@@ -33,11 +33,19 @@ import {
 } from 'src/enum';
 import { AuthRequest } from 'src/middleware/auth.guard';
 import { BaseService } from 'src/services/base.service';
+import { StorageService } from 'src/services/storage.service';
 import { UploadFile, UploadRequest } from 'src/types';
 import { requireUploadAccess } from 'src/utils/access';
 import { asUploadRequest, onBeforeLink } from 'src/utils/asset.util';
 import { isAssetChecksumConstraint } from 'src/utils/database';
-import { getFilenameExtension, getFileNameWithoutExtension, ImmichFileResponse } from 'src/utils/file';
+import {
+  getFilenameExtension,
+  getFileNameWithoutExtension,
+  ImmichFileResponse,
+  ImmichMediaResponse,
+  ImmichRedirectResponse,
+  ImmichStreamResponse,
+} from 'src/utils/file';
 import { mimeTypes } from 'src/utils/mime-types';
 import { fromChecksum } from 'src/utils/request';
 
@@ -193,7 +201,7 @@ export class AssetMediaService extends BaseService {
     }
   }
 
-  async downloadOriginal(auth: AuthDto, id: string, dto: AssetDownloadOriginalDto): Promise<ImmichFileResponse> {
+  async downloadOriginal(auth: AuthDto, id: string, dto: AssetDownloadOriginalDto): Promise<ImmichMediaResponse> {
     await this.requireAccess({ auth, permission: Permission.AssetDownload, ids: [id] });
 
     if (auth.sharedLink) {
@@ -207,19 +215,19 @@ export class AssetMediaService extends BaseService {
 
     const path = editedPath ?? originalPath!;
 
-    return new ImmichFileResponse({
+    return this.serveFromBackend(
       path,
-      fileName: getFileNameWithoutExtension(originalFileName) + getFilenameExtension(path),
-      contentType: mimeTypes.lookup(path),
-      cacheControl: CacheControl.PrivateWithCache,
-    });
+      mimeTypes.lookup(path),
+      CacheControl.PrivateWithCache,
+      getFileNameWithoutExtension(originalFileName) + getFilenameExtension(path),
+    );
   }
 
   async viewThumbnail(
     auth: AuthDto,
     id: string,
     dto: AssetMediaOptionsDto,
-  ): Promise<ImmichFileResponse | AssetMediaRedirectResponse> {
+  ): Promise<ImmichMediaResponse | AssetMediaRedirectResponse> {
     await this.requireAccess({ auth, permission: Permission.AssetView, ids: [id] });
 
     if (dto.size === AssetMediaSize.Original) {
@@ -254,15 +262,10 @@ export class AssetMediaService extends BaseService {
 
     const fileName = `${getFileNameWithoutExtension(originalFileName)}_${size}${getFilenameExtension(path)}`;
 
-    return new ImmichFileResponse({
-      fileName,
-      path,
-      contentType: mimeTypes.lookup(path),
-      cacheControl: CacheControl.PrivateWithCache,
-    });
+    return this.serveFromBackend(path, mimeTypes.lookup(path), CacheControl.PrivateWithCache, fileName);
   }
 
-  async playbackVideo(auth: AuthDto, id: string): Promise<ImmichFileResponse> {
+  async playbackVideo(auth: AuthDto, id: string): Promise<ImmichMediaResponse> {
     await this.requireAccess({ auth, permission: Permission.AssetView, ids: [id] });
 
     const asset = await this.assetRepository.getForVideo(id);
@@ -273,11 +276,7 @@ export class AssetMediaService extends BaseService {
 
     const filepath = asset.encodedVideoPath || asset.originalPath;
 
-    return new ImmichFileResponse({
-      path: filepath,
-      contentType: mimeTypes.lookup(filepath),
-      cacheControl: CacheControl.PrivateWithCache,
-    });
+    return this.serveFromBackend(filepath, mimeTypes.lookup(filepath), CacheControl.PrivateWithCache);
   }
 
   async checkExistingAssets(
@@ -320,6 +319,42 @@ export class AssetMediaService extends BaseService {
         };
       }),
     };
+  }
+
+  private async serveFromBackend(
+    filePath: string,
+    contentType: string,
+    cacheControl: CacheControl,
+    fileName?: string,
+  ): Promise<ImmichMediaResponse> {
+    const backend = StorageService.resolveBackendForKey(filePath);
+    const strategy = await backend.getServeStrategy(filePath, contentType);
+
+    switch (strategy.type) {
+      case 'file': {
+        return new ImmichFileResponse({
+          path: strategy.path,
+          contentType,
+          cacheControl,
+          fileName,
+        });
+      }
+      case 'redirect': {
+        return new ImmichRedirectResponse({
+          url: strategy.url,
+          cacheControl,
+        });
+      }
+      case 'stream': {
+        return new ImmichStreamResponse({
+          stream: strategy.stream,
+          contentType,
+          length: strategy.length,
+          cacheControl,
+          fileName,
+        });
+      }
+    }
   }
 
   private async handleUploadError(

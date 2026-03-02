@@ -1,6 +1,6 @@
 import { createReadStream, createWriteStream } from 'node:fs';
 import { access, mkdir, stat, unlink, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { dirname, isAbsolute, join } from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { ServeStrategy, StorageBackend } from 'src/interfaces/storage-backend.interface';
@@ -9,6 +9,10 @@ export class DiskStorageBackend implements StorageBackend {
   constructor(private mediaLocation: string) {}
 
   private resolvePath(key: string): string {
+    // Absolute paths are legacy disk assets — return as-is
+    if (isAbsolute(key)) {
+      return key;
+    }
     return join(this.mediaLocation, key);
   }
 

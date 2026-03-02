@@ -5,6 +5,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Stats } from 'node:fs';
+import { DiskStorageBackend } from 'src/backends/disk-storage.backend';
 import { AssetFile } from 'src/database';
 import { AssetMediaStatus, AssetRejectReason, AssetUploadAction } from 'src/dtos/asset-media-response.dto';
 import { AssetMediaCreateDto, AssetMediaReplaceDto, AssetMediaSize, UploadFieldName } from 'src/dtos/asset-media.dto';
@@ -13,6 +14,7 @@ import { AssetEditAction } from 'src/dtos/editing.dto';
 import { AssetFileType, AssetStatus, AssetType, AssetVisibility, CacheControl, JobName } from 'src/enum';
 import { AuthRequest } from 'src/middleware/auth.guard';
 import { AssetMediaService } from 'src/services/asset-media.service';
+import { StorageService } from 'src/services/storage.service';
 import { UploadBody } from 'src/types';
 import { ASSET_CHECKSUM_CONSTRAINT } from 'src/utils/database';
 import { ImmichFileResponse } from 'src/utils/file';
@@ -202,6 +204,12 @@ const copiedAsset = Object.freeze({
 describe(AssetMediaService.name, () => {
   let sut: AssetMediaService;
   let mocks: ServiceMocks;
+
+  beforeAll(() => {
+    // Initialize the disk backend for StorageService so that serveFromBackend works in tests.
+    // The DiskStorageBackend returns absolute paths as-is, so the mediaLocation value doesn't matter.
+    (StorageService as any).diskBackend = new DiskStorageBackend('/data');
+  });
 
   beforeEach(() => {
     ({ sut, mocks } = newTestService(AssetMediaService));
