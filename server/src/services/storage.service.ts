@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend';
 import { S3StorageBackend } from 'src/backends/s3-storage.backend';
 import { resolveBackend } from 'src/backends/storage-backend.provider';
@@ -189,9 +189,16 @@ export class StorageService extends BaseService {
       }
 
       try {
-        await this.storageRepository.unlink(file);
+        if (isAbsolute(file)) {
+          // Disk file — existing behavior
+          await this.storageRepository.unlink(file);
+        } else {
+          // S3 object — delete via backend
+          const backend = StorageService.resolveBackendForKey(file);
+          await backend.delete(file);
+        }
       } catch (error: any) {
-        this.logger.warn('Unable to remove file from disk', error);
+        this.logger.warn('Unable to remove file', error);
       }
     }
 

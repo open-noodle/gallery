@@ -189,15 +189,15 @@ describe(StorageService.name, () => {
     it('should handle an error removing a file', async () => {
       mocks.storage.unlink.mockRejectedValue(new Error('something-went-wrong'));
 
-      await sut.handleDeleteFiles({ files: ['path/to/something'] });
+      await sut.handleDeleteFiles({ files: ['/path/to/something'] });
 
-      expect(mocks.storage.unlink).toHaveBeenCalledWith('path/to/something');
+      expect(mocks.storage.unlink).toHaveBeenCalledWith('/path/to/something');
     });
 
     it('should remove the file', async () => {
-      await sut.handleDeleteFiles({ files: ['path/to/something'] });
+      await sut.handleDeleteFiles({ files: ['/path/to/something'] });
 
-      expect(mocks.storage.unlink).toHaveBeenCalledWith('path/to/something');
+      expect(mocks.storage.unlink).toHaveBeenCalledWith('/path/to/something');
     });
   });
 });
