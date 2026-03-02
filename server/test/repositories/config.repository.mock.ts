@@ -81,7 +81,17 @@ const envData: EnvData = {
   },
 
   storage: {
+    backend: 'disk',
     ignoreMountCheckErrors: false,
+    s3: {
+      bucket: '',
+      region: 'us-east-1',
+      endpoint: undefined,
+      accessKeyId: undefined,
+      secretAccessKey: undefined,
+      presignedUrlExpiry: 3600,
+      serveMode: 'redirect',
+    },
   },
 
   telemetry: {
