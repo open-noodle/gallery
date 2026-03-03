@@ -1942,7 +1942,7 @@ describe(MetadataService.name, () => {
         } as Stats);
         mockBackend.downloadToTemp.mockResolvedValue({
           tempPath: s3TempPath,
-          cleanup: vi.fn().mockResolvedValue(undefined),
+          cleanup: vi.fn().mockResolvedValue(),
         });
       });
 
@@ -1977,8 +1977,8 @@ describe(MetadataService.name, () => {
         mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset);
 
         mockBackend.downloadToTemp
-          .mockResolvedValueOnce({ tempPath: s3TempPath, cleanup: vi.fn().mockResolvedValue(undefined) })
-          .mockResolvedValueOnce({ tempPath: s3SidecarTempPath, cleanup: vi.fn().mockResolvedValue(undefined) });
+          .mockResolvedValueOnce({ tempPath: s3TempPath, cleanup: vi.fn().mockResolvedValue() })
+          .mockResolvedValueOnce({ tempPath: s3SidecarTempPath, cleanup: vi.fn().mockResolvedValue() });
 
         const sidecarDate = new Date('2023-01-01T00:00:00.000Z');
         mockReadTags({}, { CreationDate: sidecarDate.toISOString() });
@@ -1995,7 +1995,7 @@ describe(MetadataService.name, () => {
       });
 
       it('should cleanup temp files after processing S3 asset', async () => {
-        const cleanupOriginal = vi.fn().mockResolvedValue(undefined);
+        const cleanupOriginal = vi.fn().mockResolvedValue();
         const asset = AssetFactory.create({ originalPath: 'upload/user1/ab/cd/file.jpg' });
         mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset);
         mockBackend.downloadToTemp.mockResolvedValue({ tempPath: s3TempPath, cleanup: cleanupOriginal });
@@ -2011,7 +2011,7 @@ describe(MetadataService.name, () => {
         mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset);
         mockBackend.downloadToTemp.mockResolvedValue({
           tempPath: s3TempPath,
-          cleanup: vi.fn().mockResolvedValue(undefined),
+          cleanup: vi.fn().mockResolvedValue(),
         });
         mocks.media.probe.mockResolvedValue(probeStub.videoStreamH264);
         mockReadTags();
@@ -2096,7 +2096,7 @@ describe(MetadataService.name, () => {
         mockBackend.exists.mockResolvedValue(true);
         mockBackend.downloadToTemp.mockResolvedValue({
           tempPath: localSidecarTempPath,
-          cleanup: vi.fn().mockResolvedValue(undefined),
+          cleanup: vi.fn().mockResolvedValue(),
         });
         mocks.storage.createPlainReadStream.mockReturnValue({} as any);
 
