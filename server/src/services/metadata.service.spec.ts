@@ -13,8 +13,10 @@ import {
   JobStatus,
   SourceType,
 } from 'src/enum';
+import { StorageBackend } from 'src/interfaces/storage-backend.interface';
 import { ImmichTags } from 'src/repositories/metadata.repository';
 import { firstDateTime, MetadataService } from 'src/services/metadata.service';
+import { StorageService } from 'src/services/storage.service';
 import { AssetFactory } from 'test/factories/asset.factory';
 import { PersonFactory } from 'test/factories/person.factory';
 import { probeStub } from 'test/fixtures/media.stub';
@@ -1902,6 +1904,233 @@ describe(MetadataService.name, () => {
       const result = firstDateTime(tags);
       expect(result?.tag).toBe('CreationDate');
       expect(result?.dateTime?.toDate()?.toISOString()).toBe('2025-05-24T16:26:20.000Z');
+    });
+  });
+
+  describe('S3 storage backend support', () => {
+    let mockBackend: {
+      downloadToTemp: ReturnType<typeof vi.fn>;
+      exists: ReturnType<typeof vi.fn>;
+      put: ReturnType<typeof vi.fn>;
+    };
+
+    beforeEach(() => {
+      mockBackend = {
+        downloadToTemp: vi.fn(),
+        exists: vi.fn(),
+        put: vi.fn(),
+      };
+      vi.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue(mockBackend as unknown as StorageBackend);
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    describe('handleMetadataExtraction with S3 paths', () => {
+      const s3TempPath = '/tmp/immich-temp-original.jpg';
+      const s3SidecarTempPath = '/tmp/immich-temp-sidecar.xmp';
+
+      beforeEach(() => {
+        const time = new Date('2022-01-01T00:00:00.000Z');
+        const timeMs = time.valueOf();
+        mocks.storage.stat.mockResolvedValue({
+          size: 123_456,
+          mtime: time,
+          mtimeMs: timeMs,
+          birthtimeMs: timeMs,
+        } as Stats);
+        mockBackend.downloadToTemp.mockResolvedValue({
+          tempPath: s3TempPath,
+          cleanup: vi.fn().mockResolvedValue(undefined),
+        });
+      });
+
+      it('should download S3 asset to temp and use local path for readTags/stat', async () => {
+        const asset = AssetFactory.create({ originalPath: 'upload/user1/ab/cd/file.jpg' });
+        mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset);
+        mockReadTags();
+
+        await sut.handleMetadataExtraction({ id: asset.id });
+
+        expect(mockBackend.downloadToTemp).toHaveBeenCalledWith('upload/user1/ab/cd/file.jpg');
+        expect(mocks.metadata.readTags).toHaveBeenCalledWith(s3TempPath);
+        expect(mocks.storage.stat).toHaveBeenCalledWith(s3TempPath);
+      });
+
+      it('should not call downloadToTemp for absolute (disk) paths', async () => {
+        const asset = AssetFactory.create({ originalPath: '/data/library/file.jpg' });
+        mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset);
+        mockReadTags();
+
+        await sut.handleMetadataExtraction({ id: asset.id });
+
+        expect(mockBackend.downloadToTemp).not.toHaveBeenCalled();
+        expect(mocks.metadata.readTags).toHaveBeenCalledWith('/data/library/file.jpg');
+        expect(mocks.storage.stat).toHaveBeenCalledWith('/data/library/file.jpg');
+      });
+
+      it('should download S3 sidecar to temp and use local path for readTags', async () => {
+        const asset = AssetFactory.from({ originalPath: 'upload/user1/ab/cd/file.jpg' })
+          .file({ type: AssetFileType.Sidecar, path: 'upload/user1/ab/cd/file.jpg.xmp' })
+          .build();
+        mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset);
+
+        mockBackend.downloadToTemp
+          .mockResolvedValueOnce({ tempPath: s3TempPath, cleanup: vi.fn().mockResolvedValue(undefined) })
+          .mockResolvedValueOnce({ tempPath: s3SidecarTempPath, cleanup: vi.fn().mockResolvedValue(undefined) });
+
+        const sidecarDate = new Date('2023-01-01T00:00:00.000Z');
+        mockReadTags({}, { CreationDate: sidecarDate.toISOString() });
+
+        await sut.handleMetadataExtraction({ id: asset.id });
+
+        // Original should be downloaded
+        expect(mockBackend.downloadToTemp).toHaveBeenCalledWith('upload/user1/ab/cd/file.jpg');
+        // Sidecar should be downloaded
+        expect(mockBackend.downloadToTemp).toHaveBeenCalledWith('upload/user1/ab/cd/file.jpg.xmp');
+        // readTags should be called with local temp paths
+        expect(mocks.metadata.readTags).toHaveBeenCalledWith(s3TempPath);
+        expect(mocks.metadata.readTags).toHaveBeenCalledWith(s3SidecarTempPath);
+      });
+
+      it('should cleanup temp files after processing S3 asset', async () => {
+        const cleanupOriginal = vi.fn().mockResolvedValue(undefined);
+        const asset = AssetFactory.create({ originalPath: 'upload/user1/ab/cd/file.jpg' });
+        mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset);
+        mockBackend.downloadToTemp.mockResolvedValue({ tempPath: s3TempPath, cleanup: cleanupOriginal });
+        mockReadTags();
+
+        await sut.handleMetadataExtraction({ id: asset.id });
+
+        expect(cleanupOriginal).toHaveBeenCalledOnce();
+      });
+
+      it('should use local temp path for video probe on S3 video assets', async () => {
+        const asset = AssetFactory.create({ originalPath: 'upload/user1/ab/cd/video.mp4', type: AssetType.Video });
+        mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset);
+        mockBackend.downloadToTemp.mockResolvedValue({
+          tempPath: s3TempPath,
+          cleanup: vi.fn().mockResolvedValue(undefined),
+        });
+        mocks.media.probe.mockResolvedValue(probeStub.videoStreamH264);
+        mockReadTags();
+
+        await sut.handleMetadataExtraction({ id: asset.id });
+
+        // probe should be called with the local temp path, not the S3 key
+        expect(mocks.media.probe).toHaveBeenCalledWith(s3TempPath);
+      });
+    });
+
+    describe('handleSidecarCheck with S3 paths', () => {
+      it('should use backend.exists() for S3 sidecar candidates', async () => {
+        const asset = forSidecarJob({
+          originalPath: 'upload/user1/ab/cd/IMG_123.jpg',
+          files: [],
+        });
+        mocks.assetJob.getForSidecarCheckJob.mockResolvedValue(asset);
+        mockBackend.exists.mockResolvedValueOnce(true);
+
+        await expect(sut.handleSidecarCheck({ id: asset.id })).resolves.toBe(JobStatus.Success);
+
+        expect(mockBackend.exists).toHaveBeenCalledWith('upload/user1/ab/cd/IMG_123.jpg.xmp');
+        expect(mocks.storage.checkFileExists).not.toHaveBeenCalled();
+        expect(mocks.asset.upsertFile).toHaveBeenCalledWith({
+          assetId: asset.id,
+          type: AssetFileType.Sidecar,
+          path: 'upload/user1/ab/cd/IMG_123.jpg.xmp',
+        });
+      });
+
+      it('should fall through to .xmp candidate on S3', async () => {
+        const asset = forSidecarJob({
+          originalPath: 'upload/user1/ab/cd/IMG_123.jpg',
+          files: [],
+        });
+        mocks.assetJob.getForSidecarCheckJob.mockResolvedValue(asset);
+        mockBackend.exists.mockResolvedValueOnce(false);
+        mockBackend.exists.mockResolvedValueOnce(true);
+
+        await expect(sut.handleSidecarCheck({ id: asset.id })).resolves.toBe(JobStatus.Success);
+
+        expect(mockBackend.exists).toHaveBeenCalledWith('upload/user1/ab/cd/IMG_123.jpg.xmp');
+        expect(mockBackend.exists).toHaveBeenCalledWith('upload/user1/ab/cd/IMG_123.xmp');
+        expect(mocks.asset.upsertFile).toHaveBeenCalledWith({
+          assetId: asset.id,
+          type: AssetFileType.Sidecar,
+          path: 'upload/user1/ab/cd/IMG_123.xmp',
+        });
+      });
+
+      it('should use checkFileExists for disk (absolute) paths', async () => {
+        const asset = forSidecarJob({
+          originalPath: '/path/to/IMG_123.jpg',
+          files: [],
+        });
+        mocks.assetJob.getForSidecarCheckJob.mockResolvedValue(asset);
+        mocks.storage.checkFileExists.mockResolvedValueOnce(true);
+
+        await expect(sut.handleSidecarCheck({ id: asset.id })).resolves.toBe(JobStatus.Success);
+
+        expect(mocks.storage.checkFileExists).toHaveBeenCalled();
+        expect(mockBackend.exists).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('handleSidecarWrite with S3 paths', () => {
+      it('should download, write tags, and upload sidecar for S3 assets', async () => {
+        const asset = factory.jobAssets.sidecarWrite();
+        // Make the sidecar path relative (S3)
+        asset.originalPath = 'upload/user1/ab/cd/file.jpg';
+        asset.files = [
+          {
+            id: 'sidecar-id',
+            type: AssetFileType.Sidecar,
+            path: 'upload/user1/ab/cd/file.jpg.xmp',
+            isEdited: false,
+          },
+        ];
+
+        const localSidecarTempPath = '/tmp/immich-temp-sidecar.xmp';
+        mockBackend.exists.mockResolvedValue(true);
+        mockBackend.downloadToTemp.mockResolvedValue({
+          tempPath: localSidecarTempPath,
+          cleanup: vi.fn().mockResolvedValue(undefined),
+        });
+        mocks.storage.createPlainReadStream.mockReturnValue({} as any);
+
+        mocks.assetJob.getLockedPropertiesForMetadataExtraction.mockResolvedValue(['rating']);
+        asset.exifInfo.rating = 3;
+        mocks.assetJob.getForSidecarWriteJob.mockResolvedValue(asset);
+
+        await expect(sut.handleSidecarWrite({ id: asset.id })).resolves.toBe(JobStatus.Success);
+
+        // Should download existing sidecar
+        expect(mockBackend.downloadToTemp).toHaveBeenCalledWith('upload/user1/ab/cd/file.jpg.xmp');
+        // Should write tags to the local temp path
+        expect(mocks.metadata.writeTags).toHaveBeenCalledWith(localSidecarTempPath, { Rating: 3 });
+        // Should upload back to S3
+        expect(mockBackend.put).toHaveBeenCalledWith(
+          'upload/user1/ab/cd/file.jpg.xmp',
+          expect.anything(),
+          { contentType: 'application/xml' },
+        );
+      });
+
+      it('should write tags directly for disk (absolute) sidecar paths', async () => {
+        const asset = factory.jobAssets.sidecarWrite();
+        asset.exifInfo.rating = 4;
+
+        mocks.assetJob.getLockedPropertiesForMetadataExtraction.mockResolvedValue(['rating']);
+        mocks.assetJob.getForSidecarWriteJob.mockResolvedValue(asset);
+
+        await expect(sut.handleSidecarWrite({ id: asset.id })).resolves.toBe(JobStatus.Success);
+
+        expect(mocks.metadata.writeTags).toHaveBeenCalledWith(asset.files[0].path, { Rating: 4 });
+        expect(mockBackend.downloadToTemp).not.toHaveBeenCalled();
+        expect(mockBackend.put).not.toHaveBeenCalled();
+      });
     });
   });
 });
