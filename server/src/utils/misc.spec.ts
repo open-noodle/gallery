@@ -1,4 +1,5 @@
 import { SystemConfig } from 'src/config';
+import { LoggingRepository } from 'src/repositories/logging.repository';
 import {
   clamp,
   getCLIPModelInfo,
@@ -7,6 +8,7 @@ import {
   getKeysDeep,
   getMethodNames,
   globToSqlPattern,
+  handlePromiseError,
   ImmichStartupError,
   isConnectionAborted,
   isDuplicateDetectionEnabled,
@@ -18,7 +20,7 @@ import {
   routeToErrorMessage,
   unsetDeep,
 } from 'src/utils/misc';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 describe('getKeysDeep', () => {
   it('should handle an empty object', () => {
@@ -295,6 +297,28 @@ describe('isFaceImportEnabled', () => {
   it('should return false when face import is disabled', () => {
     const metadata = { faces: { import: false } } as SystemConfig['metadata'];
     expect(isFaceImportEnabled(metadata)).toBe(false);
+  });
+});
+
+describe('handlePromiseError', () => {
+  it('should log the error when promise rejects', async () => {
+    const logger = { error: vi.fn() } as unknown as LoggingRepository;
+    const error = new Error('test failure');
+    const promise = Promise.reject(error);
+
+    handlePromiseError(promise, logger);
+
+    // Wait for the catch handler to execute
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(logger.error).toHaveBeenCalledWith(`Promise error: ${error}`, error.stack);
+  });
+
+  it('should not throw when promise resolves', () => {
+    const logger = { error: vi.fn() } as unknown as LoggingRepository;
+    const promise = Promise.resolve('ok');
+
+    expect(() => handlePromiseError(promise, logger)).not.toThrow();
   });
 });
 
