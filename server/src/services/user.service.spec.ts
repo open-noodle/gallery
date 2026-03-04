@@ -1,6 +1,8 @@
 import { BadRequestException, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { UserAdmin } from 'src/database';
 import { CacheControl, JobName, UserMetadataKey } from 'src/enum';
+import { DiskStorageBackend } from 'src/backends/disk-storage.backend';
+import { StorageService } from 'src/services/storage.service';
 import { UserService } from 'src/services/user.service';
 import { ImmichFileResponse } from 'src/utils/file';
 import { authStub } from 'test/fixtures/auth.stub';
@@ -18,6 +20,10 @@ const makeDeletedAt = (daysAgo: number) => {
 describe(UserService.name, () => {
   let sut: UserService;
   let mocks: ServiceMocks;
+
+  beforeAll(() => {
+    (StorageService as any).diskBackend = new DiskStorageBackend('/data');
+  });
 
   beforeEach(() => {
     ({ sut, mocks } = newTestService(UserService));
