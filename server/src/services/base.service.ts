@@ -6,6 +6,7 @@ import { SALT_ROUNDS } from 'src/constants';
 import { StorageCore } from 'src/cores/storage.core';
 import { UserAdmin } from 'src/database';
 import { CacheControl } from 'src/enum';
+import { ServeStrategy } from 'src/interfaces/storage-backend.interface';
 import {
   ImmichFileResponse,
   ImmichMediaResponse,
@@ -228,10 +229,10 @@ export class BaseService {
     cacheControl: CacheControl,
     fileName?: string,
   ): Promise<ImmichMediaResponse> {
-    // Lazy import to avoid circular dependency (StorageService extends BaseService)
-    const { StorageService } = await import('src/services/storage.service');
+    // @ts-expect-error -- lazy import with relative path to avoid circular dependency (StorageService extends BaseService)
+    const { StorageService } = await import('./storage.service');
     const backend = StorageService.resolveBackendForKey(filePath);
-    const strategy = await backend.getServeStrategy(filePath, contentType);
+    const strategy: ServeStrategy = await backend.getServeStrategy(filePath, contentType);
 
     switch (strategy.type) {
       case 'file': {
