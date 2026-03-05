@@ -167,6 +167,8 @@ export class AssetJobRepository {
       .select(columns.assetFiles)
       .where('asset_file.assetId', '=', id)
       .$if(!!fileType, (qb) => qb.where('asset_file.type', '=', fileType!))
+      .orderBy('asset_file.isEdited', 'desc')
+      .limit(1)
       .execute();
   }
 

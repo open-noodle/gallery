@@ -816,23 +816,24 @@ describe(NotificationService.name, () => {
       });
     });
 
-    it('should send email without thumbnail when getAlbumThumbnailFiles returns more than one file', async () => {
-      const assetFile1 = AssetFileFactory.create({ type: AssetFileType.Thumbnail });
-      const assetFile2 = AssetFileFactory.create({ type: AssetFileType.Thumbnail });
+    it('should send email with edited album thumbnail when available', async () => {
+      const editedFile = AssetFileFactory.create({ type: AssetFileType.Thumbnail, isEdited: true });
       const user = UserFactory.create();
-      const album = AlbumFactory.from({ albumThumbnailAssetId: newUuid() }).albumUser({ userId: user.id }).build();
+      const album = AlbumFactory.from({ albumThumbnailAssetId: editedFile.assetId })
+        .albumUser({ userId: user.id })
+        .build();
       mocks.album.getById.mockResolvedValue(album);
       mocks.user.get.mockResolvedValue(user);
       mocks.notification.create.mockResolvedValue(notificationStub.albumEvent);
       mocks.email.renderEmail.mockResolvedValue({ html: '', text: '' });
-      mocks.assetJob.getAlbumThumbnailFiles.mockResolvedValue([assetFile1, assetFile2]);
+      mocks.assetJob.getAlbumThumbnailFiles.mockResolvedValue([editedFile]);
 
       await sut.handleAlbumUpdate({ id: '', recipientId: user.id });
 
       expect(mocks.job.queue).toHaveBeenCalledWith({
         name: JobName.SendMail,
         data: expect.objectContaining({
-          imageAttachments: undefined,
+          imageAttachments: [{ filename: 'album-thumbnail.jpg', path: editedFile.path, cid: 'album-thumbnail' }],
         }),
       });
     });

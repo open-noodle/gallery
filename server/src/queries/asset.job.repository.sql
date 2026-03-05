@@ -321,6 +321,10 @@ from
 where
   "asset_file"."assetId" = $1
   and "asset_file"."type" = $2
+order by
+  "asset_file"."isEdited" desc
+limit
+  1
 
 -- AssetJobRepository.streamForSearchDuplicates
 select
