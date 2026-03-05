@@ -13,6 +13,8 @@ const E2E_DIR = resolve(__dirname, '..');
 const BASE_URL = 'http://127.0.0.1:2285/api';
 const DB_URL = 'postgres://postgres:postgres@127.0.0.1:5435/immich';
 const COMPOSE = 'docker compose -f docker-compose.yml -f docker-compose.storage-migration.yml';
+// Must match the server container's IMMICH_MEDIA_LOCATION (default in Docker)
+const MEDIA_LOCATION = '/usr/src/app/upload';
 
 // ---------------------------------------------------------------------------
 // File Generators
@@ -297,7 +299,7 @@ export function minioFileExists(key: string): boolean {
 
 export function diskFileExists(path: string): boolean {
   try {
-    dockerExec('immich-server', `test -f ${path}`);
+    dockerExec('immich-server', `test -f "${path}"`);
     return true;
   } catch {
     return false;
@@ -431,16 +433,27 @@ async function phaseMigrateToS3(): Promise<void> {
     await res.arrayBuffer();
   }
 
-  // MinIO files exist
+  // MinIO files exist (originals, asset files, person thumbnails, profile images)
   console.log('  Verifying MinIO files exist...');
   for (const asset of state.assets) {
     assert(minioFileExists(asset.originalPath), `Expected MinIO file to exist: ${asset.originalPath}`);
+  }
+  for (const af of state.assetFiles) {
+    assert(minioFileExists(af.path), `Expected MinIO asset file to exist: ${af.path}`);
+  }
+  for (const p of state.persons) {
+    assert(minioFileExists(p.thumbnailPath), `Expected MinIO person thumbnail to exist: ${p.thumbnailPath}`);
+  }
+  for (const u of state.users) {
+    if (u.profileImagePath) {
+      assert(minioFileExists(u.profileImagePath), `Expected MinIO profile image to exist: ${u.profileImagePath}`);
+    }
   }
 
   // Disk files gone (deleteSource: true)
   console.log('  Verifying disk files are removed...');
   for (const asset of state.assets) {
-    assert(!diskFileExists(`/usr/src/app/upload/${asset.originalPath}`), `Expected disk file to be deleted: /usr/src/app/upload/${asset.originalPath}`);
+    assert(!diskFileExists(`${MEDIA_LOCATION}/${asset.originalPath}`), `Expected disk file to be deleted: ${MEDIA_LOCATION}/${asset.originalPath}`);
   }
 
   // Migration log validation
@@ -449,9 +462,8 @@ async function phaseMigrateToS3(): Promise<void> {
   const batchLogs = s3Logs.filter((l) => l.batchId === batchId);
   assert(batchLogs.length > 0, `Expected migration logs with batchId=${batchId}, got ${batchLogs.length}`);
 
-  console.log(`  Assets: ${state.assets.length}`);
-  console.log(`  Asset files: ${state.assetFiles.length}`);
-  console.log(`  MinIO files verified: ${state.assets.length}`);
+  console.log(`  Assets: ${state.assets.length}, Asset files: ${state.assetFiles.length}`);
+  console.log(`  Persons: ${state.persons.length}, Users with profile: ${state.users.length}`);
   console.log(`  Migration log entries (toS3): ${s3Logs.length}`);
   console.log('=== Phase 2: Migrate to S3 complete ===');
 }
@@ -507,10 +519,21 @@ async function phaseMigrateToDisk(): Promise<void> {
     await res.arrayBuffer();
   }
 
-  // Disk files exist (paths are absolute now)
+  // Disk files exist (originals, asset files, person thumbnails, profile images)
   console.log('  Verifying disk files exist...');
   for (const asset of state.assets) {
     assert(diskFileExists(asset.originalPath), `Expected disk file to exist: ${asset.originalPath}`);
+  }
+  for (const af of state.assetFiles) {
+    assert(diskFileExists(af.path), `Expected disk asset file to exist: ${af.path}`);
+  }
+  for (const p of state.persons) {
+    assert(diskFileExists(p.thumbnailPath), `Expected disk person thumbnail to exist: ${p.thumbnailPath}`);
+  }
+  for (const u of state.users) {
+    if (u.profileImagePath) {
+      assert(diskFileExists(u.profileImagePath), `Expected disk profile image to exist: ${u.profileImagePath}`);
+    }
   }
 
   // MinIO files gone (deleteSource: true)
@@ -518,8 +541,9 @@ async function phaseMigrateToDisk(): Promise<void> {
   dockerExec('minio', 'mc alias set local http://localhost:9000 minioadmin minioadmin');
 
   console.log('  Verifying MinIO files are removed...');
+  const mediaPrefix = new RegExp(`^${MEDIA_LOCATION}/`);
   for (const asset of state.assets) {
-    const s3Key = asset.originalPath.replace(/^\/usr\/src\/app\/upload\//, '');
+    const s3Key = asset.originalPath.replace(mediaPrefix, '');
     assert(!minioFileExists(s3Key), `Expected MinIO file to be deleted: ${s3Key}`);
   }
 
@@ -527,9 +551,8 @@ async function phaseMigrateToDisk(): Promise<void> {
   const diskLogs = state.migrationLogs.filter((l) => l.direction === 'toDisk');
   assert(diskLogs.length > 0, `Expected migration logs with direction=toDisk, got ${diskLogs.length}`);
 
-  console.log(`  Assets: ${state.assets.length}`);
-  console.log(`  Asset files: ${state.assetFiles.length}`);
-  console.log(`  Disk files verified: ${state.assets.length}`);
+  console.log(`  Assets: ${state.assets.length}, Asset files: ${state.assetFiles.length}`);
+  console.log(`  Persons: ${state.persons.length}, Users with profile: ${state.users.length}`);
   console.log(`  Migration log entries (toDisk): ${diskLogs.length}`);
   console.log('=== Phase 3: Migrate to Disk complete ===');
 }
