@@ -1,4 +1,4 @@
-<p align="center"> 
+<p align="center">
   <br/>
   <a href="https://opensource.org/license/agpl-v3"><img src="https://img.shields.io/badge/License-AGPL_v3-blue.svg?color=3F51B5&style=for-the-badge&label=License&logoColor=000000&labelColor=ececec" alt="License: AGPLv3"></a>
   <a href="https://discord.immich.app">
@@ -17,6 +17,66 @@
 <img src="design/immich-screenshots.png" title="Main Screenshot">
 </a>
 <br/>
+
+> [!NOTE]
+> This is a **community fork** of [Immich](https://github.com/immich-app/immich) with additional features and improvements. We regularly sync with upstream to stay up to date. See [What's Different](#whats-different-from-upstream-immich) below.
+
+## What's Different from Upstream Immich
+
+This fork builds on top of Immich with the following improvements:
+
+### S3-Compatible Storage
+
+Store your photos and videos in any S3-compatible object storage — AWS S3, MinIO, Cloudflare R2, Backblaze B2, Wasabi, and more. Configure it with a few environment variables and new uploads go straight to your bucket. Choose between `redirect` mode (clients download directly from S3 via presigned URLs) or `proxy` mode (server streams the files). Both disk and S3 backends run simultaneously, so existing files on disk continue to work. See the [S3 Storage documentation](docs/docs/features/s3-storage.md) for full setup instructions.
+
+### Improved Test Coverage
+
+Server unit test coverage has been increased from **74% to 94%**, providing significantly better reliability and confidence in code changes.
+
+### Structured JSON Logging
+
+Added support for structured JSON log output (`IMMICH_LOG_FORMAT=json`), making it easy to integrate Immich with log aggregation systems like Grafana Loki, ELK Stack, Datadog, or Splunk.
+
+---
+
+## Switching to This Fork
+
+Switching is simple — just change your Docker image names. Your existing database, configuration, and media files are fully compatible.
+
+### Step 1: Back Up Your Database
+
+> [!IMPORTANT]
+> Always back up your database before switching. This allows you to revert to upstream Immich if needed.
+
+```bash
+docker exec -t immich_postgres pg_dumpall -c -U postgres | gzip > immich-db-backup-$(date +%Y%m%d).sql.gz
+```
+
+### Step 2: Update Your Docker Compose File
+
+Change the image references in your `docker-compose.yml`:
+
+```diff
+services:
+  immich-server:
+-   image: ghcr.io/immich-app/immich-server:${IMMICH_VERSION:-release}
++   image: ghcr.io/deeds67/immich-server:${IMMICH_VERSION:-release}
+
+  immich-machine-learning:
+-   image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION:-release}
++   image: ghcr.io/deeds67/immich-machine-learning:${IMMICH_VERSION:-release}
+```
+
+### Step 3: Restart
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+That's it. To switch back to upstream Immich, reverse the image names and restore your database backup.
+
+---
 
 <p align="center">
   <a href="readme_i18n/README_ca_ES.md">Català</a>
@@ -41,9 +101,7 @@
 
 
 > [!WARNING]
-> ⚠️ Always follow [3-2-1](https://www.backblaze.com/blog/the-3-2-1-backup-strategy/) backup plan for your precious photos and videos!
-> 
- 
+> Always follow [3-2-1](https://www.backblaze.com/blog/the-3-2-1-backup-strategy/) backup plan for your precious photos and videos!
 
 > [!NOTE]
 > You can find the main documentation, including installation guides, at https://immich.app/.
