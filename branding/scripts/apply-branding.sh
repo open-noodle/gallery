@@ -292,3 +292,69 @@ patch_ios() {
 
   echo "  Patched project.pbxproj, Info.plist, and entitlements"
 }
+
+#
+# --- Docker ---
+#
+patch_docker() {
+  echo "--- Patching Docker configs ---"
+
+  local compose_dir="$REPO_ROOT/docker"
+  for f in "$compose_dir"/docker-compose*.yml; do
+    if [[ -f "$f" ]]; then
+      # Replace upstream image references
+      sed -i "s|ghcr\.io/immich-app/immich-server|${DOCKER_REGISTRY}/${DOCKER_SERVER_IMAGE}|g" "$f"
+      sed -i "s|ghcr\.io/immich-app/immich-machine-learning|${DOCKER_REGISTRY}/${DOCKER_ML_IMAGE}|g" "$f"
+      echo "  Patched $(basename "$f")"
+    fi
+  done
+}
+
+#
+# --- CLI ---
+#
+patch_cli() {
+  echo "--- Patching CLI ---"
+
+  local cli_pkg="$REPO_ROOT/cli/package.json"
+  if [[ -f "$cli_pkg" ]]; then
+    local tmp
+    tmp=$(mktemp)
+    jq --arg bin "$CLI_BIN_NAME" \
+      '.bin = { ($bin): "./bin/immich" } | .description = "Command Line Interface (CLI) for Noodle Gallery"' \
+      "$cli_pkg" > "$tmp"
+    mv "$tmp" "$cli_pkg"
+    echo "  Patched cli/package.json bin name"
+  fi
+}
+
+#
+# --- Docs ---
+#
+patch_docs() {
+  echo "--- Patching documentation ---"
+
+  local docusaurus="$REPO_ROOT/docs/docusaurus.config.js"
+  if [[ -f "$docusaurus" ]]; then
+    sed -i "s/title: 'Immich'/title: '${NAME}'/g" "$docusaurus"
+    sed -i "s|url: 'https://docs\.immich\.app'|url: '${DOCS_URL}'|g" "$docusaurus"
+    echo "  Patched docusaurus.config.js"
+  fi
+}
+
+#
+# --- Main ---
+#
+main() {
+  patch_i18n
+  patch_web
+  patch_assets
+  patch_android
+  patch_ios
+  patch_docker
+  patch_cli
+  patch_docs
+  echo "=== Branding applied successfully ==="
+}
+
+main "$@"
