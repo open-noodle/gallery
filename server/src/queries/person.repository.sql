@@ -177,6 +177,7 @@ select
       "asset_file"."assetId" = "asset"."id"
       and "asset_file"."type" = 'preview'
       and "asset_file"."isEdited" = $1
+    limit 1
   ) as "previewPath"
 from
   "person"
