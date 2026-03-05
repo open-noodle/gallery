@@ -315,6 +315,31 @@ export type WorkflowAction = Selectable<WorkflowActionTable> & {
   order: number;
 };
 
+export type SharedSpace = {
+  id: string;
+  name: string;
+  description: string | null;
+  createdById: string;
+  createdAt: Date;
+  updatedAt: Date;
+  createId: string;
+  updateId: string;
+};
+
+export type SharedSpaceMember = {
+  spaceId: string;
+  userId: string;
+  role: string;
+  joinedAt: Date;
+};
+
+export type SharedSpaceAsset = {
+  spaceId: string;
+  assetId: string;
+  addedById: string | null;
+  addedAt: Date;
+};
+
 const userColumns = ['id', 'name', 'email', 'avatarColor', 'profileImagePath', 'profileChangedAt'] as const;
 const userWithPrefixColumns = [
   'user2.id',
