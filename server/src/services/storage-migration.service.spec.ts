@@ -306,7 +306,7 @@ describe(StorageMigrationService.name, () => {
       mockDiskBackend.exists.mockResolvedValue(true);
       mockS3Backend.exists.mockResolvedValue(false);
       mockDiskBackend.get.mockResolvedValue({ stream: mockStream });
-      mockS3Backend.put.mockResolvedValue();
+      mockS3Backend.put.mockResolvedValue(undefined);
       mocks.storageMigration.updateAssetOriginalPath.mockResolvedValue(true);
       mocks.storageMigration.createLogEntry.mockResolvedValue({} as any);
 
@@ -371,7 +371,7 @@ describe(StorageMigrationService.name, () => {
           },
         }),
       });
-      mockS3Backend.put.mockResolvedValue();
+      mockS3Backend.put.mockResolvedValue(undefined);
       mocks.storageMigration.updateAssetOriginalPath.mockResolvedValue(false); // 0 rows
 
       const result = await sut.handleMigration(baseJob);
@@ -389,8 +389,8 @@ describe(StorageMigrationService.name, () => {
       mockDiskBackend.exists.mockResolvedValue(true);
       mockS3Backend.exists.mockResolvedValue(false);
       mockDiskBackend.get.mockResolvedValue({ stream: mockStream });
-      mockS3Backend.put.mockResolvedValue();
-      mockDiskBackend.delete.mockResolvedValue();
+      mockS3Backend.put.mockResolvedValue(undefined);
+      mockDiskBackend.delete.mockResolvedValue(undefined);
       mocks.storageMigration.updateAssetOriginalPath.mockResolvedValue(true);
       mocks.storageMigration.createLogEntry.mockResolvedValue({} as any);
 
@@ -409,7 +409,7 @@ describe(StorageMigrationService.name, () => {
       mockDiskBackend.exists.mockResolvedValue(true);
       mockS3Backend.exists.mockResolvedValue(false);
       mockDiskBackend.get.mockResolvedValue({ stream: mockStream });
-      mockS3Backend.put.mockResolvedValue();
+      mockS3Backend.put.mockResolvedValue(undefined);
       mocks.storageMigration.updateAssetOriginalPath.mockResolvedValue(true);
       mocks.storageMigration.createLogEntry.mockResolvedValue({} as any);
 
@@ -448,7 +448,7 @@ describe(StorageMigrationService.name, () => {
       mockS3Backend.exists.mockResolvedValue(true);
       mockDiskBackend.exists.mockResolvedValue(false);
       mockS3Backend.get.mockResolvedValue({ stream: mockStream });
-      mockDiskBackend.put.mockResolvedValue();
+      mockDiskBackend.put.mockResolvedValue(undefined);
       mocks.storageMigration.updateAssetOriginalPath.mockResolvedValue(true);
       mocks.storageMigration.createLogEntry.mockResolvedValue({} as any);
 
@@ -477,7 +477,7 @@ describe(StorageMigrationService.name, () => {
       mockDiskBackend.exists.mockResolvedValue(true);
       mockS3Backend.exists.mockResolvedValue(false);
       mockDiskBackend.get.mockResolvedValue({ stream: mockStream });
-      mockS3Backend.put.mockResolvedValue();
+      mockS3Backend.put.mockResolvedValue(undefined);
       mocks.storageMigration.updateAssetEncodedVideoPath.mockResolvedValue(true);
       mocks.storageMigration.createLogEntry.mockResolvedValue({} as any);
 
@@ -508,7 +508,7 @@ describe(StorageMigrationService.name, () => {
       mockDiskBackend.exists.mockResolvedValue(true);
       mockS3Backend.exists.mockResolvedValue(false);
       mockDiskBackend.get.mockResolvedValue({ stream: mockStream });
-      mockS3Backend.put.mockResolvedValue();
+      mockS3Backend.put.mockResolvedValue(undefined);
       mocks.storageMigration.updateAssetFilePath.mockResolvedValue(true);
       mocks.storageMigration.createLogEntry.mockResolvedValue({} as any);
 
@@ -539,7 +539,7 @@ describe(StorageMigrationService.name, () => {
       mockDiskBackend.exists.mockResolvedValue(true);
       mockS3Backend.exists.mockResolvedValue(false);
       mockDiskBackend.get.mockResolvedValue({ stream: mockStream });
-      mockS3Backend.put.mockResolvedValue();
+      mockS3Backend.put.mockResolvedValue(undefined);
       mocks.storageMigration.updatePersonThumbnailPath.mockResolvedValue(true);
       mocks.storageMigration.createLogEntry.mockResolvedValue({} as any);
 
@@ -570,7 +570,7 @@ describe(StorageMigrationService.name, () => {
       mockDiskBackend.exists.mockResolvedValue(true);
       mockS3Backend.exists.mockResolvedValue(false);
       mockDiskBackend.get.mockResolvedValue({ stream: mockStream });
-      mockS3Backend.put.mockResolvedValue();
+      mockS3Backend.put.mockResolvedValue(undefined);
       mocks.storageMigration.updateUserProfileImagePath.mockResolvedValue(true);
       mocks.storageMigration.createLogEntry.mockResolvedValue({} as any);
 

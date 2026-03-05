@@ -40,6 +40,7 @@ Immich includes a built-in tool for migrating files between disk and S3-compatib
 ### Monitoring Progress
 
 The status panel shows:
+
 - Whether a migration is currently active
 - Number of waiting, active, completed, and failed jobs
 

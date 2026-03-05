@@ -2513,7 +2513,6 @@ export type SystemConfigJobDto = {
     search: JobSettingsDto;
     sidecar: JobSettingsDto;
     smartSearch: JobSettingsDto;
-    storageBackendMigration: JobSettingsDto;
     thumbnailGeneration: JobSettingsDto;
     videoConversion: JobSettingsDto;
     workflow: JobSettingsDto;

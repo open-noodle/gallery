@@ -24531,9 +24531,6 @@
           "smartSearch": {
             "$ref": "#/components/schemas/JobSettingsDto"
           },
-          "storageBackendMigration": {
-            "$ref": "#/components/schemas/JobSettingsDto"
-          },
           "thumbnailGeneration": {
             "$ref": "#/components/schemas/JobSettingsDto"
           },
@@ -24556,7 +24553,6 @@
           "search",
           "sidecar",
           "smartSearch",
-          "storageBackendMigration",
           "thumbnailGeneration",
           "videoConversion",
           "workflow"

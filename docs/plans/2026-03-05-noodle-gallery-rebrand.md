@@ -13,6 +13,7 @@
 ### Task 1: Create `branding/config.json`
 
 **Files:**
+
 - Create: `branding/config.json`
 
 **Step 1: Create the config file**
@@ -69,6 +70,7 @@ git commit -m "feat(branding): add branding config for Noodle Gallery"
 ### Task 2: Create i18n override file
 
 **Files:**
+
 - Create: `branding/i18n/overrides-en.json`
 
 **Step 1: Create the override file**
@@ -142,6 +144,7 @@ git commit -m "feat(branding): add i18n override strings for Noodle Gallery"
 ### Task 3: Create placeholder asset directory
 
 **Files:**
+
 - Create: `branding/assets/README.md`
 
 **Step 1: Create asset directory with README checklist**
@@ -184,6 +187,7 @@ git commit -m "feat(branding): add asset directory with checklist"
 ### Task 4: Write `apply-branding.sh` — i18n and web
 
 **Files:**
+
 - Create: `branding/scripts/apply-branding.sh`
 
 **Step 1: Write the script header and config loading**
@@ -437,6 +441,7 @@ git commit -m "feat(branding): add apply-branding.sh — i18n, web, and asset ov
 ### Task 5: Write `apply-branding.sh` — mobile platform configs
 
 **Files:**
+
 - Modify: `branding/scripts/apply-branding.sh`
 
 **Step 1: Add Android patching function**
@@ -542,6 +547,7 @@ git commit -m "feat(branding): add Android and iOS patching to apply-branding.sh
 ### Task 6: Write `apply-branding.sh` — Docker, CLI, docs, and main entrypoint
 
 **Files:**
+
 - Modify: `branding/scripts/apply-branding.sh`
 
 **Step 1: Add Docker patching function**
@@ -642,6 +648,7 @@ git commit -m "feat(branding): add Docker, CLI, docs patching and main entrypoin
 ### Task 7: Write `verify-branding.sh`
 
 **Files:**
+
 - Create: `branding/scripts/verify-branding.sh`
 
 **Step 1: Write the verification script**
@@ -736,6 +743,7 @@ git commit -m "feat(branding): add verify-branding.sh for leak detection"
 ### Task 8: Create composite GitHub Action
 
 **Files:**
+
 - Create: `.github/actions/apply-branding/action.yml`
 
 **Step 1: Write the action**
@@ -775,6 +783,7 @@ git commit -m "feat(ci): add composite GitHub Action for branding"
 ### Task 9: Add branding step to Docker workflow
 
 **Files:**
+
 - Modify: `.github/workflows/docker.yml`
 
 **Step 1: Read the current docker workflow to understand its structure**
@@ -786,7 +795,7 @@ Run: `cat .github/workflows/docker.yml | head -80`
 In every job that builds Docker images, add this step immediately after `actions/checkout`:
 
 ```yaml
-    - uses: ./.github/actions/apply-branding
+- uses: ./.github/actions/apply-branding
 ```
 
 Also update the image name tags to use the config values. The exact changes depend on the workflow structure found in step 1.
@@ -803,6 +812,7 @@ git commit -m "feat(ci): add branding step to Docker workflow"
 ### Task 10: Add branding step to mobile, CLI, docs, and SDK workflows
 
 **Files:**
+
 - Modify: `.github/workflows/build-mobile.yml`
 - Modify: `.github/workflows/cli.yml`
 - Modify: `.github/workflows/docs-build.yml`
@@ -868,40 +878,46 @@ git checkout -- .
 ### Task 12: Document the branding workflow
 
 **Files:**
+
 - Modify: `IMPROVEMENTS.md`
 
 **Step 1: Add a "How to use" section**
 
 Add to the top of the rebrand section in IMPROVEMENTS.md:
 
-```markdown
+````markdown
 ### How to Use
 
 **Local development (apply branding):**
+
 ```bash
 ./branding/scripts/apply-branding.sh
 ```
+````
 
 **Local development (reset to upstream branding):**
+
 ```bash
 git checkout -- .
 ```
 
 **After upstream merge:**
+
 1. Merge upstream: `git fetch upstream && git merge upstream/main`
 2. Resolve conflicts (if any in branding-touched files)
 3. Run `./branding/scripts/verify-branding.sh` to check for new "Immich" strings
 4. If new i18n keys were added upstream with "Immich", add overrides to `branding/i18n/overrides-en.json`
 
 **CI:** Branding is applied automatically by the composite GitHub Action in all build workflows.
-```
+
+````
 
 **Step 2: Commit**
 
 ```bash
 git add IMPROVEMENTS.md
 git commit -m "docs: add branding workflow usage instructions"
-```
+````
 
 ---
 

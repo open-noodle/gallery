@@ -15,7 +15,7 @@ export async function up(db: Kysely<any>): Promise<void> {
     );
   `.execute(db);
 
-  await sql`ALTER TABLE "storage_migration_log" ADD CONSTRAINT "PK_storage_migration_log" PRIMARY KEY ("id");`.execute(
+  await sql`ALTER TABLE "storage_migration_log" ADD CONSTRAINT "storage_migration_log_pkey" PRIMARY KEY ("id");`.execute(
     db,
   );
   await sql`CREATE INDEX "IDX_storage_migration_log_batchId" ON "storage_migration_log" ("batchId")`.execute(db);
@@ -25,6 +25,6 @@ export async function up(db: Kysely<any>): Promise<void> {
 export async function down(db: Kysely<any>): Promise<void> {
   await sql`DROP INDEX "IDX_storage_migration_log_entityId";`.execute(db);
   await sql`DROP INDEX "IDX_storage_migration_log_batchId";`.execute(db);
-  await sql`ALTER TABLE "storage_migration_log" DROP CONSTRAINT "PK_storage_migration_log";`.execute(db);
+  await sql`ALTER TABLE "storage_migration_log" DROP CONSTRAINT "storage_migration_log_pkey";`.execute(db);
   await sql`DROP TABLE "storage_migration_log";`.execute(db);
 }

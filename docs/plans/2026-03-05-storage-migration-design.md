@@ -25,17 +25,17 @@ Following Immich's established pattern (thumbnail generation, library sync):
 
 New `storage_migration_log` table:
 
-| Column       | Type              | Description                              |
-|--------------|-------------------|------------------------------------------|
-| `id`         | uuid (PK)         | Auto-generated                           |
-| `entityType` | enum              | `asset`, `assetFile`, `person`, `user`   |
-| `entityId`   | uuid              | ID of the asset/person/user              |
-| `fileType`   | enum (nullable)   | `original`, `encodedVideo`, `preview`, `thumbnail`, `fullsize`, `sidecar` |
-| `oldPath`    | text              | Path before migration                    |
-| `newPath`    | text              | Path after migration                     |
-| `direction`  | enum              | `toS3`, `toDisk`                         |
-| `migratedAt` | timestamptz       | Completion timestamp                     |
-| `batchId`    | uuid              | Groups files from a single migration run |
+| Column       | Type            | Description                                                               |
+| ------------ | --------------- | ------------------------------------------------------------------------- |
+| `id`         | uuid (PK)       | Auto-generated                                                            |
+| `entityType` | enum            | `asset`, `assetFile`, `person`, `user`                                    |
+| `entityId`   | uuid            | ID of the asset/person/user                                               |
+| `fileType`   | enum (nullable) | `original`, `encodedVideo`, `preview`, `thumbnail`, `fullsize`, `sidecar` |
+| `oldPath`    | text            | Path before migration                                                     |
+| `newPath`    | text            | Path after migration                                                      |
+| `direction`  | enum            | `toS3`, `toDisk`                                                          |
+| `migratedAt` | timestamptz     | Completion timestamp                                                      |
+| `batchId`    | uuid            | Groups files from a single migration run                                  |
 
 Enables rollback (query by batchId, swap paths), progress tracking, and auditability.
 
@@ -44,8 +44,9 @@ Enables rollback (query by batchId, swap paths), progress tracking, and auditabi
 ```typescript
 interface IStorageMigrationOptions {
   direction: 'toS3' | 'toDisk';
-  deleteSource: boolean;           // default: false
-  fileTypes: {                     // all default to true
+  deleteSource: boolean; // default: false
+  fileTypes: {
+    // all default to true
     originals: boolean;
     thumbnails: boolean;
     previews: boolean;
@@ -55,7 +56,7 @@ interface IStorageMigrationOptions {
     personThumbnails: boolean;
     profileImages: boolean;
   };
-  concurrency: number;             // default: 5
+  concurrency: number; // default: 5
 }
 ```
 
@@ -91,8 +92,8 @@ A `GET /storage-migration/estimate` endpoint returns:
     personThumbnails: number;
     profileImages: number;
     total: number;
-  };
-  estimatedSizeBytes: number;  // from exif.fileSizeInByte (originals only)
+  }
+  estimatedSizeBytes: number; // from exif.fileSizeInByte (originals only)
 }
 ```
 
@@ -100,12 +101,12 @@ Size estimate covers originals only (DB-sourced). Generated file sizes are not t
 
 ## API Endpoints
 
-| Method | Path                                  | Description                                    |
-|--------|---------------------------------------|------------------------------------------------|
-| GET    | `/storage-migration/estimate`         | File counts and estimated size per type         |
-| POST   | `/storage-migration/start`            | Start migration with options                    |
-| GET    | `/storage-migration/status`           | Running/idle, progress, batch ID                |
-| POST   | `/storage-migration/rollback/:batchId`| Roll back a completed migration batch           |
+| Method | Path                                   | Description                             |
+| ------ | -------------------------------------- | --------------------------------------- |
+| GET    | `/storage-migration/estimate`          | File counts and estimated size per type |
+| POST   | `/storage-migration/start`             | Start migration with options            |
+| GET    | `/storage-migration/status`            | Running/idle, progress, batch ID        |
+| POST   | `/storage-migration/rollback/:batchId` | Roll back a completed migration batch   |
 
 All endpoints require admin authentication.
 

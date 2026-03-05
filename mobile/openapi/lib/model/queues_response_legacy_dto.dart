@@ -27,6 +27,7 @@ class QueuesResponseLegacyDto {
     required this.search,
     required this.sidecar,
     required this.smartSearch,
+    required this.storageBackendMigration,
     required this.storageTemplateMigration,
     required this.thumbnailGeneration,
     required this.videoConversion,
@@ -61,6 +62,8 @@ class QueuesResponseLegacyDto {
 
   QueueResponseLegacyDto smartSearch;
 
+  QueueResponseLegacyDto storageBackendMigration;
+
   QueueResponseLegacyDto storageTemplateMigration;
 
   QueueResponseLegacyDto thumbnailGeneration;
@@ -85,6 +88,7 @@ class QueuesResponseLegacyDto {
     other.search == search &&
     other.sidecar == sidecar &&
     other.smartSearch == smartSearch &&
+    other.storageBackendMigration == storageBackendMigration &&
     other.storageTemplateMigration == storageTemplateMigration &&
     other.thumbnailGeneration == thumbnailGeneration &&
     other.videoConversion == videoConversion &&
@@ -107,13 +111,14 @@ class QueuesResponseLegacyDto {
     (search.hashCode) +
     (sidecar.hashCode) +
     (smartSearch.hashCode) +
+    (storageBackendMigration.hashCode) +
     (storageTemplateMigration.hashCode) +
     (thumbnailGeneration.hashCode) +
     (videoConversion.hashCode) +
     (workflow.hashCode);
 
   @override
-  String toString() => 'QueuesResponseLegacyDto[backgroundTask=$backgroundTask, backupDatabase=$backupDatabase, duplicateDetection=$duplicateDetection, editor=$editor, faceDetection=$faceDetection, facialRecognition=$facialRecognition, library_=$library_, metadataExtraction=$metadataExtraction, migration=$migration, notifications=$notifications, ocr=$ocr, search=$search, sidecar=$sidecar, smartSearch=$smartSearch, storageTemplateMigration=$storageTemplateMigration, thumbnailGeneration=$thumbnailGeneration, videoConversion=$videoConversion, workflow=$workflow]';
+  String toString() => 'QueuesResponseLegacyDto[backgroundTask=$backgroundTask, backupDatabase=$backupDatabase, duplicateDetection=$duplicateDetection, editor=$editor, faceDetection=$faceDetection, facialRecognition=$facialRecognition, library_=$library_, metadataExtraction=$metadataExtraction, migration=$migration, notifications=$notifications, ocr=$ocr, search=$search, sidecar=$sidecar, smartSearch=$smartSearch, storageBackendMigration=$storageBackendMigration, storageTemplateMigration=$storageTemplateMigration, thumbnailGeneration=$thumbnailGeneration, videoConversion=$videoConversion, workflow=$workflow]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -131,6 +136,7 @@ class QueuesResponseLegacyDto {
       json[r'search'] = this.search;
       json[r'sidecar'] = this.sidecar;
       json[r'smartSearch'] = this.smartSearch;
+      json[r'storageBackendMigration'] = this.storageBackendMigration;
       json[r'storageTemplateMigration'] = this.storageTemplateMigration;
       json[r'thumbnailGeneration'] = this.thumbnailGeneration;
       json[r'videoConversion'] = this.videoConversion;
@@ -161,6 +167,7 @@ class QueuesResponseLegacyDto {
         search: QueueResponseLegacyDto.fromJson(json[r'search'])!,
         sidecar: QueueResponseLegacyDto.fromJson(json[r'sidecar'])!,
         smartSearch: QueueResponseLegacyDto.fromJson(json[r'smartSearch'])!,
+        storageBackendMigration: QueueResponseLegacyDto.fromJson(json[r'storageBackendMigration'])!,
         storageTemplateMigration: QueueResponseLegacyDto.fromJson(json[r'storageTemplateMigration'])!,
         thumbnailGeneration: QueueResponseLegacyDto.fromJson(json[r'thumbnailGeneration'])!,
         videoConversion: QueueResponseLegacyDto.fromJson(json[r'videoConversion'])!,
@@ -226,6 +233,7 @@ class QueuesResponseLegacyDto {
     'search',
     'sidecar',
     'smartSearch',
+    'storageBackendMigration',
     'storageTemplateMigration',
     'thumbnailGeneration',
     'videoConversion',

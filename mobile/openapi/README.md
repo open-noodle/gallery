@@ -265,6 +265,10 @@ Class | Method | HTTP request | Description
 *StacksApi* | [**removeAssetFromStack**](doc//StacksApi.md#removeassetfromstack) | **DELETE** /stacks/{id}/assets/{assetId} | Remove an asset from a stack
 *StacksApi* | [**searchStacks**](doc//StacksApi.md#searchstacks) | **GET** /stacks | Retrieve stacks
 *StacksApi* | [**updateStack**](doc//StacksApi.md#updatestack) | **PUT** /stacks/{id} | Update a stack
+*StorageMigrationAdminApi* | [**getEstimate**](doc//StorageMigrationAdminApi.md#getestimate) | **GET** /storage-migration/estimate | Get storage migration estimate
+*StorageMigrationAdminApi* | [**getStatus**](doc//StorageMigrationAdminApi.md#getstatus) | **GET** /storage-migration/status | Get storage migration status
+*StorageMigrationAdminApi* | [**rollback**](doc//StorageMigrationAdminApi.md#rollback) | **POST** /storage-migration/rollback/{batchId} | Rollback a storage migration batch
+*StorageMigrationAdminApi* | [**start**](doc//StorageMigrationAdminApi.md#start) | **POST** /storage-migration/start | Start storage migration
 *SyncApi* | [**deleteSyncAck**](doc//SyncApi.md#deletesyncack) | **DELETE** /sync/ack | Delete acknowledgements
 *SyncApi* | [**getDeltaSync**](doc//SyncApi.md#getdeltasync) | **POST** /sync/delta-sync | Get delta sync for user
 *SyncApi* | [**getFullSyncForUser**](doc//SyncApi.md#getfullsyncforuser) | **POST** /sync/full-sync | Get full sync for user
@@ -566,6 +570,8 @@ Class | Method | HTTP request | Description
  - [StackUpdateDto](doc//StackUpdateDto.md)
  - [StatisticsSearchDto](doc//StatisticsSearchDto.md)
  - [StorageFolder](doc//StorageFolder.md)
+ - [StorageMigrationFileTypesDto](doc//StorageMigrationFileTypesDto.md)
+ - [StorageMigrationStartDto](doc//StorageMigrationStartDto.md)
  - [SyncAckDeleteDto](doc//SyncAckDeleteDto.md)
  - [SyncAckDto](doc//SyncAckDto.md)
  - [SyncAckSetDto](doc//SyncAckSetDto.md)

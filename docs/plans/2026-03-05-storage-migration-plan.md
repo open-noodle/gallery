@@ -13,6 +13,7 @@
 ### Task 1: Database Migration — Create `storage_migration_log` Table
 
 **Files:**
+
 - Create: `server/src/schema/migrations/<timestamp>-AddStorageMigrationLog.ts`
 - Create: `server/src/schema/tables/storage-migration-log.table.ts`
 
@@ -106,6 +107,7 @@ git commit -m "feat(server): add storage_migration_log table for disk<->S3 migra
 ### Task 2: Enums & Job Type Definitions
 
 **Files:**
+
 - Modify: `server/src/enum.ts` (add to `QueueName`, `JobName`)
 - Modify: `server/src/types.ts` (add job data interfaces and `JobItem` entries)
 
@@ -182,6 +184,7 @@ git commit -m "feat(server): add StorageBackendMigration enums and job type defi
 ### Task 3: Storage Migration Repository
 
 **Files:**
+
 - Create: `server/src/repositories/storage-migration.repository.ts`
 
 **Step 1: Write the repository**
@@ -227,13 +230,7 @@ export class StorageMigrationRepository {
     let query = this.db
       .selectFrom('asset_files')
       .innerJoin('assets', 'assets.id', 'asset_files.assetId')
-      .select([
-        'asset_files.id',
-        'asset_files.assetId',
-        'asset_files.path',
-        'asset_files.type',
-        'assets.ownerId',
-      ])
+      .select(['asset_files.id', 'asset_files.assetId', 'asset_files.path', 'asset_files.type', 'assets.ownerId'])
       .where('assets.deletedAt', 'is', null)
       .where('asset_files.type', 'in', fileTypes);
 
@@ -331,7 +328,7 @@ export class StorageMigrationRepository {
    */
   async getFileCounts(direction: 'toS3' | 'toDisk') {
     const isAbsolute = direction === 'toS3';
-    const pathFilter = isAbsolute ? 'like' : 'not like' as const;
+    const pathFilter = isAbsolute ? 'like' : ('not like' as const);
 
     // Count originals
     const originals = await this.db
@@ -474,21 +471,14 @@ export class StorageMigrationRepository {
    * Get all log entries for a batch (for rollback).
    */
   async getLogEntriesByBatch(batchId: string) {
-    return this.db
-      .selectFrom('storage_migration_log')
-      .selectAll()
-      .where('batchId', '=', batchId)
-      .execute();
+    return this.db.selectFrom('storage_migration_log').selectAll().where('batchId', '=', batchId).execute();
   }
 
   /**
    * Delete log entries for a batch (after rollback).
    */
   async deleteLogEntriesByBatch(batchId: string) {
-    await this.db
-      .deleteFrom('storage_migration_log')
-      .where('batchId', '=', batchId)
-      .execute();
+    await this.db.deleteFrom('storage_migration_log').where('batchId', '=', batchId).execute();
   }
 }
 ```
@@ -515,6 +505,7 @@ git commit -m "feat(server): add StorageMigrationRepository for migration querie
 ### Task 4: Storage Migration Service — Orchestrator & Worker
 
 **Files:**
+
 - Create: `server/src/services/storage-migration.service.ts`
 
 **Step 1: Write the service**
@@ -542,14 +533,10 @@ export class StorageMigrationService extends BaseService {
   private validateBackendConfig(direction: 'toS3' | 'toDisk') {
     const { storage } = this.configRepository.getEnv();
     if (direction === 'toS3' && storage.backend !== 's3') {
-      throw new BadRequestException(
-        'IMMICH_STORAGE_BACKEND must be set to "s3" before migrating to S3',
-      );
+      throw new BadRequestException('IMMICH_STORAGE_BACKEND must be set to "s3" before migrating to S3');
     }
     if (direction === 'toDisk' && storage.backend !== 'disk') {
-      throw new BadRequestException(
-        'IMMICH_STORAGE_BACKEND must be set to "disk" before migrating to disk',
-      );
+      throw new BadRequestException('IMMICH_STORAGE_BACKEND must be set to "disk" before migrating to disk');
     }
   }
 
@@ -923,6 +910,7 @@ git commit -m "feat(server): add StorageMigrationService with orchestrator, work
 ### Task 5: Storage Migration Service — Unit Tests
 
 **Files:**
+
 - Create: `server/src/services/storage-migration.service.spec.ts`
 
 **Step 1: Write tests for the service**
@@ -960,6 +948,7 @@ git commit -m "test(server): add unit tests for StorageMigrationService"
 ### Task 6: Controller & DTOs
 
 **Files:**
+
 - Create: `server/src/controllers/storage-migration.controller.ts`
 - Create: `server/src/dtos/storage-migration.dto.ts`
 - Modify: `server/src/controllers/index.ts` (add controller)
@@ -1134,6 +1123,7 @@ git commit -m "feat(server): add StorageMigrationController with estimate, start
 ### Task 7: Wire Up Queue & Job Service
 
 **Files:**
+
 - Modify: `server/src/services/queue.service.ts` (add to start switch)
 
 **Step 1: Add to queue start switch**
@@ -1192,6 +1182,7 @@ git commit -m "chore: regenerate OpenAPI specs and TypeScript SDK for storage mi
 ### Task 9: Admin UI — Storage Migration Page
 
 **Files:**
+
 - Create: `web/src/routes/admin/storage-migration/+page.svelte`
 - Create: `web/src/routes/admin/storage-migration/+page.ts`
 
@@ -1271,20 +1262,25 @@ git commit -m "chore: format storage migration code"
 ## Key Implementation Notes
 
 ### Table/Column Name Mapping
+
 Verify exact Kysely table names by checking `server/src/schema/index.ts`. The queries in the repository use the DB table names (e.g., `assets`, `asset_files`, `person`, `users`, `exif`).
 
 ### Path Conversion Logic
+
 - **Disk → S3**: Strip the `IMMICH_MEDIA_LOCATION` prefix (e.g., `/usr/src/app/upload/`) to get a relative key.
 - **S3 → Disk**: Prepend `IMMICH_MEDIA_LOCATION` to get an absolute path.
 - This matches the existing convention: `isAbsolute(path)` → disk, relative → S3.
 
 ### StorageCore Import
+
 The `StorageMigrationService` needs `StorageCore` from `src/cores/storage.core` for `getMediaLocation()`.
 
 ### BaseService Extension
+
 Adding `StorageMigrationRepository` to `BaseService` touches multiple files. Follow the exact pattern of existing repositories — check alphabetical ordering in the constructor parameter list and `ServiceOverrides` type.
 
 ### Test Patterns
+
 - Use `newTestService(StorageMigrationService)` to get auto-mocked dependencies.
 - Use `makeStream()` helper from `test/utils.ts` to create async iterators for streaming mocks.
 - Mock `StorageService.getDiskBackend()` and `StorageService.getS3Backend()` as static method mocks.
