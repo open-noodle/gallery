@@ -45,6 +45,7 @@ jobs:
     steps:
       - id: token
         shell: bash
+        working-directory: ${{ github.workspace }}
         run: echo "token=${{ github.token }}" >> "$GITHUB_OUTPUT"
 
       - name: Checkout repository

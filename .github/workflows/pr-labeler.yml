@@ -13,6 +13,7 @@ jobs:
     steps:
       - id: token
         shell: bash
+        working-directory: ${{ github.workspace }}
         run: echo "token=${{ github.token }}" >> "$GITHUB_OUTPUT"
 
       - uses: actions/labeler@634933edcd8ababfe52f92936142cc22ac488b1b # v6.0.1

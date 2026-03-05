@@ -22,6 +22,7 @@ jobs:
     steps:
       - id: token
         shell: bash
+        working-directory: ${{ github.workspace }}
         run: echo "token=${{ github.token }}" >> "$GITHUB_OUTPUT"
 
       - name: Check what should run
@@ -53,6 +54,7 @@ jobs:
     steps:
       - id: token
         shell: bash
+        working-directory: ${{ github.workspace }}
         run: echo "token=${{ github.token }}" >> "$GITHUB_OUTPUT"
 
       - name: Checkout code
