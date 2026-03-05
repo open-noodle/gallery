@@ -13,6 +13,7 @@
 ## Task 1: Database Schema — Table Definitions
 
 **Files:**
+
 - Create: `server/src/schema/tables/shared-space.table.ts`
 - Create: `server/src/schema/tables/shared-space-member.table.ts`
 - Create: `server/src/schema/tables/shared-space-asset.table.ts`
@@ -23,7 +24,16 @@
 Create `server/src/schema/tables/shared-space.table.ts`:
 
 ```typescript
-import { Column, CreateDateColumn, ForeignKeyColumn, Generated, PrimaryGeneratedUuidV7Column, Table, Timestamp, UpdateDateColumn } from '@immich/sql-tools';
+import {
+  Column,
+  CreateDateColumn,
+  ForeignKeyColumn,
+  Generated,
+  PrimaryGeneratedUuidV7Column,
+  Table,
+  Timestamp,
+  UpdateDateColumn,
+} from '@immich/sql-tools';
 import { CreateIdColumn, UpdatedAtTrigger, UpdateIdColumn } from 'src/decorators';
 import { UserTable } from 'src/schema/tables/user.table';
 
@@ -110,6 +120,7 @@ export class SharedSpaceAssetTable {
 **Step 4: Register tables in schema index**
 
 Edit `server/src/schema/index.ts`:
+
 - Add imports for `SharedSpaceTable`, `SharedSpaceMemberTable`, `SharedSpaceAssetTable`
 - Add them to the `tables` array in `ImmichDatabase`
 - Add entries to the `DB` interface
@@ -126,6 +137,7 @@ git commit -m "feat(server): add shared space table definitions"
 ## Task 2: Database Migration
 
 **Files:**
+
 - Create: `server/src/schema/migrations/{timestamp}-CreateSharedSpaceTables.ts`
 
 **Step 1: Create migration file**
@@ -214,6 +226,7 @@ git commit -m "feat(server): add shared space database migration"
 ## Task 3: Enums, Types, and Permission Registration
 
 **Files:**
+
 - Modify: `server/src/enum.ts` (add Permission entries, ApiTag, SharedSpaceRole enum)
 - Modify: `server/src/database.ts` (add entity types)
 
@@ -295,6 +308,7 @@ git commit -m "feat(server): add shared space enums and database types"
 ## Task 4: Repository
 
 **Files:**
+
 - Create: `server/src/repositories/shared-space.repository.ts`
 - Modify: `server/src/repositories/index.ts` (register)
 
@@ -343,11 +357,7 @@ export class SharedSpaceRepository {
 
   @GenerateSql({ params: [DummyValue.UUID] })
   getById(id: string) {
-    return this.db
-      .selectFrom('shared_space')
-      .selectAll()
-      .where('id', '=', id)
-      .executeTakeFirst();
+    return this.db.selectFrom('shared_space').selectAll().where('id', '=', id).executeTakeFirst();
   }
 
   @GenerateSql({ params: [DummyValue.UUID] })
@@ -361,11 +371,7 @@ export class SharedSpaceRepository {
   }
 
   create(values: Insertable<SharedSpaceTable>) {
-    return this.db
-      .insertInto('shared_space')
-      .values(values)
-      .returningAll()
-      .executeTakeFirstOrThrow();
+    return this.db.insertInto('shared_space').values(values).returningAll().executeTakeFirstOrThrow();
   }
 
   @GenerateSql({ params: [DummyValue.UUID, { name: 'Updated Space' }] })
@@ -380,10 +386,7 @@ export class SharedSpaceRepository {
 
   @GenerateSql({ params: [DummyValue.UUID] })
   async remove(id: string) {
-    await this.db
-      .deleteFrom('shared_space')
-      .where('id', '=', id)
-      .execute();
+    await this.db.deleteFrom('shared_space').where('id', '=', id).execute();
   }
 
   // -- Members --
@@ -411,11 +414,7 @@ export class SharedSpaceRepository {
   }
 
   addMember(values: Insertable<SharedSpaceMemberTable>) {
-    return this.db
-      .insertInto('shared_space_member')
-      .values(values)
-      .returningAll()
-      .executeTakeFirstOrThrow();
+    return this.db.insertInto('shared_space_member').values(values).returningAll().executeTakeFirstOrThrow();
   }
 
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID, { role: 'editor' }] })
@@ -472,12 +471,14 @@ export class SharedSpaceRepository {
 **Step 3: Register repository**
 
 Edit `server/src/repositories/index.ts`:
+
 - Add `import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';`
 - Add `SharedSpaceRepository` to the `repositories` array (alphabetical order, after `SharedLinkAssetRepository`)
 
 **Step 4: Register in BaseService**
 
 Edit `server/src/services/base.service.ts`:
+
 - Add `import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';`
 - Add `SharedSpaceRepository` to `BASE_SERVICE_DEPENDENCIES` array (after `SharedLinkAssetRepository`)
 - Add `protected sharedSpaceRepository: SharedSpaceRepository,` to the constructor (after `sharedLinkAssetRepository`)
@@ -494,6 +495,7 @@ git commit -m "feat(server): add shared space repository"
 ## Task 5: DTOs
 
 **Files:**
+
 - Create: `server/src/dtos/shared-space.dto.ts`
 
 **Step 1: Create DTOs**
@@ -623,6 +625,7 @@ git commit -m "feat(server): add shared space DTOs"
 ## Task 6: Service
 
 **Files:**
+
 - Create: `server/src/services/shared-space.service.ts`
 - Modify: `server/src/services/index.ts` (register)
 - Create: `server/src/services/shared-space.service.spec.ts`
@@ -654,16 +657,34 @@ describe(SharedSpaceService.name, () => {
     it('should create a space and add the creator as owner', async () => {
       const user = factory.user();
       const auth = factory.auth({ user: { id: user.id } });
-      const space = { id: 'space-1', name: 'Family', description: null, createdById: user.id, createdAt: new Date(), updatedAt: new Date(), createId: 'c1', updateId: 'u1' };
+      const space = {
+        id: 'space-1',
+        name: 'Family',
+        description: null,
+        createdById: user.id,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        createId: 'c1',
+        updateId: 'u1',
+      };
 
       mocks.sharedSpace.create.mockResolvedValue(space);
-      mocks.sharedSpace.addMember.mockResolvedValue({ spaceId: space.id, userId: user.id, role: SharedSpaceRole.Owner, joinedAt: new Date() });
+      mocks.sharedSpace.addMember.mockResolvedValue({
+        spaceId: space.id,
+        userId: user.id,
+        role: SharedSpaceRole.Owner,
+        joinedAt: new Date(),
+      });
 
       const result = await sut.create(auth, { name: 'Family' });
 
       expect(result.name).toBe('Family');
       expect(mocks.sharedSpace.create).toHaveBeenCalledWith({ name: 'Family', createdById: user.id });
-      expect(mocks.sharedSpace.addMember).toHaveBeenCalledWith({ spaceId: space.id, userId: user.id, role: SharedSpaceRole.Owner });
+      expect(mocks.sharedSpace.addMember).toHaveBeenCalledWith({
+        spaceId: space.id,
+        userId: user.id,
+        role: SharedSpaceRole.Owner,
+      });
     });
   });
 
@@ -696,7 +717,12 @@ describe(SharedSpaceService.name, () => {
       const user = factory.user();
       const auth = factory.auth({ user: { id: user.id } });
 
-      mocks.sharedSpace.getMember.mockResolvedValue({ spaceId: 'space-1', userId: user.id, role: SharedSpaceRole.Editor, joinedAt: new Date() });
+      mocks.sharedSpace.getMember.mockResolvedValue({
+        spaceId: 'space-1',
+        userId: user.id,
+        role: SharedSpaceRole.Editor,
+        joinedAt: new Date(),
+      });
 
       await expect(sut.remove(auth, 'space-1')).rejects.toThrow();
     });
@@ -792,7 +818,11 @@ export class SharedSpaceService extends BaseService {
     }));
   }
 
-  async addMember(auth: AuthDto, spaceId: string, dto: SharedSpaceMemberCreateDto): Promise<SharedSpaceMemberResponseDto> {
+  async addMember(
+    auth: AuthDto,
+    spaceId: string,
+    dto: SharedSpaceMemberCreateDto,
+  ): Promise<SharedSpaceMemberResponseDto> {
     await this.requireRole(auth, spaceId, SharedSpaceRole.Owner);
 
     const existing = await this.sharedSpaceRepository.getMember(spaceId, dto.userId);
@@ -819,7 +849,12 @@ export class SharedSpaceService extends BaseService {
     };
   }
 
-  async updateMember(auth: AuthDto, spaceId: string, userId: string, dto: SharedSpaceMemberUpdateDto): Promise<SharedSpaceMemberResponseDto> {
+  async updateMember(
+    auth: AuthDto,
+    spaceId: string,
+    userId: string,
+    dto: SharedSpaceMemberUpdateDto,
+  ): Promise<SharedSpaceMemberResponseDto> {
     await this.requireRole(auth, spaceId, SharedSpaceRole.Owner);
 
     if (userId === auth.user.id) {
@@ -903,7 +938,14 @@ export class SharedSpaceService extends BaseService {
     }
   }
 
-  private mapSpace(space: { id: string; name: string; description: string | null; createdById: string; createdAt: Date; updatedAt: Date }): SharedSpaceResponseDto {
+  private mapSpace(space: {
+    id: string;
+    name: string;
+    description: string | null;
+    createdById: string;
+    createdAt: Date;
+    updatedAt: Date;
+  }): SharedSpaceResponseDto {
     return {
       id: space.id,
       name: space.name,
@@ -919,6 +961,7 @@ export class SharedSpaceService extends BaseService {
 **Step 4: Register service**
 
 Edit `server/src/services/index.ts`:
+
 - Add `import { SharedSpaceService } from 'src/services/shared-space.service';`
 - Add `SharedSpaceService` to the `services` array (after `SharedLinkService`)
 
@@ -942,6 +985,7 @@ git commit -m "feat(server): add shared space service with tests"
 ## Task 7: Controller
 
 **Files:**
+
 - Create: `server/src/controllers/shared-space.controller.ts`
 - Modify: `server/src/controllers/index.ts` (register)
 
@@ -1022,7 +1066,11 @@ export class SharedSpaceController {
     description: 'Update name or description of a shared space.',
     history: new HistoryBuilder().added('v1').beta('v1'),
   })
-  update(@Auth() auth: AuthDto, @Param() { id }: UUIDParamDto, @Body() dto: SharedSpaceUpdateDto): Promise<SharedSpaceResponseDto> {
+  update(
+    @Auth() auth: AuthDto,
+    @Param() { id }: UUIDParamDto,
+    @Body() dto: SharedSpaceUpdateDto,
+  ): Promise<SharedSpaceResponseDto> {
     return this.service.update(auth, id, dto);
   }
 
@@ -1058,7 +1106,11 @@ export class SharedSpaceController {
     description: 'Add a user to the shared space.',
     history: new HistoryBuilder().added('v1').beta('v1'),
   })
-  addMember(@Auth() auth: AuthDto, @Param() { id }: UUIDParamDto, @Body() dto: SharedSpaceMemberCreateDto): Promise<SharedSpaceMemberResponseDto> {
+  addMember(
+    @Auth() auth: AuthDto,
+    @Param() { id }: UUIDParamDto,
+    @Body() dto: SharedSpaceMemberCreateDto,
+  ): Promise<SharedSpaceMemberResponseDto> {
     return this.service.addMember(auth, id, dto);
   }
 
@@ -1066,10 +1118,15 @@ export class SharedSpaceController {
   @Authenticated({ permission: Permission.SharedSpaceMemberUpdate })
   @Endpoint({
     summary: 'Update space member',
-    description: 'Change a member\'s role in the shared space.',
+    description: "Change a member's role in the shared space.",
     history: new HistoryBuilder().added('v1').beta('v1'),
   })
-  updateMember(@Auth() auth: AuthDto, @Param('id') id: string, @Param('userId') userId: string, @Body() dto: SharedSpaceMemberUpdateDto): Promise<SharedSpaceMemberResponseDto> {
+  updateMember(
+    @Auth() auth: AuthDto,
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+    @Body() dto: SharedSpaceMemberUpdateDto,
+  ): Promise<SharedSpaceMemberResponseDto> {
     return this.service.updateMember(auth, id, userId, dto);
   }
 
@@ -1107,7 +1164,11 @@ export class SharedSpaceController {
     description: 'Unlink assets from the shared space.',
     history: new HistoryBuilder().added('v1').beta('v1'),
   })
-  removeAssets(@Auth() auth: AuthDto, @Param() { id }: UUIDParamDto, @Body() dto: SharedSpaceAssetRemoveDto): Promise<void> {
+  removeAssets(
+    @Auth() auth: AuthDto,
+    @Param() { id }: UUIDParamDto,
+    @Body() dto: SharedSpaceAssetRemoveDto,
+  ): Promise<void> {
     return this.service.removeAssets(auth, id, dto);
   }
 }
@@ -1116,6 +1177,7 @@ export class SharedSpaceController {
 **Step 2: Register controller**
 
 Edit `server/src/controllers/index.ts`:
+
 - Add `import { SharedSpaceController } from 'src/controllers/shared-space.controller';`
 - Add `SharedSpaceController` to the `controllers` array (after `SharedLinkController`)
 
@@ -1139,6 +1201,7 @@ git commit -m "feat(server): add shared space controller and API endpoints"
 ## Task 8: OpenAPI Regeneration
 
 **Files:**
+
 - Modified by codegen: `open-api/`, `web/src/lib/`, `mobile/openapi/`
 
 **Step 1: Build server and regenerate OpenAPI specs**
@@ -1179,6 +1242,7 @@ git commit -m "chore: regenerate OpenAPI specs for shared spaces"
 ## Task 9: Web UI — Routes and Navigation
 
 **Files:**
+
 - Modify: `web/src/lib/route.ts` (add route)
 - Modify: `web/src/lib/components/shared-components/side-bar/user-sidebar.svelte` (add nav item)
 - Create: `web/src/routes/(user)/spaces/+page.ts`
@@ -1473,6 +1537,7 @@ git commit -m "fix(web): address lint and type errors in shared spaces"
 ## Task 11: Mobile — Data Layer
 
 **Files:**
+
 - Create: `mobile/lib/infrastructure/entities/shared_space.entity.dart`
 - Create: `mobile/lib/repositories/shared_space_api.repository.dart`
 - Create: `mobile/lib/domain/services/shared_space.service.dart`
@@ -1599,6 +1664,7 @@ git commit -m "feat(mobile): add shared space data layer and providers"
 ## Task 12: Mobile — UI Pages
 
 **Files:**
+
 - Create: `mobile/lib/pages/library/spaces/spaces.page.dart`
 - Create: `mobile/lib/pages/library/spaces/space_detail.page.dart`
 - Modify: `mobile/lib/routing/router.dart` (add routes)
@@ -1718,6 +1784,7 @@ class SpaceDetailPage extends HookConsumerWidget {
 **Step 3: Register routes**
 
 Edit `mobile/lib/routing/router.dart`:
+
 - Add imports for `SpacesPage` and `SpaceDetailPage`
 - Add routes in the route list:
 
@@ -1736,6 +1803,7 @@ AutoRoute(
 **Step 4: Add to Library page**
 
 Edit `mobile/lib/pages/library/library.page.dart`:
+
 - Add a "Spaces" button/card in the Quick Access section that navigates to `SpacesRoute()`
 
 **Step 5: Run code generation**
@@ -1756,6 +1824,7 @@ git commit -m "feat(mobile): add shared spaces UI pages and navigation"
 ## Task 13: Server Tests — Full Coverage
 
 **Files:**
+
 - Modify: `server/src/services/shared-space.service.spec.ts` (expand tests)
 - Modify: `server/test/small.factory.ts` (add factory)
 
@@ -1790,6 +1859,7 @@ Add `sharedSpace: sharedSpaceFactory` and `sharedSpaceMember: sharedSpaceMemberF
 **Step 2: Expand service tests**
 
 Add comprehensive tests to `server/src/services/shared-space.service.spec.ts` covering:
+
 - `create`: creates space and adds creator as owner
 - `getAll`: returns user's spaces
 - `get`: returns space if member, throws if not

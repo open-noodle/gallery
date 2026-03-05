@@ -37,47 +37,47 @@ A Shared Space is a virtual library owned by multiple users. It acts as a shared
 
 **`shared_space`**
 
-| Column        | Type        | Description                              |
-| ------------- | ----------- | ---------------------------------------- |
-| `id`          | uuid (PK)   | Auto-generated                           |
-| `name`        | text        | Display name (e.g., "Smith Family")      |
-| `description` | text?       | Optional description                     |
-| `createdAt`   | timestamptz | Creation timestamp                       |
-| `updatedAt`   | timestamptz | Last modified                            |
-| `createdById` | uuid (FK)   | User who created the space               |
+| Column        | Type        | Description                         |
+| ------------- | ----------- | ----------------------------------- |
+| `id`          | uuid (PK)   | Auto-generated                      |
+| `name`        | text        | Display name (e.g., "Smith Family") |
+| `description` | text?       | Optional description                |
+| `createdAt`   | timestamptz | Creation timestamp                  |
+| `updatedAt`   | timestamptz | Last modified                       |
+| `createdById` | uuid (FK)   | User who created the space          |
 
 **`shared_space_member`**
 
-| Column     | Type               | Description                    |
-| ---------- | ------------------ | ------------------------------ |
-| `spaceId`  | uuid (FK, PK)      | Reference to shared_space      |
-| `userId`   | uuid (FK, PK)      | Reference to user              |
-| `role`     | enum               | `owner`, `editor`, `viewer`    |
-| `joinedAt` | timestamptz        | When the user joined           |
+| Column     | Type          | Description                 |
+| ---------- | ------------- | --------------------------- |
+| `spaceId`  | uuid (FK, PK) | Reference to shared_space   |
+| `userId`   | uuid (FK, PK) | Reference to user           |
+| `role`     | enum          | `owner`, `editor`, `viewer` |
+| `joinedAt` | timestamptz   | When the user joined        |
 
 **`shared_space_asset`**
 
-| Column      | Type          | Description                                  |
-| ----------- | ------------- | -------------------------------------------- |
-| `spaceId`   | uuid (FK, PK) | Reference to shared_space                    |
-| `assetId`   | uuid (FK, PK) | Reference to asset                           |
-| `addedById` | uuid (FK)     | User who linked the asset into the space     |
-| `addedAt`   | timestamptz   | When the asset was added                     |
+| Column      | Type          | Description                              |
+| ----------- | ------------- | ---------------------------------------- |
+| `spaceId`   | uuid (FK, PK) | Reference to shared_space                |
+| `assetId`   | uuid (FK, PK) | Reference to asset                       |
+| `addedById` | uuid (FK)     | User who linked the asset into the space |
+| `addedAt`   | timestamptz   | When the asset was added                 |
 
 #### Role Permissions
 
-| Permission                | Owner | Editor | Viewer |
-| ------------------------- | ----- | ------ | ------ |
-| View assets in space      | Y     | Y      | Y      |
-| Search within space       | Y     | Y      | Y      |
-| View map for space        | Y     | Y      | Y      |
-| Add own assets to space   | Y     | Y      | N      |
-| Remove assets from space  | Y     | Y      | N      |
-| Create albums in space    | Y     | Y      | N      |
-| Invite/remove members     | Y     | N      | N      |
-| Change member roles       | Y     | N      | N      |
-| Delete the space          | Y     | N      | N      |
-| Leave the space           | N     | Y      | Y      |
+| Permission               | Owner | Editor | Viewer |
+| ------------------------ | ----- | ------ | ------ |
+| View assets in space     | Y     | Y      | Y      |
+| Search within space      | Y     | Y      | Y      |
+| View map for space       | Y     | Y      | Y      |
+| Add own assets to space  | Y     | Y      | N      |
+| Remove assets from space | Y     | Y      | N      |
+| Create albums in space   | Y     | Y      | N      |
+| Invite/remove members    | Y     | N      | N      |
+| Change member roles      | Y     | N      | N      |
+| Delete the space         | Y     | N      | N      |
+| Leave the space          | N     | Y      | Y      |
 
 ### Server Architecture
 
@@ -184,14 +184,14 @@ Albums
 
 A tabbed view similar to the main app but scoped to the space:
 
-| Tab        | Content                                                      |
-| ---------- | ------------------------------------------------------------ |
-| Timeline   | Chronological grid of all assets in the space                |
-| Albums     | Albums within the space (Phase 3)                            |
-| Map        | Map markers for geotagged assets in the space                |
-| People     | Face clusters for this space (Phase 2 — hidden until then)   |
-| Members    | Member list with roles, invite button, role management       |
-| Settings   | Name, description, delete space (owner only)                 |
+| Tab      | Content                                                    |
+| -------- | ---------------------------------------------------------- |
+| Timeline | Chronological grid of all assets in the space              |
+| Albums   | Albums within the space (Phase 3)                          |
+| Map      | Map markers for geotagged assets in the space              |
+| People   | Face clusters for this space (Phase 2 — hidden until then) |
+| Members  | Member list with roles, invite button, role management     |
+| Settings | Name, description, delete space (owner only)               |
 
 #### Adding Assets to a Space
 
@@ -256,33 +256,33 @@ Face clusters and labels become **space-scoped**. When an asset is linked into a
 
 **`shared_space_person`**
 
-| Column          | Type          | Description                                    |
-| --------------- | ------------- | ---------------------------------------------- |
-| `id`            | uuid (PK)     | Auto-generated                                 |
-| `spaceId`       | uuid (FK)     | Reference to shared_space                      |
-| `name`          | text?         | Shared display name                            |
-| `thumbnailPath` | text?         | Best face thumbnail                            |
-| `birthDate`     | date?         | Optional birth date                            |
-| `createdAt`     | timestamptz   | When this person was first detected in space   |
+| Column          | Type        | Description                                  |
+| --------------- | ----------- | -------------------------------------------- |
+| `id`            | uuid (PK)   | Auto-generated                               |
+| `spaceId`       | uuid (FK)   | Reference to shared_space                    |
+| `name`          | text?       | Shared display name                          |
+| `thumbnailPath` | text?       | Best face thumbnail                          |
+| `birthDate`     | date?       | Optional birth date                          |
+| `createdAt`     | timestamptz | When this person was first detected in space |
 
 **`shared_space_person_alias`**
 
-| Column     | Type          | Description                                   |
-| ---------- | ------------- | --------------------------------------------- |
-| `personId` | uuid (FK, PK) | Reference to shared_space_person              |
-| `userId`   | uuid (FK, PK) | User who set this alias                       |
-| `alias`    | text          | User's local name (e.g., "Mom" vs "Tiffany")  |
+| Column     | Type          | Description                                  |
+| ---------- | ------------- | -------------------------------------------- |
+| `personId` | uuid (FK, PK) | Reference to shared_space_person             |
+| `userId`   | uuid (FK, PK) | User who set this alias                      |
+| `alias`    | text          | User's local name (e.g., "Mom" vs "Tiffany") |
 
 **`shared_space_face`**
 
-| Column     | Type          | Description                                    |
-| ---------- | ------------- | ---------------------------------------------- |
-| `id`       | uuid (PK)     | Auto-generated                                 |
-| `spaceId`  | uuid (FK)     | Reference to shared_space                      |
-| `personId` | uuid (FK)?    | Reference to shared_space_person (nullable)    |
-| `assetId`  | uuid (FK)     | Reference to asset                             |
-| `embedding`| vector        | Face embedding (copied from asset_faces)       |
-| `imageWidth`, `imageHeight`, `boundingBoxX1`, etc. | int | Face crop coordinates          |
+| Column                                             | Type       | Description                                 |
+| -------------------------------------------------- | ---------- | ------------------------------------------- |
+| `id`                                               | uuid (PK)  | Auto-generated                              |
+| `spaceId`                                          | uuid (FK)  | Reference to shared_space                   |
+| `personId`                                         | uuid (FK)? | Reference to shared_space_person (nullable) |
+| `assetId`                                          | uuid (FK)  | Reference to asset                          |
+| `embedding`                                        | vector     | Face embedding (copied from asset_faces)    |
+| `imageWidth`, `imageHeight`, `boundingBoxX1`, etc. | int        | Face crop coordinates                       |
 
 ### How It Works
 
@@ -290,7 +290,7 @@ Face clusters and labels become **space-scoped**. When an asset is linked into a
 2. **Clustering runs per-space** as a background job (BullMQ). It groups `shared_space_face` rows into `shared_space_person` entries using the same DBSCAN/clustering logic as the per-user pipeline.
 3. **Naming is collaborative.** Any editor/owner can name a `shared_space_person`. The shared name is the default display.
 4. **Aliases are per-user.** A user can set a local alias via `shared_space_person_alias` that overrides the shared name in their UI only. Resolution: alias > shared name > "Unknown".
-5. **Privacy boundary:** Only faces on assets *in the space* are clustered. Personal library face data is never exposed.
+5. **Privacy boundary:** Only faces on assets _in the space_ are clustered. Personal library face data is never exposed.
 
 ### Server Changes
 
@@ -378,12 +378,12 @@ Albums created inside a shared space are automatically visible to all space memb
 
 Shared Spaces coexist with existing sharing. No forced migration:
 
-| Existing Feature   | Interaction with Spaces                                          |
-| ------------------ | ---------------------------------------------------------------- |
-| Partner sharing    | Remains as-is. Users can optionally create a space instead.      |
-| Album sharing      | Remains as-is. Space albums are a superset.                      |
-| Shared links       | Can be created for space albums and individual space assets.     |
-| External libraries | Can be linked into a space like any other asset.                 |
+| Existing Feature   | Interaction with Spaces                                      |
+| ------------------ | ------------------------------------------------------------ |
+| Partner sharing    | Remains as-is. Users can optionally create a space instead.  |
+| Album sharing      | Remains as-is. Space albums are a superset.                  |
+| Shared links       | Can be created for space albums and individual space assets. |
+| External libraries | Can be linked into a space like any other asset.             |
 
 A future admin tool could offer "Convert partner sharing to space" as a one-click migration for existing users.
 
