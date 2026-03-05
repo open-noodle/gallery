@@ -6,6 +6,29 @@
 
 Branding overlay — a `branding/` directory in the fork containing config, assets, i18n overrides, and scripts. Internal code stays "immich" for upstream sync compatibility.
 
+### How to Use
+
+**Local development (apply branding):**
+
+```bash
+./branding/scripts/apply-branding.sh
+```
+
+**Local development (reset to upstream branding):**
+
+```bash
+git checkout -- .
+```
+
+**After upstream merge:**
+
+1. Merge upstream: `git fetch upstream && git merge upstream/main`
+2. Resolve conflicts (if any in branding-touched files)
+3. Run `./branding/scripts/verify-branding.sh` to check for new "Immich" strings
+4. If new i18n keys were added upstream with "Immich", add overrides to `branding/i18n/overrides-en.json`
+
+**CI:** Branding is applied automatically by the composite GitHub Action in all build workflows.
+
 ### What changes at build time
 
 1. All user-visible "Immich" text -> "Noodle Gallery" (web, mobile, CLI, docs, OpenAPI)
@@ -18,10 +41,6 @@ Branding overlay — a `branding/` directory in the fork containing config, asse
 ### What stays "immich"
 
 - Package names, npm scopes, env vars, database name, Docker Compose service names, API paths, all source code identifiers
-
-### CI/CD
-
-Composite GitHub Action runs `apply-branding.sh` + `verify-branding.sh` after checkout in every build workflow. Verification catches branding leaks from upstream changes.
 
 ### Branding Overlay Directory Structure
 
