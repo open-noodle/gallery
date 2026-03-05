@@ -78,6 +78,20 @@ export class StorageMigrationService extends BaseService {
     this.validateBackendConfig(options.direction);
     await this.validateS3Connection();
 
+    const fileCounts = await this.storageMigrationRepository.getFileCounts(options.direction);
+    const total =
+      fileCounts.originals +
+      fileCounts.thumbnails +
+      fileCounts.previews +
+      fileCounts.fullsize +
+      fileCounts.sidecars +
+      fileCounts.encodedVideos +
+      fileCounts.personThumbnails +
+      fileCounts.profileImages;
+    if (total === 0) {
+      throw new BadRequestException('No files to migrate');
+    }
+
     const isActive = await this.jobRepository.isActive(QueueName.StorageBackendMigration);
     if (isActive) {
       throw new BadRequestException('A storage migration is already in progress');

@@ -113,10 +113,22 @@ describe(StorageMigrationService.name, () => {
       concurrency: 4,
     };
 
+    const nonZeroFileCounts = {
+      originals: 10,
+      thumbnails: 0,
+      previews: 0,
+      fullsize: 0,
+      sidecars: 0,
+      encodedVideos: 0,
+      personThumbnails: 0,
+      profileImages: 0,
+    };
+
     it('should validate backend config, check no active migration, queue orchestrator, and return batchId', async () => {
       mocks.config.getEnv.mockReturnValue(mockEnvData({ storage: { backend: 's3' } }));
       mocks.job.isActive.mockResolvedValue(false);
       mockS3Backend.exists.mockResolvedValue(true);
+      mocks.storageMigration.getFileCounts.mockResolvedValue(nonZeroFileCounts);
 
       const result = await sut.start(defaultOptions);
 
@@ -155,8 +167,27 @@ describe(StorageMigrationService.name, () => {
       mocks.config.getEnv.mockReturnValue(mockEnvData({ storage: { backend: 's3' } }));
       mocks.job.isActive.mockResolvedValue(true);
       mockS3Backend.exists.mockResolvedValue(true);
+      mocks.storageMigration.getFileCounts.mockResolvedValue(nonZeroFileCounts);
 
       await expect(sut.start(defaultOptions)).rejects.toThrow('A storage migration is already in progress');
+    });
+
+    it('should throw if there are no files to migrate', async () => {
+      mocks.config.getEnv.mockReturnValue(mockEnvData({ storage: { backend: 's3' } }));
+      mockS3Backend.exists.mockResolvedValue(true);
+      mocks.storageMigration.getFileCounts.mockResolvedValue({
+        originals: 0,
+        thumbnails: 0,
+        previews: 0,
+        fullsize: 0,
+        sidecars: 0,
+        encodedVideos: 0,
+        personThumbnails: 0,
+        profileImages: 0,
+      });
+
+      await expect(sut.start(defaultOptions)).rejects.toThrow('No files to migrate');
+      expect(mocks.job.queue).not.toHaveBeenCalled();
     });
   });
 

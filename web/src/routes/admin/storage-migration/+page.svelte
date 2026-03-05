@@ -297,11 +297,16 @@
       <section class="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
         <h2 class="mb-4 text-lg font-semibold">Start Migration</h2>
         <div class="flex items-center gap-4">
-          <Button onclick={handleStart} disabled={starting || (status?.isActive ?? false)}>
+          <Button
+            onclick={handleStart}
+            disabled={starting || (status?.isActive ?? false) || (estimate?.fileCounts.total ?? 0) === 0}
+          >
             {starting ? 'Starting...' : 'Start Migration'}
           </Button>
           {#if status?.isActive}
             <span class="text-sm font-medium text-yellow-600 dark:text-yellow-400">Migration is currently active</span>
+          {:else if (estimate?.fileCounts.total ?? 0) === 0}
+            <span class="text-sm text-gray-500 dark:text-gray-400">No files to migrate</span>
           {/if}
         </div>
       </section>
