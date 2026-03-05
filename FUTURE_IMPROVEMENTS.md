@@ -1,20 +1,5 @@
 # Future CI/CD Improvements
 
-## ARM Runner Support
-
-ARM runners (`ubuntu-24.04-arm`) were removed from the E2E test matrix because:
-
-- Docker images pinned by SHA digest in `e2e/docker-compose.yml` (postgres with vectorchord, valkey) may not have ARM64 manifests
-- The `ghcr.io/immich-app/immich-server-build-cache` is not accessible from the fork
-- The Docker build fails immediately on ARM runners
-
-**To re-enable ARM E2E testing:**
-
-1. Verify that all Docker images in `e2e/docker-compose.yml` have multi-arch manifests (amd64 + arm64)
-2. Either remove the `cache_from` directive or set up ARM build cache accessible from the fork
-3. Change `runner: [ubuntu-latest]` back to `runner: [ubuntu-latest, ubuntu-24.04-arm]` in `.github/workflows/test.yml` (two locations: `e2e-tests-server-cli` and `e2e-tests-web`)
-4. Alternatively, add `continue-on-error: true` for ARM matrix entries so ARM failures don't block the pipeline
-
 ## DCM (Dart Code Metrics) License
 
 DCM was disabled in `.github/workflows/static_analysis.yml` because it requires a valid license key (`--ci-key` and `--email`). The upstream immich-app org likely has this configured.
