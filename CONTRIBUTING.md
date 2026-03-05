@@ -23,7 +23,9 @@ We **actively encourage** the use of LLMs and AI coding tools. Unlike some proje
 
 **All PRs must include a spec or design document** that describes *what* the change does and *why*. This applies whether you wrote every line by hand, pair-programmed with an LLM, or let an agent do the heavy lifting. A well-written spec means reviewers can evaluate intent and correctness, not just syntax — and it turns out that's what matters regardless of who (or what) wrote the code.
 
-In our experience, the "large amount of back-and-forth" that some projects attribute to LLM-generated code is really a symptom of missing specs and unclear requirements. Solve that, and the tooling becomes irrelevant.
+**All PRs must also include tests.** We didn't get from 74% to 94% server test coverage by accident. Tests are how you prove your code works — spec says *what*, tests prove *that*. No tests, no merge.
+
+In our experience, the "large amount of back-and-forth" that some projects attribute to LLM-generated code is really a symptom of missing specs and unclear requirements. Solve that, add tests, and the tooling becomes irrelevant.
 
 ## Feature freezes
 
