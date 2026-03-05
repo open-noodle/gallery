@@ -53,6 +53,7 @@ import { ServerInfoRepository } from 'src/repositories/server-info.repository';
 import { SessionRepository } from 'src/repositories/session.repository';
 import { SharedLinkAssetRepository } from 'src/repositories/shared-link-asset.repository';
 import { SharedLinkRepository } from 'src/repositories/shared-link.repository';
+import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
 import { StackRepository } from 'src/repositories/stack.repository';
 import { StorageMigrationRepository } from 'src/repositories/storage-migration.repository';
 import { StorageRepository } from 'src/repositories/storage.repository';
@@ -248,6 +249,7 @@ export type ServiceOverrides = {
   session: SessionRepository;
   sharedLink: SharedLinkRepository;
   sharedLinkAsset: SharedLinkAssetRepository;
+  sharedSpace: SharedSpaceRepository;
   stack: StackRepository;
   storageMigration: StorageMigrationRepository;
   storage: StorageRepository;
@@ -332,6 +334,7 @@ export const getMocks = () => {
     session: automock(SessionRepository),
     sharedLink: automock(SharedLinkRepository),
     sharedLinkAsset: automock(SharedLinkAssetRepository),
+    sharedSpace: automock(SharedSpaceRepository),
     stack: automock(StackRepository),
     storageMigration: automock(StorageMigrationRepository),
     storage: newStorageRepositoryMock(),
@@ -400,6 +403,7 @@ export const newTestService = <T extends BaseService>(
     overrides.session || (mocks.session as As<SessionRepository>),
     overrides.sharedLink || (mocks.sharedLink as As<SharedLinkRepository>),
     overrides.sharedLinkAsset || (mocks.sharedLinkAsset as As<SharedLinkAssetRepository>),
+    overrides.sharedSpace || (mocks.sharedSpace as As<SharedSpaceRepository>),
     overrides.stack || (mocks.stack as As<StackRepository>),
     overrides.storageMigration || (mocks.storageMigration as As<StorageMigrationRepository>),
     overrides.storage || (mocks.storage as As<StorageRepository>),
