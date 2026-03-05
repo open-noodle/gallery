@@ -183,6 +183,8 @@ export const endpointTags: Record<ApiTag, string> = {
     'A shared link is a public url that provides access to a specific album, asset, or collection of assets. A shared link can be protected with a password, include a specific slug, allow or disallow downloads, and optionally include an expiration date.',
   [ApiTag.Stacks]:
     'A stack is a group of related assets. One asset is the "primary" asset, and the rest are "child" assets. On the main timeline, stack parents are included by default, while child assets are hidden.',
+  [ApiTag.StorageMigration]:
+    'Administrative endpoints for migrating files between disk and S3 storage backends. Includes estimating migration scope, starting migrations, monitoring status, and rolling back completed batches.',
   [ApiTag.Sync]: 'A collection of endpoints for the new mobile synchronization implementation.',
   [ApiTag.SystemConfig]: 'Endpoints to view, modify, and validate the system configuration settings.',
   [ApiTag.SystemMetadata]:

@@ -875,6 +875,7 @@ export enum ApiTag {
   Sessions = 'Sessions',
   SharedLinks = 'Shared links',
   Stacks = 'Stacks',
+  StorageMigration = 'Storage Migration (admin)',
   Sync = 'Sync',
   SystemConfig = 'System config',
   SystemMetadata = 'System metadata',
