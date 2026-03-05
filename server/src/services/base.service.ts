@@ -224,8 +224,8 @@ export class BaseService {
     cacheControl: CacheControl,
     fileName?: string,
   ): Promise<ImmichMediaResponse> {
-    // @ts-expect-error -- lazy import with relative path to avoid circular dependency (StorageService extends BaseService)
-    const { StorageService } = await import('./storage.service');
+    // lazy import to avoid circular dependency (StorageService extends BaseService)
+    const { StorageService } = await import('./storage.service.js');
     const backend = StorageService.resolveBackendForKey(filePath);
     const strategy: ServeStrategy = await backend.getServeStrategy(filePath, contentType);
 
