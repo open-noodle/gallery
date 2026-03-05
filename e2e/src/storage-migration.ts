@@ -368,6 +368,170 @@ async function phaseSetup(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Phase 2: Migrate to S3
+// ---------------------------------------------------------------------------
+async function phaseMigrateToS3(): Promise<void> {
+  console.log('=== Phase 2: Migrate to S3 ===');
+
+  // Login (server was restarted, old sessions invalid)
+  console.log('  Logging in as admin...');
+  const token = await loginAdmin();
+
+  // Get migration estimate
+  console.log('  Getting migration estimate...');
+  const estimate = await api('GET', '/storage-migration/estimate?direction=toS3', { token });
+  console.log(`  Estimate: total=${estimate.total} originals=${estimate.originals ?? 0} thumbnails=${estimate.thumbnails ?? 0}`);
+  assert(estimate.total > 0, `Expected estimate total > 0, got ${estimate.total}`);
+
+  // Start migration
+  console.log('  Starting migration to S3...');
+  const batchId = await startMigration(token, 'toS3');
+  console.log(`  Batch ID: ${batchId}`);
+
+  // Wait for migration to complete
+  console.log('  Waiting for migration to complete...');
+  await waitForMigration(token);
+
+  // Set up minio mc alias
+  console.log('  Setting up MinIO mc alias...');
+  dockerExec('minio', 'mc alias set local http://localhost:9000 minioadmin minioadmin');
+
+  // Validate
+  console.log('  Capturing and validating post-migration state...');
+  const state = await captureState();
+
+  // DB paths should be relative (not starting with /)
+  for (const asset of state.assets) {
+    assert(!asset.originalPath.startsWith('/'), `Asset originalPath should be relative after S3 migration: ${asset.originalPath}`);
+  }
+  for (const af of state.assetFiles) {
+    assert(!af.path.startsWith('/'), `AssetFile path should be relative after S3 migration: ${af.path}`);
+  }
+  for (const p of state.persons) {
+    assert(!p.thumbnailPath.startsWith('/'), `Person thumbnailPath should be relative after S3 migration: ${p.thumbnailPath}`);
+  }
+  for (const u of state.users) {
+    if (u.profileImagePath) {
+      assert(!u.profileImagePath.startsWith('/'), `User profileImagePath should be relative after S3 migration: ${u.profileImagePath}`);
+    }
+  }
+
+  // API access: each asset original should be accessible
+  console.log('  Verifying API access to assets...');
+  for (const asset of state.assets) {
+    const res = await fetch(`${BASE_URL}/assets/${asset.id}/original`, {
+      headers: { Authorization: `Bearer ${token}` },
+      redirect: 'follow',
+    });
+    assert(res.status === 200, `Expected 200 for asset ${asset.id} original, got ${res.status}`);
+    // Consume body to avoid leaking connections
+    await res.arrayBuffer();
+  }
+
+  // MinIO files exist
+  console.log('  Verifying MinIO files exist...');
+  for (const asset of state.assets) {
+    assert(minioFileExists(asset.originalPath), `Expected MinIO file to exist: ${asset.originalPath}`);
+  }
+
+  // Disk files gone (deleteSource: true)
+  console.log('  Verifying disk files are removed...');
+  for (const asset of state.assets) {
+    assert(!diskFileExists(`/usr/src/app/upload/${asset.originalPath}`), `Expected disk file to be deleted: /usr/src/app/upload/${asset.originalPath}`);
+  }
+
+  // Migration log validation
+  const s3Logs = state.migrationLogs.filter((l) => l.direction === 'toS3');
+  assert(s3Logs.length > 0, `Expected migration logs with direction=toS3, got ${s3Logs.length}`);
+  const batchLogs = s3Logs.filter((l) => l.batchId === batchId);
+  assert(batchLogs.length > 0, `Expected migration logs with batchId=${batchId}, got ${batchLogs.length}`);
+
+  console.log(`  Assets: ${state.assets.length}`);
+  console.log(`  Asset files: ${state.assetFiles.length}`);
+  console.log(`  MinIO files verified: ${state.assets.length}`);
+  console.log(`  Migration log entries (toS3): ${s3Logs.length}`);
+  console.log('=== Phase 2: Migrate to S3 complete ===');
+}
+
+// ---------------------------------------------------------------------------
+// Phase 3: Migrate to Disk
+// ---------------------------------------------------------------------------
+async function phaseMigrateToDisk(): Promise<void> {
+  console.log('=== Phase 3: Migrate to Disk ===');
+
+  // Login
+  console.log('  Logging in as admin...');
+  const token = await loginAdmin();
+
+  // Start migration
+  console.log('  Starting migration to disk...');
+  const batchId = await startMigration(token, 'toDisk');
+  console.log(`  Batch ID: ${batchId}`);
+
+  // Wait for migration to complete
+  console.log('  Waiting for migration to complete...');
+  await waitForMigration(token);
+
+  // Validate
+  console.log('  Capturing and validating post-migration state...');
+  const state = await captureState();
+
+  // DB paths should be absolute (starting with /)
+  for (const asset of state.assets) {
+    assert(asset.originalPath.startsWith('/'), `Asset originalPath should be absolute after disk migration: ${asset.originalPath}`);
+  }
+  for (const af of state.assetFiles) {
+    assert(af.path.startsWith('/'), `AssetFile path should be absolute after disk migration: ${af.path}`);
+  }
+  for (const p of state.persons) {
+    assert(p.thumbnailPath.startsWith('/'), `Person thumbnailPath should be absolute after disk migration: ${p.thumbnailPath}`);
+  }
+  for (const u of state.users) {
+    if (u.profileImagePath) {
+      assert(u.profileImagePath.startsWith('/'), `User profileImagePath should be absolute after disk migration: ${u.profileImagePath}`);
+    }
+  }
+
+  // API access: each asset original should be accessible
+  console.log('  Verifying API access to assets...');
+  for (const asset of state.assets) {
+    const res = await fetch(`${BASE_URL}/assets/${asset.id}/original`, {
+      headers: { Authorization: `Bearer ${token}` },
+      redirect: 'follow',
+    });
+    assert(res.status === 200, `Expected 200 for asset ${asset.id} original, got ${res.status}`);
+    // Consume body to avoid leaking connections
+    await res.arrayBuffer();
+  }
+
+  // Disk files exist (paths are absolute now)
+  console.log('  Verifying disk files exist...');
+  for (const asset of state.assets) {
+    assert(diskFileExists(asset.originalPath), `Expected disk file to exist: ${asset.originalPath}`);
+  }
+
+  // MinIO files gone (deleteSource: true)
+  console.log('  Setting up MinIO mc alias...');
+  dockerExec('minio', 'mc alias set local http://localhost:9000 minioadmin minioadmin');
+
+  console.log('  Verifying MinIO files are removed...');
+  for (const asset of state.assets) {
+    const s3Key = asset.originalPath.replace(/^\/usr\/src\/app\/upload\//, '');
+    assert(!minioFileExists(s3Key), `Expected MinIO file to be deleted: ${s3Key}`);
+  }
+
+  // Migration log validation
+  const diskLogs = state.migrationLogs.filter((l) => l.direction === 'toDisk');
+  assert(diskLogs.length > 0, `Expected migration logs with direction=toDisk, got ${diskLogs.length}`);
+
+  console.log(`  Assets: ${state.assets.length}`);
+  console.log(`  Asset files: ${state.assetFiles.length}`);
+  console.log(`  Disk files verified: ${state.assets.length}`);
+  console.log(`  Migration log entries (toDisk): ${diskLogs.length}`);
+  console.log('=== Phase 3: Migrate to Disk complete ===');
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 async function main() {
@@ -386,13 +550,11 @@ async function main() {
         break;
       }
       case 'migrate-to-s3': {
-        // Phase 2: Start migration to S3, wait, validate paths and files
-        console.log('Phase: migrate-to-s3 — placeholder');
+        await phaseMigrateToS3();
         break;
       }
       case 'migrate-to-disk': {
-        // Phase 3: Start migration to disk, wait, validate paths and files
-        console.log('Phase: migrate-to-disk — placeholder');
+        await phaseMigrateToDisk();
         break;
       }
       default: {
