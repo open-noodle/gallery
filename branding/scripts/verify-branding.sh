@@ -27,9 +27,11 @@ check_files=(
 for file in "${check_files[@]}"; do
   filepath="$REPO_ROOT/$file"
   if [[ -f "$filepath" ]]; then
-    # Case-sensitive grep for the upstream brand name
-    if grep -q "$UPSTREAM_NAME" "$filepath"; then
-      echo "  WARN: '$UPSTREAM_NAME' still found in $file"
+    # Exclude known code-internal patterns (function names, class names, CSS classes)
+    matches=$(grep -c "$UPSTREAM_NAME" "$filepath" 2>/dev/null || true)
+    allowed=$(grep -cE "(Immich(App|Service|Link)|immich-|bg-immich|getMyImmich|// .*[Ii]mmich)" "$filepath" 2>/dev/null || true)
+    if [[ "$matches" -gt 0 && "$matches" -gt "$allowed" ]]; then
+      echo "  WARN: '$UPSTREAM_NAME' still found in $file ($matches hits, $allowed allowed)"
       EXIT_CODE=1
     else
       echo "  OK: $file"

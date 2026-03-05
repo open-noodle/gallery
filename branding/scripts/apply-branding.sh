@@ -90,6 +90,8 @@ patch_web() {
       '.info.title = $name | .info.description = $desc' \
       "$openapi" > "$tmp"
     mv "$tmp" "$openapi"
+    # Replace remaining user-facing "Immich" in API descriptions
+    sed -i "s/Immich/${NAME}/g" "$openapi"
     echo "  Patched OpenAPI spec"
   fi
 }
@@ -338,6 +340,8 @@ patch_docs() {
   if [[ -f "$docusaurus" ]]; then
     sed -i "s/title: 'Immich'/title: '${NAME}'/g" "$docusaurus"
     sed -i "s|url: 'https://docs\.immich\.app'|url: '${DOCS_URL}'|g" "$docusaurus"
+    # Replace remaining user-facing "Immich" references (navbar, footer, etc.)
+    sed -i "s/Immich/${NAME}/g" "$docusaurus"
     echo "  Patched docusaurus.config.js"
   fi
 }
