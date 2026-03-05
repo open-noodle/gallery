@@ -109,7 +109,7 @@ describe('ImmichStartupError / isStartUpError', () => {
   it('should return false for non-error values', () => {
     expect(isStartUpError('string')).toBe(false);
     expect(isStartUpError(null)).toBe(false);
-    expect(isStartUpError(undefined)).toBe(false);
+    expect(isStartUpError()).toBe(false);
     expect(isStartUpError(42)).toBe(false);
     expect(isStartUpError({})).toBe(false);
   });
@@ -212,17 +212,17 @@ describe('getExternalDomain', () => {
   });
 });
 
-describe('machine learning feature flags', () => {
-  const createMlConfig = (overrides: Partial<SystemConfig['machineLearning']> = {}): SystemConfig['machineLearning'] =>
-    ({
-      enabled: true,
-      clip: { enabled: true },
-      facialRecognition: { enabled: true },
-      ocr: { enabled: true },
-      duplicateDetection: { enabled: true },
-      ...overrides,
-    }) as SystemConfig['machineLearning'];
+const createMlConfig = (overrides: Partial<SystemConfig['machineLearning']> = {}): SystemConfig['machineLearning'] =>
+  ({
+    enabled: true,
+    clip: { enabled: true },
+    facialRecognition: { enabled: true },
+    ocr: { enabled: true },
+    duplicateDetection: { enabled: true },
+    ...overrides,
+  }) as SystemConfig['machineLearning'];
 
+describe('machine learning feature flags', () => {
   describe('isSmartSearchEnabled', () => {
     it('should return true when ML and CLIP are both enabled', () => {
       expect(isSmartSearchEnabled(createMlConfig())).toBe(true);

@@ -33,12 +33,14 @@ type ServeStrategy =
 ```
 
 **DiskStorageBackend:**
+
 - `put` writes to `{mediaLocation}/{key}`, creating directories as needed
 - `get` returns a `createReadStream` on the local file
 - `getServeStrategy` always returns `{ type: 'file', path }`
 - `downloadToTemp` returns the real path directly (no copy needed)
 
 **S3StorageBackend:**
+
 - `put` uses `@aws-sdk/lib-storage` Upload for multipart support on large files
 - `get` returns the S3 GetObject body stream
 - `getServeStrategy` returns `redirect` (presigned URL) or `stream` (proxy) based on config
@@ -48,8 +50,8 @@ type ServeStrategy =
 
 ```typescript
 function resolveBackend(key: string): StorageBackend {
-  if (path.isAbsolute(key)) return diskBackend;  // legacy disk asset
-  return s3Backend;                                // new S3 asset
+  if (path.isAbsolute(key)) return diskBackend; // legacy disk asset
+  return s3Backend; // new S3 asset
 }
 ```
 
@@ -93,6 +95,7 @@ DB columns that store file paths (`assets.originalPath`, `assets.encodedVideoPat
 - **Relative key** (no leading `/`): S3 asset, used as the S3 object key directly
 
 Key format examples:
+
 ```
 upload/user123/ab/cd/original.jpg
 thumbs/user123/ab/cd/thumb.webp
@@ -126,6 +129,7 @@ Client → multer (writes to disk temp) → SHA1 computed during stream
 ```
 
 Key points:
+
 - Multer still writes to local disk first (streaming SHA1 checksum requirement)
 - Storage template determines the initial S3 key at upload time — one write, no subsequent move
 - Large uploads use `@aws-sdk/lib-storage` multipart upload
@@ -200,22 +204,22 @@ The download service streams multiple assets into a ZIP archive. For S3 assets, 
 
 ## 8. Files That Change
 
-| Layer | File(s) | Change |
-|-------|---------|--------|
-| Config | `config.repository.ts`, `config.ts` | Add S3 env vars and config types |
-| Backend interface | New `src/interfaces/storage-backend.interface.ts` | New file |
-| Disk backend | New `src/backends/disk-storage.backend.ts` | Wraps existing local fs ops |
-| S3 backend | New `src/backends/s3-storage.backend.ts` | AWS SDK S3 client |
-| Backend factory | `app.module.ts` or new provider | Instantiate both backends, provide resolver |
-| StorageCore | `cores/storage.core.ts` | Path methods return relative keys |
-| Upload interceptor | `middleware/file-upload.interceptor.ts` | After multer writes temp, upload to S3 if enabled |
-| Asset media service | `services/asset-media.service.ts` | Use backend for serve/download |
-| Media service | `services/media.service.ts` | Bracket processing with downloadToTemp/put |
-| File utils | `utils/file.ts` | ImmichFileResponse supports redirect/stream strategies |
-| Asset media controller | `controllers/asset-media.controller.ts` | Handle redirect/stream responses |
-| Storage service | `services/storage.service.ts` | Bootstrap initializes both backends |
-| Download service | `services/download.service.ts` | ZIP streaming from S3 |
-| Person service | `services/person.service.ts` | Use backend for person thumbnail paths |
+| Layer                  | File(s)                                           | Change                                                 |
+| ---------------------- | ------------------------------------------------- | ------------------------------------------------------ |
+| Config                 | `config.repository.ts`, `config.ts`               | Add S3 env vars and config types                       |
+| Backend interface      | New `src/interfaces/storage-backend.interface.ts` | New file                                               |
+| Disk backend           | New `src/backends/disk-storage.backend.ts`        | Wraps existing local fs ops                            |
+| S3 backend             | New `src/backends/s3-storage.backend.ts`          | AWS SDK S3 client                                      |
+| Backend factory        | `app.module.ts` or new provider                   | Instantiate both backends, provide resolver            |
+| StorageCore            | `cores/storage.core.ts`                           | Path methods return relative keys                      |
+| Upload interceptor     | `middleware/file-upload.interceptor.ts`           | After multer writes temp, upload to S3 if enabled      |
+| Asset media service    | `services/asset-media.service.ts`                 | Use backend for serve/download                         |
+| Media service          | `services/media.service.ts`                       | Bracket processing with downloadToTemp/put             |
+| File utils             | `utils/file.ts`                                   | ImmichFileResponse supports redirect/stream strategies |
+| Asset media controller | `controllers/asset-media.controller.ts`           | Handle redirect/stream responses                       |
+| Storage service        | `services/storage.service.ts`                     | Bootstrap initializes both backends                    |
+| Download service       | `services/download.service.ts`                    | ZIP streaming from S3                                  |
+| Person service         | `services/person.service.ts`                      | Use backend for person thumbnail paths                 |
 
 ## 9. What Stays the Same
 

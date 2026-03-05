@@ -1372,7 +1372,6 @@ describe(MetadataService.name, () => {
     });
 
     it('should remove existing exif faces before adding new ones', async () => {
-      const existingFace = { id: 'face-1', sourceType: SourceType.Exif };
       const asset = AssetFactory.from().face({ id: 'face-1', sourceType: SourceType.Exif }).build();
       const person = PersonFactory.create();
 

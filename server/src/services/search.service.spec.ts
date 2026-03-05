@@ -312,7 +312,7 @@ describe(SearchService.name, () => {
     it('should throw if queryAssetId has no embedding', async () => {
       const assetId = newUuid();
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([assetId]));
-      mocks.search.getEmbedding.mockResolvedValue(undefined);
+      mocks.search.getEmbedding.mockResolvedValue();
 
       await expect(sut.searchSmart(authStub.user1, { queryAssetId: assetId })).rejects.toThrow(
         `Asset ${assetId} has no embedding`,

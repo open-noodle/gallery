@@ -78,6 +78,43 @@ const newWorkflowAction = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
+const setupForWorkflowRun = async (
+  sut: PluginService,
+  mocks: ServiceMocks,
+  mockNewPlugin: ReturnType<typeof vi.fn>,
+  mockPluginCall: ReturnType<typeof vi.fn>,
+) => {
+  const [workflowId, ownerId, pluginId, filterId, actionId] = newUuids();
+  const asset = factory.asset({ ownerId });
+
+  // Bootstrap the service to set the pluginJwtSecret and loadedPlugins
+  const coreManifest = JSON.stringify({
+    name: 'core-plugin',
+    version: '1.0.0',
+    title: 'Core Plugin',
+    description: 'The core plugin',
+    author: 'Immich',
+    wasm: { path: 'plugin.wasm' },
+  });
+
+  mocks.crypto.randomBytesAsText.mockReturnValue('mock-jwt-secret');
+  mocks.storage.readTextFile.mockResolvedValue(coreManifest);
+  mocks.plugin.getPluginByName.mockResolvedValue(
+    newPluginEntity({ name: 'core-plugin', version: '1.0.0' }),
+  );
+
+  const pluginEntity = newPluginEntity({ id: pluginId, wasmPath: '/path/to/plugin.wasm' });
+  mocks.plugin.getAllPlugins.mockResolvedValue([pluginEntity]);
+  mockNewPlugin.mockResolvedValue({ call: mockPluginCall });
+
+  await sut.onBootstrap();
+
+  // Reset mocks that were used during bootstrap
+  mocks.plugin.getAllPlugins.mockReset();
+
+  return { workflowId, ownerId, pluginId, filterId, actionId, asset };
+};
+
 describe(PluginService.name, () => {
   let sut: PluginService;
   let mocks: ServiceMocks;
@@ -196,7 +233,7 @@ describe(PluginService.name, () => {
     it('should throw BadRequestException when plugin is not found', async () => {
       const id = newUuid();
 
-      mocks.plugin.getPlugin.mockResolvedValue(undefined);
+      mocks.plugin.getPlugin.mockResolvedValue();
 
       await expect(sut.get(id)).rejects.toBeInstanceOf(BadRequestException);
       await expect(sut.get(id)).rejects.toThrow('Plugin not found');
@@ -218,7 +255,7 @@ describe(PluginService.name, () => {
 
       mocks.crypto.randomBytesAsText.mockReturnValue('mock-secret');
       mocks.storage.readTextFile.mockResolvedValue(manifestContent);
-      mocks.plugin.getPluginByName.mockResolvedValue(undefined);
+      mocks.plugin.getPluginByName.mockResolvedValue();
       mocks.plugin.loadPlugin.mockResolvedValue({
         plugin: newPluginEntity({ name: 'core-plugin' }),
         filters: [],
@@ -253,7 +290,7 @@ describe(PluginService.name, () => {
 
       mocks.crypto.randomBytesAsText.mockReturnValue('mock-secret');
       mocks.storage.readTextFile.mockResolvedValueOnce(coreManifest).mockResolvedValueOnce(externalManifest);
-      mocks.plugin.getPluginByName.mockResolvedValue(undefined);
+      mocks.plugin.getPluginByName.mockResolvedValue();
       mocks.plugin.loadPlugin.mockResolvedValue({
         plugin: newPluginEntity(),
         filters: [],
@@ -282,7 +319,7 @@ describe(PluginService.name, () => {
 
       mocks.crypto.randomBytesAsText.mockReturnValue('mock-secret');
       mocks.storage.readTextFile.mockResolvedValue(coreManifest);
-      mocks.plugin.getPluginByName.mockResolvedValue(undefined);
+      mocks.plugin.getPluginByName.mockResolvedValue();
       mocks.plugin.loadPlugin.mockResolvedValue({
         plugin: newPluginEntity(),
         filters: [],
@@ -501,40 +538,9 @@ describe(PluginService.name, () => {
   });
 
   describe('handleWorkflowRun', () => {
-    const setupForWorkflowRun = async () => {
-      const [workflowId, ownerId, pluginId, filterId, actionId] = newUuids();
-      const asset = factory.asset({ ownerId });
-
-      // Bootstrap the service to set the pluginJwtSecret and loadedPlugins
-      const coreManifest = JSON.stringify({
-        name: 'core-plugin',
-        version: '1.0.0',
-        title: 'Core Plugin',
-        description: 'The core plugin',
-        author: 'Immich',
-        wasm: { path: 'plugin.wasm' },
-      });
-
-      mocks.crypto.randomBytesAsText.mockReturnValue('mock-jwt-secret');
-      mocks.storage.readTextFile.mockResolvedValue(coreManifest);
-      mocks.plugin.getPluginByName.mockResolvedValue(
-        newPluginEntity({ name: 'core-plugin', version: '1.0.0' }),
-      );
-
-      const pluginEntity = newPluginEntity({ id: pluginId, wasmPath: '/path/to/plugin.wasm' });
-      mocks.plugin.getAllPlugins.mockResolvedValue([pluginEntity]);
-      mockNewPlugin.mockResolvedValue({ call: mockPluginCall });
-
-      await sut.onBootstrap();
-
-      // Reset mocks that were used during bootstrap
-      mocks.plugin.getAllPlugins.mockReset();
-
-      return { workflowId, ownerId, pluginId, filterId, actionId, asset };
-    };
 
     it('should return Failed when workflow is not found', async () => {
-      mocks.workflow.getWorkflow.mockResolvedValue(undefined);
+      mocks.workflow.getWorkflow.mockResolvedValue();
 
       const result = await sut.handleWorkflowRun({
         id: newUuid(),
@@ -546,7 +552,7 @@ describe(PluginService.name, () => {
     });
 
     it('should return Success when all filters pass and actions execute', async () => {
-      const { workflowId, ownerId, pluginId, filterId, actionId, asset } = await setupForWorkflowRun();
+      const { workflowId, ownerId, pluginId, filterId, actionId, asset } = await setupForWorkflowRun(sut, mocks, mockNewPlugin, mockPluginCall);
 
       const workflow = newWorkflowEntity({ id: workflowId });
       const wfFilter = newWorkflowFilter({ workflowId, pluginFilterId: filterId });
@@ -565,7 +571,7 @@ describe(PluginService.name, () => {
 
       mockPluginCall
         .mockResolvedValueOnce({ text: () => JSON.stringify({ passed: true }) })
-        .mockResolvedValueOnce(undefined);
+        .mockResolvedValueOnce();
 
       const result = await sut.handleWorkflowRun({
         id: workflowId,
@@ -578,7 +584,7 @@ describe(PluginService.name, () => {
     });
 
     it('should return Skipped when a filter returns passed=false', async () => {
-      const { workflowId, ownerId, pluginId, filterId, actionId, asset } = await setupForWorkflowRun();
+      const { workflowId, ownerId, pluginId, filterId, asset } = await setupForWorkflowRun(sut, mocks, mockNewPlugin, mockPluginCall);
 
       const workflow = newWorkflowEntity({ id: workflowId });
       const wfFilter = newWorkflowFilter({ workflowId, pluginFilterId: filterId });
@@ -603,7 +609,7 @@ describe(PluginService.name, () => {
     });
 
     it('should return Skipped when a filter returns null result', async () => {
-      const { workflowId, ownerId, pluginId, filterId, asset } = await setupForWorkflowRun();
+      const { workflowId, ownerId, pluginId, filterId, asset } = await setupForWorkflowRun(sut, mocks, mockNewPlugin, mockPluginCall);
 
       const workflow = newWorkflowEntity({ id: workflowId });
       const wfFilter = newWorkflowFilter({ workflowId, pluginFilterId: filterId });
@@ -629,7 +635,7 @@ describe(PluginService.name, () => {
     });
 
     it('should return Skipped when filter is not found in the plugin repository', async () => {
-      const { workflowId, ownerId, asset } = await setupForWorkflowRun();
+      const { workflowId, ownerId, asset } = await setupForWorkflowRun(sut, mocks, mockNewPlugin, mockPluginCall);
 
       const workflow = newWorkflowEntity({ id: workflowId });
       const wfFilter = newWorkflowFilter({ workflowId, pluginFilterId: newUuid() });
@@ -638,7 +644,7 @@ describe(PluginService.name, () => {
       mocks.workflow.getFilters.mockResolvedValue([wfFilter as any]);
       mocks.workflow.getActions.mockResolvedValue([]);
 
-      mocks.plugin.getFilter.mockResolvedValue(undefined);
+      mocks.plugin.getFilter.mockResolvedValue();
       mocks.crypto.signJwt.mockReturnValue('signed-jwt-token');
 
       const result = await sut.handleWorkflowRun({
@@ -651,7 +657,7 @@ describe(PluginService.name, () => {
     });
 
     it('should return Skipped when filter plugin instance is not loaded', async () => {
-      const { workflowId, ownerId, asset } = await setupForWorkflowRun();
+      const { workflowId, ownerId, asset } = await setupForWorkflowRun(sut, mocks, mockNewPlugin, mockPluginCall);
 
       const unknownPluginId = newUuid();
       const workflow = newWorkflowEntity({ id: workflowId });
@@ -676,7 +682,7 @@ describe(PluginService.name, () => {
     });
 
     it('should return Failed when action is not found', async () => {
-      const { workflowId, ownerId, asset } = await setupForWorkflowRun();
+      const { workflowId, ownerId, asset } = await setupForWorkflowRun(sut, mocks, mockNewPlugin, mockPluginCall);
 
       const workflow = newWorkflowEntity({ id: workflowId });
 
@@ -684,7 +690,7 @@ describe(PluginService.name, () => {
       mocks.workflow.getFilters.mockResolvedValue([]);
       mocks.workflow.getActions.mockResolvedValue([newWorkflowAction({ workflowId, pluginActionId: newUuid() }) as any]);
 
-      mocks.plugin.getAction.mockResolvedValue(undefined);
+      mocks.plugin.getAction.mockResolvedValue();
       mocks.crypto.signJwt.mockReturnValue('signed-jwt-token');
 
       const result = await sut.handleWorkflowRun({
@@ -697,7 +703,7 @@ describe(PluginService.name, () => {
     });
 
     it('should return Failed when action plugin instance is not loaded', async () => {
-      const { workflowId, ownerId, asset } = await setupForWorkflowRun();
+      const { workflowId, ownerId, asset } = await setupForWorkflowRun(sut, mocks, mockNewPlugin, mockPluginCall);
 
       const unknownPluginId = newUuid();
       const workflow = newWorkflowEntity({ id: workflowId });
@@ -723,7 +729,7 @@ describe(PluginService.name, () => {
     });
 
     it('should execute workflow with no filters and only actions', async () => {
-      const { workflowId, ownerId, pluginId, actionId, asset } = await setupForWorkflowRun();
+      const { workflowId, ownerId, pluginId, actionId, asset } = await setupForWorkflowRun(sut, mocks, mockNewPlugin, mockPluginCall);
 
       const workflow = newWorkflowEntity({ id: workflowId });
       const wfAction = newWorkflowAction({ workflowId, pluginActionId: actionId });
@@ -736,7 +742,7 @@ describe(PluginService.name, () => {
       mocks.plugin.getAction.mockResolvedValue(action as any);
       mocks.crypto.signJwt.mockReturnValue('signed-jwt-token');
 
-      mockPluginCall.mockResolvedValueOnce(undefined);
+      mockPluginCall.mockResolvedValueOnce();
 
       const result = await sut.handleWorkflowRun({
         id: workflowId,
@@ -749,7 +755,7 @@ describe(PluginService.name, () => {
     });
 
     it('should pass correct input to filter plugin calls', async () => {
-      const { workflowId, ownerId, pluginId, filterId, asset } = await setupForWorkflowRun();
+      const { workflowId, ownerId, pluginId, filterId, asset } = await setupForWorkflowRun(sut, mocks, mockNewPlugin, mockPluginCall);
 
       const filterConfig = { assetType: 'image' };
       const workflow = newWorkflowEntity({ id: workflowId });
@@ -790,7 +796,7 @@ describe(PluginService.name, () => {
     });
 
     it('should pass correct input to action plugin calls', async () => {
-      const { workflowId, ownerId, pluginId, actionId, asset } = await setupForWorkflowRun();
+      const { workflowId, ownerId, pluginId, actionId, asset } = await setupForWorkflowRun(sut, mocks, mockNewPlugin, mockPluginCall);
 
       const actionConfig = { albumId: newUuid() };
       const workflow = newWorkflowEntity({ id: workflowId });
@@ -804,7 +810,7 @@ describe(PluginService.name, () => {
       mocks.plugin.getAction.mockResolvedValue(action as any);
       mocks.crypto.signJwt.mockReturnValue('signed-jwt-token');
 
-      mockPluginCall.mockResolvedValueOnce(undefined);
+      mockPluginCall.mockResolvedValueOnce();
 
       await sut.handleWorkflowRun({
         id: workflowId,
@@ -869,7 +875,7 @@ describe(PluginService.name, () => {
     });
 
     it('should execute multiple filters sequentially and stop on first failure', async () => {
-      const { workflowId, ownerId, pluginId, asset } = await setupForWorkflowRun();
+      const { workflowId, ownerId, pluginId, asset } = await setupForWorkflowRun(sut, mocks, mockNewPlugin, mockPluginCall);
 
       const [filterId1, filterId2] = newUuids();
       const workflow = newWorkflowEntity({ id: workflowId });
@@ -901,7 +907,7 @@ describe(PluginService.name, () => {
     });
 
     it('should execute multiple actions sequentially', async () => {
-      const { workflowId, ownerId, pluginId, asset } = await setupForWorkflowRun();
+      const { workflowId, ownerId, pluginId, asset } = await setupForWorkflowRun(sut, mocks, mockNewPlugin, mockPluginCall);
 
       const [actionId1, actionId2] = newUuids();
       const workflow = newWorkflowEntity({ id: workflowId });
@@ -917,7 +923,7 @@ describe(PluginService.name, () => {
       mocks.plugin.getAction.mockResolvedValueOnce(action1 as any).mockResolvedValueOnce(action2 as any);
       mocks.crypto.signJwt.mockReturnValue('signed-jwt-token');
 
-      mockPluginCall.mockResolvedValue(undefined);
+      mockPluginCall.mockResolvedValue();
 
       const result = await sut.handleWorkflowRun({
         id: workflowId,
@@ -932,7 +938,7 @@ describe(PluginService.name, () => {
     });
 
     it('should sign JWT with the user ID from the event', async () => {
-      const { workflowId, ownerId, pluginId, actionId, asset } = await setupForWorkflowRun();
+      const { workflowId, ownerId, pluginId, actionId, asset } = await setupForWorkflowRun(sut, mocks, mockNewPlugin, mockPluginCall);
 
       const workflow = newWorkflowEntity({ id: workflowId });
       const wfAction = newWorkflowAction({ workflowId, pluginActionId: actionId });
@@ -945,7 +951,7 @@ describe(PluginService.name, () => {
       mocks.plugin.getAction.mockResolvedValue(action as any);
       mocks.crypto.signJwt.mockReturnValue('signed-jwt-token');
 
-      mockPluginCall.mockResolvedValueOnce(undefined);
+      mockPluginCall.mockResolvedValueOnce();
 
       await sut.handleWorkflowRun({
         id: workflowId,

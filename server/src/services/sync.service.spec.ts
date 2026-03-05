@@ -36,16 +36,17 @@ const parseChunks = (chunks: string[]) => {
  * Create mock sub-repos for SyncRepository. The automock doesn't handle
  * nested instance properties created in the constructor, so we wire them up manually.
  */
+const makeSub = () => ({
+  getDeletes: vi.fn().mockReturnValue(makeStream([])),
+  getUpserts: vi.fn().mockReturnValue(makeStream([])),
+  getBackfill: vi.fn().mockReturnValue(makeStream([])),
+  getCreatedAfter: vi.fn().mockResolvedValue([]),
+  cleanupAuditTable: vi.fn().mockResolvedValue(),
+  getCreates: vi.fn().mockReturnValue(makeStream([])),
+  getUpdates: vi.fn().mockReturnValue(makeStream([])),
+});
+
 const setupSyncMocks = (mocks: ServiceMocks) => {
-  const makeSub = () => ({
-    getDeletes: vi.fn().mockReturnValue(makeStream([])),
-    getUpserts: vi.fn().mockReturnValue(makeStream([])),
-    getBackfill: vi.fn().mockReturnValue(makeStream([])),
-    getCreatedAfter: vi.fn().mockResolvedValue([]),
-    cleanupAuditTable: vi.fn().mockResolvedValue(undefined),
-    getCreates: vi.fn().mockReturnValue(makeStream([])),
-    getUpdates: vi.fn().mockReturnValue(makeStream([])),
-  });
 
   const subs = {
     album: makeSub(),

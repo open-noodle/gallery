@@ -564,7 +564,7 @@ describe(NotificationService.name, () => {
       const ids = [newUuid(), newUuid()];
       const readAt = new Date();
       mocks.access.notification.checkOwnerAccess.mockResolvedValue(new Set(ids));
-      mocks.notification.updateAll.mockResolvedValue(undefined);
+      mocks.notification.updateAll.mockResolvedValue();
 
       await sut.updateAll(auth, { ids, readAt });
       expect(mocks.notification.updateAll).toHaveBeenCalledWith(ids, { readAt });
@@ -576,7 +576,7 @@ describe(NotificationService.name, () => {
       const auth = { user: { id: newUuid() } } as any;
       const ids = [newUuid(), newUuid()];
       mocks.access.notification.checkOwnerAccess.mockResolvedValue(new Set(ids));
-      mocks.notification.deleteAll.mockResolvedValue(undefined);
+      mocks.notification.deleteAll.mockResolvedValue();
 
       await sut.deleteAll(auth, { ids });
       expect(mocks.notification.deleteAll).toHaveBeenCalledWith(ids);
@@ -598,7 +598,7 @@ describe(NotificationService.name, () => {
       const auth = { user: { id: newUuid() } } as any;
       const id = newUuid();
       mocks.access.notification.checkOwnerAccess.mockResolvedValue(new Set([id]));
-      mocks.notification.get.mockResolvedValue(undefined);
+      mocks.notification.get.mockResolvedValue();
 
       await expect(sut.get(auth, id)).rejects.toThrow('Notification not found');
     });
@@ -623,7 +623,7 @@ describe(NotificationService.name, () => {
       const auth = { user: { id: newUuid() } } as any;
       const id = newUuid();
       mocks.access.notification.checkOwnerAccess.mockResolvedValue(new Set([id]));
-      mocks.notification.delete.mockResolvedValue(undefined);
+      mocks.notification.delete.mockResolvedValue();
 
       await sut.delete(auth, id);
       expect(mocks.notification.delete).toHaveBeenCalledWith(id);
@@ -632,7 +632,7 @@ describe(NotificationService.name, () => {
 
   describe('onNotificationsCleanup', () => {
     it('should call cleanup on the notification repository', async () => {
-      mocks.notification.cleanup.mockResolvedValue(undefined);
+      mocks.notification.cleanup.mockResolvedValue();
       await sut.onNotificationsCleanup();
       expect(mocks.notification.cleanup).toHaveBeenCalled();
     });
@@ -640,7 +640,7 @@ describe(NotificationService.name, () => {
 
   describe('onJobError', () => {
     it('should return early if no admin exists', async () => {
-      mocks.user.getAdmin.mockResolvedValue(undefined);
+      mocks.user.getAdmin.mockResolvedValue();
 
       await sut.onJobError({ job: { name: JobName.DatabaseBackup, data: {} }, error: new Error('fail') });
       expect(mocks.notification.create).not.toHaveBeenCalled();
@@ -739,7 +739,7 @@ describe(NotificationService.name, () => {
 
   describe('sendTestEmail', () => {
     it('should throw if user is not found', async () => {
-      mocks.user.get.mockResolvedValue(undefined);
+      mocks.user.get.mockResolvedValue();
       await expect(sut.sendTestEmail('user-id', configs.smtpEnabled.notifications.smtp)).rejects.toThrow(
         'User not found',
       );

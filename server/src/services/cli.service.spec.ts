@@ -233,7 +233,7 @@ describe(CliService.name, () => {
       mocks.user.update.mockResolvedValue(admin);
       mocks.crypto.randomBytesAsText.mockReturnValue('generated-random-password');
 
-      const ask = vitest.fn().mockResolvedValue(undefined);
+      const ask = vitest.fn().mockResolvedValue();
 
       const response = await sut.resetAdminPassword(ask);
 

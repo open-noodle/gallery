@@ -723,7 +723,7 @@ describe(LibraryService.name, () => {
     it('should throw an error when library is not found', async () => {
       const libraryId = newUuid();
 
-      mocks.library.getStatistics.mockResolvedValue(undefined);
+      mocks.library.getStatistics.mockResolvedValue();
 
       await expect(sut.getStatistics(libraryId)).rejects.toBeInstanceOf(BadRequestException);
       expect(mocks.library.getStatistics).toHaveBeenCalledWith(libraryId);
@@ -1184,7 +1184,7 @@ describe(LibraryService.name, () => {
     it('should handle when asset is not found for a path', async () => {
       const library = factory.library();
 
-      mocks.asset.getByLibraryIdAndOriginalPath.mockResolvedValue(undefined);
+      mocks.asset.getByLibraryIdAndOriginalPath.mockResolvedValue();
 
       await expect(
         sut.handleAssetRemoval({ libraryId: library.id, paths: ['/data/missing.jpg'] }),

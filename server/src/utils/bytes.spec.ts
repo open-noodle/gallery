@@ -73,9 +73,9 @@ describe('asHumanReadable', () => {
 });
 
 describe('hexOrBufferToBase64', () => {
-  it('should convert a hex-encoded string (with \\x prefix) to base64', () => {
+  it(String.raw`should convert a hex-encoded string (with \x prefix) to base64`, () => {
     // "hello" in hex is 68656c6c6f
-    const hex = '\\x68656c6c6f';
+    const hex = String.raw`\x68656c6c6f`;
     const result = hexOrBufferToBase64(hex);
 
     expect(result).toBe(Buffer.from('hello').toString('base64'));
@@ -89,7 +89,7 @@ describe('hexOrBufferToBase64', () => {
   });
 
   it('should handle an empty hex string', () => {
-    const hex = '\\x';
+    const hex = String.raw`\x`;
     const result = hexOrBufferToBase64(hex);
 
     expect(result).toBe('');
@@ -104,7 +104,7 @@ describe('hexOrBufferToBase64', () => {
 
   it('should produce consistent results for hex string and equivalent Buffer', () => {
     const data = 'test data 123';
-    const hexString = '\\x' + Buffer.from(data).toString('hex');
+    const hexString = String.raw`\x` + Buffer.from(data).toString('hex');
     const buffer = Buffer.from(data);
 
     expect(hexOrBufferToBase64(hexString)).toBe(hexOrBufferToBase64(buffer));
@@ -112,7 +112,7 @@ describe('hexOrBufferToBase64', () => {
 
   it('should handle binary data in hex format', () => {
     // Binary bytes 0x00, 0xFF, 0x80
-    const hex = '\\x00ff80';
+    const hex = String.raw`\x00ff80`;
     const result = hexOrBufferToBase64(hex);
 
     const expected = Buffer.from([0x00, 0xff, 0x80]).toString('base64');

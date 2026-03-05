@@ -46,69 +46,69 @@ describe('tokenizeForSearch', () => {
 
   describe('CJK text', () => {
     it('should tokenize a single CJK character as-is', () => {
-      expect(tokenizeForSearch('\u4e16')).toEqual(['\u4e16']);
+      expect(tokenizeForSearch('\u4E16')).toEqual(['\u4E16']);
     });
 
     it('should tokenize two CJK characters into a single bigram', () => {
-      expect(tokenizeForSearch('\u4e16\u754c')).toEqual(['\u4e16\u754c']);
+      expect(tokenizeForSearch('\u4E16\u754C')).toEqual(['\u4E16\u754C']);
     });
 
     it('should tokenize three CJK characters into overlapping bigrams', () => {
       // 世界杯 -> 世界, 界杯
-      expect(tokenizeForSearch('\u4e16\u754c\u676f')).toEqual(['\u4e16\u754c', '\u754c\u676f']);
+      expect(tokenizeForSearch('\u4E16\u754C\u676F')).toEqual(['\u4E16\u754C', '\u754C\u676F']);
     });
 
     it('should tokenize four CJK characters into overlapping bigrams', () => {
       // 人工智能 -> 人工, 工智, 智能
-      expect(tokenizeForSearch('\u4eba\u5de5\u667a\u80fd')).toEqual(['\u4eba\u5de5', '\u5de5\u667a', '\u667a\u80fd']);
+      expect(tokenizeForSearch('\u4EBA\u5DE5\u667A\u80FD')).toEqual(['\u4EBA\u5DE5', '\u5DE5\u667A', '\u667A\u80FD']);
     });
 
     it('should handle Japanese Hiragana', () => {
       // こんにちは (5 chars) -> こん, んに, にち, ちは
-      expect(tokenizeForSearch('\u3053\u3093\u306b\u3061\u306f')).toEqual([
+      expect(tokenizeForSearch('\u3053\u3093\u306B\u3061\u306F')).toEqual([
         '\u3053\u3093',
-        '\u3093\u306b',
-        '\u306b\u3061',
-        '\u3061\u306f',
+        '\u3093\u306B',
+        '\u306B\u3061',
+        '\u3061\u306F',
       ]);
     });
 
     it('should handle Japanese Katakana', () => {
       // カタカナ (4 chars) -> カタ, タカ, カナ
-      expect(tokenizeForSearch('\u30ab\u30bf\u30ab\u30ca')).toEqual(['\u30ab\u30bf', '\u30bf\u30ab', '\u30ab\u30ca']);
+      expect(tokenizeForSearch('\u30AB\u30BF\u30AB\u30CA')).toEqual(['\u30AB\u30BF', '\u30BF\u30AB', '\u30AB\u30CA']);
     });
 
     it('should handle Korean characters', () => {
       // 한국 (2 chars) -> 한국
-      expect(tokenizeForSearch('\ud55c\uad6d')).toEqual(['\ud55c\uad6d']);
+      expect(tokenizeForSearch('\uD55C\uAD6D')).toEqual(['\uD55C\uAD6D']);
     });
   });
 
   describe('mixed text', () => {
     it('should handle CJK followed by Latin', () => {
-      expect(tokenizeForSearch('\u4e16\u754c hello')).toEqual(['\u4e16\u754c', 'hello']);
+      expect(tokenizeForSearch('\u4E16\u754C hello')).toEqual(['\u4E16\u754C', 'hello']);
     });
 
     it('should handle Latin followed by CJK', () => {
-      expect(tokenizeForSearch('hello \u4e16\u754c')).toEqual(['hello', '\u4e16\u754c']);
+      expect(tokenizeForSearch('hello \u4E16\u754C')).toEqual(['hello', '\u4E16\u754C']);
     });
 
     it('should handle alternating Latin and CJK', () => {
-      expect(tokenizeForSearch('test \u4e16\u754c\u676f more')).toEqual([
+      expect(tokenizeForSearch('test \u4E16\u754C\u676F more')).toEqual([
         'test',
-        '\u4e16\u754c',
-        '\u754c\u676f',
+        '\u4E16\u754C',
+        '\u754C\u676F',
         'more',
       ]);
     });
 
     it('should handle CJK and Latin without spaces between them', () => {
       // CJK chars are split from Latin even without whitespace
-      expect(tokenizeForSearch('\u4e16\u754chello')).toEqual(['\u4e16\u754c', 'hello']);
+      expect(tokenizeForSearch('\u4E16\u754Chello')).toEqual(['\u4E16\u754C', 'hello']);
     });
 
     it('should handle Latin followed by CJK without spaces', () => {
-      expect(tokenizeForSearch('hello\u4e16\u754c')).toEqual(['hello', '\u4e16\u754c']);
+      expect(tokenizeForSearch('hello\u4E16\u754C')).toEqual(['hello', '\u4E16\u754C']);
     });
   });
 });
@@ -256,7 +256,7 @@ describe('isAssetChecksumConstraint', () => {
   });
 
   it('should return false for undefined', () => {
-    expect(isAssetChecksumConstraint(undefined)).toBe(false);
+    expect(isAssetChecksumConstraint()).toBe(false);
   });
 
   it('should return false for an object without constraint_name', () => {
@@ -295,7 +295,7 @@ describe('updateLockedColumns', () => {
       description: 'desc',
       dateTimeOriginal: new Date(),
       latitude: 40.7,
-      longitude: -74.0,
+      longitude: -74,
       rating: 3,
       timeZone: 'UTC',
       tags: ['tag1'],

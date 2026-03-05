@@ -15,11 +15,13 @@
 ## Task 1: Add AWS SDK dependencies
 
 **Files:**
+
 - Modify: `server/package.json`
 
 **Step 1: Install packages**
 
 Run:
+
 ```bash
 cd server && pnpm add @aws-sdk/client-s3 @aws-sdk/s3-request-presigner @aws-sdk/lib-storage
 ```
@@ -27,9 +29,11 @@ cd server && pnpm add @aws-sdk/client-s3 @aws-sdk/s3-request-presigner @aws-sdk/
 **Step 2: Verify installation**
 
 Run:
+
 ```bash
 cd server && node -e "require('@aws-sdk/client-s3'); require('@aws-sdk/s3-request-presigner'); require('@aws-sdk/lib-storage'); console.log('OK')"
 ```
+
 Expected: `OK`
 
 **Step 3: Commit**
@@ -44,6 +48,7 @@ git commit -m "feat(server): add AWS S3 SDK dependencies"
 ## Task 2: Add S3 configuration to EnvDto and config repository
 
 **Files:**
+
 - Modify: `server/src/dtos/env.dto.ts`
 - Modify: `server/src/repositories/config.repository.ts` (the `EnvData` interface and `getEnv()` function)
 
@@ -231,6 +236,7 @@ git commit -m "feat(server): add S3 storage configuration env vars"
 ## Task 3: Create StorageBackend interface
 
 **Files:**
+
 - Create: `server/src/interfaces/storage-backend.interface.ts`
 
 **Step 1: Create the interface file**
@@ -286,6 +292,7 @@ git commit -m "feat(server): add StorageBackend interface"
 ## Task 4: Implement DiskStorageBackend
 
 **Files:**
+
 - Create: `server/src/backends/disk-storage.backend.ts`
 - Create: `server/src/backends/disk-storage.backend.spec.ts`
 
@@ -484,6 +491,7 @@ git commit -m "feat(server): implement DiskStorageBackend"
 ## Task 5: Implement S3StorageBackend
 
 **Files:**
+
 - Create: `server/src/backends/s3-storage.backend.ts`
 - Create: `server/src/backends/s3-storage.backend.spec.ts`
 
@@ -668,12 +676,7 @@ Expected: FAIL — module `src/backends/s3-storage.backend` does not exist.
 Create `server/src/backends/s3-storage.backend.ts`:
 
 ```typescript
-import {
-  DeleteObjectCommand,
-  GetObjectCommand,
-  HeadObjectCommand,
-  S3Client,
-} from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Upload } from '@aws-sdk/lib-storage';
 import { createWriteStream } from 'node:fs';
@@ -735,9 +738,7 @@ export class S3StorageBackend implements StorageBackend {
   }
 
   async get(key: string): Promise<{ stream: Readable; contentType?: string; length?: number }> {
-    const response = await this.client.send(
-      new GetObjectCommand({ Bucket: this.bucket, Key: key }),
-    );
+    const response = await this.client.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }));
 
     return {
       stream: response.Body as Readable,
@@ -818,6 +819,7 @@ git commit -m "feat(server): implement S3StorageBackend"
 ## Task 6: Create StorageBackend provider and resolver
 
 **Files:**
+
 - Create: `server/src/backends/storage-backend.provider.ts`
 - Create: `server/src/backends/storage-backend.provider.spec.ts`
 
@@ -879,11 +881,7 @@ export const WRITE_BACKEND = 'WRITE_BACKEND';
  * Absolute paths (starting with /) are disk assets (legacy).
  * Relative keys are S3 assets.
  */
-export function resolveBackend(
-  key: string,
-  diskBackend: StorageBackend,
-  s3Backend: StorageBackend,
-): StorageBackend {
+export function resolveBackend(key: string, diskBackend: StorageBackend, s3Backend: StorageBackend): StorageBackend {
   if (isAbsolute(key)) {
     return diskBackend;
   }
@@ -916,6 +914,7 @@ git commit -m "feat(server): add StorageBackend resolver and factory functions"
 ## Task 7: Modify StorageCore to produce relative keys
 
 **Files:**
+
 - Modify: `server/src/cores/storage.core.ts`
 - Modify/create: `server/src/cores/storage.core.spec.ts` (if not existing, check first)
 
@@ -1039,6 +1038,7 @@ git commit -m "feat(server): add relative-key path methods to StorageCore"
 ## Task 8: Extend ImmichFileResponse and sendFile to support redirect/stream
 
 **Files:**
+
 - Modify: `server/src/utils/file.ts`
 - Create or modify: `server/src/utils/file.spec.ts`
 
@@ -1112,6 +1112,7 @@ export type ImmichMediaResponse = ImmichFileResponse | ImmichRedirectResponse | 
 ```
 
 Add `Readable` to the imports at top:
+
 ```typescript
 import { Readable } from 'node:stream';
 ```
@@ -1133,6 +1134,7 @@ git commit -m "feat(server): add ImmichRedirectResponse and ImmichStreamResponse
 ## Task 9: Update sendFile to handle all response types
 
 **Files:**
+
 - Modify: `server/src/utils/file.ts`
 - Modify: `server/src/utils/file.spec.ts`
 
@@ -1141,7 +1143,13 @@ git commit -m "feat(server): add ImmichRedirectResponse and ImmichStreamResponse
 Add to `server/src/utils/file.spec.ts`:
 
 ```typescript
-import { sendFile, ImmichFileResponse, ImmichRedirectResponse, ImmichStreamResponse, ImmichMediaResponse } from 'src/utils/file';
+import {
+  sendFile,
+  ImmichFileResponse,
+  ImmichRedirectResponse,
+  ImmichStreamResponse,
+  ImmichMediaResponse,
+} from 'src/utils/file';
 import { CacheControl } from 'src/enum';
 import { LoggingRepository } from 'src/repositories/logging.repository';
 
@@ -1293,6 +1301,7 @@ git commit -m "feat(server): extend sendFile to handle redirect and stream respo
 ## Task 10: Wire up StorageBackend in BaseService and StorageService
 
 **Files:**
+
 - Modify: `server/src/services/storage.service.ts`
 - Modify: `server/src/services/base.service.ts`
 
@@ -1303,6 +1312,7 @@ This task integrates the backend into the service layer. The StorageService init
 Modify `server/src/services/storage.service.ts`:
 
 At the top, add imports:
+
 ```typescript
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend';
 import { S3StorageBackend } from 'src/backends/s3-storage.backend';
@@ -1311,6 +1321,7 @@ import { StorageBackend } from 'src/interfaces/storage-backend.interface';
 ```
 
 Add static fields and accessor:
+
 ```typescript
 @Injectable()
 export class StorageService extends BaseService {
@@ -1342,22 +1353,23 @@ export class StorageService extends BaseService {
 ```
 
 In the `onBootstrap` method, after `StorageCore.setMediaLocation(...)`, add:
+
 ```typescript
-    // Initialize storage backends
-    const envData = this.configRepository.getEnv();
-    StorageService.diskBackend = new DiskStorageBackend(StorageCore.getMediaLocation());
-    StorageService.writeBackendType = envData.storage.backend;
+// Initialize storage backends
+const envData = this.configRepository.getEnv();
+StorageService.diskBackend = new DiskStorageBackend(StorageCore.getMediaLocation());
+StorageService.writeBackendType = envData.storage.backend;
 
-    if (envData.storage.s3.bucket) {
-      StorageService.s3Backend = new S3StorageBackend(envData.storage.s3);
-      this.logger.log(`S3 storage backend configured (bucket: ${envData.storage.s3.bucket})`);
-    }
+if (envData.storage.s3.bucket) {
+  StorageService.s3Backend = new S3StorageBackend(envData.storage.s3);
+  this.logger.log(`S3 storage backend configured (bucket: ${envData.storage.s3.bucket})`);
+}
 
-    if (envData.storage.backend === 's3' && !StorageService.s3Backend) {
-      throw new ImmichStartupError('IMMICH_STORAGE_BACKEND is set to s3 but IMMICH_S3_BUCKET is not configured');
-    }
+if (envData.storage.backend === 's3' && !StorageService.s3Backend) {
+  throw new ImmichStartupError('IMMICH_STORAGE_BACKEND is set to s3 but IMMICH_S3_BUCKET is not configured');
+}
 
-    this.logger.log(`Storage write backend: ${envData.storage.backend}`);
+this.logger.log(`Storage write backend: ${envData.storage.backend}`);
 ```
 
 **Step 2: Verify TypeScript compiles**
@@ -1382,6 +1394,7 @@ git commit -m "feat(server): wire up StorageBackend initialization in StorageSer
 ## Task 11: Update AssetMediaService to use StorageBackend for serving
 
 **Files:**
+
 - Modify: `server/src/services/asset-media.service.ts`
 
 This is where `downloadOriginal`, `viewThumbnail`, and `playbackVideo` need to return the appropriate response type based on the backend.
@@ -1412,6 +1425,7 @@ it('should return redirect response for S3 asset in downloadOriginal', async () 
 ```
 
 This test structure will evolve as the implementation proceeds. The key verification is:
+
 - Disk assets (absolute paths) → `ImmichFileResponse` (existing behavior)
 - S3 assets (relative keys) → `ImmichRedirectResponse` or `ImmichStreamResponse`
 
@@ -1420,12 +1434,14 @@ This test structure will evolve as the implementation proceeds. The key verifica
 In `server/src/services/asset-media.service.ts`, update the serve methods to check the path format and use the appropriate backend:
 
 Add import at top:
+
 ```typescript
 import { StorageService } from 'src/services/storage.service';
 import { ImmichMediaResponse, ImmichRedirectResponse, ImmichStreamResponse } from 'src/utils/file';
 ```
 
 Add a private helper method:
+
 ```typescript
   private async serveFromBackend(
     filePath: string,
@@ -1465,9 +1481,14 @@ Add a private helper method:
 ```
 
 Update `downloadOriginal` return type to `Promise<ImmichMediaResponse>` and use:
+
 ```typescript
-    return this.serveFromBackend(path, mimeTypes.lookup(path), CacheControl.PrivateWithCache,
-      getFileNameWithoutExtension(originalFileName) + getFilenameExtension(path));
+return this.serveFromBackend(
+  path,
+  mimeTypes.lookup(path),
+  CacheControl.PrivateWithCache,
+  getFileNameWithoutExtension(originalFileName) + getFilenameExtension(path),
+);
 ```
 
 Update `viewThumbnail` return type to `Promise<ImmichMediaResponse | AssetMediaRedirectResponse>` and use `serveFromBackend` for the `ImmichFileResponse` case.
@@ -1498,6 +1519,7 @@ git commit -m "feat(server): serve files from StorageBackend in AssetMediaServic
 ## Task 12: Update MediaService thumbnail generation for S3
 
 **Files:**
+
 - Modify: `server/src/services/media.service.ts`
 
 The thumbnail generation methods read `asset.originalPath` and write output files. For S3 assets, we need to download the original to temp, process it, then upload the output.
@@ -1512,6 +1534,7 @@ import { isAbsolute } from 'node:path';
 ```
 
 Add a private helper:
+
 ```typescript
   /**
    * For S3 assets, downloads original to temp before processing.
@@ -1567,6 +1590,7 @@ git commit -m "feat(server): add S3 download/upload bracket to media processing"
 ## Task 13: Update DownloadService for S3 assets in ZIP
 
 **Files:**
+
 - Modify: `server/src/services/download.service.ts`
 
 **Step 1: Update downloadArchive to stream from S3**
@@ -1574,46 +1598,48 @@ git commit -m "feat(server): add S3 download/upload bracket to media processing"
 In the `downloadArchive` method, the current code calls `storageRepository.realpath(realpath)` and `zip.addFile(realpath, filename)`. For S3 assets, we need to get a stream from the backend instead.
 
 Add import:
+
 ```typescript
 import { StorageService } from 'src/services/storage.service';
 import { isAbsolute } from 'node:path';
 ```
 
 Replace the file-adding loop:
+
 ```typescript
-    for (const assetId of dto.assetIds) {
-      const asset = assetMap.get(assetId);
-      if (!asset) {
-        continue;
-      }
+for (const assetId of dto.assetIds) {
+  const asset = assetMap.get(assetId);
+  if (!asset) {
+    continue;
+  }
 
-      const { originalPath, editedPath, originalFileName } = asset;
+  const { originalPath, editedPath, originalFileName } = asset;
 
-      let filename = originalFileName;
-      const count = paths[filename] || 0;
-      paths[filename] = count + 1;
-      if (count !== 0) {
-        const parsedFilename = parse(originalFileName);
-        filename = `${parsedFilename.name}+${count}${parsedFilename.ext}`;
-      }
+  let filename = originalFileName;
+  const count = paths[filename] || 0;
+  paths[filename] = count + 1;
+  if (count !== 0) {
+    const parsedFilename = parse(originalFileName);
+    filename = `${parsedFilename.name}+${count}${parsedFilename.ext}`;
+  }
 
-      let filePath = dto.edited && editedPath ? editedPath : originalPath;
+  let filePath = dto.edited && editedPath ? editedPath : originalPath;
 
-      if (isAbsolute(filePath)) {
-        // Disk asset — existing behavior
-        try {
-          filePath = await this.storageRepository.realpath(filePath);
-        } catch {
-          this.logger.warn('Unable to resolve realpath', { originalPath });
-        }
-        zip.addFile(filePath, filename);
-      } else {
-        // S3 asset — stream from backend
-        const backend = StorageService.resolveBackendForKey(filePath);
-        const { stream } = await backend.get(filePath);
-        zip.addFile(stream, filename);
-      }
+  if (isAbsolute(filePath)) {
+    // Disk asset — existing behavior
+    try {
+      filePath = await this.storageRepository.realpath(filePath);
+    } catch {
+      this.logger.warn('Unable to resolve realpath', { originalPath });
     }
+    zip.addFile(filePath, filename);
+  } else {
+    // S3 asset — stream from backend
+    const backend = StorageService.resolveBackendForKey(filePath);
+    const { stream } = await backend.get(filePath);
+    zip.addFile(stream, filename);
+  }
+}
 ```
 
 Note: `zip.addFile` may need to accept a `Readable` stream in addition to a path. Check the `ImmichZipStream` interface in `server/src/repositories/storage.repository.ts`. If `addFile` only accepts paths, it will need to be extended to accept streams. The `archiver` library supports both `file()` and `append()` — verify the implementation.
@@ -1635,6 +1661,7 @@ git commit -m "feat(server): support S3 assets in ZIP download"
 ## Task 14: Update StorageService file deletion for S3
 
 **Files:**
+
 - Modify: `server/src/services/storage.service.ts`
 
 **Step 1: Update handleDeleteFiles to use backend**
@@ -1668,6 +1695,7 @@ The `handleDeleteFiles` job currently calls `storageRepository.unlink(file)`. Fo
 ```
 
 Add import:
+
 ```typescript
 import { isAbsolute } from 'node:path';
 ```
@@ -1689,11 +1717,13 @@ git commit -m "feat(server): delete S3 objects in FileDelete job"
 ## Task 15: Update upload flow to write to S3
 
 **Files:**
+
 - Modify: `server/src/services/asset-media.service.ts`
 
 **Step 1: Update the create() method to upload to S3**
 
 In the `create()` method (line ~427), after the asset is created in the DB with the temp upload path, if the write backend is S3:
+
 1. Compute the relative key using the storage template
 2. Upload the temp file to S3
 3. Update the DB record with the relative key
@@ -1704,40 +1734,37 @@ This is the most complex integration point. The storage template logic currently
 Add to the `create()` method after the asset is created:
 
 ```typescript
-    // If S3 backend, upload the file and update the path
-    const writeBackend = StorageService.getWriteBackend();
-    if (!(writeBackend instanceof DiskStorageBackend)) {
-      const relativeKey = StorageCore.getRelativeNestedPath(
-        StorageFolder.Upload,
-        ownerId,
-        `${asset.id}${getFilenameExtension(file.originalPath)}`,
-      );
-      const { createReadStream } = await import('node:fs');
-      await writeBackend.put(relativeKey, createReadStream(file.originalPath), {
-        contentType: mimeTypes.lookup(file.originalPath),
-      });
-      await this.assetRepository.update({ id: asset.id, originalPath: relativeKey });
-      // Clean up the temp local file
-      await this.jobRepository.queue({ name: JobName.FileDelete, data: { files: [file.originalPath] } });
+// If S3 backend, upload the file and update the path
+const writeBackend = StorageService.getWriteBackend();
+if (!(writeBackend instanceof DiskStorageBackend)) {
+  const relativeKey = StorageCore.getRelativeNestedPath(
+    StorageFolder.Upload,
+    ownerId,
+    `${asset.id}${getFilenameExtension(file.originalPath)}`,
+  );
+  const { createReadStream } = await import('node:fs');
+  await writeBackend.put(relativeKey, createReadStream(file.originalPath), {
+    contentType: mimeTypes.lookup(file.originalPath),
+  });
+  await this.assetRepository.update({ id: asset.id, originalPath: relativeKey });
+  // Clean up the temp local file
+  await this.jobRepository.queue({ name: JobName.FileDelete, data: { files: [file.originalPath] } });
 
-      if (sidecarFile) {
-        const sidecarKey = StorageCore.getRelativeNestedPath(
-          StorageFolder.Upload,
-          ownerId,
-          `${asset.id}.xmp`,
-        );
-        await writeBackend.put(sidecarKey, createReadStream(sidecarFile.originalPath));
-        await this.assetRepository.upsertFile({
-          assetId: asset.id,
-          path: sidecarKey,
-          type: AssetFileType.Sidecar,
-        });
-        await this.jobRepository.queue({ name: JobName.FileDelete, data: { files: [sidecarFile.originalPath] } });
-      }
-    }
+  if (sidecarFile) {
+    const sidecarKey = StorageCore.getRelativeNestedPath(StorageFolder.Upload, ownerId, `${asset.id}.xmp`);
+    await writeBackend.put(sidecarKey, createReadStream(sidecarFile.originalPath));
+    await this.assetRepository.upsertFile({
+      assetId: asset.id,
+      path: sidecarKey,
+      type: AssetFileType.Sidecar,
+    });
+    await this.jobRepository.queue({ name: JobName.FileDelete, data: { files: [sidecarFile.originalPath] } });
+  }
+}
 ```
 
 Add imports:
+
 ```typescript
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend';
 import { StorageService } from 'src/services/storage.service';
@@ -1760,6 +1787,7 @@ git commit -m "feat(server): upload assets to S3 in create flow"
 ## Task 16: Integration test with MinIO
 
 **Files:**
+
 - Create: `server/src/backends/s3-storage.backend.integration.spec.ts`
 
 This test uses testcontainers to spin up a MinIO container and runs the full put/get/exists/delete/downloadToTemp cycle against real S3.
@@ -1905,22 +1933,22 @@ git commit -m "fix(server): resolve lint and type errors from S3 storage backend
 
 ## Summary of tasks
 
-| Task | Description | Key files |
-|------|-------------|-----------|
-| 1 | Install AWS SDK | `package.json` |
-| 2 | S3 env config | `env.dto.ts`, `config.repository.ts` |
-| 3 | StorageBackend interface | `interfaces/storage-backend.interface.ts` |
-| 4 | DiskStorageBackend | `backends/disk-storage.backend.ts` |
-| 5 | S3StorageBackend | `backends/s3-storage.backend.ts` |
-| 6 | Backend resolver | `backends/storage-backend.provider.ts` |
-| 7 | StorageCore relative keys | `cores/storage.core.ts` |
-| 8 | Response classes | `utils/file.ts` |
-| 9 | sendFile update | `utils/file.ts` |
-| 10 | Bootstrap wiring | `services/storage.service.ts` |
-| 11 | Serve from backend | `services/asset-media.service.ts` |
-| 12 | Thumbnail/transcode S3 | `services/media.service.ts` |
-| 13 | ZIP download S3 | `services/download.service.ts` |
-| 14 | File deletion S3 | `services/storage.service.ts` |
-| 15 | Upload to S3 | `services/asset-media.service.ts` |
-| 16 | Integration test | `backends/s3-storage.backend.integration.spec.ts` |
-| 17 | Type-check, lint, full run | all |
+| Task | Description                | Key files                                         |
+| ---- | -------------------------- | ------------------------------------------------- |
+| 1    | Install AWS SDK            | `package.json`                                    |
+| 2    | S3 env config              | `env.dto.ts`, `config.repository.ts`              |
+| 3    | StorageBackend interface   | `interfaces/storage-backend.interface.ts`         |
+| 4    | DiskStorageBackend         | `backends/disk-storage.backend.ts`                |
+| 5    | S3StorageBackend           | `backends/s3-storage.backend.ts`                  |
+| 6    | Backend resolver           | `backends/storage-backend.provider.ts`            |
+| 7    | StorageCore relative keys  | `cores/storage.core.ts`                           |
+| 8    | Response classes           | `utils/file.ts`                                   |
+| 9    | sendFile update            | `utils/file.ts`                                   |
+| 10   | Bootstrap wiring           | `services/storage.service.ts`                     |
+| 11   | Serve from backend         | `services/asset-media.service.ts`                 |
+| 12   | Thumbnail/transcode S3     | `services/media.service.ts`                       |
+| 13   | ZIP download S3            | `services/download.service.ts`                    |
+| 14   | File deletion S3           | `services/storage.service.ts`                     |
+| 15   | Upload to S3               | `services/asset-media.service.ts`                 |
+| 16   | Integration test           | `backends/s3-storage.backend.integration.spec.ts` |
+| 17   | Type-check, lint, full run | all                                               |

@@ -547,7 +547,7 @@ describe(StorageService.name, () => {
     it('should continue deleting files even if one fails', async () => {
       mocks.storage.unlink
         .mockRejectedValueOnce(new Error('first-file-error'))
-        .mockResolvedValueOnce(undefined);
+        .mockResolvedValueOnce();
 
       await sut.handleDeleteFiles({ files: ['/path/to/file1', '/path/to/file2'] });
 

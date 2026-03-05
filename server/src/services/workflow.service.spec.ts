@@ -4,6 +4,67 @@ import { WorkflowService } from 'src/services/workflow.service';
 import { factory, newUuid, newUuids } from 'test/small.factory';
 import { newTestService, ServiceMocks } from 'test/utils';
 
+const makeWorkflow = (overrides: Record<string, unknown> = {}) => {
+  return {
+    id: newUuid(),
+    ownerId: newUuid(),
+    triggerType: PluginTriggerType.AssetCreate,
+    name: 'Test Workflow',
+    description: 'A test workflow',
+    createdAt: new Date('2025-01-01T00:00:00.000Z'),
+    enabled: true,
+    ...overrides,
+  };
+};
+
+const makeFilter = (overrides: Record<string, unknown> = {}) => {
+  return {
+    id: newUuid(),
+    workflowId: newUuid(),
+    pluginFilterId: newUuid(),
+    filterConfig: null,
+    order: 0,
+    ...overrides,
+  };
+};
+
+const makeAction = (overrides: Record<string, unknown> = {}) => {
+  return {
+    id: newUuid(),
+    workflowId: newUuid(),
+    pluginActionId: newUuid(),
+    actionConfig: null,
+    order: 0,
+    ...overrides,
+  };
+};
+
+const makePluginFilter = (overrides: Record<string, unknown> = {}) => {
+  return {
+    id: newUuid(),
+    pluginId: newUuid(),
+    methodName: 'testFilter',
+    title: 'Test Filter',
+    description: 'A test filter',
+    supportedContexts: [PluginContext.Asset],
+    schema: null,
+    ...overrides,
+  };
+};
+
+const makePluginAction = (overrides: Record<string, unknown> = {}) => {
+  return {
+    id: newUuid(),
+    pluginId: newUuid(),
+    methodName: 'testAction',
+    title: 'Test Action',
+    description: 'A test action',
+    supportedContexts: [PluginContext.Asset],
+    schema: null,
+    ...overrides,
+  };
+};
+
 describe(WorkflowService.name, () => {
   let sut: WorkflowService;
   let mocks: ServiceMocks;
@@ -15,67 +76,6 @@ describe(WorkflowService.name, () => {
   it('should work', () => {
     expect(sut).toBeDefined();
   });
-
-  const makeWorkflow = (overrides: Record<string, unknown> = {}) => {
-    return {
-      id: newUuid(),
-      ownerId: newUuid(),
-      triggerType: PluginTriggerType.AssetCreate,
-      name: 'Test Workflow',
-      description: 'A test workflow',
-      createdAt: new Date('2025-01-01T00:00:00.000Z'),
-      enabled: true,
-      ...overrides,
-    };
-  };
-
-  const makeFilter = (overrides: Record<string, unknown> = {}) => {
-    return {
-      id: newUuid(),
-      workflowId: newUuid(),
-      pluginFilterId: newUuid(),
-      filterConfig: null,
-      order: 0,
-      ...overrides,
-    };
-  };
-
-  const makeAction = (overrides: Record<string, unknown> = {}) => {
-    return {
-      id: newUuid(),
-      workflowId: newUuid(),
-      pluginActionId: newUuid(),
-      actionConfig: null,
-      order: 0,
-      ...overrides,
-    };
-  };
-
-  const makePluginFilter = (overrides: Record<string, unknown> = {}) => {
-    return {
-      id: newUuid(),
-      pluginId: newUuid(),
-      methodName: 'testFilter',
-      title: 'Test Filter',
-      description: 'A test filter',
-      supportedContexts: [PluginContext.Asset],
-      schema: null,
-      ...overrides,
-    };
-  };
-
-  const makePluginAction = (overrides: Record<string, unknown> = {}) => {
-    return {
-      id: newUuid(),
-      pluginId: newUuid(),
-      methodName: 'testAction',
-      title: 'Test Action',
-      description: 'A test action',
-      supportedContexts: [PluginContext.Asset],
-      schema: null,
-      ...overrides,
-    };
-  };
 
   describe('create', () => {
     it('should create a workflow with filters and actions', async () => {
@@ -228,7 +228,7 @@ describe(WorkflowService.name, () => {
       const auth = factory.auth();
       const invalidFilterId = newUuid();
 
-      mocks.plugin.getFilter.mockResolvedValue(undefined);
+      mocks.plugin.getFilter.mockResolvedValue();
 
       await expect(
         sut.create(auth, {
@@ -246,7 +246,7 @@ describe(WorkflowService.name, () => {
       const auth = factory.auth();
       const invalidActionId = newUuid();
 
-      mocks.plugin.getAction.mockResolvedValue(undefined);
+      mocks.plugin.getAction.mockResolvedValue();
 
       await expect(
         sut.create(auth, {
@@ -467,7 +467,7 @@ describe(WorkflowService.name, () => {
       const id = newUuid();
 
       mocks.access.workflow.checkOwnerAccess.mockResolvedValue(new Set([id]));
-      mocks.workflow.getWorkflow.mockResolvedValue(undefined);
+      mocks.workflow.getWorkflow.mockResolvedValue();
 
       await expect(sut.get(auth, id)).rejects.toThrow('Workflow not found');
     });
@@ -542,7 +542,7 @@ describe(WorkflowService.name, () => {
       const id = newUuid();
 
       mocks.access.workflow.checkOwnerAccess.mockResolvedValue(new Set([id]));
-      mocks.workflow.getWorkflow.mockResolvedValue(undefined);
+      mocks.workflow.getWorkflow.mockResolvedValue();
 
       await expect(sut.update(auth, id, { name: 'Updated' })).rejects.toThrow('Workflow not found');
     });
@@ -720,7 +720,7 @@ describe(WorkflowService.name, () => {
 
       mocks.access.workflow.checkOwnerAccess.mockResolvedValue(new Set([workflow.id]));
       mocks.workflow.getWorkflow.mockResolvedValue(workflow as any);
-      mocks.plugin.getFilter.mockResolvedValue(undefined);
+      mocks.plugin.getFilter.mockResolvedValue();
 
       await expect(
         sut.update(auth, workflow.id, {
@@ -738,7 +738,7 @@ describe(WorkflowService.name, () => {
 
       mocks.access.workflow.checkOwnerAccess.mockResolvedValue(new Set([workflow.id]));
       mocks.workflow.getWorkflow.mockResolvedValue(workflow as any);
-      mocks.plugin.getAction.mockResolvedValue(undefined);
+      mocks.plugin.getAction.mockResolvedValue();
 
       await expect(
         sut.update(auth, workflow.id, {
@@ -828,7 +828,7 @@ describe(WorkflowService.name, () => {
       const id = newUuid();
 
       mocks.access.workflow.checkOwnerAccess.mockResolvedValue(new Set([id]));
-      mocks.workflow.deleteWorkflow.mockResolvedValue(undefined);
+      mocks.workflow.deleteWorkflow.mockResolvedValue();
 
       await sut.delete(auth, id);
 

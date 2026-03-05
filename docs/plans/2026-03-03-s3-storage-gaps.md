@@ -13,9 +13,11 @@
 ## Task A: Update MetadataService for S3 (critical — blocks thumbnails)
 
 **Files:**
+
 - Modify: `server/src/services/metadata.service.ts`
 
 **What's broken:**
+
 1. `handleMetadataExtraction()` calls `storageRepository.stat(asset.originalPath)` — fails on relative keys
 2. `getExifTags()` calls `metadataRepository.readTags(asset.originalPath)` — exiftool needs a local file
 3. `getExifTags()` calls `metadataRepository.readTags(sidecarFile.path)` — same issue for sidecars
@@ -28,12 +30,14 @@
 **Fix approach:**
 
 Add imports:
+
 ```typescript
 import { StorageService } from 'src/services/storage.service';
 import { isAbsolute } from 'node:path';
 ```
 
 Add the same `ensureLocalFile` helper as MediaService:
+
 ```typescript
 private async ensureLocalFile(filePath: string): Promise<{ localPath: string; cleanup: () => Promise<void> }> {
   if (isAbsolute(filePath)) {
@@ -55,8 +59,8 @@ const { localPath: localOriginal, cleanup: cleanupOriginal } = await this.ensure
 // Also download sidecar if it exists and is a relative key
 try {
   const [exifTags, stats] = await Promise.all([
-    this.getExifTags(asset, localOriginal),  // pass local path
-    this.storageRepository.stat(localOriginal),  // stat local file
+    this.getExifTags(asset, localOriginal), // pass local path
+    this.storageRepository.stat(localOriginal), // stat local file
   ]);
   // ... rest of method unchanged ...
 } finally {
@@ -65,6 +69,7 @@ try {
 ```
 
 Update `getExifTags` to accept an optional `localOriginalPath` parameter (same pattern as MediaService):
+
 - Use `localOriginalPath` for `readTags()` and `probe()`
 - Use `asset.originalPath` for type/mime checks
 
@@ -84,6 +89,7 @@ Update `getExifTags` to accept an optional `localOriginalPath` parameter (same p
 - For S3 assets, use `backend.exists()` instead of `storageRepository.checkFileExists()`
 
 **Tests:**
+
 - Run: `cd server && pnpm test -- --run src/services/metadata.service.spec.ts`
 - Existing tests use absolute paths → disk mode → no change in behavior
 
@@ -94,9 +100,11 @@ Update `getExifTags` to accept an optional `localOriginalPath` parameter (same p
 ## Task B: Update ML repository for S3 file paths
 
 **Files:**
+
 - Modify: `server/src/repositories/machine-learning.repository.ts`
 
 **What's broken:**
+
 - `getFormData()` calls `readFile(payload.imagePath)` — fails on relative S3 keys
 - Used by both `encodeImage()` (SmartInfoService) and `detectFaces()` (PersonService)
 
@@ -125,6 +133,7 @@ if ('imagePath' in payload) {
 This is simpler than `ensureLocalFile` — we just stream from S3 into memory since we need the bytes anyway (no need for a temp file).
 
 **Tests:**
+
 - Run: `cd server && pnpm test -- --run src/repositories/machine-learning.repository.spec.ts`
 
 **Commit:** `feat(server): support S3 paths in ML repository`
@@ -134,9 +143,11 @@ This is simpler than `ensureLocalFile` — we just stream from S3 into memory si
 ## Task C: Update AssetMediaService.replaceFileData for S3
 
 **Files:**
+
 - Modify: `server/src/services/asset-media.service.ts`
 
 **What's broken:**
+
 - `replaceFileData()` calls `storageRepository.utimes(file.originalPath, ...)` — S3 doesn't support utimes
 
 **Fix approach:**
@@ -152,6 +163,7 @@ if (isAbsolute(file.originalPath)) {
 Also need to handle the replace flow for S3: upload the replacement file to S3 and update the DB path.
 
 **Tests:**
+
 - Run: `cd server && pnpm test -- --run src/services/asset-media.service.spec.ts`
 
 **Commit:** `feat(server): handle S3 paths in replaceFileData`
@@ -161,6 +173,7 @@ Also need to handle the replace flow for S3: upload the replacement file to S3 a
 ## Task D: Verify end-to-end with Docker
 
 **Steps:**
+
 1. Restart dev stack: `make dev`
 2. Upload a photo with `IMMICH_STORAGE_BACKEND=s3`
 3. Check server logs for errors during metadata extraction
@@ -176,9 +189,9 @@ A → B → C → D (sequential — A is the critical blocker, B and C are secon
 
 ## Summary
 
-| Task | Service | Complexity | Fix pattern |
-|------|---------|-----------|-------------|
-| A | MetadataService | High | ensureLocalFile + persistFile for sidecars/motion |
-| B | ML Repository | Low | Stream S3 object into buffer |
-| C | AssetMediaService | Low | Skip utimes for relative keys |
-| D | Docker verification | — | Manual test |
+| Task | Service             | Complexity | Fix pattern                                       |
+| ---- | ------------------- | ---------- | ------------------------------------------------- |
+| A    | MetadataService     | High       | ensureLocalFile + persistFile for sidecars/motion |
+| B    | ML Repository       | Low        | Stream S3 object into buffer                      |
+| C    | AssetMediaService   | Low        | Skip utimes for relative keys                     |
+| D    | Docker verification | —          | Manual test                                       |

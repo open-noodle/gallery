@@ -4,7 +4,7 @@ import { JobName, UserMetadataKey, UserStatus } from 'src/enum';
 import { UserAdminService } from 'src/services/user-admin.service';
 import { authStub } from 'test/fixtures/auth.stub';
 import { userStub } from 'test/fixtures/user.stub';
-import { factory, newUuid } from 'test/small.factory';
+import { factory } from 'test/small.factory';
 import { newTestService, ServiceMocks } from 'test/utils';
 import { describe } from 'vitest';
 

@@ -97,7 +97,7 @@ describe(JobService.name, () => {
     });
 
     it('should not call onDone when job returns a non-status response', async () => {
-      mocks.job.run.mockResolvedValue(undefined);
+      mocks.job.run.mockResolvedValue();
 
       const job: JobItem = { name: JobName.SidecarCheck, data: { id: 'asset-1' } };
       await sut.onJobRun(QueueName.BackgroundTask, job);
@@ -311,7 +311,7 @@ describe(JobService.name, () => {
     it('should not send websocket event when person is not found', async () => {
       mocks.job.run.mockResolvedValue(JobStatus.Success);
       const personId = newUuid();
-      mocks.person.getById.mockResolvedValue(undefined);
+      mocks.person.getById.mockResolvedValue();
 
       await sut.onJobRun(QueueName.ThumbnailGeneration, {
         name: JobName.PersonGenerateThumbnail,
@@ -418,7 +418,7 @@ describe(JobService.name, () => {
       mocks.job.run.mockResolvedValue(JobStatus.Success);
       const assetId = newUuid();
 
-      mocks.asset.getById.mockResolvedValue(undefined);
+      mocks.asset.getById.mockResolvedValue();
       mocks.assetEdit.getWithSyncInfo.mockResolvedValue([]);
 
       await sut.onJobRun(QueueName.ThumbnailGeneration, {

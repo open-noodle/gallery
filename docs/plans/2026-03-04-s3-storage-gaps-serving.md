@@ -13,6 +13,7 @@
 ### Task 1: Extract `serveFromBackend` to BaseService
 
 **Files:**
+
 - Modify: `server/src/services/base.service.ts`
 - Modify: `server/src/services/asset-media.service.ts:326-359`
 
@@ -22,12 +23,7 @@ In `server/src/services/base.service.ts`, add the import at the top:
 
 ```typescript
 import { StorageService } from 'src/services/storage.service';
-import {
-  ImmichFileResponse,
-  ImmichMediaResponse,
-  ImmichRedirectResponse,
-  ImmichStreamResponse,
-} from 'src/utils/file';
+import { ImmichFileResponse, ImmichMediaResponse, ImmichRedirectResponse, ImmichStreamResponse } from 'src/utils/file';
 import { CacheControl } from 'src/enum';
 ```
 
@@ -76,6 +72,7 @@ protected async serveFromBackend(
 In `server/src/services/asset-media.service.ts`, delete the private `serveFromBackend` method (lines 326-359). The existing calls (`this.serveFromBackend(...)` at lines 220, 267, 281) will now resolve to the inherited `BaseService` method.
 
 Also remove the now-unused imports from `asset-media.service.ts`:
+
 - `ImmichRedirectResponse` (no longer referenced directly)
 - `ImmichStreamResponse` (no longer referenced directly)
 - `StorageService` import (only if no other usage remains — check first)
@@ -96,6 +93,7 @@ feat(server): extract serveFromBackend to BaseService
 ### Task 2: Fix PersonService.getThumbnail()
 
 **Files:**
+
 - Modify: `server/src/services/person.service.ts:44,165-177`
 - Modify: `server/src/services/person.service.spec.ts:7,115-161`
 
@@ -134,10 +132,13 @@ Expected: PASS (no functional change yet, just test setup)
 In `server/src/services/person.service.ts`:
 
 Change the import at line 44 from:
+
 ```typescript
 import { ImmichFileResponse } from 'src/utils/file';
 ```
+
 to:
+
 ```typescript
 import { ImmichMediaResponse } from 'src/utils/file';
 ```
@@ -176,6 +177,7 @@ feat(server): support S3 paths in PersonService.getThumbnail
 ### Task 3: Fix PersonService.removeAllPeople()
 
 **Files:**
+
 - Modify: `server/src/services/person.service.ts:255-260`
 - Modify: `server/src/services/person.service.spec.ts:440-451`
 
@@ -236,6 +238,7 @@ feat(server): route person thumbnail deletion through FileDelete job
 ### Task 4: Fix UserService.getProfileImage()
 
 **Files:**
+
 - Modify: `server/src/services/user.service.ts:18,121-132`
 - Modify: `server/src/services/user.service.spec.ts:1-10,18-27,180-193`
 
@@ -244,6 +247,7 @@ feat(server): route person thumbnail deletion through FileDelete job
 In `server/src/services/user.service.spec.ts`:
 
 Change the import at line 5:
+
 ```typescript
 // Before
 import { ImmichFileResponse } from 'src/utils/file';
@@ -271,6 +275,7 @@ Expected: PASS
 In `server/src/services/user.service.ts`:
 
 Change the import at line 18:
+
 ```typescript
 // Before
 import { ImmichFileResponse } from 'src/utils/file';
@@ -307,6 +312,7 @@ feat(server): support S3 paths in UserService.getProfileImage
 ### Task 5: Fix NotificationService email attachments
 
 **Files:**
+
 - Modify: `server/src/types.ts:236-240`
 - Modify: `server/src/repositories/email.repository.ts:127-131`
 - Modify: `server/src/services/notification.service.ts:1-32,435-456`
@@ -398,6 +404,7 @@ feat(server): support S3 thumbnails in email attachments
 ### Task 6: Guard StorageTemplateService for S3 assets
 
 **Files:**
+
 - Modify: `server/src/services/storage-template.service.ts:1-5,141-170`
 - Modify: `server/src/services/storage-template.service.spec.ts:97`
 
