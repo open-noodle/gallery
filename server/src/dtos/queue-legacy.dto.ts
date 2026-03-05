@@ -73,6 +73,9 @@ export class QueuesResponseLegacyDto implements Record<QueueName, QueueResponseL
 
   @ApiProperty({ type: QueueResponseLegacyDto })
   [QueueName.Editor]!: QueueResponseLegacyDto;
+
+  @ApiProperty({ type: QueueResponseLegacyDto })
+  [QueueName.StorageBackendMigration]!: QueueResponseLegacyDto;
 }
 
 export const mapQueueLegacy = (response: QueueResponseDto): QueueResponseLegacyDto => {

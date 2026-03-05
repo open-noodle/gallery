@@ -42,6 +42,7 @@ const updatedConfig = Object.freeze<SystemConfig>({
     [QueueName.Ocr]: { concurrency: 1 },
     [QueueName.Workflow]: { concurrency: 5 },
     [QueueName.Editor]: { concurrency: 2 },
+    [QueueName.StorageBackendMigration]: { concurrency: 5 },
   },
   backup: {
     database: {

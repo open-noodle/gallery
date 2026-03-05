@@ -567,6 +567,7 @@ export enum QueueName {
   Ocr = 'ocr',
   Workflow = 'workflow',
   Editor = 'editor',
+  StorageBackendMigration = 'storageBackendMigration',
 }
 
 export enum QueueJobStatus {
@@ -656,6 +657,10 @@ export enum JobName {
 
   // Workflow
   WorkflowRun = 'WorkflowRun',
+
+  // Storage Backend Migration
+  StorageBackendMigrationQueueAll = 'StorageBackendMigrationQueueAll',
+  StorageBackendMigrationSingle = 'StorageBackendMigrationSingle',
 }
 
 export enum QueueCommand {

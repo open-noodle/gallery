@@ -277,6 +277,33 @@ export interface IWorkflowJob<T extends PluginTriggerType = PluginTriggerType> {
   event: WorkflowData[T];
 }
 
+export interface IStorageMigrationJob {
+  entityType: 'asset' | 'assetFile' | 'person' | 'user';
+  entityId: string;
+  fileType: string | null;
+  sourcePath: string;
+  batchId: string;
+  direction: 'toS3' | 'toDisk';
+  deleteSource: boolean;
+}
+
+export interface IStorageMigrationQueueAllJob {
+  direction: 'toS3' | 'toDisk';
+  deleteSource: boolean;
+  fileTypes: {
+    originals: boolean;
+    thumbnails: boolean;
+    previews: boolean;
+    fullsize: boolean;
+    encodedVideos: boolean;
+    sidecars: boolean;
+    personThumbnails: boolean;
+    profileImages: boolean;
+  };
+  concurrency: number;
+  batchId: string;
+}
+
 export interface JobCounts {
   active: number;
   completed: number;
@@ -389,7 +416,11 @@ export type JobItem =
   | { name: JobName.WorkflowRun; data: IWorkflowJob }
 
   // Editor
-  | { name: JobName.AssetEditThumbnailGeneration; data: IEntityJob };
+  | { name: JobName.AssetEditThumbnailGeneration; data: IEntityJob }
+
+  // Storage Backend Migration
+  | { name: JobName.StorageBackendMigrationQueueAll; data: IStorageMigrationQueueAllJob }
+  | { name: JobName.StorageBackendMigrationSingle; data: IStorageMigrationJob };
 
 export type VectorExtension = (typeof VECTOR_EXTENSIONS)[number];
 
