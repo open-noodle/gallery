@@ -2326,6 +2326,68 @@ export type AssetIdsResponseDto = {
     /** Whether operation succeeded */
     success: boolean;
 };
+export type SharedSpaceResponseDto = {
+    /** Number of assets */
+    assetCount?: number;
+    /** Creation date */
+    createdAt: string;
+    /** Creator user ID */
+    createdById: string;
+    /** Space description */
+    description?: string | null;
+    /** Space ID */
+    id: string;
+    /** Number of members */
+    memberCount?: number;
+    /** Space name */
+    name: string;
+    /** Last update date */
+    updatedAt: string;
+};
+export type SharedSpaceCreateDto = {
+    /** Space description */
+    description?: string;
+    /** Space name */
+    name: string;
+};
+export type SharedSpaceUpdateDto = {
+    /** Space description */
+    description?: string;
+    /** Space name */
+    name?: string;
+};
+export type SharedSpaceAssetRemoveDto = {
+    /** Asset IDs */
+    assetIds: string[];
+};
+export type SharedSpaceAssetAddDto = {
+    /** Asset IDs */
+    assetIds: string[];
+};
+export type SharedSpaceMemberResponseDto = {
+    /** User email */
+    email: string;
+    /** Join date */
+    joinedAt: string;
+    /** User name */
+    name: string;
+    /** Profile image path */
+    profileImagePath?: string;
+    /** Member role */
+    role: Role;
+    /** User ID */
+    userId: string;
+};
+export type SharedSpaceMemberCreateDto = {
+    /** Member role */
+    role?: SharedSpaceRole;
+    /** User ID */
+    userId: string;
+};
+export type SharedSpaceMemberUpdateDto = {
+    /** Member role */
+    role: SharedSpaceRole;
+};
 export type StackResponseDto = {
     /** Stack assets */
     assets: AssetResponseDto[];
@@ -6056,6 +6118,156 @@ export function addSharedLinkAssets({ id, key, slug, assetIdsDto }: {
     })));
 }
 /**
+ * Get all shared spaces
+ */
+export function getAllSpaces(opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: SharedSpaceResponseDto[];
+    }>("/shared-spaces", {
+        ...opts
+    }));
+}
+/**
+ * Create a shared space
+ */
+export function createSpace({ sharedSpaceCreateDto }: {
+    sharedSpaceCreateDto: SharedSpaceCreateDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 201;
+        data: SharedSpaceResponseDto;
+    }>("/shared-spaces", oazapfts.json({
+        ...opts,
+        method: "POST",
+        body: sharedSpaceCreateDto
+    })));
+}
+/**
+ * Delete a shared space
+ */
+export function removeSpace({ id }: {
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}`, {
+        ...opts,
+        method: "DELETE"
+    }));
+}
+/**
+ * Get a shared space
+ */
+export function getSpace({ id }: {
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: SharedSpaceResponseDto;
+    }>(`/shared-spaces/${encodeURIComponent(id)}`, {
+        ...opts
+    }));
+}
+/**
+ * Update a shared space
+ */
+export function updateSpace({ id, sharedSpaceUpdateDto }: {
+    id: string;
+    sharedSpaceUpdateDto: SharedSpaceUpdateDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: SharedSpaceResponseDto;
+    }>(`/shared-spaces/${encodeURIComponent(id)}`, oazapfts.json({
+        ...opts,
+        method: "PATCH",
+        body: sharedSpaceUpdateDto
+    })));
+}
+/**
+ * Remove assets from a shared space
+ */
+export function removeAssets({ id, sharedSpaceAssetRemoveDto }: {
+    id: string;
+    sharedSpaceAssetRemoveDto: SharedSpaceAssetRemoveDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/assets`, oazapfts.json({
+        ...opts,
+        method: "DELETE",
+        body: sharedSpaceAssetRemoveDto
+    })));
+}
+/**
+ * Add assets to a shared space
+ */
+export function addAssets({ id, sharedSpaceAssetAddDto }: {
+    id: string;
+    sharedSpaceAssetAddDto: SharedSpaceAssetAddDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/assets`, oazapfts.json({
+        ...opts,
+        method: "POST",
+        body: sharedSpaceAssetAddDto
+    })));
+}
+/**
+ * Get members of a shared space
+ */
+export function getMembers({ id }: {
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: SharedSpaceMemberResponseDto[];
+    }>(`/shared-spaces/${encodeURIComponent(id)}/members`, {
+        ...opts
+    }));
+}
+/**
+ * Add a member to a shared space
+ */
+export function addMember({ id, sharedSpaceMemberCreateDto }: {
+    id: string;
+    sharedSpaceMemberCreateDto: SharedSpaceMemberCreateDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 201;
+        data: SharedSpaceMemberResponseDto;
+    }>(`/shared-spaces/${encodeURIComponent(id)}/members`, oazapfts.json({
+        ...opts,
+        method: "POST",
+        body: sharedSpaceMemberCreateDto
+    })));
+}
+/**
+ * Remove a member from a shared space
+ */
+export function removeMember({ id, userId }: {
+    id: string;
+    userId: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/members/${encodeURIComponent(userId)}`, {
+        ...opts,
+        method: "DELETE"
+    }));
+}
+/**
+ * Update a member in a shared space
+ */
+export function updateMember({ id, userId, sharedSpaceMemberUpdateDto }: {
+    id: string;
+    userId: string;
+    sharedSpaceMemberUpdateDto: SharedSpaceMemberUpdateDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: SharedSpaceMemberResponseDto;
+    }>(`/shared-spaces/${encodeURIComponent(id)}/members/${encodeURIComponent(userId)}`, oazapfts.json({
+        ...opts,
+        method: "PATCH",
+        body: sharedSpaceMemberUpdateDto
+    })));
+}
+/**
  * Delete stacks
  */
 export function deleteStacks({ bulkIdsDto }: {
@@ -7056,6 +7268,16 @@ export enum Permission {
     PartnerRead = "partner.read",
     PartnerUpdate = "partner.update",
     PartnerDelete = "partner.delete",
+    SharedSpaceCreate = "sharedSpace.create",
+    SharedSpaceRead = "sharedSpace.read",
+    SharedSpaceUpdate = "sharedSpace.update",
+    SharedSpaceDelete = "sharedSpace.delete",
+    SharedSpaceMemberCreate = "sharedSpaceMember.create",
+    SharedSpaceMemberUpdate = "sharedSpaceMember.update",
+    SharedSpaceMemberDelete = "sharedSpaceMember.delete",
+    SharedSpaceAssetCreate = "sharedSpaceAsset.create",
+    SharedSpaceAssetRead = "sharedSpaceAsset.read",
+    SharedSpaceAssetDelete = "sharedSpaceAsset.delete",
     PersonCreate = "person.create",
     PersonRead = "person.read",
     PersonUpdate = "person.update",
@@ -7311,6 +7533,16 @@ export enum Error2 {
     Duplicate = "duplicate",
     NoPermission = "no_permission",
     NotFound = "not_found"
+}
+export enum Role {
+    Owner = "owner",
+    Editor = "editor",
+    Viewer = "viewer"
+}
+export enum SharedSpaceRole {
+    Owner = "owner",
+    Editor = "editor",
+    Viewer = "viewer"
 }
 export enum Direction {
     ToS3 = "toS3",
