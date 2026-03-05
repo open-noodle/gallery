@@ -13,7 +13,6 @@
 ## Task 1: Python ML Schemas — Add PET_DETECTION Task
 
 **Files:**
-
 - Modify: `machine-learning/immich_ml/schemas.py:23-26` (ModelTask enum)
 - Modify: `machine-learning/immich_ml/schemas.py` (add output types)
 
@@ -60,7 +59,6 @@ git commit -m "feat(ml): add PET_DETECTION model task and output types"
 ## Task 2: Python PetDetector Model Class
 
 **Files:**
-
 - Create: `machine-learning/immich_ml/models/pet_detection/__init__.py`
 - Create: `machine-learning/immich_ml/models/pet_detection/detection.py`
 
@@ -224,7 +222,6 @@ git commit -m "feat(ml): add PetDetector model class with YOLOv8 inference"
 ## Task 3: Python Model Registration
 
 **Files:**
-
 - Modify: `machine-learning/immich_ml/models/constants.py:70-75,163-178` (add model set and source)
 - Modify: `machine-learning/immich_ml/models/__init__.py:15-48` (add to dispatch)
 
@@ -281,7 +278,6 @@ git commit -m "feat(ml): register pet detection models in dispatch"
 ## Task 4: Python PetDetector Tests
 
 **Files:**
-
 - Modify: `machine-learning/test_main.py` (add test class)
 
 **Step 1: Write PetDetector unit tests**
@@ -418,7 +414,6 @@ git commit -m "test(ml): add PetDetector unit tests"
 ## Task 5: Server Enums and Config
 
 **Files:**
-
 - Modify: `server/src/enum.ts:551-571,582-664` (QueueName, JobName)
 - Modify: `server/src/config.ts:54-84,268-274` (type and defaults)
 - Modify: `server/src/utils/misc.ts:95-103` (helper function)
@@ -449,7 +444,7 @@ petDetection: {
   enabled: boolean;
   modelName: string;
   minScore: number;
-}
+};
 ```
 
 **Step 4: Add config defaults**
@@ -490,7 +485,6 @@ git commit -m "feat(server): add pet detection enums, config, and helper"
 ## Task 6: Server DTOs
 
 **Files:**
-
 - Modify: `server/src/dtos/model-config.dto.ts` (add PetDetectionConfig class)
 - Modify: `server/src/dtos/system-config.dto.ts:298-332` (add to ML DTO)
 
@@ -539,7 +533,6 @@ git commit -m "feat(server): add PetDetectionConfig DTO"
 ## Task 7: Database Schema and Migration
 
 **Files:**
-
 - Modify: `server/src/schema/tables/person.table.ts` (add type, species columns)
 - Modify: `server/src/schema/tables/asset-job-status.table.ts` (add petsDetectedAt)
 - Create: migration file via `pnpm migrations:generate`
@@ -570,7 +563,6 @@ petsDetectedAt!: Timestamp | null;
 Run: `cd server && pnpm migrations:generate`
 
 This will auto-generate a migration file in `server/src/migrations/`. Verify it contains:
-
 - `ALTER TABLE "person" ADD "type" character varying NOT NULL DEFAULT 'person'`
 - `ALTER TABLE "person" ADD "species" character varying`
 - `ALTER TABLE "asset_job_status" ADD "petsDetectedAt" TIMESTAMP WITH TIME ZONE`
@@ -592,7 +584,6 @@ git commit -m "feat(server): add pet detection database columns and migration"
 ## Task 8: Server ML Repository — detectPets Method
 
 **Files:**
-
 - Modify: `server/src/repositories/machine-learning.repository.ts` (add types and method)
 
 **Step 1: Add ModelTask enum value**
@@ -654,7 +645,6 @@ git commit -m "feat(server): add detectPets method to ML repository"
 ## Task 9: Server Pet Detection Service
 
 **Files:**
-
 - Create: `server/src/services/pet-detection.service.ts`
 
 **Step 1: Write the service**
@@ -750,7 +740,6 @@ git commit -m "feat(server): add pet detection service"
 ## Task 10: Server Job Service Integration
 
 **Files:**
-
 - Modify: `server/src/services/job.service.ts:143-148` (add to fanout)
 
 **Step 1: Add pet detection to post-thumbnail fanout**
@@ -798,7 +787,6 @@ git commit -m "feat(server): integrate pet detection into job pipeline"
 ## Task 11: Server Unit Tests
 
 **Files:**
-
 - Create: `server/src/services/pet-detection.service.spec.ts`
 
 **Step 1: Write unit tests**
@@ -839,10 +827,7 @@ describe(PetDetectionService.name, () => {
 
     it('should fail if asset not found', async () => {
       mocks.configRepository.getSystemConfig.mockResolvedValue({
-        machineLearning: {
-          enabled: true,
-          petDetection: { enabled: true, modelName: 'yolov8n-animals', minScore: 0.6 },
-        },
+        machineLearning: { enabled: true, petDetection: { enabled: true, modelName: 'yolov8n-animals', minScore: 0.6 } },
       });
       mocks.assetRepository.getById.mockResolvedValue(undefined);
 
@@ -852,10 +837,7 @@ describe(PetDetectionService.name, () => {
 
     it('should detect pets and store results', async () => {
       mocks.configRepository.getSystemConfig.mockResolvedValue({
-        machineLearning: {
-          enabled: true,
-          petDetection: { enabled: true, modelName: 'yolov8n-animals', minScore: 0.6 },
-        },
+        machineLearning: { enabled: true, petDetection: { enabled: true, modelName: 'yolov8n-animals', minScore: 0.6 } },
       });
       mocks.assetRepository.getById.mockResolvedValue({
         id: 'asset-1',
@@ -864,7 +846,9 @@ describe(PetDetectionService.name, () => {
       mocks.machineLearningRepository.detectPets.mockResolvedValue({
         imageHeight: 800,
         imageWidth: 600,
-        pets: [{ boundingBox: { x1: 10, y1: 20, x2: 200, y2: 300 }, score: 0.9, label: 'cat' }],
+        pets: [
+          { boundingBox: { x1: 10, y1: 20, x2: 200, y2: 300 }, score: 0.9, label: 'cat' },
+        ],
       });
 
       const result = await sut.handlePetDetection({ id: 'asset-1' });
@@ -911,7 +895,6 @@ git commit -m "test(server): add pet detection service unit tests"
 ## Task 12: Frontend — Admin ML Settings
 
 **Files:**
-
 - Modify: `web/src/lib/components/admin-settings/MachineLearningSettings.svelte` (add pet detection accordion)
 
 **Step 1: Add pet detection settings accordion**
@@ -1002,7 +985,6 @@ git commit -m "feat(web): add pet detection admin settings"
 ## Task 13: Frontend — Pet Badge on People Cards
 
 **Files:**
-
 - Modify: `web/src/lib/components/faces-page/people-card.svelte` (add pet badge)
 
 **Step 1: Add pet badge**
@@ -1042,7 +1024,6 @@ git commit -m "feat(web): add pet badge on people cards"
 ## Task 14: OpenAPI Regeneration and Final Integration
 
 **Files:**
-
 - Regenerated: `open-api/` (TypeScript SDK and Dart client)
 
 **Step 1: Build server**
@@ -1086,27 +1067,26 @@ git commit -m "chore: regenerate OpenAPI clients with pet detection types"
 
 ## Task Summary
 
-| Task | Component | Description                                  |
-| ---- | --------- | -------------------------------------------- |
-| 1    | ML Python | Add ModelTask.PET_DETECTION and output types |
-| 2    | ML Python | PetDetector class with YOLOv8 inference      |
-| 3    | ML Python | Register models in constants + dispatch      |
-| 4    | ML Python | PetDetector unit tests                       |
-| 5    | Server    | Enums, config type/defaults, helper function |
-| 6    | Server    | PetDetectionConfig DTO                       |
-| 7    | Server    | Database schema + migration                  |
-| 8    | Server    | ML repository detectPets method              |
-| 9    | Server    | PetDetectionService                          |
-| 10   | Server    | Job pipeline integration                     |
-| 11   | Server    | Service unit tests                           |
-| 12   | Web       | Admin ML settings accordion                  |
-| 13   | Web       | Pet badge on people cards                    |
-| 14   | All       | OpenAPI regen + final integration check      |
+| Task | Component | Description |
+|------|-----------|-------------|
+| 1 | ML Python | Add ModelTask.PET_DETECTION and output types |
+| 2 | ML Python | PetDetector class with YOLOv8 inference |
+| 3 | ML Python | Register models in constants + dispatch |
+| 4 | ML Python | PetDetector unit tests |
+| 5 | Server | Enums, config type/defaults, helper function |
+| 6 | Server | PetDetectionConfig DTO |
+| 7 | Server | Database schema + migration |
+| 8 | Server | ML repository detectPets method |
+| 9 | Server | PetDetectionService |
+| 10 | Server | Job pipeline integration |
+| 11 | Server | Service unit tests |
+| 12 | Web | Admin ML settings accordion |
+| 13 | Web | Pet badge on people cards |
+| 14 | All | OpenAPI regen + final integration check |
 
 ## Phase 2 Follow-up (not in this plan)
 
 After Phase 1 is validated:
-
 - Add `PetRecognizer` model class using MegaDescriptor
 - Add embedding storage + clustering in the service
 - Add `allowedSpecies` config and gating logic
