@@ -10,16 +10,6 @@ DCM was disabled in `.github/workflows/static_analysis.yml` because it requires 
 2. Add the key as a repository secret
 3. Uncomment the DCM step in `static_analysis.yml`
 
-## E2E Asset Serving Tests
-
-The `GET /assets/:id/original` and `GET /assets/:id/thumbnail` E2E tests fail with 500 errors. Root cause: `StorageService.diskBackend` is a static field initialized only in `onBootstrap()`, and the `resolveBackendForKey()` / `getWriteBackend()` methods don't guard against it being undefined.
-
-**To fix:**
-
-1. Add a null check or default initialization for `diskBackend` in `StorageService.resolveBackendForKey()`
-2. Or initialize `diskBackend` at declaration time rather than waiting for `onBootstrap()`
-3. Review `BaseService.serveFromBackend()` for proper error handling
-
 ## Token Management
 
 The upstream `immich-app/devtools/actions/create-workflow-token` was replaced with `${{ github.token }}` throughout all workflow files. This works for fork CI but provides more limited permissions than the custom Push-O-Matic app token.
