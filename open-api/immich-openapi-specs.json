@@ -12180,6 +12180,201 @@
         "x-immich-state": "Stable"
       }
     },
+    "/storage-migration/estimate": {
+      "get": {
+        "description": "Estimate the number of files and approximate size that would be migrated for the given direction.",
+        "operationId": "getEstimate",
+        "parameters": [
+          {
+            "name": "direction",
+            "required": true,
+            "in": "query",
+            "description": "Migration direction",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "toS3",
+                "toDisk"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Get storage migration estimate",
+        "tags": [
+          "Storage Migration (admin)"
+        ],
+        "x-immich-admin-only": true,
+        "x-immich-history": [
+          {
+            "version": "v2.5.0",
+            "state": "Added"
+          },
+          {
+            "version": "v2.5.0",
+            "state": "Alpha"
+          }
+        ],
+        "x-immich-permission": "job.read",
+        "x-immich-state": "Alpha"
+      }
+    },
+    "/storage-migration/rollback/{batchId}": {
+      "post": {
+        "description": "Rollback a previously completed storage migration batch by reverting all database path changes.",
+        "operationId": "rollback",
+        "parameters": [
+          {
+            "name": "batchId",
+            "required": true,
+            "in": "path",
+            "description": "Batch ID",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Rollback a storage migration batch",
+        "tags": [
+          "Storage Migration (admin)"
+        ],
+        "x-immich-admin-only": true,
+        "x-immich-history": [
+          {
+            "version": "v2.5.0",
+            "state": "Added"
+          },
+          {
+            "version": "v2.5.0",
+            "state": "Alpha"
+          }
+        ],
+        "x-immich-permission": "job.create",
+        "x-immich-state": "Alpha"
+      }
+    },
+    "/storage-migration/start": {
+      "post": {
+        "description": "Start a storage backend migration job to move files between disk and S3 storage.",
+        "operationId": "start",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StorageMigrationStartDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Start storage migration",
+        "tags": [
+          "Storage Migration (admin)"
+        ],
+        "x-immich-admin-only": true,
+        "x-immich-history": [
+          {
+            "version": "v2.5.0",
+            "state": "Added"
+          },
+          {
+            "version": "v2.5.0",
+            "state": "Alpha"
+          }
+        ],
+        "x-immich-permission": "job.create",
+        "x-immich-state": "Alpha"
+      }
+    },
+    "/storage-migration/status": {
+      "get": {
+        "description": "Retrieve the current status of the storage migration queue, including active and pending job counts.",
+        "operationId": "getStatus",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Get storage migration status",
+        "tags": [
+          "Storage Migration (admin)"
+        ],
+        "x-immich-admin-only": true,
+        "x-immich-history": [
+          {
+            "version": "v2.5.0",
+            "state": "Added"
+          },
+          {
+            "version": "v2.5.0",
+            "state": "Alpha"
+          }
+        ],
+        "x-immich-permission": "job.read",
+        "x-immich-state": "Alpha"
+      }
+    },
     "/sync/ack": {
       "delete": {
         "description": "Delete specific synchronization acknowledgments.",
@@ -15294,6 +15489,10 @@
       "description": "A stack is a group of related assets. One asset is the \"primary\" asset, and the rest are \"child\" assets. On the main timeline, stack parents are included by default, while child assets are hidden."
     },
     {
+      "name": "Storage Migration (admin)",
+      "description": "Administrative endpoints for migrating files between disk and S3 storage backends. Includes estimating migration scope, starting migrations, monitoring status, and rolling back completed batches."
+    },
+    {
       "name": "Sync",
       "description": "A collection of endpoints for the new mobile synchronization implementation."
     },
@@ -18207,7 +18406,9 @@
           "VersionCheck",
           "OcrQueueAll",
           "Ocr",
-          "WorkflowRun"
+          "WorkflowRun",
+          "StorageBackendMigrationQueueAll",
+          "StorageBackendMigrationSingle"
         ],
         "type": "string"
       },
@@ -20512,7 +20713,8 @@
           "backupDatabase",
           "ocr",
           "workflow",
-          "editor"
+          "editor",
+          "storageBackendMigration"
         ],
         "type": "string"
       },
@@ -20663,6 +20865,9 @@
           "smartSearch": {
             "$ref": "#/components/schemas/QueueResponseLegacyDto"
           },
+          "storageBackendMigration": {
+            "$ref": "#/components/schemas/QueueResponseLegacyDto"
+          },
           "storageTemplateMigration": {
             "$ref": "#/components/schemas/QueueResponseLegacyDto"
           },
@@ -20691,6 +20896,7 @@
           "search",
           "sidecar",
           "smartSearch",
+          "storageBackendMigration",
           "storageTemplateMigration",
           "thumbnailGeneration",
           "videoConversion",
@@ -22524,6 +22730,108 @@
         ],
         "type": "string"
       },
+      "StorageMigrationFileTypesDto": {
+        "properties": {
+          "encodedVideos": {
+            "default": true,
+            "description": "Include encoded video files",
+            "type": "boolean"
+          },
+          "fullsize": {
+            "default": true,
+            "description": "Include full-size files",
+            "type": "boolean"
+          },
+          "originals": {
+            "default": true,
+            "description": "Include original files",
+            "type": "boolean"
+          },
+          "personThumbnails": {
+            "default": true,
+            "description": "Include person thumbnail files",
+            "type": "boolean"
+          },
+          "previews": {
+            "default": true,
+            "description": "Include preview files",
+            "type": "boolean"
+          },
+          "profileImages": {
+            "default": true,
+            "description": "Include profile image files",
+            "type": "boolean"
+          },
+          "sidecars": {
+            "default": true,
+            "description": "Include sidecar files",
+            "type": "boolean"
+          },
+          "thumbnails": {
+            "default": true,
+            "description": "Include thumbnail files",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "encodedVideos",
+          "fullsize",
+          "originals",
+          "personThumbnails",
+          "previews",
+          "profileImages",
+          "sidecars",
+          "thumbnails"
+        ],
+        "type": "object"
+      },
+      "StorageMigrationStartDto": {
+        "properties": {
+          "concurrency": {
+            "default": 5,
+            "description": "Concurrency level",
+            "maximum": 20,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "deleteSource": {
+            "default": false,
+            "description": "Delete source files after migration",
+            "type": "boolean"
+          },
+          "direction": {
+            "description": "Migration direction",
+            "enum": [
+              "toS3",
+              "toDisk"
+            ],
+            "type": "string"
+          },
+          "fileTypes": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StorageMigrationFileTypesDto"
+              }
+            ],
+            "default": {
+              "encodedVideos": true,
+              "fullsize": true,
+              "originals": true,
+              "personThumbnails": true,
+              "previews": true,
+              "profileImages": true,
+              "sidecars": true,
+              "thumbnails": true
+            },
+            "description": "File types to migrate"
+          }
+        },
+        "required": [
+          "deleteSource",
+          "direction"
+        ],
+        "type": "object"
+      },
       "SyncAckDeleteDto": {
         "properties": {
           "types": {
@@ -24223,6 +24531,9 @@
           "smartSearch": {
             "$ref": "#/components/schemas/JobSettingsDto"
           },
+          "storageBackendMigration": {
+            "$ref": "#/components/schemas/JobSettingsDto"
+          },
           "thumbnailGeneration": {
             "$ref": "#/components/schemas/JobSettingsDto"
           },
@@ -24245,6 +24556,7 @@
           "search",
           "sidecar",
           "smartSearch",
+          "storageBackendMigration",
           "thumbnailGeneration",
           "videoConversion",
           "workflow"

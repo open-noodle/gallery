@@ -1267,6 +1267,7 @@ export type QueuesResponseLegacyDto = {
     search: QueueResponseLegacyDto;
     sidecar: QueueResponseLegacyDto;
     smartSearch: QueueResponseLegacyDto;
+    storageBackendMigration: QueueResponseLegacyDto;
     storageTemplateMigration: QueueResponseLegacyDto;
     thumbnailGeneration: QueueResponseLegacyDto;
     videoConversion: QueueResponseLegacyDto;
@@ -2341,6 +2342,34 @@ export type StackUpdateDto = {
     /** Primary asset ID */
     primaryAssetId?: string;
 };
+export type StorageMigrationFileTypesDto = {
+    /** Include encoded video files */
+    encodedVideos: boolean;
+    /** Include full-size files */
+    fullsize: boolean;
+    /** Include original files */
+    originals: boolean;
+    /** Include person thumbnail files */
+    personThumbnails: boolean;
+    /** Include preview files */
+    previews: boolean;
+    /** Include profile image files */
+    profileImages: boolean;
+    /** Include sidecar files */
+    sidecars: boolean;
+    /** Include thumbnail files */
+    thumbnails: boolean;
+};
+export type StorageMigrationStartDto = {
+    /** Concurrency level */
+    concurrency?: number;
+    /** Delete source files after migration */
+    deleteSource: boolean;
+    /** Migration direction */
+    direction: Direction;
+    /** File types to migrate */
+    fileTypes?: StorageMigrationFileTypesDto;
+};
 export type SyncAckDeleteDto = {
     /** Sync entity types to delete acks for */
     types?: SyncEntityType[];
@@ -2484,6 +2513,7 @@ export type SystemConfigJobDto = {
     search: JobSettingsDto;
     sidecar: JobSettingsDto;
     smartSearch: JobSettingsDto;
+    storageBackendMigration: JobSettingsDto;
     thumbnailGeneration: JobSettingsDto;
     videoConversion: JobSettingsDto;
     workflow: JobSettingsDto;
@@ -6121,6 +6151,49 @@ export function removeAssetFromStack({ assetId, id }: {
     }));
 }
 /**
+ * Get storage migration estimate
+ */
+export function getEstimate({ direction }: {
+    direction: "toS3" | "toDisk";
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText(`/storage-migration/estimate${QS.query(QS.explode({
+        direction
+    }))}`, {
+        ...opts
+    }));
+}
+/**
+ * Rollback a storage migration batch
+ */
+export function rollback({ batchId }: {
+    batchId: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText(`/storage-migration/rollback/${encodeURIComponent(batchId)}`, {
+        ...opts,
+        method: "POST"
+    }));
+}
+/**
+ * Start storage migration
+ */
+export function start({ storageMigrationStartDto }: {
+    storageMigrationStartDto: StorageMigrationStartDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText("/storage-migration/start", oazapfts.json({
+        ...opts,
+        method: "POST",
+        body: storageMigrationStartDto
+    })));
+}
+/**
+ * Get storage migration status
+ */
+export function getStatus(opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText("/storage-migration/status", {
+        ...opts
+    }));
+}
+/**
  * Delete acknowledgements
  */
 export function deleteSyncAck({ syncAckDeleteDto }: {
@@ -7124,7 +7197,8 @@ export enum QueueName {
     BackupDatabase = "backupDatabase",
     Ocr = "ocr",
     Workflow = "workflow",
-    Editor = "editor"
+    Editor = "editor",
+    StorageBackendMigration = "storageBackendMigration"
 }
 export enum QueueCommand {
     Start = "start",
@@ -7218,7 +7292,9 @@ export enum JobName {
     VersionCheck = "VersionCheck",
     OcrQueueAll = "OcrQueueAll",
     Ocr = "Ocr",
-    WorkflowRun = "WorkflowRun"
+    WorkflowRun = "WorkflowRun",
+    StorageBackendMigrationQueueAll = "StorageBackendMigrationQueueAll",
+    StorageBackendMigrationSingle = "StorageBackendMigrationSingle"
 }
 export enum SearchSuggestionType {
     Country = "country",
@@ -7236,6 +7312,10 @@ export enum Error2 {
     Duplicate = "duplicate",
     NoPermission = "no_permission",
     NotFound = "not_found"
+}
+export enum Direction {
+    ToS3 = "toS3",
+    ToDisk = "toDisk"
 }
 export enum SyncEntityType {
     AuthUserV1 = "AuthUserV1",
