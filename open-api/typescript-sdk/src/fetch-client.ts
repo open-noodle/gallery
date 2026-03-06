@@ -1725,6 +1725,8 @@ export type MetadataSearchDto = {
     rating?: number | null;
     /** Number of results to return */
     size?: number;
+    /** Shared space ID to filter by */
+    spaceId?: string;
     /** Filter by state/province name */
     state?: string | null;
     /** Filter by tag IDs */
@@ -1841,6 +1843,8 @@ export type RandomSearchDto = {
     rating?: number | null;
     /** Number of results to return */
     size?: number;
+    /** Shared space ID to filter by */
+    spaceId?: string;
     /** Filter by state/province name */
     state?: string | null;
     /** Filter by tag IDs */
@@ -1917,6 +1921,8 @@ export type SmartSearchDto = {
     rating?: number | null;
     /** Number of results to return */
     size?: number;
+    /** Shared space ID to filter by */
+    spaceId?: string;
     /** Filter by state/province name */
     state?: string | null;
     /** Filter by tag IDs */
@@ -1981,6 +1987,8 @@ export type StatisticsSearchDto = {
     personIds?: string[];
     /** Filter by rating [1-5], or null for unrated */
     rating?: number | null;
+    /** Shared space ID to filter by */
+    spaceId?: string;
     /** Filter by state/province name */
     state?: string | null;
     /** Filter by tag IDs */
@@ -5555,7 +5563,7 @@ export function getExploreData(opts?: Oazapfts.RequestOpts) {
 /**
  * Search large assets
  */
-export function searchLargeAssets({ albumIds, city, country, createdAfter, createdBefore, deviceId, isEncoded, isFavorite, isMotion, isNotInAlbum, isOffline, lensModel, libraryId, make, minFileSize, model, ocr, personIds, rating, size, state, tagIds, takenAfter, takenBefore, trashedAfter, trashedBefore, $type, updatedAfter, updatedBefore, visibility, withDeleted, withExif }: {
+export function searchLargeAssets({ albumIds, city, country, createdAfter, createdBefore, deviceId, isEncoded, isFavorite, isMotion, isNotInAlbum, isOffline, lensModel, libraryId, make, minFileSize, model, ocr, personIds, rating, size, spaceId, state, tagIds, takenAfter, takenBefore, trashedAfter, trashedBefore, $type, updatedAfter, updatedBefore, visibility, withDeleted, withExif }: {
     albumIds?: string[];
     city?: string | null;
     country?: string | null;
@@ -5576,6 +5584,7 @@ export function searchLargeAssets({ albumIds, city, country, createdAfter, creat
     personIds?: string[];
     rating?: number | null;
     size?: number;
+    spaceId?: string;
     state?: string | null;
     tagIds?: string[] | null;
     takenAfter?: string;
@@ -5613,6 +5622,7 @@ export function searchLargeAssets({ albumIds, city, country, createdAfter, creat
         personIds,
         rating,
         size,
+        spaceId,
         state,
         tagIds,
         takenAfter,
@@ -6237,6 +6247,19 @@ export function addAssets({ id, sharedSpaceAssetAddDto }: {
         method: "POST",
         body: sharedSpaceAssetAddDto
     })));
+}
+/**
+ * Get map markers for a shared space
+ */
+export function getMapMarkers2({ id }: {
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: MapMarkerResponseDto[];
+    }>(`/shared-spaces/${encodeURIComponent(id)}/map-markers`, {
+        ...opts
+    }));
 }
 /**
  * Get members of a shared space

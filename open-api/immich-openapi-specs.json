@@ -9443,6 +9443,16 @@
             }
           },
           {
+            "name": "spaceId",
+            "required": false,
+            "in": "query",
+            "description": "Shared space ID to filter by",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "state",
             "required": false,
             "in": "query",
@@ -12149,6 +12159,65 @@
           }
         ],
         "x-immich-permission": "sharedSpaceAsset.create",
+        "x-immich-state": "Beta"
+      }
+    },
+    "/shared-spaces/{id}/map-markers": {
+      "get": {
+        "description": "Retrieve map markers for geotagged assets in a shared space.",
+        "operationId": "getMapMarkers",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MapMarkerResponseDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Get map markers for a shared space",
+        "tags": [
+          "Shared Spaces"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "sharedSpace.read",
         "x-immich-state": "Beta"
       }
     },
@@ -20016,6 +20085,11 @@
             "minimum": 1,
             "type": "number"
           },
+          "spaceId": {
+            "description": "Shared space ID to filter by",
+            "format": "uuid",
+            "type": "string"
+          },
           "state": {
             "description": "Filter by state/province name",
             "nullable": true,
@@ -21826,6 +21900,11 @@
             "minimum": 1,
             "type": "number"
           },
+          "spaceId": {
+            "description": "Shared space ID to filter by",
+            "format": "uuid",
+            "type": "string"
+          },
           "state": {
             "description": "Filter by state/province name",
             "nullable": true,
@@ -23440,6 +23519,11 @@
             "minimum": 1,
             "type": "number"
           },
+          "spaceId": {
+            "description": "Shared space ID to filter by",
+            "format": "uuid",
+            "type": "string"
+          },
           "state": {
             "description": "Filter by state/province name",
             "nullable": true,
@@ -23684,6 +23768,11 @@
               }
             ],
             "x-immich-state": "Stable"
+          },
+          "spaceId": {
+            "description": "Shared space ID to filter by",
+            "format": "uuid",
+            "type": "string"
           },
           "state": {
             "description": "Filter by state/province name",
