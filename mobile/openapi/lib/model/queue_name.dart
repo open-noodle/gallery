@@ -39,6 +39,7 @@ class QueueName {
   static const notifications = QueueName._(r'notifications');
   static const backupDatabase = QueueName._(r'backupDatabase');
   static const ocr = QueueName._(r'ocr');
+  static const petDetection = QueueName._(r'petDetection');
   static const workflow = QueueName._(r'workflow');
   static const editor = QueueName._(r'editor');
   static const storageBackendMigration = QueueName._(r'storageBackendMigration');
@@ -61,6 +62,7 @@ class QueueName {
     notifications,
     backupDatabase,
     ocr,
+    petDetection,
     workflow,
     editor,
     storageBackendMigration,
@@ -118,6 +120,7 @@ class QueueNameTypeTransformer {
         case r'notifications': return QueueName.notifications;
         case r'backupDatabase': return QueueName.backupDatabase;
         case r'ocr': return QueueName.ocr;
+        case r'petDetection': return QueueName.petDetection;
         case r'workflow': return QueueName.workflow;
         case r'editor': return QueueName.editor;
         case r'storageBackendMigration': return QueueName.storageBackendMigration;

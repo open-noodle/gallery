@@ -54,9 +54,7 @@ class PetDetector(InferenceModel):
         blob = np.expand_dims(blob, axis=0)  # add batch dim -> NCHW
         return blob
 
-    def _postprocess(
-        self, raw: NDArray[np.float32], orig_w: int, orig_h: int
-    ) -> PetDetectionOutput:
+    def _postprocess(self, raw: NDArray[np.float32], orig_w: int, orig_h: int) -> PetDetectionOutput:
         # raw shape: (1, 84, 8400) -> transpose to (8400, 84)
         predictions = raw[0].T  # (8400, 84)
 
@@ -127,9 +125,7 @@ class PetDetector(InferenceModel):
         return results
 
     @staticmethod
-    def _nms(
-        boxes: NDArray[np.float32], scores: NDArray[np.float32], iou_threshold: float
-    ) -> NDArray[np.intp]:
+    def _nms(boxes: NDArray[np.float32], scores: NDArray[np.float32], iou_threshold: float) -> NDArray[np.intp]:
         x1 = boxes[:, 0]
         y1 = boxes[:, 1]
         x2 = boxes[:, 2]
