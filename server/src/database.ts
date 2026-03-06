@@ -251,10 +251,12 @@ export type Person = {
   updateId: string;
   isFavorite: boolean;
   name: string;
+  type: string;
   birthDate: Date | null;
   color: string | null;
   faceAssetId: string | null;
   isHidden: boolean;
+  species: string | null;
   thumbnailPath: string;
 };
 
