@@ -107,6 +107,18 @@ class SpacesPage extends HookConsumerWidget {
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    if (space.assetCount != null)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8.0),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.photo_outlined, size: 16, color: context.colorScheme.onSurface.withAlpha(150)),
+                            const SizedBox(width: 2),
+                            Text('${space.assetCount!.toInt()}', style: context.textTheme.bodySmall),
+                          ],
+                        ),
+                      ),
                     if (space.memberCount != null)
                       Padding(
                         padding: const EdgeInsets.only(right: 4.0),
