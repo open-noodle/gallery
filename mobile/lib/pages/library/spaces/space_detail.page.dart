@@ -40,12 +40,18 @@ class SpaceDetailPage extends HookConsumerWidget {
                   ),
                 ),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16.0,
+                  vertical: 8.0,
+                ),
                 child: Row(
                   children: [
                     if (space.assetCount != null)
                       Chip(
-                        avatar: const Icon(Icons.photo_library_outlined, size: 18),
+                        avatar: const Icon(
+                          Icons.photo_library_outlined,
+                          size: 18,
+                        ),
                         label: Text('${space.assetCount!.toInt()} assets'),
                       ),
                     if (space.assetCount != null && space.memberCount != null)
@@ -60,7 +66,11 @@ class SpaceDetailPage extends HookConsumerWidget {
               ),
               const Divider(),
               Padding(
-                padding: const EdgeInsets.only(left: 16.0, top: 8.0, bottom: 4.0),
+                padding: const EdgeInsets.only(
+                  left: 16.0,
+                  top: 8.0,
+                  bottom: 4.0,
+                ),
                 child: Text(
                   'Members',
                   style: context.textTheme.titleSmall?.copyWith(
@@ -85,7 +95,9 @@ class SpaceDetailPage extends HookConsumerWidget {
                       return ListTile(
                         leading: CircleAvatar(
                           child: Text(
-                            member.name.isNotEmpty ? member.name[0].toUpperCase() : '?',
+                            member.name.isNotEmpty
+                                ? member.name[0].toUpperCase()
+                                : '?',
                           ),
                         ),
                         title: Text(member.name),

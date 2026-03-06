@@ -155,7 +155,11 @@ class AppRouter extends RootStackRouter {
   ) {
     _authGuard = AuthGuard(apiService);
     _duplicateGuard = const DuplicateGuard();
-    _lockedGuard = LockedGuard(apiService, secureStorageService, localAuthService);
+    _lockedGuard = LockedGuard(
+      apiService,
+      secureStorageService,
+      localAuthService,
+    );
     _backupPermissionGuard = BackupPermissionGuard(galleryPermissionNotifier);
     _galleryGuard = const GalleryGuard();
   }
@@ -166,28 +170,61 @@ class AppRouter extends RootStackRouter {
   @override
   late final List<AutoRoute> routes = [
     AutoRoute(page: SplashScreenRoute.page, initial: true),
-    AutoRoute(page: PermissionOnboardingRoute.page, guards: [_authGuard, _duplicateGuard]),
+    AutoRoute(
+      page: PermissionOnboardingRoute.page,
+      guards: [_authGuard, _duplicateGuard],
+    ),
     AutoRoute(page: LoginRoute.page),
     AutoRoute(page: ChangePasswordRoute.page),
-    AutoRoute(page: SearchRoute.page, guards: [_authGuard, _duplicateGuard], maintainState: false),
+    AutoRoute(
+      page: SearchRoute.page,
+      guards: [_authGuard, _duplicateGuard],
+      maintainState: false,
+    ),
     AutoRoute(
       page: TabControllerRoute.page,
       guards: [_authGuard, _duplicateGuard],
       children: [
-        AutoRoute(page: PhotosRoute.page, guards: [_authGuard, _duplicateGuard]),
-        AutoRoute(page: SearchRoute.page, guards: [_authGuard, _duplicateGuard], maintainState: false),
-        AutoRoute(page: LibraryRoute.page, guards: [_authGuard, _duplicateGuard]),
-        AutoRoute(page: AlbumsRoute.page, guards: [_authGuard, _duplicateGuard]),
+        AutoRoute(
+          page: PhotosRoute.page,
+          guards: [_authGuard, _duplicateGuard],
+        ),
+        AutoRoute(
+          page: SearchRoute.page,
+          guards: [_authGuard, _duplicateGuard],
+          maintainState: false,
+        ),
+        AutoRoute(
+          page: LibraryRoute.page,
+          guards: [_authGuard, _duplicateGuard],
+        ),
+        AutoRoute(
+          page: AlbumsRoute.page,
+          guards: [_authGuard, _duplicateGuard],
+        ),
       ],
     ),
     AutoRoute(
       page: TabShellRoute.page,
       guards: [_authGuard, _duplicateGuard],
       children: [
-        AutoRoute(page: MainTimelineRoute.page, guards: [_authGuard, _duplicateGuard]),
-        AutoRoute(page: DriftSearchRoute.page, guards: [_authGuard, _duplicateGuard], maintainState: false),
-        AutoRoute(page: DriftLibraryRoute.page, guards: [_authGuard, _duplicateGuard]),
-        AutoRoute(page: DriftAlbumsRoute.page, guards: [_authGuard, _duplicateGuard]),
+        AutoRoute(
+          page: MainTimelineRoute.page,
+          guards: [_authGuard, _duplicateGuard],
+        ),
+        AutoRoute(
+          page: DriftSearchRoute.page,
+          guards: [_authGuard, _duplicateGuard],
+          maintainState: false,
+        ),
+        AutoRoute(
+          page: DriftLibraryRoute.page,
+          guards: [_authGuard, _duplicateGuard],
+        ),
+        AutoRoute(
+          page: DriftAlbumsRoute.page,
+          guards: [_authGuard, _duplicateGuard],
+        ),
       ],
     ),
     CustomRoute(
@@ -195,9 +232,15 @@ class AppRouter extends RootStackRouter {
       guards: [_authGuard, _galleryGuard],
       transitionsBuilder: CustomTransitionsBuilders.zoomedPage,
     ),
-    AutoRoute(page: BackupControllerRoute.page, guards: [_authGuard, _duplicateGuard, _backupPermissionGuard]),
+    AutoRoute(
+      page: BackupControllerRoute.page,
+      guards: [_authGuard, _duplicateGuard, _backupPermissionGuard],
+    ),
     AutoRoute(page: AllPlacesRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: CreateAlbumRoute.page, guards: [_authGuard, _duplicateGuard]),
+    AutoRoute(
+      page: CreateAlbumRoute.page,
+      guards: [_authGuard, _duplicateGuard],
+    ),
     AutoRoute(page: EditImageRoute.page),
     AutoRoute(page: CropImageRoute.page),
     AutoRoute(page: FilterImageRoute.page),
@@ -208,8 +251,14 @@ class AppRouter extends RootStackRouter {
       transitionsBuilder: TransitionsBuilders.slideLeft,
     ),
     AutoRoute(page: AllVideosRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: AllMotionPhotosRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: RecentlyTakenRoute.page, guards: [_authGuard, _duplicateGuard]),
+    AutoRoute(
+      page: AllMotionPhotosRoute.page,
+      guards: [_authGuard, _duplicateGuard],
+    ),
+    AutoRoute(
+      page: RecentlyTakenRoute.page,
+      guards: [_authGuard, _duplicateGuard],
+    ),
     CustomRoute(
       page: AlbumAssetSelectionRoute.page,
       guards: [_authGuard, _duplicateGuard],
@@ -220,14 +269,23 @@ class AppRouter extends RootStackRouter {
       guards: [_authGuard, _duplicateGuard],
       transitionsBuilder: TransitionsBuilders.slideBottom,
     ),
-    AutoRoute(page: AlbumViewerRoute.page, guards: [_authGuard, _duplicateGuard]),
+    AutoRoute(
+      page: AlbumViewerRoute.page,
+      guards: [_authGuard, _duplicateGuard],
+    ),
     CustomRoute(
       page: AlbumAdditionalSharedUserSelectionRoute.page,
       guards: [_authGuard, _duplicateGuard],
       transitionsBuilder: TransitionsBuilders.slideBottom,
     ),
-    AutoRoute(page: BackupAlbumSelectionRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: AlbumPreviewRoute.page, guards: [_authGuard, _duplicateGuard]),
+    AutoRoute(
+      page: BackupAlbumSelectionRoute.page,
+      guards: [_authGuard, _duplicateGuard],
+    ),
+    AutoRoute(
+      page: AlbumPreviewRoute.page,
+      guards: [_authGuard, _duplicateGuard],
+    ),
     CustomRoute(
       page: FailedBackupStatusRoute.page,
       guards: [_authGuard, _duplicateGuard],
@@ -257,23 +315,44 @@ class AppRouter extends RootStackRouter {
       guards: [_authGuard, _duplicateGuard],
     ),
     AutoRoute(page: FolderRoute.page, guards: [_authGuard]),
-    AutoRoute(page: PartnerDetailRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: PersonResultRoute.page, guards: [_authGuard, _duplicateGuard]),
+    AutoRoute(
+      page: PartnerDetailRoute.page,
+      guards: [_authGuard, _duplicateGuard],
+    ),
+    AutoRoute(
+      page: PersonResultRoute.page,
+      guards: [_authGuard, _duplicateGuard],
+    ),
     AutoRoute(page: AllPeopleRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: MemoryRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: MapRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: AlbumOptionsRoute.page, guards: [_authGuard, _duplicateGuard]),
+    AutoRoute(
+      page: AlbumOptionsRoute.page,
+      guards: [_authGuard, _duplicateGuard],
+    ),
     AutoRoute(page: TrashRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: SharedLinkRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: SharedLinkEditRoute.page, guards: [_authGuard, _duplicateGuard]),
+    AutoRoute(
+      page: SharedLinkRoute.page,
+      guards: [_authGuard, _duplicateGuard],
+    ),
+    AutoRoute(
+      page: SharedLinkEditRoute.page,
+      guards: [_authGuard, _duplicateGuard],
+    ),
     CustomRoute(
       page: ActivitiesRoute.page,
       guards: [_authGuard, _duplicateGuard],
       transitionsBuilder: TransitionsBuilders.slideLeft,
       durationInMilliseconds: 200,
     ),
-    CustomRoute(page: MapLocationPickerRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: BackupOptionsRoute.page, guards: [_authGuard, _duplicateGuard]),
+    CustomRoute(
+      page: MapLocationPickerRoute.page,
+      guards: [_authGuard, _duplicateGuard],
+    ),
+    AutoRoute(
+      page: BackupOptionsRoute.page,
+      guards: [_authGuard, _duplicateGuard],
+    ),
     AutoRoute(page: HeaderSettingsRoute.page, guards: [_duplicateGuard]),
     CustomRoute(
       page: PeopleCollectionRoute.page,
@@ -295,16 +374,43 @@ class AppRouter extends RootStackRouter {
       guards: [_authGuard, _duplicateGuard],
       transitionsBuilder: TransitionsBuilders.slideLeft,
     ),
-    AutoRoute(page: NativeVideoViewerRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: ShareIntentRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: LockedRoute.page, guards: [_authGuard, _lockedGuard, _duplicateGuard]),
+    AutoRoute(
+      page: NativeVideoViewerRoute.page,
+      guards: [_authGuard, _duplicateGuard],
+    ),
+    AutoRoute(
+      page: ShareIntentRoute.page,
+      guards: [_authGuard, _duplicateGuard],
+    ),
+    AutoRoute(
+      page: LockedRoute.page,
+      guards: [_authGuard, _lockedGuard, _duplicateGuard],
+    ),
     AutoRoute(page: PinAuthRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: LocalMediaSummaryRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: RemoteMediaSummaryRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: DriftBackupRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: DriftBackupAlbumSelectionRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: LocalTimelineRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: MainTimelineRoute.page, guards: [_authGuard, _duplicateGuard]),
+    AutoRoute(
+      page: LocalMediaSummaryRoute.page,
+      guards: [_authGuard, _duplicateGuard],
+    ),
+    AutoRoute(
+      page: RemoteMediaSummaryRoute.page,
+      guards: [_authGuard, _duplicateGuard],
+    ),
+    AutoRoute(
+      page: DriftBackupRoute.page,
+      guards: [_authGuard, _duplicateGuard],
+    ),
+    AutoRoute(
+      page: DriftBackupAlbumSelectionRoute.page,
+      guards: [_authGuard, _duplicateGuard],
+    ),
+    AutoRoute(
+      page: LocalTimelineRoute.page,
+      guards: [_authGuard, _duplicateGuard],
+    ),
+    AutoRoute(
+      page: MainTimelineRoute.page,
+      guards: [_authGuard, _duplicateGuard],
+    ),
     AutoRoute(page: RemoteAlbumRoute.page, guards: [_authGuard]),
     AutoRoute(
       page: AssetViewerRoute.page,
@@ -319,38 +425,116 @@ class AppRouter extends RootStackRouter {
         ),
       ),
     ),
-    AutoRoute(page: DriftMemoryRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: DriftFavoriteRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: DriftTrashRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: DriftArchiveRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: DriftLockedFolderRoute.page, guards: [_authGuard, _lockedGuard, _duplicateGuard]),
-    AutoRoute(page: DriftVideoRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: DriftLibraryRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: DriftAssetSelectionTimelineRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: DriftPartnerDetailRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: DriftRecentlyTakenRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: DriftLocalAlbumsRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: DriftCreateAlbumRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: DriftPlaceRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: DriftPlaceDetailRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: DriftUserSelectionRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: ChangeExperienceRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: DriftPartnerRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: DriftUploadDetailRoute.page, guards: [_authGuard, _duplicateGuard]),
+    AutoRoute(
+      page: DriftMemoryRoute.page,
+      guards: [_authGuard, _duplicateGuard],
+    ),
+    AutoRoute(
+      page: DriftFavoriteRoute.page,
+      guards: [_authGuard, _duplicateGuard],
+    ),
+    AutoRoute(
+      page: DriftTrashRoute.page,
+      guards: [_authGuard, _duplicateGuard],
+    ),
+    AutoRoute(
+      page: DriftArchiveRoute.page,
+      guards: [_authGuard, _duplicateGuard],
+    ),
+    AutoRoute(
+      page: DriftLockedFolderRoute.page,
+      guards: [_authGuard, _lockedGuard, _duplicateGuard],
+    ),
+    AutoRoute(
+      page: DriftVideoRoute.page,
+      guards: [_authGuard, _duplicateGuard],
+    ),
+    AutoRoute(
+      page: DriftLibraryRoute.page,
+      guards: [_authGuard, _duplicateGuard],
+    ),
+    AutoRoute(
+      page: DriftAssetSelectionTimelineRoute.page,
+      guards: [_authGuard, _duplicateGuard],
+    ),
+    AutoRoute(
+      page: DriftPartnerDetailRoute.page,
+      guards: [_authGuard, _duplicateGuard],
+    ),
+    AutoRoute(
+      page: DriftRecentlyTakenRoute.page,
+      guards: [_authGuard, _duplicateGuard],
+    ),
+    AutoRoute(
+      page: DriftLocalAlbumsRoute.page,
+      guards: [_authGuard, _duplicateGuard],
+    ),
+    AutoRoute(
+      page: DriftCreateAlbumRoute.page,
+      guards: [_authGuard, _duplicateGuard],
+    ),
+    AutoRoute(
+      page: DriftPlaceRoute.page,
+      guards: [_authGuard, _duplicateGuard],
+    ),
+    AutoRoute(
+      page: DriftPlaceDetailRoute.page,
+      guards: [_authGuard, _duplicateGuard],
+    ),
+    AutoRoute(
+      page: DriftUserSelectionRoute.page,
+      guards: [_authGuard, _duplicateGuard],
+    ),
+    AutoRoute(
+      page: ChangeExperienceRoute.page,
+      guards: [_authGuard, _duplicateGuard],
+    ),
+    AutoRoute(
+      page: DriftPartnerRoute.page,
+      guards: [_authGuard, _duplicateGuard],
+    ),
+    AutoRoute(
+      page: DriftUploadDetailRoute.page,
+      guards: [_authGuard, _duplicateGuard],
+    ),
     AutoRoute(page: SyncStatusRoute.page, guards: [_duplicateGuard]),
-    AutoRoute(page: DriftPeopleCollectionRoute.page, guards: [_authGuard, _duplicateGuard]),
+    AutoRoute(
+      page: DriftPeopleCollectionRoute.page,
+      guards: [_authGuard, _duplicateGuard],
+    ),
     AutoRoute(page: DriftPersonRoute.page, guards: [_authGuard]),
-    AutoRoute(page: DriftBackupOptionsRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: DriftAlbumOptionsRoute.page, guards: [_authGuard, _duplicateGuard]),
+    AutoRoute(
+      page: DriftBackupOptionsRoute.page,
+      guards: [_authGuard, _duplicateGuard],
+    ),
+    AutoRoute(
+      page: DriftAlbumOptionsRoute.page,
+      guards: [_authGuard, _duplicateGuard],
+    ),
     AutoRoute(page: DriftMapRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: DriftEditImageRoute.page),
     AutoRoute(page: DriftCropImageRoute.page),
     AutoRoute(page: DriftFilterImageRoute.page),
-    AutoRoute(page: DriftActivitiesRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: DriftBackupAssetDetailRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: AssetTroubleshootRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: DownloadInfoRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: CleanupPreviewRoute.page, guards: [_authGuard, _duplicateGuard]),
+    AutoRoute(
+      page: DriftActivitiesRoute.page,
+      guards: [_authGuard, _duplicateGuard],
+    ),
+    AutoRoute(
+      page: DriftBackupAssetDetailRoute.page,
+      guards: [_authGuard, _duplicateGuard],
+    ),
+    AutoRoute(
+      page: AssetTroubleshootRoute.page,
+      guards: [_authGuard, _duplicateGuard],
+    ),
+    AutoRoute(
+      page: DownloadInfoRoute.page,
+      guards: [_authGuard, _duplicateGuard],
+    ),
+    AutoRoute(
+      page: CleanupPreviewRoute.page,
+      guards: [_authGuard, _duplicateGuard],
+    ),
     // required to handle all deeplinks in deep_link.service.dart
     // auto_route_library#1722
     RedirectRoute(path: '*', redirectTo: '/'),
