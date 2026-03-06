@@ -2,14 +2,16 @@
   import UserAvatar from '$lib/components/shared-components/user-avatar.svelte';
   import SpaceAddMemberModal from '$lib/modals/SpaceAddMemberModal.svelte';
   import { handleError } from '$lib/utils/handle-error';
+  import { user } from '$lib/stores/user.store';
   import {
     removeMember,
     SharedSpaceRole,
     updateMember,
+    updateMemberTimeline,
     UserAvatarColor,
     type SharedSpaceMemberResponseDto,
   } from '@immich/sdk';
-  import { BasicModal, Button, Field, modalManager, Select, Text, type SelectOption } from '@immich/ui';
+  import { BasicModal, Button, Field, modalManager, Select, Switch, Text, type SelectOption } from '@immich/ui';
   import { mdiAccountPlus } from '@mdi/js';
   import { t } from 'svelte-i18n';
 
@@ -75,6 +77,18 @@
     }
   };
 
+  const handleTimelineToggle = async (member: SharedSpaceMemberResponseDto, showInTimeline: boolean) => {
+    try {
+      const updated = await updateMemberTimeline({
+        id: spaceId,
+        sharedSpaceMemberTimelineDto: { showInTimeline },
+      });
+      members = members.map((m) => (m.userId === updated.userId ? updated : m));
+    } catch (error) {
+      handleError(error, $t('unable_to_update_timeline_display_status'));
+    }
+  };
+
   const handleClose = () => {
     onClose(members);
   };
@@ -113,6 +127,12 @@
           </Field>
         {:else}
           <span class="text-sm text-immich-fg/60 dark:text-immich-dark-fg/60 capitalize">{member.role}</span>
+        {/if}
+        {#if member.userId === $user?.id}
+          <Switch
+            checked={member.showInTimeline}
+            onCheckedChange={(checked) => handleTimelineToggle(member, checked)}
+          />
         {/if}
       </div>
     {/each}
