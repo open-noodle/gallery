@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post
 import { ApiTags } from '@nestjs/swagger';
 import { Endpoint, HistoryBuilder } from 'src/decorators';
 import { AuthDto } from 'src/dtos/auth.dto';
+import { MapMarkerResponseDto } from 'src/dtos/map.dto';
 import {
   SharedSpaceAssetAddDto,
   SharedSpaceAssetRemoveDto,
@@ -150,6 +151,17 @@ export class SharedSpaceController {
   })
   removeMember(@Auth() auth: AuthDto, @Param('id') id: string, @Param('userId') userId: string): Promise<void> {
     return this.service.removeMember(auth, id, userId);
+  }
+
+  @Get(':id/map-markers')
+  @Authenticated({ permission: Permission.SharedSpaceRead })
+  @Endpoint({
+    summary: 'Get map markers for a shared space',
+    description: 'Retrieve map markers for geotagged assets in a shared space.',
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  getMapMarkers(@Auth() auth: AuthDto, @Param() { id }: UUIDParamDto): Promise<MapMarkerResponseDto[]> {
+    return this.service.getMapMarkers(auth, id);
   }
 
   @Post(':id/assets')
