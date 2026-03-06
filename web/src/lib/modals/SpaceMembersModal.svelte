@@ -1,9 +1,10 @@
 <script lang="ts">
   import UserAvatar from '$lib/components/shared-components/user-avatar.svelte';
   import SpaceAddMemberModal from '$lib/modals/SpaceAddMemberModal.svelte';
-  import { removeMember, UserAvatarColor, type SharedSpaceMemberResponseDto } from '@immich/sdk';
-  import { BasicModal, Button, IconButton, modalManager, Text } from '@immich/ui';
-  import { mdiAccountPlus, mdiClose } from '@mdi/js';
+  import { handleError } from '$lib/utils/handle-error';
+  import { removeMember, SharedSpaceRole, updateMember, UserAvatarColor, type SharedSpaceMemberResponseDto } from '@immich/sdk';
+  import { BasicModal, Button, Field, modalManager, Select, Text, type SelectOption } from '@immich/ui';
+  import { mdiAccountPlus } from '@mdi/js';
   import { t } from 'svelte-i18n';
 
   interface Props {
@@ -50,6 +51,24 @@
     }
   };
 
+  const handleRoleChange = async (member: SharedSpaceMemberResponseDto, newRole: SharedSpaceRole | 'remove') => {
+    if (newRole === 'remove') {
+      await handleRemoveMember(member);
+      return;
+    }
+
+    try {
+      const updated = await updateMember({
+        id: spaceId,
+        userId: member.userId,
+        sharedSpaceMemberUpdateDto: { role: newRole },
+      });
+      members = members.map((m) => (m.userId === updated.userId ? updated : m));
+    } catch (error) {
+      handleError(error, $t('errors.error_updating_member_role'));
+    }
+  };
+
   const handleClose = () => {
     onClose(members);
   };
@@ -70,15 +89,24 @@
           <Text fontWeight="medium">{member.name}</Text>
           <Text size="tiny" color="muted">{member.email}</Text>
         </div>
-        <span class="text-sm text-immich-fg/60 dark:text-immich-dark-fg/60 capitalize">{member.role}</span>
-        {#if isOwner && member.role !== 'owner'}
-          <IconButton
-            shape="round"
-            size="small"
-            icon={mdiClose}
-            aria-label={$t('spaces_remove_member')}
-            onclick={() => handleRemoveMember(member)}
-          />
+        {#if isOwner && member.role === 'owner'}
+          <Field disabled class="w-32 shrink-0">
+            <Select options={[{ label: $t('owner'), value: 'owner' }]} value="owner" />
+          </Field>
+        {:else if isOwner}
+          <Field class="w-32 shrink-0">
+            <Select
+              value={member.role}
+              options={[
+                { label: $t('role_editor'), value: SharedSpaceRole.Editor },
+                { label: $t('role_viewer'), value: SharedSpaceRole.Viewer },
+                { label: $t('remove'), value: 'remove' },
+              ] as SelectOption<SharedSpaceRole | 'remove'>[]}
+              onChange={(value) => handleRoleChange(member, value)}
+            />
+          </Field>
+        {:else}
+          <span class="text-sm text-immich-fg/60 dark:text-immich-dark-fg/60 capitalize">{member.role}</span>
         {/if}
       </div>
     {/each}

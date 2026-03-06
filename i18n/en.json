@@ -1058,6 +1058,7 @@
     "error_hiding_buy_button": "Error hiding buy button",
     "error_removing_assets_from_album": "Error removing assets from album, check console for more details",
     "error_removing_assets_from_space": "Error removing assets from space",
+    "error_updating_member_role": "Error updating member role",
     "error_selecting_all_assets": "Error selecting all assets",
     "exclusion_pattern_already_exists": "This exclusion pattern already exists.",
     "failed_to_create_album": "Failed to create album",
