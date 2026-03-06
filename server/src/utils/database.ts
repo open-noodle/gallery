@@ -317,6 +317,16 @@ export function searchAssetBuilder(kysely: Kysely<DB>, options: AssetSearchBuild
     .selectFrom('asset')
     .where('asset.visibility', '=', visibility)
     .$if(!!options.albumIds && options.albumIds.length > 0, (qb) => inAlbums(qb, options.albumIds!))
+    .$if(!!options.spaceId, (qb) =>
+      qb.where((eb) =>
+        eb.exists(
+          eb
+            .selectFrom('shared_space_asset')
+            .whereRef('shared_space_asset.assetId', '=', 'asset.id')
+            .where('shared_space_asset.spaceId', '=', asUuid(options.spaceId!)),
+        ),
+      ),
+    )
     .$if(!!options.tagIds && options.tagIds.length > 0, (qb) => hasTags(qb, options.tagIds!))
     .$if(options.tagIds === null, (qb) =>
       qb.where((eb) => eb.not(eb.exists((eb) => eb.selectFrom('tag_asset').whereRef('assetId', '=', 'asset.id')))),
