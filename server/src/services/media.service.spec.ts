@@ -1481,6 +1481,20 @@ describe(MediaService.name, () => {
       expect(mocks.systemMetadata.get).toHaveBeenCalled();
     });
 
+    it('should not skip when only pet detection is enabled', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({
+        machineLearning: {
+          enabled: true,
+          facialRecognition: { enabled: false },
+          petDetection: { enabled: true },
+        },
+        metadata: { faces: { import: false } },
+      });
+
+      await expect(sut.handleGeneratePersonThumbnail({ id: 'person-1' })).resolves.toBe(JobStatus.Failed);
+      expect(mocks.person.getDataForThumbnailGenerationJob).toHaveBeenCalledWith('person-1');
+    });
+
     it('should skip a person not found', async () => {
       await sut.handleGeneratePersonThumbnail({ id: 'person-1' });
       expect(mocks.media.generateThumbnail).not.toHaveBeenCalled();
