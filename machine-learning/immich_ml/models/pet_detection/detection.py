@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Any
 
 import cv2
@@ -36,6 +37,19 @@ class PetDetector(InferenceModel):
     def __init__(self, model_name: str, min_score: float = 0.6, **model_kwargs: Any) -> None:
         self.min_score = model_kwargs.pop("minScore", min_score)
         super().__init__(model_name, **model_kwargs)
+
+    @property
+    def model_path(self) -> Path:
+        # Support both conventions:
+        # 1. Standard: detection/model.onnx (matches base class)
+        # 2. Legacy: <model_name>.onnx at cache root (e.g. yolo11m.onnx)
+        standard = super().model_path
+        if standard.is_file():
+            return standard
+        alt = self.cache_dir / f"{self.model_name}.onnx"
+        if alt.is_file():
+            return alt
+        return standard
 
     def _download(self) -> None:
         from huggingface_hub import snapshot_download
