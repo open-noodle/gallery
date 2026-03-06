@@ -2,7 +2,13 @@
   import UserAvatar from '$lib/components/shared-components/user-avatar.svelte';
   import SpaceAddMemberModal from '$lib/modals/SpaceAddMemberModal.svelte';
   import { handleError } from '$lib/utils/handle-error';
-  import { removeMember, SharedSpaceRole, updateMember, UserAvatarColor, type SharedSpaceMemberResponseDto } from '@immich/sdk';
+  import {
+    removeMember,
+    SharedSpaceRole,
+    updateMember,
+    UserAvatarColor,
+    type SharedSpaceMemberResponseDto,
+  } from '@immich/sdk';
   import { BasicModal, Button, Field, modalManager, Select, Text, type SelectOption } from '@immich/ui';
   import { mdiAccountPlus } from '@mdi/js';
   import { t } from 'svelte-i18n';
@@ -96,7 +102,7 @@
         {:else if isOwner}
           <Field class="w-32 shrink-0">
             <Select
-              value={member.role}
+              value={member.role as SharedSpaceRole}
               options={[
                 { label: $t('role_editor'), value: SharedSpaceRole.Editor },
                 { label: $t('role_viewer'), value: SharedSpaceRole.Viewer },
