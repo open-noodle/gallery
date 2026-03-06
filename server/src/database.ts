@@ -333,6 +333,7 @@ export type SharedSpaceMember = {
   userId: string;
   role: string;
   joinedAt: Date;
+  showInTimeline: boolean;
 };
 
 export type SharedSpaceAsset = {

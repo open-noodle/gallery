@@ -8,6 +8,7 @@ import {
   SharedSpaceCreateDto,
   SharedSpaceMemberCreateDto,
   SharedSpaceMemberResponseDto,
+  SharedSpaceMemberTimelineDto,
   SharedSpaceMemberUpdateDto,
   SharedSpaceResponseDto,
   SharedSpaceUpdateDto,
@@ -106,6 +107,21 @@ export class SharedSpaceController {
     @Body() dto: SharedSpaceMemberCreateDto,
   ): Promise<SharedSpaceMemberResponseDto> {
     return this.service.addMember(auth, id, dto);
+  }
+
+  @Patch(':id/members/me/timeline')
+  @Authenticated({ permission: Permission.SharedSpaceRead })
+  @Endpoint({
+    summary: 'Update timeline visibility for current member',
+    description: "Toggle whether this space's assets appear in the current user's personal timeline.",
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  updateMemberTimeline(
+    @Auth() auth: AuthDto,
+    @Param('id') id: string,
+    @Body() dto: SharedSpaceMemberTimelineDto,
+  ): Promise<SharedSpaceMemberResponseDto> {
+    return this.service.updateMemberTimeline(auth, id, dto);
   }
 
   @Patch(':id/members/:userId')

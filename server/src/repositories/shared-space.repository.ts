@@ -58,6 +58,7 @@ export class SharedSpaceRepository {
         'shared_space_member.userId',
         'shared_space_member.role',
         'shared_space_member.joinedAt',
+        'shared_space_member.showInTimeline',
         'user.name',
         'user.email',
         'user.profileImagePath',
@@ -81,6 +82,7 @@ export class SharedSpaceRepository {
         'shared_space_member.userId',
         'shared_space_member.role',
         'shared_space_member.joinedAt',
+        'shared_space_member.showInTimeline',
         'user.name',
         'user.email',
         'user.profileImagePath',
@@ -111,6 +113,16 @@ export class SharedSpaceRepository {
       .deleteFrom('shared_space_member')
       .where('spaceId', '=', spaceId)
       .where('userId', '=', userId)
+      .execute();
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID] })
+  getSpaceIdsForTimeline(userId: string) {
+    return this.db
+      .selectFrom('shared_space_member')
+      .where('userId', '=', userId)
+      .where('showInTimeline', '=', true)
+      .select('spaceId')
       .execute();
   }
 

@@ -12275,6 +12275,71 @@
         "x-immich-state": "Beta"
       }
     },
+    "/shared-spaces/{id}/members/me/timeline": {
+      "patch": {
+        "description": "Toggle whether this space's assets appear in the current user's personal timeline.",
+        "operationId": "updateMemberTimeline",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SharedSpaceMemberTimelineDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedSpaceMemberResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Update timeline visibility for current member",
+        "tags": [
+          "Shared Spaces"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "sharedSpace.read",
+        "x-immich-state": "Beta"
+      }
+    },
     "/shared-spaces/{id}/members/{userId}": {
       "delete": {
         "description": "Remove a member from a shared space, or leave the space.",
@@ -14454,6 +14519,15 @@
             }
           },
           {
+            "name": "withSharedSpaces",
+            "required": false,
+            "in": "query",
+            "description": "Include assets from shared spaces where the user has timeline enabled",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "name": "withStacked",
             "required": false,
             "in": "query",
@@ -14635,6 +14709,15 @@
             "required": false,
             "in": "query",
             "description": "Include assets shared by partners",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "withSharedSpaces",
+            "required": false,
+            "in": "query",
+            "description": "Include assets from shared spaces where the user has timeline enabled",
             "schema": {
               "type": "boolean"
             }
@@ -23082,6 +23165,10 @@
             ],
             "type": "string"
           },
+          "showInTimeline": {
+            "description": "Show space assets in timeline",
+            "type": "boolean"
+          },
           "userId": {
             "description": "User ID",
             "type": "string"
@@ -23092,7 +23179,20 @@
           "joinedAt",
           "name",
           "role",
+          "showInTimeline",
           "userId"
+        ],
+        "type": "object"
+      },
+      "SharedSpaceMemberTimelineDto": {
+        "properties": {
+          "showInTimeline": {
+            "description": "Show space assets in personal timeline",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "showInTimeline"
         ],
         "type": "object"
       },

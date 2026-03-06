@@ -16,4 +16,7 @@ export class SharedSpaceMemberTable {
 
   @CreateDateColumn()
   joinedAt!: Generated<Timestamp>;
+
+  @Column({ type: 'boolean', default: true })
+  showInTimeline!: Generated<boolean>;
 }

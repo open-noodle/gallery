@@ -12,6 +12,7 @@ const makeMemberResult = (overrides: Record<string, unknown> = {}) => ({
   profileImagePath: '',
   profileChangedAt: newDate(),
   avatarColor: null,
+  showInTimeline: true,
   ...overrides,
 });
 
@@ -337,6 +338,52 @@ describe(SharedSpaceService.name, () => {
         ForbiddenException,
       );
       expect(mocks.sharedSpace.updateMember).not.toHaveBeenCalled();
+    });
+
+    it('should allow any member to toggle their own showInTimeline', async () => {
+      const auth = factory.auth();
+      const spaceId = newUuid();
+      const viewerMember = makeMemberResult({
+        spaceId,
+        userId: auth.user.id,
+        role: SharedSpaceRole.Viewer,
+        showInTimeline: true,
+      });
+      const updatedMember = makeMemberResult({
+        spaceId,
+        userId: auth.user.id,
+        role: SharedSpaceRole.Viewer,
+        showInTimeline: false,
+      });
+
+      mocks.sharedSpace.getMember
+        .mockResolvedValueOnce(viewerMember) // requireMembership check
+        .mockResolvedValueOnce(updatedMember); // fetch after update
+      mocks.sharedSpace.updateMember.mockResolvedValue(
+        factory.sharedSpaceMember({
+          spaceId,
+          userId: auth.user.id,
+          showInTimeline: false,
+        }),
+      );
+
+      const result = await sut.updateMemberTimeline(auth, spaceId, { showInTimeline: false });
+
+      expect(result.showInTimeline).toBe(false);
+      expect(mocks.sharedSpace.updateMember).toHaveBeenCalledWith(spaceId, auth.user.id, {
+        showInTimeline: false,
+      });
+    });
+
+    it('should throw when non-member tries to toggle timeline', async () => {
+      const auth = factory.auth();
+      const spaceId = newUuid();
+
+      mocks.sharedSpace.getMember.mockResolvedValue(void 0);
+
+      await expect(sut.updateMemberTimeline(auth, spaceId, { showInTimeline: false })).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
     });
   });
 

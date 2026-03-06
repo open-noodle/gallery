@@ -46,7 +46,12 @@
 
   let { isViewing: showAssetViewer } = assetViewingStore;
   let timelineManager = $state<TimelineManager>() as TimelineManager;
-  const options = { visibility: AssetVisibility.Timeline, withStacked: true, withPartners: true };
+  const options = {
+    visibility: AssetVisibility.Timeline,
+    withStacked: true,
+    withPartners: true,
+    withSharedSpaces: true,
+  };
 
   const assetInteraction = new AssetInteraction();
 

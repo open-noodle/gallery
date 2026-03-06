@@ -23,12 +23,19 @@
     getSpace,
     removeSpace,
     Role,
+    updateMemberTimeline,
     type SharedSpaceMemberResponseDto,
     type SharedSpaceResponseDto,
   } from '@immich/sdk';
-  import { IconButton, modalManager, toastManager } from '@immich/ui';
-  import { mdiAccountMultipleOutline, mdiDeleteOutline, mdiImagePlusOutline, mdiPlus } from '@mdi/js';
-  import { Icon } from '@immich/ui';
+  import { Icon, IconButton, modalManager, toastManager } from '@immich/ui';
+  import {
+    mdiAccountMultipleOutline,
+    mdiDeleteOutline,
+    mdiEyeOffOutline,
+    mdiEyeOutline,
+    mdiImagePlusOutline,
+    mdiPlus,
+  } from '@mdi/js';
   import { t } from 'svelte-i18n';
   import type { PageData } from './$types';
 
@@ -51,6 +58,7 @@
   const currentMember = $derived(members.find((m) => m.userId === $user.id));
   const isOwner = $derived(currentMember?.role === Role.Owner);
   const isEditor = $derived(currentMember?.role === Role.Owner || currentMember?.role === Role.Editor);
+  const showInTimeline = $derived(currentMember?.showInTimeline ?? true);
 
   const options = $derived.by(() => {
     if (viewMode === 'select-assets') {
@@ -111,6 +119,18 @@
     await goto(Route.spaces());
   };
 
+  const handleToggleTimeline = async () => {
+    try {
+      const updated = await updateMemberTimeline({
+        id: space.id,
+        sharedSpaceMemberTimelineDto: { showInTimeline: !showInTimeline },
+      });
+      members = members.map((m) => (m.userId === updated.userId ? updated : m));
+    } catch (error) {
+      handleError(error, $t('errors.unable_to_update_timeline_display_status'));
+    }
+  };
+
   const handleShowMembers = async () => {
     const updatedMembers = await modalManager.show(SpaceMembersModal, {
       spaceId: space.id,
@@ -161,6 +181,16 @@
             icon={mdiImagePlusOutline}
           />
         {/if}
+
+        <IconButton
+          variant="ghost"
+          shape="round"
+          color="secondary"
+          aria-label={showInTimeline ? $t('spaces_hide_from_timeline') : $t('spaces_show_on_timeline')}
+          title={showInTimeline ? $t('spaces_hide_from_timeline') : $t('spaces_show_on_timeline')}
+          onclick={handleToggleTimeline}
+          icon={showInTimeline ? mdiEyeOutline : mdiEyeOffOutline}
+        />
 
         <IconButton
           variant="ghost"

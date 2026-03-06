@@ -652,6 +652,8 @@ class ApiClient {
           return SharedSpaceMemberCreateDto.fromJson(value);
         case 'SharedSpaceMemberResponseDto':
           return SharedSpaceMemberResponseDto.fromJson(value);
+        case 'SharedSpaceMemberTimelineDto':
+          return SharedSpaceMemberTimelineDto.fromJson(value);
         case 'SharedSpaceMemberUpdateDto':
           return SharedSpaceMemberUpdateDto.fromJson(value);
         case 'SharedSpaceResponseDto':

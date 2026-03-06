@@ -33,6 +33,7 @@ describe('SpaceMembersModal', () => {
     email: 'owner@test.com',
     role: Role.Owner,
     joinedAt: '2024-01-01T00:00:00.000Z',
+    showInTimeline: true,
   };
 
   const editorMember: SharedSpaceMemberResponseDto = {
@@ -41,6 +42,7 @@ describe('SpaceMembersModal', () => {
     email: 'editor@test.com',
     role: Role.Editor,
     joinedAt: '2024-01-02T00:00:00.000Z',
+    showInTimeline: true,
   };
 
   const viewerMember: SharedSpaceMemberResponseDto = {
@@ -49,6 +51,7 @@ describe('SpaceMembersModal', () => {
     email: 'viewer@test.com',
     role: Role.Viewer,
     joinedAt: '2024-01-03T00:00:00.000Z',
+    showInTimeline: false,
   };
 
   beforeEach(() => {
