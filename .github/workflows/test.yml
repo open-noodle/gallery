@@ -509,6 +509,11 @@ jobs:
         with:
           channel: 'stable'
           flutter-version-file: ./mobile/pubspec.yaml
+      - name: Configure git for GitHub dependencies
+        run: git config --global url."https://x-access-token:${{ github.token }}@github.com/".insteadOf "https://github.com/"
+      - name: Install dependencies
+        run: dart pub get
+        working-directory: ./mobile
       - name: Generate translation file
         run: dart run easy_localization:generate -S ../i18n && dart run bin/generate_keys.dart
         working-directory: ./mobile

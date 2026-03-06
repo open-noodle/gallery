@@ -53,6 +53,9 @@ jobs:
           channel: 'stable'
           flutter-version-file: ./mobile/pubspec.yaml
 
+      - name: Configure git for GitHub dependencies
+        run: git config --global url."https://x-access-token:${{ github.token }}@github.com/".insteadOf "https://github.com/"
+
       - name: Install dependencies
         run: dart pub get
 
