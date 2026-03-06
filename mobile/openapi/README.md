@@ -268,6 +268,7 @@ Class | Method | HTTP request | Description
 *SharedSpacesApi* | [**removeMember**](doc//SharedSpacesApi.md#removemember) | **DELETE** /shared-spaces/{id}/members/{userId} | Remove a member from a shared space
 *SharedSpacesApi* | [**removeSpace**](doc//SharedSpacesApi.md#removespace) | **DELETE** /shared-spaces/{id} | Delete a shared space
 *SharedSpacesApi* | [**updateMember**](doc//SharedSpacesApi.md#updatemember) | **PATCH** /shared-spaces/{id}/members/{userId} | Update a member in a shared space
+*SharedSpacesApi* | [**updateMemberTimeline**](doc//SharedSpacesApi.md#updatemembertimeline) | **PATCH** /shared-spaces/{id}/members/me/timeline | Update timeline visibility for current member
 *SharedSpacesApi* | [**updateSpace**](doc//SharedSpacesApi.md#updatespace) | **PATCH** /shared-spaces/{id} | Update a shared space
 *StacksApi* | [**createStack**](doc//StacksApi.md#createstack) | **POST** /stacks | Create a stack
 *StacksApi* | [**deleteStack**](doc//StacksApi.md#deletestack) | **DELETE** /stacks/{id} | Delete a stack
@@ -578,6 +579,7 @@ Class | Method | HTTP request | Description
  - [SharedSpaceCreateDto](doc//SharedSpaceCreateDto.md)
  - [SharedSpaceMemberCreateDto](doc//SharedSpaceMemberCreateDto.md)
  - [SharedSpaceMemberResponseDto](doc//SharedSpaceMemberResponseDto.md)
+ - [SharedSpaceMemberTimelineDto](doc//SharedSpaceMemberTimelineDto.md)
  - [SharedSpaceMemberUpdateDto](doc//SharedSpaceMemberUpdateDto.md)
  - [SharedSpaceResponseDto](doc//SharedSpaceResponseDto.md)
  - [SharedSpaceRole](doc//SharedSpaceRole.md)

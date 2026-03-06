@@ -2379,6 +2379,8 @@ export type SharedSpaceMemberResponseDto = {
     profileImagePath?: string;
     /** Member role */
     role: Role;
+    /** Show space assets in timeline */
+    showInTimeline: boolean;
     /** User ID */
     userId: string;
 };
@@ -2387,6 +2389,10 @@ export type SharedSpaceMemberCreateDto = {
     role?: SharedSpaceRole;
     /** User ID */
     userId: string;
+};
+export type SharedSpaceMemberTimelineDto = {
+    /** Show space assets in personal timeline */
+    showInTimeline: boolean;
 };
 export type SharedSpaceMemberUpdateDto = {
     /** Member role */
@@ -6243,6 +6249,22 @@ export function addMember({ id, sharedSpaceMemberCreateDto }: {
     })));
 }
 /**
+ * Update timeline visibility for current member
+ */
+export function updateMemberTimeline({ id, sharedSpaceMemberTimelineDto }: {
+    id: string;
+    sharedSpaceMemberTimelineDto: SharedSpaceMemberTimelineDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: SharedSpaceMemberResponseDto;
+    }>(`/shared-spaces/${encodeURIComponent(id)}/members/me/timeline`, oazapfts.json({
+        ...opts,
+        method: "PATCH",
+        body: sharedSpaceMemberTimelineDto
+    })));
+}
+/**
  * Remove a member from a shared space
  */
 export function removeMember({ id, userId }: {
@@ -6709,7 +6731,7 @@ export function tagAssets({ id, bulkIdsDto }: {
 /**
  * Get time bucket
  */
-export function getTimeBucket({ albumId, bbox, isFavorite, isTrashed, key, order, personId, slug, spaceId, tagId, timeBucket, userId, visibility, withCoordinates, withPartners, withStacked }: {
+export function getTimeBucket({ albumId, bbox, isFavorite, isTrashed, key, order, personId, slug, spaceId, tagId, timeBucket, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }: {
     albumId?: string;
     bbox?: string;
     isFavorite?: boolean;
@@ -6725,6 +6747,7 @@ export function getTimeBucket({ albumId, bbox, isFavorite, isTrashed, key, order
     visibility?: AssetVisibility;
     withCoordinates?: boolean;
     withPartners?: boolean;
+    withSharedSpaces?: boolean;
     withStacked?: boolean;
 }, opts?: Oazapfts.RequestOpts) {
     return oazapfts.ok(oazapfts.fetchJson<{
@@ -6746,6 +6769,7 @@ export function getTimeBucket({ albumId, bbox, isFavorite, isTrashed, key, order
         visibility,
         withCoordinates,
         withPartners,
+        withSharedSpaces,
         withStacked
     }))}`, {
         ...opts
@@ -6754,7 +6778,7 @@ export function getTimeBucket({ albumId, bbox, isFavorite, isTrashed, key, order
 /**
  * Get time buckets
  */
-export function getTimeBuckets({ albumId, bbox, isFavorite, isTrashed, key, order, personId, slug, spaceId, tagId, userId, visibility, withCoordinates, withPartners, withStacked }: {
+export function getTimeBuckets({ albumId, bbox, isFavorite, isTrashed, key, order, personId, slug, spaceId, tagId, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }: {
     albumId?: string;
     bbox?: string;
     isFavorite?: boolean;
@@ -6769,6 +6793,7 @@ export function getTimeBuckets({ albumId, bbox, isFavorite, isTrashed, key, orde
     visibility?: AssetVisibility;
     withCoordinates?: boolean;
     withPartners?: boolean;
+    withSharedSpaces?: boolean;
     withStacked?: boolean;
 }, opts?: Oazapfts.RequestOpts) {
     return oazapfts.ok(oazapfts.fetchJson<{
@@ -6789,6 +6814,7 @@ export function getTimeBuckets({ albumId, bbox, isFavorite, isTrashed, key, orde
         visibility,
         withCoordinates,
         withPartners,
+        withSharedSpaces,
         withStacked
     }))}`, {
         ...opts

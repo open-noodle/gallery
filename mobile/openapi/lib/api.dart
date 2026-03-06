@@ -304,6 +304,7 @@ part 'model/shared_space_asset_remove_dto.dart';
 part 'model/shared_space_create_dto.dart';
 part 'model/shared_space_member_create_dto.dart';
 part 'model/shared_space_member_response_dto.dart';
+part 'model/shared_space_member_timeline_dto.dart';
 part 'model/shared_space_member_update_dto.dart';
 part 'model/shared_space_response_dto.dart';
 part 'model/shared_space_role.dart';

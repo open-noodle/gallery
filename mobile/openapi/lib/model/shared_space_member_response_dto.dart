@@ -20,6 +20,7 @@ class SharedSpaceMemberResponseDto {
     this.profileChangedAt,
     this.profileImagePath,
     required this.role,
+    required this.showInTimeline,
     required this.userId,
   });
 
@@ -62,6 +63,9 @@ class SharedSpaceMemberResponseDto {
   /// Member role
   SharedSpaceMemberResponseDtoRoleEnum role;
 
+  /// Show space assets in timeline
+  bool showInTimeline;
+
   /// User ID
   String userId;
 
@@ -74,6 +78,7 @@ class SharedSpaceMemberResponseDto {
     other.profileChangedAt == profileChangedAt &&
     other.profileImagePath == profileImagePath &&
     other.role == role &&
+    other.showInTimeline == showInTimeline &&
     other.userId == userId;
 
   @override
@@ -86,10 +91,11 @@ class SharedSpaceMemberResponseDto {
     (profileChangedAt == null ? 0 : profileChangedAt!.hashCode) +
     (profileImagePath == null ? 0 : profileImagePath!.hashCode) +
     (role.hashCode) +
+    (showInTimeline.hashCode) +
     (userId.hashCode);
 
   @override
-  String toString() => 'SharedSpaceMemberResponseDto[avatarColor=$avatarColor, email=$email, joinedAt=$joinedAt, name=$name, profileChangedAt=$profileChangedAt, profileImagePath=$profileImagePath, role=$role, userId=$userId]';
+  String toString() => 'SharedSpaceMemberResponseDto[avatarColor=$avatarColor, email=$email, joinedAt=$joinedAt, name=$name, profileChangedAt=$profileChangedAt, profileImagePath=$profileImagePath, role=$role, showInTimeline=$showInTimeline, userId=$userId]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -112,6 +118,7 @@ class SharedSpaceMemberResponseDto {
     //  json[r'profileImagePath'] = null;
     }
       json[r'role'] = this.role;
+      json[r'showInTimeline'] = this.showInTimeline;
       json[r'userId'] = this.userId;
     return json;
   }
@@ -132,6 +139,7 @@ class SharedSpaceMemberResponseDto {
         profileChangedAt: mapValueOfType<String>(json, r'profileChangedAt'),
         profileImagePath: mapValueOfType<String>(json, r'profileImagePath'),
         role: SharedSpaceMemberResponseDtoRoleEnum.fromJson(json[r'role'])!,
+        showInTimeline: mapValueOfType<bool>(json, r'showInTimeline')!,
         userId: mapValueOfType<String>(json, r'userId')!,
       );
     }
@@ -184,6 +192,7 @@ class SharedSpaceMemberResponseDto {
     'joinedAt',
     'name',
     'role',
+    'showInTimeline',
     'userId',
   };
 }
