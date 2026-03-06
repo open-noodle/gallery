@@ -16,9 +16,9 @@ export async function up(db: Kysely<any>): Promise<void> {
     );
   `.execute(db);
 
-  await sql`CREATE INDEX "IDX_shared_space_createdById" ON "shared_space" ("createdById")`.execute(db);
-  await sql`CREATE INDEX "IDX_shared_space_createId" ON "shared_space" ("createId")`.execute(db);
-  await sql`CREATE INDEX "IDX_shared_space_updateId" ON "shared_space" ("updateId")`.execute(db);
+  await sql`CREATE INDEX "shared_space_createdById_idx" ON "shared_space" ("createdById")`.execute(db);
+  await sql`CREATE INDEX "shared_space_createId_idx" ON "shared_space" ("createId")`.execute(db);
+  await sql`CREATE INDEX "shared_space_updateId_idx" ON "shared_space" ("updateId")`.execute(db);
 
   await sql`
     CREATE OR REPLACE TRIGGER "shared_space_updatedAt"
@@ -39,7 +39,7 @@ export async function up(db: Kysely<any>): Promise<void> {
     );
   `.execute(db);
 
-  await sql`CREATE INDEX "IDX_shared_space_member_userId" ON "shared_space_member" ("userId")`.execute(db);
+  await sql`CREATE INDEX "shared_space_member_userId_idx" ON "shared_space_member" ("userId")`.execute(db);
 
   await sql`
     CREATE TABLE "shared_space_asset" (
@@ -54,8 +54,8 @@ export async function up(db: Kysely<any>): Promise<void> {
     );
   `.execute(db);
 
-  await sql`CREATE INDEX "IDX_shared_space_asset_assetId" ON "shared_space_asset" ("assetId")`.execute(db);
-  await sql`CREATE INDEX "IDX_shared_space_asset_addedById" ON "shared_space_asset" ("addedById")`.execute(db);
+  await sql`CREATE INDEX "shared_space_asset_assetId_idx" ON "shared_space_asset" ("assetId")`.execute(db);
+  await sql`CREATE INDEX "shared_space_asset_addedById_idx" ON "shared_space_asset" ("addedById")`.execute(db);
 }
 
 export async function down(db: Kysely<any>): Promise<void> {
