@@ -117,6 +117,16 @@ export class SharedSpaceRepository {
   }
 
   @GenerateSql({ params: [DummyValue.UUID] })
+  getSpaceIdsForTimeline(userId: string) {
+    return this.db
+      .selectFrom('shared_space_member')
+      .where('userId', '=', userId)
+      .where('showInTimeline', '=', true)
+      .select('spaceId')
+      .execute();
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID] })
   async getAssetCount(spaceId: string): Promise<number> {
     const result = await this.db
       .selectFrom('shared_space_asset')
