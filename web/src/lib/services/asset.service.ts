@@ -5,6 +5,7 @@ import { eventManager } from '$lib/managers/event-manager.svelte';
 import AssetAddToAlbumModal from '$lib/modals/AssetAddToAlbumModal.svelte';
 import AssetTagModal from '$lib/modals/AssetTagModal.svelte';
 import SharedLinkCreateModal from '$lib/modals/SharedLinkCreateModal.svelte';
+import { waitForWebsocketEvent } from '$lib/stores/websocket';
 import { user as authUser, preferences } from '$lib/stores/user.store';
 import type { AssetControlContext } from '$lib/types';
 import { getSharedLink, sleep } from '$lib/utils';
@@ -13,13 +14,17 @@ import { handleError } from '$lib/utils/handle-error';
 import { getFormatter } from '$lib/utils/i18n';
 import { asQueryString } from '$lib/utils/shared-links';
 import {
+  AssetEditAction,
   AssetJobName,
   AssetTypeEnum,
   AssetVisibility,
+  editAsset,
+  getAssetEdits,
   getAssetInfo,
   getBaseUrl,
   runAssetJobs,
   updateAsset,
+  type AssetEditActionItemDto,
   type AssetJobsDto,
   type AssetResponseDto,
 } from '@immich/sdk';
@@ -41,6 +46,8 @@ import {
   mdiMotionPauseOutline,
   mdiMotionPlayOutline,
   mdiPlus,
+  mdiRotateLeft,
+  mdiRotateRight,
   mdiShareVariantOutline,
   mdiTagPlusOutline,
   mdiTune,
@@ -223,19 +230,42 @@ export const getAssetActions = ($t: MessageFormatter, asset: AssetResponseDto) =
     shortcuts: { key: 't' },
   };
 
+  const canEdit = () =>
+    !sharedLink &&
+    isOwner &&
+    asset.type === AssetTypeEnum.Image &&
+    !asset.livePhotoVideoId &&
+    asset.exifInfo?.projectionType !== ProjectionType.EQUIRECTANGULAR &&
+    !asset.originalPath.toLowerCase().endsWith('.insp') &&
+    !asset.originalPath.toLowerCase().endsWith('.gif') &&
+    !asset.originalPath.toLowerCase().endsWith('.svg');
+
   const Edit: ActionItem = {
     title: $t('editor'),
     icon: mdiTune,
-    $if: () =>
-      !sharedLink &&
-      isOwner &&
-      asset.type === AssetTypeEnum.Image &&
-      !asset.livePhotoVideoId &&
-      asset.exifInfo?.projectionType !== ProjectionType.EQUIRECTANGULAR &&
-      !asset.originalPath.toLowerCase().endsWith('.insp') &&
-      !asset.originalPath.toLowerCase().endsWith('.gif') &&
-      !asset.originalPath.toLowerCase().endsWith('.svg'),
+    $if: canEdit,
     onAction: () => assetViewerManager.openEditor(),
+  };
+
+  const RotateRight: ActionItem = {
+    title: $t('rotate_right'),
+    icon: mdiRotateRight,
+    $if: canEdit,
+    onAction: () => handleQuickRotate(asset, 90),
+  };
+
+  const RotateLeft: ActionItem = {
+    title: $t('rotate_left'),
+    icon: mdiRotateLeft,
+    $if: canEdit,
+    onAction: () => handleQuickRotate(asset, -90),
+  };
+
+  const Rotate180: ActionItem = {
+    title: $t('rotate_180'),
+    icon: mdiRotateRight,
+    $if: canEdit,
+    onAction: () => handleQuickRotate(asset, 180),
   };
 
   const RefreshFacesJob: ActionItem = {
@@ -280,6 +310,9 @@ export const getAssetActions = ($t: MessageFormatter, asset: AssetResponseDto) =
     Copy,
     Tag,
     Edit,
+    RotateRight,
+    RotateLeft,
+    Rotate180,
     RefreshFacesJob,
     RefreshMetadataJob,
     RegenerateThumbnailJob,
@@ -376,5 +409,27 @@ const handleRunAssetJob = async (dto: AssetJobsDto) => {
     toastManager.success(getAssetJobMessage($t, dto.name));
   } catch (error) {
     handleError(error, $t('errors.unable_to_submit_job'));
+  }
+};
+
+const handleQuickRotate = async (asset: AssetResponseDto, angle: number) => {
+  const $t = await getFormatter();
+
+  try {
+    const existing = await getAssetEdits({ id: asset.id });
+    const newEdit: AssetEditActionItemDto = {
+      action: AssetEditAction.Rotate,
+      parameters: { angle },
+    };
+    const edits = [...existing.edits.map(({ action, parameters }) => ({ action, parameters })), newEdit];
+
+    const editCompleted = waitForWebsocketEvent('AssetEditReadyV1', (event) => event.asset.id === asset.id, 10_000);
+
+    await editAsset({ id: asset.id, assetEditsCreateDto: { edits } });
+    await editCompleted;
+
+    eventManager.emit('AssetEditsApplied', asset.id);
+  } catch (error) {
+    handleError(error, $t('rotate_error'));
   }
 };
