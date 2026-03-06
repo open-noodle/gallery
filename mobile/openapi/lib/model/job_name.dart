@@ -78,6 +78,8 @@ class JobName {
   static const versionCheck = JobName._(r'VersionCheck');
   static const ocrQueueAll = JobName._(r'OcrQueueAll');
   static const ocr = JobName._(r'Ocr');
+  static const petDetectionQueueAll = JobName._(r'PetDetectionQueueAll');
+  static const petDetection = JobName._(r'PetDetection');
   static const workflowRun = JobName._(r'WorkflowRun');
   static const storageBackendMigrationQueueAll = JobName._(r'StorageBackendMigrationQueueAll');
   static const storageBackendMigrationSingle = JobName._(r'StorageBackendMigrationSingle');
@@ -139,6 +141,8 @@ class JobName {
     versionCheck,
     ocrQueueAll,
     ocr,
+    petDetectionQueueAll,
+    petDetection,
     workflowRun,
     storageBackendMigrationQueueAll,
     storageBackendMigrationSingle,
@@ -235,6 +239,8 @@ class JobNameTypeTransformer {
         case r'VersionCheck': return JobName.versionCheck;
         case r'OcrQueueAll': return JobName.ocrQueueAll;
         case r'Ocr': return JobName.ocr;
+        case r'PetDetectionQueueAll': return JobName.petDetectionQueueAll;
+        case r'PetDetection': return JobName.petDetection;
         case r'WorkflowRun': return JobName.workflowRun;
         case r'StorageBackendMigrationQueueAll': return JobName.storageBackendMigrationQueueAll;
         case r'StorageBackendMigrationSingle': return JobName.storageBackendMigrationSingle;

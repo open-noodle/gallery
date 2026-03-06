@@ -111,6 +111,10 @@ export class PersonResponseDto {
   isFavorite?: boolean;
   @Property({ description: 'Person color (hex)', history: new HistoryBuilder().added('v1.126.0').stable('v2') })
   color?: string;
+  @ApiProperty({ description: 'Entity type (person or pet)', default: 'person' })
+  type!: string;
+  @ApiPropertyOptional({ description: 'Pet species (e.g. dog, cat)', nullable: true })
+  species?: string | null;
 }
 
 export class PersonWithFacesResponseDto extends PersonResponseDto {
@@ -232,6 +236,8 @@ export function mapPerson(person: Person): PersonResponseDto {
     isFavorite: person.isFavorite,
     color: person.color ?? undefined,
     updatedAt: person.updatedAt,
+    type: person.type,
+    species: person.species,
   };
 }
 

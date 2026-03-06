@@ -7,14 +7,15 @@ final sharedSpacesProvider = FutureProvider<List<SharedSpaceResponseDto>>((ref) 
   return repository.getAll();
 });
 
-final sharedSpaceProvider =
-    FutureProvider.family<SharedSpaceResponseDto, String>((ref, id) async {
+final sharedSpaceProvider = FutureProvider.family<SharedSpaceResponseDto, String>((ref, id) async {
   final repository = ref.watch(sharedSpaceApiRepositoryProvider);
   return repository.get(id);
 });
 
-final sharedSpaceMembersProvider =
-    FutureProvider.family<List<SharedSpaceMemberResponseDto>, String>((ref, spaceId) async {
+final sharedSpaceMembersProvider = FutureProvider.family<List<SharedSpaceMemberResponseDto>, String>((
+  ref,
+  spaceId,
+) async {
   final repository = ref.watch(sharedSpaceApiRepositoryProvider);
   return repository.getMembers(spaceId);
 });

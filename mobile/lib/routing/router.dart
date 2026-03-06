@@ -252,10 +252,7 @@ class AppRouter extends RootStackRouter {
       guards: [_authGuard, _duplicateGuard],
       transitionsBuilder: TransitionsBuilders.slideLeft,
     ),
-    AutoRoute(
-      page: SpaceDetailRoute.page,
-      guards: [_authGuard, _duplicateGuard],
-    ),
+    AutoRoute(page: SpaceDetailRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: FolderRoute.page, guards: [_authGuard]),
     AutoRoute(page: PartnerDetailRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: PersonResultRoute.page, guards: [_authGuard, _duplicateGuard]),

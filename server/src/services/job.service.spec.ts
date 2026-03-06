@@ -156,12 +156,18 @@ describe(JobService.name, () => {
       },
       {
         item: { name: JobName.AssetGenerateThumbnails, data: { id: 'asset-1', source: 'upload' } },
-        jobs: [JobName.SmartSearch, JobName.AssetDetectFaces, JobName.Ocr],
+        jobs: [JobName.SmartSearch, JobName.AssetDetectFaces, JobName.Ocr, JobName.PetDetection],
         stub: [AssetFactory.create({ id: 'asset-1', livePhotoVideoId: newUuid() })],
       },
       {
         item: { name: JobName.AssetGenerateThumbnails, data: { id: 'asset-1', source: 'upload' } },
-        jobs: [JobName.SmartSearch, JobName.AssetDetectFaces, JobName.Ocr, JobName.AssetEncodeVideo],
+        jobs: [
+          JobName.SmartSearch,
+          JobName.AssetDetectFaces,
+          JobName.Ocr,
+          JobName.PetDetection,
+          JobName.AssetEncodeVideo,
+        ],
         stub: [AssetFactory.create({ id: 'asset-1', type: AssetType.Video })],
       },
       {
@@ -462,6 +468,7 @@ describe(JobService.name, () => {
           { name: JobName.SmartSearch, data: expect.anything() },
           { name: JobName.AssetDetectFaces, data: expect.anything() },
           { name: JobName.Ocr, data: expect.anything() },
+          { name: JobName.PetDetection, data: expect.anything() },
         ]),
       );
     });
@@ -495,6 +502,7 @@ describe(JobService.name, () => {
         { name: JobName.SmartSearch, data: { id, source: 'upload' } },
         { name: JobName.AssetDetectFaces, data: { id, source: 'upload' } },
         { name: JobName.Ocr, data: { id, source: 'upload' } },
+        { name: JobName.PetDetection, data: { id, source: 'upload' } },
       ]);
     });
 
@@ -513,6 +521,7 @@ describe(JobService.name, () => {
         { name: JobName.SmartSearch, data: { id, source: 'upload' } },
         { name: JobName.AssetDetectFaces, data: { id, source: 'upload' } },
         { name: JobName.Ocr, data: { id, source: 'upload' } },
+        { name: JobName.PetDetection, data: { id, source: 'upload' } },
         { name: JobName.AssetEncodeVideo, data: { id, source: 'upload' } },
       ]);
     });

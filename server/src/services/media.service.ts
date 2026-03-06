@@ -48,7 +48,7 @@ import { getDimensions } from 'src/utils/asset.util';
 import { checkFaceVisibility, checkOcrVisibility } from 'src/utils/editor';
 import { BaseConfig, ThumbnailConfig } from 'src/utils/media';
 import { mimeTypes } from 'src/utils/mime-types';
-import { clamp, isFaceImportEnabled, isFacialRecognitionEnabled } from 'src/utils/misc';
+import { clamp, isFaceImportEnabled, isFacialRecognitionEnabled, isPetDetectionEnabled } from 'src/utils/misc';
 import { getOutputDimensions } from 'src/utils/transform';
 
 interface UpsertFileOptions {
@@ -505,7 +505,11 @@ export class MediaService extends BaseService {
   @OnJob({ name: JobName.PersonGenerateThumbnail, queue: QueueName.ThumbnailGeneration })
   async handleGeneratePersonThumbnail({ id }: JobOf<JobName.PersonGenerateThumbnail>): Promise<JobStatus> {
     const { machineLearning, metadata, image } = await this.getConfig({ withCache: true });
-    if (!isFacialRecognitionEnabled(machineLearning) && !isFaceImportEnabled(metadata)) {
+    if (
+      !isFacialRecognitionEnabled(machineLearning) &&
+      !isFaceImportEnabled(metadata) &&
+      !isPetDetectionEnabled(machineLearning)
+    ) {
       return JobStatus.Skipped;
     }
 

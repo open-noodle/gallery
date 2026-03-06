@@ -3,8 +3,9 @@ import 'package:immich_mobile/providers/api.provider.dart';
 import 'package:immich_mobile/repositories/api.repository.dart';
 import 'package:openapi/api.dart';
 
-final sharedSpaceApiRepositoryProvider =
-    Provider((ref) => SharedSpaceApiRepository(ref.watch(apiServiceProvider).sharedSpacesApi));
+final sharedSpaceApiRepositoryProvider = Provider(
+  (ref) => SharedSpaceApiRepository(ref.watch(apiServiceProvider).sharedSpacesApi),
+);
 
 class SharedSpaceApiRepository extends ApiRepository {
   final SharedSpacesApi _api;
@@ -41,6 +42,5 @@ class SharedSpaceApiRepository extends ApiRepository {
     return await checkNull(_api.addMember(spaceId, dto));
   }
 
-  Future<void> removeMember(String spaceId, String userId) =>
-      _api.removeMember(spaceId, userId);
+  Future<void> removeMember(String spaceId, String userId) => _api.removeMember(spaceId, userId);
 }

@@ -287,6 +287,7 @@ export class AssetRepository {
       return;
     }
 
+    type JobStatusColumns = Exclude<keyof AssetJobStatusTable, 'assetId'>;
     const values = jobStatus.map((row) => ({ ...row, assetId: asUuid(row.assetId) }));
     await this.db
       .insertInto('asset_job_status')
@@ -299,7 +300,8 @@ export class AssetRepository {
               facesRecognizedAt: eb.ref('excluded.facesRecognizedAt'),
               metadataExtractedAt: eb.ref('excluded.metadataExtractedAt'),
               ocrAt: eb.ref('excluded.ocrAt'),
-            },
+              petsDetectedAt: eb.ref('excluded.petsDetectedAt'),
+            } satisfies Record<JobStatusColumns, unknown>,
             values[0],
           ),
         ),

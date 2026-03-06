@@ -223,6 +223,9 @@ describe(PersonService.name, () => {
         thumbnailPath: person.thumbnailPath,
         isHidden: false,
         isFavorite: false,
+        color: undefined,
+        type: 'person',
+        species: null,
         updatedAt: expect.any(Date),
       });
       expect(mocks.person.update).toHaveBeenCalledWith({ id: person.id, birthDate: new Date('1976-06-30') });
@@ -414,6 +417,9 @@ describe(PersonService.name, () => {
         id: person.id,
         name: person.name,
         thumbnailPath: person.thumbnailPath,
+        color: undefined,
+        type: 'person',
+        species: null,
         updatedAt: expect.any(Date),
       });
 

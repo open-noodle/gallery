@@ -413,6 +413,10 @@ export type JobItem =
   | { name: JobName.OcrQueueAll; data: IBaseJob }
   | { name: JobName.Ocr; data: IEntityJob }
 
+  // Pet Detection
+  | { name: JobName.PetDetectionQueueAll; data: IBaseJob }
+  | { name: JobName.PetDetection; data: IEntityJob }
+
   // Workflow
   | { name: JobName.WorkflowRun; data: IWorkflowJob }
 

@@ -15,7 +15,13 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { SystemConfig } from 'src/config';
-import { CLIPConfig, DuplicateDetectionConfig, FacialRecognitionConfig, OcrConfig } from 'src/dtos/model-config.dto';
+import {
+  CLIPConfig,
+  DuplicateDetectionConfig,
+  FacialRecognitionConfig,
+  OcrConfig,
+  PetDetectionConfig,
+} from 'src/dtos/model-config.dto';
 import {
   AudioCodec,
   CQMode,
@@ -221,6 +227,12 @@ class SystemConfigJobDto implements Record<ConcurrentQueueName, JobSettingsDto> 
   @ValidateNested()
   @IsObject()
   @Type(() => JobSettingsDto)
+  [QueueName.PetDetection]!: JobSettingsDto;
+
+  @ApiProperty({ type: JobSettingsDto, description: undefined })
+  @ValidateNested()
+  @IsObject()
+  @Type(() => JobSettingsDto)
   [QueueName.Sidecar]!: JobSettingsDto;
 
   @ApiProperty({ type: JobSettingsDto, description: undefined })
@@ -329,6 +341,11 @@ class SystemConfigMachineLearningDto {
   @ValidateNested()
   @IsObject()
   ocr!: OcrConfig;
+
+  @Type(() => PetDetectionConfig)
+  @ValidateNested()
+  @IsObject()
+  petDetection!: PetDetectionConfig;
 }
 
 enum MapTheme {

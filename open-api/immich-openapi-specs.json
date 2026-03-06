@@ -19046,6 +19046,8 @@
           "VersionCheck",
           "OcrQueueAll",
           "Ocr",
+          "PetDetectionQueueAll",
+          "PetDetection",
           "WorkflowRun",
           "StorageBackendMigrationQueueAll",
           "StorageBackendMigrationSingle"
@@ -20783,8 +20785,18 @@
             "description": "Person name",
             "type": "string"
           },
+          "species": {
+            "description": "Pet species (e.g. dog, cat)",
+            "nullable": true,
+            "type": "string"
+          },
           "thumbnailPath": {
             "description": "Thumbnail path",
+            "type": "string"
+          },
+          "type": {
+            "default": "person",
+            "description": "Entity type (person or pet)",
             "type": "string"
           },
           "updatedAt": {
@@ -20809,7 +20821,8 @@
           "id",
           "isHidden",
           "name",
-          "thumbnailPath"
+          "thumbnailPath",
+          "type"
         ],
         "type": "object"
       },
@@ -20915,8 +20928,18 @@
             "description": "Person name",
             "type": "string"
           },
+          "species": {
+            "description": "Pet species (e.g. dog, cat)",
+            "nullable": true,
+            "type": "string"
+          },
           "thumbnailPath": {
             "description": "Thumbnail path",
+            "type": "string"
+          },
+          "type": {
+            "default": "person",
+            "description": "Entity type (person or pet)",
             "type": "string"
           },
           "updatedAt": {
@@ -20942,7 +20965,33 @@
           "id",
           "isHidden",
           "name",
-          "thumbnailPath"
+          "thumbnailPath",
+          "type"
+        ],
+        "type": "object"
+      },
+      "PetDetectionConfig": {
+        "properties": {
+          "enabled": {
+            "description": "Whether the task is enabled",
+            "type": "boolean"
+          },
+          "minScore": {
+            "description": "Minimum confidence score for pet detection",
+            "format": "double",
+            "maximum": 1,
+            "minimum": 0.1,
+            "type": "number"
+          },
+          "modelName": {
+            "description": "Name of the model to use",
+            "type": "string"
+          }
+        },
+        "required": [
+          "enabled",
+          "minScore",
+          "modelName"
         ],
         "type": "object"
       },
@@ -21362,6 +21411,7 @@
           "notifications",
           "backupDatabase",
           "ocr",
+          "petDetection",
           "workflow",
           "editor",
           "storageBackendMigration"
@@ -21506,6 +21556,9 @@
           "ocr": {
             "$ref": "#/components/schemas/QueueResponseLegacyDto"
           },
+          "petDetection": {
+            "$ref": "#/components/schemas/QueueResponseLegacyDto"
+          },
           "search": {
             "$ref": "#/components/schemas/QueueResponseLegacyDto"
           },
@@ -21543,6 +21596,7 @@
           "migration",
           "notifications",
           "ocr",
+          "petDetection",
           "search",
           "sidecar",
           "smartSearch",
@@ -25369,6 +25423,9 @@
           "ocr": {
             "$ref": "#/components/schemas/JobSettingsDto"
           },
+          "petDetection": {
+            "$ref": "#/components/schemas/JobSettingsDto"
+          },
           "search": {
             "$ref": "#/components/schemas/JobSettingsDto"
           },
@@ -25397,6 +25454,7 @@
           "migration",
           "notifications",
           "ocr",
+          "petDetection",
           "search",
           "sidecar",
           "smartSearch",
@@ -25490,6 +25548,9 @@
           "ocr": {
             "$ref": "#/components/schemas/OcrConfig"
           },
+          "petDetection": {
+            "$ref": "#/components/schemas/PetDetectionConfig"
+          },
           "urls": {
             "format": "uri",
             "items": {
@@ -25507,6 +25568,7 @@
           "enabled",
           "facialRecognition",
           "ocr",
+          "petDetection",
           "urls"
         ],
         "type": "object"

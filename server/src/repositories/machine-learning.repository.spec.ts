@@ -46,6 +46,11 @@ describe(MachineLearningRepository.name, () => {
         minRecognitionScore: 0.5,
         maxResolution: 0,
       },
+      petDetection: {
+        enabled: false,
+        modelName: 'yolo11n',
+        minScore: 0.6,
+      },
     });
   };
 

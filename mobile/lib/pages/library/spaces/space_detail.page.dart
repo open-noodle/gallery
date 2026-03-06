@@ -34,9 +34,7 @@ class SpaceDetailPage extends HookConsumerWidget {
                   padding: const EdgeInsets.all(16.0),
                   child: Text(
                     space.description!,
-                    style: context.textTheme.bodyLarge?.copyWith(
-                      color: context.colorScheme.onSurface.withAlpha(180),
-                    ),
+                    style: context.textTheme.bodyLarge?.copyWith(color: context.colorScheme.onSurface.withAlpha(180)),
                   ),
                 ),
               Padding(
@@ -48,8 +46,7 @@ class SpaceDetailPage extends HookConsumerWidget {
                         avatar: const Icon(Icons.photo_library_outlined, size: 18),
                         label: Text('${space.assetCount!.toInt()} assets'),
                       ),
-                    if (space.assetCount != null && space.memberCount != null)
-                      const SizedBox(width: 8),
+                    if (space.assetCount != null && space.memberCount != null) const SizedBox(width: 8),
                     if (space.memberCount != null)
                       Chip(
                         avatar: const Icon(Icons.people_outline, size: 18),
@@ -63,18 +60,13 @@ class SpaceDetailPage extends HookConsumerWidget {
                 padding: const EdgeInsets.only(left: 16.0, top: 8.0, bottom: 4.0),
                 child: Text(
                   'Members',
-                  style: context.textTheme.titleSmall?.copyWith(
-                    color: context.colorScheme.onSurface.withAlpha(200),
-                  ),
+                  style: context.textTheme.titleSmall?.copyWith(color: context.colorScheme.onSurface.withAlpha(200)),
                 ),
               ),
               membersAsync.when(
                 data: (members) {
                   if (members.isEmpty) {
-                    return const Padding(
-                      padding: EdgeInsets.all(16.0),
-                      child: Text('No members yet'),
-                    );
+                    return const Padding(padding: EdgeInsets.all(16.0), child: Text('No members yet'));
                   }
                   return ListView.builder(
                     shrinkWrap: true,
@@ -83,18 +75,11 @@ class SpaceDetailPage extends HookConsumerWidget {
                     itemBuilder: (context, index) {
                       final member = members[index];
                       return ListTile(
-                        leading: CircleAvatar(
-                          child: Text(
-                            member.name.isNotEmpty ? member.name[0].toUpperCase() : '?',
-                          ),
-                        ),
+                        leading: CircleAvatar(child: Text(member.name.isNotEmpty ? member.name[0].toUpperCase() : '?')),
                         title: Text(member.name),
                         subtitle: Text(member.email),
                         trailing: Chip(
-                          label: Text(
-                            member.role.value,
-                            style: context.textTheme.labelSmall,
-                          ),
+                          label: Text(member.role.value, style: context.textTheme.labelSmall),
                           padding: EdgeInsets.zero,
                           visualDensity: VisualDensity.compact,
                         ),
@@ -106,10 +91,8 @@ class SpaceDetailPage extends HookConsumerWidget {
                   padding: EdgeInsets.all(16.0),
                   child: Center(child: CircularProgressIndicator()),
                 ),
-                error: (error, _) => Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Text('Failed to load members: $error'),
-                ),
+                error: (error, _) =>
+                    Padding(padding: const EdgeInsets.all(16.0), child: Text('Failed to load members: $error')),
               ),
             ],
           );
