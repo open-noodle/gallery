@@ -68,4 +68,4 @@ Photos are linked by reference — they remain in your personal library and appe
 
 ## API
 
-Shared Spaces are accessible via the REST API under the `/shared-spaces` endpoint group. See the [API documentation](/docs/api) for details.
+Shared Spaces are accessible via the REST API under the `/shared-spaces` endpoint group.
