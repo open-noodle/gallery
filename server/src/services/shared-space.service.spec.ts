@@ -11,6 +11,7 @@ const makeMemberResult = (overrides: Record<string, unknown> = {}) => ({
   email: 'test@immich.cloud',
   profileImagePath: '',
   profileChangedAt: newDate(),
+  avatarColor: null,
   ...overrides,
 });
 

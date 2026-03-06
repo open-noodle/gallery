@@ -116,7 +116,7 @@
               shape="round"
               size="small"
               icon={mdiClose}
-              title={$t('spaces_remove_member')}
+              aria-label={$t('spaces_remove_member')}
               onclick={() => handleRemoveMember(member)}
             />
           {/if}

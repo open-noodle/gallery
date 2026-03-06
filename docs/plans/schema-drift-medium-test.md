@@ -49,6 +49,7 @@ describe('schema drift', () => {
 ```
 
 **Key points:**
+
 - No need to run migrations — `globalSetup.ts` already does that before any medium test runs.
 - `getSchemaDrift()` compares the code-defined schema (`schemaFromCode`) against the actual database schema (`schemaFromDatabase`) and returns any differences.
 - Asserting on `drift.asHuman()` gives clear failure messages showing exactly which indexes/triggers/columns are wrong.

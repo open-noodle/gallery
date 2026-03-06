@@ -30,6 +30,7 @@
 ### Task 1: Add `checkConnection()` to S3StorageBackend
 
 **Files:**
+
 - Modify: `server/src/backends/s3-storage.backend.ts`
 - Test: `server/src/backends/s3-storage.backend.spec.ts`
 
@@ -83,6 +84,7 @@ git commit -m "feat: add checkConnection() to S3StorageBackend"
 ### Task 2: Call health check from StorageService.onBootstrap()
 
 **Files:**
+
 - Modify: `server/src/services/storage.service.ts`
 - Test: `server/src/services/storage.service.spec.ts`
 
@@ -111,7 +113,7 @@ if (envData.storage.s3.bucket) {
   } catch (error: any) {
     throw new ImmichStartupError(
       `Failed to connect to S3 bucket "${envData.storage.s3.bucket}": ${error.message}. ` +
-      'Check that the bucket exists, credentials are correct, and the endpoint is reachable.',
+        'Check that the bucket exists, credentials are correct, and the endpoint is reachable.',
     );
   }
 }

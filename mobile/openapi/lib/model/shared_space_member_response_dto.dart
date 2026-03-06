@@ -13,13 +13,24 @@ part of openapi.api;
 class SharedSpaceMemberResponseDto {
   /// Returns a new [SharedSpaceMemberResponseDto] instance.
   SharedSpaceMemberResponseDto({
+    this.avatarColor,
     required this.email,
     required this.joinedAt,
     required this.name,
+    this.profileChangedAt,
     this.profileImagePath,
     required this.role,
     required this.userId,
   });
+
+  /// Avatar color
+  ///
+  /// Please note: This property should have been non-nullable! Since the specification file
+  /// does not include a default value (using the "default:" property), however, the generated
+  /// source code must fall back to having a nullable type.
+  /// Consider adding a "default:" property in the specification file to hide this note.
+  ///
+  String? avatarColor;
 
   /// User email
   String email;
@@ -29,6 +40,15 @@ class SharedSpaceMemberResponseDto {
 
   /// User name
   String name;
+
+  /// Profile change date
+  ///
+  /// Please note: This property should have been non-nullable! Since the specification file
+  /// does not include a default value (using the "default:" property), however, the generated
+  /// source code must fall back to having a nullable type.
+  /// Consider adding a "default:" property in the specification file to hide this note.
+  ///
+  String? profileChangedAt;
 
   /// Profile image path
   ///
@@ -47,9 +67,11 @@ class SharedSpaceMemberResponseDto {
 
   @override
   bool operator ==(Object other) => identical(this, other) || other is SharedSpaceMemberResponseDto &&
+    other.avatarColor == avatarColor &&
     other.email == email &&
     other.joinedAt == joinedAt &&
     other.name == name &&
+    other.profileChangedAt == profileChangedAt &&
     other.profileImagePath == profileImagePath &&
     other.role == role &&
     other.userId == userId;
@@ -57,21 +79,33 @@ class SharedSpaceMemberResponseDto {
   @override
   int get hashCode =>
     // ignore: unnecessary_parenthesis
+    (avatarColor == null ? 0 : avatarColor!.hashCode) +
     (email.hashCode) +
     (joinedAt.hashCode) +
     (name.hashCode) +
+    (profileChangedAt == null ? 0 : profileChangedAt!.hashCode) +
     (profileImagePath == null ? 0 : profileImagePath!.hashCode) +
     (role.hashCode) +
     (userId.hashCode);
 
   @override
-  String toString() => 'SharedSpaceMemberResponseDto[email=$email, joinedAt=$joinedAt, name=$name, profileImagePath=$profileImagePath, role=$role, userId=$userId]';
+  String toString() => 'SharedSpaceMemberResponseDto[avatarColor=$avatarColor, email=$email, joinedAt=$joinedAt, name=$name, profileChangedAt=$profileChangedAt, profileImagePath=$profileImagePath, role=$role, userId=$userId]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
+    if (this.avatarColor != null) {
+      json[r'avatarColor'] = this.avatarColor;
+    } else {
+    //  json[r'avatarColor'] = null;
+    }
       json[r'email'] = this.email;
       json[r'joinedAt'] = this.joinedAt;
       json[r'name'] = this.name;
+    if (this.profileChangedAt != null) {
+      json[r'profileChangedAt'] = this.profileChangedAt;
+    } else {
+    //  json[r'profileChangedAt'] = null;
+    }
     if (this.profileImagePath != null) {
       json[r'profileImagePath'] = this.profileImagePath;
     } else {
@@ -91,9 +125,11 @@ class SharedSpaceMemberResponseDto {
       final json = value.cast<String, dynamic>();
 
       return SharedSpaceMemberResponseDto(
+        avatarColor: mapValueOfType<String>(json, r'avatarColor'),
         email: mapValueOfType<String>(json, r'email')!,
         joinedAt: mapValueOfType<String>(json, r'joinedAt')!,
         name: mapValueOfType<String>(json, r'name')!,
+        profileChangedAt: mapValueOfType<String>(json, r'profileChangedAt'),
         profileImagePath: mapValueOfType<String>(json, r'profileImagePath'),
         role: SharedSpaceMemberResponseDtoRoleEnum.fromJson(json[r'role'])!,
         userId: mapValueOfType<String>(json, r'userId')!,
