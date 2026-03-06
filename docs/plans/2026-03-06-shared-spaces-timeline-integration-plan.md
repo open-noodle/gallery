@@ -13,6 +13,7 @@
 ## Context & Key Files
 
 ### Server
+
 - **Schema:** `server/src/schema/tables/shared-space-member.table.ts`
 - **DTOs:** `server/src/dtos/shared-space.dto.ts`, `server/src/dtos/time-bucket.dto.ts`
 - **Services:** `server/src/services/timeline.service.ts`, `server/src/services/shared-space.service.ts`
@@ -21,11 +22,13 @@
 - **Factory:** `server/test/small.factory.ts`
 
 ### Web
+
 - **Photos page:** `web/src/routes/(user)/photos/[[assetId=id]]/+page.svelte`
 - **Members modal:** `web/src/lib/modals/SpaceMembersModal.svelte`
 - **Members modal test:** `web/src/lib/modals/SpaceMembersModal.spec.ts`
 
 ### Reference patterns
+
 - **Partner `inTimeline`:** `server/src/schema/tables/partner.table.ts` (line 44-45), `server/src/utils/asset.util.ts` (lines 111-139)
 - **Partner settings toggle:** `web/src/lib/components/user-settings-page/partner-settings.svelte` (lines 185-190) — uses `SettingSwitch`
 - **Existing `withPartners` validation:** `server/src/services/timeline.service.ts` (lines 71-82)
@@ -35,6 +38,7 @@
 ## Task 1: Add `showInTimeline` column to schema and create migration
 
 **Files:**
+
 - Modify: `server/src/schema/tables/shared-space-member.table.ts`
 - Create: `server/src/schema/migrations/{timestamp}-AddShowInTimelineToSharedSpaceMember.ts`
 - Modify: `server/test/small.factory.ts`
@@ -51,6 +55,7 @@ showInTimeline!: Generated<boolean>;
 **Step 2: Generate migration**
 
 Run from `server/`:
+
 ```bash
 pnpm migrations:generate
 ```
@@ -104,6 +109,7 @@ git commit -m "feat: add showInTimeline column to shared_space_member"
 ## Task 2: Update DTOs and service for `showInTimeline`
 
 **Files:**
+
 - Modify: `server/src/dtos/shared-space.dto.ts`
 - Modify: `server/src/services/shared-space.service.ts`
 - Modify: `server/src/repositories/shared-space.repository.ts`
@@ -324,6 +330,7 @@ git commit -m "feat: add showInTimeline to member DTOs and updateMemberTimeline 
 This method queries space IDs where the user is a member and `showInTimeline = true`.
 
 **Files:**
+
 - Modify: `server/src/repositories/shared-space.repository.ts`
 
 **Step 1: Add the method**
@@ -360,6 +367,7 @@ git commit -m "feat: add getSpaceIdsForTimeline repository method"
 ## Task 4: Add `withSharedSpaces` to timeline DTO and service
 
 **Files:**
+
 - Modify: `server/src/dtos/time-bucket.dto.ts`
 - Modify: `server/src/services/timeline.service.ts`
 - Modify: `server/src/repositories/asset.repository.ts` (interface only)
@@ -371,10 +379,7 @@ In `server/src/services/timeline.service.spec.ts`, add a new describe block insi
 ```typescript
 describe('withSharedSpaces', () => {
   it('should resolve space IDs and pass them as timelineSpaceIds', async () => {
-    mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([
-      { spaceId: 'space-1' },
-      { spaceId: 'space-2' },
-    ]);
+    mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId: 'space-1' }, { spaceId: 'space-2' }]);
     mocks.asset.getTimeBuckets.mockResolvedValue([{ timeBucket: 'bucket', count: 1 }]);
 
     await sut.getTimeBuckets(authStub.admin, {
@@ -540,6 +545,7 @@ git commit -m "feat: add withSharedSpaces to timeline DTO and service"
 This is the core query change. When `timelineSpaceIds` is present, the repository uses a UNION to combine user-owned assets with space assets.
 
 **Files:**
+
 - Modify: `server/src/repositories/asset.repository.ts`
 
 **Step 1: Update `getTimeBuckets` method**
@@ -547,11 +553,13 @@ This is the core query change. When `timelineSpaceIds` is present, the repositor
 In `server/src/repositories/asset.repository.ts`, find the `getTimeBuckets` method (around line 690). The current CTE builds a single query. When `timelineSpaceIds` is present, we need to UNION two queries.
 
 The key change is in the CTE definition. Currently the CTE does:
+
 ```typescript
 .$if(!!options.userIds, (qb) => qb.where('asset.ownerId', '=', anyUuid(options.userIds!)))
 ```
 
 Replace that line with:
+
 ```typescript
 .$if(!!options.userIds && !options.timelineSpaceIds, (qb) =>
   qb.where('asset.ownerId', '=', anyUuid(options.userIds!)),
@@ -572,6 +580,7 @@ Replace that line with:
 ```
 
 **Important:** This applies the same pattern to BOTH `getTimeBuckets` AND `getTimeBucket`. The `getTimeBucket` method (around line 749) has a similar `userIds` filter line (around line 826):
+
 ```typescript
 .$if(!!options.userIds, (qb) => qb.where('asset.ownerId', '=', anyUuid(options.userIds!)))
 ```
@@ -579,6 +588,7 @@ Replace that line with:
 Apply the same replacement there.
 
 **Note on UNION vs OR approach:** After deeper analysis, the OR+EXISTS approach inside a single CTE is actually the better fit here because:
+
 1. Both `getTimeBuckets` and `getTimeBucket` already use CTEs with many conditional filters
 2. A true UNION would require duplicating the entire CTE with all its conditional filters
 3. PostgreSQL can optimize `OR EXISTS` with proper indexes on `shared_space_asset(spaceId, assetId)`
@@ -612,6 +622,7 @@ git commit -m "feat: add timelineSpaceIds OR EXISTS clause to timeline queries"
 ## Task 6: Regenerate OpenAPI SDK and SQL docs
 
 **Files:**
+
 - Various generated files
 
 **Step 1: Build server**
@@ -662,6 +673,7 @@ git commit -m "chore: regenerate OpenAPI clients and SQL docs for timeline integ
 ## Task 7: Update web frontend — photos page and members modal
 
 **Files:**
+
 - Modify: `web/src/routes/(user)/photos/[[assetId=id]]/+page.svelte`
 - Modify: `web/src/lib/modals/SpaceMembersModal.svelte`
 
@@ -761,6 +773,7 @@ git commit -m "feat(web): add withSharedSpaces to timeline and toggle in members
 ## Task 8: Update web tests
 
 **Files:**
+
 - Modify: `web/src/lib/modals/SpaceMembersModal.spec.ts`
 
 **Step 1: Update test member fixtures**

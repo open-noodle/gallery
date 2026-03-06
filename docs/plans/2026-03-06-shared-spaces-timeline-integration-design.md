@@ -54,15 +54,19 @@ No new settings page needed.
 ## Testing
 
 **Server unit tests:**
+
 - `timeline.service.spec.ts`: Test `buildTimeBucketOptions` with `withSharedSpaces: true` — verify space ID resolution and pass-through. Test validation throws when combined with archive/favorites/trash.
 - `shared-space.service.spec.ts`: Test `updateMember` with `showInTimeline` field.
 
 **Server medium tests:**
+
 - Test the UNION query with real DB — verify space assets appear in time buckets alongside user-owned assets, and disappear when `showInTimeline` is toggled off.
 
 **Web unit tests:**
+
 - `SpaceMembersModal.spec.ts`: Test that the "Show in timeline" toggle renders for the current user's row only.
 
 **Regeneration:**
+
 - OpenAPI SDK regeneration for new DTO fields.
 - SQL query docs regeneration.
