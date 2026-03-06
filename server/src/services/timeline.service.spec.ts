@@ -132,10 +132,7 @@ describe(TimelineService.name, () => {
 
     describe('withSharedSpaces', () => {
       it('should resolve space IDs and pass them as timelineSpaceIds', async () => {
-        mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([
-          { spaceId: 'space-1' },
-          { spaceId: 'space-2' },
-        ]);
+        mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId: 'space-1' }, { spaceId: 'space-2' }]);
         mocks.asset.getTimeBuckets.mockResolvedValue([{ timeBucket: 'bucket', count: 1 }]);
 
         await sut.getTimeBuckets(authStub.admin, {

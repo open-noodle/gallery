@@ -381,9 +381,9 @@ describe(SharedSpaceService.name, () => {
 
       mocks.sharedSpace.getMember.mockResolvedValue(void 0);
 
-      await expect(
-        sut.updateMemberTimeline(auth, spaceId, { showInTimeline: false }),
-      ).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(sut.updateMemberTimeline(auth, spaceId, { showInTimeline: false })).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
     });
   });
 

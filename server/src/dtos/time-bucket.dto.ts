@@ -42,7 +42,10 @@ export class TimeBucketDto {
   @ValidateBoolean({ optional: true, description: 'Include assets shared by partners' })
   withPartners?: boolean;
 
-  @ValidateBoolean({ optional: true, description: 'Include assets from shared spaces where the user has timeline enabled' })
+  @ValidateBoolean({
+    optional: true,
+    description: 'Include assets from shared spaces where the user has timeline enabled',
+  })
   withSharedSpaces?: boolean;
 
   @ValidateEnum({
