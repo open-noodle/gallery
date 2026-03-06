@@ -10,6 +10,8 @@
   import {
     mdiAccount,
     mdiAccountMultiple,
+    mdiAccountGroup,
+    mdiAccountGroupOutline,
     mdiAccountMultipleOutline,
     mdiAccountOutline,
     mdiArchiveArrowDown,
@@ -61,6 +63,8 @@
     icon={mdiAccountMultipleOutline}
     activeIcon={mdiAccountMultiple}
   />
+
+  <NavbarItem title={$t('spaces')} href={Route.spaces()} icon={mdiAccountGroupOutline} activeIcon={mdiAccountGroup} />
 
   <NavbarGroup title={$t('library')} size="tiny" />
 

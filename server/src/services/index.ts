@@ -30,6 +30,7 @@ import { SearchService } from 'src/services/search.service';
 import { ServerService } from 'src/services/server.service';
 import { SessionService } from 'src/services/session.service';
 import { SharedLinkService } from 'src/services/shared-link.service';
+import { SharedSpaceService } from 'src/services/shared-space.service';
 import { SmartInfoService } from 'src/services/smart-info.service';
 import { StackService } from 'src/services/stack.service';
 import { StorageMigrationService } from 'src/services/storage-migration.service';
@@ -81,6 +82,7 @@ export const services = [
   ServerService,
   SessionService,
   SharedLinkService,
+  SharedSpaceService,
   SmartInfoService,
   StackService,
   StorageMigrationService,

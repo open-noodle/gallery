@@ -13,6 +13,8 @@ import {
   Partner,
   Person,
   Session,
+  SharedSpace,
+  SharedSpaceMember,
   Stack,
   Tag,
   User,
@@ -30,6 +32,7 @@ import {
   AssetVisibility,
   MemoryType,
   Permission,
+  SharedSpaceRole,
   SourceType,
   UserMetadataKey,
   UserStatus,
@@ -508,6 +511,26 @@ const personFactory = (person?: Partial<Person>): Person => ({
   ...person,
 });
 
+const sharedSpaceFactory = (data: Partial<SharedSpace> = {}): SharedSpace => ({
+  id: newUuid(),
+  name: 'Test Space',
+  description: null,
+  createdById: newUuid(),
+  createdAt: newDate(),
+  updatedAt: newDate(),
+  createId: newUuid(),
+  updateId: newUuid(),
+  ...data,
+});
+
+const sharedSpaceMemberFactory = (data: Partial<SharedSpaceMember> = {}): SharedSpaceMember => ({
+  spaceId: newUuid(),
+  userId: newUuid(),
+  role: SharedSpaceRole.Viewer,
+  joinedAt: newDate(),
+  ...data,
+});
+
 const albumFactory = (album?: Partial<Omit<Album, 'assets'>>) => ({
   albumName: 'My Album',
   albumThumbnailAssetId: null,
@@ -551,6 +574,8 @@ export const factory = {
   face: faceFactory,
   person: personFactory,
   assetEdit: assetEditFactory,
+  sharedSpace: sharedSpaceFactory,
+  sharedSpaceMember: sharedSpaceMemberFactory,
   tag: tagFactory,
   album: albumFactory,
   uuid: newUuid,

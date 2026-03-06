@@ -109,6 +109,10 @@ export const Route = {
   // sharing
   sharing: () => '/sharing',
 
+  // spaces
+  spaces: () => '/spaces',
+  viewSpace: ({ id }: { id: string }) => `/spaces/${id}`,
+
   // shared links
   sharedLinks: (params?: { filter?: SharedLinkTab }) => '/shared-links' + asQueryString(params),
   editSharedLink: ({ id }: { id: string }) => `/shared-links/${id}/edit`,

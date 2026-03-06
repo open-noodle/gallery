@@ -2756,6 +2756,59 @@ class SharedLinkRoute extends PageRouteInfo<void> {
 }
 
 /// generated route for
+/// [SpaceDetailPage]
+class SpaceDetailRoute extends PageRouteInfo<SpaceDetailRouteArgs> {
+  SpaceDetailRoute({
+    Key? key,
+    required String spaceId,
+    List<PageRouteInfo>? children,
+  }) : super(
+         SpaceDetailRoute.name,
+         args: SpaceDetailRouteArgs(key: key, spaceId: spaceId),
+         initialChildren: children,
+       );
+
+  static const String name = 'SpaceDetailRoute';
+
+  static PageInfo page = PageInfo(
+    name,
+    builder: (data) {
+      final args = data.argsAs<SpaceDetailRouteArgs>();
+      return SpaceDetailPage(key: args.key, spaceId: args.spaceId);
+    },
+  );
+}
+
+class SpaceDetailRouteArgs {
+  const SpaceDetailRouteArgs({this.key, required this.spaceId});
+
+  final Key? key;
+
+  final String spaceId;
+
+  @override
+  String toString() {
+    return 'SpaceDetailRouteArgs{key: $key, spaceId: $spaceId}';
+  }
+}
+
+/// generated route for
+/// [SpacesPage]
+class SpacesRoute extends PageRouteInfo<void> {
+  const SpacesRoute({List<PageRouteInfo>? children})
+    : super(SpacesRoute.name, initialChildren: children);
+
+  static const String name = 'SpacesRoute';
+
+  static PageInfo page = PageInfo(
+    name,
+    builder: (data) {
+      return const SpacesPage();
+    },
+  );
+}
+
+/// generated route for
 /// [SplashScreenPage]
 class SplashScreenRoute extends PageRouteInfo<void> {
   const SplashScreenRoute({List<PageRouteInfo>? children})

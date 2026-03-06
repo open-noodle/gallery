@@ -35,6 +35,7 @@ class ApiService implements Authentication {
   late MemoriesApi memoriesApi;
   late SessionsApi sessionsApi;
   late TagsApi tagsApi;
+  late SharedSpacesApi sharedSpacesApi;
 
   ApiService() {
     // The below line ensures that the api clients are initialized when the service is instantiated
@@ -80,6 +81,7 @@ class ApiService implements Authentication {
     memoriesApi = MemoriesApi(_apiClient);
     sessionsApi = SessionsApi(_apiClient);
     tagsApi = TagsApi(_apiClient);
+    sharedSpacesApi = SharedSpacesApi(_apiClient);
   }
 
   Future<String> resolveAndSetEndpoint(String serverUrl) async {

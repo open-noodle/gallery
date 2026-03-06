@@ -258,6 +258,17 @@ Class | Method | HTTP request | Description
 *SharedLinksApi* | [**removeSharedLinkAssets**](doc//SharedLinksApi.md#removesharedlinkassets) | **DELETE** /shared-links/{id}/assets | Remove assets from a shared link
 *SharedLinksApi* | [**sharedLinkLogin**](doc//SharedLinksApi.md#sharedlinklogin) | **POST** /shared-links/login | Shared link login
 *SharedLinksApi* | [**updateSharedLink**](doc//SharedLinksApi.md#updatesharedlink) | **PATCH** /shared-links/{id} | Update a shared link
+*SharedSpacesApi* | [**addAssets**](doc//SharedSpacesApi.md#addassets) | **POST** /shared-spaces/{id}/assets | Add assets to a shared space
+*SharedSpacesApi* | [**addMember**](doc//SharedSpacesApi.md#addmember) | **POST** /shared-spaces/{id}/members | Add a member to a shared space
+*SharedSpacesApi* | [**createSpace**](doc//SharedSpacesApi.md#createspace) | **POST** /shared-spaces | Create a shared space
+*SharedSpacesApi* | [**getAllSpaces**](doc//SharedSpacesApi.md#getallspaces) | **GET** /shared-spaces | Get all shared spaces
+*SharedSpacesApi* | [**getMembers**](doc//SharedSpacesApi.md#getmembers) | **GET** /shared-spaces/{id}/members | Get members of a shared space
+*SharedSpacesApi* | [**getSpace**](doc//SharedSpacesApi.md#getspace) | **GET** /shared-spaces/{id} | Get a shared space
+*SharedSpacesApi* | [**removeAssets**](doc//SharedSpacesApi.md#removeassets) | **DELETE** /shared-spaces/{id}/assets | Remove assets from a shared space
+*SharedSpacesApi* | [**removeMember**](doc//SharedSpacesApi.md#removemember) | **DELETE** /shared-spaces/{id}/members/{userId} | Remove a member from a shared space
+*SharedSpacesApi* | [**removeSpace**](doc//SharedSpacesApi.md#removespace) | **DELETE** /shared-spaces/{id} | Delete a shared space
+*SharedSpacesApi* | [**updateMember**](doc//SharedSpacesApi.md#updatemember) | **PATCH** /shared-spaces/{id}/members/{userId} | Update a member in a shared space
+*SharedSpacesApi* | [**updateSpace**](doc//SharedSpacesApi.md#updatespace) | **PATCH** /shared-spaces/{id} | Update a shared space
 *StacksApi* | [**createStack**](doc//StacksApi.md#createstack) | **POST** /stacks | Create a stack
 *StacksApi* | [**deleteStack**](doc//StacksApi.md#deletestack) | **DELETE** /stacks/{id} | Delete a stack
 *StacksApi* | [**deleteStacks**](doc//StacksApi.md#deletestacks) | **DELETE** /stacks | Delete stacks
@@ -562,6 +573,15 @@ Class | Method | HTTP request | Description
  - [SharedLinkType](doc//SharedLinkType.md)
  - [SharedLinksResponse](doc//SharedLinksResponse.md)
  - [SharedLinksUpdate](doc//SharedLinksUpdate.md)
+ - [SharedSpaceAssetAddDto](doc//SharedSpaceAssetAddDto.md)
+ - [SharedSpaceAssetRemoveDto](doc//SharedSpaceAssetRemoveDto.md)
+ - [SharedSpaceCreateDto](doc//SharedSpaceCreateDto.md)
+ - [SharedSpaceMemberCreateDto](doc//SharedSpaceMemberCreateDto.md)
+ - [SharedSpaceMemberResponseDto](doc//SharedSpaceMemberResponseDto.md)
+ - [SharedSpaceMemberUpdateDto](doc//SharedSpaceMemberUpdateDto.md)
+ - [SharedSpaceResponseDto](doc//SharedSpaceResponseDto.md)
+ - [SharedSpaceRole](doc//SharedSpaceRole.md)
+ - [SharedSpaceUpdateDto](doc//SharedSpaceUpdateDto.md)
  - [SignUpDto](doc//SignUpDto.md)
  - [SmartSearchDto](doc//SmartSearchDto.md)
  - [SourceType](doc//SourceType.md)
