@@ -127,7 +127,7 @@
       });
       members = members.map((m) => (m.userId === updated.userId ? updated : m));
     } catch (error) {
-      handleError(error, $t('unable_to_update_timeline_display_status'));
+      handleError(error, $t('errors.unable_to_update_timeline_display_status'));
     }
   };
 
