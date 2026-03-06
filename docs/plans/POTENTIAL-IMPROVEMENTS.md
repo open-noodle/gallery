@@ -2,25 +2,25 @@
 
 Top community feature requests from upstream Immich discussions and issues, ranked by upvotes.
 
-| Votes | Feature                                  | Notes                                                                                      |
-| ----- | ---------------------------------------- | ------------------------------------------------------------------------------------------ |
-| 828   | Better sharing                           | Under feature freeze upstream — albums, stacks, shared links, partner sharing need rework   |
-| 670   | Private/protected albums                 | Hidden/locked albums (NSFW, sensitive)                                                     |
-| 636   | Pet detection                            | ML model for cats, dogs, etc.                                                              |
-| 479   | Image rotation                           | In-app rotate/crop                                                                         |
-| 474   | "Add to Library" from shared links       | Save others' shared photos to your own library                                             |
-| 374   | Automatic stacking                       | Auto-group burst shots, RAW+JPG pairs                                                      |
-| 319   | OCR search                               | Search photos by text in them (partially shipped but memory-leaky)                         |
-| 275   | Duplicate detection                      | Find and merge duplicates (partially shipped)                                              |
-| 273   | Hide albums from timeline                | Exclude certain albums from main view                                                      |
-| 249   | Choose libraries for partner sharing     | Share specific albums, not everything                                                      |
-| 249   | Recently added section                   | Show "new uploads" separately                                                              |
-| 212   | Folder view                              | Browse by folder structure, not just timeline                                              |
-| 210   | Preserve album info from upload          | Keep album names from phone on import                                                      |
-| 202   | More storage backends                    | Already implemented in this fork (S3 support)                                              |
-| 197   | Auto-create albums from external libraries |                                                                                            |
-| 184   | Metadata editor                          | Edit EXIF data in-app                                                                      |
-| 184   | Delete from web, sync to mobile          | Two-way delete sync                                                                        |
-| 182   | Push notifications for Memories          |                                                                                            |
-| 179   | Auto-share albums to matched faces       |                                                                                            |
-| 165   | Nested albums                            | Sub-albums / album hierarchy                                                               |
+| Votes | Feature                                    | Notes                                                                 |
+| ----- | ------------------------------------------ | --------------------------------------------------------------------- |
+| 828   | Better sharing                             | Phase 1 (Shared Spaces) implemented in this fork. Phases 2-3 planned. |
+| 670   | Private/protected albums                   | Hidden/locked albums (NSFW, sensitive)                                |
+| 636   | Pet detection                              | ML model for cats, dogs, etc.                                         |
+| 479   | Image rotation                             | In-app rotate/crop                                                    |
+| 474   | "Add to Library" from shared links         | Save others' shared photos to your own library                        |
+| 374   | Automatic stacking                         | Auto-group burst shots, RAW+JPG pairs                                 |
+| 319   | OCR search                                 | Search photos by text in them (partially shipped but memory-leaky)    |
+| 275   | Duplicate detection                        | Find and merge duplicates (partially shipped)                         |
+| 273   | Hide albums from timeline                  | Exclude certain albums from main view                                 |
+| 249   | Choose libraries for partner sharing       | Share specific albums, not everything                                 |
+| 249   | Recently added section                     | Show "new uploads" separately                                         |
+| 212   | Folder view                                | Browse by folder structure, not just timeline                         |
+| 210   | Preserve album info from upload            | Keep album names from phone on import                                 |
+| 202   | More storage backends                      | Already implemented in this fork (S3 support)                         |
+| 197   | Auto-create albums from external libraries |                                                                       |
+| 184   | Metadata editor                            | Edit EXIF data in-app                                                 |
+| 184   | Delete from web, sync to mobile            | Two-way delete sync                                                   |
+| 182   | Push notifications for Memories            |                                                                       |
+| 179   | Auto-share albums to matched faces         |                                                                       |
+| 165   | Nested albums                              | Sub-albums / album hierarchy                                          |
