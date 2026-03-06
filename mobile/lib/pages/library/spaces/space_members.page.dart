@@ -61,7 +61,7 @@ class SpaceMembersPage extends HookConsumerWidget {
           ref.invalidate(sharedSpaceMembersProvider(spaceId));
           if (isLeaving && context.mounted) {
             ref.invalidate(sharedSpacesProvider);
-            context.maybePop();
+            await context.maybePop();
           } else if (context.mounted) {
             ImmichToast.show(
               context: context,

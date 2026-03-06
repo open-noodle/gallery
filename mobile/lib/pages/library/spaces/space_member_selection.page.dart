@@ -39,7 +39,7 @@ class SpaceMemberSelectionPage extends HookConsumerWidget {
             msg: 'Added ${selectedUsers.value.length} members',
             toastType: ToastType.success,
           );
-          context.maybePop();
+          await context.maybePop();
         }
       } catch (e) {
         if (context.mounted) {

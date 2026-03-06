@@ -153,7 +153,7 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
         ref.invalidate(sharedSpacesProvider);
         if (context.mounted) {
           ImmichToast.show(context: context, msg: 'Space deleted', toastType: ToastType.success);
-          context.maybePop();
+          await context.maybePop();
         }
       } catch (e) {
         if (context.mounted) {
