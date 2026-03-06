@@ -15,6 +15,7 @@
 ### Task 1: Fix person thumbnail scalar subquery (#26045)
 
 **Files:**
+
 - Modify: `server/src/repositories/person.repository.ts:285-293`
 - Test: `server/src/services/media.service.spec.ts` (existing tests + new test)
 
@@ -77,6 +78,7 @@ git commit -m "fix(server): add limit to person thumbnail preview subquery (#260
 ### Task 2: Fix download-as-album serving original instead of edited (#26182)
 
 **Files:**
+
 - Modify: `server/src/repositories/asset.repository.ts:1086-1106`
 - Test: `server/src/services/download.service.spec.ts`
 
@@ -98,9 +100,7 @@ it('should use edited path when edited flag is true and editedPath exists', asyn
   mocks.asset.getForOriginals.mockResolvedValue([editedAsset]);
   mocks.storage.createZipStream.mockReturnValue(archiveMock);
 
-  await expect(
-    sut.downloadArchive(authStub.admin, { assetIds: [asset.id], edited: true }),
-  ).resolves.toEqual({
+  await expect(sut.downloadArchive(authStub.admin, { assetIds: [asset.id], edited: true })).resolves.toEqual({
     stream: archiveMock.stream,
   });
 
@@ -142,6 +142,7 @@ git commit -m "fix(server): serve edited files in download-as-album (#26182)"
 ### Task 3: Fix album thumbnail not using edited version (#25803)
 
 **Files:**
+
 - Modify: `server/src/repositories/asset-job.repository.ts:163-171`
 - Test: `server/src/services/notification.service.spec.ts`
 
@@ -191,6 +192,7 @@ git commit -m "fix(server): prefer edited album thumbnail file (#25803)"
 ### Task 4: Add i18n keys for quick-rotate
 
 **Files:**
+
 - Modify: `i18n/en.json`
 
 **Step 1: Add new i18n keys**
@@ -217,6 +219,7 @@ git commit -m "feat(i18n): add quick-rotate translation keys"
 ### Task 5: Add quick-rotate ActionItem to asset service
 
 **Files:**
+
 - Modify: `web/src/lib/services/asset.service.ts`
 
 **Step 1: Read the full file**
@@ -228,6 +231,7 @@ Read `web/src/lib/services/asset.service.ts` to understand the existing action p
 Add `RotateRight` action next to the `Edit` action. Import `mdiRotateRight` from `@mdi/js`. Import `getAssetEdits`, `editAsset`, `AssetEditAction` from `@immich/sdk`. Import `waitForWebsocketEvent` from `$lib/stores/websocket`. Import `eventManager` from `$lib/managers/event-manager.svelte`. Import `toastManager` from `@immich/ui`.
 
 The RotateRight action should:
+
 - Have the same `$if` condition as `Edit` (owner, image, not live photo, not panorama, not GIF, not SVG)
 - Use `mdiRotateRight` icon
 - Use title `$t('quick_rotate_right')`
@@ -263,6 +267,7 @@ git commit -m "feat(web): add quick-rotate action items to asset service"
 ### Task 6: Add rotate button to viewer navbar
 
 **Files:**
+
 - Modify: `web/src/lib/components/asset-viewer/asset-viewer-nav-bar.svelte`
 
 **Step 1: Add rotate-right button to the toolbar**
@@ -302,6 +307,7 @@ git commit -m "feat(web): add rotate button to viewer toolbar and More menu"
 ### Task 7: Handle asset refresh after quick-rotate
 
 **Files:**
+
 - Check: `web/src/lib/components/asset-viewer/asset-viewer.svelte`
 
 **Step 1: Verify the refresh mechanism**
@@ -325,6 +331,7 @@ Only commit if modifications were required.
 ### Task 8: Add batch rotate timeline action component
 
 **Files:**
+
 - Create: `web/src/lib/components/timeline/actions/RotateAction.svelte`
 
 **Step 1: Create the component**
@@ -420,6 +427,7 @@ git commit -m "feat(web): add batch rotate action component for timeline"
 ### Task 9: Wire batch rotate into timeline toolbar
 
 **Files:**
+
 - Modify: The component that renders the timeline multi-select toolbar
 
 **Step 1: Find where timeline actions are rendered**
