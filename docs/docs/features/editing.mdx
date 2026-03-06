@@ -12,8 +12,36 @@ Currently, Immich supports the following types of edits:
 
 <img src={require('./img/web-edit-interface.webp').default} title="Web edit interface" />
 
+## Quick Rotate
+
+You can quickly rotate images without opening the full editor. Quick-rotate is available in two places:
+
+### Asset Viewer
+
+When viewing a single image, a **Rotate Right** button appears in the toolbar. Additional rotation options (**Rotate Left** and **Rotate 180°**) are available in the **More** menu (three dots).
+
+The rotation is applied immediately and the image refreshes in place.
+
+### Multi-Select (Batch Rotate)
+
+When selecting multiple assets in the timeline, you can rotate them all at once:
+
+1. Select the images you want to rotate
+2. Open the context menu (three dots)
+3. Choose **Rotate Right**, **Rotate Left**, or **Rotate 180°**
+
+Only image assets are rotated — videos are automatically skipped.
+
 ## Download
 
 When you download an edited asset, Immich provides the edited version of the asset by default. However, you can choose to download the original version if needed.
 
 <img src={require('./img/web-edit-download.webp').default} title="Web edit download" />
+
+## Edited Asset Handling
+
+Edited assets are fully integrated throughout Immich:
+
+- **Album thumbnails** use the edited version of an asset when available
+- **Person thumbnails** correctly display the original (unedited) preview for face recognition
+- **Downloads** serve the edited version by default, with an option to download the original

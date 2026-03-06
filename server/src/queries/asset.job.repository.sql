@@ -324,7 +324,7 @@ where
 order by
   "asset_file"."isEdited" desc
 limit
-  1
+  $3
 
 -- AssetJobRepository.streamForSearchDuplicates
 select
