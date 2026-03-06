@@ -11,7 +11,7 @@ import {
   SharedSpaceResponseDto,
   SharedSpaceUpdateDto,
 } from 'src/dtos/shared-space.dto';
-import { SharedSpaceRole } from 'src/enum';
+import { Permission, SharedSpaceRole } from 'src/enum';
 import { BaseService } from 'src/services/base.service';
 
 const ROLE_HIERARCHY: Record<SharedSpaceRole, number> = {
@@ -174,6 +174,20 @@ export class SharedSpaceService extends BaseService {
   async removeAssets(auth: AuthDto, spaceId: string, dto: SharedSpaceAssetRemoveDto): Promise<void> {
     await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
     await this.sharedSpaceRepository.removeAssets(spaceId, dto.assetIds);
+  }
+
+  async getMapMarkers(auth: AuthDto, id: string) {
+    await this.requireAccess({ auth, permission: Permission.SharedSpaceRead, ids: [id] });
+
+    const markers = await this.sharedSpaceRepository.getMapMarkers(id);
+    return markers.map((marker) => ({
+      id: marker.id,
+      lat: marker.latitude!,
+      lon: marker.longitude!,
+      city: marker.city ?? null,
+      state: marker.state ?? null,
+      country: marker.country ?? null,
+    }));
   }
 
   private async requireMembership(auth: AuthDto, spaceId: string) {

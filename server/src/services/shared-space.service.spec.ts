@@ -1,4 +1,5 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import { MapMarkerResponseDto } from 'src/dtos/map.dto';
 import { SharedSpaceRole } from 'src/enum';
 import { SharedSpaceService } from 'src/services/shared-space.service';
 import { factory, newDate, newUuid } from 'test/small.factory';
@@ -496,6 +497,95 @@ describe(SharedSpaceService.name, () => {
         ForbiddenException,
       );
       expect(mocks.sharedSpace.removeAssets).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getMapMarkers', () => {
+    it('should require shared space read access', async () => {
+      const auth = factory.auth();
+      const spaceId = newUuid();
+
+      mocks.access.sharedSpace.checkMemberAccess.mockResolvedValue(new Set());
+
+      await expect(sut.getMapMarkers(auth, spaceId)).rejects.toThrow();
+      expect(mocks.sharedSpace.getMapMarkers).not.toHaveBeenCalled();
+    });
+
+    it('should return map markers for space assets', async () => {
+      const auth = factory.auth();
+      const spaceId = newUuid();
+      const assetId1 = newUuid();
+      const assetId2 = newUuid();
+
+      mocks.access.sharedSpace.checkMemberAccess.mockResolvedValue(new Set([spaceId]));
+      mocks.sharedSpace.getMapMarkers.mockResolvedValue([
+        { id: assetId1, latitude: 40.7128, longitude: -74.006, city: 'New York', state: 'New York', country: 'USA' },
+        {
+          id: assetId2,
+          latitude: 34.0522,
+          longitude: -118.2437,
+          city: 'Los Angeles',
+          state: 'California',
+          country: 'USA',
+        },
+      ]);
+
+      const result = await sut.getMapMarkers(auth, spaceId);
+
+      expect(result).toHaveLength(2);
+      expect(result[0]).toEqual<MapMarkerResponseDto>({
+        id: assetId1,
+        lat: 40.7128,
+        lon: -74.006,
+        city: 'New York',
+        state: 'New York',
+        country: 'USA',
+      });
+      expect(result[1]).toEqual<MapMarkerResponseDto>({
+        id: assetId2,
+        lat: 34.0522,
+        lon: -118.2437,
+        city: 'Los Angeles',
+        state: 'California',
+        country: 'USA',
+      });
+      expect(mocks.access.sharedSpace.checkMemberAccess).toHaveBeenCalledWith(auth.user.id, new Set([spaceId]));
+    });
+
+    it('should return empty array when space has no geotagged assets', async () => {
+      const auth = factory.auth();
+      const spaceId = newUuid();
+
+      mocks.access.sharedSpace.checkMemberAccess.mockResolvedValue(new Set([spaceId]));
+      mocks.sharedSpace.getMapMarkers.mockResolvedValue([]);
+
+      const result = await sut.getMapMarkers(auth, spaceId);
+
+      expect(result).toEqual([]);
+      expect(mocks.sharedSpace.getMapMarkers).toHaveBeenCalledWith(spaceId);
+    });
+
+    it('should map marker fields correctly with null city/state/country', async () => {
+      const auth = factory.auth();
+      const spaceId = newUuid();
+      const assetId = newUuid();
+
+      mocks.access.sharedSpace.checkMemberAccess.mockResolvedValue(new Set([spaceId]));
+      mocks.sharedSpace.getMapMarkers.mockResolvedValue([
+        { id: assetId, latitude: 51.5074, longitude: -0.1278, city: null, state: null, country: null },
+      ]);
+
+      const result = await sut.getMapMarkers(auth, spaceId);
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toEqual<MapMarkerResponseDto>({
+        id: assetId,
+        lat: 51.5074,
+        lon: -0.1278,
+        city: null,
+        state: null,
+        country: null,
+      });
     });
   });
 });

@@ -157,4 +157,25 @@ export class SharedSpaceRepository {
       .where('assetId', 'in', assetIds)
       .execute();
   }
+
+  @GenerateSql({ params: [DummyValue.UUID] })
+  getMapMarkers(spaceId: string) {
+    return this.db
+      .selectFrom('shared_space_asset')
+      .innerJoin('asset', 'asset.id', 'shared_space_asset.assetId')
+      .innerJoin('asset_exif', 'asset.id', 'asset_exif.assetId')
+      .where('shared_space_asset.spaceId', '=', spaceId)
+      .where('asset.deletedAt', 'is', null)
+      .where('asset_exif.latitude', 'is not', null)
+      .where('asset_exif.longitude', 'is not', null)
+      .select([
+        'asset.id',
+        'asset_exif.latitude',
+        'asset_exif.longitude',
+        'asset_exif.city',
+        'asset_exif.state',
+        'asset_exif.country',
+      ])
+      .execute();
+  }
 }
