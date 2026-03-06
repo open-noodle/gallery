@@ -55,6 +55,60 @@ describe('requireElevatedPermission', () => {
   });
 });
 
+describe('checkOtherAccess SharedSpaceRead', () => {
+  it('should check member access for SharedSpaceRead', async () => {
+    const accessMock = newAccessRepositoryMock();
+    const userId = newUuid();
+    const spaceId = newUuid();
+    const auth: AuthDto = {
+      user: {
+        id: userId,
+        isAdmin: false,
+        name: 'test',
+        email: 'test@test.com',
+        quotaUsageInBytes: 0,
+        quotaSizeInBytes: null,
+      },
+    };
+
+    accessMock.sharedSpace.checkMemberAccess.mockResolvedValue(new Set([spaceId]));
+
+    const result = await checkAccess(accessMock as any, {
+      auth,
+      permission: Permission.SharedSpaceRead,
+      ids: new Set([spaceId]),
+    });
+
+    expect(result).toEqual(new Set([spaceId]));
+    expect(accessMock.sharedSpace.checkMemberAccess).toHaveBeenCalledWith(userId, new Set([spaceId]));
+  });
+
+  it('should return an empty set when user is not a member', async () => {
+    const accessMock = newAccessRepositoryMock();
+    const userId = newUuid();
+    const spaceId = newUuid();
+    const auth: AuthDto = {
+      user: {
+        id: userId,
+        isAdmin: false,
+        name: 'test',
+        email: 'test@test.com',
+        quotaUsageInBytes: 0,
+        quotaSizeInBytes: null,
+      },
+    };
+
+    const result = await checkAccess(accessMock as any, {
+      auth,
+      permission: Permission.SharedSpaceRead,
+      ids: new Set([spaceId]),
+    });
+
+    expect(result).toEqual(new Set());
+    expect(accessMock.sharedSpace.checkMemberAccess).toHaveBeenCalledWith(userId, new Set([spaceId]));
+  });
+});
+
 describe('checkOtherAccess default case', () => {
   it('should return an empty set for an unhandled permission', async () => {
     const accessMock = newAccessRepositoryMock();

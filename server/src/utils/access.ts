@@ -310,6 +310,10 @@ const checkOtherAccess = async (access: AccessRepository, request: OtherAccessRe
       return access.stack.checkOwnerAccess(auth.user.id, ids);
     }
 
+    case Permission.SharedSpaceRead: {
+      return await access.sharedSpace.checkMemberAccess(auth.user.id, ids);
+    }
+
     case Permission.WorkflowRead:
     case Permission.WorkflowUpdate:
     case Permission.WorkflowDelete: {
