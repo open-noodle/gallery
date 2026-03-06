@@ -24,17 +24,21 @@
     getSpace,
     removeSpace,
     Role,
+    searchSmart,
     updateMemberTimeline,
+    type AssetResponseDto,
     type SharedSpaceMemberResponseDto,
     type SharedSpaceResponseDto,
   } from '@immich/sdk';
-  import { Icon, IconButton, modalManager, toastManager } from '@immich/ui';
+  import { Icon, IconButton, LoadingSpinner, modalManager, toastManager } from '@immich/ui';
   import {
     mdiAccountMultipleOutline,
+    mdiClose,
     mdiDeleteOutline,
     mdiEyeOffOutline,
     mdiEyeOutline,
     mdiImagePlusOutline,
+    mdiMagnify,
     mdiPlus,
   } from '@mdi/js';
   import { t } from 'svelte-i18n';
@@ -76,6 +80,10 @@
   };
 
   const handleEscape = () => {
+    if (showSearchResults) {
+      clearSearch();
+      return;
+    }
     if (viewMode === 'select-assets') {
       handleCloseSelectAssets();
       return;
@@ -158,6 +166,39 @@
     timelineManager.removeAssets(assetIds);
     await refreshSpace();
   };
+
+  let searchQuery = $state('');
+  let searchResults = $state<AssetResponseDto[]>([]);
+  let isSearching = $state(false);
+  let showSearchResults = $state(false);
+
+  const handleSearch = async () => {
+    const query = searchQuery.trim();
+    if (!query) {
+      showSearchResults = false;
+      searchResults = [];
+      return;
+    }
+
+    isSearching = true;
+    try {
+      const { assets } = await searchSmart({
+        smartSearchDto: { query, spaceId: space.id },
+      });
+      searchResults = assets.items;
+      showSearchResults = true;
+    } catch {
+      searchResults = [];
+    } finally {
+      isSearching = false;
+    }
+  };
+
+  const clearSearch = () => {
+    searchQuery = '';
+    searchResults = [];
+    showSearchResults = false;
+  };
 </script>
 
 <OnEvents {onSpaceAddAssets} {onSpaceRemoveAssets} />
@@ -218,53 +259,160 @@
     {/if}
   {/snippet}
 
-  <Timeline
-    enableRouting={true}
-    bind:timelineManager
-    {options}
-    assetInteraction={currentAssetInteraction}
-    {isSelectionMode}
-    onEscape={handleEscape}
-  >
-    {#if viewMode !== 'select-assets'}
-      <section class="pt-4">
-        <div class="flex gap-4 mt-2 text-sm text-immich-fg/60 dark:text-immich-dark-fg/60">
-          <span>{space.assetCount ?? 0} {$t('photos')}</span>
-          <span>{members.length} {$t('members')}</span>
-        </div>
-
-        {#if space.description}
-          <p
-            class="whitespace-pre-line mb-6 mt-4 w-full pb-2 text-start font-medium text-base text-black dark:text-gray-300"
-          >
-            {space.description}
-          </p>
-        {/if}
-      </section>
-    {/if}
-
-    {#snippet empty()}
-      {#if viewMode === 'view'}
-        <section class="mt-50 flex place-content-center place-items-center">
-          <div class="w-75">
-            <p class="uppercase text-xs dark:text-immich-dark-fg">{$t('spaces_no_assets')}</p>
-            {#if isEditor}
-              <button
-                type="button"
-                onclick={() => (viewMode = 'select-assets')}
-                class="mt-5 bg-subtle flex w-full place-items-center gap-6 rounded-2xl border px-8 py-8 text-immich-fg transition-all hover:bg-gray-100 dark:hover:bg-gray-500/20 hover:text-immich-primary dark:border-none dark:text-immich-dark-fg dark:hover:text-immich-dark-primary"
-              >
-                <span class="text-primary">
-                  <Icon icon={mdiPlus} size="24" />
-                </span>
-                <span class="text-lg">{$t('add_photos')}</span>
-              </button>
-            {/if}
+  {#if showSearchResults}
+    <div class="px-4">
+      {#if viewMode !== 'select-assets'}
+        <section class="pt-4">
+          <div class="flex gap-4 mt-2 text-sm text-immich-fg/60 dark:text-immich-dark-fg/60">
+            <span>{space.assetCount ?? 0} {$t('photos')}</span>
+            <span>{members.length} {$t('members')}</span>
           </div>
+
+          <div class="mt-2 flex items-center gap-2">
+            <form
+              class="relative flex-1"
+              onsubmit={(e) => {
+                e.preventDefault();
+                void handleSearch();
+              }}
+            >
+              <input
+                type="text"
+                bind:value={searchQuery}
+                placeholder={$t('search')}
+                class="w-full rounded-lg border bg-transparent px-10 py-2 text-sm dark:border-gray-600 focus:border-immich-primary focus:outline-none"
+              />
+              <button type="submit" class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                <Icon icon={mdiMagnify} size="18" />
+              </button>
+              {#if searchQuery}
+                <button
+                  type="button"
+                  onclick={clearSearch}
+                  class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  <Icon icon={mdiClose} size="18" />
+                </button>
+              {/if}
+            </form>
+          </div>
+
+          {#if space.description}
+            <p
+              class="whitespace-pre-line mb-6 mt-4 w-full pb-2 text-start font-medium text-base text-black dark:text-gray-300"
+            >
+              {space.description}
+            </p>
+          {/if}
         </section>
       {/if}
-    {/snippet}
-  </Timeline>
+
+      <section class="py-4">
+        {#if isSearching}
+          <div class="flex justify-center py-8">
+            <LoadingSpinner />
+          </div>
+        {:else if searchResults.length === 0}
+          <p class="mt-8 text-center text-gray-500 dark:text-gray-400">{$t('search_no_result')}</p>
+        {:else}
+          <p class="mb-4 text-sm text-gray-500 dark:text-gray-400">
+            {searchResults.length} results
+          </p>
+          <div class="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-1">
+            {#each searchResults as asset (asset.id)}
+              <a
+                href="{Route.viewSpace({ id: space.id })}/photos/{asset.id}"
+                class="aspect-square cursor-pointer overflow-hidden rounded"
+              >
+                <img
+                  src="/api/assets/{asset.id}/thumbnail"
+                  alt={asset.originalFileName}
+                  class="h-full w-full object-cover"
+                />
+              </a>
+            {/each}
+          </div>
+        {/if}
+      </section>
+    </div>
+  {:else}
+    <Timeline
+      enableRouting={true}
+      bind:timelineManager
+      {options}
+      assetInteraction={currentAssetInteraction}
+      {isSelectionMode}
+      onEscape={handleEscape}
+    >
+      {#if viewMode !== 'select-assets'}
+        <section class="pt-4">
+          <div class="flex gap-4 mt-2 text-sm text-immich-fg/60 dark:text-immich-dark-fg/60">
+            <span>{space.assetCount ?? 0} {$t('photos')}</span>
+            <span>{members.length} {$t('members')}</span>
+          </div>
+
+          <div class="mt-2 flex items-center gap-2">
+            <form
+              class="relative flex-1"
+              onsubmit={(e) => {
+                e.preventDefault();
+                void handleSearch();
+              }}
+            >
+              <input
+                type="text"
+                bind:value={searchQuery}
+                placeholder={$t('search')}
+                class="w-full rounded-lg border bg-transparent px-10 py-2 text-sm dark:border-gray-600 focus:border-immich-primary focus:outline-none"
+              />
+              <button type="submit" class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                <Icon icon={mdiMagnify} size="18" />
+              </button>
+              {#if searchQuery}
+                <button
+                  type="button"
+                  onclick={clearSearch}
+                  class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  <Icon icon={mdiClose} size="18" />
+                </button>
+              {/if}
+            </form>
+          </div>
+
+          {#if space.description}
+            <p
+              class="whitespace-pre-line mb-6 mt-4 w-full pb-2 text-start font-medium text-base text-black dark:text-gray-300"
+            >
+              {space.description}
+            </p>
+          {/if}
+        </section>
+      {/if}
+
+      {#snippet empty()}
+        {#if viewMode === 'view'}
+          <section class="mt-50 flex place-content-center place-items-center">
+            <div class="w-75">
+              <p class="uppercase text-xs dark:text-immich-dark-fg">{$t('spaces_no_assets')}</p>
+              {#if isEditor}
+                <button
+                  type="button"
+                  onclick={() => (viewMode = 'select-assets')}
+                  class="mt-5 bg-subtle flex w-full place-items-center gap-6 rounded-2xl border px-8 py-8 text-immich-fg transition-all hover:bg-gray-100 dark:hover:bg-gray-500/20 hover:text-immich-primary dark:border-none dark:text-immich-dark-fg dark:hover:text-immich-dark-primary"
+                >
+                  <span class="text-primary">
+                    <Icon icon={mdiPlus} size="24" />
+                  </span>
+                  <span class="text-lg">{$t('add_photos')}</span>
+                </button>
+              {/if}
+            </div>
+          </section>
+        {/if}
+      {/snippet}
+    </Timeline>
+  {/if}
 </UserPageLayout>
 
 {#if assetInteraction.selectionActive && viewMode === 'view'}
