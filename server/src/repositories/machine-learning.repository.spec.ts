@@ -46,6 +46,11 @@ describe(MachineLearningRepository.name, () => {
         minRecognitionScore: 0.5,
         maxResolution: 0,
       },
+      petDetection: {
+        enabled: false,
+        modelName: 'yolov8n-animals',
+        minScore: 0.6,
+      },
     });
   };
 
