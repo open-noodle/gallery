@@ -2,12 +2,36 @@
   import MenuOption from '$lib/components/shared-components/context-menu/menu-option.svelte';
   import { getAssetControlContext } from '$lib/utils/context';
   import { handleError } from '$lib/utils/handle-error';
-  import { AssetEditAction, editAsset, getAssetEdits, type AssetEditActionItemDto } from '@immich/sdk';
+  import {
+    AssetEditAction,
+    editAsset,
+    getAssetEdits,
+    removeAssetEdits,
+    type AssetEditActionItemDto,
+  } from '@immich/sdk';
   import { toastManager } from '@immich/ui';
   import { mdiRotateLeft, mdiRotateRight } from '@mdi/js';
   import { t } from 'svelte-i18n';
 
   const { clearSelect, getOwnedAssets } = getAssetControlContext();
+
+  const normalizeAngle = (angle: number): number => ((angle % 360) + 360) % 360;
+
+  const mergeRotation = (
+    existingEdits: AssetEditActionItemDto[],
+    additionalAngle: number,
+  ): AssetEditActionItemDto[] => {
+    const otherEdits = existingEdits.filter((e) => e.action !== AssetEditAction.Rotate);
+    const existingRotate = existingEdits.find((e) => e.action === AssetEditAction.Rotate);
+    const existingAngle = (existingRotate?.parameters as { angle?: number })?.angle ?? 0;
+    const merged = normalizeAngle(existingAngle + additionalAngle);
+
+    if (merged === 0) {
+      return otherEdits;
+    }
+
+    return [...otherEdits, { action: AssetEditAction.Rotate, parameters: { angle: merged } }];
+  };
 
   const handleRotate = async (angle: number) => {
     try {
@@ -22,12 +46,14 @@
       for (const asset of assets) {
         try {
           const existing = await getAssetEdits({ id: asset.id });
-          const newEdit: AssetEditActionItemDto = {
-            action: AssetEditAction.Rotate,
-            parameters: { angle },
-          };
-          const edits = [...existing.edits.map(({ action, parameters }) => ({ action, parameters })), newEdit];
-          await editAsset({ id: asset.id, assetEditsCreateDto: { edits } });
+          const edits = mergeRotation(
+            existing.edits.map(({ action, parameters }) => ({ action, parameters })),
+            angle,
+          );
+
+          await (edits.length === 0
+            ? removeAssetEdits({ id: asset.id })
+            : editAsset({ id: asset.id, assetEditsCreateDto: { edits } }));
           success++;
         } catch {
           failed++;
@@ -48,5 +74,5 @@
 </script>
 
 <MenuOption icon={mdiRotateRight} text={$t('rotate_right')} onClick={() => handleRotate(90)} />
-<MenuOption icon={mdiRotateLeft} text={$t('rotate_left')} onClick={() => handleRotate(-90)} />
+<MenuOption icon={mdiRotateLeft} text={$t('rotate_left')} onClick={() => handleRotate(270)} />
 <MenuOption icon={mdiRotateRight} text={$t('rotate_180')} onClick={() => handleRotate(180)} />
