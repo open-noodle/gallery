@@ -76,6 +76,7 @@ interface AssetBuilderOptions {
   tagId?: string;
   personId?: string;
   userIds?: string[];
+  timelineSpaceIds?: string[];
   withStacked?: boolean;
   exifInfo?: boolean;
   status?: AssetStatus;

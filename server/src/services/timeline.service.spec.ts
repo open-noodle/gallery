@@ -129,6 +129,78 @@ describe(TimelineService.name, () => {
         );
       });
     });
+
+    describe('withSharedSpaces', () => {
+      it('should resolve space IDs and pass them as timelineSpaceIds', async () => {
+        mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([
+          { spaceId: 'space-1' },
+          { spaceId: 'space-2' },
+        ]);
+        mocks.asset.getTimeBuckets.mockResolvedValue([{ timeBucket: 'bucket', count: 1 }]);
+
+        await sut.getTimeBuckets(authStub.admin, {
+          withSharedSpaces: true,
+          visibility: AssetVisibility.Timeline,
+        });
+
+        expect(mocks.sharedSpace.getSpaceIdsForTimeline).toHaveBeenCalledWith(authStub.admin.user.id);
+        expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
+          expect.objectContaining({
+            userIds: [authStub.admin.user.id],
+            timelineSpaceIds: ['space-1', 'space-2'],
+          }),
+        );
+      });
+
+      it('should not pass timelineSpaceIds when user has no enabled spaces', async () => {
+        mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
+        mocks.asset.getTimeBuckets.mockResolvedValue([{ timeBucket: 'bucket', count: 1 }]);
+
+        await sut.getTimeBuckets(authStub.admin, {
+          withSharedSpaces: true,
+          visibility: AssetVisibility.Timeline,
+        });
+
+        const calledWith = mocks.asset.getTimeBuckets.mock.calls[0][0];
+        expect(calledWith.timelineSpaceIds).toBeUndefined();
+      });
+
+      it('should throw when combined with archive visibility', async () => {
+        await expect(
+          sut.getTimeBuckets(authStub.admin, {
+            withSharedSpaces: true,
+            visibility: AssetVisibility.Archive,
+          }),
+        ).rejects.toThrow(BadRequestException);
+      });
+
+      it('should throw when combined with undefined visibility', async () => {
+        await expect(
+          sut.getTimeBuckets(authStub.admin, {
+            withSharedSpaces: true,
+            visibility: undefined,
+          }),
+        ).rejects.toThrow(BadRequestException);
+      });
+
+      it('should throw when combined with isFavorite', async () => {
+        await expect(
+          sut.getTimeBuckets(authStub.admin, {
+            withSharedSpaces: true,
+            isFavorite: true,
+          }),
+        ).rejects.toThrow(BadRequestException);
+      });
+
+      it('should throw when combined with isTrashed', async () => {
+        await expect(
+          sut.getTimeBuckets(authStub.admin, {
+            withSharedSpaces: true,
+            isTrashed: true,
+          }),
+        ).rejects.toThrow(BadRequestException);
+      });
+    });
   });
 
   describe('getTimeBucket', () => {
