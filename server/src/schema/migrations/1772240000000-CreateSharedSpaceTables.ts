@@ -3,7 +3,7 @@ import { Kysely, sql } from 'kysely';
 export async function up(db: Kysely<any>): Promise<void> {
   await sql`
     CREATE TABLE "shared_space" (
-      "id" uuid NOT NULL DEFAULT immich_uuid_v7(),
+      "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
       "name" text NOT NULL,
       "description" text,
       "createdById" uuid NOT NULL,

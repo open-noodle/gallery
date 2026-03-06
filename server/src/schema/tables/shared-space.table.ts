@@ -3,17 +3,18 @@ import {
   CreateDateColumn,
   ForeignKeyColumn,
   Generated,
+  PrimaryGeneratedColumn,
   Table,
   Timestamp,
   UpdateDateColumn,
 } from '@immich/sql-tools';
-import { CreateIdColumn, PrimaryGeneratedUuidV7Column, UpdatedAtTrigger, UpdateIdColumn } from 'src/decorators';
+import { CreateIdColumn, UpdatedAtTrigger, UpdateIdColumn } from 'src/decorators';
 import { UserTable } from 'src/schema/tables/user.table';
 
 @Table('shared_space')
 @UpdatedAtTrigger('shared_space_updatedAt')
 export class SharedSpaceTable {
-  @PrimaryGeneratedUuidV7Column()
+  @PrimaryGeneratedColumn()
   id!: Generated<string>;
 
   @Column({ type: 'text' })
