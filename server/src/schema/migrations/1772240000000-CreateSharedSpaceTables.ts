@@ -27,6 +27,8 @@ export async function up(db: Kysely<any>): Promise<void> {
       EXECUTE FUNCTION updated_at();
   `.execute(db);
 
+  await sql`INSERT INTO "migration_overrides" ("name", "value") VALUES ('trigger_shared_space_updatedAt', '{"type":"trigger","name":"shared_space_updatedAt","sql":"CREATE OR REPLACE TRIGGER \\"shared_space_updatedAt\\"\\n  BEFORE UPDATE ON \\"shared_space\\"\\n  FOR EACH ROW\\n  EXECUTE FUNCTION updated_at();"}'::jsonb);`.execute(db);
+
   await sql`
     CREATE TABLE "shared_space_member" (
       "spaceId" uuid NOT NULL,
@@ -61,6 +63,7 @@ export async function up(db: Kysely<any>): Promise<void> {
 export async function down(db: Kysely<any>): Promise<void> {
   await sql`DROP TABLE "shared_space_asset"`.execute(db);
   await sql`DROP TABLE "shared_space_member"`.execute(db);
+  await sql`DELETE FROM "migration_overrides" WHERE "name" = 'trigger_shared_space_updatedAt'`.execute(db);
   await sql`DROP TRIGGER "shared_space_updatedAt" ON "shared_space"`.execute(db);
   await sql`DROP TABLE "shared_space"`.execute(db);
 }
