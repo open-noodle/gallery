@@ -1,37 +1,14 @@
 <script lang="ts">
   import MenuOption from '$lib/components/shared-components/context-menu/menu-option.svelte';
+  import { mergeRotation } from '$lib/services/asset.service';
   import { getAssetControlContext } from '$lib/utils/context';
   import { handleError } from '$lib/utils/handle-error';
-  import {
-    AssetEditAction,
-    editAsset,
-    getAssetEdits,
-    removeAssetEdits,
-    type AssetEditActionItemDto,
-  } from '@immich/sdk';
+  import { editAsset, getAssetEdits, removeAssetEdits } from '@immich/sdk';
   import { toastManager } from '@immich/ui';
   import { mdiRotateLeft, mdiRotateRight } from '@mdi/js';
   import { t } from 'svelte-i18n';
 
   const { clearSelect, getOwnedAssets } = getAssetControlContext();
-
-  const normalizeAngle = (angle: number): number => ((angle % 360) + 360) % 360;
-
-  const mergeRotation = (
-    existingEdits: AssetEditActionItemDto[],
-    additionalAngle: number,
-  ): AssetEditActionItemDto[] => {
-    const otherEdits = existingEdits.filter((e) => e.action !== AssetEditAction.Rotate);
-    const existingRotate = existingEdits.find((e) => e.action === AssetEditAction.Rotate);
-    const existingAngle = (existingRotate?.parameters as { angle?: number })?.angle ?? 0;
-    const merged = normalizeAngle(existingAngle + additionalAngle);
-
-    if (merged === 0) {
-      return otherEdits;
-    }
-
-    return [...otherEdits, { action: AssetEditAction.Rotate, parameters: { angle: merged } }];
-  };
 
   const handleRotate = async (angle: number) => {
     try {
