@@ -148,43 +148,45 @@
 >
   {#snippet buttons()}
     {#if viewMode === 'view' && !assetInteraction.selectionActive}
-      {#if isEditor}
+      <div class="flex">
+        {#if isEditor}
+          <IconButton
+            variant="ghost"
+            shape="round"
+            color="secondary"
+            aria-label={$t('add_photos')}
+            onclick={() => {
+              viewMode = 'select-assets';
+            }}
+            icon={mdiImagePlusOutline}
+          />
+        {/if}
+
         <IconButton
           variant="ghost"
           shape="round"
           color="secondary"
-          aria-label={$t('add_photos')}
-          onclick={() => {
-            viewMode = 'select-assets';
-          }}
-          icon={mdiImagePlusOutline}
+          aria-label={$t('members')}
+          onclick={handleShowMembers}
+          icon={mdiAccountMultipleOutline}
         />
-      {/if}
 
-      <IconButton
-        variant="ghost"
-        shape="round"
-        color="secondary"
-        aria-label={$t('members')}
-        onclick={handleShowMembers}
-        icon={mdiAccountMultipleOutline}
-      />
-
-      {#if isOwner}
-        <IconButton
-          variant="ghost"
-          shape="round"
-          color="secondary"
-          aria-label={$t('spaces_delete')}
-          onclick={handleDelete}
-          icon={mdiDeleteOutline}
-        />
-      {/if}
+        {#if isOwner}
+          <IconButton
+            variant="ghost"
+            shape="round"
+            color="secondary"
+            aria-label={$t('spaces_delete')}
+            onclick={handleDelete}
+            icon={mdiDeleteOutline}
+          />
+        {/if}
+      </div>
     {/if}
   {/snippet}
 
   <Timeline
-    enableRouting={false}
+    enableRouting={true}
     bind:timelineManager
     {options}
     assetInteraction={currentAssetInteraction}
