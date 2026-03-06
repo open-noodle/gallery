@@ -1,9 +1,11 @@
 <script lang="ts">
   import MenuOption from '$lib/components/shared-components/context-menu/menu-option.svelte';
+  import { eventManager } from '$lib/managers/event-manager.svelte';
   import { mergeRotation } from '$lib/services/asset.service';
+  import { waitForWebsocketEvent } from '$lib/stores/websocket';
   import { getAssetControlContext } from '$lib/utils/context';
   import { handleError } from '$lib/utils/handle-error';
-  import { editAsset, getAssetEdits, removeAssetEdits } from '@immich/sdk';
+  import { editAsset, getAssetEdits, getAssetInfo, removeAssetEdits } from '@immich/sdk';
   import { toastManager } from '@immich/ui';
   import { mdiRotateLeft, mdiRotateRight } from '@mdi/js';
   import { t } from 'svelte-i18n';
@@ -19,6 +21,7 @@
 
       let success = 0;
       let failed = 0;
+      const pendingRefreshes: Promise<void>[] = [];
 
       for (const asset of assets) {
         try {
@@ -28,9 +31,22 @@
             angle,
           );
 
+          const editCompleted = waitForWebsocketEvent(
+            'AssetEditReadyV1',
+            (event) => event.asset.id === asset.id,
+            10_000,
+          );
+
           await (edits.length === 0
             ? removeAssetEdits({ id: asset.id })
             : editAsset({ id: asset.id, assetEditsCreateDto: { edits } }));
+
+          pendingRefreshes.push(
+            editCompleted
+              .then(() => getAssetInfo({ id: asset.id }))
+              .then((refreshed) => void eventManager.emit('AssetUpdate', refreshed))
+              .catch(() => {}),
+          );
           success++;
         } catch {
           failed++;
@@ -44,6 +60,9 @@
       }
 
       clearSelect();
+
+      // Refresh thumbnails in the background after edits complete
+      void Promise.allSettled(pendingRefreshes);
     } catch (error) {
       handleError(error, $t('rotate_error'));
     }
