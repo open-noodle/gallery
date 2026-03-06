@@ -576,6 +576,67 @@ class SharedSpacesApi {
     return null;
   }
 
+  /// Update timeline visibility for current member
+  ///
+  /// Toggle whether this space's assets appear in the current user's personal timeline.
+  ///
+  /// Note: This method returns the HTTP [Response].
+  ///
+  /// Parameters:
+  ///
+  /// * [String] id (required):
+  ///
+  /// * [SharedSpaceMemberTimelineDto] sharedSpaceMemberTimelineDto (required):
+  Future<Response> updateMemberTimelineWithHttpInfo(String id, SharedSpaceMemberTimelineDto sharedSpaceMemberTimelineDto,) async {
+    // ignore: prefer_const_declarations
+    final apiPath = r'/shared-spaces/{id}/members/me/timeline'
+      .replaceAll('{id}', id);
+
+    // ignore: prefer_final_locals
+    Object? postBody = sharedSpaceMemberTimelineDto;
+
+    final queryParams = <QueryParam>[];
+    final headerParams = <String, String>{};
+    final formParams = <String, String>{};
+
+    const contentTypes = <String>['application/json'];
+
+
+    return apiClient.invokeAPI(
+      apiPath,
+      'PATCH',
+      queryParams,
+      postBody,
+      headerParams,
+      formParams,
+      contentTypes.isEmpty ? null : contentTypes.first,
+    );
+  }
+
+  /// Update timeline visibility for current member
+  ///
+  /// Toggle whether this space's assets appear in the current user's personal timeline.
+  ///
+  /// Parameters:
+  ///
+  /// * [String] id (required):
+  ///
+  /// * [SharedSpaceMemberTimelineDto] sharedSpaceMemberTimelineDto (required):
+  Future<SharedSpaceMemberResponseDto?> updateMemberTimeline(String id, SharedSpaceMemberTimelineDto sharedSpaceMemberTimelineDto,) async {
+    final response = await updateMemberTimelineWithHttpInfo(id, sharedSpaceMemberTimelineDto,);
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
+    }
+    // When a remote server returns no body with a status of 204, we shall not decode it.
+    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
+    // FormatException when trying to decode an empty string.
+    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'SharedSpaceMemberResponseDto',) as SharedSpaceMemberResponseDto;
+    
+    }
+    return null;
+  }
+
   /// Update a shared space
   ///
   /// Update the name or description of a shared space.

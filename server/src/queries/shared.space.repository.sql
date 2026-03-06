@@ -37,6 +37,7 @@ select
   "shared_space_member"."userId",
   "shared_space_member"."role",
   "shared_space_member"."joinedAt",
+  "shared_space_member"."showInTimeline",
   "user"."name",
   "user"."email",
   "user"."profileImagePath",
@@ -55,6 +56,7 @@ select
   "shared_space_member"."userId",
   "shared_space_member"."role",
   "shared_space_member"."joinedAt",
+  "shared_space_member"."showInTimeline",
   "user"."name",
   "user"."email",
   "user"."profileImagePath",
@@ -83,6 +85,15 @@ delete from "shared_space_member"
 where
   "spaceId" = $1
   and "userId" = $2
+
+-- SharedSpaceRepository.getSpaceIdsForTimeline
+select
+  "spaceId"
+from
+  "shared_space_member"
+where
+  "userId" = $1
+  and "showInTimeline" = $2
 
 -- SharedSpaceRepository.getAssetCount
 select
