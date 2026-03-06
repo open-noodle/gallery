@@ -6,6 +6,7 @@ import {
   SharedSpaceCreateDto,
   SharedSpaceMemberCreateDto,
   SharedSpaceMemberResponseDto,
+  SharedSpaceMemberTimelineDto,
   SharedSpaceMemberUpdateDto,
   SharedSpaceResponseDto,
   SharedSpaceUpdateDto,
@@ -128,6 +129,25 @@ export class SharedSpaceService extends BaseService {
     return this.mapMember(member);
   }
 
+  async updateMemberTimeline(
+    auth: AuthDto,
+    spaceId: string,
+    dto: SharedSpaceMemberTimelineDto,
+  ): Promise<SharedSpaceMemberResponseDto> {
+    await this.requireMembership(auth, spaceId);
+
+    await this.sharedSpaceRepository.updateMember(spaceId, auth.user.id, {
+      showInTimeline: dto.showInTimeline,
+    });
+
+    const member = await this.sharedSpaceRepository.getMember(spaceId, auth.user.id);
+    if (!member) {
+      throw new BadRequestException('Member not found');
+    }
+
+    return this.mapMember(member);
+  }
+
   async removeMember(auth: AuthDto, spaceId: string, userId: string): Promise<void> {
     const isSelf = auth.user.id === userId;
 
@@ -181,6 +201,7 @@ export class SharedSpaceService extends BaseService {
     profileImagePath: string;
     profileChangedAt: unknown;
     avatarColor: string | null;
+    showInTimeline: boolean;
   }): SharedSpaceMemberResponseDto {
     return {
       userId: member.userId,
@@ -191,6 +212,7 @@ export class SharedSpaceService extends BaseService {
       profileImagePath: member.profileImagePath,
       profileChangedAt: member.profileChangedAt as unknown as string,
       avatarColor: member.avatarColor ?? undefined,
+      showInTimeline: member.showInTimeline,
     };
   }
 

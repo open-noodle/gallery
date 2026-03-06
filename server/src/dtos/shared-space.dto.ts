@@ -101,6 +101,15 @@ export class SharedSpaceMemberResponseDto {
 
   @ApiPropertyOptional({ description: 'Avatar color' })
   avatarColor?: string;
+
+  @ApiProperty({ description: 'Show space assets in timeline' })
+  showInTimeline!: boolean;
+}
+
+export class SharedSpaceMemberTimelineDto {
+  @ApiProperty({ description: 'Show space assets in personal timeline' })
+  @IsNotEmpty()
+  showInTimeline!: boolean;
 }
 
 export class SharedSpaceAssetAddDto {
