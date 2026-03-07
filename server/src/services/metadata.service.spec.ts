@@ -1958,6 +1958,31 @@ describe(MetadataService.name, () => {
       );
     });
 
+    it('should extract metadata from a supplemental-metadata.json sidecar (new format)', async () => {
+      const asset = AssetFactory.from()
+        .file({ type: AssetFileType.Sidecar, path: '/path/to/IMG_1234.jpg.supplemental-metadata.json' })
+        .build();
+      mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset);
+      mocks.metadata.readTags.mockResolvedValueOnce({});
+      mocks.storage.readTextFile.mockResolvedValue(
+        JSON.stringify({
+          photoTakenTime: { timestamp: '1609459200' },
+          description: 'New format sidecar',
+        }),
+      );
+
+      await sut.handleMetadataExtraction({ id: asset.id });
+
+      expect(mocks.storage.readTextFile).toHaveBeenCalledWith('/path/to/IMG_1234.jpg.supplemental-metadata.json');
+      expect(mocks.asset.upsertExif).toHaveBeenCalledWith(
+        expect.objectContaining({
+          description: 'New format sidecar',
+          dateTimeOriginal: new Date('2021-01-01T00:00:00.000Z'),
+        }),
+        { lockedPropertiesBehavior: 'skip' },
+      );
+    });
+
     it('should merge Google Takeout JSON sidecar data with EXIF data, preferring sidecar dates', async () => {
       const asset = AssetFactory.from().file({ type: AssetFileType.Sidecar, path: '/path/to/photo.jpg.json' }).build();
       mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset);
@@ -2116,6 +2141,25 @@ describe(MetadataService.name, () => {
         assetId: asset.id,
         type: AssetFileType.Sidecar,
         path: '/path/to/IMG_123.jpg.xmp',
+      });
+    });
+
+    it('should detect a supplemental-metadata.json sidecar (new Google Takeout format)', async () => {
+      const asset = forSidecarJob({ originalPath: '/path/to/IMG_123.jpg', files: [] });
+
+      mocks.assetJob.getForSidecarCheckJob.mockResolvedValue(asset);
+      // .jpg.xmp not found, .xmp not found, .jpg.json not found, .supplemental-metadata.json found
+      mocks.storage.checkFileExists.mockResolvedValueOnce(false);
+      mocks.storage.checkFileExists.mockResolvedValueOnce(false);
+      mocks.storage.checkFileExists.mockResolvedValueOnce(false);
+      mocks.storage.checkFileExists.mockResolvedValueOnce(true);
+
+      await expect(sut.handleSidecarCheck({ id: asset.id })).resolves.toBe(JobStatus.Success);
+
+      expect(mocks.asset.upsertFile).toHaveBeenCalledWith({
+        assetId: asset.id,
+        type: AssetFileType.Sidecar,
+        path: '/path/to/IMG_123.jpg.supplemental-metadata.json',
       });
     });
   });

@@ -35,7 +35,12 @@ import { JobItem, JobOf } from 'src/types';
 import { getAssetFiles } from 'src/utils/asset.util';
 import { isAssetChecksumConstraint } from 'src/utils/database';
 import { mergeTimeZone } from 'src/utils/date';
-import { googleTakeoutToImmichTags, parseGoogleTakeoutJson } from 'src/utils/google-takeout';
+import {
+  getGoogleTakeoutJsonCandidates,
+  googleTakeoutToImmichTags,
+  isGoogleTakeoutJsonSidecar,
+  parseGoogleTakeoutJson,
+} from 'src/utils/google-takeout';
 import { mimeTypes } from 'src/utils/mime-types';
 import { isFaceImportEnabled } from 'src/utils/misc';
 import { upsertTags } from 'src/utils/tag';
@@ -560,8 +565,8 @@ export class MetadataService extends BaseService {
       `${originalPath}.xmp`,
       // IMG_123.xmp
       `${join(assetPath.dir, assetPath.name)}.xmp`,
-      // IMG_123.jpg.json (Google Takeout format)
-      `${originalPath}.json`,
+      // Google Takeout JSON sidecar candidates
+      ...getGoogleTakeoutJsonCandidates(originalPath),
     );
 
     return candidates;
@@ -592,7 +597,7 @@ export class MetadataService extends BaseService {
     const effectiveOriginalPath = localOriginalPath || asset.originalPath;
     const effectiveSidecarPath = localSidecarPath || sidecarFile?.path;
 
-    const isJsonSidecar = effectiveSidecarPath?.endsWith('.json');
+    const isJsonSidecar = effectiveSidecarPath ? isGoogleTakeoutJsonSidecar(effectiveSidecarPath) : false;
 
     const [mediaTags, sidecarTags, videoTags] = await Promise.all([
       this.metadataRepository.readTags(effectiveOriginalPath),

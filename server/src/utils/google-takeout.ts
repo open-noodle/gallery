@@ -139,15 +139,25 @@ function isValidGps(latitude?: number, longitude?: number): boolean {
  * Google Takeout JSON sidecar files.
  *
  * Google Takeout naming conventions:
- * - `IMG_1234.jpg` → `IMG_1234.jpg.json`
+ * - Old format: `IMG_1234.jpg` → `IMG_1234.jpg.json`
+ * - New format (since late 2024): `IMG_1234.jpg` → `IMG_1234.jpg.supplemental-metadata.json`
  * - For truncated filenames (>47 chars), the JSON name may not match exactly
  * - Edited photos: `IMG_1234-edited.jpg` → `IMG_1234.jpg.json` (shares original's JSON)
  * - Duplicate names in album: `IMG_1234.jpg(1).json`, `IMG_1234.jpg(2).json`
  */
 export function getGoogleTakeoutJsonCandidates(originalPath: string): string[] {
-  const candidates: string[] = [`${originalPath}.json`];
+  return [
+    // Old format: IMG_1234.jpg.json
+    `${originalPath}.json`,
+    // New format (since late 2024): IMG_1234.jpg.supplemental-metadata.json
+    `${originalPath}.supplemental-metadata.json`,
+  ];
+}
 
-  // Primary pattern: originalPath + .json (e.g., IMG_1234.jpg.json)
-
-  return candidates;
+/**
+ * Checks if a sidecar path looks like a Google Takeout JSON sidecar.
+ * Matches both old format (.json) and new format (.supplemental-metadata.json).
+ */
+export function isGoogleTakeoutJsonSidecar(sidecarPath: string): boolean {
+  return sidecarPath.endsWith('.json');
 }

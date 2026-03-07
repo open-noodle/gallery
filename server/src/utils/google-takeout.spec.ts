@@ -3,6 +3,7 @@ import {
   getGoogleTakeoutJsonCandidates,
   GoogleTakeoutMetadata,
   googleTakeoutToImmichTags,
+  isGoogleTakeoutJsonSidecar,
   parseGoogleTakeoutJson,
 } from 'src/utils/google-takeout';
 
@@ -230,24 +231,49 @@ describe('googleTakeoutToImmichTags', () => {
 });
 
 describe('getGoogleTakeoutJsonCandidates', () => {
-  it('should generate primary candidate: originalPath + .json', () => {
+  it('should generate both old and new format candidates', () => {
     const candidates = getGoogleTakeoutJsonCandidates('/path/to/IMG_1234.jpg');
-    expect(candidates).toContain('/path/to/IMG_1234.jpg.json');
+    expect(candidates).toEqual(['/path/to/IMG_1234.jpg.json', '/path/to/IMG_1234.jpg.supplemental-metadata.json']);
   });
 
   it('should work with various file extensions', () => {
-    expect(getGoogleTakeoutJsonCandidates('/path/photo.png')).toContain('/path/photo.png.json');
-    expect(getGoogleTakeoutJsonCandidates('/path/video.mp4')).toContain('/path/video.mp4.json');
-    expect(getGoogleTakeoutJsonCandidates('/path/image.heic')).toContain('/path/image.heic.json');
+    for (const ext of ['png', 'mp4', 'heic']) {
+      const candidates = getGoogleTakeoutJsonCandidates(`/path/photo.${ext}`);
+      expect(candidates).toContain(`/path/photo.${ext}.json`);
+      expect(candidates).toContain(`/path/photo.${ext}.supplemental-metadata.json`);
+    }
   });
 
   it('should handle paths with spaces', () => {
     const candidates = getGoogleTakeoutJsonCandidates('/path/to/My Photo Album/IMG 1234.jpg');
     expect(candidates).toContain('/path/to/My Photo Album/IMG 1234.jpg.json');
+    expect(candidates).toContain('/path/to/My Photo Album/IMG 1234.jpg.supplemental-metadata.json');
   });
 
   it('should handle paths with special characters', () => {
     const candidates = getGoogleTakeoutJsonCandidates('/path/to/photo (1).jpg');
     expect(candidates).toContain('/path/to/photo (1).jpg.json');
+    expect(candidates).toContain('/path/to/photo (1).jpg.supplemental-metadata.json');
+  });
+
+  it('should list old format before new format (prefer old)', () => {
+    const candidates = getGoogleTakeoutJsonCandidates('/path/to/photo.jpg');
+    expect(candidates[0]).toBe('/path/to/photo.jpg.json');
+    expect(candidates[1]).toBe('/path/to/photo.jpg.supplemental-metadata.json');
+  });
+});
+
+describe('isGoogleTakeoutJsonSidecar', () => {
+  it('should detect old format .json sidecar', () => {
+    expect(isGoogleTakeoutJsonSidecar('/path/to/IMG_1234.jpg.json')).toBe(true);
+  });
+
+  it('should detect new format .supplemental-metadata.json sidecar', () => {
+    expect(isGoogleTakeoutJsonSidecar('/path/to/IMG_1234.jpg.supplemental-metadata.json')).toBe(true);
+  });
+
+  it('should not match XMP sidecars', () => {
+    expect(isGoogleTakeoutJsonSidecar('/path/to/IMG_1234.jpg.xmp')).toBe(false);
+    expect(isGoogleTakeoutJsonSidecar('/path/to/IMG_1234.xmp')).toBe(false);
   });
 });
