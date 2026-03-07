@@ -16,10 +16,14 @@ import {
   QueueName,
   QueuesResponseLegacyDto,
   SharedLinkCreateDto,
+  SharedSpaceCreateDto,
+  SharedSpaceMemberCreateDto,
   UpdateLibraryDto,
   UserAdminCreateDto,
   UserPreferencesUpdateDto,
   ValidateLibraryDto,
+  addAssets as addSpaceAssets,
+  addMember as addSpaceMember,
   checkExistingAssets,
   createAlbum,
   createApiKey,
@@ -28,6 +32,7 @@ import {
   createPartner,
   createPerson,
   createSharedLink,
+  createSpace,
   createStack,
   createUserAdmin,
   deleteAssets,
@@ -323,6 +328,15 @@ export const utils = {
 
   updateAlbumUser: (accessToken: string, args: Parameters<typeof updateAlbumUser>[0]) =>
     updateAlbumUser(args, { headers: asBearerAuth(accessToken) }),
+
+  createSpace: (accessToken: string, dto: SharedSpaceCreateDto) =>
+    createSpace({ sharedSpaceCreateDto: dto }, { headers: asBearerAuth(accessToken) }),
+
+  addSpaceMember: (accessToken: string, spaceId: string, dto: SharedSpaceMemberCreateDto) =>
+    addSpaceMember({ id: spaceId, sharedSpaceMemberCreateDto: dto }, { headers: asBearerAuth(accessToken) }),
+
+  addSpaceAssets: (accessToken: string, spaceId: string, assetIds: string[]) =>
+    addSpaceAssets({ id: spaceId, sharedSpaceAssetAddDto: { assetIds } }, { headers: asBearerAuth(accessToken) }),
 
   createAsset: async (
     accessToken: string,

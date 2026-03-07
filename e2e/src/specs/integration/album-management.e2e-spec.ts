@@ -1,4 +1,4 @@
-import { AlbumResponseDto, LoginResponseDto, createAlbum } from '@immich/sdk';
+import { LoginResponseDto, createAlbum } from '@immich/sdk';
 import { expect, test } from '@playwright/test';
 import type { Socket } from 'socket.io-client';
 import { asBearerAuth, utils } from 'src/utils';
