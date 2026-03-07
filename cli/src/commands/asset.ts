@@ -20,6 +20,12 @@ import micromatch from 'micromatch';
 import { Stats, createReadStream, existsSync } from 'node:fs';
 import { stat, unlink } from 'node:fs/promises';
 import path, { basename } from 'node:path';
+import { findOsxphotosSidecar, parseOsxphotosMetadata } from 'src/importers/apple-photos';
+import {
+  findGoogleTakeoutSidecar,
+  getAlbumNameFromTakeout,
+  parseGoogleTakeoutMetadata,
+} from 'src/importers/google-takeout';
 import { Queue } from 'src/queue';
 import { BaseOptions, Batcher, authenticate, crawl, requirePermissions, s, sha1 } from 'src/utils';
 
@@ -29,6 +35,8 @@ const UPLOAD_WATCH_DEBOUNCE_TIME_MS = 10_000;
 // TODO figure out why `id` is missing
 type AssetBulkUploadCheckResults = Array<AssetBulkUploadCheckResult & { id: string }>;
 type Asset = { id: string; filepath: string };
+
+export type ImportSource = 'google-takeout' | 'apple-photos';
 
 export interface UploadOptionsDto {
   recursive?: boolean;
@@ -44,6 +52,7 @@ export interface UploadOptionsDto {
   progress?: boolean;
   watch?: boolean;
   jsonOutput?: boolean;
+  from?: ImportSource;
 }
 
 class UploadFile extends File {
@@ -136,6 +145,11 @@ export const startWatch = async (
 export const upload = async (paths: string[], baseOptions: BaseOptions, options: UploadOptionsDto) => {
   await authenticate(baseOptions);
   await requirePermissions([Permission.AssetUpload]);
+
+  // When importing from a source, enable album auto-creation by default
+  if (options.from && !options.album && !options.albumName) {
+    options.album = true;
+  }
 
   const scanFiles = await scan(paths, options);
 
@@ -308,7 +322,7 @@ export const checkForDuplicates = async (files: string[], { concurrency, skipHas
 
 export const uploadFiles = async (
   files: string[],
-  { dryRun, concurrency, progress }: UploadOptionsDto,
+  { dryRun, concurrency, progress, from }: UploadOptionsDto,
 ): Promise<Asset[]> => {
   if (files.length === 0) {
     console.log('All assets were already uploaded, nothing to do.');
@@ -358,7 +372,7 @@ export const uploadFiles = async (
         throw new Error(`Stats not found for ${filepath}`);
       }
 
-      const response = await uploadFile(filepath, stats);
+      const response = await uploadFile(filepath, stats, from);
       newAssets.push({ id: response.id, filepath });
       if (response.status === AssetMediaStatus.Duplicate) {
         duplicateCount++;
@@ -400,23 +414,60 @@ export const uploadFiles = async (
   return newAssets;
 };
 
-const uploadFile = async (input: string, stats: Stats): Promise<AssetMediaResponseDto> => {
+const getImportMetadata = async (
+  input: string,
+  from?: ImportSource,
+): Promise<{ isFavorite: boolean; fileCreatedAt?: Date; sidecarPath?: string }> => {
+  if (from === 'google-takeout') {
+    const jsonSidecar = findGoogleTakeoutSidecar(input);
+    if (jsonSidecar) {
+      const metadata = await parseGoogleTakeoutMetadata(jsonSidecar);
+      if (metadata) {
+        return {
+          isFavorite: metadata.isFavorite,
+          fileCreatedAt: metadata.dateTimeOriginal,
+          sidecarPath: findSidecar(input),
+        };
+      }
+    }
+  }
+
+  if (from === 'apple-photos') {
+    const jsonSidecar = findOsxphotosSidecar(input);
+    if (jsonSidecar) {
+      const metadata = await parseOsxphotosMetadata(jsonSidecar);
+      if (metadata) {
+        return {
+          isFavorite: metadata.isFavorite,
+          fileCreatedAt: metadata.dateTimeOriginal,
+          sidecarPath: findSidecar(input),
+        };
+      }
+    }
+  }
+
+  return { isFavorite: false, sidecarPath: findSidecar(input) };
+};
+
+const uploadFile = async (input: string, stats: Stats, from?: ImportSource): Promise<AssetMediaResponseDto> => {
   const { baseUrl, headers } = defaults;
+
+  const importMeta = await getImportMetadata(input, from);
+  const fileCreatedAt = importMeta.fileCreatedAt ?? stats.mtime;
 
   const formData = new FormData();
   formData.append('deviceAssetId', `${basename(input)}-${stats.size}`.replaceAll(/\s+/g, ''));
   formData.append('deviceId', 'CLI');
-  formData.append('fileCreatedAt', stats.mtime.toISOString());
+  formData.append('fileCreatedAt', fileCreatedAt.toISOString());
   formData.append('fileModifiedAt', stats.mtime.toISOString());
   formData.append('fileSize', String(stats.size));
-  formData.append('isFavorite', 'false');
+  formData.append('isFavorite', String(importMeta.isFavorite));
   formData.append('assetData', new UploadFile(input, stats.size));
 
-  const sidecarPath = findSidecar(input);
-  if (sidecarPath) {
+  if (importMeta.sidecarPath) {
     try {
-      const stats = await stat(sidecarPath);
-      const sidecarData = new UploadFile(sidecarPath, stats.size);
+      const stats = await stat(importMeta.sidecarPath);
+      const sidecarData = new UploadFile(importMeta.sidecarPath, stats.size);
       formData.append('sidecarData', sidecarData);
     } catch {
       // noop
@@ -585,5 +636,13 @@ const updateAlbums = async (assets: Asset[], options: UploadOptionsDto) => {
 // - Windows: `D:\\test\\Filename.txt` or `D:/test/Filename.txt`
 // - Unix: `/test/Filename.txt`
 export const getAlbumName = (filepath: string, options: UploadOptionsDto) => {
-  return options.albumName ?? path.basename(path.dirname(filepath));
+  if (options.albumName) {
+    return options.albumName;
+  }
+
+  if (options.from === 'google-takeout') {
+    return getAlbumNameFromTakeout(filepath);
+  }
+
+  return path.basename(path.dirname(filepath));
 };

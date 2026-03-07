@@ -80,6 +80,11 @@ program
       'IMMICH_DELETE_DUPLICATES',
     ),
   )
+  .addOption(
+    new Option('--from <source>', 'Import from a specific source format (google-takeout, apple-photos)')
+      .env('IMMICH_IMPORT_FROM')
+      .choices(['google-takeout', 'apple-photos']),
+  )
   .addOption(new Option('--no-progress', 'Hide progress bars').env('IMMICH_PROGRESS_BAR').default(true))
   .addOption(
     new Option('--watch', 'Watch for changes and upload automatically')
