@@ -645,7 +645,7 @@ describe(LibraryService.name, () => {
 
       mocks.library.get.mockResolvedValue(library);
       mocks.asset.createAll.mockResolvedValue([asset1, asset2, asset3]);
-      mocks.album.getByOwnerAndName.mockResolvedValue();
+      mocks.album.getByOwnerAndName.mockResolvedValue(undefined);
       mocks.album.create.mockResolvedValue({} as any);
 
       await expect(sut.handleSyncFiles(mockLibraryJob)).resolves.toBe(JobStatus.Success);
@@ -725,7 +725,7 @@ describe(LibraryService.name, () => {
 
       mocks.library.get.mockResolvedValue(library);
       mocks.asset.createAll.mockResolvedValue([asset]);
-      mocks.album.getByOwnerAndName.mockResolvedValue();
+      mocks.album.getByOwnerAndName.mockResolvedValue(undefined);
       mocks.album.create.mockRejectedValue(new Error('DB error'));
 
       await expect(sut.handleSyncFiles(mockLibraryJob)).resolves.toBe(JobStatus.Success);

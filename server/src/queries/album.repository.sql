@@ -185,6 +185,16 @@ where
 group by
   "album_asset"."albumId"
 
+-- AlbumRepository.getByOwnerAndName
+select
+  "album".*
+from
+  "album"
+where
+  "album"."ownerId" = $1
+  and "album"."albumName" = $2
+  and "album"."deletedAt" is null
+
 -- AlbumRepository.getOwned
 select
   "album".*,
