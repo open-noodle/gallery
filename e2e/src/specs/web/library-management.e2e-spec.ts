@@ -26,7 +26,7 @@ test.describe('Library Management', () => {
     await expect(page).toHaveURL(/\/admin\/library-management\/new/);
 
     // Submit the form (owner defaults to admin)
-    await page.getByRole('button', { name: 'Create' }).click();
+    await page.getByRole('button', { name: 'Create', exact: true }).click();
 
     // Should redirect to the library detail page
     await expect(page).toHaveURL(/\/admin\/library-management\/[a-f0-9-]+$/);
