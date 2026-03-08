@@ -11,8 +11,7 @@
 part of openapi.api;
 
 class SharedSpacesApi {
-  SharedSpacesApi([ApiClient? apiClient])
-      : apiClient = apiClient ?? defaultApiClient;
+  SharedSpacesApi([ApiClient? apiClient]) : apiClient = apiClient ?? defaultApiClient;
 
   final ApiClient apiClient;
 
@@ -137,8 +136,7 @@ class SharedSpacesApi {
     // When a remote server returns no body with a status of 204, we shall not decode it.
     // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
     // FormatException when trying to decode an empty string.
-    if (response.body.isNotEmpty &&
-        response.statusCode != HttpStatus.noContent) {
+    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
       return await apiClient.deserializeAsync(
         await _decodeBodyBytes(response),
         'SharedSpaceMemberResponseDto',
@@ -201,8 +199,7 @@ class SharedSpacesApi {
     // When a remote server returns no body with a status of 204, we shall not decode it.
     // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
     // FormatException when trying to decode an empty string.
-    if (response.body.isNotEmpty &&
-        response.statusCode != HttpStatus.noContent) {
+    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
       return await apiClient.deserializeAsync(
         await _decodeBodyBytes(response),
         'SharedSpaceResponseDto',
@@ -251,11 +248,9 @@ class SharedSpacesApi {
     // When a remote server returns no body with a status of 204, we shall not decode it.
     // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
     // FormatException when trying to decode an empty string.
-    if (response.body.isNotEmpty &&
-        response.statusCode != HttpStatus.noContent) {
+    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
       final responseBody = await _decodeBodyBytes(response);
-      return (await apiClient.deserializeAsync(
-              responseBody, 'List<SharedSpaceResponseDto>') as List)
+      return (await apiClient.deserializeAsync(responseBody, 'List<SharedSpaceResponseDto>') as List)
           .cast<SharedSpaceResponseDto>()
           .toList(growable: false);
     }
@@ -316,11 +311,9 @@ class SharedSpacesApi {
     // When a remote server returns no body with a status of 204, we shall not decode it.
     // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
     // FormatException when trying to decode an empty string.
-    if (response.body.isNotEmpty &&
-        response.statusCode != HttpStatus.noContent) {
+    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
       final responseBody = await _decodeBodyBytes(response);
-      return (await apiClient.deserializeAsync(
-              responseBody, 'List<SharedSpaceMemberResponseDto>') as List)
+      return (await apiClient.deserializeAsync(responseBody, 'List<SharedSpaceMemberResponseDto>') as List)
           .cast<SharedSpaceMemberResponseDto>()
           .toList(growable: false);
     }
@@ -381,8 +374,7 @@ class SharedSpacesApi {
     // When a remote server returns no body with a status of 204, we shall not decode it.
     // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
     // FormatException when trying to decode an empty string.
-    if (response.body.isNotEmpty &&
-        response.statusCode != HttpStatus.noContent) {
+    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
       return await apiClient.deserializeAsync(
         await _decodeBodyBytes(response),
         'SharedSpaceResponseDto',
@@ -445,11 +437,9 @@ class SharedSpacesApi {
     // When a remote server returns no body with a status of 204, we shall not decode it.
     // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
     // FormatException when trying to decode an empty string.
-    if (response.body.isNotEmpty &&
-        response.statusCode != HttpStatus.noContent) {
+    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
       final responseBody = await _decodeBodyBytes(response);
-      return (await apiClient.deserializeAsync(
-              responseBody, 'List<MapMarkerResponseDto>') as List)
+      return (await apiClient.deserializeAsync(responseBody, 'List<MapMarkerResponseDto>') as List)
           .cast<MapMarkerResponseDto>()
           .toList(growable: false);
     }
@@ -532,9 +522,7 @@ class SharedSpacesApi {
     String userId,
   ) async {
     // ignore: prefer_const_declarations
-    final apiPath = r'/shared-spaces/{id}/members/{userId}'
-        .replaceAll('{id}', id)
-        .replaceAll('{userId}', userId);
+    final apiPath = r'/shared-spaces/{id}/members/{userId}'.replaceAll('{id}', id).replaceAll('{userId}', userId);
 
     // ignore: prefer_final_locals
     Object? postBody;
@@ -650,9 +638,7 @@ class SharedSpacesApi {
     SharedSpaceMemberUpdateDto sharedSpaceMemberUpdateDto,
   ) async {
     // ignore: prefer_const_declarations
-    final apiPath = r'/shared-spaces/{id}/members/{userId}'
-        .replaceAll('{id}', id)
-        .replaceAll('{userId}', userId);
+    final apiPath = r'/shared-spaces/{id}/members/{userId}'.replaceAll('{id}', id).replaceAll('{userId}', userId);
 
     // ignore: prefer_final_locals
     Object? postBody = sharedSpaceMemberUpdateDto;
@@ -701,8 +687,7 @@ class SharedSpacesApi {
     // When a remote server returns no body with a status of 204, we shall not decode it.
     // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
     // FormatException when trying to decode an empty string.
-    if (response.body.isNotEmpty &&
-        response.statusCode != HttpStatus.noContent) {
+    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
       return await apiClient.deserializeAsync(
         await _decodeBodyBytes(response),
         'SharedSpaceMemberResponseDto',
@@ -727,8 +712,7 @@ class SharedSpacesApi {
     SharedSpaceMemberTimelineDto sharedSpaceMemberTimelineDto,
   ) async {
     // ignore: prefer_const_declarations
-    final apiPath =
-        r'/shared-spaces/{id}/members/me/timeline'.replaceAll('{id}', id);
+    final apiPath = r'/shared-spaces/{id}/members/me/timeline'.replaceAll('{id}', id);
 
     // ignore: prefer_final_locals
     Object? postBody = sharedSpaceMemberTimelineDto;
@@ -773,8 +757,7 @@ class SharedSpacesApi {
     // When a remote server returns no body with a status of 204, we shall not decode it.
     // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
     // FormatException when trying to decode an empty string.
-    if (response.body.isNotEmpty &&
-        response.statusCode != HttpStatus.noContent) {
+    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
       return await apiClient.deserializeAsync(
         await _decodeBodyBytes(response),
         'SharedSpaceMemberResponseDto',
@@ -844,8 +827,7 @@ class SharedSpacesApi {
     // When a remote server returns no body with a status of 204, we shall not decode it.
     // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
     // FormatException when trying to decode an empty string.
-    if (response.body.isNotEmpty &&
-        response.statusCode != HttpStatus.noContent) {
+    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
       return await apiClient.deserializeAsync(
         await _decodeBodyBytes(response),
         'SharedSpaceResponseDto',

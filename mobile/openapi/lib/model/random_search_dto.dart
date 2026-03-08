@@ -559,9 +559,7 @@ class RandomSearchDto {
 
       return RandomSearchDto(
         albumIds: json[r'albumIds'] is Iterable
-            ? (json[r'albumIds'] as Iterable)
-                .cast<String>()
-                .toList(growable: false)
+            ? (json[r'albumIds'] as Iterable).cast<String>().toList(growable: false)
             : const [],
         city: mapValueOfType<String>(json, r'city'),
         country: mapValueOfType<String>(json, r'country'),
@@ -579,19 +577,14 @@ class RandomSearchDto {
         model: mapValueOfType<String>(json, r'model'),
         ocr: mapValueOfType<String>(json, r'ocr'),
         personIds: json[r'personIds'] is Iterable
-            ? (json[r'personIds'] as Iterable)
-                .cast<String>()
-                .toList(growable: false)
+            ? (json[r'personIds'] as Iterable).cast<String>().toList(growable: false)
             : const [],
-        rating:
-            json[r'rating'] == null ? null : num.parse('${json[r'rating']}'),
+        rating: json[r'rating'] == null ? null : num.parse('${json[r'rating']}'),
         size: num.parse('${json[r'size']}'),
         spaceId: mapValueOfType<String>(json, r'spaceId'),
         state: mapValueOfType<String>(json, r'state'),
         tagIds: json[r'tagIds'] is Iterable
-            ? (json[r'tagIds'] as Iterable)
-                .cast<String>()
-                .toList(growable: false)
+            ? (json[r'tagIds'] as Iterable).cast<String>().toList(growable: false)
             : const [],
         takenAfter: mapDateTime(json, r'takenAfter', r''),
         takenBefore: mapDateTime(json, r'takenBefore', r''),
