@@ -188,12 +188,12 @@
     }
 
     isSearching = true;
+    showSearchResults = true;
     try {
       const { assets } = await searchSmart({
         smartSearchDto: { query, spaceId: space.id },
       });
       searchResults = assets.items;
-      showSearchResults = true;
     } catch {
       searchResults = [];
     } finally {
