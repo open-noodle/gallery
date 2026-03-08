@@ -9,12 +9,14 @@ Immich currently supports photo import via: (1) direct upload API, (2) CLI bulk 
 ## What Users Have Today (Export Formats)
 
 ### Google Photos (via Google Takeout)
+
 - Folder structure: `Takeout/Google Photos/<Album Name>/`
 - Media files alongside `.json` sidecar files (one per photo/video)
 - JSON contains: `photoTakenTime`, `geoData` (lat/lng), `description`, `title`, `creationTime`, `favorited`, `archived`
 - Gotchas: filenames can be truncated, edited versions included separately, live photos split into still + video, duplicate files across albums
 
 ### Apple Photos (via export or library access)
+
 - **Export from Photos.app**: Folder of media files, optional "IPTC as XMP" sidecars, subfolder-per-album structure
 - **Photos Library package** (`~/Pictures/Photos Library.photoslibrary/`): SQLite DB (`Photos.sqlite`) + organized originals/derivatives in `Masters/` and `resources/`
 - **osxphotos** (community tool): Can export Apple Photos library with metadata as JSON/XMP sidecars, preserving albums, favorites, keywords, locations, descriptions, people tags
@@ -28,6 +30,7 @@ Immich currently supports photo import via: (1) direct upload API, (2) CLI bulk 
 Add `immich upload --from google-takeout <path>` and `immich upload --from apple-photos <path>` to the existing CLI.
 
 **How it works:**
+
 1. User exports from Google Takeout or Apple Photos (or uses osxphotos)
 2. CLI parses the export structure, reads JSON/XMP sidecars
 3. Uploads via existing API with metadata populated from sidecars
@@ -38,6 +41,7 @@ Add `immich upload --from google-takeout <path>` and `immich upload --from apple
 **Cons:** Requires CLI installation, no progress UI in web app, large exports can be slow over network
 
 **Key files to modify:**
+
 - `cli/src/commands/asset.ts` — add `--from` flag and parser modules
 - New: `cli/src/importers/google-takeout.ts`, `cli/src/importers/apple-photos.ts`
 
@@ -48,6 +52,7 @@ Add `immich upload --from google-takeout <path>` and `immich upload --from apple
 Add a new "Import from Service" feature in the server that understands Google Takeout and Apple Photos export formats.
 
 **How it works:**
+
 1. User mounts their export folder (e.g., via Docker volume)
 2. In web UI: "Import" > "Google Photos Takeout" > select path
 3. Server scans the folder, parses JSON sidecars, creates assets with full metadata
@@ -55,6 +60,7 @@ Add a new "Import from Service" feature in the server that understands Google Ta
 5. Albums auto-created from folder names
 
 **Implementation approach:**
+
 - Extend the existing Library scanning infrastructure (`library.service.ts`)
 - Add a new import source type alongside "External Library"
 - New metadata parser that reads Google Takeout JSON / Apple Photos XMP into the EXIF pipeline
@@ -64,6 +70,7 @@ Add a new "Import from Service" feature in the server that understands Google Ta
 **Cons:** Requires mounted volume, more server complexity, tightly coupled to export formats that change
 
 **Key files to modify:**
+
 - `server/src/services/metadata.service.ts` — add JSON sidecar parsing alongside XMP
 - `server/src/services/library.service.ts` — add import-source-aware scanning
 - `server/src/dtos/library.dto.ts` — add import source type
@@ -76,6 +83,7 @@ Add a new "Import from Service" feature in the server that understands Google Ta
 Connect to Google Photos API directly and pull photos/videos without requiring a Takeout export.
 
 **How it works:**
+
 1. User authenticates with Google OAuth in Immich web UI
 2. Immich server calls Google Photos API to list albums and media items
 3. Downloads originals + metadata directly
@@ -94,12 +102,14 @@ Connect to Google Photos API directly and pull photos/videos without requiring a
 Rather than building format-specific importers, make Immich's existing infrastructure smarter about non-XMP sidecars and add a guided import flow.
 
 **How it works:**
+
 1. **Enhance sidecar support**: Teach metadata extraction to read `.json` sidecars (Google Takeout format) in addition to `.xmp`
 2. **Add import wizard in web UI**: Guided flow that asks "Where are you importing from?" and provides format-specific instructions
 3. **Smart album detection**: Parse folder structures to auto-create albums
 4. **Duplicate handling**: Enhanced dedup for Takeout's duplicate-across-albums issue
 
 **What changes:**
+
 - `metadata.service.ts`: Add JSON sidecar discovery and parsing (look for `filename.json` alongside `filename.jpg`)
 - `library.service.ts`: Add album-from-folder creation during library scan
 - Web UI: Import wizard component with instructions per source
@@ -114,21 +124,25 @@ Rather than building format-specific importers, make Immich's existing infrastru
 **Start with Option D (Smart Sidecars + Wizard), then layer on Option A (CLI commands).**
 
 ### Phase 1: JSON Sidecar Support
+
 - Teach `metadata.service.ts` to discover and parse `.json` sidecars alongside media files
 - Map Google Takeout JSON fields → EXIF fields (dates, GPS, description, favorites)
 - This alone unlocks Google Takeout import via existing external library scanning
 
 ### Phase 2: Import Wizard UI
+
 - Add web UI flow: Settings > Import > choose source > instructions + path config
 - Auto-album creation from folder names during library scan
 - Progress tracking via existing job infrastructure
 
 ### Phase 3: CLI Import Commands
+
 - `immich upload --from google-takeout ./Takeout/`
 - `immich upload --from apple-photos ./Export/`
 - Handles format quirks (truncated filenames, live photo pairing, dedup)
 
 ### Phase 4 (Optional): Google OAuth Integration
+
 - Direct API import for users who want seamless sync
 - Incremental import support
 
@@ -136,27 +150,27 @@ Rather than building format-specific importers, make Immich's existing infrastru
 
 ## Google Takeout JSON → Immich Metadata Mapping
 
-| Google Takeout Field | Immich Field | Location |
-|---------------------|-------------|----------|
-| `photoTakenTime.timestamp` | `dateTimeOriginal` | `asset_exif` |
-| `geoData.latitude` | `latitude` | `asset_exif` |
-| `geoData.longitude` | `longitude` | `asset_exif` |
-| `description` | `description` | `asset_exif` |
-| `title` | `originalFileName` | `asset` |
-| `favorited` | `isFavorite` | `asset` |
-| `archived` | `visibility: Archive` | `asset` |
-| Parent folder name | Album name | `album` |
+| Google Takeout Field       | Immich Field          | Location     |
+| -------------------------- | --------------------- | ------------ |
+| `photoTakenTime.timestamp` | `dateTimeOriginal`    | `asset_exif` |
+| `geoData.latitude`         | `latitude`            | `asset_exif` |
+| `geoData.longitude`        | `longitude`           | `asset_exif` |
+| `description`              | `description`         | `asset_exif` |
+| `title`                    | `originalFileName`    | `asset`      |
+| `favorited`                | `isFavorite`          | `asset`      |
+| `archived`                 | `visibility: Archive` | `asset`      |
+| Parent folder name         | Album name            | `album`      |
 
 ## Apple Photos Export → Immich Metadata Mapping
 
-| Apple Photos Field | Immich Field | Source |
-|-------------------|-------------|--------|
-| EXIF DateTimeOriginal | `dateTimeOriginal` | Embedded EXIF (already works) |
-| IPTC/XMP GPS | `latitude`, `longitude` | XMP sidecar (already works) |
-| IPTC Keywords | Tags | XMP sidecar (already works) |
-| Folder name | Album name | Folder structure |
-| Favorites (via osxphotos JSON) | `isFavorite` | JSON sidecar |
-| Description (via osxphotos JSON) | `description` | JSON sidecar |
+| Apple Photos Field               | Immich Field            | Source                        |
+| -------------------------------- | ----------------------- | ----------------------------- |
+| EXIF DateTimeOriginal            | `dateTimeOriginal`      | Embedded EXIF (already works) |
+| IPTC/XMP GPS                     | `latitude`, `longitude` | XMP sidecar (already works)   |
+| IPTC Keywords                    | Tags                    | XMP sidecar (already works)   |
+| Folder name                      | Album name              | Folder structure              |
+| Favorites (via osxphotos JSON)   | `isFavorite`            | JSON sidecar                  |
+| Description (via osxphotos JSON) | `description`           | JSON sidecar                  |
 
 **Key insight:** Apple Photos exports with XMP sidecars already work well with Immich's existing library scanning. The gap is mainly for favorites, albums, and descriptions which need JSON sidecar support or osxphotos integration.
 
