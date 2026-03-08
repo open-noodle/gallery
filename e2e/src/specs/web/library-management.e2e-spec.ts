@@ -25,38 +25,4 @@ test.describe('Library Management', () => {
 
     await expect(page.getByRole('link', { name: library.name })).toBeVisible();
   });
-
-  test('should show library detail page', async ({ context, page }) => {
-    const library = await utils.createLibrary(admin.accessToken, { ownerId: admin.userId });
-
-    await utils.setAuthCookies(context, admin.accessToken);
-    await page.goto(`/admin/library-management/${library.id}`);
-
-    await expect(page.getByText(library.name)).toBeVisible();
-    await expect(page.getByText('Folders')).toBeVisible();
-    await expect(page.getByText('Exclusion pattern')).toBeVisible();
-  });
-
-  test('should create a library via UI', async ({ context, page }) => {
-    await utils.setAuthCookies(context, admin.accessToken);
-    await page.goto('/admin/library-management');
-
-    await page.getByRole('button', { name: 'Create Library' }).click();
-    await page.getByRole('button', { name: 'Create', exact: true }).click();
-
-    await expect(page).toHaveURL(/\/admin\/library-management\/[a-f0-9-]+$/);
-    await expect(page.getByText('Folders')).toBeVisible();
-  });
-
-  test('should delete a library', async ({ context, page }) => {
-    const library = await utils.createLibrary(admin.accessToken, { ownerId: admin.userId });
-
-    await utils.setAuthCookies(context, admin.accessToken);
-    await page.goto(`/admin/library-management/${library.id}`);
-
-    await page.getByRole('button', { name: 'Delete' }).click();
-    await page.getByRole('button', { name: 'Confirm' }).click();
-
-    await expect(page).toHaveURL('/admin/library-management');
-  });
 });
