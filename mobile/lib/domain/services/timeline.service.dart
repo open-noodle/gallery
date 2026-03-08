@@ -12,16 +12,11 @@ import 'package:immich_mobile/domain/utils/event_stream.dart';
 import 'package:immich_mobile/infrastructure/repositories/timeline.repository.dart';
 import 'package:immich_mobile/utils/async_mutex.dart';
 
-typedef TimelineAssetSource =
-    Future<List<BaseAsset>> Function(int index, int count);
+typedef TimelineAssetSource = Future<List<BaseAsset>> Function(int index, int count);
 
 typedef TimelineBucketSource = Stream<List<Bucket>> Function();
 
-typedef TimelineQuery = ({
-  TimelineAssetSource assetSource,
-  TimelineBucketSource bucketSource,
-  TimelineOrigin origin,
-});
+typedef TimelineQuery = ({TimelineAssetSource assetSource, TimelineBucketSource bucketSource, TimelineOrigin origin});
 
 enum TimelineOrigin {
   main,
@@ -46,21 +41,17 @@ class TimelineFactory {
   final DriftTimelineRepository _timelineRepository;
   final SettingsService _settingsService;
 
-  const TimelineFactory({
-    required DriftTimelineRepository timelineRepository,
-    required SettingsService settingsService,
-  }) : _timelineRepository = timelineRepository,
-       _settingsService = settingsService;
+  const TimelineFactory({required DriftTimelineRepository timelineRepository, required SettingsService settingsService})
+    : _timelineRepository = timelineRepository,
+      _settingsService = settingsService;
 
   GroupAssetsBy get groupBy {
-    final group =
-        GroupAssetsBy.values[_settingsService.get(Setting.groupAssetsBy)];
+    final group = GroupAssetsBy.values[_settingsService.get(Setting.groupAssetsBy)];
     // We do not support auto grouping in the new timeline yet, fallback to day grouping
     return group == GroupAssetsBy.auto ? GroupAssetsBy.day : group;
   }
 
-  TimelineService main(List<String> timelineUsers) =>
-      TimelineService(_timelineRepository.main(timelineUsers, groupBy));
+  TimelineService main(List<String> timelineUsers) => TimelineService(_timelineRepository.main(timelineUsers, groupBy));
 
   TimelineService localAlbum({required String albumId}) =>
       TimelineService(_timelineRepository.localAlbum(albumId, groupBy));
@@ -68,26 +59,19 @@ class TimelineFactory {
   TimelineService remoteAlbum({required String albumId}) =>
       TimelineService(_timelineRepository.remoteAlbum(albumId, groupBy));
 
-  TimelineService remoteAssets(String userId) =>
-      TimelineService(_timelineRepository.remote(userId, groupBy));
+  TimelineService remoteAssets(String userId) => TimelineService(_timelineRepository.remote(userId, groupBy));
 
-  TimelineService favorite(String userId) =>
-      TimelineService(_timelineRepository.favorite(userId, groupBy));
+  TimelineService favorite(String userId) => TimelineService(_timelineRepository.favorite(userId, groupBy));
 
-  TimelineService trash(String userId) =>
-      TimelineService(_timelineRepository.trash(userId, groupBy));
+  TimelineService trash(String userId) => TimelineService(_timelineRepository.trash(userId, groupBy));
 
-  TimelineService archive(String userId) =>
-      TimelineService(_timelineRepository.archived(userId, groupBy));
+  TimelineService archive(String userId) => TimelineService(_timelineRepository.archived(userId, groupBy));
 
-  TimelineService lockedFolder(String userId) =>
-      TimelineService(_timelineRepository.locked(userId, groupBy));
+  TimelineService lockedFolder(String userId) => TimelineService(_timelineRepository.locked(userId, groupBy));
 
-  TimelineService video(String userId) =>
-      TimelineService(_timelineRepository.video(userId, groupBy));
+  TimelineService video(String userId) => TimelineService(_timelineRepository.video(userId, groupBy));
 
-  TimelineService place(String place) =>
-      TimelineService(_timelineRepository.place(place, groupBy));
+  TimelineService place(String place) => TimelineService(_timelineRepository.place(place, groupBy));
 
   TimelineService person(String userId, String personId) =>
       TimelineService(_timelineRepository.person(userId, personId, groupBy));
@@ -95,18 +79,11 @@ class TimelineFactory {
   TimelineService fromAssets(List<BaseAsset> assets, TimelineOrigin type) =>
       TimelineService(_timelineRepository.fromAssets(assets, type));
 
-  TimelineService fromAssetStream(
-    List<BaseAsset> Function() getAssets,
-    Stream<int> assetCount,
-    TimelineOrigin type,
-  ) => TimelineService(
-    _timelineRepository.fromAssetStream(getAssets, assetCount, type),
-  );
+  TimelineService fromAssetStream(List<BaseAsset> Function() getAssets, Stream<int> assetCount, TimelineOrigin type) =>
+      TimelineService(_timelineRepository.fromAssetStream(getAssets, assetCount, type));
 
-  TimelineService fromAssetsWithBuckets(
-    List<BaseAsset> assets,
-    TimelineOrigin type,
-  ) => TimelineService(_timelineRepository.fromAssetsWithBuckets(assets, type));
+  TimelineService fromAssetsWithBuckets(List<BaseAsset> assets, TimelineOrigin type) =>
+      TimelineService(_timelineRepository.fromAssetsWithBuckets(assets, type));
 
   TimelineService map(List<String> userIds, TimelineMapOptions options) =>
       TimelineService(_timelineRepository.map(userIds, options, groupBy));
@@ -125,11 +102,7 @@ class TimelineService {
   int get totalAssets => _totalAssets;
 
   TimelineService(TimelineQuery query)
-    : this._(
-        assetSource: query.assetSource,
-        bucketSource: query.bucketSource,
-        origin: query.origin,
-      );
+    : this._(assetSource: query.assetSource, bucketSource: query.bucketSource, origin: query.origin);
 
   TimelineService._({
     required TimelineAssetSource assetSource,
@@ -139,10 +112,7 @@ class TimelineService {
        _bucketSource = bucketSource {
     _bucketSubscription = _bucketSource().listen((buckets) {
       _mutex.run(() async {
-        final totalAssets = buckets.fold<int>(
-          0,
-          (acc, bucket) => acc + bucket.assetCount,
-        );
+        final totalAssets = buckets.fold<int>(0, (acc, bucket) => acc + bucket.assetCount);
 
         if (totalAssets == 0) {
           _bufferOffset = 0;
@@ -172,8 +142,7 @@ class TimelineService {
 
   Stream<List<Bucket>> Function() get watchBuckets => _bucketSource;
 
-  Future<List<BaseAsset>> loadAssets(int index, int count) =>
-      _mutex.run(() => _loadAssets(index, count));
+  Future<List<BaseAsset>> loadAssets(int index, int count) => _mutex.run(() => _loadAssets(index, count));
 
   Future<List<BaseAsset>> _loadAssets(int index, int count) async {
     if (hasRange(index, count)) {
@@ -186,10 +155,7 @@ class TimelineService {
     // make sure to load a meaningful amount of data (and not only the requested slice)
     // otherwise, each call to [loadAssets] would result in DB call trashing performance
     // fills small requests to [kTimelineAssetLoadBatchSize], adds some legroom into the opposite scroll direction for large requests
-    final len = math.max(
-      kTimelineAssetLoadBatchSize,
-      count + kTimelineAssetLoadOppositeSize,
-    );
+    final len = math.max(kTimelineAssetLoadBatchSize, count + kTimelineAssetLoadOppositeSize);
     // when scrolling forward, start shortly before the requested offset
     // when scrolling backward, end shortly after the requested offset to guard against the user scrolling
     // in the other direction a tiny bit resulting in another required load from the DB
@@ -222,11 +188,9 @@ class TimelineService {
   }
 
   // Preload assets around the given index for asset viewer
-  Future<void> preloadAssets(int index) =>
-      _mutex.run(() => _loadAssets(index, math.min(5, _totalAssets - index)));
+  Future<void> preloadAssets(int index) => _mutex.run(() => _loadAssets(index, math.min(5, _totalAssets - index)));
 
-  BaseAsset getRandomAsset() =>
-      _buffer.elementAt(math.Random().nextInt(_buffer.length));
+  BaseAsset getRandomAsset() => _buffer.elementAt(math.Random().nextInt(_buffer.length));
 
   BaseAsset getAsset(int index) {
     if (!hasRange(index, 1)) {

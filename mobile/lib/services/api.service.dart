@@ -132,11 +132,7 @@ class ApiService implements Authentication {
     } on SocketException catch (_) {
       return false;
     } catch (error, stackTrace) {
-      _log.severe(
-        "Error while checking server availability",
-        error,
-        stackTrace,
-      );
+      _log.severe("Error while checking server availability", error, stackTrace);
       return false;
     }
     return true;
@@ -175,17 +171,11 @@ class ApiService implements Authentication {
 
     if (Platform.isIOS) {
       final iosInfo = await deviceInfoPlugin.iosInfo;
-      authenticationApi.apiClient.addDefaultHeader(
-        'deviceModel',
-        iosInfo.utsname.machine,
-      );
+      authenticationApi.apiClient.addDefaultHeader('deviceModel', iosInfo.utsname.machine);
       authenticationApi.apiClient.addDefaultHeader('deviceType', 'iOS');
     } else if (Platform.isAndroid) {
       final androidInfo = await deviceInfoPlugin.androidInfo;
-      authenticationApi.apiClient.addDefaultHeader(
-        'deviceModel',
-        androidInfo.model,
-      );
+      authenticationApi.apiClient.addDefaultHeader('deviceModel', androidInfo.model);
       authenticationApi.apiClient.addDefaultHeader('deviceType', 'Android');
     } else {
       authenticationApi.apiClient.addDefaultHeader('deviceModel', 'Unknown');
@@ -239,10 +229,7 @@ class ApiService implements Authentication {
   }
 
   @override
-  Future<void> applyToParams(
-    List<QueryParam> queryParams,
-    Map<String, String> headerParams,
-  ) {
+  Future<void> applyToParams(List<QueryParam> queryParams, Map<String, String> headerParams) {
     return Future.value();
   }
 

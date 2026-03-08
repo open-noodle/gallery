@@ -6,8 +6,7 @@ import 'package:openapi/api.dart' as api;
 
 import '../../test_utils.dart';
 
-class MockSharedSpaceApiRepository extends Mock
-    implements SharedSpaceApiRepository {}
+class MockSharedSpaceApiRepository extends Mock implements SharedSpaceApiRepository {}
 
 void main() {
   late MockSharedSpaceApiRepository mockRepo;
@@ -37,9 +36,7 @@ void main() {
       when(() => mockRepo.getAll()).thenAnswer((_) async => spaces);
 
       final container = TestUtils.createContainer(
-        overrides: [
-          sharedSpaceApiRepositoryProvider.overrideWithValue(mockRepo),
-        ],
+        overrides: [sharedSpaceApiRepositoryProvider.overrideWithValue(mockRepo)],
       );
 
       final result = await container.read(sharedSpacesProvider.future);
@@ -53,15 +50,10 @@ void main() {
       when(() => mockRepo.getAll()).thenThrow(Exception('Network error'));
 
       final container = TestUtils.createContainer(
-        overrides: [
-          sharedSpaceApiRepositoryProvider.overrideWithValue(mockRepo),
-        ],
+        overrides: [sharedSpaceApiRepositoryProvider.overrideWithValue(mockRepo)],
       );
 
-      expect(
-        () => container.read(sharedSpacesProvider.future),
-        throwsA(isA<Exception>()),
-      );
+      expect(() => container.read(sharedSpacesProvider.future), throwsA(isA<Exception>()));
     });
   });
 
@@ -77,14 +69,10 @@ void main() {
       when(() => mockRepo.get('space-1')).thenAnswer((_) async => space);
 
       final container = TestUtils.createContainer(
-        overrides: [
-          sharedSpaceApiRepositoryProvider.overrideWithValue(mockRepo),
-        ],
+        overrides: [sharedSpaceApiRepositoryProvider.overrideWithValue(mockRepo)],
       );
 
-      final result = await container.read(
-        sharedSpaceProvider('space-1').future,
-      );
+      final result = await container.read(sharedSpaceProvider('space-1').future);
 
       expect(result.id, equals('space-1'));
       expect(result.name, equals('Family Photos'));
@@ -111,47 +99,29 @@ void main() {
           showInTimeline: true,
         ),
       ];
-      when(
-        () => mockRepo.getMembers('space-1'),
-      ).thenAnswer((_) async => members);
+      when(() => mockRepo.getMembers('space-1')).thenAnswer((_) async => members);
 
       final container = TestUtils.createContainer(
-        overrides: [
-          sharedSpaceApiRepositoryProvider.overrideWithValue(mockRepo),
-        ],
+        overrides: [sharedSpaceApiRepositoryProvider.overrideWithValue(mockRepo)],
       );
 
-      final result = await container.read(
-        sharedSpaceMembersProvider('space-1').future,
-      );
+      final result = await container.read(sharedSpaceMembersProvider('space-1').future);
 
       expect(result.length, equals(2));
-      expect(
-        result[0].role,
-        equals(api.SharedSpaceMemberResponseDtoRoleEnum.owner),
-      );
-      expect(
-        result[1].role,
-        equals(api.SharedSpaceMemberResponseDtoRoleEnum.viewer),
-      );
+      expect(result[0].role, equals(api.SharedSpaceMemberResponseDtoRoleEnum.owner));
+      expect(result[1].role, equals(api.SharedSpaceMemberResponseDtoRoleEnum.viewer));
     });
   });
 
   group('spaceAssetsProvider', () {
     test('returns assets from repository', () async {
-      when(
-        () => mockRepo.getSpaceAssets('space-1'),
-      ).thenAnswer((_) async => []);
+      when(() => mockRepo.getSpaceAssets('space-1')).thenAnswer((_) async => []);
 
       final container = TestUtils.createContainer(
-        overrides: [
-          sharedSpaceApiRepositoryProvider.overrideWithValue(mockRepo),
-        ],
+        overrides: [sharedSpaceApiRepositoryProvider.overrideWithValue(mockRepo)],
       );
 
-      final result = await container.read(
-        spaceAssetsProvider('space-1').future,
-      );
+      final result = await container.read(spaceAssetsProvider('space-1').future);
 
       expect(result, isEmpty);
       verify(() => mockRepo.getSpaceAssets('space-1')).called(1);

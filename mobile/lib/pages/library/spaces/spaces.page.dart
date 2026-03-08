@@ -29,31 +29,19 @@ class SpacesPage extends HookConsumerWidget {
               children: [
                 TextField(
                   controller: nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Name',
-                    hintText: 'Enter space name',
-                  ),
+                  decoration: const InputDecoration(labelText: 'Name', hintText: 'Enter space name'),
                   autofocus: true,
                 ),
                 const SizedBox(height: 8),
                 TextField(
                   controller: descController,
-                  decoration: const InputDecoration(
-                    labelText: 'Description (optional)',
-                    hintText: 'Enter description',
-                  ),
+                  decoration: const InputDecoration(labelText: 'Description (optional)', hintText: 'Enter description'),
                 ),
               ],
             ),
             actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                child: const Text('Create'),
-              ),
+              TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
+              TextButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Create')),
             ],
           );
         },
@@ -61,20 +49,12 @@ class SpacesPage extends HookConsumerWidget {
 
       if (result == true && nameController.text.isNotEmpty) {
         try {
-          final description = descController.text.isEmpty
-              ? null
-              : descController.text;
-          await ref
-              .read(sharedSpaceApiRepositoryProvider)
-              .create(nameController.text, description: description);
+          final description = descController.text.isEmpty ? null : descController.text;
+          await ref.read(sharedSpaceApiRepositoryProvider).create(nameController.text, description: description);
           ref.invalidate(sharedSpacesProvider);
         } catch (e) {
           if (context.mounted) {
-            ImmichToast.show(
-              context: context,
-              msg: 'Failed to create space',
-              toastType: ToastType.error,
-            );
+            ImmichToast.show(context: context, msg: 'Failed to create space', toastType: ToastType.error);
           }
         }
       }
@@ -84,11 +64,7 @@ class SpacesPage extends HookConsumerWidget {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Spaces'),
-        elevation: 0,
-        centerTitle: false,
-      ),
+      appBar: AppBar(title: const Text('Spaces'), elevation: 0, centerTitle: false),
       body: spacesAsync.when(
         data: (spaces) {
           if (spaces.isEmpty) {
@@ -96,24 +72,16 @@ class SpacesPage extends HookConsumerWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                    Icons.workspaces_outlined,
-                    size: 64,
-                    color: context.colorScheme.onSurface.withAlpha(100),
-                  ),
+                  Icon(Icons.workspaces_outlined, size: 64, color: context.colorScheme.onSurface.withAlpha(100)),
                   const SizedBox(height: 16),
                   Text(
                     'No spaces yet',
-                    style: context.textTheme.titleMedium?.copyWith(
-                      color: context.colorScheme.onSurface.withAlpha(150),
-                    ),
+                    style: context.textTheme.titleMedium?.copyWith(color: context.colorScheme.onSurface.withAlpha(150)),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'Create a space to share photos with others',
-                    style: context.textTheme.bodyMedium?.copyWith(
-                      color: context.colorScheme.onSurface.withAlpha(100),
-                    ),
+                    style: context.textTheme.bodyMedium?.copyWith(color: context.colorScheme.onSurface.withAlpha(100)),
                   ),
                   const SizedBox(height: 24),
                   ElevatedButton.icon(
@@ -134,11 +102,7 @@ class SpacesPage extends HookConsumerWidget {
                 leading: const Icon(Icons.workspaces_outlined),
                 title: Text(space.name, style: context.textTheme.bodyLarge),
                 subtitle: space.description != null
-                    ? Text(
-                        space.description!,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      )
+                    ? Text(space.description!, maxLines: 1, overflow: TextOverflow.ellipsis)
                     : null,
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -149,18 +113,9 @@ class SpacesPage extends HookConsumerWidget {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(
-                              Icons.photo_outlined,
-                              size: 16,
-                              color: context.colorScheme.onSurface.withAlpha(
-                                150,
-                              ),
-                            ),
+                            Icon(Icons.photo_outlined, size: 16, color: context.colorScheme.onSurface.withAlpha(150)),
                             const SizedBox(width: 2),
-                            Text(
-                              '${space.assetCount!.toInt()}',
-                              style: context.textTheme.bodySmall,
-                            ),
+                            Text('${space.assetCount!.toInt()}', style: context.textTheme.bodySmall),
                           ],
                         ),
                       ),
@@ -170,26 +125,16 @@ class SpacesPage extends HookConsumerWidget {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(
-                              Icons.people_outline,
-                              size: 16,
-                              color: context.colorScheme.onSurface.withAlpha(
-                                150,
-                              ),
-                            ),
+                            Icon(Icons.people_outline, size: 16, color: context.colorScheme.onSurface.withAlpha(150)),
                             const SizedBox(width: 2),
-                            Text(
-                              '${space.memberCount!.toInt()}',
-                              style: context.textTheme.bodySmall,
-                            ),
+                            Text('${space.memberCount!.toInt()}', style: context.textTheme.bodySmall),
                           ],
                         ),
                       ),
                     const Icon(Icons.chevron_right),
                   ],
                 ),
-                onTap: () =>
-                    context.pushRoute(SpaceDetailRoute(spaceId: space.id)),
+                onTap: () => context.pushRoute(SpaceDetailRoute(spaceId: space.id)),
               );
             },
           );
@@ -203,18 +148,12 @@ class SpacesPage extends HookConsumerWidget {
               const SizedBox(height: 16),
               Text('Failed to load spaces: $error'),
               const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () => ref.invalidate(sharedSpacesProvider),
-                child: const Text('Retry'),
-              ),
+              ElevatedButton(onPressed: () => ref.invalidate(sharedSpacesProvider), child: const Text('Retry')),
             ],
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: createSpaceDialog,
-        child: const Icon(Icons.add),
-      ),
+      floatingActionButton: FloatingActionButton(onPressed: createSpaceDialog, child: const Icon(Icons.add)),
     );
   }
 }

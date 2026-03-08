@@ -104,22 +104,17 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
   SharedSpaceRole get _currentRole {
     final member = _currentMember;
     if (member == null) return SharedSpaceRole.viewer;
-    return SharedSpaceRole.fromJson(member.role.value) ??
-        SharedSpaceRole.viewer;
+    return SharedSpaceRole.fromJson(member.role.value) ?? SharedSpaceRole.viewer;
   }
 
   Future<void> _addPhotos() async {
-    final newAssets = await context.pushRoute<Set<BaseAsset>>(
-      DriftAssetSelectionTimelineRoute(),
-    );
+    final newAssets = await context.pushRoute<Set<BaseAsset>>(DriftAssetSelectionTimelineRoute());
 
     if (newAssets == null || newAssets.isEmpty) return;
 
     try {
       final assetIds = newAssets.map((a) => (a as RemoteAsset).id).toList();
-      await ref
-          .read(sharedSpaceApiRepositoryProvider)
-          .addAssets(widget.spaceId, assetIds);
+      await ref.read(sharedSpaceApiRepositoryProvider).addAssets(widget.spaceId, assetIds);
       if (context.mounted) {
         ImmichToast.show(
           context: context,
@@ -130,11 +125,7 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
       await _refreshAssets();
     } catch (e) {
       if (context.mounted) {
-        ImmichToast.show(
-          context: context,
-          msg: 'Failed to add photos',
-          toastType: ToastType.error,
-        );
+        ImmichToast.show(context: context, msg: 'Failed to add photos', toastType: ToastType.error);
       }
     }
   }
@@ -144,19 +135,12 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete Space'),
-        content: Text(
-          'Are you sure you want to delete "${_space?.name}"? This cannot be undone.',
-        ),
+        content: Text('Are you sure you want to delete "${_space?.name}"? This cannot be undone.'),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
-          ),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            style: TextButton.styleFrom(
-              foregroundColor: Theme.of(ctx).colorScheme.error,
-            ),
+            style: TextButton.styleFrom(foregroundColor: Theme.of(ctx).colorScheme.error),
             child: const Text('Delete'),
           ),
         ],
@@ -168,53 +152,34 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
         await ref.read(sharedSpaceApiRepositoryProvider).delete(widget.spaceId);
         ref.invalidate(sharedSpacesProvider);
         if (context.mounted) {
-          ImmichToast.show(
-            context: context,
-            msg: 'Space deleted',
-            toastType: ToastType.success,
-          );
+          ImmichToast.show(context: context, msg: 'Space deleted', toastType: ToastType.success);
           await context.maybePop();
         }
       } catch (e) {
         if (context.mounted) {
-          ImmichToast.show(
-            context: context,
-            msg: 'Failed to delete space',
-            toastType: ToastType.error,
-          );
+          ImmichToast.show(context: context, msg: 'Failed to delete space', toastType: ToastType.error);
         }
       }
     }
   }
 
   void _navigateToMembers() {
-    context
-        .pushRoute(SpaceMembersRoute(spaceId: widget.spaceId))
-        .then((_) => _loadData());
+    context.pushRoute(SpaceMembersRoute(spaceId: widget.spaceId)).then((_) => _loadData());
   }
 
   Future<void> _toggleTimeline() async {
     try {
       final updated = await ref
           .read(sharedSpaceApiRepositoryProvider)
-          .updateMemberTimeline(
-            widget.spaceId,
-            showInTimeline: !_showInTimeline,
-          );
+          .updateMemberTimeline(widget.spaceId, showInTimeline: !_showInTimeline);
       if (mounted) {
         setState(() {
-          _members = _members
-              ?.map((m) => m.userId == updated.userId ? updated : m)
-              .toList();
+          _members = _members?.map((m) => m.userId == updated.userId ? updated : m).toList();
         });
       }
     } catch (e) {
       if (context.mounted) {
-        ImmichToast.show(
-          context: context,
-          msg: 'Failed to update timeline visibility',
-          toastType: ToastType.error,
-        );
+        ImmichToast.show(context: context, msg: 'Failed to update timeline visibility', toastType: ToastType.error);
       }
     }
   }
@@ -286,32 +251,17 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
                 tooltip: 'Add Photos',
               ),
             IconButton(
-              icon: Icon(
-                _showInTimeline
-                    ? Icons.visibility_outlined
-                    : Icons.visibility_off_outlined,
-              ),
+              icon: Icon(_showInTimeline ? Icons.visibility_outlined : Icons.visibility_off_outlined),
               onPressed: _toggleTimeline,
-              tooltip: _showInTimeline
-                  ? 'Hide from Timeline'
-                  : 'Show on Timeline',
+              tooltip: _showInTimeline ? 'Hide from Timeline' : 'Show on Timeline',
             ),
-            IconButton(
-              icon: const Icon(Icons.people_outline),
-              onPressed: _navigateToMembers,
-              tooltip: 'Members',
-            ),
+            IconButton(icon: const Icon(Icons.people_outline), onPressed: _navigateToMembers, tooltip: 'Members'),
             if (_isOwner)
               PopupMenuButton<String>(
                 onSelected: (value) {
                   if (value == 'delete') _deleteSpace();
                 },
-                itemBuilder: (context) => [
-                  const PopupMenuItem(
-                    value: 'delete',
-                    child: Text('Delete Space'),
-                  ),
-                ],
+                itemBuilder: (context) => [const PopupMenuItem(value: 'delete', child: Text('Delete Space'))],
               ),
           ],
         ),
@@ -337,21 +287,16 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
             children: [
               Text(
                 '$assetCount photos',
-                style: context.textTheme.bodySmall?.copyWith(
-                  color: context.colorScheme.onSurface.withAlpha(150),
-                ),
+                style: context.textTheme.bodySmall?.copyWith(color: context.colorScheme.onSurface.withAlpha(150)),
               ),
               const SizedBox(width: 16),
               Text(
                 '$memberCount members',
-                style: context.textTheme.bodySmall?.copyWith(
-                  color: context.colorScheme.onSurface.withAlpha(150),
-                ),
+                style: context.textTheme.bodySmall?.copyWith(color: context.colorScheme.onSurface.withAlpha(150)),
               ),
             ],
           ),
-          if (_space?.description != null &&
-              _space!.description!.isNotEmpty) ...[
+          if (_space?.description != null && _space!.description!.isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(_space!.description!, style: context.textTheme.bodyMedium),
           ],
@@ -367,31 +312,17 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
         centerTitle: false,
         actions: [
           IconButton(
-            icon: Icon(
-              _showInTimeline
-                  ? Icons.visibility_outlined
-                  : Icons.visibility_off_outlined,
-            ),
+            icon: Icon(_showInTimeline ? Icons.visibility_outlined : Icons.visibility_off_outlined),
             onPressed: _toggleTimeline,
-            tooltip: _showInTimeline
-                ? 'Hide from Timeline'
-                : 'Show on Timeline',
+            tooltip: _showInTimeline ? 'Hide from Timeline' : 'Show on Timeline',
           ),
-          IconButton(
-            icon: const Icon(Icons.people_outline),
-            onPressed: _navigateToMembers,
-          ),
+          IconButton(icon: const Icon(Icons.people_outline), onPressed: _navigateToMembers),
           if (_isOwner)
             PopupMenuButton<String>(
               onSelected: (value) {
                 if (value == 'delete') _deleteSpace();
               },
-              itemBuilder: (context) => [
-                const PopupMenuItem(
-                  value: 'delete',
-                  child: Text('Delete Space'),
-                ),
-              ],
+              itemBuilder: (context) => [const PopupMenuItem(value: 'delete', child: Text('Delete Space'))],
             ),
         ],
       ),
@@ -399,17 +330,11 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.photo_library_outlined,
-              size: 64,
-              color: context.colorScheme.onSurface.withAlpha(100),
-            ),
+            Icon(Icons.photo_library_outlined, size: 64, color: context.colorScheme.onSurface.withAlpha(100)),
             const SizedBox(height: 16),
             Text(
               'No photos yet',
-              style: context.textTheme.titleMedium?.copyWith(
-                color: context.colorScheme.onSurface.withAlpha(150),
-              ),
+              style: context.textTheme.titleMedium?.copyWith(color: context.colorScheme.onSurface.withAlpha(150)),
             ),
             if (_canEdit) ...[
               const SizedBox(height: 24),

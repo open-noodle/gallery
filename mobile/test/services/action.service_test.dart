@@ -17,8 +17,7 @@ import '../repository.mocks.dart';
 
 class MockDownloadRepository extends Mock implements DownloadRepository {}
 
-class MockSharedSpaceApiRepository extends Mock
-    implements SharedSpaceApiRepository {}
+class MockSharedSpaceApiRepository extends Mock implements SharedSpaceApiRepository {}
 
 void main() {
   late ActionService sut;
@@ -39,12 +38,7 @@ void main() {
     TestWidgetsFlutterBinding.ensureInitialized();
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
 
-    db = Drift(
-      drift.DatabaseConnection(
-        NativeDatabase.memory(),
-        closeStreamsSynchronously: true,
-      ),
-    );
+    db = Drift(drift.DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true));
     await StoreService.init(storeRepository: DriftStoreRepository(db));
   });
 
@@ -83,37 +77,26 @@ void main() {
   });
 
   group('ActionService.deleteLocal', () {
-    test(
-      'routes deleted ids to trashed repository when Android trash handling is enabled',
-      () async {
-        await Store.put(StoreKey.manageLocalMediaAndroid, true);
-        const ids = ['a', 'b'];
+    test('routes deleted ids to trashed repository when Android trash handling is enabled', () async {
+      await Store.put(StoreKey.manageLocalMediaAndroid, true);
+      const ids = ['a', 'b'];
 
-        when(
-          () => assetMediaRepository.deleteAll(ids),
-        ).thenAnswer((_) async => ids);
-        when(
-          () => trashedLocalAssetRepository.applyTrashedAssets(ids),
-        ).thenAnswer((_) async {});
+      when(() => assetMediaRepository.deleteAll(ids)).thenAnswer((_) async => ids);
+      when(() => trashedLocalAssetRepository.applyTrashedAssets(ids)).thenAnswer((_) async {});
 
-        final result = await sut.deleteLocal(ids);
+      final result = await sut.deleteLocal(ids);
 
-        expect(result, ids.length);
-        verify(() => assetMediaRepository.deleteAll(ids)).called(1);
-        verify(
-          () => trashedLocalAssetRepository.applyTrashedAssets(ids),
-        ).called(1);
-        verifyNever(() => localAssetRepository.delete(any()));
-      },
-    );
+      expect(result, ids.length);
+      verify(() => assetMediaRepository.deleteAll(ids)).called(1);
+      verify(() => trashedLocalAssetRepository.applyTrashedAssets(ids)).called(1);
+      verifyNever(() => localAssetRepository.delete(any()));
+    });
 
     test('deletes locally when Android trash handling is disabled', () async {
       await Store.put(StoreKey.manageLocalMediaAndroid, false);
       const ids = ['c'];
 
-      when(
-        () => assetMediaRepository.deleteAll(ids),
-      ).thenAnswer((_) async => ids);
+      when(() => assetMediaRepository.deleteAll(ids)).thenAnswer((_) async => ids);
       when(() => localAssetRepository.delete(ids)).thenAnswer((_) async {});
 
       final result = await sut.deleteLocal(ids);
@@ -128,9 +111,7 @@ void main() {
       await Store.put(StoreKey.manageLocalMediaAndroid, true);
       const ids = ['x'];
 
-      when(
-        () => assetMediaRepository.deleteAll(ids),
-      ).thenAnswer((_) async => <String>[]);
+      when(() => assetMediaRepository.deleteAll(ids)).thenAnswer((_) async => <String>[]);
 
       final result = await sut.deleteLocal(ids);
 

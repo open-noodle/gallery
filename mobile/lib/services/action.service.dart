@@ -78,39 +78,18 @@ class ActionService {
   }
 
   Future<void> archive(List<String> remoteIds) async {
-    await _assetApiRepository.updateVisibility(
-      remoteIds,
-      AssetVisibilityEnum.archive,
-    );
-    await _remoteAssetRepository.updateVisibility(
-      remoteIds,
-      AssetVisibility.archive,
-    );
+    await _assetApiRepository.updateVisibility(remoteIds, AssetVisibilityEnum.archive);
+    await _remoteAssetRepository.updateVisibility(remoteIds, AssetVisibility.archive);
   }
 
   Future<void> unArchive(List<String> remoteIds) async {
-    await _assetApiRepository.updateVisibility(
-      remoteIds,
-      AssetVisibilityEnum.timeline,
-    );
-    await _remoteAssetRepository.updateVisibility(
-      remoteIds,
-      AssetVisibility.timeline,
-    );
+    await _assetApiRepository.updateVisibility(remoteIds, AssetVisibilityEnum.timeline);
+    await _remoteAssetRepository.updateVisibility(remoteIds, AssetVisibility.timeline);
   }
 
-  Future<void> moveToLockFolder(
-    List<String> remoteIds,
-    List<String> localIds,
-  ) async {
-    await _assetApiRepository.updateVisibility(
-      remoteIds,
-      AssetVisibilityEnum.locked,
-    );
-    await _remoteAssetRepository.updateVisibility(
-      remoteIds,
-      AssetVisibility.locked,
-    );
+  Future<void> moveToLockFolder(List<String> remoteIds, List<String> localIds) async {
+    await _assetApiRepository.updateVisibility(remoteIds, AssetVisibilityEnum.locked);
+    await _remoteAssetRepository.updateVisibility(remoteIds, AssetVisibility.locked);
 
     // Ask user if they want to delete local copies
     if (localIds.isNotEmpty) {
@@ -119,14 +98,8 @@ class ActionService {
   }
 
   Future<void> removeFromLockFolder(List<String> remoteIds) async {
-    await _assetApiRepository.updateVisibility(
-      remoteIds,
-      AssetVisibilityEnum.timeline,
-    );
-    await _remoteAssetRepository.updateVisibility(
-      remoteIds,
-      AssetVisibility.timeline,
-    );
+    await _assetApiRepository.updateVisibility(remoteIds, AssetVisibilityEnum.timeline);
+    await _remoteAssetRepository.updateVisibility(remoteIds, AssetVisibility.timeline);
   }
 
   Future<void> trash(List<String> remoteIds) async {
@@ -139,10 +112,7 @@ class ActionService {
     await _remoteAssetRepository.restoreTrash(ids);
   }
 
-  Future<void> trashRemoteAndDeleteLocal(
-    List<String> remoteIds,
-    List<String> localIds,
-  ) async {
+  Future<void> trashRemoteAndDeleteLocal(List<String> remoteIds, List<String> localIds) async {
     await _assetApiRepository.delete(remoteIds, false);
     await _remoteAssetRepository.trash(remoteIds);
 
@@ -151,10 +121,7 @@ class ActionService {
     }
   }
 
-  Future<void> deleteRemoteAndLocal(
-    List<String> remoteIds,
-    List<String> localIds,
-  ) async {
+  Future<void> deleteRemoteAndLocal(List<String> remoteIds, List<String> localIds) async {
     await _assetApiRepository.delete(remoteIds, true);
     await _remoteAssetRepository.delete(remoteIds);
 
@@ -167,10 +134,7 @@ class ActionService {
     return await _deleteLocalAssets(localIds);
   }
 
-  Future<bool> editLocation(
-    List<String> remoteIds,
-    BuildContext context,
-  ) async {
+  Future<bool> editLocation(List<String> remoteIds, BuildContext context) async {
     maplibre.LatLng? initialLatLng;
     if (remoteIds.length == 1) {
       final exif = await _remoteAssetRepository.getExif(remoteIds[0]);
@@ -180,10 +144,7 @@ class ActionService {
       }
     }
 
-    final location = await showLocationPicker(
-      context: context,
-      initialLatLng: initialLatLng,
-    );
+    final location = await showLocationPicker(context: context, initialLatLng: initialLatLng);
 
     if (location == null) {
       return false;
@@ -195,10 +156,7 @@ class ActionService {
     return true;
   }
 
-  Future<bool> editDateTime(
-    List<String> remoteIds,
-    BuildContext context,
-  ) async {
+  Future<bool> editDateTime(List<String> remoteIds, BuildContext context) async {
     DateTime? initialDate;
     String? timeZone;
     Duration? offset;
@@ -218,10 +176,7 @@ class ActionService {
 
       if (exifData?.dateTimeOriginal != null) {
         timeZone = exifData!.timeZone;
-        (dt, offset) = applyTimezoneOffset(
-          dateTime: exifData.dateTimeOriginal!,
-          timeZone: exifData.timeZone,
-        );
+        (dt, offset) = applyTimezoneOffset(dateTime: exifData.dateTimeOriginal!, timeZone: exifData.timeZone);
       }
 
       initialDate = dt;
@@ -286,16 +241,8 @@ class ActionService {
     await _assetApiRepository.unStack(stackIds);
   }
 
-  Future<int> shareAssets(
-    List<BaseAsset> assets,
-    BuildContext context, {
-    Completer<void>? cancelCompleter,
-  }) {
-    return _assetMediaRepository.shareAssets(
-      assets,
-      context,
-      cancelCompleter: cancelCompleter,
-    );
+  Future<int> shareAssets(List<BaseAsset> assets, BuildContext context, {Completer<void>? cancelCompleter}) {
+    return _assetMediaRepository.shareAssets(assets, context, cancelCompleter: cancelCompleter);
   }
 
   Future<List<bool>> downloadAll(List<RemoteAsset> assets) {
@@ -303,10 +250,7 @@ class ActionService {
   }
 
   Future<bool> setAlbumCover(String albumId, String assetId) async {
-    final updatedAlbum = await _albumApiRepository.updateAlbum(
-      albumId,
-      thumbnailAssetId: assetId,
-    );
+    final updatedAlbum = await _albumApiRepository.updateAlbum(albumId, thumbnailAssetId: assetId);
     await _remoteAlbumRepository.update(updatedAlbum);
     return true;
   }
@@ -316,8 +260,7 @@ class ActionService {
     if (deletedIds.isEmpty) {
       return 0;
     }
-    if (CurrentPlatform.isAndroid &&
-        Store.get(StoreKey.manageLocalMediaAndroid, false)) {
+    if (CurrentPlatform.isAndroid && Store.get(StoreKey.manageLocalMediaAndroid, false)) {
       await _trashedLocalAssetRepository.applyTrashedAssets(deletedIds);
     } else {
       await _localAssetRepository.delete(deletedIds);
