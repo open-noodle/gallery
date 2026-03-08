@@ -5,19 +5,19 @@
 
 ## Gap Analysis
 
-| Feature | Web | Mobile |
-|---------|-----|--------|
-| List spaces | Yes | Yes |
-| Create space | Yes | Yes |
-| Delete space | Yes | No (repo exists, no UI) |
-| View space detail | Yes | Partial (read-only, no photos) |
-| Add members | Yes | No (repo exists, no UI) |
-| Remove members | Yes | No |
-| Edit member roles | Yes | No (repo + API method missing) |
-| View space photos (grid) | Yes | No |
-| Add photos to space | Yes | No |
-| Remove photos from space | Yes | No |
-| Role-based UI gating | Yes | No |
+| Feature                  | Web | Mobile                         |
+| ------------------------ | --- | ------------------------------ |
+| List spaces              | Yes | Yes                            |
+| Create space             | Yes | Yes                            |
+| Delete space             | Yes | No (repo exists, no UI)        |
+| View space detail        | Yes | Partial (read-only, no photos) |
+| Add members              | Yes | No (repo exists, no UI)        |
+| Remove members           | Yes | No                             |
+| Edit member roles        | Yes | No (repo + API method missing) |
+| View space photos (grid) | Yes | No                             |
+| Add photos to space      | Yes | No                             |
+| Remove photos from space | Yes | No                             |
+| Role-based UI gating     | Yes | No                             |
 
 ## Approach
 
@@ -106,14 +106,14 @@ Existing routes unchanged: `SpacesRoute`, `SpaceDetailRoute`.
 
 ## Key Reference Files
 
-| Pattern | Reference File |
-|---------|---------------|
-| Album detail with grid | `pages/album/album_viewer.dart` |
-| Album app bar + actions | `pages/album/album_viewer_appbar.dart` |
-| Asset selection picker | `pages/album/album_asset_selection.page.dart` |
-| User selection picker | `pages/album/album_additional_shared_user_selection.page.dart` |
-| Multi-select grid | `widgets/asset_grid/multiselect_grid.dart` |
-| Bottom action bar | `widgets/asset_grid/control_bottom_app_bar.dart` |
-| Timeline provider | `providers/asset_viewer/render_list.provider.dart` |
-| User avatars | `widgets/common/user_circle_avatar.dart` |
-| Shared user icons | `widgets/album/album_shared_user_icons.dart` |
+| Pattern                 | Reference File                                                 |
+| ----------------------- | -------------------------------------------------------------- |
+| Album detail with grid  | `pages/album/album_viewer.dart`                                |
+| Album app bar + actions | `pages/album/album_viewer_appbar.dart`                         |
+| Asset selection picker  | `pages/album/album_asset_selection.page.dart`                  |
+| User selection picker   | `pages/album/album_additional_shared_user_selection.page.dart` |
+| Multi-select grid       | `widgets/asset_grid/multiselect_grid.dart`                     |
+| Bottom action bar       | `widgets/asset_grid/control_bottom_app_bar.dart`               |
+| Timeline provider       | `providers/asset_viewer/render_list.provider.dart`             |
+| User avatars            | `widgets/common/user_circle_avatar.dart`                       |
+| Shared user icons       | `widgets/album/album_shared_user_icons.dart`                   |

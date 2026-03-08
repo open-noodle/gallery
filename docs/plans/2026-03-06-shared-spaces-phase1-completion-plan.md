@@ -194,10 +194,7 @@ it('should pass spaceId through to search repository', async () => {
 
   await sut.searchMetadata(authStub.user1, { spaceId });
 
-  expect(mocks.search.searchMetadata).toHaveBeenCalledWith(
-    expect.anything(),
-    expect.objectContaining({ spaceId }),
-  );
+  expect(mocks.search.searchMetadata).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ spaceId }));
 });
 ```
 

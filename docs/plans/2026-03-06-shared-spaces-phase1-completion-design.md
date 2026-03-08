@@ -63,13 +63,13 @@ No metadata/smart toggle — smart search handles both natural language and keyw
 
 ### Actions to add
 
-| Action             | Gate                         |
-| ------------------ | ---------------------------- |
-| Archive            | User owns all selected       |
-| Change Date        | User owns all selected       |
-| Change Location    | User owns all selected       |
-| Change Description | User owns all selected       |
-| Tag                | User owns all selected       |
+| Action             | Gate                   |
+| ------------------ | ---------------------- |
+| Archive            | User owns all selected |
+| Change Date        | User owns all selected |
+| Change Location    | User owns all selected |
+| Change Description | User owns all selected |
+| Tag                | User owns all selected |
 
 ### Actions explicitly excluded
 

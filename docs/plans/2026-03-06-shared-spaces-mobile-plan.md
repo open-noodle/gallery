@@ -13,6 +13,7 @@
 ## Task 1: Repository Layer — Add Missing Methods
 
 **Files:**
+
 - Modify: `mobile/lib/repositories/shared_space_api.repository.dart`
 
 **Step 1: Add updateMember, addAssets, removeAssets methods**
@@ -58,6 +59,7 @@ git commit -m "feat(mobile): add updateMember, addAssets, removeAssets to space 
 The server's timeline API supports `spaceId` filtering via `/timeline/buckets` and `/timeline/bucket`. The mobile OpenAPI client has `TimelineApi` generated but it's never initialized. We need it to fetch space assets.
 
 **Files:**
+
 - Modify: `mobile/lib/services/api.service.dart`
 
 **Step 1: Add TimelineApi to ApiService**
@@ -92,6 +94,7 @@ git commit -m "feat(mobile): initialize TimelineApi in ApiService"
 Fetch space assets using the server's timeline endpoints, convert the columnar `TimeBucketAssetResponseDto` format to `List<RemoteAsset>` for use with `TimelineFactory.fromAssetsWithBuckets()`.
 
 **Files:**
+
 - Modify: `mobile/lib/repositories/shared_space_api.repository.dart`
 
 **Step 1: Add timeline API dependency and asset fetching**
@@ -190,6 +193,7 @@ git commit -m "feat(mobile): add space asset fetching via timeline API"
 ## Task 4: Provider Layer — Current Member and Role Helpers
 
 **Files:**
+
 - Modify: `mobile/lib/providers/shared_space.provider.dart`
 
 **Step 1: Add currentSpaceMemberProvider**
@@ -234,6 +238,7 @@ git commit -m "feat(mobile): add currentSpaceMember and spaceAssets providers"
 ## Task 5: Add TimelineOrigin.remoteSpace
 
 **Files:**
+
 - Modify: `mobile/lib/domain/services/timeline.service.dart`
 
 **Step 1: Add remoteSpace to TimelineOrigin enum**
@@ -275,6 +280,7 @@ git commit -m "feat(mobile): add TimelineOrigin.remoteSpace"
 Follow the `removeFromAlbum` pattern in the action service to add `removeFromSpace`.
 
 **Files:**
+
 - Modify: `mobile/lib/services/action.service.dart`
 - Modify: `mobile/lib/providers/infrastructure/action.provider.dart`
 
@@ -328,6 +334,7 @@ git commit -m "feat(mobile): add removeFromSpace action"
 Follow the `RemoveFromAlbumActionButton` pattern exactly.
 
 **Files:**
+
 - Create: `mobile/lib/presentation/widgets/action_buttons/remove_from_space_action_button.widget.dart`
 
 **Step 1: Create the widget**
@@ -400,6 +407,7 @@ git commit -m "feat(mobile): add RemoveFromSpaceActionButton"
 Create a bottom sheet for multi-select actions within a space, following `RemoteAlbumBottomSheet`.
 
 **Files:**
+
 - Create: `mobile/lib/presentation/widgets/bottom_sheet/space_bottom_sheet.widget.dart`
 
 **Step 1: Create the widget**
@@ -493,6 +501,7 @@ git commit -m "feat(mobile): add SpaceBottomSheet for multi-select actions"
 This is the biggest task. Rewrite `space_detail.page.dart` to use the `Timeline` widget with photo grid, following the `drift_remote_album.page.dart` pattern.
 
 **Files:**
+
 - Rewrite: `mobile/lib/pages/library/spaces/space_detail.page.dart`
 
 **Step 1: Rewrite the page**
@@ -808,6 +817,7 @@ git commit -m "feat(mobile): rewrite space detail page with Timeline grid and ro
 Create a dedicated page for viewing and managing space members.
 
 **Files:**
+
 - Create: `mobile/lib/pages/library/spaces/space_members.page.dart`
 
 **Step 1: Create the page**
@@ -1028,6 +1038,7 @@ git commit -m "feat(mobile): add SpaceMembersPage with role editing and remove"
 Create a user picker for adding members to a space, following `AlbumAdditionalSharedUserSelectionPage`.
 
 **Files:**
+
 - Create: `mobile/lib/pages/library/spaces/space_member_selection.page.dart`
 
 **Step 1: Create the page**
@@ -1190,6 +1201,7 @@ git commit -m "feat(mobile): add SpaceMemberSelectionPage for adding members"
 Register the new pages with auto_route and run code generation.
 
 **Files:**
+
 - Modify: `mobile/lib/routing/router.dart`
 
 **Step 1: Add imports and route definitions**
@@ -1240,6 +1252,7 @@ git commit -m "feat(mobile): add space members and member selection routes"
 Minor enhancement to show asset count in the space list.
 
 **Files:**
+
 - Modify: `mobile/lib/pages/library/spaces/spaces.page.dart`
 
 **Step 1: Add asset count to trailing**
@@ -1293,6 +1306,7 @@ git commit -m "feat(mobile): show asset count in spaces list"
 The `ActionService` needs the `SharedSpaceApiRepository` injected. Wire it up properly.
 
 **Files:**
+
 - Modify: `mobile/lib/services/action.service.dart` (add constructor parameter)
 - Modify: provider file that creates `ActionService` (find via grep for `actionServiceProvider` or `ActionService(`)
 
@@ -1361,27 +1375,30 @@ git commit -m "fix(mobile): resolve compilation issues for shared spaces"
 ## Summary of Files
 
 ### New Files
-| File | Purpose |
-|------|---------|
-| `pages/library/spaces/space_members.page.dart` | Member management (view, edit role, remove) |
-| `pages/library/spaces/space_member_selection.page.dart` | User picker for adding members |
-| `presentation/widgets/action_buttons/remove_from_space_action_button.widget.dart` | Multi-select remove action |
-| `presentation/widgets/bottom_sheet/space_bottom_sheet.widget.dart` | Multi-select action bar |
+
+| File                                                                              | Purpose                                     |
+| --------------------------------------------------------------------------------- | ------------------------------------------- |
+| `pages/library/spaces/space_members.page.dart`                                    | Member management (view, edit role, remove) |
+| `pages/library/spaces/space_member_selection.page.dart`                           | User picker for adding members              |
+| `presentation/widgets/action_buttons/remove_from_space_action_button.widget.dart` | Multi-select remove action                  |
+| `presentation/widgets/bottom_sheet/space_bottom_sheet.widget.dart`                | Multi-select action bar                     |
 
 ### Modified Files
-| File | Changes |
-|------|---------|
+
+| File                                            | Changes                                                   |
+| ----------------------------------------------- | --------------------------------------------------------- |
 | `repositories/shared_space_api.repository.dart` | Add updateMember, addAssets, removeAssets, getSpaceAssets |
-| `providers/shared_space.provider.dart` | Add currentSpaceMember, spaceAssets providers |
-| `services/api.service.dart` | Initialize TimelineApi |
-| `services/action.service.dart` | Add removeFromSpace method |
-| `providers/infrastructure/action.provider.dart` | Add removeFromSpace to notifier |
-| `domain/services/timeline.service.dart` | Add TimelineOrigin.remoteSpace |
-| `pages/library/spaces/space_detail.page.dart` | Full rewrite with Timeline grid |
-| `pages/library/spaces/spaces.page.dart` | Add asset count display |
-| `routing/router.dart` | Add new routes |
+| `providers/shared_space.provider.dart`          | Add currentSpaceMember, spaceAssets providers             |
+| `services/api.service.dart`                     | Initialize TimelineApi                                    |
+| `services/action.service.dart`                  | Add removeFromSpace method                                |
+| `providers/infrastructure/action.provider.dart` | Add removeFromSpace to notifier                           |
+| `domain/services/timeline.service.dart`         | Add TimelineOrigin.remoteSpace                            |
+| `pages/library/spaces/space_detail.page.dart`   | Full rewrite with Timeline grid                           |
+| `pages/library/spaces/spaces.page.dart`         | Add asset count display                                   |
+| `routing/router.dart`                           | Add new routes                                            |
 
 ### Generated Files (auto-updated)
-| File | Trigger |
-|------|---------|
+
+| File                     | Trigger                    |
+| ------------------------ | -------------------------- |
 | `routing/router.gr.dart` | auto_route code generation |
