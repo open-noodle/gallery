@@ -342,7 +342,9 @@
         {/if}
       </section>
     </div>
-  {:else}
+  {/if}
+
+  <div class:hidden={showSearchResults}>
     <Timeline
       enableRouting={true}
       bind:timelineManager
@@ -351,7 +353,7 @@
       {isSelectionMode}
       onEscape={handleEscape}
     >
-      {#if viewMode !== 'select-assets'}
+      {#if viewMode !== 'select-assets' && !showSearchResults}
         <section class="pt-4">
           <div class="flex gap-4 mt-2 text-sm text-immich-fg/60 dark:text-immich-dark-fg/60">
             <span>{space.assetCount ?? 0} {$t('photos')}</span>
@@ -419,7 +421,7 @@
         {/if}
       {/snippet}
     </Timeline>
-  {/if}
+  </div>
 </UserPageLayout>
 
 {#if assetInteraction.selectionActive && viewMode === 'view'}
