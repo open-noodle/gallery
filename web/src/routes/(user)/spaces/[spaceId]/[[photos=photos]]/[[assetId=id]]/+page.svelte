@@ -74,7 +74,7 @@
 
   const options = $derived.by(() => {
     if (viewMode === 'select-assets') {
-      return { visibility: AssetVisibility.Timeline };
+      return { visibility: AssetVisibility.Timeline, timelineSpaceId: space.id };
     }
     return { spaceId: space.id };
   });
