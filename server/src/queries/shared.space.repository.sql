@@ -103,6 +103,12 @@ from
 where
   "spaceId" = $1
 
+-- SharedSpaceRepository.removeAssets
+delete from "shared_space_asset"
+where
+  "spaceId" = $1
+  and "assetId" in ($2)
+
 -- SharedSpaceRepository.getMostRecentAssetId
 select
   "asset"."id"
@@ -115,13 +121,7 @@ where
 order by
   "shared_space_asset"."addedAt" desc
 limit
-  1
-
--- SharedSpaceRepository.removeAssets
-delete from "shared_space_asset"
-where
-  "spaceId" = $1
-  and "assetId" in ($2)
+  $2
 
 -- SharedSpaceRepository.getMapMarkers
 select

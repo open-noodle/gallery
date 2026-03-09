@@ -13,6 +13,7 @@
 ## Task 1: Add `thumbnailAssetId` Column — Schema & Migration
 
 **Files:**
+
 - Modify: `server/src/schema/tables/shared-space.table.ts`
 - Create: `server/src/schema/migrations/1772260000000-AddThumbnailAssetIdToSharedSpace.ts`
 - Modify: `server/src/database.ts` (lines 320-329, SharedSpace type)
@@ -44,7 +45,7 @@ export type SharedSpace = {
   updatedAt: Date;
   createId: string;
   updateId: string;
-  thumbnailAssetId: string | null;  // ADD THIS
+  thumbnailAssetId: string | null; // ADD THIS
 };
 ```
 
@@ -58,9 +59,7 @@ import { Kysely, sql } from 'kysely';
 export async function up(db: Kysely<unknown>): Promise<void> {
   await db.schema
     .alterTable('shared_space')
-    .addColumn('thumbnailAssetId', 'uuid', (col) =>
-      col.references('assets.id').onDelete('set null'),
-    )
+    .addColumn('thumbnailAssetId', 'uuid', (col) => col.references('assets.id').onDelete('set null'))
     .execute();
 
   await db.schema
@@ -71,10 +70,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
 }
 
 export async function down(db: Kysely<unknown>): Promise<void> {
-  await db.schema
-    .alterTable('shared_space')
-    .dropColumn('thumbnailAssetId')
-    .execute();
+  await db.schema.alterTable('shared_space').dropColumn('thumbnailAssetId').execute();
 }
 ```
 
@@ -92,7 +88,7 @@ const sharedSpaceFactory = (data: Partial<SharedSpace> = {}): SharedSpace => ({
   updatedAt: newDate(),
   createId: newUuid(),
   updateId: newUuid(),
-  thumbnailAssetId: null,  // ADD THIS
+  thumbnailAssetId: null, // ADD THIS
   ...data,
 });
 ```
@@ -118,6 +114,7 @@ git commit -m "feat(server): add thumbnailAssetId column to shared_space table"
 ## Task 2: Server — Update DTOs and Service for Thumbnail
 
 **Files:**
+
 - Modify: `server/src/dtos/shared-space.dto.ts`
 - Modify: `server/src/services/shared-space.service.ts`
 - Modify: `server/src/repositories/shared-space.repository.ts`
@@ -244,7 +241,12 @@ Add test to `getAll` block:
 it('should include member info for each space', async () => {
   const auth = factory.auth();
   const space = factory.sharedSpace({ name: 'Space 1' });
-  const member1 = makeMemberResult({ spaceId: space.id, userId: auth.user.id, role: SharedSpaceRole.Owner, name: 'Alice' });
+  const member1 = makeMemberResult({
+    spaceId: space.id,
+    userId: auth.user.id,
+    role: SharedSpaceRole.Owner,
+    name: 'Alice',
+  });
   const member2 = makeMemberResult({ spaceId: space.id, role: SharedSpaceRole.Viewer, name: 'Bob' });
 
   mocks.sharedSpace.getAllByUserId.mockResolvedValue([space]);
@@ -434,6 +436,7 @@ git commit -m "feat(server): add thumbnail support and member info to shared spa
 ## Task 3: Regenerate OpenAPI Clients
 
 **Files:**
+
 - Modified (auto-generated): `open-api/typescript-sdk/src/fetch-client.ts`
 - Modified (auto-generated): `mobile/openapi/`
 
@@ -461,6 +464,7 @@ git commit -m "chore: regenerate OpenAPI clients for space thumbnail support"
 ## Task 4: Web — SpaceCard Component (TDD)
 
 **Files:**
+
 - Create: `web/src/lib/components/spaces/space-card.svelte`
 - Create: `web/src/lib/components/spaces/space-card.spec.ts`
 
@@ -513,8 +517,26 @@ describe('SpaceCard component', () => {
 
   it('should render member avatars when members are provided', () => {
     const members = [
-      { userId: 'u1', name: 'Alice', email: 'a@b.com', role: 'owner', joinedAt: '', profileImagePath: '', avatarColor: 'primary', showInTimeline: true },
-      { userId: 'u2', name: 'Bob', email: 'b@b.com', role: 'viewer', joinedAt: '', profileImagePath: '', avatarColor: 'blue', showInTimeline: true },
+      {
+        userId: 'u1',
+        name: 'Alice',
+        email: 'a@b.com',
+        role: 'owner',
+        joinedAt: '',
+        profileImagePath: '',
+        avatarColor: 'primary',
+        showInTimeline: true,
+      },
+      {
+        userId: 'u2',
+        name: 'Bob',
+        email: 'b@b.com',
+        role: 'viewer',
+        joinedAt: '',
+        profileImagePath: '',
+        avatarColor: 'blue',
+        showInTimeline: true,
+      },
     ];
     render(SpaceCard, { space: makeSpace({ members }) });
     // Each avatar shows the first letter of the user's name as fallback
@@ -661,6 +683,7 @@ git commit -m "feat(web): add SpaceCard component with thumbnail and avatar supp
 ## Task 5: Web — Update Spaces List Page
 
 **Files:**
+
 - Modify: `web/src/routes/(user)/spaces/+page.svelte`
 
 ### Step 1: Update the spaces list page to use SpaceCard
@@ -732,6 +755,7 @@ git commit -m "feat(web): use SpaceCard grid layout on spaces list page"
 ## Task 6: Web — "Set as Space Cover" Action (TDD)
 
 **Files:**
+
 - Modify: `web/src/routes/(user)/spaces/[spaceId]/[[photos=photos]]/[[assetId=id]]/+page.svelte`
 - Test: Add tests for the action behavior (server-side tests already cover the API)
 
@@ -811,6 +835,7 @@ git commit -m "feat: allow editors to set space cover photo"
 ## Task 7: Generate SQL Documentation & Final Checks
 
 **Files:**
+
 - Modified (auto-generated): `server/src/queries/shared.space.repository.sql`
 
 ### Step 1: Generate SQL docs
@@ -824,6 +849,7 @@ cd server && make sql
 ```bash
 cd server && pnpm test -- --run
 ```
+
 Expected: ALL PASS
 
 ### Step 3: Run web test suite
@@ -831,6 +857,7 @@ Expected: ALL PASS
 ```bash
 cd web && pnpm test -- --run
 ```
+
 Expected: ALL PASS
 
 ### Step 4: Lint and format
@@ -870,12 +897,12 @@ Use `/babysit` to monitor CI and fix any failures.
 
 ## Summary of Test Coverage
 
-| Area | Tests |
-|------|-------|
-| Server: update with thumbnailAssetId | 2 tests (set + clear) |
-| Server: getAll with thumbnailAssetId | 1 test |
-| Server: get with thumbnail auto-fallback | 3 tests (set, fallback, no assets) |
-| Server: getAll with member info | 1 test |
-| Server: editor thumbnail permission | 1 test |
-| Web: SpaceCard rendering | 7 tests (name, counts, thumbnail, empty, avatars, overflow, link) |
-| **Total new tests** | **15 tests** |
+| Area                                     | Tests                                                             |
+| ---------------------------------------- | ----------------------------------------------------------------- |
+| Server: update with thumbnailAssetId     | 2 tests (set + clear)                                             |
+| Server: getAll with thumbnailAssetId     | 1 test                                                            |
+| Server: get with thumbnail auto-fallback | 3 tests (set, fallback, no assets)                                |
+| Server: getAll with member info          | 1 test                                                            |
+| Server: editor thumbnail permission      | 1 test                                                            |
+| Web: SpaceCard rendering                 | 7 tests (name, counts, thumbnail, empty, avatars, overflow, link) |
+| **Total new tests**                      | **15 tests**                                                      |
