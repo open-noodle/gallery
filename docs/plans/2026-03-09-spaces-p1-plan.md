@@ -13,6 +13,7 @@
 ### Task 1: Database Migration — Add `lastActivityAt` column
 
 **Files:**
+
 - Create: `server/src/schema/migrations/1772790000000-AddLastActivityAtToSharedSpace.ts`
 - Modify: `server/src/schema/tables/shared-space.table.ts:31`
 - Modify: `server/src/database.ts:320-330`
@@ -63,6 +64,7 @@ git commit -m "feat(server): add lastActivityAt column to shared_space table"
 ### Task 2: Update Test Factory — Add new fields
 
 **Files:**
+
 - Modify: `server/test/small.factory.ts:516-527`
 
 **Step 1: Add `lastActivityAt` to sharedSpaceFactory**
@@ -105,6 +107,7 @@ git commit -m "test(server): add lastActivityAt to shared space factory"
 ### Task 3: Repository — Add `getRecentAssets` method
 
 **Files:**
+
 - Modify: `server/src/repositories/shared-space.repository.ts:160-173`
 
 **Step 1: Add the method**
@@ -154,6 +157,7 @@ git commit -m "feat(server): add getRecentAssets and getLastAssetAddedAt reposit
 ### Task 4: DTOs — Add new fields to SharedSpaceResponseDto
 
 **Files:**
+
 - Modify: `server/src/dtos/shared-space.dto.ts:86-116`
 
 **Step 1: Add new fields to SharedSpaceResponseDto**
@@ -183,6 +187,7 @@ git commit -m "feat(server): add lastActivityAt, recentAssetIds, recentAssetThum
 ### Task 5: Service Tests — Write failing tests for `lastActivityAt` tracking
 
 **Files:**
+
 - Modify: `server/src/services/shared-space.service.spec.ts:621-715`
 
 **Step 1: Write failing test — addAssets updates lastActivityAt**
@@ -204,7 +209,10 @@ it('should update lastActivityAt when adding assets', async () => {
 
   await sut.addAssets(auth, spaceId, { assetIds: [assetId] });
 
-  expect(mocks.sharedSpace.update).toHaveBeenCalledWith(spaceId, expect.objectContaining({ lastActivityAt: expect.any(Date) }));
+  expect(mocks.sharedSpace.update).toHaveBeenCalledWith(
+    spaceId,
+    expect.objectContaining({ lastActivityAt: expect.any(Date) }),
+  );
 });
 ```
 
@@ -266,6 +274,7 @@ git commit -m "test(server): add failing tests for lastActivityAt tracking"
 ### Task 6: Service Implementation — `lastActivityAt` tracking in addAssets/removeAssets
 
 **Files:**
+
 - Modify: `server/src/services/shared-space.service.ts:189-204`
 
 **Step 1: Update addAssets to set lastActivityAt**
@@ -322,6 +331,7 @@ git commit -m "feat(server): update lastActivityAt on asset add/remove"
 ### Task 7: Service Tests — Write failing tests for collage data in getAll/get
 
 **Files:**
+
 - Modify: `server/src/services/shared-space.service.spec.ts:89-237`
 
 **Step 1: Write failing test — getAll includes collage data**
@@ -446,6 +456,7 @@ git commit -m "test(server): add failing tests for collage data and lastActivity
 ### Task 8: Service Implementation — Collage data and lastActivityAt in getAll/get/mapSpace
 
 **Files:**
+
 - Modify: `server/src/services/shared-space.service.ts:41-81,260-278`
 
 **Step 1: Update getAll to fetch recent assets**
@@ -620,6 +631,7 @@ git commit -m "chore: regenerate OpenAPI clients with collage and lastActivityAt
 ### Task 11: Web — SpaceCollage component
 
 **Files:**
+
 - Create: `web/src/lib/components/spaces/space-collage.svelte`
 
 **Step 1: Create the component**
@@ -719,6 +731,7 @@ git commit -m "feat(web): add SpaceCollage component with 4 layout variants"
 ### Task 12: Web — SpaceCollage unit tests
 
 **Files:**
+
 - Create: `web/src/lib/components/spaces/space-collage.spec.ts`
 
 **Step 1: Write tests**
@@ -808,6 +821,7 @@ git commit -m "test(web): add SpaceCollage component tests"
 ### Task 13: Web — Update space-card to use SpaceCollage
 
 **Files:**
+
 - Modify: `web/src/lib/components/spaces/space-card.svelte`
 
 **Step 1: Replace thumbnail section with SpaceCollage**
@@ -910,6 +924,7 @@ git commit -m "feat(web): replace single thumbnail with SpaceCollage in space ca
 ### Task 14: Web — SpaceHero component
 
 **Files:**
+
 - Create: `web/src/lib/components/spaces/space-hero.svelte`
 
 **Step 1: Create the component**
@@ -1020,6 +1035,7 @@ git commit -m "feat(web): add SpaceHero component with cover photo and gradient 
 ### Task 15: Web — SpaceHero unit tests
 
 **Files:**
+
 - Create: `web/src/lib/components/spaces/space-hero.spec.ts`
 
 **Step 1: Write tests**
@@ -1116,6 +1132,7 @@ git commit -m "test(web): add SpaceHero component tests"
 ### Task 16: Web — Integrate SpaceHero into detail page
 
 **Files:**
+
 - Modify: `web/src/routes/(user)/spaces/[spaceId]/[[photos=photos]]/[[assetId=id]]/+page.svelte`
 
 **Step 1: Import SpaceHero**
@@ -1164,6 +1181,7 @@ git commit -m "feat(web): integrate SpaceHero into space detail page"
 ### Task 17: Web — SpacesControls component and sort store
 
 **Files:**
+
 - Create: `web/src/lib/stores/space-view.store.ts`
 - Create: `web/src/lib/components/spaces/spaces-controls.svelte`
 
@@ -1325,6 +1343,7 @@ git commit -m "feat(web): add SpacesControls component with sort dropdown and pe
 ### Task 18: Web — SpacesControls unit tests
 
 **Files:**
+
 - Create: `web/src/lib/components/spaces/spaces-controls.spec.ts`
 
 **Step 1: Write tests**
@@ -1379,9 +1398,27 @@ describe('Space sorting logic', () => {
     return sorted;
   };
 
-  const alpha = makeSpace({ id: 's1', name: 'Alpha', createdAt: '2026-01-01T00:00:00.000Z', assetCount: 5, lastActivityAt: '2026-03-01T00:00:00.000Z' });
-  const beta = makeSpace({ id: 's2', name: 'Beta', createdAt: '2026-02-01T00:00:00.000Z', assetCount: 20, lastActivityAt: '2026-03-05T00:00:00.000Z' });
-  const gamma = makeSpace({ id: 's3', name: 'Gamma', createdAt: '2026-03-01T00:00:00.000Z', assetCount: 10, lastActivityAt: null });
+  const alpha = makeSpace({
+    id: 's1',
+    name: 'Alpha',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    assetCount: 5,
+    lastActivityAt: '2026-03-01T00:00:00.000Z',
+  });
+  const beta = makeSpace({
+    id: 's2',
+    name: 'Beta',
+    createdAt: '2026-02-01T00:00:00.000Z',
+    assetCount: 20,
+    lastActivityAt: '2026-03-05T00:00:00.000Z',
+  });
+  const gamma = makeSpace({
+    id: 's3',
+    name: 'Gamma',
+    createdAt: '2026-03-01T00:00:00.000Z',
+    assetCount: 10,
+    lastActivityAt: null,
+  });
 
   it('should sort by name ascending', () => {
     const result = sortSpaces([gamma, alpha, beta], SpaceSortBy.Name, 'asc');
@@ -1455,6 +1492,7 @@ git commit -m "test(web): add SpacesControls sorting logic tests"
 ### Task 19: Web — Integrate SpacesControls into space list page
 
 **Files:**
+
 - Modify: `web/src/routes/(user)/spaces/+page.svelte`
 
 **Step 1: Import and wire up SpacesControls**
@@ -1551,6 +1589,7 @@ git commit -m "fix: resolve test failures from P1 integration"
 ### Task 22: E2E Tests — Playwright specs for collage, hero, and sort
 
 **Files:**
+
 - Create: `e2e/src/web/specs/spaces-p1.e2e-spec.ts`
 
 > **Note:** E2E test file location and exact API helpers depend on the current E2E setup. Check `e2e/src/specs/web/` for existing test files and `e2e/src/utils.ts` for available helpers (`utils.createSpace`, `utils.addSpaceAssets`, `utils.createAsset`).
@@ -1608,7 +1647,11 @@ test.describe('Spaces P1 — Collage, Hero, Sort', () => {
         utils.createAsset(admin.accessToken),
         utils.createAsset(admin.accessToken),
       ]);
-      await utils.addSpaceAssets(admin.accessToken, space.id, assets.map((a) => a.id));
+      await utils.addSpaceAssets(
+        admin.accessToken,
+        space.id,
+        assets.map((a) => a.id),
+      );
 
       await utils.setAuthCookies(context, admin.accessToken);
       await page.goto('/spaces');
@@ -1684,7 +1727,11 @@ test.describe('Spaces P1 — Collage, Hero, Sort', () => {
         utils.createAsset(admin.accessToken),
         utils.createAsset(admin.accessToken),
       ]);
-      await utils.addSpaceAssets(admin.accessToken, space2.id, assets.map((a) => a.id));
+      await utils.addSpaceAssets(
+        admin.accessToken,
+        space2.id,
+        assets.map((a) => a.id),
+      );
       const singleAsset = await utils.createAsset(admin.accessToken);
       await utils.addSpaceAssets(admin.accessToken, space1.id, [singleAsset.id]);
 

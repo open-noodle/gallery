@@ -46,6 +46,7 @@ Replaces the single `AssetCover` in `space-card.svelte`. Three layout variants b
 **1 asset** — single full image (`aspect-square rounded-xl`)
 
 **2-3 assets** — asymmetric split:
+
 ```
 ┌─────────┬──────┐
 │         │  B   │
@@ -53,9 +54,11 @@ Replaces the single `AssetCover` in `space-card.svelte`. Three layout variants b
 │         │  C   │
 └─────────┴──────┘
 ```
+
 A takes ~60% width, B and C stack on the right. For 2 assets, C is omitted (A 60%, B 40% full height).
 
 **4+ assets** — 2x2 grid with 2px gap:
+
 ```
 ┌──────┬──────┐
 │  A   │  B   │
@@ -71,7 +74,7 @@ A takes ~60% width, B and C stack on the right. For 2 assets, C is omitted (A 60
 ```typescript
 interface Props {
   assets: { id: string; thumbhash: string | null }[];
-  gradientClass?: string;  // P0 gradient fallback for 0 assets
+  gradientClass?: string; // P0 gradient fallback for 0 assets
   preload?: boolean;
 }
 ```
@@ -137,12 +140,12 @@ Minimal toolbar at the top of the space list page, right-aligned above the grid.
 
 ### Sort options
 
-| Label | Field | Default order |
-|-------|-------|---------------|
-| Name | `name` | A → Z |
-| Last Activity | `lastActivityAt` | Newest first |
-| Date Created | `createdAt` | Newest first |
-| Asset Count | `assetCount` | Highest first |
+| Label         | Field            | Default order |
+| ------------- | ---------------- | ------------- |
+| Name          | `name`           | A → Z         |
+| Last Activity | `lastActivityAt` | Newest first  |
+| Date Created  | `createdAt`      | Newest first  |
+| Asset Count   | `assetCount`     | Highest first |
 
 Clicking the active sort option flips order (asc ↔ desc). Switching options uses that option's default. Arrow icon indicates direction.
 
@@ -181,6 +184,7 @@ Every server change follows strict TDD — failing test first, then implement, t
 ### Server unit tests (vitest) — written BEFORE implementation
 
 **`lastActivityAt` tracking:**
+
 - `create()` sets `lastActivityAt` to null
 - `addAssets()` updates `lastActivityAt` to current time
 - `addAssets()` with empty array doesn't update `lastActivityAt`
@@ -188,6 +192,7 @@ Every server change follows strict TDD — failing test first, then implement, t
 - `removeAssets()` sets `lastActivityAt` to null when space becomes empty
 
 **Collage data:**
+
 - `getAll()` includes `recentAssetIds` array (up to 4)
 - `getAll()` includes `recentAssetThumhashes` parallel array
 - `getAll()` returns empty arrays for spaces with no assets
@@ -195,12 +200,14 @@ Every server change follows strict TDD — failing test first, then implement, t
 - Assets ordered by `addedAt` descending
 
 **Existing behavior preserved:**
+
 - All existing tests continue passing
 - `update()`, `delete()`, member management unaffected
 
 ### Web component unit tests (vitest + @testing-library/svelte)
 
 **SpaceCollage (~8 tests):**
+
 - Single image layout for 1 asset
 - Asymmetric layout for 2 assets
 - Asymmetric layout for 3 assets
@@ -211,6 +218,7 @@ Every server change follows strict TDD — failing test first, then implement, t
 - Correct `data-testid` per variant
 
 **SpaceHero (~8 tests):**
+
 - Cover photo renders when `thumbnailAssetId` set
 - Gradient background when no cover
 - Correct gradient class from `space.color`
@@ -221,6 +229,7 @@ Every server change follows strict TDD — failing test first, then implement, t
 - Expands description on click
 
 **SpacesControls (~12 tests):**
+
 - Sort by name ascending/descending
 - Sort by last activity newest/oldest first
 - Sort by date created newest/oldest first
@@ -231,6 +240,7 @@ Every server change follows strict TDD — failing test first, then implement, t
 - Persists preference across renders
 
 **space-card.svelte (modified, ~2 new tests):**
+
 - Passes collage data to SpaceCollage
 - Handles missing `recentAssetIds` gracefully
 
@@ -239,18 +249,21 @@ Every server change follows strict TDD — failing test first, then implement, t
 New file: `e2e/src/web/specs/spaces-p1.e2e-spec.ts`
 
 **Collage cards:**
+
 - Create space, add 1 asset → single image layout
 - Add 2-3 assets → asymmetric layout
 - Add 4+ assets → 2x2 grid layout
 - 0 assets → gradient placeholder
 
 **Hero section:**
+
 - Space with cover photo → hero shows cover image
 - Space without cover → hero shows gradient
 - Hero displays name, stat chips, role badge
 - Long description truncated with "Show more"
 
 **Sort:**
+
 - Name sort reorders alphabetically
 - Last activity sort reflects recency
 - Asset count sort orders by count
@@ -266,22 +279,22 @@ New file: `e2e/src/web/specs/spaces-p1.e2e-spec.ts`
 
 ## Files Touched
 
-| Change | Files |
-|--------|-------|
+| Change                     | Files                                                                                                       |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | `lastActivityAt` migration | `server/src/schema/migrations/`, `server/src/schema/tables/shared-space.table.ts`, `server/src/database.ts` |
-| Repository method | `server/src/repositories/shared-space.repository.ts` |
-| DTOs | `server/src/dtos/shared-space.dto.ts` |
-| Service logic + tests | `server/src/services/shared-space.service.ts`, `server/src/services/shared-space.service.spec.ts` |
-| Test factory | `server/test/small.factory.ts` |
-| OpenAPI regen | `open-api/`, `mobile/openapi/` |
-| Collage component | `web/src/lib/components/spaces/space-collage.svelte` (new) |
-| Space card update | `web/src/lib/components/spaces/space-card.svelte` |
-| Hero component | `web/src/lib/components/spaces/space-hero.svelte` (new) |
-| Detail page update | `web/src/routes/(user)/spaces/[spaceId]/.../+page.svelte` |
-| Sort controls | `web/src/lib/components/spaces/spaces-controls.svelte` (new) |
-| Sort store | `web/src/lib/stores/space-view.store.ts` (new) |
-| List page update | `web/src/routes/(user)/spaces/+page.svelte` |
-| E2E tests | `e2e/src/web/specs/spaces-p1.e2e-spec.ts` (new) |
+| Repository method          | `server/src/repositories/shared-space.repository.ts`                                                        |
+| DTOs                       | `server/src/dtos/shared-space.dto.ts`                                                                       |
+| Service logic + tests      | `server/src/services/shared-space.service.ts`, `server/src/services/shared-space.service.spec.ts`           |
+| Test factory               | `server/test/small.factory.ts`                                                                              |
+| OpenAPI regen              | `open-api/`, `mobile/openapi/`                                                                              |
+| Collage component          | `web/src/lib/components/spaces/space-collage.svelte` (new)                                                  |
+| Space card update          | `web/src/lib/components/spaces/space-card.svelte`                                                           |
+| Hero component             | `web/src/lib/components/spaces/space-hero.svelte` (new)                                                     |
+| Detail page update         | `web/src/routes/(user)/spaces/[spaceId]/.../+page.svelte`                                                   |
+| Sort controls              | `web/src/lib/components/spaces/spaces-controls.svelte` (new)                                                |
+| Sort store                 | `web/src/lib/stores/space-view.store.ts` (new)                                                              |
+| List page update           | `web/src/routes/(user)/spaces/+page.svelte`                                                                 |
+| E2E tests                  | `e2e/src/web/specs/spaces-p1.e2e-spec.ts` (new)                                                             |
 
 ## Out of Scope
 
