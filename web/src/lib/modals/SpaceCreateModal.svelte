@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { createSpace, type SharedSpaceResponseDto } from '@immich/sdk';
+  import ColorPicker from '$lib/components/spaces/color-picker.svelte';
+  import { createSpace, UserAvatarColor, type SharedSpaceResponseDto } from '@immich/sdk';
   import { Field, FormModal, Input, Textarea } from '@immich/ui';
   import { mdiAccountGroup } from '@mdi/js';
   import { t } from 'svelte-i18n';
@@ -12,12 +13,14 @@
 
   let name = $state('');
   let description = $state('');
+  let color = $state<UserAvatarColor>(UserAvatarColor.Primary);
 
   const onSubmit = async () => {
     const space = await createSpace({
       sharedSpaceCreateDto: {
         name,
         description: description || undefined,
+        color,
       },
     });
     onClose(space);
@@ -31,6 +34,9 @@
     </Field>
     <Field label={$t('description')}>
       <Textarea bind:value={description} />
+    </Field>
+    <Field label={$t('color')}>
+      <ColorPicker value={color} onchange={(c) => (color = c)} />
     </Field>
   </div>
 </FormModal>
