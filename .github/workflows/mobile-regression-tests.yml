@@ -24,7 +24,7 @@ jobs:
           flutter-version-file: ./mobile/pubspec.yaml
 
       - name: Install Patrol CLI
-        run: dart pub global activate patrol_cli
+        run: dart pub global activate patrol_cli 3.11.0
 
       - name: Generate translation file
         run: dart run easy_localization:generate -S ../i18n && dart run bin/generate_keys.dart
