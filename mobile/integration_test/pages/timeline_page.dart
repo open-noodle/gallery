@@ -36,15 +36,18 @@ class TimelinePage {
   /// Navigate to the search tab.
   Future<void> goToSearch() async {
     await $(Icons.search_rounded).tap();
+    await $.pump(const Duration(seconds: 1));
   }
 
   /// Navigate to the albums tab.
   Future<void> goToAlbums() async {
     await $(Icons.photo_album_outlined).tap();
+    await $.pump(const Duration(seconds: 1));
   }
 
   /// Navigate to the library tab.
   Future<void> goToLibrary() async {
     await $(Icons.space_dashboard_outlined).tap();
+    await $.pump(const Duration(seconds: 1));
   }
 }

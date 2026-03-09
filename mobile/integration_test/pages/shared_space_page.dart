@@ -10,10 +10,16 @@ class SharedSpacePage {
 
   /// Navigate to shared spaces from the library tab.
   Future<void> openFromLibrary() async {
-    await $('Spaces').waitUntilVisible(
-      timeout: const Duration(seconds: 10),
-    );
-    await $('Spaces').tap();
+    // "Spaces" is in a QuickAccessButtonList at the bottom of the Library page's
+    // CustomScrollView — it's often below the fold, so we must scroll to it.
+    final spacesText = find.text('Spaces');
+    for (var i = 0; i < 10; i++) {
+      await $.pump(const Duration(milliseconds: 500));
+      if ($.tester.any(spacesText)) break;
+    }
+    await $.tester.ensureVisible(spacesText);
+    await $.pump();
+    await $.tester.tap(spacesText);
     await $.pump(const Duration(seconds: 2));
   }
 
