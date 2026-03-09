@@ -579,7 +579,9 @@ class RandomSearchDto {
         rating: json[r'rating'] == null
             ? null
             : num.parse('${json[r'rating']}'),
-        size: num.parse('${json[r'size']}'),
+        size: json[r'size'] == null
+            ? null
+            : num.parse('${json[r'size']}'),
         spaceId: mapValueOfType<String>(json, r'spaceId'),
         state: mapValueOfType<String>(json, r'state'),
         tagIds: json[r'tagIds'] is Iterable

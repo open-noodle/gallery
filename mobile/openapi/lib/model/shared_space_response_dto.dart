@@ -137,12 +137,16 @@ class SharedSpaceResponseDto {
       final json = value.cast<String, dynamic>();
 
       return SharedSpaceResponseDto(
-        assetCount: num.parse('${json[r'assetCount']}'),
+        assetCount: json[r'assetCount'] == null
+            ? null
+            : num.parse('${json[r'assetCount']}'),
         createdAt: mapValueOfType<String>(json, r'createdAt')!,
         createdById: mapValueOfType<String>(json, r'createdById')!,
         description: mapValueOfType<String>(json, r'description'),
         id: mapValueOfType<String>(json, r'id')!,
-        memberCount: num.parse('${json[r'memberCount']}'),
+        memberCount: json[r'memberCount'] == null
+            ? null
+            : num.parse('${json[r'memberCount']}'),
         members: SharedSpaceMemberResponseDto.listFromJson(json[r'members']),
         name: mapValueOfType<String>(json, r'name')!,
         thumbnailAssetId: mapValueOfType<String>(json, r'thumbnailAssetId'),

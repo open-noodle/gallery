@@ -2793,6 +2793,96 @@ class SpaceDetailRouteArgs {
 }
 
 /// generated route for
+/// [SpaceMemberSelectionPage]
+class SpaceMemberSelectionRoute
+    extends PageRouteInfo<SpaceMemberSelectionRouteArgs> {
+  SpaceMemberSelectionRoute({
+    Key? key,
+    required String spaceId,
+    required List<String> existingMemberIds,
+    List<PageRouteInfo>? children,
+  }) : super(
+         SpaceMemberSelectionRoute.name,
+         args: SpaceMemberSelectionRouteArgs(
+           key: key,
+           spaceId: spaceId,
+           existingMemberIds: existingMemberIds,
+         ),
+         initialChildren: children,
+       );
+
+  static const String name = 'SpaceMemberSelectionRoute';
+
+  static PageInfo page = PageInfo(
+    name,
+    builder: (data) {
+      final args = data.argsAs<SpaceMemberSelectionRouteArgs>();
+      return SpaceMemberSelectionPage(
+        key: args.key,
+        spaceId: args.spaceId,
+        existingMemberIds: args.existingMemberIds,
+      );
+    },
+  );
+}
+
+class SpaceMemberSelectionRouteArgs {
+  const SpaceMemberSelectionRouteArgs({
+    this.key,
+    required this.spaceId,
+    required this.existingMemberIds,
+  });
+
+  final Key? key;
+
+  final String spaceId;
+
+  final List<String> existingMemberIds;
+
+  @override
+  String toString() {
+    return 'SpaceMemberSelectionRouteArgs{key: $key, spaceId: $spaceId, existingMemberIds: $existingMemberIds}';
+  }
+}
+
+/// generated route for
+/// [SpaceMembersPage]
+class SpaceMembersRoute extends PageRouteInfo<SpaceMembersRouteArgs> {
+  SpaceMembersRoute({
+    Key? key,
+    required String spaceId,
+    List<PageRouteInfo>? children,
+  }) : super(
+         SpaceMembersRoute.name,
+         args: SpaceMembersRouteArgs(key: key, spaceId: spaceId),
+         initialChildren: children,
+       );
+
+  static const String name = 'SpaceMembersRoute';
+
+  static PageInfo page = PageInfo(
+    name,
+    builder: (data) {
+      final args = data.argsAs<SpaceMembersRouteArgs>();
+      return SpaceMembersPage(key: args.key, spaceId: args.spaceId);
+    },
+  );
+}
+
+class SpaceMembersRouteArgs {
+  const SpaceMembersRouteArgs({this.key, required this.spaceId});
+
+  final Key? key;
+
+  final String spaceId;
+
+  @override
+  String toString() {
+    return 'SpaceMembersRouteArgs{key: $key, spaceId: $spaceId}';
+  }
+}
+
+/// generated route for
 /// [SpacesPage]
 class SpacesRoute extends PageRouteInfo<void> {
   const SpacesRoute({List<PageRouteInfo>? children})

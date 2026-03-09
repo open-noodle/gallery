@@ -610,7 +610,9 @@ class SmartSearchDto {
         make: mapValueOfType<String>(json, r'make'),
         model: mapValueOfType<String>(json, r'model'),
         ocr: mapValueOfType<String>(json, r'ocr'),
-        page: num.parse('${json[r'page']}'),
+        page: json[r'page'] == null
+            ? null
+            : num.parse('${json[r'page']}'),
         personIds: json[r'personIds'] is Iterable
             ? (json[r'personIds'] as Iterable).cast<String>().toList(growable: false)
             : const [],
@@ -619,7 +621,9 @@ class SmartSearchDto {
         rating: json[r'rating'] == null
             ? null
             : num.parse('${json[r'rating']}'),
-        size: num.parse('${json[r'size']}'),
+        size: json[r'size'] == null
+            ? null
+            : num.parse('${json[r'size']}'),
         spaceId: mapValueOfType<String>(json, r'spaceId'),
         state: mapValueOfType<String>(json, r'state'),
         tagIds: json[r'tagIds'] is Iterable

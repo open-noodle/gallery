@@ -760,7 +760,9 @@ class MetadataSearchDto {
         order: AssetOrder.fromJson(json[r'order']) ?? AssetOrder.desc,
         originalFileName: mapValueOfType<String>(json, r'originalFileName'),
         originalPath: mapValueOfType<String>(json, r'originalPath'),
-        page: num.parse('${json[r'page']}'),
+        page: json[r'page'] == null
+            ? null
+            : num.parse('${json[r'page']}'),
         personIds: json[r'personIds'] is Iterable
             ? (json[r'personIds'] as Iterable).cast<String>().toList(growable: false)
             : const [],
@@ -768,7 +770,9 @@ class MetadataSearchDto {
         rating: json[r'rating'] == null
             ? null
             : num.parse('${json[r'rating']}'),
-        size: num.parse('${json[r'size']}'),
+        size: json[r'size'] == null
+            ? null
+            : num.parse('${json[r'size']}'),
         spaceId: mapValueOfType<String>(json, r'spaceId'),
         state: mapValueOfType<String>(json, r'state'),
         tagIds: json[r'tagIds'] is Iterable
