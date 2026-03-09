@@ -22,12 +22,13 @@
   import { getAltText } from '$lib/utils/thumbnail-util';
   import { toTimelineAsset } from '$lib/utils/timeline-util';
   import { AssetMediaSize, type SharedLinkResponseDto } from '@immich/sdk';
-  import { LoadingSpinner, toastManager } from '@immich/ui';
+  import { toastManager } from '@immich/ui';
   import { onDestroy, untrack } from 'svelte';
   import { useSwipe, type SwipeCustomEvent } from 'svelte-gestures';
   import { t } from 'svelte-i18n';
   import { fade } from 'svelte/transition';
   import type { AssetCursor } from './asset-viewer.svelte';
+  import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
 
   interface Props {
     cursor: AssetCursor;

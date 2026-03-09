@@ -1,11 +1,12 @@
 <script lang="ts">
   import UserAvatar from '$lib/components/shared-components/user-avatar.svelte';
   import { addMember, searchUsers, type SharedSpaceMemberResponseDto, type UserResponseDto } from '@immich/sdk';
-  import { FormModal, ListButton, LoadingSpinner, Stack, Text } from '@immich/ui';
+  import { FormModal, ListButton, Stack, Text } from '@immich/ui';
   import { mdiAccountPlus } from '@mdi/js';
   import { onMount } from 'svelte';
   import { t } from 'svelte-i18n';
   import { SvelteMap } from 'svelte/reactivity';
+  import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
 
   type Props = {
     spaceId: string;

@@ -1,9 +1,10 @@
 <script lang="ts">
   import { searchSmart, type AssetResponseDto } from '@immich/sdk';
-  import { Icon, LoadingSpinner } from '@immich/ui';
+  import { Icon } from '@immich/ui';
   import { mdiClose, mdiMagnify } from '@mdi/js';
   import { Route } from '$lib/route';
   import { t } from 'svelte-i18n';
+  import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
 
   interface Props {
     spaceId: string;
