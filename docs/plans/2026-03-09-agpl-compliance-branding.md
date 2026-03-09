@@ -13,6 +13,7 @@
 ### Task 1: Add repository fields to branding config
 
 **Files:**
+
 - Modify: `branding/config.json`
 
 **Step 1: Add repository and upstream sections to config**
@@ -86,6 +87,7 @@ git commit -m "feat(branding): add repository and upstream URL fields to config"
 ### Task 2: Add i18n keys for upstream attribution section
 
 **Files:**
+
 - Modify: `i18n/en.json`
 - Modify: `branding/i18n/overrides-en.json`
 
@@ -115,15 +117,18 @@ git commit -m "feat(branding): add upstream_project i18n key"
 ### Task 3: Invert HelpAndFeedbackModal sections
 
 **Files:**
+
 - Modify: `web/src/lib/modals/HelpAndFeedbackModal.svelte`
 
 **Step 1: Rewrite the modal to invert the sections**
 
 The current structure is:
+
 1. "Official Immich Resources" (hardcoded upstream links) — primary
 2. "Third-Party Resources" (env-var-driven fork links) — secondary, conditional
 
 The new structure should be:
+
 1. "Official Immich Resources" (i18n key, which branding overrides to "Official Noodle Gallery Resources") — shows hardcoded links that the branding script will patch
 2. "Upstream Project" — secondary section showing "Based on {upstream_name}" with upstream repo, docs, Discord links
 
@@ -190,6 +195,7 @@ Replace the full content of `HelpAndFeedbackModal.svelte` with:
 Wait — this doesn't quite work. The hardcoded links in the primary section need to be patchable by the branding script. The upstream section should always show Immich links regardless of branding. Let me reconsider.
 
 The correct approach: keep the current file structure mostly intact (hardcoded URLs that the branding script patches), but ADD the upstream attribution section at the bottom. The branding script will:
+
 - Replace the primary section's URLs with `open-noodle/gallery` URLs
 - The upstream section at the bottom always shows Immich attribution
 
@@ -294,6 +300,7 @@ git commit -m "feat(web): add upstream project attribution section to help modal
 ### Task 4: Update apply-branding.sh to patch help modal URLs
 
 **Files:**
+
 - Modify: `branding/scripts/apply-branding.sh`
 
 **Step 1: Read config values for repository URLs**
@@ -359,6 +366,7 @@ git commit -m "feat(branding): patch help modal URLs with fork repository links"
 ### Task 5: Make server versionUrl configurable
 
 **Files:**
+
 - Modify: `server/src/services/server.service.ts`
 - Modify: `server/src/services/server.service.spec.ts`
 
@@ -385,9 +393,7 @@ it('should use repositoryUrl from build metadata for versionUrl when available',
   );
 
   const result = await sut.getAboutInfo();
-  expect(result.versionUrl).toBe(
-    `https://github.com/open-noodle/gallery/releases/tag/${result.version}`,
-  );
+  expect(result.versionUrl).toBe(`https://github.com/open-noodle/gallery/releases/tag/${result.version}`);
 });
 ```
 
@@ -442,6 +448,7 @@ git commit -m "feat(server): derive versionUrl from IMMICH_REPOSITORY_URL env va
 ### Task 6: Make APK links configurable
 
 **Files:**
+
 - Modify: `server/src/services/server.service.ts`
 - Modify: `server/src/services/server.service.spec.ts`
 
@@ -462,9 +469,7 @@ it('should use repositoryUrl from build metadata for APK links', () => {
   const result = sut.getApkLinks();
   const version = serverVersion.toString();
 
-  expect(result.universal).toBe(
-    `https://github.com/open-noodle/gallery/releases/download/v${version}/app-release.apk`,
-  );
+  expect(result.universal).toBe(`https://github.com/open-noodle/gallery/releases/download/v${version}/app-release.apk`);
 });
 ```
 
@@ -508,6 +513,7 @@ git commit -m "feat(server): derive APK download links from IMMICH_REPOSITORY_UR
 ### Task 7: Update ServerAboutModal main branch warning
 
 **Files:**
+
 - Modify: `web/src/lib/modals/ServerAboutModal.svelte`
 
 **Step 1: Update the condition to also match the fork repo**
@@ -536,6 +542,7 @@ git commit -m "feat(web): show main branch warning for fork repo too"
 ### Task 8: Update apply-branding.sh to set Docker env vars
 
 **Files:**
+
 - Modify: `branding/scripts/apply-branding.sh`
 
 **Step 1: Extend `patch_docker` to set env vars**
@@ -582,6 +589,7 @@ git commit -m "feat(branding): set IMMICH_REPOSITORY env vars in Docker config"
 ### Task 9: Extend verify-branding.sh for URL leak detection
 
 **Files:**
+
 - Modify: `branding/scripts/verify-branding.sh`
 
 **Step 1: Add URL leak checks**
@@ -633,6 +641,7 @@ git commit -m "feat(branding): extend verify script with URL leak detection"
 ### Task 10: Update branding config docker registry to open-noodle
 
 **Files:**
+
 - Already done in Task 1 (config.json registry set to `ghcr.io/open-noodle`)
 
 This is a no-op — covered by Task 1. Verify the existing docker workflow references are consistent.

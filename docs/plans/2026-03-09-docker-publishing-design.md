@@ -13,8 +13,8 @@ Re-enable Docker image publishing for the Noodle Gallery fork so users can pull 
 
 ### Images
 
-| Image                      | Registry           | Tags                            |
-| -------------------------- | ------------------ | ------------------------------- |
+| Image                      | Registry               | Tags                            |
+| -------------------------- | ---------------------- | ------------------------------- |
 | `noodle-gallery-server`    | `ghcr.io/open-noodle/` | `<version>`, `latest`           |
 | `noodle-gallery-ml` (CPU)  | `ghcr.io/open-noodle/` | `<version>`, `latest`           |
 | `noodle-gallery-ml` (CUDA) | `ghcr.io/open-noodle/` | `<version>-cuda`, `latest-cuda` |

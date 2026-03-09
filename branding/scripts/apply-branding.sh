@@ -106,6 +106,7 @@ patch_help_modal() {
   local help_modal="$REPO_ROOT/web/src/lib/modals/HelpAndFeedbackModal.svelte"
 
   # Replace docs URL (backtick template literal → plain string)
+  # shellcheck disable=SC2016 -- matching literal ${info.version} in Svelte template
   sed -i 's|`https://docs\.\${info\.version}\.archive\.immich\.app/overview/introduction`|'"'${REPO_DOCS_URL}'"'|g' "$help_modal"
 
   # Replace bugs/issues URL (only appears once, outside upstream section)

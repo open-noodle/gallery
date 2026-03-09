@@ -332,9 +332,7 @@ describe(ServerService.name, () => {
       );
 
       const result = await sut.getAboutInfo();
-      expect(result.versionUrl).toBe(
-        `https://github.com/open-noodle/gallery/releases/tag/${result.version}`,
-      );
+      expect(result.versionUrl).toBe(`https://github.com/open-noodle/gallery/releases/tag/${result.version}`);
     });
   });
 
