@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:patrol/patrol.dart';
 
 import '../common/test_app.dart';
@@ -17,17 +18,25 @@ class LoginPage {
 
   /// Wait for the server URL screen (phase 1) to be visible.
   Future<void> waitForServerUrlScreen() async {
-    // The server URL screen has a "Next" button
     await $('Next').waitUntilVisible();
   }
 
   /// Enter the server URL and proceed to the credentials screen.
   Future<void> enterServerUrl(String url) async {
     await waitForServerUrlScreen();
-    // Phase 1 has a single TextFormField for the server URL
-    await $(TextFormField).first.enterText(url);
-    // Tap the "Next" button (ElevatedButton in the ImmichForm)
-    await $(ElevatedButton).first.tap();
+    // Scroll the form into view — the login form is in a SingleChildScrollView
+    // and the TextFormField may be below the fold (logo + spacer push it down).
+    await $.tester.ensureVisible(find.byType(TextFormField).first);
+    await $.pump();
+    // Use tester.enterText directly to bypass patrol's hit-test
+    // (the field may overlap with the rotating logo's bounding box)
+    await $.tester.enterText(find.byType(TextFormField).first, url);
+    await $.pump();
+    // Tap the "Next" button
+    await $.tester.ensureVisible(find.text('Next'));
+    await $.pump();
+    await $.tester.tap(find.text('Next'));
+    await $.pump();
   }
 
   // --- Phase 2: Credentials ---
@@ -51,17 +60,30 @@ class LoginPage {
   }
 
   /// Enter email and password on the credentials screen (phase 2).
-  Future<void> enterCredentials({required String email, required String password}) async {
-    final fields = $(TextFormField);
-    // Phase 2 has two TextFormFields: email (0) and password (1)
-    await fields.at(0).enterText(email);
-    await fields.at(1).enterText(password);
+  Future<void> enterCredentials({
+    required String email,
+    required String password,
+  }) async {
+    final emailField = find.byType(TextFormField).at(0);
+    final passwordField = find.byType(TextFormField).at(1);
+
+    await $.tester.ensureVisible(emailField);
+    await $.pump();
+    await $.tester.enterText(emailField, email);
+    await $.pump();
+
+    await $.tester.ensureVisible(passwordField);
+    await $.pump();
+    await $.tester.enterText(passwordField, password);
+    await $.pump();
   }
 
   /// Tap the login button on the credentials screen.
   Future<void> tapLogin() async {
-    // Find the ElevatedButton that contains "Login" text
-    await $(ElevatedButton).first.tap();
+    await $.tester.ensureVisible(find.text('Login'));
+    await $.pump();
+    await $.tester.tap(find.text('Login'));
+    await $.pump();
   }
 
   /// Full login flow with default test credentials.

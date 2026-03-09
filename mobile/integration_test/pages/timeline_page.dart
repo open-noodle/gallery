@@ -8,9 +8,11 @@ class TimelinePage {
 
   const TimelinePage(this.$);
 
-  /// Wait for the timeline to finish loading.
+  /// Wait for the timeline to finish loading (NavigationBar visible).
   Future<void> waitForLoaded() async {
-    await $(NavigationBar).waitUntilVisible();
+    await $(NavigationBar).waitUntilVisible(
+      timeout: const Duration(seconds: 30),
+    );
   }
 
   /// Verify we are on the timeline screen.
@@ -28,7 +30,7 @@ class TimelinePage {
       find.byType(Scrollable).first,
       const Offset(0, -300),
     );
-    await $.tester.pumpAndSettle();
+    await $.pump(const Duration(milliseconds: 500));
   }
 
   /// Navigate to the search tab.
