@@ -36,7 +36,7 @@ Future<void> pumpImmichApp(PatrolIntegrationTester $) async {
   await Store.clear();
   await isar.writeTxn(() => isar.clear());
 
-  await $.pumpWidgetAndSettle(
+  await $.pumpWidget(
     ProviderScope(
       overrides: [
         dbProvider.overrideWithValue(isar),
@@ -46,4 +46,10 @@ Future<void> pumpImmichApp(PatrolIntegrationTester $) async {
       child: const app.MainWidget(),
     ),
   );
+  // Pump frames to let the app bootstrap (splash screen, routing, etc.)
+  // without waiting for all animations to settle — Immich has persistent
+  // animations that prevent pumpAndSettle from completing.
+  for (var i = 0; i < 30; i++) {
+    await $.pump(const Duration(milliseconds: 500));
+  }
 }

@@ -3,6 +3,7 @@ import 'package:patrol/patrol.dart';
 
 import '../common/patrol_config.dart';
 import '../common/test_app.dart';
+import '../common/wait_helpers.dart';
 import '../fixtures/seed_data.dart';
 import '../pages/login_page.dart';
 import '../pages/timeline_page.dart';
@@ -24,6 +25,11 @@ void main() {
       final timelinePage = TimelinePage($);
 
       await loginPage.loginWithTestCredentials();
+
+      // After login, the app may request gallery permissions (native dialog).
+      // Grant it so the timeline can load.
+      await grantPermissionIfRequested($);
+
       await timelinePage.waitForLoaded();
       expect(timelinePage.isVisible, isTrue);
     },
