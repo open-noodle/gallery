@@ -36,7 +36,7 @@ jobs:
           mobile/integration_test/scripts/start-backend.sh
 
       - name: Run all integration tests
-        uses: reactivecircus/android-emulator-runner@v2.34.0
+        uses: reactivecircus/android-emulator-runner@324029e2f414c084d8b15ba075288885e74aef9c # v2.34.0
         with:
           api-level: 33
           arch: x86_64
@@ -52,7 +52,7 @@ jobs:
 
       - name: Upload failure screenshots
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: regression-failure-screenshots
           path: mobile/build/app/outputs/androidTest-results/
