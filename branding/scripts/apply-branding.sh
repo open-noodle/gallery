@@ -20,6 +20,12 @@ DEEP_LINK_SCHEME=$(jq -r '.mobile.deep_link_scheme' "$CONFIG")
 SHARED_GROUP=$(jq -r '.mobile.shared_group' "$CONFIG")
 BG_TASK_PREFIX=$(jq -r '.mobile.background_task_prefix' "$CONFIG")
 
+# Repository
+REPO_NAME=$(jq -r '.repository.name' "$CONFIG")
+REPO_URL=$(jq -r '.repository.url' "$CONFIG")
+REPO_DOCS_URL=$(jq -r '.repository.docs_url' "$CONFIG")
+REPO_ISSUES_URL=$(jq -r '.repository.issues_url' "$CONFIG")
+
 # Docker
 DOCKER_REGISTRY=$(jq -r '.docker.registry' "$CONFIG")
 DOCKER_SERVER_IMAGE=$(jq -r '.docker.server_image' "$CONFIG")
@@ -90,6 +96,31 @@ patch_web() {
     sed -i "s/Immich/${NAME}/g" "$openapi"
     echo "  Patched OpenAPI spec"
   fi
+}
+
+#
+# --- Help Modal ---
+#
+patch_help_modal() {
+  echo "--- Patching help modal URLs ---"
+  local help_modal="$REPO_ROOT/web/src/lib/modals/HelpAndFeedbackModal.svelte"
+
+  # Replace docs URL (backtick template literal → plain string)
+  sed -i 's|`https://docs\.\${info\.version}\.archive\.immich\.app/overview/introduction`|'"'${REPO_DOCS_URL}'"'|g' "$help_modal"
+
+  # Replace bugs/issues URL (only appears once, outside upstream section)
+  sed -i "s|https://github\.com/immich-app/immich/issues/new/choose|${REPO_ISSUES_URL}|g" "$help_modal"
+
+  # Replace primary source URL (with trailing slash — upstream section has no trailing slash)
+  sed -i "s|https://github\.com/immich-app/immich/|${REPO_URL}|" "$help_modal"
+
+  # Remove Discord link from primary section (outside BRANDING:UPSTREAM markers)
+  local tmp
+  tmp=$(mktemp)
+  awk 'BEGIN{u=0} /BRANDING:UPSTREAM_START/{u=1} /BRANDING:UPSTREAM_END/{u=0; print; next} u==0 && /discord\.immich\.app/{next} {print}' "$help_modal" > "$tmp"
+  mv "$tmp" "$help_modal"
+
+  echo "  Patched HelpAndFeedbackModal.svelte"
 }
 
 #
@@ -306,6 +337,18 @@ patch_docker() {
       echo "  Patched $(basename "$f")"
     fi
   done
+
+  # Append branding env vars to example.env
+  local env_example="$REPO_ROOT/docker/example.env"
+  if [[ -f "$env_example" ]]; then
+    cat >> "$env_example" <<EOF
+
+# ${NAME} branding
+IMMICH_REPOSITORY=${REPO_NAME}
+IMMICH_REPOSITORY_URL=${REPO_URL}
+EOF
+    echo "  Added branding env vars to example.env"
+  fi
 }
 
 #
@@ -348,6 +391,7 @@ patch_docs() {
 main() {
   patch_i18n
   patch_web
+  patch_help_modal
   patch_assets
   patch_android
   patch_ios
