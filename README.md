@@ -13,10 +13,6 @@
 </p>
 <h3 align="center">High performance self-hosted photo and video management solution</h3>
 <br/>
-<a href="https://immich.app">
-<img src="design/immich-screenshots.png" title="Main Screenshot">
-</a>
-<br/>
 
 > [!NOTE]
 > This is a **community fork** of [Immich](https://github.com/immich-app/immich) with additional features and improvements. We regularly sync with upstream to stay up to date. See [What's Different](#whats-different-from-upstream-immich) below.
@@ -93,49 +89,6 @@ docker compose up -d
 ```
 
 That's it. To switch back to upstream Immich, reverse the image names and restore your database backup.
-
-## Docker Images
-
-Pre-built Docker images are published to GitHub Container Registry (GHCR) under the `open-noodle` organization.
-
-### Available Images
-
-| Image | Description |
-| :---- | :---------- |
-| `ghcr.io/open-noodle/gallery-server` | Server + web UI + CLI (all-in-one) |
-| `ghcr.io/open-noodle/gallery-ml` | Machine learning service (CPU) |
-| `ghcr.io/open-noodle/gallery-ml:*-cuda` | Machine learning service (NVIDIA CUDA) |
-
-### Tags
-
-- **`latest`** / **`latest-cuda`** — most recent published build
-- **`v*`** (e.g. `v2.5.6-noodle.1`) — pinned version release
-
-### Publishing (for maintainers)
-
-Images are built and published via the **Docker** GitHub Actions workflow (`.github/workflows/docker.yml`).
-
-**How it works:**
-1. The workflow is triggered manually via `workflow_dispatch` from the GitHub Actions UI
-2. You provide a version tag (e.g. `v2.5.6-noodle.1`) as input
-3. Three jobs run in parallel: server, ML (CPU), and ML (CUDA)
-4. Each image is tagged with both the version and `latest`
-5. Images are pushed to GHCR using the built-in `GITHUB_TOKEN` — no extra secrets needed
-
-**To publish a new version:**
-
-```bash
-gh workflow run docker.yml --ref main -f version=v2.5.6-noodle.1
-```
-
-Or use the GitHub Actions UI: Actions > Docker > Run workflow > enter version > Run.
-
-**To enable auto-publish on every push to main**, uncomment the `push` trigger in `.github/workflows/docker.yml`:
-
-```yaml
-push:
-  branches: [main]
-```
 
 ---
 
@@ -235,18 +188,45 @@ Read more about translations [here](https://docs.immich.app/developer/translatio
 
 ![Activities](https://repobeats.axiom.co/api/embed/9e86d9dc3ddd137161f2f6d2e758d7863b1789cb.svg "Repobeats analytics image")
 
-## Star history
+## Docker Images
 
-<a href="https://star-history.com/#immich-app/immich&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=immich-app/immich&type=date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=immich-app/immich&type=date" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=immich-app/immich&type=date" width="100%" />
- </picture>
-</a>
+Pre-built Docker images are published to GitHub Container Registry (GHCR) under the `open-noodle` organization.
 
-## Contributors
+### Available Images
 
-<a href="https://github.com/immich-app/immich/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=immich-app/immich" width="100%"/>
-</a>
+| Image | Description |
+| :---- | :---------- |
+| `ghcr.io/open-noodle/gallery-server` | Server + web UI + CLI (all-in-one) |
+| `ghcr.io/open-noodle/gallery-ml` | Machine learning service (CPU) |
+| `ghcr.io/open-noodle/gallery-ml:*-cuda` | Machine learning service (NVIDIA CUDA) |
+
+### Tags
+
+- **`latest`** / **`latest-cuda`** — most recent published build
+- **`v*`** (e.g. `v2.5.6-noodle.1`) — pinned version release
+
+### Publishing (for maintainers)
+
+Images are built and published via the **Docker** GitHub Actions workflow (`.github/workflows/docker.yml`).
+
+**How it works:**
+1. The workflow is triggered manually via `workflow_dispatch` from the GitHub Actions UI
+2. You provide a version tag (e.g. `v2.5.6-noodle.1`) as input
+3. Three jobs run in parallel: server, ML (CPU), and ML (CUDA)
+4. Each image is tagged with both the version and `latest`
+5. Images are pushed to GHCR using the built-in `GITHUB_TOKEN` — no extra secrets needed
+
+**To publish a new version:**
+
+```bash
+gh workflow run docker.yml --ref main -f version=v2.5.6-noodle.1
+```
+
+Or use the GitHub Actions UI: Actions > Docker > Run workflow > enter version > Run.
+
+**To enable auto-publish on every push to main**, uncomment the `push` trigger in `.github/workflows/docker.yml`:
+
+```yaml
+push:
+  branches: [main]
+```
