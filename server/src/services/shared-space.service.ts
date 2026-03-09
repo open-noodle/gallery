@@ -191,6 +191,11 @@ export class SharedSpaceService extends BaseService {
     await this.sharedSpaceRepository.addAssets(
       dto.assetIds.map((assetId) => ({ spaceId, assetId, addedById: auth.user.id })),
     );
+
+    const space = await this.sharedSpaceRepository.getById(spaceId);
+    if (space && !space.thumbnailAssetId) {
+      await this.sharedSpaceRepository.update(spaceId, { thumbnailAssetId: dto.assetIds[0] });
+    }
   }
 
   async removeAssets(auth: AuthDto, spaceId: string, dto: SharedSpaceAssetRemoveDto): Promise<void> {
