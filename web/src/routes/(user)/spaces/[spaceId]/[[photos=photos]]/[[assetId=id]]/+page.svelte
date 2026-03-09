@@ -40,6 +40,7 @@
   import { Icon, IconButton, modalManager, toastManager } from '@immich/ui';
   import {
     mdiAccountMultipleOutline,
+    mdiCameraOutline,
     mdiDeleteOutline,
     mdiDotsVertical,
     mdiEyeOffOutline,
@@ -257,9 +258,19 @@
 
   {#if viewMode !== 'select-assets'}
     <section class="px-4 pt-4">
-      <div class="flex gap-4 mt-2 text-sm text-immich-fg/60 dark:text-immich-dark-fg/60">
-        <span>{space.assetCount ?? 0} {$t('photos')}</span>
-        <span>{members.length} {$t('members')}</span>
+      <div class="flex flex-wrap gap-2 mt-2">
+        <span
+          class="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1 text-sm text-gray-700 dark:bg-gray-800 dark:text-gray-300"
+        >
+          <Icon icon={mdiCameraOutline} size="16" />
+          {space.assetCount ?? 0} {$t('photos')}
+        </span>
+        <span
+          class="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1 text-sm text-gray-700 dark:bg-gray-800 dark:text-gray-300"
+        >
+          <Icon icon={mdiAccountMultipleOutline} size="16" />
+          {members.length} {$t('members')}
+        </span>
       </div>
 
       <SpaceSearch bind:this={spaceSearch} spaceId={space.id} bind:showSearchResults />
