@@ -13,6 +13,7 @@
 ### Task 1: Add Patrol Dependencies
 
 **Files:**
+
 - Modify: `mobile/pubspec.yaml` (lines 101-127, dev_dependencies section)
 
 **Step 1: Add patrol to dev_dependencies**
@@ -66,6 +67,7 @@ patrol:
 **Step 3: Install dependencies**
 
 Run from `mobile/`:
+
 ```bash
 flutter pub get
 ```
@@ -92,6 +94,7 @@ git commit -m "chore(mobile): add patrol dependency for integration testing"
 ### Task 2: Configure Android for Patrol
 
 **Files:**
+
 - Modify: `mobile/android/app/build.gradle`
 - Create: `mobile/android/app/src/androidTest/java/app/alextran/immich/MainActivityTest.java`
 
@@ -138,6 +141,7 @@ public class MainActivityTest {}
 **Step 4: Verify Android build compiles**
 
 Run from `mobile/`:
+
 ```bash
 patrol build android --target integration_test/smoke/login_test.dart 2>&1 || echo "Expected: may fail since test file doesn't exist yet, but Gradle config should resolve"
 ```
@@ -156,6 +160,7 @@ git commit -m "chore(mobile): configure Android for Patrol test runner"
 ### Task 3: Create Test Infrastructure — Common Utilities
 
 **Files:**
+
 - Create: `mobile/integration_test/common/patrol_config.dart`
 - Create: `mobile/integration_test/common/test_app.dart`
 - Create: `mobile/integration_test/common/wait_helpers.dart`
@@ -295,6 +300,7 @@ Future<void> retryUntil(
 **Step 4: Verify files compile**
 
 Run from `mobile/`:
+
 ```bash
 dart analyze integration_test/common/
 ```
@@ -313,6 +319,7 @@ git commit -m "feat(mobile): add Patrol test infrastructure and app bootstrap"
 ### Task 4: Create Page Objects — Login Page
 
 **Files:**
+
 - Create: `mobile/integration_test/pages/login_page.dart`
 
 **Step 1: Create the login page object**
@@ -407,6 +414,7 @@ git commit -m "feat(mobile): add login page object for Patrol tests"
 ### Task 5: Create Page Objects — Timeline, Asset Viewer, Album, Search, Shared Space
 
 **Files:**
+
 - Create: `mobile/integration_test/pages/timeline_page.dart`
 - Create: `mobile/integration_test/pages/asset_viewer_page.dart`
 - Create: `mobile/integration_test/pages/album_page.dart`
@@ -644,6 +652,7 @@ git commit -m "feat(mobile): add page objects for timeline, viewer, album, searc
 ### Task 6: Create Fixtures — Test Credentials and Seed Data
 
 **Files:**
+
 - Create: `mobile/integration_test/fixtures/test_credentials.dart`
 - Create: `mobile/integration_test/fixtures/seed_data.dart`
 - Create: `mobile/integration_test/fixtures/assets/` (directory with sample images)
@@ -752,6 +761,7 @@ mkdir -p mobile/integration_test/fixtures/assets
 For the sample images, use any small JPEG files. We can generate simple test images later, or copy from `e2e/test-assets/` if available. For now, create a placeholder README:
 
 Create `mobile/integration_test/fixtures/assets/README.md`:
+
 ```
 # Test Assets
 
@@ -771,6 +781,7 @@ git commit -m "feat(mobile): add test fixtures and seed data helper"
 ### Task 7: Create Smoke Test — Login
 
 **Files:**
+
 - Create: `mobile/integration_test/smoke/login_test.dart`
 
 **Step 1: Write the login smoke test**
@@ -838,6 +849,7 @@ void main() {
 **Step 2: Verify the test compiles**
 
 Run from `mobile/`:
+
 ```bash
 dart analyze integration_test/smoke/login_test.dart
 ```
@@ -856,6 +868,7 @@ git commit -m "feat(mobile): add login smoke test with Patrol"
 ### Task 8: Create Smoke Test — Timeline
 
 **Files:**
+
 - Create: `mobile/integration_test/smoke/timeline_test.dart`
 
 **Step 1: Write the timeline smoke test**
@@ -923,6 +936,7 @@ git commit -m "feat(mobile): add timeline smoke test with Patrol"
 ### Task 9: Create Smoke Test — Upload
 
 **Files:**
+
 - Create: `mobile/integration_test/smoke/upload_test.dart`
 
 **Step 1: Write the upload smoke test**
@@ -985,6 +999,7 @@ git commit -m "feat(mobile): add upload smoke test with Patrol"
 ### Task 10: Create Regression Tests — Albums, Search, Shared Spaces, Permissions, Backup
 
 **Files:**
+
 - Create: `mobile/integration_test/regression/album_test.dart`
 - Create: `mobile/integration_test/regression/search_test.dart`
 - Create: `mobile/integration_test/regression/shared_spaces_test.dart`
@@ -1246,6 +1261,7 @@ git commit -m "feat(mobile): add regression tests for albums, search, spaces, pe
 ### Task 11: Create Docker Compose for Mobile Integration Tests
 
 **Files:**
+
 - Create: `mobile/integration_test/docker-compose.yml`
 
 **Step 1: Create a mobile-specific docker compose file**
@@ -1362,6 +1378,7 @@ git commit -m "feat(mobile): add Docker Compose and helper scripts for test back
 ### Task 12: Add CI Workflow for Smoke Tests
 
 **Files:**
+
 - Modify: `.github/workflows/test.yml` (add mobile-integration-tests job)
 
 **Step 1: Add the mobile integration test job**
@@ -1369,77 +1386,77 @@ git commit -m "feat(mobile): add Docker Compose and helper scripts for test back
 In `.github/workflows/test.yml`, add a new job after the `mobile-unit-tests` job (after line 518). This job runs the smoke tests on every PR that changes mobile files.
 
 ```yaml
-  mobile-integration-tests:
-    name: Integration Test Mobile
-    needs: pre-job
-    if: ${{ fromJSON(needs.pre-job.outputs.should_run).mobile == true }}
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          persist-credentials: false
+mobile-integration-tests:
+  name: Integration Test Mobile
+  needs: pre-job
+  if: ${{ fromJSON(needs.pre-job.outputs.should_run).mobile == true }}
+  runs-on: ubuntu-latest
+  permissions:
+    contents: read
+  timeout-minutes: 30
+  steps:
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      with:
+        persist-credentials: false
 
-      - name: Setup Flutter SDK
-        uses: subosito/flutter-action@fd55f4c5af5b953cc57a2be44cb082c8f6635e8e # v2.21.0
-        with:
-          channel: 'stable'
-          flutter-version-file: ./mobile/pubspec.yaml
+    - name: Setup Flutter SDK
+      uses: subosito/flutter-action@fd55f4c5af5b953cc57a2be44cb082c8f6635e8e # v2.21.0
+      with:
+        channel: 'stable'
+        flutter-version-file: ./mobile/pubspec.yaml
 
-      - name: Install Patrol CLI
-        run: dart pub global activate patrol_cli
+    - name: Install Patrol CLI
+      run: dart pub global activate patrol_cli
 
-      - name: Generate translation file
-        run: dart run easy_localization:generate -S ../i18n && dart run bin/generate_keys.dart
-        working-directory: ./mobile
+    - name: Generate translation file
+      run: dart run easy_localization:generate -S ../i18n && dart run bin/generate_keys.dart
+      working-directory: ./mobile
 
-      - name: Start Immich backend
-        run: |
-          chmod +x mobile/integration_test/scripts/start-backend.sh
-          mobile/integration_test/scripts/start-backend.sh
+    - name: Start Immich backend
+      run: |
+        chmod +x mobile/integration_test/scripts/start-backend.sh
+        mobile/integration_test/scripts/start-backend.sh
 
-      - name: Run integration tests
-        uses: Wandalen/wretry.action@v3
-        with:
-          attempt_limit: 2
-          command: |
-            cd mobile
-            patrol test integration_test/smoke/ \
-              --dart-define=TEST_SERVER_URL=http://10.0.2.127:2285 \
-              --dart-define=TEST_EMAIL=admin@immich.app \
-              --dart-define=TEST_PASSWORD=admin
-        env:
-          ANDROID_EMULATOR_WAIT: 120
+    - name: Run integration tests
+      uses: Wandalen/wretry.action@v3
+      with:
+        attempt_limit: 2
+        command: |
+          cd mobile
+          patrol test integration_test/smoke/ \
+            --dart-define=TEST_SERVER_URL=http://10.0.2.127:2285 \
+            --dart-define=TEST_EMAIL=admin@immich.app \
+            --dart-define=TEST_PASSWORD=admin
+      env:
+        ANDROID_EMULATOR_WAIT: 120
 
-      - name: Upload failure screenshots
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: patrol-failure-screenshots
-          path: mobile/build/app/outputs/androidTest-results/
+    - name: Upload failure screenshots
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: patrol-failure-screenshots
+        path: mobile/build/app/outputs/androidTest-results/
 
-      - name: Stop backend
-        if: always()
-        run: mobile/integration_test/scripts/stop-backend.sh
+    - name: Stop backend
+      if: always()
+      run: mobile/integration_test/scripts/stop-backend.sh
 ```
 
 Note: This is a starting point. The emulator setup step (using `reactivecircus/android-emulator-runner`) may need to be added — Patrol CLI can handle emulator management in some setups, but if not, add:
 
 ```yaml
-      - name: Run integration tests on emulator
-        uses: reactivecircus/android-emulator-runner@v2.34.0
-        with:
-          api-level: 33
-          arch: x86_64
-          profile: pixel_6
-          force-avd-creation: false
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
-          script: |
-            cd mobile
-            patrol test integration_test/smoke/ \
-              --dart-define=TEST_SERVER_URL=http://10.0.2.2:2285
+- name: Run integration tests on emulator
+  uses: reactivecircus/android-emulator-runner@v2.34.0
+  with:
+    api-level: 33
+    arch: x86_64
+    profile: pixel_6
+    force-avd-creation: false
+    emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+    script: |
+      cd mobile
+      patrol test integration_test/smoke/ \
+        --dart-define=TEST_SERVER_URL=http://10.0.2.2:2285
 ```
 
 (10.0.2.2 is the Android emulator's alias for the host machine's localhost.)
@@ -1456,6 +1473,7 @@ git commit -m "ci(mobile): add integration test workflow with Patrol and Docker 
 ### Task 13: Add Nightly Regression Workflow
 
 **Files:**
+
 - Create: `.github/workflows/mobile-regression-tests.yml`
 
 **Step 1: Create the nightly workflow**
@@ -1540,6 +1558,7 @@ git commit -m "ci(mobile): add nightly regression test workflow"
 ### Task 14: Add Makefile Targets for Local Development
 
 **Files:**
+
 - Modify: `Makefile` (add mobile test targets)
 
 **Step 1: Add mobile integration test targets to root Makefile**
@@ -1592,6 +1611,7 @@ Expected: Login test runs on the connected device/emulator.
 **Step 3: Fix any issues**
 
 Common issues to watch for:
+
 - Widget finders may need adjustment based on actual widget keys/text
 - Server URL may need `10.0.2.2` (emulator) vs `localhost` (host)
 - Timing: increase `existsTimeout` in patrol_config.dart if tests are flaky
@@ -1617,6 +1637,7 @@ git commit -m "fix(mobile): adjust integration tests based on local run"
 ### Task 16: Update Existing Integration Tests (Optional Migration)
 
 **Files:**
+
 - Modify: `mobile/integration_test/module_login/login_test.dart`
 - Modify: `mobile/integration_test/test_utils/general_helper.dart`
 - Modify: `mobile/integration_test/test_utils/login_helper.dart`

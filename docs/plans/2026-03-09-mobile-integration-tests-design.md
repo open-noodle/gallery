@@ -14,6 +14,7 @@ Patrol was chosen over Maestro and stock `integration_test` for these reasons:
 - **Gray-box testing**: Access to Flutter widget tree (`find.byKey()`, state inspection) alongside native automation.
 
 Alternatives considered:
+
 - **Maestro**: YAML-based, framework-agnostic, simpler setup. But black-box only, can't inspect Flutter state, tests in a different language from the codebase.
 - **Stock `integration_test`**: Zero dependencies but can't interact with native OS dialogs — a dealbreaker for Immich's permission-heavy flows.
 
@@ -61,12 +62,14 @@ mobile/
 ### Backend
 
 Tests run against a local Immich stack via Docker Compose (the existing `e2e` profile):
+
 - Server, PostgreSQL, Redis, ML service
 - Accessible at `http://localhost:2283` (configurable via env var)
 
 ### Seed Data
 
 A `setup_test_data.dart` fixture runs once before the test suite:
+
 - Creates a test user via the Immich API
 - Uploads ~5 sample photos (stored in `integration_test/fixtures/assets/`)
 - Creates an album with 2 assets
@@ -128,12 +131,14 @@ mobile-integration-tests:
 ### Regression Tests — Nightly/On-Demand
 
 Separate workflow via `schedule` (cron) or `workflow_dispatch`:
+
 - Runs `patrol test integration_test/` (all tests)
 - Same infrastructure, broader scope
 
 ### Escape Hatch
 
 If GH Actions emulators prove too flaky, migrate to:
+
 - **Firebase Test Lab** (free Spark plan: 10 tests/day)
 - **emulator.wtf** (Patrol team's recommendation)
 
@@ -145,54 +150,56 @@ Build APK + test APK, upload to device farm.
 
 #### Smoke Suite (PR gate)
 
-| Test | Flows Covered | Native Interaction |
-|------|--------------|-------------------|
-| `login_test` | Enter server URL, connect, login with valid credentials, verify timeline loads | No |
-| `timeline_test` | Scroll timeline, tap asset, verify viewer opens, swipe between assets, go back | No |
-| `upload_test` | Grant photo library permission, trigger manual upload, verify asset appears in timeline | Yes — permission grant |
+| Test            | Flows Covered                                                                           | Native Interaction     |
+| --------------- | --------------------------------------------------------------------------------------- | ---------------------- |
+| `login_test`    | Enter server URL, connect, login with valid credentials, verify timeline loads          | No                     |
+| `timeline_test` | Scroll timeline, tap asset, verify viewer opens, swipe between assets, go back          | No                     |
+| `upload_test`   | Grant photo library permission, trigger manual upload, verify asset appears in timeline | Yes — permission grant |
 
 #### Regression Suite (Nightly)
 
-| Test | Flows Covered | Native Interaction |
-|------|--------------|-------------------|
-| `album_test` | Create album, add assets to album, rename album, remove asset from album, delete album | No |
-| `search_test` | Text search, filter by media type (photo/video), verify results display | No |
-| `shared_spaces_test` | Create shared space, invite member, add assets, toggle "show in timeline", verify assets appear/disappear in timeline | No |
-| `permissions_test` | Deny photo permission on prompt, verify error/empty state, open system settings, grant permission, verify recovery | Yes — permission deny + settings navigation |
-| `backup_test` | Enable automatic backup in settings, verify background upload starts, check notification tray for upload status | Yes — notification inspection |
+| Test                 | Flows Covered                                                                                                         | Native Interaction                          |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| `album_test`         | Create album, add assets to album, rename album, remove asset from album, delete album                                | No                                          |
+| `search_test`        | Text search, filter by media type (photo/video), verify results display                                               | No                                          |
+| `shared_spaces_test` | Create shared space, invite member, add assets, toggle "show in timeline", verify assets appear/disappear in timeline | No                                          |
+| `permissions_test`   | Deny photo permission on prompt, verify error/empty state, open system settings, grant permission, verify recovery    | Yes — permission deny + settings navigation |
+| `backup_test`        | Enable automatic backup in settings, verify background upload starts, check notification tray for upload status       | Yes — notification inspection               |
 
 ### Not Tested (Future Phases)
 
-| Area | Flows | Priority | Reason Deferred |
-|------|-------|----------|----------------|
-| **Map view** | View assets on map, cluster interaction, navigate to asset from map pin | Medium | Requires GPS location mocking, complex map widget interaction |
-| **Face recognition** | View people section, tap person, see grouped photos | Medium | Depends on ML processing time, non-deterministic grouping |
-| **CLIP/Smart search** | Search by natural language ("dog on beach"), verify semantic results | Medium | ML model inference time, result quality is non-deterministic |
-| **OCR search** | Search text found in photos | Low | Depends on ML processing, similar challenges to CLIP |
-| **Video playback** | Play video asset, seek, pause, fullscreen | Medium | Video player widget testing is fragile across emulator configs |
-| **Multi-user** | Two users sharing assets, concurrent timeline updates | High | Requires managing two app instances or API-driven second user |
-| **Memories** | View memories carousel, dismiss, navigate to asset | Low | Time-dependent feature, hard to seed deterministically |
-| **Download/export** | Download original asset to device, share to external app | Medium | Requires file system verification, external app interaction |
-| **Settings** | Change theme, language, storage template, notification preferences | Low | Mostly UI state, well covered by widget tests |
-| **Partner sharing** | Add partner, view partner's assets in timeline | High | Similar to shared spaces but different access model |
-| **Offline mode** | Browse cached assets without network, verify graceful degradation | Medium | Requires network toggling on emulator |
-| **Biometric auth** | Enable app lock, verify fingerprint/face prompt on resume | Low | Biometric mocking varies across emulator versions |
-| **Trash/archive** | Move to trash, restore, permanent delete, archive/unarchive | Medium | Straightforward CRUD, good candidate for next phase |
-| **Favorites** | Mark favorite, filter by favorites, unfavorite | Medium | Simple flow, good candidate for next phase |
-| **Multi-select** | Long-press to select, select multiple, batch delete/move/share | Medium | Gesture-heavy, worth testing but tricky on emulators |
-| **External library** | Configure external library path, scan, verify assets imported | Low | Requires device storage setup |
-| **Server administration** | User management, storage stats, job queue (admin only) | Low | Better tested via web E2E or API tests |
-| **Widget (home screen)** | Configure home screen widget, verify it displays recent photos | Low | Android widget testing requires special setup |
+| Area                      | Flows                                                                   | Priority | Reason Deferred                                                |
+| ------------------------- | ----------------------------------------------------------------------- | -------- | -------------------------------------------------------------- |
+| **Map view**              | View assets on map, cluster interaction, navigate to asset from map pin | Medium   | Requires GPS location mocking, complex map widget interaction  |
+| **Face recognition**      | View people section, tap person, see grouped photos                     | Medium   | Depends on ML processing time, non-deterministic grouping      |
+| **CLIP/Smart search**     | Search by natural language ("dog on beach"), verify semantic results    | Medium   | ML model inference time, result quality is non-deterministic   |
+| **OCR search**            | Search text found in photos                                             | Low      | Depends on ML processing, similar challenges to CLIP           |
+| **Video playback**        | Play video asset, seek, pause, fullscreen                               | Medium   | Video player widget testing is fragile across emulator configs |
+| **Multi-user**            | Two users sharing assets, concurrent timeline updates                   | High     | Requires managing two app instances or API-driven second user  |
+| **Memories**              | View memories carousel, dismiss, navigate to asset                      | Low      | Time-dependent feature, hard to seed deterministically         |
+| **Download/export**       | Download original asset to device, share to external app                | Medium   | Requires file system verification, external app interaction    |
+| **Settings**              | Change theme, language, storage template, notification preferences      | Low      | Mostly UI state, well covered by widget tests                  |
+| **Partner sharing**       | Add partner, view partner's assets in timeline                          | High     | Similar to shared spaces but different access model            |
+| **Offline mode**          | Browse cached assets without network, verify graceful degradation       | Medium   | Requires network toggling on emulator                          |
+| **Biometric auth**        | Enable app lock, verify fingerprint/face prompt on resume               | Low      | Biometric mocking varies across emulator versions              |
+| **Trash/archive**         | Move to trash, restore, permanent delete, archive/unarchive             | Medium   | Straightforward CRUD, good candidate for next phase            |
+| **Favorites**             | Mark favorite, filter by favorites, unfavorite                          | Medium   | Simple flow, good candidate for next phase                     |
+| **Multi-select**          | Long-press to select, select multiple, batch delete/move/share          | Medium   | Gesture-heavy, worth testing but tricky on emulators           |
+| **External library**      | Configure external library path, scan, verify assets imported           | Low      | Requires device storage setup                                  |
+| **Server administration** | User management, storage stats, job queue (admin only)                  | Low      | Better tested via web E2E or API tests                         |
+| **Widget (home screen)**  | Configure home screen widget, verify it displays recent photos          | Low      | Android widget testing requires special setup                  |
 
 ### Recommended Next Phases
 
 **Phase 2** (high value, moderate effort):
+
 - `trash_archive_test` — trash, restore, archive flows
 - `favorites_test` — favorite/unfavorite, filter
 - `multi_select_test` — batch operations
 - `partner_sharing_test` — partner add/view
 
 **Phase 3** (high value, higher effort):
+
 - `map_test` — with GPS mocking
 - `video_test` — playback controls
 - `multi_user_test` — API-driven second user
@@ -200,10 +207,10 @@ Build APK + test APK, upload to device farm.
 
 ## Platform Coverage
 
-| Platform | CI | Local |
-|----------|-----|-------|
-| Android (emulator, API 33) | Yes — every PR (smoke), nightly (regression) | Yes |
-| iOS (simulator) | No — requires macOS runner ($$$) | Yes — any dev with a Mac |
+| Platform                   | CI                                           | Local                    |
+| -------------------------- | -------------------------------------------- | ------------------------ |
+| Android (emulator, API 33) | Yes — every PR (smoke), nightly (regression) | Yes                      |
+| iOS (simulator)            | No — requires macOS runner ($$$)             | Yes — any dev with a Mac |
 
 ## Dependencies
 
