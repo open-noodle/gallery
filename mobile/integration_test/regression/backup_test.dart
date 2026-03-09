@@ -25,8 +25,8 @@ void main() {
       final timelinePage = TimelinePage($);
 
       await loginPage.loginWithTestCredentials();
-      await timelinePage.waitForLoaded();
       await grantPermissionIfRequested($);
+      await timelinePage.waitForLoaded();
       await $(Icons.backup).tap();
       await $.pump(const Duration(seconds: 3));
     },

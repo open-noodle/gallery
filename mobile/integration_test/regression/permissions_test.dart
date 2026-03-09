@@ -25,7 +25,6 @@ void main() {
       final timelinePage = TimelinePage($);
 
       await loginPage.loginWithTestCredentials();
-      await timelinePage.waitForLoaded();
       await denyPermissionIfRequested($);
       await timelinePage.waitForLoaded();
       expect(timelinePage.isVisible, isTrue);
