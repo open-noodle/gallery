@@ -64,6 +64,26 @@ Photos are linked by reference — they remain in your personal library and appe
 3. Click the **Remove from space** button in the action bar.
 4. Confirm the removal.
 
+## Timeline Integration
+
+Each member can choose whether a space's photos appear in their personal timeline:
+
+1. Open the space.
+2. Click the **eye icon** in the space header toolbar.
+3. Toggle between **Show on timeline** and **Hide from timeline**.
+
+When enabled, photos from that space are merged into your main Photos timeline alongside your own assets. This is per-member — each user controls their own setting independently.
+
+> Timeline integration cannot be combined with archive, favorites, or trash filters.
+
+## Space Covers
+
+Spaces display as album-style cards with a cover photo, member avatars, and asset/member counts. The cover photo is automatically set to the first photo added to the space, but Owners and Editors can change it:
+
+1. Open the space.
+2. Select a single photo.
+3. Choose **Set as space cover** from the action menu.
+
 ## Differences from Partner Sharing
 
 | Feature         | Partner Sharing    | Shared Spaces              |
