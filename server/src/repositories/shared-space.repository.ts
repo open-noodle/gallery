@@ -172,6 +172,29 @@ export class SharedSpaceRepository {
     return result?.id;
   }
 
+  @GenerateSql({ params: [DummyValue.UUID, 4] })
+  getRecentAssets(spaceId: string, limit: number = 4) {
+    return this.db
+      .selectFrom('shared_space_asset')
+      .innerJoin('asset', 'asset.id', 'shared_space_asset.assetId')
+      .where('shared_space_asset.spaceId', '=', spaceId)
+      .where('asset.deletedAt', 'is', null)
+      .orderBy('shared_space_asset.addedAt', 'desc')
+      .select(['asset.id', 'asset.thumbhash'])
+      .limit(limit)
+      .execute();
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID] })
+  async getLastAssetAddedAt(spaceId: string): Promise<Date | undefined> {
+    const result = await this.db
+      .selectFrom('shared_space_asset')
+      .where('spaceId', '=', spaceId)
+      .select((eb) => eb.fn.max('addedAt').as('lastAddedAt'))
+      .executeTakeFirst();
+    return result?.lastAddedAt ?? undefined;
+  }
+
   @GenerateSql({ params: [DummyValue.UUID] })
   getMapMarkers(spaceId: string) {
     return this.db
