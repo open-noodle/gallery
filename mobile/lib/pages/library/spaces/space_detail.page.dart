@@ -114,6 +114,7 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
     try {
       final assetIds = newAssets.map((a) => (a as RemoteAsset).id).toList();
       await ref.read(sharedSpaceApiRepositoryProvider).addAssets(widget.spaceId, assetIds);
+      ref.invalidate(sharedSpacesProvider);
       if (context.mounted) {
         ImmichToast.show(
           context: context,

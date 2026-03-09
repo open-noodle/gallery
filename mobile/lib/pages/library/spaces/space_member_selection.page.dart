@@ -6,10 +6,22 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/user.model.dart';
 import 'package:immich_mobile/extensions/asyncvalue_extensions.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
-import 'package:immich_mobile/providers/album/suggested_shared_users.provider.dart';
+import 'package:immich_mobile/providers/infrastructure/user.provider.dart';
+import 'package:immich_mobile/providers/user.provider.dart';
+import 'package:immich_mobile/providers/shared_space.provider.dart';
 import 'package:immich_mobile/repositories/shared_space_api.repository.dart';
 import 'package:immich_mobile/widgets/common/immich_toast.dart';
 import 'package:immich_mobile/widgets/common/user_circle_avatar.dart';
+
+/// Provider that fetches users directly from the API to ensure availability
+/// even before local Isar sync completes. The standard [otherUsersProvider]
+/// reads from Isar which may be empty on fresh login.
+final spaceMemberCandidatesProvider = FutureProvider.autoDispose<List<UserDto>>((ref) async {
+  final currentUser = ref.watch(currentUserProvider);
+  final allUsers = await ref.watch(userApiRepositoryProvider).getAll();
+  allUsers.removeWhere((u) => currentUser?.id == u.id);
+  return allUsers;
+});
 
 @RoutePage()
 class SpaceMemberSelectionPage extends HookConsumerWidget {
@@ -20,7 +32,7 @@ class SpaceMemberSelectionPage extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final suggestedUsers = ref.watch(otherUsersProvider);
+    final suggestedUsers = ref.watch(spaceMemberCandidatesProvider);
     final selectedUsers = useState<Set<UserDto>>({});
 
     Future<void> addSelectedMembers() async {
@@ -29,6 +41,8 @@ class SpaceMemberSelectionPage extends HookConsumerWidget {
         for (final user in selectedUsers.value) {
           await repo.addMember(spaceId, user.id);
         }
+        ref.invalidate(sharedSpaceMembersProvider(spaceId));
+        ref.invalidate(sharedSpacesProvider);
         if (context.mounted) {
           ImmichToast.show(
             context: context,
@@ -72,9 +86,9 @@ class SpaceMemberSelectionPage extends HookConsumerWidget {
       ),
       body: suggestedUsers.widgetWhen(
         onData: (users) {
-          users.removeWhere((u) => existingMemberIds.contains(u.id));
+          final filteredUsers = users.where((u) => !existingMemberIds.contains(u.id)).toList();
 
-          if (users.isEmpty) {
+          if (filteredUsers.isEmpty) {
             return const Center(child: Text('No users available to add'));
           }
 
@@ -107,9 +121,9 @@ class SpaceMemberSelectionPage extends HookConsumerWidget {
               ListView.builder(
                 primary: false,
                 shrinkWrap: true,
-                itemCount: users.length,
+                itemCount: filteredUsers.length,
                 itemBuilder: (context, index) {
-                  final user = users[index];
+                  final user = filteredUsers[index];
                   return ListTile(
                     leading: buildTileIcon(user),
                     dense: true,

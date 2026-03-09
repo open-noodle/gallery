@@ -48,8 +48,8 @@ class SpaceMembersPage extends HookConsumerWidget {
         try {
           await ref.read(sharedSpaceApiRepositoryProvider).removeMember(spaceId, member.userId);
           ref.invalidate(sharedSpaceMembersProvider(spaceId));
+          ref.invalidate(sharedSpacesProvider);
           if (isLeaving && context.mounted) {
-            ref.invalidate(sharedSpacesProvider);
             await context.maybePop();
           } else if (context.mounted) {
             ImmichToast.show(context: context, msg: '${member.name} removed', toastType: ToastType.success);

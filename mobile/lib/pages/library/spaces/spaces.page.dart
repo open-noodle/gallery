@@ -94,7 +94,9 @@ class SpacesPage extends HookConsumerWidget {
             );
           }
 
-          return ListView.builder(
+          return RefreshIndicator(
+            onRefresh: () async => ref.invalidate(sharedSpacesProvider),
+            child: ListView.builder(
             itemCount: spaces.length,
             itemBuilder: (context, index) {
               final space = spaces[index];
@@ -134,9 +136,13 @@ class SpacesPage extends HookConsumerWidget {
                     const Icon(Icons.chevron_right),
                   ],
                 ),
-                onTap: () => context.pushRoute(SpaceDetailRoute(spaceId: space.id)),
+                onTap: () async {
+                  await context.pushRoute(SpaceDetailRoute(spaceId: space.id));
+                  ref.invalidate(sharedSpacesProvider);
+                },
               );
             },
+          ),
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
