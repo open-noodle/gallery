@@ -13,10 +13,10 @@ The model detects the following animal categories: bird, cat, dog, horse, sheep,
 Three model sizes are available, trading accuracy for speed:
 
 | Model     | Parameters | Accuracy (mAP) | Speed    |
-| --------- | ---------- | --------------- | -------- |
-| `yolo11n` | 2.6M       | 39.5            | Fastest  |
-| `yolo11s` | 9.4M       | 47.0            | Balanced |
-| `yolo11m` | 20.1M      | 51.5            | Slowest  |
+| --------- | ---------- | -------------- | -------- |
+| `yolo11n` | 2.6M       | 39.5           | Fastest  |
+| `yolo11s` | 9.4M       | 47.0           | Balanced |
+| `yolo11m` | 20.1M      | 51.5           | Slowest  |
 
 The default model is **yolo11s**, which offers a good balance between accuracy and performance.
 
