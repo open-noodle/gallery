@@ -131,6 +131,15 @@ export class SharedSpaceResponseDto {
   @ApiPropertyOptional({ description: 'Space color', enum: UserAvatarColor })
   color?: UserAvatarColor | null;
 
+  @ApiPropertyOptional({ description: 'Last activity timestamp (most recent asset add)' })
+  lastActivityAt?: string | null;
+
+  @ApiPropertyOptional({ description: 'Recent asset IDs for collage display (up to 4)', type: [String] })
+  recentAssetIds?: string[];
+
+  @ApiPropertyOptional({ description: 'Thumbhashes for recent assets (parallel array)', type: [String] })
+  recentAssetThumbhashes?: (string | null)[];
+
   @ApiPropertyOptional({ description: 'Space members (summary)', type: [SharedSpaceMemberResponseDto] })
   members?: SharedSpaceMemberResponseDto[];
 }
