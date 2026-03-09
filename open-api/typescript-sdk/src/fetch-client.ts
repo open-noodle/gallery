@@ -2366,6 +2366,8 @@ export type SharedSpaceMemberResponseDto = {
 export type SharedSpaceResponseDto = {
     /** Number of assets */
     assetCount?: number;
+    /** Space color */
+    color?: Color | null;
     /** Creation date */
     createdAt: string;
     /** Creator user ID */
@@ -2386,12 +2388,16 @@ export type SharedSpaceResponseDto = {
     updatedAt: string;
 };
 export type SharedSpaceCreateDto = {
+    /** Space color */
+    color?: UserAvatarColor;
     /** Space description */
     description?: string;
     /** Space name */
     name: string;
 };
 export type SharedSpaceUpdateDto = {
+    /** Space color */
+    color?: UserAvatarColor;
     /** Space description */
     description?: string;
     /** Space name */
@@ -7618,6 +7624,18 @@ export enum Error2 {
     Duplicate = "duplicate",
     NoPermission = "no_permission",
     NotFound = "not_found"
+}
+export enum Color {
+    Primary = "primary",
+    Pink = "pink",
+    Red = "red",
+    Yellow = "yellow",
+    Blue = "blue",
+    Green = "green",
+    Purple = "purple",
+    Orange = "orange",
+    Gray = "gray",
+    Amber = "amber"
 }
 export enum Role {
     Owner = "owner",
