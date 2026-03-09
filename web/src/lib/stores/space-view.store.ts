@@ -1,5 +1,6 @@
 import { SortOrder } from '$lib/stores/preferences.store';
 import { persisted } from 'svelte-persisted-store';
+import type { Translations } from 'svelte-i18n';
 
 export enum SpaceSortBy {
   Name = 'Name',
@@ -20,7 +21,7 @@ export const spaceViewSettings = persisted<SpaceViewSettings>('space-view-settin
 
 export interface SpaceSortOptionMetadata {
   id: SpaceSortBy;
-  label: string;
+  label: Translations;
   defaultOrder: SortOrder;
 }
 

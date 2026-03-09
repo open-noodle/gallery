@@ -64,7 +64,7 @@
 
   let sortIcon = $derived($spaceViewSettings.sortOrder === SortOrder.Desc ? mdiArrowDownThin : mdiArrowUpThin);
   let activeLabel = $derived(
-    sortOptionsMetadata.find((o) => o.id === $spaceViewSettings.sortBy)?.label ?? 'last_activity',
+    sortOptionsMetadata.find((o) => o.id === $spaceViewSettings.sortBy)?.label ?? ('last_activity' as const),
   );
 </script>
 
