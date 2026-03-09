@@ -574,6 +574,7 @@ jobs:
           working-directory: ./mobile
           script: |
             patrol test --target integration_test/smoke/ \
+              --exclude integration_test/regression/ \
               --dart-define=TEST_SERVER_URL=http://10.0.2.2:2285 \
               --dart-define=TEST_EMAIL=admin@immich.app \
               --dart-define=TEST_PASSWORD=admin
