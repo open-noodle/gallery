@@ -184,10 +184,6 @@ Read more about translations [here](https://docs.immich.app/developer/translatio
 <img src="https://hosted.weblate.org/widget/immich/immich/multi-auto.svg" alt="Translation status" />
 </a>
 
-## Repository activity
-
-![Activities](https://repobeats.axiom.co/api/embed/9e86d9dc3ddd137161f2f6d2e758d7863b1789cb.svg "Repobeats analytics image")
-
 ## Docker Images
 
 Pre-built Docker images are published to GitHub Container Registry (GHCR) under the `open-noodle` organization.
