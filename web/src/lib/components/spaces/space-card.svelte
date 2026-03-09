@@ -3,7 +3,7 @@
   import UserAvatar from '$lib/components/shared-components/user-avatar.svelte';
   import { Route } from '$lib/route';
   import { getAssetMediaUrl } from '$lib/utils';
-  import type { SharedSpaceResponseDto, UserAvatarColor } from '@immich/sdk';
+  import { UserAvatarColor, type SharedSpaceResponseDto } from '@immich/sdk';
   import { Icon } from '@immich/ui';
   import { mdiImageMultipleOutline } from '@mdi/js';
   import { t } from 'svelte-i18n';
@@ -16,6 +16,21 @@
   let { space, preload = false }: Props = $props();
 
   const MAX_AVATARS = 4;
+
+  const gradientClasses: Record<string, string> = {
+    [UserAvatarColor.Primary]: 'from-immich-primary/60 to-immich-primary',
+    [UserAvatarColor.Pink]: 'from-pink-300 to-pink-500',
+    [UserAvatarColor.Red]: 'from-red-400 to-red-600',
+    [UserAvatarColor.Yellow]: 'from-yellow-300 to-yellow-500',
+    [UserAvatarColor.Blue]: 'from-blue-400 to-blue-600',
+    [UserAvatarColor.Green]: 'from-green-400 to-green-700',
+    [UserAvatarColor.Purple]: 'from-purple-400 to-purple-700',
+    [UserAvatarColor.Orange]: 'from-orange-400 to-orange-600',
+    [UserAvatarColor.Gray]: 'from-gray-400 to-gray-600',
+    [UserAvatarColor.Amber]: 'from-amber-400 to-amber-600',
+  };
+
+  let gradientClass = $derived(gradientClasses[space.color ?? 'primary'] ?? gradientClasses[UserAvatarColor.Primary]);
 
   let thumbnailUrl = $derived(space.thumbnailAssetId ? getAssetMediaUrl({ id: space.thumbnailAssetId }) : null);
   let visibleMembers = $derived((space.members ?? []).slice(0, MAX_AVATARS));
@@ -32,10 +47,10 @@
       <AssetCover alt={space.name} class="transition-all duration-300 hover:shadow-lg" src={thumbnailUrl} {preload} />
     {:else}
       <div
-        class="flex size-full items-center justify-center rounded-xl bg-gray-100 aspect-square dark:bg-gray-800"
+        class="flex size-full items-center justify-center rounded-xl bg-gradient-to-br {gradientClass} aspect-square"
         data-testid="space-no-cover"
       >
-        <Icon icon={mdiImageMultipleOutline} size="4em" class="text-gray-300 dark:text-gray-600" />
+        <Icon icon={mdiImageMultipleOutline} size="4em" class="text-white/40" />
       </div>
     {/if}
 
