@@ -28,9 +28,9 @@ if (typeof globalThis.localStorage?.getItem !== 'function') {
   const ss = createStorage();
   Object.defineProperty(globalThis, 'localStorage', { value: ls, writable: true, configurable: true });
   Object.defineProperty(globalThis, 'sessionStorage', { value: ss, writable: true, configurable: true });
-  if (typeof window !== 'undefined') {
-    Object.defineProperty(window, 'localStorage', { value: ls, writable: true, configurable: true });
-    Object.defineProperty(window, 'sessionStorage', { value: ss, writable: true, configurable: true });
+  if (globalThis.window !== undefined) {
+    Object.defineProperty(globalThis.window, 'localStorage', { value: ls, writable: true, configurable: true });
+    Object.defineProperty(globalThis.window, 'sessionStorage', { value: ss, writable: true, configurable: true });
   }
 }
 
