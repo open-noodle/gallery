@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { MapMarkerResponseDto } from 'src/dtos/map.dto';
-import { SharedSpaceRole } from 'src/enum';
+import { SharedSpaceRole, UserAvatarColor } from 'src/enum';
 import { SharedSpaceService } from 'src/services/shared-space.service';
 import { factory, newDate, newUuid } from 'test/small.factory';
 import { newTestService, ServiceMocks } from 'test/utils';
@@ -52,6 +52,7 @@ describe(SharedSpaceService.name, () => {
       expect(mocks.sharedSpace.create).toHaveBeenCalledWith({
         name: 'Test Space',
         description: null,
+        color: 'primary',
         createdById: auth.user.id,
       });
 
@@ -81,6 +82,55 @@ describe(SharedSpaceService.name, () => {
       expect(mocks.sharedSpace.create).toHaveBeenCalledWith({
         name: 'Test Space',
         description: 'A cool space',
+        color: 'primary',
+        createdById: auth.user.id,
+      });
+    });
+
+    it('should pass color when provided', async () => {
+      const auth = factory.auth();
+      const space = factory.sharedSpace({ createdById: auth.user.id, color: 'blue' });
+
+      mocks.sharedSpace.create.mockResolvedValue(space);
+      mocks.sharedSpace.addMember.mockResolvedValue(
+        factory.sharedSpaceMember({
+          spaceId: space.id,
+          userId: auth.user.id,
+          role: SharedSpaceRole.Owner,
+        }),
+      );
+
+      const result = await sut.create(auth, { name: 'Test Space', color: UserAvatarColor.Blue });
+
+      expect(result.color).toBe('blue');
+      expect(mocks.sharedSpace.create).toHaveBeenCalledWith({
+        name: 'Test Space',
+        description: null,
+        color: UserAvatarColor.Blue,
+        createdById: auth.user.id,
+      });
+    });
+
+    it('should default color to primary when not provided', async () => {
+      const auth = factory.auth();
+      const space = factory.sharedSpace({ createdById: auth.user.id, color: 'primary' });
+
+      mocks.sharedSpace.create.mockResolvedValue(space);
+      mocks.sharedSpace.addMember.mockResolvedValue(
+        factory.sharedSpaceMember({
+          spaceId: space.id,
+          userId: auth.user.id,
+          role: SharedSpaceRole.Owner,
+        }),
+      );
+
+      const result = await sut.create(auth, { name: 'Test Space' });
+
+      expect(result.color).toBe('primary');
+      expect(mocks.sharedSpace.create).toHaveBeenCalledWith({
+        name: 'Test Space',
+        description: null,
+        color: 'primary',
         createdById: auth.user.id,
       });
     });
@@ -137,6 +187,19 @@ describe(SharedSpaceService.name, () => {
       expect(result[0].members).toHaveLength(2);
       expect(result[0].members![0].name).toBe('User 1');
       expect(result[0].members![1].name).toBe('User 2');
+    });
+
+    it('should include color in response', async () => {
+      const auth = factory.auth();
+      const space = factory.sharedSpace({ name: 'Blue Space', color: 'blue' });
+
+      mocks.sharedSpace.getAllByUserId.mockResolvedValue([space]);
+      mocks.sharedSpace.getMembers.mockResolvedValue([]);
+      mocks.sharedSpace.getAssetCount.mockResolvedValue(0);
+
+      const result = await sut.getAll(auth);
+
+      expect(result[0].color).toBe('blue');
     });
   });
 
@@ -234,6 +297,26 @@ describe(SharedSpaceService.name, () => {
 
       await expect(sut.get(auth, newUuid())).rejects.toBeInstanceOf(ForbiddenException);
     });
+
+    it('should include color in response', async () => {
+      const auth = factory.auth();
+      const space = factory.sharedSpace({ color: 'green' });
+      const member = makeMemberResult({
+        spaceId: space.id,
+        userId: auth.user.id,
+        role: SharedSpaceRole.Viewer,
+      });
+
+      mocks.sharedSpace.getMember.mockResolvedValue(member);
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.getMembers.mockResolvedValue([member]);
+      mocks.sharedSpace.getAssetCount.mockResolvedValue(0);
+      mocks.sharedSpace.getMostRecentAssetId.mockResolvedValue(void 0);
+
+      const result = await sut.get(auth, space.id);
+
+      expect(result.color).toBe('green');
+    });
   });
 
   describe('update', () => {
@@ -252,6 +335,8 @@ describe(SharedSpaceService.name, () => {
       expect(mocks.sharedSpace.update).toHaveBeenCalledWith(space.id, {
         name: 'Updated Name',
         description: undefined,
+        thumbnailAssetId: undefined,
+        color: undefined,
       });
     });
 
@@ -272,6 +357,7 @@ describe(SharedSpaceService.name, () => {
         name: undefined,
         description: undefined,
         thumbnailAssetId,
+        color: undefined,
       });
     });
 
@@ -291,6 +377,7 @@ describe(SharedSpaceService.name, () => {
         name: undefined,
         description: undefined,
         thumbnailAssetId: null,
+        color: undefined,
       });
     });
 
@@ -326,6 +413,38 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.getMember.mockResolvedValue(member);
 
       await expect(sut.update(auth, space.id, { description: 'New Description' })).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+    });
+
+    it('should allow owner to update color', async () => {
+      const auth = factory.auth();
+      const space = factory.sharedSpace();
+      const member = makeMemberResult({ spaceId: space.id, userId: auth.user.id, role: SharedSpaceRole.Owner });
+      const updatedSpace = { ...space, color: 'blue' };
+
+      mocks.sharedSpace.getMember.mockResolvedValue(member);
+      mocks.sharedSpace.update.mockResolvedValue(updatedSpace);
+
+      const result = await sut.update(auth, space.id, { color: UserAvatarColor.Blue });
+
+      expect(result.color).toBe('blue');
+      expect(mocks.sharedSpace.update).toHaveBeenCalledWith(space.id, {
+        name: undefined,
+        description: undefined,
+        thumbnailAssetId: undefined,
+        color: UserAvatarColor.Blue,
+      });
+    });
+
+    it('should not allow editor to update color', async () => {
+      const auth = factory.auth();
+      const space = factory.sharedSpace();
+      const member = makeMemberResult({ spaceId: space.id, userId: auth.user.id, role: SharedSpaceRole.Editor });
+
+      mocks.sharedSpace.getMember.mockResolvedValue(member);
+
+      await expect(sut.update(auth, space.id, { color: UserAvatarColor.Blue })).rejects.toBeInstanceOf(
         ForbiddenException,
       );
     });
