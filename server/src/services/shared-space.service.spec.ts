@@ -224,8 +224,8 @@ describe(SharedSpaceService.name, () => {
       const auth = factory.auth();
       const space = factory.sharedSpace();
       const recentAssets = [
-        { id: newUuid(), thumbhash: 'abc123' },
-        { id: newUuid(), thumbhash: 'def456' },
+        { id: newUuid(), thumbhash: Buffer.from('abc123') },
+        { id: newUuid(), thumbhash: Buffer.from('def456') },
       ];
 
       mocks.sharedSpace.getAllByUserId.mockResolvedValue([space]);
@@ -366,9 +366,9 @@ describe(SharedSpaceService.name, () => {
       const space = factory.sharedSpace();
       const member = makeMemberResult({ spaceId: space.id, userId: auth.user.id, role: SharedSpaceRole.Viewer });
       const recentAssets = [
-        { id: newUuid(), thumbhash: 'thumb1' },
+        { id: newUuid(), thumbhash: Buffer.from('thumb1') },
         { id: newUuid(), thumbhash: null },
-        { id: newUuid(), thumbhash: 'thumb3' },
+        { id: newUuid(), thumbhash: Buffer.from('thumb3') },
       ];
 
       mocks.sharedSpace.getMember.mockResolvedValue(member);

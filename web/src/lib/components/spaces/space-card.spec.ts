@@ -44,7 +44,7 @@ describe('SpaceCard component', () => {
   });
 
   it('should render collage when recentAssetIds are provided', () => {
-    render(SpaceCard, { space: makeSpace({ recentAssetIds: ['a1', 'a2'], recentAssetThumbhashes: [null, null] }) });
+    render(SpaceCard, { space: makeSpace({ recentAssetIds: ['a1', 'a2'], recentAssetThumbhashes: ['', ''] }) });
     expect(screen.getByTestId('collage-asymmetric')).toBeInTheDocument();
   });
 

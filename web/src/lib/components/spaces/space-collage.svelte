@@ -70,10 +70,7 @@
     {/if}
   </div>
 {:else}
-  <div
-    class="grid grid-cols-2 grid-rows-2 aspect-square gap-0.5 overflow-hidden rounded-xl"
-    data-testid="collage-grid"
-  >
+  <div class="grid grid-cols-2 grid-rows-2 aspect-square gap-0.5 overflow-hidden rounded-xl" data-testid="collage-grid">
     {#each assets.slice(0, 4) as asset (asset.id)}
       <img
         alt=""
