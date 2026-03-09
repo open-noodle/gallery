@@ -31,7 +31,7 @@ Store your photos and videos in any S3-compatible object storage — AWS S3, Min
 
 ### Shared Spaces
 
-Create collaborative photo-sharing spaces where multiple users can contribute and browse photos together. Unlike partner sharing (which shares your entire library one-way), Shared Spaces let you create focused groups — "Family", "Friends", "Vacation 2025" — with role-based access (Owner, Editor, Viewer). Photos are linked by reference with zero additional storage cost. Members can optionally merge space assets into their personal timeline with a single toggle. See the [Shared Spaces documentation](docs/docs/features/shared-spaces.md) for details.
+Create collaborative photo-sharing spaces where multiple users can contribute and browse photos together. Unlike partner sharing (which shares your entire library one-way), Shared Spaces let you create focused groups — "Family", "Friends", "Vacation 2025" — with role-based access (Owner, Editor, Viewer). Photos are linked by reference with zero additional storage cost. Members can optionally merge space assets into their personal timeline with a single toggle. Available on both web and mobile. See the [Shared Spaces documentation](docs/docs/features/shared-spaces.md) for details.
 
 ### Pet Detection
 
