@@ -112,7 +112,7 @@ describe('Space sorting logic', () => {
 
   it('should sort null lastActivityAt to end when sorting desc', () => {
     const result = sortSpaces([gamma, beta, alpha], SpaceSortBy.LastActivity, 'desc');
-    expect(result.at(-1).name).toBe('Gamma');
+    expect(result.at(-1)!.name).toBe('Gamma');
   });
 
   it('should sort null lastActivityAt to start when sorting asc', () => {

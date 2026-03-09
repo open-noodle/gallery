@@ -52,6 +52,7 @@
       </p>
       {#if space.description.length > 120}
         <button
+          type="button"
           class="mt-0.5 text-xs text-white/60 hover:text-white/90"
           onclick={() => (showFullDescription = !showFullDescription)}
           data-testid="hero-show-more"

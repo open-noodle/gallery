@@ -70,6 +70,7 @@
 
 <div class="relative mb-4 flex justify-end" data-testid="spaces-controls">
   <button
+    type="button"
     class="flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-800"
     onclick={() => (showDropdown = !showDropdown)}
     data-testid="sort-button"
@@ -86,6 +87,7 @@
     >
       {#each sortOptionsMetadata as option (option.id)}
         <button
+          type="button"
           class="flex w-full items-center justify-between px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-800"
           class:font-semibold={$spaceViewSettings.sortBy === option.id}
           onclick={() => handleSort(option)}

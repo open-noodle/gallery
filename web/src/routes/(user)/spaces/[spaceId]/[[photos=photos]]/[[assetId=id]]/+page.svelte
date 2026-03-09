@@ -207,7 +207,7 @@
     'from-sky-400 to-blue-600',
   ];
 
-  const spaceGradient = $derived(gradientClasses[Math.abs(space.id.charCodeAt(0)) % gradientClasses.length]);
+  const spaceGradient = $derived(gradientClasses[Math.abs(space.id.codePointAt(0) ?? 0) % gradientClasses.length]);
 </script>
 
 <OnEvents {onSpaceAddAssets} {onSpaceRemoveAssets} />
