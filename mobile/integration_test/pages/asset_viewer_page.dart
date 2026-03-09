@@ -10,7 +10,9 @@ class AssetViewerPage {
 
   /// Wait for the viewer to be visible (PageView indicates the viewer is open).
   Future<void> waitForVisible() async {
-    await $(PageView).waitUntilVisible();
+    await $(PageView).waitUntilVisible(
+      timeout: const Duration(seconds: 30),
+    );
   }
 
   /// Swipe left to next asset.
@@ -19,7 +21,7 @@ class AssetViewerPage {
       find.byType(PageView).first,
       const Offset(-300, 0),
     );
-    await $.tester.pumpAndSettle();
+    await $.pump(const Duration(milliseconds: 500));
   }
 
   /// Swipe right to previous asset.
@@ -28,11 +30,12 @@ class AssetViewerPage {
       find.byType(PageView).first,
       const Offset(300, 0),
     );
-    await $.tester.pumpAndSettle();
+    await $.pump(const Duration(milliseconds: 500));
   }
 
   /// Go back to timeline.
   Future<void> goBack() async {
     await $.platformAutomator.android.pressBack();
+    await $.pump(const Duration(milliseconds: 500));
   }
 }

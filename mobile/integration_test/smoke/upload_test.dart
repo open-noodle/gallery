@@ -16,7 +16,7 @@ void main() {
   });
 
   patrolTest(
-    'Grant photo permission and trigger upload',
+    'Grant photo permission after login',
     config: patrolConfig,
     ($) async {
       await pumpImmichApp($);
@@ -25,8 +25,6 @@ void main() {
       final timelinePage = TimelinePage($);
 
       await loginPage.loginWithTestCredentials();
-      await timelinePage.waitForLoaded();
-
       await grantPermissionIfRequested($);
 
       await timelinePage.waitForLoaded();
