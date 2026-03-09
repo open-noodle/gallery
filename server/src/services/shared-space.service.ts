@@ -52,7 +52,7 @@ export class SharedSpaceService extends BaseService {
         memberCount: members.length,
         assetCount,
         recentAssetIds: recentAssets.map((a) => a.id),
-        recentAssetThumbhashes: recentAssets.map((a) => a.thumbhash),
+        recentAssetThumbhashes: recentAssets.map((a) => (a.thumbhash ? Buffer.from(a.thumbhash).toString('base64') : null)),
         members: members.map((m) => this.mapMember(m)),
       });
     }
@@ -82,7 +82,7 @@ export class SharedSpaceService extends BaseService {
       memberCount: members.length,
       assetCount,
       recentAssetIds: recentAssets.map((a) => a.id),
-      recentAssetThumbhashes: recentAssets.map((a) => a.thumbhash),
+      recentAssetThumbhashes: recentAssets.map((a) => (a.thumbhash ? Buffer.from(a.thumbhash).toString('base64') : null)),
       members: members.map((m) => this.mapMember(m)),
     };
   }

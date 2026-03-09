@@ -236,7 +236,7 @@ describe(SharedSpaceService.name, () => {
       const result = await sut.getAll(auth);
 
       expect(result[0].recentAssetIds).toEqual([recentAssets[0].id, recentAssets[1].id]);
-      expect(result[0].recentAssetThumbhashes).toEqual(['abc123', 'def456']);
+      expect(result[0].recentAssetThumbhashes).toEqual(['YWJjMTIz', 'ZGVmNDU2']);
     });
 
     it('should return empty arrays for spaces with no assets', async () => {
@@ -381,7 +381,7 @@ describe(SharedSpaceService.name, () => {
       const result = await sut.get(auth, space.id);
 
       expect(result.recentAssetIds).toEqual([recentAssets[0].id, recentAssets[1].id, recentAssets[2].id]);
-      expect(result.recentAssetThumbhashes).toEqual(['thumb1', null, 'thumb3']);
+      expect(result.recentAssetThumbhashes).toEqual(['dGh1bWIx', null, 'dGh1bWIz']);
     });
 
     it('should include lastActivityAt in response', async () => {
