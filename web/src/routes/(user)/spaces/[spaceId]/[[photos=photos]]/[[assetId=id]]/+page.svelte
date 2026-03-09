@@ -4,6 +4,7 @@
   import UserPageLayout from '$lib/components/layouts/user-page-layout.svelte';
   import ControlAppBar from '$lib/components/shared-components/control-app-bar.svelte';
   import ButtonContextMenu from '$lib/components/shared-components/context-menu/button-context-menu.svelte';
+  import RoleBadge from '$lib/components/spaces/role-badge.svelte';
   import SpaceMap from '$lib/components/spaces/space-map.svelte';
   import SpaceSearch from '$lib/components/spaces/space-search.svelte';
   import MenuOption from '$lib/components/shared-components/context-menu/menu-option.svelte';
@@ -153,6 +154,7 @@
       spaceId: space.id,
       members,
       isOwner,
+      spaceColor: space.color,
     });
     if (updatedMembers) {
       members = updatedMembers;
@@ -272,6 +274,12 @@
           {members.length} {$t('members')}
         </span>
       </div>
+
+      {#if currentMember}
+        <div class="mt-2">
+          <RoleBadge role={currentMember.role} spaceColor={space.color} />
+        </div>
+      {/if}
 
       <SpaceSearch bind:this={spaceSearch} spaceId={space.id} bind:showSearchResults />
 
