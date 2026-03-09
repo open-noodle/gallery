@@ -58,6 +58,7 @@ android {
     targetSdkVersion 35
     versionCode flutterVersionCode.toInteger()
     versionName flutterVersionName
+    testInstrumentationRunner "pl.leancode.patrol.PatrolJUnitRunner"
   }
 
   signingConfigs {
@@ -121,6 +122,7 @@ dependencies {
 
   ksp "com.github.bumptech.glide:ksp:$glide_version"
   coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.2'
+  androidTestImplementation "pl.leancode.patrol:patrol:+"
 
   //Glance Widget
   implementation "androidx.glance:glance-appwidget:$compose_version"
