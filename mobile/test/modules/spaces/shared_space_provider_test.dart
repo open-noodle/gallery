@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:immich_mobile/domain/models/user.model.dart';
-import 'package:immich_mobile/infrastructure/repositories/user_api.repository.dart';
 import 'package:immich_mobile/pages/library/spaces/space_member_selection.page.dart';
 import 'package:immich_mobile/providers/infrastructure/user.provider.dart';
 import 'package:immich_mobile/providers/shared_space.provider.dart';
@@ -66,10 +65,7 @@ void main() {
         ],
       );
 
-      expect(
-        () => container.read(sharedSpacesProvider.future),
-        throwsA(isA<Exception>()),
-      );
+      expect(() => container.read(sharedSpacesProvider.future), throwsA(isA<Exception>()));
     });
   });
 
@@ -85,9 +81,7 @@ void main() {
       when(() => mockRepo.get('space-1')).thenAnswer((_) async => space);
 
       final container = TestUtils.createContainer(
-        overrides: [
-          sharedSpaceApiRepositoryProvider.overrideWithValue(mockRepo),
-        ],
+        overrides: [sharedSpaceApiRepositoryProvider.overrideWithValue(mockRepo)],
       );
 
       final result = await container.read(sharedSpaceProvider('space-1').future);
@@ -120,9 +114,7 @@ void main() {
       when(() => mockRepo.getMembers('space-1')).thenAnswer((_) async => members);
 
       final container = TestUtils.createContainer(
-        overrides: [
-          sharedSpaceApiRepositoryProvider.overrideWithValue(mockRepo),
-        ],
+        overrides: [sharedSpaceApiRepositoryProvider.overrideWithValue(mockRepo)],
       );
 
       final result = await container.read(sharedSpaceMembersProvider('space-1').future);
@@ -138,9 +130,7 @@ void main() {
       when(() => mockRepo.getSpaceAssets('space-1')).thenAnswer((_) async => []);
 
       final container = TestUtils.createContainer(
-        overrides: [
-          sharedSpaceApiRepositoryProvider.overrideWithValue(mockRepo),
-        ],
+        overrides: [sharedSpaceApiRepositoryProvider.overrideWithValue(mockRepo)],
       );
 
       final result = await container.read(spaceAssetsProvider('space-1').future);
@@ -221,7 +211,13 @@ void main() {
       final allUsers = [
         UserDto(id: 'user-1', name: 'Alice', email: 'alice@test.com', isAdmin: false, profileChangedAt: DateTime(2024)),
         UserDto(id: 'user-2', name: 'Bob', email: 'bob@test.com', isAdmin: false, profileChangedAt: DateTime(2024)),
-        UserDto(id: 'user-3', name: 'Charlie', email: 'charlie@test.com', isAdmin: false, profileChangedAt: DateTime(2024)),
+        UserDto(
+          id: 'user-3',
+          name: 'Charlie',
+          email: 'charlie@test.com',
+          isAdmin: false,
+          profileChangedAt: DateTime(2024),
+        ),
       ];
       when(() => mockUserApiRepo.getAll()).thenAnswer((_) async => List.from(allUsers));
 
