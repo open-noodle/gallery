@@ -72,11 +72,17 @@ Change the image references in your `docker-compose.yml`:
 services:
   immich-server:
 -   image: ghcr.io/immich-app/immich-server:${IMMICH_VERSION:-release}
-+   image: ghcr.io/deeds67/immich-server:${IMMICH_VERSION:-release}
++   image: ghcr.io/open-noodle/gallery-server:${IMMICH_VERSION:-latest}
 
   immich-machine-learning:
 -   image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION:-release}
-+   image: ghcr.io/deeds67/immich-machine-learning:${IMMICH_VERSION:-release}
++   image: ghcr.io/open-noodle/gallery-ml:${IMMICH_VERSION:-latest}
+```
+
+For NVIDIA GPU acceleration on the ML container, use the `-cuda` tag variant:
+
+```yaml
+image: ghcr.io/open-noodle/gallery-ml:${IMMICH_VERSION:-latest}-cuda
 ```
 
 ### Step 3: Restart
@@ -87,6 +93,49 @@ docker compose up -d
 ```
 
 That's it. To switch back to upstream Immich, reverse the image names and restore your database backup.
+
+## Docker Images
+
+Pre-built Docker images are published to GitHub Container Registry (GHCR) under the `open-noodle` organization.
+
+### Available Images
+
+| Image | Description |
+| :---- | :---------- |
+| `ghcr.io/open-noodle/gallery-server` | Server + web UI + CLI (all-in-one) |
+| `ghcr.io/open-noodle/gallery-ml` | Machine learning service (CPU) |
+| `ghcr.io/open-noodle/gallery-ml:*-cuda` | Machine learning service (NVIDIA CUDA) |
+
+### Tags
+
+- **`latest`** / **`latest-cuda`** — most recent published build
+- **`v*`** (e.g. `v2.5.6-noodle.1`) — pinned version release
+
+### Publishing (for maintainers)
+
+Images are built and published via the **Docker** GitHub Actions workflow (`.github/workflows/docker.yml`).
+
+**How it works:**
+1. The workflow is triggered manually via `workflow_dispatch` from the GitHub Actions UI
+2. You provide a version tag (e.g. `v2.5.6-noodle.1`) as input
+3. Three jobs run in parallel: server, ML (CPU), and ML (CUDA)
+4. Each image is tagged with both the version and `latest`
+5. Images are pushed to GHCR using the built-in `GITHUB_TOKEN` — no extra secrets needed
+
+**To publish a new version:**
+
+```bash
+gh workflow run docker.yml --ref main -f version=v2.5.6-noodle.1
+```
+
+Or use the GitHub Actions UI: Actions > Docker > Run workflow > enter version > Run.
+
+**To enable auto-publish on every push to main**, uncomment the `push` trigger in `.github/workflows/docker.yml`:
+
+```yaml
+push:
+  branches: [main]
+```
 
 ---
 

@@ -17,9 +17,9 @@
   },
 
   "docker": {
-    "registry": "ghcr.io/deeds67",
-    "server_image": "noodle-gallery-server",
-    "ml_image": "noodle-gallery-ml"
+    "registry": "ghcr.io/open-noodle",
+    "server_image": "gallery-server",
+    "ml_image": "gallery-ml"
   },
 
   "cli": {
