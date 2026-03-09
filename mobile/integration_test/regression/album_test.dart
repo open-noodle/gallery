@@ -2,6 +2,7 @@ import 'package:patrol/patrol.dart';
 
 import '../common/patrol_config.dart';
 import '../common/test_app.dart';
+import '../common/wait_helpers.dart';
 import '../fixtures/seed_data.dart';
 import '../pages/album_page.dart';
 import '../pages/login_page.dart';
@@ -25,6 +26,7 @@ void main() {
       final albumPage = AlbumPage($);
 
       await loginPage.loginWithTestCredentials();
+      await grantPermissionIfRequested($);
       await timelinePage.waitForLoaded();
       await timelinePage.goToLibrary();
       await albumPage.createAlbum('Test Album');
