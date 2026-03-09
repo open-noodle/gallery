@@ -13,11 +13,11 @@ Re-enable Docker image publishing for the Noodle Gallery fork so users can pull 
 
 ### Images
 
-| Image                      | Registry           | Tags                            |
-| -------------------------- | ------------------ | ------------------------------- |
-| `noodle-gallery-server`    | `ghcr.io/deeds67/` | `<version>`, `latest`           |
-| `noodle-gallery-ml` (CPU)  | `ghcr.io/deeds67/` | `<version>`, `latest`           |
-| `noodle-gallery-ml` (CUDA) | `ghcr.io/deeds67/` | `<version>-cuda`, `latest-cuda` |
+| Image                      | Registry               | Tags                            |
+| -------------------------- | ---------------------- | ------------------------------- |
+| `noodle-gallery-server`    | `ghcr.io/open-noodle/` | `<version>`, `latest`           |
+| `noodle-gallery-ml` (CPU)  | `ghcr.io/open-noodle/` | `<version>`, `latest`           |
+| `noodle-gallery-ml` (CUDA) | `ghcr.io/open-noodle/` | `<version>-cuda`, `latest-cuda` |
 
 When auto-publish is enabled later, pushes to main tag as `main` / `main-cuda` instead of a version.
 
@@ -54,6 +54,6 @@ Trigger with a test version (e.g. `v0.0.0-test.1`) to validate the workflow with
 1. Replace `.github/workflows/docker.yml` with self-contained workflow
 2. Re-enable the workflow: `gh workflow enable docker.yml`
 3. Push to a branch, trigger manually with `v0.0.0-test.1`
-4. Verify images appear at `ghcr.io/deeds67/noodle-gallery-*`
+4. Verify images appear at `ghcr.io/open-noodle/noodle-gallery-*`
 5. Update `docker/docker-compose.yml` to reference fork images
 6. Update `docker/example.env` with a note about fork versioning

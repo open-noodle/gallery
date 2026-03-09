@@ -5,6 +5,21 @@
   "name_snake": "noodle_gallery",
   "description": "Self-hosted photo and video management solution",
 
+  "repository": {
+    "name": "open-noodle/gallery",
+    "url": "https://github.com/open-noodle/gallery",
+    "docs_url": "https://github.com/open-noodle/gallery/tree/main/docs",
+    "issues_url": "https://github.com/open-noodle/gallery/issues/new/choose",
+    "releases_url": "https://github.com/open-noodle/gallery/releases"
+  },
+
+  "upstream": {
+    "name": "Immich",
+    "url": "https://github.com/immich-app/immich",
+    "docs_url": "https://docs.immich.app",
+    "discord_url": "https://discord.immich.app"
+  },
+
   "mobile": {
     "bundle_id": "app.noodle.gallery",
     "bundle_id_debug": "app.noodle.gallery.debug",

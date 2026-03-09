@@ -34,7 +34,7 @@ git checkout -- .
 1. All user-visible "Immich" text -> "Noodle Gallery" (web, mobile, CLI, docs, OpenAPI)
 2. All visual assets -> Noodle Gallery logos/icons/splash
 3. Mobile bundle IDs -> `app.noodle.gallery`
-4. Docker images -> `ghcr.io/deeds67/noodle-gallery-server` / `noodle-gallery-ml`
+4. Docker images -> `ghcr.io/open-noodle/gallery-server` / `gallery-ml`
 5. CLI binary -> `noodle-gallery`
 6. Deep link scheme -> `noodle-gallery://`
 
@@ -76,7 +76,7 @@ branding/
   },
 
   "docker": {
-    "registry": "ghcr.io/deeds67",
+    "registry": "ghcr.io/open-noodle",
     "server_image": "noodle-gallery-server",
     "ml_image": "noodle-gallery-ml"
   },

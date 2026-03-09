@@ -152,7 +152,7 @@ image: ghcr.io/immich-app/immich-server:${IMMICH_VERSION:-release}
 to:
 
 ```yaml
-image: ghcr.io/deeds67/noodle-gallery-server:${IMMICH_VERSION:-latest}
+image: ghcr.io/open-noodle/noodle-gallery-server:${IMMICH_VERSION:-latest}
 ```
 
 Change the ML image from:
@@ -164,7 +164,7 @@ image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION:-release}
 to:
 
 ```yaml
-image: ghcr.io/deeds67/noodle-gallery-ml:${IMMICH_VERSION:-latest}
+image: ghcr.io/open-noodle/noodle-gallery-ml:${IMMICH_VERSION:-latest}
 ```
 
 **Step 2: Commit**
@@ -203,7 +203,7 @@ gh run list --workflow=docker.yml --limit 1
 gh run watch <run-id>
 ```
 
-Expected: All jobs pass, images appear at `ghcr.io/deeds67/noodle-gallery-server:v0.0.0-test.1` and `ghcr.io/deeds67/noodle-gallery-ml:v0.0.0-test.1`.
+Expected: All jobs pass, images appear at `ghcr.io/open-noodle/noodle-gallery-server:v0.0.0-test.1` and `ghcr.io/open-noodle/noodle-gallery-ml:v0.0.0-test.1`.
 
 **Step 5: Verify images exist**
 

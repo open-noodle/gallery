@@ -313,6 +313,27 @@ describe(ServerService.name, () => {
       const result = await sut.getAboutInfo();
       expect(result.licensed).toBe(true);
     });
+
+    it('should use repositoryUrl from build metadata for versionUrl when available', async () => {
+      mocks.serverInfo.getBuildVersions.mockResolvedValue({
+        nodejs: '18.0.0',
+        ffmpeg: '6.0',
+        imagemagick: '7.1.0',
+        libvips: '8.14.0',
+        exiftool: '12.0',
+      });
+      mocks.systemMetadata.get.mockResolvedValue(null);
+      mocks.config.getEnv.mockReturnValue(
+        mockEnvData({
+          buildMetadata: {
+            repositoryUrl: 'https://github.com/open-noodle/gallery',
+          },
+        }),
+      );
+
+      const result = await sut.getAboutInfo();
+      expect(result.versionUrl).toBe(`https://github.com/open-noodle/gallery/releases/tag/${result.version}`);
+    });
   });
 
   describe('onBootstrap', () => {
@@ -412,6 +433,23 @@ describe(ServerService.name, () => {
         universal: `https://github.com/immich-app/immich/releases/download/v${version}/app-release.apk`,
         x86_64: `https://github.com/immich-app/immich/releases/download/v${version}/app-x86_64-release.apk`,
       });
+    });
+
+    it('should use repositoryUrl from build metadata for APK links when available', () => {
+      mocks.config.getEnv.mockReturnValue(
+        mockEnvData({
+          buildMetadata: {
+            repositoryUrl: 'https://github.com/open-noodle/gallery',
+          },
+        }),
+      );
+
+      const result = sut.getApkLinks();
+      const version = serverVersion.toString();
+
+      expect(result.universal).toBe(
+        `https://github.com/open-noodle/gallery/releases/download/v${version}/app-release.apk`,
+      );
     });
   });
 
