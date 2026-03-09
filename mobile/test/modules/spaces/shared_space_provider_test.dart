@@ -1,10 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:immich_mobile/providers/shared_space.provider.dart';
+import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:immich_mobile/repositories/shared_space_api.repository.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:openapi/api.dart' as api;
 
 import '../../test_utils.dart';
+import '../shared/shared_mocks.dart';
 
 class MockSharedSpaceApiRepository extends Mock implements SharedSpaceApiRepository {}
 
@@ -38,6 +40,7 @@ void main() {
       final container = TestUtils.createContainer(
         overrides: [
           sharedSpaceApiRepositoryProvider.overrideWithValue(mockRepo),
+          currentUserProvider.overrideWith((ref) => MockCurrentUserProvider()),
         ],
       );
 
@@ -54,6 +57,7 @@ void main() {
       final container = TestUtils.createContainer(
         overrides: [
           sharedSpaceApiRepositoryProvider.overrideWithValue(mockRepo),
+          currentUserProvider.overrideWith((ref) => MockCurrentUserProvider()),
         ],
       );
 
