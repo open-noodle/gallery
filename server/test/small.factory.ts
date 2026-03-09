@@ -518,6 +518,7 @@ const sharedSpaceFactory = (data: Partial<SharedSpace> = {}): SharedSpace => ({
   name: 'Test Space',
   description: null,
   createdById: newUuid(),
+  thumbnailAssetId: null,
   createdAt: newDate(),
   updatedAt: newDate(),
   createId: newUuid(),

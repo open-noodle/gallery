@@ -9,6 +9,7 @@ import {
   UpdateDateColumn,
 } from '@immich/sql-tools';
 import { CreateIdColumn, UpdatedAtTrigger, UpdateIdColumn } from 'src/decorators';
+import { AssetTable } from 'src/schema/tables/asset.table';
 import { UserTable } from 'src/schema/tables/user.table';
 
 @Table('shared_space')
@@ -25,6 +26,9 @@ export class SharedSpaceTable {
 
   @ForeignKeyColumn(() => UserTable, { onDelete: 'CASCADE', nullable: false })
   createdById!: string;
+
+  @ForeignKeyColumn(() => AssetTable, { onDelete: 'SET NULL', nullable: true })
+  thumbnailAssetId!: string | null;
 
   @CreateDateColumn()
   createdAt!: Generated<Timestamp>;
