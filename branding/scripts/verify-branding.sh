@@ -22,6 +22,7 @@ check_files=(
   "docs/docusaurus.config.js"
   "open-api/immich-openapi-specs.json"
   "cli/package.json"
+  "web/src/lib/modals/HelpAndFeedbackModal.svelte"
 )
 
 for file in "${check_files[@]}"; do
@@ -64,6 +65,31 @@ if [[ -f "$pbxproj" ]]; then
     EXIT_CODE=1
   else
     echo "  OK: project.pbxproj"
+  fi
+fi
+
+# Check that hardcoded upstream URLs are patched in user-facing frontend
+echo "--- Checking URL replacements ---"
+help_modal="$REPO_ROOT/web/src/lib/modals/HelpAndFeedbackModal.svelte"
+if [[ -f "$help_modal" ]]; then
+  # Extract content outside BRANDING:UPSTREAM markers
+  outside_upstream=$(sed '/BRANDING:UPSTREAM_START/,/BRANDING:UPSTREAM_END/d' "$help_modal")
+  if echo "$outside_upstream" | grep -q "github\.com/immich-app/immich"; then
+    echo "  WARN: Upstream GitHub URL found outside upstream section in HelpAndFeedbackModal.svelte"
+    EXIT_CODE=1
+  else
+    echo "  OK: HelpAndFeedbackModal.svelte (URLs patched)"
+  fi
+fi
+
+# Verify Docker env vars are set
+env_example="$REPO_ROOT/docker/example.env"
+if [[ -f "$env_example" ]]; then
+  if grep -q "IMMICH_REPOSITORY=" "$env_example"; then
+    echo "  OK: example.env has IMMICH_REPOSITORY"
+  else
+    echo "  WARN: example.env missing IMMICH_REPOSITORY"
+    EXIT_CODE=1
   fi
 fi
 
