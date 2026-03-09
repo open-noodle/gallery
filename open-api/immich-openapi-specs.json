@@ -18271,6 +18271,7 @@
           "mp3",
           "aac",
           "libopus",
+          "opus",
           "pcm_s16le"
         ],
         "type": "string"
