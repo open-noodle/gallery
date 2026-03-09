@@ -54,10 +54,7 @@ describe('SpaceCard component', () => {
   });
 
   it('should render member avatars when members are provided', () => {
-    const members = [
-      makeMember({ userId: 'u1', name: 'Alice' }),
-      makeMember({ userId: 'u2', name: 'Bob' }),
-    ];
+    const members = [makeMember({ userId: 'u1', name: 'Alice' }), makeMember({ userId: 'u2', name: 'Bob' })];
     render(SpaceCard, { space: makeSpace({ members }) });
     expect(screen.getByText('A')).toBeInTheDocument();
     expect(screen.getByText('B')).toBeInTheDocument();
