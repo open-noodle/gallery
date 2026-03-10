@@ -623,6 +623,51 @@ export class SharedSpaceService extends BaseService {
     return JobStatus.Success;
   }
 
+  @OnJob({ name: JobName.SharedSpaceFaceMatchAll, queue: QueueName.FacialRecognition })
+  async handleSharedSpaceFaceMatchAll({ spaceId }: JobOf<JobName.SharedSpaceFaceMatchAll>): Promise<JobStatus> {
+    const space = await this.sharedSpaceRepository.getById(spaceId);
+    if (!space || !space.faceRecognitionEnabled) {
+      return JobStatus.Skipped;
+    }
+
+    const assets = await this.sharedSpaceRepository.getAssetIdsInSpace(spaceId);
+    for (const { assetId } of assets) {
+      await this.jobRepository.queue({
+        name: JobName.SharedSpaceFaceMatch,
+        data: { spaceId, assetId },
+      });
+    }
+
+    return JobStatus.Success;
+  }
+
+  @OnJob({ name: JobName.SharedSpacePersonThumbnail, queue: QueueName.ThumbnailGeneration })
+  async handleSharedSpacePersonThumbnail({ id }: JobOf<JobName.SharedSpacePersonThumbnail>): Promise<JobStatus> {
+    const person = await this.sharedSpaceRepository.getPersonById(id);
+    if (!person || !person.representativeFaceId) {
+      return JobStatus.Skipped;
+    }
+
+    // Look up the actual face to find the personal person ID for thumbnail generation
+    const face = await this.personRepository.getFaceById(person.representativeFaceId);
+    if (!face) {
+      return JobStatus.Skipped;
+    }
+
+    // If the face's personal person has a thumbnail, copy its path
+    if (face.personId) {
+      const personalPerson = await this.personRepository.getById(face.personId);
+      if (personalPerson?.thumbnailPath) {
+        await this.sharedSpaceRepository.updatePerson(id, {
+          thumbnailPath: personalPerson.thumbnailPath,
+        });
+        return JobStatus.Success;
+      }
+    }
+
+    return JobStatus.Skipped;
+  }
+
   private async requireMembership(auth: AuthDto, spaceId: string) {
     const member = await this.sharedSpaceRepository.getMember(spaceId, auth.user.id);
     if (!member) {

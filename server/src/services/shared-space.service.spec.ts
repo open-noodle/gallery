@@ -1999,6 +1999,126 @@ describe(SharedSpaceService.name, () => {
     });
   });
 
+  describe('handleSharedSpaceFaceMatchAll', () => {
+    it('should skip when space not found', async () => {
+      mocks.sharedSpace.getById.mockResolvedValue(void 0);
+
+      const result = await sut.handleSharedSpaceFaceMatchAll({ spaceId: 'space-1' });
+
+      expect(result).toBe(JobStatus.Skipped);
+    });
+
+    it('should skip when face recognition is disabled', async () => {
+      const space = factory.sharedSpace({ faceRecognitionEnabled: false });
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+
+      const result = await sut.handleSharedSpaceFaceMatchAll({ spaceId: space.id });
+
+      expect(result).toBe(JobStatus.Skipped);
+    });
+
+    it('should queue SharedSpaceFaceMatch for each asset in the space', async () => {
+      const spaceId = newUuid();
+      const space = factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true });
+
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.getAssetIdsInSpace.mockResolvedValue([
+        { assetId: 'a1' },
+        { assetId: 'a2' },
+        { assetId: 'a3' },
+      ]);
+
+      const result = await sut.handleSharedSpaceFaceMatchAll({ spaceId });
+
+      expect(result).toBe(JobStatus.Success);
+      expect(mocks.job.queue).toHaveBeenCalledWith({
+        name: JobName.SharedSpaceFaceMatch,
+        data: { spaceId, assetId: 'a1' },
+      });
+      expect(mocks.job.queue).toHaveBeenCalledWith({
+        name: JobName.SharedSpaceFaceMatch,
+        data: { spaceId, assetId: 'a2' },
+      });
+      expect(mocks.job.queue).toHaveBeenCalledWith({
+        name: JobName.SharedSpaceFaceMatch,
+        data: { spaceId, assetId: 'a3' },
+      });
+    });
+
+    it('should succeed with no assets', async () => {
+      const spaceId = newUuid();
+      const space = factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true });
+
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.getAssetIdsInSpace.mockResolvedValue([]);
+
+      const result = await sut.handleSharedSpaceFaceMatchAll({ spaceId });
+
+      expect(result).toBe(JobStatus.Success);
+      expect(mocks.job.queue).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('handleSharedSpacePersonThumbnail', () => {
+    it('should skip when person not found', async () => {
+      mocks.sharedSpace.getPersonById.mockResolvedValue(void 0);
+
+      const result = await sut.handleSharedSpacePersonThumbnail({ id: 'person-1' });
+
+      expect(result).toBe(JobStatus.Skipped);
+    });
+
+    it('should skip when person has no representative face', async () => {
+      const person = factory.sharedSpacePerson({ representativeFaceId: null });
+      mocks.sharedSpace.getPersonById.mockResolvedValue(person);
+
+      const result = await sut.handleSharedSpacePersonThumbnail({ id: person.id });
+
+      expect(result).toBe(JobStatus.Skipped);
+    });
+
+    it('should copy thumbnail from personal person when available', async () => {
+      const personId = newUuid();
+      const faceId = newUuid();
+      const assetFacePersonId = newUuid();
+      const person = factory.sharedSpacePerson({ id: personId, representativeFaceId: faceId });
+      const personalPerson = factory.person({
+        id: assetFacePersonId,
+        thumbnailPath: '/path/to/thumbnail.jpg',
+      });
+
+      mocks.sharedSpace.getPersonById.mockResolvedValue(person);
+      mocks.person.getFaceById.mockResolvedValue({
+        id: faceId,
+        personId: assetFacePersonId,
+      } as any);
+      mocks.person.getById.mockResolvedValue(personalPerson);
+      mocks.sharedSpace.updatePerson.mockResolvedValue(
+        factory.sharedSpacePerson({ id: personId, thumbnailPath: '/path/to/thumbnail.jpg' }),
+      );
+
+      const result = await sut.handleSharedSpacePersonThumbnail({ id: personId });
+
+      expect(result).toBe(JobStatus.Success);
+      expect(mocks.sharedSpace.updatePerson).toHaveBeenCalledWith(personId, {
+        thumbnailPath: '/path/to/thumbnail.jpg',
+      });
+    });
+
+    it('should skip when face not found in person repository', async () => {
+      const personId = newUuid();
+      const faceId = newUuid();
+      const person = factory.sharedSpacePerson({ id: personId, representativeFaceId: faceId });
+
+      mocks.sharedSpace.getPersonById.mockResolvedValue(person);
+      mocks.person.getFaceById.mockResolvedValue(void 0);
+
+      const result = await sut.handleSharedSpacePersonThumbnail({ id: personId });
+
+      expect(result).toBe(JobStatus.Skipped);
+    });
+  });
+
   describe('getSpacePeople', () => {
     it('should require membership', async () => {
       mocks.sharedSpace.getMember.mockResolvedValue(void 0);
