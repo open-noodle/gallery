@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { MapMarkerResponseDto } from 'src/dtos/map.dto';
-import { SharedSpaceRole, UserAvatarColor } from 'src/enum';
+import { SharedSpaceActivityType, SharedSpaceRole, UserAvatarColor } from 'src/enum';
 import { SharedSpaceService } from 'src/services/shared-space.service';
 import { factory, newDate, newUuid } from 'test/small.factory';
 import { newTestService, ServiceMocks } from 'test/utils';
@@ -1071,6 +1071,7 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.getMember.mockResolvedValue(editorMember);
       mocks.sharedSpace.addAssets.mockResolvedValue([]);
       mocks.sharedSpace.update.mockResolvedValue(space);
+      mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
 
       await sut.addAssets(auth, spaceId, { assetIds: [assetId1, assetId2] });
 
@@ -1090,6 +1091,7 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.getMember.mockResolvedValue(editorMember);
       mocks.sharedSpace.addAssets.mockResolvedValue([]);
       mocks.sharedSpace.update.mockResolvedValue(space);
+      mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
 
       await sut.addAssets(auth, spaceId, { assetIds: [assetId1] });
 
@@ -1106,6 +1108,7 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.getMember.mockResolvedValue(editorMember);
       mocks.sharedSpace.addAssets.mockResolvedValue([]);
       mocks.sharedSpace.update.mockResolvedValue(space);
+      mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
 
       await sut.addAssets(auth, spaceId, { assetIds: [assetId] });
 
@@ -1124,6 +1127,23 @@ describe(SharedSpaceService.name, () => {
 
       await expect(sut.addAssets(auth, spaceId, { assetIds: [newUuid()] })).rejects.toBeInstanceOf(ForbiddenException);
       expect(mocks.sharedSpace.addAssets).not.toHaveBeenCalled();
+    });
+
+    it('should log activity when adding assets', async () => {
+      const auth = factory.auth();
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
+      mocks.sharedSpace.addAssets.mockResolvedValue(void 0);
+      mocks.sharedSpace.update.mockResolvedValue(factory.sharedSpace());
+      mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
+
+      await sut.addAssets(auth, 'space-1', { assetIds: ['a1', 'a2', 'a3'] });
+
+      expect(mocks.sharedSpace.logActivity).toHaveBeenCalledWith({
+        spaceId: 'space-1',
+        userId: auth.user.id,
+        type: SharedSpaceActivityType.AssetAdd,
+        data: { count: 3, assetIds: ['a1', 'a2', 'a3'] },
+      });
     });
   });
 

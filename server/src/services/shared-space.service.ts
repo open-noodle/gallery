@@ -11,7 +11,7 @@ import {
   SharedSpaceResponseDto,
   SharedSpaceUpdateDto,
 } from 'src/dtos/shared-space.dto';
-import { Permission, SharedSpaceRole, UserAvatarColor } from 'src/enum';
+import { Permission, SharedSpaceActivityType, SharedSpaceRole, UserAvatarColor } from 'src/enum';
 import { BaseService } from 'src/services/base.service';
 
 const ROLE_HIERARCHY: Record<SharedSpaceRole, number> = {
@@ -250,6 +250,13 @@ export class SharedSpaceService extends BaseService {
     );
 
     await this.sharedSpaceRepository.update(spaceId, { lastActivityAt: new Date() });
+
+    await this.sharedSpaceRepository.logActivity({
+      spaceId,
+      userId: auth.user.id,
+      type: SharedSpaceActivityType.AssetAdd,
+      data: { count: dto.assetIds.length, assetIds: dto.assetIds.slice(0, 4) },
+    });
   }
 
   async markSpaceViewed(auth: AuthDto, spaceId: string): Promise<void> {
