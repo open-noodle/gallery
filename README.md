@@ -9,7 +9,10 @@
 </p>
 
 <p align="center">
-<img src="design/gallery-logo.svg" width="300" title="Gallery Logo">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="design/gallery-logo-dark.svg">
+  <img src="design/gallery-logo.svg" width="300" title="Gallery Logo">
+</picture>
 </p>
 <h3 align="center">High performance self-hosted photo and video management solution</h3>
 <br/>
