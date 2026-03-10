@@ -2,7 +2,8 @@ import { BadRequestException } from '@nestjs/common';
 import { JobName, JobStatus, PluginContext, PluginTriggerType } from 'src/enum';
 import { pluginTriggers } from 'src/plugins';
 import { PluginService } from 'src/services/plugin.service';
-import { factory, newUuid, newUuids } from 'test/small.factory';
+import { AssetFactory } from 'test/factories/asset.factory';
+import { newUuid, newUuids } from 'test/small.factory';
 import { newTestService, ServiceMocks } from 'test/utils';
 
 const mockPluginCall = vi.fn();
