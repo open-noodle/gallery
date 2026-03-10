@@ -5,6 +5,9 @@ import { DummyValue, GenerateSql } from 'src/decorators';
 import { DB } from 'src/schema';
 import { SharedSpaceAssetTable } from 'src/schema/tables/shared-space-asset.table';
 import { SharedSpaceMemberTable } from 'src/schema/tables/shared-space-member.table';
+import { SharedSpacePersonAliasTable } from 'src/schema/tables/shared-space-person-alias.table';
+import { SharedSpacePersonFaceTable } from 'src/schema/tables/shared-space-person-face.table';
+import { SharedSpacePersonTable } from 'src/schema/tables/shared-space-person.table';
 import { SharedSpaceTable } from 'src/schema/tables/shared-space.table';
 
 @Injectable()
@@ -320,6 +323,160 @@ export class SharedSpaceRepository {
       .orderBy('shared_space_activity.createdAt', 'desc')
       .limit(limit)
       .offset(offset)
+      .execute();
+  }
+
+  // ==========================================
+  // Shared Space Person CRUD
+  // ==========================================
+
+  @GenerateSql({ params: [DummyValue.UUID] })
+  getPersonsBySpaceId(spaceId: string) {
+    return this.db
+      .selectFrom('shared_space_person')
+      .selectAll()
+      .where('spaceId', '=', spaceId)
+      .orderBy('name', 'asc')
+      .execute();
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID] })
+  getPersonById(id: string) {
+    return this.db.selectFrom('shared_space_person').selectAll().where('id', '=', id).executeTakeFirst();
+  }
+
+  createPerson(values: Insertable<SharedSpacePersonTable>) {
+    return this.db.insertInto('shared_space_person').values(values).returningAll().executeTakeFirstOrThrow();
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID, { name: 'Updated Person' }] })
+  updatePerson(id: string, values: Updateable<SharedSpacePersonTable>) {
+    return this.db
+      .updateTable('shared_space_person')
+      .set(values)
+      .where('id', '=', id)
+      .returningAll()
+      .executeTakeFirstOrThrow();
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID] })
+  async deletePerson(id: string) {
+    await this.db.deleteFrom('shared_space_person').where('id', '=', id).execute();
+  }
+
+  addPersonFaces(values: Insertable<SharedSpacePersonFaceTable>[]) {
+    if (values.length === 0) {
+      return Promise.resolve([]);
+    }
+
+    return this.db
+      .insertInto('shared_space_person_face')
+      .values(values)
+      .onConflict((oc) => oc.doNothing())
+      .returningAll()
+      .execute();
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID] })
+  async getPersonFaceCount(personId: string): Promise<number> {
+    const result = await this.db
+      .selectFrom('shared_space_person_face')
+      .select((eb) => eb.fn.countAll().as('count'))
+      .where('personId', '=', personId)
+      .executeTakeFirstOrThrow();
+    return Number(result.count);
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID] })
+  async getPersonAssetCount(personId: string): Promise<number> {
+    const result = await this.db
+      .selectFrom('shared_space_person_face')
+      .innerJoin('asset_face', 'asset_face.id', 'shared_space_person_face.assetFaceId')
+      .select((eb) => eb.fn.count(eb.fn('distinct', ['asset_face.assetId'])).as('count'))
+      .where('shared_space_person_face.personId', '=', personId)
+      .executeTakeFirstOrThrow();
+    return Number(result.count);
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID, [DummyValue.UUID]] })
+  async removePersonFacesByAssetIds(spaceId: string, assetIds: string[]) {
+    await this.db
+      .deleteFrom('shared_space_person_face')
+      .where(
+        'assetFaceId',
+        'in',
+        this.db
+          .selectFrom('asset_face')
+          .select('asset_face.id')
+          .where('asset_face.assetId', 'in', assetIds),
+      )
+      .where(
+        'personId',
+        'in',
+        this.db
+          .selectFrom('shared_space_person')
+          .select('shared_space_person.id')
+          .where('shared_space_person.spaceId', '=', spaceId),
+      )
+      .execute();
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID] })
+  async deleteOrphanedPersons(spaceId: string) {
+    await this.db
+      .deleteFrom('shared_space_person')
+      .where('spaceId', '=', spaceId)
+      .where('name', '=', '')
+      .where(
+        'id',
+        'not in',
+        this.db.selectFrom('shared_space_person_face').select('personId'),
+      )
+      .execute();
+  }
+
+  // ==========================================
+  // Shared Space Person Alias CRUD
+  // ==========================================
+
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
+  getAlias(personId: string, userId: string) {
+    return this.db
+      .selectFrom('shared_space_person_alias')
+      .selectAll()
+      .where('personId', '=', personId)
+      .where('userId', '=', userId)
+      .executeTakeFirst();
+  }
+
+  upsertAlias(values: Insertable<SharedSpacePersonAliasTable>) {
+    return this.db
+      .insertInto('shared_space_person_alias')
+      .values(values)
+      .onConflict((oc) =>
+        oc.columns(['personId', 'userId']).doUpdateSet((eb) => ({ alias: eb.ref('excluded.alias') })),
+      )
+      .returningAll()
+      .executeTakeFirstOrThrow();
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
+  async deleteAlias(personId: string, userId: string) {
+    await this.db
+      .deleteFrom('shared_space_person_alias')
+      .where('personId', '=', personId)
+      .where('userId', '=', userId)
+      .execute();
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
+  getAliasesBySpaceAndUser(spaceId: string, userId: string) {
+    return this.db
+      .selectFrom('shared_space_person_alias')
+      .innerJoin('shared_space_person', 'shared_space_person.id', 'shared_space_person_alias.personId')
+      .where('shared_space_person.spaceId', '=', spaceId)
+      .where('shared_space_person_alias.userId', '=', userId)
+      .selectAll('shared_space_person_alias')
       .execute();
   }
 }
