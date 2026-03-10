@@ -973,11 +973,10 @@ describe(SharedSpaceService.name, () => {
       const assetId1 = newUuid();
       const assetId2 = newUuid();
       const editorMember = makeMemberResult({ spaceId, userId: auth.user.id, role: SharedSpaceRole.Editor });
-      const space = factory.sharedSpace({ id: spaceId, thumbnailAssetId: newUuid() });
+      const space = factory.sharedSpace({ id: spaceId });
 
       mocks.sharedSpace.getMember.mockResolvedValue(editorMember);
       mocks.sharedSpace.addAssets.mockResolvedValue([]);
-      mocks.sharedSpace.getById.mockResolvedValue(space);
       mocks.sharedSpace.update.mockResolvedValue(space);
 
       await sut.addAssets(auth, spaceId, { assetIds: [assetId1, assetId2] });
@@ -988,7 +987,7 @@ describe(SharedSpaceService.name, () => {
       ]);
     });
 
-    it('should auto-set thumbnailAssetId when space has no thumbnail', async () => {
+    it('should NOT auto-set thumbnailAssetId when space has no thumbnail', async () => {
       const auth = factory.auth();
       const spaceId = newUuid();
       const assetId1 = newUuid();
@@ -997,30 +996,9 @@ describe(SharedSpaceService.name, () => {
 
       mocks.sharedSpace.getMember.mockResolvedValue(editorMember);
       mocks.sharedSpace.addAssets.mockResolvedValue([]);
-      mocks.sharedSpace.getById.mockResolvedValue(space);
-      mocks.sharedSpace.update.mockResolvedValue({ ...space, thumbnailAssetId: assetId1 });
-
-      await sut.addAssets(auth, spaceId, { assetIds: [assetId1] });
-
-      expect(mocks.sharedSpace.update).toHaveBeenCalledWith(spaceId, {
-        thumbnailAssetId: assetId1,
-        lastActivityAt: expect.any(Date),
-      });
-    });
-
-    it('should not change thumbnailAssetId when space already has one', async () => {
-      const auth = factory.auth();
-      const spaceId = newUuid();
-      const existingThumbnail = newUuid();
-      const editorMember = makeMemberResult({ spaceId, userId: auth.user.id, role: SharedSpaceRole.Editor });
-      const space = factory.sharedSpace({ id: spaceId, thumbnailAssetId: existingThumbnail });
-
-      mocks.sharedSpace.getMember.mockResolvedValue(editorMember);
-      mocks.sharedSpace.addAssets.mockResolvedValue([]);
-      mocks.sharedSpace.getById.mockResolvedValue(space);
       mocks.sharedSpace.update.mockResolvedValue(space);
 
-      await sut.addAssets(auth, spaceId, { assetIds: [newUuid()] });
+      await sut.addAssets(auth, spaceId, { assetIds: [assetId1] });
 
       expect(mocks.sharedSpace.update).toHaveBeenCalledWith(spaceId, { lastActivityAt: expect.any(Date) });
     });
@@ -1030,11 +1008,10 @@ describe(SharedSpaceService.name, () => {
       const spaceId = newUuid();
       const assetId = newUuid();
       const editorMember = makeMemberResult({ spaceId, userId: auth.user.id, role: SharedSpaceRole.Editor });
-      const space = factory.sharedSpace({ id: spaceId, thumbnailAssetId: newUuid() });
+      const space = factory.sharedSpace({ id: spaceId });
 
       mocks.sharedSpace.getMember.mockResolvedValue(editorMember);
       mocks.sharedSpace.addAssets.mockResolvedValue([]);
-      mocks.sharedSpace.getById.mockResolvedValue(space);
       mocks.sharedSpace.update.mockResolvedValue(space);
 
       await sut.addAssets(auth, spaceId, { assetIds: [assetId] });

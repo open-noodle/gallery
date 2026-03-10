@@ -245,12 +245,7 @@ export class SharedSpaceService extends BaseService {
       dto.assetIds.map((assetId) => ({ spaceId, assetId, addedById: auth.user.id })),
     );
 
-    const space = await this.sharedSpaceRepository.getById(spaceId);
-    const updateFields: Record<string, unknown> = { lastActivityAt: new Date() };
-    if (space && !space.thumbnailAssetId) {
-      updateFields.thumbnailAssetId = dto.assetIds[0];
-    }
-    await this.sharedSpaceRepository.update(spaceId, updateFields);
+    await this.sharedSpaceRepository.update(spaceId, { lastActivityAt: new Date() });
   }
 
   async markSpaceViewed(auth: AuthDto, spaceId: string): Promise<void> {
