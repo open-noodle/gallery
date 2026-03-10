@@ -246,7 +246,7 @@
   });
 </script>
 
-<OnEvents {onSpaceAddAssets} {onSpaceRemoveAssets} />
+<OnEvents {onSpaceAddAssets} {onSpaceRemoveAssets} onAssetsDelete={refreshSpace} />
 
 <UserPageLayout
   hideNavbar={assetInteraction.selectionActive || viewMode === 'select-assets' || viewMode === 'select-cover'}
