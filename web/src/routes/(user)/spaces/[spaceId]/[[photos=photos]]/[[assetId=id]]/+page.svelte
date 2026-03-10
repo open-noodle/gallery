@@ -9,6 +9,7 @@
   import SpaceNewAssetsDivider from '$lib/components/spaces/space-new-assets-divider.svelte';
   import SpaceOnboardingBanner from '$lib/components/spaces/space-onboarding-banner.svelte';
   import SpacePanel from '$lib/components/spaces/space-panel.svelte';
+  import SpacePeopleStrip from '$lib/components/spaces/space-people-strip.svelte';
   import SpaceSearch from '$lib/components/spaces/space-search.svelte';
   import MenuOption from '$lib/components/shared-components/context-menu/menu-option.svelte';
   import ArchiveAction from '$lib/components/timeline/actions/ArchiveAction.svelte';
@@ -35,6 +36,7 @@
     getMembers,
     getSpace,
     getSpaceActivities,
+    getSpacePeople,
     markSpaceViewed,
     removeSpace,
     Role,
@@ -43,6 +45,7 @@
     UserAvatarColor,
     type SharedSpaceActivityResponseDto,
     type SharedSpaceMemberResponseDto,
+    type SharedSpacePersonResponseDto,
     type SharedSpaceResponseDto,
   } from '@immich/sdk';
   import { IconButton, modalManager, toastManager } from '@immich/ui';
@@ -78,6 +81,9 @@
   const ACTIVITY_PAGE_SIZE = 50;
   let initializedSpaceId = $state('');
 
+  let spacePeople = $state<SharedSpacePersonResponseDto[]>([]);
+  let selectedPersonId = $state<string | null>(null);
+
   let timelineManager = $state<TimelineManager>() as TimelineManager;
 
   const assetInteraction = new AssetInteraction();
@@ -92,7 +98,11 @@
     if (viewMode === 'select-assets') {
       return { visibility: AssetVisibility.Timeline, timelineSpaceId: space.id };
     }
-    return { spaceId: space.id };
+    const base: Record<string, unknown> = { spaceId: space.id };
+    if (selectedPersonId) {
+      base.spacePersonId = selectedPersonId;
+    }
+    return base;
   });
 
   const currentAssetInteraction = $derived(viewMode === 'select-assets' ? timelineInteraction : assetInteraction);
@@ -123,6 +133,22 @@
       handleError(error, 'Failed to load activities');
     }
   }
+
+  async function loadSpacePeople() {
+    if (!space.faceRecognitionEnabled) {
+      spacePeople = [];
+      return;
+    }
+    try {
+      spacePeople = await getSpacePeople({ id: space.id });
+    } catch (error) {
+      handleError(error, 'Failed to load space people');
+    }
+  }
+
+  const handlePersonClick = (personId: string) => {
+    selectedPersonId = selectedPersonId === personId ? null : personId;
+  };
 
   const handleEscape = () => {
     if (showSearchResults) {
@@ -303,6 +329,7 @@
       initializedSpaceId = space.id;
       void markSpaceViewed({ id: space.id });
       void loadActivities();
+      void loadSpacePeople();
     }
   });
 </script>
@@ -380,6 +407,16 @@
         onSavePosition={handleSavePosition}
         onCancelReposition={handleCancelReposition}
       />
+
+      {#if space.faceRecognitionEnabled && spacePeople.length > 0}
+        <SpacePeopleStrip
+          people={spacePeople}
+          spaceId={space.id}
+          {selectedPersonId}
+          spaceColor={space.color ?? 'primary'}
+          onPersonClick={handlePersonClick}
+        />
+      {/if}
 
       {#if (space.assetCount ?? 0) > 0}
         <SpaceSearch bind:this={spaceSearch} spaceId={space.id} bind:showSearchResults />
