@@ -12,8 +12,10 @@ import {
   SharedSpaceResponseDto,
   SharedSpaceUpdateDto,
 } from 'src/dtos/shared-space.dto';
-import { JobName, Permission, SharedSpaceActivityType, SharedSpaceRole, UserAvatarColor } from 'src/enum';
+import { OnJob } from 'src/decorators';
+import { JobName, JobStatus, Permission, QueueName, SharedSpaceActivityType, SharedSpaceRole, UserAvatarColor } from 'src/enum';
 import { BaseService } from 'src/services/base.service';
+import { JobOf } from 'src/types';
 
 const ROLE_HIERARCHY: Record<SharedSpaceRole, number> = {
   [SharedSpaceRole.Viewer]: 0,
@@ -405,6 +407,50 @@ export class SharedSpaceService extends BaseService {
       state: marker.state ?? null,
       country: marker.country ?? null,
     }));
+  }
+
+  @OnJob({ name: JobName.SharedSpaceFaceMatch, queue: QueueName.FacialRecognition })
+  async handleSharedSpaceFaceMatch({ spaceId, assetId }: JobOf<JobName.SharedSpaceFaceMatch>): Promise<JobStatus> {
+    const space = await this.sharedSpaceRepository.getById(spaceId);
+    if (!space || !space.faceRecognitionEnabled) {
+      return JobStatus.Skipped;
+    }
+
+    const { machineLearning } = await this.getConfig({ withCache: true });
+    const maxDistance = machineLearning.facialRecognition.maxDistance;
+
+    const faces = await this.sharedSpaceRepository.getAssetFacesForMatching(assetId);
+    for (const face of faces) {
+      const isAssigned = await this.sharedSpaceRepository.isPersonFaceAssigned(face.id, spaceId);
+      if (isAssigned) {
+        continue;
+      }
+
+      const matches = await this.sharedSpaceRepository.findClosestSpacePerson(spaceId, face.embedding, {
+        maxDistance,
+        numResults: 1,
+      });
+
+      let personId: string;
+      if (matches.length > 0) {
+        personId = matches[0].personId;
+      } else {
+        const newPerson = await this.sharedSpaceRepository.createPerson({
+          spaceId,
+          name: '',
+          representativeFaceId: face.id,
+        });
+        personId = newPerson.id;
+        await this.jobRepository.queue({
+          name: JobName.SharedSpacePersonThumbnail,
+          data: { id: newPerson.id },
+        });
+      }
+
+      await this.sharedSpaceRepository.addPersonFaces([{ personId, assetFaceId: face.id }]);
+    }
+
+    return JobStatus.Success;
   }
 
   private async requireMembership(auth: AuthDto, spaceId: string) {
