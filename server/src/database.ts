@@ -347,6 +347,15 @@ export type SharedSpaceAsset = {
   addedAt: Date;
 };
 
+export type SharedSpaceActivity = {
+  id: string;
+  spaceId: string;
+  userId: string | null;
+  type: string;
+  data: Record<string, unknown>;
+  createdAt: Date;
+};
+
 const userColumns = ['id', 'name', 'email', 'avatarColor', 'profileImagePath', 'profileChangedAt'] as const;
 const userWithPrefixColumns = [
   'user2.id',

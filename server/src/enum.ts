@@ -58,6 +58,18 @@ export enum SharedSpaceRole {
   Viewer = 'viewer',
 }
 
+export enum SharedSpaceActivityType {
+  AssetAdd = 'asset_add',
+  AssetRemove = 'asset_remove',
+  MemberJoin = 'member_join',
+  MemberLeave = 'member_leave',
+  MemberRemove = 'member_remove',
+  MemberRoleChange = 'member_role_change',
+  CoverChange = 'cover_change',
+  SpaceRename = 'space_rename',
+  SpaceColorChange = 'space_color_change',
+}
+
 export enum AssetOrder {
   Asc = 'asc',
   Desc = 'desc',
