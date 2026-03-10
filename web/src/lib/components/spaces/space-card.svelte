@@ -37,6 +37,16 @@
   );
   let visibleMembers = $derived((space.members ?? []).slice(0, MAX_AVATARS));
   let overflowCount = $derived(Math.max(0, (space.members ?? []).length - MAX_AVATARS));
+
+  let hasActivity = $derived((space.newAssetCount ?? 0) > 0);
+  let activityText = $derived.by(() => {
+    const count = space.newAssetCount ?? 0;
+    const displayCount = count > 99 ? '99+' : String(count);
+    if (space.lastContributor) {
+      return `${space.lastContributor.name} added ${displayCount} new`;
+    }
+    return `${displayCount} new photos`;
+  });
 </script>
 
 <a
@@ -46,6 +56,12 @@
 >
   <div class="relative">
     <SpaceCollage assets={collageAssets} {gradientClass} {preload} />
+
+    {#if hasActivity}
+      <div data-testid="activity-dot" class="absolute -right-1 -top-1 z-10 h-2 w-2 rounded-full bg-immich-primary">
+        <div class="absolute inset-0 animate-ping rounded-full bg-immich-primary opacity-40"></div>
+      </div>
+    {/if}
 
     {#if visibleMembers.length > 0}
       <div class="absolute bottom-2 end-2 flex items-center">
@@ -84,6 +100,12 @@
     >
       {space.name}
     </p>
+
+    {#if hasActivity}
+      <p data-testid="activity-line" class="truncate text-xs font-medium text-immich-primary">
+        {activityText}
+      </p>
+    {/if}
 
     <span class="flex gap-2 text-sm dark:text-immich-dark-fg" data-testid="space-details">
       {#if space.assetCount != null}
