@@ -74,10 +74,10 @@ test.describe('Spaces P1 — Collage, Hero, Sort', () => {
       const space = await utils.createSpace(admin.accessToken, { name: 'Cover Space' });
       const asset = await utils.createAsset(admin.accessToken);
       await utils.addSpaceAssets(admin.accessToken, space.id, [asset.id]);
+      await utils.updateSpace(admin.accessToken, space.id, { thumbnailAssetId: asset.id });
 
       await utils.setAuthCookies(context, admin.accessToken);
       await page.goto(`/spaces/${space.id}`);
-      // Space auto-sets thumbnailAssetId on first asset add
       await expect(page.locator('[data-testid="hero-cover-image"]')).toBeVisible();
     });
 
