@@ -393,6 +393,9 @@ export class SharedSpaceService extends BaseService {
       type: SharedSpaceActivityType.AssetRemove,
       data: { count: dto.assetIds.length },
     });
+
+    await this.sharedSpaceRepository.removePersonFacesByAssetIds(spaceId, dto.assetIds);
+    await this.sharedSpaceRepository.deleteOrphanedPersons(spaceId);
   }
 
   async getMapMarkers(auth: AuthDto, id: string) {

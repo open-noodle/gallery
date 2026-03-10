@@ -1430,6 +1430,11 @@ describe(SharedSpaceService.name, () => {
   });
 
   describe('removeAssets', () => {
+    const setupRemoveAssetsMocks = () => {
+      mocks.sharedSpace.removePersonFacesByAssetIds.mockResolvedValue(void 0);
+      mocks.sharedSpace.deleteOrphanedPersons.mockResolvedValue(void 0);
+    };
+
     it('should remove assets when editor', async () => {
       const auth = factory.auth();
       const spaceId = newUuid();
@@ -1443,6 +1448,7 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.getLastAssetAddedAt.mockResolvedValue(new Date());
       mocks.sharedSpace.update.mockResolvedValue(factory.sharedSpace({ id: spaceId }));
       mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
+      setupRemoveAssetsMocks();
 
       await sut.removeAssets(auth, spaceId, { assetIds: [assetId1, assetId2] });
 
@@ -1461,6 +1467,7 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.getLastAssetAddedAt.mockResolvedValue(lastDate);
       mocks.sharedSpace.update.mockResolvedValue(factory.sharedSpace({ id: spaceId, lastActivityAt: lastDate }));
       mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
+      setupRemoveAssetsMocks();
 
       await sut.removeAssets(auth, spaceId, { assetIds: [newUuid()] });
 
@@ -1479,6 +1486,7 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.getLastAssetAddedAt.mockResolvedValue(void 0);
       mocks.sharedSpace.update.mockResolvedValue(factory.sharedSpace({ id: spaceId, lastActivityAt: null }));
       mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
+      setupRemoveAssetsMocks();
 
       await sut.removeAssets(auth, spaceId, { assetIds: [newUuid()] });
 
@@ -1498,6 +1506,7 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.getLastAssetAddedAt.mockResolvedValue(void 0);
       mocks.sharedSpace.update.mockResolvedValue(factory.sharedSpace({ id: spaceId, thumbnailAssetId: null }));
       mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
+      setupRemoveAssetsMocks();
 
       await sut.removeAssets(auth, spaceId, { assetIds: [coverAssetId] });
 
@@ -1521,6 +1530,7 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.getLastAssetAddedAt.mockResolvedValue(new Date());
       mocks.sharedSpace.update.mockResolvedValue(factory.sharedSpace({ id: spaceId }));
       mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
+      setupRemoveAssetsMocks();
 
       await sut.removeAssets(auth, spaceId, { assetIds: [otherAssetId] });
 
@@ -1549,6 +1559,7 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.getLastAssetAddedAt.mockResolvedValue(void 0);
       mocks.sharedSpace.update.mockResolvedValue(factory.sharedSpace());
       mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
+      setupRemoveAssetsMocks();
 
       const auth = factory.auth();
       await sut.removeAssets(auth, 'space-1', { assetIds: ['a1', 'a2'] });
@@ -1559,6 +1570,27 @@ describe(SharedSpaceService.name, () => {
         type: SharedSpaceActivityType.AssetRemove,
         data: { count: 2 },
       });
+    });
+
+    it('should remove person faces by asset IDs after removing assets', async () => {
+      const auth = factory.auth();
+      const spaceId = newUuid();
+      const assetId = newUuid();
+      const editorMember = makeMemberResult({ spaceId, userId: auth.user.id, role: SharedSpaceRole.Editor });
+
+      mocks.sharedSpace.getMember.mockResolvedValue(editorMember);
+      mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId }));
+      mocks.sharedSpace.removeAssets.mockResolvedValue(void 0);
+      mocks.sharedSpace.getLastAssetAddedAt.mockResolvedValue(new Date());
+      mocks.sharedSpace.update.mockResolvedValue(factory.sharedSpace({ id: spaceId }));
+      mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
+      mocks.sharedSpace.removePersonFacesByAssetIds.mockResolvedValue(void 0);
+      mocks.sharedSpace.deleteOrphanedPersons.mockResolvedValue(void 0);
+
+      await sut.removeAssets(auth, spaceId, { assetIds: [assetId] });
+
+      expect(mocks.sharedSpace.removePersonFacesByAssetIds).toHaveBeenCalledWith(spaceId, [assetId]);
+      expect(mocks.sharedSpace.deleteOrphanedPersons).toHaveBeenCalledWith(spaceId);
     });
   });
 
