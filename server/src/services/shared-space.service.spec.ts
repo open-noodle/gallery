@@ -1105,4 +1105,22 @@ describe(SharedSpaceService.name, () => {
       });
     });
   });
+
+  describe('markSpaceViewed', () => {
+    it('should update lastViewedAt for the calling user', async () => {
+      const auth = factory.auth();
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
+
+      await sut.markSpaceViewed(auth, 'space-1');
+
+      expect(mocks.sharedSpace.updateMemberLastViewed).toHaveBeenCalledWith('space-1', auth.user.id);
+    });
+
+    it('should throw for non-members', async () => {
+      const auth = factory.auth();
+      mocks.sharedSpace.getMember.mockResolvedValue(void 0);
+
+      await expect(sut.markSpaceViewed(auth, 'space-1')).rejects.toThrow('Not a member of this space');
+    });
+  });
 });
