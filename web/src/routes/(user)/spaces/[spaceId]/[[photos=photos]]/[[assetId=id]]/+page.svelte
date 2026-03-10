@@ -278,12 +278,6 @@
         gradientClass={spaceGradient}
       />
 
-      {#if currentMember}
-        <div class="mt-2">
-          <RoleBadge role={currentMember.role} spaceColor={space.color} />
-        </div>
-      {/if}
-
       <SpaceSearch bind:this={spaceSearch} spaceId={space.id} bind:showSearchResults />
     </section>
   {/if}
