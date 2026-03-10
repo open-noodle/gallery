@@ -534,6 +534,7 @@ const sharedSpaceMemberFactory = (data: Partial<SharedSpaceMember> = {}): Shared
   role: SharedSpaceRole.Viewer,
   joinedAt: newDate(),
   showInTimeline: true,
+  lastViewedAt: null,
   ...data,
 });
 

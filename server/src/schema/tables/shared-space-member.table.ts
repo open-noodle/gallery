@@ -19,4 +19,7 @@ export class SharedSpaceMemberTable {
 
   @Column({ type: 'boolean', default: true })
   showInTimeline!: Generated<boolean>;
+
+  @Column({ type: 'timestamp with time zone', nullable: true })
+  lastViewedAt!: Timestamp | null;
 }
