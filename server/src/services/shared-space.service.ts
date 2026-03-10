@@ -91,9 +91,18 @@ export class SharedSpaceService extends BaseService {
     const assetCount = await this.sharedSpaceRepository.getAssetCount(id);
     const recentAssets = await this.sharedSpaceRepository.getRecentAssets(id);
 
+    let { thumbnailAssetId } = space;
+    if (thumbnailAssetId) {
+      const activeIds = new Set(recentAssets.map((a) => a.id));
+      if (assetCount === 0 || (assetCount <= activeIds.size && !activeIds.has(thumbnailAssetId))) {
+        thumbnailAssetId = null;
+        await this.sharedSpaceRepository.update(id, { thumbnailAssetId: null });
+      }
+    }
+
     return {
       ...this.mapSpace(space),
-      thumbnailAssetId: space.thumbnailAssetId,
+      thumbnailAssetId,
       memberCount: members.length,
       assetCount,
       recentAssetIds: recentAssets.map((a) => a.id),
@@ -250,10 +259,20 @@ export class SharedSpaceService extends BaseService {
 
   async removeAssets(auth: AuthDto, spaceId: string, dto: SharedSpaceAssetRemoveDto): Promise<void> {
     await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
+
+    const space = await this.sharedSpaceRepository.getById(spaceId);
     await this.sharedSpaceRepository.removeAssets(spaceId, dto.assetIds);
 
     const lastAddedAt = await this.sharedSpaceRepository.getLastAssetAddedAt(spaceId);
-    await this.sharedSpaceRepository.update(spaceId, { lastActivityAt: lastAddedAt ?? null });
+    const updateData: { lastActivityAt: Date | null; thumbnailAssetId?: null } = {
+      lastActivityAt: lastAddedAt ?? null,
+    };
+
+    if (space?.thumbnailAssetId && dto.assetIds.includes(space.thumbnailAssetId)) {
+      updateData.thumbnailAssetId = null;
+    }
+
+    await this.sharedSpaceRepository.update(spaceId, updateData);
   }
 
   async getMapMarkers(auth: AuthDto, id: string) {

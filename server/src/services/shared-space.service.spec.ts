@@ -400,6 +400,79 @@ describe(SharedSpaceService.name, () => {
       expect(mocks.sharedSpace.getMostRecentAssetId).not.toHaveBeenCalled();
     });
 
+    it('should clear thumbnailAssetId when the cover asset has been deleted', async () => {
+      const auth = factory.auth();
+      const deletedAssetId = newUuid();
+      const space = factory.sharedSpace({ thumbnailAssetId: deletedAssetId });
+      const member = makeMemberResult({
+        spaceId: space.id,
+        userId: auth.user.id,
+        role: SharedSpaceRole.Viewer,
+      });
+
+      mocks.sharedSpace.getMember.mockResolvedValue(member);
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.getMembers.mockResolvedValue([member]);
+      mocks.sharedSpace.getAssetCount.mockResolvedValue(0);
+      mocks.sharedSpace.getRecentAssets.mockResolvedValue([]);
+      mocks.sharedSpace.update.mockResolvedValue(factory.sharedSpace({ id: space.id, thumbnailAssetId: null }));
+
+      const result = await sut.get(auth, space.id);
+
+      expect(result.thumbnailAssetId).toBeNull();
+      expect(mocks.sharedSpace.update).toHaveBeenCalledWith(space.id, { thumbnailAssetId: null });
+    });
+
+    it('should clear thumbnailAssetId when the cover asset was deleted but other assets remain', async () => {
+      const auth = factory.auth();
+      const deletedAssetId = newUuid();
+      const activeAssetId = newUuid();
+      const space = factory.sharedSpace({ thumbnailAssetId: deletedAssetId });
+      const member = makeMemberResult({
+        spaceId: space.id,
+        userId: auth.user.id,
+        role: SharedSpaceRole.Viewer,
+      });
+
+      mocks.sharedSpace.getMember.mockResolvedValue(member);
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.getMembers.mockResolvedValue([member]);
+      mocks.sharedSpace.getAssetCount.mockResolvedValue(1);
+      mocks.sharedSpace.getRecentAssets.mockResolvedValue([{ id: activeAssetId, thumbhash: null }]);
+      mocks.sharedSpace.update.mockResolvedValue(factory.sharedSpace({ id: space.id, thumbnailAssetId: null }));
+
+      const result = await sut.get(auth, space.id);
+
+      expect(result.thumbnailAssetId).toBeNull();
+      expect(mocks.sharedSpace.update).toHaveBeenCalledWith(space.id, { thumbnailAssetId: null });
+    });
+
+    it('should keep thumbnailAssetId when it is still an active asset', async () => {
+      const auth = factory.auth();
+      const coverAssetId = newUuid();
+      const space = factory.sharedSpace({ thumbnailAssetId: coverAssetId });
+      const member = makeMemberResult({
+        spaceId: space.id,
+        userId: auth.user.id,
+        role: SharedSpaceRole.Viewer,
+      });
+
+      mocks.sharedSpace.getMember.mockResolvedValue(member);
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.getMembers.mockResolvedValue([member]);
+      mocks.sharedSpace.getAssetCount.mockResolvedValue(3);
+      mocks.sharedSpace.getRecentAssets.mockResolvedValue([
+        { id: coverAssetId, thumbhash: null },
+        { id: newUuid(), thumbhash: null },
+        { id: newUuid(), thumbhash: null },
+      ]);
+
+      const result = await sut.get(auth, space.id);
+
+      expect(result.thumbnailAssetId).toBe(coverAssetId);
+      expect(mocks.sharedSpace.update).not.toHaveBeenCalled();
+    });
+
     it('should return assetCount of 0 when all assets are deleted', async () => {
       const auth = factory.auth();
       const space = factory.sharedSpace();
@@ -1063,6 +1136,7 @@ describe(SharedSpaceService.name, () => {
       const editorMember = makeMemberResult({ spaceId, userId: auth.user.id, role: SharedSpaceRole.Editor });
 
       mocks.sharedSpace.getMember.mockResolvedValue(editorMember);
+      mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId }));
       mocks.sharedSpace.removeAssets.mockResolvedValue(void 0);
       mocks.sharedSpace.getLastAssetAddedAt.mockResolvedValue(new Date());
       mocks.sharedSpace.update.mockResolvedValue(factory.sharedSpace({ id: spaceId }));
@@ -1079,6 +1153,7 @@ describe(SharedSpaceService.name, () => {
       const editorMember = makeMemberResult({ spaceId, userId: auth.user.id, role: SharedSpaceRole.Editor });
 
       mocks.sharedSpace.getMember.mockResolvedValue(editorMember);
+      mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId }));
       mocks.sharedSpace.removeAssets.mockResolvedValue(void 0);
       mocks.sharedSpace.getLastAssetAddedAt.mockResolvedValue(lastDate);
       mocks.sharedSpace.update.mockResolvedValue(factory.sharedSpace({ id: spaceId, lastActivityAt: lastDate }));
@@ -1095,6 +1170,7 @@ describe(SharedSpaceService.name, () => {
       const editorMember = makeMemberResult({ spaceId, userId: auth.user.id, role: SharedSpaceRole.Editor });
 
       mocks.sharedSpace.getMember.mockResolvedValue(editorMember);
+      mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId }));
       mocks.sharedSpace.removeAssets.mockResolvedValue(void 0);
       mocks.sharedSpace.getLastAssetAddedAt.mockResolvedValue(void 0);
       mocks.sharedSpace.update.mockResolvedValue(factory.sharedSpace({ id: spaceId, lastActivityAt: null }));
@@ -1102,6 +1178,48 @@ describe(SharedSpaceService.name, () => {
       await sut.removeAssets(auth, spaceId, { assetIds: [newUuid()] });
 
       expect(mocks.sharedSpace.update).toHaveBeenCalledWith(spaceId, { lastActivityAt: null });
+    });
+
+    it('should clear thumbnailAssetId when the cover photo is removed', async () => {
+      const auth = factory.auth();
+      const spaceId = newUuid();
+      const coverAssetId = newUuid();
+      const editorMember = makeMemberResult({ spaceId, userId: auth.user.id, role: SharedSpaceRole.Editor });
+      const space = factory.sharedSpace({ id: spaceId, thumbnailAssetId: coverAssetId });
+
+      mocks.sharedSpace.getMember.mockResolvedValue(editorMember);
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.removeAssets.mockResolvedValue(void 0);
+      mocks.sharedSpace.getLastAssetAddedAt.mockResolvedValue(void 0);
+      mocks.sharedSpace.update.mockResolvedValue(factory.sharedSpace({ id: spaceId, thumbnailAssetId: null }));
+
+      await sut.removeAssets(auth, spaceId, { assetIds: [coverAssetId] });
+
+      expect(mocks.sharedSpace.update).toHaveBeenCalledWith(spaceId, {
+        lastActivityAt: null,
+        thumbnailAssetId: null,
+      });
+    });
+
+    it('should not clear thumbnailAssetId when a non-cover photo is removed', async () => {
+      const auth = factory.auth();
+      const spaceId = newUuid();
+      const coverAssetId = newUuid();
+      const otherAssetId = newUuid();
+      const editorMember = makeMemberResult({ spaceId, userId: auth.user.id, role: SharedSpaceRole.Editor });
+      const space = factory.sharedSpace({ id: spaceId, thumbnailAssetId: coverAssetId });
+
+      mocks.sharedSpace.getMember.mockResolvedValue(editorMember);
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.removeAssets.mockResolvedValue(void 0);
+      mocks.sharedSpace.getLastAssetAddedAt.mockResolvedValue(new Date());
+      mocks.sharedSpace.update.mockResolvedValue(factory.sharedSpace({ id: spaceId }));
+
+      await sut.removeAssets(auth, spaceId, { assetIds: [otherAssetId] });
+
+      expect(mocks.sharedSpace.update).toHaveBeenCalledWith(spaceId, {
+        lastActivityAt: expect.any(Date),
+      });
     });
 
     it('should throw when viewer tries to remove', async () => {
