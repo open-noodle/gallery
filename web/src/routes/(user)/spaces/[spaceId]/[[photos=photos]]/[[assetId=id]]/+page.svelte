@@ -398,6 +398,7 @@
   onClose={() => (membersPanelOpen = false)}
   onMembersChanged={async () => {
     members = await getMembers({ id: space.id });
+    await refreshSpace();
   }}
 />
 
