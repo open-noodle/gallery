@@ -1,5 +1,6 @@
 <script lang="ts">
   import UserAvatar from '$lib/components/shared-components/user-avatar.svelte';
+  import RoleBadge from '$lib/components/spaces/role-badge.svelte';
   import SpaceAddMemberModal from '$lib/modals/SpaceAddMemberModal.svelte';
   import { handleError } from '$lib/utils/handle-error';
   import {
@@ -17,10 +18,11 @@
     spaceId: string;
     members: SharedSpaceMemberResponseDto[];
     isOwner: boolean;
+    spaceColor?: string | null;
     onClose: (updatedMembers?: SharedSpaceMemberResponseDto[]) => void;
   }
 
-  let { spaceId, members: initialMembers, isOwner, onClose }: Props = $props();
+  let { spaceId, members: initialMembers, isOwner, spaceColor = 'primary', onClose }: Props = $props();
   let members = $state([...initialMembers]);
 
   const toAvatarUser = (member: SharedSpaceMemberResponseDto) => ({
@@ -96,9 +98,7 @@
           <Text size="tiny" color="muted">{member.email}</Text>
         </div>
         {#if isOwner && member.role === 'owner'}
-          <Field disabled class="w-32 shrink-0">
-            <Select options={[{ label: $t('owner'), value: 'owner' }]} value="owner" />
-          </Field>
+          <RoleBadge role="owner" {spaceColor} />
         {:else if isOwner}
           <Field class="w-32 shrink-0">
             <Select
@@ -112,7 +112,7 @@
             />
           </Field>
         {:else}
-          <span class="text-sm text-immich-fg/60 dark:text-immich-dark-fg/60 capitalize">{member.role}</span>
+          <RoleBadge role={member.role} {spaceColor} />
         {/if}
       </div>
     {/each}

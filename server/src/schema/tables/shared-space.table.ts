@@ -30,6 +30,9 @@ export class SharedSpaceTable {
   @ForeignKeyColumn(() => AssetTable, { onDelete: 'SET NULL', nullable: true })
   thumbnailAssetId!: string | null;
 
+  @Column({ type: 'character varying', length: 20, nullable: true })
+  color!: string | null;
+
   @CreateDateColumn()
   createdAt!: Generated<Timestamp>;
 

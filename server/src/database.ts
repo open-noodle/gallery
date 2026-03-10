@@ -323,6 +323,7 @@ export type SharedSpace = {
   description: string | null;
   createdById: string;
   thumbnailAssetId: string | null;
+  color: string | null;
   createdAt: Date;
   updatedAt: Date;
   createId: string;

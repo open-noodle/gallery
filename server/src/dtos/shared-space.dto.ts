@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
-import { SharedSpaceRole } from 'src/enum';
+import { SharedSpaceRole, UserAvatarColor } from 'src/enum';
 import { ValidateEnum, ValidateUUID } from 'src/validation';
 
 export class SharedSpaceCreateDto {
@@ -15,6 +15,15 @@ export class SharedSpaceCreateDto {
   @IsOptional()
   @MaxLength(500)
   description?: string;
+
+  @ValidateEnum({
+    enum: UserAvatarColor,
+    name: 'UserAvatarColor',
+    description: 'Space color',
+    optional: true,
+    default: UserAvatarColor.Primary,
+  })
+  color?: UserAvatarColor;
 }
 
 export class SharedSpaceUpdateDto {
@@ -33,6 +42,14 @@ export class SharedSpaceUpdateDto {
 
   @ValidateUUID({ optional: true, nullable: true, description: 'Thumbnail asset ID' })
   thumbnailAssetId?: string | null;
+
+  @ValidateEnum({
+    enum: UserAvatarColor,
+    name: 'UserAvatarColor',
+    description: 'Space color',
+    optional: true,
+  })
+  color?: UserAvatarColor;
 }
 
 export class SharedSpaceMemberCreateDto {
@@ -110,6 +127,9 @@ export class SharedSpaceResponseDto {
 
   @ApiPropertyOptional({ description: 'Thumbnail asset ID' })
   thumbnailAssetId?: string | null;
+
+  @ApiPropertyOptional({ description: 'Space color', enum: UserAvatarColor })
+  color?: UserAvatarColor | null;
 
   @ApiPropertyOptional({ description: 'Space members (summary)', type: [SharedSpaceMemberResponseDto] })
   members?: SharedSpaceMemberResponseDto[];

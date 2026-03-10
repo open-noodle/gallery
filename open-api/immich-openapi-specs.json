@@ -23172,6 +23172,15 @@
       },
       "SharedSpaceCreateDto": {
         "properties": {
+          "color": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserAvatarColor"
+              }
+            ],
+            "default": "primary",
+            "description": "Space color"
+          },
           "description": {
             "description": "Space description",
             "maxLength": 500,
@@ -23298,6 +23307,23 @@
             "description": "Number of assets",
             "type": "number"
           },
+          "color": {
+            "description": "Space color",
+            "enum": [
+              "primary",
+              "pink",
+              "red",
+              "yellow",
+              "blue",
+              "green",
+              "purple",
+              "orange",
+              "gray",
+              "amber"
+            ],
+            "nullable": true,
+            "type": "string"
+          },
           "createdAt": {
             "description": "Creation date",
             "type": "string"
@@ -23360,6 +23386,14 @@
       },
       "SharedSpaceUpdateDto": {
         "properties": {
+          "color": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserAvatarColor"
+              }
+            ],
+            "description": "Space color"
+          },
           "description": {
             "description": "Space description",
             "maxLength": 500,

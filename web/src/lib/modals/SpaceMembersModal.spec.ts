@@ -103,7 +103,7 @@ describe('SpaceMembersModal', () => {
     expect(screen.queryByText('spaces_add_member')).not.toBeInTheDocument();
   });
 
-  it('should show role select triggers for owners viewing members', () => {
+  it('should show role badge for owner and select triggers for other members', () => {
     render(SpaceMembersModal, {
       spaceId,
       members: [ownerMember, editorMember, viewerMember],
@@ -111,10 +111,12 @@ describe('SpaceMembersModal', () => {
       onClose,
     });
 
-    // Owner's disabled dropdown shows "owner", editor/viewer show translated role labels
-    const ownerTrigger = screen.getByRole('button', { name: 'owner' });
-    expect(ownerTrigger).toHaveAttribute('aria-expanded', 'false');
+    // Owner shows a static role badge (not a dropdown)
+    const ownerBadge = screen.getByTestId('role-badge-owner');
+    expect(ownerBadge).toBeInTheDocument();
+    expect(ownerBadge.tagName).toBe('SPAN');
 
+    // Editor/viewer still show select dropdowns
     const editorTrigger = screen.getByRole('button', { name: 'role_editor' });
     expect(editorTrigger).toBeInTheDocument();
 
@@ -122,7 +124,7 @@ describe('SpaceMembersModal', () => {
     expect(viewerTrigger).toBeInTheDocument();
   });
 
-  it('should disable the owner role dropdown', () => {
+  it('should show owner role badge instead of dropdown', () => {
     render(SpaceMembersModal, {
       spaceId,
       members: [ownerMember, editorMember],
@@ -130,8 +132,10 @@ describe('SpaceMembersModal', () => {
       onClose,
     });
 
-    const ownerTrigger = screen.getByRole('button', { name: 'owner' });
-    expect(ownerTrigger).toBeDisabled();
+    // Owner row has a role badge, not a button/dropdown
+    const ownerBadge = screen.getByTestId('role-badge-owner');
+    expect(ownerBadge).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'owner' })).not.toBeInTheDocument();
   });
 
   it('should show static role text for non-owners viewing members', () => {
@@ -142,9 +146,9 @@ describe('SpaceMembersModal', () => {
       onClose,
     });
 
-    // Non-owners should see plain text role labels, not dropdown triggers
-    expect(screen.getByText('owner')).toBeInTheDocument();
-    expect(screen.getByText('editor')).toBeInTheDocument();
+    // Non-owners should see role badges, not dropdown triggers
+    expect(screen.getByTestId('role-badge-owner')).toBeInTheDocument();
+    expect(screen.getByTestId('role-badge-editor')).toBeInTheDocument();
     // Should not have select triggers (no aria-haspopup=listbox buttons)
     expect(screen.queryByRole('button', { name: 'owner' })).not.toBeInTheDocument();
   });

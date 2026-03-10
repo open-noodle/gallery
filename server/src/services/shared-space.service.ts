@@ -11,7 +11,7 @@ import {
   SharedSpaceResponseDto,
   SharedSpaceUpdateDto,
 } from 'src/dtos/shared-space.dto';
-import { Permission, SharedSpaceRole } from 'src/enum';
+import { Permission, SharedSpaceRole, UserAvatarColor } from 'src/enum';
 import { BaseService } from 'src/services/base.service';
 
 const ROLE_HIERARCHY: Record<SharedSpaceRole, number> = {
@@ -26,6 +26,7 @@ export class SharedSpaceService extends BaseService {
     const space = await this.sharedSpaceRepository.create({
       name: dto.name,
       description: dto.description ?? null,
+      color: dto.color ?? 'primary',
       createdById: auth.user.id,
     });
 
@@ -81,7 +82,7 @@ export class SharedSpaceService extends BaseService {
   }
 
   async update(auth: AuthDto, id: string, dto: SharedSpaceUpdateDto): Promise<SharedSpaceResponseDto> {
-    const isMetadataUpdate = dto.name !== undefined || dto.description !== undefined;
+    const isMetadataUpdate = dto.name !== undefined || dto.description !== undefined || dto.color !== undefined;
     const minimumRole = isMetadataUpdate ? SharedSpaceRole.Owner : SharedSpaceRole.Editor;
     await this.requireRole(auth, id, minimumRole);
 
@@ -89,6 +90,7 @@ export class SharedSpaceService extends BaseService {
       name: dto.name,
       description: dto.description,
       thumbnailAssetId: dto.thumbnailAssetId,
+      color: dto.color,
     });
 
     return this.mapSpace(space);
@@ -265,6 +267,7 @@ export class SharedSpaceService extends BaseService {
     createdAt: unknown;
     updatedAt: unknown;
     thumbnailAssetId?: string | null;
+    color?: string | null;
   }): SharedSpaceResponseDto {
     return {
       id: space.id,
@@ -274,6 +277,7 @@ export class SharedSpaceService extends BaseService {
       createdAt: space.createdAt as unknown as string,
       updatedAt: space.updatedAt as unknown as string,
       thumbnailAssetId: space.thumbnailAssetId ?? null,
+      color: (space.color as UserAvatarColor) ?? null,
     };
   }
 }

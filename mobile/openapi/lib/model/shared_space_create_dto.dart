@@ -13,9 +13,13 @@ part of openapi.api;
 class SharedSpaceCreateDto {
   /// Returns a new [SharedSpaceCreateDto] instance.
   SharedSpaceCreateDto({
+    this.color = UserAvatarColor.primary,
     this.description,
     required this.name,
   });
+
+  /// Space color
+  UserAvatarColor color;
 
   /// Space description
   ///
@@ -31,20 +35,23 @@ class SharedSpaceCreateDto {
 
   @override
   bool operator ==(Object other) => identical(this, other) || other is SharedSpaceCreateDto &&
+    other.color == color &&
     other.description == description &&
     other.name == name;
 
   @override
   int get hashCode =>
     // ignore: unnecessary_parenthesis
+    (color.hashCode) +
     (description == null ? 0 : description!.hashCode) +
     (name.hashCode);
 
   @override
-  String toString() => 'SharedSpaceCreateDto[description=$description, name=$name]';
+  String toString() => 'SharedSpaceCreateDto[color=$color, description=$description, name=$name]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
+      json[r'color'] = this.color;
     if (this.description != null) {
       json[r'description'] = this.description;
     } else {
@@ -63,6 +70,7 @@ class SharedSpaceCreateDto {
       final json = value.cast<String, dynamic>();
 
       return SharedSpaceCreateDto(
+        color: UserAvatarColor.fromJson(json[r'color']) ?? UserAvatarColor.primary,
         description: mapValueOfType<String>(json, r'description'),
         name: mapValueOfType<String>(json, r'name')!,
       );

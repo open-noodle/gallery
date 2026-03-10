@@ -4,6 +4,7 @@
   import UserPageLayout from '$lib/components/layouts/user-page-layout.svelte';
   import ControlAppBar from '$lib/components/shared-components/control-app-bar.svelte';
   import ButtonContextMenu from '$lib/components/shared-components/context-menu/button-context-menu.svelte';
+  import RoleBadge from '$lib/components/spaces/role-badge.svelte';
   import SpaceMap from '$lib/components/spaces/space-map.svelte';
   import SpaceSearch from '$lib/components/spaces/space-search.svelte';
   import MenuOption from '$lib/components/shared-components/context-menu/menu-option.svelte';
@@ -40,6 +41,7 @@
   import { Icon, IconButton, modalManager, toastManager } from '@immich/ui';
   import {
     mdiAccountMultipleOutline,
+    mdiCameraOutline,
     mdiDeleteOutline,
     mdiDotsVertical,
     mdiEyeOffOutline,
@@ -152,6 +154,7 @@
       spaceId: space.id,
       members,
       isOwner,
+      spaceColor: space.color,
     });
     if (updatedMembers) {
       members = updatedMembers;
@@ -257,10 +260,28 @@
 
   {#if viewMode !== 'select-assets'}
     <section class="px-4 pt-4">
-      <div class="flex gap-4 mt-2 text-sm text-immich-fg/60 dark:text-immich-dark-fg/60">
-        <span>{space.assetCount ?? 0} {$t('photos')}</span>
-        <span>{members.length} {$t('members')}</span>
+      <div class="flex flex-wrap gap-2 mt-2">
+        <span
+          class="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1 text-sm text-gray-700 dark:bg-gray-800 dark:text-gray-300"
+        >
+          <Icon icon={mdiCameraOutline} size="16" />
+          {space.assetCount ?? 0}
+          {$t('photos')}
+        </span>
+        <span
+          class="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1 text-sm text-gray-700 dark:bg-gray-800 dark:text-gray-300"
+        >
+          <Icon icon={mdiAccountMultipleOutline} size="16" />
+          {members.length}
+          {$t('members')}
+        </span>
       </div>
+
+      {#if currentMember}
+        <div class="mt-2">
+          <RoleBadge role={currentMember.role} spaceColor={space.color} />
+        </div>
+      {/if}
 
       <SpaceSearch bind:this={spaceSearch} spaceId={space.id} bind:showSearchResults />
 
