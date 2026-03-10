@@ -234,6 +234,15 @@ export interface INightlyJob extends IBaseJob {
   nightly?: boolean;
 }
 
+export interface ISharedSpaceFaceMatchJob extends IBaseJob {
+  spaceId: string;
+  assetId: string;
+}
+
+export interface ISharedSpaceFaceMatchAllJob extends IBaseJob {
+  spaceId: string;
+}
+
 export type EmailImageAttachment = {
   filename: string;
   cid: string;
@@ -428,8 +437,8 @@ export type JobItem =
   | { name: JobName.StorageBackendMigrationSingle; data: IStorageMigrationJob }
 
   // Shared Space Face Recognition
-  | { name: JobName.SharedSpaceFaceMatch; data: IEntityJob }
-  | { name: JobName.SharedSpaceFaceMatchAll; data: IBaseJob }
+  | { name: JobName.SharedSpaceFaceMatch; data: ISharedSpaceFaceMatchJob }
+  | { name: JobName.SharedSpaceFaceMatchAll; data: ISharedSpaceFaceMatchAllJob }
   | { name: JobName.SharedSpacePersonThumbnail; data: IEntityJob };
 
 export type VectorExtension = (typeof VECTOR_EXTENSIONS)[number];

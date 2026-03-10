@@ -12,7 +12,7 @@ import {
   SharedSpaceResponseDto,
   SharedSpaceUpdateDto,
 } from 'src/dtos/shared-space.dto';
-import { Permission, SharedSpaceActivityType, SharedSpaceRole, UserAvatarColor } from 'src/enum';
+import { JobName, Permission, SharedSpaceActivityType, SharedSpaceRole, UserAvatarColor } from 'src/enum';
 import { BaseService } from 'src/services/base.service';
 
 const ROLE_HIERARCHY: Record<SharedSpaceRole, number> = {
@@ -329,6 +329,16 @@ export class SharedSpaceService extends BaseService {
       type: SharedSpaceActivityType.AssetAdd,
       data: { count: dto.assetIds.length, assetIds: dto.assetIds.slice(0, 4) },
     });
+
+    const space = await this.sharedSpaceRepository.getById(spaceId);
+    if (space?.faceRecognitionEnabled) {
+      for (const assetId of dto.assetIds) {
+        await this.jobRepository.queue({
+          name: JobName.SharedSpaceFaceMatch,
+          data: { spaceId, assetId },
+        });
+      }
+    }
   }
 
   async markSpaceViewed(auth: AuthDto, spaceId: string): Promise<void> {
