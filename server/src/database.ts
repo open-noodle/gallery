@@ -325,6 +325,7 @@ export type SharedSpace = {
   thumbnailAssetId: string | null;
   color: string | null;
   thumbnailCropY: number | null;
+  faceRecognitionEnabled: boolean;
   lastActivityAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -355,6 +356,29 @@ export type SharedSpaceActivity = {
   type: string;
   data: Record<string, unknown>;
   createdAt: Date;
+};
+
+export type SharedSpacePerson = {
+  id: string;
+  spaceId: string;
+  name: string;
+  representativeFaceId: string | null;
+  thumbnailPath: string;
+  isHidden: boolean;
+  birthDate: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type SharedSpacePersonFace = {
+  personId: string;
+  assetFaceId: string;
+};
+
+export type SharedSpacePersonAlias = {
+  personId: string;
+  userId: string;
+  alias: string;
 };
 
 const userColumns = ['id', 'name', 'email', 'avatarColor', 'profileImagePath', 'profileChangedAt'] as const;

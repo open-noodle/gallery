@@ -379,6 +379,7 @@ const sharedSpaceFactory = (data: Partial<SharedSpace> = {}): SharedSpace => ({
   thumbnailAssetId: null,
   color: 'primary',
   thumbnailCropY: null,
+  faceRecognitionEnabled: true,
   lastActivityAt: null,
   createdAt: newDate(),
   updatedAt: newDate(),
