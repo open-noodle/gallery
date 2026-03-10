@@ -36,6 +36,9 @@ export class SharedSpaceTable {
   @Column({ type: 'integer', nullable: true })
   thumbnailCropY!: number | null;
 
+  @Column({ type: 'boolean', default: true })
+  faceRecognitionEnabled!: Generated<boolean>;
+
   @Column({ type: 'timestamp with time zone', nullable: true })
   lastActivityAt!: Timestamp | null;
 
