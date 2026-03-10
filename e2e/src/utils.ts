@@ -25,6 +25,7 @@ import {
   addAssets as addSpaceAssets,
   addMember as addSpaceMember,
   checkExistingAssets,
+  markSpaceViewed,
   createAlbum,
   createApiKey,
   createJob,
@@ -348,6 +349,9 @@ export const utils = {
 
   addSpaceAssets: (accessToken: string, spaceId: string, assetIds: string[]) =>
     addSpaceAssets({ id: spaceId, sharedSpaceAssetAddDto: { assetIds } }, { headers: asBearerAuth(accessToken) }),
+
+  markSpaceViewed: (accessToken: string, spaceId: string) =>
+    markSpaceViewed({ id: spaceId }, { headers: asBearerAuth(accessToken) }),
 
   createAsset: async (
     accessToken: string,

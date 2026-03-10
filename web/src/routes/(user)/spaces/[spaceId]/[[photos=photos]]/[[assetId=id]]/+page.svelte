@@ -254,6 +254,7 @@
           aria-label={$t('members')}
           onclick={handleShowMembers}
           icon={mdiAccountMultipleOutline}
+          data-testid="space-members-button"
         />
 
         {#if isOwner}
