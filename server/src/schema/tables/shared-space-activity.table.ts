@@ -3,7 +3,7 @@ import {
   CreateDateColumn,
   ForeignKeyColumn,
   Generated,
-  PrimaryGeneratedUuidV7Column,
+  PrimaryGeneratedColumn,
   Table,
   Timestamp,
 } from '@immich/sql-tools';
@@ -12,7 +12,7 @@ import { UserTable } from 'src/schema/tables/user.table';
 
 @Table('shared_space_activity')
 export class SharedSpaceActivityTable {
-  @PrimaryGeneratedUuidV7Column()
+  @PrimaryGeneratedColumn()
   id!: Generated<string>;
 
   @ForeignKeyColumn(() => SharedSpaceTable, { onDelete: 'CASCADE', index: false })

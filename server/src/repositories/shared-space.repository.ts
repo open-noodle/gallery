@@ -295,7 +295,7 @@ export class SharedSpaceRepository {
         spaceId: values.spaceId,
         userId: values.userId,
         type: values.type,
-        data: JSON.stringify(values.data ?? {}),
+        data: JSON.stringify(values.data ?? {}) as unknown as Record<string, unknown>,
       })
       .execute();
   }
@@ -304,17 +304,17 @@ export class SharedSpaceRepository {
   getActivities(spaceId: string, limit: number = 50, offset: number = 0) {
     return this.db
       .selectFrom('shared_space_activity')
-      .leftJoin('users', 'users.id', 'shared_space_activity.userId')
+      .leftJoin('user', 'user.id', 'shared_space_activity.userId')
       .select([
         'shared_space_activity.id',
         'shared_space_activity.type',
         'shared_space_activity.data',
         'shared_space_activity.createdAt',
         'shared_space_activity.userId',
-        'users.name',
-        'users.email',
-        'users.profileImagePath',
-        'users.avatarColor',
+        'user.name',
+        'user.email',
+        'user.profileImagePath',
+        'user.avatarColor',
       ])
       .where('shared_space_activity.spaceId', '=', spaceId)
       .orderBy('shared_space_activity.createdAt', 'desc')
