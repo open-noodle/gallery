@@ -316,7 +316,9 @@
         onSetCover={isEditor ? () => (viewMode = 'select-cover') : undefined}
       />
 
-      <SpaceSearch bind:this={spaceSearch} spaceId={space.id} bind:showSearchResults />
+      {#if (space.assetCount ?? 0) > 0}
+        <SpaceSearch bind:this={spaceSearch} spaceId={space.id} bind:showSearchResults />
+      {/if}
     </section>
 
     {#if isOwner}
