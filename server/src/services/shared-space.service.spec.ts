@@ -263,10 +263,66 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.getMembers.mockResolvedValue([]);
       mocks.sharedSpace.getAssetCount.mockResolvedValue(0);
       mocks.sharedSpace.getRecentAssets.mockResolvedValue([]);
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ lastViewedAt: null }));
 
       const result = await sut.getAll(auth);
 
       expect(result[0].lastActivityAt).toBe(lastActivity.toISOString());
+    });
+
+    it('should return newAssetCount when member has lastViewedAt', async () => {
+      const auth = factory.auth();
+      const lastViewed = new Date('2024-01-01');
+      const space = factory.sharedSpace();
+      mocks.sharedSpace.getAllByUserId.mockResolvedValue([space]);
+      mocks.sharedSpace.getMembers.mockResolvedValue([]);
+      mocks.sharedSpace.getAssetCount.mockResolvedValue(5);
+      mocks.sharedSpace.getRecentAssets.mockResolvedValue([]);
+      mocks.sharedSpace.getMember.mockResolvedValue(
+        makeMemberResult({ role: SharedSpaceRole.Owner, lastViewedAt: lastViewed }),
+      );
+      mocks.sharedSpace.getNewAssetCount.mockResolvedValue(3);
+      mocks.sharedSpace.getLastContributor.mockResolvedValue({ id: 'user-2', name: 'Marie' });
+
+      const result = await sut.getAll(auth);
+
+      expect(result[0].newAssetCount).toBe(3);
+      expect(result[0].lastContributor).toEqual({ id: 'user-2', name: 'Marie' });
+    });
+
+    it('should return newAssetCount equal to assetCount when lastViewedAt is null', async () => {
+      const auth = factory.auth();
+      const space = factory.sharedSpace();
+      mocks.sharedSpace.getAllByUserId.mockResolvedValue([space]);
+      mocks.sharedSpace.getMembers.mockResolvedValue([]);
+      mocks.sharedSpace.getAssetCount.mockResolvedValue(5);
+      mocks.sharedSpace.getRecentAssets.mockResolvedValue([]);
+      mocks.sharedSpace.getMember.mockResolvedValue(
+        makeMemberResult({ role: SharedSpaceRole.Owner, lastViewedAt: null }),
+      );
+
+      const result = await sut.getAll(auth);
+
+      expect(result[0].newAssetCount).toBe(5);
+      expect(result[0].lastContributor).toBeNull();
+    });
+
+    it('should return newAssetCount 0 when no new assets since lastViewedAt', async () => {
+      const auth = factory.auth();
+      const space = factory.sharedSpace();
+      mocks.sharedSpace.getAllByUserId.mockResolvedValue([space]);
+      mocks.sharedSpace.getMembers.mockResolvedValue([]);
+      mocks.sharedSpace.getAssetCount.mockResolvedValue(5);
+      mocks.sharedSpace.getRecentAssets.mockResolvedValue([]);
+      mocks.sharedSpace.getMember.mockResolvedValue(
+        makeMemberResult({ role: SharedSpaceRole.Owner, lastViewedAt: new Date() }),
+      );
+      mocks.sharedSpace.getNewAssetCount.mockResolvedValue(0);
+
+      const result = await sut.getAll(auth);
+
+      expect(result[0].newAssetCount).toBe(0);
+      expect(result[0].lastContributor).toBeNull();
     });
   });
 
