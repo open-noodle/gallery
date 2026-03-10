@@ -1110,6 +1110,7 @@ describe(SharedSpaceService.name, () => {
     it('should update lastViewedAt for the calling user', async () => {
       const auth = factory.auth();
       mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
+      mocks.sharedSpace.updateMemberLastViewed.mockResolvedValue(void 0);
 
       await sut.markSpaceViewed(auth, 'space-1');
 

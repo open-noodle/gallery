@@ -212,6 +212,11 @@ export class SharedSpaceService extends BaseService {
     await this.sharedSpaceRepository.update(spaceId, updateFields);
   }
 
+  async markSpaceViewed(auth: AuthDto, spaceId: string): Promise<void> {
+    await this.requireMembership(auth, spaceId);
+    await this.sharedSpaceRepository.updateMemberLastViewed(spaceId, auth.user.id);
+  }
+
   async removeAssets(auth: AuthDto, spaceId: string, dto: SharedSpaceAssetRemoveDto): Promise<void> {
     await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
     await this.sharedSpaceRepository.removeAssets(spaceId, dto.assetIds);
