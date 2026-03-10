@@ -1038,6 +1038,7 @@ describe(SharedSpaceService.name, () => {
 
       mocks.sharedSpace.getMember.mockResolvedValue(ownerMember);
       mocks.sharedSpace.removeMember.mockResolvedValue(void 0);
+      mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
 
       await sut.removeMember(auth, spaceId, targetUserId);
 
@@ -1051,6 +1052,7 @@ describe(SharedSpaceService.name, () => {
 
       mocks.sharedSpace.getMember.mockResolvedValue(viewerMember);
       mocks.sharedSpace.removeMember.mockResolvedValue(void 0);
+      mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
 
       await sut.removeMember(auth, spaceId, auth.user.id);
 
@@ -1077,6 +1079,42 @@ describe(SharedSpaceService.name, () => {
 
       await expect(sut.removeMember(auth, spaceId, newUuid())).rejects.toBeInstanceOf(ForbiddenException);
       expect(mocks.sharedSpace.removeMember).not.toHaveBeenCalled();
+    });
+
+    it('should log member_leave when member leaves', async () => {
+      const auth = factory.auth({ user: { id: 'user-1' } });
+      mocks.sharedSpace.getMember.mockResolvedValue(
+        makeMemberResult({ userId: 'user-1', role: SharedSpaceRole.Editor }),
+      );
+      mocks.sharedSpace.removeMember.mockResolvedValue(void 0);
+      mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
+
+      await sut.removeMember(auth, 'space-1', 'user-1');
+
+      expect(mocks.sharedSpace.logActivity).toHaveBeenCalledWith({
+        spaceId: 'space-1',
+        userId: 'user-1',
+        type: SharedSpaceActivityType.MemberLeave,
+        data: {},
+      });
+    });
+
+    it('should log member_remove when owner removes a member', async () => {
+      const auth = factory.auth({ user: { id: 'owner-1' } });
+      mocks.sharedSpace.getMember.mockResolvedValue(
+        makeMemberResult({ userId: 'owner-1', role: SharedSpaceRole.Owner }),
+      );
+      mocks.sharedSpace.removeMember.mockResolvedValue(void 0);
+      mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
+
+      await sut.removeMember(auth, 'space-1', 'other-user');
+
+      expect(mocks.sharedSpace.logActivity).toHaveBeenCalledWith({
+        spaceId: 'space-1',
+        userId: auth.user.id,
+        type: SharedSpaceActivityType.MemberRemove,
+        data: { removedUserId: 'other-user' },
+      });
     });
   });
 

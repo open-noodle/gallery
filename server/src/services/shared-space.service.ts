@@ -243,11 +243,23 @@ export class SharedSpaceService extends BaseService {
         throw new BadRequestException('Owner cannot leave the space');
       }
       await this.sharedSpaceRepository.removeMember(spaceId, userId);
+      await this.sharedSpaceRepository.logActivity({
+        spaceId,
+        userId,
+        type: SharedSpaceActivityType.MemberLeave,
+        data: {},
+      });
       return;
     }
 
     await this.requireRole(auth, spaceId, SharedSpaceRole.Owner);
     await this.sharedSpaceRepository.removeMember(spaceId, userId);
+    await this.sharedSpaceRepository.logActivity({
+      spaceId,
+      userId: auth.user.id,
+      type: SharedSpaceActivityType.MemberRemove,
+      data: { removedUserId: userId },
+    });
   }
 
   async addAssets(auth: AuthDto, spaceId: string, dto: SharedSpaceAssetAddDto): Promise<void> {
