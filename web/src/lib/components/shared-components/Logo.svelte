@@ -26,7 +26,7 @@
   const src = $derived.by(() => {
     switch (variant) {
       case 'stacked': {
-        return '/gallery-logo-stacked.svg';
+        return theme.value === Theme.Light ? '/gallery-logo-stacked.svg' : '/gallery-logo-stacked-dark.svg';
       }
       case 'inline': {
         return theme.value === Theme.Light ? '/gallery-logo-inline-light.svg' : '/gallery-logo-inline-dark.svg';
