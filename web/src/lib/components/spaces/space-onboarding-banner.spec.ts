@@ -142,12 +142,12 @@ describe('SpaceOnboardingBanner', () => {
     expect(fill.style.width).toBe('33%');
   });
 
-  it('should update invite-members step when space.memberCount changes from 1 to 2', () => {
+  it('should update invite-members step when space.memberCount changes from 1 to 2', async () => {
     const { rerender } = render(SpaceOnboardingBanner, { ...defaultProps, space: makeSpace({ memberCount: 1 }) });
     expect(screen.getByTestId('step-invite-members-action')).toBeInTheDocument();
     expect(screen.queryByTestId('step-invite-members-check')).not.toBeInTheDocument();
 
-    rerender({ ...defaultProps, space: makeSpace({ memberCount: 2 }) });
+    await rerender({ ...defaultProps, space: makeSpace({ memberCount: 2 }) });
     expect(screen.getByTestId('step-invite-members-check')).toBeInTheDocument();
     expect(screen.queryByTestId('step-invite-members-action')).not.toBeInTheDocument();
   });
@@ -230,33 +230,36 @@ describe('SpaceOnboardingBanner', () => {
   });
 
   describe('banner disappears after completing all steps via rerender', () => {
-    it('should disappear when going from 0/3 to 3/3', () => {
+    it('should disappear when going from 0/3 to 3/3', async () => {
       const { rerender } = render(SpaceOnboardingBanner, { ...defaultProps, space: makeSpace() });
       expect(screen.getByTestId('onboarding-banner')).toBeInTheDocument();
 
-      rerender({ ...defaultProps, space: makeSpace({ assetCount: 5, memberCount: 2, thumbnailAssetId: 'asset-1' }) });
+      await rerender({
+        ...defaultProps,
+        space: makeSpace({ assetCount: 5, memberCount: 2, thumbnailAssetId: 'asset-1' }),
+      });
       expect(screen.queryByTestId('onboarding-banner')).not.toBeInTheDocument();
     });
 
-    it('should disappear when completing steps one at a time', () => {
+    it('should disappear when completing steps one at a time', async () => {
       const { rerender } = render(SpaceOnboardingBanner, { ...defaultProps, space: makeSpace() });
       expect(screen.getByTestId('onboarding-banner')).toBeInTheDocument();
       expect(screen.getByTestId('progress-bar-fill').style.width).toBe('0%');
 
       // Step 1: add photos
-      rerender({ ...defaultProps, space: makeSpace({ assetCount: 5 }) });
+      await rerender({ ...defaultProps, space: makeSpace({ assetCount: 5 }) });
       expect(screen.getByTestId('onboarding-banner')).toBeInTheDocument();
       expect(screen.getByTestId('step-add-photos-check')).toBeInTheDocument();
       expect(screen.getByTestId('progress-bar-fill').style.width).toBe('33%');
 
       // Step 2: invite members
-      rerender({ ...defaultProps, space: makeSpace({ assetCount: 5, memberCount: 2 }) });
+      await rerender({ ...defaultProps, space: makeSpace({ assetCount: 5, memberCount: 2 }) });
       expect(screen.getByTestId('onboarding-banner')).toBeInTheDocument();
       expect(screen.getByTestId('step-invite-members-check')).toBeInTheDocument();
       expect(screen.getByTestId('progress-bar-fill').style.width).toBe('67%');
 
       // Step 3: set cover — banner disappears
-      rerender({
+      await rerender({
         ...defaultProps,
         space: makeSpace({ assetCount: 5, memberCount: 2, thumbnailAssetId: 'asset-1' }),
       });

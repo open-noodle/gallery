@@ -81,6 +81,7 @@
         {$t('spaces_setup_steps_done', { values: { completed: completedCount, total: 3 } })}
       </p>
       <button
+        type="button"
         class="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-200"
         onclick={() => (collapsed = !collapsed)}
         data-testid="banner-collapse-toggle"
@@ -114,7 +115,8 @@
           {:else}
             <button
               type="button"
-              class="flex w-full items-center gap-3 px-4 py-3.5 transition-colors duration-150 hover:bg-gray-50 dark:hover:bg-gray-800/50 {i < steps.length - 1
+              class="flex w-full items-center gap-3 px-4 py-3.5 transition-colors duration-150 hover:bg-gray-50 dark:hover:bg-gray-800/50 {i <
+              steps.length - 1
                 ? 'border-b border-gray-100 dark:border-gray-800'
                 : ''}"
               onclick={step.action}
