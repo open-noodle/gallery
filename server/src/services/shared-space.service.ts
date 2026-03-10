@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { AuthDto } from 'src/dtos/auth.dto';
 import {
+  SharedSpaceActivityResponseDto,
   SharedSpaceAssetAddDto,
   SharedSpaceAssetRemoveDto,
   SharedSpaceCreateDto,
@@ -316,6 +317,32 @@ export class SharedSpaceService extends BaseService {
   async markSpaceViewed(auth: AuthDto, spaceId: string): Promise<void> {
     await this.requireMembership(auth, spaceId);
     await this.sharedSpaceRepository.updateMemberLastViewed(spaceId, auth.user.id);
+  }
+
+  async getActivities(
+    auth: AuthDto,
+    spaceId: string,
+    query: { limit?: number; offset?: number },
+  ): Promise<SharedSpaceActivityResponseDto[]> {
+    await this.requireMembership(auth, spaceId);
+
+    const activities = await this.sharedSpaceRepository.getActivities(
+      spaceId,
+      query.limit ?? 50,
+      query.offset ?? 0,
+    );
+
+    return activities.map((a) => ({
+      id: a.id,
+      type: a.type,
+      data: a.data as Record<string, unknown>,
+      createdAt: (a.createdAt as unknown as Date).toISOString(),
+      userId: a.userId,
+      userName: a.name,
+      userEmail: a.email,
+      userProfileImagePath: a.profileImagePath,
+      userAvatarColor: a.avatarColor,
+    }));
   }
 
   async removeAssets(auth: AuthDto, spaceId: string, dto: SharedSpaceAssetRemoveDto): Promise<void> {

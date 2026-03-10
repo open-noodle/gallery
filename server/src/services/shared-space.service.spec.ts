@@ -1544,4 +1544,53 @@ describe(SharedSpaceService.name, () => {
       await expect(sut.markSpaceViewed(auth, 'space-1')).rejects.toThrow('Not a member of this space');
     });
   });
+
+  describe('getActivities', () => {
+    it('should require membership', async () => {
+      mocks.sharedSpace.getMember.mockResolvedValue(null);
+      await expect(sut.getActivities(factory.auth(), 'space-1', {})).rejects.toThrow('Not a member');
+    });
+
+    it('should return mapped activities', async () => {
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult());
+      mocks.sharedSpace.getActivities.mockResolvedValue([
+        {
+          id: 'act-1',
+          type: 'asset_add',
+          data: { count: 5 },
+          createdAt: new Date('2026-03-10T12:00:00Z'),
+          userId: 'user-1',
+          name: 'Pierre',
+          email: 'pierre@test.com',
+          profileImagePath: '/path/to/img',
+          avatarColor: 'primary',
+        },
+      ]);
+
+      const result = await sut.getActivities(factory.auth(), 'space-1', {});
+
+      expect(result).toEqual([
+        {
+          id: 'act-1',
+          type: 'asset_add',
+          data: { count: 5 },
+          createdAt: '2026-03-10T12:00:00.000Z',
+          userId: 'user-1',
+          userName: 'Pierre',
+          userEmail: 'pierre@test.com',
+          userProfileImagePath: '/path/to/img',
+          userAvatarColor: 'primary',
+        },
+      ]);
+    });
+
+    it('should pass limit and offset to repository', async () => {
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult());
+      mocks.sharedSpace.getActivities.mockResolvedValue([]);
+
+      await sut.getActivities(factory.auth(), 'space-1', { limit: 10, offset: 20 });
+
+      expect(mocks.sharedSpace.getActivities).toHaveBeenCalledWith('space-1', 10, 20);
+    });
+  });
 });
