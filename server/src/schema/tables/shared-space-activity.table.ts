@@ -3,6 +3,7 @@ import {
   CreateDateColumn,
   ForeignKeyColumn,
   Generated,
+  Index,
   PrimaryGeneratedColumn,
   Table,
   Timestamp,
@@ -11,6 +12,7 @@ import { SharedSpaceTable } from 'src/schema/tables/shared-space.table';
 import { UserTable } from 'src/schema/tables/user.table';
 
 @Table('shared_space_activity')
+@Index({ columns: ['spaceId', 'createdAt'] })
 export class SharedSpaceActivityTable {
   @PrimaryGeneratedColumn()
   id!: Generated<string>;
