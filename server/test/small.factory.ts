@@ -11,6 +11,7 @@ import {
   Person,
   Session,
   SharedSpace,
+  SharedSpaceActivity,
   SharedSpaceMember,
   Tag,
   User,
@@ -395,6 +396,16 @@ const sharedSpaceMemberFactory = (data: Partial<SharedSpaceMember> = {}): Shared
   ...data,
 });
 
+const sharedSpaceActivityFactory = (data: Partial<SharedSpaceActivity> = {}): SharedSpaceActivity => ({
+  id: newUuid(),
+  spaceId: newUuid(),
+  userId: newUuid(),
+  type: 'asset_add',
+  data: {},
+  createdAt: newDate(),
+  ...data,
+});
+
 const albumFactory = (album?: Partial<Omit<Album, 'assets'>>) => ({
   albumName: 'My Album',
   albumThumbnailAssetId: null,
@@ -434,6 +445,7 @@ export const factory = {
   assetEdit: assetEditFactory,
   sharedSpace: sharedSpaceFactory,
   sharedSpaceMember: sharedSpaceMemberFactory,
+  sharedSpaceActivity: sharedSpaceActivityFactory,
   tag: tagFactory,
   album: albumFactory,
   uuid: newUuid,

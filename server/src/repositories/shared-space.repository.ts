@@ -287,4 +287,39 @@ export class SharedSpaceRepository {
       ])
       .execute();
   }
+
+  async logActivity(values: { spaceId: string; userId: string; type: string; data?: Record<string, unknown> }) {
+    await this.db
+      .insertInto('shared_space_activity')
+      .values({
+        spaceId: values.spaceId,
+        userId: values.userId,
+        type: values.type,
+        data: JSON.stringify(values.data ?? {}),
+      })
+      .execute();
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID, 50, 0] })
+  getActivities(spaceId: string, limit: number = 50, offset: number = 0) {
+    return this.db
+      .selectFrom('shared_space_activity')
+      .leftJoin('users', 'users.id', 'shared_space_activity.userId')
+      .select([
+        'shared_space_activity.id',
+        'shared_space_activity.type',
+        'shared_space_activity.data',
+        'shared_space_activity.createdAt',
+        'shared_space_activity.userId',
+        'users.name',
+        'users.email',
+        'users.profileImagePath',
+        'users.avatarColor',
+      ])
+      .where('shared_space_activity.spaceId', '=', spaceId)
+      .orderBy('shared_space_activity.createdAt', 'desc')
+      .limit(limit)
+      .offset(offset)
+      .execute();
+  }
 }
