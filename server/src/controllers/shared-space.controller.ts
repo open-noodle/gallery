@@ -1,9 +1,11 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Endpoint, HistoryBuilder } from 'src/decorators';
 import { AuthDto } from 'src/dtos/auth.dto';
 import { MapMarkerResponseDto } from 'src/dtos/map.dto';
 import {
+  SharedSpaceActivityQueryDto,
+  SharedSpaceActivityResponseDto,
   SharedSpaceAssetAddDto,
   SharedSpaceAssetRemoveDto,
   SharedSpaceCreateDto,
@@ -202,5 +204,16 @@ export class SharedSpaceController {
     @Body() dto: SharedSpaceAssetRemoveDto,
   ): Promise<void> {
     return this.service.removeAssets(auth, id, dto);
+  }
+
+  @Get(':id/activities')
+  @Authenticated({ permission: Permission.SharedSpaceRead })
+  @Endpoint({ operationId: 'getSpaceActivities', summary: 'Get space activity feed' })
+  getSpaceActivities(
+    @Auth() auth: AuthDto,
+    @Param() { id }: UUIDParamDto,
+    @Query() query: SharedSpaceActivityQueryDto,
+  ): Promise<SharedSpaceActivityResponseDto[]> {
+    return this.service.getActivities(auth, id, query);
   }
 }
