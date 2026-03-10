@@ -125,6 +125,18 @@ export class SharedSpaceController {
     return this.service.updateMemberTimeline(auth, id, dto);
   }
 
+  @Patch(':id/view')
+  @Authenticated({ permission: Permission.SharedSpaceRead })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Endpoint({
+    summary: 'Mark space as viewed',
+    description: 'Update the last viewed timestamp for the current user in this space.',
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  markSpaceViewed(@Auth() auth: AuthDto, @Param() { id }: UUIDParamDto): Promise<void> {
+    return this.service.markSpaceViewed(auth, id);
+  }
+
   @Patch(':id/members/:userId')
   @Authenticated({ permission: Permission.SharedSpaceMemberUpdate })
   @Endpoint({
