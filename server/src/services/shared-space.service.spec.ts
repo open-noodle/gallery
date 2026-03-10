@@ -424,6 +424,7 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.getMembers.mockResolvedValue([member]);
       mocks.sharedSpace.getAssetCount.mockResolvedValue(0);
       mocks.sharedSpace.getMostRecentAssetId.mockResolvedValue(void 0);
+      mocks.sharedSpace.getRecentAssets.mockResolvedValue([]);
 
       const result = await sut.get(auth, space.id);
 

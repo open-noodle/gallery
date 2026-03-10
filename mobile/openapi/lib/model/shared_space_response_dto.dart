@@ -19,9 +19,12 @@ class SharedSpaceResponseDto {
     required this.createdById,
     this.description,
     required this.id,
+    this.lastActivityAt,
     this.memberCount,
     this.members = const [],
     required this.name,
+    this.recentAssetIds = const [],
+    this.recentAssetThumbhashes = const [],
     this.thumbnailAssetId,
     required this.updatedAt,
   });
@@ -50,6 +53,9 @@ class SharedSpaceResponseDto {
   /// Space ID
   String id;
 
+  /// Last activity timestamp (most recent asset add)
+  String? lastActivityAt;
+
   /// Number of members
   ///
   /// Please note: This property should have been non-nullable! Since the specification file
@@ -65,6 +71,12 @@ class SharedSpaceResponseDto {
   /// Space name
   String name;
 
+  /// Recent asset IDs for collage display (up to 4)
+  List<String> recentAssetIds;
+
+  /// Thumbhashes for recent assets (parallel array)
+  List<String> recentAssetThumbhashes;
+
   /// Thumbnail asset ID
   String? thumbnailAssetId;
 
@@ -79,9 +91,12 @@ class SharedSpaceResponseDto {
     other.createdById == createdById &&
     other.description == description &&
     other.id == id &&
+    other.lastActivityAt == lastActivityAt &&
     other.memberCount == memberCount &&
     _deepEquality.equals(other.members, members) &&
     other.name == name &&
+    _deepEquality.equals(other.recentAssetIds, recentAssetIds) &&
+    _deepEquality.equals(other.recentAssetThumbhashes, recentAssetThumbhashes) &&
     other.thumbnailAssetId == thumbnailAssetId &&
     other.updatedAt == updatedAt;
 
@@ -94,14 +109,17 @@ class SharedSpaceResponseDto {
     (createdById.hashCode) +
     (description == null ? 0 : description!.hashCode) +
     (id.hashCode) +
+    (lastActivityAt == null ? 0 : lastActivityAt!.hashCode) +
     (memberCount == null ? 0 : memberCount!.hashCode) +
     (members.hashCode) +
     (name.hashCode) +
+    (recentAssetIds.hashCode) +
+    (recentAssetThumbhashes.hashCode) +
     (thumbnailAssetId == null ? 0 : thumbnailAssetId!.hashCode) +
     (updatedAt.hashCode);
 
   @override
-  String toString() => 'SharedSpaceResponseDto[assetCount=$assetCount, color=$color, createdAt=$createdAt, createdById=$createdById, description=$description, id=$id, memberCount=$memberCount, members=$members, name=$name, thumbnailAssetId=$thumbnailAssetId, updatedAt=$updatedAt]';
+  String toString() => 'SharedSpaceResponseDto[assetCount=$assetCount, color=$color, createdAt=$createdAt, createdById=$createdById, description=$description, id=$id, lastActivityAt=$lastActivityAt, memberCount=$memberCount, members=$members, name=$name, recentAssetIds=$recentAssetIds, recentAssetThumbhashes=$recentAssetThumbhashes, thumbnailAssetId=$thumbnailAssetId, updatedAt=$updatedAt]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -123,6 +141,11 @@ class SharedSpaceResponseDto {
     //  json[r'description'] = null;
     }
       json[r'id'] = this.id;
+    if (this.lastActivityAt != null) {
+      json[r'lastActivityAt'] = this.lastActivityAt;
+    } else {
+    //  json[r'lastActivityAt'] = null;
+    }
     if (this.memberCount != null) {
       json[r'memberCount'] = this.memberCount;
     } else {
@@ -130,6 +153,8 @@ class SharedSpaceResponseDto {
     }
       json[r'members'] = this.members;
       json[r'name'] = this.name;
+      json[r'recentAssetIds'] = this.recentAssetIds;
+      json[r'recentAssetThumbhashes'] = this.recentAssetThumbhashes;
     if (this.thumbnailAssetId != null) {
       json[r'thumbnailAssetId'] = this.thumbnailAssetId;
     } else {
@@ -156,11 +181,18 @@ class SharedSpaceResponseDto {
         createdById: mapValueOfType<String>(json, r'createdById')!,
         description: mapValueOfType<String>(json, r'description'),
         id: mapValueOfType<String>(json, r'id')!,
+        lastActivityAt: mapValueOfType<String>(json, r'lastActivityAt'),
         memberCount: json[r'memberCount'] == null
             ? null
             : num.parse('${json[r'memberCount']}'),
         members: SharedSpaceMemberResponseDto.listFromJson(json[r'members']),
         name: mapValueOfType<String>(json, r'name')!,
+        recentAssetIds: json[r'recentAssetIds'] is Iterable
+            ? (json[r'recentAssetIds'] as Iterable).cast<String>().toList(growable: false)
+            : const [],
+        recentAssetThumbhashes: json[r'recentAssetThumbhashes'] is Iterable
+            ? (json[r'recentAssetThumbhashes'] as Iterable).cast<String>().toList(growable: false)
+            : const [],
         thumbnailAssetId: mapValueOfType<String>(json, r'thumbnailAssetId'),
         updatedAt: mapValueOfType<String>(json, r'updatedAt')!,
       );
