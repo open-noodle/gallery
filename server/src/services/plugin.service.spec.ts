@@ -86,7 +86,7 @@ const setupForWorkflowRun = async (
   mockPluginCall: ReturnType<typeof vi.fn>,
 ) => {
   const [workflowId, ownerId, pluginId, filterId, actionId] = newUuids();
-  const asset = factory.asset({ ownerId });
+  const asset = AssetFactory.create({ ownerId });
 
   // Bootstrap the service to set the pluginJwtSecret and loadedPlugins
   const coreManifest = JSON.stringify({
@@ -465,7 +465,7 @@ describe(PluginService.name, () => {
   describe('handleAssetCreate', () => {
     it('should queue workflow jobs when workflows exist for the owner', async () => {
       const [ownerId, workflowId] = newUuids();
-      const asset = factory.asset({ ownerId });
+      const asset = AssetFactory.create({ ownerId });
       const workflow = newWorkflowEntity({ id: workflowId, ownerId });
 
       mocks.workflow.getWorkflowByOwnerAndTrigger.mockResolvedValue([workflow as any]);
@@ -487,7 +487,7 @@ describe(PluginService.name, () => {
 
     it('should not queue jobs when no workflows exist for the owner', async () => {
       const ownerId = newUuid();
-      const asset = factory.asset({ ownerId });
+      const asset = AssetFactory.create({ ownerId });
 
       mocks.workflow.getWorkflowByOwnerAndTrigger.mockResolvedValue([]);
 
@@ -498,7 +498,7 @@ describe(PluginService.name, () => {
 
     it('should queue multiple workflow jobs when multiple workflows match', async () => {
       const ownerId = newUuid();
-      const asset = factory.asset({ ownerId });
+      const asset = AssetFactory.create({ ownerId });
       const [workflowId1, workflowId2] = newUuids();
       const workflow1 = newWorkflowEntity({ id: workflowId1, ownerId });
       const workflow2 = newWorkflowEntity({ id: workflowId2, ownerId });
@@ -523,7 +523,7 @@ describe(PluginService.name, () => {
       const result = await sut.handleWorkflowRun({
         id: newUuid(),
         type: PluginTriggerType.AssetCreate,
-        event: { userId: newUuid(), asset: factory.asset() as any },
+        event: { userId: newUuid(), asset: AssetFactory.create() as any },
       });
 
       expect(result).toBe(JobStatus.Failed);
@@ -873,7 +873,7 @@ describe(PluginService.name, () => {
       const result = await sut.handleWorkflowRun({
         id: newUuid(),
         type: PluginTriggerType.AssetCreate,
-        event: { userId: newUuid(), asset: factory.asset() as any },
+        event: { userId: newUuid(), asset: AssetFactory.create() as any },
       });
 
       expect(result).toBe(JobStatus.Failed);

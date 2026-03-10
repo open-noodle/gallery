@@ -56,11 +56,11 @@ describe(MemoryService.name, () => {
 
     it('should create on-this-day memories when assets exist', async () => {
       const user = factory.userAdmin();
-      const asset = factory.asset({ ownerId: user.id });
+      const asset = AssetFactory.create({ ownerId: user.id });
       mocks.user.getList.mockResolvedValue([user]);
       mocks.systemMetadata.get.mockResolvedValue(null);
       mocks.asset.getByDayOfYear.mockResolvedValue([{ year: 2023, assets: [asset] }]);
-      mocks.memory.create.mockResolvedValue(factory.memory());
+      mocks.memory.create.mockResolvedValue(MemoryFactory.create());
 
       await sut.onMemoriesCreate();
 
@@ -227,7 +227,7 @@ describe(MemoryService.name, () => {
 
     it('should pass all optional fields when creating a memory', async () => {
       const userId = newUuid();
-      const memory = factory.memory({ ownerId: userId });
+      const memory = MemoryFactory.create({ ownerId: userId });
       const showAt = new Date();
       const hideAt = new Date();
       const seenAt = new Date();
@@ -278,7 +278,7 @@ describe(MemoryService.name, () => {
     });
 
     it('should update a memory with seenAt', async () => {
-      const memory = factory.memory();
+      const memory = MemoryFactory.create();
       const seenAt = new Date();
 
       mocks.access.memory.checkOwnerAccess.mockResolvedValue(new Set([memory.id]));
@@ -290,7 +290,7 @@ describe(MemoryService.name, () => {
     });
 
     it('should update a memory with memoryAt', async () => {
-      const memory = factory.memory();
+      const memory = MemoryFactory.create();
       const memoryAt = new Date();
 
       mocks.access.memory.checkOwnerAccess.mockResolvedValue(new Set([memory.id]));
@@ -382,7 +382,7 @@ describe(MemoryService.name, () => {
 
     it('should update memory updatedAt when assets are successfully added', async () => {
       const assetId = newUuid();
-      const memory = factory.memory();
+      const memory = MemoryFactory.create();
 
       mocks.access.memory.checkOwnerAccess.mockResolvedValue(new Set([memory.id]));
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([assetId]));
@@ -397,8 +397,8 @@ describe(MemoryService.name, () => {
     });
 
     it('should not update memory updatedAt when no assets are successfully added', async () => {
-      const asset = factory.asset();
-      const memory = factory.memory({ assets: [asset] });
+      const asset = AssetFactory.create();
+      const memory = MemoryFactory.from().asset(asset).build();
 
       mocks.access.memory.checkOwnerAccess.mockResolvedValue(new Set([memory.id]));
       mocks.memory.get.mockResolvedValue(memory);
@@ -448,8 +448,8 @@ describe(MemoryService.name, () => {
     });
 
     it('should update memory updatedAt when assets are successfully removed', async () => {
-      const memory = factory.memory();
-      const asset = factory.asset();
+      const memory = MemoryFactory.create();
+      const asset = AssetFactory.create();
 
       mocks.access.memory.checkOwnerAccess.mockResolvedValue(new Set([memory.id]));
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
@@ -466,7 +466,7 @@ describe(MemoryService.name, () => {
     });
 
     it('should not update memory updatedAt when no assets are successfully removed', async () => {
-      const memory = factory.memory();
+      const memory = MemoryFactory.create();
 
       mocks.access.memory.checkOwnerAccess.mockResolvedValue(new Set([memory.id]));
       mocks.memory.getAssetIds.mockResolvedValue(new Set());
