@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsInt, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 import { SharedSpaceRole, UserAvatarColor } from 'src/enum';
 import { ValidateEnum, ValidateUUID } from 'src/validation';
 
@@ -157,6 +158,9 @@ export class SharedSpaceResponseDto {
 
   @ApiPropertyOptional({ description: 'Last contributor since last viewed' })
   lastContributor?: { id: string; name: string } | null;
+
+  @ApiPropertyOptional({ description: 'When the current user last viewed this space' })
+  lastViewedAt?: string | null;
 }
 
 export class SharedSpaceMemberTimelineDto {
@@ -173,4 +177,50 @@ export class SharedSpaceAssetAddDto {
 export class SharedSpaceAssetRemoveDto {
   @ValidateUUID({ each: true, description: 'Asset IDs' })
   assetIds!: string[];
+}
+
+export class SharedSpaceActivityQueryDto {
+  @ApiPropertyOptional({ description: 'Number of items to return', default: 50 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number;
+
+  @ApiPropertyOptional({ description: 'Number of items to skip', default: 0 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  offset?: number;
+}
+
+export class SharedSpaceActivityResponseDto {
+  @ApiProperty({ description: 'Activity ID' })
+  id!: string;
+
+  @ApiProperty({ description: 'Activity type' })
+  type!: string;
+
+  @ApiProperty({ description: 'Event-specific data' })
+  data!: Record<string, unknown>;
+
+  @ApiProperty({ description: 'When the event occurred' })
+  createdAt!: string;
+
+  @ApiPropertyOptional({ description: 'User ID who performed the action' })
+  userId?: string | null;
+
+  @ApiPropertyOptional({ description: 'User name' })
+  userName?: string | null;
+
+  @ApiPropertyOptional({ description: 'User email' })
+  userEmail?: string | null;
+
+  @ApiPropertyOptional({ description: 'User profile image path' })
+  userProfileImagePath?: string | null;
+
+  @ApiPropertyOptional({ description: 'User avatar color' })
+  userAvatarColor?: string | null;
 }
