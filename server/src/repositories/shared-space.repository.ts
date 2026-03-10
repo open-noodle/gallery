@@ -234,6 +234,38 @@ export class SharedSpaceRepository {
   }
 
   @GenerateSql({ params: [DummyValue.UUID] })
+  getContributionCounts(spaceId: string) {
+    return this.db
+      .selectFrom('shared_space_asset')
+      .where('spaceId', '=', spaceId)
+      .groupBy('addedById')
+      .select(['addedById', (eb) => eb.fn.countAll().as('count')])
+      .execute();
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID] })
+  getMemberActivity(spaceId: string) {
+    return this.db
+      .selectFrom('shared_space_asset')
+      .where('spaceId', '=', spaceId)
+      .groupBy('addedById')
+      .select([
+        'addedById',
+        (eb) => eb.fn.max('addedAt').as('lastAddedAt'),
+        (eb) =>
+          eb
+            .selectFrom('shared_space_asset as ssa2')
+            .whereRef('ssa2.addedById', '=', 'shared_space_asset.addedById')
+            .where('ssa2.spaceId', '=', spaceId)
+            .orderBy('ssa2.addedAt', 'desc')
+            .select('ssa2.assetId')
+            .limit(1)
+            .as('recentAssetId'),
+      ])
+      .execute();
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID] })
   getMapMarkers(spaceId: string) {
     return this.db
       .selectFrom('shared_space_asset')
