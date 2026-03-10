@@ -893,6 +893,88 @@ describe(SharedSpaceService.name, () => {
 
       expect(mocks.sharedSpace.logActivity).not.toHaveBeenCalled();
     });
+
+    it('should require owner role for faceRecognitionEnabled', async () => {
+      const auth = factory.auth();
+      const space = factory.sharedSpace();
+      const member = makeMemberResult({ spaceId: space.id, userId: auth.user.id, role: SharedSpaceRole.Editor });
+
+      mocks.sharedSpace.getMember.mockResolvedValue(member);
+
+      await expect(sut.update(auth, space.id, { faceRecognitionEnabled: true })).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+    });
+
+    it('should update faceRecognitionEnabled when owner', async () => {
+      const auth = factory.auth();
+      const space = factory.sharedSpace({ faceRecognitionEnabled: false });
+      const member = makeMemberResult({ spaceId: space.id, userId: auth.user.id, role: SharedSpaceRole.Owner });
+      const updatedSpace = { ...space, faceRecognitionEnabled: true };
+
+      mocks.sharedSpace.getMember.mockResolvedValue(member);
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.update.mockResolvedValue(updatedSpace);
+      mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
+
+      await sut.update(auth, space.id, { faceRecognitionEnabled: true });
+
+      expect(mocks.sharedSpace.update).toHaveBeenCalledWith(space.id, expect.objectContaining({
+        faceRecognitionEnabled: true,
+      }));
+    });
+
+    it('should queue SharedSpaceFaceMatchAll when toggling faceRecognitionEnabled from false to true', async () => {
+      const auth = factory.auth();
+      const space = factory.sharedSpace({ faceRecognitionEnabled: false });
+      const member = makeMemberResult({ spaceId: space.id, userId: auth.user.id, role: SharedSpaceRole.Owner });
+
+      mocks.sharedSpace.getMember.mockResolvedValue(member);
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.update.mockResolvedValue({ ...space, faceRecognitionEnabled: true });
+      mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
+
+      await sut.update(auth, space.id, { faceRecognitionEnabled: true });
+
+      expect(mocks.job.queue).toHaveBeenCalledWith({
+        name: JobName.SharedSpaceFaceMatchAll,
+        data: { spaceId: space.id },
+      });
+    });
+
+    it('should not queue SharedSpaceFaceMatchAll when toggling from true to false', async () => {
+      const auth = factory.auth();
+      const space = factory.sharedSpace({ faceRecognitionEnabled: true });
+      const member = makeMemberResult({ spaceId: space.id, userId: auth.user.id, role: SharedSpaceRole.Owner });
+
+      mocks.sharedSpace.getMember.mockResolvedValue(member);
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.update.mockResolvedValue({ ...space, faceRecognitionEnabled: false });
+      mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
+
+      await sut.update(auth, space.id, { faceRecognitionEnabled: false });
+
+      expect(mocks.job.queue).not.toHaveBeenCalledWith(
+        expect.objectContaining({ name: JobName.SharedSpaceFaceMatchAll }),
+      );
+    });
+
+    it('should not queue SharedSpaceFaceMatchAll when faceRecognitionEnabled is already true', async () => {
+      const auth = factory.auth();
+      const space = factory.sharedSpace({ faceRecognitionEnabled: true });
+      const member = makeMemberResult({ spaceId: space.id, userId: auth.user.id, role: SharedSpaceRole.Owner });
+
+      mocks.sharedSpace.getMember.mockResolvedValue(member);
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.update.mockResolvedValue(space);
+      mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
+
+      await sut.update(auth, space.id, { faceRecognitionEnabled: true });
+
+      expect(mocks.job.queue).not.toHaveBeenCalledWith(
+        expect.objectContaining({ name: JobName.SharedSpaceFaceMatchAll }),
+      );
+    });
   });
 
   describe('remove', () => {

@@ -131,7 +131,11 @@ export class SharedSpaceService extends BaseService {
   }
 
   async update(auth: AuthDto, id: string, dto: SharedSpaceUpdateDto): Promise<SharedSpaceResponseDto> {
-    const isMetadataUpdate = dto.name !== undefined || dto.description !== undefined || dto.color !== undefined;
+    const isMetadataUpdate =
+      dto.name !== undefined ||
+      dto.description !== undefined ||
+      dto.color !== undefined ||
+      dto.faceRecognitionEnabled !== undefined;
     const minimumRole = isMetadataUpdate ? SharedSpaceRole.Owner : SharedSpaceRole.Editor;
     await this.requireRole(auth, id, minimumRole);
 
@@ -145,6 +149,7 @@ export class SharedSpaceService extends BaseService {
       thumbnailAssetId: dto.thumbnailAssetId,
       thumbnailCropY,
       color: dto.color,
+      faceRecognitionEnabled: dto.faceRecognitionEnabled,
     });
 
     if (existing) {
@@ -170,6 +175,17 @@ export class SharedSpaceService extends BaseService {
           userId: auth.user.id,
           type: SharedSpaceActivityType.CoverChange,
           data: { assetId: dto.thumbnailAssetId },
+        });
+      }
+
+      // Queue face matching when toggling from disabled to enabled
+      if (
+        dto.faceRecognitionEnabled === true &&
+        !existing.faceRecognitionEnabled
+      ) {
+        await this.jobRepository.queue({
+          name: JobName.SharedSpaceFaceMatchAll,
+          data: { spaceId: id },
         });
       }
     }
