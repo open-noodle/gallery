@@ -1,6 +1,6 @@
 # Storage Migration
 
-Immich includes a built-in tool for migrating files between disk and S3-compatible object storage. You can migrate all your existing files from disk to S3, or from S3 back to disk.
+Noodle Gallery includes a built-in tool for migrating files between disk and S3-compatible object storage. You can migrate all your existing files from disk to S3, or from S3 back to disk.
 
 ## Features
 
