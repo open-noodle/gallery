@@ -867,6 +867,7 @@ describe(SharedSpaceService.name, () => {
           role: SharedSpaceRole.Viewer,
         }),
       );
+      mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
 
       const result = await sut.addMember(auth, spaceId, { userId: newUserId });
 
@@ -905,6 +906,26 @@ describe(SharedSpaceService.name, () => {
 
       await expect(sut.addMember(auth, spaceId, { userId: newUuid() })).rejects.toBeInstanceOf(ForbiddenException);
       expect(mocks.sharedSpace.addMember).not.toHaveBeenCalled();
+    });
+
+    it('should log activity when adding a member', async () => {
+      const auth = factory.auth();
+      mocks.sharedSpace.getMember.mockResolvedValueOnce(makeMemberResult({ role: SharedSpaceRole.Owner }));
+      mocks.sharedSpace.getMember.mockResolvedValueOnce(null);
+      mocks.sharedSpace.addMember.mockResolvedValue(void 0);
+      mocks.sharedSpace.getMember.mockResolvedValueOnce(
+        makeMemberResult({ userId: 'new-user', role: SharedSpaceRole.Editor }),
+      );
+      mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
+
+      await sut.addMember(auth, 'space-1', { userId: 'new-user', role: SharedSpaceRole.Editor });
+
+      expect(mocks.sharedSpace.logActivity).toHaveBeenCalledWith({
+        spaceId: 'space-1',
+        userId: 'new-user',
+        type: SharedSpaceActivityType.MemberJoin,
+        data: { role: SharedSpaceRole.Editor, invitedById: auth.user.id },
+      });
     });
   });
 

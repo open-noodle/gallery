@@ -183,6 +183,13 @@ export class SharedSpaceService extends BaseService {
       throw new BadRequestException('Failed to add member');
     }
 
+    await this.sharedSpaceRepository.logActivity({
+      spaceId,
+      userId: dto.userId,
+      type: SharedSpaceActivityType.MemberJoin,
+      data: { role, invitedById: auth.user.id },
+    });
+
     return this.mapMember(member);
   }
 
