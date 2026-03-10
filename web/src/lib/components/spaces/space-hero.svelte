@@ -2,7 +2,7 @@
   import { getAssetMediaUrl } from '$lib/utils';
   import type { SharedSpaceResponseDto } from '@immich/sdk';
   import { Icon } from '@immich/ui';
-  import { mdiAccountMultipleOutline, mdiCameraOutline } from '@mdi/js';
+  import { mdiAccountMultipleOutline, mdiCameraOutline, mdiImageEditOutline } from '@mdi/js';
   import { t } from 'svelte-i18n';
 
   interface Props {
@@ -11,9 +11,17 @@
     assetCount: number;
     currentRole?: string;
     gradientClass?: string;
+    onSetCover?: () => void;
   }
 
-  let { space, memberCount, assetCount, currentRole, gradientClass = 'from-gray-400 to-gray-600' }: Props = $props();
+  let {
+    space,
+    memberCount,
+    assetCount,
+    currentRole,
+    gradientClass = 'from-gray-400 to-gray-600',
+    onSetCover,
+  }: Props = $props();
 
   let coverUrl = $derived(space.thumbnailAssetId ? getAssetMediaUrl({ id: space.thumbnailAssetId }) : null);
   let showFullDescription = $state(false);
@@ -38,6 +46,18 @@
   {/if}
 
   <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent"></div>
+
+  {#if onSetCover}
+    <button
+      type="button"
+      class="absolute right-3 top-3 flex items-center gap-1.5 rounded-full bg-black/40 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-sm transition-colors hover:bg-black/60"
+      onclick={onSetCover}
+      data-testid="hero-set-cover-button"
+    >
+      <Icon icon={mdiImageEditOutline} size="14" />
+      {$t('set_cover_photo')}
+    </button>
+  {/if}
 
   <div class="absolute bottom-0 left-0 right-0 p-6 text-white">
     <h1 class="text-2xl font-bold drop-shadow-md" data-testid="hero-title">{space.name}</h1>

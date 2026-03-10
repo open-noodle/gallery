@@ -91,14 +91,9 @@ export class SharedSpaceService extends BaseService {
     const assetCount = await this.sharedSpaceRepository.getAssetCount(id);
     const recentAssets = await this.sharedSpaceRepository.getRecentAssets(id);
 
-    let thumbnailAssetId = space.thumbnailAssetId;
-    if (!thumbnailAssetId) {
-      thumbnailAssetId = (await this.sharedSpaceRepository.getMostRecentAssetId(id)) ?? null;
-    }
-
     return {
       ...this.mapSpace(space),
-      thumbnailAssetId,
+      thumbnailAssetId: space.thumbnailAssetId,
       memberCount: members.length,
       assetCount,
       recentAssetIds: recentAssets.map((a) => a.id),

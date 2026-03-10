@@ -16,9 +16,10 @@
     gradientClass?: string;
     onAddPhotos: () => void;
     onInviteMembers: () => void;
+    onSetCover: () => void;
   }
 
-  let { space, gradientClass = '', onAddPhotos, onInviteMembers }: Props = $props();
+  let { space, gradientClass = '', onAddPhotos, onInviteMembers, onSetCover }: Props = $props();
 
   let collapsed = $state(false);
 
@@ -53,7 +54,7 @@
       label: $t('spaces_onboarding_set_cover'),
       description: $t('spaces_onboarding_set_cover_description'),
       complete: hasCover,
-      action: undefined,
+      action: onSetCover,
     },
   ]);
 </script>

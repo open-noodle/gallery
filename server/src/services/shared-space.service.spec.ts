@@ -379,10 +379,9 @@ describe(SharedSpaceService.name, () => {
       expect(mocks.sharedSpace.getMostRecentAssetId).not.toHaveBeenCalled();
     });
 
-    it('should auto-fallback to most recent asset when thumbnailAssetId is null', async () => {
+    it('should return null thumbnailAssetId when not explicitly set', async () => {
       const auth = factory.auth();
       const space = factory.sharedSpace({ thumbnailAssetId: null });
-      const fallbackAssetId = newUuid();
       const member = makeMemberResult({
         spaceId: space.id,
         userId: auth.user.id,
@@ -393,35 +392,12 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.getById.mockResolvedValue(space);
       mocks.sharedSpace.getMembers.mockResolvedValue([member]);
       mocks.sharedSpace.getAssetCount.mockResolvedValue(5);
-      mocks.sharedSpace.getMostRecentAssetId.mockResolvedValue(fallbackAssetId);
-      mocks.sharedSpace.getRecentAssets.mockResolvedValue([]);
-
-      const result = await sut.get(auth, space.id);
-
-      expect(result.thumbnailAssetId).toBe(fallbackAssetId);
-      expect(mocks.sharedSpace.getMostRecentAssetId).toHaveBeenCalledWith(space.id);
-    });
-
-    it('should return null thumbnailAssetId when no assets and no thumbnail set', async () => {
-      const auth = factory.auth();
-      const space = factory.sharedSpace({ thumbnailAssetId: null });
-      const member = makeMemberResult({
-        spaceId: space.id,
-        userId: auth.user.id,
-        role: SharedSpaceRole.Viewer,
-      });
-
-      mocks.sharedSpace.getMember.mockResolvedValue(member);
-      mocks.sharedSpace.getById.mockResolvedValue(space);
-      mocks.sharedSpace.getMembers.mockResolvedValue([member]);
-      mocks.sharedSpace.getAssetCount.mockResolvedValue(0);
-      mocks.sharedSpace.getMostRecentAssetId.mockResolvedValue(void 0);
       mocks.sharedSpace.getRecentAssets.mockResolvedValue([]);
 
       const result = await sut.get(auth, space.id);
 
       expect(result.thumbnailAssetId).toBeNull();
-      expect(mocks.sharedSpace.getMostRecentAssetId).toHaveBeenCalledWith(space.id);
+      expect(mocks.sharedSpace.getMostRecentAssetId).not.toHaveBeenCalled();
     });
 
     it('should include recentAssetIds and thumbhashes', async () => {

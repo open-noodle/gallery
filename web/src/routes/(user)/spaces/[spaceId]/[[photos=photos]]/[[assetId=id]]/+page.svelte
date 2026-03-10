@@ -38,6 +38,7 @@
     Role,
     updateMemberTimeline,
     updateSpace,
+    UserAvatarColor,
     type SharedSpaceMemberResponseDto,
     type SharedSpaceResponseDto,
   } from '@immich/sdk';
@@ -55,7 +56,7 @@
   import { t } from 'svelte-i18n';
   import type { PageData } from './$types';
 
-  type ViewMode = 'view' | 'select-assets';
+  type ViewMode = 'view' | 'select-assets' | 'select-cover';
 
   interface Props {
     data: PageData;
@@ -85,7 +86,7 @@
   });
 
   const currentAssetInteraction = $derived(viewMode === 'select-assets' ? timelineInteraction : assetInteraction);
-  const isSelectionMode = $derived(viewMode === 'select-assets');
+  const isSelectionMode = $derived(viewMode === 'select-assets' || viewMode === 'select-cover');
 
   const refreshSpace = async () => {
     space = await getSpace({ id: space.id });
@@ -100,6 +101,10 @@
       handleCloseSelectAssets();
       return;
     }
+    if (viewMode === 'select-cover') {
+      handleCloseSelectCover();
+      return;
+    }
     if (assetInteraction.selectionActive) {
       cancelMultiselect(assetInteraction);
       return;
@@ -110,6 +115,31 @@
   const handleCloseSelectAssets = () => {
     timelineInteraction.clearMultiselect();
     viewMode = 'view';
+  };
+
+  const handleCloseSelectCover = () => {
+    assetInteraction.clearMultiselect();
+    viewMode = 'view';
+  };
+
+  const handleSetCoverFromSelection = async () => {
+    const assets = assetInteraction.selectedAssets;
+    if (assets.length !== 1) {
+      return;
+    }
+
+    try {
+      await updateSpace({
+        id: space.id,
+        sharedSpaceUpdateDto: { thumbnailAssetId: assets[0].id },
+      });
+      space = { ...space, thumbnailAssetId: assets[0].id };
+      toastManager.success($t('space_cover_updated'));
+      assetInteraction.clearMultiselect();
+      viewMode = 'view';
+    } catch (error) {
+      handleError(error, $t('errors.unable_to_update_space_cover'));
+    }
   };
 
   const handleAddAssets = async () => {
@@ -194,16 +224,20 @@
   let showSearchResults = $state(false);
   let spaceSearch = $state<SpaceSearch>();
 
-  const gradientClasses = [
-    'from-indigo-400 to-cyan-600',
-    'from-rose-400 to-orange-500',
-    'from-emerald-400 to-teal-600',
-    'from-violet-400 to-purple-600',
-    'from-amber-400 to-red-500',
-    'from-sky-400 to-blue-600',
-  ];
+  const gradientClasses: Record<string, string> = {
+    [UserAvatarColor.Primary]: 'from-immich-primary/60 to-immich-primary',
+    [UserAvatarColor.Pink]: 'from-pink-300 to-pink-500',
+    [UserAvatarColor.Red]: 'from-red-400 to-red-600',
+    [UserAvatarColor.Yellow]: 'from-yellow-300 to-yellow-500',
+    [UserAvatarColor.Blue]: 'from-blue-400 to-blue-600',
+    [UserAvatarColor.Green]: 'from-green-400 to-green-700',
+    [UserAvatarColor.Purple]: 'from-purple-400 to-purple-700',
+    [UserAvatarColor.Orange]: 'from-orange-400 to-orange-600',
+    [UserAvatarColor.Gray]: 'from-gray-400 to-gray-600',
+    [UserAvatarColor.Amber]: 'from-amber-400 to-amber-600',
+  };
 
-  const spaceGradient = $derived(gradientClasses[Math.abs(space.id.codePointAt(0) ?? 0) % gradientClasses.length]);
+  const spaceGradient = $derived(gradientClasses[space.color ?? 'primary'] ?? gradientClasses[UserAvatarColor.Primary]);
 
   $effect(() => {
     if (space?.id) {
@@ -215,8 +249,8 @@
 <OnEvents {onSpaceAddAssets} {onSpaceRemoveAssets} />
 
 <UserPageLayout
-  hideNavbar={assetInteraction.selectionActive || viewMode === 'select-assets'}
-  title={viewMode === 'select-assets' ? undefined : space.name}
+  hideNavbar={assetInteraction.selectionActive || viewMode === 'select-assets' || viewMode === 'select-cover'}
+  title={viewMode === 'select-assets' || viewMode === 'select-cover' ? undefined : space.name}
   scrollbar={false}
 >
   {#snippet buttons()}
@@ -271,7 +305,7 @@
     {/if}
   {/snippet}
 
-  {#if viewMode !== 'select-assets'}
+  {#if viewMode === 'view'}
     <section class="px-4 pt-4">
       <SpaceHero
         {space}
@@ -279,6 +313,7 @@
         assetCount={space.assetCount ?? 0}
         currentRole={currentMember?.role}
         gradientClass={spaceGradient}
+        onSetCover={isEditor ? () => (viewMode = 'select-cover') : undefined}
       />
 
       <SpaceSearch bind:this={spaceSearch} spaceId={space.id} bind:showSearchResults />
@@ -290,6 +325,7 @@
         gradientClass={spaceGradient}
         onAddPhotos={() => (viewMode = 'select-assets')}
         onInviteMembers={() => (membersPanelOpen = true)}
+        onSetCover={() => (viewMode = 'select-cover')}
       />
     {/if}
   {/if}
@@ -384,6 +420,32 @@
         onclick={handleAddAssets}
         icon={mdiPlus}
         disabled={!timelineInteraction.selectionActive}
+      />
+    {/snippet}
+  </ControlAppBar>
+{/if}
+
+{#if viewMode === 'select-cover'}
+  <ControlAppBar onClose={handleCloseSelectCover}>
+    {#snippet leading()}
+      <p class="text-lg dark:text-immich-dark-fg">
+        {#if !assetInteraction.selectionActive}
+          {$t('set_cover_photo')}
+        {:else}
+          {$t('selected_count', { values: { count: assetInteraction.selectedAssets.length } })}
+        {/if}
+      </p>
+    {/snippet}
+
+    {#snippet trailing()}
+      <IconButton
+        variant="ghost"
+        shape="round"
+        color="secondary"
+        aria-label={$t('set_cover_photo')}
+        onclick={handleSetCoverFromSelection}
+        icon={mdiImageOutline}
+        disabled={assetInteraction.selectedAssets.length !== 1}
       />
     {/snippet}
   </ControlAppBar>

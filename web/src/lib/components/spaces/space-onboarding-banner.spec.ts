@@ -25,6 +25,7 @@ const defaultProps = {
   gradientClass: 'from-indigo-400 to-cyan-600',
   onAddPhotos: vi.fn(),
   onInviteMembers: vi.fn(),
+  onSetCover: vi.fn(),
 };
 
 describe('SpaceOnboardingBanner', () => {
@@ -84,6 +85,7 @@ describe('SpaceOnboardingBanner', () => {
     render(SpaceOnboardingBanner, { ...defaultProps, space: makeSpace() });
     expect(screen.getByTestId('step-add-photos-action')).toBeInTheDocument();
     expect(screen.getByTestId('step-invite-members-action')).toBeInTheDocument();
+    expect(screen.getByTestId('step-set-cover-action')).toBeInTheDocument();
   });
 
   it('should hide action button for completed steps', () => {
@@ -107,6 +109,13 @@ describe('SpaceOnboardingBanner', () => {
     render(SpaceOnboardingBanner, { ...defaultProps, onInviteMembers });
     await fireEvent.click(screen.getByTestId('step-invite-members-action'));
     expect(onInviteMembers).toHaveBeenCalledTimes(1);
+  });
+
+  it('should call onSetCover callback when set cover action clicked', async () => {
+    const onSetCover = vi.fn();
+    render(SpaceOnboardingBanner, { ...defaultProps, onSetCover });
+    await fireEvent.click(screen.getByTestId('step-set-cover-action'));
+    expect(onSetCover).toHaveBeenCalledTimes(1);
   });
 
   it('should toggle collapsed state when collapse button clicked', async () => {
