@@ -19,6 +19,13 @@ export async function up(db: Kysely<unknown>): Promise<void> {
     .addColumn('birthDate', 'date')
     .addColumn('createdAt', 'timestamptz', (col) => col.notNull().defaultTo(sql`now()`))
     .addColumn('updatedAt', 'timestamptz', (col) => col.notNull().defaultTo(sql`now()`))
+    .addColumn('updateId', 'uuid', (col) => col.notNull().defaultTo(sql`immich_uuid_v7()`))
+    .execute();
+
+  await db.schema
+    .createIndex('shared_space_person_updateId_idx')
+    .on('shared_space_person')
+    .columns(['updateId'])
     .execute();
 
   await db.schema

@@ -368,6 +368,7 @@ export type SharedSpacePerson = {
   birthDate: string | null;
   createdAt: Date;
   updatedAt: Date;
+  updateId: string;
 };
 
 export type SharedSpacePersonFace = {

@@ -9,7 +9,7 @@ import {
   Timestamp,
   UpdateDateColumn,
 } from '@immich/sql-tools';
-import { UpdatedAtTrigger } from 'src/decorators';
+import { UpdatedAtTrigger, UpdateIdColumn } from 'src/decorators';
 import { AssetFaceTable } from 'src/schema/tables/asset-face.table';
 import { SharedSpaceTable } from 'src/schema/tables/shared-space.table';
 
@@ -43,4 +43,7 @@ export class SharedSpacePersonTable {
 
   @UpdateDateColumn()
   updatedAt!: Generated<Timestamp>;
+
+  @UpdateIdColumn({ index: true })
+  updateId!: Generated<string>;
 }
