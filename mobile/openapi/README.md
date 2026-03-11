@@ -271,6 +271,7 @@ Class | Method | HTTP request | Description
 *SharedSpacesApi* | [**getSpacePeople**](doc//SharedSpacesApi.md#getspacepeople) | **GET** /shared-spaces/{id}/people | Get people in a shared space
 *SharedSpacesApi* | [**getSpacePerson**](doc//SharedSpacesApi.md#getspaceperson) | **GET** /shared-spaces/{id}/people/{personId} | Get a person in a shared space
 *SharedSpacesApi* | [**getSpacePersonAssets**](doc//SharedSpacesApi.md#getspacepersonassets) | **GET** /shared-spaces/{id}/people/{personId}/assets | Get assets for a person in a shared space
+*SharedSpacesApi* | [**getSpacePersonThumbnail**](doc//SharedSpacesApi.md#getspacepersonthumbnail) | **GET** /shared-spaces/{id}/people/{personId}/thumbnail | Get a space person thumbnail
 *SharedSpacesApi* | [**markSpaceViewed**](doc//SharedSpacesApi.md#markspaceviewed) | **PATCH** /shared-spaces/{id}/view | Mark space as viewed
 *SharedSpacesApi* | [**mergeSpacePeople**](doc//SharedSpacesApi.md#mergespacepeople) | **POST** /shared-spaces/{id}/people/{personId}/merge | Merge people in a shared space
 *SharedSpacesApi* | [**removeAssets**](doc//SharedSpacesApi.md#removeassets) | **DELETE** /shared-spaces/{id}/assets | Remove assets from a shared space
