@@ -1,6 +1,6 @@
 <script lang="ts">
   import { getAssetMediaUrl } from '$lib/utils';
-  import type { SharedSpaceResponseDto } from '@immich/sdk';
+  import { AssetMediaSize, type SharedSpaceResponseDto } from '@immich/sdk';
   import { Icon } from '@immich/ui';
   import { mdiAccountMultipleOutline, mdiCameraOutline, mdiImageEditOutline } from '@mdi/js';
   import { t } from 'svelte-i18n';
@@ -23,7 +23,9 @@
     onSetCover,
   }: Props = $props();
 
-  let coverUrl = $derived(space.thumbnailAssetId ? getAssetMediaUrl({ id: space.thumbnailAssetId }) : null);
+  let coverUrl = $derived(
+    space.thumbnailAssetId ? getAssetMediaUrl({ id: space.thumbnailAssetId, size: AssetMediaSize.Preview }) : null,
+  );
   let showFullDescription = $state(false);
 
   const roleLabels: Record<string, string> = {
