@@ -66,6 +66,9 @@ export const Route = {
   // folders
   folders: (params?: { path?: string }) => '/folders' + asQueryString(params),
 
+  // import
+  import: () => '/import',
+
   // libraries
   libraries: () => '/admin/library-management',
   newLibrary: () => '/admin/library-management/new',

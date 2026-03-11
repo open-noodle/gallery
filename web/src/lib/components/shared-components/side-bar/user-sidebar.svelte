@@ -16,6 +16,7 @@
     mdiAccountOutline,
     mdiArchiveArrowDown,
     mdiArchiveArrowDownOutline,
+    mdiDatabaseImportOutline,
     mdiFolderOutline,
     mdiHeart,
     mdiHeartOutline,
@@ -92,6 +93,8 @@
   {/if}
 
   <NavbarItem title={$t('utilities')} href={Route.utilities()} icon={mdiToolboxOutline} activeIcon={mdiToolbox} />
+
+  <NavbarItem title={$t('import')} href={Route.import()} icon={mdiDatabaseImportOutline} />
 
   <NavbarItem
     title={$t('archive')}
