@@ -15213,6 +15213,16 @@
             }
           },
           {
+            "name": "spacePersonId",
+            "required": false,
+            "in": "query",
+            "description": "Filter assets containing a specific shared space person (space face recognition)",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "tagId",
             "required": false,
             "in": "query",
@@ -15412,6 +15422,16 @@
             "required": false,
             "in": "query",
             "description": "Filter assets belonging to a specific shared space",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "spacePersonId",
+            "required": false,
+            "in": "query",
+            "description": "Filter assets containing a specific shared space person (space face recognition)",
             "schema": {
               "format": "uuid",
               "type": "string"

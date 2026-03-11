@@ -7030,7 +7030,7 @@ export function tagAssets({ id, bulkIdsDto }: {
 /**
  * Get time bucket
  */
-export function getTimeBucket({ albumId, bbox, isFavorite, isTrashed, key, order, personId, slug, spaceId, tagId, timeBucket, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }: {
+export function getTimeBucket({ albumId, bbox, isFavorite, isTrashed, key, order, personId, slug, spaceId, spacePersonId, tagId, timeBucket, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }: {
     albumId?: string;
     bbox?: string;
     isFavorite?: boolean;
@@ -7040,6 +7040,7 @@ export function getTimeBucket({ albumId, bbox, isFavorite, isTrashed, key, order
     personId?: string;
     slug?: string;
     spaceId?: string;
+    spacePersonId?: string;
     tagId?: string;
     timeBucket: string;
     userId?: string;
@@ -7062,6 +7063,7 @@ export function getTimeBucket({ albumId, bbox, isFavorite, isTrashed, key, order
         personId,
         slug,
         spaceId,
+        spacePersonId,
         tagId,
         timeBucket,
         userId,
@@ -7077,7 +7079,7 @@ export function getTimeBucket({ albumId, bbox, isFavorite, isTrashed, key, order
 /**
  * Get time buckets
  */
-export function getTimeBuckets({ albumId, bbox, isFavorite, isTrashed, key, order, personId, slug, spaceId, tagId, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }: {
+export function getTimeBuckets({ albumId, bbox, isFavorite, isTrashed, key, order, personId, slug, spaceId, spacePersonId, tagId, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }: {
     albumId?: string;
     bbox?: string;
     isFavorite?: boolean;
@@ -7087,6 +7089,7 @@ export function getTimeBuckets({ albumId, bbox, isFavorite, isTrashed, key, orde
     personId?: string;
     slug?: string;
     spaceId?: string;
+    spacePersonId?: string;
     tagId?: string;
     userId?: string;
     visibility?: AssetVisibility;
@@ -7108,6 +7111,7 @@ export function getTimeBuckets({ albumId, bbox, isFavorite, isTrashed, key, orde
         personId,
         slug,
         spaceId,
+        spacePersonId,
         tagId,
         userId,
         visibility,
