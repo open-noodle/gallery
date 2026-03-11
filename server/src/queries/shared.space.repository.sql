@@ -258,3 +258,190 @@ limit
   $2
 offset
   $3
+
+-- SharedSpaceRepository.getPersonsBySpaceId
+select
+  *
+from
+  "shared_space_person"
+where
+  "spaceId" = $1
+order by
+  "name" asc
+
+-- SharedSpaceRepository.getPersonById
+select
+  *
+from
+  "shared_space_person"
+where
+  "id" = $1
+
+-- SharedSpaceRepository.updatePerson
+update "shared_space_person"
+set
+  "name" = $1
+where
+  "id" = $2
+returning
+  *
+
+-- SharedSpaceRepository.deletePerson
+delete from "shared_space_person"
+where
+  "id" = $1
+
+-- SharedSpaceRepository.getPersonFaceCount
+select
+  count(*) as "count"
+from
+  "shared_space_person_face"
+where
+  "personId" = $1
+
+-- SharedSpaceRepository.getPersonAssetCount
+select
+  count(distinct ("asset_face"."assetId")) as "count"
+from
+  "shared_space_person_face"
+  inner join "asset_face" on "asset_face"."id" = "shared_space_person_face"."assetFaceId"
+where
+  "shared_space_person_face"."personId" = $1
+
+-- SharedSpaceRepository.getPersonAssetIds
+select distinct
+  "asset_face"."assetId"
+from
+  "shared_space_person_face"
+  inner join "asset_face" on "asset_face"."id" = "shared_space_person_face"."assetFaceId"
+where
+  "shared_space_person_face"."personId" = $1
+
+-- SharedSpaceRepository.removePersonFacesByAssetIds
+delete from "shared_space_person_face"
+where
+  "assetFaceId" in (
+    select
+      "asset_face"."id"
+    from
+      "asset_face"
+    where
+      "asset_face"."assetId" in ($1)
+  )
+  and "personId" in (
+    select
+      "shared_space_person"."id"
+    from
+      "shared_space_person"
+    where
+      "shared_space_person"."spaceId" = $2
+  )
+
+-- SharedSpaceRepository.deleteOrphanedPersons
+delete from "shared_space_person"
+where
+  "spaceId" = $1
+  and "name" = $2
+  and "id" not in (
+    select
+      "personId"
+    from
+      "shared_space_person_face"
+  )
+
+-- SharedSpaceRepository.getAlias
+select
+  *
+from
+  "shared_space_person_alias"
+where
+  "personId" = $1
+  and "userId" = $2
+
+-- SharedSpaceRepository.deleteAlias
+delete from "shared_space_person_alias"
+where
+  "personId" = $1
+  and "userId" = $2
+
+-- SharedSpaceRepository.getAliasesBySpaceAndUser
+select
+  "shared_space_person_alias".*
+from
+  "shared_space_person_alias"
+  inner join "shared_space_person" on "shared_space_person"."id" = "shared_space_person_alias"."personId"
+where
+  "shared_space_person"."spaceId" = $1
+  and "shared_space_person_alias"."userId" = $2
+
+-- SharedSpaceRepository.findClosestSpacePerson
+begin
+set
+  local vchordrq.probes = 1
+with
+  "cte" as (
+    select
+      "shared_space_person"."id" as "personId",
+      "shared_space_person"."name",
+      face_search.embedding <=> $1 as "distance"
+    from
+      "shared_space_person"
+      inner join "shared_space_person_face" on "shared_space_person_face"."personId" = "shared_space_person"."id"
+      inner join "face_search" on "face_search"."faceId" = "shared_space_person_face"."assetFaceId"
+    where
+      "shared_space_person"."spaceId" = $2
+    order by
+      "distance"
+    limit
+      $3
+  )
+select
+  *
+from
+  "cte"
+where
+  "cte"."distance" <= $4
+rollback
+
+-- SharedSpaceRepository.getAssetFacesForMatching
+select
+  "asset_face"."id",
+  "asset_face"."assetId",
+  "asset_face"."personId",
+  "face_search"."embedding"
+from
+  "asset_face"
+  inner join "face_search" on "face_search"."faceId" = "asset_face"."id"
+where
+  "asset_face"."assetId" = $1
+  and "asset_face"."deletedAt" is null
+
+-- SharedSpaceRepository.getAssetIdsInSpace
+select
+  "assetId"
+from
+  "shared_space_asset"
+where
+  "spaceId" = $1
+
+-- SharedSpaceRepository.getSpaceIdsForAsset
+select
+  "shared_space_asset"."spaceId"
+from
+  "shared_space_asset"
+  inner join "shared_space" on "shared_space"."id" = "shared_space_asset"."spaceId"
+where
+  "shared_space_asset"."assetId" = $1
+  and "shared_space"."faceRecognitionEnabled" = $2
+
+-- SharedSpaceRepository.isPersonFaceAssigned
+select
+  "shared_space_person_face"."assetFaceId"
+from
+  "shared_space_person_face"
+  inner join "shared_space_person" on "shared_space_person"."id" = "shared_space_person_face"."personId"
+where
+  "shared_space_person_face"."assetFaceId" = $1
+  and "shared_space_person"."spaceId" = $2
+limit
+  $3
