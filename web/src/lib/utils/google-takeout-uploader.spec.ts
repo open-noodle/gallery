@@ -60,6 +60,11 @@ describe('uploadTakeoutItem', () => {
     uploadTakeoutItem = mod.uploadTakeoutItem;
     sdkMock = await import('@immich/sdk');
     utilsMock = (await import('$lib/utils')) as unknown as typeof utilsMock;
+
+    // Default: checkBulkUpload accepts the asset (no duplicate)
+    vi.mocked(sdkMock.checkBulkUpload).mockResolvedValue({
+      results: [{ id: 'IMG_001.jpg', action: Action.Accept, reason: undefined as unknown as Reason }],
+    });
   });
 
   it('builds FormData with correct fileCreatedAt from Takeout date', async () => {
