@@ -12,7 +12,7 @@ describe('parseGoogleTakeoutSidecar', () => {
       title: 'IMG_1234.jpg',
       description: 'A beautiful sunset',
       photoTakenTime: { timestamp: '1609459200' },
-      geoData: { latitude: 48.8566, longitude: 2.3522, altitude: 35.0 },
+      geoData: { latitude: 48.8566, longitude: 2.3522, altitude: 35 },
       favorited: true,
       archived: true,
     });
@@ -135,11 +135,10 @@ describe('matchSidecarToMedia', () => {
   });
 
   it('should match sidecar to media by exact filename', () => {
-    const result = matchSidecarToMedia(
-      'Takeout/Google Photos/Trip/IMG_1234.jpg.json',
-      validSidecar,
-      ['Takeout/Google Photos/Trip/IMG_1234.jpg', 'Takeout/Google Photos/Trip/IMG_5678.jpg'],
-    );
+    const result = matchSidecarToMedia('Takeout/Google Photos/Trip/IMG_1234.jpg.json', validSidecar, [
+      'Takeout/Google Photos/Trip/IMG_1234.jpg',
+      'Takeout/Google Photos/Trip/IMG_5678.jpg',
+    ]);
     expect(result).toBe('Takeout/Google Photos/Trip/IMG_1234.jpg');
   });
 
@@ -154,11 +153,9 @@ describe('matchSidecarToMedia', () => {
     // Google truncates long filenames to 47 characters before appending .json
     const longName = 'this_is_a_really_long_filename_that_exceeds_47_chars_total.jpg';
     const truncated = longName.slice(0, 47);
-    const result = matchSidecarToMedia(
-      `Takeout/Google Photos/Album/${truncated}.json`,
-      validSidecar,
-      [`Takeout/Google Photos/Album/${longName}`],
-    );
+    const result = matchSidecarToMedia(`Takeout/Google Photos/Album/${truncated}.json`, validSidecar, [
+      `Takeout/Google Photos/Album/${longName}`,
+    ]);
     expect(result).toBe(`Takeout/Google Photos/Album/${longName}`);
   });
 

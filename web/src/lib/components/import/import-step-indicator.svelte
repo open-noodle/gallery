@@ -20,11 +20,9 @@
 </script>
 
 <div class="flex items-center justify-center gap-0">
-  {#each steps as step, i}
+  {#each steps as step, i (step.index)}
     {#if i > 0}
-      <div
-        class="h-0.5 w-8 sm:w-12 {step.index <= currentStep ? 'bg-primary' : 'bg-gray-200 dark:bg-gray-700'}"
-      ></div>
+      <div class="h-0.5 w-8 sm:w-12 {step.index <= currentStep ? 'bg-primary' : 'bg-gray-200 dark:bg-gray-700'}"></div>
     {/if}
     <div
       class="flex flex-col items-center gap-1"

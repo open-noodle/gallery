@@ -1,7 +1,7 @@
 import type { ImportOptions } from '$lib/managers/import-manager.svelte';
-import type { TakeoutMediaItem } from '$lib/utils/google-takeout-parser';
 import { uploadRequest } from '$lib/utils';
 import { createAlbum } from '$lib/utils/album-utils';
+import type { TakeoutMediaItem } from '$lib/utils/google-takeout-parser';
 import {
   Action,
   AssetMediaStatus,
@@ -34,7 +34,7 @@ export async function uploadTakeoutItem(item: TakeoutMediaItem, options: ImportO
       : new Date(item.file.lastModified).toISOString();
 
     // Duplicate check
-    if (options.skipDuplicates && crypto?.subtle?.digest) {
+    if (options.skipDuplicates && crypto?.subtle) {
       try {
         const checksum = await computeSha1(item.file);
         const {

@@ -23,7 +23,9 @@
 
   let { progress, total, isPaused, isComplete, onTogglePause }: Props = $props();
 
-  let progressPercent = $derived(total > 0 ? Math.round(((progress.imported + progress.skipped + progress.errors) / total) * 100) : 0);
+  let progressPercent = $derived(
+    total > 0 ? Math.round(((progress.imported + progress.skipped + progress.errors) / total) * 100) : 0,
+  );
 
   let remaining = $derived(total - progress.imported - progress.skipped - progress.errors);
 </script>
@@ -93,22 +95,34 @@
 
     <!-- Status counters -->
     <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
-      <div data-testid="status-imported" class="flex flex-col items-center gap-1 rounded-lg bg-green-50 p-3 dark:bg-green-900/20">
+      <div
+        data-testid="status-imported"
+        class="flex flex-col items-center gap-1 rounded-lg bg-green-50 p-3 dark:bg-green-900/20"
+      >
         <Icon icon={mdiCheckCircle} size="18" class="text-green-500" />
         <span class="text-lg font-semibold text-green-600 dark:text-green-400">{progress.imported}</span>
         <span class="text-xs text-gray-500">{$t('import_status_imported')}</span>
       </div>
-      <div data-testid="status-skipped" class="flex flex-col items-center gap-1 rounded-lg bg-yellow-50 p-3 dark:bg-yellow-900/20">
+      <div
+        data-testid="status-skipped"
+        class="flex flex-col items-center gap-1 rounded-lg bg-yellow-50 p-3 dark:bg-yellow-900/20"
+      >
         <Icon icon={mdiSkipNext} size="18" class="text-yellow-500" />
         <span class="text-lg font-semibold text-yellow-600 dark:text-yellow-400">{progress.skipped}</span>
         <span class="text-xs text-gray-500">{$t('import_status_skipped')}</span>
       </div>
-      <div data-testid="status-errors" class="flex flex-col items-center gap-1 rounded-lg bg-red-50 p-3 dark:bg-red-900/20">
+      <div
+        data-testid="status-errors"
+        class="flex flex-col items-center gap-1 rounded-lg bg-red-50 p-3 dark:bg-red-900/20"
+      >
         <Icon icon={mdiAlertCircle} size="18" class="text-red-500" />
         <span class="text-lg font-semibold text-red-600 dark:text-red-400">{progress.errors}</span>
         <span class="text-xs text-gray-500">{$t('import_status_errors')}</span>
       </div>
-      <div data-testid="status-remaining" class="flex flex-col items-center gap-1 rounded-lg bg-gray-50 p-3 dark:bg-gray-800">
+      <div
+        data-testid="status-remaining"
+        class="flex flex-col items-center gap-1 rounded-lg bg-gray-50 p-3 dark:bg-gray-800"
+      >
         <Icon icon={mdiClockOutline} size="18" class="text-gray-400" />
         <span class="text-lg font-semibold text-gray-500">{remaining}</span>
         <span class="text-xs text-gray-500">{$t('import_status_remaining')}</span>

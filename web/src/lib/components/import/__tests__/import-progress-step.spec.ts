@@ -52,7 +52,7 @@ describe('ImportProgressStep', () => {
     expect(getByTestId('status-errors')).toHaveTextContent('2');
   });
 
-  it('shows pause button', async () => {
+  it('shows pause button', () => {
     const onTogglePause = vi.fn();
     const { getByTestId } = render(ImportProgressStep, {
       props: {

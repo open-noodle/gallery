@@ -1,5 +1,6 @@
-import type { TakeoutMediaItem } from '$lib/utils/google-takeout-parser';
 import type { ImportOptions } from '$lib/managers/import-manager.svelte';
+import type { TakeoutMediaItem } from '$lib/utils/google-takeout-parser';
+import { Action, Reason } from '@immich/sdk';
 
 vi.mock('@immich/sdk', () => ({
   getBaseUrl: vi.fn(() => 'http://localhost'),
@@ -8,6 +9,7 @@ vi.mock('@immich/sdk', () => ({
   AssetMediaStatus: { Duplicate: 'duplicate', Created: 'created' },
   AssetVisibility: { Archive: 'archive', Timeline: 'timeline' },
   Action: { Reject: 'reject', Accept: 'accept' },
+  Reason: { Duplicate: 'duplicate', UnsupportedFormat: 'unsupported-format' },
 }));
 
 vi.mock('$lib/utils', () => ({
@@ -20,7 +22,7 @@ vi.mock('$lib/utils/album-utils', () => ({
 
 function makeItem(overrides: Partial<TakeoutMediaItem> = {}): TakeoutMediaItem {
   const file = new File(['fake-image-data'], 'IMG_001.jpg', { type: 'image/jpeg' });
-  Object.defineProperty(file, 'lastModified', { value: 1609459200000 });
+  Object.defineProperty(file, 'lastModified', { value: 1_609_459_200_000 });
   return {
     path: 'Takeout/Google Photos/Trip/IMG_001.jpg',
     file,
@@ -199,7 +201,7 @@ describe('uploadTakeoutItem', () => {
 
   it('returns duplicate status when dedup check rejects', async () => {
     vi.mocked(sdkMock.checkBulkUpload).mockResolvedValue({
-      results: [{ id: 'IMG_001.jpg', assetId: 'existing-asset-1', action: 'reject' as const, reason: 'duplicate' }],
+      results: [{ id: 'IMG_001.jpg', assetId: 'existing-asset-1', action: Action.Reject, reason: Reason.Duplicate }],
     });
 
     const item = makeItem();

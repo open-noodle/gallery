@@ -1,7 +1,5 @@
-import { detectAlbums, matchSidecarToMedia, parseGoogleTakeoutSidecar } from '$lib/utils/google-takeout-parser';
 import type { TakeoutAlbum, TakeoutMediaItem, TakeoutMetadata } from '$lib/utils/google-takeout-parser';
-
-export type { TakeoutAlbum, TakeoutMediaItem, TakeoutMetadata };
+import { detectAlbums, matchSidecarToMedia, parseGoogleTakeoutSidecar } from '$lib/utils/google-takeout-parser';
 
 export interface ScanProgress {
   currentFile: string;
@@ -99,7 +97,8 @@ function checkAbort(signal?: AbortSignal): void {
 
 interface ZipEntry {
   filename: string;
-  getData?: (writer: unknown) => Promise<unknown>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  getData?: (...args: any[]) => Promise<any>;
 }
 
 function isZipFile(file: File): boolean {
@@ -352,9 +351,7 @@ export async function scanTakeoutFiles(options: ScanOptions): Promise<ScanResult
   const albums = detectAlbums(allItems);
 
   // Compute date range
-  const dates = allItems
-    .filter((item) => item.metadata?.dateTaken)
-    .map((item) => item.metadata!.dateTaken!);
+  const dates = allItems.filter((item) => item.metadata?.dateTaken).map((item) => item.metadata!.dateTaken!);
 
   let dateRange: { earliest: Date; latest: Date } | undefined;
   if (dates.length > 0) {
@@ -375,3 +372,5 @@ export async function scanTakeoutFiles(options: ScanOptions): Promise<ScanResult
     },
   };
 }
+
+export { type TakeoutAlbum, type TakeoutMediaItem, type TakeoutMetadata } from '$lib/utils/google-takeout-parser';

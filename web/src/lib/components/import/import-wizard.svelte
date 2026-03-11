@@ -5,6 +5,7 @@
   import type { ScanResult } from '$lib/utils/google-takeout-scanner';
   import { createImportAlbums, uploadTakeoutItem } from '$lib/utils/google-takeout-uploader';
   import { Container } from '@immich/ui';
+  import { SvelteMap, SvelteSet } from 'svelte/reactivity';
   import ImportFilesStep from './import-files-step.svelte';
   import ImportProgressStep from './import-progress-step.svelte';
   import ImportReviewStep from './import-review-step.svelte';
@@ -26,7 +27,7 @@
       const result: ScanResult = await scanTakeoutFiles({
         files: manager.selectedFiles,
         onProgress: (progress) => {
-          manager.scanProgress = { ...progress, albumNames: new Set(progress.albumNames) };
+          manager.scanProgress = { ...progress, albumNames: new SvelteSet(progress.albumNames) };
         },
         signal: abortController.signal,
       });
@@ -56,7 +57,7 @@
 
     manager.currentStep = ImportStep.Import;
     const items = manager.scanResult.items;
-    const assetIdMap = new Map<string, string>();
+    const assetIdMap = new SvelteMap<string, string>();
 
     manager.importProgress = {
       imported: 0,

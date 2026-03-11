@@ -103,8 +103,10 @@
         </Button>
       </div>
       <div class="max-h-48 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700">
-        {#each files as file}
-          <div class="flex items-center justify-between border-b border-gray-100 px-4 py-2 last:border-b-0 dark:border-gray-800">
+        {#each files as file (file.name)}
+          <div
+            class="flex items-center justify-between border-b border-gray-100 px-4 py-2 last:border-b-0 dark:border-gray-800"
+          >
             <span class="truncate text-sm">{file.name}</span>
             <span class="ml-2 shrink-0 text-xs text-gray-400">{formatSize(file.size)}</span>
           </div>
@@ -121,12 +123,7 @@
     <Button variant="outline" leadingIcon={mdiArrowLeft} onclick={onBack}>
       {$t('back')}
     </Button>
-    <Button
-      data-testid="next-button"
-      disabled={files.length === 0}
-      trailingIcon={mdiArrowRight}
-      onclick={onNext}
-    >
+    <Button data-testid="next-button" disabled={files.length === 0} trailingIcon={mdiArrowRight} onclick={onNext}>
       {$t('next')}
     </Button>
   </div>
