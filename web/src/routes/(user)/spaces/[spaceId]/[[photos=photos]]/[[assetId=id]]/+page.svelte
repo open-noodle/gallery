@@ -91,24 +91,7 @@
 
   let timelineManager = $state<TimelineManager>() as TimelineManager;
 
-  // Hero scroll behavior
-  const HERO_HEIGHT = 200;
-  let heroSection: HTMLElement | undefined = $state();
-  let scrollY = $state(0);
-
-  $effect(() => {
-    const scrollContainer = heroSection?.closest('.overflow-y-auto');
-    if (!scrollContainer) {
-      return;
-    }
-    const handler = () => {
-      scrollY = (scrollContainer as HTMLElement).scrollTop;
-    };
-    scrollContainer.addEventListener('scroll', handler, { passive: true });
-    return () => scrollContainer.removeEventListener('scroll', handler);
-  });
-
-  const heroOpacity = $derived(Math.max(0, 1 - (scrollY / HERO_HEIGHT) * 1.8));
+  const HERO_HEIGHT = 160;
 
   const assetInteraction = new AssetInteraction();
   const timelineInteraction = new AssetInteraction();
@@ -499,11 +482,7 @@
   {/snippet}
 
   {#if viewMode === 'view'}
-    <section
-      class="px-4 pt-4"
-      bind:this={heroSection}
-      style="opacity: {heroOpacity};"
-    >
+    <section class="px-4 pt-4">
       <SpaceHero
         {space}
         memberCount={members.length}
@@ -519,7 +498,6 @@
         faceRecognitionEnabled={space.faceRecognitionEnabled}
         spaceId={space.id}
         height={HERO_HEIGHT}
-        parallaxOffset={scrollY * 0.4}
       />
 
       {#if space.faceRecognitionEnabled && spacePeople.length > 0}

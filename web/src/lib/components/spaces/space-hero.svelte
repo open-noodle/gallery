@@ -20,7 +20,6 @@
     faceRecognitionEnabled?: boolean;
     spaceId?: string;
     height?: number;
-    parallaxOffset?: number;
   }
 
   let {
@@ -38,7 +37,6 @@
     faceRecognitionEnabled,
     spaceId,
     height = 250,
-    parallaxOffset = 0,
   }: Props = $props();
 
   let coverUrl = $derived(
@@ -103,7 +101,7 @@
       class="absolute inset-0 size-full select-none object-cover"
       class:cursor-grab={repositioning && !isDragging}
       class:cursor-grabbing={repositioning && isDragging}
-      style="object-position: center {displayCropY}%; transform: translateY({parallaxOffset}px); height: calc(100% + {parallaxOffset * 2}px);"
+      style="object-position: center {displayCropY}%;"
       draggable="false"
       data-testid="hero-cover-image"
       onpointerdown={handlePointerDown}
