@@ -93,7 +93,6 @@ describe('Spaces people page', () => {
     const people = [makePerson({ id: 'p1', name: 'Alice' }), makePerson({ id: 'p2', name: 'Bob' })];
     const { baseElement } = renderPage({ people });
 
-    // ImageThumbnail renders img elements — check URLs contain person IDs
     const images = baseElement.querySelectorAll('img');
     const srcs = [...images].map((img) => img.getAttribute('src'));
     expect(srcs.some((s) => s?.includes('p1/thumbnail'))).toBe(true);
@@ -114,11 +113,9 @@ describe('Spaces people page', () => {
     const people = [makePerson({ id: 'p1', name: 'Alice' })];
     renderPage({ people, members: [makeMember({ role: Role.Viewer })] });
 
-    // Viewer should see text, not an input
     const nameInput = screen.queryByDisplayValue('Alice');
     expect(nameInput).toBeNull();
 
-    // Should show the name as text
     expect(screen.getByText('Alice')).toBeInTheDocument();
   });
 
@@ -126,7 +123,6 @@ describe('Spaces people page', () => {
     const people = [makePerson({ id: 'p1', name: 'Alice' })];
     const { baseElement } = renderPage({ people, members: [makeMember({ role: Role.Editor })] });
 
-    // Find the person card container (role="group")
     const card = baseElement.querySelector('[role="group"]')!;
     expect(card).toBeTruthy();
 
@@ -146,7 +142,7 @@ describe('Spaces people page', () => {
     expect(screen.queryByLabelText('show_person_options')).toBeNull();
   });
 
-  it('context menu has "Set alias" and "Merge" options', async () => {
+  it('context menu has "Merge" option', async () => {
     const people = [makePerson({ id: 'p1', name: 'Alice' })];
     const { baseElement } = renderPage({ people, members: [makeMember({ role: Role.Editor })] });
 
@@ -157,7 +153,6 @@ describe('Spaces people page', () => {
     const user = userEvent.setup();
     await user.click(menuButton);
 
-    expect(screen.getByText('spaces_set_alias')).toBeInTheDocument();
     expect(screen.getByText('merge_people')).toBeInTheDocument();
   });
 
@@ -187,84 +182,15 @@ describe('Spaces people page', () => {
     });
   });
 
-  it('alias editing via context menu shows inline alias input', async () => {
-    const people = [makePerson({ id: 'p1', name: 'Alice' })];
-    const { baseElement } = renderPage({ people, members: [makeMember({ role: Role.Editor })] });
+  it('does not call API when name is unchanged', async () => {
+    const person = makePerson({ id: 'p1', name: 'Alice' });
+    renderPage({ people: [person], members: [makeMember({ role: Role.Editor })] });
 
-    const card = baseElement.querySelector('[role="group"]')!;
-    await fireEvent.mouseEnter(card);
+    const nameInput = screen.getByDisplayValue('Alice');
+    await fireEvent.focusIn(nameInput);
+    await fireEvent.focusOut(nameInput);
 
-    const user = userEvent.setup();
-    await user.click(screen.getByLabelText('show_person_options'));
-    await user.click(screen.getByText('spaces_set_alias'));
-
-    await waitFor(() => {
-      const aliasInput = screen.getByPlaceholderText('spaces_alias_placeholder');
-      expect(aliasInput).toBeInTheDocument();
-    });
-  });
-
-  it('alias save calls setSpacePersonAlias API', async () => {
-    const people = [makePerson({ id: 'p1', name: 'Alice' })];
-    sdkMock.setSpacePersonAlias.mockResolvedValue('' as never);
-    sdkMock.getSpacePeople.mockResolvedValue(people);
-
-    const { baseElement } = renderPage({ people, members: [makeMember({ role: Role.Editor })] });
-
-    const card = baseElement.querySelector('[role="group"]')!;
-    await fireEvent.mouseEnter(card);
-    const user = userEvent.setup();
-    await user.click(screen.getByLabelText('show_person_options'));
-    await user.click(screen.getByText('spaces_set_alias'));
-
-    await waitFor(() => {
-      expect(screen.getByPlaceholderText('spaces_alias_placeholder')).toBeInTheDocument();
-    });
-
-    const aliasInput = screen.getByPlaceholderText('spaces_alias_placeholder');
-    await user.type(aliasInput, 'Ally');
-    await user.keyboard('{Enter}');
-
-    await waitFor(() => {
-      expect(sdkMock.setSpacePersonAlias).toHaveBeenCalledWith(
-        expect.objectContaining({
-          id: 'space-1',
-          personId: 'p1',
-          sharedSpacePersonAliasDto: { alias: 'Ally' },
-        }),
-      );
-    });
-  });
-
-  it('alias clear calls deleteSpacePersonAlias API', async () => {
-    const people = [makePerson({ id: 'p1', name: 'Alice', alias: 'Ally' })];
-    sdkMock.deleteSpacePersonAlias.mockResolvedValue('' as never);
-    sdkMock.getSpacePeople.mockResolvedValue(people);
-
-    const { baseElement } = renderPage({ people, members: [makeMember({ role: Role.Editor })] });
-
-    const card = baseElement.querySelector('[role="group"]')!;
-    await fireEvent.mouseEnter(card);
-    const user = userEvent.setup();
-    await user.click(screen.getByLabelText('show_person_options'));
-    await user.click(screen.getByText('spaces_set_alias'));
-
-    await waitFor(() => {
-      expect(screen.getByPlaceholderText('spaces_alias_placeholder')).toBeInTheDocument();
-    });
-
-    const aliasInput = screen.getByPlaceholderText('spaces_alias_placeholder');
-    await user.clear(aliasInput);
-    await user.keyboard('{Enter}');
-
-    await waitFor(() => {
-      expect(sdkMock.deleteSpacePersonAlias).toHaveBeenCalledWith(
-        expect.objectContaining({
-          id: 'space-1',
-          personId: 'p1',
-        }),
-      );
-    });
+    expect(sdkMock.updateSpacePerson).not.toHaveBeenCalled();
   });
 
   it('empty state shows when no people', () => {
@@ -274,17 +200,31 @@ describe('Spaces people page', () => {
     expect(screen.getByText('spaces_no_people_description')).toBeInTheDocument();
   });
 
-  it('back button navigates to space detail', () => {
+  it('back button is present', () => {
     renderPage();
 
     const backButton = screen.getByLabelText('back');
     expect(backButton).toBeInTheDocument();
   });
 
-  it('shows "aka [alias]" when person has alias', () => {
-    const people = [makePerson({ id: 'p1', name: 'Alice', alias: 'Ally' })];
+  it('renders multiple person cards', () => {
+    const people = [
+      makePerson({ id: 'p1', name: 'Alice' }),
+      makePerson({ id: 'p2', name: 'Bob' }),
+      makePerson({ id: 'p3', name: 'Charlie' }),
+    ];
     renderPage({ people, members: [makeMember({ role: Role.Editor })] });
 
-    expect(screen.getByText('aka Ally')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Alice')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Bob')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Charlie')).toBeInTheDocument();
+  });
+
+  it('links each person thumbnail to their detail page', () => {
+    const people = [makePerson({ id: 'p1', name: 'Alice' })];
+    const { baseElement } = renderPage({ people });
+
+    const link = baseElement.querySelector('a[href="/spaces/space-1/people/p1"]');
+    expect(link).toBeTruthy();
   });
 });
