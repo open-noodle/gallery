@@ -462,7 +462,7 @@ export class SharedSpaceService extends BaseService {
       results.push(this.mapSpacePerson(person, faceCount, assetCount, aliasMap.get(person.id) ?? null));
     }
 
-    return results.sort((a, b) => b.assetCount - a.assetCount);
+    return results.toSorted((a, b) => b.assetCount - a.assetCount);
   }
 
   async getSpacePerson(auth: AuthDto, spaceId: string, personId: string): Promise<SharedSpacePersonResponseDto> {
