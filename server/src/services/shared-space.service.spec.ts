@@ -48,6 +48,7 @@ describe(SharedSpaceService.name, () => {
       expect(result.id).toBe(space.id);
       expect(result.name).toBe('Test Space');
       expect(result.createdById).toBe(auth.user.id);
+      expect(result.faceRecognitionEnabled).toBe(true);
 
       expect(mocks.sharedSpace.create).toHaveBeenCalledWith({
         name: 'Test Space',
@@ -152,6 +153,7 @@ describe(SharedSpaceService.name, () => {
 
       expect(result).toHaveLength(2);
       expect(result[0].name).toBe('Space 1');
+      expect(result[0].faceRecognitionEnabled).toBe(true);
       expect(result[1].name).toBe('Space 2');
       expect(mocks.sharedSpace.getAllByUserId).toHaveBeenCalledWith(auth.user.id);
     });
@@ -355,6 +357,27 @@ describe(SharedSpaceService.name, () => {
       expect(result.id).toBe(space.id);
       expect(result.memberCount).toBe(2);
       expect(result.assetCount).toBe(5);
+      expect(result.faceRecognitionEnabled).toBe(true);
+    });
+
+    it('should return faceRecognitionEnabled=false when disabled', async () => {
+      const auth = factory.auth();
+      const space = factory.sharedSpace({ faceRecognitionEnabled: false });
+      const member = makeMemberResult({
+        spaceId: space.id,
+        userId: auth.user.id,
+        role: SharedSpaceRole.Viewer,
+      });
+
+      mocks.sharedSpace.getMember.mockResolvedValue(member);
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.getMembers.mockResolvedValue([member]);
+      mocks.sharedSpace.getAssetCount.mockResolvedValue(0);
+      mocks.sharedSpace.getRecentAssets.mockResolvedValue([]);
+
+      const result = await sut.get(auth, space.id);
+
+      expect(result.faceRecognitionEnabled).toBe(false);
     });
 
     it('should return thumbnailAssetId when set', async () => {
@@ -917,8 +940,9 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.update.mockResolvedValue(updatedSpace);
       mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
 
-      await sut.update(auth, space.id, { faceRecognitionEnabled: true });
+      const result = await sut.update(auth, space.id, { faceRecognitionEnabled: true });
 
+      expect(result.faceRecognitionEnabled).toBe(true);
       expect(mocks.sharedSpace.update).toHaveBeenCalledWith(
         space.id,
         expect.objectContaining({

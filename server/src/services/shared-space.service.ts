@@ -719,6 +719,7 @@ export class SharedSpaceService extends BaseService {
     thumbnailAssetId?: string | null;
     thumbnailCropY?: number | null;
     color?: string | null;
+    faceRecognitionEnabled?: boolean;
     lastActivityAt?: Date | null;
   }): SharedSpaceResponseDto {
     return {
@@ -731,6 +732,7 @@ export class SharedSpaceService extends BaseService {
       thumbnailAssetId: space.thumbnailAssetId ?? null,
       thumbnailCropY: space.thumbnailCropY ?? null,
       color: (space.color as UserAvatarColor) ?? null,
+      faceRecognitionEnabled: space.faceRecognitionEnabled ?? true,
       lastActivityAt: space.lastActivityAt ? space.lastActivityAt.toISOString() : null,
     };
   }
