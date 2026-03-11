@@ -91,8 +91,6 @@
 
   let timelineManager = $state<TimelineManager>() as TimelineManager;
 
-  const HERO_HEIGHT = 160;
-
   const assetInteraction = new AssetInteraction();
   const timelineInteraction = new AssetInteraction();
 
@@ -481,54 +479,6 @@
     {/if}
   {/snippet}
 
-  {#if viewMode === 'view'}
-    <section class="px-4 pt-4">
-      <SpaceHero
-        {space}
-        memberCount={members.length}
-        assetCount={space.assetCount ?? 0}
-        currentRole={currentMember?.role}
-        gradientClass={spaceGradient}
-        onSetCover={isEditor ? () => (viewMode = 'select-cover') : undefined}
-        onReposition={isEditor && space.thumbnailAssetId ? handleReposition : undefined}
-        {repositioning}
-        onSavePosition={handleSavePosition}
-        onCancelReposition={handleCancelReposition}
-        peopleCount={spacePeople.length}
-        faceRecognitionEnabled={space.faceRecognitionEnabled}
-        spaceId={space.id}
-        height={HERO_HEIGHT}
-      />
-
-      {#if space.faceRecognitionEnabled && spacePeople.length > 0}
-        <SpacePeopleStrip
-          people={spacePeople}
-          spaceId={space.id}
-          {selectedPersonId}
-          onPersonClick={handlePersonClick}
-        />
-      {/if}
-    </section>
-
-    {#if isOwner}
-      <SpaceOnboardingBanner
-        {space}
-        gradientClass={spaceGradient}
-        onAddPhotos={() => (viewMode = 'select-assets')}
-        onInviteMembers={() => (panelOpen = true)}
-        onSetCover={() => (viewMode = 'select-cover')}
-      />
-    {/if}
-  {/if}
-
-  {#if (space.newAssetCount ?? 0) > 0 && space.lastViewedAt}
-    <SpaceNewAssetsDivider
-      newAssetCount={space.newAssetCount ?? 0}
-      lastViewedAt={space.lastViewedAt}
-      spaceColor={space.color ?? 'primary'}
-    />
-  {/if}
-
   {#if showSearchResults}
     <section class="px-4 py-4">
       {#if isSearching}
@@ -568,6 +518,54 @@
       {isSelectionMode}
       onEscape={handleEscape}
     >
+      {#if viewMode === 'view'}
+        <section class="px-4 pt-4">
+          <SpaceHero
+            {space}
+            memberCount={members.length}
+            assetCount={space.assetCount ?? 0}
+            currentRole={currentMember?.role}
+            gradientClass={spaceGradient}
+            onSetCover={isEditor ? () => (viewMode = 'select-cover') : undefined}
+            onReposition={isEditor && space.thumbnailAssetId ? handleReposition : undefined}
+            {repositioning}
+            onSavePosition={handleSavePosition}
+            onCancelReposition={handleCancelReposition}
+            peopleCount={spacePeople.length}
+            faceRecognitionEnabled={space.faceRecognitionEnabled}
+            spaceId={space.id}
+            height={HERO_HEIGHT}
+          />
+
+          {#if space.faceRecognitionEnabled && spacePeople.length > 0}
+            <SpacePeopleStrip
+              people={spacePeople}
+              spaceId={space.id}
+              {selectedPersonId}
+              onPersonClick={handlePersonClick}
+            />
+          {/if}
+        </section>
+
+        {#if isOwner}
+          <SpaceOnboardingBanner
+            {space}
+            gradientClass={spaceGradient}
+            onAddPhotos={() => (viewMode = 'select-assets')}
+            onInviteMembers={() => (panelOpen = true)}
+            onSetCover={() => (viewMode = 'select-cover')}
+          />
+        {/if}
+
+        {#if (space.newAssetCount ?? 0) > 0 && space.lastViewedAt}
+          <SpaceNewAssetsDivider
+            newAssetCount={space.newAssetCount ?? 0}
+            lastViewedAt={space.lastViewedAt}
+            spaceColor={space.color ?? 'primary'}
+          />
+        {/if}
+      {/if}
+
       {#snippet empty()}
         {#if viewMode === 'view'}
           <div class="mx-auto max-w-md py-16 text-center">
