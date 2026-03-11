@@ -101,6 +101,11 @@ export class SharedSpaceService extends BaseService {
       }
     }
 
+    let newAssetCount = 0;
+    if (membership.lastViewedAt) {
+      newAssetCount = await this.sharedSpaceRepository.getNewAssetCount(id, membership.lastViewedAt);
+    }
+
     return {
       ...this.mapSpace(space),
       thumbnailAssetId,
@@ -111,6 +116,7 @@ export class SharedSpaceService extends BaseService {
         a.thumbhash ? Buffer.from(a.thumbhash).toString('base64') : null,
       ),
       members: members.map((m) => this.mapMember(m)),
+      newAssetCount,
       lastViewedAt: membership.lastViewedAt ? (membership.lastViewedAt as unknown as Date).toISOString() : null,
     };
   }

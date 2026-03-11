@@ -595,10 +595,12 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.getMembers.mockResolvedValue([]);
       mocks.sharedSpace.getAssetCount.mockResolvedValue(0);
       mocks.sharedSpace.getRecentAssets.mockResolvedValue([]);
+      mocks.sharedSpace.getNewAssetCount.mockResolvedValue(3);
 
       const result = await sut.get(factory.auth(), space.id);
 
       expect(result.lastViewedAt).toBe('2026-03-09T10:00:00.000Z');
+      expect(result.newAssetCount).toBe(3);
     });
   });
 
