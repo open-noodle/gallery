@@ -44,10 +44,10 @@ describe('SpacePeopleStrip', () => {
     expect(screen.getByTestId('person-label-p1')).toHaveTextContent('Alice Johnson');
   });
 
-  it('should display "Unknown" when no name or alias', () => {
+  it('should not show label when no name or alias', () => {
     const people = [makePerson({ id: 'p1', name: '', alias: null })];
     render(SpacePeopleStrip, { people, spaceId: 'space-1' });
-    expect(screen.getByTestId('person-label-p1')).toHaveTextContent('Unknown');
+    expect(screen.queryByTestId('person-label-p1')).not.toBeInTheDocument();
   });
 
   it('should show selected state with ring when selectedPersonId matches', () => {
