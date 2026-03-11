@@ -67,6 +67,7 @@
   let members: SharedSpaceMemberResponseDto[] = $state(data.members);
   let viewMode = $state<ViewMode>('view');
   let membersPanelOpen = $state(false);
+  let repositioning = $state(false);
 
   let timelineManager = $state<TimelineManager>() as TimelineManager;
 
@@ -122,6 +123,28 @@
     viewMode = 'view';
   };
 
+  const handleReposition = () => {
+    repositioning = true;
+  };
+
+  const handleSavePosition = async (cropY: number) => {
+    try {
+      await updateSpace({
+        id: space.id,
+        sharedSpaceUpdateDto: { thumbnailCropY: cropY },
+      });
+      space = { ...space, thumbnailCropY: cropY };
+      repositioning = false;
+      toastManager.success($t('space_cover_updated'));
+    } catch (error) {
+      handleError(error, $t('errors.unable_to_update_space_cover'));
+    }
+  };
+
+  const handleCancelReposition = () => {
+    repositioning = false;
+  };
+
   const handleSetCoverFromSelection = async () => {
     const assets = assetInteraction.selectedAssets;
     if (assets.length !== 1) {
@@ -133,10 +156,11 @@
         id: space.id,
         sharedSpaceUpdateDto: { thumbnailAssetId: assets[0].id },
       });
-      space = { ...space, thumbnailAssetId: assets[0].id };
+      space = { ...space, thumbnailAssetId: assets[0].id, thumbnailCropY: null };
       toastManager.success($t('space_cover_updated'));
       assetInteraction.clearMultiselect();
       viewMode = 'view';
+      repositioning = true;
     } catch (error) {
       handleError(error, $t('errors.unable_to_update_space_cover'));
     }
@@ -202,9 +226,10 @@
         id: space.id,
         sharedSpaceUpdateDto: { thumbnailAssetId: assets[0].id },
       });
-      space = { ...space, thumbnailAssetId: assets[0].id };
+      space = { ...space, thumbnailAssetId: assets[0].id, thumbnailCropY: null };
       toastManager.success($t('space_cover_updated'));
       cancelMultiselect(assetInteraction);
+      repositioning = true;
     } catch (error) {
       handleError(error, $t('errors.unable_to_update_space_cover'));
     }
@@ -314,6 +339,10 @@
         currentRole={currentMember?.role}
         gradientClass={spaceGradient}
         onSetCover={isEditor ? () => (viewMode = 'select-cover') : undefined}
+        onReposition={isEditor && space.thumbnailAssetId ? handleReposition : undefined}
+        {repositioning}
+        onSavePosition={handleSavePosition}
+        onCancelReposition={handleCancelReposition}
       />
 
       {#if (space.assetCount ?? 0) > 0}
