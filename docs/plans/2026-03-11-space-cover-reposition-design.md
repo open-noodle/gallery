@@ -16,10 +16,10 @@ Space cover photos display using CSS `object-cover` with default center position
 
 ### Hero Button States
 
-| State | Buttons (top-right) |
-|-------|---------------------|
-| No cover set | "Set Cover Photo" |
-| Cover set | "Reposition" + "Change Cover" |
+| State           | Buttons (top-right)                            |
+| --------------- | ---------------------------------------------- |
+| No cover set    | "Set Cover Photo"                              |
+| Cover set       | "Reposition" + "Change Cover"                  |
 | Reposition mode | (no buttons - replaced by Save/Cancel overlay) |
 
 ### Data Model
@@ -58,14 +58,14 @@ No visual change when no custom position is set.
 
 **Changes:**
 
-| Layer | Change |
-|-------|--------|
-| DB schema | Add `thumbnailCropY` column to `shared_space` table |
-| Migration | New migration for the column |
-| DTO | Add `thumbnailCropY` to `SharedSpaceUpdateDto` and `SharedSpaceResponseDto` |
-| space-hero.svelte | Add reposition mode with drag handling, apply `object-position`, dual button layout |
+| Layer             | Change                                                                                 |
+| ----------------- | -------------------------------------------------------------------------------------- |
+| DB schema         | Add `thumbnailCropY` column to `shared_space` table                                    |
+| Migration         | New migration for the column                                                           |
+| DTO               | Add `thumbnailCropY` to `SharedSpaceUpdateDto` and `SharedSpaceResponseDto`            |
+| space-hero.svelte | Add reposition mode with drag handling, apply `object-position`, dual button layout    |
 | Space detail page | Wire up reposition mode entry/exit, API call on save, auto-enter after cover selection |
-| OpenAPI + SDK | Regenerate to include new field |
+| OpenAPI + SDK     | Regenerate to include new field                                                        |
 
 **No changes:**
 

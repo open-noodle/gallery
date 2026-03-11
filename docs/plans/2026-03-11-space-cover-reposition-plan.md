@@ -13,6 +13,7 @@
 ### Task 1: Database Schema — Add `thumbnailCropY` Column
 
 **Files:**
+
 - Modify: `server/src/schema/tables/shared-space.table.ts:34` (add column after `color`)
 - Modify: `server/src/database.ts:320-332` (add field to `SharedSpace` type)
 - Create: `server/src/schema/migrations/1772810000000-AddThumbnailCropYToSharedSpace.ts`
@@ -63,6 +64,7 @@ git commit -m "feat(server): add thumbnailCropY column to shared_space table"
 ### Task 2: Server DTO & Service — Wire Up `thumbnailCropY`
 
 **Files:**
+
 - Modify: `server/src/dtos/shared-space.dto.ts:29-53` (SharedSpaceUpdateDto) and `112-160` (SharedSpaceResponseDto)
 - Modify: `server/src/services/shared-space.service.ts:116-129` (update method) and `332-354` (mapSpace)
 
@@ -217,6 +219,7 @@ git commit -m "feat(server): add thumbnailCropY to shared space DTO and service"
 ### Task 3: Server — Clear `thumbnailCropY` When Cover Changes
 
 **Files:**
+
 - Modify: `server/src/services/shared-space.service.spec.ts` (add test)
 - Modify: `server/src/services/shared-space.service.ts:116-129`
 
@@ -246,10 +249,7 @@ it('should clear thumbnailCropY when thumbnailAssetId changes', async () => {
 
   await sut.update(auth, spaceId, { thumbnailAssetId: newUuid() });
 
-  expect(mocks.sharedSpace.update).toHaveBeenCalledWith(
-    spaceId,
-    expect.objectContaining({ thumbnailCropY: null }),
-  );
+  expect(mocks.sharedSpace.update).toHaveBeenCalledWith(spaceId, expect.objectContaining({ thumbnailCropY: null }));
 });
 ```
 
@@ -293,6 +293,7 @@ git commit -m "feat(server): reset thumbnailCropY when cover photo changes"
 ### Task 4: Regenerate OpenAPI & SDK
 
 **Files:**
+
 - Modified (auto-generated): `open-api/immich-openapi-specs.json`, `open-api/typescript-sdk/src/fetch-client.ts`
 
 **Step 1: Build server and regenerate**
@@ -323,6 +324,7 @@ git commit -m "chore: regenerate OpenAPI spec and TypeScript SDK"
 ### Task 5: Web — Apply `object-position` to Hero Image
 
 **Files:**
+
 - Modify: `web/src/lib/components/spaces/space-hero.svelte:38-44`
 
 **Step 1: Write test**
@@ -425,6 +427,7 @@ git commit -m "feat(web): apply thumbnailCropY as object-position on space hero"
 ### Task 6: Web — Dual Button Layout (Reposition + Change Cover)
 
 **Files:**
+
 - Modify: `web/src/lib/components/spaces/space-hero.svelte`
 - Modify: `web/src/lib/components/spaces/space-hero.spec.ts`
 
@@ -554,6 +557,7 @@ git commit -m "feat(web): add Reposition and Change Cover buttons to space hero"
 ### Task 7: Web — Reposition Mode with Drag Interaction
 
 **Files:**
+
 - Modify: `web/src/lib/components/spaces/space-hero.svelte`
 - Modify: `web/src/lib/components/spaces/space-hero.spec.ts`
 
@@ -795,6 +799,7 @@ git commit -m "feat(web): add reposition mode with drag interaction to space her
 ### Task 8: Web — Wire Up Space Detail Page
 
 **Files:**
+
 - Modify: `web/src/routes/(user)/spaces/[spaceId]/[[photos=photos]]/[[assetId=id]]/+page.svelte`
 
 **Step 1: Add reposition state and handlers**
@@ -840,7 +845,7 @@ space = { ...space, thumbnailAssetId: assets[0].id, thumbnailCropY: null };
 toastManager.success($t('space_cover_updated'));
 assetInteraction.clearMultiselect();
 viewMode = 'view';
-repositioning = true;  // Auto-enter reposition after selecting new cover
+repositioning = true; // Auto-enter reposition after selecting new cover
 ```
 
 Do the same in `handleSetAsCover`.
