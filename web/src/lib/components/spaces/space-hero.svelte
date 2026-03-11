@@ -61,7 +61,7 @@
   let hasCover = $derived(!!space.thumbnailAssetId);
 
   const handlePointerDown = (e: PointerEvent) => {
-    if (!repositioning) return;
+    if (!repositioning) {return;}
     isDragging = true;
     dragStartY = e.clientY;
     dragStartCropY = dragCropY;
@@ -69,7 +69,7 @@
   };
 
   const handlePointerMove = (e: PointerEvent) => {
-    if (!isDragging) return;
+    if (!isDragging) {return;}
     hasInteracted = true;
     const deltaY = e.clientY - dragStartY;
     const deltaPct = -(deltaY / 2.5);
@@ -86,10 +86,11 @@
     <img
       src={coverUrl}
       alt={space.name}
-      class="absolute inset-0 size-full object-cover"
+      class="absolute inset-0 size-full select-none object-cover"
       class:cursor-grab={repositioning && !isDragging}
       class:cursor-grabbing={repositioning && isDragging}
       style="object-position: center {displayCropY}%;"
+      draggable="false"
       data-testid="hero-cover-image"
       onpointerdown={handlePointerDown}
       onpointermove={handlePointerMove}
