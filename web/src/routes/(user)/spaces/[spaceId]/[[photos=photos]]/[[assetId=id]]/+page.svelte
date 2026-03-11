@@ -55,6 +55,7 @@
     mdiDotsVertical,
     mdiEyeOffOutline,
     mdiEyeOutline,
+    mdiFaceRecognition,
     mdiImageOutline,
     mdiImagePlusOutline,
     mdiPlus,
@@ -263,6 +264,19 @@
     }
   };
 
+  const handleToggleFaceRecognition = async () => {
+    try {
+      const updated = await updateSpace({
+        id: space.id,
+        sharedSpaceUpdateDto: { faceRecognitionEnabled: !space.faceRecognitionEnabled },
+      });
+      space = { ...space, faceRecognitionEnabled: updated.faceRecognitionEnabled };
+      await loadSpacePeople();
+    } catch (error) {
+      handleError(error, 'Failed to update face recognition');
+    }
+  };
+
   const handleShowMembers = () => {
     panelOpen = !panelOpen;
   };
@@ -384,6 +398,16 @@
             variant="ghost"
             shape="round"
             color="secondary"
+            aria-label={space.faceRecognitionEnabled ? 'Disable face recognition' : 'Enable face recognition'}
+            title={space.faceRecognitionEnabled ? 'Disable face recognition' : 'Enable face recognition'}
+            onclick={handleToggleFaceRecognition}
+            icon={mdiFaceRecognition}
+          />
+
+          <IconButton
+            variant="ghost"
+            shape="round"
+            color="secondary"
             aria-label={$t('spaces_delete')}
             onclick={handleDelete}
             icon={mdiDeleteOutline}
@@ -406,6 +430,9 @@
         {repositioning}
         onSavePosition={handleSavePosition}
         onCancelReposition={handleCancelReposition}
+        peopleCount={spacePeople.length}
+        faceRecognitionEnabled={space.faceRecognitionEnabled}
+        spaceId={space.id}
       />
 
       {#if space.faceRecognitionEnabled && spacePeople.length > 0}

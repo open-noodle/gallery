@@ -184,4 +184,54 @@ describe('SpaceHero component', () => {
     screen.getByTestId('reposition-cancel-button').click();
     expect(onCancelReposition).toHaveBeenCalled();
   });
+
+  it('should show people count chip when faceRecognitionEnabled and peopleCount > 0', () => {
+    render(SpaceHero, {
+      space: makeSpace(),
+      memberCount: 3,
+      assetCount: 42,
+      faceRecognitionEnabled: true,
+      peopleCount: 5,
+      spaceId: 'space-1',
+    });
+    expect(screen.getByTestId('hero-people-count')).toHaveTextContent('5');
+  });
+
+  it('should not show people chip when faceRecognitionEnabled is false', () => {
+    render(SpaceHero, {
+      space: makeSpace(),
+      memberCount: 3,
+      assetCount: 42,
+      faceRecognitionEnabled: false,
+      peopleCount: 5,
+      spaceId: 'space-1',
+    });
+    expect(screen.queryByTestId('hero-people-count')).not.toBeInTheDocument();
+  });
+
+  it('should not show people chip when peopleCount is 0', () => {
+    render(SpaceHero, {
+      space: makeSpace(),
+      memberCount: 3,
+      assetCount: 42,
+      faceRecognitionEnabled: true,
+      peopleCount: 0,
+      spaceId: 'space-1',
+    });
+    expect(screen.queryByTestId('hero-people-count')).not.toBeInTheDocument();
+  });
+
+  it('should link to people sub-route', () => {
+    render(SpaceHero, {
+      space: makeSpace(),
+      memberCount: 3,
+      assetCount: 42,
+      faceRecognitionEnabled: true,
+      peopleCount: 5,
+      spaceId: 'space-1',
+    });
+    const link = screen.getByTestId('hero-people-count');
+    expect(link).toBeInTheDocument();
+    expect(link.getAttribute('href')).toBe('/spaces/space-1/people');
+  });
 });

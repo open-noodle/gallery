@@ -31,9 +31,7 @@
   let mergeTargetId = $state<string | null>(null);
 
   const currentMember = $derived(members.find((m) => m.userId === space.createdById));
-  const isEditor = $derived(
-    currentMember?.role === Role.Owner || currentMember?.role === Role.Editor,
-  );
+  const isEditor = $derived(currentMember?.role === Role.Owner || currentMember?.role === Role.Editor);
 
   const displayName = $derived(person.alias || person.name || 'Unknown');
 
@@ -108,16 +106,14 @@
 
         <div class="mt-4 flex items-center gap-3">
           <div class="size-16 overflow-hidden rounded-full">
-            <img
-              src={getThumbUrl(person)}
-              alt={displayName}
-              class="size-full object-cover"
-            />
+            <img src={getThumbUrl(person)} alt={displayName} class="size-full object-cover" />
           </div>
           <div>
             <p class="font-medium">{displayName}</p>
             <p class="text-xs text-gray-500">
-              {person.assetCount} {$t('photos')} · {person.faceCount} {$t('spaces_faces')}
+              {person.assetCount}
+              {$t('photos')} · {person.faceCount}
+              {$t('spaces_faces')}
             </p>
           </div>
         </div>
@@ -136,8 +132,8 @@
               type="button"
               class="relative overflow-hidden rounded-xl border-2 transition-colors
                 {mergeTargetId === other.id
-                  ? 'border-immich-primary bg-immich-primary/5'
-                  : 'border-transparent hover:border-gray-200 dark:hover:border-gray-700'}"
+                ? 'border-immich-primary bg-immich-primary/5'
+                : 'border-transparent hover:border-gray-200 dark:hover:border-gray-700'}"
               onclick={() => (mergeTargetId = other.id)}
               data-testid="merge-target-{other.id}"
             >
@@ -186,11 +182,7 @@
     <section class="px-4 pt-4">
       <div class="mb-4 flex items-center gap-4">
         <div class="size-20 overflow-hidden rounded-full">
-          <img
-            src={getThumbUrl(person)}
-            alt={displayName}
-            class="size-full object-cover"
-          />
+          <img src={getThumbUrl(person)} alt={displayName} class="size-full object-cover" />
         </div>
         <div>
           <h2 class="text-xl font-bold">{displayName}</h2>
@@ -198,7 +190,8 @@
             <p class="text-sm text-gray-500 dark:text-gray-400">{person.name}</p>
           {/if}
           <p class="text-sm text-gray-400 dark:text-gray-500">
-            {person.assetCount} {$t('photos')}
+            {person.assetCount}
+            {$t('photos')}
           </p>
         </div>
       </div>

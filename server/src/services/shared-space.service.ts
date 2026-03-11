@@ -20,7 +20,15 @@ import {
   SharedSpaceResponseDto,
   SharedSpaceUpdateDto,
 } from 'src/dtos/shared-space.dto';
-import { JobName, JobStatus, Permission, QueueName, SharedSpaceActivityType, SharedSpaceRole, UserAvatarColor } from 'src/enum';
+import {
+  JobName,
+  JobStatus,
+  Permission,
+  QueueName,
+  SharedSpaceActivityType,
+  SharedSpaceRole,
+  UserAvatarColor,
+} from 'src/enum';
 import { BaseService } from 'src/services/base.service';
 import { JobOf } from 'src/types';
 
@@ -179,10 +187,7 @@ export class SharedSpaceService extends BaseService {
       }
 
       // Queue face matching when toggling from disabled to enabled
-      if (
-        dto.faceRecognitionEnabled === true &&
-        !existing.faceRecognitionEnabled
-      ) {
+      if (dto.faceRecognitionEnabled === true && !existing.faceRecognitionEnabled) {
         await this.jobRepository.queue({
           name: JobName.SharedSpaceFaceMatchAll,
           data: { spaceId: id },
@@ -457,11 +462,7 @@ export class SharedSpaceService extends BaseService {
     return results;
   }
 
-  async getSpacePerson(
-    auth: AuthDto,
-    spaceId: string,
-    personId: string,
-  ): Promise<SharedSpacePersonResponseDto> {
+  async getSpacePerson(auth: AuthDto, spaceId: string, personId: string): Promise<SharedSpacePersonResponseDto> {
     await this.requireMembership(auth, spaceId);
 
     const person = await this.sharedSpaceRepository.getPersonById(personId);

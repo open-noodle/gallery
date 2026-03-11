@@ -67,7 +67,11 @@
       <button
         type="button"
         class="rounded-full bg-black/50 p-1.5 text-white backdrop-blur-sm transition-colors hover:bg-black/70"
-        onclick={(e: MouseEvent) => { e.stopPropagation(); e.preventDefault(); onSetAlias?.(person.id); }}
+        onclick={(e: MouseEvent) => {
+          e.stopPropagation();
+          e.preventDefault();
+          onSetAlias?.(person.id);
+        }}
         title={$t('spaces_set_alias')}
         data-testid="set-alias-button"
       >
@@ -76,7 +80,11 @@
       <button
         type="button"
         class="rounded-full bg-black/50 p-1.5 text-white backdrop-blur-sm transition-colors hover:bg-black/70"
-        onclick={(e: MouseEvent) => { e.stopPropagation(); e.preventDefault(); onMerge?.(person.id); }}
+        onclick={(e: MouseEvent) => {
+          e.stopPropagation();
+          e.preventDefault();
+          onMerge?.(person.id);
+        }}
         title={$t('merge_people')}
         data-testid="merge-button"
       >

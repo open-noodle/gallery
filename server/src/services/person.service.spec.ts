@@ -1183,9 +1183,7 @@ describe(PersonService.name, () => {
       await sut.handleRecognizeFaces({ id: noPerson1.id });
 
       expect(mocks.sharedSpace.getSpaceIdsForAsset).toHaveBeenCalledWith(noPerson1.assetId);
-      expect(mocks.job.queue).not.toHaveBeenCalledWith(
-        expect.objectContaining({ name: JobName.SharedSpaceFaceMatch }),
-      );
+      expect(mocks.job.queue).not.toHaveBeenCalledWith(expect.objectContaining({ name: JobName.SharedSpaceFaceMatch }));
     });
   });
 

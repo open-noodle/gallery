@@ -48,12 +48,7 @@
             : ''}"
           data-testid="person-ring-{person.id}"
         >
-          <img
-            src={getThumbUrl(person)}
-            alt={getDisplayName(person)}
-            class="size-full object-cover"
-            loading="lazy"
-          />
+          <img src={getThumbUrl(person)} alt={getDisplayName(person)} class="size-full object-cover" loading="lazy" />
         </div>
         <span
           class="max-w-[56px] truncate text-xs {selectedPersonId === person.id

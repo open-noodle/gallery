@@ -919,9 +919,12 @@ describe(SharedSpaceService.name, () => {
 
       await sut.update(auth, space.id, { faceRecognitionEnabled: true });
 
-      expect(mocks.sharedSpace.update).toHaveBeenCalledWith(space.id, expect.objectContaining({
-        faceRecognitionEnabled: true,
-      }));
+      expect(mocks.sharedSpace.update).toHaveBeenCalledWith(
+        space.id,
+        expect.objectContaining({
+          faceRecognitionEnabled: true,
+        }),
+      );
     });
 
     it('should queue SharedSpaceFaceMatchAll when toggling faceRecognitionEnabled from false to true', async () => {
@@ -1505,17 +1508,15 @@ describe(SharedSpaceService.name, () => {
 
       await sut.addAssets(auth, spaceId, { assetIds: [assetId] });
 
-      expect(mocks.job.queue).not.toHaveBeenCalledWith(
-        expect.objectContaining({ name: JobName.SharedSpaceFaceMatch }),
-      );
+      expect(mocks.job.queue).not.toHaveBeenCalledWith(expect.objectContaining({ name: JobName.SharedSpaceFaceMatch }));
     });
   });
 
   describe('removeAssets', () => {
-    const setupRemoveAssetsMocks = () => {
+    beforeEach(() => {
       mocks.sharedSpace.removePersonFacesByAssetIds.mockResolvedValue(void 0);
       mocks.sharedSpace.deleteOrphanedPersons.mockResolvedValue(void 0);
-    };
+    });
 
     it('should remove assets when editor', async () => {
       const auth = factory.auth();
@@ -1530,7 +1531,6 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.getLastAssetAddedAt.mockResolvedValue(new Date());
       mocks.sharedSpace.update.mockResolvedValue(factory.sharedSpace({ id: spaceId }));
       mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
-      setupRemoveAssetsMocks();
 
       await sut.removeAssets(auth, spaceId, { assetIds: [assetId1, assetId2] });
 
@@ -1549,7 +1549,6 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.getLastAssetAddedAt.mockResolvedValue(lastDate);
       mocks.sharedSpace.update.mockResolvedValue(factory.sharedSpace({ id: spaceId, lastActivityAt: lastDate }));
       mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
-      setupRemoveAssetsMocks();
 
       await sut.removeAssets(auth, spaceId, { assetIds: [newUuid()] });
 
@@ -1568,7 +1567,6 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.getLastAssetAddedAt.mockResolvedValue(void 0);
       mocks.sharedSpace.update.mockResolvedValue(factory.sharedSpace({ id: spaceId, lastActivityAt: null }));
       mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
-      setupRemoveAssetsMocks();
 
       await sut.removeAssets(auth, spaceId, { assetIds: [newUuid()] });
 
@@ -1588,7 +1586,6 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.getLastAssetAddedAt.mockResolvedValue(void 0);
       mocks.sharedSpace.update.mockResolvedValue(factory.sharedSpace({ id: spaceId, thumbnailAssetId: null }));
       mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
-      setupRemoveAssetsMocks();
 
       await sut.removeAssets(auth, spaceId, { assetIds: [coverAssetId] });
 
@@ -1612,7 +1609,6 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.getLastAssetAddedAt.mockResolvedValue(new Date());
       mocks.sharedSpace.update.mockResolvedValue(factory.sharedSpace({ id: spaceId }));
       mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
-      setupRemoveAssetsMocks();
 
       await sut.removeAssets(auth, spaceId, { assetIds: [otherAssetId] });
 
@@ -1641,7 +1637,6 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.getLastAssetAddedAt.mockResolvedValue(void 0);
       mocks.sharedSpace.update.mockResolvedValue(factory.sharedSpace());
       mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
-      setupRemoveAssetsMocks();
 
       const auth = factory.auth();
       await sut.removeAssets(auth, 'space-1', { assetIds: ['a1', 'a2'] });
@@ -1883,17 +1878,13 @@ describe(SharedSpaceService.name, () => {
         { id: faceId, assetId, personId: null, embedding },
       ]);
       mocks.sharedSpace.isPersonFaceAssigned.mockResolvedValue(false);
-      mocks.sharedSpace.findClosestSpacePerson.mockResolvedValue([
-        { personId, name: 'Alice', distance: 0.3 },
-      ]);
+      mocks.sharedSpace.findClosestSpacePerson.mockResolvedValue([{ personId, name: 'Alice', distance: 0.3 }]);
       mocks.sharedSpace.addPersonFaces.mockResolvedValue([]);
 
       const result = await sut.handleSharedSpaceFaceMatch({ spaceId, assetId });
 
       expect(result).toBe(JobStatus.Success);
-      expect(mocks.sharedSpace.addPersonFaces).toHaveBeenCalledWith([
-        { personId, assetFaceId: faceId },
-      ]);
+      expect(mocks.sharedSpace.addPersonFaces).toHaveBeenCalledWith([{ personId, assetFaceId: faceId }]);
     });
 
     it('should create new person when no match is found', async () => {
@@ -1922,9 +1913,7 @@ describe(SharedSpaceService.name, () => {
         name: '',
         representativeFaceId: faceId,
       });
-      expect(mocks.sharedSpace.addPersonFaces).toHaveBeenCalledWith([
-        { personId: newPersonId, assetFaceId: faceId },
-      ]);
+      expect(mocks.sharedSpace.addPersonFaces).toHaveBeenCalledWith([{ personId: newPersonId, assetFaceId: faceId }]);
       expect(mocks.job.queue).toHaveBeenCalledWith({
         name: JobName.SharedSpacePersonThumbnail,
         data: { id: newPersonId },
@@ -2022,11 +2011,7 @@ describe(SharedSpaceService.name, () => {
       const space = factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true });
 
       mocks.sharedSpace.getById.mockResolvedValue(space);
-      mocks.sharedSpace.getAssetIdsInSpace.mockResolvedValue([
-        { assetId: 'a1' },
-        { assetId: 'a2' },
-        { assetId: 'a3' },
-      ]);
+      mocks.sharedSpace.getAssetIdsInSpace.mockResolvedValue([{ assetId: 'a1' }, { assetId: 'a2' }, { assetId: 'a3' }]);
 
       const result = await sut.handleSharedSpaceFaceMatchAll({ spaceId });
 
@@ -2111,7 +2096,7 @@ describe(SharedSpaceService.name, () => {
       const person = factory.sharedSpacePerson({ id: personId, representativeFaceId: faceId });
 
       mocks.sharedSpace.getPersonById.mockResolvedValue(person);
-      mocks.person.getFaceById.mockResolvedValue(void 0);
+      mocks.person.getFaceById.mockResolvedValue(undefined as any);
 
       const result = await sut.handleSharedSpacePersonThumbnail({ id: personId });
 
@@ -2182,9 +2167,7 @@ describe(SharedSpaceService.name, () => {
 
     it('should throw when person belongs to different space', async () => {
       mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
-      mocks.sharedSpace.getPersonById.mockResolvedValue(
-        factory.sharedSpacePerson({ spaceId: 'other-space' }),
-      );
+      mocks.sharedSpace.getPersonById.mockResolvedValue(factory.sharedSpacePerson({ spaceId: 'other-space' }));
 
       await expect(sut.getSpacePerson(factory.auth(), 'space-1', 'person-1')).rejects.toThrow('Person not found');
     });
@@ -2215,18 +2198,18 @@ describe(SharedSpaceService.name, () => {
     it('should require editor role', async () => {
       mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
 
-      await expect(
-        sut.updateSpacePerson(factory.auth(), 'space-1', 'person-1', { name: 'New Name' }),
-      ).rejects.toThrow('Insufficient role');
+      await expect(sut.updateSpacePerson(factory.auth(), 'space-1', 'person-1', { name: 'New Name' })).rejects.toThrow(
+        'Insufficient role',
+      );
     });
 
     it('should throw when person not found', async () => {
       mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
       mocks.sharedSpace.getPersonById.mockResolvedValue(void 0);
 
-      await expect(
-        sut.updateSpacePerson(factory.auth(), 'space-1', 'person-1', { name: 'New Name' }),
-      ).rejects.toThrow('Person not found');
+      await expect(sut.updateSpacePerson(factory.auth(), 'space-1', 'person-1', { name: 'New Name' })).rejects.toThrow(
+        'Person not found',
+      );
     });
 
     it('should update person name', async () => {
@@ -2302,13 +2285,11 @@ describe(SharedSpaceService.name, () => {
       const spaceId = newUuid();
       const personId = newUuid();
       mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
-      mocks.sharedSpace.getPersonById.mockResolvedValue(
-        factory.sharedSpacePerson({ id: personId, spaceId }),
-      );
+      mocks.sharedSpace.getPersonById.mockResolvedValue(factory.sharedSpacePerson({ id: personId, spaceId }));
 
-      await expect(
-        sut.mergeSpacePeople(factory.auth(), spaceId, personId, { ids: [personId] }),
-      ).rejects.toThrow('Cannot merge a person into themselves');
+      await expect(sut.mergeSpacePeople(factory.auth(), spaceId, personId, { ids: [personId] })).rejects.toThrow(
+        'Cannot merge a person into themselves',
+      );
     });
 
     it('should merge source persons into target', async () => {
@@ -2337,18 +2318,18 @@ describe(SharedSpaceService.name, () => {
     it('should require membership', async () => {
       mocks.sharedSpace.getMember.mockResolvedValue(void 0);
 
-      await expect(
-        sut.setSpacePersonAlias(factory.auth(), 'space-1', 'person-1', { alias: 'Nick' }),
-      ).rejects.toThrow('Not a member');
+      await expect(sut.setSpacePersonAlias(factory.auth(), 'space-1', 'person-1', { alias: 'Nick' })).rejects.toThrow(
+        'Not a member',
+      );
     });
 
     it('should throw when person not found', async () => {
       mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
       mocks.sharedSpace.getPersonById.mockResolvedValue(void 0);
 
-      await expect(
-        sut.setSpacePersonAlias(factory.auth(), 'space-1', 'person-1', { alias: 'Nick' }),
-      ).rejects.toThrow('Person not found');
+      await expect(sut.setSpacePersonAlias(factory.auth(), 'space-1', 'person-1', { alias: 'Nick' })).rejects.toThrow(
+        'Person not found',
+      );
     });
 
     it('should upsert alias for user', async () => {
@@ -2376,9 +2357,7 @@ describe(SharedSpaceService.name, () => {
     it('should require membership', async () => {
       mocks.sharedSpace.getMember.mockResolvedValue(void 0);
 
-      await expect(
-        sut.deleteSpacePersonAlias(factory.auth(), 'space-1', 'person-1'),
-      ).rejects.toThrow('Not a member');
+      await expect(sut.deleteSpacePersonAlias(factory.auth(), 'space-1', 'person-1')).rejects.toThrow('Not a member');
     });
 
     it('should delete alias for user', async () => {

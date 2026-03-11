@@ -426,10 +426,7 @@ export class SharedSpaceRepository {
       .where(
         'assetFaceId',
         'in',
-        this.db
-          .selectFrom('asset_face')
-          .select('asset_face.id')
-          .where('asset_face.assetId', 'in', assetIds),
+        this.db.selectFrom('asset_face').select('asset_face.id').where('asset_face.assetId', 'in', assetIds),
       )
       .where(
         'personId',
@@ -448,11 +445,7 @@ export class SharedSpaceRepository {
       .deleteFrom('shared_space_person')
       .where('spaceId', '=', spaceId)
       .where('name', '=', '')
-      .where(
-        'id',
-        'not in',
-        this.db.selectFrom('shared_space_person_face').select('personId'),
-      )
+      .where('id', 'not in', this.db.selectFrom('shared_space_person_face').select('personId'))
       .execute();
   }
 
@@ -474,9 +467,7 @@ export class SharedSpaceRepository {
     return this.db
       .insertInto('shared_space_person_alias')
       .values(values)
-      .onConflict((oc) =>
-        oc.columns(['personId', 'userId']).doUpdateSet((eb) => ({ alias: eb.ref('excluded.alias') })),
-      )
+      .onConflict((oc) => oc.columns(['personId', 'userId']).doUpdateSet((eb) => ({ alias: eb.ref('excluded.alias') })))
       .returningAll()
       .executeTakeFirstOrThrow();
   }
@@ -506,11 +497,7 @@ export class SharedSpaceRepository {
   // ==========================================
 
   @GenerateSql({
-    params: [
-      DummyValue.UUID,
-      DummyValue.VECTOR,
-      { maxDistance: 0.6, numResults: 1 },
-    ],
+    params: [DummyValue.UUID, DummyValue.VECTOR, { maxDistance: 0.6, numResults: 1 }],
   })
   findClosestSpacePerson(spaceId: string, embedding: string, options: { maxDistance: number; numResults: number }) {
     return this.db.transaction().execute(async (trx) => {
@@ -519,16 +506,8 @@ export class SharedSpaceRepository {
         .with('cte', (qb) =>
           qb
             .selectFrom('shared_space_person')
-            .innerJoin(
-              'shared_space_person_face',
-              'shared_space_person_face.personId',
-              'shared_space_person.id',
-            )
-            .innerJoin(
-              'face_search',
-              'face_search.faceId',
-              'shared_space_person_face.assetFaceId',
-            )
+            .innerJoin('shared_space_person_face', 'shared_space_person_face.personId', 'shared_space_person.id')
+            .innerJoin('face_search', 'face_search.faceId', 'shared_space_person_face.assetFaceId')
             .select([
               'shared_space_person.id as personId',
               'shared_space_person.name',
@@ -550,12 +529,7 @@ export class SharedSpaceRepository {
     return this.db
       .selectFrom('asset_face')
       .innerJoin('face_search', 'face_search.faceId', 'asset_face.id')
-      .select([
-        'asset_face.id',
-        'asset_face.assetId',
-        'asset_face.personId',
-        'face_search.embedding',
-      ])
+      .select(['asset_face.id', 'asset_face.assetId', 'asset_face.personId', 'face_search.embedding'])
       .where('asset_face.assetId', '=', assetId)
       .where('asset_face.deletedAt', 'is', null)
       .execute();
@@ -563,11 +537,7 @@ export class SharedSpaceRepository {
 
   @GenerateSql({ params: [DummyValue.UUID] })
   getAssetIdsInSpace(spaceId: string) {
-    return this.db
-      .selectFrom('shared_space_asset')
-      .select('assetId')
-      .where('spaceId', '=', spaceId)
-      .execute();
+    return this.db.selectFrom('shared_space_asset').select('assetId').where('spaceId', '=', spaceId).execute();
   }
 
   @GenerateSql({ params: [DummyValue.UUID] })
@@ -585,11 +555,7 @@ export class SharedSpaceRepository {
   async isPersonFaceAssigned(assetFaceId: string, spaceId: string): Promise<boolean> {
     const result = await this.db
       .selectFrom('shared_space_person_face')
-      .innerJoin(
-        'shared_space_person',
-        'shared_space_person.id',
-        'shared_space_person_face.personId',
-      )
+      .innerJoin('shared_space_person', 'shared_space_person.id', 'shared_space_person_face.personId')
       .select('shared_space_person_face.assetFaceId')
       .where('shared_space_person_face.assetFaceId', '=', assetFaceId)
       .where('shared_space_person.spaceId', '=', spaceId)

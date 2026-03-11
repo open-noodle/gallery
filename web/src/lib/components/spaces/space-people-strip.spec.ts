@@ -25,10 +25,7 @@ describe('SpacePeopleStrip', () => {
   });
 
   it('should render face thumbnails for each person', () => {
-    const people = [
-      makePerson({ id: 'p1', name: 'Alice' }),
-      makePerson({ id: 'p2', name: 'Bob' }),
-    ];
+    const people = [makePerson({ id: 'p1', name: 'Alice' }), makePerson({ id: 'p2', name: 'Bob' })];
     render(SpacePeopleStrip, { people, spaceId: 'space-1' });
     expect(screen.getByTestId('people-strip')).toBeInTheDocument();
     expect(screen.getByTestId('person-thumb-p1')).toBeInTheDocument();
@@ -76,17 +73,13 @@ describe('SpacePeopleStrip', () => {
   });
 
   it('should show "See all" link when people count exceeds threshold', () => {
-    const people = Array.from({ length: 8 }, (_, i) =>
-      makePerson({ id: `p${i}`, name: `Person ${i}` }),
-    );
+    const people = Array.from({ length: 8 }, (_, i) => makePerson({ id: `p${i}`, name: `Person ${i}` }));
     render(SpacePeopleStrip, { people, spaceId: 'space-1' });
     expect(screen.getByTestId('see-all-people')).toBeInTheDocument();
   });
 
   it('should link to people page', () => {
-    const people = Array.from({ length: 10 }, (_, i) =>
-      makePerson({ id: `p${i}`, name: `Person ${i}` }),
-    );
+    const people = Array.from({ length: 10 }, (_, i) => makePerson({ id: `p${i}`, name: `Person ${i}` }));
     render(SpacePeopleStrip, { people, spaceId: 'space-1' });
     const link = screen.getByTestId('see-all-people');
     expect(link.getAttribute('href')).toBe('/spaces/space-1/people');
