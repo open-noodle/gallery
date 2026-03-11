@@ -215,6 +215,26 @@ class AssetAccess {
 
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID_SET] })
   @ChunkedSet({ paramIndex: 1 })
+  async checkSpaceAccess(userId: string, assetIds: Set<string>) {
+    if (assetIds.size === 0) {
+      return new Set<string>();
+    }
+
+    return this.db
+      .selectFrom('shared_space_asset')
+      .innerJoin('shared_space_member', 'shared_space_member.spaceId', 'shared_space_asset.spaceId')
+      .innerJoin('asset', (join) =>
+        join.onRef('asset.id', '=', 'shared_space_asset.assetId').on('asset.deletedAt', 'is', null),
+      )
+      .select('asset.id')
+      .where('shared_space_member.userId', '=', userId)
+      .where('asset.id', 'in', [...assetIds])
+      .execute()
+      .then((assets) => new Set(assets.map((asset) => asset.id)));
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID_SET] })
+  @ChunkedSet({ paramIndex: 1 })
   async checkSharedLinkAccess(sharedLinkId: string, assetIds: Set<string>) {
     if (assetIds.size === 0) {
       return new Set<string>();

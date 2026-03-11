@@ -202,6 +202,26 @@ describe(AssetService.name, () => {
       expect(mocks.access.asset.checkAlbumAccess).toHaveBeenCalledWith(authStub.admin.user.id, new Set([asset.id]));
     });
 
+    it('should allow shared space access', async () => {
+      const asset = AssetFactory.create();
+      mocks.access.asset.checkSpaceAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getById.mockResolvedValue(asset);
+
+      await sut.get(authStub.admin, asset.id);
+
+      expect(mocks.access.asset.checkSpaceAccess).toHaveBeenCalledWith(authStub.admin.user.id, new Set([asset.id]));
+    });
+
+    it('should clear people for shared space access (non-owner)', async () => {
+      const asset = AssetFactory.from().exif().build();
+      mocks.access.asset.checkSpaceAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getById.mockResolvedValue(asset);
+
+      const result = await sut.get(authStub.admin, asset.id);
+
+      expect(result).toHaveProperty('people', []);
+    });
+
     it('should throw an error for no access', async () => {
       await expect(sut.get(authStub.admin, AssetFactory.create().id)).rejects.toBeInstanceOf(BadRequestException);
 
