@@ -2402,6 +2402,8 @@ export type SharedSpaceResponseDto = {
     recentAssetThumbhashes?: string[];
     /** Thumbnail asset ID */
     thumbnailAssetId?: string | null;
+    /** Vertical crop position for cover photo (0-100) */
+    thumbnailCropY?: number | null;
     /** Last update date */
     updatedAt: string;
 };
@@ -2422,6 +2424,8 @@ export type SharedSpaceUpdateDto = {
     name?: string;
     /** Thumbnail asset ID */
     thumbnailAssetId?: string | null;
+    /** Vertical crop position for cover photo (0-100) */
+    thumbnailCropY?: number | null;
 };
 export type SharedSpaceAssetRemoveDto = {
     /** Asset IDs */
