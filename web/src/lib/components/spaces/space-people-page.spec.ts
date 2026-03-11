@@ -11,7 +11,7 @@ import { userAdminFactory } from '@test-data/factories/user-factory';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
-import SpacePeoplePage from './+page.svelte';
+import SpacePeoplePage from '../../../routes/(user)/spaces/[spaceId]/people/+page.svelte';
 
 vi.mock('$lib/components/layouts/user-page-layout.svelte', async () => {
   const { default: MockComponent } = await import('./mock-user-page-layout.test-wrapper.svelte');
