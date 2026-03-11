@@ -459,7 +459,7 @@
           <IconButton
             variant="ghost"
             shape="round"
-            color="secondary"
+            color={space.faceRecognitionEnabled ? 'primary' : 'secondary'}
             aria-label={space.faceRecognitionEnabled ? 'Disable face recognition' : 'Enable face recognition'}
             title={space.faceRecognitionEnabled ? 'Disable face recognition' : 'Enable face recognition'}
             onclick={handleToggleFaceRecognition}
