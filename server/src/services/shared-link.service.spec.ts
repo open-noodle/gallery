@@ -7,7 +7,7 @@ import { AlbumFactory } from 'test/factories/album.factory';
 import { AssetFactory } from 'test/factories/asset.factory';
 import { SharedLinkFactory } from 'test/factories/shared-link.factory';
 import { authStub } from 'test/fixtures/auth.stub';
-import { sharedLinkResponseStub, sharedLinkStub } from 'test/fixtures/shared-link.stub';
+import { sharedLinkStub } from 'test/fixtures/shared-link.stub';
 import { getForSharedLink } from 'test/mappers';
 import { factory, newUuid } from 'test/small.factory';
 import { newTestService, ServiceMocks } from 'test/utils';
