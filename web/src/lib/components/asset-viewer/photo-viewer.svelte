@@ -24,7 +24,6 @@
   import { useSwipe, type SwipeCustomEvent } from 'svelte-gestures';
   import { t } from 'svelte-i18n';
   import type { AssetCursor } from './asset-viewer.svelte';
-  import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
 
   interface Props {
     cursor: AssetCursor;
