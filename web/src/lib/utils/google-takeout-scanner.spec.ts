@@ -149,18 +149,20 @@ describe('scanTakeoutFiles', () => {
     for (let i = 1; i <= 20; i++) {
       const name = `IMG_${String(i).padStart(3, '0')}.jpg`;
       const album = i <= 10 ? 'Album1' : 'Album2';
-      entries.push({
-        path: `Takeout/Google Photos/${album}/${name}.json`,
-        content: makeSidecar({
-          title: name,
-          photoTakenTime: { timestamp: String(1_609_459_200 + i * 86_400) },
-          geoData: { latitude: 48 + i * 0.01, longitude: 2 + i * 0.01 },
-        }),
-      });
-      entries.push({
-        path: `Takeout/Google Photos/${album}/${name}`,
-        content: `fake-image-data-${i}`,
-      });
+      entries.push(
+        {
+          path: `Takeout/Google Photos/${album}/${name}.json`,
+          content: makeSidecar({
+            title: name,
+            photoTakenTime: { timestamp: String(1_609_459_200 + i * 86_400) },
+            geoData: { latitude: 48 + i * 0.01, longitude: 2 + i * 0.01 },
+          }),
+        },
+        {
+          path: `Takeout/Google Photos/${album}/${name}`,
+          content: `fake-image-data-${i}`,
+        },
+      );
     }
 
     const zipBlob = await createZipBlob(entries);
