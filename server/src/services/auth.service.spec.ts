@@ -12,7 +12,7 @@ import { SessionFactory } from 'test/factories/session.factory';
 import { UserFactory } from 'test/factories/user.factory';
 import { sharedLinkStub } from 'test/fixtures/shared-link.stub';
 import { systemConfigStub } from 'test/fixtures/system-config.stub';
-import { newUuid } from 'test/small.factory';
+import { factory, newUuid } from 'test/small.factory';
 import { newTestService, ServiceMocks } from 'test/utils';
 
 const oauthResponse = ({

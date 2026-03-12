@@ -164,7 +164,7 @@ describe(AssetService.name, () => {
     it('should delete owner from response for shared link with showExif', async () => {
       const asset = AssetFactory.from().exif({ description: 'foo' }).build();
       mocks.access.asset.checkSharedLinkAccess.mockResolvedValue(new Set([asset.id]));
-      mocks.asset.getById.mockResolvedValue(asset);
+      mocks.asset.getById.mockResolvedValue(asset as any);
 
       const result = await sut.get(
         { ...authStub.adminSharedLink, sharedLink: { ...authStub.adminSharedLink.sharedLink!, showExif: true } },
@@ -177,7 +177,7 @@ describe(AssetService.name, () => {
     it('should clear people for non-owner access', async () => {
       const asset = AssetFactory.from().exif().build();
       mocks.access.asset.checkPartnerAccess.mockResolvedValue(new Set([asset.id]));
-      mocks.asset.getById.mockResolvedValue(asset);
+      mocks.asset.getById.mockResolvedValue(asset as any);
 
       const result = await sut.get(authStub.admin, asset.id);
 
@@ -207,7 +207,7 @@ describe(AssetService.name, () => {
     it('should allow shared space access', async () => {
       const asset = AssetFactory.create();
       mocks.access.asset.checkSpaceAccess.mockResolvedValue(new Set([asset.id]));
-      mocks.asset.getById.mockResolvedValue(asset);
+      mocks.asset.getById.mockResolvedValue(asset as any);
 
       await sut.get(authStub.admin, asset.id);
 
@@ -217,7 +217,7 @@ describe(AssetService.name, () => {
     it('should clear people for shared space access (non-owner)', async () => {
       const asset = AssetFactory.from().exif().build();
       mocks.access.asset.checkSpaceAccess.mockResolvedValue(new Set([asset.id]));
-      mocks.asset.getById.mockResolvedValue(asset);
+      mocks.asset.getById.mockResolvedValue(asset as any);
 
       const result = await sut.get(authStub.admin, asset.id);
 
@@ -446,8 +446,8 @@ describe(AssetService.name, () => {
       const auth = AuthFactory.create();
       const asset = AssetFactory.create({ livePhotoVideoId: null });
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
-      mocks.asset.getById.mockResolvedValueOnce(asset);
-      mocks.asset.update.mockResolvedValueOnce(asset);
+      mocks.asset.getById.mockResolvedValueOnce(asset as any);
+      mocks.asset.update.mockResolvedValueOnce(asset as any);
 
       await sut.update(auth, asset.id, { livePhotoVideoId: null });
 
@@ -457,7 +457,7 @@ describe(AssetService.name, () => {
     it('should update latitude and longitude', async () => {
       const asset = AssetFactory.create();
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
-      mocks.asset.update.mockResolvedValue(asset);
+      mocks.asset.update.mockResolvedValue(asset as any);
 
       await sut.update(authStub.admin, asset.id, { latitude: 40.7128, longitude: -74.006 });
 
@@ -799,7 +799,7 @@ describe(AssetService.name, () => {
           primaryAssetId: asset.id,
           assets: stackAssets,
         },
-      });
+      } as any);
 
       await sut.handleAssetDeletion({ id: asset.id, deleteOnDisk: true });
 
@@ -854,7 +854,7 @@ describe(AssetService.name, () => {
 
     it('should not update usage for library assets', async () => {
       const asset = AssetFactory.from({ libraryId: newUuid() }).exif({ fileSizeInByte: 5000 }).build();
-      mocks.assetJob.getForAssetDeletion.mockResolvedValue(asset);
+      mocks.assetJob.getForAssetDeletion.mockResolvedValue(asset as any);
 
       await sut.handleAssetDeletion({ id: asset.id, deleteOnDisk: true });
 
@@ -866,7 +866,7 @@ describe(AssetService.name, () => {
         .file({ type: AssetFileType.Thumbnail })
         .file({ type: AssetFileType.Sidecar })
         .build();
-      mocks.assetJob.getForAssetDeletion.mockResolvedValue(asset);
+      mocks.assetJob.getForAssetDeletion.mockResolvedValue(asset as any);
 
       await sut.handleAssetDeletion({ id: asset.id, deleteOnDisk: false });
 
@@ -879,7 +879,7 @@ describe(AssetService.name, () => {
 
     it('should emit AssetDelete event', async () => {
       const asset = AssetFactory.create();
-      mocks.assetJob.getForAssetDeletion.mockResolvedValue(asset);
+      mocks.assetJob.getForAssetDeletion.mockResolvedValue(asset as any);
 
       await sut.handleAssetDeletion({ id: asset.id, deleteOnDisk: true });
 
@@ -1581,7 +1581,7 @@ describe(AssetService.name, () => {
     it('should remove asset edits and queue thumbnail generation', async () => {
       const asset = AssetFactory.create();
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
-      mocks.asset.getById.mockResolvedValue(asset);
+      mocks.asset.getById.mockResolvedValue(asset as any);
       mocks.assetEdit.replaceAll.mockResolvedValue([]);
 
       await sut.removeAssetEdits(authStub.admin, asset.id);

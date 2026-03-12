@@ -46,12 +46,12 @@ export class StorageMigrationRepository {
 
   streamEncodedVideos(direction: StorageMigrationDirection) {
     return this.db
-      .selectFrom('asset')
-      .select(['id', 'encodedVideoPath'])
-      .where('encodedVideoPath', 'is not', null)
-      .where('encodedVideoPath', '!=', '')
-      .$if(direction === 'toS3', (qb) => qb.where('encodedVideoPath', 'like', '/%'))
-      .$if(direction === 'toDisk', (qb) => qb.where('encodedVideoPath', 'not like', '/%'))
+      .selectFrom('asset_file')
+      .innerJoin('asset', 'asset.id', 'asset_file.assetId')
+      .select(['asset_file.id', 'asset_file.assetId', 'asset_file.path', 'asset_file.type'])
+      .where('asset_file.type', '=', AssetFileType.EncodedVideo)
+      .$if(direction === 'toS3', (qb) => qb.where('asset_file.path', 'like', '/%'))
+      .$if(direction === 'toDisk', (qb) => qb.where('asset_file.path', 'not like', '/%'))
       .stream();
   }
 
@@ -112,11 +112,10 @@ export class StorageMigrationRepository {
         .executeTakeFirstOrThrow(),
 
       this.db
-        .selectFrom('asset')
+        .selectFrom('asset_file')
         .select((eb) => eb.fn.countAll<number>().as('count'))
-        .where('encodedVideoPath', 'is not', null)
-        .where('encodedVideoPath', '!=', '')
-        .where('encodedVideoPath', pathFilter, pathPattern)
+        .where('type', '=', AssetFileType.EncodedVideo)
+        .where('path', pathFilter, pathPattern)
         .executeTakeFirstOrThrow(),
 
       this.db
@@ -161,10 +160,11 @@ export class StorageMigrationRepository {
 
   async updateAssetEncodedVideoPath(assetId: string, oldPath: string, newPath: string): Promise<boolean> {
     const result = await this.db
-      .updateTable('asset')
-      .set({ encodedVideoPath: newPath })
-      .where('id', '=', assetId)
-      .where('encodedVideoPath', '=', oldPath)
+      .updateTable('asset_file')
+      .set({ path: newPath })
+      .where('assetId', '=', assetId)
+      .where('type', '=', AssetFileType.EncodedVideo)
+      .where('path', '=', oldPath)
       .executeTakeFirst();
 
     return Number(result.numUpdatedRows) > 0;

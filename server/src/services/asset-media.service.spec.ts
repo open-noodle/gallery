@@ -813,8 +813,8 @@ describe(AssetMediaService.name, () => {
     it('should update a photo with no sidecar to photo with no sidecar', async () => {
       const updatedFile = { ...fileStub.photo, originalPath: '/fake_path/photo1.jpeg' };
       const updatedAsset = { ...existingAsset, ...updatedFile };
-      mocks.asset.getById.mockResolvedValueOnce(existingAsset);
-      mocks.asset.getById.mockResolvedValueOnce(updatedAsset);
+      mocks.asset.getById.mockResolvedValueOnce(existingAsset as any);
+      mocks.asset.getById.mockResolvedValueOnce(updatedAsset as any);
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([existingAsset.id]));
       // this is the original file size
       mocks.storage.stat.mockResolvedValue({ size: 0 } as Stats);
@@ -862,8 +862,8 @@ describe(AssetMediaService.name, () => {
       const updatedFile = { ...fileStub.photo, originalPath: '/fake_path/photo1.jpeg' };
       const sidecarFile = fileStub.photoSidecar;
       const updatedAsset = { ...sidecarAsset, ...updatedFile };
-      mocks.asset.getById.mockResolvedValueOnce(existingAsset);
-      mocks.asset.getById.mockResolvedValueOnce(updatedAsset);
+      mocks.asset.getById.mockResolvedValueOnce(existingAsset as any);
+      mocks.asset.getById.mockResolvedValueOnce(updatedAsset as any);
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([sidecarAsset.id]));
       // this is the original file size
       mocks.storage.stat.mockResolvedValue({ size: 0 } as Stats);
@@ -900,8 +900,8 @@ describe(AssetMediaService.name, () => {
       const updatedFile = { ...fileStub.photo, originalPath: '/fake_path/photo1.jpeg' };
 
       const updatedAsset = { ...sidecarAsset, ...updatedFile };
-      mocks.asset.getById.mockResolvedValueOnce(sidecarAsset);
-      mocks.asset.getById.mockResolvedValueOnce(updatedAsset);
+      mocks.asset.getById.mockResolvedValueOnce(sidecarAsset as any);
+      mocks.asset.getById.mockResolvedValueOnce(updatedAsset as any);
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([sidecarAsset.id]));
       // this is the original file size
       mocks.storage.stat.mockResolvedValue({ size: 0 } as Stats);
@@ -935,8 +935,8 @@ describe(AssetMediaService.name, () => {
       // S3 uploaded files have relative paths
       const updatedFile = { ...fileStub.photo, originalPath: 'upload/user/ab/cd/photo1.jpeg' };
       const updatedAsset = { ...existingAsset, ...updatedFile };
-      mocks.asset.getById.mockResolvedValueOnce(existingAsset);
-      mocks.asset.getById.mockResolvedValueOnce(updatedAsset);
+      mocks.asset.getById.mockResolvedValueOnce(existingAsset as any);
+      mocks.asset.getById.mockResolvedValueOnce(updatedAsset as any);
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([existingAsset.id]));
       // this is the original file size
       mocks.storage.stat.mockResolvedValue({ size: 0 } as Stats);
@@ -957,7 +957,7 @@ describe(AssetMediaService.name, () => {
       (error as any).constraint_name = ASSET_CHECKSUM_CONSTRAINT;
 
       mocks.asset.update.mockRejectedValue(error);
-      mocks.asset.getById.mockResolvedValueOnce(sidecarAsset);
+      mocks.asset.getById.mockResolvedValueOnce(sidecarAsset as any);
       mocks.asset.getUploadAssetIdByChecksum.mockResolvedValue(sidecarAsset.id);
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([sidecarAsset.id]));
       // this is the original file size
@@ -1260,7 +1260,7 @@ describe(AssetMediaService.name, () => {
       (error as any).constraint_name = ASSET_CHECKSUM_CONSTRAINT;
 
       mocks.asset.update.mockRejectedValue(error);
-      mocks.asset.getById.mockResolvedValueOnce(existingAsset);
+      mocks.asset.getById.mockResolvedValueOnce(existingAsset as any);
       mocks.asset.getUploadAssetIdByChecksum.mockResolvedValue(void 0);
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([existingAsset.id]));
 

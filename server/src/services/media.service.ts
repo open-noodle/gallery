@@ -725,10 +725,11 @@ export class MediaService extends BaseService {
       let { ffmpeg } = await this.getConfig({ withCache: true });
       const target = this.getTranscodeTarget(ffmpeg, videoStream, audioStream);
       if (target === TranscodeTarget.None && !this.isRemuxRequired(ffmpeg, format)) {
-        if (asset.encodedVideoPath) {
+        const encodedVideo = getAssetFile(asset.files, AssetFileType.EncodedVideo, { isEdited: false });
+        if (encodedVideo) {
           this.logger.log(`Transcoded video exists for asset ${asset.id}, but is no longer required. Deleting...`);
-          await this.jobRepository.queue({ name: JobName.FileDelete, data: { files: [asset.encodedVideoPath] } });
-          await this.assetRepository.update({ id: asset.id, encodedVideoPath: null });
+          await this.jobRepository.queue({ name: JobName.FileDelete, data: { files: [encodedVideo.path] } });
+          await this.assetRepository.deleteFiles([encodedVideo]);
         } else {
           this.logger.verbose(`Asset ${asset.id} does not require transcoding based on current policy, skipping`);
         }
@@ -784,7 +785,12 @@ export class MediaService extends BaseService {
       const relativeKey = StorageCore.getRelativeEncodedVideoPath(asset);
       const finalPath = await this.persistFile(output, relativeKey, 'video/mp4');
 
-      await this.assetRepository.update({ id: asset.id, encodedVideoPath: finalPath });
+      await this.assetRepository.upsertFile({
+        assetId: asset.id,
+        type: AssetFileType.EncodedVideo,
+        path: finalPath,
+        isEdited: false,
+      });
 
       return JobStatus.Success;
     } finally {

@@ -21,6 +21,7 @@ import {
   UserAdmin,
 } from 'src/database';
 import { AuthDto } from 'src/dtos/auth.dto';
+import { AssetEditAction, AssetEditActionItem, MirrorAxis } from 'src/dtos/editing.dto';
 import { QueueStatisticsDto } from 'src/dtos/queue.dto';
 import { AssetFileType, AssetOrder, Permission, SharedSpaceRole, UserMetadataKey, UserStatus } from 'src/enum';
 import { UserMetadataItem } from 'src/types';
@@ -118,8 +119,8 @@ const partnerFactory = ({
   sharedWith: sharedWithProvided,
   ...partner
 }: Partial<Partner> = {}) => {
-  const sharedBy = UserFactory.create(sharedByProvided ?? {});
-  const sharedWith = UserFactory.create(sharedWithProvided ?? {});
+  const sharedBy = UserFactory.create(sharedByProvided as any ?? {});
+  const sharedWith = UserFactory.create(sharedWithProvided as any ?? {});
 
   return {
     sharedById: sharedBy.id,
@@ -460,6 +461,8 @@ export const factory = {
   apiKey: apiKeyFactory,
   assetOcr: assetOcrFactory,
   auth: authFactory,
+  authApiKey: authApiKeyFactory,
+  authUser: authUserFactory,
   library: libraryFactory,
   partner: partnerFactory,
   queueStatistics: queueStatisticsFactory,

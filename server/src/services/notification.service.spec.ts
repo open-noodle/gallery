@@ -784,7 +784,7 @@ describe(NotificationService.name, () => {
       const album = AlbumFactory.from({ albumThumbnailAssetId: assetFile.assetId })
         .albumUser({ userId: user.id })
         .build();
-      mocks.album.getById.mockResolvedValue(album);
+      mocks.album.getById.mockResolvedValue(album as any);
       mocks.user.get.mockResolvedValue(user);
       mocks.notification.create.mockResolvedValue(notificationStub.albumEvent);
       mocks.email.renderEmail.mockResolvedValue({ html: '', text: '' });
@@ -803,7 +803,7 @@ describe(NotificationService.name, () => {
     it('should send email without thumbnail when no albumThumbnailAssetId', async () => {
       const user = UserFactory.create();
       const album = AlbumFactory.from({ albumThumbnailAssetId: null }).albumUser({ userId: user.id }).build();
-      mocks.album.getById.mockResolvedValue(album);
+      mocks.album.getById.mockResolvedValue(album as any);
       mocks.user.get.mockResolvedValue(user);
       mocks.notification.create.mockResolvedValue(notificationStub.albumEvent);
       mocks.email.renderEmail.mockResolvedValue({ html: '', text: '' });
@@ -825,7 +825,7 @@ describe(NotificationService.name, () => {
       const album = AlbumFactory.from({ albumThumbnailAssetId: editedFile.assetId })
         .albumUser({ userId: user.id })
         .build();
-      mocks.album.getById.mockResolvedValue(album);
+      mocks.album.getById.mockResolvedValue(album as any);
       mocks.user.get.mockResolvedValue(user);
       mocks.notification.create.mockResolvedValue(notificationStub.albumEvent);
       mocks.email.renderEmail.mockResolvedValue({ html: '', text: '' });

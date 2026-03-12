@@ -1434,7 +1434,7 @@ describe(PersonService.name, () => {
       mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.id]));
       mocks.person.getById.mockResolvedValue(person);
       mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set([face.id]));
-      mocks.person.getFacesByIds.mockResolvedValue([face]);
+      mocks.person.getFacesByIds.mockResolvedValue([face] as any);
       mocks.person.reassignFace.mockResolvedValue(1);
       mocks.person.getRandomFace.mockResolvedValue(AssetFaceFactory.create());
       mocks.person.update.mockResolvedValue(person);
@@ -1463,7 +1463,7 @@ describe(PersonService.name, () => {
       mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([newPerson.id]));
       mocks.person.getById.mockResolvedValue(newPerson);
       mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set([face.id]));
-      mocks.person.getFacesByIds.mockResolvedValue([face]);
+      mocks.person.getFacesByIds.mockResolvedValue([face] as any);
       mocks.person.reassignFace.mockResolvedValue(1);
       mocks.person.getRandomFace.mockResolvedValue(AssetFaceFactory.create());
       mocks.person.update.mockResolvedValue(newPerson);
@@ -1483,7 +1483,7 @@ describe(PersonService.name, () => {
 
       mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.id]));
       mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set([face.id]));
-      mocks.person.getFaceById.mockResolvedValue(face);
+      mocks.person.getFaceById.mockResolvedValue(face as any);
       mocks.person.getById.mockResolvedValue(person);
       mocks.person.reassignFace.mockResolvedValue(1);
       mocks.person.getRandomFace.mockResolvedValue(AssetFaceFactory.create());
@@ -1504,7 +1504,7 @@ describe(PersonService.name, () => {
 
       mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([newPerson.id]));
       mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set([face.id]));
-      mocks.person.getFaceById.mockResolvedValue(face);
+      mocks.person.getFaceById.mockResolvedValue(face as any);
       mocks.person.getById.mockResolvedValue(newPerson);
       mocks.person.reassignFace.mockResolvedValue(1);
       mocks.person.getRandomFace.mockResolvedValue(AssetFaceFactory.create());
@@ -1694,7 +1694,7 @@ describe(PersonService.name, () => {
 
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
       mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.id]));
-      mocks.asset.getById.mockResolvedValue(asset);
+      mocks.asset.getById.mockResolvedValue(asset as any);
 
       await sut.createFace(auth, {
         assetId: asset.id,
@@ -1787,7 +1787,7 @@ describe(PersonService.name, () => {
       const asset = AssetFactory.from({ visibility: AssetVisibility.Hidden })
         .file({ type: AssetFileType.Preview })
         .build();
-      mocks.assetJob.getForDetectFacesJob.mockResolvedValue(asset);
+      mocks.assetJob.getForDetectFacesJob.mockResolvedValue(asset as any);
 
       await expect(sut.handleDetectFaces({ id: asset.id })).resolves.toBe(JobStatus.Skipped);
       expect(mocks.machineLearning.detectFaces).not.toHaveBeenCalled();

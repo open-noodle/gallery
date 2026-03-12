@@ -637,7 +637,7 @@ describe(MetadataService.name, () => {
 
     it('should extract Rotate90CW orientation for video with rotation -90', async () => {
       const asset = AssetFactory.create({ type: AssetType.Video });
-      mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset);
+      mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset as any);
       mocks.media.probe.mockResolvedValue({
         ...probeStub.videoStreamH264,
         videoStreams: [{ ...probeStub.videoStreamH264.videoStreams[0], rotation: -90 }],
@@ -654,7 +654,7 @@ describe(MetadataService.name, () => {
 
     it('should extract Horizontal orientation for video with rotation 0', async () => {
       const asset = AssetFactory.create({ type: AssetType.Video });
-      mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset);
+      mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset as any);
       mocks.media.probe.mockResolvedValue({
         ...probeStub.videoStreamH264,
         videoStreams: [{ ...probeStub.videoStreamH264.videoStreams[0], rotation: 0 }],
@@ -671,7 +671,7 @@ describe(MetadataService.name, () => {
 
     it('should extract Rotate180 orientation for video with rotation 180', async () => {
       const asset = AssetFactory.create({ type: AssetType.Video });
-      mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset);
+      mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset as any);
       mocks.media.probe.mockResolvedValue({
         ...probeStub.videoStreamH264,
         videoStreams: [{ ...probeStub.videoStreamH264.videoStreams[0], rotation: 180 }],
@@ -688,7 +688,7 @@ describe(MetadataService.name, () => {
 
     it('should not set orientation for video with unsupported rotation value', async () => {
       const asset = AssetFactory.create({ type: AssetType.Video });
-      mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset);
+      mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset as any);
       mocks.media.probe.mockResolvedValue({
         ...probeStub.videoStreamH264,
         videoStreams: [{ ...probeStub.videoStreamH264.videoStreams[0], rotation: 45 }],
@@ -704,7 +704,7 @@ describe(MetadataService.name, () => {
 
     it('should extract video dimensions from probe', async () => {
       const asset = AssetFactory.create({ type: AssetType.Video });
-      mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset);
+      mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset as any);
       mocks.media.probe.mockResolvedValue({
         ...probeStub.videoStreamH264,
         videoStreams: [{ ...probeStub.videoStreamH264.videoStreams[0], width: 3840, height: 2160 }],
@@ -721,7 +721,7 @@ describe(MetadataService.name, () => {
 
     it('should handle video with no video streams', async () => {
       const asset = AssetFactory.create({ type: AssetType.Video });
-      mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset);
+      mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset as any);
       mocks.media.probe.mockResolvedValue(probeStub.noVideoStreams);
       mockReadTags({});
 
@@ -1186,7 +1186,7 @@ describe(MetadataService.name, () => {
 
     it('should handle string Duration from exif', async () => {
       const asset = AssetFactory.create({ originalFileName: 'file.webp' });
-      mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset);
+      mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset as any);
       mockReadTags({ Duration: '01:30:00.000' }, {});
 
       await sut.handleMetadataExtraction({ id: asset.id });
@@ -1374,7 +1374,7 @@ describe(MetadataService.name, () => {
       const asset = AssetFactory.from().face({ id: 'face-1', sourceType: SourceType.Exif }).build();
       const person = PersonFactory.create();
 
-      mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset);
+      mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset as any);
       mocks.systemMetadata.get.mockResolvedValue({ metadata: { faces: { import: true } } });
       mockReadTags(makeFaceTags({ Name: person.name }));
       mocks.person.getDistinctNames.mockResolvedValue([{ id: person.id, name: person.name }]);
@@ -1520,7 +1520,7 @@ describe(MetadataService.name, () => {
 
     it('should convert per-pixel bit depth to per-channel for bitsPerSample', async () => {
       const asset = AssetFactory.create();
-      mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset);
+      mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset as any);
       mockReadTags({ BitsPerSample: 24 });
 
       await sut.handleMetadataExtraction({ id: asset.id });
@@ -1531,7 +1531,7 @@ describe(MetadataService.name, () => {
 
     it('should parse BitsPerSample from string tag', async () => {
       const asset = AssetFactory.create();
-      mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset);
+      mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset as any);
       mockReadTags({ BitsPerSample: '12 12 12' as unknown as number });
 
       await sut.handleMetadataExtraction({ id: asset.id });
@@ -1543,7 +1543,7 @@ describe(MetadataService.name, () => {
 
     it('should use ComponentBitDepth when BitsPerSample is not available', async () => {
       const asset = AssetFactory.create();
-      mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset);
+      mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset as any);
       mockReadTags({ ComponentBitDepth: 10 });
 
       await sut.handleMetadataExtraction({ id: asset.id });
@@ -1554,7 +1554,7 @@ describe(MetadataService.name, () => {
 
     it('should extract autoStackId from BurstID', async () => {
       const asset = AssetFactory.create();
-      mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset);
+      mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset as any);
       mockReadTags({ BurstID: 'burst-123' });
 
       await sut.handleMetadataExtraction({ id: asset.id });
@@ -1565,7 +1565,7 @@ describe(MetadataService.name, () => {
 
     it('should extract autoStackId from BurstUUID when BurstID is not present', async () => {
       const asset = AssetFactory.create();
-      mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset);
+      mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset as any);
       mockReadTags({ BurstUUID: 'burst-uuid-456' });
 
       await sut.handleMetadataExtraction({ id: asset.id });
@@ -1576,7 +1576,7 @@ describe(MetadataService.name, () => {
 
     it('should parse ImageSize dimensions from exif tags', async () => {
       const asset = AssetFactory.create();
-      mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset);
+      mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset as any);
       mockReadTags({ ImageSize: '4000x3000' });
 
       await sut.handleMetadataExtraction({ id: asset.id });
@@ -2050,7 +2050,7 @@ describe(MetadataService.name, () => {
       asset.exifInfo.rating = 3;
 
       mocks.assetJob.getLockedPropertiesForMetadataExtraction.mockResolvedValue(['rating']);
-      mocks.assetJob.getForSidecarWriteJob.mockResolvedValue(asset);
+      mocks.assetJob.getForSidecarWriteJob.mockResolvedValue(asset as any);
 
       await expect(sut.handleSidecarWrite({ id: asset.id })).resolves.toBe(JobStatus.Success);
 
@@ -2067,7 +2067,7 @@ describe(MetadataService.name, () => {
       asset.exifInfo.tags = ['tag1', 'tag2'];
 
       mocks.assetJob.getLockedPropertiesForMetadataExtraction.mockResolvedValue(['tags']);
-      mocks.assetJob.getForSidecarWriteJob.mockResolvedValue(asset);
+      mocks.assetJob.getForSidecarWriteJob.mockResolvedValue(asset as any);
 
       await expect(sut.handleSidecarWrite({ id: asset.id })).resolves.toBe(JobStatus.Success);
 
@@ -2204,7 +2204,7 @@ describe(MetadataService.name, () => {
 
       it('should download S3 asset to temp and use local path for readTags/stat', async () => {
         const asset = AssetFactory.create({ originalPath: 'upload/user1/ab/cd/file.jpg' });
-        mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset);
+        mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset as any);
         mockReadTags();
 
         await sut.handleMetadataExtraction({ id: asset.id });
@@ -2216,7 +2216,7 @@ describe(MetadataService.name, () => {
 
       it('should not call downloadToTemp for absolute (disk) paths', async () => {
         const asset = AssetFactory.create({ originalPath: '/data/library/file.jpg' });
-        mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset);
+        mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset as any);
         mockReadTags();
 
         await sut.handleMetadataExtraction({ id: asset.id });
@@ -2230,7 +2230,7 @@ describe(MetadataService.name, () => {
         const asset = AssetFactory.from({ originalPath: 'upload/user1/ab/cd/file.jpg' })
           .file({ type: AssetFileType.Sidecar, path: 'upload/user1/ab/cd/file.jpg.xmp' })
           .build();
-        mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset);
+        mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset as any);
 
         mockBackend.downloadToTemp
           // eslint-disable-next-line unicorn/no-useless-undefined
@@ -2256,7 +2256,7 @@ describe(MetadataService.name, () => {
         // eslint-disable-next-line unicorn/no-useless-undefined
         const cleanupOriginal = vi.fn().mockResolvedValue(undefined);
         const asset = AssetFactory.create({ originalPath: 'upload/user1/ab/cd/file.jpg' });
-        mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset);
+        mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset as any);
         mockBackend.downloadToTemp.mockResolvedValue({ tempPath: s3TempPath, cleanup: cleanupOriginal });
         mockReadTags();
 
@@ -2267,7 +2267,7 @@ describe(MetadataService.name, () => {
 
       it('should use local temp path for video probe on S3 video assets', async () => {
         const asset = AssetFactory.create({ originalPath: 'upload/user1/ab/cd/video.mp4', type: AssetType.Video });
-        mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset);
+        mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset as any);
         mockBackend.downloadToTemp.mockResolvedValue({
           tempPath: s3TempPath,
           // eslint-disable-next-line unicorn/no-useless-undefined
@@ -2363,7 +2363,7 @@ describe(MetadataService.name, () => {
 
         mocks.assetJob.getLockedPropertiesForMetadataExtraction.mockResolvedValue(['rating']);
         asset.exifInfo.rating = 3;
-        mocks.assetJob.getForSidecarWriteJob.mockResolvedValue(asset);
+        mocks.assetJob.getForSidecarWriteJob.mockResolvedValue(asset as any);
 
         await expect(sut.handleSidecarWrite({ id: asset.id })).resolves.toBe(JobStatus.Success);
 
@@ -2382,7 +2382,7 @@ describe(MetadataService.name, () => {
         asset.exifInfo.rating = 4;
 
         mocks.assetJob.getLockedPropertiesForMetadataExtraction.mockResolvedValue(['rating']);
-        mocks.assetJob.getForSidecarWriteJob.mockResolvedValue(asset);
+        mocks.assetJob.getForSidecarWriteJob.mockResolvedValue(asset as any);
 
         await expect(sut.handleSidecarWrite({ id: asset.id })).resolves.toBe(JobStatus.Success);
 

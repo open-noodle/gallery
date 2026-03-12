@@ -4279,13 +4279,14 @@ describe(MediaService.name, () => {
 
   describe('handleVideoConversion - delete existing encoded video', () => {
     it('should delete existing encoded video when transcoding is no longer required', async () => {
-      const asset = AssetFactory.create({
+      const asset = AssetFactory.from({
         id: 'video-id',
         type: AssetType.Video,
         originalPath: '/original/path.ext',
-        encodedVideoPath: '/encoded/path.mp4',
-      });
-      mocks.assetJob.getForVideoConversion.mockResolvedValue(asset);
+      })
+        .file({ type: AssetFileType.EncodedVideo, path: '/encoded/path.mp4' })
+        .build();
+      mocks.assetJob.getForVideoConversion.mockResolvedValue(asset as any);
       sut.videoInterfaces = { dri: ['renderD128'], mali: true };
 
       mocks.media.probe.mockResolvedValue(probeStub.matroskaContainer);
@@ -4303,7 +4304,9 @@ describe(MediaService.name, () => {
         name: JobName.FileDelete,
         data: { files: ['/encoded/path.mp4'] },
       });
-      expect(mocks.asset.update).toHaveBeenCalledWith({ id: 'video-id', encodedVideoPath: null });
+      expect(mocks.asset.deleteFiles).toHaveBeenCalledWith([
+        expect.objectContaining({ type: AssetFileType.EncodedVideo, path: '/encoded/path.mp4' }),
+      ]);
     });
   });
 
@@ -4343,7 +4346,7 @@ describe(MediaService.name, () => {
       const asset = AssetFactory.from({ type: AssetType.Other as any })
         .exif()
         .build();
-      mocks.assetJob.getForGenerateThumbnailJob.mockResolvedValue(asset);
+      mocks.assetJob.getForGenerateThumbnailJob.mockResolvedValue(asset as any);
 
       await expect(sut.handleGenerateThumbnails({ id: asset.id })).resolves.toBe(JobStatus.Skipped);
       expect(mocks.media.generateThumbnail).not.toHaveBeenCalled();
@@ -4351,7 +4354,7 @@ describe(MediaService.name, () => {
 
     it('should skip hidden assets', async () => {
       const asset = AssetFactory.from({ visibility: AssetVisibility.Hidden }).exif().build();
-      mocks.assetJob.getForGenerateThumbnailJob.mockResolvedValue(asset);
+      mocks.assetJob.getForGenerateThumbnailJob.mockResolvedValue(asset as any);
 
       await expect(sut.handleGenerateThumbnails({ id: asset.id })).resolves.toBe(JobStatus.Skipped);
       expect(mocks.media.generateThumbnail).not.toHaveBeenCalled();

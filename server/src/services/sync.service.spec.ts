@@ -1215,8 +1215,8 @@ describe(SyncService.name, () => {
           sharedById: 'partner-id',
           sharedWithId: authStub.user1.user.id,
         }),
-      ]);
-      mocks.asset.getChangedDeltaSync.mockResolvedValue([ownAsset, partnerAssetTimeline, partnerAssetArchived]);
+      ] as any);
+      mocks.asset.getChangedDeltaSync.mockResolvedValue([ownAsset, partnerAssetTimeline, partnerAssetArchived] as any);
       mocks.audit.getAfter.mockResolvedValue([]);
       mocks.access.timeline.checkPartnerAccess.mockResolvedValue(new Set(['partner-id']));
 
