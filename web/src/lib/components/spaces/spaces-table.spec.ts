@@ -1,5 +1,5 @@
 import SpacesTable from '$lib/components/spaces/spaces-table.svelte';
-import type { SharedSpaceResponseDto } from '@immich/sdk';
+import { SharedSpaceRole, type SharedSpaceResponseDto } from '@immich/sdk';
 import { render } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 
@@ -76,7 +76,7 @@ describe('SpacesTable', () => {
             userId: 'user-1',
             name: 'Alice',
             email: 'alice@example.com',
-            role: 'owner' as any,
+            role: SharedSpaceRole.Owner,
             showInTimeline: true,
             joinedAt: '2026-01-01T00:00:00.000Z',
           },

@@ -18,6 +18,5 @@ export const sharedSpaceFactory = Sync.makeFactory<SharedSpaceResponseDto>({
   recentAssetThumbhashes: [],
   lastActivityAt: Sync.each(() => faker.date.recent().toISOString()),
   newAssetCount: 0,
-  lastContributor: null,
   lastViewedAt: null,
 });
