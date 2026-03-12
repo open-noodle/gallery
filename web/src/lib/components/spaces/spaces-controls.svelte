@@ -3,7 +3,7 @@
   import { sortOptionsMetadata, SpaceSortBy, spaceViewSettings } from '$lib/stores/space-view.store';
   import type { SharedSpaceResponseDto } from '@immich/sdk';
   import { Icon } from '@immich/ui';
-  import { mdiArrowDownThin, mdiArrowUpThin, mdiSort } from '@mdi/js';
+  import { mdiArrowDownThin, mdiArrowUpThin, mdiFormatListBulletedSquare, mdiSort, mdiViewGridOutline } from '@mdi/js';
   import { t } from 'svelte-i18n';
 
   interface Props {
@@ -68,7 +68,16 @@
   );
 </script>
 
-<div class="relative mb-4 flex justify-end" data-testid="spaces-controls">
+<div class="relative mb-4 flex items-center justify-end gap-2" data-testid="spaces-controls">
+  <button
+    type="button"
+    class="flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-800"
+    onclick={() => ($spaceViewSettings.viewMode = $spaceViewSettings.viewMode === 'card' ? 'list' : 'card')}
+    data-testid="view-toggle"
+  >
+    <Icon icon={$spaceViewSettings.viewMode === 'card' ? mdiFormatListBulletedSquare : mdiViewGridOutline} size="18" />
+  </button>
+
   <button
     type="button"
     class="flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-800"

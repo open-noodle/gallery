@@ -1,5 +1,9 @@
-import { SpaceSortBy } from '$lib/stores/space-view.store';
+import { render } from '@testing-library/svelte';
+import userEvent from '@testing-library/user-event';
+import SpacesControls from '$lib/components/spaces/spaces-controls.svelte';
+import { SpaceSortBy, spaceViewSettings } from '$lib/stores/space-view.store';
 import type { SharedSpaceResponseDto } from '@immich/sdk';
+import { get } from 'svelte/store';
 
 const makeSpace = (overrides: Partial<SharedSpaceResponseDto> = {}): SharedSpaceResponseDto => ({
   id: 'space-1',
@@ -118,5 +122,38 @@ describe('Space sorting logic', () => {
   it('should sort null lastActivityAt to start when sorting asc', () => {
     const result = sortSpaces([beta, alpha, gamma], SpaceSortBy.LastActivity, 'asc');
     expect(result[0].name).toBe('Gamma');
+  });
+});
+
+describe('SpacesControls', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    spaceViewSettings.reset();
+  });
+
+  it('should render view toggle button', () => {
+    const spaces = [makeSpace()];
+    const { getByTestId } = render(SpacesControls, { props: { spaces, onSorted: vi.fn() } });
+    expect(getByTestId('view-toggle')).toBeDefined();
+  });
+
+  it('should toggle viewMode from card to list on click', async () => {
+    const user = userEvent.setup();
+    const spaces = [makeSpace()];
+    const { getByTestId } = render(SpacesControls, { props: { spaces, onSorted: vi.fn() } });
+
+    expect(get(spaceViewSettings).viewMode).toBe('card');
+    await user.click(getByTestId('view-toggle'));
+    expect(get(spaceViewSettings).viewMode).toBe('list');
+  });
+
+  it('should toggle viewMode from list back to card on click', async () => {
+    const user = userEvent.setup();
+    spaceViewSettings.update((s) => ({ ...s, viewMode: 'list' }));
+    const spaces = [makeSpace()];
+    const { getByTestId } = render(SpacesControls, { props: { spaces, onSorted: vi.fn() } });
+
+    await user.click(getByTestId('view-toggle'));
+    expect(get(spaceViewSettings).viewMode).toBe('card');
   });
 });
