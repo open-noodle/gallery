@@ -30,14 +30,14 @@ All zip extraction, JSON sidecar parsing, and photo-to-metadata matching happens
 
 ## Metadata Mapping
 
-| Takeout JSON Field | Immich Field | Method |
-|---|---|---|
-| `photoTakenTime.timestamp` | `dateTimeOriginal` | Upload DTO |
-| `geoData.latitude/longitude` | `latitude/longitude` | Post-upload `updateAsset` |
-| `description` | `description` | Post-upload `updateAsset` |
-| `favorited` | `isFavorite` | Upload DTO |
-| `archived` | `visibility: archive` | Post-upload `updateAsset` |
-| Folder structure | Album membership | Album API after upload |
+| Takeout JSON Field           | Immich Field          | Method                    |
+| ---------------------------- | --------------------- | ------------------------- |
+| `photoTakenTime.timestamp`   | `dateTimeOriginal`    | Upload DTO                |
+| `geoData.latitude/longitude` | `latitude/longitude`  | Post-upload `updateAsset` |
+| `description`                | `description`         | Post-upload `updateAsset` |
+| `favorited`                  | `isFavorite`          | Upload DTO                |
+| `archived`                   | `visibility: archive` | Post-upload `updateAsset` |
+| Folder structure             | Album membership      | Album API after upload    |
 
 GPS coordinates of (0, 0) are filtered out (Google's placeholder for "no location").
 
