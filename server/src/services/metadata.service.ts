@@ -315,7 +315,10 @@ export class MetadataService extends BaseService {
 
           // camera
           make:
-            exifTags.Make ?? exifTags.Device?.Manufacturer ?? exifTags.AndroidMake ?? (exifTags.DeviceManufacturer || null),
+            exifTags.Make ??
+            exifTags.Device?.Manufacturer ??
+            exifTags.AndroidMake ??
+            (exifTags.DeviceManufacturer || null),
           model:
             exifTags.Model ?? exifTags.Device?.ModelName ?? exifTags.AndroidModel ?? (exifTags.DeviceModelName || null),
           fps: validate(Number.parseFloat(exifTags.VideoFrameRate!)),

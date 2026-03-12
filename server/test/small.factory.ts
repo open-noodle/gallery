@@ -119,8 +119,8 @@ const partnerFactory = ({
   sharedWith: sharedWithProvided,
   ...partner
 }: Partial<Partner> = {}) => {
-  const sharedBy = UserFactory.create(sharedByProvided as any ?? {});
-  const sharedWith = UserFactory.create(sharedWithProvided as any ?? {});
+  const sharedBy = UserFactory.create((sharedByProvided as any) ?? {});
+  const sharedWith = UserFactory.create((sharedWithProvided as any) ?? {});
 
   return {
     sharedById: sharedBy.id,

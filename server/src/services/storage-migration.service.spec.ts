@@ -229,7 +229,14 @@ describe(StorageMigrationService.name, () => {
         ]),
       );
       mocks.storageMigration.streamEncodedVideos.mockReturnValue(
-        makeStream([{ id: 'file-2', assetId: 'asset-2', path: '/usr/src/app/upload/encoded-video/user/ab/cd/video.mp4', type: AssetFileType.EncodedVideo }]),
+        makeStream([
+          {
+            id: 'file-2',
+            assetId: 'asset-2',
+            path: '/usr/src/app/upload/encoded-video/user/ab/cd/video.mp4',
+            type: AssetFileType.EncodedVideo,
+          },
+        ]),
       );
       mocks.storageMigration.streamPersonThumbnails.mockReturnValue(
         makeStream([{ id: 'person-1', thumbnailPath: '/usr/src/app/upload/thumbs/user/ab/cd/person.jpeg' }]),
