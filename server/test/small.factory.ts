@@ -21,7 +21,6 @@ import {
   UserAdmin,
 } from 'src/database';
 import { AuthDto } from 'src/dtos/auth.dto';
-import { AssetEditAction, AssetEditActionItem, MirrorAxis } from 'src/dtos/editing.dto';
 import { QueueStatisticsDto } from 'src/dtos/queue.dto';
 import { AssetFileType, AssetOrder, Permission, SharedSpaceRole, UserMetadataKey, UserStatus } from 'src/enum';
 import { UserMetadataItem } from 'src/types';
@@ -461,8 +460,6 @@ export const factory = {
   apiKey: apiKeyFactory,
   assetOcr: assetOcrFactory,
   auth: authFactory,
-  authApiKey: authApiKeyFactory,
-  authUser: authUserFactory,
   library: libraryFactory,
   partner: partnerFactory,
   queueStatistics: queueStatisticsFactory,

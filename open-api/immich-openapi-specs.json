@@ -11615,22 +11615,6 @@
               "format": "uuid",
               "type": "string"
             }
-          },
-          {
-            "name": "key",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "slug",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
           }
         ],
         "requestBody": {
@@ -11687,6 +11671,7 @@
             "state": "Stable"
           }
         ],
+        "x-immich-permission": "sharedLink.update",
         "x-immich-state": "Stable"
       },
       "put": {
