@@ -23,13 +23,13 @@
 
 {#if layout === 'empty'}
   <div
-    class="flex size-full items-center justify-center rounded-xl bg-gradient-to-br {gradientClass} aspect-square"
+    class="flex size-full items-center justify-center rounded-none bg-gradient-to-br {gradientClass} aspect-square"
     data-testid="collage-empty"
   >
     <Icon icon={mdiImageMultipleOutline} size="4em" class="text-white/40" />
   </div>
 {:else if layout === 'single'}
-  <div class="aspect-square overflow-hidden rounded-xl" data-testid="collage-single">
+  <div class="aspect-square overflow-hidden rounded-none" data-testid="collage-single">
     <img
       alt=""
       src={getAssetMediaUrl({ id: assets[0].id })}
@@ -40,7 +40,7 @@
   </div>
 {:else if layout === 'asymmetric'}
   <div
-    class="grid aspect-square gap-0.5 overflow-hidden rounded-xl"
+    class="grid aspect-square gap-0.5 overflow-hidden rounded-none"
     style="grid-template-columns: 3fr 2fr;"
     data-testid="collage-asymmetric"
   >
@@ -70,7 +70,10 @@
     {/if}
   </div>
 {:else}
-  <div class="grid grid-cols-2 grid-rows-2 aspect-square gap-0.5 overflow-hidden rounded-xl" data-testid="collage-grid">
+  <div
+    class="grid grid-cols-2 grid-rows-2 aspect-square gap-0.5 overflow-hidden rounded-none"
+    data-testid="collage-grid"
+  >
     {#each assets.slice(0, 4) as asset (asset.id)}
       <img
         alt=""

@@ -58,7 +58,7 @@
 
 <a
   href={Route.viewSpace({ id: space.id })}
-  class="group relative rounded-2xl border border-transparent p-5 hover:bg-gray-100 hover:border-gray-200 dark:hover:border-gray-800 dark:hover:bg-gray-900"
+  class="group relative overflow-hidden rounded-2xl border border-transparent hover:border-gray-200 dark:hover:border-gray-800"
   data-testid="space-card"
   onmouseenter={() => (showMenu = true)}
   onmouseleave={() => {
@@ -148,7 +148,7 @@
     {/if}
   </div>
 
-  <div class="mt-4">
+  <div class="px-4 pb-4 pt-3 hover:bg-gray-100 dark:hover:bg-gray-900">
     <p
       class="w-full leading-6 text-lg line-clamp-2 font-semibold text-black dark:text-white group-hover:text-primary"
       data-testid="space-name"

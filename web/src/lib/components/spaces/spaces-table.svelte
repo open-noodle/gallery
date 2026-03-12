@@ -146,7 +146,7 @@
         href={Route.viewSpace({ id: space.id })}
         class="flex items-center gap-3 font-medium text-black hover:text-immich-primary dark:text-white dark:hover:text-immich-primary"
       >
-        <div class="h-8 w-8 shrink-0">
+        <div class="h-8 w-8 shrink-0 overflow-hidden rounded-lg">
           <SpaceCollage assets={collageAssets} {gradientClass} />
         </div>
         <span class="flex items-center gap-1">
