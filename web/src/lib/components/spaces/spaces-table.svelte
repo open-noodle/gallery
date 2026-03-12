@@ -189,7 +189,7 @@
                   onclick={(e) => { e.stopPropagation(); onTogglePin(space.id); openMenuId = null; }}
                 >
                   <Icon icon={pinnedIds.includes(space.id) ? mdiPinOff : mdiPin} size="16" />
-                  {pinnedIds.includes(space.id) ? 'Unpin' : 'Pin to top'}
+                  {pinnedIds.includes(space.id) ? $t('spaces_unpin') : $t('spaces_pin_to_top')}
                 </button>
               </div>
             {/if}

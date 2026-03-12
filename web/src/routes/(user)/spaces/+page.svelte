@@ -53,7 +53,7 @@
     {#if split.showSection}
       <div class="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
         <Icon icon={mdiPin} size="14" />
-        <span>Pinned</span>
+        <span>{$t('spaces_pinned')}</span>
       </div>
     {/if}
 

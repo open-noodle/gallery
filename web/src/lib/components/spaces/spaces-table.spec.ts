@@ -135,7 +135,7 @@ describe('SpacesTable', () => {
     });
     await user.hover(getByTestId('space-row'));
     await user.click(getByTestId('row-menu-button-pin-1'));
-    await user.click(getByText('Pin to top'));
+    await user.click(getByText('spaces_pin_to_top'));
     expect(onTogglePin).toHaveBeenCalledWith('pin-1');
   });
 });

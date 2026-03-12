@@ -132,7 +132,7 @@ describe('SpaceCard component', () => {
       const card = screen.getByTestId('space-card');
       await user.hover(card);
       await user.click(screen.getByTestId('space-menu-button'));
-      expect(screen.getByText('Pin to top')).toBeInTheDocument();
+      expect(screen.getByText('spaces_pin_to_top')).toBeInTheDocument();
     });
 
     it('should show "Unpin" when pinned after hovering and clicking menu', async () => {
@@ -141,7 +141,7 @@ describe('SpaceCard component', () => {
       const card = screen.getByTestId('space-card');
       await user.hover(card);
       await user.click(screen.getByTestId('space-menu-button'));
-      expect(screen.getByText('Unpin')).toBeInTheDocument();
+      expect(screen.getByText('spaces_unpin')).toBeInTheDocument();
     });
 
     it('should call onTogglePin with space id when clicking "Pin to top"', async () => {
@@ -151,7 +151,7 @@ describe('SpaceCard component', () => {
       const card = screen.getByTestId('space-card');
       await user.hover(card);
       await user.click(screen.getByTestId('space-menu-button'));
-      await user.click(screen.getByText('Pin to top'));
+      await user.click(screen.getByText('spaces_pin_to_top'));
       expect(onTogglePin).toHaveBeenCalledWith('space-42');
     });
 

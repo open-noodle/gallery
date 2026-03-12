@@ -105,7 +105,7 @@
           }}
         >
           <Icon icon={isPinned ? mdiPinOff : mdiPin} size="16" />
-          {isPinned ? 'Unpin' : 'Pin to top'}
+          {isPinned ? $t('spaces_unpin') : $t('spaces_pin_to_top')}
         </button>
       </div>
     {/if}
