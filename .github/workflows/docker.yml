@@ -4,12 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version tag (e.g. v2.5.6-noodle.1)'
-        required: true
+        description: 'Version tag (e.g. v3.0.5) — overrides auto-version'
+        required: false
         type: string
-  # Uncomment to auto-publish on push to main:
-  # push:
-  #   branches: [main]
+  push:
+    branches: [main]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -18,8 +17,73 @@ concurrency:
 permissions: {}
 
 jobs:
+  version:
+    name: Compute Version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Compute next version
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [[ -n "$INPUT_VERSION" ]]; then
+            echo "version=$INPUT_VERSION" >> "$GITHUB_OUTPUT"
+          else
+            # Find the latest vX.Y.Z tag by semver sort
+            latest=$(git tag --list 'v*.*.*' --sort=-version:refname | head -n1)
+            if [[ -z "$latest" ]]; then
+              echo "::error::No existing version tags found. Run a manual release first."
+              exit 1
+            fi
+
+            major=$(echo "$latest" | sed 's/^v//' | cut -d. -f1)
+            minor=$(echo "$latest" | sed 's/^v//' | cut -d. -f2)
+            patch=$(echo "$latest" | sed 's/^v//' | cut -d. -f3)
+
+            # Determine bump type from merge commit message or PR labels
+            commit_msg=$(git log -1 --pretty=%B)
+            bump="patch"
+
+            # Check for PR labels (changelog:feat, changelog:fix, etc.)
+            pr_number=$(echo "$commit_msg" | grep -oP '#\K[0-9]+' | head -1)
+            if [[ -n "$pr_number" ]]; then
+              labels=$(gh pr view "$pr_number" --json labels --jq '.labels[].name' 2>/dev/null || true)
+              if echo "$labels" | grep -q 'changelog:feat'; then
+                bump="minor"
+              fi
+            fi
+
+            # Also check conventional commit prefix as fallback
+            if echo "$commit_msg" | head -1 | grep -qP '^feat(\(.+\))?!?:'; then
+              bump="minor"
+            fi
+            if echo "$commit_msg" | grep -q 'BREAKING CHANGE'; then
+              bump="major"
+            fi
+
+            case "$bump" in
+              major) echo "version=v$((major + 1)).0.0" >> "$GITHUB_OUTPUT" ;;
+              minor) echo "version=v${major}.$((minor + 1)).0" >> "$GITHUB_OUTPUT" ;;
+              patch) echo "version=v${major}.${minor}.$((patch + 1))" >> "$GITHUB_OUTPUT" ;;
+            esac
+          fi
+          echo "Version: $(grep version "$GITHUB_OUTPUT" | cut -d= -f2)"
+
   build-server:
     name: Build & Push Server
+    needs: version
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -47,7 +111,7 @@ jobs:
           file: server/Dockerfile
           push: true
           tags: |
-            ghcr.io/open-noodle/gallery-server:${{ inputs.version || github.ref_name }}
+            ghcr.io/open-noodle/gallery-server:${{ needs.version.outputs.version }}
             ghcr.io/open-noodle/gallery-server:latest
           build-args: |
             DEVICE=cpu
@@ -59,6 +123,7 @@ jobs:
 
   build-ml:
     name: Build & Push ML (${{ matrix.device }})
+    needs: version
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -94,9 +159,28 @@ jobs:
           file: machine-learning/Dockerfile
           push: true
           tags: |
-            ghcr.io/open-noodle/gallery-ml:${{ inputs.version || github.ref_name }}${{ matrix.suffix }}
+            ghcr.io/open-noodle/gallery-ml:${{ needs.version.outputs.version }}${{ matrix.suffix }}
             ghcr.io/open-noodle/gallery-ml:latest${{ matrix.suffix }}
           build-args: |
             DEVICE=${{ matrix.device }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  tag:
+    name: Create Git Tag
+    needs: [version, build-server, build-ml]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: true
+
+      - name: Create tag
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          git tag "$VERSION"
+          git push origin "$VERSION"
