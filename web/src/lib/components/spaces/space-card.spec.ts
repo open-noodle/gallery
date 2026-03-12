@@ -2,6 +2,7 @@ import SpaceCard from '$lib/components/spaces/space-card.svelte';
 import type { SharedSpaceMemberResponseDto, SharedSpaceResponseDto } from '@immich/sdk';
 import { Role } from '@immich/sdk';
 import { render, screen } from '@testing-library/svelte';
+import userEvent from '@testing-library/user-event';
 
 const makeMember = (overrides: Partial<SharedSpaceMemberResponseDto> = {}): SharedSpaceMemberResponseDto => ({
   userId: 'user-1',
@@ -109,5 +110,59 @@ describe('SpaceCard component', () => {
   it('should cap display at 99+', () => {
     render(SpaceCard, { space: makeSpace({ newAssetCount: 150 }) });
     expect(screen.getByTestId('activity-line')).toHaveTextContent('99+ new photos');
+  });
+
+  describe('pin/unpin context menu', () => {
+    it('should not show menu button initially', () => {
+      render(SpaceCard, { space: makeSpace() });
+      expect(screen.queryByTestId('space-menu-button')).not.toBeInTheDocument();
+    });
+
+    it('should show menu button on hover', async () => {
+      const user = userEvent.setup();
+      render(SpaceCard, { space: makeSpace() });
+      const card = screen.getByTestId('space-card');
+      await user.hover(card);
+      expect(screen.getByTestId('space-menu-button')).toBeInTheDocument();
+    });
+
+    it('should show "Pin to top" when not pinned after hovering and clicking menu', async () => {
+      const user = userEvent.setup();
+      render(SpaceCard, { space: makeSpace(), isPinned: false });
+      const card = screen.getByTestId('space-card');
+      await user.hover(card);
+      await user.click(screen.getByTestId('space-menu-button'));
+      expect(screen.getByText('Pin to top')).toBeInTheDocument();
+    });
+
+    it('should show "Unpin" when pinned after hovering and clicking menu', async () => {
+      const user = userEvent.setup();
+      render(SpaceCard, { space: makeSpace(), isPinned: true });
+      const card = screen.getByTestId('space-card');
+      await user.hover(card);
+      await user.click(screen.getByTestId('space-menu-button'));
+      expect(screen.getByText('Unpin')).toBeInTheDocument();
+    });
+
+    it('should call onTogglePin with space id when clicking "Pin to top"', async () => {
+      const onTogglePin = vi.fn();
+      const user = userEvent.setup();
+      render(SpaceCard, { space: makeSpace({ id: 'space-42' }), isPinned: false, onTogglePin });
+      const card = screen.getByTestId('space-card');
+      await user.hover(card);
+      await user.click(screen.getByTestId('space-menu-button'));
+      await user.click(screen.getByText('Pin to top'));
+      expect(onTogglePin).toHaveBeenCalledWith('space-42');
+    });
+
+    it('should show pin overlay when isPinned is true', () => {
+      render(SpaceCard, { space: makeSpace(), isPinned: true });
+      expect(screen.getByTestId('pin-overlay')).toBeInTheDocument();
+    });
+
+    it('should not show pin overlay when isPinned is false', () => {
+      render(SpaceCard, { space: makeSpace(), isPinned: false });
+      expect(screen.queryByTestId('pin-overlay')).not.toBeInTheDocument();
+    });
   });
 });

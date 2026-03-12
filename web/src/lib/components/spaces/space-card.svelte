@@ -3,14 +3,21 @@
   import SpaceCollage from '$lib/components/spaces/space-collage.svelte';
   import { Route } from '$lib/route';
   import { UserAvatarColor, type SharedSpaceResponseDto } from '@immich/sdk';
+  import { mdiDotsVertical, mdiPin, mdiPinOff } from '@mdi/js';
+  import { Icon } from '@immich/ui';
   import { t } from 'svelte-i18n';
 
   interface Props {
     space: SharedSpaceResponseDto;
     preload?: boolean;
+    isPinned?: boolean;
+    onTogglePin?: (id: string) => void;
   }
 
-  let { space, preload = false }: Props = $props();
+  let { space, preload = false, isPinned = false, onTogglePin = () => {} }: Props = $props();
+
+  let showMenu = $state(false);
+  let showDropdown = $state(false);
 
   const MAX_AVATARS = 4;
 
@@ -53,9 +60,55 @@
   href={Route.viewSpace({ id: space.id })}
   class="group relative rounded-2xl border border-transparent p-5 hover:bg-gray-100 hover:border-gray-200 dark:hover:border-gray-800 dark:hover:bg-gray-900"
   data-testid="space-card"
+  onmouseenter={() => (showMenu = true)}
+  onmouseleave={() => {
+    showMenu = false;
+    showDropdown = false;
+  }}
 >
   <div class="relative">
     <SpaceCollage assets={collageAssets} {gradientClass} {preload} />
+
+    {#if isPinned}
+      <div class="absolute top-2 start-2 z-10 rounded-full bg-white/70 p-1 dark:bg-gray-800/70" data-testid="pin-overlay">
+        <Icon icon={mdiPin} size="14" class="text-gray-600 dark:text-gray-400" />
+      </div>
+    {/if}
+
+    {#if showMenu}
+      <button
+        type="button"
+        class="absolute top-2 end-2 z-20 rounded-full bg-white/80 p-1 shadow-sm hover:bg-white dark:bg-gray-800/80 dark:hover:bg-gray-800"
+        onclick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          showDropdown = !showDropdown;
+        }}
+        data-testid="space-menu-button"
+      >
+        <Icon icon={mdiDotsVertical} size="18" />
+      </button>
+    {/if}
+
+    {#if showDropdown}
+      <div
+        class="absolute top-10 end-2 z-30 min-w-[140px] rounded-lg border bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900"
+      >
+        <button
+          type="button"
+          class="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-800"
+          onclick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onTogglePin(space.id);
+            showDropdown = false;
+          }}
+        >
+          <Icon icon={isPinned ? mdiPinOff : mdiPin} size="16" />
+          {isPinned ? 'Unpin' : 'Pin to top'}
+        </button>
+      </div>
+    {/if}
 
     {#if hasActivity}
       <div data-testid="activity-dot" class="absolute -right-1 -top-1 z-10 h-2 w-2 rounded-full bg-immich-primary">
