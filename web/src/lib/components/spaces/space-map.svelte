@@ -1,10 +1,7 @@
 <script lang="ts">
-  import MapModal from '$lib/modals/MapModal.svelte';
-  import { assetViewingStore } from '$lib/stores/asset-viewing.store';
-  import { getSpaceMapMarkers, type MapMarkerResponseDto } from '@immich/sdk';
-  import { IconButton, modalManager } from '@immich/ui';
+  import { QueryParameter } from '$lib/constants';
+  import { Icon } from '@immich/ui';
   import { mdiMapOutline } from '@mdi/js';
-  import { onDestroy, onMount } from 'svelte';
   import { t } from 'svelte-i18n';
 
   interface Props {
@@ -12,43 +9,14 @@
   }
 
   let { spaceId }: Props = $props();
-  let abortController: AbortController;
-  let { setAssetId } = assetViewingStore;
 
-  let mapMarkers: MapMarkerResponseDto[] = $state([]);
-
-  onMount(async () => {
-    mapMarkers = await loadMapMarkers();
-  });
-
-  onDestroy(() => {
-    abortController?.abort();
-    assetViewingStore.showAssetViewer(false);
-  });
-
-  async function loadMapMarkers() {
-    if (abortController) {
-      abortController.abort();
-    }
-    abortController = new AbortController();
-
-    return getSpaceMapMarkers({ id: spaceId });
-  }
-
-  async function openMap() {
-    const assetIds = await modalManager.show(MapModal, { mapMarkers });
-
-    if (assetIds) {
-      await setAssetId(assetIds[0]);
-    }
-  }
+  const mapUrl = $derived(`/map?${QueryParameter.SPACE_ID}=${spaceId}`);
 </script>
 
-<IconButton
-  variant="ghost"
-  shape="round"
-  color="secondary"
-  icon={mdiMapOutline}
-  onclick={openMap}
+<a
+  href={mapUrl}
+  class="flex items-center justify-center rounded-full p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
   aria-label={$t('map')}
-/>
+>
+  <Icon icon={mdiMapOutline} size="24" />
+</a>

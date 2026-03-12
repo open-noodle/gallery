@@ -186,6 +186,114 @@ class SharedSpacesApi {
     return null;
   }
 
+  /// Delete a person from a shared space
+  ///
+  /// Permanently delete a person and their face assignments from a shared space.
+  ///
+  /// Note: This method returns the HTTP [Response].
+  ///
+  /// Parameters:
+  ///
+  /// * [String] id (required):
+  ///
+  /// * [String] personId (required):
+  Future<Response> deleteSpacePersonWithHttpInfo(String id, String personId,) async {
+    // ignore: prefer_const_declarations
+    final apiPath = r'/shared-spaces/{id}/people/{personId}'
+      .replaceAll('{id}', id)
+      .replaceAll('{personId}', personId);
+
+    // ignore: prefer_final_locals
+    Object? postBody;
+
+    final queryParams = <QueryParam>[];
+    final headerParams = <String, String>{};
+    final formParams = <String, String>{};
+
+    const contentTypes = <String>[];
+
+
+    return apiClient.invokeAPI(
+      apiPath,
+      'DELETE',
+      queryParams,
+      postBody,
+      headerParams,
+      formParams,
+      contentTypes.isEmpty ? null : contentTypes.first,
+    );
+  }
+
+  /// Delete a person from a shared space
+  ///
+  /// Permanently delete a person and their face assignments from a shared space.
+  ///
+  /// Parameters:
+  ///
+  /// * [String] id (required):
+  ///
+  /// * [String] personId (required):
+  Future<void> deleteSpacePerson(String id, String personId,) async {
+    final response = await deleteSpacePersonWithHttpInfo(id, personId,);
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
+    }
+  }
+
+  /// Delete a person alias in a shared space
+  ///
+  /// Remove a user-specific alias for a person in a shared space.
+  ///
+  /// Note: This method returns the HTTP [Response].
+  ///
+  /// Parameters:
+  ///
+  /// * [String] id (required):
+  ///
+  /// * [String] personId (required):
+  Future<Response> deleteSpacePersonAliasWithHttpInfo(String id, String personId,) async {
+    // ignore: prefer_const_declarations
+    final apiPath = r'/shared-spaces/{id}/people/{personId}/alias'
+      .replaceAll('{id}', id)
+      .replaceAll('{personId}', personId);
+
+    // ignore: prefer_final_locals
+    Object? postBody;
+
+    final queryParams = <QueryParam>[];
+    final headerParams = <String, String>{};
+    final formParams = <String, String>{};
+
+    const contentTypes = <String>[];
+
+
+    return apiClient.invokeAPI(
+      apiPath,
+      'DELETE',
+      queryParams,
+      postBody,
+      headerParams,
+      formParams,
+      contentTypes.isEmpty ? null : contentTypes.first,
+    );
+  }
+
+  /// Delete a person alias in a shared space
+  ///
+  /// Remove a user-specific alias for a person in a shared space.
+  ///
+  /// Parameters:
+  ///
+  /// * [String] id (required):
+  ///
+  /// * [String] personId (required):
+  Future<void> deleteSpacePersonAlias(String id, String personId,) async {
+    final response = await deleteSpacePersonAliasWithHttpInfo(id, personId,);
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
+    }
+  }
+
   /// Get all shared spaces
   ///
   /// Retrieve all shared spaces the user is a member of.
@@ -489,6 +597,255 @@ class SharedSpacesApi {
     return null;
   }
 
+  /// Get people in a shared space
+  ///
+  /// Retrieve all people detected in a shared space.
+  ///
+  /// Note: This method returns the HTTP [Response].
+  ///
+  /// Parameters:
+  ///
+  /// * [String] id (required):
+  Future<Response> getSpacePeopleWithHttpInfo(String id,) async {
+    // ignore: prefer_const_declarations
+    final apiPath = r'/shared-spaces/{id}/people'
+      .replaceAll('{id}', id);
+
+    // ignore: prefer_final_locals
+    Object? postBody;
+
+    final queryParams = <QueryParam>[];
+    final headerParams = <String, String>{};
+    final formParams = <String, String>{};
+
+    const contentTypes = <String>[];
+
+
+    return apiClient.invokeAPI(
+      apiPath,
+      'GET',
+      queryParams,
+      postBody,
+      headerParams,
+      formParams,
+      contentTypes.isEmpty ? null : contentTypes.first,
+    );
+  }
+
+  /// Get people in a shared space
+  ///
+  /// Retrieve all people detected in a shared space.
+  ///
+  /// Parameters:
+  ///
+  /// * [String] id (required):
+  Future<List<SharedSpacePersonResponseDto>?> getSpacePeople(String id,) async {
+    final response = await getSpacePeopleWithHttpInfo(id,);
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
+    }
+    // When a remote server returns no body with a status of 204, we shall not decode it.
+    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
+    // FormatException when trying to decode an empty string.
+    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
+      final responseBody = await _decodeBodyBytes(response);
+      return (await apiClient.deserializeAsync(responseBody, 'List<SharedSpacePersonResponseDto>') as List)
+        .cast<SharedSpacePersonResponseDto>()
+        .toList(growable: false);
+
+    }
+    return null;
+  }
+
+  /// Get a person in a shared space
+  ///
+  /// Retrieve details of a specific person in a shared space.
+  ///
+  /// Note: This method returns the HTTP [Response].
+  ///
+  /// Parameters:
+  ///
+  /// * [String] id (required):
+  ///
+  /// * [String] personId (required):
+  Future<Response> getSpacePersonWithHttpInfo(String id, String personId,) async {
+    // ignore: prefer_const_declarations
+    final apiPath = r'/shared-spaces/{id}/people/{personId}'
+      .replaceAll('{id}', id)
+      .replaceAll('{personId}', personId);
+
+    // ignore: prefer_final_locals
+    Object? postBody;
+
+    final queryParams = <QueryParam>[];
+    final headerParams = <String, String>{};
+    final formParams = <String, String>{};
+
+    const contentTypes = <String>[];
+
+
+    return apiClient.invokeAPI(
+      apiPath,
+      'GET',
+      queryParams,
+      postBody,
+      headerParams,
+      formParams,
+      contentTypes.isEmpty ? null : contentTypes.first,
+    );
+  }
+
+  /// Get a person in a shared space
+  ///
+  /// Retrieve details of a specific person in a shared space.
+  ///
+  /// Parameters:
+  ///
+  /// * [String] id (required):
+  ///
+  /// * [String] personId (required):
+  Future<SharedSpacePersonResponseDto?> getSpacePerson(String id, String personId,) async {
+    final response = await getSpacePersonWithHttpInfo(id, personId,);
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
+    }
+    // When a remote server returns no body with a status of 204, we shall not decode it.
+    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
+    // FormatException when trying to decode an empty string.
+    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'SharedSpacePersonResponseDto',) as SharedSpacePersonResponseDto;
+    
+    }
+    return null;
+  }
+
+  /// Get assets for a person in a shared space
+  ///
+  /// Retrieve asset IDs for all assets containing a specific person in a shared space.
+  ///
+  /// Note: This method returns the HTTP [Response].
+  ///
+  /// Parameters:
+  ///
+  /// * [String] id (required):
+  ///
+  /// * [String] personId (required):
+  Future<Response> getSpacePersonAssetsWithHttpInfo(String id, String personId,) async {
+    // ignore: prefer_const_declarations
+    final apiPath = r'/shared-spaces/{id}/people/{personId}/assets'
+      .replaceAll('{id}', id)
+      .replaceAll('{personId}', personId);
+
+    // ignore: prefer_final_locals
+    Object? postBody;
+
+    final queryParams = <QueryParam>[];
+    final headerParams = <String, String>{};
+    final formParams = <String, String>{};
+
+    const contentTypes = <String>[];
+
+
+    return apiClient.invokeAPI(
+      apiPath,
+      'GET',
+      queryParams,
+      postBody,
+      headerParams,
+      formParams,
+      contentTypes.isEmpty ? null : contentTypes.first,
+    );
+  }
+
+  /// Get assets for a person in a shared space
+  ///
+  /// Retrieve asset IDs for all assets containing a specific person in a shared space.
+  ///
+  /// Parameters:
+  ///
+  /// * [String] id (required):
+  ///
+  /// * [String] personId (required):
+  Future<List<String>?> getSpacePersonAssets(String id, String personId,) async {
+    final response = await getSpacePersonAssetsWithHttpInfo(id, personId,);
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
+    }
+    // When a remote server returns no body with a status of 204, we shall not decode it.
+    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
+    // FormatException when trying to decode an empty string.
+    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
+      final responseBody = await _decodeBodyBytes(response);
+      return (await apiClient.deserializeAsync(responseBody, 'List<String>') as List)
+        .cast<String>()
+        .toList(growable: false);
+
+    }
+    return null;
+  }
+
+  /// Get a space person thumbnail
+  ///
+  /// Retrieve the thumbnail image for a person in a shared space.
+  ///
+  /// Note: This method returns the HTTP [Response].
+  ///
+  /// Parameters:
+  ///
+  /// * [String] id (required):
+  ///
+  /// * [String] personId (required):
+  Future<Response> getSpacePersonThumbnailWithHttpInfo(String id, String personId,) async {
+    // ignore: prefer_const_declarations
+    final apiPath = r'/shared-spaces/{id}/people/{personId}/thumbnail'
+      .replaceAll('{id}', id)
+      .replaceAll('{personId}', personId);
+
+    // ignore: prefer_final_locals
+    Object? postBody;
+
+    final queryParams = <QueryParam>[];
+    final headerParams = <String, String>{};
+    final formParams = <String, String>{};
+
+    const contentTypes = <String>[];
+
+
+    return apiClient.invokeAPI(
+      apiPath,
+      'GET',
+      queryParams,
+      postBody,
+      headerParams,
+      formParams,
+      contentTypes.isEmpty ? null : contentTypes.first,
+    );
+  }
+
+  /// Get a space person thumbnail
+  ///
+  /// Retrieve the thumbnail image for a person in a shared space.
+  ///
+  /// Parameters:
+  ///
+  /// * [String] id (required):
+  ///
+  /// * [String] personId (required):
+  Future<MultipartFile?> getSpacePersonThumbnail(String id, String personId,) async {
+    final response = await getSpacePersonThumbnailWithHttpInfo(id, personId,);
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
+    }
+    // When a remote server returns no body with a status of 204, we shall not decode it.
+    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
+    // FormatException when trying to decode an empty string.
+    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'MultipartFile',) as MultipartFile;
+    
+    }
+    return null;
+  }
+
   /// Mark space as viewed
   ///
   /// Update the last viewed timestamp for the current user in this space.
@@ -533,6 +890,64 @@ class SharedSpacesApi {
   /// * [String] id (required):
   Future<void> markSpaceViewed(String id,) async {
     final response = await markSpaceViewedWithHttpInfo(id,);
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
+    }
+  }
+
+  /// Merge people in a shared space
+  ///
+  /// Merge one or more people into the target person in a shared space.
+  ///
+  /// Note: This method returns the HTTP [Response].
+  ///
+  /// Parameters:
+  ///
+  /// * [String] id (required):
+  ///
+  /// * [String] personId (required):
+  ///
+  /// * [SharedSpacePersonMergeDto] sharedSpacePersonMergeDto (required):
+  Future<Response> mergeSpacePeopleWithHttpInfo(String id, String personId, SharedSpacePersonMergeDto sharedSpacePersonMergeDto,) async {
+    // ignore: prefer_const_declarations
+    final apiPath = r'/shared-spaces/{id}/people/{personId}/merge'
+      .replaceAll('{id}', id)
+      .replaceAll('{personId}', personId);
+
+    // ignore: prefer_final_locals
+    Object? postBody = sharedSpacePersonMergeDto;
+
+    final queryParams = <QueryParam>[];
+    final headerParams = <String, String>{};
+    final formParams = <String, String>{};
+
+    const contentTypes = <String>['application/json'];
+
+
+    return apiClient.invokeAPI(
+      apiPath,
+      'POST',
+      queryParams,
+      postBody,
+      headerParams,
+      formParams,
+      contentTypes.isEmpty ? null : contentTypes.first,
+    );
+  }
+
+  /// Merge people in a shared space
+  ///
+  /// Merge one or more people into the target person in a shared space.
+  ///
+  /// Parameters:
+  ///
+  /// * [String] id (required):
+  ///
+  /// * [String] personId (required):
+  ///
+  /// * [SharedSpacePersonMergeDto] sharedSpacePersonMergeDto (required):
+  Future<void> mergeSpacePeople(String id, String personId, SharedSpacePersonMergeDto sharedSpacePersonMergeDto,) async {
+    final response = await mergeSpacePeopleWithHttpInfo(id, personId, sharedSpacePersonMergeDto,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -689,6 +1104,64 @@ class SharedSpacesApi {
   /// * [String] id (required):
   Future<void> removeSpace(String id,) async {
     final response = await removeSpaceWithHttpInfo(id,);
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
+    }
+  }
+
+  /// Set a person alias in a shared space
+  ///
+  /// Set a user-specific alias for a person in a shared space.
+  ///
+  /// Note: This method returns the HTTP [Response].
+  ///
+  /// Parameters:
+  ///
+  /// * [String] id (required):
+  ///
+  /// * [String] personId (required):
+  ///
+  /// * [SharedSpacePersonAliasDto] sharedSpacePersonAliasDto (required):
+  Future<Response> setSpacePersonAliasWithHttpInfo(String id, String personId, SharedSpacePersonAliasDto sharedSpacePersonAliasDto,) async {
+    // ignore: prefer_const_declarations
+    final apiPath = r'/shared-spaces/{id}/people/{personId}/alias'
+      .replaceAll('{id}', id)
+      .replaceAll('{personId}', personId);
+
+    // ignore: prefer_final_locals
+    Object? postBody = sharedSpacePersonAliasDto;
+
+    final queryParams = <QueryParam>[];
+    final headerParams = <String, String>{};
+    final formParams = <String, String>{};
+
+    const contentTypes = <String>['application/json'];
+
+
+    return apiClient.invokeAPI(
+      apiPath,
+      'PUT',
+      queryParams,
+      postBody,
+      headerParams,
+      formParams,
+      contentTypes.isEmpty ? null : contentTypes.first,
+    );
+  }
+
+  /// Set a person alias in a shared space
+  ///
+  /// Set a user-specific alias for a person in a shared space.
+  ///
+  /// Parameters:
+  ///
+  /// * [String] id (required):
+  ///
+  /// * [String] personId (required):
+  ///
+  /// * [SharedSpacePersonAliasDto] sharedSpacePersonAliasDto (required):
+  Future<void> setSpacePersonAlias(String id, String personId, SharedSpacePersonAliasDto sharedSpacePersonAliasDto,) async {
+    final response = await setSpacePersonAliasWithHttpInfo(id, personId, sharedSpacePersonAliasDto,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -877,6 +1350,72 @@ class SharedSpacesApi {
     // FormatException when trying to decode an empty string.
     if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
       return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'SharedSpaceResponseDto',) as SharedSpaceResponseDto;
+    
+    }
+    return null;
+  }
+
+  /// Update a person in a shared space
+  ///
+  /// Update the name, visibility, birth date, or representative face of a person.
+  ///
+  /// Note: This method returns the HTTP [Response].
+  ///
+  /// Parameters:
+  ///
+  /// * [String] id (required):
+  ///
+  /// * [String] personId (required):
+  ///
+  /// * [SharedSpacePersonUpdateDto] sharedSpacePersonUpdateDto (required):
+  Future<Response> updateSpacePersonWithHttpInfo(String id, String personId, SharedSpacePersonUpdateDto sharedSpacePersonUpdateDto,) async {
+    // ignore: prefer_const_declarations
+    final apiPath = r'/shared-spaces/{id}/people/{personId}'
+      .replaceAll('{id}', id)
+      .replaceAll('{personId}', personId);
+
+    // ignore: prefer_final_locals
+    Object? postBody = sharedSpacePersonUpdateDto;
+
+    final queryParams = <QueryParam>[];
+    final headerParams = <String, String>{};
+    final formParams = <String, String>{};
+
+    const contentTypes = <String>['application/json'];
+
+
+    return apiClient.invokeAPI(
+      apiPath,
+      'PUT',
+      queryParams,
+      postBody,
+      headerParams,
+      formParams,
+      contentTypes.isEmpty ? null : contentTypes.first,
+    );
+  }
+
+  /// Update a person in a shared space
+  ///
+  /// Update the name, visibility, birth date, or representative face of a person.
+  ///
+  /// Parameters:
+  ///
+  /// * [String] id (required):
+  ///
+  /// * [String] personId (required):
+  ///
+  /// * [SharedSpacePersonUpdateDto] sharedSpacePersonUpdateDto (required):
+  Future<SharedSpacePersonResponseDto?> updateSpacePerson(String id, String personId, SharedSpacePersonUpdateDto sharedSpacePersonUpdateDto,) async {
+    final response = await updateSpacePersonWithHttpInfo(id, personId, sharedSpacePersonUpdateDto,);
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
+    }
+    // When a remote server returns no body with a status of 204, we shall not decode it.
+    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
+    // FormatException when trying to decode an empty string.
+    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'SharedSpacePersonResponseDto',) as SharedSpacePersonResponseDto;
     
     }
     return null;

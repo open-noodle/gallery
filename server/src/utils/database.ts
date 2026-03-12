@@ -187,6 +187,18 @@ export function hasPeople<O>(qb: SelectQueryBuilder<DB, 'asset', O>, personIds: 
   );
 }
 
+export function hasSpacePerson<O>(qb: SelectQueryBuilder<DB, 'asset', O>, spacePersonId: string) {
+  return qb.where((eb) =>
+    eb.exists(
+      eb
+        .selectFrom('shared_space_person_face')
+        .innerJoin('asset_face', 'asset_face.id', 'shared_space_person_face.assetFaceId')
+        .whereRef('asset_face.assetId', '=', 'asset.id')
+        .where('shared_space_person_face.personId', '=', asUuid(spacePersonId)),
+    ),
+  );
+}
+
 export function inAlbums<O>(qb: SelectQueryBuilder<DB, 'asset', O>, albumIds: string[]) {
   return qb.innerJoin(
     (eb) =>

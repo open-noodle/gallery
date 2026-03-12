@@ -27,6 +27,7 @@ import {
   anyUuid,
   asUuid,
   hasPeople,
+  hasSpacePerson,
   removeUndefinedKeys,
   truncatedDate,
   unnest,
@@ -75,6 +76,7 @@ interface AssetBuilderOptions {
   spaceId?: string;
   tagId?: string;
   personId?: string;
+  spacePersonId?: string;
   userIds?: string[];
   timelineSpaceIds?: string[];
   withStacked?: boolean;
@@ -726,6 +728,7 @@ export class AssetRepository {
               .where('shared_space_asset.spaceId', '=', asUuid(options.spaceId!)),
           )
           .$if(!!options.personId, (qb) => hasPeople(qb, [options.personId!]))
+          .$if(!!options.spacePersonId, (qb) => hasSpacePerson(qb, options.spacePersonId!))
           .$if(!!options.withStacked, (qb) =>
             qb
               .leftJoin('stack', (join) =>
@@ -841,6 +844,7 @@ export class AssetRepository {
             ),
           )
           .$if(!!options.personId, (qb) => hasPeople(qb, [options.personId!]))
+          .$if(!!options.spacePersonId, (qb) => hasSpacePerson(qb, options.spacePersonId!))
           .$if(!!options.userIds && !options.timelineSpaceIds, (qb) =>
             qb.where('asset.ownerId', '=', anyUuid(options.userIds!)),
           )

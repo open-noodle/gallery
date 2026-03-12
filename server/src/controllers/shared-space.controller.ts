@@ -1,8 +1,29 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Next,
+  Param,
+  Patch,
+  Post,
+  Put,
+  Query,
+  Res,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { NextFunction, Response } from 'express';
 import { Endpoint, HistoryBuilder } from 'src/decorators';
 import { AuthDto } from 'src/dtos/auth.dto';
 import { MapMarkerResponseDto } from 'src/dtos/map.dto';
+import {
+  SharedSpacePersonAliasDto,
+  SharedSpacePersonMergeDto,
+  SharedSpacePersonResponseDto,
+  SharedSpacePersonUpdateDto,
+} from 'src/dtos/shared-space-person.dto';
 import {
   SharedSpaceActivityQueryDto,
   SharedSpaceActivityResponseDto,
@@ -17,14 +38,21 @@ import {
   SharedSpaceUpdateDto,
 } from 'src/dtos/shared-space.dto';
 import { ApiTag, Permission } from 'src/enum';
-import { Auth, Authenticated } from 'src/middleware/auth.guard';
+import { Auth, Authenticated, FileResponse } from 'src/middleware/auth.guard';
+import { LoggingRepository } from 'src/repositories/logging.repository';
 import { SharedSpaceService } from 'src/services/shared-space.service';
+import { sendFile } from 'src/utils/file';
 import { UUIDParamDto } from 'src/validation';
 
 @ApiTags(ApiTag.SharedSpaces)
 @Controller('shared-spaces')
 export class SharedSpaceController {
-  constructor(private service: SharedSpaceService) {}
+  constructor(
+    private service: SharedSpaceService,
+    private logger: LoggingRepository,
+  ) {
+    this.logger.setContext(SharedSpaceController.name);
+  }
 
   @Post()
   @Authenticated({ permission: Permission.SharedSpaceCreate })
@@ -215,5 +243,146 @@ export class SharedSpaceController {
     @Query() query: SharedSpaceActivityQueryDto,
   ): Promise<SharedSpaceActivityResponseDto[]> {
     return this.service.getActivities(auth, id, query);
+  }
+
+  @Get(':id/people')
+  @Authenticated({ permission: Permission.SharedSpaceRead })
+  @Endpoint({
+    summary: 'Get people in a shared space',
+    description: 'Retrieve all people detected in a shared space.',
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  getSpacePeople(@Auth() auth: AuthDto, @Param() { id }: UUIDParamDto): Promise<SharedSpacePersonResponseDto[]> {
+    return this.service.getSpacePeople(auth, id);
+  }
+
+  @Get(':id/people/:personId')
+  @Authenticated({ permission: Permission.SharedSpaceRead })
+  @Endpoint({
+    summary: 'Get a person in a shared space',
+    description: 'Retrieve details of a specific person in a shared space.',
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  getSpacePerson(
+    @Auth() auth: AuthDto,
+    @Param('id') id: string,
+    @Param('personId') personId: string,
+  ): Promise<SharedSpacePersonResponseDto> {
+    return this.service.getSpacePerson(auth, id, personId);
+  }
+
+  @Get(':id/people/:personId/thumbnail')
+  @FileResponse()
+  @Authenticated({ permission: Permission.SharedSpaceRead })
+  @Endpoint({
+    summary: 'Get a space person thumbnail',
+    description: 'Retrieve the thumbnail image for a person in a shared space.',
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  async getSpacePersonThumbnail(
+    @Res() res: Response,
+    @Next() next: NextFunction,
+    @Auth() auth: AuthDto,
+    @Param('id') id: string,
+    @Param('personId') personId: string,
+  ) {
+    await sendFile(res, next, () => this.service.getSpacePersonThumbnail(auth, id, personId), this.logger);
+  }
+
+  @Put(':id/people/:personId')
+  @Authenticated({ permission: Permission.SharedSpaceAssetCreate })
+  @Endpoint({
+    summary: 'Update a person in a shared space',
+    description: 'Update the name, visibility, birth date, or representative face of a person.',
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  updateSpacePerson(
+    @Auth() auth: AuthDto,
+    @Param('id') id: string,
+    @Param('personId') personId: string,
+    @Body() dto: SharedSpacePersonUpdateDto,
+  ): Promise<SharedSpacePersonResponseDto> {
+    return this.service.updateSpacePerson(auth, id, personId, dto);
+  }
+
+  @Delete(':id/people/:personId')
+  @Authenticated({ permission: Permission.SharedSpaceAssetCreate })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Endpoint({
+    summary: 'Delete a person from a shared space',
+    description: 'Permanently delete a person and their face assignments from a shared space.',
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  deleteSpacePerson(
+    @Auth() auth: AuthDto,
+    @Param('id') id: string,
+    @Param('personId') personId: string,
+  ): Promise<void> {
+    return this.service.deleteSpacePerson(auth, id, personId);
+  }
+
+  @Post(':id/people/:personId/merge')
+  @Authenticated({ permission: Permission.SharedSpaceAssetCreate })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Endpoint({
+    summary: 'Merge people in a shared space',
+    description: 'Merge one or more people into the target person in a shared space.',
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  mergeSpacePeople(
+    @Auth() auth: AuthDto,
+    @Param('id') id: string,
+    @Param('personId') personId: string,
+    @Body() dto: SharedSpacePersonMergeDto,
+  ): Promise<void> {
+    return this.service.mergeSpacePeople(auth, id, personId, dto);
+  }
+
+  @Put(':id/people/:personId/alias')
+  @Authenticated({ permission: Permission.SharedSpaceRead })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Endpoint({
+    summary: 'Set a person alias in a shared space',
+    description: 'Set a user-specific alias for a person in a shared space.',
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  setSpacePersonAlias(
+    @Auth() auth: AuthDto,
+    @Param('id') id: string,
+    @Param('personId') personId: string,
+    @Body() dto: SharedSpacePersonAliasDto,
+  ): Promise<void> {
+    return this.service.setSpacePersonAlias(auth, id, personId, dto);
+  }
+
+  @Delete(':id/people/:personId/alias')
+  @Authenticated({ permission: Permission.SharedSpaceRead })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Endpoint({
+    summary: 'Delete a person alias in a shared space',
+    description: 'Remove a user-specific alias for a person in a shared space.',
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  deleteSpacePersonAlias(
+    @Auth() auth: AuthDto,
+    @Param('id') id: string,
+    @Param('personId') personId: string,
+  ): Promise<void> {
+    return this.service.deleteSpacePersonAlias(auth, id, personId);
+  }
+
+  @Get(':id/people/:personId/assets')
+  @Authenticated({ permission: Permission.SharedSpaceRead })
+  @Endpoint({
+    summary: 'Get assets for a person in a shared space',
+    description: 'Retrieve asset IDs for all assets containing a specific person in a shared space.',
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  getSpacePersonAssets(
+    @Auth() auth: AuthDto,
+    @Param('id') id: string,
+    @Param('personId') personId: string,
+  ): Promise<string[]> {
+    return this.service.getSpacePersonAssets(auth, id, personId);
   }
 }

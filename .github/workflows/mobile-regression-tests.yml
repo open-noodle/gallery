@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    timeout-minutes: 60
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -58,13 +58,11 @@ jobs:
           arch: x86_64
           force-avd-creation: false
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
-          emulator-boot-timeout: 300
+          emulator-boot-timeout: 600
           working-directory: ./mobile
           script: |
-            patrol test integration_test/ \
-              --dart-define=TEST_SERVER_URL=http://10.0.2.2:2285 \
-              --dart-define=TEST_EMAIL=admin@immich.app \
-              --dart-define=TEST_PASSWORD=admin
+            chmod +x integration_test/scripts/run-tests.sh
+            integration_test/scripts/run-tests.sh
 
       - name: Upload failure screenshots
         if: failure()

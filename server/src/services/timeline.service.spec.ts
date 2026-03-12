@@ -501,6 +501,37 @@ describe(TimelineService.name, () => {
     });
   });
 
+  describe('spacePersonId filtering', () => {
+    it('should pass spacePersonId through to asset repository for getTimeBuckets', async () => {
+      mocks.access.sharedSpace.checkMemberAccess.mockResolvedValue(new Set(['space-id']));
+      mocks.asset.getTimeBuckets.mockResolvedValue([{ timeBucket: 'bucket', count: 1 }]);
+
+      await sut.getTimeBuckets(authStub.admin, { spaceId: 'space-id', spacePersonId: 'person-id' });
+
+      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
+        expect.objectContaining({ spaceId: 'space-id', spacePersonId: 'person-id' }),
+      );
+    });
+
+    it('should pass spacePersonId through to asset repository for getTimeBucket', async () => {
+      mocks.access.sharedSpace.checkMemberAccess.mockResolvedValue(new Set(['space-id']));
+      const json = `[{ id: ['asset-id'] }]`;
+      mocks.asset.getTimeBucket.mockResolvedValue({ assets: json });
+
+      await sut.getTimeBucket(authStub.admin, {
+        timeBucket: 'bucket',
+        spaceId: 'space-id',
+        spacePersonId: 'person-id',
+      });
+
+      expect(mocks.asset.getTimeBucket).toHaveBeenCalledWith(
+        'bucket',
+        expect.objectContaining({ spaceId: 'space-id', spacePersonId: 'person-id' }),
+        authStub.admin,
+      );
+    });
+  });
+
   describe('edge cases', () => {
     it('should not interfere when albumId is provided instead of spaceId', async () => {
       mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set(['album-id']));

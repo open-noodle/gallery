@@ -2,7 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsInt, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 import { SharedSpaceRole, UserAvatarColor } from 'src/enum';
-import { ValidateEnum, ValidateUUID } from 'src/validation';
+import { ValidateBoolean, ValidateEnum, ValidateUUID } from 'src/validation';
 
 export class SharedSpaceCreateDto {
   @ApiProperty({ description: 'Space name' })
@@ -44,6 +44,13 @@ export class SharedSpaceUpdateDto {
   @ValidateUUID({ optional: true, nullable: true, description: 'Thumbnail asset ID' })
   thumbnailAssetId?: string | null;
 
+  @ApiPropertyOptional({ description: 'Vertical crop position for cover photo (0-100)', type: 'integer' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  thumbnailCropY?: number | null;
+
   @ValidateEnum({
     enum: UserAvatarColor,
     name: 'UserAvatarColor',
@@ -51,6 +58,9 @@ export class SharedSpaceUpdateDto {
     optional: true,
   })
   color?: UserAvatarColor;
+
+  @ValidateBoolean({ optional: true, description: 'Enable face recognition for this space' })
+  faceRecognitionEnabled?: boolean;
 }
 
 export class SharedSpaceMemberCreateDto {
@@ -138,8 +148,14 @@ export class SharedSpaceResponseDto {
   @ApiPropertyOptional({ description: 'Thumbnail asset ID' })
   thumbnailAssetId?: string | null;
 
+  @ApiPropertyOptional({ description: 'Vertical crop position for cover photo (0-100)' })
+  thumbnailCropY?: number | null;
+
   @ApiPropertyOptional({ description: 'Space color', enum: UserAvatarColor })
   color?: UserAvatarColor | null;
+
+  @ApiPropertyOptional({ description: 'Whether face recognition is enabled for this space' })
+  faceRecognitionEnabled?: boolean;
 
   @ApiPropertyOptional({ description: 'Last activity timestamp (most recent asset add)' })
   lastActivityAt?: string | null;

@@ -540,6 +540,15 @@ export class PersonService extends BaseService {
       await this.personRepository.reassignFaces({ faceIds: [id], newPersonId: personId });
     }
 
+    // Queue shared space face matching for any spaces containing this asset
+    const spaceIds = await this.sharedSpaceRepository.getSpaceIdsForAsset(face.assetId);
+    for (const { spaceId } of spaceIds) {
+      await this.jobRepository.queue({
+        name: JobName.SharedSpaceFaceMatch,
+        data: { spaceId, assetId: face.assetId },
+      });
+    }
+
     return JobStatus.Success;
   }
 

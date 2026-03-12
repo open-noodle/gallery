@@ -19,6 +19,7 @@
     scrollbar?: boolean;
     use?: ActionArray;
     actions?: Array<HeaderButtonActionItem | MenuItemType>;
+    leading?: Snippet;
     sidebar?: Snippet;
     buttons?: Snippet;
     children?: Snippet;
@@ -31,6 +32,7 @@
     scrollbar = true,
     use = [],
     actions = [],
+    leading,
     sidebar,
     buttons,
     children,
@@ -72,6 +74,7 @@
     {#if !hideNavbar && (title || buttons)}
       <div class="absolute flex h-16 w-full place-items-center justify-between border-b p-2 text-dark">
         <div class="flex gap-2 items-center">
+          {@render leading?.()}
           {#if title}
             <div class="outline-none pe-8" tabindex="-1" id={headerId}>{title}</div>
           {/if}

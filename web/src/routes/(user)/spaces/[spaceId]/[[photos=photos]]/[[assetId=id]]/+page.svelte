@@ -9,7 +9,8 @@
   import SpaceNewAssetsDivider from '$lib/components/spaces/space-new-assets-divider.svelte';
   import SpaceOnboardingBanner from '$lib/components/spaces/space-onboarding-banner.svelte';
   import SpacePanel from '$lib/components/spaces/space-panel.svelte';
-  import SpaceSearch from '$lib/components/spaces/space-search.svelte';
+  import SpacePeopleStrip from '$lib/components/spaces/space-people-strip.svelte';
+  import SearchBar from '$lib/elements/SearchBar.svelte';
   import MenuOption from '$lib/components/shared-components/context-menu/menu-option.svelte';
   import ArchiveAction from '$lib/components/timeline/actions/ArchiveAction.svelte';
   import ChangeDate from '$lib/components/timeline/actions/ChangeDateAction.svelte';
@@ -29,29 +30,36 @@
   import { preferences, user } from '$lib/stores/user.store';
   import { cancelMultiselect } from '$lib/utils/asset-utils';
   import { handleError } from '$lib/utils/handle-error';
+  import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
   import {
     addAssets,
     AssetVisibility,
     getMembers,
     getSpace,
     getSpaceActivities,
+    getSpacePeople,
     markSpaceViewed,
     removeSpace,
     Role,
+    searchSmart,
     updateMemberTimeline,
     updateSpace,
     UserAvatarColor,
+    type AssetResponseDto,
     type SharedSpaceActivityResponseDto,
     type SharedSpaceMemberResponseDto,
+    type SharedSpacePersonResponseDto,
     type SharedSpaceResponseDto,
   } from '@immich/sdk';
   import { IconButton, modalManager, toastManager } from '@immich/ui';
   import {
     mdiAccountMultipleOutline,
+    mdiArrowLeft,
     mdiDeleteOutline,
     mdiDotsVertical,
     mdiEyeOffOutline,
     mdiEyeOutline,
+    mdiFaceRecognition,
     mdiImageOutline,
     mdiImagePlusOutline,
     mdiPlus,
@@ -70,12 +78,16 @@
   let members: SharedSpaceMemberResponseDto[] = $state(data.members);
   let viewMode = $state<ViewMode>('view');
   let panelOpen = $state(false);
+  let repositioning = $state(false);
 
   let activities = $state<SharedSpaceActivityResponseDto[]>([]);
   let hasMoreActivities = $state(false);
   let activityOffset = $state(0);
   const ACTIVITY_PAGE_SIZE = 50;
   let initializedSpaceId = $state('');
+
+  let spacePeople = $state<SharedSpacePersonResponseDto[]>([]);
+  let selectedPersonId = $state<string | null>(null);
 
   let timelineManager = $state<TimelineManager>() as TimelineManager;
 
@@ -91,7 +103,11 @@
     if (viewMode === 'select-assets') {
       return { visibility: AssetVisibility.Timeline, timelineSpaceId: space.id };
     }
-    return { spaceId: space.id };
+    const base: Record<string, unknown> = { spaceId: space.id };
+    if (selectedPersonId) {
+      base.spacePersonId = selectedPersonId;
+    }
+    return base;
   });
 
   const currentAssetInteraction = $derived(viewMode === 'select-assets' ? timelineInteraction : assetInteraction);
@@ -123,9 +139,25 @@
     }
   }
 
+  async function loadSpacePeople() {
+    if (!space.faceRecognitionEnabled) {
+      spacePeople = [];
+      return;
+    }
+    try {
+      spacePeople = await getSpacePeople({ id: space.id });
+    } catch (error) {
+      handleError(error, 'Failed to load space people');
+    }
+  }
+
+  const handlePersonClick = (personId: string) => {
+    selectedPersonId = selectedPersonId === personId ? null : personId;
+  };
+
   const handleEscape = () => {
     if (showSearchResults) {
-      spaceSearch?.clearSearch();
+      clearSearch();
       return;
     }
     if (viewMode === 'select-assets') {
@@ -153,6 +185,28 @@
     viewMode = 'view';
   };
 
+  const handleReposition = () => {
+    repositioning = true;
+  };
+
+  const handleSavePosition = async (cropY: number) => {
+    try {
+      await updateSpace({
+        id: space.id,
+        sharedSpaceUpdateDto: { thumbnailCropY: cropY },
+      });
+      space = { ...space, thumbnailCropY: cropY };
+      repositioning = false;
+      toastManager.success($t('space_cover_updated'));
+    } catch (error) {
+      handleError(error, $t('errors.unable_to_update_space_cover'));
+    }
+  };
+
+  const handleCancelReposition = () => {
+    repositioning = false;
+  };
+
   const handleSetCoverFromSelection = async () => {
     const assets = assetInteraction.selectedAssets;
     if (assets.length !== 1) {
@@ -164,10 +218,11 @@
         id: space.id,
         sharedSpaceUpdateDto: { thumbnailAssetId: assets[0].id },
       });
-      space = { ...space, thumbnailAssetId: assets[0].id };
+      space = { ...space, thumbnailAssetId: assets[0].id, thumbnailCropY: null };
       toastManager.success($t('space_cover_updated'));
       assetInteraction.clearMultiselect();
       viewMode = 'view';
+      repositioning = true;
     } catch (error) {
       handleError(error, $t('errors.unable_to_update_space_cover'));
     }
@@ -213,6 +268,19 @@
     }
   };
 
+  const handleToggleFaceRecognition = async () => {
+    try {
+      const updated = await updateSpace({
+        id: space.id,
+        sharedSpaceUpdateDto: { faceRecognitionEnabled: !space.faceRecognitionEnabled },
+      });
+      space = { ...space, faceRecognitionEnabled: updated.faceRecognitionEnabled };
+      await loadSpacePeople();
+    } catch (error) {
+      handleError(error, 'Failed to update face recognition');
+    }
+  };
+
   const handleShowMembers = () => {
     panelOpen = !panelOpen;
   };
@@ -234,9 +302,10 @@
         id: space.id,
         sharedSpaceUpdateDto: { thumbnailAssetId: assets[0].id },
       });
-      space = { ...space, thumbnailAssetId: assets[0].id };
+      space = { ...space, thumbnailAssetId: assets[0].id, thumbnailCropY: null };
       toastManager.success($t('space_cover_updated'));
       cancelMultiselect(assetInteraction);
+      repositioning = true;
     } catch (error) {
       handleError(error, $t('errors.unable_to_update_space_cover'));
     }
@@ -255,8 +324,37 @@
     await loadActivities();
   };
 
+  let searchQuery = $state('');
+  let searchResults = $state<AssetResponseDto[]>([]);
+  let isSearching = $state(false);
   let showSearchResults = $state(false);
-  let spaceSearch = $state<SpaceSearch>();
+
+  const handleSearchSubmit = async () => {
+    const query = searchQuery.trim();
+    if (!query) {
+      clearSearch();
+      return;
+    }
+
+    isSearching = true;
+    showSearchResults = true;
+    try {
+      const { assets } = await searchSmart({
+        smartSearchDto: { query, spaceId: space.id },
+      });
+      searchResults = assets.items;
+    } catch {
+      searchResults = [];
+    } finally {
+      isSearching = false;
+    }
+  };
+
+  const clearSearch = () => {
+    searchQuery = '';
+    searchResults = [];
+    showSearchResults = false;
+  };
 
   const gradientClasses: Record<string, string> = {
     [UserAvatarColor.Primary]: 'from-immich-primary/60 to-immich-primary',
@@ -278,6 +376,7 @@
       initializedSpaceId = space.id;
       void markSpaceViewed({ id: space.id });
       void loadActivities();
+      void loadSpacePeople();
     }
   });
 </script>
@@ -289,9 +388,38 @@
   title={viewMode === 'select-assets' || viewMode === 'select-cover' ? undefined : space.name}
   scrollbar={false}
 >
+  {#snippet leading()}
+    {#if viewMode === 'view' && !assetInteraction.selectionActive}
+      <IconButton
+        variant="ghost"
+        shape="round"
+        color="secondary"
+        aria-label={$t('back')}
+        onclick={() => goto(Route.spaces())}
+        icon={mdiArrowLeft}
+      />
+    {/if}
+  {/snippet}
+
   {#snippet buttons()}
     {#if viewMode === 'view' && !assetInteraction.selectionActive}
-      <div class="flex">
+      <div class="flex items-center gap-1">
+        {#if (space.assetCount ?? 0) > 0}
+          <div class="hidden h-10 sm:block sm:w-40 xl:w-60">
+            <SearchBar
+              placeholder={$t('search')}
+              bind:name={searchQuery}
+              showLoadingSpinner={isSearching}
+              onSearch={({ force }) => {
+                if (force) {
+                  void handleSearchSubmit();
+                }
+              }}
+              onReset={clearSearch}
+            />
+          </div>
+        {/if}
+
         {#if isEditor}
           <IconButton
             variant="ghost"
@@ -331,6 +459,16 @@
           <IconButton
             variant="ghost"
             shape="round"
+            color={space.faceRecognitionEnabled ? 'primary' : 'secondary'}
+            aria-label={space.faceRecognitionEnabled ? 'Disable face recognition' : 'Enable face recognition'}
+            title={space.faceRecognitionEnabled ? 'Disable face recognition' : 'Enable face recognition'}
+            onclick={handleToggleFaceRecognition}
+            icon={mdiFaceRecognition}
+          />
+
+          <IconButton
+            variant="ghost"
+            shape="round"
             color="secondary"
             aria-label={$t('spaces_delete')}
             onclick={handleDelete}
@@ -341,39 +479,34 @@
     {/if}
   {/snippet}
 
-  {#if viewMode === 'view'}
-    <section class="px-4 pt-4">
-      <SpaceHero
-        {space}
-        memberCount={members.length}
-        assetCount={space.assetCount ?? 0}
-        currentRole={currentMember?.role}
-        gradientClass={spaceGradient}
-        onSetCover={isEditor ? () => (viewMode = 'select-cover') : undefined}
-      />
-
-      {#if (space.assetCount ?? 0) > 0}
-        <SpaceSearch bind:this={spaceSearch} spaceId={space.id} bind:showSearchResults />
+  {#if showSearchResults}
+    <section class="px-4 py-4">
+      {#if isSearching}
+        <div class="flex justify-center py-8">
+          <LoadingSpinner />
+        </div>
+      {:else if searchResults.length === 0}
+        <p class="mt-8 text-center text-gray-500 dark:text-gray-400">{$t('search_no_result')}</p>
+      {:else}
+        <p class="mb-4 text-sm text-gray-500 dark:text-gray-400">
+          {searchResults.length} results
+        </p>
+        <div class="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-1">
+          {#each searchResults as asset (asset.id)}
+            <a
+              href="{Route.viewSpace({ id: space.id })}/photos/{asset.id}"
+              class="aspect-square cursor-pointer overflow-hidden rounded"
+            >
+              <img
+                src="/api/assets/{asset.id}/thumbnail"
+                alt={asset.originalFileName}
+                class="h-full w-full object-cover"
+              />
+            </a>
+          {/each}
+        </div>
       {/if}
     </section>
-
-    {#if isOwner}
-      <SpaceOnboardingBanner
-        {space}
-        gradientClass={spaceGradient}
-        onAddPhotos={() => (viewMode = 'select-assets')}
-        onInviteMembers={() => (panelOpen = true)}
-        onSetCover={() => (viewMode = 'select-cover')}
-      />
-    {/if}
-  {/if}
-
-  {#if (space.newAssetCount ?? 0) > 0 && space.lastViewedAt}
-    <SpaceNewAssetsDivider
-      newAssetCount={space.newAssetCount ?? 0}
-      lastViewedAt={space.lastViewedAt}
-      spaceColor={space.color ?? 'primary'}
-    />
   {/if}
 
   {#if !showSearchResults}
@@ -385,6 +518,53 @@
       {isSelectionMode}
       onEscape={handleEscape}
     >
+      {#if viewMode === 'view'}
+        <section class="px-4 pt-4">
+          <SpaceHero
+            {space}
+            memberCount={members.length}
+            assetCount={space.assetCount ?? 0}
+            currentRole={currentMember?.role}
+            gradientClass={spaceGradient}
+            onSetCover={isEditor ? () => (viewMode = 'select-cover') : undefined}
+            onReposition={isEditor && space.thumbnailAssetId ? handleReposition : undefined}
+            {repositioning}
+            onSavePosition={handleSavePosition}
+            onCancelReposition={handleCancelReposition}
+            peopleCount={spacePeople.length}
+            faceRecognitionEnabled={space.faceRecognitionEnabled}
+            spaceId={space.id}
+          />
+
+          {#if space.faceRecognitionEnabled && spacePeople.length > 0}
+            <SpacePeopleStrip
+              people={spacePeople}
+              spaceId={space.id}
+              {selectedPersonId}
+              onPersonClick={handlePersonClick}
+            />
+          {/if}
+        </section>
+
+        {#if isOwner}
+          <SpaceOnboardingBanner
+            {space}
+            gradientClass={spaceGradient}
+            onAddPhotos={() => (viewMode = 'select-assets')}
+            onInviteMembers={() => (panelOpen = true)}
+            onSetCover={() => (viewMode = 'select-cover')}
+          />
+        {/if}
+
+        {#if (space.newAssetCount ?? 0) > 0 && space.lastViewedAt}
+          <SpaceNewAssetsDivider
+            newAssetCount={space.newAssetCount ?? 0}
+            lastViewedAt={space.lastViewedAt}
+            spaceColor={space.color ?? 'primary'}
+          />
+        {/if}
+      {/if}
+
       {#snippet empty()}
         {#if viewMode === 'view'}
           <div class="mx-auto max-w-md py-16 text-center">

@@ -1,5 +1,13 @@
-import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { SharedSpacePerson } from 'src/database';
+import { OnJob } from 'src/decorators';
 import { AuthDto } from 'src/dtos/auth.dto';
+import {
+  SharedSpacePersonAliasDto,
+  SharedSpacePersonMergeDto,
+  SharedSpacePersonResponseDto,
+  SharedSpacePersonUpdateDto,
+} from 'src/dtos/shared-space-person.dto';
 import {
   SharedSpaceActivityResponseDto,
   SharedSpaceAssetAddDto,
@@ -12,8 +20,20 @@ import {
   SharedSpaceResponseDto,
   SharedSpaceUpdateDto,
 } from 'src/dtos/shared-space.dto';
-import { Permission, SharedSpaceActivityType, SharedSpaceRole, UserAvatarColor } from 'src/enum';
+import {
+  CacheControl,
+  JobName,
+  JobStatus,
+  Permission,
+  QueueName,
+  SharedSpaceActivityType,
+  SharedSpaceRole,
+  UserAvatarColor,
+} from 'src/enum';
 import { BaseService } from 'src/services/base.service';
+import { JobOf } from 'src/types';
+import { ImmichMediaResponse } from 'src/utils/file';
+import { mimeTypes } from 'src/utils/mime-types';
 
 const ROLE_HIERARCHY: Record<SharedSpaceRole, number> = {
   [SharedSpaceRole.Viewer]: 0,
@@ -122,16 +142,25 @@ export class SharedSpaceService extends BaseService {
   }
 
   async update(auth: AuthDto, id: string, dto: SharedSpaceUpdateDto): Promise<SharedSpaceResponseDto> {
-    const isMetadataUpdate = dto.name !== undefined || dto.description !== undefined || dto.color !== undefined;
+    const isMetadataUpdate =
+      dto.name !== undefined ||
+      dto.description !== undefined ||
+      dto.color !== undefined ||
+      dto.faceRecognitionEnabled !== undefined;
     const minimumRole = isMetadataUpdate ? SharedSpaceRole.Owner : SharedSpaceRole.Editor;
     await this.requireRole(auth, id, minimumRole);
+
+    // Reset crop position when cover photo changes
+    const thumbnailCropY = dto.thumbnailAssetId === undefined ? dto.thumbnailCropY : null;
 
     const existing = await this.sharedSpaceRepository.getById(id);
     const space = await this.sharedSpaceRepository.update(id, {
       name: dto.name,
       description: dto.description,
       thumbnailAssetId: dto.thumbnailAssetId,
+      thumbnailCropY,
       color: dto.color,
+      faceRecognitionEnabled: dto.faceRecognitionEnabled,
     });
 
     if (existing) {
@@ -157,6 +186,14 @@ export class SharedSpaceService extends BaseService {
           userId: auth.user.id,
           type: SharedSpaceActivityType.CoverChange,
           data: { assetId: dto.thumbnailAssetId },
+        });
+      }
+
+      // Queue face matching when toggling from disabled to enabled
+      if (dto.faceRecognitionEnabled === true && !existing.faceRecognitionEnabled) {
+        await this.jobRepository.queue({
+          name: JobName.SharedSpaceFaceMatchAll,
+          data: { spaceId: id },
         });
       }
     }
@@ -325,6 +362,16 @@ export class SharedSpaceService extends BaseService {
       type: SharedSpaceActivityType.AssetAdd,
       data: { count: dto.assetIds.length, assetIds: dto.assetIds.slice(0, 4) },
     });
+
+    const space = await this.sharedSpaceRepository.getById(spaceId);
+    if (space?.faceRecognitionEnabled) {
+      for (const assetId of dto.assetIds) {
+        await this.jobRepository.queue({
+          name: JobName.SharedSpaceFaceMatch,
+          data: { spaceId, assetId },
+        });
+      }
+    }
   }
 
   async markSpaceViewed(auth: AuthDto, spaceId: string): Promise<void> {
@@ -377,6 +424,9 @@ export class SharedSpaceService extends BaseService {
       type: SharedSpaceActivityType.AssetRemove,
       data: { count: dto.assetIds.length },
     });
+
+    await this.sharedSpaceRepository.removePersonFacesByAssetIds(spaceId, dto.assetIds);
+    await this.sharedSpaceRepository.deleteOrphanedPersons(spaceId);
   }
 
   async getMapMarkers(auth: AuthDto, id: string) {
@@ -391,6 +441,258 @@ export class SharedSpaceService extends BaseService {
       state: marker.state ?? null,
       country: marker.country ?? null,
     }));
+  }
+
+  async getSpacePeople(auth: AuthDto, spaceId: string): Promise<SharedSpacePersonResponseDto[]> {
+    await this.requireMembership(auth, spaceId);
+
+    const space = await this.sharedSpaceRepository.getById(spaceId);
+    if (!space?.faceRecognitionEnabled) {
+      return [];
+    }
+
+    const persons = await this.sharedSpaceRepository.getPersonsBySpaceId(spaceId);
+    const aliases = await this.sharedSpaceRepository.getAliasesBySpaceAndUser(spaceId, auth.user.id);
+    const aliasMap = new Map(aliases.map((a) => [a.personId, a.alias]));
+
+    const results: SharedSpacePersonResponseDto[] = [];
+    for (const person of persons) {
+      const faceCount = await this.sharedSpaceRepository.getPersonFaceCount(person.id);
+      const assetCount = await this.sharedSpaceRepository.getPersonAssetCount(person.id);
+      results.push(this.mapSpacePerson(person, faceCount, assetCount, aliasMap.get(person.id) ?? null));
+    }
+
+    return results.toSorted((a, b) => b.assetCount - a.assetCount);
+  }
+
+  async getSpacePerson(auth: AuthDto, spaceId: string, personId: string): Promise<SharedSpacePersonResponseDto> {
+    await this.requireMembership(auth, spaceId);
+
+    const person = await this.sharedSpaceRepository.getPersonById(personId);
+    if (!person || person.spaceId !== spaceId) {
+      throw new BadRequestException('Person not found');
+    }
+
+    const faceCount = await this.sharedSpaceRepository.getPersonFaceCount(personId);
+    const assetCount = await this.sharedSpaceRepository.getPersonAssetCount(personId);
+    const alias = await this.sharedSpaceRepository.getAlias(personId, auth.user.id);
+
+    return this.mapSpacePerson(person, faceCount, assetCount, alias?.alias ?? null);
+  }
+
+  async getSpacePersonThumbnail(auth: AuthDto, spaceId: string, personId: string): Promise<ImmichMediaResponse> {
+    await this.requireMembership(auth, spaceId);
+
+    const person = await this.sharedSpaceRepository.getPersonById(personId);
+    if (!person || person.spaceId !== spaceId || !person.thumbnailPath) {
+      throw new NotFoundException();
+    }
+
+    return this.serveFromBackend(
+      person.thumbnailPath,
+      mimeTypes.lookup(person.thumbnailPath),
+      CacheControl.PrivateWithoutCache,
+    );
+  }
+
+  async updateSpacePerson(
+    auth: AuthDto,
+    spaceId: string,
+    personId: string,
+    dto: SharedSpacePersonUpdateDto,
+  ): Promise<SharedSpacePersonResponseDto> {
+    await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
+
+    const person = await this.sharedSpaceRepository.getPersonById(personId);
+    if (!person || person.spaceId !== spaceId) {
+      throw new BadRequestException('Person not found');
+    }
+
+    const updated = await this.sharedSpaceRepository.updatePerson(personId, {
+      name: dto.name,
+      isHidden: dto.isHidden,
+      birthDate: dto.birthDate,
+      representativeFaceId: dto.representativeFaceId,
+    });
+
+    const faceCount = await this.sharedSpaceRepository.getPersonFaceCount(personId);
+    const assetCount = await this.sharedSpaceRepository.getPersonAssetCount(personId);
+    const alias = await this.sharedSpaceRepository.getAlias(personId, auth.user.id);
+
+    return this.mapSpacePerson(updated, faceCount, assetCount, alias?.alias ?? null);
+  }
+
+  async deleteSpacePerson(auth: AuthDto, spaceId: string, personId: string): Promise<void> {
+    await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
+
+    const person = await this.sharedSpaceRepository.getPersonById(personId);
+    if (!person || person.spaceId !== spaceId) {
+      throw new BadRequestException('Person not found');
+    }
+
+    await this.sharedSpaceRepository.deletePerson(personId);
+  }
+
+  async mergeSpacePeople(
+    auth: AuthDto,
+    spaceId: string,
+    targetPersonId: string,
+    dto: SharedSpacePersonMergeDto,
+  ): Promise<void> {
+    await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
+
+    const target = await this.sharedSpaceRepository.getPersonById(targetPersonId);
+    if (!target || target.spaceId !== spaceId) {
+      throw new BadRequestException('Person not found');
+    }
+
+    if (dto.ids.includes(targetPersonId)) {
+      throw new BadRequestException('Cannot merge a person into themselves');
+    }
+
+    for (const sourceId of dto.ids) {
+      const source = await this.sharedSpaceRepository.getPersonById(sourceId);
+      if (!source || source.spaceId !== spaceId) {
+        continue;
+      }
+
+      await this.sharedSpaceRepository.reassignPersonFaces(sourceId, targetPersonId);
+      await this.sharedSpaceRepository.deletePerson(sourceId);
+    }
+  }
+
+  async setSpacePersonAlias(
+    auth: AuthDto,
+    spaceId: string,
+    personId: string,
+    dto: SharedSpacePersonAliasDto,
+  ): Promise<void> {
+    await this.requireMembership(auth, spaceId);
+
+    const person = await this.sharedSpaceRepository.getPersonById(personId);
+    if (!person || person.spaceId !== spaceId) {
+      throw new BadRequestException('Person not found');
+    }
+
+    await this.sharedSpaceRepository.upsertAlias({
+      personId,
+      userId: auth.user.id,
+      alias: dto.alias,
+    });
+  }
+
+  async deleteSpacePersonAlias(auth: AuthDto, spaceId: string, personId: string): Promise<void> {
+    await this.requireMembership(auth, spaceId);
+    await this.sharedSpaceRepository.deleteAlias(personId, auth.user.id);
+  }
+
+  async getSpacePersonAssets(auth: AuthDto, spaceId: string, personId: string): Promise<string[]> {
+    await this.requireMembership(auth, spaceId);
+
+    const person = await this.sharedSpaceRepository.getPersonById(personId);
+    if (!person || person.spaceId !== spaceId) {
+      throw new BadRequestException('Person not found');
+    }
+
+    const assets = await this.sharedSpaceRepository.getPersonAssetIds(personId);
+    return assets.map((a) => a.assetId);
+  }
+
+  @OnJob({ name: JobName.SharedSpaceFaceMatch, queue: QueueName.FacialRecognition })
+  async handleSharedSpaceFaceMatch({ spaceId, assetId }: JobOf<JobName.SharedSpaceFaceMatch>): Promise<JobStatus> {
+    const space = await this.sharedSpaceRepository.getById(spaceId);
+    if (!space || !space.faceRecognitionEnabled) {
+      return JobStatus.Skipped;
+    }
+
+    const { machineLearning } = await this.getConfig({ withCache: true });
+    const maxDistance = machineLearning.facialRecognition.maxDistance;
+
+    const faces = await this.sharedSpaceRepository.getAssetFacesForMatching(assetId);
+    for (const face of faces) {
+      const isAssigned = await this.sharedSpaceRepository.isPersonFaceAssigned(face.id, spaceId);
+      if (isAssigned) {
+        continue;
+      }
+
+      const matches = await this.sharedSpaceRepository.findClosestSpacePerson(spaceId, face.embedding, {
+        maxDistance,
+        numResults: 1,
+      });
+
+      let personId: string;
+      if (matches.length > 0) {
+        personId = matches[0].personId;
+      } else {
+        let name = '';
+        if (face.personId) {
+          const personalPerson = await this.personRepository.getById(face.personId);
+          if (personalPerson?.name) {
+            name = personalPerson.name;
+          }
+        }
+
+        const newPerson = await this.sharedSpaceRepository.createPerson({
+          spaceId,
+          name,
+          representativeFaceId: face.id,
+        });
+        personId = newPerson.id;
+        await this.jobRepository.queue({
+          name: JobName.SharedSpacePersonThumbnail,
+          data: { id: newPerson.id },
+        });
+      }
+
+      await this.sharedSpaceRepository.addPersonFaces([{ personId, assetFaceId: face.id }]);
+    }
+
+    return JobStatus.Success;
+  }
+
+  @OnJob({ name: JobName.SharedSpaceFaceMatchAll, queue: QueueName.FacialRecognition })
+  async handleSharedSpaceFaceMatchAll({ spaceId }: JobOf<JobName.SharedSpaceFaceMatchAll>): Promise<JobStatus> {
+    const space = await this.sharedSpaceRepository.getById(spaceId);
+    if (!space || !space.faceRecognitionEnabled) {
+      return JobStatus.Skipped;
+    }
+
+    const assets = await this.sharedSpaceRepository.getAssetIdsInSpace(spaceId);
+    for (const { assetId } of assets) {
+      await this.jobRepository.queue({
+        name: JobName.SharedSpaceFaceMatch,
+        data: { spaceId, assetId },
+      });
+    }
+
+    return JobStatus.Success;
+  }
+
+  @OnJob({ name: JobName.SharedSpacePersonThumbnail, queue: QueueName.ThumbnailGeneration })
+  async handleSharedSpacePersonThumbnail({ id }: JobOf<JobName.SharedSpacePersonThumbnail>): Promise<JobStatus> {
+    const person = await this.sharedSpaceRepository.getPersonById(id);
+    if (!person || !person.representativeFaceId) {
+      return JobStatus.Skipped;
+    }
+
+    // Look up the actual face to find the personal person ID for thumbnail generation
+    const face = await this.personRepository.getFaceById(person.representativeFaceId);
+    if (!face) {
+      return JobStatus.Skipped;
+    }
+
+    // If the face's personal person has a thumbnail, copy its path
+    if (face.personId) {
+      const personalPerson = await this.personRepository.getById(face.personId);
+      if (personalPerson?.thumbnailPath) {
+        await this.sharedSpaceRepository.updatePerson(id, {
+          thumbnailPath: personalPerson.thumbnailPath,
+        });
+        return JobStatus.Success;
+      }
+    }
+
+    return JobStatus.Skipped;
   }
 
   private async requireMembership(auth: AuthDto, spaceId: string) {
@@ -441,7 +743,9 @@ export class SharedSpaceService extends BaseService {
     createdAt: unknown;
     updatedAt: unknown;
     thumbnailAssetId?: string | null;
+    thumbnailCropY?: number | null;
     color?: string | null;
+    faceRecognitionEnabled?: boolean;
     lastActivityAt?: Date | null;
   }): SharedSpaceResponseDto {
     return {
@@ -452,8 +756,32 @@ export class SharedSpaceService extends BaseService {
       createdAt: space.createdAt as unknown as string,
       updatedAt: space.updatedAt as unknown as string,
       thumbnailAssetId: space.thumbnailAssetId ?? null,
+      thumbnailCropY: space.thumbnailCropY ?? null,
       color: (space.color as UserAvatarColor) ?? null,
+      faceRecognitionEnabled: space.faceRecognitionEnabled ?? true,
       lastActivityAt: space.lastActivityAt ? space.lastActivityAt.toISOString() : null,
+    };
+  }
+
+  private mapSpacePerson(
+    person: SharedSpacePerson,
+    faceCount: number,
+    assetCount: number,
+    alias: string | null,
+  ): SharedSpacePersonResponseDto {
+    return {
+      id: person.id,
+      spaceId: person.spaceId,
+      name: person.name,
+      thumbnailPath: person.thumbnailPath,
+      isHidden: person.isHidden,
+      birthDate: person.birthDate,
+      representativeFaceId: person.representativeFaceId,
+      faceCount,
+      assetCount,
+      alias,
+      createdAt: (person.createdAt as unknown as Date).toISOString(),
+      updatedAt: (person.updatedAt as unknown as Date).toISOString(),
     };
   }
 }
