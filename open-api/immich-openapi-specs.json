@@ -23589,6 +23589,11 @@
             "nullable": true,
             "type": "string"
           },
+          "thumbnailCropY": {
+            "description": "Vertical crop position for cover photo (0-100)",
+            "nullable": true,
+            "type": "number"
+          },
           "updatedAt": {
             "description": "Last update date",
             "type": "string"
@@ -23637,6 +23642,13 @@
             "format": "uuid",
             "nullable": true,
             "type": "string"
+          },
+          "thumbnailCropY": {
+            "description": "Vertical crop position for cover photo (0-100)",
+            "maximum": 100,
+            "minimum": 0,
+            "nullable": true,
+            "type": "integer"
           }
         },
         "type": "object"

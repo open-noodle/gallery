@@ -33,6 +33,9 @@ export class SharedSpaceTable {
   @Column({ type: 'character varying', length: 20, nullable: true })
   color!: string | null;
 
+  @Column({ type: 'integer', nullable: true })
+  thumbnailCropY!: number | null;
+
   @Column({ type: 'timestamp with time zone', nullable: true })
   lastActivityAt!: Timestamp | null;
 

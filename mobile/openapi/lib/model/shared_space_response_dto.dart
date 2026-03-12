@@ -29,6 +29,7 @@ class SharedSpaceResponseDto {
     this.recentAssetIds = const [],
     this.recentAssetThumbhashes = const [],
     this.thumbnailAssetId,
+    this.thumbnailCropY,
     required this.updatedAt,
   });
 
@@ -103,6 +104,9 @@ class SharedSpaceResponseDto {
   /// Thumbnail asset ID
   String? thumbnailAssetId;
 
+  /// Vertical crop position for cover photo (0-100)
+  num? thumbnailCropY;
+
   /// Last update date
   String updatedAt;
 
@@ -124,6 +128,7 @@ class SharedSpaceResponseDto {
     _deepEquality.equals(other.recentAssetIds, recentAssetIds) &&
     _deepEquality.equals(other.recentAssetThumbhashes, recentAssetThumbhashes) &&
     other.thumbnailAssetId == thumbnailAssetId &&
+    other.thumbnailCropY == thumbnailCropY &&
     other.updatedAt == updatedAt;
 
   @override
@@ -145,10 +150,11 @@ class SharedSpaceResponseDto {
     (recentAssetIds.hashCode) +
     (recentAssetThumbhashes.hashCode) +
     (thumbnailAssetId == null ? 0 : thumbnailAssetId!.hashCode) +
+    (thumbnailCropY == null ? 0 : thumbnailCropY!.hashCode) +
     (updatedAt.hashCode);
 
   @override
-  String toString() => 'SharedSpaceResponseDto[assetCount=$assetCount, color=$color, createdAt=$createdAt, createdById=$createdById, description=$description, id=$id, lastActivityAt=$lastActivityAt, lastContributor=$lastContributor, lastViewedAt=$lastViewedAt, memberCount=$memberCount, members=$members, name=$name, newAssetCount=$newAssetCount, recentAssetIds=$recentAssetIds, recentAssetThumbhashes=$recentAssetThumbhashes, thumbnailAssetId=$thumbnailAssetId, updatedAt=$updatedAt]';
+  String toString() => 'SharedSpaceResponseDto[assetCount=$assetCount, color=$color, createdAt=$createdAt, createdById=$createdById, description=$description, id=$id, lastActivityAt=$lastActivityAt, lastContributor=$lastContributor, lastViewedAt=$lastViewedAt, memberCount=$memberCount, members=$members, name=$name, newAssetCount=$newAssetCount, recentAssetIds=$recentAssetIds, recentAssetThumbhashes=$recentAssetThumbhashes, thumbnailAssetId=$thumbnailAssetId, thumbnailCropY=$thumbnailCropY, updatedAt=$updatedAt]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -204,6 +210,11 @@ class SharedSpaceResponseDto {
     } else {
     //  json[r'thumbnailAssetId'] = null;
     }
+    if (this.thumbnailCropY != null) {
+      json[r'thumbnailCropY'] = this.thumbnailCropY;
+    } else {
+    //  json[r'thumbnailCropY'] = null;
+    }
       json[r'updatedAt'] = this.updatedAt;
     return json;
   }
@@ -243,6 +254,9 @@ class SharedSpaceResponseDto {
             ? (json[r'recentAssetThumbhashes'] as Iterable).cast<String>().toList(growable: false)
             : const [],
         thumbnailAssetId: mapValueOfType<String>(json, r'thumbnailAssetId'),
+        thumbnailCropY: json[r'thumbnailCropY'] == null
+            ? null
+            : num.parse('${json[r'thumbnailCropY']}'),
         updatedAt: mapValueOfType<String>(json, r'updatedAt')!,
       );
     }

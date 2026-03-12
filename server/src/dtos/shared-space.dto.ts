@@ -44,6 +44,13 @@ export class SharedSpaceUpdateDto {
   @ValidateUUID({ optional: true, nullable: true, description: 'Thumbnail asset ID' })
   thumbnailAssetId?: string | null;
 
+  @ApiPropertyOptional({ description: 'Vertical crop position for cover photo (0-100)', type: 'integer' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  thumbnailCropY?: number | null;
+
   @ValidateEnum({
     enum: UserAvatarColor,
     name: 'UserAvatarColor',
@@ -137,6 +144,9 @@ export class SharedSpaceResponseDto {
 
   @ApiPropertyOptional({ description: 'Thumbnail asset ID' })
   thumbnailAssetId?: string | null;
+
+  @ApiPropertyOptional({ description: 'Vertical crop position for cover photo (0-100)' })
+  thumbnailCropY?: number | null;
 
   @ApiPropertyOptional({ description: 'Space color', enum: UserAvatarColor })
   color?: UserAvatarColor | null;
