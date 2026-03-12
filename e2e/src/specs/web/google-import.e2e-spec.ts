@@ -105,18 +105,11 @@ test.describe('Google Photos Import', () => {
     // Step 5: Wait for import to complete
     await expect(page.getByText(/import complete/i)).toBeVisible({ timeout: 30_000 });
 
-    // Verify a favorited asset was uploaded with correct metadata.
-    // Poll because the search index may lag behind on slower runners (ARM).
-    let foundAsset;
-    for (let attempt = 0; attempt < 10; attempt++) {
-      const { assets } = await utils.searchAssets(admin.accessToken, { originalFileName: 'IMG_001.png' });
-      if (assets.items.length > 0) {
-        foundAsset = assets.items[0];
-        break;
-      }
-      await page.waitForTimeout(1000);
-    }
-    expect(foundAsset).toBeDefined();
-    expect(foundAsset!.isFavorite).toBe(true);
+    // Wait for background processing queues to finish before searching
+    await utils.waitForQueueFinish(admin.accessToken, 'metadataExtraction');
+
+    const { assets } = await utils.searchAssets(admin.accessToken, { originalFileName: 'IMG_001.png' });
+    expect(assets.items).toHaveLength(1);
+    expect(assets.items[0].isFavorite).toBe(true);
   });
 });
