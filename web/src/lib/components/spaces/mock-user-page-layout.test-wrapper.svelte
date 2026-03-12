@@ -7,7 +7,6 @@
     leading?: Snippet;
     buttons?: Snippet;
     children?: Snippet;
-    [key: string]: unknown;
   }
 
   let { title, leading, buttons, children }: Props = $props();
