@@ -70,7 +70,10 @@
     <SpaceCollage assets={collageAssets} {gradientClass} {preload} />
 
     {#if isPinned}
-      <div class="absolute top-2 start-2 z-10 rounded-full bg-white/70 p-1 dark:bg-gray-800/70" data-testid="pin-overlay">
+      <div
+        class="absolute top-2 start-2 z-10 rounded-full bg-white/70 p-1 dark:bg-gray-800/70"
+        data-testid="pin-overlay"
+      >
         <Icon icon={mdiPin} size="14" class="text-gray-600 dark:text-gray-400" />
       </div>
     {/if}

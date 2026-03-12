@@ -15,6 +15,7 @@ Add `viewMode: 'card' | 'list'` to `SpaceViewSettings` in `space-view.store.ts`,
 ### Controls
 
 Add a toggle button in `spaces-controls.svelte` (right side, next to sort dropdown). Uses the album page pattern:
+
 - In card mode: shows list icon (`mdiFormatListBulletedSquare`) to switch to list
 - In list mode: shows grid icon (`mdiViewGridOutline`) to switch to cards
 
@@ -26,10 +27,10 @@ Increase grid size from `grid-auto-fill-56` (14rem) to `grid-auto-fill-72` (18re
 
 New component rendering a `<table>` with 6 columns:
 
-| Name | Role | Photos | Members | New | Last Activity |
-|------|------|--------|---------|-----|---------------|
-| Family Vacation | Owner | 342 | 5 | 12 new | 2h ago |
-| NYC Trip | Editor | 89 | 3 | — | 5d ago |
+| Name            | Role   | Photos | Members | New    | Last Activity |
+| --------------- | ------ | ------ | ------- | ------ | ------------- |
+| Family Vacation | Owner  | 342    | 5       | 12 new | 2h ago        |
+| NYC Trip        | Editor | 89     | 3       | —      | 5d ago        |
 
 **Row anatomy:**
 
@@ -41,6 +42,7 @@ New component rendering a `<table>` with 6 columns:
 ```
 
 Column details:
+
 - **Color bar**: 3px vertical left-edge bar using the space's gradient color. Carries space color identity from cards into list mode.
 - **Name**: 32x32 rounded-lg `SpaceCollage` thumbnail + clickable link to space detail.
 - **Role**: Reuses existing `role-badge.svelte`.
@@ -71,6 +73,7 @@ Client-only (localStorage). No server changes — pinning is a personal UI prefe
 ### Pin/Unpin Interaction
 
 Two access methods:
+
 1. **Three-dot menu on hover** — top-right of card (or row), shows on hover. Options: "Pin to top" / "Unpin".
 2. **Right-click context menu** — on cards and list rows with the same options.
 
@@ -104,9 +107,11 @@ Pinned spaces respect the active sort among themselves. Unpinned spaces sort sep
 ## Files Affected
 
 **Modified:**
+
 - `web/src/lib/stores/space-view.store.ts` — add `viewMode`, `pinnedSpaceIds`
 - `web/src/lib/components/spaces/spaces-controls.svelte` — add view toggle button
 - `web/src/routes/(user)/spaces/+page.svelte` — conditional rendering, pinned section, larger grid, context menus
 
 **New:**
+
 - `web/src/lib/components/spaces/spaces-table.svelte` — list view table component

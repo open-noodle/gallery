@@ -13,6 +13,7 @@
 ### Task 1: Add `viewMode` to store
 
 **Files:**
+
 - Modify: `web/src/lib/stores/space-view.store.ts`
 
 **Step 1: Write the failing test**
@@ -73,6 +74,7 @@ git commit -m "feat(spaces): add viewMode to space view settings store"
 ### Task 2: Add `pinnedSpaceIds` store
 
 **Files:**
+
 - Modify: `web/src/lib/stores/space-view.store.ts`
 - Modify: `web/src/lib/stores/space-view.store.spec.ts`
 
@@ -121,6 +123,7 @@ git commit -m "feat(spaces): add pinnedSpaceIds persisted store"
 ### Task 3: Add SharedSpaceResponseDto test factory
 
 **Files:**
+
 - Create: `web/src/test-data/factories/shared-space-factory.ts`
 
 **Step 1: Write the factory**
@@ -170,6 +173,7 @@ git commit -m "test: add SharedSpaceResponseDto test factory"
 ### Task 4: Add view toggle button to SpacesControls
 
 **Files:**
+
 - Modify: `web/src/lib/components/spaces/spaces-controls.svelte`
 
 **Step 1: Write the failing test**
@@ -252,6 +256,7 @@ git commit -m "feat(spaces): add list/grid view toggle button to controls"
 ### Task 5: Create SpacesTable component
 
 **Files:**
+
 - Create: `web/src/lib/components/spaces/spaces-table.svelte`
 - Create: `web/src/lib/components/spaces/spaces-table.spec.ts`
 
@@ -491,6 +496,7 @@ git commit -m "feat(spaces): add SpacesTable list view component"
 ### Task 6: Wire up view toggle in spaces page
 
 **Files:**
+
 - Modify: `web/src/routes/(user)/spaces/+page.svelte`
 
 **Step 1: Write the failing test**
@@ -561,6 +567,7 @@ git commit -m "feat(spaces): wire view toggle and increase card grid to 72"
 ### Task 7: Add pinned spaces splitting logic
 
 **Files:**
+
 - Create: `web/src/lib/utils/space-utils.ts`
 - Create: `web/src/lib/utils/space-utils.spec.ts`
 
@@ -671,6 +678,7 @@ git commit -m "feat(spaces): add splitPinnedSpaces utility"
 ### Task 8: Add context menu to SpaceCard for pin/unpin
 
 **Files:**
+
 - Modify: `web/src/lib/components/spaces/space-card.svelte`
 - Create: `web/src/lib/components/spaces/space-card.spec.ts`
 
@@ -820,6 +828,7 @@ git commit -m "feat(spaces): add pin/unpin context menu and overlay to SpaceCard
 ### Task 9: Add context menu to SpacesTable rows
 
 **Files:**
+
 - Modify: `web/src/lib/components/spaces/spaces-table.svelte`
 - Modify: `web/src/lib/components/spaces/spaces-table.spec.ts`
 
@@ -878,6 +887,7 @@ Expected: FAIL — `pinnedIds` and `onTogglePin` props not accepted.
 Add to `SpacesTable` props: `pinnedIds: string[] = []`, `onTogglePin: (id: string) => void = () => {}`.
 
 For each row:
+
 - Track `hoveredId` state. On `onmouseenter`, set `hoveredId = space.id`. On `onmouseleave`, clear it.
 - Show pin icon in name cell when `pinnedIds.includes(space.id)`:
   ```svelte
@@ -905,6 +915,7 @@ git commit -m "feat(spaces): add pin/unpin context menu to SpacesTable rows"
 ### Task 10: Wire pinned sections into spaces page
 
 **Files:**
+
 - Modify: `web/src/routes/(user)/spaces/+page.svelte`
 
 **Step 1: Implement the pinned section rendering**
@@ -954,6 +965,7 @@ git commit -m "feat(spaces): wire pinned sections into spaces list page"
 ### Task 11: Add i18n keys
 
 **Files:**
+
 - Modify: `i18n/en.json`
 
 **Step 1: Add i18n keys**

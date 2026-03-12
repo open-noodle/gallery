@@ -1,7 +1,7 @@
-import { render } from '@testing-library/svelte';
-import userEvent from '@testing-library/user-event';
 import SpacesTable from '$lib/components/spaces/spaces-table.svelte';
 import type { SharedSpaceResponseDto } from '@immich/sdk';
+import { render } from '@testing-library/svelte';
+import userEvent from '@testing-library/user-event';
 
 vi.mock('$lib/route', () => ({
   Route: {
@@ -94,7 +94,11 @@ describe('SpacesTable', () => {
   });
 
   it('renders correct number of rows for multiple spaces', () => {
-    const spaces = [makeSpace({ id: 's1', name: 'A' }), makeSpace({ id: 's2', name: 'B' }), makeSpace({ id: 's3', name: 'C' })];
+    const spaces = [
+      makeSpace({ id: 's1', name: 'A' }),
+      makeSpace({ id: 's2', name: 'B' }),
+      makeSpace({ id: 's3', name: 'C' }),
+    ];
     const { getAllByTestId } = render(SpacesTable, { props: { spaces, currentUserId: 'user-1' } });
     expect(getAllByTestId('space-row')).toHaveLength(3);
   });

@@ -1,8 +1,8 @@
-import { render } from '@testing-library/svelte';
-import userEvent from '@testing-library/user-event';
 import SpacesControls from '$lib/components/spaces/spaces-controls.svelte';
 import { SpaceSortBy, spaceViewSettings } from '$lib/stores/space-view.store';
 import type { SharedSpaceResponseDto } from '@immich/sdk';
+import { render } from '@testing-library/svelte';
+import userEvent from '@testing-library/user-event';
 import { get } from 'svelte/store';
 
 const makeSpace = (overrides: Partial<SharedSpaceResponseDto> = {}): SharedSpaceResponseDto => ({

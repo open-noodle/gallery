@@ -51,7 +51,9 @@
     <SpacesControls {spaces} onSorted={(sorted) => (sortedSpaces = sorted)} />
 
     {#if split.showSection}
-      <div class="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
+      <div
+        class="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500"
+      >
         <Icon icon={mdiPin} size="14" />
         <span>{$t('spaces_pinned')}</span>
       </div>
@@ -59,12 +61,22 @@
 
     {#if $spaceViewSettings.viewMode === 'list'}
       {#if split.pinned.length > 0}
-        <SpacesTable spaces={split.pinned} currentUserId={$user?.id ?? ''} pinnedIds={$pinnedSpaceIds} onTogglePin={handleTogglePin} />
+        <SpacesTable
+          spaces={split.pinned}
+          currentUserId={$user?.id ?? ''}
+          pinnedIds={$pinnedSpaceIds}
+          onTogglePin={handleTogglePin}
+        />
       {/if}
       {#if split.showSection}
         <hr class="my-4 border-gray-200 dark:border-gray-700" />
       {/if}
-      <SpacesTable spaces={split.unpinned} currentUserId={$user?.id ?? ''} pinnedIds={$pinnedSpaceIds} onTogglePin={handleTogglePin} />
+      <SpacesTable
+        spaces={split.unpinned}
+        currentUserId={$user?.id ?? ''}
+        pinnedIds={$pinnedSpaceIds}
+        onTogglePin={handleTogglePin}
+      />
     {:else}
       <div class="grid grid-auto-fill-72 gap-y-4">
         {#each split.pinned as space, index (space.id)}

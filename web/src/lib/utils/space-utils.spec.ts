@@ -2,7 +2,13 @@ import { splitPinnedSpaces } from '$lib/utils/space-utils';
 
 type MinimalSpace = { id: string; [key: string]: unknown };
 
-const makeSpace = (id: string): MinimalSpace => ({ id, name: `Space ${id}`, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), createdById: 'user-1' });
+const makeSpace = (id: string): MinimalSpace => ({
+  id,
+  name: `Space ${id}`,
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+  createdById: 'user-1',
+});
 
 describe('splitPinnedSpaces', () => {
   it('should return empty pinned and all unpinned when no IDs pinned', () => {
