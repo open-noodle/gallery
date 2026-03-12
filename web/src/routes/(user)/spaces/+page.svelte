@@ -6,11 +6,12 @@
   import SpacesTable from '$lib/components/spaces/spaces-table.svelte';
   import SpaceCreateModal from '$lib/modals/SpaceCreateModal.svelte';
   import { Route } from '$lib/route';
-  import { spaceViewSettings } from '$lib/stores/space-view.store';
+  import { pinnedSpaceIds, spaceViewSettings } from '$lib/stores/space-view.store';
   import { user } from '$lib/stores/user.store';
+  import { splitPinnedSpaces } from '$lib/utils/space-utils';
   import { type SharedSpaceResponseDto } from '@immich/sdk';
-  import { Button, modalManager } from '@immich/ui';
-  import { mdiPlus } from '@mdi/js';
+  import { Button, Icon, modalManager } from '@immich/ui';
+  import { mdiPin, mdiPlus } from '@mdi/js';
   import { goto } from '$app/navigation';
   import { t } from 'svelte-i18n';
   import type { PageData } from './$types';
@@ -23,11 +24,17 @@
   let spaces: SharedSpaceResponseDto[] = $state(data.spaces);
   let sortedSpaces: SharedSpaceResponseDto[] = $state(data.spaces);
 
+  let split = $derived(splitPinnedSpaces(sortedSpaces, $pinnedSpaceIds));
+
   const handleCreate = async () => {
     const space = await modalManager.show(SpaceCreateModal, {});
     if (space) {
       await goto(Route.viewSpace({ id: space.id }));
     }
+  };
+
+  const handleTogglePin = (id: string) => {
+    pinnedSpaceIds.update((ids) => (ids.includes(id) ? ids.filter((i) => i !== id) : [...ids, id]));
   };
 </script>
 
@@ -42,12 +49,34 @@
     <EmptyPlaceholder text={$t('spaces_empty')} onClick={handleCreate} class="mt-10 mx-auto" />
   {:else}
     <SpacesControls {spaces} onSorted={(sorted) => (sortedSpaces = sorted)} />
+
+    {#if split.showSection}
+      <div class="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
+        <Icon icon={mdiPin} size="14" />
+        <span>Pinned</span>
+      </div>
+    {/if}
+
     {#if $spaceViewSettings.viewMode === 'list'}
-      <SpacesTable spaces={sortedSpaces} currentUserId={$user?.id ?? ''} />
+      {#if split.pinned.length > 0}
+        <SpacesTable spaces={split.pinned} currentUserId={$user?.id ?? ''} pinnedIds={$pinnedSpaceIds} onTogglePin={handleTogglePin} />
+      {/if}
+      {#if split.showSection}
+        <hr class="my-4 border-gray-200 dark:border-gray-700" />
+      {/if}
+      <SpacesTable spaces={split.unpinned} currentUserId={$user?.id ?? ''} pinnedIds={$pinnedSpaceIds} onTogglePin={handleTogglePin} />
     {:else}
       <div class="grid grid-auto-fill-72 gap-y-4">
-        {#each sortedSpaces as space, index (space.id)}
-          <SpaceCard {space} preload={index < 20} />
+        {#each split.pinned as space, index (space.id)}
+          <SpaceCard {space} preload={index < 20} isPinned={true} onTogglePin={handleTogglePin} />
+        {/each}
+      </div>
+      {#if split.showSection}
+        <hr class="my-4 border-gray-200 dark:border-gray-700" />
+      {/if}
+      <div class="grid grid-auto-fill-72 gap-y-4">
+        {#each split.unpinned as space, index (space.id)}
+          <SpaceCard {space} preload={index < 20} isPinned={false} onTogglePin={handleTogglePin} />
         {/each}
       </div>
     {/if}
