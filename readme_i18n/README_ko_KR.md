@@ -41,6 +41,9 @@
 
 </p>
 
+> [!NOTE]
+> 이것은 추가 기능이 포함된 [Immich](https://github.com/immich-app/immich)의 **커뮤니티 포크**입니다. Docker 이미지, 전환 방법 및 전체 변경 사항 목록은 [메인 README](../README.md)를 참조하세요.
+
 > [!WARNING]
 > ⚠️ 중요한 사진과 동영상을 위해 항상 [3-2-1](https://www.backblaze.com/blog/the-3-2-1-backup-strategy/) 백업 계획을 따르세요!
 >

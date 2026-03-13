@@ -103,6 +103,8 @@ dependencies {
   ksp libs.glide.ksp
   coreLibraryDesugaring libs.desugar.jdk.libs
 
+  androidTestUtil "androidx.test:orchestrator:1.5.1"
+
   //Glance Widget
   implementation libs.glance.appwidget
   implementation libs.gson
