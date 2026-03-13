@@ -80,6 +80,10 @@ export class SearchService extends BaseService {
       requireElevatedPermission(auth);
     }
 
+    if (dto.spaceId) {
+      await this.requireAccess({ auth, permission: Permission.SharedSpaceRead, ids: [dto.spaceId] });
+    }
+
     let checksum: Buffer | undefined;
     if (dto.checksum) {
       const encoding = dto.checksum.length === 28 ? 'base64' : 'hex';
@@ -172,6 +176,10 @@ export class SearchService extends BaseService {
 
     if (dto.visibility === AssetVisibility.Locked) {
       requireElevatedPermission(auth);
+    }
+
+    if (dto.spaceId) {
+      await this.requireAccess({ auth, permission: Permission.SharedSpaceRead, ids: [dto.spaceId] });
     }
 
     const { machineLearning } = await this.getConfig({ withCache: false });

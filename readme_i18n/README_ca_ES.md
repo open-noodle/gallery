@@ -39,6 +39,9 @@
   <a href="README_ml_IN.md">മലയാളം</a>
 </p>
 
+> [!NOTE]
+> Aquesta és una **bifurcació comunitària** d'[Immich](https://github.com/immich-app/immich) amb funcionalitats addicionals. Per a les imatges Docker, instruccions de canvi i la llista completa de canvis, consulteu el [README principal](../README.md).
+
 > [!WARNING]
 > ⚠️ Always follow [3-2-1](https://www.backblaze.com/blog/the-3-2-1-backup-strategy/) backup plan for your precious photos and videos!
 >
