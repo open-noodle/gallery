@@ -53,6 +53,9 @@ import { VersionService } from 'src/services/version.service.js';
 import { ViewService } from 'src/services/view.service.js';
 import { WorkflowExecutionService } from 'src/services/workflow-execution.service.js';
 import { WorkflowService } from 'src/services/workflow.service.js';
+import { PetDetectionService } from 'src/services/pet-detection.service.js';
+import { SharedSpaceService } from 'src/services/shared-space.service.js';
+import { StorageMigrationService } from 'src/services/storage-migration.service.js';
 
 export const services = [
   ApiKeyService,
@@ -85,6 +88,7 @@ export const services = [
   ClusterGroupService,
   PartnerService,
   PasskeyService,
+  PetDetectionService,
   PersonService,
   PluginService,
   QueueService,
@@ -92,8 +96,10 @@ export const services = [
   ServerService,
   SessionService,
   SharedLinkService,
+  SharedSpaceService,
   SmartInfoService,
   StackService,
+  StorageMigrationService,
   StorageService,
   StorageTemplateService,
   SyncService,

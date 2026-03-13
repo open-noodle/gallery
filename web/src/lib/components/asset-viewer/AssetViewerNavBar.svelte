@@ -116,6 +116,8 @@
     <ActionButton action={Actions.Info} />
     <ActionButton action={Actions.Favorite} />
     <ActionButton action={Actions.Unfavorite} />
+
+    <ActionButton action={Actions.RotateRight} />
     <ActionButton action={Actions.Edit} />
 
     {#if isOwner}
@@ -128,6 +130,8 @@
 
         <ActionMenuItem action={Actions.Download} />
         <ActionMenuItem action={Actions.DownloadOriginal} />
+        <ActionMenuItem action={Actions.RotateLeft} />
+        <ActionMenuItem action={Actions.Rotate180} />
 
         {#if !isLocked && asset.isTrashed}
           <RestoreAction {asset} {onAction} />

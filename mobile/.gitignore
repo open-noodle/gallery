@@ -71,3 +71,5 @@ lib/generated/
 
 # Flutter widget previews cache
 .widget_preview/
+
+integration_test/test_bundle.dart

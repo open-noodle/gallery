@@ -5,8 +5,8 @@
   import { getPersonActions } from '#lib/services/person.service.ts';
   import { getPeopleThumbnailUrl } from '#lib/utils.ts';
   import { type PersonResponseDto } from '@immich/sdk';
-  import { ContextMenuButton } from '@immich/ui';
-  import { mdiAccountMultipleCheckOutline } from '@mdi/js';
+  import { ContextMenuButton, Icon } from '@immich/ui';
+  import { mdiAccountMultipleCheckOutline, mdiPaw } from '@mdi/js';
   import { t } from 'svelte-i18n';
 
   type Props = {
@@ -45,6 +45,14 @@
         preload={false}
       />
       <PersonIndicator {person} />
+      {#if person.type === 'pet'}
+        <div
+          class="absolute bottom-1 right-1 rounded-full bg-immich-primary p-1 text-white"
+          title={person.species ?? undefined}
+        >
+          <Icon icon={mdiPaw} size="16" class="text-white" />
+        </div>
+      {/if}
     </div>
 
     <div class="absolute inset-e-2 top-2 opacity-0 group-hover:opacity-100 focus-within:opacity-100">

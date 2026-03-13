@@ -76,6 +76,10 @@
       missingText: $t('missing'),
       disabled: !machineLearning.ocr.enabled,
     },
+    [QueueName.PetDetection]: {
+      allText: $t('all'),
+      missingText: $t('missing'),
+    },
     [QueueName.VideoConversion]: {
       allText: $t('all'),
       missingText: $t('missing'),
