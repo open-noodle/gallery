@@ -459,10 +459,10 @@ const albumFactory = (album?: Partial<Omit<Album, 'assets'>>) => ({
 export const factory = {
   activity: activityFactory,
   apiKey: apiKeyFactory,
+  authUser: authUserFactory,
+  authApiKey: authApiKeyFactory,
   assetOcr: assetOcrFactory,
   auth: authFactory,
-  authApiKey: authApiKeyFactory,
-  authUser: authUserFactory,
   library: libraryFactory,
   partner: partnerFactory,
   queueStatistics: queueStatisticsFactory,

@@ -155,13 +155,6 @@ const createDto = Object.freeze({
   duration: '0:00:00.000000',
 }) as AssetMediaCreateDto;
 
-const replaceDto = Object.freeze({
-  deviceAssetId: 'deviceAssetId',
-  deviceId: 'deviceId',
-  fileModifiedAt: new Date('2024-04-15T23:41:36.910Z'),
-  fileCreatedAt: new Date('2024-04-15T23:41:36.910Z'),
-}) as AssetMediaReplaceDto;
-
 const assetEntity = Object.freeze({
   id: 'id_1',
   ownerId: 'user_id_1',
@@ -181,6 +174,13 @@ const assetEntity = Object.freeze({
   },
   livePhotoVideoId: null,
 } as MapAsset);
+
+const replaceDto = Object.freeze({
+  deviceAssetId: 'deviceAssetId',
+  deviceId: 'deviceId',
+  fileModifiedAt: new Date('2024-04-15T23:41:36.910Z'),
+  fileCreatedAt: new Date('2024-04-15T23:41:36.910Z'),
+}) as AssetMediaReplaceDto;
 
 const existingAsset = Object.freeze({
   ...assetEntity,
