@@ -41,7 +41,7 @@ import { PersonTable } from 'src/schema/tables/person.table';
 import { BaseService } from 'src/services/base.service';
 import { JobItem, JobOf } from 'src/types';
 import { getDimensions } from 'src/utils/asset.util';
-import { ImmichFileResponse } from 'src/utils/file';
+import { ImmichMediaResponse } from 'src/utils/file';
 import { mimeTypes } from 'src/utils/mime-types';
 import { batched, findOrFail, isFacialRecognitionEnabled } from 'src/utils/misc';
 import { Point, transformPoints } from 'src/utils/transform';
@@ -167,18 +167,18 @@ export class PersonService extends BaseService {
     return this.personRepository.getStatistics(personGroupId, auth.user.id);
   }
 
-  async getThumbnail(auth: AuthDto, personGroupId: string): Promise<ImmichFileResponse> {
+  async getThumbnail(auth: AuthDto, personGroupId: string): Promise<ImmichMediaResponse> {
     await this.requireAccess({ auth, permission: Permission.PersonRead, ids: [personGroupId] });
     const person = await this.personRepository.getByGroupId({ ownerId: auth.user.id, personGroupId });
     if (!person || !person.thumbnailPath) {
       throw new NotFoundException();
     }
 
-    return new ImmichFileResponse({
-      path: person.thumbnailPath,
-      contentType: mimeTypes.lookup(person.thumbnailPath),
-      cacheControl: CacheControl.PrivateWithoutCache,
-    });
+    return this.serveFromBackend(
+      person.thumbnailPath,
+      mimeTypes.lookup(person.thumbnailPath),
+      CacheControl.PrivateWithoutCache,
+    );
   }
 
   async create(auth: AuthDto, dto: PersonCreateDto): Promise<PersonResponseDto> {
@@ -266,8 +266,11 @@ export class PersonService extends BaseService {
       return;
     }
 
+    // Upstream unlinks inline; the fork queues a FileDelete job so S3-backed thumbnails are removed
+    // through the storage abstraction. Keep that on top of upstream's delete-returns-the-rows shape.
     const people = await this.personRepository.delete(groupIds, ownerId);
-    await Promise.all(people.map((person) => this.storageRepository.unlink(person.thumbnailPath)));
+    const files = people.map((person) => person.thumbnailPath);
+    await this.jobRepository.queue({ name: JobName.FileDelete, data: { files } });
     await this.personRepository.deleteEmptyGroups();
     this.logger.debug(`Deleted ${groupIds.length} people`);
   }
@@ -561,6 +564,15 @@ export class PersonService extends BaseService {
 
       this.logger.debug(`Assigning face ${id} to person group ${personGroupId}`);
       await this.personRepository.reassignFaces({ faceIds: [id], newPersonGroupId: personGroupId });
+    }
+
+    // Queue shared space face matching for any spaces containing this asset
+    const spaceIds = await this.sharedSpaceRepository.getSpaceIdsForAsset(face.assetId);
+    for (const { spaceId } of spaceIds) {
+      await this.jobRepository.queue({
+        name: JobName.SharedSpaceFaceMatch,
+        data: { spaceId, assetId: face.assetId },
+      });
     }
 
     return JobStatus.Success;
