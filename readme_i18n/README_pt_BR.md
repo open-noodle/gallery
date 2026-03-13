@@ -42,6 +42,9 @@
 
 </p>
 
+> [!NOTE]
+> Este é um **fork comunitário** do [Immich](https://github.com/immich-app/immich) com funcionalidades adicionais. Para imagens Docker, instruções de migração e a lista completa de alterações, consulte o [README principal](../README.md).
+
 > [!WARNING]
 > ⚠️ Sempre siga o plano [3-2-1](https://www.backblaze.com/blog/the-3-2-1-backup-strategy/) de backup para as suas mídias preciosas!
 >

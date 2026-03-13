@@ -43,6 +43,8 @@
   <a href="README_ml_IN.md">മലയാളം</a>
 </p>
 
+> [!NOTE]
+> นี่คือ**ฟอร์กชุมชน**ของ [Immich](https://github.com/immich-app/immich) ที่มีฟีเจอร์เพิ่มเติม สำหรับ Docker images คำแนะนำการเปลี่ยนมาใช้ และรายการเปลี่ยนแปลงทั้งหมด โปรดดูที่ [README หลัก](../README.md)
 
 > [!WARNING]
 > ⚠️ ปฏิบัติตามแผนการสำรองข้อมูลแบบ [3-2-1](https://www.backblaze.com/blog/the-3-2-1-backup-strategy/) สำหรับภาพถ่ายและวิดีโอที่สำคัญของคุณอยู่เสมอ
