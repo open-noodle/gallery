@@ -61,10 +61,10 @@ class SharedSpacePage {
 
   /// Delete the current space via the popup menu.
   Future<void> deleteCurrentSpace() async {
-    await $(PopupMenuButton).waitUntilVisible(
+    await $(Icons.more_vert).waitUntilVisible(
       timeout: const Duration(seconds: 10),
     );
-    await $(PopupMenuButton).tap();
+    await $(Icons.more_vert).tap();
     await $.pump(const Duration(seconds: 1));
 
     await $('Delete Space').waitUntilVisible(
