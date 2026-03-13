@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:patrol/patrol.dart';
 
 import '../common/patrol_config.dart';

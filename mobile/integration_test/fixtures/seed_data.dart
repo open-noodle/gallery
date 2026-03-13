@@ -142,6 +142,11 @@ class TestDataSeeder {
       request.headers.set('Authorization', 'Bearer $secondUserAccessToken');
       final response = await request.close();
       final body = await response.transform(utf8.decoder).join();
+      if (response.statusCode != 200) {
+        throw StateError(
+          'Get user failed (${response.statusCode}): $body',
+        );
+      }
       final json = jsonDecode(body) as Map<String, dynamic>;
       return json['id'] as String;
     } finally {
