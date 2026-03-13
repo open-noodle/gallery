@@ -19,12 +19,18 @@
   let destroyed = false;
 
   $effect(() => {
-    if (src === undefined || capturedSource !== undefined) {
+    // gallery-fork: re-capture whenever the source CHANGES (not only on first
+    // capture) and release the previous object URL, in upstream's early-return shape.
+    if (src === undefined || src === capturedSource) {
       return;
     }
 
+    const oldSource = capturedSource;
     capturedSource = src;
     untrack(() => {
+      if (oldSource !== undefined) {
+        cancelImageUrl(oldSource);
+      }
       onStart?.();
     });
   });
