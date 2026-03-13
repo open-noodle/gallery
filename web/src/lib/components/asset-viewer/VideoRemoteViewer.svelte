@@ -1,9 +1,10 @@
 <script lang="ts">
   import { castManager, CastState } from '#lib/managers/cast-manager.svelte.ts';
   import { handleError } from '#lib/utils/handle-error.ts';
-  import { Icon, IconButton, LoadingSpinner } from '@immich/ui';
+  import { Icon, IconButton } from '@immich/ui';
   import { mdiCastConnected, mdiPause, mdiPlay } from '@mdi/js';
   import { t } from 'svelte-i18n';
+  import LoadingSpinner from '#lib/components/shared-components/LoadingSpinner.svelte';
 
   interface Props {
     poster: string;

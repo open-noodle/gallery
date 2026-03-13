@@ -37,7 +37,7 @@ import { Auth, Authenticated, FileResponse } from 'src/middleware/auth.guard.js'
 import { FileUploadInterceptor, getFiles } from 'src/middleware/file-upload.interceptor.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
 import { AssetMediaService } from 'src/services/asset-media.service.js';
-import { ImmichFileResponse, sendFile } from 'src/utils/file.js';
+import { ImmichFileResponse, ImmichRedirectResponse, ImmichStreamResponse, sendFile } from 'src/utils/file.js';
 import { FileNotEmptyValidator, UUIDParamDto } from 'src/validation.js';
 
 @ApiTags(ApiTag.Assets)
@@ -136,7 +136,11 @@ export class AssetMediaController {
 
     const viewThumbnailRes = await this.service.viewThumbnail(auth, id, dto);
 
-    if (viewThumbnailRes instanceof ImmichFileResponse) {
+    if (
+      viewThumbnailRes instanceof ImmichFileResponse ||
+      viewThumbnailRes instanceof ImmichRedirectResponse ||
+      viewThumbnailRes instanceof ImmichStreamResponse
+    ) {
       await sendFile(res, next, () => Promise.resolve(viewThumbnailRes), this.logger);
     } else {
       // viewThumbnailRes is a AssetMediaRedirectResponse
