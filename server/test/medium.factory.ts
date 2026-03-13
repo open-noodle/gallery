@@ -822,6 +822,7 @@ const sharedSpaceInsert = (
     description: null,
     color: 'primary',
     faceRecognitionEnabled: true,
+    createdById: newUuid(),
     ...dto,
   };
 };

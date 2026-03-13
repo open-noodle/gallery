@@ -138,7 +138,7 @@ describe(AssetService.name, () => {
         await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
 
         // Add member to space
-        const { member: memberRecord } = await ctx.newSharedSpaceMember({
+        await ctx.newSharedSpaceMember({
           spaceId: space.id,
           userId: member.id,
           role: 'editor',
