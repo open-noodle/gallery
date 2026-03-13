@@ -53,6 +53,8 @@ import { VideoStreamRepository } from 'src/repositories/video-stream.repository.
 import { ViewRepository } from 'src/repositories/view-repository.js';
 import { WebsocketRepository } from 'src/repositories/websocket.repository.js';
 import { WorkflowRepository } from 'src/repositories/workflow.repository.js';
+import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
+import { StorageMigrationRepository } from 'src/repositories/storage-migration.repository.js';
 
 export const repositories = [
   AccessRepository,
@@ -96,7 +98,9 @@ export const repositories = [
   ServerInfoRepository,
   SharedLinkRepository,
   SharedLinkAssetRepository,
+  SharedSpaceRepository,
   StackRepository,
+  StorageMigrationRepository,
   StorageRepository,
   SyncRepository,
   SyncCheckpointRepository,

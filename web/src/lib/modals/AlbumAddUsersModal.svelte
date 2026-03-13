@@ -4,11 +4,12 @@
   import { handleAddUsersToAlbum } from '$lib/services/album.service';
   import { normalizeSearchString } from '$lib/utils/string-utils';
   import { searchUsers, type AlbumResponseDto, type UserResponseDto } from '@immich/sdk';
-  import { FormModal, ListButton, LoadingSpinner, Stack, Text } from '@immich/ui';
+  import { FormModal, ListButton, Stack, Text } from '@immich/ui';
   import { sortBy } from 'lodash-es';
   import { onMount } from 'svelte';
   import { t } from 'svelte-i18n';
   import { SvelteMap } from 'svelte/reactivity';
+  import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
 
   type Props = {
     album: AlbumResponseDto;

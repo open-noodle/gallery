@@ -89,6 +89,9 @@ import { newMetadataRepositoryMock } from 'test/repositories/metadata.repository
 import { newStorageRepositoryMock } from 'test/repositories/storage.repository.mock.js';
 import { newSystemMetadataRepositoryMock } from 'test/repositories/system-metadata.repository.mock.js';
 import { ITelemetryRepositoryMock, newTelemetryRepositoryMock } from 'test/repositories/telemetry.repository.mock.js';
+import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
+import { StorageMigrationRepository } from 'src/repositories/storage-migration.repository.js';
+import { RepositoryInterface } from 'src/types.js';
 
 export type ControllerContext = {
   authenticate: Mock;
@@ -273,7 +276,9 @@ export type ServiceOverrides = {
   session: SessionRepository;
   sharedLink: SharedLinkRepository;
   sharedLinkAsset: SharedLinkAssetRepository;
+  sharedSpace: SharedSpaceRepository;
   stack: StackRepository;
+  storageMigration: StorageMigrationRepository;
   storage: StorageRepository;
   sync: SyncRepository;
   syncCheckpoint: SyncCheckpointRepository;
@@ -360,7 +365,9 @@ export const getMocks = () => {
     session: automock(SessionRepository),
     sharedLink: automock(SharedLinkRepository),
     sharedLinkAsset: automock(SharedLinkAssetRepository),
+    sharedSpace: automock(SharedSpaceRepository),
     stack: automock(StackRepository),
+    storageMigration: automock(StorageMigrationRepository),
     storage: newStorageRepositoryMock(),
     sync: automock(SyncRepository),
     syncCheckpoint: automock(SyncCheckpointRepository),
@@ -433,7 +440,9 @@ export const newTestService = <T extends BaseService>(
     overrides.session || (mocks.session as As<SessionRepository>),
     overrides.sharedLink || (mocks.sharedLink as As<SharedLinkRepository>),
     overrides.sharedLinkAsset || (mocks.sharedLinkAsset as As<SharedLinkAssetRepository>),
+    overrides.sharedSpace || (mocks.sharedSpace as As<SharedSpaceRepository>),
     overrides.stack || (mocks.stack as As<StackRepository>),
+    overrides.storageMigration || (mocks.storageMigration as As<StorageMigrationRepository>),
     overrides.storage || (mocks.storage as As<StorageRepository>),
     overrides.sync || (mocks.sync as As<SyncRepository>),
     overrides.syncCheckpoint || (mocks.syncCheckpoint as As<SyncCheckpointRepository>),

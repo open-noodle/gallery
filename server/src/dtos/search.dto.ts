@@ -65,6 +65,9 @@ const BaseSearchSchema = z.object({
       deprecated: true,
     }),
   ocr: z.string().optional().describe('Filter by OCR text content').meta(DEPRECATED_FLAT_FIELD),
+  // Fork field: no V3 `filter` equivalent exists, so it is NOT marked DEPRECATED_FLAT_FIELD —
+  // that meta advertises a structured replacement, and there is none for shared spaces.
+  spaceId: z.uuidv4().optional().describe('Shared space ID to filter by'),
 });
 
 const BaseSearchWithResultsSchema = BaseSearchSchema.extend({

@@ -55,6 +55,7 @@ import { SearchRepository } from 'src/repositories/search.repository.js';
 import { SessionRepository } from 'src/repositories/session.repository.js';
 import { SharedLinkAssetRepository } from 'src/repositories/shared-link-asset.repository.js';
 import { SharedLinkRepository } from 'src/repositories/shared-link.repository.js';
+import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { StackRepository } from 'src/repositories/stack.repository.js';
 import { StorageRepository } from 'src/repositories/storage.repository.js';
 import { SyncCheckpointRepository } from 'src/repositories/sync-checkpoint.repository.js';
@@ -359,6 +360,42 @@ export class MediumTestContext<S extends ClassConstructor<typeof BaseService> = 
       config,
     );
   }
+
+  async newSharedSpace(
+    dto: Partial<Insertable<Omit<any, 'id' | 'createdAt' | 'updatedAt' | 'createId' | 'updateId'>>> = {},
+  ) {
+    const space = mediumFactory.sharedSpaceInsert(dto);
+    const result = await this.database
+      .insertInto('shared_space')
+      .values(space)
+      .returningAll()
+      .executeTakeFirstOrThrow();
+    return { space: result, result };
+  }
+
+  async newSharedSpaceMember(dto: { spaceId: string; userId: string; role?: string }) {
+    const member = mediumFactory.sharedSpaceMemberInsert(dto);
+    const result = await this.database
+      .insertInto('shared_space_member')
+      .values(member)
+      .returningAll()
+      .executeTakeFirstOrThrow();
+    return { member: result, result };
+  }
+
+  async newSharedSpaceAsset(dto: { spaceId: string; assetId: string; addedById?: string | null }) {
+    const spaceAsset = {
+      spaceId: dto.spaceId,
+      assetId: dto.assetId,
+      addedById: dto.addedById ?? null,
+    };
+    const result = await this.database
+      .insertInto('shared_space_asset')
+      .values(spaceAsset)
+      .returningAll()
+      .executeTakeFirstOrThrow();
+    return { spaceAsset: result, result };
+  }
 }
 
 export class SyncTestContext extends MediumTestContext<typeof SyncService> {
@@ -488,6 +525,7 @@ const newRealRepository = <T extends BaseServiceDeps[number]>(key: T, db: Kysely
     case SessionRepository:
     case SharedLinkRepository:
     case SharedLinkAssetRepository:
+    case SharedSpaceRepository:
     case StackRepository:
     case SyncRepository:
     case SyncCheckpointRepository:
@@ -860,6 +898,28 @@ const uploadFile = (file: Partial<UploadFile> = {}) => {
   };
 };
 
+const sharedSpaceInsert = (
+  dto: Partial<Omit<any, 'id' | 'createdAt' | 'updatedAt' | 'createId' | 'updateId'>> = {},
+) => {
+  return {
+    name: 'Test Space',
+    description: null,
+    color: 'primary',
+    faceRecognitionEnabled: true,
+    createdById: newUuid(),
+    ...dto,
+  };
+};
+
+const sharedSpaceMemberInsert = (dto: { spaceId: string; userId: string; role?: string }) => {
+  return {
+    spaceId: dto.spaceId,
+    userId: dto.userId,
+    role: dto.role ?? 'viewer',
+    showInTimeline: true,
+  };
+};
+
 export const mediumFactory = {
   assetInsert,
   assetFaceInsert,
@@ -875,4 +935,6 @@ export const mediumFactory = {
   loginResponse,
   tagInsert,
   uploadFile,
+  sharedSpaceInsert,
+  sharedSpaceMemberInsert,
 };

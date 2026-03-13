@@ -35,9 +35,11 @@ const QueuesResponseLegacySchema = z
     [QueueName.Notification]: QueueResponseLegacySchema,
     [QueueName.BackupDatabase]: QueueResponseLegacySchema,
     [QueueName.Ocr]: QueueResponseLegacySchema,
+    [QueueName.PetDetection]: QueueResponseLegacySchema,
     [QueueName.Workflow]: QueueResponseLegacySchema,
     [QueueName.Editor]: QueueResponseLegacySchema,
     [QueueName.IntegrityCheck]: QueueResponseLegacySchema,
+    [QueueName.StorageBackendMigration]: QueueResponseLegacySchema,
   })
   .meta({ id: 'QueuesResponseLegacyDto' });
 

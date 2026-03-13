@@ -64,6 +64,12 @@ import { WorkflowRepository } from 'src/repositories/workflow.repository.js';
 import { UserTable } from 'src/schema/tables/user.table.js';
 import { AccessRequest, checkAccess, requireAccess } from 'src/utils/access.js';
 import { getConfig, updateConfig } from 'src/utils/config.js';
+import { CacheControl } from 'src/enum.js';
+import { ServeStrategy } from 'src/interfaces/storage-backend.interface.js';
+import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
+import { StorageMigrationRepository } from 'src/repositories/storage-migration.repository.js';
+import { ClassConstructor } from 'src/types.js';
+import { ImmichFileResponse, ImmichMediaResponse, ImmichRedirectResponse, ImmichStreamResponse } from 'src/utils/file.js';
 
 export const BASE_SERVICE_DEPENDENCIES = [
   LoggingRepository,
@@ -107,7 +113,9 @@ export const BASE_SERVICE_DEPENDENCIES = [
   SessionRepository,
   SharedLinkRepository,
   SharedLinkAssetRepository,
+  SharedSpaceRepository,
   StackRepository,
+  StorageMigrationRepository,
   StorageRepository,
   SyncRepository,
   SyncCheckpointRepository,
@@ -169,7 +177,9 @@ export class BaseService {
     protected sessionRepository: SessionRepository,
     protected sharedLinkRepository: SharedLinkRepository,
     protected sharedLinkAssetRepository: SharedLinkAssetRepository,
+    protected sharedSpaceRepository: SharedSpaceRepository,
     protected stackRepository: StackRepository,
+    protected storageMigrationRepository: StorageMigrationRepository,
     protected storageRepository: StorageRepository,
     protected syncRepository: SyncRepository,
     protected syncCheckpointRepository: SyncCheckpointRepository,
@@ -297,6 +307,44 @@ export class BaseService {
   async requireSetupAvailable(): Promise<void> {
     if (!(await this.isSetupAvailable())) {
       throw new BadRequestException('Admin setup is not available');
+    }
+  }
+
+  protected async serveFromBackend(
+    filePath: string,
+    contentType: string,
+    cacheControl: CacheControl,
+    fileName?: string,
+  ): Promise<ImmichMediaResponse> {
+    // lazy import to avoid circular dependency (StorageService extends BaseService)
+    const { StorageService } = await import('./storage.service.js');
+    const backend = StorageService.resolveBackendForKey(filePath);
+    const strategy: ServeStrategy = await backend.getServeStrategy(filePath, contentType);
+
+    switch (strategy.type) {
+      case 'file': {
+        return new ImmichFileResponse({
+          path: strategy.path,
+          contentType,
+          cacheControl,
+          fileName,
+        });
+      }
+      case 'redirect': {
+        return new ImmichRedirectResponse({
+          url: strategy.url,
+          cacheControl,
+        });
+      }
+      case 'stream': {
+        return new ImmichStreamResponse({
+          stream: strategy.stream,
+          contentType,
+          length: strategy.length,
+          cacheControl,
+          fileName,
+        });
+      }
     }
   }
 

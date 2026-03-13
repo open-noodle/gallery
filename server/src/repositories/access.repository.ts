@@ -228,6 +228,47 @@ class AssetAccess {
 
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID_SET] })
   @ChunkedSet({ paramIndex: 1 })
+  async checkSpaceAccess(userId: string, assetIds: Set<string>) {
+    if (assetIds.size === 0) {
+      return new Set<string>();
+    }
+
+    return this.db
+      .selectFrom('shared_space_asset')
+      .innerJoin('shared_space_member', 'shared_space_member.spaceId', 'shared_space_asset.spaceId')
+      .innerJoin('asset', (join) =>
+        join.onRef('asset.id', '=', 'shared_space_asset.assetId').on('asset.deletedAt', 'is', null),
+      )
+      .select('asset.id')
+      .where('shared_space_member.userId', '=', userId)
+      .where('asset.id', 'in', [...assetIds])
+      .execute()
+      .then((assets) => new Set(assets.map((asset) => asset.id)));
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID_SET] })
+  @ChunkedSet({ paramIndex: 1 })
+  async checkSpaceEditAccess(userId: string, assetIds: Set<string>) {
+    if (assetIds.size === 0) {
+      return new Set<string>();
+    }
+
+    return this.db
+      .selectFrom('shared_space_asset')
+      .innerJoin('shared_space_member', 'shared_space_member.spaceId', 'shared_space_asset.spaceId')
+      .innerJoin('asset', (join) =>
+        join.onRef('asset.id', '=', 'shared_space_asset.assetId').on('asset.deletedAt', 'is', null),
+      )
+      .select('asset.id')
+      .where('shared_space_member.userId', '=', userId)
+      .where('asset.id', 'in', [...assetIds])
+      .where('shared_space_member.role', 'in', ['editor', 'owner'])
+      .execute()
+      .then((assets) => new Set(assets.map((asset) => asset.id)));
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID_SET] })
+  @ChunkedSet({ paramIndex: 1 })
   async checkSharedLinkAccess(sharedLinkId: string, assetIds: Set<string>) {
     if (assetIds.size === 0) {
       return new Set<string>();
@@ -613,6 +654,26 @@ class WorkflowAccess {
   }
 }
 
+class SharedSpaceAccess {
+  constructor(private db: Kysely<DB>) {}
+
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID_SET] })
+  @ChunkedSet({ paramIndex: 1 })
+  async checkMemberAccess(userId: string, spaceIds: Set<string>) {
+    if (spaceIds.size === 0) {
+      return new Set<string>();
+    }
+
+    return this.db
+      .selectFrom('shared_space_member')
+      .select('shared_space_member.spaceId')
+      .where('shared_space_member.spaceId', 'in', [...spaceIds])
+      .where('shared_space_member.userId', '=', userId)
+      .execute()
+      .then((rows) => new Set(rows.map((row) => row.spaceId)));
+  }
+}
+
 @Injectable()
 export class AccessRepository {
   activity: ActivityAccess;
@@ -626,6 +687,7 @@ export class AccessRepository {
   clusterGroup: ClusterGroupAccess;
   clusterGroupRequest: ClusterGroupRequestAccess;
   person: PersonAccess;
+  sharedSpace: SharedSpaceAccess;
   partner: PartnerAccess;
   session: SessionAccess;
   stack: StackAccess;
@@ -645,6 +707,7 @@ export class AccessRepository {
     this.clusterGroup = new ClusterGroupAccess(db);
     this.clusterGroupRequest = new ClusterGroupRequestAccess(db);
     this.person = new PersonAccess(db);
+    this.sharedSpace = new SharedSpaceAccess(db);
     this.partner = new PartnerAccess(db);
     this.session = new SessionAccess(db);
     this.stack = new StackAccess(db);

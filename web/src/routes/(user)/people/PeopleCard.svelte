@@ -4,7 +4,7 @@
   import { getPeopleThumbnailUrl } from '$lib/utils';
   import { type PersonResponseDto } from '@immich/sdk';
   import { ContextMenuButton, Icon } from '@immich/ui';
-  import { mdiAccountMultipleCheckOutline, mdiHeart } from '@mdi/js';
+  import { mdiAccountMultipleCheckOutline, mdiHeart, mdiPaw } from '@mdi/js';
   import { t } from 'svelte-i18n';
   import ImageThumbnail from '$lib/components/assets/thumbnail/ImageThumbnail.svelte';
 
@@ -45,6 +45,14 @@
       {#if person.isFavorite}
         <div class="absolute inset-s-4 top-4">
           <Icon icon={mdiHeart} size="24" class="text-white" />
+        </div>
+      {/if}
+      {#if person.type === 'pet'}
+        <div
+          class="absolute bottom-1 right-1 rounded-full bg-immich-primary p-1 text-white"
+          title={person.species ?? undefined}
+        >
+          <Icon icon={mdiPaw} size="16" class="text-white" />
         </div>
       {/if}
     </div>
