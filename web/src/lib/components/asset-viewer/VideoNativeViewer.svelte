@@ -7,10 +7,16 @@
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
   import { authManager } from '$lib/managers/auth-manager.svelte';
   import { mediaCapabilitiesManager } from '$lib/managers/media-capabilities-manager.svelte';
-  import { autoPlayVideo, lang, loopVideo as loopVideoPreference } from '$lib/stores/preferences.store';
+  import {
+    autoPlayVideo,
+    lang,
+    loopVideo as loopVideoPreference,
+    videoViewerMuted,
+    videoViewerVolume,
+  } from '$lib/stores/preferences.store';
   import { getAssetHlsSessionUrl, getAssetHlsUrl, getAssetMediaUrl, getAssetPlaybackUrl } from '$lib/utils';
   import { AssetMediaSize, type AssetResponseDto } from '@immich/sdk';
-  import { Icon, LoadingSpinner, shortcuts } from '@immich/ui';
+  import { Icon, shortcuts } from '@immich/ui';
   import {
     mdiCheck,
     mdiChevronLeft,
@@ -45,6 +51,7 @@
   import { t } from 'svelte-i18n';
   import { fade } from 'svelte/transition';
   import './immich-time-range';
+  import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
 
   interface Props {
     asset: AssetResponseDto;
@@ -88,6 +95,7 @@
 
     return getAssetPlaybackUrl({ id: assetId, cacheKey });
   });
+  let isScrubbing = $state(false);
   const aspectRatio = $derived(asset.width && asset.height ? `${asset.width} / ${asset.height}` : undefined);
   let showVideo = $state(false);
   let hasFocused = $state(false);
@@ -278,7 +286,7 @@
 
   const handleCanPlay = async (video: HTMLVideoElement) => {
     try {
-      if (!video.paused) {
+      if (!video.paused && !isScrubbing) {
         await video.play();
         onVideoStarted();
       }
@@ -326,7 +334,24 @@
 
   // The time is only refreshed on HLS fragment decode by default,
   // so manually emit events on seek to update it immediately.
-  const onSeeking = (event: Event) => event.currentTarget?.dispatchEvent(new Event('timeupdate'));
+  const onSeeking = (event: Event) => {
+    isScrubbing = true;
+    event.currentTarget?.dispatchEvent(new Event('timeupdate'));
+  };
+  const onSeeked = () => (isScrubbing = false);
+
+  const onVolumeChange = (event: Event) => {
+    const video = event.currentTarget as HTMLVideoElement;
+    $videoViewerMuted = video.muted;
+    $videoViewerVolume = video.volume;
+  };
+
+  $effect(() => {
+    if (videoPlayer) {
+      videoPlayer.muted = $videoViewerMuted;
+      videoPlayer.volume = $videoViewerVolume;
+    }
+  });
 </script>
 
 <svelte:body
@@ -389,7 +414,9 @@
             oncanplay={(e: Event) => handleCanPlay(e.currentTarget as HTMLVideoElement)}
             onloadedmetadata={() => (hasLoadedMetadata = true)}
             onended={onVideoEnded}
+            onvolumechange={onVolumeChange}
             onseeking={onSeeking}
+            onseeked={onSeeked}
             onplaying={(e: Event) => {
               if (hasFocused) {
                 return;
@@ -399,6 +426,7 @@
               hasFocused = true;
             }}
             onclose={onClose}
+            muted={$videoViewerMuted}
             poster={getAssetMediaUrl({ id: asset.id, size: AssetMediaSize.Preview, cacheKey })}
           ></hls-video>
         {:else}
@@ -415,7 +443,9 @@
             oncanplay={(e) => handleCanPlay(e.currentTarget)}
             onloadedmetadata={() => (hasLoadedMetadata = true)}
             onended={onVideoEnded}
+            onvolumechange={onVolumeChange}
             onseeking={onSeeking}
+            onseeked={onSeeked}
             onplaying={(e) => {
               if (hasFocused) {
                 return;
@@ -425,7 +455,9 @@
               hasFocused = true;
             }}
             onclose={onClose}
+            muted={$videoViewerMuted}
             poster={getAssetMediaUrl({ id: asset.id, size: AssetMediaSize.Preview, cacheKey })}
+            src={assetFileUrl}
           ></video>
         {/if}
 

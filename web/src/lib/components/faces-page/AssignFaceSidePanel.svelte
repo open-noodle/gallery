@@ -7,12 +7,13 @@
   import { zoomImageToBase64 } from '$lib/utils/people-utils';
   import { getPersonNameWithHiddenValue } from '$lib/utils/person';
   import { AssetTypeEnum, getAllPeople, type AssetFaceResponseDto, type PersonResponseDto } from '@immich/sdk';
-  import { IconButton, LoadingSpinner } from '@immich/ui';
+  import { IconButton } from '@immich/ui';
   import { mdiArrowLeftThin, mdiClose, mdiMagnify, mdiPlus } from '@mdi/js';
   import { onMount } from 'svelte';
   import { t } from 'svelte-i18n';
   import { linear } from 'svelte/easing';
   import { fly } from 'svelte/transition';
+  import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
   import ImageThumbnail from '../assets/thumbnail/ImageThumbnail.svelte';
 
   interface Props {
