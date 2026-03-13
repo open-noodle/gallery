@@ -79,6 +79,24 @@ export enum AlbumUserRole {
 
 export const AlbumUserRoleSchema = z.enum(AlbumUserRole).describe('Album user role').meta({ id: 'AlbumUserRole' });
 
+export enum SharedSpaceRole {
+  Owner = 'owner',
+  Editor = 'editor',
+  Viewer = 'viewer',
+}
+
+export enum SharedSpaceActivityType {
+  AssetAdd = 'asset_add',
+  AssetRemove = 'asset_remove',
+  MemberJoin = 'member_join',
+  MemberLeave = 'member_leave',
+  MemberRemove = 'member_remove',
+  MemberRoleChange = 'member_role_change',
+  CoverChange = 'cover_change',
+  SpaceRename = 'space_rename',
+  SpaceColorChange = 'space_color_change',
+}
+
 export enum AssetOrder {
   Asc = 'asc',
   Desc = 'desc',
@@ -253,6 +271,18 @@ export enum Permission {
   PasskeyRead = 'passkey.read',
   PasskeyUpdate = 'passkey.update',
   PasskeyDelete = 'passkey.delete',
+  SharedSpaceCreate = 'sharedSpace.create',
+  SharedSpaceRead = 'sharedSpace.read',
+  SharedSpaceUpdate = 'sharedSpace.update',
+  SharedSpaceDelete = 'sharedSpace.delete',
+
+  SharedSpaceMemberCreate = 'sharedSpaceMember.create',
+  SharedSpaceMemberUpdate = 'sharedSpaceMember.update',
+  SharedSpaceMemberDelete = 'sharedSpaceMember.delete',
+
+  SharedSpaceAssetCreate = 'sharedSpaceAsset.create',
+  SharedSpaceAssetRead = 'sharedSpaceAsset.read',
+  SharedSpaceAssetDelete = 'sharedSpaceAsset.delete',
 
   PersonCreate = 'person.create',
   PersonRead = 'person.read',
@@ -867,9 +897,11 @@ export enum QueueName {
   Notification = 'notifications',
   BackupDatabase = 'backupDatabase',
   Ocr = 'ocr',
+  PetDetection = 'petDetection',
   Workflow = 'workflow',
   IntegrityCheck = 'integrityCheck',
   Editor = 'editor',
+  StorageBackendMigration = 'storageBackendMigration',
 }
 
 export const QueueNameSchema = z.enum(QueueName).describe('Queue name').meta({ id: 'QueueName' });
@@ -963,6 +995,10 @@ export enum JobName {
   OcrQueueAll = 'OcrQueueAll',
   Ocr = 'Ocr',
 
+  // Pet Detection
+  PetDetectionQueueAll = 'PetDetectionQueueAll',
+  PetDetection = 'PetDetection',
+
   // Workflow
   WorkflowAssetTrigger = 'WorkflowAssetTrigger',
 
@@ -977,6 +1013,15 @@ export enum JobName {
   IntegrityChecksumFilesRefresh = 'IntegrityChecksumFilesRefresh',
   IntegrityDeleteReportType = 'IntegrityDeleteReportType',
   IntegrityDeleteReports = 'IntegrityDeleteReports',
+
+  // Storage Backend Migration
+  StorageBackendMigrationQueueAll = 'StorageBackendMigrationQueueAll',
+  StorageBackendMigrationSingle = 'StorageBackendMigrationSingle',
+
+  // Shared Space Face Recognition
+  SharedSpaceFaceMatch = 'SharedSpaceFaceMatch',
+  SharedSpaceFaceMatchAll = 'SharedSpaceFaceMatchAll',
+  SharedSpacePersonThumbnail = 'SharedSpacePersonThumbnail',
 }
 
 export const JobNameSchema = z.enum(JobName).describe('Job name').meta({ id: 'JobName' });
@@ -1292,7 +1337,9 @@ export enum ApiTag {
   Server = 'Server',
   Sessions = 'Sessions',
   SharedLinks = 'Shared links',
+  SharedSpaces = 'Shared Spaces',
   Stacks = 'Stacks',
+  StorageMigration = 'Storage Migration (admin)',
   Sync = 'Sync',
   SystemConfig = 'System config',
   SystemMetadata = 'System metadata',

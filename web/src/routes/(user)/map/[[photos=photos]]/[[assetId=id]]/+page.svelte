@@ -1,9 +1,10 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
+  import { page } from '$app/state';
   import UserPageLayout from '#lib/components/layouts/UserPageLayout.svelte';
   import MapTimelinePanel from './MapTimelinePanel.svelte';
   import type { SelectionBBox } from '#lib/components/shared-components/map/types.ts';
-  import { timeToLoadTheMap } from '#lib/constants.ts';
+  import { QueryParameter, timeToLoadTheMap } from '#lib/constants.ts';
   import Portal from '#lib/elements/Portal.svelte';
   import { assetViewerManager } from '#lib/managers/asset-viewer-manager.svelte.ts';
   import { Route } from '#lib/route.ts';
@@ -11,9 +12,12 @@
   import { delay } from '#lib/utils/asset-utils.ts';
   import { navigate } from '#lib/utils/navigation.ts';
   import { mapSettings } from '#lib/stores/preferences.store.ts';
-  import { LoadingSpinner } from '@immich/ui';
+  import { IconButton } from '@immich/ui';
+  import { mdiArrowLeft } from '@mdi/js';
   import { onDestroy } from 'svelte';
+  import { t } from 'svelte-i18n';
   import type { PageData } from './$types';
+  import LoadingSpinner from '#lib/components/shared-components/LoadingSpinner.svelte';
   import { createPreloadedQuery } from '#lib/queries/client.ts';
   import { getUserConfigQuery } from '#lib/queries/config-user.query.ts';
 
@@ -25,6 +29,9 @@
   }
 
   let { data }: Props = $props();
+
+  const spaceId = $derived(page.url.searchParams.get(QueryParameter.SPACE_ID) || undefined);
+
   let selectedClusterIds = $state.raw(new Set<string>());
   let selectedClusterBBox = $state.raw<SelectionBBox>();
   let isTimelinePanelVisible = $state(false);
@@ -61,6 +68,18 @@
 
 {#if config.map.enabled}
   <UserPageLayout title={data.meta.title}>
+    {#snippet leading()}
+      {#if spaceId}
+        <IconButton
+          variant="ghost"
+          shape="round"
+          color="secondary"
+          aria-label={$t('back')}
+          onclick={() => goto(`/spaces/${spaceId}`)}
+          icon={mdiArrowLeft}
+        />
+      {/if}
+    {/snippet}
     <div class="isolate flex size-full flex-col sm:flex-row">
       <div
         class={[
@@ -83,6 +102,8 @@
             onViewportClose={closeTimelinePanel}
             viewportGridActive={isTimelinePanelVisible}
             autoOpenPanel={$mapSettings.showAssetPanel}
+            {spaceId}
+            showSettings={!spaceId}
           />
         {/await}
       </div>
@@ -94,6 +115,7 @@
             {selectedClusterIds}
             assetCount={selectedClusterIds.size}
             onClose={closeTimelinePanel}
+            {spaceId}
           />
         </div>
       {/if}

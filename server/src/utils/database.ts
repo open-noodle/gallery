@@ -304,6 +304,18 @@ export function inSharedAlbum(userId: string, assetId: 'asset.id' | 'asset_face.
   );
 }
 
+export function hasSpacePerson<O>(qb: SelectQueryBuilder<DB, 'asset', O>, spacePersonId: string) {
+  return qb.where((eb) =>
+    eb.exists(
+      eb
+        .selectFrom('shared_space_person_face')
+        .innerJoin('asset_face', 'asset_face.id', 'shared_space_person_face.assetFaceId')
+        .whereRef('asset_face.assetId', '=', 'asset.id')
+        .where('shared_space_person_face.personId', '=', asUuid(spacePersonId)),
+    ),
+  );
+}
+
 export function inAlbums<O>(qb: SelectQueryBuilder<DB, 'asset', O>, albumIds: string[]) {
   return qb.innerJoin(
     (eb) =>
@@ -442,6 +454,16 @@ export function searchAssetBuilderLegacy(kysely: Kysely<DB>, options: AssetSearc
       ),
     )
     .$if(!!options.albumIds && options.albumIds.length > 0, (qb) => inAlbums(qb, options.albumIds!))
+    .$if(!!options.spaceId, (qb) =>
+      qb.where((eb) =>
+        eb.exists(
+          eb
+            .selectFrom('shared_space_asset')
+            .whereRef('shared_space_asset.assetId', '=', 'asset.id')
+            .where('shared_space_asset.spaceId', '=', asUuid(options.spaceId!)),
+        ),
+      ),
+    )
     .$if(!!options.tagIds && options.tagIds.length > 0, (qb) => hasTags(qb, options.tagIds!))
     .$if(options.tagIds === null, (qb) =>
       qb.where((eb) => eb.not(eb.exists((eb) => eb.selectFrom('tag_asset').whereRef('assetId', '=', 'asset.id')))),

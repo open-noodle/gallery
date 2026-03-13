@@ -1,7 +1,7 @@
 <script lang="ts">
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { OnboardingRole } from '#lib/types.ts';
-  import { Logo } from '@immich/ui';
+  import Logo from '#lib/components/shared-components/Logo.svelte';
   import { t } from 'svelte-i18n';
   import { createPreloadedQuery } from '#lib/queries/client.ts';
   import { getServerConfigQuery } from '#lib/queries/server-info.query.ts';

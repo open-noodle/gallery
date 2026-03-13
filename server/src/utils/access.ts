@@ -174,7 +174,11 @@ const checkOtherAccess = async (access: AccessRepository, request: OtherAccessRe
         auth.user.id,
         ids.difference(isOwner).difference(isAlbum),
       );
-      return isOwner.union(isAlbum).union(isPartner);
+      const isSpace = await access.asset.checkSpaceAccess(
+        auth.user.id,
+        ids.difference(isOwner).difference(isAlbum).difference(isPartner),
+      );
+      return isOwner.union(isAlbum).union(isPartner).union(isSpace);
     }
 
     case Permission.AssetShare: {
@@ -198,7 +202,11 @@ const checkOtherAccess = async (access: AccessRepository, request: OtherAccessRe
         auth.user.id,
         ids.difference(isOwner).difference(isAlbum),
       );
-      return isOwner.union(isAlbum).union(isPartner);
+      const isSpace = await access.asset.checkSpaceAccess(
+        auth.user.id,
+        ids.difference(isOwner).difference(isAlbum).difference(isPartner),
+      );
+      return isOwner.union(isAlbum).union(isPartner).union(isSpace);
     }
 
     case Permission.AssetDownload: {
@@ -208,11 +216,17 @@ const checkOtherAccess = async (access: AccessRepository, request: OtherAccessRe
         auth.user.id,
         ids.difference(isOwner).difference(isAlbum),
       );
-      return isOwner.union(isAlbum).union(isPartner);
+      const isSpace = await access.asset.checkSpaceAccess(
+        auth.user.id,
+        ids.difference(isOwner).difference(isAlbum).difference(isPartner),
+      );
+      return isOwner.union(isAlbum).union(isPartner).union(isSpace);
     }
 
     case Permission.AssetUpdate: {
-      return await access.asset.checkOwnerAccess(auth.user.id, ids, auth.session?.hasElevatedPermission);
+      const isOwner = await access.asset.checkOwnerAccess(auth.user.id, ids, auth.session?.hasElevatedPermission);
+      const isSpaceEditor = await access.asset.checkSpaceEditAccess(auth.user.id, ids.difference(isOwner));
+      return isOwner.union(isSpaceEditor);
     }
 
     case Permission.AssetDelete: {
@@ -416,6 +430,10 @@ const checkOtherAccess = async (access: AccessRepository, request: OtherAccessRe
 
     case Permission.StackDelete: {
       return access.stack.checkOwnerAccess(auth.user.id, ids);
+    }
+
+    case Permission.SharedSpaceRead: {
+      return await access.sharedSpace.checkMemberAccess(auth.user.id, ids);
     }
 
     case Permission.WorkflowRead:

@@ -1,7 +1,8 @@
 <script lang="ts">
-  import { IconButton, LoadingSpinner } from '@immich/ui';
+  import { IconButton } from '@immich/ui';
   import { mdiClose, mdiMagnify } from '@mdi/js';
   import { t } from 'svelte-i18n';
+  import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
 
   interface Props {
     name: string;

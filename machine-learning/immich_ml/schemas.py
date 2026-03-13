@@ -24,6 +24,7 @@ class ModelTask(StrEnum):
     FACIAL_RECOGNITION = "facial-recognition"
     SEARCH = "clip"
     OCR = "ocr"
+    PET_DETECTION = "pet-detection"
 
 
 class ModelType(StrEnum):
@@ -44,6 +45,7 @@ class ModelSource(StrEnum):
     MCLIP = "mclip"
     OPENCLIP = "openclip"
     PADDLE = "paddle"
+    YOLO = "yolo"
 
 
 class ModelOrganization(StrEnum):
@@ -120,6 +122,15 @@ class DetectedFace(TypedDict):
 
 
 FacialRecognitionOutput = list[DetectedFace]
+
+
+class DetectedPet(TypedDict):
+    boundingBox: BoundingBox
+    score: float
+    label: str
+
+
+PetDetectionOutput = list[DetectedPet]
 
 
 class Options:

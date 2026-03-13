@@ -2,8 +2,9 @@
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { handleError } from '#lib/utils/handle-error.ts';
   import { activateProduct, getActivationKey } from '#lib/utils/license-utils.ts';
-  import { Button, Heading, LoadingSpinner } from '@immich/ui';
+  import { Button, Heading } from '@immich/ui';
   import { t } from 'svelte-i18n';
+  import LoadingSpinner from '#lib/components/shared-components/LoadingSpinner.svelte';
   import UserPurchaseOptionCard from './IndividualPurchaseOptionCard.svelte';
   import ServerPurchaseOptionCard from './ServerPurchaseOptionCard.svelte';
 
