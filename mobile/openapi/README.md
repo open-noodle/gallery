@@ -258,6 +258,30 @@ Class | Method | HTTP request | Description
 *SharedLinksApi* | [**removeSharedLinkAssets**](doc//SharedLinksApi.md#removesharedlinkassets) | **DELETE** /shared-links/{id}/assets | Remove assets from a shared link
 *SharedLinksApi* | [**sharedLinkLogin**](doc//SharedLinksApi.md#sharedlinklogin) | **POST** /shared-links/login | Shared link login
 *SharedLinksApi* | [**updateSharedLink**](doc//SharedLinksApi.md#updatesharedlink) | **PATCH** /shared-links/{id} | Update a shared link
+*SharedSpacesApi* | [**addAssets**](doc//SharedSpacesApi.md#addassets) | **POST** /shared-spaces/{id}/assets | Add assets to a shared space
+*SharedSpacesApi* | [**addMember**](doc//SharedSpacesApi.md#addmember) | **POST** /shared-spaces/{id}/members | Add a member to a shared space
+*SharedSpacesApi* | [**createSpace**](doc//SharedSpacesApi.md#createspace) | **POST** /shared-spaces | Create a shared space
+*SharedSpacesApi* | [**deleteSpacePerson**](doc//SharedSpacesApi.md#deletespaceperson) | **DELETE** /shared-spaces/{id}/people/{personId} | Delete a person from a shared space
+*SharedSpacesApi* | [**deleteSpacePersonAlias**](doc//SharedSpacesApi.md#deletespacepersonalias) | **DELETE** /shared-spaces/{id}/people/{personId}/alias | Delete a person alias in a shared space
+*SharedSpacesApi* | [**getAllSpaces**](doc//SharedSpacesApi.md#getallspaces) | **GET** /shared-spaces | Get all shared spaces
+*SharedSpacesApi* | [**getMembers**](doc//SharedSpacesApi.md#getmembers) | **GET** /shared-spaces/{id}/members | Get members of a shared space
+*SharedSpacesApi* | [**getSpace**](doc//SharedSpacesApi.md#getspace) | **GET** /shared-spaces/{id} | Get a shared space
+*SharedSpacesApi* | [**getSpaceActivities**](doc//SharedSpacesApi.md#getspaceactivities) | **GET** /shared-spaces/{id}/activities | Get space activity feed
+*SharedSpacesApi* | [**getSpaceMapMarkers**](doc//SharedSpacesApi.md#getspacemapmarkers) | **GET** /shared-spaces/{id}/map-markers | Get map markers for a shared space
+*SharedSpacesApi* | [**getSpacePeople**](doc//SharedSpacesApi.md#getspacepeople) | **GET** /shared-spaces/{id}/people | Get people in a shared space
+*SharedSpacesApi* | [**getSpacePerson**](doc//SharedSpacesApi.md#getspaceperson) | **GET** /shared-spaces/{id}/people/{personId} | Get a person in a shared space
+*SharedSpacesApi* | [**getSpacePersonAssets**](doc//SharedSpacesApi.md#getspacepersonassets) | **GET** /shared-spaces/{id}/people/{personId}/assets | Get assets for a person in a shared space
+*SharedSpacesApi* | [**getSpacePersonThumbnail**](doc//SharedSpacesApi.md#getspacepersonthumbnail) | **GET** /shared-spaces/{id}/people/{personId}/thumbnail | Get a space person thumbnail
+*SharedSpacesApi* | [**markSpaceViewed**](doc//SharedSpacesApi.md#markspaceviewed) | **PATCH** /shared-spaces/{id}/view | Mark space as viewed
+*SharedSpacesApi* | [**mergeSpacePeople**](doc//SharedSpacesApi.md#mergespacepeople) | **POST** /shared-spaces/{id}/people/{personId}/merge | Merge people in a shared space
+*SharedSpacesApi* | [**removeAssets**](doc//SharedSpacesApi.md#removeassets) | **DELETE** /shared-spaces/{id}/assets | Remove assets from a shared space
+*SharedSpacesApi* | [**removeMember**](doc//SharedSpacesApi.md#removemember) | **DELETE** /shared-spaces/{id}/members/{userId} | Remove a member from a shared space
+*SharedSpacesApi* | [**removeSpace**](doc//SharedSpacesApi.md#removespace) | **DELETE** /shared-spaces/{id} | Delete a shared space
+*SharedSpacesApi* | [**setSpacePersonAlias**](doc//SharedSpacesApi.md#setspacepersonalias) | **PUT** /shared-spaces/{id}/people/{personId}/alias | Set a person alias in a shared space
+*SharedSpacesApi* | [**updateMember**](doc//SharedSpacesApi.md#updatemember) | **PATCH** /shared-spaces/{id}/members/{userId} | Update a member in a shared space
+*SharedSpacesApi* | [**updateMemberTimeline**](doc//SharedSpacesApi.md#updatemembertimeline) | **PATCH** /shared-spaces/{id}/members/me/timeline | Update timeline visibility for current member
+*SharedSpacesApi* | [**updateSpace**](doc//SharedSpacesApi.md#updatespace) | **PATCH** /shared-spaces/{id} | Update a shared space
+*SharedSpacesApi* | [**updateSpacePerson**](doc//SharedSpacesApi.md#updatespaceperson) | **PUT** /shared-spaces/{id}/people/{personId} | Update a person in a shared space
 *StacksApi* | [**createStack**](doc//StacksApi.md#createstack) | **POST** /stacks | Create a stack
 *StacksApi* | [**deleteStack**](doc//StacksApi.md#deletestack) | **DELETE** /stacks/{id} | Delete a stack
 *StacksApi* | [**deleteStacks**](doc//StacksApi.md#deletestacks) | **DELETE** /stacks | Delete stacks
@@ -265,6 +289,10 @@ Class | Method | HTTP request | Description
 *StacksApi* | [**removeAssetFromStack**](doc//StacksApi.md#removeassetfromstack) | **DELETE** /stacks/{id}/assets/{assetId} | Remove an asset from a stack
 *StacksApi* | [**searchStacks**](doc//StacksApi.md#searchstacks) | **GET** /stacks | Retrieve stacks
 *StacksApi* | [**updateStack**](doc//StacksApi.md#updatestack) | **PUT** /stacks/{id} | Update a stack
+*StorageMigrationAdminApi* | [**getEstimate**](doc//StorageMigrationAdminApi.md#getestimate) | **GET** /storage-migration/estimate | Get storage migration estimate
+*StorageMigrationAdminApi* | [**getStatus**](doc//StorageMigrationAdminApi.md#getstatus) | **GET** /storage-migration/status | Get storage migration status
+*StorageMigrationAdminApi* | [**rollback**](doc//StorageMigrationAdminApi.md#rollback) | **POST** /storage-migration/rollback/{batchId} | Rollback a storage migration batch
+*StorageMigrationAdminApi* | [**start**](doc//StorageMigrationAdminApi.md#start) | **POST** /storage-migration/start | Start storage migration
 *SyncApi* | [**deleteSyncAck**](doc//SyncApi.md#deletesyncack) | **DELETE** /sync/ack | Delete acknowledgements
 *SyncApi* | [**getDeltaSync**](doc//SyncApi.md#getdeltasync) | **POST** /sync/delta-sync | Get delta sync for user
 *SyncApi* | [**getFullSyncForUser**](doc//SyncApi.md#getfullsyncforuser) | **POST** /sync/full-sync | Get full sync for user
@@ -494,6 +522,7 @@ Class | Method | HTTP request | Description
  - [PersonStatisticsResponseDto](doc//PersonStatisticsResponseDto.md)
  - [PersonUpdateDto](doc//PersonUpdateDto.md)
  - [PersonWithFacesResponseDto](doc//PersonWithFacesResponseDto.md)
+ - [PetDetectionConfig](doc//PetDetectionConfig.md)
  - [PinCodeChangeDto](doc//PinCodeChangeDto.md)
  - [PinCodeResetDto](doc//PinCodeResetDto.md)
  - [PinCodeSetupDto](doc//PinCodeSetupDto.md)
@@ -558,6 +587,22 @@ Class | Method | HTTP request | Description
  - [SharedLinkType](doc//SharedLinkType.md)
  - [SharedLinksResponse](doc//SharedLinksResponse.md)
  - [SharedLinksUpdate](doc//SharedLinksUpdate.md)
+ - [SharedSpaceActivityResponseDto](doc//SharedSpaceActivityResponseDto.md)
+ - [SharedSpaceAssetAddDto](doc//SharedSpaceAssetAddDto.md)
+ - [SharedSpaceAssetRemoveDto](doc//SharedSpaceAssetRemoveDto.md)
+ - [SharedSpaceCreateDto](doc//SharedSpaceCreateDto.md)
+ - [SharedSpaceMemberCreateDto](doc//SharedSpaceMemberCreateDto.md)
+ - [SharedSpaceMemberResponseDto](doc//SharedSpaceMemberResponseDto.md)
+ - [SharedSpaceMemberTimelineDto](doc//SharedSpaceMemberTimelineDto.md)
+ - [SharedSpaceMemberUpdateDto](doc//SharedSpaceMemberUpdateDto.md)
+ - [SharedSpacePersonAliasDto](doc//SharedSpacePersonAliasDto.md)
+ - [SharedSpacePersonMergeDto](doc//SharedSpacePersonMergeDto.md)
+ - [SharedSpacePersonResponseDto](doc//SharedSpacePersonResponseDto.md)
+ - [SharedSpacePersonUpdateDto](doc//SharedSpacePersonUpdateDto.md)
+ - [SharedSpaceResponseDto](doc//SharedSpaceResponseDto.md)
+ - [SharedSpaceResponseDtoLastContributor](doc//SharedSpaceResponseDtoLastContributor.md)
+ - [SharedSpaceRole](doc//SharedSpaceRole.md)
+ - [SharedSpaceUpdateDto](doc//SharedSpaceUpdateDto.md)
  - [SignUpDto](doc//SignUpDto.md)
  - [SmartSearchDto](doc//SmartSearchDto.md)
  - [SourceType](doc//SourceType.md)
@@ -566,6 +611,8 @@ Class | Method | HTTP request | Description
  - [StackUpdateDto](doc//StackUpdateDto.md)
  - [StatisticsSearchDto](doc//StatisticsSearchDto.md)
  - [StorageFolder](doc//StorageFolder.md)
+ - [StorageMigrationFileTypesDto](doc//StorageMigrationFileTypesDto.md)
+ - [StorageMigrationStartDto](doc//StorageMigrationStartDto.md)
  - [SyncAckDeleteDto](doc//SyncAckDeleteDto.md)
  - [SyncAckDto](doc//SyncAckDto.md)
  - [SyncAckSetDto](doc//SyncAckSetDto.md)

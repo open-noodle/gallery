@@ -90,6 +90,8 @@ jobs:
           persist-credentials: false
           token: ${{ steps.token.outputs.token }}
 
+      - uses: ./.github/actions/apply-branding
+
       - name: Create the Keystore
         env:
           KEY_JKS: ${{ secrets.KEY_JKS }}
@@ -189,6 +191,8 @@ jobs:
         with:
           ref: ${{ inputs.ref || github.sha }}
           persist-credentials: false
+
+      - uses: ./.github/actions/apply-branding
 
       - name: Setup Flutter SDK
         uses: subosito/flutter-action@fd55f4c5af5b953cc57a2be44cb082c8f6635e8e # v2
