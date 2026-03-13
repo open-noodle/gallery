@@ -1,10 +1,10 @@
 import { EditManager } from '$lib/managers/edit/edit-manager.svelte';
 import { eventManager } from '$lib/managers/event-manager.svelte';
-import { waitForWebsocketEvent } from '$lib/stores/websocket';
 import { getFormatter } from '$lib/utils/i18n';
 import { editAsset, getAssetInfo, removeAssetEdits } from '@immich/sdk';
 import { toastManager } from '@immich/ui';
 import { assetFactory } from '@test-data/factories/asset-factory';
+import { websocketMock } from '@test-data/mocks/websocket.mock';
 import type { MessageFormatter } from 'svelte-i18n';
 
 vi.mock('@immich/sdk');
@@ -41,7 +41,7 @@ describe('EditManager', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(getFormatter).mockResolvedValue(((key: string) => key) as MessageFormatter);
-    vi.mocked(waitForWebsocketEvent).mockResolvedValue(undefined as never);
+    websocketMock.waitForWebsocketEvent.mockResolvedValue(undefined as never);
     editManager = new EditManager();
   });
 
