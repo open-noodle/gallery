@@ -43,6 +43,9 @@
 
 </p>
 
+> [!NOTE]
+> 这是 [Immich](https://github.com/immich-app/immich) 的**社区分支**，包含额外功能。有关 Docker 镜像、迁移说明和完整变更列表，请查看[主 README](../README.md)。
+
 > [!WARNING]
 > ⚠️ 为了您宝贵的照片与视频，请始终遵守 [3-2-1](https://www.backblaze.com/blog/the-3-2-1-backup-strategy/) 备份方案！
 >

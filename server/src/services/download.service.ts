@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { isAbsolute, parse } from 'node:path';
 import sanitize from 'sanitize-filename';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { AuthDto, isEditedOnly } from 'src/dtos/auth.dto.js';
@@ -12,8 +13,8 @@ import { Permission } from 'src/enum.js';
 import { ImmichReadStream } from 'src/repositories/storage.repository.js';
 import { BaseService } from 'src/services/base.service.js';
 import { HumanReadableSize } from 'src/utils/bytes.js';
-import { getFileNameWithoutExtension, getFilenameExtension } from 'src/utils/file.js';
 import { getPreferences } from 'src/utils/preferences.js';
+import { StorageService } from 'src/services/storage.service.js';
 
 @Injectable()
 export class DownloadService extends BaseService {
@@ -104,25 +105,30 @@ export class DownloadService extends BaseService {
 
       const { originalPath, editedPath, originalFileName } = asset;
 
-      const name = getFileNameWithoutExtension(sanitize(originalFileName) || 'unnamed');
-      const extension = getFilenameExtension(editedPath || originalPath);
-      let filename = name + extension;
-
+      let filename = sanitize(originalFileName) || 'unnamed';
       const count = paths[filename] || 0;
       paths[filename] = count + 1;
       if (count !== 0) {
-        filename = `${name}+${count}${extension}`;
+        const parsedFilename = parse(filename);
+        filename = `${parsedFilename.name}+${count}${parsedFilename.ext}`;
       }
 
-      let realpath = editedPath || originalPath;
+      let filePath = edited && editedPath ? editedPath : originalPath;
 
-      try {
-        realpath = await this.storageRepository.realpath(realpath);
-      } catch {
-        this.logger.warn('Unable to resolve realpath', { realpath });
+      if (isAbsolute(filePath)) {
+        // Disk asset — resolve symlinks and add by path
+        try {
+          filePath = await this.storageRepository.realpath(filePath);
+        } catch {
+          this.logger.warn('Unable to resolve realpath', { originalPath });
+        }
+        zip.addFile(filePath, filename);
+      } else {
+        // S3 asset — stream from backend
+        const backend = StorageService.resolveBackendForKey(filePath);
+        const { stream } = await backend.get(filePath);
+        zip.addFile(stream, filename);
       }
-
-      zip.addFile(realpath, filename);
     }
 
     void zip.finalize();
