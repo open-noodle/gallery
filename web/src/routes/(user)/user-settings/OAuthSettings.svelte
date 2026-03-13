@@ -3,10 +3,12 @@
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { oauth } from '#lib/utils.ts';
   import { handleError } from '#lib/utils/handle-error.ts';
-  import { Button, LoadingSpinner, toastManager } from '@immich/ui';
+  import { type UserAdminResponseDto } from '@immich/sdk';
+  import { Button, toastManager } from '@immich/ui';
   import { onMount } from 'svelte';
   import { t } from 'svelte-i18n';
   import { fade } from 'svelte/transition';
+  import LoadingSpinner from '#lib/components/shared-components/LoadingSpinner.svelte';
   import { createPreloadedQuery } from '#lib/queries/client.ts';
   import { getUserConfigQuery } from '#lib/queries/config-user.query.ts';
 

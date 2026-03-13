@@ -123,6 +123,8 @@ jobs:
           github_token: ${{ steps.token.outputs.token }}
           working_directory: ./mobile
 
+      - uses: ./.github/actions/apply-branding
+
       - name: Create the Keystore
         if: ${{ !github.event.pull_request.head.repo.fork }}
         env:
@@ -265,6 +267,8 @@ jobs:
         with:
           github_token: ${{ steps.token.outputs.token }}
           working_directory: ./mobile
+
+      - uses: ./.github/actions/apply-branding
 
       - name: Setup Ruby
         uses: ruby/setup-ruby@e1bd6146574da5e0795075b5319b300edb30c5b0 # v1.333.0

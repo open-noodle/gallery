@@ -45,6 +45,8 @@ import { UserController } from 'src/controllers/user.controller.js';
 import { VideoStreamController } from 'src/controllers/video-stream.controller.js';
 import { ViewController } from 'src/controllers/view.controller.js';
 import { WorkflowController } from 'src/controllers/workflow.controller.js';
+import { SharedSpaceController } from 'src/controllers/shared-space.controller.js';
+import { StorageMigrationController } from 'src/controllers/storage-migration.controller.js';
 
 export const controllers = [
   ApiKeyController,
@@ -82,7 +84,9 @@ export const controllers = [
   ServerController,
   SessionController,
   SharedLinkController,
+  SharedSpaceController,
   StackController,
+  StorageMigrationController,
   SyncController,
   SystemConfigController,
   SystemMetadataController,

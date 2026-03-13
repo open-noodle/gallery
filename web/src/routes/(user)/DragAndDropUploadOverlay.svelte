@@ -5,7 +5,7 @@
   import { dragAndDropFilesStore } from '#lib/stores/drag-and-drop-files.store.ts';
   import { fileUploadHandler } from '#lib/utils/file-uploader.ts';
   import { isAlbumsRoute, isLockedFolderRoute } from '#lib/utils/navigation.ts';
-  import { Logo } from '@immich/ui';
+  import Logo from '#lib/components/shared-components/Logo.svelte';
   import { t } from 'svelte-i18n';
   import { fade } from 'svelte/transition';
 

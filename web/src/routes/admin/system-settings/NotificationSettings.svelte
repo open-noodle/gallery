@@ -15,6 +15,7 @@
   import { Button, toastManager } from '@immich/ui';
   import { t } from 'svelte-i18n';
   import { fade } from 'svelte/transition';
+  import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
 
   const query = createPreloadedQuery(getAdminConfigQuery);
   const config = $derived(query.data);
