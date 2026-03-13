@@ -1,6 +1,8 @@
 import { BadRequestException } from '@nestjs/common';
 import { JobStatus } from 'src/enum';
 import { SessionService } from 'src/services/session.service';
+import { AuthFactory } from 'test/factories/auth.factory';
+import { SessionFactory } from 'test/factories/session.factory';
 import { authStub } from 'test/fixtures/auth.stub';
 import { factory, newUuid } from 'test/small.factory';
 import { newTestService, ServiceMocks } from 'test/utils';
@@ -115,9 +117,9 @@ describe('SessionService', () => {
 
   describe('getAll', () => {
     it('should get the devices', async () => {
-      const currentSession = factory.session();
-      const otherSession = factory.session();
-      const auth = factory.auth({ session: currentSession });
+      const currentSession = SessionFactory.create();
+      const otherSession = SessionFactory.create();
+      const auth = AuthFactory.from().session(currentSession).build();
 
       mocks.session.getByUserId.mockResolvedValue([currentSession, otherSession]);
 

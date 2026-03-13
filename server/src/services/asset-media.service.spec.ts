@@ -24,6 +24,7 @@ import { AuthFactory } from 'test/factories/auth.factory';
 import { authStub } from 'test/fixtures/auth.stub';
 import { fileStub } from 'test/fixtures/file.stub';
 import { userStub } from 'test/fixtures/user.stub';
+import { getForAsset } from 'test/mappers';
 import { newTestService, ServiceMocks } from 'test/utils';
 
 const file1 = Buffer.from('d2947b871a706081be194569951b7db246907957', 'hex');
@@ -172,7 +173,6 @@ const assetEntity = Object.freeze({
   fileCreatedAt: new Date('2022-06-19T23:41:36.910Z'),
   updatedAt: new Date('2022-06-19T23:41:36.910Z'),
   isFavorite: false,
-  encodedVideoPath: '',
   duration: '0:00:00.000000',
   files: [] as AssetFile[],
   exifInfo: {
@@ -442,7 +442,7 @@ describe(AssetMediaService.name, () => {
         .owner(authStub.user1.user)
         .build();
       const asset = AssetFactory.create({ livePhotoVideoId: motionAsset.id });
-      mocks.asset.getById.mockResolvedValueOnce(motionAsset);
+      mocks.asset.getById.mockResolvedValueOnce(getForAsset(motionAsset));
       mocks.asset.create.mockResolvedValueOnce(asset);
 
       await expect(
@@ -459,7 +459,7 @@ describe(AssetMediaService.name, () => {
     it('should hide the linked motion asset', async () => {
       const motionAsset = AssetFactory.from({ type: AssetType.Video }).owner(authStub.user1.user).build();
       const asset = AssetFactory.create();
-      mocks.asset.getById.mockResolvedValueOnce(motionAsset);
+      mocks.asset.getById.mockResolvedValueOnce(getForAsset(motionAsset));
       mocks.asset.create.mockResolvedValueOnce(asset);
 
       await expect(
@@ -478,7 +478,7 @@ describe(AssetMediaService.name, () => {
 
     it('should handle a sidecar file', async () => {
       const asset = AssetFactory.from().file({ type: AssetFileType.Sidecar }).build();
-      mocks.asset.getById.mockResolvedValueOnce(asset);
+      mocks.asset.getById.mockResolvedValueOnce(getForAsset(asset));
       mocks.asset.create.mockResolvedValueOnce(asset);
 
       await expect(sut.uploadAsset(authStub.user1, createDto, fileStub.photo, fileStub.photoSidecar)).resolves.toEqual({
@@ -745,13 +745,18 @@ describe(AssetMediaService.name, () => {
     });
 
     it('should return the encoded video path if available', async () => {
-      const asset = AssetFactory.create({ encodedVideoPath: '/path/to/encoded/video.mp4' });
+      const asset = AssetFactory.from()
+        .file({ type: AssetFileType.EncodedVideo, path: '/path/to/encoded/video.mp4' })
+        .build();
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
-      mocks.asset.getForVideo.mockResolvedValue(asset);
+      mocks.asset.getForVideo.mockResolvedValue({
+        originalPath: asset.originalPath,
+        encodedVideoPath: asset.files[0].path,
+      });
 
       await expect(sut.playbackVideo(authStub.admin, asset.id)).resolves.toEqual(
         new ImmichFileResponse({
-          path: asset.encodedVideoPath!,
+          path: '/path/to/encoded/video.mp4',
           cacheControl: CacheControl.PrivateWithCache,
           contentType: 'video/mp4',
         }),
@@ -761,7 +766,10 @@ describe(AssetMediaService.name, () => {
     it('should fall back to the original path', async () => {
       const asset = AssetFactory.create({ type: AssetType.Video, originalPath: '/original/path.ext' });
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
-      mocks.asset.getForVideo.mockResolvedValue(asset);
+      mocks.asset.getForVideo.mockResolvedValue({
+        originalPath: asset.originalPath,
+        encodedVideoPath: null,
+      });
 
       await expect(sut.playbackVideo(authStub.admin, asset.id)).resolves.toEqual(
         new ImmichFileResponse({
@@ -805,8 +813,8 @@ describe(AssetMediaService.name, () => {
     it('should update a photo with no sidecar to photo with no sidecar', async () => {
       const updatedFile = { ...fileStub.photo, originalPath: '/fake_path/photo1.jpeg' };
       const updatedAsset = { ...existingAsset, ...updatedFile };
-      mocks.asset.getById.mockResolvedValueOnce(existingAsset);
-      mocks.asset.getById.mockResolvedValueOnce(updatedAsset);
+      mocks.asset.getById.mockResolvedValueOnce(existingAsset as any);
+      mocks.asset.getById.mockResolvedValueOnce(updatedAsset as any);
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([existingAsset.id]));
       // this is the original file size
       mocks.storage.stat.mockResolvedValue({ size: 0 } as Stats);
@@ -854,8 +862,8 @@ describe(AssetMediaService.name, () => {
       const updatedFile = { ...fileStub.photo, originalPath: '/fake_path/photo1.jpeg' };
       const sidecarFile = fileStub.photoSidecar;
       const updatedAsset = { ...sidecarAsset, ...updatedFile };
-      mocks.asset.getById.mockResolvedValueOnce(existingAsset);
-      mocks.asset.getById.mockResolvedValueOnce(updatedAsset);
+      mocks.asset.getById.mockResolvedValueOnce(existingAsset as any);
+      mocks.asset.getById.mockResolvedValueOnce(updatedAsset as any);
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([sidecarAsset.id]));
       // this is the original file size
       mocks.storage.stat.mockResolvedValue({ size: 0 } as Stats);
@@ -892,8 +900,8 @@ describe(AssetMediaService.name, () => {
       const updatedFile = { ...fileStub.photo, originalPath: '/fake_path/photo1.jpeg' };
 
       const updatedAsset = { ...sidecarAsset, ...updatedFile };
-      mocks.asset.getById.mockResolvedValueOnce(sidecarAsset);
-      mocks.asset.getById.mockResolvedValueOnce(updatedAsset);
+      mocks.asset.getById.mockResolvedValueOnce(sidecarAsset as any);
+      mocks.asset.getById.mockResolvedValueOnce(updatedAsset as any);
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([sidecarAsset.id]));
       // this is the original file size
       mocks.storage.stat.mockResolvedValue({ size: 0 } as Stats);
@@ -927,8 +935,8 @@ describe(AssetMediaService.name, () => {
       // S3 uploaded files have relative paths
       const updatedFile = { ...fileStub.photo, originalPath: 'upload/user/ab/cd/photo1.jpeg' };
       const updatedAsset = { ...existingAsset, ...updatedFile };
-      mocks.asset.getById.mockResolvedValueOnce(existingAsset);
-      mocks.asset.getById.mockResolvedValueOnce(updatedAsset);
+      mocks.asset.getById.mockResolvedValueOnce(existingAsset as any);
+      mocks.asset.getById.mockResolvedValueOnce(updatedAsset as any);
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([existingAsset.id]));
       // this is the original file size
       mocks.storage.stat.mockResolvedValue({ size: 0 } as Stats);
@@ -949,7 +957,7 @@ describe(AssetMediaService.name, () => {
       (error as any).constraint_name = ASSET_CHECKSUM_CONSTRAINT;
 
       mocks.asset.update.mockRejectedValue(error);
-      mocks.asset.getById.mockResolvedValueOnce(sidecarAsset);
+      mocks.asset.getById.mockResolvedValueOnce(sidecarAsset as any);
       mocks.asset.getUploadAssetIdByChecksum.mockResolvedValue(sidecarAsset.id);
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([sidecarAsset.id]));
       // this is the original file size
@@ -1252,7 +1260,7 @@ describe(AssetMediaService.name, () => {
       (error as any).constraint_name = ASSET_CHECKSUM_CONSTRAINT;
 
       mocks.asset.update.mockRejectedValue(error);
-      mocks.asset.getById.mockResolvedValueOnce(existingAsset);
+      mocks.asset.getById.mockResolvedValueOnce(existingAsset as any);
       mocks.asset.getUploadAssetIdByChecksum.mockResolvedValue(void 0);
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([existingAsset.id]));
 

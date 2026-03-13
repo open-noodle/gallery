@@ -195,9 +195,9 @@ export class StorageMigrationService extends BaseService {
       for await (const row of this.storageMigrationRepository.streamEncodedVideos(direction)) {
         await enqueue({
           entityType: 'asset',
-          entityId: row.id,
+          entityId: row.assetId,
           fileType: 'encodedVideo',
-          sourcePath: row.encodedVideoPath!,
+          sourcePath: row.path,
           batchId,
           direction,
           deleteSource,

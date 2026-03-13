@@ -6,7 +6,7 @@ import { AlbumFactory } from 'test/factories/album.factory';
 import { AssetFactory } from 'test/factories/asset.factory';
 import { UserFactory } from 'test/factories/user.factory';
 import { userStub } from 'test/fixtures/user.stub';
-import { getForStorageTemplate } from 'test/mappers';
+import { getForAlbum, getForStorageTemplate } from 'test/mappers';
 import { makeStream, newTestService, ServiceMocks } from 'test/utils';
 
 const motionAsset = AssetFactory.from({ type: AssetType.Video }).exif().build();
@@ -181,7 +181,9 @@ describe(StorageTemplateService.name, () => {
         .exif()
         .build();
 
-      const album = AlbumFactory.from().asset().build();
+      const album = AlbumFactory.from()
+        .asset({}, (builder) => builder.exif())
+        .build();
       const config = structuredClone(defaults);
       config.storageTemplate.template = '{{y}}/{{#if album}}{{album}}{{else}}other/{{MM}}{{/if}}/{{filename}}';
       sut.onConfigInit({ newConfig: config });
@@ -193,7 +195,7 @@ describe(StorageTemplateService.name, () => {
 
       mocks.assetJob.getForStorageTemplateJob.mockResolvedValueOnce(getForStorageTemplate(stillAsset));
       mocks.assetJob.getForStorageTemplateJob.mockResolvedValueOnce(getForStorageTemplate(motionAsset));
-      mocks.album.getByAssetId.mockResolvedValue([album]);
+      mocks.album.getByAssetId.mockResolvedValue([getForAlbum(album)]);
 
       mocks.move.create.mockResolvedValueOnce({
         id: '123',
@@ -222,7 +224,9 @@ describe(StorageTemplateService.name, () => {
     it('should use handlebar if condition for album', async () => {
       const user = UserFactory.create();
       const asset = AssetFactory.from().owner(user).exif().build();
-      const album = AlbumFactory.from().asset().build();
+      const album = AlbumFactory.from()
+        .asset({}, (builder) => builder.exif())
+        .build();
       const config = structuredClone(defaults);
       config.storageTemplate.template = '{{y}}/{{#if album}}{{album}}{{else}}other/{{MM}}{{/if}}/{{filename}}';
 
@@ -230,7 +234,7 @@ describe(StorageTemplateService.name, () => {
 
       mocks.user.get.mockResolvedValue(user);
       mocks.assetJob.getForStorageTemplateJob.mockResolvedValueOnce(getForStorageTemplate(asset));
-      mocks.album.getByAssetId.mockResolvedValueOnce([album]);
+      mocks.album.getByAssetId.mockResolvedValueOnce([getForAlbum(album)]);
 
       expect(await sut.handleMigrationSingle({ id: asset.id })).toBe(JobStatus.Success);
 
@@ -270,7 +274,9 @@ describe(StorageTemplateService.name, () => {
     it('should handle album startDate', async () => {
       const user = UserFactory.create();
       const asset = AssetFactory.from().owner(user).exif().build();
-      const album = AlbumFactory.from().asset().build();
+      const album = AlbumFactory.from()
+        .asset({}, (builder) => builder.exif())
+        .build();
       const config = structuredClone(defaults);
       config.storageTemplate.template =
         '{{#if album}}{{album-startDate-y}}/{{album-startDate-MM}} - {{album}}{{else}}{{y}}/{{MM}}/{{/if}}/{{filename}}';
@@ -279,7 +285,7 @@ describe(StorageTemplateService.name, () => {
 
       mocks.user.get.mockResolvedValue(user);
       mocks.assetJob.getForStorageTemplateJob.mockResolvedValueOnce(getForStorageTemplate(asset));
-      mocks.album.getByAssetId.mockResolvedValueOnce([album]);
+      mocks.album.getByAssetId.mockResolvedValueOnce([getForAlbum(album)]);
       mocks.album.getMetadataForIds.mockResolvedValueOnce([
         {
           startDate: asset.fileCreatedAt,
@@ -824,7 +830,9 @@ describe(StorageTemplateService.name, () => {
       })
         .exif()
         .build();
-      const album = AlbumFactory.from().asset().build();
+      const album = AlbumFactory.from()
+        .asset({}, (builder) => builder.exif())
+        .build();
       const config = structuredClone(defaults);
       config.storageTemplate.template = '{{y}}/{{#if album}}{{album}}{{else}}other/{{MM}}{{/if}}/{{filename}}';
       sut.onConfigInit({ newConfig: config });
@@ -835,7 +843,7 @@ describe(StorageTemplateService.name, () => {
       mocks.assetJob.streamForStorageTemplateJob.mockReturnValue(makeStream([getForStorageTemplate(stillAsset)]));
       mocks.user.getList.mockResolvedValue([userStub.user1]);
       mocks.assetJob.getForStorageTemplateJob.mockResolvedValueOnce(getForStorageTemplate(motionAsset));
-      mocks.album.getByAssetId.mockResolvedValue([album]);
+      mocks.album.getByAssetId.mockResolvedValue([getForAlbum(album)]);
 
       mocks.move.create.mockResolvedValueOnce({
         id: '123',
@@ -863,7 +871,9 @@ describe(StorageTemplateService.name, () => {
 
     it('should use still photo album info when migrating live photo motion video', async () => {
       const user = userStub.user1;
-      const album = AlbumFactory.from().asset().build();
+      const album = AlbumFactory.from()
+        .asset({}, (builder) => builder.exif())
+        .build();
       const config = structuredClone(defaults);
       config.storageTemplate.template = '{{y}}/{{#if album}}{{album}}{{else}}other{{/if}}/{{filename}}';
 
@@ -872,7 +882,7 @@ describe(StorageTemplateService.name, () => {
       mocks.assetJob.streamForStorageTemplateJob.mockReturnValue(makeStream([getForStorageTemplate(stillAsset)]));
       mocks.user.getList.mockResolvedValue([user]);
       mocks.assetJob.getForStorageTemplateJob.mockResolvedValueOnce(getForStorageTemplate(motionAsset));
-      mocks.album.getByAssetId.mockResolvedValue([album]);
+      mocks.album.getByAssetId.mockResolvedValue([getForAlbum(album)]);
 
       mocks.move.create.mockResolvedValueOnce({
         id: '123',

@@ -1,12 +1,14 @@
 import { BadRequestException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { AssetIdErrorReason } from 'src/dtos/asset-ids.response.dto';
+import { mapSharedLink } from 'src/dtos/shared-link.dto';
 import { SharedLinkType } from 'src/enum';
 import { SharedLinkService } from 'src/services/shared-link.service';
 import { AlbumFactory } from 'test/factories/album.factory';
 import { AssetFactory } from 'test/factories/asset.factory';
 import { SharedLinkFactory } from 'test/factories/shared-link.factory';
 import { authStub } from 'test/fixtures/auth.stub';
-import { sharedLinkResponseStub, sharedLinkStub } from 'test/fixtures/shared-link.stub';
+import { sharedLinkStub } from 'test/fixtures/shared-link.stub';
+import { getForSharedLink } from 'test/mappers';
 import { factory, newUuid } from 'test/small.factory';
 import { newTestService, ServiceMocks } from 'test/utils';
 
@@ -24,16 +26,18 @@ describe(SharedLinkService.name, () => {
 
   describe('getAll', () => {
     it('should return all shared links for a user', async () => {
-      mocks.sharedLink.getAll.mockResolvedValue([sharedLinkStub.expired, sharedLinkStub.valid]);
-      await expect(sut.getAll(authStub.user1, {})).resolves.toEqual([
-        sharedLinkResponseStub.expired,
-        sharedLinkResponseStub.valid,
-      ]);
+      const [sharedLink1, sharedLink2] = [SharedLinkFactory.create(), SharedLinkFactory.create()];
+      mocks.sharedLink.getAll.mockResolvedValue([getForSharedLink(sharedLink1), getForSharedLink(sharedLink2)]);
+      await expect(sut.getAll(authStub.user1, {})).resolves.toEqual(
+        [getForSharedLink(sharedLink1), getForSharedLink(sharedLink2)].map((link) =>
+          mapSharedLink(link, { stripAssetMetadata: false }),
+        ),
+      );
       expect(mocks.sharedLink.getAll).toHaveBeenCalledWith({ userId: authStub.user1.user.id });
     });
 
     it('should pass id filter to getAll', async () => {
-      mocks.sharedLink.getAll.mockResolvedValue([sharedLinkStub.valid]);
+      mocks.sharedLink.getAll.mockResolvedValue([sharedLinkStub.valid] as any);
 
       await sut.getAll(authStub.user1, { id: 'link-id' });
 
@@ -41,7 +45,7 @@ describe(SharedLinkService.name, () => {
     });
 
     it('should pass albumId filter to getAll', async () => {
-      mocks.sharedLink.getAll.mockResolvedValue([sharedLinkStub.valid]);
+      mocks.sharedLink.getAll.mockResolvedValue([sharedLinkStub.valid] as any);
 
       await sut.getAll(authStub.user1, { albumId: 'album-id' });
 
@@ -55,7 +59,7 @@ describe(SharedLinkService.name, () => {
     });
 
     it('should throw BadRequestException when shared link is not password protected', async () => {
-      mocks.sharedLink.get.mockResolvedValue({ ...sharedLinkStub.valid, password: null });
+      mocks.sharedLink.get.mockResolvedValue({ ...sharedLinkStub.valid, password: null } as any);
 
       await expect(sut.login(authStub.adminSharedLink, { password: 'test' })).rejects.toBeInstanceOf(
         BadRequestException,
@@ -63,7 +67,7 @@ describe(SharedLinkService.name, () => {
     });
 
     it('should throw UnauthorizedException for invalid password', async () => {
-      mocks.sharedLink.get.mockResolvedValue({ ...sharedLinkStub.individual, password: 'correct-password' });
+      mocks.sharedLink.get.mockResolvedValue({ ...sharedLinkStub.individual, password: 'correct-password' } as any);
 
       await expect(sut.login(authStub.adminSharedLink, { password: 'wrong-password' })).rejects.toBeInstanceOf(
         UnauthorizedException,
@@ -72,7 +76,7 @@ describe(SharedLinkService.name, () => {
 
     it('should return shared link and token for valid password', async () => {
       const sharedLink = { ...sharedLinkStub.individual, password: 'correct-password' };
-      mocks.sharedLink.get.mockResolvedValue(sharedLink);
+      mocks.sharedLink.get.mockResolvedValue(sharedLink as any);
       mocks.crypto.hashSha256.mockReturnValue(Buffer.from('hashed-token'));
 
       const result = await sut.login(authStub.adminSharedLink, { password: 'correct-password' });
@@ -94,8 +98,11 @@ describe(SharedLinkService.name, () => {
 
     it('should return the shared link for the public user', async () => {
       const authDto = authStub.adminSharedLink;
-      mocks.sharedLink.get.mockResolvedValue(sharedLinkStub.valid);
-      await expect(sut.getMine(authDto, [])).resolves.toEqual(sharedLinkResponseStub.valid);
+      const sharedLink = SharedLinkFactory.create();
+      mocks.sharedLink.get.mockResolvedValue(getForSharedLink(sharedLink));
+      await expect(sut.getMine(authDto, [])).resolves.toEqual(
+        mapSharedLink(getForSharedLink(sharedLink), { stripAssetMetadata: false }),
+      );
       expect(mocks.sharedLink.get).toHaveBeenCalledWith(authDto.user.id, authDto.sharedLink?.id);
     });
 
@@ -107,7 +114,13 @@ describe(SharedLinkService.name, () => {
           allowUpload: true,
         },
       });
-      mocks.sharedLink.get.mockResolvedValue(sharedLinkStub.readonlyNoExif);
+      mocks.sharedLink.get.mockResolvedValue(
+        getForSharedLink(
+          SharedLinkFactory.from({ showExif: false })
+            .asset({}, (builder) => builder.exif())
+            .build(),
+        ),
+      );
       const response = await sut.getMine(authDto, []);
       expect(response.assets[0]).toMatchObject({ hasMetadata: false });
       expect(mocks.sharedLink.get).toHaveBeenCalledWith(authDto.user.id, authDto.sharedLink?.id);
@@ -121,7 +134,8 @@ describe(SharedLinkService.name, () => {
     });
 
     it('should accept a valid shared link auth token', async () => {
-      mocks.sharedLink.get.mockResolvedValue({ ...sharedLinkStub.individual, password: '123' });
+      const sharedLink = SharedLinkFactory.create({ password: '123' });
+      mocks.sharedLink.get.mockResolvedValue(getForSharedLink(sharedLink));
       const secret = Buffer.from('auth-token-123');
       mocks.crypto.hashSha256.mockReturnValue(secret);
       await expect(sut.getMine(authStub.adminSharedLink, [secret.toString('base64')])).resolves.toBeDefined();
@@ -132,7 +146,7 @@ describe(SharedLinkService.name, () => {
     });
 
     it('should throw UnauthorizedException for invalid token on password-protected link', async () => {
-      mocks.sharedLink.get.mockResolvedValue({ ...sharedLinkStub.individual, password: '123' });
+      mocks.sharedLink.get.mockResolvedValue({ ...sharedLinkStub.individual, password: '123' } as any);
       const secret = Buffer.from('auth-token-123');
       mocks.crypto.hashSha256.mockReturnValue(secret);
 
@@ -153,9 +167,12 @@ describe(SharedLinkService.name, () => {
     });
 
     it('should get a shared link by id', async () => {
-      mocks.sharedLink.get.mockResolvedValue(sharedLinkStub.valid);
-      await expect(sut.get(authStub.user1, sharedLinkStub.valid.id)).resolves.toEqual(sharedLinkResponseStub.valid);
-      expect(mocks.sharedLink.get).toHaveBeenCalledWith(authStub.user1.user.id, sharedLinkStub.valid.id);
+      const sharedLink = SharedLinkFactory.create();
+      mocks.sharedLink.get.mockResolvedValue(getForSharedLink(sharedLink));
+      await expect(sut.get(authStub.user1, sharedLink.id)).resolves.toEqual(
+        mapSharedLink(getForSharedLink(sharedLink), { stripAssetMetadata: true }),
+      );
+      expect(mocks.sharedLink.get).toHaveBeenCalledWith(authStub.user1.user.id, sharedLink.id);
     });
   });
 
@@ -186,8 +203,9 @@ describe(SharedLinkService.name, () => {
 
     it('should create an album shared link', async () => {
       const album = AlbumFactory.from().asset().build();
+      const sharedLink = SharedLinkFactory.from().album(album).build();
       mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set([album.id]));
-      mocks.sharedLink.create.mockResolvedValue(sharedLinkStub.valid);
+      mocks.sharedLink.create.mockResolvedValue(getForSharedLink(sharedLink));
 
       await sut.create(authStub.admin, { type: SharedLinkType.Album, albumId: album.id });
 
@@ -208,8 +226,11 @@ describe(SharedLinkService.name, () => {
 
     it('should create an individual shared link', async () => {
       const asset = AssetFactory.create();
+      const sharedLink = SharedLinkFactory.from()
+        .asset(asset, (builder) => builder.exif())
+        .build();
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
-      mocks.sharedLink.create.mockResolvedValue(sharedLinkStub.individual);
+      mocks.sharedLink.create.mockResolvedValue(getForSharedLink(sharedLink));
 
       await sut.create(authStub.admin, {
         type: SharedLinkType.Individual,
@@ -241,8 +262,11 @@ describe(SharedLinkService.name, () => {
 
     it('should create a shared link with allowDownload set to false when showMetadata is false', async () => {
       const asset = AssetFactory.create();
+      const sharedLink = SharedLinkFactory.from({ allowDownload: false })
+        .asset(asset, (builder) => builder.exif())
+        .build();
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
-      mocks.sharedLink.create.mockResolvedValue(sharedLinkStub.individual);
+      mocks.sharedLink.create.mockResolvedValue(getForSharedLink(sharedLink));
 
       await sut.create(authStub.admin, {
         type: SharedLinkType.Individual,
@@ -276,7 +300,7 @@ describe(SharedLinkService.name, () => {
       const asset = AssetFactory.create();
       const expiresAt = new Date('2025-12-31');
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
-      mocks.sharedLink.create.mockResolvedValue(sharedLinkStub.individual);
+      mocks.sharedLink.create.mockResolvedValue(sharedLinkStub.individual as any);
 
       await sut.create(authStub.admin, {
         type: SharedLinkType.Individual,
@@ -296,7 +320,7 @@ describe(SharedLinkService.name, () => {
     it('should create a shared link with a password', async () => {
       const asset = AssetFactory.create();
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
-      mocks.sharedLink.create.mockResolvedValue(sharedLinkStub.individual);
+      mocks.sharedLink.create.mockResolvedValue(sharedLinkStub.individual as any);
 
       await sut.create(authStub.admin, {
         type: SharedLinkType.Individual,
@@ -349,8 +373,9 @@ describe(SharedLinkService.name, () => {
     });
 
     it('should update a shared link', async () => {
-      mocks.sharedLink.get.mockResolvedValue(sharedLinkStub.valid);
-      mocks.sharedLink.update.mockResolvedValue(sharedLinkStub.valid);
+      const sharedLink = SharedLinkFactory.create();
+      mocks.sharedLink.get.mockResolvedValue(getForSharedLink(sharedLink));
+      mocks.sharedLink.update.mockResolvedValue(getForSharedLink(sharedLink));
 
       await sut.update(authStub.user1, sharedLinkStub.valid.id, { allowDownload: false });
 
@@ -364,8 +389,8 @@ describe(SharedLinkService.name, () => {
     });
 
     it('should set expiresAt to null when changeExpiryTime is true and expiresAt is not provided', async () => {
-      mocks.sharedLink.get.mockResolvedValue(sharedLinkStub.valid);
-      mocks.sharedLink.update.mockResolvedValue(sharedLinkStub.valid);
+      mocks.sharedLink.get.mockResolvedValue(sharedLinkStub.valid as any);
+      mocks.sharedLink.update.mockResolvedValue(sharedLinkStub.valid as any);
 
       await sut.update(authStub.user1, sharedLinkStub.valid.id, { changeExpiryTime: true });
 
@@ -374,8 +399,8 @@ describe(SharedLinkService.name, () => {
 
     it('should use provided expiresAt when both changeExpiryTime and expiresAt are set', async () => {
       const expiresAt = new Date('2025-12-31');
-      mocks.sharedLink.get.mockResolvedValue(sharedLinkStub.valid);
-      mocks.sharedLink.update.mockResolvedValue(sharedLinkStub.valid);
+      mocks.sharedLink.get.mockResolvedValue(sharedLinkStub.valid as any);
+      mocks.sharedLink.update.mockResolvedValue(sharedLinkStub.valid as any);
 
       await sut.update(authStub.user1, sharedLinkStub.valid.id, {
         changeExpiryTime: true,
@@ -388,8 +413,8 @@ describe(SharedLinkService.name, () => {
     });
 
     it('should update shared link with showMetadata', async () => {
-      mocks.sharedLink.get.mockResolvedValue(sharedLinkStub.valid);
-      mocks.sharedLink.update.mockResolvedValue(sharedLinkStub.valid);
+      mocks.sharedLink.get.mockResolvedValue(sharedLinkStub.valid as any);
+      mocks.sharedLink.update.mockResolvedValue(sharedLinkStub.valid as any);
 
       await sut.update(authStub.user1, sharedLinkStub.valid.id, { showMetadata: false });
 
@@ -397,8 +422,8 @@ describe(SharedLinkService.name, () => {
     });
 
     it('should update shared link with password', async () => {
-      mocks.sharedLink.get.mockResolvedValue(sharedLinkStub.valid);
-      mocks.sharedLink.update.mockResolvedValue(sharedLinkStub.valid);
+      mocks.sharedLink.get.mockResolvedValue(sharedLinkStub.valid as any);
+      mocks.sharedLink.update.mockResolvedValue(sharedLinkStub.valid as any);
 
       await sut.update(authStub.user1, sharedLinkStub.valid.id, { password: 'new-password' });
 
@@ -406,8 +431,8 @@ describe(SharedLinkService.name, () => {
     });
 
     it('should update shared link description', async () => {
-      mocks.sharedLink.get.mockResolvedValue(sharedLinkStub.valid);
-      mocks.sharedLink.update.mockResolvedValue(sharedLinkStub.valid);
+      mocks.sharedLink.get.mockResolvedValue(sharedLinkStub.valid as any);
+      mocks.sharedLink.update.mockResolvedValue(sharedLinkStub.valid as any);
 
       await sut.update(authStub.user1, sharedLinkStub.valid.id, { description: 'Updated description' });
 
@@ -417,7 +442,7 @@ describe(SharedLinkService.name, () => {
     });
 
     it('should throw BadRequestException for duplicate slug on update', async () => {
-      mocks.sharedLink.get.mockResolvedValue(sharedLinkStub.valid);
+      mocks.sharedLink.get.mockResolvedValue(sharedLinkStub.valid as any);
       const error = new Error('duplicate slug');
       (error as any).constraint_name = 'shared_link_slug_uq';
       mocks.sharedLink.update.mockRejectedValue(error);
@@ -428,7 +453,7 @@ describe(SharedLinkService.name, () => {
     });
 
     it('should rethrow unknown errors on update', async () => {
-      mocks.sharedLink.get.mockResolvedValue(sharedLinkStub.valid);
+      mocks.sharedLink.get.mockResolvedValue(sharedLinkStub.valid as any);
       const error = new Error('unknown error');
       mocks.sharedLink.update.mockRejectedValue(error);
 
@@ -447,19 +472,21 @@ describe(SharedLinkService.name, () => {
     });
 
     it('should remove a key', async () => {
-      mocks.sharedLink.get.mockResolvedValue(sharedLinkStub.valid);
+      const sharedLink = SharedLinkFactory.create();
+      mocks.sharedLink.get.mockResolvedValue(getForSharedLink(sharedLink));
       mocks.sharedLink.remove.mockResolvedValue();
 
-      await sut.remove(authStub.user1, sharedLinkStub.valid.id);
+      await sut.remove(authStub.user1, sharedLink.id);
 
-      expect(mocks.sharedLink.get).toHaveBeenCalledWith(authStub.user1.user.id, sharedLinkStub.valid.id);
-      expect(mocks.sharedLink.remove).toHaveBeenCalledWith(sharedLinkStub.valid.id);
+      expect(mocks.sharedLink.get).toHaveBeenCalledWith(authStub.user1.user.id, sharedLink.id);
+      expect(mocks.sharedLink.remove).toHaveBeenCalledWith(sharedLink.id);
     });
   });
 
   describe('addAssets', () => {
     it('should not work on album shared links', async () => {
-      mocks.sharedLink.get.mockResolvedValue(sharedLinkStub.valid);
+      const sharedLink = SharedLinkFactory.from().album().build();
+      mocks.sharedLink.get.mockResolvedValue(getForSharedLink(sharedLink));
 
       await expect(sut.addAssets(authStub.admin, 'link-1', { assetIds: ['asset-1'] })).rejects.toBeInstanceOf(
         BadRequestException,
@@ -468,11 +495,13 @@ describe(SharedLinkService.name, () => {
 
     it('should add assets to a shared link', async () => {
       const asset = AssetFactory.create();
-      const sharedLink = SharedLinkFactory.from().asset(asset).build();
+      const sharedLink = SharedLinkFactory.from()
+        .asset(asset, (builder) => builder.exif())
+        .build();
       const newAsset = AssetFactory.create();
-      mocks.sharedLink.get.mockResolvedValue(sharedLink);
-      mocks.sharedLink.create.mockResolvedValue(sharedLink);
-      mocks.sharedLink.update.mockResolvedValue(sharedLink);
+      mocks.sharedLink.get.mockResolvedValue(getForSharedLink(sharedLink));
+      mocks.sharedLink.create.mockResolvedValue(getForSharedLink(sharedLink));
+      mocks.sharedLink.update.mockResolvedValue(getForSharedLink(sharedLink));
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([newAsset.id]));
 
       await expect(
@@ -486,7 +515,7 @@ describe(SharedLinkService.name, () => {
       expect(mocks.access.asset.checkOwnerAccess).toHaveBeenCalledTimes(1);
       expect(mocks.sharedLink.update).toHaveBeenCalled();
       expect(mocks.sharedLink.update).toHaveBeenCalledWith({
-        ...sharedLink,
+        ...getForSharedLink(sharedLink),
         slug: null,
         assetIds: [newAsset.id],
       });
@@ -495,8 +524,8 @@ describe(SharedLinkService.name, () => {
     it('should handle all assets being duplicates', async () => {
       const asset = AssetFactory.create();
       const sharedLink = SharedLinkFactory.from().asset(asset).build();
-      mocks.sharedLink.get.mockResolvedValue(sharedLink);
-      mocks.sharedLink.update.mockResolvedValue(sharedLink);
+      mocks.sharedLink.get.mockResolvedValue(sharedLink as any);
+      mocks.sharedLink.update.mockResolvedValue(sharedLink as any);
 
       const result = await sut.addAssets(authStub.admin, sharedLink.id, { assetIds: [asset.id] });
 
@@ -507,19 +536,22 @@ describe(SharedLinkService.name, () => {
 
   describe('removeAssets', () => {
     it('should not work on album shared links', async () => {
-      mocks.sharedLink.get.mockResolvedValue(sharedLinkStub.valid);
+      const sharedLink = SharedLinkFactory.from().album().build();
+      mocks.sharedLink.get.mockResolvedValue(getForSharedLink(sharedLink));
 
-      await expect(sut.removeAssets(authStub.admin, 'link-1', { assetIds: ['asset-1'] })).rejects.toBeInstanceOf(
+      await expect(sut.removeAssets(authStub.admin, sharedLink.id, { assetIds: ['asset-1'] })).rejects.toBeInstanceOf(
         BadRequestException,
       );
     });
 
     it('should remove assets from a shared link', async () => {
       const asset = AssetFactory.create();
-      const sharedLink = SharedLinkFactory.from().asset(asset).build();
-      mocks.sharedLink.get.mockResolvedValue(sharedLink);
-      mocks.sharedLink.create.mockResolvedValue(sharedLink);
-      mocks.sharedLink.update.mockResolvedValue(sharedLink);
+      const sharedLink = SharedLinkFactory.from()
+        .asset(asset, (builder) => builder.exif())
+        .build();
+      mocks.sharedLink.get.mockResolvedValue(getForSharedLink(sharedLink));
+      mocks.sharedLink.create.mockResolvedValue(getForSharedLink(sharedLink));
+      mocks.sharedLink.update.mockResolvedValue(getForSharedLink(sharedLink));
       mocks.sharedLinkAsset.remove.mockResolvedValue([asset.id]);
 
       await expect(
@@ -535,9 +567,9 @@ describe(SharedLinkService.name, () => {
 
     it('should handle all assets not found', async () => {
       const sharedLink = SharedLinkFactory.from().build();
-      mocks.sharedLink.get.mockResolvedValue(sharedLink);
+      mocks.sharedLink.get.mockResolvedValue(sharedLink as any);
       mocks.sharedLinkAsset.remove.mockResolvedValue([]);
-      mocks.sharedLink.update.mockResolvedValue(sharedLink);
+      mocks.sharedLink.update.mockResolvedValue(sharedLink as any);
 
       const result = await sut.removeAssets(authStub.admin, sharedLink.id, { assetIds: ['missing-1', 'missing-2'] });
 
@@ -564,11 +596,14 @@ describe(SharedLinkService.name, () => {
     });
 
     it('should return metadata tags', async () => {
-      mocks.sharedLink.get.mockResolvedValue(sharedLinkStub.individual);
+      const sharedLink = SharedLinkFactory.from({ description: null })
+        .asset({}, (builder) => builder.exif())
+        .build();
+      mocks.sharedLink.get.mockResolvedValue(getForSharedLink(sharedLink));
 
       await expect(sut.getMetadataTags(authStub.adminSharedLink)).resolves.toEqual({
         description: '1 shared photos & videos',
-        imageUrl: `https://my.immich.app/api/assets/${sharedLinkStub.individual.assets[0].id}/thumbnail?key=LCtkaJX4R1O_9D-2lq0STzsPryoL1UdAbyb6Sna1xxmQCSuqU2J1ZUsqt6GR-yGm1s0`,
+        imageUrl: `https://my.immich.app/api/assets/${sharedLink.assets[0].id}/thumbnail?key=${sharedLink.key.toString('base64url')}`,
         title: 'Public Share',
       });
 
@@ -593,7 +628,7 @@ describe(SharedLinkService.name, () => {
         album: { ...album, albumThumbnailAssetId: null },
         assets: [],
       };
-      mocks.sharedLink.get.mockResolvedValue(sharedLink);
+      mocks.sharedLink.get.mockResolvedValue(sharedLink as any);
 
       const result = await sut.getMetadataTags(authStub.adminSharedLink);
 
@@ -608,7 +643,7 @@ describe(SharedLinkService.name, () => {
         album: { ...album, albumThumbnailAssetId: thumbnailAssetId, assets: [] },
         assets: [],
       };
-      mocks.sharedLink.get.mockResolvedValue(sharedLink);
+      mocks.sharedLink.get.mockResolvedValue(sharedLink as any);
 
       const result = await sut.getMetadataTags(authStub.adminSharedLink);
 
@@ -637,7 +672,7 @@ describe(SharedLinkService.name, () => {
         album: { ...album, albumThumbnailAssetId: null, assets },
         assets: [],
       };
-      mocks.sharedLink.get.mockResolvedValue(sharedLink);
+      mocks.sharedLink.get.mockResolvedValue(sharedLink as any);
 
       const result = await sut.getMetadataTags(authStub.adminSharedLink);
 
