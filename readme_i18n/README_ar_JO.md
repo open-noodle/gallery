@@ -39,6 +39,9 @@
   <a href="README_ml_IN.md">മലയാളം</a>
 </p>
 
+> [!NOTE]
+> هذا **تفرع مجتمعي** من [Immich](https://github.com/immich-app/immich) يتضمن ميزات إضافية. للاطلاع على صور Docker وتعليمات التبديل وقائمة التغييرات الكاملة، راجع [الملف التمهيدي الرئيسي](../README.md).
+
 > [!WARNING]
 > ⚠️ اتبع دائمًا خطة النسخ الاحتياطي [١-٢-٣](https://www.backblaze.com/blog/the-3-2-1-backup-strategy/) لصورك ومقاطع الفيديو الثمينة الخاصة بك
 >

@@ -38,6 +38,9 @@
   <a href="README_ml_IN.md">മലയാളം</a>
 </p>
 
+> [!NOTE]
+> これは [Immich](https://github.com/immich-app/immich) の**コミュニティフォーク**で、追加機能が含まれています。Dockerイメージ、移行手順、変更点の一覧については、[メインのREADME](../README.md)をご覧ください。
+
 > [!WARNING]
 > ⚠️ 大切な写真やビデオは、常に [3-2-1](https://www.backblaze.com/blog/the-3-2-1-backup-strategy/) のバックアッププランに従ってください！
 >

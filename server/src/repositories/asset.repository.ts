@@ -37,6 +37,7 @@ import {
   anyUuid,
   asUuid,
   hasPeople,
+  hasSpacePerson,
   inSharedAlbum,
   removeUndefinedKeys,
   truncatedDate,
@@ -84,9 +85,12 @@ interface AssetBuilderOptions {
   isTrashed?: boolean;
   isDuplicate?: boolean;
   albumId?: string;
+  spaceId?: string;
   tagId?: string;
   personId?: string;
+  spacePersonId?: string;
   userIds?: string[];
+  timelineSpaceIds?: string[];
   withStacked?: boolean;
   exifInfo?: boolean;
   status?: AssetStatus;
@@ -357,6 +361,7 @@ export class AssetRepository {
       return;
     }
 
+    type JobStatusColumns = Exclude<keyof AssetJobStatusTable, 'assetId'>;
     const values = jobStatus.map((row) => ({ ...row, assetId: asUuid(row.assetId) }));
     await this.db
       .insertInto('asset_job_status')
@@ -369,7 +374,8 @@ export class AssetRepository {
               facesRecognizedAt: eb.ref('excluded.facesRecognizedAt'),
               metadataExtractedAt: eb.ref('excluded.metadataExtractedAt'),
               ocrAt: eb.ref('excluded.ocrAt'),
-            },
+              petsDetectedAt: eb.ref('excluded.petsDetectedAt'),
+            } satisfies Record<JobStatusColumns, unknown>,
             values[0],
           ),
         ),
@@ -779,7 +785,13 @@ export class AssetRepository {
               .innerJoin('album_asset', 'asset.id', 'album_asset.assetId')
               .where('album_asset.albumId', '=', asUuid(options.albumId!)),
           )
+          .$if(!!options.spaceId, (qb) =>
+            qb
+              .innerJoin('shared_space_asset', 'asset.id', 'shared_space_asset.assetId')
+              .where('shared_space_asset.spaceId', '=', asUuid(options.spaceId!)),
+          )
           .$if(!!options.personId, (qb) => hasPeople(qb, [options.personId!]))
+          .$if(!!options.spacePersonId, (qb) => hasSpacePerson(qb, options.spacePersonId!))
           .$if(!!options.withStacked, (qb) =>
             qb
               .leftJoin('stack', (join) =>
@@ -787,12 +799,27 @@ export class AssetRepository {
               )
               .where((eb) => eb.or([eb('asset.stackId', 'is', null), eb(eb.table('stack'), 'is not', null)])),
           )
-          .$if(!!options.userIds, (qb) =>
-            qb.where((eb) => {
-              // TODO this should become a shared `hasAccess` style helper once implement sharing in more places
-              const isOwner = eb('asset.ownerId', '=', anyUuid(options.userIds!));
-              return options.personId ? eb.or([isOwner, inSharedAlbum(eb, auth.user.id)]) : isOwner;
-            }),
+          .$if(!!options.userIds && !options.timelineSpaceIds, (qb) =>
+            qb.where((eb) =>
+              options.personId
+                ? eb.or([eb('asset.ownerId', '=', anyUuid(options.userIds!)), inSharedAlbum(eb, auth.user.id)])
+                : eb('asset.ownerId', '=', anyUuid(options.userIds!)),
+            ),
+          )
+          .$if(!!options.userIds && !!options.timelineSpaceIds, (qb) =>
+            qb.where((eb) =>
+              eb.or([
+                options.personId
+                  ? eb.or([eb('asset.ownerId', '=', anyUuid(options.userIds!)), inSharedAlbum(eb, auth.user.id)])
+                  : eb('asset.ownerId', '=', anyUuid(options.userIds!)),
+                eb.exists(
+                  eb
+                    .selectFrom('shared_space_asset')
+                    .whereRef('shared_space_asset.assetId', '=', 'asset.id')
+                    .where('shared_space_asset.spaceId', '=', anyUuid(options.timelineSpaceIds!)),
+                ),
+              ]),
+            ),
           )
           .$if(options.isFavorite !== undefined, (qb) => qb.where('asset.isFavorite', '=', options.isFavorite!))
           .$if(!!options.assetType, (qb) => qb.where('asset.type', '=', options.assetType!))
@@ -878,12 +905,39 @@ export class AssetRepository {
               ),
             ),
           )
+          .$if(!!options.spaceId, (qb) =>
+            qb.where((eb) =>
+              eb.exists(
+                eb
+                  .selectFrom('shared_space_asset')
+                  .whereRef('shared_space_asset.assetId', '=', 'asset.id')
+                  .where('shared_space_asset.spaceId', '=', asUuid(options.spaceId!)),
+              ),
+            ),
+          )
           .$if(!!options.personId, (qb) => hasPeople(qb, [options.personId!]))
-          .$if(!!options.userIds, (qb) =>
-            qb.where((eb) => {
-              const isOwner = eb('asset.ownerId', '=', anyUuid(options.userIds!));
-              return options.personId ? eb.or([isOwner, inSharedAlbum(eb, auth.user.id)]) : isOwner;
-            }),
+          .$if(!!options.spacePersonId, (qb) => hasSpacePerson(qb, options.spacePersonId!))
+          .$if(!!options.userIds && !options.timelineSpaceIds, (qb) =>
+            qb.where((eb) =>
+              options.personId
+                ? eb.or([eb('asset.ownerId', '=', anyUuid(options.userIds!)), inSharedAlbum(eb, auth.user.id)])
+                : eb('asset.ownerId', '=', anyUuid(options.userIds!)),
+            ),
+          )
+          .$if(!!options.userIds && !!options.timelineSpaceIds, (qb) =>
+            qb.where((eb) =>
+              eb.or([
+                options.personId
+                  ? eb.or([eb('asset.ownerId', '=', anyUuid(options.userIds!)), inSharedAlbum(eb, auth.user.id)])
+                  : eb('asset.ownerId', '=', anyUuid(options.userIds!)),
+                eb.exists(
+                  eb
+                    .selectFrom('shared_space_asset')
+                    .whereRef('shared_space_asset.assetId', '=', 'asset.id')
+                    .where('shared_space_asset.spaceId', '=', anyUuid(options.timelineSpaceIds!)),
+                ),
+              ]),
+            ),
           )
           .$if(options.isFavorite !== undefined, (qb) => qb.where('asset.isFavorite', '=', options.isFavorite!))
           .$if(!!options.withStacked, (qb) =>

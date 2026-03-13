@@ -16,10 +16,14 @@ import {
   QueueName,
   QueuesResponseLegacyDto,
   SharedLinkCreateDto,
+  SharedSpaceCreateDto,
+  SharedSpaceMemberCreateDto,
   UpdateLibraryDto,
   UserAdminCreateDto,
   UserPreferencesUpdateDto,
   ValidateLibraryDto,
+  addAssets as addSpaceAssets,
+  addMember as addSpaceMember,
   createAlbum,
   createApiKey,
   createJob,
@@ -27,6 +31,7 @@ import {
   createPartner,
   createPerson,
   createSharedLink,
+  createSpace,
   createStack,
   createUserAdmin,
   deleteAssets,
@@ -37,6 +42,7 @@ import {
   getQueuesLegacy,
   listDatabaseBackups,
   login,
+  markSpaceViewed,
   runQueueCommandLegacy,
   scanLibrary,
   searchAssets,
@@ -50,6 +56,7 @@ import {
   updateConfig,
   updateLibrary,
   updateMyPreferences,
+  updateSpace,
   upsertTags,
   validate,
 } from '@immich/sdk';
@@ -336,6 +343,21 @@ export const utils = {
 
   updateAlbumUser: (accessToken: string, args: Parameters<typeof updateAlbumUser>[0]) =>
     updateAlbumUser(args, { headers: asBearerAuth(accessToken) }),
+
+  createSpace: (accessToken: string, dto: SharedSpaceCreateDto) =>
+    createSpace({ sharedSpaceCreateDto: dto }, { headers: asBearerAuth(accessToken) }),
+
+  addSpaceMember: (accessToken: string, spaceId: string, dto: SharedSpaceMemberCreateDto) =>
+    addSpaceMember({ id: spaceId, sharedSpaceMemberCreateDto: dto }, { headers: asBearerAuth(accessToken) }),
+
+  addSpaceAssets: (accessToken: string, spaceId: string, assetIds: string[]) =>
+    addSpaceAssets({ id: spaceId, sharedSpaceAssetAddDto: { assetIds } }, { headers: asBearerAuth(accessToken) }),
+
+  updateSpace: (accessToken: string, spaceId: string, dto: { thumbnailAssetId?: string; name?: string }) =>
+    updateSpace({ id: spaceId, sharedSpaceUpdateDto: dto }, { headers: asBearerAuth(accessToken) }),
+
+  markSpaceViewed: (accessToken: string, spaceId: string) =>
+    markSpaceViewed({ id: spaceId }, { headers: asBearerAuth(accessToken) }),
 
   createAsset: async (
     accessToken: string,

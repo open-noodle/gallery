@@ -83,6 +83,8 @@ export const PersonResponseSchema = z
       .optional()
       .describe('Person color (hex)')
       .meta(new HistoryBuilder().added('v1.126.0').stable('v2').getExtensions()),
+    type: z.string().default('person').describe('Entity type (person or pet)'),
+    species: z.string().nullable().optional().describe('Pet species (e.g. dog, cat)'),
   })
   .meta({ id: 'PersonResponseDto' });
 
@@ -181,6 +183,8 @@ export function mapPerson(person: MaybeDehydrated<Person>): PersonResponseDto {
     isFavorite: person.isFavorite,
     color: person.color ?? undefined,
     updatedAt: asDateTimeString(person.updatedAt),
+    type: person.type,
+    species: person.species,
   };
 }
 

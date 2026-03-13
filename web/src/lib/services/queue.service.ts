@@ -10,6 +10,7 @@ import {
 import { modalManager, toastManager, type ActionItem, type IconLike } from '@immich/ui';
 import {
   mdiClose,
+  mdiCloudSyncOutline,
   mdiCog,
   mdiContentDuplicate,
   mdiDatabaseOutline,
@@ -22,6 +23,7 @@ import {
   mdiLibraryShelves,
   mdiOcr,
   mdiPause,
+  mdiPaw,
   mdiPencil,
   mdiPlay,
   mdiPlus,
@@ -208,6 +210,11 @@ export const asQueueItem = ($t: MessageFormatter, queue: { name: QueueName }): Q
       title: $t('admin.machine_learning_ocr'),
       subtitle: $t('admin.ocr_job_description'),
     },
+    [QueueName.PetDetection]: {
+      icon: mdiPaw,
+      title: $t('admin.machine_learning_pet_detection'),
+      subtitle: $t('admin.pet_detection_job_description'),
+    },
     [QueueName.VideoConversion]: {
       icon: mdiVideo,
       title: $t('admin.video_conversion_job'),
@@ -249,6 +256,10 @@ export const asQueueItem = ($t: MessageFormatter, queue: { name: QueueName }): Q
     [QueueName.Editor]: {
       icon: mdiPencil,
       title: $t('editor'),
+    },
+    [QueueName.StorageBackendMigration]: {
+      icon: mdiCloudSyncOutline,
+      title: 'Storage Backend Migration',
     },
   };
 

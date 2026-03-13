@@ -142,6 +142,8 @@ jobs:
           persist-credentials: false
           token: ${{ steps.token.outputs.token }}
 
+      - uses: ./.github/actions/apply-branding
+
       - name: Setup Mise
         uses: immich-app/devtools/actions/use-mise@06a9ef925332c91be647d6256642b86b398592c8 # use-mise-action-v3.2.1
         with:
