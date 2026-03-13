@@ -130,9 +130,8 @@ export const PersonResponseSchema = z
       .optional()
       .describe('Person color (hex)')
       .meta(new HistoryBuilder().added('v1.126.0').stable('v2').getExtensions()),
-    otherPeople: z.array(PersonOtherResponseSchema),
-    sharedBy: z.array(PeopleUserResponseSchema).describe('Users that gave the current user access to this person'),
-    sharedWith: z.array(PeopleUserResponseSchema).describe('Users the current user gave access to this person'),
+    type: z.string().default('person').describe('Entity type (person or pet)'),
+    species: z.string().nullable().optional().describe('Pet species (e.g. dog, cat)'),
   })
   .meta({ id: 'PersonResponseDto' });
 
@@ -299,10 +298,8 @@ export function mapPerson(
     isFavorite: person.isFavorite,
     color: person.color ?? undefined,
     updatedAt: asDateTimeString(person.updatedAt),
-    // TODO: use different response dtos for asset faces, which do not load the sharing properties
-    otherPeople: person.otherPeople ?? [],
-    sharedBy: (person.sharedBy ?? []).map((user) => mapPeopleUser(user)),
-    sharedWith: (person.sharedWith ?? []).map((user) => mapPeopleUser(user)),
+    type: person.type,
+    species: person.species,
   };
 }
 

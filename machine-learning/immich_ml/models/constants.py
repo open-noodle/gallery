@@ -88,6 +88,8 @@ _PADDLE_MODELS = {
     "TH__PP-OCRv5_mobile",
 }
 
+_YOLO_MODELS = {"yolo11n", "yolo11s", "yolo11m"}
+
 SUPPORTED_PROVIDERS = [
     "nv_tensorrt_rtx",
     "CUDAExecutionProvider",
@@ -175,5 +177,8 @@ def get_model_source(model_name: str) -> ModelSource | None:
 
     if cleaned_name in _PADDLE_MODELS:
         return ModelSource.PADDLE
+
+    if cleaned_name in _YOLO_MODELS:
+        return ModelSource.YOLO
 
     return None

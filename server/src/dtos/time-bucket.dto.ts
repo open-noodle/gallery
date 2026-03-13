@@ -20,6 +20,14 @@ const TimeBucketQueryBaseSchema = z
       .optional()
       .describe('Include stacked assets in the response. When true, only primary assets from stacks are returned.'),
     withPartners: stringToBool.optional().describe('Include assets shared by partners'),
+    withSharedSpaces: stringToBool
+      .optional()
+      .describe('Include assets from shared spaces where the user has timeline enabled'),
+    spaceId: z.uuidv4().optional().describe('Filter assets belonging to a specific shared space'),
+    spacePersonId: z
+      .uuidv4()
+      .optional()
+      .describe('Filter assets containing a specific shared space person (space face recognition)'),
     order: AssetOrderSchema.optional().describe(
       'Sort order for assets within time buckets (ASC for oldest first, DESC for newest first)',
     ),

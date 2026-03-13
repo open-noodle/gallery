@@ -52,6 +52,9 @@ export type Events = {
   AlbumUserUpdate: [{ albumId: string; userId: string; role: AlbumUserRole }];
   AlbumUserDelete: [{ albumId: string; userId: string }];
 
+  SpaceAddAssets: [{ assetIds: string[]; spaceId: string }];
+  SpaceRemoveAssets: [{ assetIds: string[]; spaceId: string }];
+
   PersonUpdate: [PersonResponseDto];
   PersonShare: [{ personId: string }];
   PersonUserDelete: [{ personId: string; userId: string }];
