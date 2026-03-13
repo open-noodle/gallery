@@ -17,12 +17,13 @@
     type AssetFaceResponseDto,
     type PersonResponseDto,
   } from '@immich/sdk';
-  import { Icon, IconButton, LoadingSpinner, modalManager, toastManager } from '@immich/ui';
+  import { Icon, IconButton, modalManager, toastManager } from '@immich/ui';
   import { mdiAccountOff, mdiArrowLeftThin, mdiPencil, mdiRestart, mdiTrashCan } from '@mdi/js';
   import { onMount } from 'svelte';
   import { t } from 'svelte-i18n';
   import { linear } from 'svelte/easing';
   import { fly } from 'svelte/transition';
+  import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
   import ImageThumbnail from '../assets/thumbnail/ImageThumbnail.svelte';
   import AssignFaceSidePanel from './AssignFaceSidePanel.svelte';
 
