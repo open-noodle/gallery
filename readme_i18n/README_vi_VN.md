@@ -43,6 +43,9 @@
 
 </p>
 
+> [!NOTE]
+> Đây là **bản fork cộng đồng** của [Immich](https://github.com/immich-app/immich) với các tính năng bổ sung. Để xem Docker images, hướng dẫn chuyển đổi và danh sách đầy đủ các thay đổi, vui lòng xem [README chính](../README.md).
+
 > [!WARNING]
 > ⚠️ Luôn tuân thủ kế hoạch sao lưu [3-2-1](https://www.backblaze.com/blog/the-3-2-1-backup-strategy/) cho những bức ảnh và video quý giá của bạn!
 >

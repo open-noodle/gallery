@@ -63,6 +63,9 @@ export const Route = {
   // folders
   folders: (params?: { path?: string }) => '/folders' + asQueryString(params),
 
+  // import
+  import: () => '/import',
+
   // libraries
   libraries: () => '/admin/library-management',
   newLibrary: () => '/admin/library-management/new',
@@ -111,6 +114,10 @@ export const Route = {
   // sharing
   sharing: () => '/sharing',
 
+  // spaces
+  spaces: () => '/spaces',
+  viewSpace: ({ id }: { id: string }) => `/spaces/${id}`,
+
   // shared links
   sharedLinks: (params?: { filter?: SharedLinkTab }) => '/shared-links' + asQueryString(params),
   editSharedLink: ({ id }: { id: string }) => `/shared-links/${id}/edit`,
@@ -126,6 +133,7 @@ export const Route = {
   systemMaintenance: (params?: { continue?: string }) => '/admin/maintenance' + asQueryString(params),
   systemMaintenanceIntegrityReport: ({ reportType }: { reportType: IntegrityReport }) =>
     `/admin/maintenance/integrity-report/${reportType}`,
+  storageMigration: () => '/admin/storage-migration',
 
   // tags
   tags: (params?: { path?: string }) => '/tags' + asQueryString(params),

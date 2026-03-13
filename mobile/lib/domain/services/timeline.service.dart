@@ -36,6 +36,7 @@ enum TimelineOrigin {
   albumActivities,
   folder,
   recentlyAdded,
+  remoteSpace,
 }
 
 class TimelineFactory {

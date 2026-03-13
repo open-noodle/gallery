@@ -84,7 +84,17 @@ export const envData: EnvData = {
   },
 
   storage: {
+    backend: 'disk',
     ignoreMountCheckErrors: false,
+    s3: {
+      bucket: '',
+      region: 'us-east-1',
+      endpoint: undefined,
+      accessKeyId: undefined,
+      secretAccessKey: undefined,
+      presignedUrlExpiry: 3600,
+      serveMode: 'redirect',
+    },
   },
 
   telemetry: {
@@ -105,7 +115,15 @@ export const envData: EnvData = {
   noColor: false,
 };
 
-export const mockEnvData = (config: Partial<EnvData>) => ({ ...envData, ...config });
+type MockEnvOverrides = Omit<Partial<EnvData>, 'storage'> & {
+  storage?: Partial<EnvData['storage']>;
+};
+
+export const mockEnvData = (config: MockEnvOverrides): EnvData => ({
+  ...envData,
+  ...config,
+  storage: { ...envData.storage, ...config.storage },
+});
 export const newConfigRepositoryMock = (): Mocked<RepositoryInterface<ConfigRepository>> => {
   return {
     getEnv: vitest.fn().mockReturnValue(mockEnvData({})),
