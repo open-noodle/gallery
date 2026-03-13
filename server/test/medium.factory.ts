@@ -44,7 +44,7 @@ import { SearchRepository } from 'src/repositories/search.repository';
 import { SessionRepository } from 'src/repositories/session.repository';
 import { SharedLinkAssetRepository } from 'src/repositories/shared-link-asset.repository';
 import { SharedLinkRepository } from 'src/repositories/shared-link.repository';
-import { SpaceActivityRepository } from 'src/repositories/space-activity.repository';
+import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
 import { StackRepository } from 'src/repositories/stack.repository';
 import { StorageRepository } from 'src/repositories/storage.repository';
 import { SyncCheckpointRepository } from 'src/repositories/sync-checkpoint.repository';
@@ -452,7 +452,7 @@ const newRealRepository = <T>(key: ClassConstructor<T>, db: Kysely<DB>): T => {
     case SessionRepository:
     case SharedLinkRepository:
     case SharedLinkAssetRepository:
-    case SpaceActivityRepository:
+    case SharedSpaceRepository:
     case StackRepository:
     case SyncRepository:
     case SyncCheckpointRepository:
