@@ -39,6 +39,9 @@
   <a href="README_ml_IN.md">മലയാളം</a>
 </p>
 
+> [!NOTE]
+> Bu, ek özellikler içeren [Immich](https://github.com/immich-app/immich)'in bir **topluluk çatalıdır**. Docker imajları, geçiş talimatları ve değişikliklerin tam listesi için [ana README](../README.md)'ye bakın.
+
 > [!WARNING]
 > ⚠️ Değerli fotoğraflarınız ve videolarınız için daima [3-2-1](https://www.backblaze.com/blog/the-3-2-1-backup-strategy/) yedekleme planını uygulayın!
 > 

@@ -40,6 +40,9 @@
   <a href="README_ml_IN.md">മലയാളം</a>
 </p>
 
+> [!NOTE]
+> Questo è un **fork comunitario** di [Immich](https://github.com/immich-app/immich) con funzionalità aggiuntive. Per le immagini Docker, le istruzioni per il passaggio e l'elenco completo delle modifiche, consulta il [README principale](../README.md).
+
 > [!WARNING]
 > ⚠️ Segui sempre la regola di backup [3-2-1](https://www.backblaze.com/blog/the-3-2-1-backup-strategy/) per proteggere i tuoi ricordi e le foto a cui tieni!
 >
