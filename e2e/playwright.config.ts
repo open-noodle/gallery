@@ -17,7 +17,7 @@ const config: PlaywrightTestConfig = {
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 4 : 0,
-  reporter: 'html',
+  reporter: process.env.CI ? [['html'], ['github']] : 'html',
   use: {
     baseURL: playwriteBaseUrl,
     trace: 'on-first-retry',
@@ -34,6 +34,12 @@ const config: PlaywrightTestConfig = {
       name: 'web',
       use: { ...devices['Desktop Chrome'] },
       testDir: './src/specs/web',
+      workers: 1,
+    },
+    {
+      name: 'integration',
+      use: { ...devices['Desktop Chrome'] },
+      testDir: './src/specs/integration',
       workers: 1,
     },
     {

@@ -14,7 +14,8 @@
   import { mediaQueryManager } from '#lib/stores/media-query-manager.svelte.ts';
   import { sidebarStore } from '#lib/stores/sidebar.svelte.ts';
   import { getNotificationsQuery } from '#lib/queries/notification.query.ts';
-  import { ActionButton, Button, IconButton, Logo } from '@immich/ui';
+  import { ActionButton, Button, IconButton } from '@immich/ui';
+  import Logo from '#lib/components/shared-components/Logo.svelte';
   import { createQuery } from '@tanstack/svelte-query';
   import { mdiBellBadge, mdiBellOutline, mdiMagnify, mdiMenu, mdiTrayArrowUp } from '@mdi/js';
   import { t } from 'svelte-i18n';

@@ -1,66 +1,79 @@
 <script lang="ts">
-  import FormatMessage from '#lib/elements/FormatMessage.svelte';
-  import { ExternalRoute } from '#lib/route.ts';
   import { type ServerAboutResponseDto } from '@immich/sdk';
-  import { Heading, Icon, Link, Modal, ModalBody, Stack, Text } from '@immich/ui';
+  import { Icon, Modal, ModalBody } from '@immich/ui';
   import { mdiBugOutline, mdiFaceAgent, mdiGit, mdiGithub, mdiInformationOutline } from '@mdi/js';
   import { type SimpleIcon, siDiscord } from 'simple-icons';
   import { t } from 'svelte-i18n';
 
-  type Props = {
+  interface Props {
     onClose: () => void;
     info: ServerAboutResponseDto;
-  };
+  }
 
-  const { onClose, info }: Props = $props();
-  const isThirdParty = $derived(
-    info.thirdPartyBugFeatureUrl ||
-      info.thirdPartySourceUrl ||
-      info.thirdPartyDocumentationUrl ||
-      info.thirdPartySupportUrl,
-  );
+  let { onClose, info }: Props = $props();
 </script>
 
-{#snippet link(url: string | undefined, icon: string | SimpleIcon, text: string)}
-  {#if url}
-    <div class="flex gap-2">
-      <Icon {icon} size="1.5em" />
-      <Link href={url} class="text-sm text-primary">{text}</Link>
-    </div>
-  {/if}
+{#snippet link(url: string, icon: string | SimpleIcon, text: string)}
+  <div>
+    <a href={url} target="_blank" rel="noreferrer">
+      <Icon {icon} size="1.5em" class="inline-block" />
+      <p class="inline-block text-sm font-medium text-primary underline">
+        {text}
+      </p>
+    </a>
+  </div>
 {/snippet}
 
 <Modal title={$t('support_and_feedback')} {onClose} size="small">
   <ModalBody>
-    {#if isThirdParty}
-      <Heading size="tiny">{$t('third_party_resources')}</Heading>
-      <Text>{$t('support_third_party_description')}</Text>
-      <Stack class="my-5">
-        {@render link(info.thirdPartyDocumentationUrl, mdiInformationOutline, $t('documentation'))}
-        {@render link(info.thirdPartySourceUrl, mdiGit, $t('source'))}
-        {@render link(info.thirdPartySupportUrl, mdiFaceAgent, $t('support'))}
-        {@render link(info.thirdPartyBugFeatureUrl, mdiBugOutline, $t('bugs_and_feature_requests'))}
-      </Stack>
-    {/if}
+    <p>{$t('official_immich_resources')}</p>
+    <div class="mt-5 flex flex-col gap-2">
+      {@render link(
+        `https://docs.${info.version}.archive.immich.app/overview/introduction`,
+        mdiInformationOutline,
+        $t('documentation'),
+      )}
 
-    <Heading size="tiny">{$t('official_immich_resources')}</Heading>
-    <Text>
-      <FormatMessage key="support_ensure_latest">
-        {#snippet children({ message })}
-          <Link href="https://github.com/immich-app/immich/releases">{message}</Link>
-        {/snippet}
-      </FormatMessage>
-    </Text>
-
-    <Stack class="mt-5">
-      {@render link(ExternalRoute.docs(), mdiInformationOutline, $t('documentation'))}
       {@render link('https://github.com/immich-app/immich/', mdiGithub, $t('source'))}
+
       {@render link('https://discord.immich.app', siDiscord, $t('discord'))}
+
       {@render link(
         'https://github.com/immich-app/immich/issues/new/choose',
         mdiBugOutline,
         $t('bugs_and_feature_requests'),
       )}
-    </Stack>
+    </div>
+    {#if info.thirdPartyBugFeatureUrl || info.thirdPartySourceUrl || info.thirdPartyDocumentationUrl || info.thirdPartySupportUrl}
+      <p class="mt-5">{$t('third_party_resources')}</p>
+      <p class="mt-1 text-sm">
+        {$t('support_third_party_description')}
+      </p>
+      <div class="mt-5 flex flex-col gap-2">
+        {#if info.thirdPartyDocumentationUrl}
+          {@render link(info.thirdPartyDocumentationUrl, mdiInformationOutline, $t('documentation'))}
+        {/if}
+
+        {#if info.thirdPartySourceUrl}
+          {@render link(info.thirdPartySourceUrl, mdiGit, $t('source'))}
+        {/if}
+
+        {#if info.thirdPartySupportUrl}
+          {@render link(info.thirdPartySupportUrl, mdiFaceAgent, $t('support'))}
+        {/if}
+
+        {#if info.thirdPartyBugFeatureUrl}
+          {@render link(info.thirdPartyBugFeatureUrl, mdiBugOutline, $t('bugs_and_feature_requests'))}
+        {/if}
+      </div>
+    {/if}
+    <!-- BRANDING:UPSTREAM_START -->
+    <p class="mt-5 text-sm text-secondary">{$t('upstream_project')}</p>
+    <div class="flex flex-col gap-2 mt-2">
+      {@render link('https://github.com/immich-app/immich', mdiGithub, 'Immich')}
+      {@render link('https://docs.immich.app', mdiInformationOutline, $t('documentation'))}
+      {@render link('https://discord.immich.app', siDiscord, $t('discord'))}
+    </div>
+    <!-- BRANDING:UPSTREAM_END -->
   </ModalBody>
 </Modal>

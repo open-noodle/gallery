@@ -28,6 +28,10 @@ import 'package:immich_mobile/pages/common/tab_shell.page.dart';
 import 'package:immich_mobile/pages/library/folder/folder.page.dart';
 import 'package:immich_mobile/pages/library/locked/pin_auth.page.dart';
 import 'package:immich_mobile/pages/library/partner/partner.page.dart';
+import 'package:immich_mobile/pages/library/spaces/space_detail.page.dart';
+import 'package:immich_mobile/pages/library/spaces/space_member_selection.page.dart';
+import 'package:immich_mobile/pages/library/spaces/space_members.page.dart';
+import 'package:immich_mobile/pages/library/spaces/spaces.page.dart';
 import 'package:immich_mobile/pages/library/shared_link/shared_link.page.dart';
 import 'package:immich_mobile/pages/library/shared_link/shared_link_edit.page.dart';
 import 'package:immich_mobile/pages/login/change_password.page.dart';
@@ -134,6 +138,18 @@ class AppRouter extends RootStackRouter {
     AutoRoute(page: WhatsNewRoute.page, guards: [_duplicateGuard]),
     AutoRoute(page: AppLogRoute.page, guards: [_duplicateGuard]),
     AutoRoute(page: AppLogDetailRoute.page, guards: [_duplicateGuard]),
+    CustomRoute(
+      page: SpacesRoute.page,
+      guards: [_authGuard, _duplicateGuard],
+      transitionsBuilder: TransitionsBuilders.slideLeft,
+    ),
+    AutoRoute(page: SpaceDetailRoute.page, guards: [_authGuard, _duplicateGuard]),
+    AutoRoute(page: SpaceMembersRoute.page, guards: [_authGuard, _duplicateGuard]),
+    CustomRoute(
+      page: SpaceMemberSelectionRoute.page,
+      guards: [_authGuard, _duplicateGuard],
+      transitionsBuilder: TransitionsBuilders.slideBottom,
+    ),
     AutoRoute(page: FolderRoute.page, guards: [_authGuard]),
     AutoRoute(page: SharedLinkRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: SharedLinkEditRoute.page, guards: [_authGuard, _duplicateGuard]),
