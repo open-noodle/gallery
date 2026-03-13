@@ -19,6 +19,9 @@ import { ImmichFileResponse } from 'src/utils/file.js';
 import { mediumFactory, newMediumService } from 'test/medium.factory.js';
 import { factory } from 'test/small.factory.js';
 import { getKyselyDB } from 'test/utils.js';
+import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
+import { DB } from 'src/schema.js';
+import { StorageService } from 'src/services/storage.service.js';
 
 let defaultDatabase: Kysely<DB>;
 
@@ -32,6 +35,8 @@ const setup = (db?: Kysely<DB>) => {
 
 beforeAll(async () => {
   defaultDatabase = await getKyselyDB();
+  // Initialize StorageService static backends for medium tests
+  (StorageService as any).diskBackend = new DiskStorageBackend('/tmp/immich-test');
 });
 
 describe(AssetService.name, () => {

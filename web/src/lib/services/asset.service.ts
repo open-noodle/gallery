@@ -1,14 +1,19 @@
 import {
+  AssetEditAction,
   AssetJobName,
   AssetMediaSize,
   AssetTypeEnum,
   AssetVisibility,
   bulkTagAssets,
+  editAsset,
+  getAssetEdits,
   getAssetInfo,
   removeAssetFromAlbum,
+  removeAssetEdits,
   runAssetJobs,
   updateAsset,
   type AlbumResponseDto,
+  type AssetEditActionItemDto,
   type AssetJobsDto,
   type AssetResponseDto,
 } from '@immich/sdk';
@@ -36,6 +41,8 @@ import {
   mdiMotionPlayOutline,
   mdiPlus,
   mdiPresentationPlay,
+  mdiRotateLeft,
+  mdiRotateRight,
   mdiShareVariantOutline,
   mdiTagMultipleOutline,
   mdiTagPlusOutline,
@@ -288,6 +295,16 @@ export const getAssetActions = (
     shortcuts: { key: 't' },
   };
 
+  const canEdit = () =>
+    !sharedLink &&
+    isOwner &&
+    asset.type === AssetTypeEnum.Image &&
+    !asset.livePhotoVideoId &&
+    asset.exifInfo?.projectionType !== ProjectionType.EQUIRECTANGULAR &&
+    !asset.originalPath.toLowerCase().endsWith('.insp') &&
+    !asset.originalPath.toLowerCase().endsWith('.gif') &&
+    !asset.originalPath.toLowerCase().endsWith('.svg');
+
   const TagPeople: ActionItem = {
     title: $t('tag_people'),
     icon: mdiFaceRecognition,
@@ -299,15 +316,7 @@ export const getAssetActions = (
   const Edit: ActionItem = {
     title: $t('editor'),
     icon: mdiTune,
-    $if: () =>
-      !sharedLink &&
-      isOwner &&
-      asset.type === AssetTypeEnum.Image &&
-      !asset.livePhotoVideoId &&
-      asset.exifInfo?.projectionType !== ProjectionType.EQUIRECTANGULAR &&
-      !asset.originalPath.toLowerCase().endsWith('.insp') &&
-      !asset.originalPath.toLowerCase().endsWith('.gif') &&
-      !asset.originalPath.toLowerCase().endsWith('.svg'),
+    $if: canEdit,
     onAction: () => assetViewerManager.openEditor(),
     shortcuts: [{ key: 'e' }],
   };
@@ -332,6 +341,27 @@ export const getAssetActions = (
     $if: () =>
       asset.visibility !== AssetVisibility.Locked && !asset.isArchived && !asset.isTrashed && smartSearchEnabled,
     onAction: () => goto(Route.search({ queryAssetId: asset.stackPrimaryAssetId ?? asset.id })),
+  };
+
+  const RotateRight: ActionItem = {
+    title: $t('rotate_right'),
+    icon: mdiRotateRight,
+    $if: canEdit,
+    onAction: () => handleQuickRotate(asset, 90),
+  };
+
+  const RotateLeft: ActionItem = {
+    title: $t('rotate_left'),
+    icon: mdiRotateLeft,
+    $if: canEdit,
+    onAction: () => handleQuickRotate(asset, 270),
+  };
+
+  const Rotate180: ActionItem = {
+    title: $t('rotate_180'),
+    icon: mdiRotateRight,
+    $if: canEdit,
+    onAction: () => handleQuickRotate(asset, 180),
   };
 
   const RefreshFacesJob: ActionItem = {
@@ -383,6 +413,9 @@ export const getAssetActions = (
     SetProfilePicture,
     ViewInTimeline,
     ViewSimilar,
+    RotateRight,
+    RotateLeft,
+    Rotate180,
     RefreshFacesJob,
     RefreshMetadataJob,
     RegenerateThumbnailJob,
@@ -551,5 +584,49 @@ const handleRunAssetJob = async (dto: AssetJobsDto) => {
     toastManager.primary(getAssetJobMessage($t, dto.name));
   } catch (error) {
     handleError(error, $t('errors.unable_to_submit_job'));
+  }
+};
+
+export const normalizeAngle = (angle: number): number => ((angle % 360) + 360) % 360;
+
+export const mergeRotation = (
+  existingEdits: AssetEditActionItemDto[],
+  additionalAngle: number,
+): AssetEditActionItemDto[] => {
+  const otherEdits = existingEdits.filter((e) => e.action !== AssetEditAction.Rotate);
+  const existingRotate = existingEdits.find((e) => e.action === AssetEditAction.Rotate);
+  const existingAngle = (existingRotate?.parameters as { angle?: number })?.angle ?? 0;
+  const merged = normalizeAngle(existingAngle + additionalAngle);
+
+  if (merged === 0) {
+    return otherEdits;
+  }
+
+  return [...otherEdits, { action: AssetEditAction.Rotate, parameters: { angle: merged } }];
+};
+
+const handleQuickRotate = async (asset: AssetResponseDto, angle: number) => {
+  const $t = await getFormatter();
+
+  try {
+    const existing = await getAssetEdits({ id: asset.id });
+    const edits = mergeRotation(
+      existing.edits.map(({ action, parameters }) => ({ action, parameters })),
+      angle,
+    );
+
+    const editCompleted = waitForWebsocketEvent('AssetEditReadyV1', (event) => event.asset.id === asset.id, 10_000);
+
+    await (edits.length === 0
+      ? removeAssetEdits({ id: asset.id })
+      : editAsset({ id: asset.id, assetEditsCreateDto: { edits } }));
+    await editCompleted;
+
+    const refreshedAsset = await getAssetInfo({ id: asset.id });
+    assetViewingStore.setAsset(refreshedAsset);
+    eventManager.emit('AssetUpdate', refreshedAsset);
+    eventManager.emit('AssetEditsApplied', asset.id);
+  } catch (error) {
+    handleError(error, $t('rotate_error'));
   }
 };

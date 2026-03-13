@@ -48,9 +48,8 @@ import { AssetFaceTable } from 'src/schema/tables/asset-face.table.js';
 import { FaceSearchTable } from 'src/schema/tables/face-search.table.js';
 import { PersonUserTable } from 'src/schema/tables/person-user.table.js';
 import { BaseService } from 'src/services/base.service.js';
-import { getDimensions, getMyPartnerIds } from 'src/utils/asset.util.js';
-import { ImmichFileResponse } from 'src/utils/file.js';
-import { isHttpException } from 'src/utils/logger.js';
+import { getDimensions } from 'src/utils/asset.util.js';
+import { ImmichMediaResponse } from 'src/utils/file.js';
 import { mimeTypes } from 'src/utils/mime-types.js';
 import { batched, findOrFail, hasSomeDefined, isFacialRecognitionEnabled } from 'src/utils/misc.js';
 import { Point, transformPoints } from 'src/utils/transform.js';
@@ -218,23 +217,18 @@ export class PersonService extends BaseService {
     return this.personRepository.getStatistics(personGroupId, { ownerId: auth.user.id, partnerIds });
   }
 
-  async getThumbnail(auth: AuthDto, personGroupId: string): Promise<ImmichFileResponse> {
-    await this.requirePersonAccess({
-      auth,
-      permission: Permission.PersonRead,
-      ids: [{ personGroupId, ownerId: auth.user.id }],
-    });
-    const personGroup = await this.personRepository.getForThumbnail({ ownerId: auth.user.id, personGroupId });
-    const thumbnailPath = personGroup?.thumbnailPath || personGroup?.sharedThumbnailPath;
-    if (!thumbnailPath) {
+  async getThumbnail(auth: AuthDto, personGroupId: string): Promise<ImmichMediaResponse> {
+    await this.requireAccess({ auth, permission: Permission.PersonRead, ids: [personGroupId] });
+    const person = await this.personRepository.getByGroupId({ ownerId: auth.user.id, personGroupId });
+    if (!person || !person.thumbnailPath) {
       throw new NotFoundException();
     }
 
-    return new ImmichFileResponse({
-      path: thumbnailPath,
-      contentType: mimeTypes.lookup(thumbnailPath),
-      cacheControl: CacheControl.PrivateWithoutCache,
-    });
+    return this.serveFromBackend(
+      person.thumbnailPath,
+      mimeTypes.lookup(person.thumbnailPath),
+      CacheControl.PrivateWithoutCache,
+    );
   }
 
   async create(auth: AuthDto, dto: PersonCreateDto): Promise<PersonResponseDto> {
@@ -349,8 +343,12 @@ export class PersonService extends BaseService {
       return;
     }
 
+    // Upstream unlinks inline; the fork queues a FileDelete job so S3-backed thumbnails are removed
+    // through the storage abstraction. Keep that on top of upstream's delete-returns-the-rows shape.
     const people = await this.personRepository.delete(groupIds, ownerId);
-    await Promise.all(people.map((person) => this.storageRepository.unlink(person.thumbnailPath)));
+    const files = people.map((person) => person.thumbnailPath);
+    await this.jobRepository.queue({ name: JobName.FileDelete, data: { files } });
+    await this.personRepository.deleteEmptyGroups();
     this.logger.debug(`Deleted ${groupIds.length} people`);
   }
 
@@ -642,6 +640,15 @@ export class PersonService extends BaseService {
 
       this.logger.debug(`Assigning face ${id} to person group ${personGroupId}`);
       await this.personRepository.reassignFaces({ faceIds: [id], newPersonGroupId: personGroupId });
+    }
+
+    // Queue shared space face matching for any spaces containing this asset
+    const spaceIds = await this.sharedSpaceRepository.getSpaceIdsForAsset(face.assetId);
+    for (const { spaceId } of spaceIds) {
+      await this.jobRepository.queue({
+        name: JobName.SharedSpaceFaceMatch,
+        data: { spaceId, assetId: face.assetId },
+      });
     }
 
     return JobStatus.Success;

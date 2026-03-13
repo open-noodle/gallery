@@ -212,6 +212,7 @@ export type ConcurrentQueueName = Exclude<
   | QueueName.FacialRecognition
   | QueueName.DuplicateDetection
   | QueueName.BackupDatabase
+  | QueueName.StorageBackendMigration
 >;
 
 export type Jobs = { [K in JobItem['name']]: (JobItem & { name: K })['data'] };
@@ -270,10 +271,20 @@ export interface INightlyJob extends IBaseJob {
   nightly?: boolean;
 }
 
+export interface ISharedSpaceFaceMatchJob extends IBaseJob {
+  spaceId: string;
+  assetId: string;
+}
+
+export interface ISharedSpaceFaceMatchAllJob extends IBaseJob {
+  spaceId: string;
+}
+
 export type EmailImageAttachment = {
   filename: string;
-  path: string;
   cid: string;
+  path?: string;
+  content?: Buffer;
 };
 
 export interface IEmailJob {
@@ -333,6 +344,31 @@ export interface IIntegrityPathWithChecksumJob {
   items: { path: string; reportId: string | null; checksum?: string | null }[];
 }
 
+export interface IStorageMigrationJob {
+  entityType: 'asset' | 'assetFile' | 'person' | 'user';
+  entityId: string;
+  fileType: string | null;
+  sourcePath: string;
+  batchId: string;
+  direction: 'toS3' | 'toDisk';
+  deleteSource: boolean;
+}
+
+export interface IStorageMigrationQueueAllJob {
+  direction: 'toS3' | 'toDisk';
+  deleteSource: boolean;
+  fileTypes: {
+    originals: boolean;
+    thumbnails: boolean;
+    previews: boolean;
+    fullsize: boolean;
+    encodedVideos: boolean;
+    sidecars: boolean;
+    personThumbnails: boolean;
+    profileImages: boolean;
+  };
+  concurrency: number;
+  batchId: string;
 export interface IFacialRecognitionQueueAll extends INightlyJob {
   clusterGroupId?: string;
 }
@@ -445,6 +481,10 @@ export type JobItem =
   | { name: JobName.OcrQueueAll; data: IBaseJob }
   | { name: JobName.Ocr; data: IEntityJob }
 
+  // Pet Detection
+  | { name: JobName.PetDetectionQueueAll; data: IBaseJob }
+  | { name: JobName.PetDetection; data: IEntityJob }
+
   // Workflow
   | { name: JobName.WorkflowAssetTrigger; data: { workflowId: string; assetId: string } }
 
@@ -461,7 +501,16 @@ export type JobItem =
   | { name: JobName.IntegrityDeleteReports; data: IIntegrityDeleteReportsJob }
 
   // Editor
-  | { name: JobName.AssetEditThumbnailGeneration; data: IEntityJob };
+  | { name: JobName.AssetEditThumbnailGeneration; data: IEntityJob }
+
+  // Storage Backend Migration
+  | { name: JobName.StorageBackendMigrationQueueAll; data: IStorageMigrationQueueAllJob }
+  | { name: JobName.StorageBackendMigrationSingle; data: IStorageMigrationJob }
+
+  // Shared Space Face Recognition
+  | { name: JobName.SharedSpaceFaceMatch; data: ISharedSpaceFaceMatchJob }
+  | { name: JobName.SharedSpaceFaceMatchAll; data: ISharedSpaceFaceMatchAllJob }
+  | { name: JobName.SharedSpacePersonThumbnail; data: IEntityJob };
 
 export type VectorExtension = (typeof VECTOR_EXTENSIONS)[number];
 
