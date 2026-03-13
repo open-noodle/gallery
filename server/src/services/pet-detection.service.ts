@@ -47,55 +47,61 @@ export class PetDetectionService extends BaseService {
       return JobStatus.Skipped;
     }
 
-    const { pets, imageHeight, imageWidth } = await this.machineLearningRepository.detectPets(
-      asset.previewFile,
-      machineLearning.petDetection,
-    );
+    try {
+      const { pets, imageHeight, imageWidth } = await this.machineLearningRepository.detectPets(
+        asset.previewFile,
+        machineLearning.petDetection,
+      );
 
-    const thumbnailJobs: JobItem[] = [];
-    const speciesCache = new Map<string, string>();
+      const thumbnailJobs: JobItem[] = [];
+      const speciesCache = new Map<string, string>();
 
-    for (const pet of pets) {
-      let personId = speciesCache.get(pet.label);
+      for (const pet of pets) {
+        let personId = speciesCache.get(pet.label);
 
-      if (!personId) {
-        const existing = await this.personRepository.getByOwnerAndSpecies(asset.ownerId, pet.label);
-        if (existing) {
-          personId = existing.id;
-        } else {
-          const person = await this.personRepository.create({
-            ownerId: asset.ownerId,
-            name: pet.label,
-            type: 'pet',
-            species: pet.label,
-          });
-          personId = person.id;
+        if (!personId) {
+          const existing = await this.personRepository.getByOwnerAndSpecies(asset.ownerId, pet.label);
+          if (existing) {
+            personId = existing.id;
+          } else {
+            const person = await this.personRepository.create({
+              ownerId: asset.ownerId,
+              name: pet.label,
+              type: 'pet',
+              species: pet.label,
+            });
+            personId = person.id;
+          }
+          speciesCache.set(pet.label, personId);
         }
-        speciesCache.set(pet.label, personId);
+
+        const faceId = await this.personRepository.createAssetFace({
+          assetId: id,
+          personId,
+          imageHeight,
+          imageWidth,
+          boundingBoxX1: pet.boundingBox.x1,
+          boundingBoxY1: pet.boundingBox.y1,
+          boundingBoxX2: pet.boundingBox.x2,
+          boundingBoxY2: pet.boundingBox.y2,
+        });
+
+        const person = await this.personRepository.getById(personId);
+        if (person && !person.faceAssetId) {
+          await this.personRepository.update({ id: personId, faceAssetId: faceId });
+          thumbnailJobs.push({ name: JobName.PersonGenerateThumbnail, data: { id: personId } });
+        }
       }
 
-      const faceId = await this.personRepository.createAssetFace({
-        assetId: id,
-        personId,
-        imageHeight,
-        imageWidth,
-        boundingBoxX1: pet.boundingBox.x1,
-        boundingBoxY1: pet.boundingBox.y1,
-        boundingBoxX2: pet.boundingBox.x2,
-        boundingBoxY2: pet.boundingBox.y2,
-      });
+      await this.jobRepository.queueAll(thumbnailJobs);
+      await this.assetRepository.upsertJobStatus({ assetId: id, petsDetectedAt: new Date() });
 
-      const person = await this.personRepository.getById(personId);
-      if (person && !person.faceAssetId) {
-        await this.personRepository.update({ id: personId, faceAssetId: faceId });
-        thumbnailJobs.push({ name: JobName.PersonGenerateThumbnail, data: { id: personId } });
-      }
+      this.logger.debug(`Detected ${pets.length} pet(s) for ${id}`);
+      return JobStatus.Success;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Pet detection failed for asset ${id}: ${message}`);
+      return JobStatus.Failed;
     }
-
-    await this.jobRepository.queueAll(thumbnailJobs);
-    await this.assetRepository.upsertJobStatus({ assetId: id, petsDetectedAt: new Date() });
-
-    this.logger.debug(`Detected ${pets.length} pet(s) for ${id}`);
-    return JobStatus.Success;
   }
 }

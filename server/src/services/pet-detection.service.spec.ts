@@ -286,5 +286,36 @@ describe(PetDetectionService.name, () => {
         expect.objectContaining({ assetId: asset.id, petsDetectedAt: expect.any(Date) }),
       );
     });
+
+    describe('error handling', () => {
+      it('should handle ML inference errors gracefully', async () => {
+        const asset = AssetFactory.create();
+        mocks.systemMetadata.get.mockResolvedValue(enabledConfig);
+        mocks.machineLearning.detectPets.mockRejectedValue(new Error('ML inference failed'));
+
+        expect(await sut.handlePetDetection({ id: asset.id })).toEqual(JobStatus.Failed);
+
+        expect(mocks.person.create).not.toHaveBeenCalled();
+        expect(mocks.person.createAssetFace).not.toHaveBeenCalled();
+      });
+
+      it('should handle out of memory errors during inference', async () => {
+        const asset = AssetFactory.create();
+        mocks.systemMetadata.get.mockResolvedValue(enabledConfig);
+        mocks.machineLearning.detectPets.mockRejectedValue(new Error('out of memory'));
+
+        expect(await sut.handlePetDetection({ id: asset.id })).toEqual(JobStatus.Failed);
+
+        expect(mocks.person.create).not.toHaveBeenCalled();
+      });
+
+      it('should handle model loading timeout errors', async () => {
+        const asset = AssetFactory.create();
+        mocks.systemMetadata.get.mockResolvedValue(enabledConfig);
+        mocks.machineLearning.detectPets.mockRejectedValue(new Error('model load timeout'));
+
+        expect(await sut.handlePetDetection({ id: asset.id })).toEqual(JobStatus.Failed);
+      });
+    });
   });
 });
