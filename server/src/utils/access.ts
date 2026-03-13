@@ -158,7 +158,9 @@ const checkOtherAccess = async (access: AccessRepository, request: OtherAccessRe
     }
 
     case Permission.AssetUpdate: {
-      return await access.asset.checkOwnerAccess(auth.user.id, ids, auth.session?.hasElevatedPermission);
+      const isOwner = await access.asset.checkOwnerAccess(auth.user.id, ids, auth.session?.hasElevatedPermission);
+      const isSpaceEditor = await access.asset.checkSpaceEditAccess(auth.user.id, setDifference(ids, isOwner));
+      return setUnion(isOwner, isSpaceEditor);
     }
 
     case Permission.AssetDelete: {

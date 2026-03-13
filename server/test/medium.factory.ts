@@ -298,6 +298,42 @@ export class MediumTestContext<S extends BaseService = BaseService> {
     const edits = await this.get(AssetEditRepository).replaceAll(assetId, dto.edits as AssetEditActionItem[]);
     return { edits };
   }
+
+  async newSharedSpace(
+    dto: Partial<Insertable<Omit<any, 'id' | 'createdAt' | 'updatedAt' | 'createId' | 'updateId'>>> = {},
+  ) {
+    const space = mediumFactory.sharedSpaceInsert(dto);
+    const result = await this.database
+      .insertInto('shared_space')
+      .values(space)
+      .returningAll()
+      .executeTakeFirstOrThrow();
+    return { space: result, result };
+  }
+
+  async newSharedSpaceMember(dto: { spaceId: string; userId: string; role?: string }) {
+    const member = mediumFactory.sharedSpaceMemberInsert(dto);
+    const result = await this.database
+      .insertInto('shared_space_member')
+      .values(member)
+      .returningAll()
+      .executeTakeFirstOrThrow();
+    return { member: result, result };
+  }
+
+  async newSharedSpaceAsset(dto: { spaceId: string; assetId: string; addedById?: string | null }) {
+    const spaceAsset = {
+      spaceId: dto.spaceId,
+      assetId: dto.assetId,
+      addedById: dto.addedById ?? null,
+    };
+    const result = await this.database
+      .insertInto('shared_space_asset')
+      .values(spaceAsset)
+      .returningAll()
+      .executeTakeFirstOrThrow();
+    return { spaceAsset: result, result };
+  }
 }
 
 export class SyncTestContext extends MediumTestContext<SyncService> {
@@ -778,6 +814,27 @@ const uploadFile = (file: Partial<UploadFile> = {}) => {
   };
 };
 
+const sharedSpaceInsert = (
+  dto: Partial<Omit<any, 'id' | 'createdAt' | 'updatedAt' | 'createId' | 'updateId'>> = {},
+) => {
+  return {
+    name: 'Test Space',
+    description: null,
+    color: 'primary',
+    faceRecognitionEnabled: true,
+    ...dto,
+  };
+};
+
+const sharedSpaceMemberInsert = (dto: { spaceId: string; userId: string; role?: string }) => {
+  return {
+    spaceId: dto.spaceId,
+    userId: dto.userId,
+    role: dto.role ?? 'viewer',
+    showInTimeline: true,
+  };
+};
+
 export const mediumFactory = {
   assetInsert,
   assetFaceInsert,
@@ -793,4 +850,6 @@ export const mediumFactory = {
   loginResponse,
   tagInsert,
   uploadFile,
+  sharedSpaceInsert,
+  sharedSpaceMemberInsert,
 };
