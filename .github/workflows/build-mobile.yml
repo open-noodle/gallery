@@ -95,6 +95,8 @@ jobs:
         with:
           github_token: ${{ steps.token.outputs.token }}
 
+      - uses: ./.github/actions/apply-branding
+
       - name: Create the Keystore
         if: ${{ !github.event.pull_request.head.repo.fork }}
         env:
@@ -219,6 +221,8 @@ jobs:
         uses: immich-app/devtools/actions/use-mise@cf6e190bacde3d7bda59372a786b36ac7d01536a # use-mise-action-v2.0.1
         with:
           github_token: ${{ steps.token.outputs.token }}
+
+      - uses: ./.github/actions/apply-branding
 
       - name: Install Flutter dependencies
         working-directory: ./mobile

@@ -1,6 +1,8 @@
 import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
-import { extname } from 'node:path';
+import { createReadStream } from 'node:fs';
+import { extname, isAbsolute } from 'node:path';
 import sanitize from 'sanitize-filename';
+import { DiskStorageBackend } from 'src/backends/disk-storage.backend';
 import { StorageCore } from 'src/cores/storage.core';
 import { AuthSharedLink } from 'src/database';
 import {
@@ -30,11 +32,12 @@ import {
 } from 'src/enum';
 import { AuthRequest } from 'src/middleware/auth.guard';
 import { BaseService } from 'src/services/base.service';
+import { StorageService } from 'src/services/storage.service';
 import { UploadFile, UploadRequest } from 'src/types';
 import { requireUploadAccess } from 'src/utils/access';
 import { asUploadRequest, onBeforeLink } from 'src/utils/asset.util';
 import { isAssetChecksumConstraint } from 'src/utils/database';
-import { getFilenameExtension, getFileNameWithoutExtension, ImmichFileResponse } from 'src/utils/file';
+import { getFilenameExtension, getFileNameWithoutExtension, ImmichMediaResponse } from 'src/utils/file';
 import { mimeTypes } from 'src/utils/mime-types';
 import { fromChecksum } from 'src/utils/request';
 
@@ -174,19 +177,19 @@ export class AssetMediaService extends BaseService {
 
     const path = editedPath ?? originalPath!;
 
-    return new ImmichFileResponse({
+    return this.serveFromBackend(
       path,
-      fileName: getFileNameWithoutExtension(originalFileName) + getFilenameExtension(path),
-      contentType: mimeTypes.lookup(path),
-      cacheControl: CacheControl.PrivateWithCache,
-    });
+      mimeTypes.lookup(path),
+      CacheControl.PrivateWithCache,
+      getFileNameWithoutExtension(originalFileName) + getFilenameExtension(path),
+    );
   }
 
   async viewThumbnail(
     auth: AuthDto,
     id: string,
     dto: AssetMediaOptionsDto,
-  ): Promise<ImmichFileResponse | AssetMediaRedirectResponse> {
+  ): Promise<ImmichMediaResponse | AssetMediaRedirectResponse> {
     await this.requireAccess({ auth, permission: Permission.AssetView, ids: [id] });
 
     if (dto.size === AssetMediaSize.Original) {
@@ -223,15 +226,10 @@ export class AssetMediaService extends BaseService {
       auth.sharedLink && !auth.sharedLink.showExif ? id : getFileNameWithoutExtension(originalFileName);
     const fileName = `${fileNameBase}_${size}${getFilenameExtension(path)}`;
 
-    return new ImmichFileResponse({
-      fileName,
-      path,
-      contentType: mimeTypes.lookup(path),
-      cacheControl: CacheControl.PrivateWithCache,
-    });
+    return this.serveFromBackend(path, mimeTypes.lookup(path), CacheControl.PrivateWithCache, fileName);
   }
 
-  async playbackVideo(auth: AuthDto, id: string): Promise<ImmichFileResponse> {
+  async playbackVideo(auth: AuthDto, id: string): Promise<ImmichMediaResponse> {
     await this.requireAccess({ auth, permission: Permission.AssetView, ids: [id] });
 
     const asset = await this.assetRepository.getForVideo(id);
@@ -242,11 +240,7 @@ export class AssetMediaService extends BaseService {
 
     const filepath = asset.encodedVideoPath || asset.originalPath;
 
-    return new ImmichFileResponse({
-      path: filepath,
-      contentType: mimeTypes.lookup(filepath),
-      cacheControl: CacheControl.PrivateWithCache,
-    });
+    return this.serveFromBackend(filepath, mimeTypes.lookup(filepath), CacheControl.PrivateWithCache);
   }
 
   async bulkUploadCheck(auth: AuthDto, dto: AssetBulkUploadCheckDto): Promise<AssetBulkUploadCheckResponseDto> {
@@ -355,6 +349,37 @@ export class AssetMediaService extends BaseService {
       exif: { assetId: asset.id, fileSizeInByte: file.size },
       lockedPropertiesBehavior: 'override',
     });
+
+    // If S3 backend, upload the file and update the path
+    const writeBackend = StorageService.getWriteBackend();
+    if (!(writeBackend instanceof DiskStorageBackend)) {
+      const relativeKey = StorageCore.getRelativeNestedPath(
+        StorageFolder.Upload,
+        ownerId,
+        `${asset.id}${getFilenameExtension(file.originalPath)}`,
+      );
+      const stream = createReadStream(file.originalPath);
+      await writeBackend.put(relativeKey, stream, {
+        contentType: mimeTypes.lookup(file.originalPath),
+      });
+      await this.assetRepository.update({ id: asset.id, originalPath: relativeKey });
+      // Clean up the temp local file
+      await this.jobRepository.queue({ name: JobName.FileDelete, data: { files: [file.originalPath] } });
+
+      if (sidecarFile) {
+        const sidecarKey = StorageCore.getRelativeNestedPath(StorageFolder.Upload, ownerId, `${asset.id}.xmp`);
+        await writeBackend.put(sidecarKey, createReadStream(sidecarFile.originalPath));
+        await this.assetRepository.upsertFile({
+          assetId: asset.id,
+          path: sidecarKey,
+          type: AssetFileType.Sidecar,
+        });
+        await this.jobRepository.queue({
+          name: JobName.FileDelete,
+          data: { files: [sidecarFile.originalPath] },
+        });
+      }
+    }
 
     await this.eventRepository.emit('AssetCreate', { asset });
 

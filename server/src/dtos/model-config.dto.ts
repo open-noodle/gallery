@@ -11,7 +11,14 @@ const ModelConfigSchema = TaskConfigSchema.extend({
   modelName: z.string().describe('Name of the model to use'),
 });
 
-export const CLIPConfigSchema = ModelConfigSchema.meta({ id: 'CLIPConfig' });
+export const CLIPConfigSchema = ModelConfigSchema.extend({
+  maxDistance: z
+    .number()
+    .meta({ format: 'double' })
+    .min(0)
+    .max(2)
+    .describe('Maximum cosine distance for smart search results. 0 = disabled.'),
+}).meta({ id: 'CLIPConfig' });
 
 export const DuplicateDetectionConfigSchema = TaskConfigSchema.extend({
   maxDistance: z
@@ -37,6 +44,15 @@ export const FacialRecognitionConfigSchema = ModelConfigSchema.extend({
     .describe('Maximum distance threshold for face recognition'),
   minFaces: z.int().min(1).describe('Minimum number of faces required for recognition'),
 }).meta({ id: 'FacialRecognitionConfig' });
+
+export const PetDetectionConfigSchema = ModelConfigSchema.extend({
+  minScore: z
+    .number()
+    .meta({ format: 'double' })
+    .min(0.1)
+    .max(1)
+    .describe('Minimum confidence score for pet detection'),
+}).meta({ id: 'PetDetectionConfig' });
 
 export const OcrConfigSchema = ModelConfigSchema.extend({
   maxResolution: z.int().min(1).describe('Maximum resolution for OCR processing'),

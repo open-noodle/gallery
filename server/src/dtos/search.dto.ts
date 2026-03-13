@@ -47,6 +47,7 @@ const BaseSearchSchema = z.object({
         .getExtensions(),
     }),
   ocr: z.string().optional().describe('Filter by OCR text content'),
+  spaceId: z.uuidv4().optional().describe('Shared space ID to filter by'),
 });
 
 const BaseSearchWithResultsSchema = BaseSearchSchema.extend({

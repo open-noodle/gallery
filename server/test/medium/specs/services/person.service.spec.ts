@@ -1,6 +1,7 @@
 import { Kysely } from 'kysely';
 import { AssetEditAction, MirrorAxis } from 'src/dtos/editing.dto';
 import { AssetFaceCreateDto } from 'src/dtos/person.dto';
+import { JobName } from 'src/enum';
 import { AccessRepository } from 'src/repositories/access.repository';
 import { AssetEditRepository } from 'src/repositories/asset-edit.repository';
 import { AssetRepository } from 'src/repositories/asset.repository';
@@ -41,17 +42,20 @@ describe(PersonService.name, () => {
     it('should delete the person', async () => {
       const { sut, ctx } = setup();
       const personRepo = ctx.get(PersonRepository);
-      const storageMock = ctx.getMock(StorageRepository);
+      const jobMock = ctx.getMock(JobRepository);
       const { user } = await ctx.newUser();
       const { person } = await ctx.newPerson({ ownerId: user.id });
       const auth = factory.auth({ user });
-      storageMock.unlink.mockResolvedValue();
+      jobMock.queue.mockResolvedValue();
 
       await expect(personRepo.getById(person.id)).resolves.toEqual(expect.objectContaining({ id: person.id }));
       await expect(sut.delete(auth, person.id)).resolves.toBeUndefined();
       await expect(personRepo.getById(person.id)).resolves.toBeUndefined();
 
-      expect(storageMock.unlink).toHaveBeenCalledWith(person.thumbnailPath);
+      expect(jobMock.queue).toHaveBeenCalledWith({
+        name: JobName.FileDelete,
+        data: { files: [person.thumbnailPath] },
+      });
     });
   });
 
@@ -65,21 +69,22 @@ describe(PersonService.name, () => {
 
     it('should delete the person', async () => {
       const { sut, ctx } = setup();
-      const storageMock = ctx.getMock(StorageRepository);
+      const jobMock = ctx.getMock(JobRepository);
       const personRepo = ctx.get(PersonRepository);
       const { user } = await ctx.newUser();
       const { person: person1 } = await ctx.newPerson({ ownerId: user.id });
       const { person: person2 } = await ctx.newPerson({ ownerId: user.id });
       const auth = factory.auth({ user });
-      storageMock.unlink.mockResolvedValue();
+      jobMock.queue.mockResolvedValue();
 
       await expect(sut.deleteAll(auth, { ids: [person1.id, person2.id] })).resolves.toBeUndefined();
       await expect(personRepo.getById(person1.id)).resolves.toBeUndefined();
       await expect(personRepo.getById(person2.id)).resolves.toBeUndefined();
 
-      expect(storageMock.unlink).toHaveBeenCalledTimes(2);
-      expect(storageMock.unlink).toHaveBeenCalledWith(person1.thumbnailPath);
-      expect(storageMock.unlink).toHaveBeenCalledWith(person2.thumbnailPath);
+      expect(jobMock.queue).toHaveBeenCalledWith({
+        name: JobName.FileDelete,
+        data: { files: [person1.thumbnailPath, person2.thumbnailPath] },
+      });
     });
   });
 

@@ -20,6 +20,7 @@ class MaintenanceStatusResponseDto {
     this.task,
   });
 
+  /// Maintenance action
   MaintenanceAction action;
 
   bool active;
@@ -32,15 +33,13 @@ class MaintenanceStatusResponseDto {
   ///
   String? error;
 
-  /// Minimum value: -9007199254740991
-  /// Maximum value: 9007199254740991
   ///
   /// Please note: This property should have been non-nullable! Since the specification file
   /// does not include a default value (using the "default:" property), however, the generated
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
-  int? progress;
+  num? progress;
 
   ///
   /// Please note: This property should have been non-nullable! Since the specification file
@@ -104,7 +103,9 @@ class MaintenanceStatusResponseDto {
         action: MaintenanceAction.fromJson(json[r'action'])!,
         active: mapValueOfType<bool>(json, r'active')!,
         error: mapValueOfType<String>(json, r'error'),
-        progress: mapValueOfType<int>(json, r'progress'),
+        progress: json[r'progress'] == null
+            ? null
+            : num.parse('${json[r'progress']}'),
         task: mapValueOfType<String>(json, r'task'),
       );
     }

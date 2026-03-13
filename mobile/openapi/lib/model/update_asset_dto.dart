@@ -52,9 +52,6 @@ class UpdateAssetDto {
 
   /// Latitude coordinate
   ///
-  /// Minimum value: -90
-  /// Maximum value: 90
-  ///
   /// Please note: This property should have been non-nullable! Since the specification file
   /// does not include a default value (using the "default:" property), however, the generated
   /// source code must fall back to having a nullable type.
@@ -67,9 +64,6 @@ class UpdateAssetDto {
 
   /// Longitude coordinate
   ///
-  /// Minimum value: -180
-  /// Maximum value: 180
-  ///
   /// Please note: This property should have been non-nullable! Since the specification file
   /// does not include a default value (using the "default:" property), however, the generated
   /// source code must fall back to having a nullable type.
@@ -81,8 +75,9 @@ class UpdateAssetDto {
   ///
   /// Minimum value: -1
   /// Maximum value: 5
-  int? rating;
+  num? rating;
 
+  /// Asset visibility
   ///
   /// Please note: This property should have been non-nullable! Since the specification file
   /// does not include a default value (using the "default:" property), however, the generated
@@ -174,10 +169,16 @@ class UpdateAssetDto {
         dateTimeOriginal: mapValueOfType<String>(json, r'dateTimeOriginal'),
         description: mapValueOfType<String>(json, r'description'),
         isFavorite: mapValueOfType<bool>(json, r'isFavorite'),
-        latitude: num.parse('${json[r'latitude']}'),
+        latitude: json[r'latitude'] == null
+            ? null
+            : num.parse('${json[r'latitude']}'),
         livePhotoVideoId: mapValueOfType<String>(json, r'livePhotoVideoId'),
-        longitude: num.parse('${json[r'longitude']}'),
-        rating: mapValueOfType<int>(json, r'rating'),
+        longitude: json[r'longitude'] == null
+            ? null
+            : num.parse('${json[r'longitude']}'),
+        rating: json[r'rating'] == null
+            ? null
+            : num.parse('${json[r'rating']}'),
         visibility: AssetVisibility.fromJson(json[r'visibility']),
       );
     }
