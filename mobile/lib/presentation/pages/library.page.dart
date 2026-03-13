@@ -452,6 +452,11 @@ class _QuickAccessButtonList extends ConsumerWidget {
         title: context.t.partners,
         onTap: () => context.pushRoute(const PartnerRoute()),
       ),
+      _QuickAccessItem(
+        leading: const Icon(Icons.workspaces_outlined, size: 26),
+        title: 'Spaces',
+        onTap: () => context.pushRoute(const SpacesRoute()),
+      ),
       for (final partner in partners)
         _QuickAccessItem(
           contentPadding: const EdgeInsets.only(left: 12.0, right: 18.0),

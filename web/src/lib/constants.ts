@@ -58,6 +58,7 @@ export enum QueryParameter {
   SHARED_BY_ID = 'sharedById',
   SHARED_WITH_ID = 'sharedWithId',
   SMART_SEARCH = 'smartSearch',
+  SPACE_ID = 'spaceId',
   PAGE = 'page',
   PATH = 'path',
 }
