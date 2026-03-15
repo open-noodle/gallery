@@ -3,6 +3,8 @@ name: Check PR Template
 on:
   pull_request_target: # zizmor: ignore[dangerous-triggers]
     types: [opened, edited]
+    branches-ignore:
+      - '**'
 
 permissions: {}
 
