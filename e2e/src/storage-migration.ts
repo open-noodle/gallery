@@ -1366,7 +1366,6 @@ async function phaseContentVerify(): Promise<void> {
 // ---------------------------------------------------------------------------
 async function phaseSidecarVerify(): Promise<void> {
   console.log('=== Phase: Sidecar Verification ===');
-  const token = await loginAdmin();
   const savedState = loadState();
 
   assert.ok(savedState.sidecarAssetId, 'No sidecarAssetId in state — run setup first');
