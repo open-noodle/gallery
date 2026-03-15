@@ -3,6 +3,17 @@ import { of } from 'rxjs';
 import { DemoInterceptor } from 'src/middleware/demo.interceptor';
 import { ConfigRepository } from 'src/repositories/config.repository';
 
+const createContext = (method: string, path: string, userEmail?: string) => {
+  const request = {
+    method,
+    path,
+    user: userEmail ? { user: { email: userEmail } } : undefined,
+  };
+  return {
+    switchToHttp: () => ({ getRequest: () => request }),
+  } as unknown as ExecutionContext;
+};
+
 describe('DemoInterceptor', () => {
   let interceptor: DemoInterceptor;
   let configRepository: { getEnv: ReturnType<typeof vi.fn> };
@@ -13,17 +24,6 @@ describe('DemoInterceptor', () => {
     callHandler = { handle: vi.fn().mockReturnValue(of({})) };
     interceptor = new DemoInterceptor(configRepository as unknown as ConfigRepository);
   });
-
-  const createContext = (method: string, path: string, userEmail?: string) => {
-    const request = {
-      method,
-      path,
-      user: userEmail ? { user: { email: userEmail } } : undefined,
-    };
-    return {
-      switchToHttp: () => ({ getRequest: () => request }),
-    } as unknown as ExecutionContext;
-  };
 
   it('should allow all requests when demo mode is off', () => {
     configRepository.getEnv.mockReturnValue({ demo: { enabled: false, email: '', password: '' } });

@@ -1,4 +1,5 @@
 import { AuthService, LoginDetails } from 'src/services/auth.service';
+import { SessionFactory } from 'test/factories/session.factory';
 import { newTestService, ServiceMocks } from 'test/utils';
 
 describe('AuthService (demo)', () => {
@@ -37,9 +38,7 @@ describe('AuthService (demo)', () => {
         demo: { enabled: true, email: 'demo@test.com', password: 'demo' },
       } as any);
       mocks.user.getByEmail.mockResolvedValue(demoUser as any);
-      mocks.crypto.randomBytesAsText.mockReturnValue('token123');
-      mocks.crypto.hashSha256.mockReturnValue('hashed-token');
-      mocks.session.create.mockResolvedValue(void 0);
+      mocks.session.create.mockResolvedValue(SessionFactory.create());
 
       const result = await sut.demoLogin(loginDetails);
 
