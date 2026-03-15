@@ -43,9 +43,7 @@ describe('AuthService (demo)', () => {
       const result = await sut.demoLogin(loginDetails);
 
       expect(mocks.user.getByEmail).toHaveBeenCalledWith('demo@test.com');
-      expect(mocks.session.create).toHaveBeenCalledWith(
-        expect.objectContaining({ userId: 'demo-user-id' }),
-      );
+      expect(mocks.session.create).toHaveBeenCalledWith(expect.objectContaining({ userId: 'demo-user-id' }));
       expect(result).toBeDefined();
     });
   });
