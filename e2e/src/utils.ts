@@ -476,6 +476,21 @@ export const utils = {
     ]);
   },
 
+  createPet: async (ownerId: string, species: string, name?: string) => {
+    if (!client) {
+      throw new Error('Database client not connected');
+    }
+
+    const result = await client.query(
+      `INSERT INTO "person" ("ownerId", "type", "species", "name", "thumbnailPath")
+       VALUES ($1, 'pet', $2, $3, '/my/awesome/thumbnail.jpg')
+       RETURNING "id"`,
+      [ownerId, species, name ?? species],
+    );
+
+    return result.rows[0].id as string;
+  },
+
   createSharedLink: (accessToken: string, dto: SharedLinkCreateDto) =>
     createSharedLink({ sharedLinkCreateDto: dto }, { headers: asBearerAuth(accessToken) }),
 
