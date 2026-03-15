@@ -15,6 +15,7 @@ import { MaintenanceWebsocketRepository } from 'src/maintenance/maintenance-webs
 import { MaintenanceWorkerController } from 'src/maintenance/maintenance-worker.controller';
 import { MaintenanceWorkerService } from 'src/maintenance/maintenance-worker.service';
 import { AuthGuard } from 'src/middleware/auth.guard';
+import { DemoInterceptor } from 'src/middleware/demo.interceptor';
 import { ErrorInterceptor } from 'src/middleware/error.interceptor';
 import { FileUploadInterceptor } from 'src/middleware/file-upload.interceptor';
 import { GlobalExceptionFilter } from 'src/middleware/global-exception.filter';
@@ -46,7 +47,12 @@ const commonMiddleware = [
   { provide: APP_INTERCEPTOR, useClass: ErrorInterceptor },
 ];
 
-const apiMiddleware = [FileUploadInterceptor, ...commonMiddleware, { provide: APP_GUARD, useClass: AuthGuard }];
+const apiMiddleware = [
+  FileUploadInterceptor,
+  ...commonMiddleware,
+  { provide: APP_GUARD, useClass: AuthGuard },
+  { provide: APP_INTERCEPTOR, useClass: DemoInterceptor },
+];
 
 const configRepository = new ConfigRepository();
 const { bull, cls, database, otel } = configRepository.getEnv();
