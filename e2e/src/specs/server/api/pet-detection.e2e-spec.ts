@@ -217,10 +217,12 @@ describe('/pet-detection', () => {
         utils.userSetup(admin.accessToken, {
           email: 'pet-user1@immich.cloud',
           name: 'Pet User 1',
+          password: 'password',
         }),
         utils.userSetup(admin.accessToken, {
           email: 'pet-user2@immich.cloud',
           name: 'Pet User 2',
+          password: 'password',
         }),
       ]);
       await utils.connectDatabase();
