@@ -401,7 +401,7 @@ describe('/pet-detection', () => {
         .set('Authorization', `Bearer ${admin.accessToken}`)
         .send({ ids: [pet2] });
 
-      expect(status).toBe(201);
+      expect(status).toBe(200);
 
       const { status: getStatus } = await request(app)
         .get(`/people/${pet2}`)
