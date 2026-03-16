@@ -98,4 +98,18 @@ describe('DemoInterceptor', () => {
     interceptor.intercept(context, callHandler);
     expect(callHandler.handle).toHaveBeenCalled();
   });
+
+  it('should allow PUT /users/me/preferences for demo user', () => {
+    configRepository.getEnv.mockReturnValue({ demo: { enabled: true, email: 'demo@test.com', password: '' } });
+    const context = createContext('PUT', '/api/users/me/preferences', 'demo@test.com');
+    interceptor.intercept(context, callHandler);
+    expect(callHandler.handle).toHaveBeenCalled();
+  });
+
+  it('should allow PUT /users/me/onboarding for demo user', () => {
+    configRepository.getEnv.mockReturnValue({ demo: { enabled: true, email: 'demo@test.com', password: '' } });
+    const context = createContext('PUT', '/api/users/me/onboarding', 'demo@test.com');
+    interceptor.intercept(context, callHandler);
+    expect(callHandler.handle).toHaveBeenCalled();
+  });
 });

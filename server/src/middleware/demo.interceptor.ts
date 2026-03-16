@@ -12,6 +12,11 @@ const SAFE_POST_PREFIXES = [
   '/api/auth/change-password',
 ];
 
+const SAFE_PUT_PREFIXES = [
+  '/api/users/me/preferences',
+  '/api/users/me/onboarding',
+];
+
 @Injectable()
 export class DemoInterceptor implements NestInterceptor {
   constructor(private configRepository: ConfigRepository) {}
@@ -34,6 +39,10 @@ export class DemoInterceptor implements NestInterceptor {
     }
 
     if (method === 'POST' && SAFE_POST_PREFIXES.some((prefix) => request.path.startsWith(prefix))) {
+      return next.handle();
+    }
+
+    if (method === 'PUT' && SAFE_PUT_PREFIXES.some((prefix) => request.path.startsWith(prefix))) {
       return next.handle();
     }
 
