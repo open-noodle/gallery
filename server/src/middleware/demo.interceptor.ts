@@ -9,6 +9,7 @@ const SAFE_POST_PREFIXES = [
   '/api/auth/logout',
   '/api/auth/validateToken',
   '/api/auth/demo-login',
+  '/api/auth/change-password',
 ];
 
 @Injectable()

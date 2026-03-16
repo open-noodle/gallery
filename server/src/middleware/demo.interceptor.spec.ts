@@ -91,4 +91,11 @@ describe('DemoInterceptor', () => {
     interceptor.intercept(context, callHandler);
     expect(callHandler.handle).toHaveBeenCalled();
   });
+
+  it('should allow POST /auth/change-password for demo user', () => {
+    configRepository.getEnv.mockReturnValue({ demo: { enabled: true, email: 'demo@test.com', password: '' } });
+    const context = createContext('POST', '/api/auth/change-password', 'demo@test.com');
+    interceptor.intercept(context, callHandler);
+    expect(callHandler.handle).toHaveBeenCalled();
+  });
 });
