@@ -624,7 +624,7 @@ async function phaseMigrateToS3(): Promise<void> {
   // Content integrity: download originals and compare SHA-256 hashes (each user downloads their own)
   if (savedState.contentHashes) {
     console.log('  Verifying content integrity (SHA-256)...');
-    const adminIds = new Set(savedState.adminAssetIds ?? []);
+    const adminIds = new Set(savedState.adminAssetIds as string[]);
     for (const [assetId, expectedHash] of Object.entries(savedState.contentHashes)) {
       const dlToken = adminIds.has(assetId) ? token : (user2Token ?? token);
       const content = await downloadAssetOriginal(dlToken, assetId);
@@ -784,7 +784,7 @@ async function phaseMigrateToDisk(): Promise<void> {
   // Content integrity: download originals and compare SHA-256 hashes (each user downloads their own)
   if (savedState.contentHashes) {
     console.log('  Verifying content integrity (SHA-256)...');
-    const adminIds = new Set(savedState.adminAssetIds ?? []);
+    const adminIds = new Set(savedState.adminAssetIds as string[]);
     for (const [assetId, expectedHash] of Object.entries(savedState.contentHashes)) {
       const dlToken = adminIds.has(assetId) ? token : (user2Token ?? token);
       const content = await downloadAssetOriginal(dlToken, assetId);
@@ -1348,7 +1348,7 @@ async function phaseContentVerify(): Promise<void> {
   const contentHashes: Record<string, string> = savedState.contentHashes;
 
   // Download every asset original via API and compare SHA-256 hashes (each user downloads their own)
-  const adminIds = new Set(savedState.adminAssetIds ?? []);
+  const adminIds = new Set(savedState.adminAssetIds as string[]);
   const user2Token = savedState.user2 ? await loginUser(savedState.user2.email, savedState.user2.password) : null;
 
   console.log(`  Verifying content integrity for ${Object.keys(contentHashes).length} assets...`);
