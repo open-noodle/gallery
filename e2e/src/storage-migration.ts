@@ -609,8 +609,8 @@ async function phaseMigrateToS3(): Promise<void> {
   if (user2Token && savedState.user2AssetIds) {
     console.log('  Verifying API access to assets (user2)...');
     for (const id of savedState.user2AssetIds as string[]) {
-      const res = await fetch(`${BASE_URL}/assets/${id}/original`, {
-        headers: { Authorization: `Bearer ${user2Token}` },
+      const res: Response = await fetch(`${BASE_URL}/assets/${id}/original`, {
+        headers: { Authorization: `Bearer ${user2Token as string}` },
         redirect: 'follow',
       });
       if (res.status !== 200) {
@@ -769,8 +769,8 @@ async function phaseMigrateToDisk(): Promise<void> {
   if (user2Token && savedState.user2AssetIds) {
     console.log('  Verifying API access to assets (user2)...');
     for (const id of savedState.user2AssetIds as string[]) {
-      const res = await fetch(`${BASE_URL}/assets/${id}/original`, {
-        headers: { Authorization: `Bearer ${user2Token}` },
+      const res: Response = await fetch(`${BASE_URL}/assets/${id}/original`, {
+        headers: { Authorization: `Bearer ${user2Token as string}` },
         redirect: 'follow',
       });
       if (res.status !== 200) {
