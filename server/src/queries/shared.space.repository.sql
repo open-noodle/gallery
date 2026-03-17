@@ -425,7 +425,7 @@ where
   "spaceId" = $1
   and "assetId" = $2
 limit
-  1
+  $3
 
 -- SharedSpaceRepository.isFaceInSpace
 select
@@ -438,7 +438,7 @@ where
   and "asset_face"."id" = $2
   and "asset_face"."deletedAt" is null
 limit
-  1
+  $3
 
 -- SharedSpaceRepository.getAssetIdsInSpace
 select
