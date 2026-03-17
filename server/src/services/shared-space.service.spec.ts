@@ -1456,9 +1456,7 @@ describe(SharedSpaceService.name, () => {
       mocks.access.asset.checkPartnerAccess.mockResolvedValue(new Set());
       mocks.access.asset.checkSpaceAccess.mockResolvedValue(new Set());
 
-      await expect(
-        sut.addAssets(auth, spaceId, { assetIds: [ownedAssetId, foreignAssetId] }),
-      ).rejects.toThrow();
+      await expect(sut.addAssets(auth, spaceId, { assetIds: [ownedAssetId, foreignAssetId] })).rejects.toThrow();
 
       expect(mocks.sharedSpace.addAssets).not.toHaveBeenCalled();
     });
