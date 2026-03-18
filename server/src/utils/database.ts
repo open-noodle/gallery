@@ -258,11 +258,13 @@ const isCJK = (c: number): boolean =>
   (c >= 0x34_00 && c <= 0x4d_bf);
 
 export const tokenizeForSearch = (text: string): string[] => {
+  const MAX_SEARCH_LENGTH = 1000;
+  const input = text.length > MAX_SEARCH_LENGTH ? text.slice(0, MAX_SEARCH_LENGTH) : text;
   /* eslint-disable unicorn/prefer-code-point */
   const tokens: string[] = [];
   let i = 0;
-  while (i < text.length) {
-    const c = text.charCodeAt(i);
+  while (i < input.length) {
+    const c = input.charCodeAt(i);
     if (c <= 32) {
       i++;
       continue;
@@ -270,21 +272,21 @@ export const tokenizeForSearch = (text: string): string[] => {
 
     const start = i;
     if (isCJK(c)) {
-      while (i < text.length && isCJK(text.charCodeAt(i))) {
+      while (i < input.length && isCJK(input.charCodeAt(i))) {
         i++;
       }
       if (i - start === 1) {
-        tokens.push(text[start]);
+        tokens.push(input[start]);
       } else {
         for (let k = start; k < i - 1; k++) {
-          tokens.push(text[k] + text[k + 1]);
+          tokens.push(input[k] + input[k + 1]);
         }
       }
     } else {
-      while (i < text.length && text.charCodeAt(i) > 32 && !isCJK(text.charCodeAt(i))) {
+      while (i < input.length && input.charCodeAt(i) > 32 && !isCJK(input.charCodeAt(i))) {
         i++;
       }
-      tokens.push(text.slice(start, i));
+      tokens.push(input.slice(start, i));
     }
   }
   return tokens;
