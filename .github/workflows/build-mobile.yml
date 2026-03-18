@@ -116,7 +116,7 @@ jobs:
           key: build-mobile-gradle-${{ runner.os }}-main
 
       - name: Setup Flutter SDK
-        uses: subosito/flutter-action@fd55f4c5af5b953cc57a2be44cb082c8f6635e8e # v2.21.0
+        uses: subosito/flutter-action@fd55f4c5af5b953cc57a2be44cb082c8f6635e8e # v2.21.0.21.0
         with:
           channel: 'stable'
           flutter-version-file: ./mobile/pubspec.yaml
@@ -195,7 +195,7 @@ jobs:
       - uses: ./.github/actions/apply-branding
 
       - name: Setup Flutter SDK
-        uses: subosito/flutter-action@fd55f4c5af5b953cc57a2be44cb082c8f6635e8e # v2
+        uses: subosito/flutter-action@fd55f4c5af5b953cc57a2be44cb082c8f6635e8e # v2.21.0
         with:
           channel: 'stable'
           flutter-version-file: ./mobile/pubspec.yaml
@@ -214,7 +214,7 @@ jobs:
         working-directory: ./mobile
 
       - name: Setup Ruby
-        uses: ruby/setup-ruby@v1
+        uses: ruby/setup-ruby@319994f95fa847cf3fb3cd3dbe89f6dcde9f178f # v1
         with:
           ruby-version: '3.3'
           bundler-cache: true
