@@ -160,11 +160,3 @@ flutter_launcher_icons:
 analyzer:
   exclude:
     - generated/**
-
-patrol:
-  app_name: Immich
-  test_directory: integration_test
-  android:
-    package_name: app.alextran.immich
-  ios:
-    bundle_id: app.alextran.immich
