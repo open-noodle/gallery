@@ -10,7 +10,6 @@ const SAFE_POST_PREFIXES = [
   '/api/auth/validateToken',
   '/api/auth/demo-login',
   '/api/auth/change-password',
-  '/api/sync/',
 ];
 
 const SAFE_PUT_PREFIXES = [
@@ -31,6 +30,11 @@ export class DemoInterceptor implements NestInterceptor {
     const request = context.switchToHttp().getRequest<AuthRequest>();
     const userEmail = request.user?.user?.email;
     if (!userEmail || userEmail !== demo.email) {
+      return next.handle();
+    }
+
+    // Allow all sync endpoints (GET, POST, DELETE) for mobile app
+    if (request.path.startsWith('/api/sync/')) {
       return next.handle();
     }
 
