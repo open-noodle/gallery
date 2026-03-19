@@ -13,6 +13,7 @@
 ### Task 1: Update tab constants and enum
 
 **Files:**
+
 - Modify: `mobile/lib/constants/constants.dart:61`
 - Modify: `mobile/lib/providers/tab.provider.dart:3`
 
@@ -41,6 +42,7 @@ enum TabEnum { home, search, spaces, library }
 **Step 3: Update all references to old names**
 
 In `mobile/lib/pages/common/tab_shell.page.dart:128`:
+
 ```dart
 // Before:
 if (index == kAlbumTabIndex) {
@@ -49,6 +51,7 @@ if (index == kSpacesTabIndex) {
 ```
 
 Also update `tab_shell.page.dart:129` — replace the album refresh with a spaces refresh:
+
 ```dart
 // Before:
 if (index == kAlbumTabIndex) {
@@ -59,9 +62,11 @@ if (index == kSpacesTabIndex) {
   ref.invalidate(sharedSpacesProvider);
 }
 ```
+
 This requires adding the import: `import 'package:immich_mobile/providers/shared_space.provider.dart';`
 
 In `mobile/lib/providers/app_life_cycle.provider.dart:106`:
+
 ```dart
 // Before:
 case TabEnum.albums:
@@ -82,6 +87,7 @@ cd mobile && git add -A && git commit -m "refactor(mobile): rename album tab con
 ### Task 2: Swap Albums route for Spaces route in both tab systems
 
 **Files:**
+
 - Modify: `mobile/lib/pages/common/tab_controller.page.dart:63-93,117`
 - Modify: `mobile/lib/pages/common/tab_shell.page.dart:35-59,81`
 - Modify: `mobile/lib/routing/router.dart:175-194,252-256`
@@ -91,6 +97,7 @@ cd mobile && git add -A && git commit -m "refactor(mobile): rename album tab con
 In `mobile/lib/pages/common/tab_controller.page.dart`:
 
 Change the navigation destinations (lines 77-84) — replace the Albums destination:
+
 ```dart
 // Before:
 NavigationDestination(
@@ -110,6 +117,7 @@ NavigationDestination(
 ```
 
 Change the routes list (line 117):
+
 ```dart
 // Before:
 routes: [const PhotosRoute(), SearchRoute(), const AlbumsRoute(), const LibraryRoute()],
@@ -124,6 +132,7 @@ Remove the now-unused `isRefreshingRemoteAlbums` watch (line 22) and the `album.
 In `mobile/lib/pages/common/tab_shell.page.dart`:
 
 Change navigation destinations (lines 47-53):
+
 ```dart
 // Before:
 NavigationDestination(
@@ -142,6 +151,7 @@ NavigationDestination(
 ```
 
 Change routes list (line 81):
+
 ```dart
 // Before:
 routes: const [MainTimelineRoute(), DriftSearchRoute(), DriftAlbumsRoute(), DriftLibraryRoute()],
@@ -154,6 +164,7 @@ routes: const [MainTimelineRoute(), DriftSearchRoute(), SpacesRoute(), DriftLibr
 In `mobile/lib/routing/router.dart`:
 
 Add SpacesRoute as child of TabControllerRoute (lines 178-183):
+
 ```dart
 // Before:
 children: [
@@ -172,6 +183,7 @@ children: [
 ```
 
 Same for TabShellRoute children (lines 188-193):
+
 ```dart
 // Before:
 children: [
@@ -202,6 +214,7 @@ cd mobile && dart run build_runner build --delete-conflicting-outputs
 Files that navigate to `AlbumsRoute()` after deleting an album need updating — they should now navigate to the Library tab instead since albums lives there now:
 
 In `mobile/lib/widgets/album/album_viewer_appbar.dart:62,110`:
+
 ```dart
 // Before:
 unawaited(context.navigateTo(const TabControllerRoute(children: [AlbumsRoute()])));
@@ -210,6 +223,7 @@ unawaited(context.navigateTo(const TabControllerRoute(children: [LibraryRoute()]
 ```
 
 In `mobile/lib/pages/album/album_shared_user_selection.page.dart:35`:
+
 ```dart
 // Before:
 unawaited(context.navigateTo(const TabControllerRoute(children: [AlbumsRoute()])));
@@ -218,6 +232,7 @@ unawaited(context.navigateTo(const TabControllerRoute(children: [LibraryRoute()]
 ```
 
 In `mobile/lib/pages/album/album_options.page.dart:56`:
+
 ```dart
 // Before:
 unawaited(context.navigateTo(const TabControllerRoute(children: [AlbumsRoute()])));
@@ -226,6 +241,7 @@ unawaited(context.navigateTo(const TabControllerRoute(children: [LibraryRoute()]
 ```
 
 In `mobile/lib/presentation/pages/drift_album_options.page.dart:49`:
+
 ```dart
 // Before:
 unawaited(context.navigateTo(const DriftAlbumsRoute()));
@@ -234,6 +250,7 @@ unawaited(context.navigateTo(const DriftLibraryRoute()));
 ```
 
 In `mobile/lib/presentation/pages/drift_remote_album.page.dart:144`:
+
 ```dart
 // Before:
 unawaited(context.pushRoute(const DriftAlbumsRoute()));
@@ -252,6 +269,7 @@ cd mobile && git add -A && git commit -m "feat(mobile): replace albums tab with 
 ### Task 3: Add Albums to Library pages (collection card + quick access)
 
 **Files:**
+
 - Modify: `mobile/lib/pages/library/library.page.dart:74-80,89-149`
 - Modify: `mobile/lib/presentation/pages/drift_library.page.dart:125-141,330-403`
 
@@ -260,6 +278,7 @@ cd mobile && git add -A && git commit -m "feat(mobile): replace albums tab with 
 In `mobile/lib/pages/library/library.page.dart`:
 
 Add `AlbumsCollectionCard` to the Wrap (line 77):
+
 ```dart
 // Before:
 const Wrap(
@@ -276,6 +295,7 @@ const Wrap(
 ```
 
 In QuickAccessButtons, replace the Spaces ListTile (lines 139-143) with Albums:
+
 ```dart
 // Before:
 ListTile(
@@ -292,6 +312,7 @@ ListTile(
 ```
 
 Add a new `AlbumsCollectionCard` widget at the bottom of the file (after `PlacesCollectionCard`):
+
 ```dart
 class AlbumsCollectionCard extends ConsumerWidget {
   const AlbumsCollectionCard({super.key});
@@ -359,6 +380,7 @@ class AlbumsCollectionCard extends ConsumerWidget {
 In `mobile/lib/presentation/pages/drift_library.page.dart`:
 
 Add `_AlbumsCollectionCard` to `_CollectionCards` (line 136):
+
 ```dart
 // Before:
 children: [_PeopleCollectionCard(), _PlacesCollectionCard(), _LocalAlbumsCollectionCard()],
@@ -367,6 +389,7 @@ children: [_PeopleCollectionCard(), _PlacesCollectionCard(), _LocalAlbumsCollect
 ```
 
 In `_QuickAccessButtonList`, replace Spaces ListTile (lines 392-396) with Albums:
+
 ```dart
 // Before:
 ListTile(
@@ -383,6 +406,7 @@ ListTile(
 ```
 
 Add the `_AlbumsCollectionCard` widget (after `_LocalAlbumsCollectionCard`):
+
 ```dart
 class _AlbumsCollectionCard extends ConsumerWidget {
   const _AlbumsCollectionCard();
@@ -475,6 +499,7 @@ cd mobile && git add -A && git commit -m "feat(mobile): add albums collection ca
 ### Task 4: Create SpaceCollage widget
 
 **Files:**
+
 - Create: `mobile/lib/widgets/spaces/space_collage.dart`
 
 **Step 1: Create the collage widget**
@@ -654,6 +679,7 @@ cd mobile && git add -A && git commit -m "feat(mobile): add SpaceCollage widget 
 ### Task 5: Create SpaceCard widget
 
 **Files:**
+
 - Create: `mobile/lib/widgets/spaces/space_card.dart`
 
 **Step 1: Create the card widget**
@@ -878,11 +904,13 @@ cd mobile && git add -A && git commit -m "feat(mobile): add SpaceCard widget wit
 ### Task 6: Redesign SpacesPage with card grid
 
 **Files:**
+
 - Modify: `mobile/lib/pages/library/spaces/spaces.page.dart`
 
 **Step 1: Rewrite SpacesPage**
 
 Replace the entire `build` method content. The page should:
+
 - Use `ImmichSliverAppBar` or just an `AppBar` (since it's now a tab, it should match the tab app bar style)
 - Display a 2-column grid of `SpaceCard` widgets
 - Keep pull-to-refresh

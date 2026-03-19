@@ -13,6 +13,7 @@
 ### Task 1: Add demo env vars to EnvDto and EnvData
 
 **Files:**
+
 - Modify: `server/src/dtos/env.dto.ts:162-163` (after `IMMICH_ALLOW_SETUP`)
 - Modify: `server/src/repositories/config.repository.ts:96-98` (EnvData interface, after `setup`)
 - Modify: `server/src/repositories/config.repository.ts:336-338` (getEnv() return, after `setup`)
@@ -69,11 +70,11 @@ In `server/src/dtos/env.dto.ts`, after line 163 (`IMMICH_ALLOW_SETUP`), add:
 In `server/src/repositories/config.repository.ts`, after the `setup` block (line 98), add to the `EnvData` interface:
 
 ```typescript
-  demo: {
-    enabled: boolean;
-    email: string;
-    password: string;
-  };
+demo: {
+  enabled: boolean;
+  email: string;
+  password: string;
+}
 ```
 
 **Step 5: Add demo to getEnv() return**
@@ -100,6 +101,7 @@ git commit -m "feat(demo): add IMMICH_DEMO_MODE env vars to EnvDto and EnvData"
 ### Task 2: Add demoMode to ServerConfigDto and ServerFeaturesDto
 
 **Files:**
+
 - Modify: `server/src/dtos/server.dto.ts:205` (ServerConfigDto, before closing brace)
 - Modify: `server/src/services/server.service.ts:121-140` (getSystemConfig)
 
@@ -117,7 +119,7 @@ In `server/src/dtos/server.dto.ts`, before the closing brace of `ServerConfigDto
 In `server/src/services/server.service.ts`, modify `getSystemConfig()`. Change line 122 to destructure `demo`:
 
 ```typescript
-    const { setup, demo } = this.configRepository.getEnv();
+const { setup, demo } = this.configRepository.getEnv();
 ```
 
 And add `demoMode: demo.enabled,` after `maintenanceMode: false,` (line 138).
@@ -139,6 +141,7 @@ git commit -m "feat(demo): expose demoMode in server config endpoint"
 ### Task 3: Add POST /auth/demo-login endpoint and service method
 
 **Files:**
+
 - Modify: `server/src/services/auth.service.ts:60-81` (add demoLogin method after login)
 - Modify: `server/src/controllers/auth.controller.ts:50` (add demo-login endpoint after login)
 
@@ -193,9 +196,7 @@ describe('AuthService (demo)', () => {
       const result = await sut.demoLogin(loginDetails);
 
       expect(mocks.userRepository.getByEmail).toHaveBeenCalledWith('demo@test.com');
-      expect(mocks.sessionRepository.create).toHaveBeenCalledWith(
-        expect.objectContaining({ userId: 'demo-user-id' }),
-      );
+      expect(mocks.sessionRepository.create).toHaveBeenCalledWith(expect.objectContaining({ userId: 'demo-user-id' }));
       expect(result).toBeDefined();
     });
   });
@@ -273,6 +274,7 @@ git commit -m "feat(demo): add POST /auth/demo-login endpoint"
 ### Task 4: Add DemoInterceptor for server-side write protection
 
 **Files:**
+
 - Create: `server/src/middleware/demo.interceptor.ts`
 - Create: `server/src/middleware/demo.interceptor.spec.ts`
 - Modify: `server/src/app.module.ts:49` (register interceptor in apiMiddleware)
@@ -493,6 +495,7 @@ git commit -m "chore: regenerate OpenAPI SDK with demo mode endpoints"
 ### Task 6: Add "Try Demo" button to login page
 
 **Files:**
+
 - Modify: `web/src/routes/auth/login/+page.svelte`
 
 **Step 1: Add demo login handler and button**
@@ -504,19 +507,19 @@ Add to imports (line 10): import the new `demoLogin` function from `@immich/sdk`
 Add a new handler after `handleOAuthLogin` (after line 121):
 
 ```typescript
-  let demoLoading = $state(false);
+let demoLoading = $state(false);
 
-  const handleDemoLogin = async () => {
-    try {
-      demoLoading = true;
-      errorMessage = '';
-      const user = await demoLogin();
-      await onSuccess(user);
-    } catch (error) {
-      errorMessage = getServerErrorMessage(error) || 'Unable to start demo';
-      demoLoading = false;
-    }
-  };
+const handleDemoLogin = async () => {
+  try {
+    demoLoading = true;
+    errorMessage = '';
+    const user = await demoLogin();
+    await onSuccess(user);
+  } catch (error) {
+    errorMessage = getServerErrorMessage(error) || 'Unable to start demo';
+    demoLoading = false;
+  }
+};
 ```
 
 Add the button in the template, after the OAuth section (after line 181), before the "login disabled" warning:
@@ -566,6 +569,7 @@ git commit -m "feat(demo): add Try Demo button to login page"
 ### Task 7: Add isDemo flag to AuthManager and hide write actions
 
 **Files:**
+
 - Modify: `web/src/lib/managers/auth-manager.svelte.ts` — add `isDemo` state
 - Modify: `web/src/routes/auth/login/+page.svelte` — set `isDemo` on demo login
 - Modify: `web/src/lib/components/shared-components/navigation-bar/navigation-bar.svelte` — hide upload button
@@ -577,13 +581,13 @@ git commit -m "feat(demo): add Try Demo button to login page"
 In `web/src/lib/managers/auth-manager.svelte.ts`, add to the class:
 
 ```typescript
-  isDemo = $state(false);
+isDemo = $state(false);
 ```
 
 And in the `logout()` method, after `this.isPurchased = false;` (line 52), add:
 
 ```typescript
-      this.isDemo = false;
+this.isDemo = false;
 ```
 
 **Step 2: Set isDemo on demo login**
@@ -591,13 +595,13 @@ And in the `logout()` method, after `this.isPurchased = false;` (line 52), add:
 In `web/src/routes/auth/login/+page.svelte`, in `handleDemoLogin`, before `await onSuccess(user);`, add:
 
 ```typescript
-      authManager.isDemo = true;
+authManager.isDemo = true;
 ```
 
 Import `authManager` at top if not already imported:
 
 ```typescript
-  import { authManager } from '$lib/managers/auth-manager.svelte';
+import { authManager } from '$lib/managers/auth-manager.svelte';
 ```
 
 **Step 3: Hide upload button in navigation bar**
@@ -617,7 +621,7 @@ to:
 Add `authManager` import at top:
 
 ```typescript
-  import { authManager } from '$lib/managers/auth-manager.svelte';
+import { authManager } from '$lib/managers/auth-manager.svelte';
 ```
 
 **Step 4: Hide write-only sidebar items**
@@ -631,7 +635,7 @@ In `web/src/lib/components/shared-components/side-bar/user-sidebar.svelte`, wrap
 Add import:
 
 ```typescript
-  import { authManager } from '$lib/managers/auth-manager.svelte';
+import { authManager } from '$lib/managers/auth-manager.svelte';
 ```
 
 **Step 5: Hide upload in user-page-layout**
@@ -651,7 +655,7 @@ to:
 Add import:
 
 ```typescript
-  import { authManager } from '$lib/managers/auth-manager.svelte';
+import { authManager } from '$lib/managers/auth-manager.svelte';
 ```
 
 **Step 6: Verify by building**

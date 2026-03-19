@@ -9,7 +9,7 @@ Move Spaces from being a hidden list item inside the Library tab to a first-clas
 ### Bottom bar: 4 tabs (same count, different content)
 
 | Index | Before          | After           |
-|-------|-----------------|-----------------|
+| ----- | --------------- | --------------- |
 | 0     | Photos/Timeline | Photos/Timeline |
 | 1     | Search          | Search          |
 | 2     | Albums          | **Spaces**      |
@@ -62,6 +62,7 @@ Uses `recentAssetIds` from the DTO with `RemoteImageProvider.thumbnail` for load
 ### Color system (10 space colors)
 
 Maps `SharedSpaceResponseDtoColorEnum` to gradient pairs:
+
 - primary, pink, red, yellow, blue, green, purple, orange, gray, amber
 
 ### Activity indicators

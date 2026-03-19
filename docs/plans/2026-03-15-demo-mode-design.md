@@ -72,6 +72,7 @@ Admin routes are already blocked by existing `@Authenticated({ admin: true })` g
 The `AuthManager` tracks an `isDemo` flag (set when login is initiated via `/auth/demo-login`).
 
 Hidden/disabled for demo users:
+
 - Upload button (top bar + drag-and-drop)
 - Delete/trash buttons
 - Edit actions (rotate, crop, metadata edit)
@@ -82,6 +83,7 @@ Hidden/disabled for demo users:
 - "Add to album" actions
 
 Visible for demo users:
+
 - Timeline, map, search, explore, people, memories
 - Album/space browsing (read-only)
 - Asset detail view (info panel, EXIF data)
@@ -93,16 +95,16 @@ If someone navigates directly to a write route (e.g. `/admin`), redirect to time
 
 ## Files Changed
 
-| File | Change |
-|------|--------|
+| File                                           | Change                                       |
+| ---------------------------------------------- | -------------------------------------------- |
 | `server/src/repositories/config.repository.ts` | Read `IMMICH_DEMO_*` env vars into `EnvData` |
-| `server/src/middleware/demo.guard.ts` | **New file** — write-protection interceptor |
-| `server/src/services/auth.service.ts` | Add `demoLogin()` method |
-| `server/src/controllers/auth.controller.ts` | Add `POST /auth/demo-login` endpoint |
-| `server/src/dtos/server-config.dto.ts` | Add `demoMode` to public config response |
-| `web/src/routes/auth/login/+page.svelte` | "Try Demo" button |
-| `web/src/lib/managers/auth-manager.svelte.ts` | `isDemo` flag |
-| ~4-5 web layout/component files | `{#if !isDemo}` conditionals |
+| `server/src/middleware/demo.guard.ts`          | **New file** — write-protection interceptor  |
+| `server/src/services/auth.service.ts`          | Add `demoLogin()` method                     |
+| `server/src/controllers/auth.controller.ts`    | Add `POST /auth/demo-login` endpoint         |
+| `server/src/dtos/server-config.dto.ts`         | Add `demoMode` to public config response     |
+| `web/src/routes/auth/login/+page.svelte`       | "Try Demo" button                            |
+| `web/src/lib/managers/auth-manager.svelte.ts`  | `isDemo` flag                                |
+| ~4-5 web layout/component files                | `{#if !isDemo}` conditionals                 |
 
 **Not touched:** Database schema, migrations, core permission system, mobile app.
 
