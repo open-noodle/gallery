@@ -10,6 +10,7 @@ const SAFE_POST_PREFIXES = [
   '/api/auth/validateToken',
   '/api/auth/demo-login',
   '/api/auth/change-password',
+  '/api/sync/',
 ];
 
 const SAFE_PUT_PREFIXES = [
