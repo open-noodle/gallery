@@ -12,10 +12,7 @@ const SAFE_POST_PREFIXES = [
   '/api/auth/change-password',
 ];
 
-const SAFE_PUT_PREFIXES = [
-  '/api/users/me/preferences',
-  '/api/users/me/onboarding',
-];
+const SAFE_PUT_PREFIXES = ['/api/users/me/preferences', '/api/users/me/onboarding'];
 
 @Injectable()
 export class DemoInterceptor implements NestInterceptor {

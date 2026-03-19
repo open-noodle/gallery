@@ -38,11 +38,7 @@ class SpaceCollage extends StatelessWidget {
   Widget build(BuildContext context) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
-      child: SizedBox(
-        width: size,
-        height: size,
-        child: _buildLayout(),
-      ),
+      child: SizedBox(width: size, height: size, child: _buildLayout()),
     );
   }
 
@@ -64,18 +60,10 @@ class SpaceCollage extends StatelessWidget {
     final colors = spaceGradientColors(color);
     return Container(
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: colors,
-        ),
+        gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: colors),
       ),
       child: Center(
-        child: Icon(
-          Icons.photo_library_outlined,
-          color: Colors.white.withValues(alpha: 0.7),
-          size: size * 0.35,
-        ),
+        child: Icon(Icons.photo_library_outlined, color: Colors.white.withValues(alpha: 0.7), size: size * 0.35),
       ),
     );
   }
@@ -90,20 +78,13 @@ class SpaceCollage extends StatelessWidget {
     final count = recentAssetIds.length;
     return Row(
       children: [
-        SizedBox(
-          width: (size - 2) * 0.6,
-          height: size,
-          child: _buildImage(0),
-        ),
+        SizedBox(width: (size - 2) * 0.6, height: size, child: _buildImage(0)),
         const SizedBox(width: 2),
         Expanded(
           child: Column(
             children: [
               Expanded(child: _buildImage(1)),
-              if (count >= 3) ...[
-                const SizedBox(height: 2),
-                Expanded(child: _buildImage(2)),
-              ],
+              if (count >= 3) ...[const SizedBox(height: 2), Expanded(child: _buildImage(2))],
             ],
           ),
         ),
@@ -149,9 +130,7 @@ class SpaceCollage extends StatelessWidget {
       width: double.infinity,
       height: double.infinity,
       errorBuilder: (context, error, stackTrace) {
-        return Container(
-          color: colors[0].withValues(alpha: 0.3),
-        );
+        return Container(color: colors[0].withValues(alpha: 0.3));
       },
     );
   }

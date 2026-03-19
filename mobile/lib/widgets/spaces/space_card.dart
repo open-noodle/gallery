@@ -7,16 +7,11 @@ class SpaceCard extends StatelessWidget {
   final SharedSpaceResponseDto space;
   final VoidCallback onTap;
 
-  const SpaceCard({
-    super.key,
-    required this.space,
-    required this.onTap,
-  });
+  const SpaceCard({super.key, required this.space, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    final hasNewAssets =
-        space.newAssetCount != null && space.newAssetCount! > 0;
+    final hasNewAssets = space.newAssetCount != null && space.newAssetCount! > 0;
 
     return GestureDetector(
       onTap: onTap,
@@ -58,11 +53,7 @@ class SpaceCard extends StatelessWidget {
                     ),
                   // Member avatar stack
                   if (space.members.isNotEmpty)
-                    Positioned(
-                      bottom: 8,
-                      right: 8,
-                      child: _MemberAvatarStack(members: space.members),
-                    ),
+                    Positioned(bottom: 8, right: 8, child: _MemberAvatarStack(members: space.members)),
                 ],
               );
             },
@@ -72,9 +63,7 @@ class SpaceCard extends StatelessWidget {
             padding: const EdgeInsets.only(top: 8),
             child: Text(
               space.name,
-              style: context.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+              style: context.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
@@ -85,10 +74,7 @@ class SpaceCard extends StatelessWidget {
               padding: const EdgeInsets.only(top: 2),
               child: Text(
                 _activityText(),
-                style: context.textTheme.bodySmall?.copyWith(
-                  color: context.primaryColor,
-                  fontWeight: FontWeight.w500,
-                ),
+                style: context.textTheme.bodySmall?.copyWith(color: context.primaryColor, fontWeight: FontWeight.w500),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -98,9 +84,7 @@ class SpaceCard extends StatelessWidget {
             padding: const EdgeInsets.only(top: 2),
             child: Text(
               _detailsText(),
-              style: context.textTheme.bodySmall?.copyWith(
-                color: context.colorScheme.onSurface.withAlpha(150),
-              ),
+              style: context.textTheme.bodySmall?.copyWith(color: context.colorScheme.onSurface.withAlpha(150)),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -159,12 +143,10 @@ class _MemberAvatarStack extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final visibleCount =
-        members.length > _maxVisible ? _maxVisible : members.length;
+    final visibleCount = members.length > _maxVisible ? _maxVisible : members.length;
     final overflow = members.length - _maxVisible;
     final totalItems = visibleCount + (overflow > 0 ? 1 : 0);
-    final totalWidth =
-        _avatarSize + (_avatarSize - _overlap) * (totalItems - 1);
+    final totalWidth = _avatarSize + (_avatarSize - _overlap) * (totalItems - 1);
 
     return SizedBox(
       width: totalWidth,
@@ -172,23 +154,16 @@ class _MemberAvatarStack extends StatelessWidget {
       child: Stack(
         children: [
           for (int i = 0; i < visibleCount; i++)
-            Positioned(
-              left: i * (_avatarSize - _overlap),
-              child: _buildAvatar(members[i]),
-            ),
+            Positioned(left: i * (_avatarSize - _overlap), child: _buildAvatar(members[i])),
           if (overflow > 0)
-            Positioned(
-              left: visibleCount * (_avatarSize - _overlap),
-              child: _buildOverflowBadge(overflow),
-            ),
+            Positioned(left: visibleCount * (_avatarSize - _overlap), child: _buildOverflowBadge(overflow)),
         ],
       ),
     );
   }
 
   Widget _buildAvatar(SharedSpaceMemberResponseDto member) {
-    final initial =
-        member.name.isNotEmpty ? member.name[0].toUpperCase() : '?';
+    final initial = member.name.isNotEmpty ? member.name[0].toUpperCase() : '?';
     final bgColor = _colorForMember(member);
 
     return Container(
@@ -198,23 +173,12 @@ class _MemberAvatarStack extends StatelessWidget {
         color: bgColor,
         shape: BoxShape.circle,
         border: Border.all(color: Colors.white, width: 1.5),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x33000000),
-            blurRadius: 2,
-            offset: Offset(0, 1),
-          ),
-        ],
+        boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 2, offset: Offset(0, 1))],
       ),
       child: Center(
         child: Text(
           initial,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 11,
-            fontWeight: FontWeight.bold,
-            height: 1,
-          ),
+          style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold, height: 1),
         ),
       ),
     );
@@ -228,23 +192,12 @@ class _MemberAvatarStack extends StatelessWidget {
         color: Colors.grey[500],
         shape: BoxShape.circle,
         border: Border.all(color: Colors.white, width: 1.5),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x33000000),
-            blurRadius: 2,
-            offset: Offset(0, 1),
-          ),
-        ],
+        boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 2, offset: Offset(0, 1))],
       ),
       child: Center(
         child: Text(
           '+$overflow',
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
-            height: 1,
-          ),
+          style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold, height: 1),
         ),
       ),
     );

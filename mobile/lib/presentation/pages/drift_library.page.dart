@@ -133,7 +133,12 @@ class _CollectionCards extends StatelessWidget {
         child: Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: [_PeopleCollectionCard(), _PlacesCollectionCard(), _LocalAlbumsCollectionCard(), _AlbumsCollectionCard()],
+          children: [
+            _PeopleCollectionCard(),
+            _PlacesCollectionCard(),
+            _LocalAlbumsCollectionCard(),
+            _AlbumsCollectionCard(),
+          ],
         ),
       ),
     );

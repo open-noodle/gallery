@@ -10,16 +10,13 @@ String _$getAllPeopleHash() => r'2c5e6a207683f15ab209650615fdf9cb7f76c736';
 
 /// See also [getAllPeople].
 @ProviderFor(getAllPeople)
-final getAllPeopleProvider =
-    AutoDisposeFutureProvider<List<PersonDto>>.internal(
-      getAllPeople,
-      name: r'getAllPeopleProvider',
-      debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-          ? null
-          : _$getAllPeopleHash,
-      dependencies: null,
-      allTransitiveDependencies: null,
-    );
+final getAllPeopleProvider = AutoDisposeFutureProvider<List<PersonDto>>.internal(
+  getAllPeople,
+  name: r'getAllPeopleProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product') ? null : _$getAllPeopleHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
 
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
@@ -62,9 +59,7 @@ class PersonAssetsFamily extends Family<AsyncValue<RenderList>> {
   }
 
   @override
-  PersonAssetsProvider getProviderOverride(
-    covariant PersonAssetsProvider provider,
-  ) {
+  PersonAssetsProvider getProviderOverride(covariant PersonAssetsProvider provider) {
     return call(provider.personId);
   }
 
@@ -76,8 +71,7 @@ class PersonAssetsFamily extends Family<AsyncValue<RenderList>> {
   static const Iterable<ProviderOrFamily>? _allTransitiveDependencies = null;
 
   @override
-  Iterable<ProviderOrFamily>? get allTransitiveDependencies =>
-      _allTransitiveDependencies;
+  Iterable<ProviderOrFamily>? get allTransitiveDependencies => _allTransitiveDependencies;
 
   @override
   String? get name => r'personAssetsProvider';
@@ -91,12 +85,9 @@ class PersonAssetsProvider extends AutoDisposeFutureProvider<RenderList> {
         (ref) => personAssets(ref as PersonAssetsRef, personId),
         from: personAssetsProvider,
         name: r'personAssetsProvider',
-        debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-            ? null
-            : _$personAssetsHash,
+        debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product') ? null : _$personAssetsHash,
         dependencies: PersonAssetsFamily._dependencies,
-        allTransitiveDependencies:
-            PersonAssetsFamily._allTransitiveDependencies,
+        allTransitiveDependencies: PersonAssetsFamily._allTransitiveDependencies,
         personId: personId,
       );
 
@@ -113,9 +104,7 @@ class PersonAssetsProvider extends AutoDisposeFutureProvider<RenderList> {
   final String personId;
 
   @override
-  Override overrideWith(
-    FutureOr<RenderList> Function(PersonAssetsRef provider) create,
-  ) {
+  Override overrideWith(FutureOr<RenderList> Function(PersonAssetsRef provider) create) {
     return ProviderOverride(
       origin: this,
       override: PersonAssetsProvider._internal(
@@ -156,9 +145,7 @@ mixin PersonAssetsRef on AutoDisposeFutureProviderRef<RenderList> {
   String get personId;
 }
 
-class _PersonAssetsProviderElement
-    extends AutoDisposeFutureProviderElement<RenderList>
-    with PersonAssetsRef {
+class _PersonAssetsProviderElement extends AutoDisposeFutureProviderElement<RenderList> with PersonAssetsRef {
   _PersonAssetsProviderElement(super.provider);
 
   @override
@@ -182,9 +169,7 @@ class UpdatePersonNameFamily extends Family<AsyncValue<bool>> {
   }
 
   @override
-  UpdatePersonNameProvider getProviderOverride(
-    covariant UpdatePersonNameProvider provider,
-  ) {
+  UpdatePersonNameProvider getProviderOverride(covariant UpdatePersonNameProvider provider) {
     return call(provider.personId, provider.updatedName);
   }
 
@@ -196,8 +181,7 @@ class UpdatePersonNameFamily extends Family<AsyncValue<bool>> {
   static const Iterable<ProviderOrFamily>? _allTransitiveDependencies = null;
 
   @override
-  Iterable<ProviderOrFamily>? get allTransitiveDependencies =>
-      _allTransitiveDependencies;
+  Iterable<ProviderOrFamily>? get allTransitiveDependencies => _allTransitiveDependencies;
 
   @override
   String? get name => r'updatePersonNameProvider';
@@ -208,16 +192,12 @@ class UpdatePersonNameProvider extends AutoDisposeFutureProvider<bool> {
   /// See also [updatePersonName].
   UpdatePersonNameProvider(String personId, String updatedName)
     : this._internal(
-        (ref) =>
-            updatePersonName(ref as UpdatePersonNameRef, personId, updatedName),
+        (ref) => updatePersonName(ref as UpdatePersonNameRef, personId, updatedName),
         from: updatePersonNameProvider,
         name: r'updatePersonNameProvider',
-        debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-            ? null
-            : _$updatePersonNameHash,
+        debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product') ? null : _$updatePersonNameHash,
         dependencies: UpdatePersonNameFamily._dependencies,
-        allTransitiveDependencies:
-            UpdatePersonNameFamily._allTransitiveDependencies,
+        allTransitiveDependencies: UpdatePersonNameFamily._allTransitiveDependencies,
         personId: personId,
         updatedName: updatedName,
       );
@@ -237,9 +217,7 @@ class UpdatePersonNameProvider extends AutoDisposeFutureProvider<bool> {
   final String updatedName;
 
   @override
-  Override overrideWith(
-    FutureOr<bool> Function(UpdatePersonNameRef provider) create,
-  ) {
+  Override overrideWith(FutureOr<bool> Function(UpdatePersonNameRef provider) create) {
     return ProviderOverride(
       origin: this,
       override: UpdatePersonNameProvider._internal(
@@ -262,9 +240,7 @@ class UpdatePersonNameProvider extends AutoDisposeFutureProvider<bool> {
 
   @override
   bool operator ==(Object other) {
-    return other is UpdatePersonNameProvider &&
-        other.personId == personId &&
-        other.updatedName == updatedName;
+    return other is UpdatePersonNameProvider && other.personId == personId && other.updatedName == updatedName;
   }
 
   @override
@@ -287,9 +263,7 @@ mixin UpdatePersonNameRef on AutoDisposeFutureProviderRef<bool> {
   String get updatedName;
 }
 
-class _UpdatePersonNameProviderElement
-    extends AutoDisposeFutureProviderElement<bool>
-    with UpdatePersonNameRef {
+class _UpdatePersonNameProviderElement extends AutoDisposeFutureProviderElement<bool> with UpdatePersonNameRef {
   _UpdatePersonNameProviderElement(super.provider);
 
   @override

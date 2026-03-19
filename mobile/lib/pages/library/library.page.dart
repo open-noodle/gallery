@@ -74,7 +74,12 @@ class LibraryPage extends ConsumerWidget {
             const Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: [PeopleCollectionCard(), PlacesCollectionCard(), LocalAlbumsCollectionCard(), AlbumsCollectionCard()],
+              children: [
+                PeopleCollectionCard(),
+                PlacesCollectionCard(),
+                LocalAlbumsCollectionCard(),
+                AlbumsCollectionCard(),
+              ],
             ),
             const SizedBox(height: 12),
             const QuickAccessButtons(),
