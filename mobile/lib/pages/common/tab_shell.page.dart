@@ -45,9 +45,9 @@ class _TabShellPageState extends ConsumerState<TabShellPage> {
         enabled: !isReadonlyModeEnabled,
       ),
       NavigationDestination(
-        label: 'albums'.tr(),
-        icon: const Icon(Icons.photo_album_outlined),
-        selectedIcon: Icon(Icons.photo_album_rounded, color: context.primaryColor),
+        label: 'Spaces',
+        icon: const Icon(Icons.workspaces_outlined),
+        selectedIcon: Icon(Icons.workspaces, color: context.primaryColor),
         enabled: !isReadonlyModeEnabled,
       ),
       NavigationDestination(
@@ -78,7 +78,7 @@ class _TabShellPageState extends ConsumerState<TabShellPage> {
     }
 
     return AutoTabsRouter(
-      routes: const [MainTimelineRoute(), DriftSearchRoute(), DriftAlbumsRoute(), DriftLibraryRoute()],
+      routes: const [MainTimelineRoute(), DriftSearchRoute(), SpacesRoute(), DriftLibraryRoute()],
       duration: const Duration(milliseconds: 600),
       transitionBuilder: (context, child, animation) => FadeTransition(opacity: animation, child: child),
       builder: (context, child) {
