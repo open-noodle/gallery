@@ -10,7 +10,7 @@ import 'package:immich_mobile/domain/utils/event_stream.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/presentation/pages/search/paginated_search.provider.dart';
 import 'package:immich_mobile/providers/haptic_feedback.provider.dart';
-import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
+import 'package:immich_mobile/providers/shared_space.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/memory.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/people.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/readonly_mode.provider.dart';
@@ -124,9 +124,9 @@ void _onNavigationSelected(TabsRouter router, int index, WidgetRef ref) {
     ref.read(searchInputFocusProvider).requestFocus();
   }
 
-  // Album page
-  if (index == kAlbumTabIndex) {
-    ref.read(remoteAlbumProvider.notifier).refresh();
+  // Spaces page
+  if (index == kSpacesTabIndex) {
+    ref.invalidate(sharedSpacesProvider);
   }
 
   // Library page
