@@ -128,8 +128,8 @@ class AppRouter extends RootStackRouter {
       children: [
         AutoRoute(page: MainTimelineRoute.page, guards: [_authGuard, _duplicateGuard]),
         AutoRoute(page: SearchRoute.page, guards: [_authGuard, _duplicateGuard], maintainState: false),
+        AutoRoute(page: SpacesRoute.page, guards: [_authGuard, _duplicateGuard]),
         AutoRoute(page: LibraryRoute.page, guards: [_authGuard, _duplicateGuard]),
-        AutoRoute(page: AlbumsRoute.page, guards: [_authGuard, _duplicateGuard]),
       ],
     ),
     AutoRoute(page: ProfilePictureCropRoute.page),
