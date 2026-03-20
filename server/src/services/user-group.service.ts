@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { AuthDto } from 'src/dtos/auth.dto';
 import {
   UserGroupCreateDto,
@@ -18,6 +18,34 @@ export class UserGroupService extends BaseService {
     });
 
     return this.mapGroup(group, []);
+  }
+
+  async getAll(auth: AuthDto): Promise<UserGroupResponseDto[]> {
+    const groups = await this.userGroupRepository.getAllByUserId(auth.user.id);
+
+    const results: UserGroupResponseDto[] = [];
+    for (const group of groups) {
+      const members = await this.userGroupRepository.getMembers(group.id);
+      results.push(this.mapGroup(group, members));
+    }
+    return results;
+  }
+
+  async get(auth: AuthDto, id: string): Promise<UserGroupResponseDto> {
+    const group = await this.requireOwnership(auth, id);
+    const members = await this.userGroupRepository.getMembers(id);
+    return this.mapGroup(group, members);
+  }
+
+  private async requireOwnership(auth: AuthDto, groupId: string) {
+    const group = await this.userGroupRepository.getById(groupId);
+    if (!group) {
+      throw new BadRequestException('User group not found');
+    }
+    if (group.createdById !== auth.user.id) {
+      throw new ForbiddenException('Not the owner of this group');
+    }
+    return group;
   }
 
   private mapGroup(
