@@ -3,6 +3,7 @@ import { AuthDto } from 'src/dtos/auth.dto';
 import {
   UserGroupCreateDto,
   UserGroupMemberResponseDto,
+  UserGroupMemberSetDto,
   UserGroupResponseDto,
   UserGroupUpdateDto,
 } from 'src/dtos/user-group.dto';
@@ -48,6 +49,13 @@ export class UserGroupService extends BaseService {
 
     const members = await this.userGroupRepository.getMembers(id);
     return this.mapGroup(group, members);
+  }
+
+  async setMembers(auth: AuthDto, id: string, dto: UserGroupMemberSetDto): Promise<UserGroupMemberResponseDto[]> {
+    await this.requireOwnership(auth, id);
+    await this.userGroupRepository.setMembers(id, dto.userIds);
+    const members = await this.userGroupRepository.getMembers(id);
+    return members.map((m) => this.mapMember(m));
   }
 
   async remove(auth: AuthDto, id: string): Promise<void> {
