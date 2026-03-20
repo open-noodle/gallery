@@ -76,6 +76,8 @@ import { SystemMetadataTable } from 'src/schema/tables/system-metadata.table';
 import { TagAssetTable } from 'src/schema/tables/tag-asset.table';
 import { TagClosureTable } from 'src/schema/tables/tag-closure.table';
 import { TagTable } from 'src/schema/tables/tag.table';
+import { UserGroupMemberTable } from 'src/schema/tables/user-group-member.table';
+import { UserGroupTable } from 'src/schema/tables/user-group.table';
 import { UserAuditTable } from 'src/schema/tables/user-audit.table';
 import { UserMetadataAuditTable } from 'src/schema/tables/user-metadata-audit.table';
 import { UserMetadataTable } from 'src/schema/tables/user-metadata.table';
@@ -133,6 +135,8 @@ export class ImmichDatabase {
     SharedSpacePersonTable,
     SharedSpacePersonFaceTable,
     SharedSpacePersonAliasTable,
+    UserGroupTable,
+    UserGroupMemberTable,
     SmartSearchTable,
     StackTable,
     StackAuditTable,
@@ -253,6 +257,9 @@ export interface DB {
   shared_space_person: SharedSpacePersonTable;
   shared_space_person_face: SharedSpacePersonFaceTable;
   shared_space_person_alias: SharedSpacePersonAliasTable;
+
+  user_group: UserGroupTable;
+  user_group_member: UserGroupMemberTable;
 
   smart_search: SmartSearchTable;
 

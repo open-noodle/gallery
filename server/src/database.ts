@@ -382,6 +382,22 @@ export type SharedSpacePersonAlias = {
   alias: string;
 };
 
+export type UserGroup = {
+  id: string;
+  name: string;
+  color: string | null;
+  origin: string;
+  createdById: string;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type UserGroupMember = {
+  groupId: string;
+  userId: string;
+  addedAt: Date;
+};
+
 const userColumns = ['id', 'name', 'email', 'avatarColor', 'profileImagePath', 'profileChangedAt'] as const;
 const userWithPrefixColumns = [
   'user2.id',
