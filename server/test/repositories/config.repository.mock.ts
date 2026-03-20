@@ -80,12 +80,6 @@ const envData: EnvData = {
     allow: true,
   },
 
-  demo: {
-    enabled: false,
-    email: '',
-    password: '',
-  },
-
   storage: {
     backend: 'disk',
     ignoreMountCheckErrors: false,

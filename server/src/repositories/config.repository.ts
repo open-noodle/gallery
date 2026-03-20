@@ -97,12 +97,6 @@ export interface EnvData {
     allow: boolean;
   };
 
-  demo: {
-    enabled: boolean;
-    email: string;
-    password: string;
-  };
-
   telemetry: {
     apiPort: number;
     microservicesPort: number;
@@ -341,12 +335,6 @@ const getEnv = (): EnvData => {
 
     setup: {
       allow: dto.IMMICH_ALLOW_SETUP ?? true,
-    },
-
-    demo: {
-      enabled: dto.IMMICH_DEMO_MODE ?? false,
-      email: dto.IMMICH_DEMO_USER_EMAIL ?? '',
-      password: dto.IMMICH_DEMO_USER_PASSWORD ?? '',
     },
 
     storage: {
