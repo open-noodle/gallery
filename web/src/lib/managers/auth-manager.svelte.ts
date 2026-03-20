@@ -18,6 +18,7 @@ import { page } from '$app/state';
 
 class AuthManager {
   isPurchased = $state(false);
+  isDemo = $state(false);
   isSharedLink = $derived(isSharedLinkRoute(page.route?.id));
   params = $derived(this.isSharedLink ? { key: page.params.key, slug: page.params.slug } : {});
 
