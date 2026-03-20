@@ -6,7 +6,7 @@ import { ImmichFileResponse, ImmichRedirectResponse, ImmichStreamResponse, sendF
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('node:fs/promises', () => ({
-  access: vi.fn().mockResolvedValue(undefined),
+  access: vi.fn().mockResolvedValue(void 0),
   constants: { R_OK: 4 },
 }));
 
@@ -286,7 +286,11 @@ describe('sendFile with ImmichMediaResponse', () => {
       mockLogger,
     );
 
-    expect(res.sendFile).toHaveBeenCalledWith('/tmp/test-file.jpg', { root: '/', dotfiles: 'allow' }, expect.any(Function));
+    expect(res.sendFile).toHaveBeenCalledWith(
+      '/tmp/test-file.jpg',
+      { root: '/', dotfiles: 'allow' },
+      expect.any(Function),
+    );
   });
 
   it('should handle non-http errors by logging and calling next', async () => {
