@@ -1,6 +1,7 @@
 # User Groups Implementation Plan
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
+> **REQUIRED:** Follow strict TDD — RED (failing test) → GREEN (minimal code) → REFACTOR. No production code without a failing test first.
 
 **Goal:** Add personal user groups — named, color-coded user lists that act as a selection shortcut when sharing albums or inviting to Spaces.
 
@@ -8,9 +9,11 @@
 
 **Tech Stack:** NestJS + Kysely (server), SvelteKit + Svelte 5 runes (web), `@immich/ui` components, Vitest for tests.
 
+**TDD approach:** Infrastructure tasks (schema, migration, enums, registration) come first as scaffolding — they have no behavior to test. Then all service logic follows strict RED-GREEN-REFACTOR. Each test must fail for the right reason before any implementation code is written.
+
 ---
 
-### Task 1: Database schema — table definitions
+### Task 1: Schema table definitions (infrastructure — no tests needed)
 
 **Files:**
 - Create: `server/src/schema/tables/user-group.table.ts`
@@ -91,31 +94,28 @@ git commit -m "feat(server): add user group schema table definitions"
 
 ---
 
-### Task 2: Register tables in schema index and DB interface
+### Task 2: Register tables, types, enums, migration (infrastructure — no tests needed)
 
 **Files:**
 - Modify: `server/src/schema/index.ts`
+- Modify: `server/src/database.ts`
+- Modify: `server/src/enum.ts`
+- Create: `server/src/schema/migrations/1774300000000-CreateUserGroupTables.ts`
 
-**Step 1: Add imports and register tables**
+**Step 1: Register tables in schema index**
 
 In `server/src/schema/index.ts`:
-- Add imports for `UserGroupTable` and `UserGroupMemberTable` (alphabetically near the other imports, after the SharedSpace imports around line 69)
-- Add both to the `tables` array inside `ImmichDatabase` (after `SharedSpacePersonAliasTable`, before `SmartSearchTable`)
-- Add both to the `DB` interface (after the `shared_space_person_alias` entry, before `smart_search`)
-
-Add to imports:
+- Add imports (alphabetically near SharedSpace imports):
 ```typescript
 import { UserGroupMemberTable } from 'src/schema/tables/user-group-member.table';
 import { UserGroupTable } from 'src/schema/tables/user-group.table';
 ```
-
-Add to `tables` array (after line 135 `SharedSpacePersonAliasTable`):
+- Add to `tables` array (after `SharedSpacePersonAliasTable`):
 ```typescript
     UserGroupTable,
     UserGroupMemberTable,
 ```
-
-Add to `DB` interface (after `shared_space_person_alias` around line 255):
+- Add to `DB` interface (after `shared_space_person_alias`):
 ```typescript
   user_group: UserGroupTable;
   user_group_member: UserGroupMemberTable;
@@ -143,21 +143,24 @@ export type UserGroupMember = {
 };
 ```
 
-**Step 3: Commit**
+**Step 3: Add Permission and ApiTag enums**
 
-```bash
-git add server/src/schema/index.ts server/src/database.ts
-git commit -m "feat(server): register user group tables in schema and DB interface"
+In `server/src/enum.ts`, add after `SharedSpaceAssetDelete` (around line 217):
+```typescript
+  UserGroupCreate = 'userGroup.create',
+  UserGroupRead = 'userGroup.read',
+  UserGroupUpdate = 'userGroup.update',
+  UserGroupDelete = 'userGroup.delete',
 ```
 
----
+In the `ApiTag` enum, add alphabetically:
+```typescript
+  UserGroups = 'User Groups',
+```
 
-### Task 3: Database migration
+**Step 4: Create migration**
 
-**Files:**
-- Create: `server/src/schema/migrations/1774300000000-CreateUserGroupTables.ts`
-
-**Step 1: Create migration file**
+Create `server/src/schema/migrations/1774300000000-CreateUserGroupTables.ts`:
 
 ```typescript
 import { Kysely, sql } from 'kysely';
@@ -207,54 +210,26 @@ export async function down(db: Kysely<any>): Promise<void> {
 }
 ```
 
-**Step 2: Commit**
+**Step 5: Commit**
 
 ```bash
-git add server/src/schema/migrations/1774300000000-CreateUserGroupTables.ts
-git commit -m "feat(server): add migration for user group tables"
+git add server/src/schema/index.ts server/src/database.ts server/src/enum.ts server/src/schema/migrations/1774300000000-CreateUserGroupTables.ts
+git commit -m "feat(server): register user group tables, types, enums, and migration"
 ```
 
 ---
 
-### Task 4: Enum entries — Permission and ApiTag
-
-**Files:**
-- Modify: `server/src/enum.ts`
-
-**Step 1: Add Permission entries**
-
-In `server/src/enum.ts`, add after the `SharedSpaceAssetDelete` entry (around line 217):
-
-```typescript
-  UserGroupCreate = 'userGroup.create',
-  UserGroupRead = 'userGroup.read',
-  UserGroupUpdate = 'userGroup.update',
-  UserGroupDelete = 'userGroup.delete',
-```
-
-**Step 2: Add ApiTag entry**
-
-In the `ApiTag` enum (around line 894), add alphabetically:
-
-```typescript
-  UserGroups = 'User Groups',
-```
-
-**Step 3: Commit**
-
-```bash
-git add server/src/enum.ts
-git commit -m "feat(server): add user group permission and API tag enums"
-```
-
----
-
-### Task 5: DTOs
+### Task 3: DTOs and repository (infrastructure — needed before tests can compile)
 
 **Files:**
 - Create: `server/src/dtos/user-group.dto.ts`
+- Create: `server/src/repositories/user-group.repository.ts`
+- Modify: `server/src/repositories/index.ts`
+- Modify: `server/src/services/base.service.ts`
 
-**Step 1: Create DTO file**
+**Step 1: Create DTOs**
+
+Create `server/src/dtos/user-group.dto.ts`:
 
 ```typescript
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -338,22 +313,9 @@ export class UserGroupResponseDto {
 }
 ```
 
-**Step 2: Commit**
+**Step 2: Create repository**
 
-```bash
-git add server/src/dtos/user-group.dto.ts
-git commit -m "feat(server): add user group DTOs"
-```
-
----
-
-### Task 6: Repository
-
-**Files:**
-- Create: `server/src/repositories/user-group.repository.ts`
-- Modify: `server/src/repositories/index.ts`
-
-**Step 1: Create repository**
+Create `server/src/repositories/user-group.repository.ts`:
 
 ```typescript
 import { Injectable } from '@nestjs/common';
@@ -438,51 +400,83 @@ export class UserGroupRepository {
 }
 ```
 
-**Step 2: Register repository**
+**Step 3: Register repository**
 
 In `server/src/repositories/index.ts`:
 - Add import: `import { UserGroupRepository } from 'src/repositories/user-group.repository';`
-- Add to `repositories` array (alphabetically, after `UserRepository`): `UserGroupRepository,`
+- Add to `repositories` array (after `UserRepository`): `UserGroupRepository,`
 
-**Step 3: Commit**
-
-```bash
-git add server/src/repositories/user-group.repository.ts server/src/repositories/index.ts
-git commit -m "feat(server): add user group repository"
-```
-
----
-
-### Task 7: Register repository in BaseService
-
-**Files:**
-- Modify: `server/src/services/base.service.ts`
-
-**Step 1: Add import and inject**
+**Step 4: Register in BaseService**
 
 In `server/src/services/base.service.ts`:
 - Add import: `import { UserGroupRepository } from 'src/repositories/user-group.repository';`
-- Add `UserGroupRepository` to the `BASE_SERVICE_DEPENDENCIES` array (after `UserRepository`)
+- Add `UserGroupRepository` to `BASE_SERVICE_DEPENDENCIES` array (after `UserRepository`)
 - Add constructor parameter: `protected userGroupRepository: UserGroupRepository,` (after `protected userRepository: UserRepository,`)
 
-**Step 2: Commit**
+**Step 5: Add test factories**
+
+In `server/test/small.factory.ts`:
+- Add `UserGroup, UserGroupMember` to imports from `src/database`
+- Add factories:
+
+```typescript
+const userGroupFactory = (data: Partial<UserGroup> = {}): UserGroup => ({
+  id: newUuid(),
+  name: 'Test Group',
+  color: null,
+  origin: 'manual',
+  createdById: newUuid(),
+  createdAt: newDate(),
+  updatedAt: newDate(),
+  ...data,
+});
+
+const userGroupMemberFactory = (data: Partial<UserGroupMember> = {}): UserGroupMember => ({
+  groupId: newUuid(),
+  userId: newUuid(),
+  addedAt: newDate(),
+  ...data,
+});
+```
+
+- Add to `factory` export: `userGroup: userGroupFactory,` and `userGroupMember: userGroupMemberFactory,`
+
+**Step 6: Commit**
 
 ```bash
-git add server/src/services/base.service.ts
-git commit -m "feat(server): register user group repository in BaseService"
+git add server/src/dtos/user-group.dto.ts server/src/repositories/user-group.repository.ts server/src/repositories/index.ts server/src/services/base.service.ts server/test/small.factory.ts
+git commit -m "feat(server): add user group DTOs, repository, and test factories"
 ```
 
 ---
 
-### Task 8: Service — write tests first
+### Task 4: RED — write failing test for `create`
 
 **Files:**
 - Create: `server/src/services/user-group.service.spec.ts`
+- Create: `server/src/services/user-group.service.ts` (empty stub only — enough for imports to resolve)
 
-**Step 1: Write the test file**
+**Step 1: Create minimal service stub (just enough for tests to import)**
+
+Create `server/src/services/user-group.service.ts`:
 
 ```typescript
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { BaseService } from 'src/services/base.service';
+
+@Injectable()
+export class UserGroupService extends BaseService {}
+```
+
+Register it in `server/src/services/index.ts`:
+- Add import: `import { UserGroupService } from 'src/services/user-group.service';`
+- Add to `services` array (after `UserAdminService`): `UserGroupService,`
+
+**Step 2: Write failing test for create**
+
+Create `server/src/services/user-group.service.spec.ts`:
+
+```typescript
 import { UserAvatarColor } from 'src/enum';
 import { UserGroupService } from 'src/services/user-group.service';
 import { factory, newDate, newUuid } from 'test/small.factory';
@@ -524,7 +518,7 @@ describe(UserGroupService.name, () => {
   });
 
   describe('create', () => {
-    it('should create a group', async () => {
+    it('should create a group with name and default null color', async () => {
       const auth = factory.auth();
       const group = makeGroup({ createdById: auth.user.id });
       mocks.userGroup.create.mockResolvedValue(group);
@@ -534,6 +528,7 @@ describe(UserGroupService.name, () => {
 
       expect(result.id).toBe(group.id);
       expect(result.name).toBe('Family A');
+      expect(result.members).toEqual([]);
       expect(mocks.userGroup.create).toHaveBeenCalledWith({
         name: 'Family A',
         color: null,
@@ -556,140 +551,39 @@ describe(UserGroupService.name, () => {
       });
     });
   });
-
-  describe('getAll', () => {
-    it('should return groups with members', async () => {
-      const auth = factory.auth();
-      const group = makeGroup({ createdById: auth.user.id });
-      const member = makeMember({ groupId: group.id });
-
-      mocks.userGroup.getAllByUserId.mockResolvedValue([group]);
-      mocks.userGroup.getMembers.mockResolvedValue([member]);
-
-      const result = await sut.getAll(auth);
-
-      expect(result).toHaveLength(1);
-      expect(result[0].members).toHaveLength(1);
-      expect(result[0].members[0].userId).toBe(member.userId);
-    });
-  });
-
-  describe('get', () => {
-    it('should throw if group not found', async () => {
-      const auth = factory.auth();
-      mocks.userGroup.getById.mockResolvedValue(undefined);
-
-      await expect(sut.get(auth, newUuid())).rejects.toThrow(BadRequestException);
-    });
-
-    it('should throw if not the owner', async () => {
-      const auth = factory.auth();
-      const group = makeGroup({ createdById: newUuid() });
-      mocks.userGroup.getById.mockResolvedValue(group);
-
-      await expect(sut.get(auth, group.id)).rejects.toThrow(ForbiddenException);
-    });
-
-    it('should return group with members', async () => {
-      const auth = factory.auth();
-      const group = makeGroup({ createdById: auth.user.id });
-      mocks.userGroup.getById.mockResolvedValue(group);
-      mocks.userGroup.getMembers.mockResolvedValue([]);
-
-      const result = await sut.get(auth, group.id);
-      expect(result.id).toBe(group.id);
-    });
-  });
-
-  describe('update', () => {
-    it('should throw if not the owner', async () => {
-      const auth = factory.auth();
-      const group = makeGroup({ createdById: newUuid() });
-      mocks.userGroup.getById.mockResolvedValue(group);
-
-      await expect(sut.update(auth, group.id, { name: 'New Name' })).rejects.toThrow(ForbiddenException);
-    });
-
-    it('should update the group name', async () => {
-      const auth = factory.auth();
-      const group = makeGroup({ createdById: auth.user.id });
-      const updated = { ...group, name: 'New Name' };
-      mocks.userGroup.getById.mockResolvedValue(group);
-      mocks.userGroup.update.mockResolvedValue(updated);
-      mocks.userGroup.getMembers.mockResolvedValue([]);
-
-      const result = await sut.update(auth, group.id, { name: 'New Name' });
-      expect(result.name).toBe('New Name');
-    });
-  });
-
-  describe('remove', () => {
-    it('should throw if not the owner', async () => {
-      const auth = factory.auth();
-      const group = makeGroup({ createdById: newUuid() });
-      mocks.userGroup.getById.mockResolvedValue(group);
-
-      await expect(sut.remove(auth, group.id)).rejects.toThrow(ForbiddenException);
-    });
-
-    it('should remove the group', async () => {
-      const auth = factory.auth();
-      const group = makeGroup({ createdById: auth.user.id });
-      mocks.userGroup.getById.mockResolvedValue(group);
-
-      await sut.remove(auth, group.id);
-      expect(mocks.userGroup.remove).toHaveBeenCalledWith(group.id);
-    });
-  });
-
-  describe('setMembers', () => {
-    it('should set members for a group', async () => {
-      const auth = factory.auth();
-      const group = makeGroup({ createdById: auth.user.id });
-      const userId = newUuid();
-      mocks.userGroup.getById.mockResolvedValue(group);
-      mocks.userGroup.getMembers.mockResolvedValue([makeMember({ groupId: group.id, userId })]);
-
-      const result = await sut.setMembers(auth, group.id, { userIds: [userId] });
-
-      expect(mocks.userGroup.setMembers).toHaveBeenCalledWith(group.id, [userId]);
-      expect(result).toHaveLength(1);
-    });
-  });
 });
 ```
 
-**Step 2: Run tests to verify they fail**
+**Step 3: Run test — verify RED**
 
 Run: `cd server && pnpm test -- --run src/services/user-group.service.spec.ts`
-Expected: FAIL — `UserGroupService` doesn't exist yet.
+Expected: FAIL — `sut.create is not a function` (service is empty stub).
 
-**Step 3: Commit**
+**Step 4: Commit the failing test**
 
 ```bash
-git add server/src/services/user-group.service.spec.ts
-git commit -m "test(server): add user group service tests"
+git add server/src/services/user-group.service.ts server/src/services/user-group.service.spec.ts server/src/services/index.ts
+git commit -m "test(server): RED — failing test for user group create"
 ```
 
 ---
 
-### Task 9: Service — implementation
+### Task 5: GREEN — implement `create`
 
 **Files:**
-- Create: `server/src/services/user-group.service.ts`
-- Modify: `server/src/services/index.ts`
+- Modify: `server/src/services/user-group.service.ts`
 
-**Step 1: Create service**
+**Step 1: Write minimal code to make create tests pass**
+
+Replace `server/src/services/user-group.service.ts`:
 
 ```typescript
-import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { AuthDto } from 'src/dtos/auth.dto';
 import {
   UserGroupCreateDto,
   UserGroupMemberResponseDto,
-  UserGroupMemberSetDto,
   UserGroupResponseDto,
-  UserGroupUpdateDto,
 } from 'src/dtos/user-group.dto';
 import { UserAvatarColor } from 'src/enum';
 import { BaseService } from 'src/services/base.service';
@@ -704,58 +598,6 @@ export class UserGroupService extends BaseService {
     });
 
     return this.mapGroup(group, []);
-  }
-
-  async getAll(auth: AuthDto): Promise<UserGroupResponseDto[]> {
-    const groups = await this.userGroupRepository.getAllByUserId(auth.user.id);
-
-    const results: UserGroupResponseDto[] = [];
-    for (const group of groups) {
-      const members = await this.userGroupRepository.getMembers(group.id);
-      results.push(this.mapGroup(group, members));
-    }
-    return results;
-  }
-
-  async get(auth: AuthDto, id: string): Promise<UserGroupResponseDto> {
-    const group = await this.requireOwnership(auth, id);
-    const members = await this.userGroupRepository.getMembers(id);
-    return this.mapGroup(group, members);
-  }
-
-  async update(auth: AuthDto, id: string, dto: UserGroupUpdateDto): Promise<UserGroupResponseDto> {
-    await this.requireOwnership(auth, id);
-
-    const group = await this.userGroupRepository.update(id, {
-      name: dto.name,
-      color: dto.color,
-    });
-
-    const members = await this.userGroupRepository.getMembers(id);
-    return this.mapGroup(group, members);
-  }
-
-  async remove(auth: AuthDto, id: string): Promise<void> {
-    await this.requireOwnership(auth, id);
-    await this.userGroupRepository.remove(id);
-  }
-
-  async setMembers(auth: AuthDto, id: string, dto: UserGroupMemberSetDto): Promise<UserGroupMemberResponseDto[]> {
-    await this.requireOwnership(auth, id);
-    await this.userGroupRepository.setMembers(id, dto.userIds);
-    const members = await this.userGroupRepository.getMembers(id);
-    return members.map((m) => this.mapMember(m));
-  }
-
-  private async requireOwnership(auth: AuthDto, groupId: string) {
-    const group = await this.userGroupRepository.getById(groupId);
-    if (!group) {
-      throw new BadRequestException('User group not found');
-    }
-    if (group.createdById !== auth.user.id) {
-      throw new ForbiddenException('Not the owner of this group');
-    }
-    return group;
   }
 
   private mapGroup(
@@ -790,59 +632,384 @@ export class UserGroupService extends BaseService {
 }
 ```
 
-**Step 2: Register service**
-
-In `server/src/services/index.ts`:
-- Add import: `import { UserGroupService } from 'src/services/user-group.service';`
-- Add to `services` array (after `UserAdminService`): `UserGroupService,`
-
-**Step 3: Add factory for test mocks**
-
-In `server/test/small.factory.ts`:
-- Add `UserGroup, UserGroupMember` to the imports from `src/database`
-- Add factory functions:
-
-```typescript
-const userGroupFactory = (data: Partial<UserGroup> = {}): UserGroup => ({
-  id: newUuid(),
-  name: 'Test Group',
-  color: null,
-  origin: 'manual',
-  createdById: newUuid(),
-  createdAt: newDate(),
-  updatedAt: newDate(),
-  ...data,
-});
-
-const userGroupMemberFactory = (data: Partial<UserGroupMember> = {}): UserGroupMember => ({
-  groupId: newUuid(),
-  userId: newUuid(),
-  addedAt: newDate(),
-  ...data,
-});
-```
-
-- Add to the `factory` export object:
-```typescript
-  userGroup: userGroupFactory,
-  userGroupMember: userGroupMemberFactory,
-```
-
-**Step 4: Run tests**
+**Step 2: Run test — verify GREEN**
 
 Run: `cd server && pnpm test -- --run src/services/user-group.service.spec.ts`
-Expected: PASS
+Expected: PASS — both create tests green.
 
-**Step 5: Commit**
+**Step 3: Commit**
 
 ```bash
-git add server/src/services/user-group.service.ts server/src/services/index.ts server/test/small.factory.ts
-git commit -m "feat(server): add user group service with tests"
+git add server/src/services/user-group.service.ts
+git commit -m "feat(server): GREEN — implement user group create"
 ```
 
 ---
 
-### Task 10: Controller
+### Task 6: RED — failing tests for `getAll` and `get`
+
+**Files:**
+- Modify: `server/src/services/user-group.service.spec.ts`
+
+**Step 1: Add tests for getAll and get**
+
+Append inside the `describe(UserGroupService.name)` block:
+
+```typescript
+  describe('getAll', () => {
+    it('should return groups with members for the current user', async () => {
+      const auth = factory.auth();
+      const group = makeGroup({ createdById: auth.user.id });
+      const member = makeMember({ groupId: group.id });
+
+      mocks.userGroup.getAllByUserId.mockResolvedValue([group]);
+      mocks.userGroup.getMembers.mockResolvedValue([member]);
+
+      const result = await sut.getAll(auth);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe(group.id);
+      expect(result[0].members).toHaveLength(1);
+      expect(result[0].members[0].userId).toBe(member.userId);
+      expect(mocks.userGroup.getAllByUserId).toHaveBeenCalledWith(auth.user.id);
+    });
+
+    it('should return empty array when user has no groups', async () => {
+      const auth = factory.auth();
+      mocks.userGroup.getAllByUserId.mockResolvedValue([]);
+
+      const result = await sut.getAll(auth);
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe('get', () => {
+    it('should return group with members when user is owner', async () => {
+      const auth = factory.auth();
+      const group = makeGroup({ createdById: auth.user.id });
+      mocks.userGroup.getById.mockResolvedValue(group);
+      mocks.userGroup.getMembers.mockResolvedValue([]);
+
+      const result = await sut.get(auth, group.id);
+      expect(result.id).toBe(group.id);
+    });
+
+    it('should throw BadRequestException when group not found', async () => {
+      const auth = factory.auth();
+      mocks.userGroup.getById.mockResolvedValue(undefined);
+
+      await expect(sut.get(auth, newUuid())).rejects.toThrow('User group not found');
+    });
+
+    it('should throw ForbiddenException when user is not the owner', async () => {
+      const auth = factory.auth();
+      const group = makeGroup({ createdById: newUuid() });
+      mocks.userGroup.getById.mockResolvedValue(group);
+
+      await expect(sut.get(auth, group.id)).rejects.toThrow('Not the owner of this group');
+    });
+  });
+```
+
+**Step 2: Run test — verify RED**
+
+Run: `cd server && pnpm test -- --run src/services/user-group.service.spec.ts`
+Expected: FAIL — `sut.getAll is not a function`, `sut.get is not a function`.
+
+**Step 3: Commit**
+
+```bash
+git add server/src/services/user-group.service.spec.ts
+git commit -m "test(server): RED — failing tests for getAll and get"
+```
+
+---
+
+### Task 7: GREEN — implement `getAll` and `get`
+
+**Files:**
+- Modify: `server/src/services/user-group.service.ts`
+
+**Step 1: Add getAll, get, and requireOwnership**
+
+Add these imports at the top:
+```typescript
+import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
+```
+
+Add methods to the service class (after `create`, before `mapGroup`):
+
+```typescript
+  async getAll(auth: AuthDto): Promise<UserGroupResponseDto[]> {
+    const groups = await this.userGroupRepository.getAllByUserId(auth.user.id);
+
+    const results: UserGroupResponseDto[] = [];
+    for (const group of groups) {
+      const members = await this.userGroupRepository.getMembers(group.id);
+      results.push(this.mapGroup(group, members));
+    }
+    return results;
+  }
+
+  async get(auth: AuthDto, id: string): Promise<UserGroupResponseDto> {
+    const group = await this.requireOwnership(auth, id);
+    const members = await this.userGroupRepository.getMembers(id);
+    return this.mapGroup(group, members);
+  }
+
+  private async requireOwnership(auth: AuthDto, groupId: string) {
+    const group = await this.userGroupRepository.getById(groupId);
+    if (!group) {
+      throw new BadRequestException('User group not found');
+    }
+    if (group.createdById !== auth.user.id) {
+      throw new ForbiddenException('Not the owner of this group');
+    }
+    return group;
+  }
+```
+
+**Step 2: Run test — verify GREEN**
+
+Run: `cd server && pnpm test -- --run src/services/user-group.service.spec.ts`
+Expected: ALL PASS.
+
+**Step 3: Commit**
+
+```bash
+git add server/src/services/user-group.service.ts
+git commit -m "feat(server): GREEN — implement getAll and get with ownership check"
+```
+
+---
+
+### Task 8: RED — failing tests for `update` and `remove`
+
+**Files:**
+- Modify: `server/src/services/user-group.service.spec.ts`
+
+**Step 1: Add tests**
+
+Append inside the `describe(UserGroupService.name)` block:
+
+```typescript
+  describe('update', () => {
+    it('should throw ForbiddenException when user is not the owner', async () => {
+      const auth = factory.auth();
+      const group = makeGroup({ createdById: newUuid() });
+      mocks.userGroup.getById.mockResolvedValue(group);
+
+      await expect(sut.update(auth, group.id, { name: 'New Name' })).rejects.toThrow('Not the owner of this group');
+    });
+
+    it('should update the group name', async () => {
+      const auth = factory.auth();
+      const group = makeGroup({ createdById: auth.user.id });
+      const updated = { ...group, name: 'New Name' };
+      mocks.userGroup.getById.mockResolvedValue(group);
+      mocks.userGroup.update.mockResolvedValue(updated);
+      mocks.userGroup.getMembers.mockResolvedValue([]);
+
+      const result = await sut.update(auth, group.id, { name: 'New Name' });
+
+      expect(result.name).toBe('New Name');
+      expect(mocks.userGroup.update).toHaveBeenCalledWith(group.id, { name: 'New Name', color: undefined });
+    });
+
+    it('should update the group color', async () => {
+      const auth = factory.auth();
+      const group = makeGroup({ createdById: auth.user.id });
+      const updated = { ...group, color: 'red' };
+      mocks.userGroup.getById.mockResolvedValue(group);
+      mocks.userGroup.update.mockResolvedValue(updated);
+      mocks.userGroup.getMembers.mockResolvedValue([]);
+
+      const result = await sut.update(auth, group.id, { color: UserAvatarColor.Red });
+
+      expect(result.color).toBe('red');
+    });
+  });
+
+  describe('remove', () => {
+    it('should throw ForbiddenException when user is not the owner', async () => {
+      const auth = factory.auth();
+      const group = makeGroup({ createdById: newUuid() });
+      mocks.userGroup.getById.mockResolvedValue(group);
+
+      await expect(sut.remove(auth, group.id)).rejects.toThrow('Not the owner of this group');
+    });
+
+    it('should remove the group', async () => {
+      const auth = factory.auth();
+      const group = makeGroup({ createdById: auth.user.id });
+      mocks.userGroup.getById.mockResolvedValue(group);
+
+      await sut.remove(auth, group.id);
+
+      expect(mocks.userGroup.remove).toHaveBeenCalledWith(group.id);
+    });
+  });
+```
+
+**Step 2: Run test — verify RED**
+
+Run: `cd server && pnpm test -- --run src/services/user-group.service.spec.ts`
+Expected: FAIL — `sut.update is not a function`, `sut.remove is not a function`.
+
+**Step 3: Commit**
+
+```bash
+git add server/src/services/user-group.service.spec.ts
+git commit -m "test(server): RED — failing tests for update and remove"
+```
+
+---
+
+### Task 9: GREEN — implement `update` and `remove`
+
+**Files:**
+- Modify: `server/src/services/user-group.service.ts`
+
+**Step 1: Add update and remove methods**
+
+Add import for `UserGroupUpdateDto` at the top. Add methods after `get`:
+
+```typescript
+  async update(auth: AuthDto, id: string, dto: UserGroupUpdateDto): Promise<UserGroupResponseDto> {
+    await this.requireOwnership(auth, id);
+
+    const group = await this.userGroupRepository.update(id, {
+      name: dto.name,
+      color: dto.color,
+    });
+
+    const members = await this.userGroupRepository.getMembers(id);
+    return this.mapGroup(group, members);
+  }
+
+  async remove(auth: AuthDto, id: string): Promise<void> {
+    await this.requireOwnership(auth, id);
+    await this.userGroupRepository.remove(id);
+  }
+```
+
+**Step 2: Run test — verify GREEN**
+
+Run: `cd server && pnpm test -- --run src/services/user-group.service.spec.ts`
+Expected: ALL PASS.
+
+**Step 3: Commit**
+
+```bash
+git add server/src/services/user-group.service.ts
+git commit -m "feat(server): GREEN — implement update and remove"
+```
+
+---
+
+### Task 10: RED — failing test for `setMembers`
+
+**Files:**
+- Modify: `server/src/services/user-group.service.spec.ts`
+
+**Step 1: Add test**
+
+```typescript
+  describe('setMembers', () => {
+    it('should throw ForbiddenException when user is not the owner', async () => {
+      const auth = factory.auth();
+      const group = makeGroup({ createdById: newUuid() });
+      mocks.userGroup.getById.mockResolvedValue(group);
+
+      await expect(sut.setMembers(auth, group.id, { userIds: [newUuid()] })).rejects.toThrow(
+        'Not the owner of this group',
+      );
+    });
+
+    it('should replace members and return updated list', async () => {
+      const auth = factory.auth();
+      const group = makeGroup({ createdById: auth.user.id });
+      const userId = newUuid();
+      const member = makeMember({ groupId: group.id, userId });
+
+      mocks.userGroup.getById.mockResolvedValue(group);
+      mocks.userGroup.setMembers.mockResolvedValue(undefined);
+      mocks.userGroup.getMembers.mockResolvedValue([member]);
+
+      const result = await sut.setMembers(auth, group.id, { userIds: [userId] });
+
+      expect(mocks.userGroup.setMembers).toHaveBeenCalledWith(group.id, [userId]);
+      expect(result).toHaveLength(1);
+      expect(result[0].userId).toBe(userId);
+    });
+
+    it('should allow setting empty member list', async () => {
+      const auth = factory.auth();
+      const group = makeGroup({ createdById: auth.user.id });
+
+      mocks.userGroup.getById.mockResolvedValue(group);
+      mocks.userGroup.setMembers.mockResolvedValue(undefined);
+      mocks.userGroup.getMembers.mockResolvedValue([]);
+
+      const result = await sut.setMembers(auth, group.id, { userIds: [] });
+
+      expect(mocks.userGroup.setMembers).toHaveBeenCalledWith(group.id, []);
+      expect(result).toEqual([]);
+    });
+  });
+```
+
+**Step 2: Run test — verify RED**
+
+Run: `cd server && pnpm test -- --run src/services/user-group.service.spec.ts`
+Expected: FAIL — `sut.setMembers is not a function`.
+
+**Step 3: Commit**
+
+```bash
+git add server/src/services/user-group.service.spec.ts
+git commit -m "test(server): RED — failing tests for setMembers"
+```
+
+---
+
+### Task 11: GREEN — implement `setMembers`
+
+**Files:**
+- Modify: `server/src/services/user-group.service.ts`
+
+**Step 1: Add setMembers method**
+
+Add import for `UserGroupMemberSetDto`. Add method after `remove`:
+
+```typescript
+  async setMembers(auth: AuthDto, id: string, dto: UserGroupMemberSetDto): Promise<UserGroupMemberResponseDto[]> {
+    await this.requireOwnership(auth, id);
+    await this.userGroupRepository.setMembers(id, dto.userIds);
+    const members = await this.userGroupRepository.getMembers(id);
+    return members.map((m) => this.mapMember(m));
+  }
+```
+
+**Step 2: Run test — verify GREEN**
+
+Run: `cd server && pnpm test -- --run src/services/user-group.service.spec.ts`
+Expected: ALL PASS (all 12 tests).
+
+**Step 3: REFACTOR — review the service**
+
+Review the service for duplication. The `requireOwnership` pattern is clean. The `mapGroup`/`mapMember` helpers avoid repetition. No refactoring needed.
+
+**Step 4: Commit**
+
+```bash
+git add server/src/services/user-group.service.ts
+git commit -m "feat(server): GREEN — implement setMembers, all service tests pass"
+```
+
+---
+
+### Task 12: Controller (infrastructure — delegates to tested service)
 
 **Files:**
 - Create: `server/src/controllers/user-group.controller.ts`
@@ -850,8 +1017,12 @@ git commit -m "feat(server): add user group service with tests"
 
 **Step 1: Create controller**
 
+The controller is a thin delegation layer — all business logic is tested via the service tests. Controllers follow a mechanical pattern that doesn't benefit from TDD.
+
+Create `server/src/controllers/user-group.controller.ts`:
+
 ```typescript
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Put, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Put } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Endpoint, HistoryBuilder } from 'src/decorators';
 import { AuthDto } from 'src/dtos/auth.dto';
@@ -955,7 +1126,12 @@ In `server/src/controllers/index.ts`:
 - Add import: `import { UserGroupController } from 'src/controllers/user-group.controller';`
 - Add to `controllers` array (after `UserAdminController`): `UserGroupController,`
 
-**Step 3: Commit**
+**Step 3: Run all server tests to verify nothing broke**
+
+Run: `cd server && pnpm test -- --run src/services/user-group.service.spec.ts`
+Expected: ALL PASS.
+
+**Step 4: Commit**
 
 ```bash
 git add server/src/controllers/user-group.controller.ts server/src/controllers/index.ts
@@ -964,18 +1140,18 @@ git commit -m "feat(server): add user group controller"
 
 ---
 
-### Task 11: Regenerate OpenAPI specs and SDK
+### Task 13: Regenerate OpenAPI specs and SDK
 
-**Step 1: Build server and regenerate**
+**Step 1: Build and regenerate**
 
 Run: `cd server && pnpm build`
 Then: `cd server && pnpm sync:open-api`
 Then: `make open-api-typescript`
 
-**Step 2: Verify the SDK has the new endpoints**
+**Step 2: Verify SDK has new endpoints**
 
-Run: `grep -r 'userGroup\|user-group' open-api/typescript-sdk/src/`
-Expected: Should find generated functions like `createGroup`, `getAllGroups`, etc.
+Run: `grep -r 'userGroup\|user-group\|UserGroup' open-api/typescript-sdk/src/ | head -20`
+Expected: Generated functions like `createGroup`, `getAllGroups`, `setMembers`, etc.
 
 **Step 3: Commit**
 
@@ -986,15 +1162,49 @@ git commit -m "chore: regenerate OpenAPI specs and SDK for user groups"
 
 ---
 
-### Task 12: Frontend — group settings component
+### Task 14: Frontend — i18n strings
 
 **Files:**
-- Create: `web/src/lib/components/user-settings-page/group-settings.svelte`
+- Modify: `web/src/lib/i18n/en.json`
+
+**Step 1: Add i18n keys**
+
+Find alphabetical position and add:
+
+```json
+"create_group": "Create group",
+"delete_group": "Delete group",
+"delete_group_description": "Delete group '{group}'? This won't affect any albums or spaces already shared with these users.",
+"edit_group": "Edit group",
+"group_member_count": "{count, plural, one {# member} other {# members}}",
+"groups_empty_state": "Create groups to quickly select multiple people when sharing.",
+"manage_user_groups": "Create and manage groups of users for quick sharing",
+"user_groups": "User groups"
+```
+
+Error keys (inside `errors` object):
+```json
+"unable_to_create_group": "Unable to create group",
+"unable_to_delete_group": "Unable to delete group",
+"unable_to_load_groups": "Unable to load groups",
+"unable_to_update_group": "Unable to update group"
+```
+
+**Step 2: Commit**
+
+```bash
+git add web/src/lib/i18n/
+git commit -m "feat(web): add i18n strings for user groups"
+```
+
+---
+
+### Task 15: Frontend — UserGroupModal component
+
+**Files:**
 - Create: `web/src/lib/modals/UserGroupModal.svelte`
 
-**Step 1: Create UserGroupModal**
-
-This modal is used for both creating and editing groups. It shows a name field, color picker, and a searchable user selection list.
+**Step 1: Create the modal**
 
 ```svelte
 <script lang="ts">
@@ -1168,7 +1378,22 @@ This modal is used for both creating and editing groups. It shows a name field, 
 </FormModal>
 ```
 
-**Step 2: Create group-settings.svelte**
+**Step 2: Commit**
+
+```bash
+git add web/src/lib/modals/UserGroupModal.svelte
+git commit -m "feat(web): add UserGroupModal for create/edit groups"
+```
+
+---
+
+### Task 16: Frontend — group settings component and registration
+
+**Files:**
+- Create: `web/src/lib/components/user-settings-page/group-settings.svelte`
+- Modify: `web/src/lib/components/user-settings-page/user-settings-list.svelte`
+
+**Step 1: Create group-settings.svelte**
 
 ```svelte
 <script lang="ts">
@@ -1330,11 +1555,11 @@ This modal is used for both creating and editing groups. It shows a name field, 
 </section>
 ```
 
-**Step 3: Register in user settings list**
+**Step 2: Register in user settings list**
 
 In `web/src/lib/components/user-settings-page/user-settings-list.svelte`:
 - Add import: `import GroupSettings from './group-settings.svelte';`
-- Add import for icon: `mdiAccountMultipleOutline` from `@mdi/js`
+- Add `mdiAccountMultipleOutline` to the `@mdi/js` import
 - Add accordion after the partner-sharing section (after line 143):
 
 ```svelte
@@ -1348,24 +1573,28 @@ In `web/src/lib/components/user-settings-page/user-settings-list.svelte`:
   </SettingAccordion>
 ```
 
-**Step 4: Commit**
+**Step 3: Commit**
 
 ```bash
-git add web/src/lib/modals/UserGroupModal.svelte web/src/lib/components/user-settings-page/group-settings.svelte web/src/lib/components/user-settings-page/user-settings-list.svelte
-git commit -m "feat(web): add user group settings UI with create/edit/delete"
+git add web/src/lib/components/user-settings-page/group-settings.svelte web/src/lib/components/user-settings-page/user-settings-list.svelte
+git commit -m "feat(web): add group settings UI with create/edit/delete"
 ```
 
 ---
 
-### Task 13: Frontend — group chips in sharing modals
+### Task 17: Frontend — group chips in sharing modals
 
 **Files:**
 - Modify: `web/src/lib/modals/AlbumAddUsersModal.svelte`
 - Modify: `web/src/lib/modals/SpaceAddMemberModal.svelte`
 
-**Step 1: Update AlbumAddUsersModal**
+The group chip logic is identical in both modals. The pattern:
+1. Fetch groups alongside users in `onMount` (parallel)
+2. Filter groups to only show those with at least one eligible member
+3. Render colored pills above the user list
+4. Clicking a pill toggles all eligible group members selected/deselected
 
-Replace the full content of `web/src/lib/modals/AlbumAddUsersModal.svelte` with:
+**Step 1: Replace AlbumAddUsersModal.svelte**
 
 ```svelte
 <script lang="ts">
@@ -1508,11 +1737,7 @@ Replace the full content of `web/src/lib/modals/AlbumAddUsersModal.svelte` with:
 </FormModal>
 ```
 
-**Step 2: Update SpaceAddMemberModal**
-
-Apply the same group chip pattern to `web/src/lib/modals/SpaceAddMemberModal.svelte`. The changes are identical in structure — add `getAllGroups` import, fetch groups in `onMount`, add group chip section above the user list. The submit logic stays the same (individual `addMember` calls per user).
-
-Replace the full content:
+**Step 2: Replace SpaceAddMemberModal.svelte**
 
 ```svelte
 <script lang="ts">
@@ -1671,94 +1896,41 @@ git commit -m "feat(web): add group quick-select chips to album and space sharin
 
 ---
 
-### Task 14: Add i18n strings
+### Task 18: Lint, type-check, and verify
 
-**Files:**
-- Modify: `web/src/lib/i18n/en.json` (or wherever the English locale file is)
-
-**Step 1: Find the i18n file and add keys**
-
-Search for the i18n file: `find web/src -name 'en.json' -path '*/i18n/*'`
-
-Add these keys (find alphabetical position for each):
-
-```json
-"create_group": "Create group",
-"delete_group": "Delete group",
-"delete_group_description": "Delete group '{group}'? This won't affect any albums or spaces already shared with these users.",
-"edit_group": "Edit group",
-"group_member_count": "{count, plural, one {# member} other {# members}}",
-"groups_empty_state": "Create groups to quickly select multiple people when sharing.",
-"manage_user_groups": "Create and manage groups of users for quick sharing",
-"user_groups": "User groups"
-```
-
-Also add error keys:
-```json
-"errors.unable_to_create_group": "Unable to create group",
-"errors.unable_to_delete_group": "Unable to delete group",
-"errors.unable_to_load_groups": "Unable to load groups",
-"errors.unable_to_update_group": "Unable to update group"
-```
-
-**Step 2: Commit**
-
-```bash
-git add web/src/lib/i18n/
-git commit -m "feat(web): add i18n strings for user groups"
-```
-
----
-
-### Task 15: Lint, type-check, and verify
-
-**Step 1: Run server checks**
+**Step 1: Run server tests**
 
 Run: `cd server && pnpm test -- --run src/services/user-group.service.spec.ts`
-Expected: PASS
+Expected: ALL 12 tests PASS.
 
-Run: `make check-server`
-Expected: No type errors
+**Step 2: Run server checks**
 
-Run: `make lint-server`
-Expected: Clean
-
-**Step 2: Run web checks**
-
-Run: `make check-web`
-Expected: No type errors
-
-Run: `make lint-web`
-Expected: Clean
+Run: `make check-server && make lint-server`
+Expected: Clean.
 
 **Step 3: Regenerate SQL queries**
 
 Run: `make sql`
 
-**Step 4: Fix any issues found, then commit**
+**Step 4: Run web checks**
 
-```bash
-git add -A
-git commit -m "chore: fix lint and type-check issues for user groups"
-```
+Run: `make check-web && make lint-web`
+Expected: Clean.
 
----
-
-### Task 16: Final integration commit
-
-**Step 1: Squash-verify everything builds**
+**Step 5: Build everything**
 
 Run: `make build-server && make build-sdk && make build-web`
 Expected: All three build successfully.
 
-**Step 2: Run full test suites**
+**Step 6: Run full test suites**
 
 Run: `cd server && pnpm test`
 Run: `cd web && pnpm test`
+Expected: All pass.
 
-**Step 3: Final commit if any fixes needed**
+**Step 7: Fix any issues and commit**
 
 ```bash
 git add -A
-git commit -m "feat: user groups for quick sharing (#X)"
+git commit -m "chore: fix lint and type-check issues for user groups"
 ```
