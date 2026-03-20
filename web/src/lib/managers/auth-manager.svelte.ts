@@ -15,6 +15,7 @@ import { isSharedLinkRoute } from '$lib/utils/navigation';
 
 class AuthManager {
   isPurchased = $state(false);
+  isDemo = $state(false);
   isSharedLink = $derived(isSharedLinkRoute(page.route?.id));
   params = $derived(this.isSharedLink ? { key: page.params.key, slug: page.params.slug } : {});
 

@@ -11,6 +11,7 @@ import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/pages/search/paginated_search.provider.dart';
 import 'package:immich_mobile/providers/haptic_feedback.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
+import 'package:immich_mobile/providers/shared_space.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/memory.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/readonly_mode.provider.dart';
 import 'package:immich_mobile/providers/search/search_input_focus.provider.dart';
@@ -44,9 +45,9 @@ class _TabShellPageState extends ConsumerState<TabShellPage> {
         enabled: !isReadonlyModeEnabled,
       ),
       NavigationDestination(
-        label: context.t.albums,
-        icon: const Icon(Icons.photo_album_outlined),
-        selectedIcon: Icon(Icons.photo_album_rounded, color: context.primaryColor),
+        label: 'Spaces',
+        icon: const Icon(Icons.workspaces_outlined),
+        selectedIcon: Icon(Icons.workspaces, color: context.primaryColor),
         enabled: !isReadonlyModeEnabled,
       ),
       NavigationDestination(
@@ -77,7 +78,7 @@ class _TabShellPageState extends ConsumerState<TabShellPage> {
     }
 
     return AutoTabsRouter(
-      routes: const [MainTimelineRoute(), SearchRoute(), AlbumsRoute(), LibraryRoute()],
+      routes: const [MainTimelineRoute(), SearchRoute(), SpacesRoute(), LibraryRoute()],
       duration: const Duration(milliseconds: 600),
       transitionBuilder: (context, child, animation) => FadeTransition(opacity: animation, child: child),
       builder: (context, child) {
@@ -123,9 +124,9 @@ void _onNavigationSelected(TabsRouter router, int index, WidgetRef ref) {
     ref.read(searchInputFocusProvider).requestFocus();
   }
 
-  // Album page
-  if (index == kAlbumTabIndex) {
-    unawaited(ref.read(remoteAlbumProvider.notifier).refresh());
+  // Spaces page
+  if (index == kSpacesTabIndex) {
+    ref.invalidate(sharedSpacesProvider);
   }
 
   // Library page
