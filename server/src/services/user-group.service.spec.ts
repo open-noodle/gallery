@@ -126,4 +126,59 @@ describe(UserGroupService.name, () => {
       await expect(sut.get(auth, group.id)).rejects.toThrow('Not the owner of this group');
     });
   });
+
+  describe('update', () => {
+    it('should throw ForbiddenException when user is not the owner', async () => {
+      const auth = factory.auth();
+      const group = makeGroup({ createdById: newUuid() });
+      mocks.userGroup.getById.mockResolvedValue(group);
+
+      await expect(sut.update(auth, group.id, { name: 'New Name' })).rejects.toThrow('Not the owner of this group');
+    });
+
+    it('should update the group name', async () => {
+      const auth = factory.auth();
+      const group = makeGroup({ createdById: auth.user.id });
+      const updated = { ...group, name: 'New Name' };
+      mocks.userGroup.getById.mockResolvedValue(group);
+      mocks.userGroup.update.mockResolvedValue(updated);
+      mocks.userGroup.getMembers.mockResolvedValue([]);
+
+      const result = await sut.update(auth, group.id, { name: 'New Name' });
+
+      expect(result.name).toBe('New Name');
+      expect(mocks.userGroup.update).toHaveBeenCalledWith(group.id, { name: 'New Name', color: undefined });
+    });
+
+    it('should update the group color', async () => {
+      const auth = factory.auth();
+      const group = makeGroup({ createdById: auth.user.id });
+      const updated = { ...group, color: 'red' };
+      mocks.userGroup.getById.mockResolvedValue(group);
+      mocks.userGroup.update.mockResolvedValue(updated);
+      mocks.userGroup.getMembers.mockResolvedValue([]);
+
+      const result = await sut.update(auth, group.id, { color: UserAvatarColor.Red });
+      expect(result.color).toBe('red');
+    });
+  });
+
+  describe('remove', () => {
+    it('should throw ForbiddenException when user is not the owner', async () => {
+      const auth = factory.auth();
+      const group = makeGroup({ createdById: newUuid() });
+      mocks.userGroup.getById.mockResolvedValue(group);
+
+      await expect(sut.remove(auth, group.id)).rejects.toThrow('Not the owner of this group');
+    });
+
+    it('should remove the group', async () => {
+      const auth = factory.auth();
+      const group = makeGroup({ createdById: auth.user.id });
+      mocks.userGroup.getById.mockResolvedValue(group);
+
+      await sut.remove(auth, group.id);
+      expect(mocks.userGroup.remove).toHaveBeenCalledWith(group.id);
+    });
+  });
 });
