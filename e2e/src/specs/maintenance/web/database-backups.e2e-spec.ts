@@ -28,6 +28,7 @@ test.describe('Database Backups', () => {
 
     await page.goto('/admin/maintenance?isOpen=backups');
     await page.getByRole('button', { name: 'Restore', exact: true }).click();
+    await page.getByRole('dialog').waitFor({ state: 'visible' });
     await page.getByRole('dialog').getByRole('button', { name: 'Restore' }).click();
 
     await page.waitForURL('/maintenance?**');
@@ -43,6 +44,7 @@ test.describe('Database Backups', () => {
 
     await page.goto('/admin/maintenance?isOpen=backups');
     await page.getByRole('button', { name: 'Restore', exact: true }).click();
+    await page.getByRole('dialog').waitFor({ state: 'visible' });
     await page.getByRole('dialog').getByRole('button', { name: 'Restore' }).click();
 
     await page.waitForURL('/maintenance?**');
@@ -60,6 +62,7 @@ test.describe('Database Backups', () => {
 
     await page.goto('/admin/maintenance?isOpen=backups');
     await page.getByRole('button', { name: 'Restore', exact: true }).click();
+    await page.getByRole('dialog').waitFor({ state: 'visible' });
     await page.getByRole('dialog').getByRole('button', { name: 'Restore' }).click();
 
     await page.waitForURL('/maintenance?**');
@@ -97,6 +100,7 @@ test.describe('Database Backups', () => {
 
     await page.getByRole('button', { name: 'Next' }).click();
     await page.getByRole('button', { name: 'Restore', exact: true }).click();
+    await page.getByRole('dialog').waitFor({ state: 'visible' });
     await page.getByRole('dialog').getByRole('button', { name: 'Restore' }).click();
 
     await page.waitForURL('/maintenance?**');
