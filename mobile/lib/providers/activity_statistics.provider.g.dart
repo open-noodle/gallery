@@ -6,7 +6,8 @@ part of 'activity_statistics.provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$activityStatisticsHash() => r'1f43f0bcb11c754ca3cb586a13570db25023b9a8';
+String _$activityStatisticsHash() =>
+    r'1f43f0bcb11c754ca3cb586a13570db25023b9a8';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -59,7 +60,9 @@ class ActivityStatisticsFamily extends Family<int> {
   }
 
   @override
-  ActivityStatisticsProvider getProviderOverride(covariant ActivityStatisticsProvider provider) {
+  ActivityStatisticsProvider getProviderOverride(
+    covariant ActivityStatisticsProvider provider,
+  ) {
     return call(provider.albumId, provider.assetId);
   }
 
@@ -71,7 +74,8 @@ class ActivityStatisticsFamily extends Family<int> {
   static const Iterable<ProviderOrFamily>? _allTransitiveDependencies = null;
 
   @override
-  Iterable<ProviderOrFamily>? get allTransitiveDependencies => _allTransitiveDependencies;
+  Iterable<ProviderOrFamily>? get allTransitiveDependencies =>
+      _allTransitiveDependencies;
 
   @override
   String? get name => r'activityStatisticsProvider';
@@ -80,7 +84,8 @@ class ActivityStatisticsFamily extends Family<int> {
 /// Maintains the current number of comments by <shared-album, asset>
 ///
 /// Copied from [ActivityStatistics].
-class ActivityStatisticsProvider extends AutoDisposeNotifierProviderImpl<ActivityStatistics, int> {
+class ActivityStatisticsProvider
+    extends AutoDisposeNotifierProviderImpl<ActivityStatistics, int> {
   /// Maintains the current number of comments by <shared-album, asset>
   ///
   /// Copied from [ActivityStatistics].
@@ -91,9 +96,12 @@ class ActivityStatisticsProvider extends AutoDisposeNotifierProviderImpl<Activit
           ..assetId = assetId,
         from: activityStatisticsProvider,
         name: r'activityStatisticsProvider',
-        debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product') ? null : _$activityStatisticsHash,
+        debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+            ? null
+            : _$activityStatisticsHash,
         dependencies: ActivityStatisticsFamily._dependencies,
-        allTransitiveDependencies: ActivityStatisticsFamily._allTransitiveDependencies,
+        allTransitiveDependencies:
+            ActivityStatisticsFamily._allTransitiveDependencies,
         albumId: albumId,
         assetId: assetId,
       );
@@ -143,7 +151,9 @@ class ActivityStatisticsProvider extends AutoDisposeNotifierProviderImpl<Activit
 
   @override
   bool operator ==(Object other) {
-    return other is ActivityStatisticsProvider && other.albumId == albumId && other.assetId == assetId;
+    return other is ActivityStatisticsProvider &&
+        other.albumId == albumId &&
+        other.assetId == assetId;
   }
 
   @override
@@ -166,7 +176,8 @@ mixin ActivityStatisticsRef on AutoDisposeNotifierProviderRef<int> {
   String? get assetId;
 }
 
-class _ActivityStatisticsProviderElement extends AutoDisposeNotifierProviderElement<ActivityStatistics, int>
+class _ActivityStatisticsProviderElement
+    extends AutoDisposeNotifierProviderElement<ActivityStatistics, int>
     with ActivityStatisticsRef {
   _ActivityStatisticsProviderElement(super.provider);
 

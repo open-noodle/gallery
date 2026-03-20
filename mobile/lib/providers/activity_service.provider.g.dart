@@ -13,7 +13,9 @@ String _$activityServiceHash() => r'3ce0eb33948138057cc63f07a7598047b99e7599';
 final activityServiceProvider = AutoDisposeProvider<ActivityService>.internal(
   activityService,
   name: r'activityServiceProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product') ? null : _$activityServiceHash,
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$activityServiceHash,
   dependencies: null,
   allTransitiveDependencies: null,
 );

@@ -6,17 +6,21 @@ part of 'paginated_search.provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$paginatedSearchRenderListHash() => r'22d715ff7864e5a946be38322ce7813616f899c2';
+String _$paginatedSearchRenderListHash() =>
+    r'22d715ff7864e5a946be38322ce7813616f899c2';
 
 /// See also [paginatedSearchRenderList].
 @ProviderFor(paginatedSearchRenderList)
-final paginatedSearchRenderListProvider = AutoDisposeFutureProvider<RenderList>.internal(
-  paginatedSearchRenderList,
-  name: r'paginatedSearchRenderListProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product') ? null : _$paginatedSearchRenderListHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
+final paginatedSearchRenderListProvider =
+    AutoDisposeFutureProvider<RenderList>.internal(
+      paginatedSearchRenderList,
+      name: r'paginatedSearchRenderListProvider',
+      debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+          ? null
+          : _$paginatedSearchRenderListHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
 
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element

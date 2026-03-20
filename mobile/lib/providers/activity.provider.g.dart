@@ -29,7 +29,8 @@ class _SystemHash {
   }
 }
 
-abstract class _$AlbumActivity extends BuildlessAutoDisposeAsyncNotifier<List<Activity>> {
+abstract class _$AlbumActivity
+    extends BuildlessAutoDisposeAsyncNotifier<List<Activity>> {
   late final String albumId;
   late final String? assetId;
 
@@ -59,7 +60,9 @@ class AlbumActivityFamily extends Family<AsyncValue<List<Activity>>> {
   }
 
   @override
-  AlbumActivityProvider getProviderOverride(covariant AlbumActivityProvider provider) {
+  AlbumActivityProvider getProviderOverride(
+    covariant AlbumActivityProvider provider,
+  ) {
     return call(provider.albumId, provider.assetId);
   }
 
@@ -71,7 +74,8 @@ class AlbumActivityFamily extends Family<AsyncValue<List<Activity>>> {
   static const Iterable<ProviderOrFamily>? _allTransitiveDependencies = null;
 
   @override
-  Iterable<ProviderOrFamily>? get allTransitiveDependencies => _allTransitiveDependencies;
+  Iterable<ProviderOrFamily>? get allTransitiveDependencies =>
+      _allTransitiveDependencies;
 
   @override
   String? get name => r'albumActivityProvider';
@@ -80,7 +84,9 @@ class AlbumActivityFamily extends Family<AsyncValue<List<Activity>>> {
 /// Maintains the current list of all activities for <share-album-id, asset>
 ///
 /// Copied from [AlbumActivity].
-class AlbumActivityProvider extends AutoDisposeAsyncNotifierProviderImpl<AlbumActivity, List<Activity>> {
+class AlbumActivityProvider
+    extends
+        AutoDisposeAsyncNotifierProviderImpl<AlbumActivity, List<Activity>> {
   /// Maintains the current list of all activities for <share-album-id, asset>
   ///
   /// Copied from [AlbumActivity].
@@ -91,9 +97,12 @@ class AlbumActivityProvider extends AutoDisposeAsyncNotifierProviderImpl<AlbumAc
           ..assetId = assetId,
         from: albumActivityProvider,
         name: r'albumActivityProvider',
-        debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product') ? null : _$albumActivityHash,
+        debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+            ? null
+            : _$albumActivityHash,
         dependencies: AlbumActivityFamily._dependencies,
-        allTransitiveDependencies: AlbumActivityFamily._allTransitiveDependencies,
+        allTransitiveDependencies:
+            AlbumActivityFamily._allTransitiveDependencies,
         albumId: albumId,
         assetId: assetId,
       );
@@ -137,13 +146,16 @@ class AlbumActivityProvider extends AutoDisposeAsyncNotifierProviderImpl<AlbumAc
   }
 
   @override
-  AutoDisposeAsyncNotifierProviderElement<AlbumActivity, List<Activity>> createElement() {
+  AutoDisposeAsyncNotifierProviderElement<AlbumActivity, List<Activity>>
+  createElement() {
     return _AlbumActivityProviderElement(this);
   }
 
   @override
   bool operator ==(Object other) {
-    return other is AlbumActivityProvider && other.albumId == albumId && other.assetId == assetId;
+    return other is AlbumActivityProvider &&
+        other.albumId == albumId &&
+        other.assetId == assetId;
   }
 
   @override
@@ -166,7 +178,9 @@ mixin AlbumActivityRef on AutoDisposeAsyncNotifierProviderRef<List<Activity>> {
   String? get assetId;
 }
 
-class _AlbumActivityProviderElement extends AutoDisposeAsyncNotifierProviderElement<AlbumActivity, List<Activity>>
+class _AlbumActivityProviderElement
+    extends
+        AutoDisposeAsyncNotifierProviderElement<AlbumActivity, List<Activity>>
     with AlbumActivityRef {
   _AlbumActivityProviderElement(super.provider);
 
