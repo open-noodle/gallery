@@ -174,6 +174,7 @@ describe(ServerService.name, () => {
         mapLightStyleUrl: 'https://tiles.immich.cloud/v1/style/light.json',
         maintenanceMode: false,
         minFaces: 3,
+        demoMode: false,
       });
       expect(mocks.systemMetadata.get).toHaveBeenCalled();
     });
