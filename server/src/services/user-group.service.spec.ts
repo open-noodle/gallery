@@ -72,4 +72,58 @@ describe(UserGroupService.name, () => {
       });
     });
   });
+
+  describe('getAll', () => {
+    it('should return groups with members for the current user', async () => {
+      const auth = factory.auth();
+      const group = makeGroup({ createdById: auth.user.id });
+      const member = makeMember({ groupId: group.id });
+
+      mocks.userGroup.getAllByUserId.mockResolvedValue([group]);
+      mocks.userGroup.getMembers.mockResolvedValue([member]);
+
+      const result = await sut.getAll(auth);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe(group.id);
+      expect(result[0].members).toHaveLength(1);
+      expect(result[0].members[0].userId).toBe(member.userId);
+      expect(mocks.userGroup.getAllByUserId).toHaveBeenCalledWith(auth.user.id);
+    });
+
+    it('should return empty array when user has no groups', async () => {
+      const auth = factory.auth();
+      mocks.userGroup.getAllByUserId.mockResolvedValue([]);
+
+      const result = await sut.getAll(auth);
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe('get', () => {
+    it('should return group with members when user is owner', async () => {
+      const auth = factory.auth();
+      const group = makeGroup({ createdById: auth.user.id });
+      mocks.userGroup.getById.mockResolvedValue(group);
+      mocks.userGroup.getMembers.mockResolvedValue([]);
+
+      const result = await sut.get(auth, group.id);
+      expect(result.id).toBe(group.id);
+    });
+
+    it('should throw BadRequestException when group not found', async () => {
+      const auth = factory.auth();
+      mocks.userGroup.getById.mockResolvedValue(undefined);
+
+      await expect(sut.get(auth, newUuid())).rejects.toThrow('User group not found');
+    });
+
+    it('should throw ForbiddenException when user is not the owner', async () => {
+      const auth = factory.auth();
+      const group = makeGroup({ createdById: newUuid() });
+      mocks.userGroup.getById.mockResolvedValue(group);
+
+      await expect(sut.get(auth, group.id)).rejects.toThrow('Not the owner of this group');
+    });
+  });
 });
