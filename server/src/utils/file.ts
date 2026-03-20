@@ -1,7 +1,7 @@
 import { HttpException, NotFoundException, StreamableFile } from '@nestjs/common';
 import { NextFunction, Response } from 'express';
 import { access, constants } from 'node:fs/promises';
-import { basename, extname } from 'node:path';
+import { basename, extname, resolve } from 'node:path';
 import { Readable } from 'node:stream';
 import { promisify } from 'node:util';
 import { CacheControl } from 'src/enum';
@@ -119,7 +119,11 @@ export const sendFile = async (
     }
 
     // ImmichFileResponse — existing behavior
-    await access(file.path, constants.R_OK);
+    const resolvedPath = resolve(file.path);
+    if (resolvedPath !== file.path) {
+      throw new HttpException('Invalid file path', 400);
+    }
+    await access(resolvedPath, constants.R_OK);
 
     const cacheControlHeader = cacheControlHeaders[file.cacheControl];
     if (cacheControlHeader) {
@@ -131,7 +135,7 @@ export const sendFile = async (
       res.header('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(file.fileName)}`);
     }
 
-    return await _sendFile(file.path, { dotfiles: 'allow' });
+    return await _sendFile(resolvedPath, { root: '/', dotfiles: 'allow' });
   } catch (error: Error | any) {
     // ignore client-closed connection
     if (isConnectionAborted(error) || res.headersSent) {
