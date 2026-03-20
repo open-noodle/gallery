@@ -117,6 +117,7 @@ const ServerConfigSchema = z
     mapDarkStyleUrl: z.string().describe('Map dark style URL'),
     mapLightStyleUrl: z.string().describe('Map light style URL'),
     maintenanceMode: z.boolean().describe('Whether maintenance mode is active'),
+    demoMode: z.boolean().describe('Whether demo mode is active'),
   })
   .meta({ id: 'ServerConfigDto' });
 
