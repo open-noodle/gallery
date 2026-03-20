@@ -3,6 +3,8 @@
 </script>
 
 <script lang="ts">
+  import { useActions, type ActionArray } from '#lib/actions/use-actions.ts';
+  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import NavigationBar from '#lib/components/shared-components/navigation-bar/NavigationBar.svelte';
   import UserSidebar from '#lib/components/shared-components/side-bar/UserSidebar.svelte';
   import type { HeaderButtonActionItem } from '#lib/types.ts';
@@ -16,6 +18,7 @@
     title?: string | undefined;
     description?: string | undefined;
     scrollbar?: boolean;
+    use?: ActionArray;
     actions?: Array<HeaderButtonActionItem | MenuItemType>;
     leading?: Snippet;
     sidebar?: Snippet;
@@ -28,12 +31,12 @@
     title = undefined,
     description = undefined,
     scrollbar = true,
+    use = [],
     actions = [],
     leading,
     sidebar,
     buttons,
     children,
-    ...rest
   }: Props = $props();
 
   const enabledActions = $derived(
@@ -48,7 +51,7 @@
 
 <header>
   {#if !hideNavbar}
-    <NavigationBar onUploadClick={() => openFileUploadDialog()} />
+    <NavigationBar onUploadClick={authManager.isDemo ? undefined : () => openFileUploadDialog()} />
   {/if}
 </header>
 <div
@@ -65,7 +68,7 @@
   {/if}
 
   <main class="relative">
-    <div class="{scrollbarClass} absolute {hasTitleClass} w-full overflow-y-auto p-2" {...rest}>
+    <div class="{scrollbarClass} absolute {hasTitleClass} w-full overflow-y-auto p-2" use:useActions={use}>
       {@render children?.()}
     </div>
 
