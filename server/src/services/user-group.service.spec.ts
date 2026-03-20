@@ -182,4 +182,47 @@ describe(UserGroupService.name, () => {
       expect(mocks.userGroup.remove).toHaveBeenCalledWith(group.id);
     });
   });
+
+  describe('setMembers', () => {
+    it('should throw ForbiddenException when user is not the owner', async () => {
+      const auth = factory.auth();
+      const group = makeGroup({ createdById: newUuid() });
+      mocks.userGroup.getById.mockResolvedValue(group);
+
+      await expect(sut.setMembers(auth, group.id, { userIds: [newUuid()] })).rejects.toThrow(
+        'Not the owner of this group',
+      );
+    });
+
+    it('should replace members and return updated list', async () => {
+      const auth = factory.auth();
+      const group = makeGroup({ createdById: auth.user.id });
+      const userId = newUuid();
+      const member = makeMember({ groupId: group.id, userId });
+
+      mocks.userGroup.getById.mockResolvedValue(group);
+      mocks.userGroup.setMembers.mockResolvedValue(undefined);
+      mocks.userGroup.getMembers.mockResolvedValue([member]);
+
+      const result = await sut.setMembers(auth, group.id, { userIds: [userId] });
+
+      expect(mocks.userGroup.setMembers).toHaveBeenCalledWith(group.id, [userId]);
+      expect(result).toHaveLength(1);
+      expect(result[0].userId).toBe(userId);
+    });
+
+    it('should allow setting empty member list', async () => {
+      const auth = factory.auth();
+      const group = makeGroup({ createdById: auth.user.id });
+
+      mocks.userGroup.getById.mockResolvedValue(group);
+      mocks.userGroup.setMembers.mockResolvedValue(undefined);
+      mocks.userGroup.getMembers.mockResolvedValue([]);
+
+      const result = await sut.setMembers(auth, group.id, { userIds: [] });
+
+      expect(mocks.userGroup.setMembers).toHaveBeenCalledWith(group.id, []);
+      expect(result).toEqual([]);
+    });
+  });
 });
