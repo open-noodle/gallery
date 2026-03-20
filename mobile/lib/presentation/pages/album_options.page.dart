@@ -52,7 +52,7 @@ class AlbumOptionsPage extends HookConsumerWidget {
           return;
         }
 
-        unawaited(context.navigateTo(const AlbumsRoute()));
+        unawaited(context.navigateTo(const LibraryRoute()));
       } catch (_) {
         showErrorMessage();
       }
