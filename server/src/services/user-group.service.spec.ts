@@ -176,6 +176,7 @@ describe(UserGroupService.name, () => {
       const auth = factory.auth();
       const group = makeGroup({ createdById: auth.user.id });
       mocks.userGroup.getById.mockResolvedValue(group);
+      mocks.userGroup.remove.mockResolvedValue(undefined);
 
       await sut.remove(auth, group.id);
       expect(mocks.userGroup.remove).toHaveBeenCalledWith(group.id);

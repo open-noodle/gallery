@@ -4,6 +4,7 @@ import {
   UserGroupCreateDto,
   UserGroupMemberResponseDto,
   UserGroupResponseDto,
+  UserGroupUpdateDto,
 } from 'src/dtos/user-group.dto';
 import { UserAvatarColor } from 'src/enum';
 import { BaseService } from 'src/services/base.service';
@@ -35,6 +36,23 @@ export class UserGroupService extends BaseService {
     const group = await this.requireOwnership(auth, id);
     const members = await this.userGroupRepository.getMembers(id);
     return this.mapGroup(group, members);
+  }
+
+  async update(auth: AuthDto, id: string, dto: UserGroupUpdateDto): Promise<UserGroupResponseDto> {
+    await this.requireOwnership(auth, id);
+
+    const group = await this.userGroupRepository.update(id, {
+      name: dto.name,
+      color: dto.color,
+    });
+
+    const members = await this.userGroupRepository.getMembers(id);
+    return this.mapGroup(group, members);
+  }
+
+  async remove(auth: AuthDto, id: string): Promise<void> {
+    await this.requireOwnership(auth, id);
+    await this.userGroupRepository.remove(id);
   }
 
   private async requireOwnership(auth: AuthDto, groupId: string) {
