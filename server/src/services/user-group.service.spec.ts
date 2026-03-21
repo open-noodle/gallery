@@ -11,6 +11,8 @@ const makeGroup = (overrides: Record<string, unknown> = {}) => ({
   createdById: newUuid(),
   createdAt: newDate(),
   updatedAt: newDate(),
+  createId: newUuid(),
+  updateId: newUuid(),
   ...overrides,
 });
 
