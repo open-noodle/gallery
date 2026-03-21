@@ -10,12 +10,16 @@ export async function up(db: Kysely<any>): Promise<void> {
       "createdById" uuid NOT NULL,
       "createdAt" timestamp with time zone NOT NULL DEFAULT now(),
       "updatedAt" timestamp with time zone NOT NULL DEFAULT now(),
+      "createId" uuid NOT NULL DEFAULT immich_uuid_v7(),
+      "updateId" uuid NOT NULL DEFAULT immich_uuid_v7(),
       CONSTRAINT "user_group_pkey" PRIMARY KEY ("id"),
       CONSTRAINT "user_group_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "user" ("id") ON DELETE CASCADE
     );
   `.execute(db);
 
   await sql`CREATE INDEX "user_group_createdById_idx" ON "user_group" ("createdById")`.execute(db);
+  await sql`CREATE INDEX "user_group_createId_idx" ON "user_group" ("createId")`.execute(db);
+  await sql`CREATE INDEX "user_group_updateId_idx" ON "user_group" ("updateId")`.execute(db);
 
   await sql`
     CREATE OR REPLACE TRIGGER "user_group_updatedAt"

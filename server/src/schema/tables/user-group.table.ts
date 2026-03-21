@@ -8,7 +8,7 @@ import {
   Timestamp,
   UpdateDateColumn,
 } from '@immich/sql-tools';
-import { UpdatedAtTrigger } from 'src/decorators';
+import { CreateIdColumn, UpdatedAtTrigger, UpdateIdColumn } from 'src/decorators';
 import { UserTable } from 'src/schema/tables/user.table';
 
 @Table('user_group')
@@ -34,4 +34,10 @@ export class UserGroupTable {
 
   @UpdateDateColumn()
   updatedAt!: Generated<Timestamp>;
+
+  @CreateIdColumn({ index: true })
+  createId!: Generated<string>;
+
+  @UpdateIdColumn({ index: true })
+  updateId!: Generated<string>;
 }
