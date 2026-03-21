@@ -203,6 +203,7 @@ export const utils = {
       'system_metadata',
       'tag',
       'integrity_report',
+      'user_group',
     ];
 
     const truncateTables = tables.filter((table) => table !== 'system_metadata');
