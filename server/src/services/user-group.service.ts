@@ -76,7 +76,13 @@ export class UserGroupService extends BaseService {
 
   private mapGroup(
     group: { id: string; name: string; color: string | null; origin: string; createdAt: unknown },
-    members: Array<{ userId: string; name: string; email: string; profileImagePath: string; avatarColor: string | null }>,
+    members: Array<{
+      userId: string;
+      name: string;
+      email: string;
+      profileImagePath: string;
+      avatarColor: string | null;
+    }>,
   ): UserGroupResponseDto {
     return {
       id: group.id,

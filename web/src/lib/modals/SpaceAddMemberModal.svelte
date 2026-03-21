@@ -1,6 +1,13 @@
 <script lang="ts">
   import UserAvatar from '$lib/components/shared-components/user-avatar.svelte';
-  import { addMember, getAllGroups, searchUsers, type SharedSpaceMemberResponseDto, type UserGroupResponseDto, type UserResponseDto } from '@immich/sdk';
+  import {
+    addMember,
+    getAllGroups,
+    searchUsers,
+    type SharedSpaceMemberResponseDto,
+    type UserGroupResponseDto,
+    type UserResponseDto,
+  } from '@immich/sdk';
   import { FormModal, ListButton, Stack, Text } from '@immich/ui';
   import { mdiAccountPlus } from '@mdi/js';
   import { onMount } from 'svelte';
@@ -111,7 +118,7 @@
             type="button"
             class="rounded-full px-3 py-1 text-xs font-medium transition-all border {activeGroupIds.has(group.id)
               ? group.color
-                ? colorClasses[group.color] ?? 'bg-gray-700 text-white'
+                ? (colorClasses[group.color] ?? 'bg-gray-700 text-white')
                 : 'bg-gray-700 text-white dark:bg-gray-200 dark:text-gray-800'
               : 'bg-transparent text-gray-600 dark:text-gray-400 border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800'}"
             onclick={() => handleGroupToggle(group)}

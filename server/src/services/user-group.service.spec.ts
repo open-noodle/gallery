@@ -113,7 +113,7 @@ describe(UserGroupService.name, () => {
 
     it('should throw BadRequestException when group not found', async () => {
       const auth = factory.auth();
-      mocks.userGroup.getById.mockResolvedValue(undefined);
+      mocks.userGroup.getById.mockResolvedValue();
 
       await expect(sut.get(auth, newUuid())).rejects.toThrow('User group not found');
     });
@@ -176,7 +176,7 @@ describe(UserGroupService.name, () => {
       const auth = factory.auth();
       const group = makeGroup({ createdById: auth.user.id });
       mocks.userGroup.getById.mockResolvedValue(group);
-      mocks.userGroup.remove.mockResolvedValue(undefined);
+      mocks.userGroup.remove.mockResolvedValue();
 
       await sut.remove(auth, group.id);
       expect(mocks.userGroup.remove).toHaveBeenCalledWith(group.id);
@@ -201,7 +201,7 @@ describe(UserGroupService.name, () => {
       const member = makeMember({ groupId: group.id, userId });
 
       mocks.userGroup.getById.mockResolvedValue(group);
-      mocks.userGroup.setMembers.mockResolvedValue(undefined);
+      mocks.userGroup.setMembers.mockResolvedValue();
       mocks.userGroup.getMembers.mockResolvedValue([member]);
 
       const result = await sut.setMembers(auth, group.id, { userIds: [userId] });
@@ -216,7 +216,7 @@ describe(UserGroupService.name, () => {
       const group = makeGroup({ createdById: auth.user.id });
 
       mocks.userGroup.getById.mockResolvedValue(group);
-      mocks.userGroup.setMembers.mockResolvedValue(undefined);
+      mocks.userGroup.setMembers.mockResolvedValue();
       mocks.userGroup.getMembers.mockResolvedValue([]);
 
       const result = await sut.setMembers(auth, group.id, { userIds: [] });

@@ -8,6 +8,7 @@
     removeGroup,
     setMembers,
     updateGroup,
+    UserAvatarColor,
     type UserGroupResponseDto,
     type UserResponseDto,
   } from '@immich/sdk';
@@ -51,10 +52,14 @@
 
   const handleCreate = async () => {
     const result = await modalManager.show(UserGroupModal, { currentUserId: user.id });
-    if (!result) return;
+    if (!result) {
+      return;
+    }
 
     try {
-      const group = await createGroup({ userGroupCreateDto: { name: result.name, color: result.color } });
+      const group = await createGroup({
+        userGroupCreateDto: { name: result.name, color: result.color ?? undefined },
+      });
       if (result.userIds.length > 0) {
         await setMembers({ id: group.id, userGroupMemberSetDto: { userIds: result.userIds } });
       }
@@ -66,7 +71,9 @@
 
   const handleEdit = async (group: UserGroupResponseDto) => {
     const result = await modalManager.show(UserGroupModal, { group, currentUserId: user.id });
-    if (!result) return;
+    if (!result) {
+      return;
+    }
 
     try {
       await updateGroup({ id: group.id, userGroupUpdateDto: { name: result.name, color: result.color } });
@@ -83,7 +90,9 @@
       prompt: $t('delete_group_description', { values: { group: group.name } }),
     });
 
-    if (!isConfirmed) return;
+    if (!isConfirmed) {
+      return;
+    }
 
     try {
       await removeGroup({ id: group.id });
@@ -120,7 +129,7 @@
                     name: member.name,
                     email: member.email,
                     profileImagePath: member.profileImagePath ?? '',
-                    avatarColor: member.avatarColor ?? 'primary',
+                    avatarColor: (member.avatarColor as UserAvatarColor) ?? UserAvatarColor.Primary,
                     profileChangedAt: '',
                   }}
                   size="sm"

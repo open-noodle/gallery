@@ -2,12 +2,7 @@
   import UserAvatar from '$lib/components/shared-components/user-avatar.svelte';
   import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
   import ColorPicker from '$lib/components/spaces/color-picker.svelte';
-  import {
-    searchUsers,
-    UserAvatarColor,
-    type UserGroupResponseDto,
-    type UserResponseDto,
-  } from '@immich/sdk';
+  import { searchUsers, UserAvatarColor, type UserGroupResponseDto, type UserResponseDto } from '@immich/sdk';
   import { Field, FormModal, Input, ListButton, Stack, Text } from '@immich/ui';
   import { mdiAccountGroup } from '@mdi/js';
   import { onMount } from 'svelte';
@@ -23,7 +18,7 @@
   const { group, currentUserId, onClose }: Props = $props();
 
   let name = $state(group?.name ?? '');
-  let color = $state<UserAvatarColor | null>((group?.color as UserAvatarColor) ?? null);
+  let color = $state<UserAvatarColor | null>((group?.color as unknown as UserAvatarColor) ?? null);
   let users: UserResponseDto[] = $state([]);
   let loading = $state(true);
   let search = $state('');
@@ -34,7 +29,9 @@
     users
       .filter(({ id }) => id !== currentUserId)
       .filter(({ name, email }) => {
-        if (!search) return true;
+        if (!search) {
+          return true;
+        }
         const q = search.toLowerCase();
         return name.toLowerCase().includes(q) || email.toLowerCase().includes(q);
       }),
@@ -108,7 +105,7 @@
     </Field>
 
     <div>
-      <label class="text-sm font-medium text-immich-fg dark:text-immich-dark-fg">{$t('members')}</label>
+      <span class="text-sm font-medium text-immich-fg dark:text-immich-dark-fg">{$t('members')}</span>
       {#if selectedUsers.size > 0}
         <div class="mt-1 mb-2 flex flex-wrap gap-1">
           {#each [...selectedUsers.values()] as user (user.id)}

@@ -3,7 +3,6 @@ import { Insertable, Kysely, Updateable } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { DummyValue, GenerateSql } from 'src/decorators';
 import { DB } from 'src/schema';
-import { UserGroupMemberTable } from 'src/schema/tables/user-group-member.table';
 import { UserGroupTable } from 'src/schema/tables/user-group.table';
 
 @Injectable()
@@ -31,12 +30,7 @@ export class UserGroupRepository {
 
   @GenerateSql({ params: [DummyValue.UUID, { name: 'Updated Group' }] })
   update(id: string, values: Updateable<UserGroupTable>) {
-    return this.db
-      .updateTable('user_group')
-      .set(values)
-      .where('id', '=', id)
-      .returningAll()
-      .executeTakeFirstOrThrow();
+    return this.db.updateTable('user_group').set(values).where('id', '=', id).returningAll().executeTakeFirstOrThrow();
   }
 
   @GenerateSql({ params: [DummyValue.UUID] })
