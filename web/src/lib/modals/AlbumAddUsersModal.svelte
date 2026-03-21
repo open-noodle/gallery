@@ -51,7 +51,12 @@
       activeGroupIds.delete(group.id);
       for (const member of group.members) {
         if (!excludedUserIds.includes(member.userId)) {
-          selectedUsers.delete(member.userId);
+          const coveredByOtherGroup = groups.some(
+            (g) => g.id !== group.id && activeGroupIds.has(g.id) && g.members.some((m) => m.userId === member.userId),
+          );
+          if (!coveredByOtherGroup) {
+            selectedUsers.delete(member.userId);
+          }
         }
       }
     } else {
