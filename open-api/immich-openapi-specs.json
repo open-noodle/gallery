@@ -17398,7 +17398,7 @@
     },
     {
       "name": "User Groups",
-      "description": "A user group is a collection of users that can be used to manage shared spaces and permissions together."
+      "description": "Personal user groups for quick selection when sharing albums or inviting members to shared spaces."
     },
     {
       "name": "Users",
