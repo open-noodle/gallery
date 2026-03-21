@@ -226,5 +226,20 @@ describe(UserGroupService.name, () => {
       expect(mocks.userGroup.setMembers).toHaveBeenCalledWith(group.id, []);
       expect(result).toEqual([]);
     });
+
+    it('should deduplicate user IDs', async () => {
+      const auth = factory.auth();
+      const group = makeGroup({ createdById: auth.user.id });
+      const userId = newUuid();
+      const member = makeMember({ groupId: group.id, userId });
+
+      mocks.userGroup.getById.mockResolvedValue(group);
+      mocks.userGroup.setMembers.mockResolvedValue();
+      mocks.userGroup.getMembers.mockResolvedValue([member]);
+
+      await sut.setMembers(auth, group.id, { userIds: [userId, userId, userId] });
+
+      expect(mocks.userGroup.setMembers).toHaveBeenCalledWith(group.id, [userId]);
+    });
   });
 });
