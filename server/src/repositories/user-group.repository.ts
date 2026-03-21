@@ -60,15 +60,17 @@ export class UserGroupRepository {
   }
 
   async setMembers(groupId: string, userIds: string[]) {
-    await this.db.deleteFrom('user_group_member').where('groupId', '=', groupId).execute();
+    await this.db.transaction().execute(async (trx) => {
+      await trx.deleteFrom('user_group_member').where('groupId', '=', groupId).execute();
 
-    if (userIds.length === 0) {
-      return;
-    }
+      if (userIds.length === 0) {
+        return;
+      }
 
-    await this.db
-      .insertInto('user_group_member')
-      .values(userIds.map((userId) => ({ groupId, userId })))
-      .execute();
+      await trx
+        .insertInto('user_group_member')
+        .values(userIds.map((userId) => ({ groupId, userId })))
+        .execute();
+    });
   }
 }

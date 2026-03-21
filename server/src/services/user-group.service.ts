@@ -53,7 +53,8 @@ export class UserGroupService extends BaseService {
 
   async setMembers(auth: AuthDto, id: string, dto: UserGroupMemberSetDto): Promise<UserGroupMemberResponseDto[]> {
     await this.requireOwnership(auth, id);
-    await this.userGroupRepository.setMembers(id, dto.userIds);
+    const uniqueUserIds = [...new Set(dto.userIds)];
+    await this.userGroupRepository.setMembers(id, uniqueUserIds);
     const members = await this.userGroupRepository.getMembers(id);
     return members.map((m) => this.mapMember(m));
   }
