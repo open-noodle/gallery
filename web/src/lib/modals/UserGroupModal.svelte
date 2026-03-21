@@ -18,7 +18,7 @@
   const { group, currentUserId, onClose }: Props = $props();
 
   let name = $state(group?.name ?? '');
-  let color = $state<UserAvatarColor | null>((group?.color as unknown as UserAvatarColor) ?? null);
+  let color = $state<UserAvatarColor>((group?.color as unknown as UserAvatarColor) ?? UserAvatarColor.Primary);
   let users: UserResponseDto[] = $state([]);
   let loading = $state(true);
   let search = $state('');
@@ -80,38 +80,16 @@
     </Field>
 
     <Field label={$t('color')}>
-      {#if color}
-        <div class="flex items-center gap-2">
-          <ColorPicker value={color} onchange={(c) => (color = c)} />
-          <button
-            type="button"
-            class="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
-            onclick={() => (color = null)}
-          >
-            {$t('clear')}
-          </button>
-        </div>
-      {:else}
-        <div class="flex items-center gap-2">
-          <button
-            type="button"
-            class="text-xs text-immich-primary hover:underline"
-            onclick={() => (color = UserAvatarColor.Primary)}
-          >
-            {$t('add')}
-          </button>
-        </div>
-      {/if}
+      <ColorPicker value={color} onchange={(c) => (color = c)} />
     </Field>
 
-    <div>
-      <span class="text-sm font-medium text-immich-fg dark:text-immich-dark-fg">{$t('members')}</span>
+    <Field label={$t('members')}>
       {#if selectedUsers.size > 0}
-        <div class="mt-1 mb-2 flex flex-wrap gap-1">
+        <div class="mb-2 flex flex-wrap gap-1">
           {#each [...selectedUsers.values()] as user (user.id)}
             <button
               type="button"
-              class="flex items-center gap-1 rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-xs"
+              class="flex items-center gap-1 rounded-full bg-gray-100 dark:bg-gray-700 px-2.5 py-1 text-xs transition-colors hover:bg-gray-200 dark:hover:bg-gray-600"
               onclick={() => selectedUsers.delete(user.id)}
             >
               {user.name}
@@ -121,20 +99,15 @@
         </div>
       {/if}
 
-      <input
-        type="text"
-        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-        placeholder={$t('search')}
-        bind:value={search}
-      />
-    </div>
+      <Input bind:value={search} placeholder={$t('search')} />
+    </Field>
 
     {#if loading}
       <div class="w-full flex place-items-center place-content-center p-4">
         <LoadingSpinner />
       </div>
     {:else}
-      <div class="max-h-64 overflow-y-auto">
+      <div class="max-h-64 overflow-y-auto -mx-1 px-1">
         <Stack>
           {#each filteredUsers as user (user.id)}
             <ListButton selected={selectedUsers.has(user.id)} onclick={() => handleToggle(user)}>
@@ -145,7 +118,9 @@
               </div>
             </ListButton>
           {:else}
-            <Text class="py-4">{$t('no_results')}</Text>
+            <Text class="py-4 text-center" color="muted">
+              {search ? $t('no_results') : $t('album_share_no_users')}
+            </Text>
           {/each}
         </Stack>
       </div>
