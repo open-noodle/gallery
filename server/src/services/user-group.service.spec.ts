@@ -1,3 +1,4 @@
+import { NotFoundException } from '@nestjs/common';
 import { UserAvatarColor } from 'src/enum';
 import { UserGroupService } from 'src/services/user-group.service';
 import { factory, newDate, newUuid } from 'test/small.factory';
@@ -113,11 +114,11 @@ describe(UserGroupService.name, () => {
       expect(result.id).toBe(group.id);
     });
 
-    it('should throw BadRequestException when group not found', async () => {
+    it('should throw NotFoundException when group not found', async () => {
       const auth = factory.auth();
       mocks.userGroup.getById.mockResolvedValue(void 0);
 
-      await expect(sut.get(auth, newUuid())).rejects.toThrow('User group not found');
+      await expect(sut.get(auth, newUuid())).rejects.toBeInstanceOf(NotFoundException);
     });
 
     it('should throw ForbiddenException when user is not the owner', async () => {
