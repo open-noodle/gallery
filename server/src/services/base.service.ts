@@ -58,6 +58,7 @@ import { SystemMetadataRepository } from 'src/repositories/system-metadata.repos
 import { TagRepository } from 'src/repositories/tag.repository';
 import { TelemetryRepository } from 'src/repositories/telemetry.repository';
 import { TrashRepository } from 'src/repositories/trash.repository';
+import { UserGroupRepository } from 'src/repositories/user-group.repository';
 import { UserRepository } from 'src/repositories/user.repository';
 import { VersionHistoryRepository } from 'src/repositories/version-history.repository';
 import { VideoStreamRepository } from 'src/repositories/video-stream.repository';
@@ -122,6 +123,7 @@ export const BASE_SERVICE_DEPENDENCIES = [
   TagRepository,
   TelemetryRepository,
   TrashRepository,
+  UserGroupRepository,
   UserRepository,
   VersionHistoryRepository,
   VideoStreamRepository,
@@ -186,6 +188,7 @@ export class BaseService {
     protected tagRepository: TagRepository,
     protected telemetryRepository: TelemetryRepository,
     protected trashRepository: TrashRepository,
+    protected userGroupRepository: UserGroupRepository,
     protected userRepository: UserRepository,
     protected versionRepository: VersionHistoryRepository,
     protected videoStreamRepository: VideoStreamRepository,
