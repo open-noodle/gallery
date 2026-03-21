@@ -113,7 +113,7 @@ describe(UserGroupService.name, () => {
 
     it('should throw BadRequestException when group not found', async () => {
       const auth = factory.auth();
-      mocks.userGroup.getById.mockResolvedValue();
+      mocks.userGroup.getById.mockResolvedValue(undefined);
 
       await expect(sut.get(auth, newUuid())).rejects.toThrow('User group not found');
     });
