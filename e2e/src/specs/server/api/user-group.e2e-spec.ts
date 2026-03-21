@@ -122,12 +122,12 @@ describe('/user-groups', () => {
       expect(body.members[0].userId).toBe(user2.userId);
     });
 
-    it('should return 400 for non-existent group', async () => {
+    it('should return 404 for non-existent group', async () => {
       const { status } = await request(app)
         .get('/user-groups/00000000-0000-0000-0000-000000000000')
         .set('Authorization', `Bearer ${user1.accessToken}`);
 
-      expect(status).toBe(400);
+      expect(status).toBe(404);
     });
 
     it('should return 403 for non-owner', async () => {
@@ -223,7 +223,7 @@ describe('/user-groups', () => {
         .get(`/user-groups/${group.id}`)
         .set('Authorization', `Bearer ${user1.accessToken}`);
 
-      expect(getStatus).toBe(400);
+      expect(getStatus).toBe(404);
     });
 
     it('should return 403 for non-owner', async () => {

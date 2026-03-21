@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { AuthDto } from 'src/dtos/auth.dto';
 import {
   UserGroupCreateDto,
@@ -67,7 +67,7 @@ export class UserGroupService extends BaseService {
   private async requireOwnership(auth: AuthDto, groupId: string) {
     const group = await this.userGroupRepository.getById(groupId);
     if (!group) {
-      throw new BadRequestException('User group not found');
+      throw new NotFoundException('User group not found');
     }
     if (group.createdById !== auth.user.id) {
       throw new ForbiddenException('Not the owner of this group');
