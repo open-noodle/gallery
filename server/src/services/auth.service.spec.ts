@@ -1575,6 +1575,7 @@ describe(AuthService.name, () => {
       const user = factory.userAdmin();
 
       mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.oauthEnabled);
+      mocks.oauth.getProfile.mockResolvedValue({ sub: user.oauthId });
       mocks.user.getByOAuthId.mockResolvedValue(user);
       mocks.session.create.mockResolvedValue(factory.session());
 
@@ -1591,6 +1592,7 @@ describe(AuthService.name, () => {
       const user = factory.userAdmin();
 
       mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.oauthEnabled);
+      mocks.oauth.getProfile.mockResolvedValue({ sub: user.oauthId });
       mocks.user.getByOAuthId.mockResolvedValue(user);
       mocks.session.create.mockResolvedValue(factory.session());
 
@@ -1635,6 +1637,7 @@ describe(AuthService.name, () => {
       const auth = factory.auth({ user, apiKey: { permissions: [] } });
 
       mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.enabled);
+      mocks.oauth.getProfile.mockResolvedValue({ sub: user.oauthId });
       mocks.user.getByOAuthId.mockResolvedValue(user as any);
       mocks.user.update.mockResolvedValue(user);
 
@@ -1644,7 +1647,7 @@ describe(AuthService.name, () => {
         {},
       );
 
-      expect(mocks.user.update).toHaveBeenCalledWith(auth.user.id, { oauthId: sub });
+      expect(mocks.user.update).toHaveBeenCalledWith(auth.user.id, { oauthId: user.oauthId });
     });
   });
 
