@@ -91,6 +91,8 @@ import { TagAssetTable } from 'src/schema/tables/tag-asset.table.js';
 import { TagClosureTable } from 'src/schema/tables/tag-closure.table.js';
 import { TagTable } from 'src/schema/tables/tag.table.js';
 import { UserAuditTable } from 'src/schema/tables/user-audit.table.js';
+import { UserGroupMemberTable } from 'src/schema/tables/user-group-member.table.js';
+import { UserGroupTable } from 'src/schema/tables/user-group.table.js';
 import { UserMetadataAuditTable } from 'src/schema/tables/user-metadata-audit.table.js';
 import { UserMetadataTable } from 'src/schema/tables/user-metadata.table.js';
 import { UserTable } from 'src/schema/tables/user.table.js';
@@ -159,6 +161,8 @@ export class ImmichDatabase {
     SharedSpacePersonTable,
     SharedSpacePersonFaceTable,
     SharedSpacePersonAliasTable,
+    UserGroupTable,
+    UserGroupMemberTable,
     SmartSearchTable,
     StackTable,
     StackAuditTable,
@@ -291,6 +295,9 @@ export interface DB {
   shared_space_person: SharedSpacePersonTable;
   shared_space_person_face: SharedSpacePersonFaceTable;
   shared_space_person_alias: SharedSpacePersonAliasTable;
+
+  user_group: UserGroupTable;
+  user_group_member: UserGroupMemberTable;
 
   smart_search: SmartSearchTable;
 

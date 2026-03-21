@@ -46,6 +46,7 @@ import { ViewController } from 'src/controllers/view.controller.js';
 import { WorkflowController } from 'src/controllers/workflow.controller.js';
 import { SharedSpaceController } from 'src/controllers/shared-space.controller.js';
 import { StorageMigrationController } from 'src/controllers/storage-migration.controller.js';
+import { UserGroupController } from 'src/controllers/user-group.controller.js';
 
 export const controllers = [
   ApiKeyController,
@@ -92,6 +93,7 @@ export const controllers = [
   TimelineController,
   TrashController,
   UserAdminController,
+  UserGroupController,
   UserController,
   VideoStreamController,
   ViewController,

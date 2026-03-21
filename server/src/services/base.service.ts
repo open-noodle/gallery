@@ -70,6 +70,7 @@ import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.
 import { StorageMigrationRepository } from 'src/repositories/storage-migration.repository.js';
 import { ClassConstructor } from 'src/types.js';
 import { ImmichFileResponse, ImmichMediaResponse, ImmichRedirectResponse, ImmichStreamResponse } from 'src/utils/file.js';
+import { UserGroupRepository } from 'src/repositories/user-group.repository.js';
 
 export const BASE_SERVICE_DEPENDENCIES = [
   LoggingRepository,
@@ -123,6 +124,7 @@ export const BASE_SERVICE_DEPENDENCIES = [
   TagRepository,
   TelemetryRepository,
   TrashRepository,
+  UserGroupRepository,
   UserRepository,
   VersionHistoryRepository,
   VideoStreamRepository,
@@ -187,6 +189,7 @@ export class BaseService {
     protected tagRepository: TagRepository,
     protected telemetryRepository: TelemetryRepository,
     protected trashRepository: TrashRepository,
+    protected userGroupRepository: UserGroupRepository,
     protected userRepository: UserRepository,
     protected versionRepository: VersionHistoryRepository,
     protected videoStreamRepository: VideoStreamRepository,
