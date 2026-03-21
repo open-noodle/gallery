@@ -76,7 +76,7 @@ export class UserGroupService extends BaseService {
   }
 
   private mapGroup(
-    group: { id: string; name: string; color: string | null; origin: string; createdAt: unknown },
+    group: { id: string; name: string; color: string | null; origin: string; createdAt: Date },
     members: Array<{
       userId: string;
       name: string;
@@ -90,7 +90,7 @@ export class UserGroupService extends BaseService {
       name: group.name,
       color: (group.color as UserAvatarColor) ?? null,
       origin: group.origin,
-      createdAt: group.createdAt as unknown as string,
+      createdAt: group.createdAt.toISOString(),
       members: members.map((m) => this.mapMember(m)),
     };
   }
