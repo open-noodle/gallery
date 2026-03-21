@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 import { UserAvatarColor } from 'src/enum';
 import { ValidateEnum, ValidateUUID } from 'src/validation';
 
@@ -23,6 +23,7 @@ export class UserGroupUpdateDto {
   @ApiPropertyOptional({ description: 'Group name' })
   @IsString()
   @IsNotEmpty()
+  @IsOptional()
   @MaxLength(100)
   name?: string;
 
