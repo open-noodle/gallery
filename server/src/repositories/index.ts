@@ -56,6 +56,7 @@ import { WebsocketRepository } from 'src/repositories/websocket.repository.js';
 import { WorkflowRepository } from 'src/repositories/workflow.repository.js';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { StorageMigrationRepository } from 'src/repositories/storage-migration.repository.js';
+import { UserGroupRepository } from 'src/repositories/user-group.repository.js';
 
 export const repositories = [
   AccessRepository,
@@ -110,6 +111,7 @@ export const repositories = [
   TagRepository,
   TelemetryRepository,
   TrashRepository,
+  UserGroupRepository,
   UserRepository,
   ViewRepository,
   VersionHistoryRepository,

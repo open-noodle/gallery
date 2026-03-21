@@ -54,6 +54,7 @@ import { WorkflowService } from 'src/services/workflow.service.js';
 import { PetDetectionService } from 'src/services/pet-detection.service.js';
 import { SharedSpaceService } from 'src/services/shared-space.service.js';
 import { StorageMigrationService } from 'src/services/storage-migration.service.js';
+import { UserGroupService } from 'src/services/user-group.service.js';
 
 export const services = [
   ApiKeyService,
@@ -107,6 +108,7 @@ export const services = [
   TranscodingService,
   TrashService,
   UserAdminService,
+  UserGroupService,
   UserService,
   VersionService,
   ViewService,
