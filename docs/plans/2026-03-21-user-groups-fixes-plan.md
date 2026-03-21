@@ -14,6 +14,7 @@
 ### Task 1: RED — test that `setMembers` deduplicates user IDs
 
 **Files:**
+
 - Modify: `server/src/services/user-group.service.spec.ts`
 
 **Step 1: Write failing test**
@@ -21,20 +22,20 @@
 Add to the `setMembers` describe block:
 
 ```typescript
-    it('should deduplicate user IDs', async () => {
-      const auth = factory.auth();
-      const group = makeGroup({ createdById: auth.user.id });
-      const userId = newUuid();
-      const member = makeMember({ groupId: group.id, userId });
+it('should deduplicate user IDs', async () => {
+  const auth = factory.auth();
+  const group = makeGroup({ createdById: auth.user.id });
+  const userId = newUuid();
+  const member = makeMember({ groupId: group.id, userId });
 
-      mocks.userGroup.getById.mockResolvedValue(group);
-      mocks.userGroup.setMembers.mockResolvedValue();
-      mocks.userGroup.getMembers.mockResolvedValue([member]);
+  mocks.userGroup.getById.mockResolvedValue(group);
+  mocks.userGroup.setMembers.mockResolvedValue();
+  mocks.userGroup.getMembers.mockResolvedValue([member]);
 
-      await sut.setMembers(auth, group.id, { userIds: [userId, userId, userId] });
+  await sut.setMembers(auth, group.id, { userIds: [userId, userId, userId] });
 
-      expect(mocks.userGroup.setMembers).toHaveBeenCalledWith(group.id, [userId]);
-    });
+  expect(mocks.userGroup.setMembers).toHaveBeenCalledWith(group.id, [userId]);
+});
 ```
 
 **Step 2: Run test — verify RED**
@@ -54,6 +55,7 @@ git commit -m "test(server): RED — test that setMembers deduplicates user IDs"
 ### Task 2: GREEN — deduplicate in service + wrap repository in transaction
 
 **Files:**
+
 - Modify: `server/src/services/user-group.service.ts` (deduplicate)
 - Modify: `server/src/repositories/user-group.repository.ts` (transaction)
 
@@ -109,6 +111,7 @@ git commit -m "fix(server): deduplicate user IDs and wrap setMembers in transact
 ### Task 3: RED — test that non-existent group returns NotFoundException (404)
 
 **Files:**
+
 - Modify: `server/src/services/user-group.service.spec.ts`
 
 **Step 1: Update existing test expectation**
@@ -116,23 +119,23 @@ git commit -m "fix(server): deduplicate user IDs and wrap setMembers in transact
 Change the test `'should throw BadRequestException when group not found'` to:
 
 ```typescript
-    it('should throw NotFoundException when group not found', async () => {
-      const auth = factory.auth();
-      mocks.userGroup.getById.mockResolvedValue(void 0);
+it('should throw NotFoundException when group not found', async () => {
+  const auth = factory.auth();
+  mocks.userGroup.getById.mockResolvedValue(void 0);
 
-      await expect(sut.get(auth, newUuid())).rejects.toThrow('User group not found');
-    });
+  await expect(sut.get(auth, newUuid())).rejects.toThrow('User group not found');
+});
 ```
 
 This test name change documents intent. The actual assertion (`toThrow('User group not found')`) will still pass initially because the message is the same. We need to also verify the exception TYPE. Update to:
 
 ```typescript
-    it('should throw NotFoundException when group not found', async () => {
-      const auth = factory.auth();
-      mocks.userGroup.getById.mockResolvedValue(void 0);
+it('should throw NotFoundException when group not found', async () => {
+  const auth = factory.auth();
+  mocks.userGroup.getById.mockResolvedValue(void 0);
 
-      await expect(sut.get(auth, newUuid())).rejects.toBeInstanceOf(NotFoundException);
-    });
+  await expect(sut.get(auth, newUuid())).rejects.toBeInstanceOf(NotFoundException);
+});
 ```
 
 Add `NotFoundException` to the imports at the top (there are no explicit imports — the test uses `newTestService` which auto-mocks). Add this import:
@@ -158,6 +161,7 @@ git commit -m "test(server): RED — expect NotFoundException for missing group"
 ### Task 4: GREEN — change to NotFoundException
 
 **Files:**
+
 - Modify: `server/src/services/user-group.service.ts`
 
 **Step 1: Change the exception**
@@ -191,7 +195,9 @@ In `e2e/src/specs/server/api/user-group.e2e-spec.ts`, change:
 ```typescript
     it('should return 400 for non-existent group', async () => {
 ```
+
 to:
+
 ```typescript
     it('should return 404 for non-existent group', async () => {
 ```
@@ -210,6 +216,7 @@ git commit -m "fix(server): use NotFoundException for missing user group (404 no
 ### Task 5: Fix `createdAt` typing in mapGroup
 
 **Files:**
+
 - Modify: `server/src/services/user-group.service.ts`
 
 **Step 1: Fix the mapGroup signature and conversion**
@@ -257,6 +264,7 @@ git commit -m "fix(server): type createdAt as Date and use toISOString"
 ### Task 6: Fix group deselect in sharing modals
 
 **Files:**
+
 - Modify: `web/src/lib/modals/AlbumAddUsersModal.svelte`
 - Modify: `web/src/lib/modals/SpaceAddMemberModal.svelte`
 
@@ -265,31 +273,31 @@ git commit -m "fix(server): type createdAt as Date and use toISOString"
 The deselect path must check if a user is still covered by another active group before removing. Replace the `handleGroupToggle` function:
 
 ```typescript
-  const handleGroupToggle = (group: UserGroupResponseDto) => {
-    if (activeGroupIds.has(group.id)) {
-      activeGroupIds.delete(group.id);
-      for (const member of group.members) {
-        if (!excludedUserIds.includes(member.userId)) {
-          const coveredByOtherGroup = groups.some(
-            (g) => g.id !== group.id && activeGroupIds.has(g.id) && g.members.some((m) => m.userId === member.userId),
-          );
-          if (!coveredByOtherGroup) {
-            selectedUsers.delete(member.userId);
-          }
-        }
-      }
-    } else {
-      activeGroupIds.add(group.id);
-      for (const member of group.members) {
-        if (!excludedUserIds.includes(member.userId)) {
-          const user = users.find((u) => u.id === member.userId);
-          if (user) {
-            selectedUsers.set(user.id, user);
-          }
+const handleGroupToggle = (group: UserGroupResponseDto) => {
+  if (activeGroupIds.has(group.id)) {
+    activeGroupIds.delete(group.id);
+    for (const member of group.members) {
+      if (!excludedUserIds.includes(member.userId)) {
+        const coveredByOtherGroup = groups.some(
+          (g) => g.id !== group.id && activeGroupIds.has(g.id) && g.members.some((m) => m.userId === member.userId),
+        );
+        if (!coveredByOtherGroup) {
+          selectedUsers.delete(member.userId);
         }
       }
     }
-  };
+  } else {
+    activeGroupIds.add(group.id);
+    for (const member of group.members) {
+      if (!excludedUserIds.includes(member.userId)) {
+        const user = users.find((u) => u.id === member.userId);
+        if (user) {
+          selectedUsers.set(user.id, user);
+        }
+      }
+    }
+  }
+};
 ```
 
 **Step 2: Apply the same fix to SpaceAddMemberModal.svelte**
@@ -313,17 +321,20 @@ git commit -m "fix(web): preserve users covered by other active groups on desele
 ### Task 7: Fix API tag description
 
 **Files:**
+
 - Modify: `server/src/constants.ts`
 
 **Step 1: Fix the description**
 
 Change:
+
 ```typescript
   [ApiTag.UserGroups]:
     'A user group is a collection of users that can be used to manage shared spaces and permissions together.',
 ```
 
 To:
+
 ```typescript
   [ApiTag.UserGroups]:
     'Personal user groups for quick selection when sharing albums or inviting members to shared spaces.',
