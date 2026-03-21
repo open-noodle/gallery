@@ -16,6 +16,7 @@
 ### Task 1: Schema table definitions (infrastructure — no tests needed)
 
 **Files:**
+
 - Create: `server/src/schema/tables/user-group.table.ts`
 - Create: `server/src/schema/tables/user-group-member.table.ts`
 
@@ -97,6 +98,7 @@ git commit -m "feat(server): add user group schema table definitions"
 ### Task 2: Register tables, types, enums, migration (infrastructure — no tests needed)
 
 **Files:**
+
 - Modify: `server/src/schema/index.ts`
 - Modify: `server/src/database.ts`
 - Modify: `server/src/enum.ts`
@@ -105,20 +107,26 @@ git commit -m "feat(server): add user group schema table definitions"
 **Step 1: Register tables in schema index**
 
 In `server/src/schema/index.ts`:
+
 - Add imports (alphabetically near SharedSpace imports):
+
 ```typescript
 import { UserGroupMemberTable } from 'src/schema/tables/user-group-member.table';
 import { UserGroupTable } from 'src/schema/tables/user-group.table';
 ```
+
 - Add to `tables` array (after `SharedSpacePersonAliasTable`):
+
 ```typescript
     UserGroupTable,
     UserGroupMemberTable,
 ```
+
 - Add to `DB` interface (after `shared_space_person_alias`):
+
 ```typescript
-  user_group: UserGroupTable;
-  user_group_member: UserGroupMemberTable;
+user_group: UserGroupTable;
+user_group_member: UserGroupMemberTable;
 ```
 
 **Step 2: Add types to database.ts**
@@ -146,6 +154,7 @@ export type UserGroupMember = {
 **Step 3: Add Permission and ApiTag enums**
 
 In `server/src/enum.ts`, add after `SharedSpaceAssetDelete` (around line 217):
+
 ```typescript
   UserGroupCreate = 'userGroup.create',
   UserGroupRead = 'userGroup.read',
@@ -154,6 +163,7 @@ In `server/src/enum.ts`, add after `SharedSpaceAssetDelete` (around line 217):
 ```
 
 In the `ApiTag` enum, add alphabetically:
+
 ```typescript
   UserGroups = 'User Groups',
 ```
@@ -222,6 +232,7 @@ git commit -m "feat(server): register user group tables, types, enums, and migra
 ### Task 3: DTOs and repository (infrastructure — needed before tests can compile)
 
 **Files:**
+
 - Create: `server/src/dtos/user-group.dto.ts`
 - Create: `server/src/repositories/user-group.repository.ts`
 - Modify: `server/src/repositories/index.ts`
@@ -351,12 +362,7 @@ export class UserGroupRepository {
 
   @GenerateSql({ params: [DummyValue.UUID, { name: 'Updated Group' }] })
   update(id: string, values: Updateable<UserGroupTable>) {
-    return this.db
-      .updateTable('user_group')
-      .set(values)
-      .where('id', '=', id)
-      .returningAll()
-      .executeTakeFirstOrThrow();
+    return this.db.updateTable('user_group').set(values).where('id', '=', id).returningAll().executeTakeFirstOrThrow();
   }
 
   @GenerateSql({ params: [DummyValue.UUID] })
@@ -403,12 +409,14 @@ export class UserGroupRepository {
 **Step 3: Register repository**
 
 In `server/src/repositories/index.ts`:
+
 - Add import: `import { UserGroupRepository } from 'src/repositories/user-group.repository';`
 - Add to `repositories` array (after `UserRepository`): `UserGroupRepository,`
 
 **Step 4: Register in BaseService**
 
 In `server/src/services/base.service.ts`:
+
 - Add import: `import { UserGroupRepository } from 'src/repositories/user-group.repository';`
 - Add `UserGroupRepository` to `BASE_SERVICE_DEPENDENCIES` array (after `UserRepository`)
 - Add constructor parameter: `protected userGroupRepository: UserGroupRepository,` (after `protected userRepository: UserRepository,`)
@@ -416,6 +424,7 @@ In `server/src/services/base.service.ts`:
 **Step 5: Add test factories**
 
 In `server/test/small.factory.ts`:
+
 - Add `UserGroup, UserGroupMember` to imports from `src/database`
 - Add factories:
 
@@ -453,6 +462,7 @@ git commit -m "feat(server): add user group DTOs, repository, and test factories
 ### Task 4: RED — write failing test for `create`
 
 **Files:**
+
 - Create: `server/src/services/user-group.service.spec.ts`
 - Create: `server/src/services/user-group.service.ts` (empty stub only — enough for imports to resolve)
 
@@ -469,6 +479,7 @@ export class UserGroupService extends BaseService {}
 ```
 
 Register it in `server/src/services/index.ts`:
+
 - Add import: `import { UserGroupService } from 'src/services/user-group.service';`
 - Add to `services` array (after `UserAdminService`): `UserGroupService,`
 
@@ -571,6 +582,7 @@ git commit -m "test(server): RED — failing test for user group create"
 ### Task 5: GREEN — implement `create`
 
 **Files:**
+
 - Modify: `server/src/services/user-group.service.ts`
 
 **Step 1: Write minimal code to make create tests pass**
@@ -580,11 +592,7 @@ Replace `server/src/services/user-group.service.ts`:
 ```typescript
 import { Injectable } from '@nestjs/common';
 import { AuthDto } from 'src/dtos/auth.dto';
-import {
-  UserGroupCreateDto,
-  UserGroupMemberResponseDto,
-  UserGroupResponseDto,
-} from 'src/dtos/user-group.dto';
+import { UserGroupCreateDto, UserGroupMemberResponseDto, UserGroupResponseDto } from 'src/dtos/user-group.dto';
 import { UserAvatarColor } from 'src/enum';
 import { BaseService } from 'src/services/base.service';
 
@@ -602,7 +610,13 @@ export class UserGroupService extends BaseService {
 
   private mapGroup(
     group: { id: string; name: string; color: string | null; origin: string; createdAt: unknown },
-    members: Array<{ userId: string; name: string; email: string; profileImagePath: string; avatarColor: string | null }>,
+    members: Array<{
+      userId: string;
+      name: string;
+      email: string;
+      profileImagePath: string;
+      avatarColor: string | null;
+    }>,
   ): UserGroupResponseDto {
     return {
       id: group.id,
@@ -649,6 +663,7 @@ git commit -m "feat(server): GREEN — implement user group create"
 ### Task 6: RED — failing tests for `getAll` and `get`
 
 **Files:**
+
 - Modify: `server/src/services/user-group.service.spec.ts`
 
 **Step 1: Add tests for getAll and get**
@@ -656,59 +671,59 @@ git commit -m "feat(server): GREEN — implement user group create"
 Append inside the `describe(UserGroupService.name)` block:
 
 ```typescript
-  describe('getAll', () => {
-    it('should return groups with members for the current user', async () => {
-      const auth = factory.auth();
-      const group = makeGroup({ createdById: auth.user.id });
-      const member = makeMember({ groupId: group.id });
+describe('getAll', () => {
+  it('should return groups with members for the current user', async () => {
+    const auth = factory.auth();
+    const group = makeGroup({ createdById: auth.user.id });
+    const member = makeMember({ groupId: group.id });
 
-      mocks.userGroup.getAllByUserId.mockResolvedValue([group]);
-      mocks.userGroup.getMembers.mockResolvedValue([member]);
+    mocks.userGroup.getAllByUserId.mockResolvedValue([group]);
+    mocks.userGroup.getMembers.mockResolvedValue([member]);
 
-      const result = await sut.getAll(auth);
+    const result = await sut.getAll(auth);
 
-      expect(result).toHaveLength(1);
-      expect(result[0].id).toBe(group.id);
-      expect(result[0].members).toHaveLength(1);
-      expect(result[0].members[0].userId).toBe(member.userId);
-      expect(mocks.userGroup.getAllByUserId).toHaveBeenCalledWith(auth.user.id);
-    });
-
-    it('should return empty array when user has no groups', async () => {
-      const auth = factory.auth();
-      mocks.userGroup.getAllByUserId.mockResolvedValue([]);
-
-      const result = await sut.getAll(auth);
-      expect(result).toEqual([]);
-    });
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe(group.id);
+    expect(result[0].members).toHaveLength(1);
+    expect(result[0].members[0].userId).toBe(member.userId);
+    expect(mocks.userGroup.getAllByUserId).toHaveBeenCalledWith(auth.user.id);
   });
 
-  describe('get', () => {
-    it('should return group with members when user is owner', async () => {
-      const auth = factory.auth();
-      const group = makeGroup({ createdById: auth.user.id });
-      mocks.userGroup.getById.mockResolvedValue(group);
-      mocks.userGroup.getMembers.mockResolvedValue([]);
+  it('should return empty array when user has no groups', async () => {
+    const auth = factory.auth();
+    mocks.userGroup.getAllByUserId.mockResolvedValue([]);
 
-      const result = await sut.get(auth, group.id);
-      expect(result.id).toBe(group.id);
-    });
-
-    it('should throw BadRequestException when group not found', async () => {
-      const auth = factory.auth();
-      mocks.userGroup.getById.mockResolvedValue(undefined);
-
-      await expect(sut.get(auth, newUuid())).rejects.toThrow('User group not found');
-    });
-
-    it('should throw ForbiddenException when user is not the owner', async () => {
-      const auth = factory.auth();
-      const group = makeGroup({ createdById: newUuid() });
-      mocks.userGroup.getById.mockResolvedValue(group);
-
-      await expect(sut.get(auth, group.id)).rejects.toThrow('Not the owner of this group');
-    });
+    const result = await sut.getAll(auth);
+    expect(result).toEqual([]);
   });
+});
+
+describe('get', () => {
+  it('should return group with members when user is owner', async () => {
+    const auth = factory.auth();
+    const group = makeGroup({ createdById: auth.user.id });
+    mocks.userGroup.getById.mockResolvedValue(group);
+    mocks.userGroup.getMembers.mockResolvedValue([]);
+
+    const result = await sut.get(auth, group.id);
+    expect(result.id).toBe(group.id);
+  });
+
+  it('should throw BadRequestException when group not found', async () => {
+    const auth = factory.auth();
+    mocks.userGroup.getById.mockResolvedValue(undefined);
+
+    await expect(sut.get(auth, newUuid())).rejects.toThrow('User group not found');
+  });
+
+  it('should throw ForbiddenException when user is not the owner', async () => {
+    const auth = factory.auth();
+    const group = makeGroup({ createdById: newUuid() });
+    mocks.userGroup.getById.mockResolvedValue(group);
+
+    await expect(sut.get(auth, group.id)).rejects.toThrow('Not the owner of this group');
+  });
+});
 ```
 
 **Step 2: Run test — verify RED**
@@ -728,11 +743,13 @@ git commit -m "test(server): RED — failing tests for getAll and get"
 ### Task 7: GREEN — implement `getAll` and `get`
 
 **Files:**
+
 - Modify: `server/src/services/user-group.service.ts`
 
 **Step 1: Add getAll, get, and requireOwnership**
 
 Add these imports at the top:
+
 ```typescript
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 ```
@@ -786,6 +803,7 @@ git commit -m "feat(server): GREEN — implement getAll and get with ownership c
 ### Task 8: RED — failing tests for `update` and `remove`
 
 **Files:**
+
 - Modify: `server/src/services/user-group.service.spec.ts`
 
 **Step 1: Add tests**
@@ -793,62 +811,62 @@ git commit -m "feat(server): GREEN — implement getAll and get with ownership c
 Append inside the `describe(UserGroupService.name)` block:
 
 ```typescript
-  describe('update', () => {
-    it('should throw ForbiddenException when user is not the owner', async () => {
-      const auth = factory.auth();
-      const group = makeGroup({ createdById: newUuid() });
-      mocks.userGroup.getById.mockResolvedValue(group);
+describe('update', () => {
+  it('should throw ForbiddenException when user is not the owner', async () => {
+    const auth = factory.auth();
+    const group = makeGroup({ createdById: newUuid() });
+    mocks.userGroup.getById.mockResolvedValue(group);
 
-      await expect(sut.update(auth, group.id, { name: 'New Name' })).rejects.toThrow('Not the owner of this group');
-    });
-
-    it('should update the group name', async () => {
-      const auth = factory.auth();
-      const group = makeGroup({ createdById: auth.user.id });
-      const updated = { ...group, name: 'New Name' };
-      mocks.userGroup.getById.mockResolvedValue(group);
-      mocks.userGroup.update.mockResolvedValue(updated);
-      mocks.userGroup.getMembers.mockResolvedValue([]);
-
-      const result = await sut.update(auth, group.id, { name: 'New Name' });
-
-      expect(result.name).toBe('New Name');
-      expect(mocks.userGroup.update).toHaveBeenCalledWith(group.id, { name: 'New Name', color: undefined });
-    });
-
-    it('should update the group color', async () => {
-      const auth = factory.auth();
-      const group = makeGroup({ createdById: auth.user.id });
-      const updated = { ...group, color: 'red' };
-      mocks.userGroup.getById.mockResolvedValue(group);
-      mocks.userGroup.update.mockResolvedValue(updated);
-      mocks.userGroup.getMembers.mockResolvedValue([]);
-
-      const result = await sut.update(auth, group.id, { color: UserAvatarColor.Red });
-
-      expect(result.color).toBe('red');
-    });
+    await expect(sut.update(auth, group.id, { name: 'New Name' })).rejects.toThrow('Not the owner of this group');
   });
 
-  describe('remove', () => {
-    it('should throw ForbiddenException when user is not the owner', async () => {
-      const auth = factory.auth();
-      const group = makeGroup({ createdById: newUuid() });
-      mocks.userGroup.getById.mockResolvedValue(group);
+  it('should update the group name', async () => {
+    const auth = factory.auth();
+    const group = makeGroup({ createdById: auth.user.id });
+    const updated = { ...group, name: 'New Name' };
+    mocks.userGroup.getById.mockResolvedValue(group);
+    mocks.userGroup.update.mockResolvedValue(updated);
+    mocks.userGroup.getMembers.mockResolvedValue([]);
 
-      await expect(sut.remove(auth, group.id)).rejects.toThrow('Not the owner of this group');
-    });
+    const result = await sut.update(auth, group.id, { name: 'New Name' });
 
-    it('should remove the group', async () => {
-      const auth = factory.auth();
-      const group = makeGroup({ createdById: auth.user.id });
-      mocks.userGroup.getById.mockResolvedValue(group);
-
-      await sut.remove(auth, group.id);
-
-      expect(mocks.userGroup.remove).toHaveBeenCalledWith(group.id);
-    });
+    expect(result.name).toBe('New Name');
+    expect(mocks.userGroup.update).toHaveBeenCalledWith(group.id, { name: 'New Name', color: undefined });
   });
+
+  it('should update the group color', async () => {
+    const auth = factory.auth();
+    const group = makeGroup({ createdById: auth.user.id });
+    const updated = { ...group, color: 'red' };
+    mocks.userGroup.getById.mockResolvedValue(group);
+    mocks.userGroup.update.mockResolvedValue(updated);
+    mocks.userGroup.getMembers.mockResolvedValue([]);
+
+    const result = await sut.update(auth, group.id, { color: UserAvatarColor.Red });
+
+    expect(result.color).toBe('red');
+  });
+});
+
+describe('remove', () => {
+  it('should throw ForbiddenException when user is not the owner', async () => {
+    const auth = factory.auth();
+    const group = makeGroup({ createdById: newUuid() });
+    mocks.userGroup.getById.mockResolvedValue(group);
+
+    await expect(sut.remove(auth, group.id)).rejects.toThrow('Not the owner of this group');
+  });
+
+  it('should remove the group', async () => {
+    const auth = factory.auth();
+    const group = makeGroup({ createdById: auth.user.id });
+    mocks.userGroup.getById.mockResolvedValue(group);
+
+    await sut.remove(auth, group.id);
+
+    expect(mocks.userGroup.remove).toHaveBeenCalledWith(group.id);
+  });
+});
 ```
 
 **Step 2: Run test — verify RED**
@@ -868,6 +886,7 @@ git commit -m "test(server): RED — failing tests for update and remove"
 ### Task 9: GREEN — implement `update` and `remove`
 
 **Files:**
+
 - Modify: `server/src/services/user-group.service.ts`
 
 **Step 1: Add update and remove methods**
@@ -910,53 +929,54 @@ git commit -m "feat(server): GREEN — implement update and remove"
 ### Task 10: RED — failing test for `setMembers`
 
 **Files:**
+
 - Modify: `server/src/services/user-group.service.spec.ts`
 
 **Step 1: Add test**
 
 ```typescript
-  describe('setMembers', () => {
-    it('should throw ForbiddenException when user is not the owner', async () => {
-      const auth = factory.auth();
-      const group = makeGroup({ createdById: newUuid() });
-      mocks.userGroup.getById.mockResolvedValue(group);
+describe('setMembers', () => {
+  it('should throw ForbiddenException when user is not the owner', async () => {
+    const auth = factory.auth();
+    const group = makeGroup({ createdById: newUuid() });
+    mocks.userGroup.getById.mockResolvedValue(group);
 
-      await expect(sut.setMembers(auth, group.id, { userIds: [newUuid()] })).rejects.toThrow(
-        'Not the owner of this group',
-      );
-    });
-
-    it('should replace members and return updated list', async () => {
-      const auth = factory.auth();
-      const group = makeGroup({ createdById: auth.user.id });
-      const userId = newUuid();
-      const member = makeMember({ groupId: group.id, userId });
-
-      mocks.userGroup.getById.mockResolvedValue(group);
-      mocks.userGroup.setMembers.mockResolvedValue(undefined);
-      mocks.userGroup.getMembers.mockResolvedValue([member]);
-
-      const result = await sut.setMembers(auth, group.id, { userIds: [userId] });
-
-      expect(mocks.userGroup.setMembers).toHaveBeenCalledWith(group.id, [userId]);
-      expect(result).toHaveLength(1);
-      expect(result[0].userId).toBe(userId);
-    });
-
-    it('should allow setting empty member list', async () => {
-      const auth = factory.auth();
-      const group = makeGroup({ createdById: auth.user.id });
-
-      mocks.userGroup.getById.mockResolvedValue(group);
-      mocks.userGroup.setMembers.mockResolvedValue(undefined);
-      mocks.userGroup.getMembers.mockResolvedValue([]);
-
-      const result = await sut.setMembers(auth, group.id, { userIds: [] });
-
-      expect(mocks.userGroup.setMembers).toHaveBeenCalledWith(group.id, []);
-      expect(result).toEqual([]);
-    });
+    await expect(sut.setMembers(auth, group.id, { userIds: [newUuid()] })).rejects.toThrow(
+      'Not the owner of this group',
+    );
   });
+
+  it('should replace members and return updated list', async () => {
+    const auth = factory.auth();
+    const group = makeGroup({ createdById: auth.user.id });
+    const userId = newUuid();
+    const member = makeMember({ groupId: group.id, userId });
+
+    mocks.userGroup.getById.mockResolvedValue(group);
+    mocks.userGroup.setMembers.mockResolvedValue(undefined);
+    mocks.userGroup.getMembers.mockResolvedValue([member]);
+
+    const result = await sut.setMembers(auth, group.id, { userIds: [userId] });
+
+    expect(mocks.userGroup.setMembers).toHaveBeenCalledWith(group.id, [userId]);
+    expect(result).toHaveLength(1);
+    expect(result[0].userId).toBe(userId);
+  });
+
+  it('should allow setting empty member list', async () => {
+    const auth = factory.auth();
+    const group = makeGroup({ createdById: auth.user.id });
+
+    mocks.userGroup.getById.mockResolvedValue(group);
+    mocks.userGroup.setMembers.mockResolvedValue(undefined);
+    mocks.userGroup.getMembers.mockResolvedValue([]);
+
+    const result = await sut.setMembers(auth, group.id, { userIds: [] });
+
+    expect(mocks.userGroup.setMembers).toHaveBeenCalledWith(group.id, []);
+    expect(result).toEqual([]);
+  });
+});
 ```
 
 **Step 2: Run test — verify RED**
@@ -976,6 +996,7 @@ git commit -m "test(server): RED — failing tests for setMembers"
 ### Task 11: GREEN — implement `setMembers`
 
 **Files:**
+
 - Modify: `server/src/services/user-group.service.ts`
 
 **Step 1: Add setMembers method**
@@ -1012,6 +1033,7 @@ git commit -m "feat(server): GREEN — implement setMembers, all service tests p
 ### Task 12: Controller (infrastructure — delegates to tested service)
 
 **Files:**
+
 - Create: `server/src/controllers/user-group.controller.ts`
 - Modify: `server/src/controllers/index.ts`
 
@@ -1123,6 +1145,7 @@ export class UserGroupController {
 **Step 2: Register controller**
 
 In `server/src/controllers/index.ts`:
+
 - Add import: `import { UserGroupController } from 'src/controllers/user-group.controller';`
 - Add to `controllers` array (after `UserAdminController`): `UserGroupController,`
 
@@ -1165,6 +1188,7 @@ git commit -m "chore: regenerate OpenAPI specs and SDK for user groups"
 ### Task 14: Frontend — i18n strings
 
 **Files:**
+
 - Modify: `web/src/lib/i18n/en.json`
 
 **Step 1: Add i18n keys**
@@ -1183,6 +1207,7 @@ Find alphabetical position and add:
 ```
 
 Error keys (inside `errors` object):
+
 ```json
 "unable_to_create_group": "Unable to create group",
 "unable_to_delete_group": "Unable to delete group",
@@ -1202,6 +1227,7 @@ git commit -m "feat(web): add i18n strings for user groups"
 ### Task 15: Frontend — UserGroupModal component
 
 **Files:**
+
 - Create: `web/src/lib/modals/UserGroupModal.svelte`
 
 **Step 1: Create the modal**
@@ -1390,6 +1416,7 @@ git commit -m "feat(web): add UserGroupModal for create/edit groups"
 ### Task 16: Frontend — group settings component and registration
 
 **Files:**
+
 - Create: `web/src/lib/components/user-settings-page/group-settings.svelte`
 - Modify: `web/src/lib/components/user-settings-page/user-settings-list.svelte`
 
@@ -1558,6 +1585,7 @@ git commit -m "feat(web): add UserGroupModal for create/edit groups"
 **Step 2: Register in user settings list**
 
 In `web/src/lib/components/user-settings-page/user-settings-list.svelte`:
+
 - Add import: `import GroupSettings from './group-settings.svelte';`
 - Add `mdiAccountMultipleOutline` to the `@mdi/js` import
 - Add accordion after the partner-sharing section (after line 143):
@@ -1585,10 +1613,12 @@ git commit -m "feat(web): add group settings UI with create/edit/delete"
 ### Task 17: Frontend — group chips in sharing modals
 
 **Files:**
+
 - Modify: `web/src/lib/modals/AlbumAddUsersModal.svelte`
 - Modify: `web/src/lib/modals/SpaceAddMemberModal.svelte`
 
 The group chip logic is identical in both modals. The pattern:
+
 1. Fetch groups alongside users in `onMount` (parallel)
 2. Filter groups to only show those with at least one eligible member
 3. Render colored pills above the user list

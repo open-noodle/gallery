@@ -322,6 +322,12 @@ Class | Method | HTTP request | Description
 *TrashApi* | [**emptyTrash**](doc//TrashApi.md#emptytrash) | **POST** /trash/empty | Empty trash
 *TrashApi* | [**restoreAssets**](doc//TrashApi.md#restoreassets) | **POST** /trash/restore/assets | Restore assets
 *TrashApi* | [**restoreTrash**](doc//TrashApi.md#restoretrash) | **POST** /trash/restore | Restore trash
+*UserGroupsApi* | [**createGroup**](doc//UserGroupsApi.md#creategroup) | **POST** /user-groups | Create a user group
+*UserGroupsApi* | [**getAllGroups**](doc//UserGroupsApi.md#getallgroups) | **GET** /user-groups | Get all user groups
+*UserGroupsApi* | [**getGroup**](doc//UserGroupsApi.md#getgroup) | **GET** /user-groups/{id} | Get a user group
+*UserGroupsApi* | [**removeGroup**](doc//UserGroupsApi.md#removegroup) | **DELETE** /user-groups/{id} | Delete a user group
+*UserGroupsApi* | [**setMembers**](doc//UserGroupsApi.md#setmembers) | **PUT** /user-groups/{id}/members | Set group members
+*UserGroupsApi* | [**updateGroup**](doc//UserGroupsApi.md#updategroup) | **PATCH** /user-groups/{id} | Update a user group
 *UsersApi* | [**createProfileImage**](doc//UsersApi.md#createprofileimage) | **POST** /users/profile-image | Create user profile image
 *UsersApi* | [**deleteProfileImage**](doc//UsersApi.md#deleteprofileimage) | **DELETE** /users/profile-image | Delete user profile image
 *UsersApi* | [**deleteUserLicense**](doc//UsersApi.md#deleteuserlicense) | **DELETE** /users/me/license | Delete user product key
@@ -709,6 +715,11 @@ Class | Method | HTTP request | Description
  - [UserAdminResponseDto](doc//UserAdminResponseDto.md)
  - [UserAdminUpdateDto](doc//UserAdminUpdateDto.md)
  - [UserAvatarColor](doc//UserAvatarColor.md)
+ - [UserGroupCreateDto](doc//UserGroupCreateDto.md)
+ - [UserGroupMemberResponseDto](doc//UserGroupMemberResponseDto.md)
+ - [UserGroupMemberSetDto](doc//UserGroupMemberSetDto.md)
+ - [UserGroupResponseDto](doc//UserGroupResponseDto.md)
+ - [UserGroupUpdateDto](doc//UserGroupUpdateDto.md)
  - [UserLicense](doc//UserLicense.md)
  - [UserMetadataKey](doc//UserMetadataKey.md)
  - [UserPreferencesResponseDto](doc//UserPreferencesResponseDto.md)

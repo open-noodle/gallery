@@ -884,6 +884,16 @@ class ApiClient {
           return UserAdminUpdateDto.fromJson(value);
         case 'UserAvatarColor':
           return UserAvatarColorTypeTransformer().decode(value);
+        case 'UserGroupCreateDto':
+          return UserGroupCreateDto.fromJson(value);
+        case 'UserGroupMemberResponseDto':
+          return UserGroupMemberResponseDto.fromJson(value);
+        case 'UserGroupMemberSetDto':
+          return UserGroupMemberSetDto.fromJson(value);
+        case 'UserGroupResponseDto':
+          return UserGroupResponseDto.fromJson(value);
+        case 'UserGroupUpdateDto':
+          return UserGroupUpdateDto.fromJson(value);
         case 'UserLicense':
           return UserLicense.fromJson(value);
         case 'UserMetadataKey':

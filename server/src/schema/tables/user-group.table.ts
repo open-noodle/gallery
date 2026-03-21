@@ -23,7 +23,7 @@ export class UserGroupTable {
   @Column({ type: 'character varying', length: 20, nullable: true })
   color!: string | null;
 
-  @Column({ type: 'character varying', length: 20, default: "'manual'" })
+  @Column({ type: 'character varying', default: 'manual' })
   origin!: Generated<string>;
 
   @ForeignKeyColumn(() => UserTable, { onDelete: 'CASCADE', nullable: false })

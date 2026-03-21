@@ -13,6 +13,7 @@ Personal user groups — named, color-coded lists of users that act as a selecti
 ## Scope
 
 ### In v1
+
 - Create/edit/delete groups in User Settings
 - Add/remove members from groups
 - Color-code groups (using existing `UserAvatarColor` palette)
@@ -20,6 +21,7 @@ Personal user groups — named, color-coded lists of users that act as a selecti
 - Data model includes `origin` field for future OIDC group sync
 
 ### Not in v1
+
 - OIDC group sync
 - Group-level permissions
 - Admin-managed instance-wide groups
@@ -30,25 +32,26 @@ Personal user groups — named, color-coded lists of users that act as a selecti
 
 ### `user_group` table
 
-| Column | Type | Default | Notes |
-|--------|------|---------|-------|
-| `id` | uuid PK | uuid_generate_v4() | |
-| `name` | text | | max 100 chars |
-| `color` | varchar(20) | null | from `UserAvatarColor` enum |
-| `origin` | varchar(20) | `'manual'` | future: `'oidc'` |
-| `createdById` | uuid FK → user | | CASCADE on delete |
-| `createdAt` | timestamptz | now() | |
-| `updatedAt` | timestamptz | now() | trigger-managed |
+| Column        | Type           | Default            | Notes                       |
+| ------------- | -------------- | ------------------ | --------------------------- |
+| `id`          | uuid PK        | uuid_generate_v4() |                             |
+| `name`        | text           |                    | max 100 chars               |
+| `color`       | varchar(20)    | null               | from `UserAvatarColor` enum |
+| `origin`      | varchar(20)    | `'manual'`         | future: `'oidc'`            |
+| `createdById` | uuid FK → user |                    | CASCADE on delete           |
+| `createdAt`   | timestamptz    | now()              |                             |
+| `updatedAt`   | timestamptz    | now()              | trigger-managed             |
 
 ### `user_group_member` table
 
-| Column | Type | Default | Notes |
-|--------|------|---------|-------|
-| `groupId` | uuid FK → user_group | | composite PK, CASCADE |
-| `userId` | uuid FK → user | | composite PK, CASCADE |
-| `addedAt` | timestamptz | now() | |
+| Column    | Type                 | Default | Notes                 |
+| --------- | -------------------- | ------- | --------------------- |
+| `groupId` | uuid FK → user_group |         | composite PK, CASCADE |
+| `userId`  | uuid FK → user       |         | composite PK, CASCADE |
+| `addedAt` | timestamptz          | now()   |                       |
 
 Indexes:
+
 - `user_group_createdById_idx` on `user_group(createdById)`
 - `user_group_member_userId_idx` on `user_group_member(userId)`
 
@@ -56,14 +59,14 @@ Indexes:
 
 All endpoints scoped to the authenticated user — you can only see/edit/delete groups you created.
 
-| Method | Endpoint | Purpose |
-|--------|----------|---------|
-| `POST` | `/user-groups` | Create a group |
-| `GET` | `/user-groups` | List my groups |
-| `GET` | `/user-groups/:id` | Get group with members |
-| `PATCH` | `/user-groups/:id` | Update group (name, color) |
-| `DELETE` | `/user-groups/:id` | Delete group |
-| `PUT` | `/user-groups/:id/members` | Set group members (full replace) |
+| Method   | Endpoint                   | Purpose                          |
+| -------- | -------------------------- | -------------------------------- |
+| `POST`   | `/user-groups`             | Create a group                   |
+| `GET`    | `/user-groups`             | List my groups                   |
+| `GET`    | `/user-groups/:id`         | Get group with members           |
+| `PATCH`  | `/user-groups/:id`         | Update group (name, color)       |
+| `DELETE` | `/user-groups/:id`         | Delete group                     |
+| `PUT`    | `/user-groups/:id/members` | Set group members (full replace) |
 
 ### DTOs
 
@@ -74,6 +77,7 @@ All endpoints scoped to the authenticated user — you can only see/edit/delete 
 **Set members:** `{ userIds: string[] }`
 
 **Response:**
+
 ```typescript
 {
   id: string;
@@ -87,7 +91,8 @@ All endpoints scoped to the authenticated user — you can only see/edit/delete 
     email: string;
     profileImagePath: string;
     avatarColor: UserAvatarColor;
-  }[];
+  }
+  [];
 }
 ```
 
@@ -98,11 +103,13 @@ All endpoints scoped to the authenticated user — you can only see/edit/delete 
 New accordion section in User Settings, alongside "Partner Sharing":
 
 **Group list view:**
+
 - Each group as a compact row: color dot + group name + overlapping avatar stack + member count + edit/delete actions
 - "Create group" button at the top
 - Empty state: "Create groups to quickly select multiple people when sharing"
 
 **Create/edit modal** (using `FormModal`):
+
 - Name field (text input, max 100 chars)
 - Color picker (same `UserAvatarColor` options as Spaces)
 - Member selection: multi-select `ListButton` list of all users except self
@@ -158,6 +165,7 @@ web/src/
 ## Future: OIDC Group Sync
 
 The `origin` field on `user_group` enables future OIDC integration:
+
 - Add `groupsClaim` config field to `SystemConfigOAuthDto` (follows existing `roleClaim`/`storageQuotaClaim` pattern)
 - On OIDC login, read groups array from token, reconcile with `origin: 'oidc'` groups
 - Manual groups (`origin: 'manual'`) are never touched by OIDC sync
