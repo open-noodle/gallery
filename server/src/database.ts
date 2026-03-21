@@ -390,6 +390,8 @@ export type UserGroup = {
   createdById: string;
   createdAt: Date;
   updatedAt: Date;
+  createId: string;
+  updateId: string;
 };
 
 export type UserGroupMember = {

@@ -448,6 +448,8 @@ const userGroupFactory = (data: Partial<UserGroup> = {}): UserGroup => ({
   createdById: newUuid(),
   createdAt: newDate(),
   updatedAt: newDate(),
+  createId: newUuid(),
+  updateId: newUuid(),
   ...data,
 });
 
