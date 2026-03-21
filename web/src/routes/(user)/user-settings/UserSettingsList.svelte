@@ -1,5 +1,6 @@
 <script lang="ts">
   import { page } from '$app/stores';
+  import GroupSettings from '$lib/components/user-settings-page/group-settings.svelte';
   import ChangePinCodeSettings from './PinCodeSettings.svelte';
   import DownloadSettings from './DownloadSettings.svelte';
   import FeatureSettings from './FeatureSettings.svelte';
@@ -7,11 +8,13 @@
   import UserPurchaseSettings from './UserPurchaseSettings.svelte';
   import UserUsageStatistic from './UserUsageStatistic.svelte';
   import { OpenQueryParam, QueryParameter } from '$lib/constants';
+  import { authManager } from '$lib/managers/auth-manager.svelte';
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
   import { oauth } from '$lib/utils';
   import { type ApiKeyResponseDto, type SessionResponseDto } from '@immich/sdk';
   import {
     mdiAccountGroupOutline,
+    mdiAccountMultipleOutline,
     mdiAccountOutline,
     mdiApi,
     mdiBellOutline,
@@ -127,6 +130,15 @@
   subtitle={$t('change_your_password')}
 >
   <ChangePasswordSettings />
+</SettingAccordion>
+
+<SettingAccordion
+  icon={mdiAccountMultipleOutline}
+  key="user-groups"
+  title={$t('user_groups')}
+  subtitle={$t('manage_user_groups')}
+>
+  <GroupSettings user={authManager.user} />
 </SettingAccordion>
 
 <SettingAccordion
