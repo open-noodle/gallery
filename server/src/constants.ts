@@ -200,7 +200,7 @@ export const endpointTags: Record<ApiTag, string> = {
   [ApiTag.UsersAdmin]:
     'Administrative endpoints for managing users, including creating, updating, deleting, and restoring users. Also includes endpoints for resetting passwords and PIN codes.',
   [ApiTag.UserGroups]:
-    'A user group is a collection of users that can be used to manage shared spaces and permissions together.',
+    'Personal user groups for quick selection when sharing albums or inviting members to shared spaces.',
   [ApiTag.Users]:
     'Endpoints for viewing and updating the current users, including product key information, profile picture data, onboarding progress, and more.',
   [ApiTag.Views]: 'Endpoints for specialized views, such as the folder view.',
