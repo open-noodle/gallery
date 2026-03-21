@@ -95,7 +95,7 @@ describe('/user-groups', () => {
 
   describe('GET /user-groups/:id', () => {
     it('should require authentication', async () => {
-      const { status, body } = await request(app).get('/user-groups/00000000-0000-0000-0000-000000000000');
+      const { status, body } = await request(app).get('/user-groups/fd69a48e-5579-4bfc-b1ca-dc5e4e74c724');
 
       expect(status).toBe(401);
       expect(body).toEqual(errorDto.unauthorized);
@@ -124,7 +124,7 @@ describe('/user-groups', () => {
 
     it('should return 404 for non-existent group', async () => {
       const { status } = await request(app)
-        .get('/user-groups/00000000-0000-0000-0000-000000000000')
+        .get('/user-groups/fd69a48e-5579-4bfc-b1ca-dc5e4e74c724')
         .set('Authorization', `Bearer ${user1.accessToken}`);
 
       expect(status).toBe(404);
@@ -147,7 +147,7 @@ describe('/user-groups', () => {
   describe('PATCH /user-groups/:id', () => {
     it('should require authentication', async () => {
       const { status, body } = await request(app)
-        .patch('/user-groups/00000000-0000-0000-0000-000000000000')
+        .patch('/user-groups/fd69a48e-5579-4bfc-b1ca-dc5e4e74c724')
         .send({ name: 'Updated' });
 
       expect(status).toBe(401);
@@ -201,7 +201,7 @@ describe('/user-groups', () => {
 
   describe('DELETE /user-groups/:id', () => {
     it('should require authentication', async () => {
-      const { status, body } = await request(app).delete('/user-groups/00000000-0000-0000-0000-000000000000');
+      const { status, body } = await request(app).delete('/user-groups/fd69a48e-5579-4bfc-b1ca-dc5e4e74c724');
 
       expect(status).toBe(401);
       expect(body).toEqual(errorDto.unauthorized);
@@ -243,7 +243,7 @@ describe('/user-groups', () => {
   describe('PUT /user-groups/:id/members', () => {
     it('should require authentication', async () => {
       const { status, body } = await request(app)
-        .put('/user-groups/00000000-0000-0000-0000-000000000000/members')
+        .put('/user-groups/fd69a48e-5579-4bfc-b1ca-dc5e4e74c724/members')
         .send({ userIds: [] });
 
       expect(status).toBe(401);
