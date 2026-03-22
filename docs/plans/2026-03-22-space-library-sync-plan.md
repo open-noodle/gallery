@@ -278,7 +278,7 @@ async getAssetCount(spaceId: string): Promise<number> {
 **Step 2: Update `getRecentAssets`**
 
 ```typescript
-@GenerateSql({ params: [DummyValue.UUID], options: { limit: 4 } })
+@GenerateSql({ params: [DummyValue.UUID, 4] })
 getRecentAssets(spaceId: string, limit = 4) {
   return this.db
     .selectFrom(
@@ -831,19 +831,26 @@ export class SharedSpaceLibraryLinkDto {
 
 ```typescript
 export class SharedSpaceLinkedLibraryDto {
+  @ApiProperty()
   libraryId!: string;
+
+  @ApiProperty()
   libraryName!: string;
+
+  @ApiPropertyOptional()
   addedById!: string | null;
+
+  @ApiProperty()
   createdAt!: Date;
 }
 ```
 
 **Step 3: Add `linkedLibraries` to `SharedSpaceResponseDto`**
 
-Add an optional field:
+Add an optional field with array type hint for Swagger:
 
 ```typescript
-@ApiPropertyOptional()
+@ApiPropertyOptional({ type: [SharedSpaceLinkedLibraryDto] })
 linkedLibraries?: SharedSpaceLinkedLibraryDto[];
 ```
 
@@ -1649,7 +1656,7 @@ git commit -m "feat(library): queue face match for spaces linked to library on s
 **Step 1: Add repository method**
 
 ```typescript
-@GenerateSql({ params: [DummyValue.UUID], options: { limit: 1000 } })
+@GenerateSql({ params: [DummyValue.UUID] })
 getByLibraryIdWithFaces(libraryId: string, limit = 1000, offset = 0) {
   return this.db
     .selectFrom('asset')
