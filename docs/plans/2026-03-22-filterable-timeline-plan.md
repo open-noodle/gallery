@@ -386,21 +386,22 @@ In `server/src/repositories/asset.repository.ts`, in the `getTimeBuckets` method
 2. Replace the single-value person/tag checks with array versions:
 
 ```typescript
-// Replace line 737:
+// Replace line 737 (personId is already normalized to personIds by service layer):
 // .$if(!!options.personId, (qb) => hasPeople(qb, [options.personId!]))
 .$if(!!options.personIds?.length, (qb) => hasAnyPerson(qb, options.personIds!))
-.$if(!!options.personId && !options.personIds?.length, (qb) => hasPeople(qb, [options.personId!]))
 
-// Replace line 738:
+// Replace line 738 (spacePersonId normalized to spacePersonIds by service layer):
 // .$if(!!options.spacePersonId, (qb) => hasSpacePerson(qb, options.spacePersonId!))
 .$if(!!options.spacePersonIds?.length, (qb) => hasAnySpacePerson(qb, options.spacePersonIds!))
-.$if(!!options.spacePersonId && !options.spacePersonIds?.length, (qb) => hasSpacePerson(qb, options.spacePersonId!))
 
-// Replace line 766:
+// Replace line 766 (tagId normalized to tagIds by service layer):
 // .$if(!!options.tagId, (qb) => withTagId(qb, options.tagId!))
 .$if(!!options.tagIds?.length, (qb) => withAnyTagId(qb, options.tagIds!))
-.$if(!!options.tagId && !options.tagIds?.length, (qb) => withTagId(qb, options.tagId!))
 ```
+
+Note: The old single-value fields (`personId`, `spacePersonId`, `tagId`) are normalized
+to arrays by `buildTimeBucketOptions` in the service layer (Task 2), so the repository
+only needs to handle the array versions. No fallback chains needed here.
 
 3. Add the asset type filter (no join needed):
 
@@ -626,6 +627,22 @@ describe('FilterPanel', () => {
     expect(queryByTestId('filter-section-camera')).toBeNull();
   });
 
+  it('should hide sections not in config', () => {
+    const { queryByTestId } = render(FilterPanel, {
+      props: {
+        config: { sections: ['rating'], providers: {} },
+        timeBuckets: [],
+        onFilterChange: () => {},
+      },
+    });
+    expect(queryByTestId('filter-section-people')).toBeNull();
+    expect(queryByTestId('filter-section-location')).toBeNull();
+    expect(queryByTestId('filter-section-camera')).toBeNull();
+    expect(queryByTestId('filter-section-tags')).toBeNull();
+    expect(queryByTestId('filter-section-media')).toBeNull();
+    expect(queryByTestId('filter-section-rating')).toBeTruthy();
+  });
+
   it('should collapse to icon strip', async () => {
     const { getByTestId } = render(FilterPanel, {
       props: {
@@ -637,6 +654,23 @@ describe('FilterPanel', () => {
     const collapseBtn = getByTestId('collapse-panel-btn');
     await collapseBtn.click();
     expect(getByTestId('collapsed-icon-strip')).toBeTruthy();
+  });
+
+  it('should preserve filter state when collapsing and expanding', async () => {
+    // Set a filter, collapse, expand, verify filter still active
+  });
+
+  it('should show badge dots on collapsed icons with active filters', async () => {
+    // Set person filter, collapse, verify people icon has badge
+    // Verify camera icon does NOT have badge
+  });
+
+  it('should show no badges when no filters active', async () => {
+    // Collapse with no filters, verify no badge dots
+  });
+
+  it('should expand and scroll to section when collapsed icon clicked', async () => {
+    // Collapse, click people icon, verify panel expanded
   });
 });
 ```
@@ -693,6 +727,13 @@ export interface FilterState {
   rating?: number;
   mediaType: 'all' | 'image' | 'video';
   sortOrder: 'asc' | 'desc';
+}
+
+// Client-only view state (not sent to server)
+export interface FilterViewState {
+  selectedYear?: number;
+  selectedMonth?: number;
+  collapsed: boolean;
 }
 
 export function createFilterState(): FilterState {
@@ -757,7 +798,7 @@ Create `web/src/lib/components/filter-panel/filter-section.svelte`:
     class="flex w-full items-center justify-between px-3 py-2.5 hover:bg-[var(--primary-soft)]"
     onclick={() => (expanded = !expanded)}
   >
-    <span class="text-[10px] font-bold uppercase tracking-wider text-[var(--fg-muted)]">
+    <span class="text-[10px] font-bold uppercase tracking-[0.7px] text-[var(--fg-muted)]">
       {title}
     </span>
     <Icon
@@ -1018,12 +1059,20 @@ describe('PeopleFilter', () => {
     // Assert multiple checkboxes can be active simultaneously
   });
 
+  it('should deselect and remove from selection array', () => {
+    // Select two people, deselect one, verify array has only the other
+  });
+
   it('should filter by search input', () => {
     // Type in search box, assert list filters
   });
 
   it('should show "Show N more" for long lists', () => {
     // Render with 20+ people, assert only first N shown with button
+  });
+
+  it('should emit correct filter state on selection', () => {
+    // Select a person, verify onFilterChange called with personIds
   });
 });
 
@@ -1034,7 +1083,15 @@ describe('LocationFilter', () => {
   });
 
   it('should expand cities when country selected', () => {
-    // Select country, assert cities appear indented
+    // Select country, assert second fetch for cities triggers, cities appear indented
+  });
+
+  it('should auto-fill country when city selected', () => {
+    // Select a city, verify country is also set in filter state
+  });
+
+  it('should show empty message when no locations exist', () => {
+    // Render with empty provider, assert "No locations in this space" message
   });
 });
 
@@ -1045,7 +1102,15 @@ describe('CameraFilter', () => {
   });
 
   it('should expand models when make selected', () => {
-    // Select make, assert models appear
+    // Select make, assert second fetch for models triggers, models appear
+  });
+
+  it('should auto-fill make when model selected', () => {
+    // Select a model, verify make is also set in filter state
+  });
+
+  it('should show empty message when no cameras exist', () => {
+    // Render with empty provider, assert "No cameras in this space" message
   });
 });
 ```
@@ -1083,7 +1148,8 @@ feat(web): add people, location, and camera filter components
 ```typescript
 describe('TagsFilter', () => {
   it('should render tags with checkboxes (multi-select)', () => {});
-  it('should show empty message when no tags', () => {});
+  it('should show all user tags (not space-scoped in V1)', () => {});
+  it('should show empty message when user has no tags', () => {});
 });
 
 describe('RatingFilter', () => {
@@ -1174,8 +1240,8 @@ Import the FilterPanel and wire it alongside the existing timeline:
   $effect(() => {
     timelineManager = new TimelineManager({
       spaceId: space.id,
-      personIds: filters.personIds.length ? filters.personIds : undefined,
-      // For spaces, personIds maps to spacePersonIds
+      // In Spaces context, FilterState.personIds maps to spacePersonIds
+      spacePersonIds: filters.personIds.length ? filters.personIds : undefined,
       city: filters.city,
       country: filters.country,
       make: filters.make,
@@ -1212,8 +1278,17 @@ Import the FilterPanel and wire it alongside the existing timeline:
     <!-- Active filter chips -->
     <ActiveFiltersBar {filters} onClear={() => (filters = clearFilters(filters))} />
 
-    <!-- Timeline -->
-    <Timeline {timelineManager} />
+    <!-- Timeline (or empty state when filters match nothing) -->
+    {#if totalCount === 0 && getActiveFilterCount(filters) > 0}
+      <div class="flex flex-1 flex-col items-center justify-center gap-2" data-testid="empty-state-message">
+        <p class="text-sm text-[var(--fg-muted)]">No photos match your filters</p>
+        <button class="text-sm text-[var(--primary)]" onclick={() => (filters = clearFilters(filters))}>
+          Clear all filters
+        </button>
+      </div>
+    {:else}
+      <Timeline {timelineManager} />
+    {/if}
   </div>
 </div>
 ```
@@ -1406,7 +1481,7 @@ section. Group them into test.describe blocks matching the design doc categories
 - Page load and basic rendering (3 tests)
 - Temporal picker (8 tests)
 - People filter (9 tests)
-- Location filter (10 tests)
+- Location filter (9 tests)
 - Camera filter (6 tests)
 - Tags filter (7 tests)
 - Rating filter (6 tests)
@@ -1416,6 +1491,8 @@ section. Group them into test.describe blocks matching the design doc categories
 - Combined filters (4 tests)
 - Collapsed panel (7 tests)
 - Edge cases (9 tests)
+
+Total: 87 E2E test cases (must match design doc exactly).
 
 **Setup pattern:**
 
@@ -1473,7 +1550,7 @@ cd e2e && pnpm test:web -- --grep "FilterPanel"
 **Step 3: Commit**
 
 ```
-test: add 86 E2E tests for Spaces FilterPanel
+test: add 87 E2E tests for Spaces FilterPanel
 ```
 
 ---
