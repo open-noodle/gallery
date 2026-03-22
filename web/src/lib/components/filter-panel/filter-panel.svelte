@@ -14,6 +14,7 @@
   import type { FilterPanelConfig, FilterState } from './filter-panel';
   import { createFilterState } from './filter-panel';
   import FilterSection from './filter-section.svelte';
+  import TemporalPicker from './temporal-picker.svelte';
 
   interface Props {
     config: FilterPanelConfig;
@@ -21,7 +22,6 @@
     onFilterChange: (filters: FilterState) => void;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- wired up when section contents are implemented
   let { config, timeBuckets, onFilterChange }: Props = $props();
   let collapsed = $state(false);
   let filters = $state(createFilterState());
@@ -122,7 +122,11 @@
 
     {#each config.sections as section (section)}
       <FilterSection title={sectionTitles[section]} testId={section}>
-        <p class="text-xs text-[var(--fg-muted)]">{sectionTitles[section]} filter placeholder</p>
+        {#if section === 'timeline'}
+          <TemporalPicker {timeBuckets} />
+        {:else}
+          <p class="text-xs text-[var(--fg-muted)]">{sectionTitles[section]} filter placeholder</p>
+        {/if}
       </FilterSection>
     {/each}
   </div>
