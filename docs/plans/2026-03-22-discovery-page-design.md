@@ -60,8 +60,8 @@ These are different operations and belong in different UI locations.
 │ Nav  │ [months] │  August 2023 · 312 photos                 │
 │      │          │  ┌───┐┌───┐┌───┐┌───┐┌───┐┌───┐          │
 │      │ PEOPLE   │  │   ││   ││   ││   ││   ││   │          │
-│      │ ◉ Sarah  │  └───┘└───┘└───┘└───┘└───┘└───┘          │
-│      │ ○ Max    │                                           │
+│      │ ☑ Sarah  │  └───┘└───┘└───┘└───┘└───┘└───┘          │
+│      │ ☐ Max    │                                           │
 │      │          │  July 2023 · 535 photos                    │
 │      │ LOCATION │  ┌───┐┌───┐┌───┐┌───┐┌───┐               │
 │      │ ☑ Munich │  │   ││   ││   ││   ││   │               │
@@ -201,14 +201,14 @@ interface FilterPanelConfig {
 }
 
 interface FilterState {
-  personId?: string; // single-select (server accepts one personId)
-  city?: string;
-  country?: string;
-  make?: string;
-  model?: string;
-  tagId?: string;
+  personIds: string[]; // multi-select (extend timeline to accept array)
+  city?: string; // single-select (server is single-value)
+  country?: string; // single-select
+  make?: string; // single-select
+  model?: string; // single-select
+  tagIds: string[]; // multi-select (extend timeline to accept array)
   rating?: number; // minimum rating (1-5)
-  mediaType?: 'all' | 'image' | 'video';
+  mediaType: 'all' | 'image' | 'video';
   sortOrder: 'asc' | 'desc';
   selectedYear?: number;
   selectedMonth?: number;
@@ -274,17 +274,28 @@ interface FilterState {
 The timeline endpoint already supports personId, albumId, spaceId, tagId, isFavorite,
 visibility. It is missing the EXIF-based filters that the search endpoint supports.
 
-Add these optional fields to `TimeBucketDto` and `TimeBucketAssetDto`:
+**Upgrade existing single-value fields to arrays:**
+
+The existing `personId` (single string) and `tagId` (single string) in `TimeBucketDto`
+are upgraded to `personIds` (string array) and `tagIds` (string array) to support
+multi-select. The `hasPeople()` and `withTagId()` helpers already accept arrays
+internally, so the CTE change is minimal.
+
+**Add new optional fields to `TimeBucketDto` and `TimeBucketAssetDto`:**
 
 ```typescript
-// EXIF filters (require joining asset_exif in the CTE)
+// Upgraded to arrays (multi-select)
+personIds?: string[]; // was personId: string
+tagIds?: string[]; // was tagId: string
+
+// EXIF filters — new, single-value (require joining asset_exif in CTE)
 city?: string;
 country?: string;
 make?: string; // camera make
 model?: string; // camera model
 rating?: number; // minimum rating (>=)
 
-// Asset table filters (no extra join needed)
+// Asset table filters — new (no extra join needed)
 type?: AssetType; // IMAGE or VIDEO
 ```
 
@@ -341,10 +352,10 @@ All new components live in `web/src/lib/components/filter-panel/`:
 - `filter-panel.svelte` — outer wrapper, collapsible, header with collapse button
 - `filter-section.svelte` — generic collapsible section (title + chevron + body slot)
 - `temporal-picker.svelte` — year→month grid with counts and volume bars
-- `people-filter.svelte` — searchable single-select list with avatars
+- `people-filter.svelte` — searchable multi-select list with avatars
 - `location-filter.svelte` — hierarchical country→city checkboxes
 - `camera-filter.svelte` — flat list of make/model
-- `tags-filter.svelte` — flat checkbox list
+- `tags-filter.svelte` — flat multi-select checkbox list (shows all user tags, not space-scoped)
 - `rating-filter.svelte` — interactive star selector
 - `media-type-filter.svelte` — All/Photos/Videos toggle
 - `sort-toggle.svelte` — ascending/descending toggle button
@@ -393,13 +404,15 @@ panel and scrolls to that section.
 - `TemporalPicker` handles empty bucket data without crashing
 - `TemporalPicker` month drill-down shows correct counts for selected year
 - Each filter section emits correct filter state on selection
-- `PeopleFilter` is single-select (selecting B deselects A)
+- `PeopleFilter` is multi-select (selecting B keeps A selected)
+- `PeopleFilter` deselecting removes from selection array
 - `PeopleFilter` local search filters the list client-side
 - `PeopleFilter` "Show N more" truncates long lists
 - `LocationFilter` hierarchical expand (country click → cities appear indented)
 - `LocationFilter` selecting a city also sets the parent country
 - `CameraFilter` renders make/model combinations
-- `TagsFilter` renders tag names with checkboxes
+- `TagsFilter` renders tag names with checkboxes (multi-select)
+- `TagsFilter` shows all user tags (not space-scoped in V1)
 - `RatingFilter` highlights stars up to selected value
 - `RatingFilter` clicking same star again clears the filter
 - `MediaTypeFilter` toggles between All/Photos/Videos (only one active)
@@ -435,8 +448,10 @@ _People filter:_
 
 - Verify only people present in the space are shown (not global people list)
 - Select a person — verify timeline updates to show only their photos
-- Select a different person — verify previous selection is deselected (single-select)
-- Deselect person — verify timeline returns to full space set
+- Select a second person — verify both remain selected (multi-select)
+- Verify timeline shows photos containing either selected person
+- Deselect one person — verify only the other person's filter remains
+- Deselect last person — verify timeline returns to full space set
 - Type in people search box — verify list filters to matching names
 - Clear search box — verify full people list returns
 - Space with many people — verify "Show N more" button appears and works
@@ -458,7 +473,9 @@ _Camera filter:_
 _Tags filter:_
 
 - Select a tag — verify timeline filters to tagged photos
-- Deselect — verify filter removed
+- Select a second tag — verify both remain selected (multi-select)
+- Deselect one tag — verify other tag filter remains
+- Deselect last tag — verify filter removed
 
 _Rating filter:_
 
@@ -482,6 +499,7 @@ _Sort direction:_
 _Active filter chips:_
 
 - Apply person filter — verify chip appears showing person's name
+- Apply second person — verify second chip appears (one chip per person)
 - Apply location filter — verify chip appears showing "City, Country"
 - Apply rating filter — verify chip appears showing "★ 3+"
 - Apply media type filter — verify chip appears showing "Photos only"
@@ -548,6 +566,7 @@ Additional reference mockups (earlier explorations):
 - **Mobile layout** — web-only for now.
 - **Smart/CLIP search integration** — CLIP search uses vector similarity and produces
   ranked results incompatible with month-grouped timelines. Stays in global search bar.
-- **Multi-person filter** — server accepts single `personId`. Multi-select deferred.
+- **Multi-select location/camera** — server accepts single city/make/model values.
+  Multi-select for these fields requires upstream search builder changes. Deferred.
 - **Filter state persistence** — filters reset on navigation. URL-based or local
   storage persistence deferred.
