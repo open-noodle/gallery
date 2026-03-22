@@ -383,6 +383,13 @@ export type SharedSpacePersonAlias = {
   alias: string;
 };
 
+export type SharedSpaceLibrary = {
+  spaceId: string;
+  libraryId: string;
+  addedById: string | null;
+  createdAt: Date;
+};
+
 export type UserGroup = {
   id: string;
   name: string;
