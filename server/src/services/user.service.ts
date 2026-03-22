@@ -26,6 +26,7 @@ import { generateProfileImage } from 'src/utils/profile-image.js';
 import { ArgOf } from 'src/repositories/event.repository.js';
 import { JobOf, UserMetadataItem } from 'src/types.js';
 import { createReadStream } from 'node:fs';
+import { basename } from 'node:path';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { StorageService } from 'src/services/storage.service.js';
 
@@ -127,7 +128,7 @@ export class UserService extends BaseService {
     const writeBackend = StorageService.getWriteBackend();
 
     if (!(writeBackend instanceof DiskStorageBackend)) {
-      const filename = file.path.split('/').pop()!;
+      const filename = basename(file.path);
       const relativeKey = StorageCore.getRelativeProfileImagePath(auth.user.id, filename);
       const stream = createReadStream(file.path);
       await writeBackend.put(relativeKey, stream, { contentType: mimeTypes.lookup(file.path) });
