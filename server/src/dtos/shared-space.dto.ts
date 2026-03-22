@@ -169,6 +169,9 @@ export class SharedSpaceResponseDto {
   @ApiPropertyOptional({ description: 'Space members (summary)', type: [SharedSpaceMemberResponseDto] })
   members?: SharedSpaceMemberResponseDto[];
 
+  @ApiPropertyOptional({ type: [SharedSpaceLinkedLibraryDto] })
+  linkedLibraries?: SharedSpaceLinkedLibraryDto[];
+
   @ApiPropertyOptional({ description: 'Number of new assets since last viewed' })
   newAssetCount?: number;
 
@@ -183,6 +186,25 @@ export class SharedSpaceMemberTimelineDto {
   @ApiProperty({ description: 'Show space assets in personal timeline' })
   @IsNotEmpty()
   showInTimeline!: boolean;
+}
+
+export class SharedSpaceLibraryLinkDto {
+  @ValidateUUID({ description: 'Library ID' })
+  libraryId!: string;
+}
+
+export class SharedSpaceLinkedLibraryDto {
+  @ApiProperty()
+  libraryId!: string;
+
+  @ApiProperty()
+  libraryName!: string;
+
+  @ApiPropertyOptional()
+  addedById!: string | null;
+
+  @ApiProperty()
+  createdAt!: Date;
 }
 
 export class SharedSpaceAssetAddDto {
