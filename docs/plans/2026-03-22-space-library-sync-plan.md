@@ -1508,10 +1508,12 @@ git commit -m "feat(api): add library link/unlink endpoints"
 
 **Step 1: Write failing tests**
 
-In `server/src/services/library.service.spec.ts`, add:
+In `server/src/services/library.service.spec.ts`, add the following tests **inside** the existing `describe('handleSyncFiles')` block (so they inherit the existing `beforeEach` that mocks `storage.stat`, `asset.createAll`, etc.):
 
 ```typescript
-describe('handleSyncFiles (space face matching)', () => {
+// Add these inside the existing describe('handleSyncFiles') block:
+
+describe('space face matching', () => {
   it('should queue face match jobs for spaces linked to the library', async () => {
     const libraryId = newUuid();
     const spaceId = newUuid();
@@ -2566,7 +2568,21 @@ Add `isAdmin` derived state:
 let isAdmin = $derived($user?.isAdmin ?? false);
 ```
 
-Add an `onLibrariesChanged` prop to the interface and destructure it.
+Add an optional `onLibrariesChanged` prop to the interface:
+
+```typescript
+// In the Props interface:
+onLibrariesChanged?: () => void;
+```
+
+Destructure with a no-op default:
+
+```typescript
+// In the destructure:
+let { ..., onLibrariesChanged = () => {} }: Props = $props();
+```
+
+This avoids breaking the parent page (`+page.svelte`) and existing tests (`space-panel.spec.ts`) that don't pass this prop. When the parent page is updated to handle library changes (e.g., refreshing the space data), it can pass the callback.
 
 Add a third tab button (after the Members tab, inside the tab switcher div), conditionally shown for admins:
 
