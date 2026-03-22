@@ -338,6 +338,9 @@ This requires NEW helper functions (the existing ones must not be modified):
   **Do not modify it** — search depends on AND logic. Instead, create a new
   `hasAnyPerson()` helper that uses OR logic: return assets where the person face
   matches ANY of the provided IDs (no HAVING count check).
+- `hasSpacePerson()` in `database.ts` currently accepts a single string. Create a new
+  `hasAnySpacePerson()` helper that accepts an array and uses OR logic, mirroring the
+  `hasAnyPerson()` pattern for space-scoped face clusters.
 - `withTagId()` in `database.ts` currently accepts a single string and traverses
   `tag_closure` for hierarchical tag matching. Create a new `withAnyTagId()` helper
   that accepts an array and matches assets with ANY of the selected tags. **Preserve
@@ -347,6 +350,11 @@ This requires NEW helper functions (the existing ones must not be modified):
 **Rating filter uses `>=` semantics:** The existing search builder uses exact match
 (`rating = N`). The timeline filter uses minimum rating (`rating >= N`). The CTE
 WHERE clause should use `>=`, not `=`.
+
+**Service-layer access checks:** `TimelineService.timeBucketChecks()` currently checks
+access for the single `dto.tagId`. This must be updated to iterate over `dto.tagIds[]`
+and check `Permission.TagRead` for each element. Similarly for any other access checks
+referencing the old single-value field names.
 
 **Add new optional fields to `TimeBucketDto` and `TimeBucketAssetDto`:**
 
@@ -368,8 +376,13 @@ type?: AssetType; // IMAGE or VIDEO
 ```
 
 Wire these as WHERE clauses in the `getTimeBuckets` and `getTimeBucket` CTE queries in
-`asset.repository.ts`. The `asset_exif` table needs to be joined in the CTE when any
-EXIF filter is provided.
+`asset.repository.ts`. Note the different join strategies:
+
+- **`getTimeBuckets`** does NOT currently join `asset_exif`. Add a **conditional** join
+  (`.$if(!!city || !!country || !!make || !!model || !!rating, ...)`) to avoid a
+  performance regression on unfiltered queries.
+- **`getTimeBucket`** already has an unconditional `innerJoin('asset_exif', ...)`.
+  Only WHERE clauses are needed — no additional join.
 
 ### Add space-scoped suggestions
 
@@ -564,6 +577,8 @@ _Tags filter:_
 - Deselect one tag — verify other tag filter remains and one chip removed
 - Deselect last tag — verify filter removed
 - Remove tag chip — verify that tag is deselected in the panel
+- Select a parent tag — verify photos tagged with child tags are also included
+  (tag hierarchy via tag_closure)
 
 _Rating filter:_
 
@@ -588,6 +603,8 @@ _Sort direction:_
 - Toggle to ascending — verify oldest photos appear first
 - Toggle back to descending — verify newest photos appear first
 - Toggle sort with active filters — verify filters are preserved after sort change
+- Apply filters with ascending sort, click Clear All — verify sort order remains
+  ascending (sort is a view preference, not cleared with filters)
 
 _Active filter chips:_
 
