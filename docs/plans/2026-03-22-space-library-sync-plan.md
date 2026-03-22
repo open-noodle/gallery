@@ -1740,7 +1740,9 @@ describe('handleSharedSpaceLibraryFaceSync', () => {
       { id: faceId, assetId, personId: null, embedding: '[0.1,0.2]' },
     ]);
     mocks.sharedSpace.isPersonFaceAssigned.mockResolvedValue(false);
-    mocks.sharedSpace.findClosestSpacePerson.mockResolvedValue(null);
+    mocks.sharedSpace.findClosestSpacePerson.mockResolvedValue([]);
+    mocks.sharedSpace.addPersonFaces.mockResolvedValue([]);
+    mocks.sharedSpace.createPerson.mockResolvedValue(factory.sharedSpacePerson({ spaceId }));
 
     const result = await sut.handleSharedSpaceLibraryFaceSync({ spaceId, libraryId });
 
@@ -1761,13 +1763,15 @@ describe('handleSharedSpaceLibraryFaceSync', () => {
       { id: faceId, assetId, personId: null, embedding: '[0.1,0.2]' },
     ]);
     mocks.sharedSpace.isPersonFaceAssigned.mockResolvedValue(false);
-    mocks.sharedSpace.findClosestSpacePerson.mockResolvedValue(null);
+    mocks.sharedSpace.findClosestSpacePerson.mockResolvedValue([]); // No match found
     mocks.sharedSpace.createPerson.mockResolvedValue(factory.sharedSpacePerson({ spaceId }));
+    mocks.sharedSpace.addPersonFaces.mockResolvedValue([]);
 
     await sut.handleSharedSpaceLibraryFaceSync({ spaceId, libraryId });
 
     // Should create a new space person for the unmatched face
     expect(mocks.sharedSpace.createPerson).toHaveBeenCalled();
+    expect(mocks.sharedSpace.addPersonFaces).toHaveBeenCalled();
   });
 
   it('should match face to existing space person when close enough', async () => {
@@ -1784,18 +1788,17 @@ describe('handleSharedSpaceLibraryFaceSync', () => {
       { id: faceId, assetId, personId: null, embedding: '[0.1,0.2]' },
     ]);
     mocks.sharedSpace.isPersonFaceAssigned.mockResolvedValue(false);
-    mocks.sharedSpace.findClosestSpacePerson.mockResolvedValue({
-      distance: 0.3,
-      id: existingPersonId,
-      personId: existingPersonId,
-    });
+    mocks.sharedSpace.findClosestSpacePerson.mockResolvedValue([
+      { personId: existingPersonId, name: '', distance: 0.3 },
+    ]);
+    mocks.sharedSpace.addPersonFaces.mockResolvedValue([]);
 
     await sut.handleSharedSpaceLibraryFaceSync({ spaceId, libraryId });
 
     // Should assign face to existing person, NOT create new one
-    expect(mocks.sharedSpace.assignFaceToPerson).toHaveBeenCalledWith(
-      expect.objectContaining({ personId: existingPersonId, assetFaceId: faceId }),
-    );
+    expect(mocks.sharedSpace.addPersonFaces).toHaveBeenCalledWith([
+      { personId: existingPersonId, assetFaceId: faceId },
+    ]);
     expect(mocks.sharedSpace.createPerson).not.toHaveBeenCalled();
   });
 });
@@ -1858,7 +1861,7 @@ async handleSharedSpaceLibraryFaceSync(job: { spaceId: string; libraryId: string
 }
 ```
 
-Note: `processSpaceFaceMatch` should be extracted from the existing `handleSharedSpaceFaceMatch` method as a private helper, or the orchestrator should call the same face matching logic inline. Check the existing implementation and reuse the face matching core.
+Note: Extract the face matching core from `handleSharedSpaceFaceMatch` (lines 652-692 in `shared-space.service.ts`) into a `private async processSpaceFaceMatch(spaceId: string, assetId: string)` method. This method should: (1) call `getAssetFacesForMatching(assetId)`, (2) for each face, check `isPersonFaceAssigned`, (3) call `findClosestSpacePerson`, (4) if match found call `addPersonFaces`, otherwise `createPerson` + `addPersonFaces`. Both `handleSharedSpaceFaceMatch` and the orchestrator should call this extracted method.
 
 **Step 2: Run tests — verify they pass**
 

@@ -143,7 +143,7 @@ All implementation follows TDD: write failing tests first, then implement to mak
 - should reject linking when user is admin but not a space member
 - should reject linking a non-existent library
 - should reject linking a library to a non-existent space
-- should reject linking the same library to the same space twice
+- should be idempotent when linking the same library twice (no error, no re-queued face sync)
 - should allow linking the same library to different spaces
 - should allow linking different libraries to the same space
 - should queue SharedSpaceLibraryFaceSync job on link creation
