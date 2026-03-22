@@ -79,6 +79,9 @@ interface AssetBuilderOptions {
   tagId?: string;
   personId?: string;
   spacePersonId?: string;
+  personIds?: string[];
+  spacePersonIds?: string[];
+  tagIds?: string[];
   userIds?: string[];
   timelineSpaceIds?: string[];
   withStacked?: boolean;
@@ -88,6 +91,11 @@ interface AssetBuilderOptions {
   visibility?: AssetVisibility;
   withCoordinates?: boolean;
   bbox?: BoundingBox;
+  city?: string;
+  country?: string;
+  make?: string;
+  model?: string;
+  rating?: number;
 }
 
 export interface TimeBucketOptions extends AssetBuilderOptions {

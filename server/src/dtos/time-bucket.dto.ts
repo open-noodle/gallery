@@ -1,9 +1,9 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsString } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsInt, IsString, Max, Min } from 'class-validator';
 import type { BBoxDto } from 'src/dtos/bbox.dto';
-import { AssetOrder, AssetVisibility } from 'src/enum';
+import { AssetOrder, AssetType, AssetVisibility } from 'src/enum';
 import { ValidateBBox } from 'src/utils/bbox';
-import { ValidateBoolean, ValidateEnum, ValidateUUID } from 'src/validation';
+import { Optional, ValidateBoolean, ValidateEnum, ValidateUUID } from 'src/validation';
 
 export class TimeBucketDto {
   @ValidateUUID({ optional: true, description: 'Filter assets by specific user ID' })
@@ -78,6 +78,54 @@ export class TimeBucketDto {
 
   @ValidateBBox({ optional: true })
   bbox?: BBoxDto;
+
+  // --- Array upgrades (multi-select, OR semantics) ---
+
+  @ValidateUUID({ each: true, optional: true })
+  personIds?: string[];
+
+  @ValidateUUID({ each: true, optional: true })
+  spacePersonIds?: string[];
+
+  @ValidateUUID({ each: true, optional: true })
+  tagIds?: string[];
+
+  // --- EXIF filters (new) ---
+
+  @ApiPropertyOptional({ description: 'Filter by city name' })
+  @IsString()
+  @Optional()
+  city?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by country name' })
+  @IsString()
+  @Optional()
+  country?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by camera make' })
+  @IsString()
+  @Optional()
+  make?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by camera model' })
+  @IsString()
+  @Optional()
+  model?: string;
+
+  @ApiPropertyOptional({ description: 'Minimum star rating (>=)' })
+  @IsInt()
+  @Min(1)
+  @Max(5)
+  @Optional()
+  rating?: number;
+
+  @ValidateEnum({
+    enum: AssetType,
+    name: 'AssetType',
+    optional: true,
+    description: 'Filter by asset type (IMAGE or VIDEO)',
+  })
+  type?: AssetType;
 }
 
 export class TimeBucketAssetDto extends TimeBucketDto {
