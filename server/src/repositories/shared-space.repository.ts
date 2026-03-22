@@ -6,6 +6,7 @@ import { VectorIndex } from 'src/enum';
 import { probes } from 'src/repositories/database.repository';
 import { DB } from 'src/schema';
 import { SharedSpaceAssetTable } from 'src/schema/tables/shared-space-asset.table';
+import { SharedSpaceLibraryTable } from 'src/schema/tables/shared-space-library.table';
 import { SharedSpaceMemberTable } from 'src/schema/tables/shared-space-member.table';
 import { SharedSpacePersonAliasTable } from 'src/schema/tables/shared-space-person-alias.table';
 import { SharedSpacePersonFaceTable } from 'src/schema/tables/shared-space-person-face.table';
@@ -165,6 +166,59 @@ export class SharedSpaceRepository {
       .where('spaceId', '=', spaceId)
       .where('assetId', 'in', assetIds)
       .execute();
+  }
+
+  // ==========================================
+  // Shared Space Library Link CRUD
+  // ==========================================
+
+  addLibrary(values: Insertable<SharedSpaceLibraryTable>) {
+    return this.db
+      .insertInto('shared_space_library')
+      .values(values)
+      .onConflict((oc) => oc.doNothing())
+      .returningAll()
+      .executeTakeFirst();
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
+  removeLibrary(spaceId: string, libraryId: string) {
+    return this.db
+      .deleteFrom('shared_space_library')
+      .where('spaceId', '=', spaceId)
+      .where('libraryId', '=', libraryId)
+      .execute();
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID] })
+  getLinkedLibraries(spaceId: string) {
+    return this.db
+      .selectFrom('shared_space_library')
+      .selectAll()
+      .where('spaceId', '=', spaceId)
+      .execute();
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID] })
+  getSpacesLinkedToLibrary(libraryId: string) {
+    return this.db
+      .selectFrom('shared_space_library')
+      .innerJoin('shared_space', 'shared_space.id', 'shared_space_library.spaceId')
+      .selectAll('shared_space_library')
+      .select('shared_space.faceRecognitionEnabled')
+      .where('shared_space_library.libraryId', '=', libraryId)
+      .execute();
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
+  hasLibraryLink(spaceId: string, libraryId: string) {
+    return this.db
+      .selectFrom('shared_space_library')
+      .where('spaceId', '=', spaceId)
+      .where('libraryId', '=', libraryId)
+      .select('spaceId')
+      .executeTakeFirst()
+      .then((row) => !!row);
   }
 
   @GenerateSql({ params: [DummyValue.UUID] })
