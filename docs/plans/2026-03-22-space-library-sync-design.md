@@ -128,6 +128,130 @@ JOIN shared_space_library sl ON sl."libraryId" = a."libraryId"
 WHERE sl."spaceId" = :spaceId
 ```
 
+## Testing Strategy
+
+All implementation follows TDD: write failing tests first, then implement to make them pass.
+
+### Unit Tests — Service Layer (`shared-space.service.spec.ts`)
+
+#### Link Library
+
+- should link a library to a space when user is admin and space editor
+- should link a library to a space when user is admin and space owner
+- should reject linking when user is not admin
+- should reject linking when user is admin but only a space viewer
+- should reject linking when user is admin but not a space member
+- should reject linking a non-existent library
+- should reject linking a library to a non-existent space
+- should reject linking the same library to the same space twice
+- should allow linking the same library to different spaces
+- should allow linking different libraries to the same space
+- should queue SharedSpaceLibraryFaceSync job on link creation
+- should not queue face sync job if space has faceRecognitionEnabled = false
+
+#### Unlink Library
+
+- should unlink a library from a space when user is admin and space editor
+- should unlink a library from a space when user is admin and space owner
+- should reject unlinking when user is not admin
+- should reject unlinking when user is admin but only a space viewer
+- should reject unlinking a library that is not linked to the space
+- should not fail when unlinking from a space with manually added assets from the same library
+
+#### Get Space (with linked libraries)
+
+- should include linked library info in space response
+- should return empty libraries array when no libraries linked
+
+### Unit Tests — Repository Layer (`shared-space.repository.spec.ts`)
+
+#### Asset Count
+
+- should count manual assets only when no libraries linked
+- should count library assets only when no manual assets
+- should count both manual and library assets combined
+- should not double-count an asset that exists in both shared_space_asset and a linked library
+- should count assets across multiple linked libraries without duplicates
+
+#### Recent Assets
+
+- should return recent assets from linked libraries
+- should return recent assets from both manual and library sources, sorted by date
+- should deduplicate assets appearing in both sources
+
+#### New Asset Count (recency badge)
+
+- should count new library assets added after member's lastViewedAt
+- should use asset.createdAt (not fileCreatedAt) for library assets since there is no addedAt
+
+#### Timeline Queries
+
+- should include library-linked assets in time buckets when withSharedSpaces is true
+- should include library-linked assets in time bucket asset queries
+- should deduplicate assets in time buckets across manual and library sources
+
+### Unit Tests — Face Recognition
+
+#### SharedSpaceLibraryFaceSync Orchestrator
+
+- should process all library assets with faces in batches
+- should skip assets with no detected faces
+- should create space persons for unmatched faces
+- should match faces to existing space persons
+- should be a no-op if the library link was removed before the job runs
+
+#### Ongoing Library Scan Hook
+
+- should queue SharedSpaceFaceMatch for new assets when library is linked to spaces
+- should queue jobs for multiple spaces if library is linked to more than one
+- should not queue face match jobs if library is not linked to any space
+- should not queue face match jobs if linked space has faceRecognitionEnabled = false
+
+### Edge Cases
+
+#### Library Deletion
+
+- should automatically unlink from all spaces when library is deleted (CASCADE)
+- library assets should no longer appear in any space after deletion
+
+#### Space Deletion
+
+- should automatically remove library links when space is deleted (CASCADE)
+
+#### Asset Deletion/Offline
+
+- should not include deleted assets from linked libraries in space queries
+- should not include offline assets from linked libraries in space queries
+
+#### Library Scan Race Condition
+
+- should include assets created mid-scan when querying space (no sync = no race)
+
+#### Deduplication
+
+- should show an asset once if it exists in shared_space_asset AND a linked library
+- should show an asset once if it exists in two linked libraries that both contain it
+  (e.g., same asset imported into two libraries via symlinks or overlapping import paths)
+
+#### User Permissions on Library Assets
+
+- space members should be able to view library-linked assets even though they are not the
+  library owner
+- space viewers should not be able to add/remove library links
+- non-space members should not be able to access library-linked assets through the space
+
+### Medium Tests (DB integration)
+
+These require a real database via testcontainers:
+
+- should persist shared_space_library row with correct foreign keys
+- should CASCADE delete library link when space is deleted
+- should CASCADE delete library link when library is deleted
+- should SET NULL addedById when the linking admin is deleted
+- should enforce composite PK uniqueness (spaceId, libraryId)
+- should return correct UNION results with real data across both asset sources
+- should handle UNION deduplication with real data
+
 ## What This Does NOT Cover
 
 - **Reverse sync**: Photos added to the space by members are not imported back into the
