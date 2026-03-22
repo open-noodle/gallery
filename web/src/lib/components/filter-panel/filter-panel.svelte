@@ -11,10 +11,13 @@
     mdiStar,
     mdiImage,
   } from '@mdi/js';
-  import type { FilterPanelConfig, FilterState } from './filter-panel';
+  import type { FilterPanelConfig, FilterState, PersonOption } from './filter-panel';
   import { createFilterState } from './filter-panel';
   import FilterSection from './filter-section.svelte';
   import TemporalPicker from './temporal-picker.svelte';
+  import PeopleFilter from './people-filter.svelte';
+  import LocationFilter from './location-filter.svelte';
+  import CameraFilter from './camera-filter.svelte';
 
   interface Props {
     config: FilterPanelConfig;
@@ -25,6 +28,11 @@
   let { config, timeBuckets, onFilterChange }: Props = $props();
   let collapsed = $state(false);
   let filters = $state(createFilterState());
+
+  // Fetched data for filter sections
+  let people = $state<PersonOption[]>([]);
+  let countries = $state<string[]>([]);
+  let cameraMakes = $state<string[]>([]);
 
   const sectionIcons: Record<string, string> = {
     timeline: mdiCalendar,
@@ -45,6 +53,52 @@
     rating: 'Rating',
     media: 'Media Type',
   };
+
+  // Fetch data on mount via $effect
+  $effect(() => {
+    if (config.providers.people && config.sections.includes('people')) {
+      config.providers.people().then((result) => {
+        people = result;
+      });
+    }
+  });
+
+  $effect(() => {
+    if (config.providers.locations && config.sections.includes('location')) {
+      config.providers.locations().then((result) => {
+        countries = result.filter((l) => l.type === 'country').map((l) => l.value);
+      });
+    }
+  });
+
+  $effect(() => {
+    if (config.providers.cameras && config.sections.includes('camera')) {
+      config.providers.cameras().then((result) => {
+        cameraMakes = result.filter((c) => c.type === 'make').map((c) => c.value);
+      });
+    }
+  });
+
+  function notifyFilterChange() {
+    onFilterChange(filters);
+  }
+
+  function handlePeopleChange(ids: string[]) {
+    filters.personIds = ids;
+    notifyFilterChange();
+  }
+
+  function handleLocationChange(country?: string, city?: string) {
+    filters.country = country;
+    filters.city = city;
+    notifyFilterChange();
+  }
+
+  function handleCameraChange(make?: string, model?: string) {
+    filters.make = make;
+    filters.model = model;
+    notifyFilterChange();
+  }
 
   function hasActiveFilter(section: string): boolean {
     switch (section) {
@@ -124,6 +178,36 @@
       <FilterSection title={sectionTitles[section]} testId={section}>
         {#if section === 'timeline'}
           <TemporalPicker {timeBuckets} />
+        {:else if section === 'people'}
+          <PeopleFilter {people} selectedIds={filters.personIds} onSelectionChange={handlePeopleChange} />
+        {:else if section === 'location'}
+          <LocationFilter
+            {countries}
+            selectedCity={filters.city}
+            selectedCountry={filters.country}
+            onCityFetch={async (country) => {
+              if (config.providers.locations) {
+                const result = await config.providers.locations();
+                return result.filter((l) => l.type === 'city').map((l) => l.value);
+              }
+              return [];
+            }}
+            onSelectionChange={handleLocationChange}
+          />
+        {:else if section === 'camera'}
+          <CameraFilter
+            makes={cameraMakes}
+            selectedMake={filters.make}
+            selectedModel={filters.model}
+            onModelFetch={async (make) => {
+              if (config.providers.cameras) {
+                const result = await config.providers.cameras();
+                return result.filter((c) => c.type === 'model').map((c) => c.value);
+              }
+              return [];
+            }}
+            onSelectionChange={handleCameraChange}
+          />
         {:else}
           <p class="text-xs text-[var(--fg-muted)]">{sectionTitles[section]} filter placeholder</p>
         {/if}
