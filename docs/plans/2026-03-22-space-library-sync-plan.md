@@ -226,6 +226,13 @@ git commit -m "feat(repo): add shared_space_library CRUD methods"
 
 All UNION queries must filter both `asset.deletedAt IS NULL` and `asset.isOffline = false` to exclude deleted and offline library assets.
 
+**Behavioral changes (intentional):**
+
+- `getRecentAssets`: sort changes from `addedAt` (when added to space) to `fileCreatedAt` (when photo was taken). This is required because library-linked assets have no `addedAt`. The new sort is consistent across both sources and arguably more useful.
+- `getNewAssetCount`: now joins with `asset` table and filters `deletedAt`/`isOffline` on the manual branch too. Previously counted raw `shared_space_asset` rows. This is a bug fix — deleted assets should not appear in "new" counts.
+- `getLastAssetAddedAt` and `getLastContributor`: intentionally NOT updated. These track manual contribution activity. Library-linked assets have no contributor — they flow in automatically. These methods remain `shared_space_asset`-only.
+- `getMostRecentAssetId`: intentionally NOT updated. Used for auto-selecting cover photos based on manual additions. Library assets don't trigger this.
+
 **Step 1: Update `getAssetCount`**
 
 ```typescript
@@ -372,6 +379,153 @@ getMapMarkers(spaceId: string) {
 ```bash
 git add server/src/repositories/shared-space.repository.ts
 git commit -m "feat(repo): UNION library assets in space asset queries including map"
+```
+
+---
+
+### Task 5b: Repository — Update validation and face-matching helper methods
+
+**Files:**
+
+- Modify: `server/src/repositories/shared-space.repository.ts` — `isAssetInSpace`, `isFaceInSpace`, `getAssetIdsInSpace`, `getSpaceIdsForAsset`
+
+These methods only query `shared_space_asset` and are used by the service for validation and face matching. Without updating them, library-linked assets will fail validation (e.g., setting a library asset as space thumbnail) and won't be processed by the "match all faces" job.
+
+**Step 1: Update `isAssetInSpace`**
+
+Used by `update()` for thumbnail validation. Must also check library-linked assets:
+
+```typescript
+@GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
+async isAssetInSpace(spaceId: string, assetId: string): Promise<boolean> {
+  const result = await this.db
+    .selectFrom(
+      this.db
+        .selectFrom('shared_space_asset')
+        .select('assetId as id')
+        .where('spaceId', '=', spaceId)
+        .where('assetId', '=', assetId)
+        .union(
+          this.db
+            .selectFrom('shared_space_library')
+            .innerJoin('asset', 'asset.libraryId', 'shared_space_library.libraryId')
+            .select('asset.id')
+            .where('shared_space_library.spaceId', '=', spaceId)
+            .where('asset.id', '=', assetId)
+            .where('asset.deletedAt', 'is', null)
+            .where('asset.isOffline', '=', false),
+        )
+        .as('combined'),
+    )
+    .select('combined.id')
+    .limit(1)
+    .executeTakeFirst();
+  return !!result;
+}
+```
+
+**Step 2: Update `isFaceInSpace`**
+
+Used by `updateSpacePerson()` for face validation:
+
+```typescript
+@GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
+async isFaceInSpace(spaceId: string, faceId: string): Promise<boolean> {
+  const result = await this.db
+    .selectFrom(
+      this.db
+        .selectFrom('shared_space_asset')
+        .innerJoin('asset_face', 'asset_face.assetId', 'shared_space_asset.assetId')
+        .select('asset_face.id')
+        .where('shared_space_asset.spaceId', '=', spaceId)
+        .where('asset_face.id', '=', faceId)
+        .where('asset_face.deletedAt', 'is', null)
+        .union(
+          this.db
+            .selectFrom('shared_space_library')
+            .innerJoin('asset', 'asset.libraryId', 'shared_space_library.libraryId')
+            .innerJoin('asset_face', 'asset_face.assetId', 'asset.id')
+            .select('asset_face.id')
+            .where('shared_space_library.spaceId', '=', spaceId)
+            .where('asset_face.id', '=', faceId)
+            .where('asset_face.deletedAt', 'is', null)
+            .where('asset.deletedAt', 'is', null)
+            .where('asset.isOffline', '=', false),
+        )
+        .as('combined'),
+    )
+    .select('combined.id')
+    .limit(1)
+    .executeTakeFirst();
+  return !!result;
+}
+```
+
+**Step 3: Update `getAssetIdsInSpace`**
+
+Used by `handleSharedSpaceFaceMatchAll` when face recognition is toggled on:
+
+```typescript
+@GenerateSql({ params: [DummyValue.UUID] })
+getAssetIdsInSpace(spaceId: string) {
+  return this.db
+    .selectFrom(
+      this.db
+        .selectFrom('shared_space_asset')
+        .select('assetId as id')
+        .where('spaceId', '=', spaceId)
+        .union(
+          this.db
+            .selectFrom('shared_space_library')
+            .innerJoin('asset', 'asset.libraryId', 'shared_space_library.libraryId')
+            .select('asset.id')
+            .where('shared_space_library.spaceId', '=', spaceId)
+            .where('asset.deletedAt', 'is', null)
+            .where('asset.isOffline', '=', false),
+        )
+        .as('combined'),
+    )
+    .select('combined.id as assetId')
+    .execute();
+}
+```
+
+**Step 4: Update `getSpaceIdsForAsset`**
+
+Used by `person.service.ts` during normal face detection to find which spaces contain an asset:
+
+```typescript
+@GenerateSql({ params: [DummyValue.UUID] })
+getSpaceIdsForAsset(assetId: string) {
+  return this.db
+    .selectFrom(
+      this.db
+        .selectFrom('shared_space_asset')
+        .innerJoin('shared_space', 'shared_space.id', 'shared_space_asset.spaceId')
+        .select('shared_space_asset.spaceId')
+        .where('shared_space_asset.assetId', '=', assetId)
+        .where('shared_space.faceRecognitionEnabled', '=', true)
+        .union(
+          this.db
+            .selectFrom('shared_space_library')
+            .innerJoin('asset', 'asset.libraryId', 'shared_space_library.libraryId')
+            .innerJoin('shared_space', 'shared_space.id', 'shared_space_library.spaceId')
+            .select('shared_space_library.spaceId')
+            .where('asset.id', '=', assetId)
+            .where('shared_space.faceRecognitionEnabled', '=', true),
+        )
+        .as('combined'),
+    )
+    .select('combined.spaceId')
+    .execute();
+}
+```
+
+**Step 5: Commit**
+
+```bash
+git add server/src/repositories/shared-space.repository.ts
+git commit -m "feat(repo): update validation and face-matching methods for library-linked assets"
 ```
 
 ---
@@ -564,6 +718,89 @@ git commit -m "feat(access): grant space members access to library-linked assets
 
 ---
 
+### Task 7b: Repository unit tests — UNION query logic
+
+**Files:**
+
+- Test: `server/src/services/shared-space.service.spec.ts` (repository is tested indirectly via service mocks, but we need dedicated tests for the UNION logic)
+
+Since repository methods use SQL queries that can't be meaningfully unit-tested with mocks (the UNION logic is in the query itself), these tests belong in medium tests. However, we add service-level tests that verify the correct repository methods are called with correct arguments, and rely on Task 21 (medium tests) for actual UNION verification.
+
+**Step 1: Write service-level wiring tests**
+
+Add to `shared-space.service.spec.ts` in existing `describe` blocks:
+
+```typescript
+describe('getAssetCount (with library-linked assets)', () => {
+  it('should call repository getAssetCount which includes library assets', async () => {
+    // This verifies the service calls the updated repository method
+    // The actual UNION logic is validated in medium tests (Task 21)
+    const auth = factory.auth();
+    const space = factory.sharedSpace();
+    const member = factory.sharedSpaceMember({ spaceId: space.id, userId: auth.user.id });
+
+    mocks.sharedSpace.getById.mockResolvedValue(space);
+    mocks.sharedSpace.getMember.mockResolvedValue(member);
+    mocks.sharedSpace.getMembers.mockResolvedValue([makeMemberResult({ ...member })]);
+    mocks.sharedSpace.getAssetCount.mockResolvedValue(117000);
+    mocks.sharedSpace.getRecentAssets.mockResolvedValue([]);
+    mocks.sharedSpace.getNewAssetCount.mockResolvedValue(0);
+
+    const result = await sut.get(auth, space.id);
+
+    expect(result.assetCount).toBe(117000);
+    expect(mocks.sharedSpace.getAssetCount).toHaveBeenCalledWith(space.id);
+  });
+});
+
+describe('isAssetInSpace (with library-linked assets)', () => {
+  it('should validate thumbnail from library-linked asset', async () => {
+    const auth = factory.auth();
+    const space = factory.sharedSpace();
+    const member = factory.sharedSpaceMember({
+      spaceId: space.id,
+      userId: auth.user.id,
+      role: SharedSpaceRole.Owner,
+    });
+    const thumbnailAssetId = newUuid();
+
+    mocks.sharedSpace.getById.mockResolvedValue(space);
+    mocks.sharedSpace.getMember.mockResolvedValue(member);
+    mocks.sharedSpace.isAssetInSpace.mockResolvedValue(true); // Library asset passes validation
+    mocks.sharedSpace.update.mockResolvedValue(space);
+
+    await sut.update(auth, space.id, { thumbnailAssetId });
+
+    expect(mocks.sharedSpace.isAssetInSpace).toHaveBeenCalledWith(space.id, thumbnailAssetId);
+  });
+
+  it('should reject thumbnail not in space or linked library', async () => {
+    const auth = factory.auth();
+    const space = factory.sharedSpace();
+    const member = factory.sharedSpaceMember({
+      spaceId: space.id,
+      userId: auth.user.id,
+      role: SharedSpaceRole.Owner,
+    });
+
+    mocks.sharedSpace.getById.mockResolvedValue(space);
+    mocks.sharedSpace.getMember.mockResolvedValue(member);
+    mocks.sharedSpace.isAssetInSpace.mockResolvedValue(false);
+
+    await expect(sut.update(auth, space.id, { thumbnailAssetId: newUuid() })).rejects.toThrow(BadRequestException);
+  });
+});
+```
+
+**Step 2: Commit**
+
+```bash
+git add server/src/services/shared-space.service.spec.ts
+git commit -m "test: add service-level tests for library-aware repository methods"
+```
+
+---
+
 ### Task 8: DTO — Add library fields to space DTOs
 
 **Files:**
@@ -726,7 +963,7 @@ describe('linkLibrary', () => {
 
   it('should silently no-op when linking the same library twice', async () => {
     const auth = factory.auth({ user: { isAdmin: true } });
-    const space = factory.sharedSpace();
+    const space = factory.sharedSpace({ faceRecognitionEnabled: true });
     const library = factory.library();
     const member = factory.sharedSpaceMember({
       spaceId: space.id,
@@ -741,6 +978,11 @@ describe('linkLibrary', () => {
     mocks.sharedSpace.addLibrary.mockResolvedValue(undefined);
 
     await expect(sut.linkLibrary(auth, space.id, { libraryId: library.id })).resolves.not.toThrow();
+
+    // Should NOT re-queue face sync for duplicate link
+    expect(mocks.job.queue).not.toHaveBeenCalledWith(
+      expect.objectContaining({ name: JobName.SharedSpaceLibraryFaceSync }),
+    );
   });
 
   it('should allow linking the same library to different spaces', async () => {
@@ -902,6 +1144,16 @@ describe('unlinkLibrary', () => {
     await expect(sut.unlinkLibrary(auth, space.id, newUuid())).rejects.toThrow(ForbiddenException);
   });
 
+  it('should reject when user is admin but not a space member', async () => {
+    const auth = factory.auth({ user: { isAdmin: true } });
+    const space = factory.sharedSpace();
+
+    mocks.sharedSpace.getById.mockResolvedValue(space);
+    mocks.sharedSpace.getMember.mockResolvedValue(undefined);
+
+    await expect(sut.unlinkLibrary(auth, space.id, newUuid())).rejects.toThrow(ForbiddenException);
+  });
+
   it('should not fail when unlinking a library that is not linked', async () => {
     const auth = factory.auth({ user: { isAdmin: true } });
     const space = factory.sharedSpace();
@@ -915,6 +1167,25 @@ describe('unlinkLibrary', () => {
     mocks.sharedSpace.getMember.mockResolvedValue(member);
 
     await expect(sut.unlinkLibrary(auth, space.id, newUuid())).resolves.not.toThrow();
+  });
+
+  it('should not remove manually added assets from the same library', async () => {
+    const auth = factory.auth({ user: { isAdmin: true } });
+    const space = factory.sharedSpace();
+    const member = factory.sharedSpaceMember({
+      spaceId: space.id,
+      userId: auth.user.id,
+      role: SharedSpaceRole.Owner,
+    });
+
+    mocks.sharedSpace.getById.mockResolvedValue(space);
+    mocks.sharedSpace.getMember.mockResolvedValue(member);
+
+    await sut.unlinkLibrary(auth, space.id, newUuid());
+
+    // removeLibrary only deletes from shared_space_library, NOT shared_space_asset
+    expect(mocks.sharedSpace.removeLibrary).toHaveBeenCalled();
+    expect(mocks.sharedSpace.removeAssets).not.toHaveBeenCalled();
   });
 });
 ```
@@ -944,7 +1215,7 @@ git commit -m "test: add failing tests for linkLibrary/unlinkLibrary"
 
 **Step 1: Implement `linkLibrary`**
 
-Note: `requireRole` already fetches the space via `getById` internally. Reuse the space from the role check context rather than fetching it again.
+Note: `requireRole` returns the **member** object, not the space. We need a separate `getById` call to check `faceRecognitionEnabled`. Also, `addLibrary` returns `undefined` when the library is already linked (due to `ON CONFLICT DO NOTHING`). Only queue face sync for newly created links.
 
 ```typescript
 async linkLibrary(auth: AuthDto, spaceId: string, dto: SharedSpaceLibraryLinkDto): Promise<void> {
@@ -952,29 +1223,31 @@ async linkLibrary(auth: AuthDto, spaceId: string, dto: SharedSpaceLibraryLinkDto
     throw new ForbiddenException('Only admins can link libraries to spaces');
   }
 
-  const space = await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
+  await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
 
   const library = await this.libraryRepository.get(dto.libraryId);
   if (!library) {
     throw new BadRequestException('Library not found');
   }
 
-  await this.sharedSpaceRepository.addLibrary({
+  const result = await this.sharedSpaceRepository.addLibrary({
     spaceId,
     libraryId: dto.libraryId,
     addedById: auth.user.id,
   });
 
-  if (space.faceRecognitionEnabled) {
-    await this.jobRepository.queue({
-      name: JobName.SharedSpaceLibraryFaceSync,
-      data: { spaceId, libraryId: dto.libraryId },
-    });
+  // Only queue face sync for newly created links (not duplicates)
+  if (result) {
+    const space = await this.sharedSpaceRepository.getById(spaceId);
+    if (space?.faceRecognitionEnabled) {
+      await this.jobRepository.queue({
+        name: JobName.SharedSpaceLibraryFaceSync,
+        data: { spaceId, libraryId: dto.libraryId },
+      });
+    }
   }
 }
 ```
-
-Note: If `requireRole` does not currently return the space object, modify it to do so, or fetch the space from the already-loaded data. Check the existing `requireRole` implementation — it calls `getById` and `getMember` internally. If it doesn't return the space, refactor it to return the space or use a separate call.
 
 **Step 2: Implement `unlinkLibrary`**
 
@@ -1453,6 +1726,78 @@ describe('handleSharedSpaceLibraryFaceSync', () => {
 
     expect(result).toBe(JobStatus.Success);
   });
+
+  it('should call face matching for each asset with faces', async () => {
+    const spaceId = newUuid();
+    const libraryId = newUuid();
+    const assetId = newUuid();
+    const faceId = newUuid();
+
+    mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
+    mocks.sharedSpace.hasLibraryLink.mockResolvedValue(true);
+    mocks.asset.getByLibraryIdWithFaces.mockResolvedValueOnce([{ id: assetId }]).mockResolvedValueOnce([]);
+    mocks.sharedSpace.getAssetFacesForMatching.mockResolvedValue([
+      { id: faceId, assetId, personId: null, embedding: '[0.1,0.2]' },
+    ]);
+    mocks.sharedSpace.isPersonFaceAssigned.mockResolvedValue(false);
+    mocks.sharedSpace.findClosestSpacePerson.mockResolvedValue(null);
+
+    const result = await sut.handleSharedSpaceLibraryFaceSync({ spaceId, libraryId });
+
+    expect(result).toBe(JobStatus.Success);
+    expect(mocks.sharedSpace.getAssetFacesForMatching).toHaveBeenCalledWith(assetId);
+  });
+
+  it('should create new space person for unmatched face', async () => {
+    const spaceId = newUuid();
+    const libraryId = newUuid();
+    const assetId = newUuid();
+    const faceId = newUuid();
+
+    mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
+    mocks.sharedSpace.hasLibraryLink.mockResolvedValue(true);
+    mocks.asset.getByLibraryIdWithFaces.mockResolvedValueOnce([{ id: assetId }]).mockResolvedValueOnce([]);
+    mocks.sharedSpace.getAssetFacesForMatching.mockResolvedValue([
+      { id: faceId, assetId, personId: null, embedding: '[0.1,0.2]' },
+    ]);
+    mocks.sharedSpace.isPersonFaceAssigned.mockResolvedValue(false);
+    mocks.sharedSpace.findClosestSpacePerson.mockResolvedValue(null);
+    mocks.sharedSpace.createPerson.mockResolvedValue(factory.sharedSpacePerson({ spaceId }));
+
+    await sut.handleSharedSpaceLibraryFaceSync({ spaceId, libraryId });
+
+    // Should create a new space person for the unmatched face
+    expect(mocks.sharedSpace.createPerson).toHaveBeenCalled();
+  });
+
+  it('should match face to existing space person when close enough', async () => {
+    const spaceId = newUuid();
+    const libraryId = newUuid();
+    const assetId = newUuid();
+    const faceId = newUuid();
+    const existingPersonId = newUuid();
+
+    mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
+    mocks.sharedSpace.hasLibraryLink.mockResolvedValue(true);
+    mocks.asset.getByLibraryIdWithFaces.mockResolvedValueOnce([{ id: assetId }]).mockResolvedValueOnce([]);
+    mocks.sharedSpace.getAssetFacesForMatching.mockResolvedValue([
+      { id: faceId, assetId, personId: null, embedding: '[0.1,0.2]' },
+    ]);
+    mocks.sharedSpace.isPersonFaceAssigned.mockResolvedValue(false);
+    mocks.sharedSpace.findClosestSpacePerson.mockResolvedValue({
+      distance: 0.3,
+      id: existingPersonId,
+      personId: existingPersonId,
+    });
+
+    await sut.handleSharedSpaceLibraryFaceSync({ spaceId, libraryId });
+
+    // Should assign face to existing person, NOT create new one
+    expect(mocks.sharedSpace.assignFaceToPerson).toHaveBeenCalledWith(
+      expect.objectContaining({ personId: existingPersonId, assetFaceId: faceId }),
+    );
+    expect(mocks.sharedSpace.createPerson).not.toHaveBeenCalled();
+  });
 });
 ```
 
@@ -1530,28 +1875,46 @@ git commit -m "feat(service): implement SharedSpaceLibraryFaceSync orchestrator"
 
 ---
 
-### Task 18: Register job handler
+### Task 18: Register job handler and type
 
 **Files:**
 
-- Modify: Job handler registration (follow existing `SharedSpaceFaceMatch` pattern)
+- Modify: `server/src/types.ts` — add job type interface and `JobItem` union entry
+- Modify: Job handler registration (follow existing `SharedSpaceFaceMatch` pattern — uses `@OnJob` decorator)
 
-**Step 1: Find and follow the registration pattern**
+**Step 1: Add job type to `server/src/types.ts`**
 
-Look at how `SharedSpaceFaceMatch` and `SharedSpaceFaceMatchAll` are registered. Check:
+Add the interface after `ISharedSpaceFaceMatchAllJob` (around line 245):
 
-- `server/src/utils/misc.ts` or wherever job-to-handler mapping lives
-- The worker setup files
+```typescript
+export interface ISharedSpaceLibraryFaceSyncJob extends IBaseJob {
+  spaceId: string;
+  libraryId: string;
+}
+```
 
-**Step 2: Register the new job**
+Add to the `JobItem` union type (around line 443, before the closing `;`):
 
-Register `SharedSpaceLibraryFaceSync` pointing to `SharedSpaceService.handleSharedSpaceLibraryFaceSync`. Follow the existing pattern exactly.
+```typescript
+  | { name: JobName.SharedSpaceLibraryFaceSync; data: ISharedSpaceLibraryFaceSyncJob }
+```
+
+**Step 2: Add `@OnJob` decorator to the handler**
+
+In `server/src/services/shared-space.service.ts`, add the `@OnJob` decorator to `handleSharedSpaceLibraryFaceSync`:
+
+```typescript
+@OnJob({ name: JobName.SharedSpaceLibraryFaceSync, queue: QueueName.FacialRecognition })
+async handleSharedSpaceLibraryFaceSync(job: JobOf<JobName.SharedSpaceLibraryFaceSync>): Promise<JobStatus> {
+```
+
+Follow the same pattern as `handleSharedSpaceFaceMatch` (which uses `@OnJob` with `QueueName.FacialRecognition`).
 
 **Step 3: Commit**
 
 ```bash
-git add <modified files>
-git commit -m "feat(jobs): register SharedSpaceLibraryFaceSync handler"
+git add server/src/types.ts server/src/services/shared-space.service.ts
+git commit -m "feat(jobs): register SharedSpaceLibraryFaceSync handler and type"
 ```
 
 ---
@@ -1710,6 +2073,22 @@ describe('shared_space_library (medium)', () => {
   it('should not include deleted or offline library assets in count', async () => {
     // Create library link with assets, mark some deleted/offline
     // Verify they are excluded from count
+  });
+
+  it('should deduplicate across two linked libraries containing the same asset', async () => {
+    // Create asset present in two libraries (e.g., overlapping import paths / symlinks)
+    // Link both libraries to the same space
+    // Verify getAssetCount returns the asset only once (UNION dedup)
+  });
+
+  it('should validate library-linked asset as space thumbnail', async () => {
+    // Link library, use library asset as thumbnail
+    // Verify isAssetInSpace returns true for the library asset
+  });
+
+  it('should find space IDs for a library-linked asset (face matching)', async () => {
+    // Link library with asset to space
+    // Verify getSpaceIdsForAsset returns the space for a library asset
   });
 });
 ```
@@ -2029,9 +2408,11 @@ Create `web/src/lib/components/spaces/space-linked-libraries.svelte`:
   let linkedLibraries = $derived(space.linkedLibraries ?? []);
   let availableLibraries = $state<SelectOption<string>[]>([]);
   let selectedLibraryId = $state<string>('');
-  let loading = $state(false);
+  let linking = $state(false);
+  let loadingLibraries = $state(true);
 
   async function loadAvailableLibraries() {
+    loadingLibraries = true;
     try {
       const libraries = await getAllLibraries();
       const linkedIds = new Set(linkedLibraries.map((l) => l.libraryId));
@@ -2040,6 +2421,8 @@ Create `web/src/lib/components/spaces/space-linked-libraries.svelte`:
         .map((lib) => ({ label: lib.name, value: lib.id }));
     } catch (error) {
       handleError(error, 'Failed to load libraries');
+    } finally {
+      loadingLibraries = false;
     }
   }
 
@@ -2047,7 +2430,7 @@ Create `web/src/lib/components/spaces/space-linked-libraries.svelte`:
     if (!selectedLibraryId) {
       return;
     }
-    loading = true;
+    linking = true;
     try {
       await linkLibrary({ id: space.id, sharedSpaceLibraryLinkDto: { libraryId: selectedLibraryId } });
       selectedLibraryId = '';
@@ -2055,7 +2438,7 @@ Create `web/src/lib/components/spaces/space-linked-libraries.svelte`:
     } catch (error) {
       handleError(error, 'Failed to link library');
     } finally {
-      loading = false;
+      linking = false;
     }
   }
 
@@ -2075,7 +2458,10 @@ Create `web/src/lib/components/spaces/space-linked-libraries.svelte`:
     }
   }
 
+  // Reload available libraries when linked libraries change
   $effect(() => {
+    // Track linkedLibraries to re-run when space prop updates
+    void linkedLibraries;
     loadAvailableLibraries();
   });
 </script>
@@ -2116,7 +2502,9 @@ Create `web/src/lib/components/spaces/space-linked-libraries.svelte`:
   {/if}
 
   <!-- Add library -->
-  {#if availableLibraries.length > 0}
+  {#if loadingLibraries}
+    <p class="text-xs text-gray-400">Loading libraries...</p>
+  {:else if availableLibraries.length > 0}
     <div class="flex items-end gap-2">
       <Field class="flex-1">
         <Select
@@ -2129,7 +2517,7 @@ Create `web/src/lib/components/spaces/space-linked-libraries.svelte`:
         size="small"
         leadingIcon={mdiLinkVariantPlus}
         onclick={handleLink}
-        disabled={!selectedLibraryId || loading}
+        disabled={!selectedLibraryId || linking}
       >
         Link
       </Button>
