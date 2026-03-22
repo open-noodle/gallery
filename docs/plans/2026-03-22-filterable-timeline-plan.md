@@ -876,17 +876,18 @@ Create `web/src/lib/components/filter-panel/filter-panel.svelte`:
         onclick={() => (collapsed = false)}
       >
         <Icon icon={sectionIcons[section]} size="16" />
-        {#if hasActiveFilter(section)}
+        {#if hasActiveFilter(section) && section !== 'tags' && section !== 'media'}
+          <!-- Badges only on: timeline, people, location, camera, rating (per design spec) -->
           <span class="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-[var(--primary)] border-[1.5px] border-[#131316]"></span>
         {/if}
       </button>
     {/each}
   </div>
 {:else}
-  <div class="flex w-60 flex-col overflow-y-auto border-r border-[var(--border)] bg-[#131316]"
+  <div class="flex w-60 flex-col overflow-y-auto border-r border-[var(--border)] bg-[#131316] scrollbar-thin"
        data-testid="discovery-panel">
     <!-- Header -->
-    <div class="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--border)] bg-[#131316] px-3 py-2.5">
+    <div class="sticky top-0 z-5 flex items-center justify-between border-b border-[var(--border)] bg-[#131316] px-3 py-2.5">
       <span class="text-[13px] font-semibold">Filters</span>
       <button
         class="flex h-6 w-6 items-center justify-center rounded-full text-[var(--fg-muted)]"
