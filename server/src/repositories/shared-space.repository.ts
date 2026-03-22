@@ -137,11 +137,26 @@ export class SharedSpaceRepository {
   @GenerateSql({ params: [DummyValue.UUID] })
   async getAssetCount(spaceId: string): Promise<number> {
     const result = await this.db
-      .selectFrom('shared_space_asset')
-      .innerJoin('asset', 'asset.id', 'shared_space_asset.assetId')
+      .selectFrom(
+        this.db
+          .selectFrom('shared_space_asset')
+          .innerJoin('asset', 'asset.id', 'shared_space_asset.assetId')
+          .select('asset.id')
+          .where('shared_space_asset.spaceId', '=', spaceId)
+          .where('asset.deletedAt', 'is', null)
+          .where('asset.isOffline', '=', false)
+          .union(
+            this.db
+              .selectFrom('shared_space_library')
+              .innerJoin('asset', 'asset.libraryId', 'shared_space_library.libraryId')
+              .select('asset.id')
+              .where('shared_space_library.spaceId', '=', spaceId)
+              .where('asset.deletedAt', 'is', null)
+              .where('asset.isOffline', '=', false),
+          )
+          .as('combined'),
+      )
       .select((eb) => eb.fn.countAll().as('count'))
-      .where('shared_space_asset.spaceId', '=', spaceId)
-      .where('asset.deletedAt', 'is', null)
       .executeTakeFirstOrThrow();
     return Number(result.count);
   }
@@ -236,14 +251,29 @@ export class SharedSpaceRepository {
   }
 
   @GenerateSql({ params: [DummyValue.UUID, 4] })
-  getRecentAssets(spaceId: string, limit: number = 4) {
+  getRecentAssets(spaceId: string, limit = 4) {
     return this.db
-      .selectFrom('shared_space_asset')
-      .innerJoin('asset', 'asset.id', 'shared_space_asset.assetId')
-      .where('shared_space_asset.spaceId', '=', spaceId)
-      .where('asset.deletedAt', 'is', null)
-      .orderBy('shared_space_asset.addedAt', 'desc')
-      .select(['asset.id', 'asset.thumbhash'])
+      .selectFrom(
+        this.db
+          .selectFrom('shared_space_asset')
+          .innerJoin('asset', 'asset.id', 'shared_space_asset.assetId')
+          .select(['asset.id', 'asset.thumbhash', 'asset.fileCreatedAt'])
+          .where('shared_space_asset.spaceId', '=', spaceId)
+          .where('asset.deletedAt', 'is', null)
+          .where('asset.isOffline', '=', false)
+          .union(
+            this.db
+              .selectFrom('shared_space_library')
+              .innerJoin('asset', 'asset.libraryId', 'shared_space_library.libraryId')
+              .select(['asset.id', 'asset.thumbhash', 'asset.fileCreatedAt'])
+              .where('shared_space_library.spaceId', '=', spaceId)
+              .where('asset.deletedAt', 'is', null)
+              .where('asset.isOffline', '=', false),
+          )
+          .as('combined'),
+      )
+      .select(['combined.id', 'combined.thumbhash'])
+      .orderBy('combined.fileCreatedAt', 'desc')
       .limit(limit)
       .execute();
   }
@@ -261,10 +291,28 @@ export class SharedSpaceRepository {
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.DATE] })
   async getNewAssetCount(spaceId: string, since: Date): Promise<number> {
     const result = await this.db
-      .selectFrom('shared_space_asset')
+      .selectFrom(
+        this.db
+          .selectFrom('shared_space_asset')
+          .innerJoin('asset', 'asset.id', 'shared_space_asset.assetId')
+          .select('asset.id')
+          .where('shared_space_asset.spaceId', '=', spaceId)
+          .where('shared_space_asset.addedAt', '>', since)
+          .where('asset.deletedAt', 'is', null)
+          .where('asset.isOffline', '=', false)
+          .union(
+            this.db
+              .selectFrom('shared_space_library')
+              .innerJoin('asset', 'asset.libraryId', 'shared_space_library.libraryId')
+              .select('asset.id')
+              .where('shared_space_library.spaceId', '=', spaceId)
+              .where('asset.createdAt', '>', since)
+              .where('asset.deletedAt', 'is', null)
+              .where('asset.isOffline', '=', false),
+          )
+          .as('combined'),
+      )
       .select((eb) => eb.fn.countAll().as('count'))
-      .where('spaceId', '=', spaceId)
-      .where('addedAt', '>', since)
       .executeTakeFirstOrThrow();
     return Number(result.count);
   }
@@ -329,11 +377,27 @@ export class SharedSpaceRepository {
   @GenerateSql({ params: [DummyValue.UUID] })
   getMapMarkers(spaceId: string) {
     return this.db
-      .selectFrom('shared_space_asset')
-      .innerJoin('asset', 'asset.id', 'shared_space_asset.assetId')
+      .selectFrom(
+        this.db
+          .selectFrom('shared_space_asset')
+          .innerJoin('asset', 'asset.id', 'shared_space_asset.assetId')
+          .select('asset.id')
+          .where('shared_space_asset.spaceId', '=', spaceId)
+          .where('asset.deletedAt', 'is', null)
+          .where('asset.isOffline', '=', false)
+          .union(
+            this.db
+              .selectFrom('shared_space_library')
+              .innerJoin('asset', 'asset.libraryId', 'shared_space_library.libraryId')
+              .select('asset.id')
+              .where('shared_space_library.spaceId', '=', spaceId)
+              .where('asset.deletedAt', 'is', null)
+              .where('asset.isOffline', '=', false),
+          )
+          .as('combined'),
+      )
+      .innerJoin('asset', 'asset.id', 'combined.id')
       .innerJoin('asset_exif', 'asset.id', 'asset_exif.assetId')
-      .where('shared_space_asset.spaceId', '=', spaceId)
-      .where('asset.deletedAt', 'is', null)
       .where('asset_exif.latitude', 'is not', null)
       .where('asset_exif.longitude', 'is not', null)
       .select([
