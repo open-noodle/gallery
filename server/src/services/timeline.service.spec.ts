@@ -532,6 +532,15 @@ describe(TimelineService.name, () => {
     });
   });
 
+  describe('multi-select filter passthrough (Task 2 will wire DTO support)', () => {
+    it.todo('should pass personIds array through to asset repository for getTimeBuckets');
+    it.todo('should pass spacePersonIds array through to asset repository for getTimeBuckets');
+    it.todo('should pass tagIds array through to asset repository for getTimeBuckets');
+    it.todo('should pass personIds array through to asset repository for getTimeBucket');
+    it.todo('should pass spacePersonIds array through to asset repository for getTimeBucket');
+    it.todo('should pass tagIds array through to asset repository for getTimeBucket');
+  });
+
   describe('edge cases', () => {
     it('should not interfere when albumId is provided instead of spaceId', async () => {
       mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set(['album-id']));
