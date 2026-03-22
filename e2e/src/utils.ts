@@ -218,13 +218,25 @@ export const utils = {
     const query = sql.join('\n');
     const maxRetries = 3;
 
+    const isRetryableError = (error: any) =>
+      error?.code === '40P01' || // deadlock
+      error?.message?.includes('terminated') ||
+      error?.message?.includes('Connection') ||
+      error?.message?.includes('ECONNREFUSED');
+
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         await client.query(query);
         return;
       } catch (error: any) {
-        if (error?.code === '40P01' && attempt < maxRetries) {
-          await new Promise((resolve) => setTimeout(resolve, 250 * attempt));
+        if (isRetryableError(error) && attempt < maxRetries) {
+          // Force reconnect on connection errors
+          try {
+            await client.end();
+          } catch {}
+          client = null;
+          await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
+          client = await utils.connectDatabase();
           continue;
         }
         console.error('Failed to reset database', error);
