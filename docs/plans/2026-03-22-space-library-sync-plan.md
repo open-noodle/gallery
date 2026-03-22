@@ -97,7 +97,18 @@ const sharedSpaceLibraryFactory = (data: Partial<SharedSpaceLibrary> = {}): Shar
 });
 ```
 
-Add the `SharedSpaceLibrary` type to the imports from the DB types at the top of the file.
+Add the `SharedSpaceLibrary` type to `server/src/database.ts` alongside the other shared space types (after `SharedSpaceAsset`):
+
+```typescript
+export type SharedSpaceLibrary = {
+  spaceId: string;
+  libraryId: string;
+  addedById: string | null;
+  createdAt: Date;
+};
+```
+
+Then import it in `server/test/small.factory.ts` from `src/database`.
 
 Add to the `factory` export object after `sharedSpacePersonAlias` (around line 515):
 
@@ -1588,6 +1599,7 @@ cd server && pnpm test -- --run src/services/library.service.spec.ts
 In `server/src/services/library.service.ts`, in `handleSyncFiles`, after `queuePostSyncJobs(assetIds)` (line 274), add:
 
 ```typescript
+// Queue face match for spaces linked to this library
 if (assetIds.length > 0) {
   const linkedSpaces = await this.sharedSpaceRepository.getSpacesLinkedToLibrary(job.libraryId);
   for (const link of linkedSpaces) {
@@ -1602,6 +1614,14 @@ if (assetIds.length > 0) {
   }
 }
 ```
+
+**Important:** Existing `handleSyncFiles` tests will break because they don't mock `getSpacesLinkedToLibrary`. Add this to the existing test `beforeEach` block (around line 574 of `library.service.spec.ts`):
+
+```typescript
+mocks.sharedSpace.getSpacesLinkedToLibrary.mockResolvedValue([]);
+```
+
+This ensures existing tests pass with the new code path (no linked spaces = no extra jobs queued).
 
 **Step 4: Run tests — verify they pass**
 
