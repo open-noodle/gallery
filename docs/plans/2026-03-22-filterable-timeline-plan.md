@@ -1474,7 +1474,7 @@ test: add server E2E tests for timeline EXIF filters and scoped suggestions
 
 **Follow the pattern in `e2e/src/specs/web/spaces-p1.e2e-spec.ts`.**
 
-This is the largest task — 86 E2E test cases from the design doc. Implement ALL
+This is the largest task — 87 E2E test cases from the design doc. Implement ALL
 test cases listed in the design doc's "E2E (Playwright) — comprehensive coverage"
 section. Group them into test.describe blocks matching the design doc categories:
 
