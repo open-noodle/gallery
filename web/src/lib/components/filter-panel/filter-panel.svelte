@@ -11,13 +11,16 @@
     mdiStar,
     mdiImage,
   } from '@mdi/js';
-  import type { FilterPanelConfig, FilterState, PersonOption } from './filter-panel';
+  import type { FilterPanelConfig, FilterState, PersonOption, TagOption } from './filter-panel';
   import { createFilterState } from './filter-panel';
   import FilterSection from './filter-section.svelte';
   import TemporalPicker from './temporal-picker.svelte';
   import PeopleFilter from './people-filter.svelte';
   import LocationFilter from './location-filter.svelte';
   import CameraFilter from './camera-filter.svelte';
+  import TagsFilter from './tags-filter.svelte';
+  import RatingFilter from './rating-filter.svelte';
+  import MediaTypeFilter from './media-type-filter.svelte';
 
   interface Props {
     config: FilterPanelConfig;
@@ -33,6 +36,7 @@
   let people = $state<PersonOption[]>([]);
   let countries = $state<string[]>([]);
   let cameraMakes = $state<string[]>([]);
+  let tags = $state<TagOption[]>([]);
 
   const sectionIcons: Record<string, string> = {
     timeline: mdiCalendar,
@@ -79,6 +83,14 @@
     }
   });
 
+  $effect(() => {
+    if (config.providers.tags && config.sections.includes('tags')) {
+      config.providers.tags().then((result) => {
+        tags = result;
+      });
+    }
+  });
+
   function notifyFilterChange() {
     onFilterChange(filters);
   }
@@ -97,6 +109,21 @@
   function handleCameraChange(make?: string, model?: string) {
     filters.make = make;
     filters.model = model;
+    notifyFilterChange();
+  }
+
+  function handleTagsChange(ids: string[]) {
+    filters.tagIds = ids;
+    notifyFilterChange();
+  }
+
+  function handleRatingChange(rating?: number) {
+    filters.rating = rating;
+    notifyFilterChange();
+  }
+
+  function handleMediaTypeChange(type: 'all' | 'image' | 'video') {
+    filters.mediaType = type;
     notifyFilterChange();
   }
 
@@ -147,7 +174,7 @@
         onclick={() => (collapsed = false)}
       >
         <Icon icon={sectionIcons[section]} size="16" />
-        {#if hasActiveFilter(section) && section !== 'tags' && section !== 'media'}
+        {#if hasActiveFilter(section)}
           <span
             class="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full border-[1.5px] border-[#131316] bg-[var(--primary)]"
           ></span>
@@ -208,8 +235,12 @@
             }}
             onSelectionChange={handleCameraChange}
           />
-        {:else}
-          <p class="text-xs text-[var(--fg-muted)]">{sectionTitles[section]} filter placeholder</p>
+        {:else if section === 'tags'}
+          <TagsFilter {tags} selectedIds={filters.tagIds} onSelectionChange={handleTagsChange} />
+        {:else if section === 'rating'}
+          <RatingFilter selectedRating={filters.rating} onRatingChange={handleRatingChange} />
+        {:else if section === 'media'}
+          <MediaTypeFilter selected={filters.mediaType} onTypeChange={handleMediaTypeChange} />
         {/if}
       </FilterSection>
     {/each}
