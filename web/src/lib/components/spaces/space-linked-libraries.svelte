@@ -82,7 +82,7 @@
 <div class="flex flex-col gap-4 px-5 py-4" data-testid="linked-libraries">
   <!-- Header -->
   <div class="flex items-center gap-2">
-    <Icon path={mdiBookshelf} size="20" class="text-gray-500" />
+    <Icon icon={mdiBookshelf} size="20" class="text-gray-500" />
     <h3 class="text-sm font-semibold">Connected Libraries</h3>
   </div>
 

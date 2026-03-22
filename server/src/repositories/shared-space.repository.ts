@@ -207,11 +207,7 @@ export class SharedSpaceRepository {
 
   @GenerateSql({ params: [DummyValue.UUID] })
   getLinkedLibraries(spaceId: string) {
-    return this.db
-      .selectFrom('shared_space_library')
-      .selectAll()
-      .where('spaceId', '=', spaceId)
-      .execute();
+    return this.db.selectFrom('shared_space_library').selectAll().where('spaceId', '=', spaceId).execute();
   }
 
   @GenerateSql({ params: [DummyValue.UUID] })
