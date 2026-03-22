@@ -165,6 +165,12 @@ const onEvent = ({ event, id }: { event: EventType; id: string }) => {
   }
 };
 
+const isRetryableError = (error: any) =>
+  error?.code === '40P01' || // deadlock
+  error?.message?.includes('terminated') ||
+  error?.message?.includes('Connection') ||
+  error?.message?.includes('ECONNREFUSED');
+
 export const utils = {
   connectDatabase: async () => {
     if (!client) {
@@ -218,12 +224,6 @@ export const utils = {
     const query = sql.join('\n');
     const maxRetries = 3;
 
-    const isRetryableError = (error: any) =>
-      error?.code === '40P01' || // deadlock
-      error?.message?.includes('terminated') ||
-      error?.message?.includes('Connection') ||
-      error?.message?.includes('ECONNREFUSED');
-
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         await client.query(query);
@@ -233,7 +233,9 @@ export const utils = {
           // Force reconnect on connection errors
           try {
             await client.end();
-          } catch {}
+          } catch {
+            // ignore cleanup errors
+          }
           client = null;
           await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
           client = await utils.connectDatabase();
