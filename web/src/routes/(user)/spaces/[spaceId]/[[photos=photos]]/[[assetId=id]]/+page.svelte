@@ -597,7 +597,10 @@
     {#if viewMode === 'view'}
       <FilterPanel
         config={filterConfig}
-        timeBuckets={timelineManager?.months?.map((m) => ({ timeBucket: `${m.yearMonth.year}-${String(m.yearMonth.month).padStart(2, '0')}-01T00:00:00.000Z`, count: m.assetsCount })) ?? []}
+        timeBuckets={timelineManager?.months?.map((m) => ({
+          timeBucket: `${m.yearMonth.year}-${String(m.yearMonth.month).padStart(2, '0')}-01T00:00:00.000Z`,
+          count: m.assetsCount,
+        })) ?? []}
         onFilterChange={(f) => {
           filters = f;
         }}

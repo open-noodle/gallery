@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { aggregateYears, getMonthsForYear } from '../temporal-picker.svelte';
+import { describe, expect, it } from 'vitest';
+import { aggregateYears, getMonthsForYear } from '../temporal-utils';
 
 describe('TemporalPicker', () => {
   const buckets = [

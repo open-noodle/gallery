@@ -17,9 +17,7 @@
   const INITIAL_SHOW_COUNT = 5;
 
   let filteredPeople = $derived(
-    searchQuery.trim()
-      ? people.filter((p) => p.name.toLowerCase().includes(searchQuery.trim().toLowerCase()))
-      : people,
+    searchQuery.trim() ? people.filter((p) => p.name.toLowerCase().includes(searchQuery.trim().toLowerCase())) : people,
   );
 
   let visiblePeople = $derived(showAll ? filteredPeople : filteredPeople.slice(0, INITIAL_SHOW_COUNT));

@@ -65,7 +65,8 @@
       >
         <!-- Radio indicator -->
         <div
-          class="flex h-[13px] w-[13px] flex-shrink-0 items-center justify-center rounded-full border-[1.5px] {isMakeSelected && !selectedModel
+          class="flex h-[13px] w-[13px] flex-shrink-0 items-center justify-center rounded-full border-[1.5px] {isMakeSelected &&
+          !selectedModel
             ? 'border-[var(--primary)] bg-[var(--primary)]'
             : 'border-[var(--border)]'}"
         >

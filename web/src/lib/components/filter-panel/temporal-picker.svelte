@@ -1,54 +1,5 @@
-<script module lang="ts">
-  export interface YearData {
-    year: number;
-    count: number;
-    volumePercent: number;
-  }
-
-  export interface MonthData {
-    month: number;
-    label: string;
-    count: number;
-  }
-
-  const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-  export function aggregateYears(buckets: Array<{ timeBucket: string; count: number }>): YearData[] {
-    const yearMap = new Map<number, number>();
-    for (const b of buckets) {
-      const year = new Date(b.timeBucket).getUTCFullYear();
-      yearMap.set(year, (yearMap.get(year) ?? 0) + b.count);
-    }
-    const maxCount = Math.max(...yearMap.values(), 1);
-    return [...yearMap.entries()]
-      .sort(([a], [b]) => a - b)
-      .map(([year, count]) => ({
-        year,
-        count,
-        volumePercent: Math.round((count / maxCount) * 100),
-      }));
-  }
-
-  export function getMonthsForYear(
-    buckets: Array<{ timeBucket: string; count: number }>,
-    year: number,
-  ): MonthData[] {
-    const monthMap = new Map<number, number>();
-    for (const b of buckets) {
-      const d = new Date(b.timeBucket);
-      if (d.getUTCFullYear() === year) {
-        monthMap.set(d.getUTCMonth() + 1, b.count);
-      }
-    }
-    return MONTH_LABELS.map((label, i) => ({
-      month: i + 1,
-      label,
-      count: monthMap.get(i + 1) ?? 0,
-    }));
-  }
-</script>
-
 <script lang="ts">
+  import { aggregateYears, getMonthsForYear } from './temporal-utils';
   interface Props {
     timeBuckets: Array<{ timeBucket: string; count: number }>;
     onYearSelect?: (year: number) => void;
@@ -105,7 +56,9 @@
         <button
           type="button"
           class="flex flex-col items-center rounded-lg border border-[var(--border)] px-2 py-2 transition-all duration-100
-            {m.count === 0 ? 'cursor-default opacity-30' : 'cursor-pointer hover:border-[var(--primary)] hover:bg-[var(--primary)]/5'}"
+            {m.count === 0
+            ? 'cursor-default opacity-30'
+            : 'cursor-pointer hover:border-[var(--primary)] hover:bg-[var(--primary)]/5'}"
           onclick={() => handleMonthClick(selectedYear!, m.month, m.count)}
           data-testid="month-btn-{m.month}"
         >
@@ -127,7 +80,9 @@
         <button
           type="button"
           class="year-chip flex min-w-[54px] flex-1 basis-[calc(25%-5px)] flex-col items-center rounded-lg border border-[var(--border)] px-2 py-1.5 transition-all duration-100
-            {y.count === 0 ? 'cursor-default opacity-30' : 'cursor-pointer hover:border-[var(--primary)] hover:bg-[var(--primary)]/5'}"
+            {y.count === 0
+            ? 'cursor-default opacity-30'
+            : 'cursor-pointer hover:border-[var(--primary)] hover:bg-[var(--primary)]/5'}"
           onclick={() => handleYearClick(y.year, y.count)}
           data-testid="year-btn-{y.year}"
         >

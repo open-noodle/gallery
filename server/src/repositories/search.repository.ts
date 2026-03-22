@@ -503,7 +503,10 @@ export class SearchRepository {
   }
 
   @GenerateSql({ params: [[DummyValue.UUID], DummyValue.STRING] })
-  async getCameraLensModels(userIds: string[], { make, model, spaceId }: GetCameraLensModelsOptions): Promise<string[]> {
+  async getCameraLensModels(
+    userIds: string[],
+    { make, model, spaceId }: GetCameraLensModelsOptions,
+  ): Promise<string[]> {
     const res = await this.getExifField('lensModel', userIds, { spaceId })
       .$if(!!make, (qb) => qb.where('make', '=', make!))
       .$if(!!model, (qb) => qb.where('model', '=', model!))

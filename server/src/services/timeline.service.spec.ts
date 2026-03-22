@@ -536,25 +536,19 @@ describe(TimelineService.name, () => {
     it('should pass city filter to time bucket options', async () => {
       mocks.asset.getTimeBuckets.mockResolvedValue([]);
       await sut.getTimeBuckets(authStub.admin, { city: 'Munich' });
-      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
-        expect.objectContaining({ city: 'Munich' }),
-      );
+      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(expect.objectContaining({ city: 'Munich' }));
     });
 
     it('should pass rating filter to time bucket options', async () => {
       mocks.asset.getTimeBuckets.mockResolvedValue([]);
       await sut.getTimeBuckets(authStub.admin, { rating: 3 });
-      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
-        expect.objectContaining({ rating: 3 }),
-      );
+      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(expect.objectContaining({ rating: 3 }));
     });
 
     it('should accept deprecated personId and normalize to personIds', async () => {
       mocks.asset.getTimeBuckets.mockResolvedValue([]);
       await sut.getTimeBuckets(authStub.admin, { personId: 'person-1' });
-      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
-        expect.objectContaining({ personIds: ['person-1'] }),
-      );
+      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(expect.objectContaining({ personIds: ['person-1'] }));
     });
 
     it('should pass personIds array to time bucket options', async () => {
@@ -568,9 +562,7 @@ describe(TimelineService.name, () => {
     it('should pass type as assetType to time bucket options', async () => {
       mocks.asset.getTimeBuckets.mockResolvedValue([]);
       await sut.getTimeBuckets(authStub.admin, { type: AssetType.Image });
-      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
-        expect.objectContaining({ assetType: AssetType.Image }),
-      );
+      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(expect.objectContaining({ assetType: AssetType.Image }));
     });
 
     it('should check tag access for each tagId in tagIds array', async () => {
@@ -593,27 +585,21 @@ describe(TimelineService.name, () => {
       mocks.asset.getTimeBuckets.mockResolvedValue([]);
       mocks.access.tag.checkOwnerAccess.mockResolvedValue(new Set(['tag-1', 'tag-2']));
       await sut.getTimeBuckets(authStub.admin, { tagIds: ['tag-1', 'tag-2'] });
-      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
-        expect.objectContaining({ tagIds: ['tag-1', 'tag-2'] }),
-      );
+      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(expect.objectContaining({ tagIds: ['tag-1', 'tag-2'] }));
     });
 
     it('should accept deprecated spacePersonId and normalize to spacePersonIds', async () => {
       mocks.access.sharedSpace.checkMemberAccess.mockResolvedValue(new Set(['space-id']));
       mocks.asset.getTimeBuckets.mockResolvedValue([]);
       await sut.getTimeBuckets(authStub.admin, { spaceId: 'space-id', spacePersonId: 'sp-1' });
-      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
-        expect.objectContaining({ spacePersonIds: ['sp-1'] }),
-      );
+      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(expect.objectContaining({ spacePersonIds: ['sp-1'] }));
     });
 
     it('should accept deprecated tagId and normalize to tagIds', async () => {
       mocks.asset.getTimeBuckets.mockResolvedValue([]);
       mocks.access.tag.checkOwnerAccess.mockResolvedValue(new Set(['tag-1']));
       await sut.getTimeBuckets(authStub.admin, { tagId: 'tag-1' });
-      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
-        expect.objectContaining({ tagIds: ['tag-1'] }),
-      );
+      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(expect.objectContaining({ tagIds: ['tag-1'] }));
     });
   });
 

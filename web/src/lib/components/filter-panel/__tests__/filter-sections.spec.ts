@@ -1,8 +1,8 @@
 import { fireEvent, render, waitFor } from '@testing-library/svelte';
-import PeopleFilter from '../people-filter.svelte';
-import LocationFilter from '../location-filter.svelte';
 import CameraFilter from '../camera-filter.svelte';
 import type { PersonOption } from '../filter-panel';
+import LocationFilter from '../location-filter.svelte';
+import PeopleFilter from '../people-filter.svelte';
 
 const mockPeople: PersonOption[] = [
   { id: 'p1', name: 'Sarah Chen' },

@@ -1,8 +1,8 @@
 import { fireEvent, render } from '@testing-library/svelte';
-import TagsFilter from '../tags-filter.svelte';
-import RatingFilter from '../rating-filter.svelte';
-import MediaTypeFilter from '../media-type-filter.svelte';
 import type { TagOption } from '../filter-panel';
+import MediaTypeFilter from '../media-type-filter.svelte';
+import RatingFilter from '../rating-filter.svelte';
+import TagsFilter from '../tags-filter.svelte';
 
 const mockTags: TagOption[] = [
   { id: 't1', name: 'Vacation' },
