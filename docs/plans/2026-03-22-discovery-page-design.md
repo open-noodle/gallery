@@ -89,6 +89,95 @@ These are different operations and belong in different UI locations.
 - **Scrubber stays on the right** — the existing timeline scrubber continues to work
   alongside the temporal picker.
 
+## Visual Specification
+
+**Primary mockup:** `docs/plans/mockups/discovery-independent-panel.html` (the "Left"
+option). Open this file in a browser to see expanded and collapsed states side by side.
+
+**Temporal picker detail:** `docs/plans/mockups/discovery-navigation-phase3.html` for
+volume bars, breadcrumb, and filtered count behavior.
+
+### Panel dimensions and styling
+
+- **Expanded width:** 240px, with `border-right: 1px solid var(--border)`
+- **Collapsed width:** 32px icon strip
+- **Background:** `--bg-panel: #131316` (slightly darker than nav's `#141416` for
+  visual distinction)
+- **Scrollable:** `overflow-y: auto; scrollbar-width: thin`
+
+### Panel header
+
+- Sticky at top (`position: sticky; top: 0; z-index: 5`)
+- Title "Filters" (13px, weight 600)
+- Collapse chevron button (24×24px, `mdiChevronLeft`)
+- Padding: 10px 12px, bottom border
+
+### Section structure (each filter section)
+
+- **Section header:** title (10px, uppercase, 700 weight, 0.7px letter-spacing,
+  muted color) + chevron icon (14px). Click to collapse/expand. Hover shows
+  `--primary-soft` background.
+- **Section body:** padding 0 12px 10px
+- **Divider:** `border-bottom: 1px solid var(--border)` between sections
+
+### Temporal picker section
+
+- **Year chips:** 4-column flex wrap grid, 3px gap
+  - Each chip: 1px border, 4px border-radius, 10px font, weight 600
+  - Shows year label + count (8px, opacity 0.6)
+  - Volume bar: 2px height, border-radius 1px, fills proportionally (max year = 100%)
+  - Selected state: primary background, white text, white bar on 25%-opacity track
+  - Empty/zero state: 30% opacity
+- **Month grid:** 4-column CSS grid, appears below years when a year is selected
+  - Separated by `border-top: 1px solid var(--border)` with 6px margin/padding
+  - Breadcrumb above: "All / 2020" (11px, "All" is a link in primary color)
+  - Each month: 3px padding, 4px border-radius, 9px font, weight 600
+  - Selected state: primary background, white text
+
+### Filter items (people, location, camera, tags)
+
+- **Item row:** flex, 6px gap, 4px vertical padding, 11px font
+- **Checkbox:** 13×13px, 1.5px border, 3px border-radius
+  - Active: primary background + border, white checkmark SVG (9px)
+- **Person avatar:** 18×18px circle, gradient background, 8px white initial
+- **Label:** flex-1, text-overflow ellipsis
+- **People section:** local search input (26px height, 11px font, 5px border-radius,
+  search icon 12px)
+- **"Show N more" link:** 10px, primary color, weight 500
+
+### Rating section
+
+- 5 star icons (14×14px), 2px gap
+- Unfilled: `var(--border)` color
+- Filled: `#f59e0b` amber
+
+### Media type section
+
+- 3 toggle buttons in a flex row, 4px gap
+- Each: 1px border, 4px border-radius, 10px font, centered text
+- Active: primary border, primary-soft background, primary text color
+
+### Active filters bar
+
+- Sits above the photo grid, below any toolbar
+- Background: `var(--bg-surface)`, bottom border
+- Padding: 6px 14px, flex wrap
+- **Result count:** muted color, 10px
+- **Chips:** pill shape (radius-full), 1px border, 10px font
+  - Close button: 14×14px, faint color, hover shows border background
+- **"Clear all":** primary color, weight 600, 10px, right-aligned (`margin-left: auto`)
+
+### Collapsed state
+
+- **Icon strip:** 32px wide, flex column, centered, 8px vertical padding, 12px gap
+- **First icon:** expand chevron (`mdiChevronRight`)
+- **Category icons:** 24×24px, 6px border-radius, faint color
+  - Hover: primary-soft background, muted color
+- **Active badge:** 8×8px circle, primary background, 1.5px panel-colored border,
+  positioned absolute top-right (-2px, -2px)
+- **Icons with badges:** calendar (timeline), person (people), map-pin (location),
+  camera, star (rating) — only show badge when that category has active filters
+
 ## Component Architecture
 
 ### FilterPanel — generic, view-agnostic
