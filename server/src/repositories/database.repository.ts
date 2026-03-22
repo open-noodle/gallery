@@ -2,9 +2,8 @@ import { schemaDiff, schemaFromCode, schemaFromDatabase } from '@immich/sql-tool
 import { Injectable } from '@nestjs/common';
 import AsyncLock from 'async-lock';
 import { Kysely, sql } from 'kysely';
-import { FileMigrationProvider, Migrator } from 'kysely/migration';
+import { Migrator } from 'kysely/migration';
 import { InjectKysely } from 'nestjs-kysely';
-import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { diff } from 'semver';
 import z from 'zod';
@@ -23,6 +22,7 @@ import { GenerateSql } from 'src/decorators.js';
 import { DatabaseExtension, DatabaseLock, VectorIndex } from 'src/enum.js';
 import { ConfigRepository } from 'src/repositories/config.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { CompositeMigrationProvider } from 'src/schema/composite-migration-provider.js';
 import { immich_uuid_v7 } from 'src/schema/functions.js';
 // eslint-disable-next-line import-x/no-duplicates
 import 'src/schema/index.js'; // make sure all schema definitions are imported for schemaFromCode
@@ -502,14 +502,12 @@ export class DatabaseRepository {
     return new Migrator({
       db: this.db,
       migrationLockTableName: 'kysely_migrations_lock',
-      allowUnorderedMigrations: this.configRepository.isDev(),
+      allowUnorderedMigrations: true,
       migrationTableName: 'kysely_migrations',
-      provider: new FileMigrationProvider({
-        fs: { readdir },
-        path: { join },
-        import: (filePath) => import(filePath),
-        migrationFolder: join(import.meta.dirname, '..', 'schema/migrations'),
-      }),
+      provider: new CompositeMigrationProvider([
+        join(import.meta.dirname, '..', 'schema/migrations'),
+        join(import.meta.dirname, '..', 'schema/migrations-gallery'),
+      ]),
     });
   }
 }
