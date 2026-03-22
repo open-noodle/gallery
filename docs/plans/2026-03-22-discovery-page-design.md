@@ -323,16 +323,26 @@ are upgraded to `personIds` (string array) and `tagIds` (string array) to suppor
 multi-select. Similarly, `spacePersonId` is upgraded to `spacePersonIds` (string array)
 for Spaces multi-person filtering.
 
+**Backward compatibility:** The old single-value field names (`personId`, `tagId`,
+`spacePersonId`) must be kept as deprecated aliases in the DTO alongside the new array
+fields. The DTO should accept both forms and normalize to the array internally (e.g.,
+if `personId` is provided, treat it as `personIds: [personId]`). This avoids breaking
+the mobile Dart client and existing API consumers. The OpenAPI spec will expose both
+the old and new fields until the old ones are removed in a future version.
+
 **OR semantics for multi-select:** When multiple people or tags are selected, the filter
 uses OR logic — photos matching ANY selected person or ANY selected tag are included.
-This requires changes to the existing helpers:
+This requires NEW helper functions (the existing ones must not be modified):
 
 - `hasPeople()` in `database.ts` currently uses AND logic (`HAVING COUNT = length`).
-  Modify to use OR logic for the filtering use case: return assets where the person
-  face matches ANY of the provided IDs (remove the HAVING count check).
-- `withTagId()` in `database.ts` currently accepts a single string. Create a new
-  `withTagIds()` helper that accepts an array and uses `IN (...)` or multiple OR
-  conditions to match assets with ANY of the selected tags.
+  **Do not modify it** — search depends on AND logic. Instead, create a new
+  `hasAnyPerson()` helper that uses OR logic: return assets where the person face
+  matches ANY of the provided IDs (no HAVING count check).
+- `withTagId()` in `database.ts` currently accepts a single string and traverses
+  `tag_closure` for hierarchical tag matching. Create a new `withAnyTagId()` helper
+  that accepts an array and matches assets with ANY of the selected tags. **Preserve
+  tag hierarchy:** the helper should still traverse `tag_closure` so that selecting
+  a parent tag includes photos tagged with child tags.
 
 **Rating filter uses `>=` semantics:** The existing search builder uses exact match
 (`rating = N`). The timeline filter uses minimum rating (`rating >= N`). The CTE
@@ -412,7 +422,10 @@ All new components live in `web/src/lib/components/filter-panel/`:
 - `temporal-picker.svelte` — year→month grid with counts and volume bars
 - `people-filter.svelte` — searchable multi-select list with avatars and checkboxes
 - `location-filter.svelte` — hierarchical country→city with radio buttons (single-select)
-- `camera-filter.svelte` — flat list of make/model with radio buttons (single-select)
+- `camera-filter.svelte` — flat list of make/model with radio buttons (single-select).
+  The `cameras` provider returns camera makes; when a make is selected, a second call
+  fetches models for that make (`getSpaceSuggestions(spaceId, 'camera-model', { make })`).
+  Selecting a model sets both `make` and `model` in FilterState.
 - `tags-filter.svelte` — flat multi-select checkbox list (shows all user tags, not space-scoped)
 - `rating-filter.svelte` — interactive star selector
 - `media-type-filter.svelte` — All/Photos/Videos toggle
@@ -529,6 +542,8 @@ _Location filter:_
 - Select a different city — verify previous city is deselected (single-select)
 - Verify chip shows "City, Country" format
 - Deselect city — verify timeline returns to country-level filter
+- Select a country without selecting a city — verify timeline filters to all photos
+  from that country
 - Deselect country — verify all location filters removed
 - Remove location chip — verify location filter cleared
 
