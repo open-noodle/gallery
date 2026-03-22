@@ -655,10 +655,25 @@ export class SharedSpaceRepository {
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
   async isAssetInSpace(spaceId: string, assetId: string): Promise<boolean> {
     const result = await this.db
-      .selectFrom('shared_space_asset')
-      .select('assetId')
-      .where('spaceId', '=', spaceId)
-      .where('assetId', '=', assetId)
+      .selectFrom(
+        this.db
+          .selectFrom('shared_space_asset')
+          .select('assetId as id')
+          .where('spaceId', '=', spaceId)
+          .where('assetId', '=', assetId)
+          .union(
+            this.db
+              .selectFrom('shared_space_library')
+              .innerJoin('asset', 'asset.libraryId', 'shared_space_library.libraryId')
+              .select('asset.id')
+              .where('shared_space_library.spaceId', '=', spaceId)
+              .where('asset.id', '=', assetId)
+              .where('asset.deletedAt', 'is', null)
+              .where('asset.isOffline', '=', false),
+          )
+          .as('combined'),
+      )
+      .select('combined.id')
       .limit(1)
       .executeTakeFirst();
     return !!result;
@@ -667,12 +682,29 @@ export class SharedSpaceRepository {
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
   async isFaceInSpace(spaceId: string, faceId: string): Promise<boolean> {
     const result = await this.db
-      .selectFrom('shared_space_asset')
-      .innerJoin('asset_face', 'asset_face.assetId', 'shared_space_asset.assetId')
-      .select('asset_face.id')
-      .where('shared_space_asset.spaceId', '=', spaceId)
-      .where('asset_face.id', '=', faceId)
-      .where('asset_face.deletedAt', 'is', null)
+      .selectFrom(
+        this.db
+          .selectFrom('shared_space_asset')
+          .innerJoin('asset_face', 'asset_face.assetId', 'shared_space_asset.assetId')
+          .select('asset_face.id')
+          .where('shared_space_asset.spaceId', '=', spaceId)
+          .where('asset_face.id', '=', faceId)
+          .where('asset_face.deletedAt', 'is', null)
+          .union(
+            this.db
+              .selectFrom('shared_space_library')
+              .innerJoin('asset', 'asset.libraryId', 'shared_space_library.libraryId')
+              .innerJoin('asset_face', 'asset_face.assetId', 'asset.id')
+              .select('asset_face.id')
+              .where('shared_space_library.spaceId', '=', spaceId)
+              .where('asset_face.id', '=', faceId)
+              .where('asset_face.deletedAt', 'is', null)
+              .where('asset.deletedAt', 'is', null)
+              .where('asset.isOffline', '=', false),
+          )
+          .as('combined'),
+      )
+      .select('combined.id')
       .limit(1)
       .executeTakeFirst();
     return !!result;
@@ -680,17 +712,49 @@ export class SharedSpaceRepository {
 
   @GenerateSql({ params: [DummyValue.UUID] })
   getAssetIdsInSpace(spaceId: string) {
-    return this.db.selectFrom('shared_space_asset').select('assetId').where('spaceId', '=', spaceId).execute();
+    return this.db
+      .selectFrom(
+        this.db
+          .selectFrom('shared_space_asset')
+          .select('assetId as id')
+          .where('spaceId', '=', spaceId)
+          .union(
+            this.db
+              .selectFrom('shared_space_library')
+              .innerJoin('asset', 'asset.libraryId', 'shared_space_library.libraryId')
+              .select('asset.id')
+              .where('shared_space_library.spaceId', '=', spaceId)
+              .where('asset.deletedAt', 'is', null)
+              .where('asset.isOffline', '=', false),
+          )
+          .as('combined'),
+      )
+      .select('combined.id as assetId')
+      .execute();
   }
 
   @GenerateSql({ params: [DummyValue.UUID] })
   getSpaceIdsForAsset(assetId: string) {
     return this.db
-      .selectFrom('shared_space_asset')
-      .innerJoin('shared_space', 'shared_space.id', 'shared_space_asset.spaceId')
-      .select('shared_space_asset.spaceId')
-      .where('shared_space_asset.assetId', '=', assetId)
-      .where('shared_space.faceRecognitionEnabled', '=', true)
+      .selectFrom(
+        this.db
+          .selectFrom('shared_space_asset')
+          .innerJoin('shared_space', 'shared_space.id', 'shared_space_asset.spaceId')
+          .select('shared_space_asset.spaceId')
+          .where('shared_space_asset.assetId', '=', assetId)
+          .where('shared_space.faceRecognitionEnabled', '=', true)
+          .union(
+            this.db
+              .selectFrom('shared_space_library')
+              .innerJoin('asset', 'asset.libraryId', 'shared_space_library.libraryId')
+              .innerJoin('shared_space', 'shared_space.id', 'shared_space_library.spaceId')
+              .select('shared_space_library.spaceId')
+              .where('asset.id', '=', assetId)
+              .where('shared_space.faceRecognitionEnabled', '=', true),
+          )
+          .as('combined'),
+      )
+      .select('combined.spaceId')
       .execute();
   }
 
