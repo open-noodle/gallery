@@ -749,7 +749,8 @@ export class SharedSpaceService extends BaseService {
     return JobStatus.Success;
   }
 
-  async handleSharedSpaceLibraryFaceSync(job: { spaceId: string; libraryId: string }): Promise<JobStatus> {
+  @OnJob({ name: JobName.SharedSpaceLibraryFaceSync, queue: QueueName.FacialRecognition })
+  async handleSharedSpaceLibraryFaceSync(job: JobOf<JobName.SharedSpaceLibraryFaceSync>): Promise<JobStatus> {
     const space = await this.sharedSpaceRepository.getById(job.spaceId);
     if (!space || !space.faceRecognitionEnabled) {
       return JobStatus.Skipped;
