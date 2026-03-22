@@ -24,6 +24,7 @@ import { UserAdminResponseDto, mapUserAdmin } from 'src/dtos/user.dto';
 import { AuthType, ImmichCookie, ImmichHeader, ImmichQuery, JobName, Permission } from 'src/enum';
 import { OAuthProfile } from 'src/repositories/oauth.repository';
 import { BaseService } from 'src/services/base.service';
+import { StorageService } from 'src/services/storage.service';
 import { isGranted } from 'src/utils/access';
 import { HumanReadableSize } from 'src/utils/bytes';
 import { generateProfileImage } from 'src/utils/profile-image';
