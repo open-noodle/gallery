@@ -18,8 +18,8 @@ experience.
 1. **No filtering within views** — the timeline, person, album, and space views produce
    result sets with no way to narrow them down. The only path to filtering is the search
    modal, which navigates away to `/search`.
-2. **No sorting** — the server hardcodes `ORDER BY fileCreatedAt`. Users cannot sort by
-   upload date, filename, or any other dimension.
+2. **No sorting** — the server hardcodes `ORDER BY fileCreatedAt DESC`. Users cannot
+   change sort direction.
 3. **No temporal navigation at scale** — the scrubber maps a 20-year archive to ~600px.
    Precise navigation requires sub-pixel accuracy.
 4. **Filter and search are conflated** — the `SearchFilterModal` mixes structured
@@ -53,7 +53,7 @@ These are different operations and belong in different UI locations.
 
 ```
 ┌──────┬──────────┬───────────────────────────────────────────┐
-│      │ Filters  │  ← Summer Trip 2023        [Sort ▾]      │
+│      │ Filters  │  ← Summer Trip 2023          [↑↓ Sort]   │
 │      │          ├───────────────────────────────────────────┤
 │      │ TIMELINE │  342 results [Sarah ×] [Munich ×] Clear   │
 │      │ [2023]   ├───────────────────────────────────────────┤
@@ -120,7 +120,6 @@ interface FilterState {
   tagId?: string;
   rating?: number; // minimum rating (1-5)
   mediaType?: 'all' | 'image' | 'video';
-  sortBy: 'captureDate' | 'uploadDate' | 'filename';
   sortOrder: 'asc' | 'desc';
   selectedYear?: number;
   selectedMonth?: number;
@@ -135,8 +134,8 @@ interface FilterState {
     sections: ['timeline', 'people', 'location', 'camera', 'tags', 'rating', 'media'],
     providers: {
       people: () => getSpacePeople(spaceId),
-      locations: () => getSpaceLocations(spaceId),
-      cameras: () => getSpaceCameras(spaceId),
+      locations: () => getSpaceSuggestions(spaceId, 'country'),
+      cameras: () => getSpaceSuggestions(spaceId, 'camera-make'),
       tags: () => getSpaceTags(spaceId),
     },
   }}
@@ -153,7 +152,7 @@ interface FilterState {
     sections: ['timeline', 'people', 'location', 'camera', 'rating'],
     providers: {
       people: () => getAlbumPeople(albumId),
-      locations: () => getAlbumLocations(albumId),
+      locations: () => getAlbumSuggestions(albumId, 'country'),
     },
   }}
   timeBuckets={timelineManager.months}
@@ -169,8 +168,8 @@ interface FilterState {
     sections: ['timeline', 'people', 'location', 'camera', 'tags', 'rating', 'media'],
     providers: {
       people: () => getAllPeople(),
-      locations: () => getAllLocations(),
-      cameras: () => getAllCameras(),
+      locations: () => getSuggestions('country'),
+      cameras: () => getSuggestions('camera-make'),
       tags: () => getAllTags(),
     },
   }}
@@ -192,41 +191,56 @@ Add these optional fields to `TimeBucketDto` and `TimeBucketAssetDto`:
 // EXIF filters (require joining asset_exif in the CTE)
 city?: string;
 country?: string;
-make?: string;        // camera make
-model?: string;       // camera model
-rating?: number;      // minimum rating (>=)
+make?: string; // camera make
+model?: string; // camera model
+rating?: number; // minimum rating (>=)
 
 // Asset table filters (no extra join needed)
-type?: AssetType;     // IMAGE or VIDEO
+type?: AssetType; // IMAGE or VIDEO
 ```
 
 Wire these as WHERE clauses in the `getTimeBuckets` and `getTimeBucket` CTE queries in
 `asset.repository.ts`. The `asset_exif` table needs to be joined in the CTE when any
 EXIF filter is provided.
 
-### Add `AssetSortBy` enum and `sortBy` parameter
+### Add space-scoped suggestions
+
+The existing `GET /search/suggestions` endpoint returns global results. Add an optional
+`spaceId` parameter to `SearchSuggestionRequestDto`. When provided, the `getExifField()`
+helper in `search.repository.ts` adds an EXISTS subquery to scope results to assets in
+that space:
 
 ```typescript
-export enum AssetSortBy {
-  CaptureDate = 'captureDate',
-  UploadDate = 'uploadDate',
-  Filename = 'filename',
-}
+// Reuses the existing pattern from searchAssetBuilder
+.$if(!!spaceId, (qb) =>
+  qb.where((eb) =>
+    eb.exists(
+      eb.selectFrom('shared_space_asset')
+        .whereRef('shared_space_asset.assetId', '=', 'asset.id')
+        .where('shared_space_asset.spaceId', '=', asUuid(spaceId))
+    ),
+  ),
+)
 ```
 
-Add `sortBy?: AssetSortBy` to both `TimeBucketDto` and `MetadataSearchDto`. Replace
-hardcoded `.orderBy('asset.fileCreatedAt', ...)` with dynamic field selection based on
-`sortBy`.
+This makes `GET /search/suggestions?type=country&spaceId=abc` return only countries
+that have photos in that space. The endpoint remains backward-compatible — omitting
+`spaceId` returns global results as before.
 
-Sort fields and their columns (all already indexed, no migration needed):
+People suggestions are already space-scoped via the existing
+`GET /shared-spaces/:id/people` endpoint.
 
-- `captureDate` → `asset.fileCreatedAt`
-- `uploadDate` → `asset.createdAt`
-- `filename` → `asset.originalFileName`
+### Sort direction
+
+The timeline endpoint already accepts an `order` parameter (asc/desc) via `TimeBucketDto`.
+No new enum or parameter needed — just expose it in the FilterPanel UI. The sort field
+remains `fileCreatedAt` (capture date). Additional sort fields (upload date, filename)
+are deferred to a future iteration.
 
 ### No new endpoints
 
-The existing timeline endpoints gain new optional parameters. The API contract is
+The existing timeline endpoints gain new optional filter parameters. The existing
+suggestions endpoint gains an optional `spaceId` scope parameter. The API contract is
 backward-compatible — omitting the new parameters produces the same behavior as before.
 
 ## Web Changes
@@ -244,7 +258,7 @@ All new components live in `web/src/lib/components/filter-panel/`:
 - `tags-filter.svelte` — flat checkbox list
 - `rating-filter.svelte` — interactive star selector
 - `media-type-filter.svelte` — All/Photos/Videos toggle
-- `sort-dropdown.svelte` — capture date / upload date / filename + direction
+- `sort-toggle.svelte` — ascending/descending toggle button
 - `active-filters-bar.svelte` — removable chips + result count + clear all
 
 ### Integration into Spaces page
@@ -265,10 +279,17 @@ panel and scrolls to that section.
 
 - **Unit tests** for `TimelineService` — verify new filter params are passed through
 - **Unit tests** for `AssetRepository` — verify CTE WHERE clauses for each new filter
-- **Unit tests** for `SearchService` — verify `sortBy` parameter passthrough
-- **Unit tests** for `SearchRepository` — verify dynamic ORDER BY
-- **Medium tests** (real DB) — insert assets with known EXIF data, verify timeline
-  buckets return correct counts when filtered by city, camera, rating
+  (city, country, make, model, rating, type)
+- **Unit tests** for `SearchService` — verify `spaceId` is passed to suggestions
+- **Unit tests** for `SearchRepository` — verify scoped suggestion queries include
+  EXISTS subquery when `spaceId` provided, and omit it when not
+- **Medium tests** (real DB) — insert assets with known EXIF data, verify:
+  - Timeline buckets return correct counts when filtered by city
+  - Timeline buckets return correct counts when filtered by camera make
+  - Timeline buckets return correct counts when filtered by rating
+  - Timeline buckets return zero counts for non-matching filters
+  - Scoped suggestions return only values from the specified space
+  - Global suggestions still work when spaceId is omitted
 
 ### Web (TDD + E2E)
 
@@ -277,103 +298,138 @@ panel and scrolls to that section.
 - `FilterPanel` renders configured sections only
 - `FilterPanel` hides sections not in config
 - Collapsing/expanding the panel preserves filter state
-- `TemporalPicker` aggregates monthly buckets into year counts
-- `TemporalPicker` calculates relative volume bars
-- `TemporalPicker` month drill-down shows correct counts
+- `TemporalPicker` aggregates monthly buckets into year counts correctly
+- `TemporalPicker` calculates relative volume bars (max year = 100%)
+- `TemporalPicker` handles single-month data correctly
+- `TemporalPicker` handles empty bucket data without crashing
+- `TemporalPicker` month drill-down shows correct counts for selected year
 - Each filter section emits correct filter state on selection
-- `PeopleFilter` is single-select (radio button behavior)
-- `PeopleFilter` local search filters the list
-- `LocationFilter` hierarchical expand (country → cities)
+- `PeopleFilter` is single-select (selecting B deselects A)
+- `PeopleFilter` local search filters the list client-side
+- `PeopleFilter` "Show N more" truncates long lists
+- `LocationFilter` hierarchical expand (country click → cities appear indented)
+- `LocationFilter` selecting a city also sets the parent country
+- `CameraFilter` renders make/model combinations
+- `TagsFilter` renders tag names with checkboxes
 - `RatingFilter` highlights stars up to selected value
-- `MediaTypeFilter` toggles between All/Photos/Videos
-- `SortDropdown` shows current sort, changes on selection
-- `ActiveFiltersBar` renders chips for active filters only
-- `ActiveFiltersBar` removes individual filter on chip close
-- `ActiveFiltersBar` clears all on Clear All click
+- `RatingFilter` clicking same star again clears the filter
+- `MediaTypeFilter` toggles between All/Photos/Videos (only one active)
+- `SortToggle` toggles between ascending and descending
+- `ActiveFiltersBar` renders chips for each active filter with correct labels
+- `ActiveFiltersBar` renders no chips when no filters active
+- `ActiveFiltersBar` removes individual filter on chip close click
+- `ActiveFiltersBar` clears all filters on Clear All click
+- `ActiveFiltersBar` shows result count
 - Collapsed state shows badge dots on icons with active filters
-- Collapsed icon click expands panel to that section
+- Collapsed state shows no badge on icons without active filters
+- Collapsed icon click expands panel and scrolls to that section
+- `clearAll` does NOT reset sort order (sort is a view preference, not a filter)
 
 **E2E (Playwright) — comprehensive coverage:**
 
 _Page load and basic rendering:_
 
-- Navigate to space page — verify filter panel renders
-- Verify all configured sections are visible
-- Verify temporal picker shows year/month data
+- Navigate to space page — verify filter panel renders with all sections
+- Verify temporal picker shows year/month data from space's photos
+- Verify filter panel is expanded by default
 
 _Temporal picker:_
 
-- Click a year — verify month grid appears with counts
-- Click a month — verify timeline scrolls to that month
-- Click "All years" breadcrumb — verify returns to year view
-- Verify year with zero photos after filtering is greyed out
+- Click a year — verify month grid appears with per-month counts
+- Click a month — verify timeline scrolls to that month's position
+- Click "All years" breadcrumb — verify returns to year-level view
+- Apply a filter — verify year counts update to reflect filtered set
+- Verify years with zero photos after filtering appear greyed out
+- Verify months with zero photos after filtering appear greyed out
 
 _People filter:_
 
+- Verify only people present in the space are shown (not global people list)
 - Select a person — verify timeline updates to show only their photos
-- Deselect person — verify timeline returns to full set
-- Type in people search — verify list filters
-- Verify only people in the space are shown
+- Select a different person — verify previous selection is deselected (single-select)
+- Deselect person — verify timeline returns to full space set
+- Type in people search box — verify list filters to matching names
+- Clear search box — verify full people list returns
+- Space with many people — verify "Show N more" button appears and works
 
 _Location filter:_
 
-- Select a country — verify cities appear below
-- Select a city — verify timeline filters to that city
-- Deselect city — verify filter removed
+- Verify only locations present in the space are shown
+- Select a country — verify city sub-items appear indented below
+- Select a city — verify timeline filters to photos from that city
+- Deselect city — verify timeline returns to country-level filter
+- Deselect country — verify all location filters removed
 
 _Camera filter:_
 
-- Select a camera — verify timeline filters
-- Verify only cameras used in the space are listed
+- Verify only cameras used in the space's photos are listed
+- Select a camera make/model — verify timeline filters
+- Deselect — verify filter removed
 
 _Tags filter:_
 
-- Select a tag — verify timeline filters
+- Select a tag — verify timeline filters to tagged photos
+- Deselect — verify filter removed
 
 _Rating filter:_
 
-- Click 3 stars — verify only 3+ star photos shown
-- Click same star again — verify rating filter clears
+- Click 3rd star — verify only 3+ star rated photos shown
+- Click 5th star — verify only 5-star photos shown
+- Click 3rd star again (same as current) — verify rating filter clears
+- Verify unrated photos are excluded when any rating filter is active
 
 _Media type filter:_
 
-- Click Photos — verify only images shown
-- Click Videos — verify only videos shown
-- Click All — verify both shown
+- Click Photos — verify only images shown, videos hidden
+- Click Videos — verify only videos shown, images hidden
+- Click All — verify both images and videos shown
+- Verify the toggle is All by default
 
-_Sort:_
+_Sort direction:_
 
-- Change sort to Upload Date — verify order changes
-- Change sort to Filename — verify alphabetical order
-- Toggle ascending/descending — verify order reverses
+- Toggle to ascending — verify oldest photos appear first
+- Toggle back to descending — verify newest photos appear first
 
 _Active filter chips:_
 
-- Apply person filter — verify chip appears with person name
-- Apply location filter — verify chip appears with city name
-- Remove person chip — verify only location filter remains active
-- Click Clear All — verify all filters removed, timeline shows full set
+- Apply person filter — verify chip appears showing person's name
+- Apply location filter — verify chip appears showing "City, Country"
+- Apply rating filter — verify chip appears showing "★ 3+"
+- Apply media type filter — verify chip appears showing "Photos only"
+- Verify result count in the bar updates with each filter added
+- Remove person chip by clicking × — verify person filter cleared, others remain
+- Click "Clear All" — verify all filters removed, full timeline returns
+- Verify chip bar is hidden or shows only count when no filters active
 
 _Combined filters:_
 
-- Apply person + location + rating simultaneously — verify intersection
-- Verify result count updates with each additional filter
-- Remove one filter — verify others still active
+- Apply person + location + rating simultaneously — verify results are the
+  intersection (AND logic, not OR)
+- Verify result count decreases with each additional filter
+- Remove one filter — verify others remain active and count updates
+- Verify temporal picker counts reflect the combined filter state
 
 _Collapsed panel:_
 
-- Collapse panel — verify 32px icon strip
-- Verify badge dot on people icon when person filter active
-- Verify no badge on camera icon when no camera filter active
-- Click people icon — verify panel expands scrolled to people section
-- Expand panel — verify all filters preserved
+- Click collapse button — verify panel shrinks to 32px icon strip
+- Verify badge dot appears on people icon when person filter is active
+- Verify badge dot appears on location icon when city filter is active
+- Verify no badge on camera icon when no camera filter is active
+- Click people icon in collapsed strip — verify panel expands scrolled
+  to people section
+- Expand panel — verify all previously set filters are still active
+- Collapse with no filters active — verify no badge dots shown
 
 _Edge cases:_
 
-- Apply filters that match nothing — verify empty state
-- Space with single photo — verify temporal picker shows one year/month
-- All sections collapsed — verify panel still functional
-- Rapidly toggle filters — verify no race conditions in timeline reload
+- Apply filters that match zero photos — verify empty state message
+- Space with exactly one photo — verify temporal picker shows one year and one month
+- Space with no photos — verify filter panel renders but shows empty states
+- Rapidly toggle multiple filters — verify no race conditions in timeline reload
+  (each filter change should cancel any in-flight request)
+- Apply all filter types simultaneously — verify they all work together
+- Collapse and expand panel rapidly — verify state is preserved
+- Navigate away from space and back — verify filters are reset (not persisted)
 
 ## Design Mockups
 
@@ -397,8 +453,12 @@ Additional reference mockups (earlier explorations):
   camera) link to filtered views. Deferred.
 - **Faceted filter counts** — showing result counts per filter option before selection.
   Requires heavier server queries.
-- **Rating and file size sorting** — requires new database indexes (migration).
+- **Sort field selection** — sorting by upload date, filename, file size. Requires
+  addressing the tension between non-capture-date sort fields and capture-date month
+  grouping. Deferred to a future iteration.
 - **Mobile layout** — web-only for now.
 - **Smart/CLIP search integration** — CLIP search uses vector similarity and produces
   ranked results incompatible with month-grouped timelines. Stays in global search bar.
 - **Multi-person filter** — server accepts single `personId`. Multi-select deferred.
+- **Filter state persistence** — filters reset on navigation. URL-based or local
+  storage persistence deferred.
