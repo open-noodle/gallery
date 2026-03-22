@@ -3423,4 +3423,127 @@ describe(SharedSpaceService.name, () => {
       expect(result.linkedLibraries).toEqual([]);
     });
   });
+
+  describe('handleSharedSpaceLibraryFaceSync', () => {
+    it('should process library assets with faces in batches', async () => {
+      const spaceId = newUuid();
+      const libraryId = newUuid();
+      const assetId1 = newUuid();
+      const assetId2 = newUuid();
+
+      mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
+      mocks.sharedSpace.hasLibraryLink.mockResolvedValue(true);
+      mocks.asset.getByLibraryIdWithFaces
+        .mockResolvedValueOnce([{ id: assetId1 }, { id: assetId2 }])
+        .mockResolvedValueOnce([]);
+      mocks.sharedSpace.getAssetFacesForMatching.mockResolvedValue([]);
+
+      const result = await sut.handleSharedSpaceLibraryFaceSync({ spaceId, libraryId });
+
+      expect(result).toBe(JobStatus.Success);
+      expect(mocks.asset.getByLibraryIdWithFaces).toHaveBeenCalledWith(libraryId, 1000, 0);
+      expect(mocks.asset.getByLibraryIdWithFaces).toHaveBeenCalledWith(libraryId, 1000, 2);
+    });
+
+    it('should skip when space does not exist', async () => {
+      mocks.sharedSpace.getById.mockResolvedValue(undefined);
+      const result = await sut.handleSharedSpaceLibraryFaceSync({ spaceId: newUuid(), libraryId: newUuid() });
+      expect(result).toBe(JobStatus.Skipped);
+    });
+
+    it('should skip when face recognition is disabled on the space', async () => {
+      const spaceId = newUuid();
+      mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: false }));
+      const result = await sut.handleSharedSpaceLibraryFaceSync({ spaceId, libraryId: newUuid() });
+      expect(result).toBe(JobStatus.Skipped);
+    });
+
+    it('should skip when library link was removed before job runs', async () => {
+      const spaceId = newUuid();
+      mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
+      mocks.sharedSpace.hasLibraryLink.mockResolvedValue(false);
+      const result = await sut.handleSharedSpaceLibraryFaceSync({ spaceId, libraryId: newUuid() });
+      expect(result).toBe(JobStatus.Skipped);
+    });
+
+    it('should succeed with no work when library has no assets with faces', async () => {
+      const spaceId = newUuid();
+      const libraryId = newUuid();
+      mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
+      mocks.sharedSpace.hasLibraryLink.mockResolvedValue(true);
+      mocks.asset.getByLibraryIdWithFaces.mockResolvedValue([]);
+      const result = await sut.handleSharedSpaceLibraryFaceSync({ spaceId, libraryId });
+      expect(result).toBe(JobStatus.Success);
+    });
+
+    it('should call face matching for each asset with faces', async () => {
+      const spaceId = newUuid();
+      const libraryId = newUuid();
+      const assetId = newUuid();
+      const faceId = newUuid();
+
+      mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
+      mocks.sharedSpace.hasLibraryLink.mockResolvedValue(true);
+      mocks.asset.getByLibraryIdWithFaces.mockResolvedValueOnce([{ id: assetId }]).mockResolvedValueOnce([]);
+      mocks.sharedSpace.getAssetFacesForMatching.mockResolvedValue([
+        { id: faceId, assetId, personId: null, embedding: '[0.1,0.2]' },
+      ]);
+      mocks.sharedSpace.isPersonFaceAssigned.mockResolvedValue(false);
+      mocks.sharedSpace.findClosestSpacePerson.mockResolvedValue([]);
+      mocks.sharedSpace.addPersonFaces.mockResolvedValue([]);
+      mocks.sharedSpace.createPerson.mockResolvedValue(factory.sharedSpacePerson({ spaceId }));
+
+      const result = await sut.handleSharedSpaceLibraryFaceSync({ spaceId, libraryId });
+      expect(result).toBe(JobStatus.Success);
+      expect(mocks.sharedSpace.getAssetFacesForMatching).toHaveBeenCalledWith(assetId);
+    });
+
+    it('should create new space person for unmatched face', async () => {
+      const spaceId = newUuid();
+      const libraryId = newUuid();
+      const assetId = newUuid();
+      const faceId = newUuid();
+
+      mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
+      mocks.sharedSpace.hasLibraryLink.mockResolvedValue(true);
+      mocks.asset.getByLibraryIdWithFaces.mockResolvedValueOnce([{ id: assetId }]).mockResolvedValueOnce([]);
+      mocks.sharedSpace.getAssetFacesForMatching.mockResolvedValue([
+        { id: faceId, assetId, personId: null, embedding: '[0.1,0.2]' },
+      ]);
+      mocks.sharedSpace.isPersonFaceAssigned.mockResolvedValue(false);
+      mocks.sharedSpace.findClosestSpacePerson.mockResolvedValue([]);
+      mocks.sharedSpace.createPerson.mockResolvedValue(factory.sharedSpacePerson({ spaceId }));
+      mocks.sharedSpace.addPersonFaces.mockResolvedValue([]);
+
+      await sut.handleSharedSpaceLibraryFaceSync({ spaceId, libraryId });
+      expect(mocks.sharedSpace.createPerson).toHaveBeenCalled();
+      expect(mocks.sharedSpace.addPersonFaces).toHaveBeenCalled();
+    });
+
+    it('should match face to existing space person when close enough', async () => {
+      const spaceId = newUuid();
+      const libraryId = newUuid();
+      const assetId = newUuid();
+      const faceId = newUuid();
+      const existingPersonId = newUuid();
+
+      mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
+      mocks.sharedSpace.hasLibraryLink.mockResolvedValue(true);
+      mocks.asset.getByLibraryIdWithFaces.mockResolvedValueOnce([{ id: assetId }]).mockResolvedValueOnce([]);
+      mocks.sharedSpace.getAssetFacesForMatching.mockResolvedValue([
+        { id: faceId, assetId, personId: null, embedding: '[0.1,0.2]' },
+      ]);
+      mocks.sharedSpace.isPersonFaceAssigned.mockResolvedValue(false);
+      mocks.sharedSpace.findClosestSpacePerson.mockResolvedValue([
+        { personId: existingPersonId, name: '', distance: 0.3 },
+      ]);
+      mocks.sharedSpace.addPersonFaces.mockResolvedValue([]);
+
+      await sut.handleSharedSpaceLibraryFaceSync({ spaceId, libraryId });
+      expect(mocks.sharedSpace.addPersonFaces).toHaveBeenCalledWith([
+        { personId: existingPersonId, assetFaceId: faceId },
+      ]);
+      expect(mocks.sharedSpace.createPerson).not.toHaveBeenCalled();
+    });
+  });
 });
