@@ -7,6 +7,7 @@
   "license": "GNU Affero General Public License version 3",
   "scripts": {
     "build": "nest build",
+    "postbuild": "cp dist/schema/migrations-gallery/*.js dist/schema/migrations/ 2>/dev/null || true",
     "format": "prettier --cache --check .",
     "format:fix": "prettier --cache --write --list-different .",
     "start": "pnpm run start:dev",
