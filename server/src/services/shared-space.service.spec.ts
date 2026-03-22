@@ -2955,4 +2955,63 @@ describe(SharedSpaceService.name, () => {
       expect(typeof result[0]!.createdAt).toBe('string');
     });
   });
+
+  describe('getAssetCount (with library-linked assets)', () => {
+    it('should call repository getAssetCount which includes library assets', async () => {
+      const auth = factory.auth();
+      const space = factory.sharedSpace();
+      const member = factory.sharedSpaceMember({ spaceId: space.id, userId: auth.user.id });
+
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.getMember.mockResolvedValue(member);
+      mocks.sharedSpace.getMembers.mockResolvedValue([makeMemberResult({ ...member })]);
+      mocks.sharedSpace.getAssetCount.mockResolvedValue(117000);
+      mocks.sharedSpace.getRecentAssets.mockResolvedValue([]);
+      mocks.sharedSpace.getNewAssetCount.mockResolvedValue(0);
+
+      const result = await sut.get(auth, space.id);
+
+      expect(result.assetCount).toBe(117000);
+      expect(mocks.sharedSpace.getAssetCount).toHaveBeenCalledWith(space.id);
+    });
+  });
+
+  describe('isAssetInSpace (with library-linked assets)', () => {
+    it('should validate thumbnail from library-linked asset', async () => {
+      const auth = factory.auth();
+      const space = factory.sharedSpace();
+      const member = factory.sharedSpaceMember({
+        spaceId: space.id,
+        userId: auth.user.id,
+        role: SharedSpaceRole.Owner,
+      });
+      const thumbnailAssetId = newUuid();
+
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.getMember.mockResolvedValue(member);
+      mocks.sharedSpace.isAssetInSpace.mockResolvedValue(true);
+      mocks.sharedSpace.update.mockResolvedValue(space);
+      mocks.sharedSpace.logActivity.mockResolvedValue(void 0 as any);
+
+      await sut.update(auth, space.id, { thumbnailAssetId });
+
+      expect(mocks.sharedSpace.isAssetInSpace).toHaveBeenCalledWith(space.id, thumbnailAssetId);
+    });
+
+    it('should reject thumbnail not in space or linked library', async () => {
+      const auth = factory.auth();
+      const space = factory.sharedSpace();
+      const member = factory.sharedSpaceMember({
+        spaceId: space.id,
+        userId: auth.user.id,
+        role: SharedSpaceRole.Owner,
+      });
+
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.getMember.mockResolvedValue(member);
+      mocks.sharedSpace.isAssetInSpace.mockResolvedValue(false);
+
+      await expect(sut.update(auth, space.id, { thumbnailAssetId: newUuid() })).rejects.toThrow(BadRequestException);
+    });
+  });
 });
