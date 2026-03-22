@@ -487,6 +487,22 @@ export class AssetRepository {
     return assets.map((asset) => asset.deviceAssetId);
   }
 
+  @GenerateSql({ params: [DummyValue.UUID] })
+  getByLibraryIdWithFaces(libraryId: string, limit = 1000, offset = 0) {
+    return this.db
+      .selectFrom('asset')
+      .innerJoin('asset_face', 'asset_face.assetId', 'asset.id')
+      .select('asset.id')
+      .where('asset.libraryId', '=', libraryId)
+      .where('asset.deletedAt', 'is', null)
+      .where('asset.isOffline', '=', false)
+      .groupBy('asset.id')
+      .orderBy('asset.id')
+      .limit(limit)
+      .offset(offset)
+      .execute();
+  }
+
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.STRING] })
   getByLibraryIdAndOriginalPath(libraryId: string, originalPath: string) {
     return this.db
