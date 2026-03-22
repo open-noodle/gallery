@@ -3348,4 +3348,79 @@ describe(SharedSpaceService.name, () => {
       expect(mocks.sharedSpace.removeAssets).not.toHaveBeenCalled();
     });
   });
+
+  describe('get (linked libraries)', () => {
+    it('should include linked libraries in response when user is admin', async () => {
+      const auth = factory.auth({ user: { isAdmin: true } });
+      const space = factory.sharedSpace();
+      const member = factory.sharedSpaceMember({
+        spaceId: space.id,
+        userId: auth.user.id,
+        role: SharedSpaceRole.Owner,
+      });
+      const linkedLibrary = factory.sharedSpaceLibrary({
+        spaceId: space.id,
+        libraryId: newUuid(),
+      });
+
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.getMember.mockResolvedValue(member);
+      mocks.sharedSpace.getMembers.mockResolvedValue([makeMemberResult({ ...member })]);
+      mocks.sharedSpace.getAssetCount.mockResolvedValue(100);
+      mocks.sharedSpace.getRecentAssets.mockResolvedValue([]);
+      mocks.sharedSpace.getNewAssetCount.mockResolvedValue(0);
+      mocks.sharedSpace.getLinkedLibraries.mockResolvedValue([linkedLibrary]);
+      mocks.library.get.mockResolvedValue(factory.library({ id: linkedLibrary.libraryId, name: 'Family Photos' }));
+
+      const result = await sut.get(auth, space.id);
+
+      expect(result.linkedLibraries).toHaveLength(1);
+      expect(result.linkedLibraries![0].libraryId).toBe(linkedLibrary.libraryId);
+      expect(result.linkedLibraries![0].libraryName).toBe('Family Photos');
+    });
+
+    it('should not include linked libraries for non-admin users', async () => {
+      const auth = factory.auth({ user: { isAdmin: false } });
+      const space = factory.sharedSpace();
+      const member = factory.sharedSpaceMember({
+        spaceId: space.id,
+        userId: auth.user.id,
+        role: SharedSpaceRole.Owner,
+      });
+
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.getMember.mockResolvedValue(member);
+      mocks.sharedSpace.getMembers.mockResolvedValue([makeMemberResult({ ...member })]);
+      mocks.sharedSpace.getAssetCount.mockResolvedValue(0);
+      mocks.sharedSpace.getRecentAssets.mockResolvedValue([]);
+      mocks.sharedSpace.getNewAssetCount.mockResolvedValue(0);
+
+      const result = await sut.get(auth, space.id);
+
+      expect(result.linkedLibraries).toBeUndefined();
+      expect(mocks.sharedSpace.getLinkedLibraries).not.toHaveBeenCalled();
+    });
+
+    it('should return empty linkedLibraries array for admin with no links', async () => {
+      const auth = factory.auth({ user: { isAdmin: true } });
+      const space = factory.sharedSpace();
+      const member = factory.sharedSpaceMember({
+        spaceId: space.id,
+        userId: auth.user.id,
+        role: SharedSpaceRole.Owner,
+      });
+
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.getMember.mockResolvedValue(member);
+      mocks.sharedSpace.getMembers.mockResolvedValue([makeMemberResult({ ...member })]);
+      mocks.sharedSpace.getAssetCount.mockResolvedValue(0);
+      mocks.sharedSpace.getRecentAssets.mockResolvedValue([]);
+      mocks.sharedSpace.getNewAssetCount.mockResolvedValue(0);
+      mocks.sharedSpace.getLinkedLibraries.mockResolvedValue([]);
+
+      const result = await sut.get(auth, space.id);
+
+      expect(result.linkedLibraries).toEqual([]);
+    });
+  });
 });
