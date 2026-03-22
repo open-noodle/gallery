@@ -3256,6 +3256,7 @@ describe(SharedSpaceService.name, () => {
 
       mocks.sharedSpace.getById.mockResolvedValue(space);
       mocks.sharedSpace.getMember.mockResolvedValue(member);
+      mocks.sharedSpace.removeLibrary.mockResolvedValue(undefined);
 
       await sut.unlinkLibrary(auth, space.id, libraryId);
 
@@ -3274,6 +3275,7 @@ describe(SharedSpaceService.name, () => {
 
       mocks.sharedSpace.getById.mockResolvedValue(space);
       mocks.sharedSpace.getMember.mockResolvedValue(member);
+      mocks.sharedSpace.removeLibrary.mockResolvedValue(undefined);
 
       await sut.unlinkLibrary(auth, space.id, libraryId);
 
@@ -3322,6 +3324,7 @@ describe(SharedSpaceService.name, () => {
 
       mocks.sharedSpace.getById.mockResolvedValue(space);
       mocks.sharedSpace.getMember.mockResolvedValue(member);
+      mocks.sharedSpace.removeLibrary.mockResolvedValue(undefined);
 
       await expect(sut.unlinkLibrary(auth, space.id, newUuid())).resolves.not.toThrow();
     });
@@ -3337,6 +3340,7 @@ describe(SharedSpaceService.name, () => {
 
       mocks.sharedSpace.getById.mockResolvedValue(space);
       mocks.sharedSpace.getMember.mockResolvedValue(member);
+      mocks.sharedSpace.removeLibrary.mockResolvedValue(undefined);
 
       await sut.unlinkLibrary(auth, space.id, newUuid());
 

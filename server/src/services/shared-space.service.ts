@@ -13,6 +13,7 @@ import {
   SharedSpaceAssetAddDto,
   SharedSpaceAssetRemoveDto,
   SharedSpaceCreateDto,
+  SharedSpaceLibraryLinkDto,
   SharedSpaceMemberCreateDto,
   SharedSpaceMemberResponseDto,
   SharedSpaceMemberTimelineDto,
@@ -381,6 +382,46 @@ export class SharedSpaceService extends BaseService {
         });
       }
     }
+  }
+
+  async linkLibrary(auth: AuthDto, spaceId: string, dto: SharedSpaceLibraryLinkDto): Promise<void> {
+    if (!auth.user.isAdmin) {
+      throw new ForbiddenException('Only admins can link libraries to spaces');
+    }
+
+    await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
+
+    const library = await this.libraryRepository.get(dto.libraryId);
+    if (!library) {
+      throw new BadRequestException('Library not found');
+    }
+
+    const result = await this.sharedSpaceRepository.addLibrary({
+      spaceId,
+      libraryId: dto.libraryId,
+      addedById: auth.user.id,
+    });
+
+    // Only queue face sync for newly created links (not duplicates)
+    if (result) {
+      const space = await this.sharedSpaceRepository.getById(spaceId);
+      if (space?.faceRecognitionEnabled) {
+        await this.jobRepository.queue({
+          name: JobName.SharedSpaceLibraryFaceSync,
+          data: { spaceId, libraryId: dto.libraryId },
+        });
+      }
+    }
+  }
+
+  async unlinkLibrary(auth: AuthDto, spaceId: string, libraryId: string): Promise<void> {
+    if (!auth.user.isAdmin) {
+      throw new ForbiddenException('Only admins can unlink libraries from spaces');
+    }
+
+    await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
+
+    await this.sharedSpaceRepository.removeLibrary(spaceId, libraryId);
   }
 
   async markSpaceViewed(auth: AuthDto, spaceId: string): Promise<void> {
