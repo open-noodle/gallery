@@ -22,7 +22,11 @@ type MigrationStatus = {
 @Injectable()
 export class CliService extends BaseService {
   async schemaReport(): Promise<SchemaReport> {
-    const allFiles = await this.storageRepository.readdir(join(import.meta.dirname, '../schema/migrations'));
+    const migrationFolders = [
+      join(import.meta.dirname, '../schema/migrations'),
+      join(import.meta.dirname, '../schema/migrations-gallery'),
+    ];
+    const allFiles = (await Promise.all(migrationFolders.map((f) => this.storageRepository.readdir(f)))).flat();
     const files = allFiles.filter((file) => file.endsWith('.js')).map((file) => file.slice(0, -3));
     const rows = await this.databaseRepository.getMigrations();
     const filesSet = new Set(files);
