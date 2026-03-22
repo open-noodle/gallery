@@ -3014,4 +3014,334 @@ describe(SharedSpaceService.name, () => {
       await expect(sut.update(auth, space.id, { thumbnailAssetId: newUuid() })).rejects.toThrow(BadRequestException);
     });
   });
+
+  describe('linkLibrary', () => {
+    it('should link a library when user is admin and space owner', async () => {
+      const auth = factory.auth({ user: { isAdmin: true } });
+      const space = factory.sharedSpace();
+      const library = factory.library();
+      const member = factory.sharedSpaceMember({
+        spaceId: space.id,
+        userId: auth.user.id,
+        role: SharedSpaceRole.Owner,
+      });
+
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.getMember.mockResolvedValue(member);
+      mocks.library.get.mockResolvedValue(library);
+      mocks.sharedSpace.addLibrary.mockResolvedValue(
+        factory.sharedSpaceLibrary({ spaceId: space.id, libraryId: library.id }),
+      );
+
+      await sut.linkLibrary(auth, space.id, { libraryId: library.id });
+
+      expect(mocks.sharedSpace.addLibrary).toHaveBeenCalledWith({
+        spaceId: space.id,
+        libraryId: library.id,
+        addedById: auth.user.id,
+      });
+    });
+
+    it('should link a library when user is admin and space editor', async () => {
+      const auth = factory.auth({ user: { isAdmin: true } });
+      const space = factory.sharedSpace();
+      const library = factory.library();
+      const member = factory.sharedSpaceMember({
+        spaceId: space.id,
+        userId: auth.user.id,
+        role: SharedSpaceRole.Editor,
+      });
+
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.getMember.mockResolvedValue(member);
+      mocks.library.get.mockResolvedValue(library);
+      mocks.sharedSpace.addLibrary.mockResolvedValue(
+        factory.sharedSpaceLibrary({ spaceId: space.id, libraryId: library.id }),
+      );
+
+      await sut.linkLibrary(auth, space.id, { libraryId: library.id });
+
+      expect(mocks.sharedSpace.addLibrary).toHaveBeenCalled();
+    });
+
+    it('should reject when user is not admin', async () => {
+      const auth = factory.auth({ user: { isAdmin: false } });
+      const space = factory.sharedSpace();
+
+      await expect(sut.linkLibrary(auth, space.id, { libraryId: newUuid() })).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should reject when user is admin but only a viewer', async () => {
+      const auth = factory.auth({ user: { isAdmin: true } });
+      const space = factory.sharedSpace();
+      const member = factory.sharedSpaceMember({
+        spaceId: space.id,
+        userId: auth.user.id,
+        role: SharedSpaceRole.Viewer,
+      });
+
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.getMember.mockResolvedValue(member);
+
+      await expect(sut.linkLibrary(auth, space.id, { libraryId: newUuid() })).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should reject when user is admin but not a space member', async () => {
+      const auth = factory.auth({ user: { isAdmin: true } });
+      const space = factory.sharedSpace();
+
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.getMember.mockResolvedValue(undefined);
+
+      await expect(sut.linkLibrary(auth, space.id, { libraryId: newUuid() })).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should reject linking a non-existent library', async () => {
+      const auth = factory.auth({ user: { isAdmin: true } });
+      const space = factory.sharedSpace();
+      const member = factory.sharedSpaceMember({
+        spaceId: space.id,
+        userId: auth.user.id,
+        role: SharedSpaceRole.Owner,
+      });
+
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.getMember.mockResolvedValue(member);
+      mocks.library.get.mockResolvedValue(undefined);
+
+      await expect(sut.linkLibrary(auth, space.id, { libraryId: newUuid() })).rejects.toThrow(BadRequestException);
+    });
+
+    it('should reject linking to a non-existent space', async () => {
+      const auth = factory.auth({ user: { isAdmin: true } });
+
+      mocks.sharedSpace.getById.mockResolvedValue(undefined);
+
+      await expect(sut.linkLibrary(auth, newUuid(), { libraryId: newUuid() })).rejects.toThrow();
+    });
+
+    it('should silently no-op when linking the same library twice', async () => {
+      const auth = factory.auth({ user: { isAdmin: true } });
+      const space = factory.sharedSpace({ faceRecognitionEnabled: true });
+      const library = factory.library();
+      const member = factory.sharedSpaceMember({
+        spaceId: space.id,
+        userId: auth.user.id,
+        role: SharedSpaceRole.Owner,
+      });
+
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.getMember.mockResolvedValue(member);
+      mocks.library.get.mockResolvedValue(library);
+      mocks.sharedSpace.addLibrary.mockResolvedValue(undefined);
+
+      await expect(sut.linkLibrary(auth, space.id, { libraryId: library.id })).resolves.not.toThrow();
+
+      expect(mocks.job.queue).not.toHaveBeenCalledWith(
+        expect.objectContaining({ name: JobName.SharedSpaceLibraryFaceSync }),
+      );
+    });
+
+    it('should allow linking the same library to different spaces', async () => {
+      const auth = factory.auth({ user: { isAdmin: true } });
+      const space1 = factory.sharedSpace();
+      const space2 = factory.sharedSpace();
+      const library = factory.library();
+
+      for (const space of [space1, space2]) {
+        const member = factory.sharedSpaceMember({
+          spaceId: space.id,
+          userId: auth.user.id,
+          role: SharedSpaceRole.Owner,
+        });
+
+        mocks.sharedSpace.getById.mockResolvedValue(space);
+        mocks.sharedSpace.getMember.mockResolvedValue(member);
+        mocks.library.get.mockResolvedValue(library);
+        mocks.sharedSpace.addLibrary.mockResolvedValue(
+          factory.sharedSpaceLibrary({ spaceId: space.id, libraryId: library.id }),
+        );
+
+        await sut.linkLibrary(auth, space.id, { libraryId: library.id });
+      }
+
+      expect(mocks.sharedSpace.addLibrary).toHaveBeenCalledTimes(2);
+    });
+
+    it('should allow linking different libraries to the same space', async () => {
+      const auth = factory.auth({ user: { isAdmin: true } });
+      const space = factory.sharedSpace();
+      const lib1 = factory.library();
+      const lib2 = factory.library();
+      const member = factory.sharedSpaceMember({
+        spaceId: space.id,
+        userId: auth.user.id,
+        role: SharedSpaceRole.Owner,
+      });
+
+      for (const lib of [lib1, lib2]) {
+        mocks.sharedSpace.getById.mockResolvedValue(space);
+        mocks.sharedSpace.getMember.mockResolvedValue(member);
+        mocks.library.get.mockResolvedValue(lib);
+        mocks.sharedSpace.addLibrary.mockResolvedValue(
+          factory.sharedSpaceLibrary({ spaceId: space.id, libraryId: lib.id }),
+        );
+
+        await sut.linkLibrary(auth, space.id, { libraryId: lib.id });
+      }
+
+      expect(mocks.sharedSpace.addLibrary).toHaveBeenCalledTimes(2);
+    });
+
+    it('should queue face sync job when space has face recognition enabled', async () => {
+      const auth = factory.auth({ user: { isAdmin: true } });
+      const space = factory.sharedSpace({ faceRecognitionEnabled: true });
+      const library = factory.library();
+      const member = factory.sharedSpaceMember({
+        spaceId: space.id,
+        userId: auth.user.id,
+        role: SharedSpaceRole.Owner,
+      });
+
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.getMember.mockResolvedValue(member);
+      mocks.library.get.mockResolvedValue(library);
+      mocks.sharedSpace.addLibrary.mockResolvedValue(
+        factory.sharedSpaceLibrary({ spaceId: space.id, libraryId: library.id }),
+      );
+
+      await sut.linkLibrary(auth, space.id, { libraryId: library.id });
+
+      expect(mocks.job.queue).toHaveBeenCalledWith({
+        name: JobName.SharedSpaceLibraryFaceSync,
+        data: { spaceId: space.id, libraryId: library.id },
+      });
+    });
+
+    it('should not queue face sync job when face recognition is disabled', async () => {
+      const auth = factory.auth({ user: { isAdmin: true } });
+      const space = factory.sharedSpace({ faceRecognitionEnabled: false });
+      const library = factory.library();
+      const member = factory.sharedSpaceMember({
+        spaceId: space.id,
+        userId: auth.user.id,
+        role: SharedSpaceRole.Owner,
+      });
+
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.getMember.mockResolvedValue(member);
+      mocks.library.get.mockResolvedValue(library);
+      mocks.sharedSpace.addLibrary.mockResolvedValue(
+        factory.sharedSpaceLibrary({ spaceId: space.id, libraryId: library.id }),
+      );
+
+      await sut.linkLibrary(auth, space.id, { libraryId: library.id });
+
+      expect(mocks.job.queue).not.toHaveBeenCalledWith(
+        expect.objectContaining({ name: JobName.SharedSpaceLibraryFaceSync }),
+      );
+    });
+  });
+
+  describe('unlinkLibrary', () => {
+    it('should unlink a library when user is admin and space owner', async () => {
+      const auth = factory.auth({ user: { isAdmin: true } });
+      const space = factory.sharedSpace();
+      const libraryId = newUuid();
+      const member = factory.sharedSpaceMember({
+        spaceId: space.id,
+        userId: auth.user.id,
+        role: SharedSpaceRole.Owner,
+      });
+
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.getMember.mockResolvedValue(member);
+
+      await sut.unlinkLibrary(auth, space.id, libraryId);
+
+      expect(mocks.sharedSpace.removeLibrary).toHaveBeenCalledWith(space.id, libraryId);
+    });
+
+    it('should unlink a library when user is admin and space editor', async () => {
+      const auth = factory.auth({ user: { isAdmin: true } });
+      const space = factory.sharedSpace();
+      const libraryId = newUuid();
+      const member = factory.sharedSpaceMember({
+        spaceId: space.id,
+        userId: auth.user.id,
+        role: SharedSpaceRole.Editor,
+      });
+
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.getMember.mockResolvedValue(member);
+
+      await sut.unlinkLibrary(auth, space.id, libraryId);
+
+      expect(mocks.sharedSpace.removeLibrary).toHaveBeenCalledWith(space.id, libraryId);
+    });
+
+    it('should reject when user is not admin', async () => {
+      const auth = factory.auth({ user: { isAdmin: false } });
+
+      await expect(sut.unlinkLibrary(auth, newUuid(), newUuid())).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should reject when user is admin but only a viewer', async () => {
+      const auth = factory.auth({ user: { isAdmin: true } });
+      const space = factory.sharedSpace();
+      const member = factory.sharedSpaceMember({
+        spaceId: space.id,
+        userId: auth.user.id,
+        role: SharedSpaceRole.Viewer,
+      });
+
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.getMember.mockResolvedValue(member);
+
+      await expect(sut.unlinkLibrary(auth, space.id, newUuid())).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should reject when user is admin but not a space member', async () => {
+      const auth = factory.auth({ user: { isAdmin: true } });
+      const space = factory.sharedSpace();
+
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.getMember.mockResolvedValue(undefined);
+
+      await expect(sut.unlinkLibrary(auth, space.id, newUuid())).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should not fail when unlinking a library that is not linked', async () => {
+      const auth = factory.auth({ user: { isAdmin: true } });
+      const space = factory.sharedSpace();
+      const member = factory.sharedSpaceMember({
+        spaceId: space.id,
+        userId: auth.user.id,
+        role: SharedSpaceRole.Owner,
+      });
+
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.getMember.mockResolvedValue(member);
+
+      await expect(sut.unlinkLibrary(auth, space.id, newUuid())).resolves.not.toThrow();
+    });
+
+    it('should not remove manually added assets from the same library', async () => {
+      const auth = factory.auth({ user: { isAdmin: true } });
+      const space = factory.sharedSpace();
+      const member = factory.sharedSpaceMember({
+        spaceId: space.id,
+        userId: auth.user.id,
+        role: SharedSpaceRole.Owner,
+      });
+
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.getMember.mockResolvedValue(member);
+
+      await sut.unlinkLibrary(auth, space.id, newUuid());
+
+      expect(mocks.sharedSpace.removeLibrary).toHaveBeenCalled();
+      expect(mocks.sharedSpace.removeAssets).not.toHaveBeenCalled();
+    });
+  });
 });
