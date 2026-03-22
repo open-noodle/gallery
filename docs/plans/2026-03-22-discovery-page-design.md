@@ -137,13 +137,34 @@ volume bars, breadcrumb, and filtered count behavior.
 ### Filter items (people, location, camera, tags)
 
 - **Item row:** flex, 6px gap, 4px vertical padding, 11px font
+
+**Multi-select items (people, tags):**
+
 - **Checkbox:** 13×13px, 1.5px border, 3px border-radius
   - Active: primary background + border, white checkmark SVG (9px)
+  - Multiple items can be active simultaneously
 - **Person avatar:** 18×18px circle, gradient background, 8px white initial
+
+**Single-select items (location, camera):**
+
+- **Radio indicator:** 13×13px circle, 1.5px border
+  - Active: primary background + border, white dot center (5px)
+  - Only one item active at a time — selecting another deselects the previous
+- **Location hierarchy:** country items at root level, city items indented 20px
+  when parent country is expanded. Selecting a city auto-fills the country.
+  The `locations` provider returns countries; when a country is selected, a second
+  call fetches cities for that country (`getSpaceSuggestions(spaceId, 'city',
+{ country })`)
+
+**Shared:**
+
 - **Label:** flex-1, text-overflow ellipsis
 - **People section:** local search input (26px height, 11px font, 5px border-radius,
   search icon 12px)
 - **"Show N more" link:** 10px, primary color, weight 500
+- **Empty section:** when provider returns zero items, show muted text
+  "No [people/locations/cameras/tags] in this space" (11px, muted color). Section
+  header remains visible but body shows the empty message.
 
 ### Rating section
 
@@ -166,6 +187,14 @@ volume bars, breadcrumb, and filtered count behavior.
 - **Chips:** pill shape (radius-full), 1px border, 10px font
   - Close button: 14×14px, faint color, hover shows border background
 - **"Clear all":** primary color, weight 600, 10px, right-aligned (`margin-left: auto`)
+- **Chip overflow:** bar uses `flex-wrap`, chips wrap to next line. No max-height —
+  the bar grows as needed, pushing the grid down.
+
+### Empty state (zero results)
+
+When active filters match zero photos, the grid area shows a centered message:
+"No photos match your filters" (14px, muted color) with a "Clear all filters" link
+(primary color) below it. The filter panel remains fully interactive.
 
 ### Collapsed state
 
@@ -196,22 +225,29 @@ interface FilterPanelConfig {
     tags?: () => Promise<TagOption[]>;
   };
 
-  // Time buckets — passed in from whatever TimelineManager owns the grid
-  timeBuckets?: TimeBucket[];
+  // Time buckets — passed in from whatever TimelineManager owns the grid.
+  // Type: { timeBucket: string; count: number }[] (from GET /timeline/buckets)
+  timeBuckets?: Array<{ timeBucket: string; count: number }>;
 }
 
+// Filter state sent to the server (maps to TimeBucketDto parameters)
 interface FilterState {
-  personIds: string[]; // multi-select (extend timeline to accept array)
+  personIds: string[]; // multi-select, OR logic (photos with ANY selected person)
   city?: string; // single-select (server is single-value)
   country?: string; // single-select
   make?: string; // single-select
   model?: string; // single-select
-  tagIds: string[]; // multi-select (extend timeline to accept array)
-  rating?: number; // minimum rating (1-5)
+  tagIds: string[]; // multi-select, OR logic (photos with ANY selected tag)
+  rating?: number; // minimum rating (>= N), not exact match
   mediaType: 'all' | 'image' | 'video';
   sortOrder: 'asc' | 'desc';
-  selectedYear?: number;
-  selectedMonth?: number;
+}
+
+// Client-only view state (not sent to server)
+interface FilterViewState {
+  selectedYear?: number; // temporal picker position (scroll-to)
+  selectedMonth?: number; // temporal picker position (scroll-to)
+  collapsed: boolean; // panel collapsed state
 }
 ```
 
@@ -222,16 +258,22 @@ interface FilterState {
   config={{
     sections: ['timeline', 'people', 'location', 'camera', 'tags', 'rating', 'media'],
     providers: {
-      people: () => getSpacePeople(spaceId),
+      people: () => getSpacePeople(spaceId),  // returns SharedSpacePerson[]
       locations: () => getSpaceSuggestions(spaceId, 'country'),
       cameras: () => getSpaceSuggestions(spaceId, 'camera-make'),
-      tags: () => getSpaceTags(spaceId),
+      tags: () => getAllTags(),  // global tags, not space-scoped in V1
     },
   }}
   timeBuckets={timelineManager.months}
   onFilterChange={(filters) => rebuildTimeline(filters)}
 />
 ```
+
+**Note on people in Spaces:** Spaces use `SharedSpacePerson` (space-level face clusters),
+not the global `Person` entity. The `FilterState.personIds` maps to `spacePersonIds` on
+`TimeBucketDto` when inside a Spaces context. The FilterPanel does not need to know
+this distinction — the parent view maps `personIds` to the correct server parameter
+(`spacePersonIds` for spaces, `personIds` for global timeline).
 
 ### Future usage in Albums
 
@@ -278,14 +320,30 @@ visibility. It is missing the EXIF-based filters that the search endpoint suppor
 
 The existing `personId` (single string) and `tagId` (single string) in `TimeBucketDto`
 are upgraded to `personIds` (string array) and `tagIds` (string array) to support
-multi-select. The `hasPeople()` and `withTagId()` helpers already accept arrays
-internally, so the CTE change is minimal.
+multi-select. Similarly, `spacePersonId` is upgraded to `spacePersonIds` (string array)
+for Spaces multi-person filtering.
+
+**OR semantics for multi-select:** When multiple people or tags are selected, the filter
+uses OR logic — photos matching ANY selected person or ANY selected tag are included.
+This requires changes to the existing helpers:
+
+- `hasPeople()` in `database.ts` currently uses AND logic (`HAVING COUNT = length`).
+  Modify to use OR logic for the filtering use case: return assets where the person
+  face matches ANY of the provided IDs (remove the HAVING count check).
+- `withTagId()` in `database.ts` currently accepts a single string. Create a new
+  `withTagIds()` helper that accepts an array and uses `IN (...)` or multiple OR
+  conditions to match assets with ANY of the selected tags.
+
+**Rating filter uses `>=` semantics:** The existing search builder uses exact match
+(`rating = N`). The timeline filter uses minimum rating (`rating >= N`). The CTE
+WHERE clause should use `>=`, not `=`.
 
 **Add new optional fields to `TimeBucketDto` and `TimeBucketAssetDto`:**
 
 ```typescript
-// Upgraded to arrays (multi-select)
+// Upgraded to arrays (multi-select, OR semantics)
 personIds?: string[]; // was personId: string
+spacePersonIds?: string[]; // was spacePersonId: string (for Spaces)
 tagIds?: string[]; // was tagId: string
 
 // EXIF filters — new, single-value (require joining asset_exif in CTE)
@@ -293,7 +351,7 @@ city?: string;
 country?: string;
 make?: string; // camera make
 model?: string; // camera model
-rating?: number; // minimum rating (>=)
+rating?: number; // minimum rating (>= N)
 
 // Asset table filters — new (no extra join needed)
 type?: AssetType; // IMAGE or VIDEO
@@ -352,9 +410,9 @@ All new components live in `web/src/lib/components/filter-panel/`:
 - `filter-panel.svelte` — outer wrapper, collapsible, header with collapse button
 - `filter-section.svelte` — generic collapsible section (title + chevron + body slot)
 - `temporal-picker.svelte` — year→month grid with counts and volume bars
-- `people-filter.svelte` — searchable multi-select list with avatars
-- `location-filter.svelte` — hierarchical country→city checkboxes
-- `camera-filter.svelte` — flat list of make/model
+- `people-filter.svelte` — searchable multi-select list with avatars and checkboxes
+- `location-filter.svelte` — hierarchical country→city with radio buttons (single-select)
+- `camera-filter.svelte` — flat list of make/model with radio buttons (single-select)
 - `tags-filter.svelte` — flat multi-select checkbox list (shows all user tags, not space-scoped)
 - `rating-filter.svelte` — interactive star selector
 - `media-type-filter.svelte` — All/Photos/Videos toggle
@@ -408,11 +466,16 @@ panel and scrolls to that section.
 - `PeopleFilter` deselecting removes from selection array
 - `PeopleFilter` local search filters the list client-side
 - `PeopleFilter` "Show N more" truncates long lists
-- `LocationFilter` hierarchical expand (country click → cities appear indented)
-- `LocationFilter` selecting a city also sets the parent country
-- `CameraFilter` renders make/model combinations
+- `LocationFilter` hierarchical expand (country click → cities load and appear indented)
+- `LocationFilter` selecting a city auto-fills the country field
+- `LocationFilter` is single-select (selecting a different city replaces the previous)
+- `LocationFilter` shows empty message when no locations exist
+- `CameraFilter` renders make/model combinations with radio buttons
+- `CameraFilter` is single-select (selecting a different camera replaces the previous)
+- `CameraFilter` shows empty message when no cameras exist
 - `TagsFilter` renders tag names with checkboxes (multi-select)
 - `TagsFilter` shows all user tags (not space-scoped in V1)
+- `TagsFilter` shows empty message when user has no tags
 - `RatingFilter` highlights stars up to selected value
 - `RatingFilter` clicking same star again clears the filter
 - `MediaTypeFilter` toggles between All/Photos/Videos (only one active)
@@ -441,8 +504,10 @@ _Temporal picker:_
 - Click a month — verify timeline scrolls to that month's position
 - Click "All years" breadcrumb — verify returns to year-level view
 - Apply a filter — verify year counts update to reflect filtered set
+- Select a year, then apply a person filter — verify month counts update dynamically
 - Verify years with zero photos after filtering appear greyed out
 - Verify months with zero photos after filtering appear greyed out
+- Clear all filters — verify temporal picker counts return to unfiltered totals
 
 _People filter:_
 
@@ -461,21 +526,29 @@ _Location filter:_
 - Verify only locations present in the space are shown
 - Select a country — verify city sub-items appear indented below
 - Select a city — verify timeline filters to photos from that city
+- Select a different city — verify previous city is deselected (single-select)
+- Verify chip shows "City, Country" format
 - Deselect city — verify timeline returns to country-level filter
 - Deselect country — verify all location filters removed
+- Remove location chip — verify location filter cleared
 
 _Camera filter:_
 
 - Verify only cameras used in the space's photos are listed
 - Select a camera make/model — verify timeline filters
+- Select a different camera — verify previous is deselected (single-select)
+- Verify chip shows camera make/model text
 - Deselect — verify filter removed
+- Remove camera chip — verify filter cleared
 
 _Tags filter:_
 
 - Select a tag — verify timeline filters to tagged photos
 - Select a second tag — verify both remain selected (multi-select)
-- Deselect one tag — verify other tag filter remains
+- Verify two tag chips appear (one per selected tag)
+- Deselect one tag — verify other tag filter remains and one chip removed
 - Deselect last tag — verify filter removed
+- Remove tag chip — verify that tag is deselected in the panel
 
 _Rating filter:_
 
@@ -483,6 +556,8 @@ _Rating filter:_
 - Click 5th star — verify only 5-star photos shown
 - Click 3rd star again (same as current) — verify rating filter clears
 - Verify unrated photos are excluded when any rating filter is active
+- Verify chip shows "★ 3+" format
+- Remove rating chip — verify filter cleared
 
 _Media type filter:_
 
@@ -490,11 +565,14 @@ _Media type filter:_
 - Click Videos — verify only videos shown, images hidden
 - Click All — verify both images and videos shown
 - Verify the toggle is All by default
+- Verify chip shows "Photos only" or "Videos only" (no chip for All)
+- Remove media type chip — verify toggle returns to All
 
 _Sort direction:_
 
 - Toggle to ascending — verify oldest photos appear first
 - Toggle back to descending — verify newest photos appear first
+- Toggle sort with active filters — verify filters are preserved after sort change
 
 _Active filter chips:_
 
@@ -529,14 +607,17 @@ _Collapsed panel:_
 
 _Edge cases:_
 
-- Apply filters that match zero photos — verify empty state message
+- Apply filters that match zero photos — verify empty state message with
+  "Clear all filters" link
 - Space with exactly one photo — verify temporal picker shows one year and one month
-- Space with no photos — verify filter panel renders but shows empty states
+- Space with no photos — verify filter panel renders but shows empty messages in sections
+- Space with no EXIF data — verify location and camera sections show empty messages
 - Rapidly toggle multiple filters — verify no race conditions in timeline reload
   (each filter change should cancel any in-flight request)
 - Apply all filter types simultaneously — verify they all work together
 - Collapse and expand panel rapidly — verify state is preserved
 - Navigate away from space and back — verify filters are reset (not persisted)
+- Filter section with single option — verify it is still shown and functional
 
 ## Design Mockups
 
@@ -570,3 +651,11 @@ Additional reference mockups (earlier explorations):
   Multi-select for these fields requires upstream search builder changes. Deferred.
 - **Filter state persistence** — filters reset on navigation. URL-based or local
   storage persistence deferred.
+- **Space-scoped tags** — V1 shows all user tags globally. Scoping tags to a space
+  requires a new endpoint or extending the tags API. Deferred.
+- **Keyboard navigation / accessibility** — arrow key navigation within filter
+  sections, focus management, ARIA roles for checkboxes and radio buttons. Deferred.
+- **Responsive breakpoint** — behavior when viewport is too narrow for 160px nav +
+  240px panel + usable grid. Deferred.
+- **Provider error handling** — error states when filter data providers fail to fetch.
+  Deferred (V1 shows empty section on failure).
