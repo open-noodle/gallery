@@ -239,8 +239,8 @@ interface FilterState {
   model?: string; // single-select
   tagIds: string[]; // multi-select, OR logic (photos with ANY selected tag)
   rating?: number; // minimum rating (>= N), not exact match
-  mediaType: 'all' | 'image' | 'video';
-  sortOrder: 'asc' | 'desc';
+  mediaType: 'all' | 'image' | 'video'; // maps to server AssetType: 'image'→IMAGE, 'video'→VIDEO, 'all'→omit param
+  sortOrder: 'asc' | 'desc'; // maps to server 'order' param using AssetOrder enum
 }
 
 // Client-only view state (not sent to server)
@@ -353,8 +353,9 @@ WHERE clause should use `>=`, not `=`.
 
 **Service-layer access checks:** `TimelineService.timeBucketChecks()` currently checks
 access for the single `dto.tagId`. This must be updated to iterate over `dto.tagIds[]`
-and check `Permission.TagRead` for each element. Similarly for any other access checks
-referencing the old single-value field names.
+and check `Permission.TagRead` for each element. Note: `personId` and `spacePersonId`
+do NOT have access checks in `timeBucketChecks` today (access is implicitly scoped by
+user/space/album checks), so only `tagId → tagIds` needs an access check update.
 
 **Add new optional fields to `TimeBucketDto` and `TimeBucketAssetDto`:**
 
@@ -378,9 +379,12 @@ type?: AssetType; // IMAGE or VIDEO
 Wire these as WHERE clauses in the `getTimeBuckets` and `getTimeBucket` CTE queries in
 `asset.repository.ts`. Note the different join strategies:
 
-- **`getTimeBuckets`** does NOT currently join `asset_exif`. Add a **conditional** join
-  (`.$if(!!city || !!country || !!make || !!model || !!rating, ...)`) to avoid a
-  performance regression on unfiltered queries.
+- **`getTimeBuckets`** does NOT currently join `asset_exif` except conditionally for
+  `bbox` (geospatial). Add a **single conditional** join that covers both the existing
+  `bbox` case and the new EXIF filters: `.$if(!!bbox || !!city || !!country || !!make
+|| !!model || !!rating, (qb) => qb.innerJoin('asset_exif', ...))`. This replaces
+  the existing `bbox`-only conditional join to avoid duplicate joins when both `bbox`
+  and an EXIF filter are provided.
 - **`getTimeBucket`** already has an unconditional `innerJoin('asset_exif', ...)`.
   Only WHERE clauses are needed — no additional join.
 
@@ -498,6 +502,8 @@ panel and scrolls to that section.
 - `LocationFilter` shows empty message when no locations exist
 - `CameraFilter` renders make/model combinations with radio buttons
 - `CameraFilter` is single-select (selecting a different camera replaces the previous)
+- `CameraFilter` hierarchical expand (make click triggers model load, models appear)
+- `CameraFilter` selecting a model auto-fills the make field
 - `CameraFilter` shows empty message when no cameras exist
 - `TagsFilter` renders tag names with checkboxes (multi-select)
 - `TagsFilter` shows all user tags (not space-scoped in V1)
@@ -563,9 +569,9 @@ _Location filter:_
 _Camera filter:_
 
 - Verify only cameras used in the space's photos are listed
-- Select a camera make/model — verify timeline filters
-- Select a different camera — verify previous is deselected (single-select)
-- Verify chip shows camera make/model text
+- Select a camera make — verify models appear for that make
+- Select a model — verify timeline filters and chip shows "Make Model" text
+- Select a different make — verify previous is deselected (single-select)
 - Deselect — verify filter removed
 - Remove camera chip — verify filter cleared
 
