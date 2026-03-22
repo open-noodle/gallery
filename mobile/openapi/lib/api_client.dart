@@ -650,6 +650,10 @@ class ApiClient {
           return SharedSpaceAssetRemoveDto.fromJson(value);
         case 'SharedSpaceCreateDto':
           return SharedSpaceCreateDto.fromJson(value);
+        case 'SharedSpaceLibraryLinkDto':
+          return SharedSpaceLibraryLinkDto.fromJson(value);
+        case 'SharedSpaceLinkedLibraryDto':
+          return SharedSpaceLinkedLibraryDto.fromJson(value);
         case 'SharedSpaceMemberCreateDto':
           return SharedSpaceMemberCreateDto.fromJson(value);
         case 'SharedSpaceMemberResponseDto':

@@ -120,6 +120,20 @@ export class SharedSpaceMemberResponseDto {
   recentAssetId?: string | null;
 }
 
+export class SharedSpaceLinkedLibraryDto {
+  @ApiProperty()
+  libraryId!: string;
+
+  @ApiProperty()
+  libraryName!: string;
+
+  @ApiPropertyOptional()
+  addedById!: string | null;
+
+  @ApiProperty()
+  createdAt!: Date;
+}
+
 export class SharedSpaceResponseDto {
   @ApiProperty({ description: 'Space ID' })
   id!: string;
@@ -191,20 +205,6 @@ export class SharedSpaceMemberTimelineDto {
 export class SharedSpaceLibraryLinkDto {
   @ValidateUUID({ description: 'Library ID' })
   libraryId!: string;
-}
-
-export class SharedSpaceLinkedLibraryDto {
-  @ApiProperty()
-  libraryId!: string;
-
-  @ApiProperty()
-  libraryName!: string;
-
-  @ApiPropertyOptional()
-  addedById!: string | null;
-
-  @ApiProperty()
-  createdAt!: Date;
 }
 
 export class SharedSpaceAssetAddDto {

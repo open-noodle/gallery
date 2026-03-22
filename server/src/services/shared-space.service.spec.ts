@@ -6,13 +6,13 @@ import { factory, newDate, newUuid } from 'test/small.factory';
 import { newTestService, ServiceMocks } from 'test/utils';
 
 /** Helper to build a joined member result (member + user fields from the repo join). */
-const makeMemberResult = (overrides: Record<string, unknown> = {}) => ({
+const makeMemberResult = (overrides: any = {}) => ({
   ...factory.sharedSpaceMember(),
   name: 'Test User',
   email: 'test@immich.cloud',
   profileImagePath: '',
   profileChangedAt: newDate(),
-  avatarColor: null,
+  avatarColor: null as UserAvatarColor | null,
   showInTimeline: true,
   ...overrides,
 });
@@ -2960,18 +2960,18 @@ describe(SharedSpaceService.name, () => {
     it('should call repository getAssetCount which includes library assets', async () => {
       const auth = factory.auth();
       const space = factory.sharedSpace();
-      const member = factory.sharedSpaceMember({ spaceId: space.id, userId: auth.user.id });
+      const member = makeMemberResult({ spaceId: space.id, userId: auth.user.id });
 
       mocks.sharedSpace.getById.mockResolvedValue(space);
       mocks.sharedSpace.getMember.mockResolvedValue(member);
-      mocks.sharedSpace.getMembers.mockResolvedValue([makeMemberResult({ ...member })]);
-      mocks.sharedSpace.getAssetCount.mockResolvedValue(117000);
+      mocks.sharedSpace.getMembers.mockResolvedValue([member]);
+      mocks.sharedSpace.getAssetCount.mockResolvedValue(117_000);
       mocks.sharedSpace.getRecentAssets.mockResolvedValue([]);
       mocks.sharedSpace.getNewAssetCount.mockResolvedValue(0);
 
       const result = await sut.get(auth, space.id);
 
-      expect(result.assetCount).toBe(117000);
+      expect(result.assetCount).toBe(117_000);
       expect(mocks.sharedSpace.getAssetCount).toHaveBeenCalledWith(space.id);
     });
   });
@@ -2980,7 +2980,7 @@ describe(SharedSpaceService.name, () => {
     it('should validate thumbnail from library-linked asset', async () => {
       const auth = factory.auth();
       const space = factory.sharedSpace();
-      const member = factory.sharedSpaceMember({
+      const member = makeMemberResult({
         spaceId: space.id,
         userId: auth.user.id,
         role: SharedSpaceRole.Owner,
@@ -3001,7 +3001,7 @@ describe(SharedSpaceService.name, () => {
     it('should reject thumbnail not in space or linked library', async () => {
       const auth = factory.auth();
       const space = factory.sharedSpace();
-      const member = factory.sharedSpaceMember({
+      const member = makeMemberResult({
         spaceId: space.id,
         userId: auth.user.id,
         role: SharedSpaceRole.Owner,
@@ -3020,7 +3020,7 @@ describe(SharedSpaceService.name, () => {
       const auth = factory.auth({ user: { isAdmin: true } });
       const space = factory.sharedSpace();
       const library = factory.library();
-      const member = factory.sharedSpaceMember({
+      const member = makeMemberResult({
         spaceId: space.id,
         userId: auth.user.id,
         role: SharedSpaceRole.Owner,
@@ -3046,7 +3046,7 @@ describe(SharedSpaceService.name, () => {
       const auth = factory.auth({ user: { isAdmin: true } });
       const space = factory.sharedSpace();
       const library = factory.library();
-      const member = factory.sharedSpaceMember({
+      const member = makeMemberResult({
         spaceId: space.id,
         userId: auth.user.id,
         role: SharedSpaceRole.Editor,
@@ -3074,7 +3074,7 @@ describe(SharedSpaceService.name, () => {
     it('should reject when user is admin but only a viewer', async () => {
       const auth = factory.auth({ user: { isAdmin: true } });
       const space = factory.sharedSpace();
-      const member = factory.sharedSpaceMember({
+      const member = makeMemberResult({
         spaceId: space.id,
         userId: auth.user.id,
         role: SharedSpaceRole.Viewer,
@@ -3091,7 +3091,7 @@ describe(SharedSpaceService.name, () => {
       const space = factory.sharedSpace();
 
       mocks.sharedSpace.getById.mockResolvedValue(space);
-      mocks.sharedSpace.getMember.mockResolvedValue(undefined);
+      mocks.sharedSpace.getMember.mockResolvedValue(void 0);
 
       await expect(sut.linkLibrary(auth, space.id, { libraryId: newUuid() })).rejects.toThrow(ForbiddenException);
     });
@@ -3099,7 +3099,7 @@ describe(SharedSpaceService.name, () => {
     it('should reject linking a non-existent library', async () => {
       const auth = factory.auth({ user: { isAdmin: true } });
       const space = factory.sharedSpace();
-      const member = factory.sharedSpaceMember({
+      const member = makeMemberResult({
         spaceId: space.id,
         userId: auth.user.id,
         role: SharedSpaceRole.Owner,
@@ -3107,7 +3107,7 @@ describe(SharedSpaceService.name, () => {
 
       mocks.sharedSpace.getById.mockResolvedValue(space);
       mocks.sharedSpace.getMember.mockResolvedValue(member);
-      mocks.library.get.mockResolvedValue(undefined);
+      mocks.library.get.mockResolvedValue(void 0);
 
       await expect(sut.linkLibrary(auth, space.id, { libraryId: newUuid() })).rejects.toThrow(BadRequestException);
     });
@@ -3115,7 +3115,7 @@ describe(SharedSpaceService.name, () => {
     it('should reject linking to a non-existent space', async () => {
       const auth = factory.auth({ user: { isAdmin: true } });
 
-      mocks.sharedSpace.getById.mockResolvedValue(undefined);
+      mocks.sharedSpace.getById.mockResolvedValue(void 0);
 
       await expect(sut.linkLibrary(auth, newUuid(), { libraryId: newUuid() })).rejects.toThrow();
     });
@@ -3124,7 +3124,7 @@ describe(SharedSpaceService.name, () => {
       const auth = factory.auth({ user: { isAdmin: true } });
       const space = factory.sharedSpace({ faceRecognitionEnabled: true });
       const library = factory.library();
-      const member = factory.sharedSpaceMember({
+      const member = makeMemberResult({
         spaceId: space.id,
         userId: auth.user.id,
         role: SharedSpaceRole.Owner,
@@ -3133,7 +3133,7 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.getById.mockResolvedValue(space);
       mocks.sharedSpace.getMember.mockResolvedValue(member);
       mocks.library.get.mockResolvedValue(library);
-      mocks.sharedSpace.addLibrary.mockResolvedValue(undefined);
+      mocks.sharedSpace.addLibrary.mockResolvedValue(void 0 as any);
 
       await expect(sut.linkLibrary(auth, space.id, { libraryId: library.id })).resolves.not.toThrow();
 
@@ -3149,7 +3149,7 @@ describe(SharedSpaceService.name, () => {
       const library = factory.library();
 
       for (const space of [space1, space2]) {
-        const member = factory.sharedSpaceMember({
+        const member = makeMemberResult({
           spaceId: space.id,
           userId: auth.user.id,
           role: SharedSpaceRole.Owner,
@@ -3173,7 +3173,7 @@ describe(SharedSpaceService.name, () => {
       const space = factory.sharedSpace();
       const lib1 = factory.library();
       const lib2 = factory.library();
-      const member = factory.sharedSpaceMember({
+      const member = makeMemberResult({
         spaceId: space.id,
         userId: auth.user.id,
         role: SharedSpaceRole.Owner,
@@ -3197,7 +3197,7 @@ describe(SharedSpaceService.name, () => {
       const auth = factory.auth({ user: { isAdmin: true } });
       const space = factory.sharedSpace({ faceRecognitionEnabled: true });
       const library = factory.library();
-      const member = factory.sharedSpaceMember({
+      const member = makeMemberResult({
         spaceId: space.id,
         userId: auth.user.id,
         role: SharedSpaceRole.Owner,
@@ -3222,7 +3222,7 @@ describe(SharedSpaceService.name, () => {
       const auth = factory.auth({ user: { isAdmin: true } });
       const space = factory.sharedSpace({ faceRecognitionEnabled: false });
       const library = factory.library();
-      const member = factory.sharedSpaceMember({
+      const member = makeMemberResult({
         spaceId: space.id,
         userId: auth.user.id,
         role: SharedSpaceRole.Owner,
@@ -3248,7 +3248,7 @@ describe(SharedSpaceService.name, () => {
       const auth = factory.auth({ user: { isAdmin: true } });
       const space = factory.sharedSpace();
       const libraryId = newUuid();
-      const member = factory.sharedSpaceMember({
+      const member = makeMemberResult({
         spaceId: space.id,
         userId: auth.user.id,
         role: SharedSpaceRole.Owner,
@@ -3256,7 +3256,7 @@ describe(SharedSpaceService.name, () => {
 
       mocks.sharedSpace.getById.mockResolvedValue(space);
       mocks.sharedSpace.getMember.mockResolvedValue(member);
-      mocks.sharedSpace.removeLibrary.mockResolvedValue(undefined);
+      mocks.sharedSpace.removeLibrary.mockResolvedValue([] as any);
 
       await sut.unlinkLibrary(auth, space.id, libraryId);
 
@@ -3267,7 +3267,7 @@ describe(SharedSpaceService.name, () => {
       const auth = factory.auth({ user: { isAdmin: true } });
       const space = factory.sharedSpace();
       const libraryId = newUuid();
-      const member = factory.sharedSpaceMember({
+      const member = makeMemberResult({
         spaceId: space.id,
         userId: auth.user.id,
         role: SharedSpaceRole.Editor,
@@ -3275,7 +3275,7 @@ describe(SharedSpaceService.name, () => {
 
       mocks.sharedSpace.getById.mockResolvedValue(space);
       mocks.sharedSpace.getMember.mockResolvedValue(member);
-      mocks.sharedSpace.removeLibrary.mockResolvedValue(undefined);
+      mocks.sharedSpace.removeLibrary.mockResolvedValue([] as any);
 
       await sut.unlinkLibrary(auth, space.id, libraryId);
 
@@ -3291,7 +3291,7 @@ describe(SharedSpaceService.name, () => {
     it('should reject when user is admin but only a viewer', async () => {
       const auth = factory.auth({ user: { isAdmin: true } });
       const space = factory.sharedSpace();
-      const member = factory.sharedSpaceMember({
+      const member = makeMemberResult({
         spaceId: space.id,
         userId: auth.user.id,
         role: SharedSpaceRole.Viewer,
@@ -3308,7 +3308,7 @@ describe(SharedSpaceService.name, () => {
       const space = factory.sharedSpace();
 
       mocks.sharedSpace.getById.mockResolvedValue(space);
-      mocks.sharedSpace.getMember.mockResolvedValue(undefined);
+      mocks.sharedSpace.getMember.mockResolvedValue(void 0);
 
       await expect(sut.unlinkLibrary(auth, space.id, newUuid())).rejects.toThrow(ForbiddenException);
     });
@@ -3316,7 +3316,7 @@ describe(SharedSpaceService.name, () => {
     it('should not fail when unlinking a library that is not linked', async () => {
       const auth = factory.auth({ user: { isAdmin: true } });
       const space = factory.sharedSpace();
-      const member = factory.sharedSpaceMember({
+      const member = makeMemberResult({
         spaceId: space.id,
         userId: auth.user.id,
         role: SharedSpaceRole.Owner,
@@ -3324,7 +3324,7 @@ describe(SharedSpaceService.name, () => {
 
       mocks.sharedSpace.getById.mockResolvedValue(space);
       mocks.sharedSpace.getMember.mockResolvedValue(member);
-      mocks.sharedSpace.removeLibrary.mockResolvedValue(undefined);
+      mocks.sharedSpace.removeLibrary.mockResolvedValue([] as any);
 
       await expect(sut.unlinkLibrary(auth, space.id, newUuid())).resolves.not.toThrow();
     });
@@ -3332,7 +3332,7 @@ describe(SharedSpaceService.name, () => {
     it('should not remove manually added assets from the same library', async () => {
       const auth = factory.auth({ user: { isAdmin: true } });
       const space = factory.sharedSpace();
-      const member = factory.sharedSpaceMember({
+      const member = makeMemberResult({
         spaceId: space.id,
         userId: auth.user.id,
         role: SharedSpaceRole.Owner,
@@ -3340,7 +3340,7 @@ describe(SharedSpaceService.name, () => {
 
       mocks.sharedSpace.getById.mockResolvedValue(space);
       mocks.sharedSpace.getMember.mockResolvedValue(member);
-      mocks.sharedSpace.removeLibrary.mockResolvedValue(undefined);
+      mocks.sharedSpace.removeLibrary.mockResolvedValue([] as any);
 
       await sut.unlinkLibrary(auth, space.id, newUuid());
 
@@ -3353,7 +3353,7 @@ describe(SharedSpaceService.name, () => {
     it('should include linked libraries in response when user is admin', async () => {
       const auth = factory.auth({ user: { isAdmin: true } });
       const space = factory.sharedSpace();
-      const member = factory.sharedSpaceMember({
+      const member = makeMemberResult({
         spaceId: space.id,
         userId: auth.user.id,
         role: SharedSpaceRole.Owner,
@@ -3365,7 +3365,7 @@ describe(SharedSpaceService.name, () => {
 
       mocks.sharedSpace.getById.mockResolvedValue(space);
       mocks.sharedSpace.getMember.mockResolvedValue(member);
-      mocks.sharedSpace.getMembers.mockResolvedValue([makeMemberResult({ ...member })]);
+      mocks.sharedSpace.getMembers.mockResolvedValue([member]);
       mocks.sharedSpace.getAssetCount.mockResolvedValue(100);
       mocks.sharedSpace.getRecentAssets.mockResolvedValue([]);
       mocks.sharedSpace.getNewAssetCount.mockResolvedValue(0);
@@ -3382,7 +3382,7 @@ describe(SharedSpaceService.name, () => {
     it('should not include linked libraries for non-admin users', async () => {
       const auth = factory.auth({ user: { isAdmin: false } });
       const space = factory.sharedSpace();
-      const member = factory.sharedSpaceMember({
+      const member = makeMemberResult({
         spaceId: space.id,
         userId: auth.user.id,
         role: SharedSpaceRole.Owner,
@@ -3390,7 +3390,7 @@ describe(SharedSpaceService.name, () => {
 
       mocks.sharedSpace.getById.mockResolvedValue(space);
       mocks.sharedSpace.getMember.mockResolvedValue(member);
-      mocks.sharedSpace.getMembers.mockResolvedValue([makeMemberResult({ ...member })]);
+      mocks.sharedSpace.getMembers.mockResolvedValue([member]);
       mocks.sharedSpace.getAssetCount.mockResolvedValue(0);
       mocks.sharedSpace.getRecentAssets.mockResolvedValue([]);
       mocks.sharedSpace.getNewAssetCount.mockResolvedValue(0);
@@ -3404,7 +3404,7 @@ describe(SharedSpaceService.name, () => {
     it('should return empty linkedLibraries array for admin with no links', async () => {
       const auth = factory.auth({ user: { isAdmin: true } });
       const space = factory.sharedSpace();
-      const member = factory.sharedSpaceMember({
+      const member = makeMemberResult({
         spaceId: space.id,
         userId: auth.user.id,
         role: SharedSpaceRole.Owner,
@@ -3412,7 +3412,7 @@ describe(SharedSpaceService.name, () => {
 
       mocks.sharedSpace.getById.mockResolvedValue(space);
       mocks.sharedSpace.getMember.mockResolvedValue(member);
-      mocks.sharedSpace.getMembers.mockResolvedValue([makeMemberResult({ ...member })]);
+      mocks.sharedSpace.getMembers.mockResolvedValue([member]);
       mocks.sharedSpace.getAssetCount.mockResolvedValue(0);
       mocks.sharedSpace.getRecentAssets.mockResolvedValue([]);
       mocks.sharedSpace.getNewAssetCount.mockResolvedValue(0);
@@ -3446,7 +3446,7 @@ describe(SharedSpaceService.name, () => {
     });
 
     it('should skip when space does not exist', async () => {
-      mocks.sharedSpace.getById.mockResolvedValue(undefined);
+      mocks.sharedSpace.getById.mockResolvedValue(void 0);
       const result = await sut.handleSharedSpaceLibraryFaceSync({ spaceId: newUuid(), libraryId: newUuid() });
       expect(result).toBe(JobStatus.Skipped);
     });

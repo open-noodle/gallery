@@ -273,12 +273,14 @@ Class | Method | HTTP request | Description
 *SharedSpacesApi* | [**getSpacePerson**](doc//SharedSpacesApi.md#getspaceperson) | **GET** /shared-spaces/{id}/people/{personId} | Get a person in a shared space
 *SharedSpacesApi* | [**getSpacePersonAssets**](doc//SharedSpacesApi.md#getspacepersonassets) | **GET** /shared-spaces/{id}/people/{personId}/assets | Get assets for a person in a shared space
 *SharedSpacesApi* | [**getSpacePersonThumbnail**](doc//SharedSpacesApi.md#getspacepersonthumbnail) | **GET** /shared-spaces/{id}/people/{personId}/thumbnail | Get a space person thumbnail
+*SharedSpacesApi* | [**linkLibrary**](doc//SharedSpacesApi.md#linklibrary) | **PUT** /shared-spaces/{id}/libraries | Link a library to a shared space
 *SharedSpacesApi* | [**markSpaceViewed**](doc//SharedSpacesApi.md#markspaceviewed) | **PATCH** /shared-spaces/{id}/view | Mark space as viewed
 *SharedSpacesApi* | [**mergeSpacePeople**](doc//SharedSpacesApi.md#mergespacepeople) | **POST** /shared-spaces/{id}/people/{personId}/merge | Merge people in a shared space
 *SharedSpacesApi* | [**removeAssets**](doc//SharedSpacesApi.md#removeassets) | **DELETE** /shared-spaces/{id}/assets | Remove assets from a shared space
 *SharedSpacesApi* | [**removeMember**](doc//SharedSpacesApi.md#removemember) | **DELETE** /shared-spaces/{id}/members/{userId} | Remove a member from a shared space
 *SharedSpacesApi* | [**removeSpace**](doc//SharedSpacesApi.md#removespace) | **DELETE** /shared-spaces/{id} | Delete a shared space
 *SharedSpacesApi* | [**setSpacePersonAlias**](doc//SharedSpacesApi.md#setspacepersonalias) | **PUT** /shared-spaces/{id}/people/{personId}/alias | Set a person alias in a shared space
+*SharedSpacesApi* | [**unlinkLibrary**](doc//SharedSpacesApi.md#unlinklibrary) | **DELETE** /shared-spaces/{id}/libraries/{libraryId} | Unlink a library from a shared space
 *SharedSpacesApi* | [**updateMember**](doc//SharedSpacesApi.md#updatemember) | **PATCH** /shared-spaces/{id}/members/{userId} | Update a member in a shared space
 *SharedSpacesApi* | [**updateMemberTimeline**](doc//SharedSpacesApi.md#updatemembertimeline) | **PATCH** /shared-spaces/{id}/members/me/timeline | Update timeline visibility for current member
 *SharedSpacesApi* | [**updateSpace**](doc//SharedSpacesApi.md#updatespace) | **PATCH** /shared-spaces/{id} | Update a shared space
@@ -598,6 +600,8 @@ Class | Method | HTTP request | Description
  - [SharedSpaceAssetAddDto](doc//SharedSpaceAssetAddDto.md)
  - [SharedSpaceAssetRemoveDto](doc//SharedSpaceAssetRemoveDto.md)
  - [SharedSpaceCreateDto](doc//SharedSpaceCreateDto.md)
+ - [SharedSpaceLibraryLinkDto](doc//SharedSpaceLibraryLinkDto.md)
+ - [SharedSpaceLinkedLibraryDto](doc//SharedSpaceLinkedLibraryDto.md)
  - [SharedSpaceMemberCreateDto](doc//SharedSpaceMemberCreateDto.md)
  - [SharedSpaceMemberResponseDto](doc//SharedSpaceMemberResponseDto.md)
  - [SharedSpaceMemberTimelineDto](doc//SharedSpaceMemberTimelineDto.md)
