@@ -29,8 +29,6 @@ import {
   asUuid,
   hasAnyPerson,
   hasAnySpacePerson,
-  hasPeople,
-  hasSpacePerson,
   removeUndefinedKeys,
   truncatedDate,
   unnest,
@@ -45,7 +43,6 @@ import {
   withLibrary,
   withOwner,
   withSmartSearch,
-  withTagId,
   withTags,
 } from 'src/utils/database';
 import { globToSqlPattern } from 'src/utils/misc';
@@ -738,11 +735,11 @@ export class AssetRepository {
                 q = withBoundingBox(q, options.bbox) as any;
               }
 
-              if (options.city) q = q.where('asset_exif.city', '=', options.city) as any;
-              if (options.country) q = q.where('asset_exif.country', '=', options.country) as any;
-              if (options.make) q = q.where('asset_exif.make', '=', options.make) as any;
-              if (options.model) q = q.where('asset_exif.model', '=', options.model) as any;
-              if (options.rating !== undefined) q = q.where('asset_exif.rating', '>=', options.rating) as any;
+              if (options.city) {q = q.where('asset_exif.city', '=', options.city) as any;}
+              if (options.country) {q = q.where('asset_exif.country', '=', options.country) as any;}
+              if (options.make) {q = q.where('asset_exif.make', '=', options.make) as any;}
+              if (options.model) {q = q.where('asset_exif.model', '=', options.model) as any;}
+              if (options.rating !== undefined) {q = q.where('asset_exif.rating', '>=', options.rating) as any;}
 
               return q;
             },
