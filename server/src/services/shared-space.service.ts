@@ -14,6 +14,7 @@ import {
   SharedSpaceAssetRemoveDto,
   SharedSpaceCreateDto,
   SharedSpaceLibraryLinkDto,
+  SharedSpaceLinkedLibraryDto,
   SharedSpaceMemberCreateDto,
   SharedSpaceMemberResponseDto,
   SharedSpaceMemberTimelineDto,
@@ -85,6 +86,23 @@ export class SharedSpaceService extends BaseService {
         newAssetCount = assetCount;
       }
 
+      let linkedLibraries: SharedSpaceLinkedLibraryDto[] | undefined;
+      if (auth.user.isAdmin) {
+        const links = await this.sharedSpaceRepository.getLinkedLibraries(space.id);
+        linkedLibraries = [];
+        for (const link of links) {
+          const library = await this.libraryRepository.get(link.libraryId);
+          if (library) {
+            linkedLibraries.push({
+              libraryId: link.libraryId,
+              libraryName: library.name,
+              addedById: link.addedById,
+              createdAt: link.createdAt as unknown as Date,
+            });
+          }
+        }
+      }
+
       results.push({
         ...this.mapSpace(space),
         memberCount: members.length,
@@ -96,6 +114,7 @@ export class SharedSpaceService extends BaseService {
         members: members.map((m) => this.mapMember(m)),
         newAssetCount,
         lastContributor,
+        linkedLibraries,
       });
     }
     return results;
@@ -127,6 +146,23 @@ export class SharedSpaceService extends BaseService {
       newAssetCount = await this.sharedSpaceRepository.getNewAssetCount(id, membership.lastViewedAt);
     }
 
+    let linkedLibraries: SharedSpaceLinkedLibraryDto[] | undefined;
+    if (auth.user.isAdmin) {
+      const links = await this.sharedSpaceRepository.getLinkedLibraries(space.id);
+      linkedLibraries = [];
+      for (const link of links) {
+        const library = await this.libraryRepository.get(link.libraryId);
+        if (library) {
+          linkedLibraries.push({
+            libraryId: link.libraryId,
+            libraryName: library.name,
+            addedById: link.addedById,
+            createdAt: link.createdAt as unknown as Date,
+          });
+        }
+      }
+    }
+
     return {
       ...this.mapSpace(space),
       thumbnailAssetId,
@@ -139,6 +175,7 @@ export class SharedSpaceService extends BaseService {
       members: members.map((m) => this.mapMember(m)),
       newAssetCount,
       lastViewedAt: membership.lastViewedAt ? (membership.lastViewedAt as unknown as Date).toISOString() : null,
+      linkedLibraries,
     };
   }
 
