@@ -25,6 +25,9 @@ import { getPreferences, getPreferencesPartial, mergePreferences } from 'src/uti
 import { generateProfileImage } from 'src/utils/profile-image.js';
 import { ArgOf } from 'src/repositories/event.repository.js';
 import { JobOf, UserMetadataItem } from 'src/types.js';
+import { createReadStream } from 'node:fs';
+import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
+import { StorageService } from 'src/services/storage.service.js';
 
 @Injectable()
 export class UserService extends BaseService {
@@ -118,6 +121,20 @@ export class UserService extends BaseService {
     } catch (error) {
       await this.jobRepository.queue({ name: JobName.FileDelete, data: { files: [file.path] } });
       throw new BadRequestException('Unable to process profile image', { cause: error });
+    }
+
+    let profileImagePath = file.path;
+    const writeBackend = StorageService.getWriteBackend();
+
+    if (!(writeBackend instanceof DiskStorageBackend)) {
+      const filename = file.path.split('/').pop()!;
+      const relativeKey = StorageCore.getRelativeProfileImagePath(auth.user.id, filename);
+      const stream = createReadStream(file.path);
+      await writeBackend.put(relativeKey, stream, { contentType: mimeTypes.lookup(file.path) });
+      profileImagePath = relativeKey;
+
+      // Delete the local temp file
+      await this.jobRepository.queue({ name: JobName.FileDelete, data: { files: [file.path] } });
     }
 
     const user = await this.userRepository.update(auth.user.id, {
