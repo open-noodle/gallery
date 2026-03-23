@@ -82,6 +82,7 @@
           : AssetVisibility.Timeline,
     isFavorite: spaceId ? undefined : $mapSettings.onlyFavorites || undefined,
     withPartners: spaceId ? undefined : $mapSettings.withPartners || undefined,
+    spaceId,
     timelineSpaceId: spaceId,
     withStacked: true,
     assetFilter: selectedClusterIds,
