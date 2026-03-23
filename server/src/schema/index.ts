@@ -76,6 +76,7 @@ import { SharedLinkAssetTable } from 'src/schema/tables/shared-link-asset.table.
 import { SharedLinkTable } from 'src/schema/tables/shared-link.table.js';
 import { SharedSpaceActivityTable } from 'src/schema/tables/shared-space-activity.table.js';
 import { SharedSpaceAssetTable } from 'src/schema/tables/shared-space-asset.table.js';
+import { SharedSpaceLibraryTable } from 'src/schema/tables/shared-space-library.table.js';
 import { SharedSpaceMemberTable } from 'src/schema/tables/shared-space-member.table.js';
 import { SharedSpacePersonAliasTable } from 'src/schema/tables/shared-space-person-alias.table.js';
 import { SharedSpacePersonFaceTable } from 'src/schema/tables/shared-space-person-face.table.js';
@@ -157,6 +158,7 @@ export class ImmichDatabase {
     SharedSpaceTable,
     SharedSpaceMemberTable,
     SharedSpaceAssetTable,
+    SharedSpaceLibraryTable,
     SharedSpaceActivityTable,
     SharedSpacePersonTable,
     SharedSpacePersonFaceTable,
@@ -291,6 +293,7 @@ export interface DB {
   shared_space: SharedSpaceTable;
   shared_space_member: SharedSpaceMemberTable;
   shared_space_asset: SharedSpaceAssetTable;
+  shared_space_library: SharedSpaceLibraryTable;
   shared_space_activity: SharedSpaceActivityTable;
   shared_space_person: SharedSpacePersonTable;
   shared_space_person_face: SharedSpacePersonFaceTable;
