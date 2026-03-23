@@ -601,7 +601,7 @@
           count: m.assetsCount,
         })) ?? []}
         onFilterChange={(f) => {
-          filters = f;
+          filters = { ...f, sortOrder: filters.sortOrder };
         }}
       />
     {/if}
