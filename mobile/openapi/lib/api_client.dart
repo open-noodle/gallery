@@ -304,8 +304,6 @@ class ApiClient {
           return AssetStackResponseDto.fromJson(value);
         case 'AssetStatsResponseDto':
           return AssetStatsResponseDto.fromJson(value);
-        case 'AssetType':
-          return AssetTypeTypeTransformer().decode(value);
         case 'AssetTypeEnum':
           return AssetTypeEnumTypeTransformer().decode(value);
         case 'AssetVisibility':

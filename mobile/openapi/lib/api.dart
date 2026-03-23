@@ -132,7 +132,6 @@ part 'model/asset_order.dart';
 part 'model/asset_response_dto.dart';
 part 'model/asset_stack_response_dto.dart';
 part 'model/asset_stats_response_dto.dart';
-part 'model/asset_type.dart';
 part 'model/asset_type_enum.dart';
 part 'model/asset_visibility.dart';
 part 'model/audio_codec.dart';

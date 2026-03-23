@@ -15364,7 +15364,7 @@
             "in": "query",
             "description": "Filter by asset type (IMAGE or VIDEO)",
             "schema": {
-              "$ref": "#/components/schemas/AssetType"
+              "$ref": "#/components/schemas/AssetTypeEnum"
             }
           },
           {
@@ -15661,7 +15661,7 @@
             "in": "query",
             "description": "Filter by asset type (IMAGE or VIDEO)",
             "schema": {
-              "$ref": "#/components/schemas/AssetType"
+              "$ref": "#/components/schemas/AssetTypeEnum"
             }
           },
           {
@@ -19506,15 +19506,6 @@
           "videos"
         ],
         "type": "object"
-      },
-      "AssetType": {
-        "enum": [
-          "IMAGE",
-          "VIDEO",
-          "AUDIO",
-          "OTHER"
-        ],
-        "type": "string"
       },
       "AssetTypeEnum": {
         "description": "Asset type",

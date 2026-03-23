@@ -73,9 +73,6 @@ String parameterToString(dynamic value) {
   if (value is AssetOrder) {
     return AssetOrderTypeTransformer().encode(value).toString();
   }
-  if (value is AssetType) {
-    return AssetTypeTypeTransformer().encode(value).toString();
-  }
   if (value is AssetTypeEnum) {
     return AssetTypeEnumTypeTransformer().encode(value).toString();
   }

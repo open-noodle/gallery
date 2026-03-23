@@ -121,7 +121,7 @@ export class TimeBucketDto {
 
   @ValidateEnum({
     enum: AssetType,
-    name: 'AssetType',
+    name: 'AssetTypeEnum',
     optional: true,
     description: 'Filter by asset type (IMAGE or VIDEO)',
   })

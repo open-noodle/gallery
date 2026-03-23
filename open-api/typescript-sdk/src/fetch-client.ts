@@ -7104,7 +7104,7 @@ export function getTimeBucket({ albumId, bbox, city, country, isFavorite, isTras
     tagId?: string;
     tagIds?: string[];
     timeBucket: string;
-    $type?: AssetType;
+    $type?: AssetTypeEnum;
     userId?: string;
     visibility?: AssetVisibility;
     withCoordinates?: boolean;
@@ -7170,7 +7170,7 @@ export function getTimeBuckets({ albumId, bbox, city, country, isFavorite, isTra
     spacePersonIds?: string[];
     tagId?: string;
     tagIds?: string[];
-    $type?: AssetType;
+    $type?: AssetTypeEnum;
     userId?: string;
     visibility?: AssetVisibility;
     withCoordinates?: boolean;
@@ -8217,12 +8217,6 @@ export enum LogLevel {
 export enum OAuthTokenEndpointAuthMethod {
     ClientSecretPost = "client_secret_post",
     ClientSecretBasic = "client_secret_basic"
-}
-export enum AssetType {
-    Image = "IMAGE",
-    Video = "VIDEO",
-    Audio = "AUDIO",
-    Other = "OTHER"
 }
 export enum UserMetadataKey {
     Preferences = "preferences",
