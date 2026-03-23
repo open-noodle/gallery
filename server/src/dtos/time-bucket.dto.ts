@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { IsInt, IsString, Max, Min } from 'class-validator';
 import type { BBoxDto } from 'src/dtos/bbox.dto';
 import { AssetOrder, AssetType, AssetVisibility } from 'src/enum';
@@ -82,12 +82,15 @@ export class TimeBucketDto {
 
   // --- Array upgrades (multi-select, OR semantics) ---
 
+  @Transform(({ value }) => (typeof value === 'string' ? [value] : value))
   @ValidateUUID({ each: true, optional: true })
   personIds?: string[];
 
+  @Transform(({ value }) => (typeof value === 'string' ? [value] : value))
   @ValidateUUID({ each: true, optional: true })
   spacePersonIds?: string[];
 
+  @Transform(({ value }) => (typeof value === 'string' ? [value] : value))
   @ValidateUUID({ each: true, optional: true })
   tagIds?: string[];
 
