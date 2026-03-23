@@ -43,7 +43,7 @@
   import {
     addAssets,
     AssetOrder,
-    AssetType,
+    AssetTypeEnum,
     AssetVisibility,
     getAllTags,
     getMembers,
@@ -209,7 +209,7 @@
       base.rating = filters.rating;
     }
     if (filters.mediaType !== 'all') {
-      base.$type = filters.mediaType === 'image' ? AssetType.Image : AssetType.Video;
+      base.$type = filters.mediaType === 'image' ? AssetTypeEnum.Image : AssetTypeEnum.Video;
     }
     base.order = filters.sortOrder === 'asc' ? AssetOrder.Asc : AssetOrder.Desc;
     return base;
