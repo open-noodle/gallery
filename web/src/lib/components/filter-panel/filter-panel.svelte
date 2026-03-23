@@ -61,7 +61,7 @@
   // Fetch data on mount via $effect
   $effect(() => {
     if (config.providers.people && config.sections.includes('people')) {
-      config.providers.people().then((result) => {
+      void config.providers.people().then((result) => {
         people = result;
       });
     }
@@ -69,7 +69,7 @@
 
   $effect(() => {
     if (config.providers.locations && config.sections.includes('location')) {
-      config.providers.locations().then((result) => {
+      void config.providers.locations().then((result) => {
         countries = result.filter((l) => l.type === 'country').map((l) => l.value);
       });
     }
@@ -77,7 +77,7 @@
 
   $effect(() => {
     if (config.providers.cameras && config.sections.includes('camera')) {
-      config.providers.cameras().then((result) => {
+      void config.providers.cameras().then((result) => {
         cameraMakes = result.filter((c) => c.type === 'make').map((c) => c.value);
       });
     }
@@ -85,7 +85,7 @@
 
   $effect(() => {
     if (config.providers.tags && config.sections.includes('tags')) {
-      config.providers.tags().then((result) => {
+      void config.providers.tags().then((result) => {
         tags = result;
       });
     }
@@ -212,7 +212,7 @@
             {countries}
             selectedCity={filters.city}
             selectedCountry={filters.country}
-            onCityFetch={async (country) => {
+            onCityFetch={async (_) => {
               if (config.providers.locations) {
                 const result = await config.providers.locations();
                 return result.filter((l) => l.type === 'city').map((l) => l.value);
@@ -226,7 +226,7 @@
             makes={cameraMakes}
             selectedMake={filters.make}
             selectedModel={filters.model}
-            onModelFetch={async (make) => {
+            onModelFetch={async (_) => {
               if (config.providers.cameras) {
                 const result = await config.providers.cameras();
                 return result.filter((c) => c.type === 'model').map((c) => c.value);

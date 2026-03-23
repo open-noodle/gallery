@@ -168,13 +168,13 @@ describe('PeopleFilter', () => {
 
 describe('LocationFilter', () => {
   const mockCountries = ['Germany', 'Italy', 'France'];
-  const mockCityFetch = async (country: string): Promise<string[]> => {
+  const mockCityFetch = (country: string): Promise<string[]> => {
     const cityMap: Record<string, string[]> = {
       Germany: ['Munich', 'Berlin', 'Hamburg'],
       Italy: ['Rome', 'Milan'],
       France: ['Paris', 'Lyon'],
     };
-    return cityMap[country] ?? [];
+    return Promise.resolve(cityMap[country] ?? []);
   };
 
   it('should render countries with radio buttons', () => {
@@ -281,13 +281,13 @@ describe('LocationFilter', () => {
 
 describe('CameraFilter', () => {
   const mockMakes = ['Canon', 'Sony', 'Nikon'];
-  const mockModelFetch = async (make: string): Promise<string[]> => {
+  const mockModelFetch = (make: string): Promise<string[]> => {
     const modelMap: Record<string, string[]> = {
       Canon: ['EOS R5', 'EOS R6', 'EOS 5D'],
       Sony: ['A7 IV', 'A7R V'],
       Nikon: ['Z9', 'Z6 III'],
     };
-    return modelMap[make] ?? [];
+    return Promise.resolve(modelMap[make] ?? []);
   };
 
   it('should render makes with radio buttons', () => {

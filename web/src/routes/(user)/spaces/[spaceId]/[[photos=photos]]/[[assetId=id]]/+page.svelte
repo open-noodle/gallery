@@ -7,7 +7,6 @@
     createFilterState,
     clearFilters,
     getActiveFilterCount,
-    type FilterState,
     type FilterPanelConfig,
   } from '$lib/components/filter-panel/filter-panel';
   import OnEvents from '$lib/components/OnEvents.svelte';

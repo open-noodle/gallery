@@ -10,7 +10,7 @@
 
   let selectedYear = $state<number | undefined>(undefined);
   let years = $derived(aggregateYears(timeBuckets));
-  let months = $derived(selectedYear !== undefined ? getMonthsForYear(timeBuckets, selectedYear) : []);
+  let months = $derived(selectedYear === undefined ? [] : getMonthsForYear(timeBuckets, selectedYear));
 
   function handleYearClick(year: number, count: number) {
     if (count === 0) {

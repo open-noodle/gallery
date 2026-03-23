@@ -16,7 +16,7 @@
   $effect(() => {
     if (expandedCountry) {
       loadingCities = true;
-      onCityFetch(expandedCountry).then((result) => {
+      void onCityFetch(expandedCountry).then((result) => {
         cities = result;
         loadingCities = false;
       });

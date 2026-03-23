@@ -16,7 +16,7 @@
   $effect(() => {
     if (expandedMake) {
       loadingModels = true;
-      onModelFetch(expandedMake).then((result) => {
+      void onModelFetch(expandedMake).then((result) => {
         models = result;
         loadingModels = false;
       });
