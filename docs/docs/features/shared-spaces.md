@@ -383,9 +383,9 @@ All tables prefixed `shared_space_` in the actual schema. Composite primary keys
 
 The feature follows the standard NestJS layered architecture:
 
-- **Controller** (`shared-space.controller.ts`) — 24 REST endpoints under `/shared-spaces`, with role-based permission checks.
+- **Controller** (`shared-space.controller.ts`) — 26 REST endpoints under `/shared-spaces`, with role-based permission checks.
 - **Service** (`shared-space.service.ts`) — Business logic including role validation (Owner > Editor > Viewer hierarchy), activity logging, and background job orchestration.
-- **Repository** (`shared-space.repository.ts`) — Kysely-based data access with 70+ methods covering all 7 tables.
+- **Repository** (`shared-space.repository.ts`) — Kysely-based data access with 70+ methods covering all 8 tables.
 
 ### Key Mechanisms
 
@@ -398,3 +398,17 @@ The feature follows the standard NestJS layered architecture:
 **New since last visit** — The `lastViewedAt` timestamp on each membership is updated via `PATCH /shared-spaces/:id/view` when a user opens a space. The `newAssetCount` and `lastContributor` fields in the response DTO are computed by querying assets added after this timestamp.
 
 **Face recognition (space-scoped)** — Space-scoped people are separate from personal people. When face recognition is enabled and assets are added, the service queues `SharedSpaceFaceMatch` jobs. Each job fetches face embeddings from the asset and runs a vectorchord similarity search (`<=>` operator) against existing space people. Matches within the configured distance threshold are linked; unmatched faces create new person entries. Person aliases allow each member to set their own display names for recognized people.
+
+**Connected libraries (query-through)** — When an admin links a library to a space via the `shared_space_library` junction table, no asset data is copied. Instead, every query that resolves "assets in this space" uses a SQL `UNION` of two sources:
+
+1. **Manual assets** — `shared_space_asset` (individually added by members)
+2. **Library assets** — `shared_space_library` JOIN `asset` on `libraryId` (all assets belonging to the linked library)
+
+The `UNION` (not `UNION ALL`) automatically deduplicates assets that appear in both sources. This query-through pattern is applied consistently across 14 query sites: asset counts, recent assets, new asset counts, map markers, timeline buckets (both `spaceId` and `timelineSpaceIds` paths), validation helpers (`isAssetInSpace`, `isFaceInSpace`), face-matching helpers (`getAssetIdsInSpace`, `getSpaceIdsForAsset`), and access control (`checkSpaceAccess`, `checkSpaceEditAccess`). All library-side UNION branches filter `asset.deletedAt IS NULL` and `asset.isOffline = false` to exclude deleted and offline assets.
+
+Face recognition for linked libraries uses two mechanisms:
+
+- **On link creation** — A `SharedSpaceLibraryFaceSync` orchestrator job batch-processes all library assets with detected faces (1000 at a time), reusing the extracted `processSpaceFaceMatch` method.
+- **On ongoing library scans** — The `handleSyncFiles` method in `LibraryService` checks if the scanned library is linked to any spaces and queues individual `SharedSpaceFaceMatch` jobs for newly imported assets.
+
+The admin-only "Libraries" tab in the space panel (`SpaceLinkedLibraries` component) provides the UI for linking and unlinking. The `linkedLibraries` field in `SharedSpaceResponseDto` is only populated when the requesting user is an admin.
