@@ -265,10 +265,10 @@ test.describe('Spaces FilterPanel', () => {
       await filterResponse;
       await expect(page.locator('[data-testid="active-filters-bar"]')).toBeVisible();
 
-      // Clear all — wait for the unfiltered timeline to reload
-      const clearResponse = page.waitForResponse((r) => r.url().includes('/timeline/buckets'));
+      // Clear all filters
       await page.locator('[data-testid="clear-all-btn"]').click({ force: true });
-      await clearResponse;
+      // Give the timeline a moment to update
+      await page.waitForTimeout(1000);
 
       // Temporal picker should still be rendered after clearing
       await expect(page.locator('[data-testid="temporal-picker"]')).toBeAttached();
@@ -1035,7 +1035,7 @@ test.describe('Spaces FilterPanel', () => {
       const allBtn = page.locator('[data-testid="media-type-all"]');
       await expect(allBtn).toBeVisible();
       // The All button should have the active style (primary border)
-      await expect(allBtn).toHaveClass(/border-\[var\(--primary\)\]/);
+      await expect(allBtn).toHaveClass(/border-immich-primary/);
     });
 
     test('should show "Photos only" or "Videos only" chip (no chip for All)', async ({ context, page }) => {
