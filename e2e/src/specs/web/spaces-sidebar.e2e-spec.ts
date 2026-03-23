@@ -79,7 +79,7 @@ test.describe('Spaces Sidebar Dropdown', () => {
       admin = await utils.adminSetup();
 
       const { space: oldSpace } = await createSpaceWithAssets('Old Pinned Space', 1);
-      const { space: newSpace } = await createSpaceWithAssets('New Unpinned Space', 1);
+      await createSpaceWithAssets('New Unpinned Space', 1);
 
       await utils.setAuthCookies(context, admin.accessToken);
       await page.goto('/spaces');
@@ -170,7 +170,7 @@ test.describe('Spaces Sidebar Dropdown', () => {
       await utils.resetDatabase();
       admin = await utils.adminSetup();
 
-      const { space: activeSpace } = await createSpaceWithAssets('Active Space', 1);
+      await createSpaceWithAssets('Active Space', 1);
       const emptySpace = await utils.createSpace(admin.accessToken, { name: 'Empty Space' });
 
       await utils.setAuthCookies(context, admin.accessToken);
