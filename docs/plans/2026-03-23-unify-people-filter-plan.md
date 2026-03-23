@@ -4,7 +4,7 @@
 
 **Goal:** Make the people strip and filter panel share a single `filters` state so clicking a person in the strip updates the filter panel and vice versa.
 
-**Architecture:** Replace FilterPanel's internal filter state with a `$bindable()` prop owned by the page. Change SpacePeopleStrip from single-select (`selectedPersonId`) to multi-select (`selectedPersonIds`). Remove the redundant `selectedPersonId` state from the space page.
+**Architecture:** Replace FilterPanel's internal filter state with a `$bindable()` prop owned by the page. Remove `onFilterChange` callback and `notifyFilterChange()` (only one consumer, migrated in this PR). Change SpacePeopleStrip from single-select (`selectedPersonId`) to multi-select (`selectedPersonIds`). Remove the redundant `selectedPersonId` state from the space page. Standardize on reassignment pattern (`filters = { ...filters, ... }`) for all filter mutations.
 
 **Tech Stack:** Svelte 5 (runes, `$bindable`), Tailwind CSS 4, Vitest + @testing-library/svelte
 
@@ -19,9 +19,9 @@
 - Modify: `web/src/lib/components/spaces/space-people-strip.svelte`
 - Modify: `web/src/lib/components/spaces/space-people-strip.spec.ts`
 
-**Step 1: Update tests for multi-select prop**
+**Step 1: Write failing tests for multi-select prop**
 
-In `space-people-strip.spec.ts`, change the two selection tests and add a multi-select test.
+In `space-people-strip.spec.ts`, replace the two selection tests and add a multi-select test.
 
 Replace the test at line 53 (`should show selected state with ring when selectedPersonId matches`):
 
@@ -45,7 +45,7 @@ it('should not show ring when person is not in selectedPersonIds', () => {
 });
 ```
 
-Add a new test after the ring tests:
+Add new tests after the ring tests:
 
 ```typescript
 it('should highlight multiple selected people', () => {
@@ -59,15 +59,21 @@ it('should highlight multiple selected people', () => {
   expect(screen.getByTestId('person-ring-p2').className).not.toContain('ring-2');
   expect(screen.getByTestId('person-ring-p3').className).toContain('ring-2');
 });
+
+it('should not break when selectedPersonIds contains unknown IDs', () => {
+  const people = [makePerson({ id: 'p1', name: 'Alice' })];
+  render(SpacePeopleStrip, { people, spaceId: 'space-1', selectedPersonIds: ['p1', 'unknown-id'] });
+  expect(screen.getByTestId('person-ring-p1').className).toContain('ring-2');
+});
 ```
 
 **Step 2: Run tests to verify they fail**
 
 Run: `cd web && pnpm test -- --run src/lib/components/spaces/space-people-strip.spec.ts`
 
-Expected: The 3 modified/new tests FAIL (prop `selectedPersonIds` doesn't exist yet).
+Expected: The modified/new tests FAIL (prop `selectedPersonIds` doesn't exist yet).
 
-**Step 3: Update the component**
+**Step 3: Implement the component changes**
 
 In `space-people-strip.svelte`:
 
@@ -97,7 +103,7 @@ class="w-full truncate text-center text-xs {selectedPersonIds.includes(person.id
   : 'text-gray-600 dark:text-gray-400'}"
 ```
 
-**Step 4: Run tests**
+**Step 4: Run tests to verify they pass**
 
 Run: `cd web && pnpm test -- --run src/lib/components/spaces/space-people-strip.spec.ts`
 
@@ -116,62 +122,162 @@ git commit -m "refactor: change SpacePeopleStrip to multi-select via selectedPer
 
 ---
 
-### Task 2: Make FilterPanel use bindable filters prop
+### Task 2: Make FilterPanel use bindable filters prop and remove onFilterChange
 
 **Files:**
 
 - Modify: `web/src/lib/components/filter-panel/filter-panel.svelte`
 - Modify: `web/src/lib/components/filter-panel/__tests__/filter-panel.spec.ts`
 
-**Step 1: Update FilterPanel component**
+**Step 1: Write failing tests for bindable filters**
 
-In `filter-panel.svelte`, change the Props interface and state:
-
-Replace lines 25-33:
+In `filter-panel.spec.ts`, add these tests:
 
 ```typescript
-interface Props {
-  config: FilterPanelConfig;
-  timeBuckets: Array<{ timeBucket: string; count: number }>;
-  onFilterChange?: (filters: FilterState) => void;
-}
+it('should render with externally-provided filters state', () => {
+  const filters = createFilterState();
+  filters.mediaType = 'image';
+  const { queryByTestId } = render(FilterPanel, {
+    props: {
+      config: { sections: ['media'], providers: {} },
+      timeBuckets: [],
+      filters,
+    },
+  });
+  expect(queryByTestId('filter-section-media')).toBeTruthy();
+});
 
-let { config, timeBuckets, onFilterChange }: Props = $props();
-let collapsed = $state(false);
-let filters = $state(createFilterState());
+it('should work without onFilterChange callback', () => {
+  const { queryByTestId } = render(FilterPanel, {
+    props: {
+      config: { sections: ['rating'], providers: {} },
+      timeBuckets: [],
+    },
+  });
+  expect(queryByTestId('filter-section-rating')).toBeTruthy();
+});
 ```
 
-With:
+Add `createFilterState` to the imports at the top of the test file:
+
+```typescript
+import { createFilterState } from '../filter-panel';
+```
+
+**Step 2: Run tests to verify the new tests pass or fail**
+
+Run: `cd web && pnpm test -- --run src/lib/components/filter-panel/__tests__/filter-panel.spec.ts`
+
+Note: The "externally-provided filters" test may fail because FilterPanel currently doesn't accept a `filters` prop. The "without onFilterChange" test will fail because `onFilterChange` is currently required.
+
+**Step 3: Update FilterPanel component**
+
+In `filter-panel.svelte`:
+
+Replace the Props interface and state (lines 25-33):
 
 ```typescript
 interface Props {
   config: FilterPanelConfig;
   timeBuckets: Array<{ timeBucket: string; count: number }>;
   filters?: FilterState;
-  onFilterChange?: (filters: FilterState) => void;
 }
 
-let { config, timeBuckets, filters = $bindable(createFilterState()), onFilterChange }: Props = $props();
+let { config, timeBuckets, filters = $bindable(createFilterState()) }: Props = $props();
 let collapsed = $state(false);
 ```
 
-This makes `filters` a `$bindable` prop with a default. When used with `bind:filters`, the page and FilterPanel share the same reactive state. The `onFilterChange` callback is kept as optional for backward compatibility but the `notifyFilterChange` function can still call it.
+Remove `notifyFilterChange` function (lines 94-96):
 
-**Step 2: Run existing tests**
+```typescript
+// DELETE: function notifyFilterChange() { onFilterChange(filters); }
+```
+
+Update ALL handler functions to use reassignment pattern instead of mutation + callback. Replace each handler:
+
+`handlePeopleChange` (lines 98-101):
+
+```typescript
+function handlePeopleChange(ids: string[]) {
+  filters = { ...filters, personIds: ids };
+}
+```
+
+`handleLocationChange` (lines 103-107):
+
+```typescript
+function handleLocationChange(country?: string, city?: string) {
+  filters = { ...filters, country, city };
+}
+```
+
+`handleCameraChange` (lines 109-113):
+
+```typescript
+function handleCameraChange(make?: string, model?: string) {
+  filters = { ...filters, make, model };
+}
+```
+
+`handleTagsChange` (lines 115-118):
+
+```typescript
+function handleTagsChange(ids: string[]) {
+  filters = { ...filters, tagIds: ids };
+}
+```
+
+`handleRatingChange` (lines 120-123):
+
+```typescript
+function handleRatingChange(rating?: number) {
+  filters = { ...filters, rating };
+}
+```
+
+`handleMediaTypeChange` (lines 125-128):
+
+```typescript
+function handleMediaTypeChange(type: 'all' | 'image' | 'video') {
+  filters = { ...filters, mediaType: type };
+}
+```
+
+`handleYearSelect` (lines 130-135):
+
+```typescript
+function handleYearSelect(year: number | undefined) {
+  filters = { ...filters, selectedYear: year, selectedMonth: undefined };
+}
+```
+
+`handleMonthSelect` (lines 137-141):
+
+```typescript
+function handleMonthSelect(year: number, month: number | undefined) {
+  filters = { ...filters, selectedYear: year, selectedMonth: month };
+}
+```
+
+**Step 4: Update existing tests to not pass onFilterChange**
+
+In `filter-panel.spec.ts`, remove `onFilterChange: () => {}` or `onFilterChange: vi.fn()` from all existing test renders since it is no longer a required prop. The tests should still pass without it.
+
+**Step 5: Run tests**
 
 Run: `cd web && pnpm test -- --run src/lib/components/filter-panel/__tests__/filter-panel.spec.ts`
 
-Expected: ALL existing tests pass (backward compatible — `onFilterChange` still works, internal state still initializes via default).
+Expected: ALL tests pass.
 
-**Step 3: Lint and format**
+**Step 6: Lint and format**
 
-Run: `cd web && npx prettier --write src/lib/components/filter-panel/filter-panel.svelte`
+Run: `cd web && npx prettier --write src/lib/components/filter-panel/filter-panel.svelte src/lib/components/filter-panel/__tests__/filter-panel.spec.ts`
 
-**Step 4: Commit**
+**Step 7: Commit**
 
 ```bash
-git add web/src/lib/components/filter-panel/filter-panel.svelte
-git commit -m "refactor: make FilterPanel filters a bindable prop for external state sync"
+git add web/src/lib/components/filter-panel/filter-panel.svelte web/src/lib/components/filter-panel/__tests__/filter-panel.spec.ts
+git commit -m "refactor: make FilterPanel filters a bindable prop, remove onFilterChange"
 ```
 
 ---
@@ -254,7 +360,7 @@ With:
 />
 ```
 
-Note: the `sortOrder` preservation from `onFilterChange` is no longer needed because the page and FilterPanel now share the same `filters` object. The `sortOrder` field is only modified by the `SortToggle` component on the page, and since both sides share the same object, it stays in sync automatically.
+The `sortOrder` preservation is no longer needed — the page and FilterPanel share the same `filters` object. `sortOrder` is only modified by SortToggle on the page, so it stays in sync.
 
 **Step 5: Update SpacePeopleStrip usage**
 
@@ -335,3 +441,4 @@ If dev stack is running:
 4. Select a person via the filter panel → strip highlights them
 5. Remove person chip from ActiveFiltersBar → strip deselects, filter panel deselects
 6. Clear all filters → everything deselects
+7. Use SortToggle to change sort order → change a filter in FilterPanel → sort order should be preserved
