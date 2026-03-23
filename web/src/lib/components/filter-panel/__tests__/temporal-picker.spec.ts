@@ -1,7 +1,7 @@
-import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render } from '@testing-library/svelte';
-import { aggregateYears, getMonthsForYear } from '../temporal-utils';
+import { describe, expect, it, vi } from 'vitest';
 import TemporalPicker from '../temporal-picker.svelte';
+import { aggregateYears, getMonthsForYear } from '../temporal-utils';
 
 describe('temporal-utils', () => {
   const buckets = [

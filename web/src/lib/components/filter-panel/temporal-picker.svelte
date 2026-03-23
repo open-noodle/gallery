@@ -80,10 +80,14 @@
           <span class="text-xs font-semibold">{m.label}</span>
           <span class="text-xs {isSelected ? 'text-white/80' : 'text-gray-400 dark:text-gray-500'}">{m.count}</span>
           <div
-            class="mt-1 h-[3px] w-full overflow-hidden rounded-sm {isSelected ? 'bg-white/30' : 'bg-gray-200 dark:bg-gray-700'}"
+            class="mt-1 h-[3px] w-full overflow-hidden rounded-sm {isSelected
+              ? 'bg-white/30'
+              : 'bg-gray-200 dark:bg-gray-700'}"
           >
             <div
-              class="h-full rounded-sm transition-[width] duration-300 {isSelected ? 'bg-white' : 'bg-immich-primary dark:bg-immich-dark-primary'}"
+              class="h-full rounded-sm transition-[width] duration-300 {isSelected
+                ? 'bg-white'
+                : 'bg-immich-primary dark:bg-immich-dark-primary'}"
               style="width: {m.count === 0 ? 0 : monthVolume}%"
             ></div>
           </div>
