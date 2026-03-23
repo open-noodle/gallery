@@ -256,6 +256,22 @@
     }
   }
 
+  function handleMonthSelect(year: number, month: number) {
+    const monthGroup = timelineManager?.months?.find(
+      (m) => m.yearMonth.year === year && m.yearMonth.month === month,
+    );
+    if (monthGroup) {
+      timelineManager.scrollTo(monthGroup.top);
+    }
+  }
+
+  function handleYearSelect(year: number) {
+    const monthGroup = timelineManager?.months?.find((m) => m.yearMonth.year === year);
+    if (monthGroup) {
+      timelineManager.scrollTo(monthGroup.top);
+    }
+  }
+
   const handlePersonClick = (personId: string) => {
     selectedPersonId = selectedPersonId === personId ? null : personId;
   };
@@ -603,6 +619,8 @@
         onFilterChange={(f) => {
           filters = { ...f, sortOrder: filters.sortOrder };
         }}
+        onMonthSelect={handleMonthSelect}
+        onYearSelect={handleYearSelect}
       />
     {/if}
 

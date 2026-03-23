@@ -26,9 +26,11 @@
     config: FilterPanelConfig;
     timeBuckets: Array<{ timeBucket: string; count: number }>;
     onFilterChange: (filters: FilterState) => void;
+    onMonthSelect?: (year: number, month: number) => void;
+    onYearSelect?: (year: number) => void;
   }
 
-  let { config, timeBuckets, onFilterChange }: Props = $props();
+  let { config, timeBuckets, onFilterChange, onMonthSelect, onYearSelect }: Props = $props();
   let collapsed = $state(false);
   let filters = $state(createFilterState());
 
@@ -205,7 +207,7 @@
       {#each config.sections as section (section)}
         <FilterSection title={sectionTitles[section]} testId={section}>
           {#if section === 'timeline'}
-            <TemporalPicker {timeBuckets} />
+            <TemporalPicker {timeBuckets} {onYearSelect} {onMonthSelect} />
           {:else if section === 'people'}
             <PeopleFilter {people} selectedIds={filters.personIds} onSelectionChange={handlePeopleChange} />
           {:else if section === 'location'}
