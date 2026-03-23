@@ -519,11 +519,7 @@ export class SharedSpaceService extends BaseService {
       throw new NotFoundException();
     }
 
-    return this.serveFromBackend(
-      thumbnailPath,
-      mimeTypes.lookup(thumbnailPath),
-      CacheControl.PrivateWithoutCache,
-    );
+    return this.serveFromBackend(thumbnailPath, mimeTypes.lookup(thumbnailPath), CacheControl.PrivateWithoutCache);
   }
 
   async updateSpacePerson(
