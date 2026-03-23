@@ -184,7 +184,8 @@ export class SharedSpaceService extends BaseService {
       dto.name !== undefined ||
       dto.description !== undefined ||
       dto.color !== undefined ||
-      dto.faceRecognitionEnabled !== undefined;
+      dto.faceRecognitionEnabled !== undefined ||
+      dto.petsEnabled !== undefined;
     const minimumRole = isMetadataUpdate ? SharedSpaceRole.Owner : SharedSpaceRole.Editor;
     await this.requireRole(auth, id, minimumRole);
 
@@ -207,6 +208,7 @@ export class SharedSpaceService extends BaseService {
       thumbnailCropY,
       color: dto.color,
       faceRecognitionEnabled: dto.faceRecognitionEnabled,
+      petsEnabled: dto.petsEnabled,
     });
 
     if (existing) {
@@ -547,6 +549,9 @@ export class SharedSpaceService extends BaseService {
 
     const results: SharedSpacePersonResponseDto[] = [];
     for (const person of persons) {
+      if (!space.petsEnabled && person.type === 'pet') {
+        continue;
+      }
       if (!person.thumbnailPath) {
         continue;
       }
@@ -563,6 +568,11 @@ export class SharedSpaceService extends BaseService {
 
     const person = await this.sharedSpaceRepository.getPersonById(personId);
     if (!person || person.spaceId !== spaceId) {
+      throw new BadRequestException('Person not found');
+    }
+
+    const space = await this.sharedSpaceRepository.getById(spaceId);
+    if (!space?.petsEnabled && person.type === 'pet') {
       throw new BadRequestException('Person not found');
     }
 
@@ -924,6 +934,7 @@ export class SharedSpaceService extends BaseService {
     thumbnailCropY?: number | null;
     color?: string | null;
     faceRecognitionEnabled?: boolean;
+    petsEnabled?: boolean;
     lastActivityAt?: Date | null;
   }): SharedSpaceResponseDto {
     return {
@@ -937,6 +948,7 @@ export class SharedSpaceService extends BaseService {
       thumbnailCropY: space.thumbnailCropY ?? null,
       color: (space.color as UserAvatarColor) ?? null,
       faceRecognitionEnabled: space.faceRecognitionEnabled ?? true,
+      petsEnabled: space.petsEnabled ?? true,
       lastActivityAt: space.lastActivityAt ? space.lastActivityAt.toISOString() : null,
     };
   }
@@ -960,6 +972,7 @@ export class SharedSpaceService extends BaseService {
       alias,
       createdAt: (person.createdAt as unknown as Date).toISOString(),
       updatedAt: (person.updatedAt as unknown as Date).toISOString(),
+      type: person.type,
     };
   }
 }

@@ -358,6 +358,7 @@ describe(SharedSpaceService.name, () => {
       expect(result.memberCount).toBe(2);
       expect(result.assetCount).toBe(5);
       expect(result.faceRecognitionEnabled).toBe(true);
+      expect(result.petsEnabled).toBe(true);
     });
 
     it('should return faceRecognitionEnabled=false when disabled', async () => {
@@ -648,6 +649,8 @@ describe(SharedSpaceService.name, () => {
         thumbnailAssetId: undefined,
         thumbnailCropY: undefined,
         color: undefined,
+        faceRecognitionEnabled: undefined,
+        petsEnabled: undefined,
       });
     });
 
@@ -673,6 +676,8 @@ describe(SharedSpaceService.name, () => {
         thumbnailAssetId,
         thumbnailCropY: null,
         color: undefined,
+        faceRecognitionEnabled: undefined,
+        petsEnabled: undefined,
       });
     });
 
@@ -696,6 +701,8 @@ describe(SharedSpaceService.name, () => {
         thumbnailAssetId: null,
         thumbnailCropY: null,
         color: undefined,
+        faceRecognitionEnabled: undefined,
+        petsEnabled: undefined,
       });
     });
 
@@ -774,6 +781,8 @@ describe(SharedSpaceService.name, () => {
         thumbnailAssetId: undefined,
         thumbnailCropY: undefined,
         color: UserAvatarColor.Blue,
+        faceRecognitionEnabled: undefined,
+        petsEnabled: undefined,
       });
     });
 
@@ -1021,6 +1030,40 @@ describe(SharedSpaceService.name, () => {
       expect(mocks.job.queue).not.toHaveBeenCalledWith(
         expect.objectContaining({ name: JobName.SharedSpaceFaceMatchAll }),
       );
+    });
+
+    it('should require owner role when updating petsEnabled', async () => {
+      const spaceId = newUuid();
+      mocks.sharedSpace.getMember.mockResolvedValue(
+        factory.sharedSpaceMember({ spaceId, role: SharedSpaceRole.Editor }),
+      );
+
+      await expect(sut.update(factory.auth(), spaceId, { petsEnabled: false })).rejects.toThrow('Insufficient role');
+    });
+
+    it('should pass petsEnabled to repository update', async () => {
+      const spaceId = newUuid();
+      const space = factory.sharedSpace({ id: spaceId });
+      mocks.sharedSpace.getMember.mockResolvedValue(
+        factory.sharedSpaceMember({ spaceId, role: SharedSpaceRole.Owner }),
+      );
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.update.mockResolvedValue(space);
+
+      await sut.update(factory.auth(), spaceId, { petsEnabled: false });
+
+      expect(mocks.sharedSpace.update).toHaveBeenCalledWith(spaceId, expect.objectContaining({ petsEnabled: false }));
+    });
+
+    it('should reject editor updating petsEnabled (metadata requires owner)', async () => {
+      const spaceId = newUuid();
+      mocks.sharedSpace.getMember.mockResolvedValue(
+        factory.sharedSpaceMember({ spaceId, role: SharedSpaceRole.Editor }),
+      );
+
+      await expect(
+        sut.update(factory.auth(), spaceId, { faceRecognitionEnabled: true, petsEnabled: false }),
+      ).rejects.toThrow('Insufficient role');
     });
   });
 
@@ -2348,6 +2391,7 @@ describe(SharedSpaceService.name, () => {
       expect(result[0].faceCount).toBe(5);
       expect(result[0].assetCount).toBe(3);
       expect(result[0].alias).toBe('My Alice');
+      expect(result[0].type).toBe('person');
     });
 
     it('should sort people by asset count descending', async () => {
@@ -2423,6 +2467,44 @@ describe(SharedSpaceService.name, () => {
       expect(result).toHaveLength(1);
       expect(result[0].name).toBe('Has Thumb');
     });
+
+    it('should filter out pets when petsEnabled is false', async () => {
+      const spaceId = newUuid();
+      const space = factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true, petsEnabled: false });
+      const humanPerson = factory.sharedSpacePerson({ spaceId, thumbnailPath: '/thumb.jpg', type: 'person' });
+      const petPerson = factory.sharedSpacePerson({ spaceId, thumbnailPath: '/pet.jpg', type: 'pet' });
+
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.getPersonsBySpaceId.mockResolvedValue([humanPerson, petPerson]);
+      mocks.sharedSpace.getAliasesBySpaceAndUser.mockResolvedValue([]);
+      mocks.sharedSpace.getPersonFaceCount.mockResolvedValue(1);
+      mocks.sharedSpace.getPersonAssetCount.mockResolvedValue(1);
+
+      const result = await sut.getSpacePeople(factory.auth(), spaceId);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].type).toBe('person');
+    });
+
+    it('should include pets when petsEnabled is true', async () => {
+      const spaceId = newUuid();
+      const space = factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true, petsEnabled: true });
+      const humanPerson = factory.sharedSpacePerson({ spaceId, thumbnailPath: '/thumb.jpg', type: 'person' });
+      const petPerson = factory.sharedSpacePerson({ spaceId, thumbnailPath: '/pet.jpg', type: 'pet' });
+
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.getPersonsBySpaceId.mockResolvedValue([humanPerson, petPerson]);
+      mocks.sharedSpace.getAliasesBySpaceAndUser.mockResolvedValue([]);
+      mocks.sharedSpace.getPersonFaceCount.mockResolvedValue(1);
+      mocks.sharedSpace.getPersonAssetCount.mockResolvedValue(1);
+
+      const result = await sut.getSpacePeople(factory.auth(), spaceId);
+
+      expect(result).toHaveLength(2);
+      expect(result.map((r) => r.type)).toEqual(expect.arrayContaining(['person', 'pet']));
+    });
   });
 
   describe('getSpacePerson', () => {
@@ -2451,9 +2533,11 @@ describe(SharedSpaceService.name, () => {
       const spaceId = newUuid();
       const personId = newUuid();
       const person = factory.sharedSpacePerson({ id: personId, spaceId, name: 'Bob' });
+      const space = factory.sharedSpace({ id: spaceId });
 
       mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
       mocks.sharedSpace.getPersonById.mockResolvedValue(person);
+      mocks.sharedSpace.getById.mockResolvedValue(space);
       mocks.sharedSpace.getPersonFaceCount.mockResolvedValue(10);
       mocks.sharedSpace.getPersonAssetCount.mockResolvedValue(7);
       mocks.sharedSpace.getAlias.mockResolvedValue(void 0);
@@ -2465,6 +2549,19 @@ describe(SharedSpaceService.name, () => {
       expect(result.faceCount).toBe(10);
       expect(result.assetCount).toBe(7);
       expect(result.alias).toBeNull();
+    });
+
+    it('should reject access to pet person when petsEnabled is false', async () => {
+      const spaceId = newUuid();
+      const personId = newUuid();
+      const space = factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true, petsEnabled: false });
+      const person = factory.sharedSpacePerson({ id: personId, spaceId, type: 'pet' });
+
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ spaceId }));
+      mocks.sharedSpace.getPersonById.mockResolvedValue(person);
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+
+      await expect(sut.getSpacePerson(factory.auth(), spaceId, personId)).rejects.toThrow('Person not found');
     });
   });
 
