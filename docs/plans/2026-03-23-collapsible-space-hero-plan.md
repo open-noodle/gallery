@@ -23,6 +23,8 @@
 Add these tests at the end of the existing `describe` block:
 
 ```typescript
+// --- Collapse toggle in expanded mode ---
+
 it('should show collapse toggle button when onToggleCollapse is provided', () => {
   render(SpaceHero, {
     space: makeSpace(),
@@ -42,34 +44,6 @@ it('should not show collapse toggle when onToggleCollapse is not provided', () =
   expect(screen.queryByTestId('hero-collapse-toggle')).not.toBeInTheDocument();
 });
 
-it('should render collapsed bar when collapsed is true', () => {
-  render(SpaceHero, {
-    space: makeSpace({ name: 'Family Trip' }),
-    memberCount: 3,
-    assetCount: 42,
-    collapsed: true,
-    onToggleCollapse: vi.fn(),
-  });
-  expect(screen.getByTestId('hero-collapsed-bar')).toBeInTheDocument();
-  expect(screen.getByTestId('hero-collapsed-name')).toHaveTextContent('Family Trip');
-  expect(screen.getByTestId('hero-collapsed-photo-count')).toHaveTextContent('42');
-  expect(screen.getByTestId('hero-collapsed-member-count')).toHaveTextContent('3');
-  // Expanded content should not be present
-  expect(screen.queryByTestId('hero-title')).not.toBeInTheDocument();
-});
-
-it('should show role badge in collapsed bar', () => {
-  render(SpaceHero, {
-    space: makeSpace(),
-    memberCount: 3,
-    assetCount: 42,
-    collapsed: true,
-    onToggleCollapse: vi.fn(),
-    currentRole: 'editor',
-  });
-  expect(screen.getByTestId('hero-collapsed-role')).toHaveTextContent('Editor');
-});
-
 it('should call onToggleCollapse when collapse button is clicked', () => {
   const onToggleCollapse = vi.fn();
   render(SpaceHero, {
@@ -82,33 +56,15 @@ it('should call onToggleCollapse when collapse button is clicked', () => {
   expect(onToggleCollapse).toHaveBeenCalled();
 });
 
-it('should call onToggleCollapse when expand button in collapsed bar is clicked', () => {
-  const onToggleCollapse = vi.fn();
+it('should have correct aria-expanded on collapse toggle', () => {
   render(SpaceHero, {
     space: makeSpace(),
     memberCount: 3,
     assetCount: 42,
-    collapsed: true,
-    onToggleCollapse,
-  });
-  screen.getByTestId('hero-expand-toggle').click();
-  expect(onToggleCollapse).toHaveBeenCalled();
-});
-
-it('should force expanded when repositioning even if collapsed', () => {
-  render(SpaceHero, {
-    space: makeSpace({ thumbnailAssetId: 'asset-1' }),
-    memberCount: 1,
-    assetCount: 0,
-    collapsed: true,
+    collapsed: false,
     onToggleCollapse: vi.fn(),
-    repositioning: true,
-    onSavePosition: vi.fn(),
-    onCancelReposition: vi.fn(),
   });
-  // Should show reposition controls (expanded), not collapsed bar
-  expect(screen.getByTestId('reposition-controls')).toBeInTheDocument();
-  expect(screen.queryByTestId('hero-collapsed-bar')).not.toBeInTheDocument();
+  expect(screen.getByTestId('hero-collapse-toggle')).toHaveAttribute('aria-expanded', 'true');
 });
 
 it('should not show collapse toggle during repositioning', () => {
@@ -124,15 +80,139 @@ it('should not show collapse toggle during repositioning', () => {
   expect(screen.queryByTestId('hero-collapse-toggle')).not.toBeInTheDocument();
 });
 
-it('should have correct aria-expanded on collapse toggle', () => {
+// --- Collapsed bar rendering ---
+
+it('should render collapsed bar when collapsed is true', () => {
+  render(SpaceHero, {
+    space: makeSpace({ name: 'Family Trip' }),
+    memberCount: 3,
+    assetCount: 42,
+    collapsed: true,
+    onToggleCollapse: vi.fn(),
+  });
+  expect(screen.getByTestId('hero-collapsed-bar')).toBeInTheDocument();
+  expect(screen.getByTestId('hero-collapsed-name')).toHaveTextContent('Family Trip');
+  expect(screen.getByTestId('hero-collapsed-photo-count')).toHaveTextContent('42');
+  expect(screen.getByTestId('hero-collapsed-member-count')).toHaveTextContent('3');
+  // Expanded content should not be present
+  expect(screen.queryByTestId('hero-title')).not.toBeInTheDocument();
+  expect(screen.queryByTestId('hero-photo-count')).not.toBeInTheDocument();
+  expect(screen.queryByTestId('hero-description')).not.toBeInTheDocument();
+});
+
+it('should set container height to 56px when collapsed', () => {
+  render(SpaceHero, {
+    space: makeSpace(),
+    memberCount: 3,
+    assetCount: 42,
+    collapsed: true,
+    onToggleCollapse: vi.fn(),
+  });
+  const hero = screen.getByTestId('space-hero');
+  expect(hero.style.height).toBe('56px');
+});
+
+it('should set container height to 450px when expanded', () => {
   render(SpaceHero, {
     space: makeSpace(),
     memberCount: 3,
     assetCount: 42,
     collapsed: false,
+  });
+  const hero = screen.getByTestId('space-hero');
+  expect(hero.style.height).toBe('450px');
+});
+
+it('should show role badge in collapsed bar', () => {
+  render(SpaceHero, {
+    space: makeSpace(),
+    memberCount: 3,
+    assetCount: 42,
+    collapsed: true,
+    onToggleCollapse: vi.fn(),
+    currentRole: 'editor',
+  });
+  expect(screen.getByTestId('hero-collapsed-role')).toHaveTextContent('Editor');
+});
+
+it('should show people count as plain text in collapsed bar', () => {
+  render(SpaceHero, {
+    space: makeSpace(),
+    memberCount: 3,
+    assetCount: 42,
+    collapsed: true,
+    onToggleCollapse: vi.fn(),
+    faceRecognitionEnabled: true,
+    peopleCount: 5,
+    spaceId: 'space-1',
+  });
+  const el = screen.getByTestId('hero-collapsed-people-count');
+  expect(el).toHaveTextContent('5');
+  // Should be a span, not a link
+  expect(el.tagName).toBe('SPAN');
+});
+
+it('should not show people count in collapsed bar when faceRecognitionEnabled is false', () => {
+  render(SpaceHero, {
+    space: makeSpace(),
+    memberCount: 3,
+    assetCount: 42,
+    collapsed: true,
+    onToggleCollapse: vi.fn(),
+    faceRecognitionEnabled: false,
+    peopleCount: 5,
+  });
+  expect(screen.queryByTestId('hero-collapsed-people-count')).not.toBeInTheDocument();
+});
+
+it('should show cover image behind collapsed bar when cover exists', () => {
+  render(SpaceHero, {
+    space: makeSpace({ thumbnailAssetId: 'asset-1' }),
+    memberCount: 3,
+    assetCount: 42,
+    collapsed: true,
     onToggleCollapse: vi.fn(),
   });
-  expect(screen.getByTestId('hero-collapse-toggle')).toHaveAttribute('aria-expanded', 'true');
+  expect(screen.getByTestId('hero-collapsed-bar')).toBeInTheDocument();
+  expect(screen.getByTestId('hero-cover-image')).toBeInTheDocument();
+});
+
+it('should show gradient behind collapsed bar when no cover', () => {
+  render(SpaceHero, {
+    space: makeSpace({ thumbnailAssetId: null }),
+    memberCount: 3,
+    assetCount: 42,
+    collapsed: true,
+    onToggleCollapse: vi.fn(),
+  });
+  expect(screen.getByTestId('hero-collapsed-bar')).toBeInTheDocument();
+  expect(screen.getByTestId('hero-gradient')).toBeInTheDocument();
+});
+
+it('should render collapsed bar without expand button when onToggleCollapse is not provided', () => {
+  render(SpaceHero, {
+    space: makeSpace({ name: 'Locked' }),
+    memberCount: 1,
+    assetCount: 10,
+    collapsed: true,
+  });
+  expect(screen.getByTestId('hero-collapsed-bar')).toBeInTheDocument();
+  expect(screen.queryByTestId('hero-expand-toggle')).not.toBeInTheDocument();
+});
+
+// --- Expand toggle in collapsed bar ---
+
+it('should call onToggleCollapse when expand button in collapsed bar is clicked', () => {
+  const onToggleCollapse = vi.fn();
+  render(SpaceHero, {
+    space: makeSpace(),
+    memberCount: 3,
+    assetCount: 42,
+    collapsed: true,
+    onToggleCollapse,
+  });
+  screen.getByTestId('hero-expand-toggle').click();
+  expect(onToggleCollapse).toHaveBeenCalled();
 });
 
 it('should have correct aria-expanded on expand toggle in collapsed bar', () => {
@@ -144,6 +224,24 @@ it('should have correct aria-expanded on expand toggle in collapsed bar', () => 
     onToggleCollapse: vi.fn(),
   });
   expect(screen.getByTestId('hero-expand-toggle')).toHaveAttribute('aria-expanded', 'false');
+});
+
+// --- Repositioning override ---
+
+it('should force expanded when repositioning even if collapsed', () => {
+  render(SpaceHero, {
+    space: makeSpace({ thumbnailAssetId: 'asset-1' }),
+    memberCount: 1,
+    assetCount: 0,
+    collapsed: true,
+    onToggleCollapse: vi.fn(),
+    repositioning: true,
+    onSavePosition: vi.fn(),
+    onCancelReposition: vi.fn(),
+  });
+  // Should show reposition controls (expanded), not collapsed bar
+  expect(screen.getByTestId('reposition-controls')).toBeInTheDocument();
+  expect(screen.queryByTestId('hero-collapsed-bar')).not.toBeInTheDocument();
 });
 ```
 
@@ -245,6 +343,16 @@ After the background (cover image or gradient), the content area becomes:
       {memberCount}
       {$t('members')}
     </span>
+    {#if faceRecognitionEnabled && peopleCount && peopleCount > 0}
+      <span
+        class="hidden items-center gap-1.5 rounded-full bg-white/20 px-2 py-0.5 text-xs text-white backdrop-blur-sm sm:inline-flex"
+        data-testid="hero-collapsed-people-count"
+      >
+        <Icon icon={mdiAccountGroupOutline} size="14" />
+        {peopleCount}
+        {$t('people')}
+      </span>
+    {/if}
     {#if currentRole}
       <span
         class="hidden items-center rounded-full bg-white/20 px-2 py-0.5 text-xs font-medium capitalize text-white backdrop-blur-sm sm:inline-flex"
