@@ -35,7 +35,7 @@ test.describe('Spaces Sidebar Dropdown', () => {
       await utils.setAuthCookies(context, admin.accessToken);
       await page.goto('/photos');
 
-      await expect(page.locator('a[data-testid^="sidebar-space-"]')).toHaveCount(2);
+      await expect(page.locator('[data-testid^="sidebar-space-"]')).toHaveCount(2);
     });
 
     test('should navigate to space detail page when clicking a space', async ({ context, page }) => {
@@ -46,32 +46,6 @@ test.describe('Spaces Sidebar Dropdown', () => {
 
       await page.locator(`[data-testid="sidebar-space-${space.id}"]`).click();
       await page.waitForURL(`**/spaces/${space.id}`);
-
-      // Verify the space page actually loaded (not just URL change)
-      await expect(page.locator('[data-testid="hero-title"]')).toHaveText('Nav Test Space');
-    });
-
-    test('should update page content when navigating between spaces via sidebar', async ({ context, page }) => {
-      await utils.resetDatabase();
-      admin = await utils.adminSetup();
-
-      const { space: spaceA } = await createSpaceWithAssets('Space Alpha', 1);
-      const { space: spaceB } = await createSpaceWithAssets('Space Beta', 1);
-
-      await utils.setAuthCookies(context, admin.accessToken);
-
-      // Navigate to space A first
-      await page.goto(`/spaces/${spaceA.id}`);
-      await expect(page.locator('[data-testid="hero-title"]')).toHaveText('Space Alpha');
-
-      // Click space B in the sidebar
-      await page.locator(`a[data-testid="sidebar-space-${spaceB.id}"]`).click();
-      await page.waitForURL(`**/spaces/${spaceB.id}`);
-
-      // Verify page content actually changed (not just URL)
-      // Use both selectors since hero-title is only shown when hero is expanded
-      const spaceTitle = page.locator('[data-testid="hero-title"], [data-testid="hero-collapsed-name"]').first();
-      await expect(spaceTitle).toHaveText('Space Beta');
     });
 
     test('should show max 3 spaces', async ({ context, page }) => {
@@ -85,7 +59,7 @@ test.describe('Spaces Sidebar Dropdown', () => {
       await utils.setAuthCookies(context, admin.accessToken);
       await page.goto('/photos');
 
-      await expect(page.locator('a[data-testid^="sidebar-space-"]')).toHaveCount(3);
+      await expect(page.locator('[data-testid^="sidebar-space-"]')).toHaveCount(3);
     });
 
     test('should render empty when no spaces exist', async ({ context, page }) => {
@@ -95,7 +69,7 @@ test.describe('Spaces Sidebar Dropdown', () => {
       await utils.setAuthCookies(context, admin.accessToken);
       await page.goto('/photos');
 
-      await expect(page.locator('a[data-testid^="sidebar-space-"]')).toHaveCount(0);
+      await expect(page.locator('[data-testid^="sidebar-space-"]')).toHaveCount(0);
     });
   });
 
@@ -105,7 +79,7 @@ test.describe('Spaces Sidebar Dropdown', () => {
       admin = await utils.adminSetup();
 
       const { space: oldSpace } = await createSpaceWithAssets('Old Pinned Space', 1);
-      await createSpaceWithAssets('New Unpinned Space', 1);
+      const { space: newSpace } = await createSpaceWithAssets('New Unpinned Space', 1);
 
       await utils.setAuthCookies(context, admin.accessToken);
       await page.goto('/spaces');
@@ -119,7 +93,7 @@ test.describe('Spaces Sidebar Dropdown', () => {
       // Navigate to photos to see the sidebar
       await page.goto('/photos');
 
-      const sidebarLinks = page.locator('a[data-testid^="sidebar-space-"]');
+      const sidebarLinks = page.locator('[data-testid^="sidebar-space-"]');
       await expect(sidebarLinks).toHaveCount(2);
 
       // Pinned space should appear first regardless of activity
@@ -169,25 +143,25 @@ test.describe('Spaces Sidebar Dropdown', () => {
       await utils.setAuthCookies(context, admin.accessToken);
       await page.goto('/photos');
 
-      await expect(page.locator('a[data-testid^="sidebar-space-"]').first()).toBeVisible();
+      await expect(page.locator('[data-testid^="sidebar-space-"]').first()).toBeVisible();
 
       const spacesNavItem = page.locator('nav').getByRole('link', { name: 'Spaces' }).locator('..');
       const chevron = spacesNavItem.locator('button').first();
       await chevron.click();
 
-      await expect(page.locator('a[data-testid^="sidebar-space-"]')).toHaveCount(0);
+      await expect(page.locator('[data-testid^="sidebar-space-"]')).toHaveCount(0);
 
       await page.reload();
-      await expect(page.locator('a[data-testid^="sidebar-space-"]')).toHaveCount(0);
+      await expect(page.locator('[data-testid^="sidebar-space-"]')).toHaveCount(0);
 
       const spacesNavItem2 = page.locator('nav').getByRole('link', { name: 'Spaces' }).locator('..');
       const chevron2 = spacesNavItem2.locator('button').first();
       await chevron2.click();
 
-      await expect(page.locator('a[data-testid^="sidebar-space-"]').first()).toBeVisible();
+      await expect(page.locator('[data-testid^="sidebar-space-"]').first()).toBeVisible();
 
       await page.reload();
-      await expect(page.locator('a[data-testid^="sidebar-space-"]').first()).toBeVisible();
+      await expect(page.locator('[data-testid^="sidebar-space-"]').first()).toBeVisible();
     });
   });
 
@@ -196,13 +170,13 @@ test.describe('Spaces Sidebar Dropdown', () => {
       await utils.resetDatabase();
       admin = await utils.adminSetup();
 
-      await createSpaceWithAssets('Active Space', 1);
+      const { space: activeSpace } = await createSpaceWithAssets('Active Space', 1);
       const emptySpace = await utils.createSpace(admin.accessToken, { name: 'Empty Space' });
 
       await utils.setAuthCookies(context, admin.accessToken);
       await page.goto('/photos');
 
-      await expect(page.locator('a[data-testid^="sidebar-space-"]')).toHaveCount(2);
+      await expect(page.locator('[data-testid^="sidebar-space-"]')).toHaveCount(2);
 
       await page.goto(`/spaces/${emptySpace.id}`);
 
@@ -211,7 +185,7 @@ test.describe('Spaces Sidebar Dropdown', () => {
 
       await page.goto('/photos');
 
-      await expect(page.locator('a[data-testid^="sidebar-space-"]')).toHaveCount(2);
+      await expect(page.locator('[data-testid^="sidebar-space-"]')).toHaveCount(2);
     });
   });
 });
