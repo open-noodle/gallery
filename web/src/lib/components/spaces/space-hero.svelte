@@ -157,14 +157,15 @@
         {$t('members')}
       </span>
       {#if faceRecognitionEnabled && peopleCount && peopleCount > 0}
-        <span
-          class="hidden items-center gap-1.5 rounded-full bg-white/20 px-2 py-0.5 text-xs text-white backdrop-blur-sm sm:inline-flex"
+        <a
+          href="/spaces/{spaceId}/people"
+          class="hidden items-center gap-1.5 rounded-full bg-white/20 px-2 py-0.5 text-xs text-white backdrop-blur-sm transition-colors hover:bg-white/30 sm:inline-flex"
           data-testid="hero-collapsed-people-count"
         >
           <Icon icon={mdiAccountGroupOutline} size="14" />
           {peopleCount}
           {$t('people')}
-        </span>
+        </a>
       {/if}
       {#if currentRole}
         <span

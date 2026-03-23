@@ -347,7 +347,7 @@ describe('SpaceHero component', () => {
     expect(screen.getByTestId('hero-collapsed-role')).toHaveTextContent('Editor');
   });
 
-  it('should show people count as plain text in collapsed bar', () => {
+  it('should show people count as a link in collapsed bar', () => {
     render(SpaceHero, {
       space: makeSpace(),
       memberCount: 3,
@@ -360,8 +360,8 @@ describe('SpaceHero component', () => {
     });
     const el = screen.getByTestId('hero-collapsed-people-count');
     expect(el).toHaveTextContent('5');
-    // Should be a span, not a link
-    expect(el.tagName).toBe('SPAN');
+    expect(el.tagName).toBe('A');
+    expect(el.getAttribute('href')).toBe('/spaces/space-1/people');
   });
 
   it('should not show people count in collapsed bar when faceRecognitionEnabled is false', () => {
