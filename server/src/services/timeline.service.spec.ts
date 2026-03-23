@@ -665,4 +665,58 @@ describe(TimelineService.name, () => {
       expect(calledWith.userIds).toBeUndefined();
     });
   });
+
+  describe('takenAfter / takenBefore date range filtering', () => {
+    it('should pass takenAfter to time bucket options for getTimeBuckets', async () => {
+      mocks.asset.getTimeBuckets.mockResolvedValue([]);
+      await sut.getTimeBuckets(authStub.admin, { takenAfter: '2023-01-01T00:00:00.000Z' });
+      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
+        expect.objectContaining({ takenAfter: '2023-01-01T00:00:00.000Z' }),
+      );
+    });
+
+    it('should pass takenBefore to time bucket options for getTimeBuckets', async () => {
+      mocks.asset.getTimeBuckets.mockResolvedValue([]);
+      await sut.getTimeBuckets(authStub.admin, { takenBefore: '2023-12-31T23:59:59.999Z' });
+      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
+        expect.objectContaining({ takenBefore: '2023-12-31T23:59:59.999Z' }),
+      );
+    });
+
+    it('should pass both takenAfter and takenBefore for getTimeBuckets', async () => {
+      mocks.asset.getTimeBuckets.mockResolvedValue([]);
+      await sut.getTimeBuckets(authStub.admin, {
+        takenAfter: '2023-08-01T00:00:00.000Z',
+        takenBefore: '2023-08-31T23:59:59.999Z',
+      });
+      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
+        expect.objectContaining({
+          takenAfter: '2023-08-01T00:00:00.000Z',
+          takenBefore: '2023-08-31T23:59:59.999Z',
+        }),
+      );
+    });
+
+    it('should pass takenAfter and takenBefore through for getTimeBucket', async () => {
+      mocks.access.sharedSpace.checkMemberAccess.mockResolvedValue(new Set(['space-id']));
+      const json = `[{ id: ['asset-id'] }]`;
+      mocks.asset.getTimeBucket.mockResolvedValue({ assets: json });
+
+      await sut.getTimeBucket(authStub.admin, {
+        timeBucket: '2023-08-01',
+        spaceId: 'space-id',
+        takenAfter: '2023-08-01T00:00:00.000Z',
+        takenBefore: '2023-08-31T23:59:59.999Z',
+      });
+
+      expect(mocks.asset.getTimeBucket).toHaveBeenCalledWith(
+        '2023-08-01',
+        expect.objectContaining({
+          takenAfter: '2023-08-01T00:00:00.000Z',
+          takenBefore: '2023-08-31T23:59:59.999Z',
+        }),
+        authStub.admin,
+      );
+    });
+  });
 });

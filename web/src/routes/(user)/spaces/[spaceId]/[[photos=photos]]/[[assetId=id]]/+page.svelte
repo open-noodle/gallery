@@ -212,6 +212,18 @@
       base.$type = filters.mediaType === 'image' ? AssetTypeEnum.Image : AssetTypeEnum.Video;
     }
     base.order = filters.sortOrder === 'asc' ? AssetOrder.Asc : AssetOrder.Desc;
+
+    // Temporal date-range filtering
+    if (filters.selectedYear && filters.selectedMonth) {
+      const start = new Date(filters.selectedYear, filters.selectedMonth - 1, 1);
+      const end = new Date(filters.selectedYear, filters.selectedMonth, 0, 23, 59, 59, 999);
+      base.takenAfter = start.toISOString();
+      base.takenBefore = end.toISOString();
+    } else if (filters.selectedYear) {
+      base.takenAfter = new Date(filters.selectedYear, 0, 1).toISOString();
+      base.takenBefore = new Date(filters.selectedYear, 11, 31, 23, 59, 59, 999).toISOString();
+    }
+
     return base;
   });
 
@@ -253,22 +265,6 @@
       spacePeople = await getSpacePeople({ id: space.id });
     } catch (error) {
       handleError(error, 'Failed to load space people');
-    }
-  }
-
-  function handleMonthSelect(year: number, month: number) {
-    const monthGroup = timelineManager?.months?.find(
-      (m) => m.yearMonth.year === year && m.yearMonth.month === month,
-    );
-    if (monthGroup) {
-      timelineManager.scrollTo(monthGroup.top);
-    }
-  }
-
-  function handleYearSelect(year: number) {
-    const monthGroup = timelineManager?.months?.find((m) => m.yearMonth.year === year);
-    if (monthGroup) {
-      timelineManager.scrollTo(monthGroup.top);
     }
   }
 
@@ -619,8 +615,6 @@
         onFilterChange={(f) => {
           filters = { ...f, sortOrder: filters.sortOrder };
         }}
-        onMonthSelect={handleMonthSelect}
-        onYearSelect={handleYearSelect}
       />
     {/if}
 

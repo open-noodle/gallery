@@ -41,12 +41,12 @@ export interface FilterState {
   rating?: number;
   mediaType: 'all' | 'image' | 'video';
   sortOrder: 'asc' | 'desc';
+  selectedYear?: number;
+  selectedMonth?: number;
 }
 
 // Client-only view state (not sent to server)
 export interface FilterViewState {
-  selectedYear?: number;
-  selectedMonth?: number;
   collapsed: boolean;
 }
 
@@ -82,6 +82,8 @@ export function clearFilters(state: FilterState): FilterState {
     tagIds: [],
     rating: undefined,
     mediaType: 'all',
+    selectedYear: undefined,
+    selectedMonth: undefined,
     // sortOrder is NOT cleared — it's a view preference
   };
 }

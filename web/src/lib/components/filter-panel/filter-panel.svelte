@@ -26,11 +26,9 @@
     config: FilterPanelConfig;
     timeBuckets: Array<{ timeBucket: string; count: number }>;
     onFilterChange: (filters: FilterState) => void;
-    onMonthSelect?: (year: number, month: number) => void;
-    onYearSelect?: (year: number) => void;
   }
 
-  let { config, timeBuckets, onFilterChange, onMonthSelect, onYearSelect }: Props = $props();
+  let { config, timeBuckets, onFilterChange }: Props = $props();
   let collapsed = $state(false);
   let filters = $state(createFilterState());
 
@@ -129,6 +127,19 @@
     notifyFilterChange();
   }
 
+  function handleYearSelect(year: number | undefined) {
+    filters.selectedYear = year;
+    // Clear month when year changes or is deselected
+    filters.selectedMonth = undefined;
+    notifyFilterChange();
+  }
+
+  function handleMonthSelect(year: number, month: number | undefined) {
+    filters.selectedYear = year;
+    filters.selectedMonth = month;
+    notifyFilterChange();
+  }
+
   function hasActiveFilter(section: string): boolean {
     switch (section) {
       case 'people': {
@@ -207,7 +218,13 @@
       {#each config.sections as section (section)}
         <FilterSection title={sectionTitles[section]} testId={section}>
           {#if section === 'timeline'}
-            <TemporalPicker {timeBuckets} {onYearSelect} {onMonthSelect} />
+            <TemporalPicker
+              {timeBuckets}
+              selectedYear={filters.selectedYear}
+              selectedMonth={filters.selectedMonth}
+              onYearSelect={handleYearSelect}
+              onMonthSelect={handleMonthSelect}
+            />
           {:else if section === 'people'}
             <PeopleFilter {people} selectedIds={filters.personIds} onSelectionChange={handlePeopleChange} />
           {:else if section === 'location'}

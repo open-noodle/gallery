@@ -15349,6 +15349,24 @@
             }
           },
           {
+            "name": "takenAfter",
+            "required": false,
+            "in": "query",
+            "description": "Only include assets taken on or after this date (ISO 8601)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "takenBefore",
+            "required": false,
+            "in": "query",
+            "description": "Only include assets taken on or before this date (ISO 8601)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "timeBucket",
             "required": true,
             "in": "query",
@@ -15653,6 +15671,24 @@
                 "type": "string",
                 "format": "uuid"
               }
+            }
+          },
+          {
+            "name": "takenAfter",
+            "required": false,
+            "in": "query",
+            "description": "Only include assets taken on or after this date (ISO 8601)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "takenBefore",
+            "required": false,
+            "in": "query",
+            "description": "Only include assets taken on or before this date (ISO 8601)",
+            "schema": {
+              "type": "string"
             }
           },
           {

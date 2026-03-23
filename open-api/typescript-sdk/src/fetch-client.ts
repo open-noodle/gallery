@@ -7083,7 +7083,7 @@ export function tagAssets({ id, bulkIdsDto }: {
 /**
  * Get time bucket
  */
-export function getTimeBucket({ albumId, bbox, city, country, isFavorite, isTrashed, key, make, model, order, personId, personIds, rating, slug, spaceId, spacePersonId, spacePersonIds, tagId, tagIds, timeBucket, $type, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }: {
+export function getTimeBucket({ albumId, bbox, city, country, isFavorite, isTrashed, key, make, model, order, personId, personIds, rating, slug, spaceId, spacePersonId, spacePersonIds, tagId, tagIds, takenAfter, takenBefore, timeBucket, $type, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }: {
     albumId?: string;
     bbox?: string;
     city?: string;
@@ -7103,6 +7103,8 @@ export function getTimeBucket({ albumId, bbox, city, country, isFavorite, isTras
     spacePersonIds?: string[];
     tagId?: string;
     tagIds?: string[];
+    takenAfter?: string;
+    takenBefore?: string;
     timeBucket: string;
     $type?: AssetTypeEnum;
     userId?: string;
@@ -7135,6 +7137,8 @@ export function getTimeBucket({ albumId, bbox, city, country, isFavorite, isTras
         spacePersonIds,
         tagId,
         tagIds,
+        takenAfter,
+        takenBefore,
         timeBucket,
         "type": $type,
         userId,
@@ -7150,7 +7154,7 @@ export function getTimeBucket({ albumId, bbox, city, country, isFavorite, isTras
 /**
  * Get time buckets
  */
-export function getTimeBuckets({ albumId, bbox, city, country, isFavorite, isTrashed, key, make, model, order, personId, personIds, rating, slug, spaceId, spacePersonId, spacePersonIds, tagId, tagIds, $type, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }: {
+export function getTimeBuckets({ albumId, bbox, city, country, isFavorite, isTrashed, key, make, model, order, personId, personIds, rating, slug, spaceId, spacePersonId, spacePersonIds, tagId, tagIds, takenAfter, takenBefore, $type, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }: {
     albumId?: string;
     bbox?: string;
     city?: string;
@@ -7170,6 +7174,8 @@ export function getTimeBuckets({ albumId, bbox, city, country, isFavorite, isTra
     spacePersonIds?: string[];
     tagId?: string;
     tagIds?: string[];
+    takenAfter?: string;
+    takenBefore?: string;
     $type?: AssetTypeEnum;
     userId?: string;
     visibility?: AssetVisibility;
@@ -7201,6 +7207,8 @@ export function getTimeBuckets({ albumId, bbox, city, country, isFavorite, isTra
         spacePersonIds,
         tagId,
         tagIds,
+        takenAfter,
+        takenBefore,
         "type": $type,
         userId,
         visibility,

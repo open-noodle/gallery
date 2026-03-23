@@ -96,6 +96,8 @@ interface AssetBuilderOptions {
   make?: string;
   model?: string;
   rating?: number;
+  takenAfter?: string;
+  takenBefore?: string;
 }
 
 export interface TimeBucketOptions extends AssetBuilderOptions {
@@ -796,7 +798,13 @@ export class AssetRepository {
           .$if(options.isDuplicate !== undefined, (qb) =>
             qb.where('asset.duplicateId', options.isDuplicate ? 'is not' : 'is', null),
           )
-          .$if(!!options.tagIds?.length, (qb) => withAnyTagId(qb, options.tagIds!)),
+          .$if(!!options.tagIds?.length, (qb) => withAnyTagId(qb, options.tagIds!))
+          .$if(!!options.takenAfter, (qb) =>
+            qb.where('asset.localDateTime', '>=', new Date(options.takenAfter!)),
+          )
+          .$if(!!options.takenBefore, (qb) =>
+            qb.where('asset.localDateTime', '<=', new Date(options.takenBefore!)),
+          ),
       )
       .selectFrom('asset')
       .select(sql<string>`("timeBucket" AT TIME ZONE 'UTC')::date::text`.as('timeBucket'))
@@ -939,6 +947,12 @@ export class AssetRepository {
           )
           .$if(!!options.isTrashed, (qb) => qb.where('asset.status', '!=', AssetStatus.Deleted))
           .$if(!!options.tagIds?.length, (qb) => withAnyTagId(qb, options.tagIds!))
+          .$if(!!options.takenAfter, (qb) =>
+            qb.where('asset.localDateTime', '>=', new Date(options.takenAfter!)),
+          )
+          .$if(!!options.takenBefore, (qb) =>
+            qb.where('asset.localDateTime', '<=', new Date(options.takenBefore!)),
+          )
           .orderBy(sql`(asset."localDateTime" AT TIME ZONE 'UTC')::date`, order)
           .orderBy('asset.fileCreatedAt', order),
       )

@@ -67,8 +67,8 @@ describe('FilterPanel', () => {
     expect(queryByTestId('collapsed-icon-strip')).toBeNull();
   });
 
-  it('should emit onMonthSelect when temporal picker month is clicked', async () => {
-    const monthSelectSpy = vi.fn();
+  it('should emit onFilterChange with selectedYear and selectedMonth when month is clicked', async () => {
+    const filterChangeSpy = vi.fn();
     const { getByTestId } = render(FilterPanel, {
       props: {
         config: { sections: ['timeline'], providers: {} },
@@ -76,19 +76,21 @@ describe('FilterPanel', () => {
           { timeBucket: '2023-06-01', count: 100 },
           { timeBucket: '2023-08-01', count: 200 },
         ],
-        onFilterChange: () => {},
-        onMonthSelect: monthSelectSpy,
+        onFilterChange: filterChangeSpy,
       },
     });
     // Click a year to drill into months
     await fireEvent.click(getByTestId('year-btn-2023'));
+    expect(filterChangeSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ selectedYear: 2023, selectedMonth: undefined }),
+    );
     // Then click a month
     await fireEvent.click(getByTestId('month-btn-6'));
-    expect(monthSelectSpy).toHaveBeenCalledWith(2023, 6);
+    expect(filterChangeSpy).toHaveBeenCalledWith(expect.objectContaining({ selectedYear: 2023, selectedMonth: 6 }));
   });
 
-  it('should emit onYearSelect when temporal picker year is clicked', async () => {
-    const yearSelectSpy = vi.fn();
+  it('should emit onFilterChange with selectedYear when year is clicked', async () => {
+    const filterChangeSpy = vi.fn();
     const { getByTestId } = render(FilterPanel, {
       props: {
         config: { sections: ['timeline'], providers: {} },
@@ -96,11 +98,12 @@ describe('FilterPanel', () => {
           { timeBucket: '2023-06-01', count: 100 },
           { timeBucket: '2023-08-01', count: 200 },
         ],
-        onFilterChange: () => {},
-        onYearSelect: yearSelectSpy,
+        onFilterChange: filterChangeSpy,
       },
     });
     await fireEvent.click(getByTestId('year-btn-2023'));
-    expect(yearSelectSpy).toHaveBeenCalledWith(2023);
+    expect(filterChangeSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ selectedYear: 2023, selectedMonth: undefined }),
+    );
   });
 });

@@ -128,6 +128,16 @@ export class TimeBucketDto {
     description: 'Filter by asset type (IMAGE or VIDEO)',
   })
   type?: AssetType;
+
+  @ApiPropertyOptional({ description: 'Only include assets taken on or after this date (ISO 8601)' })
+  @IsString()
+  @Optional()
+  takenAfter?: string;
+
+  @ApiPropertyOptional({ description: 'Only include assets taken on or before this date (ISO 8601)' })
+  @IsString()
+  @Optional()
+  takenBefore?: string;
 }
 
 export class TimeBucketAssetDto extends TimeBucketDto {
