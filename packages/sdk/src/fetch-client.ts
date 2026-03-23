@@ -5590,12 +5590,13 @@ export function searchAssetStatistics({ statisticsSearchDto }: {
 /**
  * Retrieve search suggestions
  */
-export function getSearchSuggestions({ country, includeNull, lensModel, make, model, state, $type }: {
+export function getSearchSuggestions({ country, includeNull, lensModel, make, model, spaceId, state, $type }: {
     country?: string;
     includeNull?: boolean;
     lensModel?: string;
     make?: string;
     model?: string;
+    spaceId?: string;
     state?: string;
     $type: SearchSuggestionType;
 }, opts?: Oazapfts.RequestOpts) {
@@ -5608,6 +5609,7 @@ export function getSearchSuggestions({ country, includeNull, lensModel, make, mo
         lensModel,
         make,
         model,
+        spaceId,
         state,
         "type": $type
     }))}`, {
@@ -6351,22 +6353,36 @@ export function tagAssets({ id, bulkIdsDto }: {
 /**
  * Get time bucket
  */
-export function getTimeBucket({ albumId, bbox, isFavorite, isTrashed, key, order, orderBy, personId, slug, tagId, timeBucket, userId, visibility, withCoordinates, withPartners, withStacked }: {
+export function getTimeBucket({ albumId, bbox, city, country, isFavorite, isTrashed, key, make, model, order, orderBy, personId, personIds, rating, slug, spaceId, spacePersonId, spacePersonIds, tagId, tagIds, takenAfter, takenBefore, timeBucket, $type, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }: {
     albumId?: string;
     bbox?: string;
+    city?: string;
+    country?: string;
     isFavorite?: boolean;
     isTrashed?: boolean;
     key?: string;
+    make?: string;
+    model?: string;
     order?: AssetOrder;
     orderBy?: AssetOrderBy;
     personId?: string;
+    personIds?: string[];
+    rating?: number;
     slug?: string;
+    spaceId?: string;
+    spacePersonId?: string;
+    spacePersonIds?: string[];
     tagId?: string;
+    tagIds?: string[];
+    takenAfter?: string;
+    takenBefore?: string;
     timeBucket: string;
+    $type?: AssetTypeEnum;
     userId?: string;
     visibility?: AssetVisibility;
     withCoordinates?: boolean;
     withPartners?: boolean;
+    withSharedSpaces?: boolean;
     withStacked?: boolean;
 }, opts?: Oazapfts.RequestOpts) {
     return oazapfts.ok(oazapfts.fetchJson<{
@@ -6375,19 +6391,33 @@ export function getTimeBucket({ albumId, bbox, isFavorite, isTrashed, key, order
     }>(`/timeline/bucket${QS.query(QS.explode({
         albumId,
         bbox,
+        city,
+        country,
         isFavorite,
         isTrashed,
         key,
+        make,
+        model,
         order,
         orderBy,
         personId,
+        personIds,
+        rating,
         slug,
+        spaceId,
+        spacePersonId,
+        spacePersonIds,
         tagId,
+        tagIds,
+        takenAfter,
+        takenBefore,
         timeBucket,
+        "type": $type,
         userId,
         visibility,
         withCoordinates,
         withPartners,
+        withSharedSpaces,
         withStacked
     }))}`, {
         ...opts
@@ -6396,21 +6426,35 @@ export function getTimeBucket({ albumId, bbox, isFavorite, isTrashed, key, order
 /**
  * Get time buckets
  */
-export function getTimeBuckets({ albumId, bbox, isFavorite, isTrashed, key, order, orderBy, personId, slug, tagId, userId, visibility, withCoordinates, withPartners, withStacked }: {
+export function getTimeBuckets({ albumId, bbox, city, country, isFavorite, isTrashed, key, make, model, order, orderBy, personId, personIds, rating, slug, spaceId, spacePersonId, spacePersonIds, tagId, tagIds, takenAfter, takenBefore, $type, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }: {
     albumId?: string;
     bbox?: string;
+    city?: string;
+    country?: string;
     isFavorite?: boolean;
     isTrashed?: boolean;
     key?: string;
+    make?: string;
+    model?: string;
     order?: AssetOrder;
     orderBy?: AssetOrderBy;
     personId?: string;
+    personIds?: string[];
+    rating?: number;
     slug?: string;
+    spaceId?: string;
+    spacePersonId?: string;
+    spacePersonIds?: string[];
     tagId?: string;
+    tagIds?: string[];
+    takenAfter?: string;
+    takenBefore?: string;
+    $type?: AssetTypeEnum;
     userId?: string;
     visibility?: AssetVisibility;
     withCoordinates?: boolean;
     withPartners?: boolean;
+    withSharedSpaces?: boolean;
     withStacked?: boolean;
 }, opts?: Oazapfts.RequestOpts) {
     return oazapfts.ok(oazapfts.fetchJson<{
@@ -6419,18 +6463,32 @@ export function getTimeBuckets({ albumId, bbox, isFavorite, isTrashed, key, orde
     }>(`/timeline/buckets${QS.query(QS.explode({
         albumId,
         bbox,
+        city,
+        country,
         isFavorite,
         isTrashed,
         key,
+        make,
+        model,
         order,
         orderBy,
         personId,
+        personIds,
+        rating,
         slug,
+        spaceId,
+        spacePersonId,
+        spacePersonIds,
         tagId,
+        tagIds,
+        takenAfter,
+        takenBefore,
+        "type": $type,
         userId,
         visibility,
         withCoordinates,
         withPartners,
+        withSharedSpaces,
         withStacked
     }))}`, {
         ...opts
