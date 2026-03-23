@@ -156,12 +156,12 @@
 
 {#if collapsed}
   <div
-    class="flex w-8 flex-col items-center gap-3 border-r border-[var(--border)] bg-[#131316] py-2"
+    class="flex w-8 flex-col items-center gap-3 border-r border-gray-200 bg-light py-2 dark:border-gray-700"
     data-testid="collapsed-icon-strip"
   >
     <button
       type="button"
-      class="flex h-6 w-6 items-center justify-center rounded-md text-[var(--fg-faint)] hover:bg-[var(--primary-soft)]"
+      class="flex h-6 w-6 items-center justify-center rounded-full text-gray-500 hover:bg-subtle dark:text-gray-400"
       onclick={() => (collapsed = false)}
       data-testid="expand-panel-btn"
     >
@@ -170,13 +170,13 @@
     {#each config.sections as section (section)}
       <button
         type="button"
-        class="relative flex h-6 w-6 items-center justify-center rounded-md text-[var(--fg-faint)] hover:bg-[var(--primary-soft)]"
+        class="relative flex h-6 w-6 items-center justify-center rounded-md text-gray-500 hover:bg-subtle dark:text-gray-400"
         onclick={() => (collapsed = false)}
       >
         <Icon icon={sectionIcons[section]} size="16" />
         {#if hasActiveFilter(section)}
           <span
-            class="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full border-[1.5px] border-[#131316] bg-[var(--primary)]"
+            class="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full border-[1.5px] border-light bg-immich-primary dark:bg-immich-dark-primary"
           ></span>
         {/if}
       </button>
@@ -184,16 +184,16 @@
   </div>
 {:else}
   <div
-    class="flex w-60 flex-col overflow-y-auto border-r border-[var(--border)] bg-[#131316] scrollbar-thin"
+    class="immich-scrollbar flex w-64 flex-col overflow-y-auto border-r border-gray-200 bg-light dark:border-gray-700"
     data-testid="discovery-panel"
   >
     <div
-      class="sticky top-0 z-5 flex items-center justify-between border-b border-[var(--border)] bg-[#131316] px-3 py-2.5"
+      class="sticky top-0 z-5 flex items-center justify-between border-b border-gray-200 bg-light px-4 py-2.5 dark:border-gray-700"
     >
-      <span class="text-[13px] font-semibold">Filters</span>
+      <span class="text-sm font-medium">Filters</span>
       <button
         type="button"
-        class="flex h-6 w-6 items-center justify-center rounded-full text-[var(--fg-muted)]"
+        class="flex h-6 w-6 items-center justify-center rounded-full text-gray-500 hover:bg-subtle dark:text-gray-400"
         onclick={() => (collapsed = true)}
         data-testid="collapse-panel-btn"
       >
@@ -201,48 +201,50 @@
       </button>
     </div>
 
-    {#each config.sections as section (section)}
-      <FilterSection title={sectionTitles[section]} testId={section}>
-        {#if section === 'timeline'}
-          <TemporalPicker {timeBuckets} />
-        {:else if section === 'people'}
-          <PeopleFilter {people} selectedIds={filters.personIds} onSelectionChange={handlePeopleChange} />
-        {:else if section === 'location'}
-          <LocationFilter
-            {countries}
-            selectedCity={filters.city}
-            selectedCountry={filters.country}
-            onCityFetch={async (_) => {
-              if (config.providers.locations) {
-                const result = await config.providers.locations();
-                return result.filter((l) => l.type === 'city').map((l) => l.value);
-              }
-              return [];
-            }}
-            onSelectionChange={handleLocationChange}
-          />
-        {:else if section === 'camera'}
-          <CameraFilter
-            makes={cameraMakes}
-            selectedMake={filters.make}
-            selectedModel={filters.model}
-            onModelFetch={async (_) => {
-              if (config.providers.cameras) {
-                const result = await config.providers.cameras();
-                return result.filter((c) => c.type === 'model').map((c) => c.value);
-              }
-              return [];
-            }}
-            onSelectionChange={handleCameraChange}
-          />
-        {:else if section === 'tags'}
-          <TagsFilter {tags} selectedIds={filters.tagIds} onSelectionChange={handleTagsChange} />
-        {:else if section === 'rating'}
-          <RatingFilter selectedRating={filters.rating} onRatingChange={handleRatingChange} />
-        {:else if section === 'media'}
-          <MediaTypeFilter selected={filters.mediaType} onTypeChange={handleMediaTypeChange} />
-        {/if}
-      </FilterSection>
-    {/each}
+    <div class="pt-4">
+      {#each config.sections as section (section)}
+        <FilterSection title={sectionTitles[section]} testId={section}>
+          {#if section === 'timeline'}
+            <TemporalPicker {timeBuckets} />
+          {:else if section === 'people'}
+            <PeopleFilter {people} selectedIds={filters.personIds} onSelectionChange={handlePeopleChange} />
+          {:else if section === 'location'}
+            <LocationFilter
+              {countries}
+              selectedCity={filters.city}
+              selectedCountry={filters.country}
+              onCityFetch={async (_) => {
+                if (config.providers.locations) {
+                  const result = await config.providers.locations();
+                  return result.filter((l) => l.type === 'city').map((l) => l.value);
+                }
+                return [];
+              }}
+              onSelectionChange={handleLocationChange}
+            />
+          {:else if section === 'camera'}
+            <CameraFilter
+              makes={cameraMakes}
+              selectedMake={filters.make}
+              selectedModel={filters.model}
+              onModelFetch={async (_) => {
+                if (config.providers.cameras) {
+                  const result = await config.providers.cameras();
+                  return result.filter((c) => c.type === 'model').map((c) => c.value);
+                }
+                return [];
+              }}
+              onSelectionChange={handleCameraChange}
+            />
+          {:else if section === 'tags'}
+            <TagsFilter {tags} selectedIds={filters.tagIds} onSelectionChange={handleTagsChange} />
+          {:else if section === 'rating'}
+            <RatingFilter selectedRating={filters.rating} onRatingChange={handleRatingChange} />
+          {:else if section === 'media'}
+            <MediaTypeFilter selected={filters.mediaType} onTypeChange={handleMediaTypeChange} />
+          {/if}
+        </FilterSection>
+      {/each}
+    </div>
   </div>
 {/if}

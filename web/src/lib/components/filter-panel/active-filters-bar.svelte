@@ -66,24 +66,24 @@
 </script>
 
 <div
-  class="flex flex-wrap items-center gap-1.5 border-b border-[var(--border)] bg-[var(--bg-surface)] px-3.5 py-1.5"
+  class="flex flex-wrap items-center gap-1.5 border-b border-gray-200 bg-gray-50 px-4 py-2 dark:border-gray-700 dark:bg-gray-900"
   data-testid="active-filters-bar"
 >
   {#if resultCount !== undefined}
-    <span class="text-[10px] text-[var(--fg-muted)]" data-testid="result-count">
+    <span class="text-xs text-gray-400 dark:text-gray-500" data-testid="result-count">
       {resultCount.toLocaleString()} result{resultCount === 1 ? '' : 's'}
     </span>
   {/if}
 
   {#each chips as chip (`${chip.type}-${chip.id ?? chip.label}`)}
     <span
-      class="inline-flex items-center gap-1 rounded-full border border-[var(--border)] px-2 py-0.5 text-[10px]"
+      class="inline-flex items-center gap-1 rounded-full bg-gray-200 px-2.5 py-0.5 text-xs dark:bg-gray-700"
       data-testid="active-chip"
     >
       <span>{chip.label}</span>
       <button
         type="button"
-        class="flex h-3.5 w-3.5 items-center justify-center rounded-full text-[var(--fg-faint)] hover:border hover:border-[var(--border)] hover:bg-[var(--bg-surface)]"
+        class="flex h-4 w-4 items-center justify-center rounded-full text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
         onclick={() => onRemoveFilter(chip.type, chip.id)}
         aria-label="Remove {chip.label} filter"
         data-testid="chip-close"
@@ -96,7 +96,7 @@
   {#if hasActiveFilters}
     <button
       type="button"
-      class="ml-auto text-[10px] font-semibold text-[var(--primary)]"
+      class="ml-auto text-xs font-semibold text-immich-primary dark:text-immich-dark-primary"
       onclick={onClearAll}
       data-testid="clear-all-btn"
     >

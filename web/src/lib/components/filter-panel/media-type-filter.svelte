@@ -13,14 +13,14 @@
   ];
 </script>
 
-<div class="flex gap-1" data-testid="media-type-filter">
+<div class="flex gap-1.5" data-testid="media-type-filter">
   {#each options as option (option.value)}
     {@const isActive = selected === option.value}
     <button
       type="button"
-      class="rounded-[4px] border px-2 py-0.5 text-[10px] {isActive
-        ? 'border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]'
-        : 'border-[var(--border)] text-[var(--fg-muted)]'}"
+      class="rounded-lg border px-2.5 py-1 text-xs {isActive
+        ? 'border-immich-primary bg-immich-primary/10 text-immich-primary dark:border-immich-dark-primary dark:bg-immich-dark-primary/20 dark:text-immich-dark-primary'
+        : 'border-gray-200 text-gray-500 dark:border-gray-700 dark:text-gray-400'}"
       onclick={() => onTypeChange(option.value)}
       data-testid="media-type-{option.value}"
     >

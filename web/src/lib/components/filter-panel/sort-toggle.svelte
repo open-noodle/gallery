@@ -19,7 +19,7 @@
 
 <button
   type="button"
-  class="flex h-8 w-8 items-center justify-center rounded-md text-[var(--fg-muted)] hover:bg-[var(--primary-soft)] hover:text-[var(--fg)]"
+  class="flex h-8 w-8 items-center justify-center rounded-full text-gray-500 hover:bg-subtle dark:text-gray-400"
   onclick={handleClick}
   {title}
   data-testid="sort-toggle"

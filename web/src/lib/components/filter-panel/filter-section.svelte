@@ -13,23 +13,23 @@
   let expanded = $state(true);
 </script>
 
-<div class="border-b border-[var(--border)]" data-testid="filter-section-{testId}">
+<div class="border-b border-gray-200 dark:border-gray-700" data-testid="filter-section-{testId}">
   <button
     type="button"
-    class="flex w-full items-center justify-between px-3 py-2.5 hover:bg-[var(--primary-soft)]"
+    class="flex w-full items-center justify-between px-4 py-3 hover:bg-subtle"
     onclick={() => (expanded = !expanded)}
   >
-    <span class="text-[10px] font-bold uppercase tracking-[0.7px] text-[var(--fg-muted)]">
+    <span class="text-sm font-medium">
       {title}
     </span>
     <Icon
       icon={mdiChevronDown}
-      size="14"
-      class="text-[var(--fg-faint)] transition-transform {expanded ? '' : '-rotate-90'}"
+      size="16"
+      class="text-gray-500 transition-transform dark:text-gray-400 {expanded ? '' : '-rotate-90'}"
     />
   </button>
   {#if expanded}
-    <div class="px-3 pb-2.5">
+    <div class="px-4 pb-4">
       {@render children()}
     </div>
   {/if}

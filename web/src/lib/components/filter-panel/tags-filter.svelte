@@ -21,26 +21,26 @@
 
 <div data-testid="tags-filter">
   {#if tags.length === 0}
-    <p class="text-[11px] text-[var(--fg-muted)]" data-testid="tags-empty">No tags available</p>
+    <p class="text-sm text-gray-400 dark:text-gray-500" data-testid="tags-empty">No tags available</p>
   {:else}
     {#each tags as tag (tag.id)}
       {@const isActive = selectedIds.includes(tag.id)}
       <button
         type="button"
-        class="flex w-full items-center gap-1.5 py-1 text-[11px] {isActive
-          ? 'font-medium text-[var(--fg)]'
-          : 'text-[var(--fg-muted)]'}"
+        class="-mx-2 flex w-[calc(100%+1rem)] items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-subtle {isActive
+          ? 'font-medium'
+          : 'text-gray-500 dark:text-gray-300'}"
         onclick={() => toggleTag(tag.id)}
         data-testid="tags-item-{tag.id}"
       >
         <!-- Checkbox -->
         <div
-          class="flex h-[13px] w-[13px] flex-shrink-0 items-center justify-center rounded-[3px] border-[1.5px] {isActive
-            ? 'border-[var(--primary)] bg-[var(--primary)]'
-            : 'border-[var(--border)]'}"
+          class="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded {isActive
+            ? 'bg-immich-primary dark:bg-immich-dark-primary'
+            : 'border border-gray-300 dark:border-gray-600'}"
         >
           {#if isActive}
-            <svg viewBox="0 0 24 24" class="h-[9px] w-[9px] text-white">
+            <svg viewBox="0 0 24 24" class="h-3 w-3 text-white dark:text-black">
               <path fill="currentColor" d="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z" />
             </svg>
           {/if}

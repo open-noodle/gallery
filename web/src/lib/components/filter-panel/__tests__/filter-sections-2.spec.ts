@@ -86,13 +86,13 @@ describe('RatingFilter', () => {
     // Stars 1-3 should be filled (amber), stars 4-5 should be unfilled
     for (const star of [1, 2, 3]) {
       const starButton = getByTestId(`rating-star-${star}`);
-      const icon = starButton.querySelector('[class*="text-[#f59e0b]"]');
+      const icon = starButton.querySelector('[class*="text-amber-400"]');
       expect(icon).toBeTruthy();
     }
 
     for (const star of [4, 5]) {
       const starButton = getByTestId(`rating-star-${star}`);
-      const icon = starButton.querySelector('[class*="text-[var(--border)]"]');
+      const icon = starButton.querySelector('[class*="text-gray-300"]');
       expect(icon).toBeTruthy();
     }
   });
@@ -143,8 +143,8 @@ describe('MediaTypeFilter', () => {
     });
 
     const allButton = getByTestId('media-type-all');
-    expect(allButton.className).toContain('border-[var(--primary)]');
-    expect(allButton.className).toContain('bg-[var(--primary-soft)]');
+    expect(allButton.className).toContain('border-immich-primary');
+    expect(allButton.className).toContain('bg-immich-primary/10');
   });
 
   it('should toggle between All, Photos, Videos', async () => {
