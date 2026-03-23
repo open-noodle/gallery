@@ -765,12 +765,10 @@ describe('TimelineManager', () => {
       Object.entries(stackedAssets).map(([key, assets]) => [key, toResponseDto(...assets)]),
     );
 
-    beforeEach(async () => {
+    beforeEach(() => {
       timelineManager = new TimelineManager();
       sdkMock.getTimeBuckets.mockResolvedValue([{ count: 2, timeBucket: '2024-02-01T00:00:00.000Z' }]);
-      sdkMock.getTimeBucket.mockImplementation(({ timeBucket }) =>
-        Promise.resolve(stackedAssetsResponse[timeBucket]),
-      );
+      sdkMock.getTimeBucket.mockImplementation(({ timeBucket }) => Promise.resolve(stackedAssetsResponse[timeBucket]));
     });
 
     it('passes spaceId and withStacked to getTimeBuckets', async () => {
@@ -815,9 +813,7 @@ describe('TimelineManager', () => {
       await timelineManager.updateOptions({ spaceId: 'space-1' });
       await timelineManager.updateViewport({ width: 1588, height: 0 });
 
-      expect(sdkMock.getTimeBuckets).toHaveBeenCalledWith(
-        expect.objectContaining({ spaceId: 'space-1' }),
-      );
+      expect(sdkMock.getTimeBuckets).toHaveBeenCalledWith(expect.objectContaining({ spaceId: 'space-1' }));
       const calledWith = sdkMock.getTimeBuckets.mock.calls[0][0];
       expect(calledWith.withStacked).toBeUndefined();
     });
