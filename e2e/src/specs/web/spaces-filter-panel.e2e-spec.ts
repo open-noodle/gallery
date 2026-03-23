@@ -461,9 +461,7 @@ test.describe('Spaces FilterPanel', () => {
           await cityItems.nth(0).click();
           await cityItems.nth(1).click();
           // Only one location chip should be active
-          const locationChips = page
-            .locator('[data-testid="active-chip"]')
-            .filter({ hasText: /,/ });
+          const locationChips = page.locator('[data-testid="active-chip"]').filter({ hasText: /,/ });
           await expect(locationChips).toHaveCount(1);
         }
       }
@@ -1207,7 +1205,7 @@ test.describe('Spaces FilterPanel', () => {
 
         // Badge dot should appear (8x8 circle with primary bg)
         const badges = page.locator(
-          '[data-testid="collapsed-icon-strip"] .absolute.rounded-full.bg-\\[var\\(--primary\\)\\]',
+          String.raw`[data-testid="collapsed-icon-strip"] .absolute.rounded-full.bg-\[var\(--primary\)\]`,
         );
         expect(await badges.count()).toBeGreaterThan(0);
       }
@@ -1226,9 +1224,7 @@ test.describe('Spaces FilterPanel', () => {
         await expect(page.locator('[data-testid="collapsed-icon-strip"]')).toBeVisible();
 
         // At least one badge dot should appear
-        const badges = page.locator(
-          '[data-testid="collapsed-icon-strip"] .absolute.rounded-full',
-        );
+        const badges = page.locator('[data-testid="collapsed-icon-strip"] .absolute.rounded-full');
         expect(await badges.count()).toBeGreaterThan(0);
       }
     });
@@ -1243,7 +1239,7 @@ test.describe('Spaces FilterPanel', () => {
 
       // No badges should appear when no filters are active
       const badges = page.locator(
-        '[data-testid="collapsed-icon-strip"] .absolute.rounded-full.bg-\\[var\\(--primary\\)\\]',
+        String.raw`[data-testid="collapsed-icon-strip"] .absolute.rounded-full.bg-\[var\(--primary\)\]`,
       );
       await expect(badges).toHaveCount(0);
     });
@@ -1294,7 +1290,7 @@ test.describe('Spaces FilterPanel', () => {
 
       // No badge dots
       const badges = page.locator(
-        '[data-testid="collapsed-icon-strip"] .absolute.rounded-full.bg-\\[var\\(--primary\\)\\]',
+        String.raw`[data-testid="collapsed-icon-strip"] .absolute.rounded-full.bg-\[var\(--primary\)\]`,
       );
       await expect(badges).toHaveCount(0);
     });

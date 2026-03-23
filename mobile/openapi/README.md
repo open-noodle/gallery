@@ -425,6 +425,7 @@ Class | Method | HTTP request | Description
  - [AssetResponseDto](doc//AssetResponseDto.md)
  - [AssetStackResponseDto](doc//AssetStackResponseDto.md)
  - [AssetStatsResponseDto](doc//AssetStatsResponseDto.md)
+ - [AssetType](doc//AssetType.md)
  - [AssetTypeEnum](doc//AssetTypeEnum.md)
  - [AssetVisibility](doc//AssetVisibility.md)
  - [AudioCodec](doc//AudioCodec.md)
