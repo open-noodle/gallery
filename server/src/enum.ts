@@ -237,6 +237,9 @@ export enum Permission {
   SharedSpaceAssetRead = 'sharedSpaceAsset.read',
   SharedSpaceAssetDelete = 'sharedSpaceAsset.delete',
 
+  SharedSpaceLibraryCreate = 'sharedSpaceLibrary.create',
+  SharedSpaceLibraryDelete = 'sharedSpaceLibrary.delete',
+
   UserGroupCreate = 'userGroup.create',
   UserGroupRead = 'userGroup.read',
   UserGroupUpdate = 'userGroup.update',
@@ -918,6 +921,7 @@ export enum JobName {
   SharedSpaceFaceMatch = 'SharedSpaceFaceMatch',
   SharedSpaceFaceMatchAll = 'SharedSpaceFaceMatchAll',
   SharedSpacePersonThumbnail = 'SharedSpacePersonThumbnail',
+  SharedSpaceLibraryFaceSync = 'SharedSpaceLibraryFaceSync',
 }
 
 export const JobNameSchema = z.enum(JobName).describe('Job name').meta({ id: 'JobName' });
