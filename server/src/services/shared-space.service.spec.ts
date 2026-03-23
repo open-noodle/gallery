@@ -3481,17 +3481,19 @@ describe(SharedSpaceService.name, () => {
       const libraryId = newUuid();
       const assetId = newUuid();
       const faceId = newUuid();
+      const personalPersonId = newUuid();
 
       mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
       mocks.sharedSpace.hasLibraryLink.mockResolvedValue(true);
       mocks.asset.getByLibraryIdWithFaces.mockResolvedValueOnce([{ id: assetId }]).mockResolvedValueOnce([]);
       mocks.sharedSpace.getAssetFacesForMatching.mockResolvedValue([
-        { id: faceId, assetId, personId: null, embedding: '[0.1,0.2]' },
+        { id: faceId, assetId, personId: personalPersonId, embedding: '[0.1,0.2]' },
       ]);
       mocks.sharedSpace.isPersonFaceAssigned.mockResolvedValue(false);
       mocks.sharedSpace.findClosestSpacePerson.mockResolvedValue([]);
       mocks.sharedSpace.addPersonFaces.mockResolvedValue([]);
       mocks.sharedSpace.createPerson.mockResolvedValue(factory.sharedSpacePerson({ spaceId }));
+      mocks.person.getById.mockResolvedValue(factory.person({ id: personalPersonId }));
 
       const result = await sut.handleSharedSpaceLibraryFaceSync({ spaceId, libraryId });
       expect(result).toBe(JobStatus.Success);
@@ -3503,17 +3505,19 @@ describe(SharedSpaceService.name, () => {
       const libraryId = newUuid();
       const assetId = newUuid();
       const faceId = newUuid();
+      const personalPersonId = newUuid();
 
       mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
       mocks.sharedSpace.hasLibraryLink.mockResolvedValue(true);
       mocks.asset.getByLibraryIdWithFaces.mockResolvedValueOnce([{ id: assetId }]).mockResolvedValueOnce([]);
       mocks.sharedSpace.getAssetFacesForMatching.mockResolvedValue([
-        { id: faceId, assetId, personId: null, embedding: '[0.1,0.2]' },
+        { id: faceId, assetId, personId: personalPersonId, embedding: '[0.1,0.2]' },
       ]);
       mocks.sharedSpace.isPersonFaceAssigned.mockResolvedValue(false);
       mocks.sharedSpace.findClosestSpacePerson.mockResolvedValue([]);
       mocks.sharedSpace.createPerson.mockResolvedValue(factory.sharedSpacePerson({ spaceId }));
       mocks.sharedSpace.addPersonFaces.mockResolvedValue([]);
+      mocks.person.getById.mockResolvedValue(factory.person({ id: personalPersonId }));
 
       await sut.handleSharedSpaceLibraryFaceSync({ spaceId, libraryId });
       expect(mocks.sharedSpace.createPerson).toHaveBeenCalled();

@@ -845,12 +845,16 @@ export class SharedSpaceService extends BaseService {
       if (matches.length > 0) {
         personId = matches[0].personId;
       } else {
+        // Only create a new space person if the face has a linked personal person
+        // (faces without one haven't passed the minFaces threshold yet)
+        if (!face.personId) {
+          continue;
+        }
+
         let name = '';
-        if (face.personId) {
-          const personalPerson = await this.personRepository.getById(face.personId);
-          if (personalPerson?.name) {
-            name = personalPerson.name;
-          }
+        const personalPerson = await this.personRepository.getById(face.personId);
+        if (personalPerson?.name) {
+          name = personalPerson.name;
         }
 
         const newPerson = await this.sharedSpaceRepository.createPerson({
