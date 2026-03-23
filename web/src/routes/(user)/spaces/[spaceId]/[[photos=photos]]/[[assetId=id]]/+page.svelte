@@ -606,8 +606,8 @@
       />
     {/if}
 
-    <!-- Main Content -->
-    <div class="flex flex-1 flex-col overflow-hidden">
+    <!-- Main Content — pl-4 adds breathing room between filter panel and content -->
+    <div class="flex flex-1 flex-col overflow-hidden pl-4">
       <!-- Active filter chips -->
       {#if viewMode === 'view' && getActiveFilterCount(filters) > 0}
         <ActiveFiltersBar

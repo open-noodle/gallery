@@ -184,7 +184,7 @@
   </div>
 {:else}
   <div
-    class="immich-scrollbar flex w-64 flex-col overflow-y-auto border-r border-gray-200 bg-light dark:border-gray-700"
+    class="immich-scrollbar flex w-64 flex-col overflow-y-auto border-r border-gray-200 bg-light shadow-sm dark:border-gray-700 dark:shadow-none"
     data-testid="discovery-panel"
   >
     <div
