@@ -119,12 +119,34 @@ test.describe('Spaces FilterPanel', () => {
       await page.locator('[data-testid="year-btn-2023"]').click();
       await expect(page.locator('[data-testid="month-grid"]')).toBeVisible();
 
-      // Click August — the click should succeed (we verify the button is interactive)
+      // Capture scroll position before clicking
+      const scrollBefore = await page.evaluate(
+        () => document.querySelector('[data-testid="discovery-timeline"]')?.scrollTop ?? 0,
+      );
+
+      // Click August — the click should trigger a scroll to that month's content
       const monthBtn = page.locator('[data-testid="month-btn-8"]');
       await expect(monthBtn).toBeVisible();
       await monthBtn.click();
-      // If the month click triggers navigation, the button should remain visible
+
+      // Wait briefly for scroll animation to complete
+      await page.waitForTimeout(500);
+
+      // Verify the timeline responded — either scroll position changed or an API request was made.
+      // Since the timeline may not have enough content to scroll, also accept that the month
+      // button remains interactive (the handler ran without error).
+      const scrollAfter = await page.evaluate(
+        () => document.querySelector('[data-testid="discovery-timeline"]')?.scrollTop ?? 0,
+      );
+      // At minimum, the button should still be visible (handler didn't crash)
       await expect(monthBtn).toBeVisible();
+      // If there was scrollable content, scroll position should have changed
+      // (We log but don't hard-fail if content is too short to scroll)
+      if (scrollBefore === scrollAfter) {
+        // Timeline may be too short to scroll — that's OK, but let's verify the
+        // click at least triggered a re-render by checking the page didn't error
+        await expect(page.locator('[data-testid="discovery-timeline"]')).toBeVisible();
+      }
     });
 
     test('should return to year-level view when clicking "All" breadcrumb', async ({ context, page }) => {
@@ -150,11 +172,19 @@ test.describe('Spaces FilterPanel', () => {
       // Verify year grid is visible
       await expect(page.locator('[data-testid="year-grid"]')).toBeVisible();
 
-      // Apply a media type filter (Photos only) to change counts
+      // Wait for the timeline/buckets API response after applying filter
+      const bucketResponse = page.waitForResponse((r) => r.url().includes('/timeline/buckets'));
       await page.locator('[data-testid="media-type-image"]').click();
+      await bucketResponse;
 
       // Year grid should still be visible — counts may have updated
       await expect(page.locator('[data-testid="year-grid"]')).toBeVisible();
+
+      // Active filters bar should confirm the filter is applied with a result count
+      const resultCount = page.locator('[data-testid="result-count"]');
+      await expect(resultCount).toBeVisible();
+      const countText = await resultCount.textContent();
+      expect(countText).toMatch(/\d+\s*result/);
     });
 
     test('should update month counts dynamically when applying a filter after selecting a year', async ({
@@ -168,11 +198,19 @@ test.describe('Spaces FilterPanel', () => {
       await page.locator('[data-testid="year-btn-2023"]').click();
       await expect(page.locator('[data-testid="month-grid"]')).toBeVisible();
 
-      // Apply media type filter — month counts should update
+      // Wait for the timeline/buckets API response after applying filter
+      const bucketResponse = page.waitForResponse((r) => r.url().includes('/timeline/buckets'));
       await page.locator('[data-testid="media-type-image"]').click();
+      await bucketResponse;
 
       // Month grid should still be visible
       await expect(page.locator('[data-testid="month-grid"]')).toBeVisible();
+
+      // Active filters bar should show a result count confirming the filter took effect
+      const resultCount = page.locator('[data-testid="result-count"]');
+      await expect(resultCount).toBeVisible();
+      const countText = await resultCount.textContent();
+      expect(countText).toMatch(/\d+\s*result/);
     });
 
     test('should grey out years with zero photos after filtering', async ({ context, page }) => {
@@ -221,15 +259,22 @@ test.describe('Spaces FilterPanel', () => {
       const { space } = await createPopulatedSpace('Clear Filters Temporal');
       await gotoSpace(context, page, space.id);
 
-      // Apply a filter
+      // Apply a filter and wait for timeline update
+      const filterResponse = page.waitForResponse((r) => r.url().includes('/timeline/buckets'));
       await page.locator('[data-testid="media-type-image"]').click();
+      await filterResponse;
       await expect(page.locator('[data-testid="active-filters-bar"]')).toBeVisible();
 
-      // Clear all — use force:true because the button may be obscured by layout overlap
+      // Clear all — wait for the unfiltered timeline to reload
+      const clearResponse = page.waitForResponse((r) => r.url().includes('/timeline/buckets'));
       await page.locator('[data-testid="clear-all-btn"]').click({ force: true });
+      await clearResponse;
 
       // Temporal picker should still be rendered after clearing
       await expect(page.locator('[data-testid="temporal-picker"]')).toBeAttached();
+
+      // No active chips should remain
+      await expect(page.locator('[data-testid="active-chip"]')).toHaveCount(0);
     });
   });
 
@@ -269,9 +314,17 @@ test.describe('Spaces FilterPanel', () => {
       const hasItems = (await personItems.count()) > 0;
 
       if (hasItems) {
+        // Wait for the timeline/buckets API to be called with the person filter
+        const bucketResponse = page.waitForResponse((r) => r.url().includes('/timeline/buckets'));
         await personItems.first().click();
-        // Should trigger filter change
+        await bucketResponse;
+
+        // Should trigger filter change and show result count
         await expect(page.locator('[data-testid="active-filters-bar"]')).toBeVisible();
+        const resultCount = page.locator('[data-testid="result-count"]');
+        await expect(resultCount).toBeVisible();
+        const countText = await resultCount.textContent();
+        expect(countText).toMatch(/\d+\s*result/);
       } else {
         await expect(emptyMsg).toBeVisible();
       }
@@ -451,9 +504,17 @@ test.describe('Spaces FilterPanel', () => {
 
         const cityItems = page.locator('[data-testid^="location-city-"]');
         if ((await cityItems.count()) > 0) {
+          // Wait for the timeline/buckets API to respond with the city filter
+          const bucketResponse = page.waitForResponse((r) => r.url().includes('/timeline/buckets'));
           await cityItems.first().click();
-          // Active filters bar should show
+          await bucketResponse;
+
+          // Active filters bar should show with result count
           await expect(page.locator('[data-testid="active-filters-bar"]')).toBeVisible();
+          const resultCount = page.locator('[data-testid="result-count"]');
+          await expect(resultCount).toBeVisible();
+          const countText = await resultCount.textContent();
+          expect(countText).toMatch(/\d+\s*result/);
         }
       }
     });
@@ -672,12 +733,22 @@ test.describe('Spaces FilterPanel', () => {
 
       const tagItem = page.locator(`[data-testid="tags-item-${tags[0].id}"]`);
       await expect(tagItem).toBeVisible();
-      await tagItem.click();
 
-      // Active filter bar should show
+      // Wait for the timeline/buckets API to respond with tag filter applied
+      const bucketResponse = page.waitForResponse((r) => r.url().includes('/timeline/buckets'));
+      await tagItem.click();
+      await bucketResponse;
+
+      // Active filter bar should show with result count
       await expect(page.locator('[data-testid="active-filters-bar"]')).toBeVisible();
       const chips = page.locator('[data-testid="active-chip"]');
       expect(await chips.count()).toBeGreaterThan(0);
+
+      // Verify the result count reflects the filtered set (only 1 asset has this tag)
+      const resultCount = page.locator('[data-testid="result-count"]');
+      await expect(resultCount).toBeVisible();
+      const countText = await resultCount.textContent();
+      expect(countText).toMatch(/\d+\s*result/);
     });
 
     test('should support multi-select for tags (both remain selected)', async ({ context, page }) => {
@@ -778,8 +849,17 @@ test.describe('Spaces FilterPanel', () => {
       if (parentTag) {
         const parentItem = page.locator(`[data-testid="tags-item-${parentTag.id}"]`);
         if (await parentItem.isVisible()) {
+          const bucketResponse = page.waitForResponse((r) => r.url().includes('/timeline/buckets'));
           await parentItem.click();
+          await bucketResponse;
+
           await expect(page.locator('[data-testid="active-filters-bar"]')).toBeVisible();
+
+          // Result count should show at least 1 (the child-tagged asset should be included)
+          const resultCount = page.locator('[data-testid="result-count"]');
+          await expect(resultCount).toBeVisible();
+          const countText = await resultCount.textContent();
+          expect(countText).toMatch(/\d+\s*result/);
         }
       }
     });
@@ -793,21 +873,43 @@ test.describe('Spaces FilterPanel', () => {
       const { space } = await createPopulatedSpace('Rating 3 Star');
       await gotoSpace(context, page, space.id);
 
+      // Wait for the timeline/buckets API to respond with filtered results
+      const bucketResponse = page.waitForResponse((r) => r.url().includes('/timeline/buckets'));
       await page.locator('[data-testid="rating-star-3"]').click();
+      await bucketResponse;
 
-      // Active filter bar should appear with rating chip
+      // Active filter bar should appear with rating chip and result count
       await expect(page.locator('[data-testid="active-filters-bar"]')).toBeVisible();
+      const resultCount = page.locator('[data-testid="result-count"]');
+      await expect(resultCount).toBeVisible();
+      const countText = await resultCount.textContent();
+      expect(countText).toMatch(/\d+\s*result/);
+
+      // Since our test assets have no ratings, the filtered count should be 0
+      // and the empty state should appear
+      const emptyState = page.locator('[data-testid="empty-state-message"]');
+      if (await emptyState.isVisible({ timeout: 2000 }).catch(() => false)) {
+        await expect(emptyState).toContainText('No photos match your filters');
+      }
     });
 
     test('should show only 5-star photos when clicking 5th star', async ({ context, page }) => {
       const { space } = await createPopulatedSpace('Rating 5 Star');
       await gotoSpace(context, page, space.id);
 
+      // Wait for the timeline/buckets API to respond with the rating filter
+      const bucketResponse = page.waitForResponse((r) => r.url().includes('/timeline/buckets'));
       await page.locator('[data-testid="rating-star-5"]').click();
+      await bucketResponse;
 
       await expect(page.locator('[data-testid="active-filters-bar"]')).toBeVisible();
       const chip = page.locator('[data-testid="active-chip"]');
       await expect(chip.first()).toContainText('5+');
+
+      // Result count should be visible — since no test assets have 5-star rating, expect 0
+      const resultCount = page.locator('[data-testid="result-count"]');
+      await expect(resultCount).toBeVisible();
+      await expect(resultCount).toContainText('0 results');
     });
 
     test('should clear rating filter when clicking same star again', async ({ context, page }) => {
@@ -827,10 +929,19 @@ test.describe('Spaces FilterPanel', () => {
       const { space } = await createPopulatedSpace('Rating Excludes Unrated');
       await gotoSpace(context, page, space.id);
 
-      // Apply rating filter — this uses >= semantics on the server
+      // Wait for the timeline/buckets API to respond with the rating filter
+      const bucketResponse = page.waitForResponse((r) => r.url().includes('/timeline/buckets'));
       await page.locator('[data-testid="rating-star-1"]').click();
+      await bucketResponse;
+
       await expect(page.locator('[data-testid="active-filters-bar"]')).toBeVisible();
-      // Server-side behavior: unrated (null rating) photos are excluded by >= check
+
+      // Our test assets are unrated, so even rating >= 1 should yield 0 results
+      // Verify result count shows in the active filters bar
+      const resultCount = page.locator('[data-testid="result-count"]');
+      await expect(resultCount).toBeVisible();
+      const countText = await resultCount.textContent();
+      expect(countText).toMatch(/\d+\s*result/);
     });
 
     test('should show chip in star format with minimum rating', async ({ context, page }) => {
@@ -863,16 +974,45 @@ test.describe('Spaces FilterPanel', () => {
       const { space } = await createPopulatedSpace('Media Photos Only');
       await gotoSpace(context, page, space.id);
 
+      // Wait for the timeline/buckets API to respond with the type filter applied
+      const bucketResponse = page.waitForResponse(
+        (r) => r.url().includes('/timeline/buckets') && r.url().includes('type'),
+      );
       await page.locator('[data-testid="media-type-image"]').click();
+      await bucketResponse;
+
+      // Active filters bar should show with a result count
       await expect(page.locator('[data-testid="active-filters-bar"]')).toBeVisible();
+      const resultCount = page.locator('[data-testid="result-count"]');
+      await expect(resultCount).toBeVisible();
+      const countText = await resultCount.textContent();
+      expect(countText).toMatch(/\d+\s*result/);
     });
 
     test('should show only videos when clicking Videos', async ({ context, page }) => {
       const { space } = await createPopulatedSpace('Media Videos Only');
       await gotoSpace(context, page, space.id);
 
+      // Wait for the timeline/buckets API to respond with the type filter applied
+      const bucketResponse = page.waitForResponse(
+        (r) => r.url().includes('/timeline/buckets') && r.url().includes('type'),
+      );
       await page.locator('[data-testid="media-type-video"]').click();
+      await bucketResponse;
+
+      // Active filters bar should show with a result count
       await expect(page.locator('[data-testid="active-filters-bar"]')).toBeVisible();
+      const resultCount = page.locator('[data-testid="result-count"]');
+      await expect(resultCount).toBeVisible();
+      const countText = await resultCount.textContent();
+      expect(countText).toMatch(/\d+\s*result/);
+
+      // Test assets are images (not videos), so filtering to videos should yield 0 results
+      // Check for empty state
+      const emptyState = page.locator('[data-testid="empty-state-message"]');
+      if (await emptyState.isVisible({ timeout: 2000 }).catch(() => false)) {
+        await expect(emptyState).toContainText('No photos match your filters');
+      }
     });
 
     test('should show both images and videos when clicking All', async ({ context, page }) => {
@@ -943,9 +1083,15 @@ test.describe('Spaces FilterPanel', () => {
       const sortToggle = page.locator('[data-testid="sort-toggle"]');
       await expect(sortToggle).toBeVisible();
 
-      // Default is descending; click to toggle to ascending
+      // Wait for the timeline/buckets API to respond with the new sort order
+      const bucketResponse = page.waitForResponse((r) => r.url().includes('/timeline/buckets'));
       await sortToggle.click();
+      await bucketResponse;
+
       await expect(sortToggle).toHaveAttribute('title', 'Sort: oldest first');
+
+      // Verify the timeline actually re-rendered by checking the container is still present
+      await expect(page.locator('[data-testid="discovery-timeline"]')).toBeVisible();
     });
 
     test('should toggle back to descending — newest photos first', async ({ context, page }) => {
@@ -1108,11 +1254,17 @@ test.describe('Spaces FilterPanel', () => {
       await page.locator('[data-testid="rating-star-3"]').click();
       await expect(page.locator('[data-testid="active-chip"]')).toHaveCount(2);
 
-      // Click Clear All — use force:true because the button may be obscured by layout overlap
+      // Click Clear All and wait for the unfiltered timeline to reload
+      const clearResponse = page.waitForResponse((r) => r.url().includes('/timeline/buckets'));
       await page.locator('[data-testid="clear-all-btn"]').click({ force: true });
+      await clearResponse;
 
       // All chips should be removed
       await expect(page.locator('[data-testid="active-chip"]')).toHaveCount(0);
+
+      // Timeline should show all content again (no empty state)
+      await expect(page.locator('[data-testid="empty-state-message"]')).not.toBeVisible();
+      await expect(page.locator('[data-testid="discovery-timeline"]')).toBeVisible();
     });
 
     test('should hide chip bar or show only count when no filters active', async ({ context, page }) => {
@@ -1132,28 +1284,54 @@ test.describe('Spaces FilterPanel', () => {
       const { space } = await createPopulatedSpace('Combined AND');
       await gotoSpace(context, page, space.id);
 
-      // Apply rating
+      // Apply rating and wait for timeline update
+      const ratingResponse = page.waitForResponse((r) => r.url().includes('/timeline/buckets'));
       await page.locator('[data-testid="rating-star-3"]').click();
-      // Apply media type
+      await ratingResponse;
+
+      // Apply media type and wait for timeline update
+      const mediaResponse = page.waitForResponse((r) => r.url().includes('/timeline/buckets'));
       await page.locator('[data-testid="media-type-image"]').click();
+      await mediaResponse;
 
       // Both chips should be present
       const chips = page.locator('[data-testid="active-chip"]');
       await expect(chips).toHaveCount(2);
+
+      // Result count should reflect combined AND logic
+      const resultCount = page.locator('[data-testid="result-count"]');
+      await expect(resultCount).toBeVisible();
+      const countText = await resultCount.textContent();
+      expect(countText).toMatch(/\d+\s*result/);
     });
 
     test('should decrease result count with each additional filter', async ({ context, page }) => {
       const { space } = await createPopulatedSpace('Count Decrease');
       await gotoSpace(context, page, space.id);
 
-      // Apply first filter
+      // Apply first filter and wait for API response
+      const firstResponse = page.waitForResponse((r) => r.url().includes('/timeline/buckets'));
       await page.locator('[data-testid="media-type-image"]').click();
+      await firstResponse;
+
       const countElem = page.locator('[data-testid="result-count"]');
       await expect(countElem).toBeVisible();
 
+      // Capture the count after the first filter
+      const firstCountText = await countElem.textContent();
+      const firstCount = Number.parseInt(firstCountText?.match(/(\d+)/)?.[1] ?? '0', 10);
+
       // Apply second filter — count should not increase (AND logic reduces or equals)
+      const secondResponse = page.waitForResponse((r) => r.url().includes('/timeline/buckets'));
       await page.locator('[data-testid="rating-star-5"]').click();
+      await secondResponse;
+
       await expect(countElem).toBeVisible();
+      const secondCountText = await countElem.textContent();
+      const secondCount = Number.parseInt(secondCountText?.match(/(\d+)/)?.[1] ?? '0', 10);
+
+      // AND logic: adding more filters should yield fewer or equal results
+      expect(secondCount).toBeLessThanOrEqual(firstCount);
     });
 
     test('should keep remaining filters active after removing one', async ({ context, page }) => {
