@@ -1,7 +1,7 @@
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import RecentSpaces from '$lib/components/shared-components/side-bar/recent-spaces.svelte';
-import { userInteraction } from '$lib/stores/user.svelte';
 import { pinnedSpaceIds } from '$lib/stores/space-view.store';
+import { userInteraction } from '$lib/stores/user.svelte';
 import { Color } from '@immich/sdk';
 import { sharedSpaceFactory } from '@test-data/factories/shared-space-factory';
 import { render, screen } from '@testing-library/svelte';
@@ -40,8 +40,16 @@ describe('RecentSpaces component', () => {
     });
 
     it('sorts pinned spaces first, then by lastActivityAt descending', async () => {
-      const pinned = sharedSpaceFactory.build({ id: 'pinned-1', name: 'Pinned', lastActivityAt: '2024-01-01T00:00:00Z' });
-      const recent = sharedSpaceFactory.build({ id: 'recent-1', name: 'Recent', lastActivityAt: '2024-06-01T00:00:00Z' });
+      const pinned = sharedSpaceFactory.build({
+        id: 'pinned-1',
+        name: 'Pinned',
+        lastActivityAt: '2024-01-01T00:00:00Z',
+      });
+      const recent = sharedSpaceFactory.build({
+        id: 'recent-1',
+        name: 'Recent',
+        lastActivityAt: '2024-06-01T00:00:00Z',
+      });
       const old = sharedSpaceFactory.build({ id: 'old-1', name: 'Old', lastActivityAt: '2024-03-01T00:00:00Z' });
 
       pinnedSpaceIds.set(['pinned-1']);
@@ -103,6 +111,7 @@ describe('RecentSpaces component', () => {
 
     it('hides colored dot when newAssetCount is undefined', async () => {
       const space = sharedSpaceFactory.build({ id: 'undef-dot' });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (space as any).newAssetCount = undefined;
       sdkMock.getAllSpaces.mockResolvedValueOnce([space]);
       await renderAndFlush();
@@ -148,6 +157,7 @@ describe('RecentSpaces component', () => {
 
     it('falls back to primary color when color is undefined', async () => {
       const space = sharedSpaceFactory.build({ id: 'undef-color', newAssetCount: 2 });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (space as any).color = undefined;
       sdkMock.getAllSpaces.mockResolvedValueOnce([space]);
       await renderAndFlush();
@@ -172,7 +182,10 @@ describe('RecentSpaces component', () => {
 
     it('pinned space with old activity appears before unpinned with recent activity', async () => {
       const pinnedOld = sharedSpaceFactory.build({ id: 'pinned-old', lastActivityAt: '2020-01-01T00:00:00Z' });
-      const unpinnedRecent = sharedSpaceFactory.build({ id: 'unpinned-recent', lastActivityAt: '2024-12-01T00:00:00Z' });
+      const unpinnedRecent = sharedSpaceFactory.build({
+        id: 'unpinned-recent',
+        lastActivityAt: '2024-12-01T00:00:00Z',
+      });
 
       pinnedSpaceIds.set(['pinned-old']);
       sdkMock.getAllSpaces.mockResolvedValueOnce([unpinnedRecent, pinnedOld]);
