@@ -696,6 +696,9 @@ export class SharedSpaceService extends BaseService {
         throw new BadRequestException('Source person not found in this space');
       }
       sources.push(source);
+      if (source.type !== target.type) {
+        throw new BadRequestException('Cannot merge people of different types');
+      }
     }
 
     for (const source of sources) {
@@ -871,6 +874,7 @@ export class SharedSpaceService extends BaseService {
           spaceId,
           name,
           representativeFaceId: face.id,
+          type: 'person',
         });
         personId = newPerson.id;
         await this.jobRepository.queue({
@@ -880,6 +884,50 @@ export class SharedSpaceService extends BaseService {
       }
 
       await this.sharedSpaceRepository.addPersonFaces([{ personId, assetFaceId: face.id }]);
+    }
+
+    // Process pet faces (detected by pet detection, no embeddings)
+    const petFaces = await this.sharedSpaceRepository.getPetFacesForAsset(assetId);
+    for (const petFace of petFaces) {
+      const isAssigned = await this.sharedSpaceRepository.isPersonFaceAssigned(petFace.id, spaceId);
+      if (isAssigned) {
+        continue;
+      }
+
+      if (!petFace.personId) {
+        continue;
+      }
+
+      // Check if a space person already exists for this personal pet person
+      const existingSpacePerson = await this.sharedSpaceRepository.findSpacePersonByLinkedPersonId(
+        spaceId,
+        petFace.personId,
+      );
+
+      let personId: string;
+      if (existingSpacePerson) {
+        personId = existingSpacePerson.id;
+      } else {
+        let name = '';
+        const personalPerson = await this.personRepository.getById(petFace.personId);
+        if (personalPerson?.name) {
+          name = personalPerson.name;
+        }
+
+        const newPerson = await this.sharedSpaceRepository.createPerson({
+          spaceId,
+          name,
+          representativeFaceId: petFace.id,
+          type: 'pet',
+        });
+        personId = newPerson.id;
+        await this.jobRepository.queue({
+          name: JobName.SharedSpacePersonThumbnail,
+          data: { id: newPerson.id },
+        });
+      }
+
+      await this.sharedSpaceRepository.addPersonFaces([{ personId, assetFaceId: petFace.id }]);
     }
   }
 
