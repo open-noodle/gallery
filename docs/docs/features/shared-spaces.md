@@ -2,6 +2,10 @@
 
 Shared Spaces are virtual libraries where multiple users can contribute, browse, and view photos together. Unlike [Partner Sharing](partner-sharing.md), which shares your entire library one-way, Shared Spaces let you create focused collaborative areas with fine-grained role-based access.
 
+:::info Permissions Model
+Gallery enforces strict role-based access on every endpoint. See the [full permissions matrix](/docs/plans/2026-03-23-spaces-permissions-matrix.md) for a detailed breakdown of what each role can and cannot do across all asset, search, download, people, and management operations.
+:::
+
 ## Key Features
 
 - **Reference-based sharing** — Photos are linked into a space, not duplicated. Zero additional storage cost.
