@@ -126,7 +126,8 @@ where
 
 -- AccessRepository.asset.checkSpaceAccess
 select
-  "asset"."id"
+  "asset"."id",
+  "asset"."livePhotoVideoId"
 from
   "shared_space_asset"
   inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_asset"."spaceId"
@@ -134,11 +135,15 @@ from
   and "asset"."deletedAt" is null
 where
   "shared_space_member"."userId" = $1
-  and "asset"."id" in ($2)
+  and (
+    "asset"."id" in ($2)
+    or "asset"."livePhotoVideoId" in ($3)
+  )
 
 -- AccessRepository.asset.checkSpaceEditAccess
 select
-  "asset"."id"
+  "asset"."id",
+  "asset"."livePhotoVideoId"
 from
   "shared_space_asset"
   inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_asset"."spaceId"
@@ -146,8 +151,11 @@ from
   and "asset"."deletedAt" is null
 where
   "shared_space_member"."userId" = $1
-  and "asset"."id" in ($2)
-  and "shared_space_member"."role" in ($3, $4)
+  and (
+    "asset"."id" in ($2)
+    or "asset"."livePhotoVideoId" in ($3)
+  )
+  and "shared_space_member"."role" in ($4, $5)
 
 -- AccessRepository.asset.checkSharedLinkAccess
 select
