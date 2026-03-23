@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import { IsInt, IsString, Max, Min } from 'class-validator';
 import type { BBoxDto } from 'src/dtos/bbox.dto';
 import { AssetOrder, AssetType, AssetVisibility } from 'src/enum';
@@ -113,6 +114,7 @@ export class TimeBucketDto {
   model?: string;
 
   @ApiPropertyOptional({ description: 'Minimum star rating (>=)' })
+  @Type(() => Number)
   @IsInt()
   @Min(1)
   @Max(5)
