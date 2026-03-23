@@ -228,12 +228,7 @@ class AssetAccess {
       )
       .select(['asset.id', 'asset.livePhotoVideoId'])
       .where('shared_space_member.userId', '=', userId)
-      .where((eb) =>
-        eb.or([
-          eb('asset.id', 'in', [...assetIds]),
-          eb('asset.livePhotoVideoId', 'in', [...assetIds]),
-        ]),
-      )
+      .where((eb) => eb.or([eb('asset.id', 'in', [...assetIds]), eb('asset.livePhotoVideoId', 'in', [...assetIds])]))
       .execute()
       .then((assets) => {
         const allowedIds = new Set<string>();
@@ -264,12 +259,7 @@ class AssetAccess {
       )
       .select(['asset.id', 'asset.livePhotoVideoId'])
       .where('shared_space_member.userId', '=', userId)
-      .where((eb) =>
-        eb.or([
-          eb('asset.id', 'in', [...assetIds]),
-          eb('asset.livePhotoVideoId', 'in', [...assetIds]),
-        ]),
-      )
+      .where((eb) => eb.or([eb('asset.id', 'in', [...assetIds]), eb('asset.livePhotoVideoId', 'in', [...assetIds])]))
       .where('shared_space_member.role', 'in', ['editor', 'owner'])
       .execute()
       .then((assets) => {
