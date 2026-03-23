@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { page } from '$app/state';
   import { Route } from '$lib/route';
   import { pinnedSpaceIds } from '$lib/stores/space-view.store';
   import { userInteraction } from '$lib/stores/user.svelte';
@@ -30,9 +29,7 @@
   let allSpaces = $state(userInteraction.recentSpaces);
 
   let spaces = $derived.by(() => {
-    if (!allSpaces) {
-      return [];
-    }
+    if (!allSpaces) return [];
     const { pinned, unpinned } = splitPinnedSpaces(allSpaces, $pinnedSpaceIds);
     return [...pinned.sort(sortByActivity), ...unpinned.sort(sortByActivity)].slice(0, 3);
   });
@@ -54,15 +51,11 @@
 </script>
 
 {#each spaces as space (space.id)}
-  {@const active = page.url.pathname.startsWith(`/spaces/${space.id}`)}
   <a
     href={Route.viewSpace({ id: space.id })}
     title={space.name}
-    aria-current={active ? 'page' : undefined}
     data-testid="sidebar-space-{space.id}"
-    class="flex w-full place-items-center gap-4 rounded-e-full py-3 transition-[padding] delay-100 duration-100 hover:cursor-pointer hover:bg-subtle hover:text-immich-primary dark:text-immich-dark-fg dark:hover:bg-immich-dark-gray dark:hover:text-immich-dark-primary ps-10 group-hover:sm:px-10 md:px-10 {active
-      ? 'bg-primary/10 text-immich-primary dark:text-immich-dark-primary'
-      : ''}"
+    class="flex w-full place-items-center gap-4 rounded-e-full py-3 transition-[padding] delay-100 duration-100 hover:cursor-pointer hover:bg-subtle hover:text-immich-primary dark:text-immich-dark-fg dark:hover:bg-immich-dark-gray dark:hover:text-immich-dark-primary ps-10 group-hover:sm:px-10 md:px-10"
   >
     <div>
       {#if space.newAssetCount && space.newAssetCount > 0}
