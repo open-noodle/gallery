@@ -496,13 +496,32 @@ export class SharedSpaceService extends BaseService {
     await this.requireMembership(auth, spaceId);
 
     const person = await this.sharedSpaceRepository.getPersonById(personId);
-    if (!person || person.spaceId !== spaceId || !person.thumbnailPath) {
+    if (!person || person.spaceId !== spaceId) {
+      throw new NotFoundException();
+    }
+
+    let thumbnailPath = person.thumbnailPath;
+
+    // Fall back to the personal person's thumbnail if the space person's path is missing
+    if (!thumbnailPath && person.representativeFaceId) {
+      const face = await this.personRepository.getFaceById(person.representativeFaceId);
+      if (face?.personId) {
+        const personalPerson = await this.personRepository.getById(face.personId);
+        if (personalPerson?.thumbnailPath) {
+          thumbnailPath = personalPerson.thumbnailPath;
+          // Persist for next time so the fallback isn't needed again
+          await this.sharedSpaceRepository.updatePerson(personId, { thumbnailPath });
+        }
+      }
+    }
+
+    if (!thumbnailPath) {
       throw new NotFoundException();
     }
 
     return this.serveFromBackend(
-      person.thumbnailPath,
-      mimeTypes.lookup(person.thumbnailPath),
+      thumbnailPath,
+      mimeTypes.lookup(thumbnailPath),
       CacheControl.PrivateWithoutCache,
     );
   }

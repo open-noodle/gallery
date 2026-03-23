@@ -2434,9 +2434,36 @@ describe(SharedSpaceService.name, () => {
     it('should throw NotFoundException when person has no thumbnail', async () => {
       const spaceId = newUuid();
       mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
-      mocks.sharedSpace.getPersonById.mockResolvedValue(factory.sharedSpacePerson({ spaceId, thumbnailPath: '' }));
+      mocks.sharedSpace.getPersonById.mockResolvedValue(
+        factory.sharedSpacePerson({ spaceId, thumbnailPath: '', representativeFaceId: null }),
+      );
 
       await expect(sut.getSpacePersonThumbnail(factory.auth(), spaceId, 'person-1')).rejects.toThrow('Not Found');
+    });
+
+    it('should fall back to personal person thumbnail when space person has no thumbnail', async () => {
+      const spaceId = newUuid();
+      const personId = newUuid();
+      const faceId = newUuid();
+      const personalPersonId = newUuid();
+      const personalPerson = factory.person({ id: personalPersonId, thumbnailPath: '/path/to/thumbnail.jpg' });
+
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
+      mocks.sharedSpace.getPersonById.mockResolvedValue(
+        factory.sharedSpacePerson({ id: personId, spaceId, thumbnailPath: '', representativeFaceId: faceId }),
+      );
+      mocks.person.getFaceById.mockResolvedValue({ id: faceId, personId: personalPersonId } as any);
+      mocks.person.getById.mockResolvedValue(personalPerson);
+      mocks.sharedSpace.updatePerson.mockResolvedValue(
+        factory.sharedSpacePerson({ id: personId, thumbnailPath: '/path/to/thumbnail.jpg' }),
+      );
+      vi.spyOn(sut as any, 'serveFromBackend').mockResolvedValue({} as any);
+
+      await expect(sut.getSpacePersonThumbnail(factory.auth(), spaceId, personId)).resolves.toBeDefined();
+
+      expect(mocks.sharedSpace.updatePerson).toHaveBeenCalledWith(personId, {
+        thumbnailPath: '/path/to/thumbnail.jpg',
+      });
     });
 
     it('should throw NotFoundException when person belongs to different space', async () => {
