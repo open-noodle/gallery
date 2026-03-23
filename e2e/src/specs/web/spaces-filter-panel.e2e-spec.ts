@@ -265,16 +265,14 @@ test.describe('Spaces FilterPanel', () => {
       await filterResponse;
       await expect(page.locator('[data-testid="active-filters-bar"]')).toBeVisible();
 
-      // Clear all filters and wait for timeline to reload
-      const clearResponse = page.waitForResponse((r) => r.url().includes('/timeline/buckets'));
+      // Clear all filters
       await page.locator('[data-testid="clear-all-btn"]').click({ force: true });
-      await clearResponse;
+
+      // Wait for active filters bar to disappear (confirms filters were cleared)
+      await expect(page.locator('[data-testid="active-filters-bar"]')).not.toBeVisible({ timeout: 10_000 });
 
       // Temporal picker should still be rendered after clearing
       await expect(page.locator('[data-testid="temporal-picker"]')).toBeAttached();
-
-      // No active chips should remain
-      await expect(page.locator('[data-testid="active-chip"]')).toHaveCount(0, { timeout: 10_000 });
     });
   });
 
