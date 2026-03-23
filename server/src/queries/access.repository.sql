@@ -128,11 +128,13 @@ where
 
 -- AccessRepository.asset.checkSpaceAccess
 select
-  "combined"."id"
+  "combined"."id",
+  "combined"."livePhotoVideoId"
 from
   (
     select
-      "asset"."id"
+      "asset"."id",
+      "asset"."livePhotoVideoId"
     from
       "shared_space_asset"
       inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_asset"."spaceId"
@@ -140,28 +142,37 @@ from
       and "asset"."deletedAt" is null
     where
       "shared_space_member"."userId" = $1
-      and "asset"."id" in ($2)
+      and (
+        "asset"."id" in ($2)
+        or "asset"."livePhotoVideoId" in ($3)
+      )
     union
     select
-      "asset"."id"
+      "asset"."id",
+      "asset"."livePhotoVideoId"
     from
       "shared_space_library"
       inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_library"."spaceId"
       inner join "asset" on "asset"."libraryId" = "shared_space_library"."libraryId"
       and "asset"."deletedAt" is null
-      and "asset"."isOffline" = $3
+      and "asset"."isOffline" = $4
     where
-      "shared_space_member"."userId" = $4
-      and "asset"."id" in ($5)
+      "shared_space_member"."userId" = $5
+      and (
+        "asset"."id" in ($6)
+        or "asset"."livePhotoVideoId" in ($7)
+      )
   ) as "combined"
 
 -- AccessRepository.asset.checkSpaceEditAccess
 select
-  "combined"."id"
+  "combined"."id",
+  "combined"."livePhotoVideoId"
 from
   (
     select
-      "asset"."id"
+      "asset"."id",
+      "asset"."livePhotoVideoId"
     from
       "shared_space_asset"
       inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_asset"."spaceId"
@@ -169,21 +180,28 @@ from
       and "asset"."deletedAt" is null
     where
       "shared_space_member"."userId" = $1
-      and "asset"."id" in ($2)
-      and "shared_space_member"."role" in ($3, $4)
+      and (
+        "asset"."id" in ($2)
+        or "asset"."livePhotoVideoId" in ($3)
+      )
+      and "shared_space_member"."role" in ($4, $5)
     union
     select
-      "asset"."id"
+      "asset"."id",
+      "asset"."livePhotoVideoId"
     from
       "shared_space_library"
       inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_library"."spaceId"
       inner join "asset" on "asset"."libraryId" = "shared_space_library"."libraryId"
       and "asset"."deletedAt" is null
-      and "asset"."isOffline" = $5
+      and "asset"."isOffline" = $6
     where
-      "shared_space_member"."userId" = $6
-      and "asset"."id" in ($7)
-      and "shared_space_member"."role" in ($8, $9)
+      "shared_space_member"."userId" = $7
+      and (
+        "asset"."id" in ($8)
+        or "asset"."livePhotoVideoId" in ($9)
+      )
+      and "shared_space_member"."role" in ($10, $11)
   ) as "combined"
 
 -- AccessRepository.asset.checkSharedLinkAccess
