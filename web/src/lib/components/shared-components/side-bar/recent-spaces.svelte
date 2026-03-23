@@ -29,7 +29,9 @@
   let allSpaces = $state(userInteraction.recentSpaces);
 
   let spaces = $derived.by(() => {
-    if (!allSpaces) return [];
+    if (!allSpaces) {
+      return [];
+    }
     const { pinned, unpinned } = splitPinnedSpaces(allSpaces, $pinnedSpaceIds);
     return [...pinned.sort(sortByActivity), ...unpinned.sort(sortByActivity)].slice(0, 3);
   });
