@@ -74,7 +74,7 @@ concurrently-deleted space return 0 instead of throwing.
 
 ### 4. Fix existing `addAssets` path
 
-- Add `@Chunked({ chunkSize: 20_000 })` to `SharedSpaceRepository.addAssets()`
+- Add `@ChunkedArray({ chunkSize: 20_000 })` to `SharedSpaceRepository.addAssets()`
   (3 params per row → 20k \* 3 = 60k, under 65,535 limit)
 - Change face matching in `addAssets` service from sequential `await queue()` loop to
   `this.jobRepository.queueAll(items)`
@@ -86,8 +86,9 @@ concurrently-deleted space return 0 instead of throwing.
 ### 6. Completion notification
 
 - Uses existing `on_notification` websocket event — no new event types needed
-- Calls `this.websocketRepository.clientSend('on_notification', userId, payload)` directly
-  from the job handler
+- Persists notification via `notificationRepository.create()` (visible even if websocket disconnected)
+- Then broadcasts via `websocketRepository.clientSend('on_notification', userId, payload)`
+- Matches the existing pattern in `notification.service.ts` for job failure notifications
 - Payload: notification DTO with title "Bulk add complete" and description with count
 
 ## Web Frontend Changes

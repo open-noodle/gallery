@@ -199,13 +199,18 @@ describe('bulkAddUserAssets', () => {
     const { ctx, sut } = setup();
     const { user } = await ctx.newUser();
     const { space } = await ctx.newSharedSpace({ createdById: user.id });
-    const { asset } = await ctx.newAsset({ ownerId: user.id });
+    await ctx.newAsset({ ownerId: user.id });
 
     await sut.bulkAddUserAssets(space.id, user.id);
 
-    // Verify via the existing getAssetIdsInSpace or direct DB query
-    const assets = await sut.getAssetIdsInSpace(space.id);
-    expect(assets).toEqual(expect.arrayContaining([expect.objectContaining({ assetId: asset.id })]));
+    // Query shared_space_asset directly to verify addedById
+    const rows = await ctx.database
+      .selectFrom('shared_space_asset')
+      .selectAll()
+      .where('spaceId', '=', space.id)
+      .execute();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].addedById).toBe(user.id);
   });
 
   it('should set spaceId correctly on all inserted rows', async () => {
@@ -300,7 +305,7 @@ git commit -m "feat: add bulkAddUserAssets repository method with INSERT...SELEC
 In `server/src/repositories/shared-space.repository.ts`, add the decorator to the existing `addAssets` method:
 
 ```typescript
-  @Chunked({ chunkSize: 20_000 })
+  @ChunkedArray({ chunkSize: 20_000 })
   addAssets(values: Insertable<SharedSpaceAssetTable>[]) {
     if (values.length === 0) {
       return Promise.resolve([]);
@@ -315,10 +320,10 @@ In `server/src/repositories/shared-space.repository.ts`, add the decorator to th
   }
 ```
 
-Make sure the `Chunked` import exists at the top of the file:
+Make sure the `ChunkedArray` import exists at the top of the file:
 
 ```typescript
-import { Chunked } from 'src/decorators';
+import { ChunkedArray } from 'src/decorators';
 ```
 
 **Step 2: Run existing tests to verify nothing breaks**
@@ -330,7 +335,7 @@ Expected: All existing `addAssets` tests still PASS
 
 ```bash
 git add server/src/repositories/shared-space.repository.ts
-git commit -m "fix: add @Chunked decorator to SharedSpaceRepository.addAssets"
+git commit -m "fix: add @ChunkedArray decorator to SharedSpaceRepository.addAssets"
 ```
 
 ---
@@ -729,10 +734,7 @@ describe('handleSharedSpaceBulkAddAssets', () => {
     await sut.handleSharedSpaceBulkAddAssets({ spaceId, userId });
 
     expect(mocks.sharedSpace.logActivity).not.toHaveBeenCalled();
-    expect(mocks.sharedSpace.update).not.toHaveBeenCalledWith(
-      spaceId,
-      expect.objectContaining({ lastActivityAt: expect.any(Date) }),
-    );
+    expect(mocks.sharedSpace.update).not.toHaveBeenCalled();
   });
 
   it('should NOT send notification when count is 0', async () => {
@@ -969,7 +971,7 @@ Add `NotificationLevel`, `NotificationType` to the enum import if not already pr
 **Step 4: Run tests to verify they pass**
 
 Run: `cd server && pnpm test -- --run src/services/shared-space.service.spec.ts`
-Expected: All 13 new tests PASS
+Expected: All 14 new tests PASS
 
 **Step 5: Commit**
 
@@ -1027,7 +1029,7 @@ git commit -m "feat: add POST /shared-spaces/:id/assets/bulk-add endpoint"
 ```bash
 cd server && pnpm build
 cd server && pnpm sync:open-api
-make open-api-typescript
+make open-api
 ```
 
 **Step 2: Verify the new endpoint appears in the SDK**
