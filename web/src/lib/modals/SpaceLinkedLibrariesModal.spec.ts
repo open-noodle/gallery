@@ -76,7 +76,7 @@ describe('SpaceLinkedLibrariesModal', () => {
 
   it('should show linked libraries when present', () => {
     const space = makeSpace({
-      linkedLibraries: [{ libraryId: 'lib-1', libraryName: 'My Photos' }],
+      linkedLibraries: [{ libraryId: 'lib-1', libraryName: 'My Photos', createdAt: '2026-01-01T00:00:00.000Z' }],
     });
     render(SpaceLinkedLibrariesModal, { space, onClose });
     expect(screen.getByText('My Photos')).toBeInTheDocument();
