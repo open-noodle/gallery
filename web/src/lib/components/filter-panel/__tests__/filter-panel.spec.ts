@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/svelte';
+import '@testing-library/jest-dom';
 import { createFilterState } from '../filter-panel';
 import FilterPanel from '../filter-panel.svelte';
 
@@ -114,6 +115,31 @@ describe('FilterPanel', () => {
       },
     });
     expect(queryByTestId('filter-section-rating')).toBeTruthy();
+  });
+
+  describe('initialCollapsed prop', () => {
+    it('should start collapsed when initialCollapsed is true', async () => {
+      render(FilterPanel, {
+        props: {
+          config: { sections: ['rating', 'media'], providers: {} },
+          timeBuckets: [],
+          initialCollapsed: true,
+        },
+      });
+      expect(screen.getByTestId('collapsed-icon-strip')).toBeInTheDocument();
+      expect(screen.queryByTestId('discovery-panel')).not.toBeInTheDocument();
+    });
+
+    it('should start expanded by default (no prop)', async () => {
+      render(FilterPanel, {
+        props: {
+          config: { sections: ['rating', 'media'], providers: {} },
+          timeBuckets: [],
+        },
+      });
+      expect(screen.getByTestId('discovery-panel')).toBeInTheDocument();
+      expect(screen.queryByTestId('collapsed-icon-strip')).not.toBeInTheDocument();
+    });
   });
 });
 

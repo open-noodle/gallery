@@ -36,10 +36,11 @@
     config: FilterPanelConfig;
     timeBuckets: Array<{ timeBucket: string; count: number }>;
     filters?: FilterState;
+    initialCollapsed?: boolean;
   }
 
-  let { config, timeBuckets, filters = $bindable(createFilterState()) }: Props = $props();
-  let collapsed = $state(false);
+  let { config, timeBuckets, filters = $bindable(createFilterState()), initialCollapsed = false }: Props = $props();
+  let collapsed = $state(initialCollapsed);
 
   // Fetched data for filter sections
   let people = $state<PersonOption[]>([]);
