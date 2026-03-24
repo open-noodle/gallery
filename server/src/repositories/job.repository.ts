@@ -277,6 +277,9 @@ export class JobRepository {
       case JobName.DatabaseBackup: {
         return { deduplication: { id: JobName.DatabaseBackup } };
       }
+      case JobName.SharedSpaceBulkAddAssets: {
+        return { jobId: `bulk-add-${item.data.spaceId}-${item.data.userId}` };
+      }
       default: {
         return null;
       }
