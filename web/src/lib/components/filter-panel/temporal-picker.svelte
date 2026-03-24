@@ -13,8 +13,17 @@
 
   let { timeBuckets, selectedYear, selectedMonth, onYearSelect, onMonthSelect }: Props = $props();
 
-  let years = $derived(aggregateYears(timeBuckets));
-  let months = $derived(selectedYear === undefined ? [] : getMonthsForYear(timeBuckets, selectedYear));
+  // Keep previous timeBuckets when new ones are empty (prevents layout shift during
+  // TimelineManager re-fetch, which briefly clears months before repopulating them)
+  let stableTimeBuckets = $state<Array<{ timeBucket: string; count: number }>>([]);
+  $effect(() => {
+    if (timeBuckets.length > 0) {
+      stableTimeBuckets = timeBuckets;
+    }
+  });
+
+  let years = $derived(aggregateYears(stableTimeBuckets));
+  let months = $derived(selectedYear === undefined ? [] : getMonthsForYear(stableTimeBuckets, selectedYear));
 
   function handleYearClick(year: number, count: number) {
     if (count === 0) {
