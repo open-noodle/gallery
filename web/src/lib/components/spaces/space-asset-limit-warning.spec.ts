@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/svelte';
 
 describe('SpaceAssetLimitWarning', () => {
   it('should not render when selectedCount is within the limit', () => {
-    render(SpaceAssetLimitWarning, { selectedCount: 5_000 });
+    render(SpaceAssetLimitWarning, { selectedCount: 5000 });
     expect(screen.queryByTestId('asset-limit-warning')).not.toBeInTheDocument();
   });
 
