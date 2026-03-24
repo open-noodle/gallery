@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Insertable, Kysely, sql, Updateable } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
-import { DummyValue, GenerateSql } from 'src/decorators';
+import { ChunkedArray, DummyValue, GenerateSql } from 'src/decorators';
 import { VectorIndex } from 'src/enum';
 import { probes } from 'src/repositories/database.repository';
 import { DB } from 'src/schema';
@@ -178,6 +178,7 @@ export class SharedSpaceRepository {
     return Number(result?.numInsertedOrUpdatedRows ?? 0);
   }
 
+  @ChunkedArray()
   addAssets(values: Insertable<SharedSpaceAssetTable>[]) {
     if (values.length === 0) {
       return Promise.resolve([]);
