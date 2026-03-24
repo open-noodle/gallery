@@ -13,6 +13,7 @@
     mdiStar,
     mdiImage,
   } from '@mdi/js';
+  import { untrack } from 'svelte';
   import type {
     FilterContext,
     FilterPanelConfig,
@@ -47,6 +48,110 @@
   let tags = $state<TagOption[]>([]);
 
   let filterContext: FilterContext | undefined = $derived(buildFilterContext(filters));
+
+  // Contextual re-fetch state
+  let prevContext: FilterContext | undefined = $state();
+  let abortController: AbortController | undefined = $state();
+  let isRefetching = $state(false);
+
+  // Debounced re-fetch when temporal filter changes
+  $effect(() => {
+    const currentContext = filterContext;
+
+    // Read prevContext without tracking to avoid re-trigger loops
+    const prev = untrack(() => prevContext);
+
+    // Skip initial load (both undefined)
+    if (prev === undefined && currentContext === undefined) {
+      return;
+    }
+
+    // Skip if context hasn't actually changed
+    if (prev?.takenAfter === currentContext?.takenAfter && prev?.takenBefore === currentContext?.takenBefore) {
+      return;
+    }
+
+    const isClear = prev !== undefined && currentContext === undefined;
+    const delay = isClear ? 0 : 200;
+
+    // Capture config providers to avoid stale closure warning
+    const providers = config.providers;
+    const sections = config.sections;
+
+    const timeout = setTimeout(() => {
+      // Abort previous in-flight requests
+      abortController?.abort();
+      const controller = new AbortController();
+      abortController = controller;
+      isRefetching = true;
+
+      const promises: Promise<void>[] = [];
+
+      if (providers.people && sections.includes('people')) {
+        promises.push(
+          providers
+            .people(currentContext)
+            .then((result) => {
+              if (!controller.signal.aborted) {
+                people = result;
+              }
+            })
+            .catch((error: unknown) => {
+              console.error('Failed to re-fetch people:', error);
+            }),
+        );
+      }
+
+      if (providers.locations && sections.includes('location')) {
+        promises.push(
+          providers
+            .locations(currentContext)
+            .then((result) => {
+              if (!controller.signal.aborted) {
+                countries = result.filter((l) => l.type === 'country').map((l) => l.value);
+              }
+            })
+            .catch((error: unknown) => {
+              console.error('Failed to re-fetch locations:', error);
+            }),
+        );
+      }
+
+      if (providers.cameras && sections.includes('camera')) {
+        promises.push(
+          providers
+            .cameras(currentContext)
+            .then((result) => {
+              if (!controller.signal.aborted) {
+                cameraMakes = result.filter((c) => c.type === 'make').map((c) => c.value);
+              }
+            })
+            .catch((error: unknown) => {
+              console.error('Failed to re-fetch cameras:', error);
+            }),
+        );
+      }
+
+      void Promise.allSettled(promises).then(() => {
+        if (!controller.signal.aborted) {
+          isRefetching = false;
+        }
+      });
+    }, delay);
+
+    prevContext = currentContext;
+
+    return () => {
+      clearTimeout(timeout);
+    };
+  });
+
+  // Cleanup on unmount
+  $effect(() => {
+    return () => {
+      abortController?.abort();
+    };
+  });
 
   const sectionIcons: Record<string, string> = {
     timeline: mdiCalendar,
@@ -289,7 +394,11 @@
     <div class="pt-4">
       {#each config.sections as section (section)}
         {#if visibleSections.has(section)}
-          <FilterSection title={sectionTitles[section]} testId={section}>
+          <FilterSection
+            title={sectionTitles[section]}
+            testId={section}
+            refetching={isRefetching && section !== 'timeline'}
+          >
             {#if section === 'timeline'}
               <TemporalPicker
                 {timeBuckets}
