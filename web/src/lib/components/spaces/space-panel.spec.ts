@@ -1,5 +1,6 @@
 import TestWrapper from '$lib/components/TestWrapper.svelte';
 import SpacePanel from '$lib/components/spaces/space-panel.svelte';
+import { user } from '$lib/stores/user.store';
 import { Role, type SharedSpaceMemberResponseDto, type SharedSpaceResponseDto } from '@immich/sdk';
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import type { Component } from 'svelte';
@@ -110,5 +111,22 @@ describe('SpacePanel', () => {
     renderPanel(defaultProps);
     const membersTab = screen.getByTestId('tab-members');
     expect(membersTab).toHaveTextContent('Members (2)');
+  });
+
+  it('should only render Activity and Members tabs for admin users', () => {
+    // Set user as admin to ensure the Libraries tab would render if it still existed
+    user.set({ id: 'u1', isAdmin: true, name: 'Admin', email: 'admin@test.com' } as any);
+    renderPanel(defaultProps);
+    const tabSwitcher = screen.getByTestId('tab-switcher');
+    const tabs = tabSwitcher.querySelectorAll('button');
+    expect(tabs).toHaveLength(2);
+    expect(tabs[0]).toHaveTextContent('Activity');
+    expect(tabs[1]).toHaveTextContent(/^Members/);
+  });
+
+  it('should not render a Libraries tab', () => {
+    user.set({ id: 'u1', isAdmin: true, name: 'Admin', email: 'admin@test.com' } as any);
+    renderPanel(defaultProps);
+    expect(screen.queryByTestId('tab-libraries')).not.toBeInTheDocument();
   });
 });

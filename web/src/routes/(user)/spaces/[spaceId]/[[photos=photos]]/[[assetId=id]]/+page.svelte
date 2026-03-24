@@ -874,10 +874,6 @@
     await refreshSpace();
     await loadActivities();
   }}
-  onLibrariesChanged={async () => {
-    await refreshSpace();
-    await loadActivities();
-  }}
   onLoadMoreActivities={loadMoreActivities}
   {hasMoreActivities}
 />
