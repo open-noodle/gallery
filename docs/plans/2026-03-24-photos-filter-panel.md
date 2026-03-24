@@ -10,6 +10,8 @@
 
 **Base branch:** `feat/contextual-filter-suggestions` (the contextual-filters worktree)
 
+**Known limitation:** `getAllPeople` does not accept `takenAfter`/`takenBefore` — the people provider on /photos returns the full global people list regardless of temporal filter. This is acceptable since people are a user-level concept, not temporally scoped.
+
 ---
 
 ### Task 1: Add `initialCollapsed` prop to FilterPanel
@@ -123,6 +125,20 @@ describe('storageKey prop', () => {
     // Default key should NOT have been written
     expect(localStorage.getItem('gallery-filter-visible-sections')).toBeNull();
   });
+
+  it('should use default key when storageKey not provided', async () => {
+    render(FilterPanel, {
+      props: {
+        config: { sections: ['rating', 'media'], providers: {} },
+        timeBuckets: [],
+      },
+    });
+
+    const ratingToggle = screen.getByTestId('section-toggle-rating');
+    await fireEvent.click(ratingToggle);
+
+    expect(localStorage.getItem('gallery-filter-visible-sections')).toBeTruthy();
+  });
 });
 ```
 
@@ -158,16 +174,7 @@ let {
 2. Remove the `STORAGE_KEY` constant (line 176) and replace all references with `storageKey`:
 
 ```typescript
-// In loadVisibleSections:
-const raw = localStorage.getItem(storageKey);
-
-// In the $effect that persists:
-localStorage.setItem(storageKey, JSON.stringify([...visibleSections]));
-```
-
-3. Update `loadVisibleSections` to accept the key parameter:
-
-```typescript
+// In loadVisibleSections — accept key param:
 function loadVisibleSections(configSections: FilterSectionType[], key: string): SvelteSet<FilterSectionType> {
   if (browser) {
     try {
@@ -176,6 +183,20 @@ function loadVisibleSections(configSections: FilterSectionType[], key: string): 
 ```
 
 And call it: `let visibleSections = $state(loadVisibleSections(config.sections, storageKey));`
+
+Update the persistence `$effect`:
+
+```typescript
+$effect(() => {
+  if (browser) {
+    try {
+      localStorage.setItem(storageKey, JSON.stringify([...visibleSections]));
+    } catch {
+      /* localStorage unavailable */
+    }
+  }
+});
+```
 
 **Step 4: Run test to verify it passes**
 
@@ -198,7 +219,6 @@ git commit -m "feat: add storageKey prop to FilterPanel for independent persiste
 - Modify: `web/src/lib/components/filter-panel/people-filter.svelte`
 - Modify: `web/src/lib/components/filter-panel/location-filter.svelte`
 - Modify: `web/src/lib/components/filter-panel/camera-filter.svelte`
-- Modify: `web/src/lib/components/filter-panel/tags-filter.svelte`
 - Test: `web/src/lib/components/filter-panel/__tests__/filter-panel.spec.ts`
 
 **Step 1: Write failing test**
@@ -207,7 +227,7 @@ Add to filter-panel.spec.ts:
 
 ```typescript
 describe('emptyText prop', () => {
-  it('should show custom empty text for people section when no people', async () => {
+  it('should show generic empty text for people section when no people', async () => {
     render(FilterPanel, {
       props: {
         config: { sections: ['people'], providers: { people: async () => [] } },
@@ -219,15 +239,39 @@ describe('emptyText prop', () => {
       expect(screen.getByTestId('people-empty')).toHaveTextContent('No people found');
     });
   });
+
+  it('should show generic empty text for location section when no locations', async () => {
+    render(FilterPanel, {
+      props: {
+        config: { sections: ['location'], providers: { locations: async () => [] } },
+        timeBuckets: [],
+      },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('location-empty')).toHaveTextContent('No locations found');
+    });
+  });
+
+  it('should show generic empty text for camera section when no cameras', async () => {
+    render(FilterPanel, {
+      props: {
+        config: { sections: ['camera'], providers: { cameras: async () => [] } },
+        timeBuckets: [],
+      },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('camera-empty')).toHaveTextContent('No cameras found');
+    });
+  });
 });
 ```
-
-Note: This test verifies the default empty text changes from "No people in this space" to "No people found". The test will initially fail because the current text says "in this space".
 
 **Step 2: Run test to verify it fails**
 
 Run: `cd web && pnpm test -- --run src/lib/components/filter-panel/__tests__/filter-panel.spec.ts`
-Expected: FAIL — text says "No people in this space"
+Expected: FAIL — text says "No people in this space" / "No locations in this space" / "No cameras in this space"
 
 **Step 3: Implement**
 
@@ -242,15 +286,11 @@ interface Props {
   onSelectionChange: (ids: string[]) => void;
   emptyText?: string;
 }
-
 let { people, selectedIds, onSelectionChange, emptyText = 'No people found' }: Props = $props();
 ```
 
-Replace the hardcoded empty text:
-
-```svelte
-<p class="text-sm text-gray-400 dark:text-gray-500" data-testid="people-empty">{emptyText}</p>
-```
+Replace: `<p ... data-testid="people-empty">No people in this space</p>`
+With: `<p ... data-testid="people-empty">{emptyText}</p>`
 
 **location-filter.svelte:**
 
@@ -259,6 +299,9 @@ emptyText?: string;
 // default: 'No locations found'
 ```
 
+Replace: `<p ... data-testid="location-empty">No locations in this space</p>`
+With: `<p ... data-testid="location-empty">{emptyText}</p>`
+
 **camera-filter.svelte:**
 
 ```typescript
@@ -266,54 +309,226 @@ emptyText?: string;
 // default: 'No cameras found'
 ```
 
-**tags-filter.svelte:**
+Replace: `<p ... data-testid="camera-empty">No cameras in this space</p>`
+With: `<p ... data-testid="camera-empty">{emptyText}</p>`
 
-```typescript
-emptyText?: string;
-// default: 'No tags available'  (already generic, keep as-is)
-```
+Note: `tags-filter.svelte` already says "No tags available" which is generic — no change needed.
 
 **Step 4: Run test to verify it passes**
 
 Run: `cd web && pnpm test -- --run src/lib/components/filter-panel/__tests__/filter-panel.spec.ts`
 Expected: PASS
 
-**Step 5: Also run existing tests to check no regressions**
+**Step 5: Run all existing tests for regressions**
 
 Run: `cd web && pnpm test -- --run src/lib/components/filter-panel/`
-Expected: All PASS
+Expected: All PASS — check that existing spaces tests don't assert on the old "in this space" text
 
 **Step 6: Commit**
 
 ```bash
-git add web/src/lib/components/filter-panel/people-filter.svelte web/src/lib/components/filter-panel/location-filter.svelte web/src/lib/components/filter-panel/camera-filter.svelte web/src/lib/components/filter-panel/tags-filter.svelte web/src/lib/components/filter-panel/__tests__/filter-panel.spec.ts
+git add web/src/lib/components/filter-panel/people-filter.svelte web/src/lib/components/filter-panel/location-filter.svelte web/src/lib/components/filter-panel/camera-filter.svelte web/src/lib/components/filter-panel/__tests__/filter-panel.spec.ts
 git commit -m "feat: add emptyText prop to filter sub-components with generic defaults"
 ```
 
 ---
 
-### Task 4: Wire FilterPanel into the /photos page
+### Task 4: Write unit tests for /photos filter logic (TDD — tests first)
 
 **Files:**
 
-- Modify: `web/src/routes/(user)/photos/[[assetId=id]]/+page.svelte`
-- Test: `web/src/routes/(user)/photos/__tests__/photos-filter.spec.ts` (new)
+- Create: `web/src/lib/utils/__tests__/photos-filter-options.spec.ts`
+- Create: `web/src/lib/utils/photos-filter-options.ts`
 
-**Step 1: Write the unit test for options derivation**
+The filter-to-options mapping logic is extracted as a pure utility function so it can be tested before wiring into the component. This is the "write tests first" step.
 
-Create `web/src/routes/(user)/photos/__tests__/photos-filter.spec.ts`:
+**Step 1: Write failing tests**
+
+Create `web/src/lib/utils/__tests__/photos-filter-options.spec.ts`:
 
 ```typescript
 import { describe, expect, it } from 'vitest';
 import { AssetOrder, AssetTypeEnum, AssetVisibility } from '@immich/sdk';
-import type { FilterState } from '$lib/components/filter-panel/filter-panel';
 import { createFilterState } from '$lib/components/filter-panel/filter-panel';
+import { buildPhotosTimelineOptions } from '$lib/utils/photos-filter-options';
 
-/**
- * Test the filter-to-options mapping logic that will be used in the /photos page.
- * This is extracted as a pure function to enable TDD before wiring into the component.
- */
-function buildTimelineOptions(filters: FilterState) {
+describe('buildPhotosTimelineOptions', () => {
+  it('should return base options with no filters', () => {
+    const options = buildPhotosTimelineOptions(createFilterState());
+
+    expect(options).toEqual({
+      visibility: AssetVisibility.Timeline,
+      withStacked: true,
+      withPartners: true,
+      withSharedSpaces: true,
+      order: AssetOrder.Desc,
+    });
+  });
+
+  it('should use personIds (not spacePersonIds) for people filter', () => {
+    const filters = { ...createFilterState(), personIds: ['person-1', 'person-2'] };
+    const options = buildPhotosTimelineOptions(filters);
+
+    expect(options.personIds).toEqual(['person-1', 'person-2']);
+    expect(options).not.toHaveProperty('spacePersonIds');
+  });
+
+  it('should include city and country for location filter', () => {
+    const filters = { ...createFilterState(), country: 'Germany', city: 'Berlin' };
+    const options = buildPhotosTimelineOptions(filters);
+
+    expect(options.country).toBe('Germany');
+    expect(options.city).toBe('Berlin');
+  });
+
+  it('should include make and model for camera filter', () => {
+    const filters = { ...createFilterState(), make: 'Sony', model: 'A7III' };
+    const options = buildPhotosTimelineOptions(filters);
+
+    expect(options.make).toBe('Sony');
+    expect(options.model).toBe('A7III');
+  });
+
+  it('should include tagIds for tags filter', () => {
+    const filters = { ...createFilterState(), tagIds: ['tag-1'] };
+    const options = buildPhotosTimelineOptions(filters);
+
+    expect(options.tagIds).toEqual(['tag-1']);
+  });
+
+  it('should include rating for rating filter', () => {
+    const filters = { ...createFilterState(), rating: 4 };
+    const options = buildPhotosTimelineOptions(filters);
+
+    expect(options.rating).toBe(4);
+  });
+
+  it('should map mediaType image to AssetTypeEnum.Image', () => {
+    const filters = { ...createFilterState(), mediaType: 'image' as const };
+    const options = buildPhotosTimelineOptions(filters);
+
+    expect(options.$type).toBe(AssetTypeEnum.Image);
+  });
+
+  it('should map mediaType video to AssetTypeEnum.Video', () => {
+    const filters = { ...createFilterState(), mediaType: 'video' as const };
+    const options = buildPhotosTimelineOptions(filters);
+
+    expect(options.$type).toBe(AssetTypeEnum.Video);
+  });
+
+  it('should not include $type when mediaType is all', () => {
+    const options = buildPhotosTimelineOptions(createFilterState());
+
+    expect(options).not.toHaveProperty('$type');
+  });
+
+  it('should set ascending order', () => {
+    const filters = { ...createFilterState(), sortOrder: 'asc' as const };
+    const options = buildPhotosTimelineOptions(filters);
+
+    expect(options.order).toBe(AssetOrder.Asc);
+  });
+
+  it('should set year-only date range', () => {
+    const filters = { ...createFilterState(), selectedYear: 2023 };
+    const options = buildPhotosTimelineOptions(filters);
+
+    expect(options.takenAfter).toBeDefined();
+    expect(options.takenBefore).toBeDefined();
+    const after = new Date(options.takenAfter as string);
+    const before = new Date(options.takenBefore as string);
+    expect(after.getFullYear()).toBe(2023);
+    expect(after.getMonth()).toBe(0);
+    expect(before.getFullYear()).toBe(2023);
+    expect(before.getMonth()).toBe(11);
+  });
+
+  it('should set year+month date range', () => {
+    const filters = { ...createFilterState(), selectedYear: 2023, selectedMonth: 8 };
+    const options = buildPhotosTimelineOptions(filters);
+
+    const after = new Date(options.takenAfter as string);
+    const before = new Date(options.takenBefore as string);
+    expect(after.getFullYear()).toBe(2023);
+    expect(after.getMonth()).toBe(7); // 0-indexed: August
+    expect(before.getMonth()).toBe(7); // Last day of August
+  });
+
+  it('should preserve withPartners and withSharedSpaces when filters are active', () => {
+    const filters = { ...createFilterState(), country: 'Japan', rating: 5 };
+    const options = buildPhotosTimelineOptions(filters);
+
+    expect(options.withPartners).toBe(true);
+    expect(options.withSharedSpaces).toBe(true);
+  });
+
+  it('should handle multiple simultaneous filters', () => {
+    const filters = {
+      ...createFilterState(),
+      personIds: ['p1'],
+      country: 'Germany',
+      city: 'Berlin',
+      make: 'Sony',
+      tagIds: ['t1', 't2'],
+      rating: 3,
+      mediaType: 'image' as const,
+      sortOrder: 'asc' as const,
+      selectedYear: 2023,
+    };
+    const options = buildPhotosTimelineOptions(filters);
+
+    expect(options.personIds).toEqual(['p1']);
+    expect(options.country).toBe('Germany');
+    expect(options.city).toBe('Berlin');
+    expect(options.make).toBe('Sony');
+    expect(options.tagIds).toEqual(['t1', 't2']);
+    expect(options.rating).toBe(3);
+    expect(options.$type).toBe(AssetTypeEnum.Image);
+    expect(options.order).toBe(AssetOrder.Asc);
+    expect(options.takenAfter).toBeDefined();
+  });
+
+  it('should not include empty personIds array', () => {
+    const options = buildPhotosTimelineOptions(createFilterState());
+
+    expect(options).not.toHaveProperty('personIds');
+  });
+
+  it('should not include empty tagIds array', () => {
+    const options = buildPhotosTimelineOptions(createFilterState());
+
+    expect(options).not.toHaveProperty('tagIds');
+  });
+
+  it('should not include undefined optional fields', () => {
+    const options = buildPhotosTimelineOptions(createFilterState());
+
+    expect(options).not.toHaveProperty('city');
+    expect(options).not.toHaveProperty('country');
+    expect(options).not.toHaveProperty('make');
+    expect(options).not.toHaveProperty('model');
+    expect(options).not.toHaveProperty('rating');
+    expect(options).not.toHaveProperty('takenAfter');
+    expect(options).not.toHaveProperty('takenBefore');
+  });
+});
+```
+
+**Step 2: Run test to verify it fails**
+
+Run: `cd web && pnpm test -- --run src/lib/utils/__tests__/photos-filter-options.spec.ts`
+Expected: FAIL — module `$lib/utils/photos-filter-options` does not exist
+
+**Step 3: Write minimal implementation**
+
+Create `web/src/lib/utils/photos-filter-options.ts`:
+
+```typescript
+import { AssetOrder, AssetTypeEnum, AssetVisibility } from '@immich/sdk';
+import type { FilterState } from '$lib/components/filter-panel/filter-panel';
+
+export function buildPhotosTimelineOptions(filters: FilterState): Record<string, unknown> {
   const base: Record<string, unknown> = {
     visibility: AssetVisibility.Timeline,
     withStacked: true,
@@ -359,124 +574,168 @@ function buildTimelineOptions(filters: FilterState) {
 
   return base;
 }
+```
 
-describe('Photos page filter options derivation', () => {
-  it('should return base options with no filters', () => {
-    const filters = createFilterState();
-    const options = buildTimelineOptions(filters);
+**Step 4: Run test to verify it passes**
 
-    expect(options).toEqual({
-      visibility: AssetVisibility.Timeline,
-      withStacked: true,
-      withPartners: true,
-      withSharedSpaces: true,
-      order: AssetOrder.Desc,
-    });
+Run: `cd web && pnpm test -- --run src/lib/utils/__tests__/photos-filter-options.spec.ts`
+Expected: All PASS
+
+**Step 5: Commit**
+
+```bash
+git add web/src/lib/utils/photos-filter-options.ts web/src/lib/utils/__tests__/photos-filter-options.spec.ts
+git commit -m "feat: extract and test buildPhotosTimelineOptions utility"
+```
+
+---
+
+### Task 5: Write unit tests for handleRemoveFilter logic
+
+**Files:**
+
+- Modify: `web/src/lib/utils/photos-filter-options.ts`
+- Modify: `web/src/lib/utils/__tests__/photos-filter-options.spec.ts`
+
+**Step 1: Write failing tests**
+
+Add to `photos-filter-options.spec.ts`:
+
+```typescript
+import { handlePhotosRemoveFilter } from '$lib/utils/photos-filter-options';
+
+describe('handlePhotosRemoveFilter', () => {
+  it('should remove a specific person from personIds', () => {
+    const filters = { ...createFilterState(), personIds: ['p1', 'p2', 'p3'] };
+    const result = handlePhotosRemoveFilter(filters, 'person', 'p2');
+
+    expect(result.personIds).toEqual(['p1', 'p3']);
   });
 
-  it('should include personIds when people filter is set', () => {
-    const filters = { ...createFilterState(), personIds: ['person-1', 'person-2'] };
-    const options = buildTimelineOptions(filters);
-
-    expect(options.personIds).toEqual(['person-1', 'person-2']);
-    // Should NOT use spacePersonIds
-    expect(options).not.toHaveProperty('spacePersonIds');
-  });
-
-  it('should include city and country when location filter is set', () => {
+  it('should clear location (both country and city)', () => {
     const filters = { ...createFilterState(), country: 'Germany', city: 'Berlin' };
-    const options = buildTimelineOptions(filters);
+    const result = handlePhotosRemoveFilter(filters, 'location');
 
-    expect(options.country).toBe('Germany');
-    expect(options.city).toBe('Berlin');
+    expect(result.country).toBeUndefined();
+    expect(result.city).toBeUndefined();
   });
 
-  it('should include make and model when camera filter is set', () => {
+  it('should clear camera (both make and model)', () => {
     const filters = { ...createFilterState(), make: 'Sony', model: 'A7III' };
-    const options = buildTimelineOptions(filters);
+    const result = handlePhotosRemoveFilter(filters, 'camera');
 
-    expect(options.make).toBe('Sony');
-    expect(options.model).toBe('A7III');
+    expect(result.make).toBeUndefined();
+    expect(result.model).toBeUndefined();
   });
 
-  it('should include tagIds when tags filter is set', () => {
-    const filters = { ...createFilterState(), tagIds: ['tag-1'] };
-    const options = buildTimelineOptions(filters);
+  it('should remove a specific tag from tagIds', () => {
+    const filters = { ...createFilterState(), tagIds: ['t1', 't2'] };
+    const result = handlePhotosRemoveFilter(filters, 'tag', 't1');
 
-    expect(options.tagIds).toEqual(['tag-1']);
+    expect(result.tagIds).toEqual(['t2']);
   });
 
-  it('should include rating when rating filter is set', () => {
+  it('should clear rating', () => {
     const filters = { ...createFilterState(), rating: 4 };
-    const options = buildTimelineOptions(filters);
+    const result = handlePhotosRemoveFilter(filters, 'rating');
 
-    expect(options.rating).toBe(4);
+    expect(result.rating).toBeUndefined();
   });
 
-  it('should map mediaType image to AssetTypeEnum.Image', () => {
-    const filters = { ...createFilterState(), mediaType: 'image' as const };
-    const options = buildTimelineOptions(filters);
-
-    expect(options.$type).toBe(AssetTypeEnum.Image);
-  });
-
-  it('should map mediaType video to AssetTypeEnum.Video', () => {
+  it('should reset mediaType to all', () => {
     const filters = { ...createFilterState(), mediaType: 'video' as const };
-    const options = buildTimelineOptions(filters);
+    const result = handlePhotosRemoveFilter(filters, 'media');
 
-    expect(options.$type).toBe(AssetTypeEnum.Video);
+    expect(result.mediaType).toBe('all');
   });
 
-  it('should not include $type when mediaType is all', () => {
-    const filters = createFilterState();
-    const options = buildTimelineOptions(filters);
+  it('should handle mediaType alias', () => {
+    const filters = { ...createFilterState(), mediaType: 'image' as const };
+    const result = handlePhotosRemoveFilter(filters, 'mediaType');
 
-    expect(options).not.toHaveProperty('$type');
+    expect(result.mediaType).toBe('all');
   });
 
-  it('should set ascending order', () => {
-    const filters = { ...createFilterState(), sortOrder: 'asc' as const };
-    const options = buildTimelineOptions(filters);
+  it('should preserve sortOrder when removing filters', () => {
+    const filters = { ...createFilterState(), sortOrder: 'asc' as const, rating: 5 };
+    const result = handlePhotosRemoveFilter(filters, 'rating');
 
-    expect(options.order).toBe(AssetOrder.Asc);
+    expect(result.sortOrder).toBe('asc');
+    expect(result.rating).toBeUndefined();
   });
 
-  it('should set date range for year filter', () => {
-    const filters = { ...createFilterState(), selectedYear: 2023 };
-    const options = buildTimelineOptions(filters);
+  it('should preserve other filters when removing one', () => {
+    const filters = { ...createFilterState(), country: 'Germany', rating: 4, personIds: ['p1'] };
+    const result = handlePhotosRemoveFilter(filters, 'rating');
 
-    expect(options.takenAfter).toBeDefined();
-    expect(options.takenBefore).toBeDefined();
-    expect(new Date(options.takenAfter as string).getFullYear()).toBe(2023);
-  });
-
-  it('should set date range for year+month filter', () => {
-    const filters = { ...createFilterState(), selectedYear: 2023, selectedMonth: 8 };
-    const options = buildTimelineOptions(filters);
-
-    const after = new Date(options.takenAfter as string);
-    const before = new Date(options.takenBefore as string);
-    expect(after.getFullYear()).toBe(2023);
-    expect(after.getMonth()).toBe(7); // 0-indexed
-    expect(before.getMonth()).toBe(7); // Last day of August
-  });
-
-  it('should preserve withPartners and withSharedSpaces when filters are active', () => {
-    const filters = { ...createFilterState(), country: 'Japan', rating: 5 };
-    const options = buildTimelineOptions(filters);
-
-    expect(options.withPartners).toBe(true);
-    expect(options.withSharedSpaces).toBe(true);
+    expect(result.country).toBe('Germany');
+    expect(result.personIds).toEqual(['p1']);
+    expect(result.rating).toBeUndefined();
   });
 });
 ```
 
-**Step 2: Run test to verify it passes** (these test a pure function defined in the test file)
+**Step 2: Run test to verify it fails**
 
-Run: `cd web && pnpm test -- --run src/routes/\(user\)/photos/__tests__/photos-filter.spec.ts`
-Expected: PASS — these validate the mapping logic before we wire it into the component
+Run: `cd web && pnpm test -- --run src/lib/utils/__tests__/photos-filter-options.spec.ts`
+Expected: FAIL — `handlePhotosRemoveFilter` does not exist
 
-**Step 3: Wire FilterPanel into the /photos page**
+**Step 3: Implement**
+
+Add to `web/src/lib/utils/photos-filter-options.ts`:
+
+```typescript
+export function handlePhotosRemoveFilter(filters: FilterState, type: string, id?: string): FilterState {
+  switch (type) {
+    case 'person': {
+      return { ...filters, personIds: filters.personIds.filter((p) => p !== id) };
+    }
+    case 'location': {
+      return { ...filters, city: undefined, country: undefined };
+    }
+    case 'camera': {
+      return { ...filters, make: undefined, model: undefined };
+    }
+    case 'tag': {
+      return { ...filters, tagIds: filters.tagIds.filter((t) => t !== id) };
+    }
+    case 'rating': {
+      return { ...filters, rating: undefined };
+    }
+    case 'media':
+    case 'mediaType': {
+      return { ...filters, mediaType: 'all' };
+    }
+    default: {
+      return filters;
+    }
+  }
+}
+```
+
+**Step 4: Run test to verify it passes**
+
+Run: `cd web && pnpm test -- --run src/lib/utils/__tests__/photos-filter-options.spec.ts`
+Expected: All PASS
+
+**Step 5: Commit**
+
+```bash
+git add web/src/lib/utils/photos-filter-options.ts web/src/lib/utils/__tests__/photos-filter-options.spec.ts
+git commit -m "feat: extract and test handlePhotosRemoveFilter utility"
+```
+
+---
+
+### Task 6: Wire FilterPanel into the /photos page
+
+**Files:**
+
+- Modify: `web/src/routes/(user)/photos/[[assetId=id]]/+page.svelte`
+
+This task uses the tested `buildPhotosTimelineOptions` and `handlePhotosRemoveFilter` utilities from Tasks 4-5.
+
+**Step 1: Implement the integration**
 
 Modify `web/src/routes/(user)/photos/[[assetId=id]]/+page.svelte`:
 
@@ -485,7 +744,6 @@ Add imports at top of `<script>`:
 ```typescript
 import FilterPanel from '$lib/components/filter-panel/filter-panel.svelte';
 import ActiveFiltersBar from '$lib/components/filter-panel/active-filters-bar.svelte';
-import SortToggle from '$lib/components/filter-panel/sort-toggle.svelte';
 import {
   createFilterState,
   clearFilters,
@@ -493,14 +751,8 @@ import {
   type FilterPanelConfig,
   type FilterContext,
 } from '$lib/components/filter-panel/filter-panel';
-import {
-  AssetOrder,
-  AssetTypeEnum,
-  getAllPeople,
-  getAllTags,
-  getSearchSuggestions,
-  SearchSuggestionType,
-} from '@immich/sdk';
+import { buildPhotosTimelineOptions, handlePhotosRemoveFilter } from '$lib/utils/photos-filter-options';
+import { getAllPeople, getAllTags, getSearchSuggestions, SearchSuggestionType } from '@immich/sdk';
 import { SvelteMap } from 'svelte/reactivity';
 ```
 
@@ -515,12 +767,8 @@ let tagNames = new SvelteMap<string, string>();
 const filterConfig: FilterPanelConfig = {
   sections: ['timeline', 'people', 'location', 'camera', 'tags', 'rating', 'media'],
   providers: {
-    people: async (context?: FilterContext) => {
-      const response = await getAllPeople({
-        withHidden: false,
-        takenAfter: context?.takenAfter,
-        takenBefore: context?.takenBefore,
-      });
+    people: async () => {
+      const response = await getAllPeople({ withHidden: false });
       for (const p of response.people) {
         personNames.set(p.id, p.name || 'Unknown');
       }
@@ -572,89 +820,14 @@ const filterConfig: FilterPanelConfig = {
   },
 };
 
-function handleRemoveFilter(type: string, id?: string) {
-  switch (type) {
-    case 'person': {
-      filters = { ...filters, personIds: filters.personIds.filter((p) => p !== id) };
-      break;
-    }
-    case 'location': {
-      filters = { ...filters, city: undefined, country: undefined };
-      break;
-    }
-    case 'camera': {
-      filters = { ...filters, make: undefined, model: undefined };
-      break;
-    }
-    case 'tag': {
-      filters = { ...filters, tagIds: filters.tagIds.filter((t) => t !== id) };
-      break;
-    }
-    case 'rating': {
-      filters = { ...filters, rating: undefined };
-      break;
-    }
-    case 'media':
-    case 'mediaType': {
-      filters = { ...filters, mediaType: 'all' };
-      break;
-    }
-  }
-}
-
 const hasActiveFilters = $derived(getActiveFilterCount(filters) > 0);
 const totalAssetCount = $derived(timelineManager?.assetCount ?? 0);
 ```
 
-Change the static `options` to derived:
+Change the static `options` to use the extracted utility:
 
 ```typescript
-const options = $derived.by(() => {
-  const base: Record<string, unknown> = {
-    visibility: AssetVisibility.Timeline,
-    withStacked: true,
-    withPartners: true,
-    withSharedSpaces: true,
-  };
-
-  if (filters.personIds.length > 0) {
-    base.personIds = filters.personIds;
-  }
-  if (filters.city) {
-    base.city = filters.city;
-  }
-  if (filters.country) {
-    base.country = filters.country;
-  }
-  if (filters.make) {
-    base.make = filters.make;
-  }
-  if (filters.model) {
-    base.model = filters.model;
-  }
-  if (filters.tagIds.length > 0) {
-    base.tagIds = filters.tagIds;
-  }
-  if (filters.rating !== undefined) {
-    base.rating = filters.rating;
-  }
-  if (filters.mediaType !== 'all') {
-    base.$type = filters.mediaType === 'image' ? AssetTypeEnum.Image : AssetTypeEnum.Video;
-  }
-  base.order = filters.sortOrder === 'asc' ? AssetOrder.Asc : AssetOrder.Desc;
-
-  if (filters.selectedYear && filters.selectedMonth) {
-    const start = new Date(filters.selectedYear, filters.selectedMonth - 1, 1);
-    const end = new Date(filters.selectedYear, filters.selectedMonth, 0, 23, 59, 59, 999);
-    base.takenAfter = start.toISOString();
-    base.takenBefore = end.toISOString();
-  } else if (filters.selectedYear) {
-    base.takenAfter = new Date(filters.selectedYear, 0, 1).toISOString();
-    base.takenBefore = new Date(filters.selectedYear, 11, 31, 23, 59, 59, 999).toISOString();
-  }
-
-  return base;
-});
+const options = $derived(buildPhotosTimelineOptions(filters));
 ```
 
 Update the template — wrap Timeline with FilterPanel in a flex container:
@@ -679,7 +852,9 @@ Update the template — wrap Timeline with FilterPanel in a flex container:
           resultCount={totalAssetCount}
           {personNames}
           {tagNames}
-          onRemoveFilter={handleRemoveFilter}
+          onRemoveFilter={(type, id) => {
+            filters = handlePhotosRemoveFilter(filters, type, id);
+          }}
           onClearAll={() => {
             filters = clearFilters(filters);
           }}
@@ -706,92 +881,45 @@ Update the template — wrap Timeline with FilterPanel in a flex container:
 </UserPageLayout>
 ```
 
-**Step 4: Verify type-checking passes**
+**Step 2: Verify type-checking passes**
 
-Run: `cd web && npx svelte-check --tsconfig tsconfig.json 2>&1 | tail -5`
+Run: `cd web && npx svelte-check --tsconfig tsconfig.json 2>&1 | grep -E "Error|error" | head -10`
 Expected: No errors in the modified file
 
-**Step 5: Run all FilterPanel unit tests**
+**Step 3: Run all FilterPanel unit tests (regression check)**
 
 Run: `cd web && pnpm test -- --run src/lib/components/filter-panel/`
 Expected: All PASS
 
-**Step 6: Commit**
+**Step 4: Commit**
 
 ```bash
-git add web/src/routes/(user)/photos/[[assetId=id]]/+page.svelte web/src/routes/(user)/photos/__tests__/photos-filter.spec.ts
-git commit -m "feat: add FilterPanel to /photos timeline page"
+git add web/src/routes/(user)/photos/[[assetId=id]]/+page.svelte
+git commit -m "feat: wire FilterPanel into /photos timeline page"
 ```
 
 ---
 
-### Task 5: Verify `getAllPeople` provider handles paginated response
-
-**Files:**
-
-- Test: `web/src/routes/(user)/photos/__tests__/photos-filter.spec.ts`
-
-**Step 1: Write test for people provider shape**
-
-Add to photos-filter.spec.ts:
-
-```typescript
-describe('People provider', () => {
-  it('should filter out people without thumbnails', () => {
-    const people = [
-      { id: '1', name: 'Alice', thumbnailPath: '/path/1' },
-      { id: '2', name: 'Bob', thumbnailPath: '' },
-      { id: '3', name: 'Charlie', thumbnailPath: '/path/3' },
-    ];
-
-    const result = people
-      .filter((p) => p.thumbnailPath)
-      .map((p) => ({ id: p.id, name: p.name, thumbnailPath: p.thumbnailPath }));
-
-    expect(result).toHaveLength(2);
-    expect(result.map((r) => r.name)).toEqual(['Alice', 'Charlie']);
-  });
-});
-```
-
-**Step 2: Run test**
-
-Run: `cd web && pnpm test -- --run src/routes/\(user\)/photos/__tests__/photos-filter.spec.ts`
-Expected: PASS
-
-**Step 3: Commit**
-
-```bash
-git add web/src/routes/(user)/photos/__tests__/photos-filter.spec.ts
-git commit -m "test: add people provider shape validation test"
-```
-
----
-
-### Task 6: Lint and format
-
-**Files:**
-
-- All modified files
+### Task 7: Lint, format, and type-check
 
 **Step 1: Format**
 
-Run: `cd web && npx prettier --write src/lib/components/filter-panel/filter-panel.svelte src/lib/components/filter-panel/people-filter.svelte src/lib/components/filter-panel/location-filter.svelte src/lib/components/filter-panel/camera-filter.svelte src/lib/components/filter-panel/tags-filter.svelte src/routes/\(user\)/photos/\[\[assetId=id\]\]/+page.svelte`
+Run: `make format-web`
 
 **Step 2: Lint**
 
-Run: `cd web && npx eslint --fix src/lib/components/filter-panel/ src/routes/\(user\)/photos/`
+Run: `make lint-web`
 
 **Step 3: Type-check**
 
 Run: `make check-web`
 
-**Step 4: Run full FilterPanel test suite**
+**Step 4: Run full unit test suite**
 
-Run: `cd web && pnpm test -- --run src/lib/components/filter-panel/`
+Run: `cd web && pnpm test -- --run src/lib/components/filter-panel/ && pnpm test -- --run src/lib/utils/__tests__/photos-filter-options.spec.ts`
 Expected: All PASS
 
-**Step 5: Commit if any formatting changes**
+**Step 5: Commit if any fixes needed**
 
 ```bash
 git add -u
@@ -800,13 +928,15 @@ git commit -m "chore: lint and format filter panel changes"
 
 ---
 
-### Task 7: E2E test — Panel renders collapsed and expands
+### Task 8: E2E tests for /photos FilterPanel
 
 **Files:**
 
 - Create: `e2e/src/specs/web/photos-filter-panel.e2e-spec.ts`
 
-**Step 1: Write the E2E test**
+**Step 1: Write all E2E tests**
+
+Uses the proven pattern from `spaces-filter-panel.e2e-spec.ts`: intercept `/timeline/buckets` responses, check `result-count` text, use actual data-testid selectors.
 
 ```typescript
 import type { LoginResponseDto } from '@immich/sdk';
@@ -821,7 +951,7 @@ test.describe('Photos FilterPanel', () => {
     await utils.resetDatabase();
     admin = await utils.adminSetup();
 
-    // Create some assets so the timeline isn't empty
+    // Create assets with varied dates so timeline has content
     await utils.createAsset(admin.accessToken, {
       fileCreatedAt: '2023-08-15T10:00:00.000Z',
       fileModifiedAt: '2023-08-15T10:00:00.000Z',
@@ -829,6 +959,10 @@ test.describe('Photos FilterPanel', () => {
     await utils.createAsset(admin.accessToken, {
       fileCreatedAt: '2023-07-10T10:00:00.000Z',
       fileModifiedAt: '2023-07-10T10:00:00.000Z',
+    });
+    await utils.createAsset(admin.accessToken, {
+      fileCreatedAt: '2022-12-25T10:00:00.000Z',
+      fileModifiedAt: '2022-12-25T10:00:00.000Z',
     });
   });
 
@@ -845,224 +979,97 @@ test.describe('Photos FilterPanel', () => {
     await expect(page.locator('[data-testid="discovery-panel"]')).not.toBeVisible();
   });
 
-  test('should expand FilterPanel and show all sections', async ({ context, page }) => {
+  test('should expand FilterPanel and show all 7 sections', async ({ context, page }) => {
     await gotoPhotos(context, page);
 
-    // Click expand button
     await page.locator('[data-testid="expand-panel-btn"]').click();
     await expect(page.locator('[data-testid="discovery-panel"]')).toBeVisible();
 
-    // Verify all sections
-    await expect(page.locator('[data-testid="filter-section-timeline"]')).toBeVisible();
-    await expect(page.locator('[data-testid="filter-section-people"]')).toBeVisible();
-    await expect(page.locator('[data-testid="filter-section-location"]')).toBeVisible();
-    await expect(page.locator('[data-testid="filter-section-camera"]')).toBeVisible();
-    await expect(page.locator('[data-testid="filter-section-tags"]')).toBeVisible();
-    await expect(page.locator('[data-testid="filter-section-rating"]')).toBeVisible();
-    await expect(page.locator('[data-testid="filter-section-media"]')).toBeVisible();
+    for (const section of ['timeline', 'people', 'location', 'camera', 'tags', 'rating', 'media']) {
+      await expect(page.locator(`[data-testid="filter-section-${section}"]`)).toBeVisible();
+    }
+  });
+
+  test('should filter by media type and show result count', async ({ context, page }) => {
+    await gotoPhotos(context, page);
+
+    // Expand panel
+    await page.locator('[data-testid="expand-panel-btn"]').click();
+
+    // Apply image filter and wait for timeline to refetch
+    const bucketResponse = page.waitForResponse((r) => r.url().includes('/timeline/buckets'));
+    await page.locator('[data-testid="media-type-image"]').click();
+    await bucketResponse;
+
+    // Active filters bar should show result count
+    const resultCount = page.locator('[data-testid="result-count"]');
+    await expect(resultCount).toBeVisible();
+    const countText = await resultCount.textContent();
+    expect(countText).toMatch(/\d+\s*result/);
+  });
+
+  test('should show ActiveFiltersBar and clear all filters', async ({ context, page }) => {
+    await gotoPhotos(context, page);
+
+    // Expand, set rating filter
+    await page.locator('[data-testid="expand-panel-btn"]').click();
+    const bucketResponse = page.waitForResponse((r) => r.url().includes('/timeline/buckets'));
+    await page.locator('[data-testid="rating-star-5"]').click();
+    await bucketResponse;
+
+    // Collapse panel — ActiveFiltersBar should be visible
+    await page.locator('[data-testid="collapse-panel-btn"]').click();
+    await expect(page.locator('[data-testid="active-filters-bar"]')).toBeVisible();
+    await expect(page.locator('[data-testid="active-chip"]').first()).toBeVisible();
+
+    // Clear all and wait for timeline refetch
+    const clearResponse = page.waitForResponse((r) => r.url().includes('/timeline/buckets'));
+    await page.locator('[data-testid="clear-all-btn"]').click();
+    await clearResponse;
+
+    // ActiveFiltersBar should disappear, full timeline restored
+    await expect(page.locator('[data-testid="active-filters-bar"]')).not.toBeVisible();
   });
 });
 ```
 
-**Step 2: Run the E2E test** (requires `make e2e` stack running)
+**Step 2: Run E2E tests** (requires `make e2e` stack running)
 
 Run: `cd e2e && npx playwright test src/specs/web/photos-filter-panel.e2e-spec.ts`
-Expected: PASS
+Expected: All PASS
 
 **Step 3: Commit**
 
 ```bash
 git add e2e/src/specs/web/photos-filter-panel.e2e-spec.ts
-git commit -m "test(e2e): add FilterPanel render tests for /photos page"
+git commit -m "test(e2e): add FilterPanel tests for /photos page"
 ```
 
 ---
 
-### Task 8: E2E test — Media type filter returns only matching assets
-
-**Files:**
-
-- Modify: `e2e/src/specs/web/photos-filter-panel.e2e-spec.ts`
-
-**Step 1: Write the test**
-
-Add to the existing test file. Note: this test relies on there being image assets already created in beforeAll. Since we only upload PNG images, filtering for "video" should show zero results and filtering for "image" should show all.
-
-```typescript
-test('should filter by media type', async ({ context, page }) => {
-  await gotoPhotos(context, page);
-
-  // Expand panel
-  await page.locator('[data-testid="expand-panel-btn"]').click();
-  await expect(page.locator('[data-testid="discovery-panel"]')).toBeVisible();
-
-  // Click "Image" in media type filter
-  await page.locator('[data-testid="media-type-image"]').click();
-
-  // Should still show assets (we uploaded images)
-  await expect(page.locator('[data-testid="timeline-group"]').first()).toBeVisible();
-
-  // Switch to "Video"
-  await page.locator('[data-testid="media-type-video"]').click();
-
-  // Should show empty state or no timeline groups (no videos uploaded)
-  await expect
-    .poll(async () => {
-      const groups = await page.locator('[data-testid="timeline-group"]').count();
-      return groups;
-    })
-    .toBe(0);
-});
-```
-
-**Step 2: Run E2E test**
-
-Run: `cd e2e && npx playwright test src/specs/web/photos-filter-panel.e2e-spec.ts`
-Expected: PASS
-
-**Step 3: Commit**
-
-```bash
-git add e2e/src/specs/web/photos-filter-panel.e2e-spec.ts
-git commit -m "test(e2e): add media type filter test for /photos"
-```
-
----
-
-### Task 9: E2E test — ActiveFiltersBar and clear all
-
-**Files:**
-
-- Modify: `e2e/src/specs/web/photos-filter-panel.e2e-spec.ts`
-
-**Step 1: Write the test**
-
-```typescript
-test('should show ActiveFiltersBar with active filters and clear all', async ({ context, page }) => {
-  await gotoPhotos(context, page);
-
-  // Expand panel
-  await page.locator('[data-testid="expand-panel-btn"]').click();
-
-  // Set rating filter
-  await page.locator('[data-testid="rating-star-5"]').click();
-
-  // Collapse panel
-  await page.locator('[data-testid="collapse-panel-btn"]').click();
-
-  // ActiveFiltersBar should be visible
-  await expect(page.locator('[data-testid="active-filters-bar"]')).toBeVisible();
-  await expect(page.locator('[data-testid="filter-chip-rating"]')).toBeVisible();
-
-  // Click clear all
-  await page.locator('[data-testid="clear-all-filters"]').click();
-
-  // ActiveFiltersBar should disappear
-  await expect(page.locator('[data-testid="active-filters-bar"]')).not.toBeVisible();
-});
-```
-
-**Step 2: Run E2E test**
-
-Run: `cd e2e && npx playwright test src/specs/web/photos-filter-panel.e2e-spec.ts`
-Expected: PASS
-
-**Step 3: Commit**
-
-```bash
-git add e2e/src/specs/web/photos-filter-panel.e2e-spec.ts
-git commit -m "test(e2e): add ActiveFiltersBar and clear-all test for /photos"
-```
-
----
-
-### Task 10: E2E test — Memory Lane hides when filters active
-
-**Files:**
-
-- Modify: `e2e/src/specs/web/photos-filter-panel.e2e-spec.ts`
-
-**Step 1: Write the test**
-
-Note: Memory Lane requires memories to exist. If no memories are generated for the test data, this test should verify the conditional rendering logic works. The test checks that the `ImageCarousel` is hidden when filters are active.
-
-```typescript
-test('should hide Memory Lane when filters are active', async ({ context, page }) => {
-  await gotoPhotos(context, page);
-
-  // Check if memory lane exists (it may not if no memories generated)
-  const memoryLane = page.locator('[data-testid="memory-lane"]');
-  const hasMemoryLane = await memoryLane.isVisible().catch(() => false);
-
-  if (hasMemoryLane) {
-    // Expand panel and set a filter
-    await page.locator('[data-testid="expand-panel-btn"]').click();
-    await page.locator('[data-testid="media-type-image"]').click();
-
-    // Memory lane should be hidden
-    await expect(memoryLane).not.toBeVisible();
-
-    // Clear filter by clicking "All" media type
-    await page.locator('[data-testid="media-type-all"]').click();
-
-    // Memory lane should reappear
-    await expect(memoryLane).toBeVisible();
-  }
-});
-```
-
-**Step 2: Run E2E test**
-
-Run: `cd e2e && npx playwright test src/specs/web/photos-filter-panel.e2e-spec.ts`
-Expected: PASS
-
-**Step 3: Commit**
-
-```bash
-git add e2e/src/specs/web/photos-filter-panel.e2e-spec.ts
-git commit -m "test(e2e): add Memory Lane visibility test for /photos filters"
-```
-
----
-
-### Task 11: Run full existing test suites — verify no regressions
-
-**Files:** None (verification only)
+### Task 9: Run full regression suite
 
 **Step 1: Run all FilterPanel unit tests**
 
 Run: `cd web && pnpm test -- --run src/lib/components/filter-panel/`
-Expected: All PASS (all 7 existing test files + new tests)
+Expected: All PASS
 
-**Step 2: Run all spaces filter E2E tests**
+**Step 2: Run photos filter unit tests**
+
+Run: `cd web && pnpm test -- --run src/lib/utils/__tests__/photos-filter-options.spec.ts`
+Expected: All PASS
+
+**Step 3: Run spaces filter E2E tests (regression)**
 
 Run: `cd e2e && npx playwright test src/specs/web/spaces-filter-panel.e2e-spec.ts`
 Expected: All 86 tests PASS
 
-**Step 3: Run web lint and type-check**
+**Step 4: Final lint and type-check**
 
-Run: `make check-web`
-Expected: No errors
+Run: `make check-web && make lint-web && make format-web`
+Expected: Clean
 
-**Step 4: Commit if any fixes needed, otherwise done**
-
----
-
-### Task 12: Final formatting and PR prep
-
-**Step 1: Format all changed files**
-
-Run: `make format-web`
-
-**Step 2: Lint all changed files**
-
-Run: `make lint-web`
-
-**Step 3: Final type-check**
-
-Run: `make check-web`
-
-**Step 4: Commit any formatting/lint fixes**
+**Step 5: Commit any final fixes**
 
 ```bash
 git add -u
