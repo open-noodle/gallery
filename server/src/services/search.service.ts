@@ -105,6 +105,10 @@ export class SearchService extends BaseService {
       requireElevatedPermission(auth);
     }
 
+    if (dto.spaceId) {
+      await this.requireAccess({ auth, permission: Permission.SharedSpaceRead, ids: [dto.spaceId] });
+    }
+
     const userIds = await this.getUserIdsToSearch(auth);
     const items = await this.searchRepository.searchLargeAssets(dto.size || 250, { ...dto, userIds });
     return items.map((item) => mapAsset(item, { auth }));
