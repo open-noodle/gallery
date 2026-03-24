@@ -20517,6 +20517,11 @@
             },
             "type": "array"
           },
+          "spaceId": {
+            "description": "Shared space ID to download all assets from",
+            "format": "uuid",
+            "type": "string"
+          },
           "userId": {
             "description": "User ID to download assets from",
             "format": "uuid",
