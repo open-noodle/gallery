@@ -414,12 +414,12 @@ export class SharedSpaceService extends BaseService {
 
     const space = await this.sharedSpaceRepository.getById(spaceId);
     if (space?.faceRecognitionEnabled) {
-      for (const assetId of dto.assetIds) {
-        await this.jobRepository.queue({
-          name: JobName.SharedSpaceFaceMatch,
+      await this.jobRepository.queueAll(
+        dto.assetIds.map((assetId) => ({
+          name: JobName.SharedSpaceFaceMatch as const,
           data: { spaceId, assetId },
-        });
-      }
+        })),
+      );
     }
   }
 
@@ -801,12 +801,12 @@ export class SharedSpaceService extends BaseService {
     }
 
     const assets = await this.sharedSpaceRepository.getAssetIdsInSpace(spaceId);
-    for (const { assetId } of assets) {
-      await this.jobRepository.queue({
-        name: JobName.SharedSpaceFaceMatch,
+    await this.jobRepository.queueAll(
+      assets.map(({ assetId }) => ({
+        name: JobName.SharedSpaceFaceMatch as const,
         data: { spaceId, assetId },
-      });
-    }
+      })),
+    );
 
     return JobStatus.Success;
   }

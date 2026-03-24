@@ -1615,14 +1615,10 @@ describe(SharedSpaceService.name, () => {
 
       await sut.addAssets(auth, spaceId, { assetIds: [assetId1, assetId2] });
 
-      expect(mocks.job.queue).toHaveBeenCalledWith({
-        name: JobName.SharedSpaceFaceMatch,
-        data: { spaceId, assetId: assetId1 },
-      });
-      expect(mocks.job.queue).toHaveBeenCalledWith({
-        name: JobName.SharedSpaceFaceMatch,
-        data: { spaceId, assetId: assetId2 },
-      });
+      expect(mocks.job.queueAll).toHaveBeenCalledWith([
+        { name: JobName.SharedSpaceFaceMatch, data: { spaceId, assetId: assetId1 } },
+        { name: JobName.SharedSpaceFaceMatch, data: { spaceId, assetId: assetId2 } },
+      ]);
     });
 
     it('should not queue SharedSpaceFaceMatch jobs when faceRecognitionEnabled is false', async () => {
@@ -2310,18 +2306,11 @@ describe(SharedSpaceService.name, () => {
       const result = await sut.handleSharedSpaceFaceMatchAll({ spaceId });
 
       expect(result).toBe(JobStatus.Success);
-      expect(mocks.job.queue).toHaveBeenCalledWith({
-        name: JobName.SharedSpaceFaceMatch,
-        data: { spaceId, assetId: 'a1' },
-      });
-      expect(mocks.job.queue).toHaveBeenCalledWith({
-        name: JobName.SharedSpaceFaceMatch,
-        data: { spaceId, assetId: 'a2' },
-      });
-      expect(mocks.job.queue).toHaveBeenCalledWith({
-        name: JobName.SharedSpaceFaceMatch,
-        data: { spaceId, assetId: 'a3' },
-      });
+      expect(mocks.job.queueAll).toHaveBeenCalledWith([
+        { name: JobName.SharedSpaceFaceMatch, data: { spaceId, assetId: 'a1' } },
+        { name: JobName.SharedSpaceFaceMatch, data: { spaceId, assetId: 'a2' } },
+        { name: JobName.SharedSpaceFaceMatch, data: { spaceId, assetId: 'a3' } },
+      ]);
     });
 
     it('should succeed with no assets', async () => {
@@ -2334,7 +2323,7 @@ describe(SharedSpaceService.name, () => {
       const result = await sut.handleSharedSpaceFaceMatchAll({ spaceId });
 
       expect(result).toBe(JobStatus.Success);
-      expect(mocks.job.queue).not.toHaveBeenCalled();
+      expect(mocks.job.queueAll).toHaveBeenCalledWith([]);
     });
   });
 
