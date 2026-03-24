@@ -1035,7 +1035,7 @@ describe(SharedSpaceService.name, () => {
     it('should require owner role when updating petsEnabled', async () => {
       const spaceId = newUuid();
       mocks.sharedSpace.getMember.mockResolvedValue(
-        factory.sharedSpaceMember({ spaceId, role: SharedSpaceRole.Editor }),
+        makeMemberResult({ spaceId, role: SharedSpaceRole.Editor }),
       );
 
       await expect(sut.update(factory.auth(), spaceId, { petsEnabled: false })).rejects.toThrow('Insufficient role');
@@ -1045,7 +1045,7 @@ describe(SharedSpaceService.name, () => {
       const spaceId = newUuid();
       const space = factory.sharedSpace({ id: spaceId });
       mocks.sharedSpace.getMember.mockResolvedValue(
-        factory.sharedSpaceMember({ spaceId, role: SharedSpaceRole.Owner }),
+        makeMemberResult({ spaceId, role: SharedSpaceRole.Owner }),
       );
       mocks.sharedSpace.getById.mockResolvedValue(space);
       mocks.sharedSpace.update.mockResolvedValue(space);
@@ -1058,7 +1058,7 @@ describe(SharedSpaceService.name, () => {
     it('should reject editor updating petsEnabled (metadata requires owner)', async () => {
       const spaceId = newUuid();
       mocks.sharedSpace.getMember.mockResolvedValue(
-        factory.sharedSpaceMember({ spaceId, role: SharedSpaceRole.Editor }),
+        makeMemberResult({ spaceId, role: SharedSpaceRole.Editor }),
       );
 
       await expect(
@@ -2990,7 +2990,7 @@ describe(SharedSpaceService.name, () => {
       const target = factory.sharedSpacePerson({ id: targetId, spaceId, type: 'person' });
       const source = factory.sharedSpacePerson({ id: sourceId, spaceId, type: 'pet' });
 
-      mocks.sharedSpace.getMember.mockResolvedValue(factory.sharedSpaceMember({ spaceId, role: SharedSpaceRole.Editor }));
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ spaceId, role: SharedSpaceRole.Editor }));
       mocks.sharedSpace.getPersonById.mockResolvedValueOnce(target).mockResolvedValueOnce(source);
 
       await expect(sut.mergeSpacePeople(factory.auth(), spaceId, targetId, { ids: [sourceId] })).rejects.toThrow(
@@ -3005,7 +3005,7 @@ describe(SharedSpaceService.name, () => {
       const target = factory.sharedSpacePerson({ id: targetId, spaceId, type: 'pet' });
       const source = factory.sharedSpacePerson({ id: sourceId, spaceId, type: 'person' });
 
-      mocks.sharedSpace.getMember.mockResolvedValue(factory.sharedSpaceMember({ spaceId, role: SharedSpaceRole.Editor }));
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ spaceId, role: SharedSpaceRole.Editor }));
       mocks.sharedSpace.getPersonById.mockResolvedValueOnce(target).mockResolvedValueOnce(source);
 
       await expect(sut.mergeSpacePeople(factory.auth(), spaceId, targetId, { ids: [sourceId] })).rejects.toThrow(
