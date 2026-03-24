@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/svelte';
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import '@testing-library/jest-dom';
 import { createFilterState } from '../filter-panel';
 import FilterPanel from '../filter-panel.svelte';
@@ -139,6 +139,44 @@ describe('FilterPanel', () => {
       });
       expect(screen.getByTestId('discovery-panel')).toBeInTheDocument();
       expect(screen.queryByTestId('collapsed-icon-strip')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('emptyText prop', () => {
+    it('should show generic empty text for people section when no people', async () => {
+      render(FilterPanel, {
+        props: {
+          config: { sections: ['people'], providers: { people: async () => [] } },
+          timeBuckets: [],
+        },
+      });
+      await waitFor(() => {
+        expect(screen.getByTestId('people-empty')).toHaveTextContent('No people found');
+      });
+    });
+
+    it('should show generic empty text for location section when no locations', async () => {
+      render(FilterPanel, {
+        props: {
+          config: { sections: ['location'], providers: { locations: async () => [] } },
+          timeBuckets: [],
+        },
+      });
+      await waitFor(() => {
+        expect(screen.getByTestId('location-empty')).toHaveTextContent('No locations found');
+      });
+    });
+
+    it('should show generic empty text for camera section when no cameras', async () => {
+      render(FilterPanel, {
+        props: {
+          config: { sections: ['camera'], providers: { cameras: async () => [] } },
+          timeBuckets: [],
+        },
+      });
+      await waitFor(() => {
+        expect(screen.getByTestId('camera-empty')).toHaveTextContent('No cameras found');
+      });
     });
   });
 });

@@ -163,7 +163,7 @@ describe('PeopleFilter', () => {
       },
     });
 
-    expect(getByTestId('people-empty').textContent).toBe('No people in this space');
+    expect(getByTestId('people-empty').textContent).toBe('No people found');
   });
 });
 
@@ -276,7 +276,7 @@ describe('LocationFilter', () => {
       },
     });
 
-    expect(getByTestId('location-empty').textContent).toBe('No locations in this space');
+    expect(getByTestId('location-empty').textContent).toBe('No locations found');
   });
 });
 
@@ -382,7 +382,7 @@ describe('CameraFilter', () => {
       },
     });
 
-    expect(getByTestId('camera-empty').textContent).toBe('No cameras in this space');
+    expect(getByTestId('camera-empty').textContent).toBe('No cameras found');
   });
 });
 

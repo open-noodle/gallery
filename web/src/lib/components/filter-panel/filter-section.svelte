@@ -39,7 +39,7 @@
       />
     {/if}
   </button>
-  {#if expanded && !isEmpty}
+  {#if expanded}
     <div class="filter-section-content px-4 pb-4" class:refetching>
       {@render children()}
     </div>
