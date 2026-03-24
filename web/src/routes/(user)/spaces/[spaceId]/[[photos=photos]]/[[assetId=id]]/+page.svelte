@@ -102,8 +102,8 @@
       hasMoreActivities = false;
       activityOffset = 0;
       spacePeople = [];
-      personNames = new Map();
-      tagNames = new Map();
+      personNames.clear();
+      tagNames.clear();
       searchQuery = '';
       searchResults = [];
       isSearching = false;
