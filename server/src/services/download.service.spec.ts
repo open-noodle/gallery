@@ -3,9 +3,10 @@ import { Readable } from 'node:stream';
 import { vitest } from 'vitest';
 import { DownloadResponseDto } from 'src/dtos/download.dto.js';
 import { DownloadService } from 'src/services/download.service.js';
+import { StorageService } from 'src/services/storage.service.js';
 import { AssetFactory } from 'test/factories/asset.factory.js';
 import { authStub } from 'test/fixtures/auth.stub.js';
-import { StorageService } from 'src/services/storage.service.js';
+import { newUuid } from 'test/small.factory.js';
 import { ServiceMocks, makeStream, newTestService } from 'test/utils.js';
 
 const downloadResponse: DownloadResponseDto = {
@@ -414,6 +415,71 @@ describe(DownloadService.name, () => {
           { assetIds: ['asset-3', 'asset-4'], size: 146_456 },
         ],
       });
+    });
+
+    it('should return a list of archives (spaceId)', async () => {
+      const spaceId = newUuid();
+
+      mocks.user.getMetadata.mockResolvedValue([]);
+      mocks.access.sharedSpace.checkMemberAccess.mockResolvedValue(new Set([spaceId]));
+      mocks.downloadRepository.downloadSpaceId.mockReturnValue(
+        makeStream([
+          { id: 'asset-1', livePhotoVideoId: null, size: 100_000 },
+          { id: 'asset-2', livePhotoVideoId: null, size: 5000 },
+        ]),
+      );
+
+      await expect(sut.getDownloadInfo(authStub.admin, { spaceId })).resolves.toEqual(downloadResponse);
+
+      expect(mocks.access.sharedSpace.checkMemberAccess).toHaveBeenCalledWith(
+        authStub.admin.user.id,
+        new Set([spaceId]),
+      );
+      expect(mocks.downloadRepository.downloadSpaceId).toHaveBeenCalledWith(spaceId);
+    });
+
+    it('should reject non-member for spaceId download', async () => {
+      const spaceId = newUuid();
+      mocks.access.sharedSpace.checkMemberAccess.mockResolvedValue(new Set());
+
+      await expect(sut.getDownloadInfo(authStub.admin, { spaceId })).rejects.toThrow();
+    });
+
+    it('should return empty archives for space with no assets', async () => {
+      const spaceId = newUuid();
+
+      mocks.user.getMetadata.mockResolvedValue([]);
+      mocks.access.sharedSpace.checkMemberAccess.mockResolvedValue(new Set([spaceId]));
+      mocks.downloadRepository.downloadSpaceId.mockReturnValue(makeStream([]));
+
+      await expect(sut.getDownloadInfo(authStub.admin, { spaceId })).resolves.toEqual({
+        totalSize: 0,
+        archives: [],
+      });
+    });
+
+    it('should include live photo video for space download', async () => {
+      const spaceId = newUuid();
+
+      mocks.user.getMetadata.mockResolvedValue([]);
+      mocks.access.sharedSpace.checkMemberAccess.mockResolvedValue(new Set([spaceId]));
+      mocks.downloadRepository.downloadSpaceId.mockReturnValue(
+        makeStream([{ id: 'asset-1', livePhotoVideoId: 'motion-1', size: 5000 }]),
+      );
+      mocks.downloadRepository.downloadMotionAssetIds.mockReturnValue(
+        makeStream([{ id: 'motion-1', livePhotoVideoId: null, size: 2000, originalPath: '/path/to/file.mp4' }]),
+      );
+
+      const result = await sut.getDownloadInfo(authStub.admin, { spaceId });
+
+      expect(result.totalSize).toBe(7000);
+      expect(result.archives[0].assetIds).toEqual(['asset-1', 'motion-1']);
+    });
+
+    it('should include spaceId in error message for invalid dto', async () => {
+      await expect(sut.getDownloadInfo(authStub.admin, {})).rejects.toThrow(
+        'assetIds, albumId, userId, or spaceId is required',
+      );
     });
 
     it('should skip the video portion of an android live photo by default', async () => {
