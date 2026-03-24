@@ -91,11 +91,15 @@ takes only an `id` path parameter with no query params. Changes needed:
    `takenBefore` fields using `@ValidateDate`
 2. Update the controller to accept `@Query() query: SpacePeopleQueryDto`
 3. Thread temporal params through the service to the repository query. The current
-   query path is `shared_space_person` → `shared_space_person_face` → `asset_face`,
-   which does NOT join through to the `asset` table. Must extend the join chain to
-   include `asset` for access to `fileCreatedAt`. Temporal filtering should exclude
-   people entirely if they have zero face assets in the date range (not just reduce
-   counts).
+   architecture is N+1: `getPersonsBySpaceId` fetches all persons (flat query on
+   `shared_space_person`), then the service loops and calls `getPersonFaceCount` /
+   `getPersonAssetCount` per person. None of these queries join through to the
+   `asset` table where `fileCreatedAt` lives. **Recommended approach:** Create a new
+   repository method that filters persons in a single query joining
+   `shared_space_person` → `shared_space_person_face` → `asset_face` → `asset` with
+   a WHERE on `asset.fileCreatedAt`, returning only persons with at least one face
+   asset in the range. This avoids the N+1 pattern and naturally excludes people with
+   zero matches.
 4. Regenerate OpenAPI spec and TypeScript SDK (covered by the same
    `make open-api-typescript` step above)
 
@@ -138,6 +142,8 @@ providers: {
 
 The page constructs actual API calls — FilterPanel passes context through. This keeps
 FilterPanel reusable across different pages (spaces, albums, future main timeline).
+The temporal scoping works identically for non-space contexts since `takenAfter`/
+`takenBefore` on `SearchSuggestionRequestDto` are independent of `spaceId`.
 
 Cascade callbacks also need temporal context. Update the Props interfaces of
 `LocationFilter` and `CameraFilter` to accept both the parent value and context:
@@ -157,6 +163,9 @@ parent value. This ensures cities are scoped by both country AND date range.
 `LocationFilter` and `CameraFilter`. Their internal `$effect` blocks should depend on
 both the parent value (e.g., `expandedCountry`) AND the context, so that changing the
 temporal filter triggers a city/model re-fetch for any currently expanded cascade.
+The `$effect` must guard on `expandedCountry` (or `expandedMake`) being set before
+issuing a re-fetch — otherwise temporal changes would trigger a fetch even when no
+cascade is expanded.
 
 ### Temporal range mapping
 
@@ -196,7 +205,9 @@ provider re-fetch. Changes to `sortOrder`, `rating`, `mediaType`, `personIds`,
 
 **`clearFilters()` bypasses debounce:** When the user clears all filters, re-fetch
 immediately with empty `FilterContext` (no 200ms wait). Users clicking "Clear All"
-expect instant feedback.
+expect instant feedback. Implementation: detect when temporal values transition from
+non-empty to `undefined` (clear action) and skip the debounce timeout, firing the
+re-fetch synchronously.
 
 ### Stale request handling
 
@@ -221,6 +232,9 @@ When suggestions narrow and a previously-selected value is no longer in the resu
 - Show it at the top of the suggestion list, visually muted
 - User can deselect manually
 - Filter results remain correct (AND of all active filters)
+- **Accessibility**: Orphaned muted items must retain `aria-selected="true"` (or
+  equivalent) so screen readers convey their active state. Visual muting alone is
+  insufficient.
 - **Cascaded children**: If a parent is still in scope but its child becomes orphaned
   (e.g., make=Canon still visible but model=EOS R5 gone from scoped results), clear
   the child selection automatically — the model list re-fetches when temporal changes,
