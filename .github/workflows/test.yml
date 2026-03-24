@@ -336,6 +336,49 @@ jobs:
       - name: Run medium tests
         run: pnpm test:medium
         if: ${{ !cancelled() }}
+  docker-build-e2e:
+    name: Build E2E Docker Image (${{ matrix.runner }})
+    needs: pre-job
+    if: ${{ fromJSON(needs.pre-job.outputs.should_run).e2e == true || fromJSON(needs.pre-job.outputs.should_run).server == true || fromJSON(needs.pre-job.outputs.should_run).cli == true || fromJSON(needs.pre-job.outputs.should_run).web == true }}
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest, ubuntu-24.04-arm]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          submodules: 'recursive'
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
+
+      - name: Build server image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: .
+          file: server/Dockerfile
+          build-args: |
+            BUILD_ID=1234567890
+            BUILD_IMAGE=e2e
+            BUILD_SOURCE_REF=e2e
+            BUILD_SOURCE_COMMIT=e2eeeeeeeeeeeeeeeeee
+          outputs: type=docker,dest=/tmp/immich-server.tar
+          tags: immich-server:latest
+          cache-from: type=gha,scope=e2e-${{ runner.arch }}
+          cache-to: type=gha,scope=e2e-${{ runner.arch }},mode=min
+
+      - name: Upload server image
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: e2e-server-image-${{ runner.arch }}
+          path: /tmp/immich-server.tar
+          retention-days: 1
+          if-no-files-found: error
   e2e-tests-server-cli:
     name: End-to-End Tests (Server & CLI)
     needs: pre-job
