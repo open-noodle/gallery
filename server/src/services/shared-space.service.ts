@@ -22,10 +22,13 @@ import {
   SharedSpaceResponseDto,
   SharedSpaceUpdateDto,
 } from 'src/dtos/shared-space.dto';
+import { mapNotification } from 'src/dtos/notification.dto';
 import {
   CacheControl,
   JobName,
   JobStatus,
+  NotificationLevel,
+  NotificationType,
   Permission,
   QueueName,
   SharedSpaceActivityType,
@@ -816,6 +819,62 @@ export class SharedSpaceService extends BaseService {
         data: { spaceId, assetId },
       })),
     );
+
+    return JobStatus.Success;
+  }
+
+  @OnJob({ name: JobName.SharedSpaceBulkAddAssets, queue: QueueName.BackgroundTask })
+  async handleSharedSpaceBulkAddAssets({
+    spaceId,
+    userId,
+  }: JobOf<JobName.SharedSpaceBulkAddAssets>): Promise<JobStatus> {
+    const member = await this.sharedSpaceRepository.getMember(spaceId, userId);
+    if (!member || ROLE_HIERARCHY[member.role as SharedSpaceRole] < ROLE_HIERARCHY[SharedSpaceRole.Editor]) {
+      return JobStatus.Skipped;
+    }
+
+    const space = await this.sharedSpaceRepository.getById(spaceId);
+    if (!space) {
+      return JobStatus.Skipped;
+    }
+
+    let count: number;
+    try {
+      count = await this.sharedSpaceRepository.bulkAddUserAssets(spaceId, userId);
+    } catch (error) {
+      this.logger.error(`Bulk add assets failed for space ${spaceId}: ${error}`);
+      return JobStatus.Failed;
+    }
+
+    if (count === 0) {
+      return JobStatus.Success;
+    }
+
+    await this.sharedSpaceRepository.update(spaceId, { lastActivityAt: new Date() });
+
+    await this.sharedSpaceRepository.logActivity({
+      spaceId,
+      userId,
+      type: SharedSpaceActivityType.AssetAdd,
+      data: { count, bulk: true },
+    });
+
+    if (space.faceRecognitionEnabled) {
+      await this.jobRepository.queue({
+        name: JobName.SharedSpaceFaceMatchAll,
+        data: { spaceId },
+      });
+    }
+
+    const notification = await this.notificationRepository.create({
+      userId,
+      type: NotificationType.Custom,
+      level: NotificationLevel.Success,
+      title: 'Bulk add complete',
+      description: `${count} photos added to space`,
+      data: JSON.stringify({ spaceId }),
+    });
+    this.websocketRepository.clientSend('on_notification', userId, mapNotification(notification));
 
     return JobStatus.Success;
   }
