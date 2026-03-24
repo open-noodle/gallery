@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Insertable, Kysely, sql, Updateable } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { ChunkedArray, DummyValue, GenerateSql } from 'src/decorators';
-import { VectorIndex } from 'src/enum';
+import { AssetType, VectorIndex } from 'src/enum';
 import { probes } from 'src/repositories/database.repository';
 import { DB } from 'src/schema';
 import { SharedSpaceAssetTable } from 'src/schema/tables/shared-space-asset.table';
@@ -275,6 +275,7 @@ export class SharedSpaceRepository {
           .where('shared_space_asset.spaceId', '=', spaceId)
           .where('asset.deletedAt', 'is', null)
           .where('asset.isOffline', '=', false)
+          .where('asset.type', '=', AssetType.Image)
           .union(
             this.db
               .selectFrom('shared_space_library')
@@ -282,7 +283,8 @@ export class SharedSpaceRepository {
               .select(['asset.id', 'asset.thumbhash', 'asset.fileCreatedAt'])
               .where('shared_space_library.spaceId', '=', spaceId)
               .where('asset.deletedAt', 'is', null)
-              .where('asset.isOffline', '=', false),
+              .where('asset.isOffline', '=', false)
+              .where('asset.type', '=', AssetType.Image),
           )
           .as('combined'),
       )

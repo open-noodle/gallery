@@ -193,6 +193,7 @@ from
       "shared_space_asset"."spaceId" = $1
       and "asset"."deletedAt" is null
       and "asset"."isOffline" = $2
+      and "asset"."type" = $3
     union
     select
       "asset"."id",
@@ -202,14 +203,15 @@ from
       "shared_space_library"
       inner join "asset" on "asset"."libraryId" = "shared_space_library"."libraryId"
     where
-      "shared_space_library"."spaceId" = $3
+      "shared_space_library"."spaceId" = $4
       and "asset"."deletedAt" is null
-      and "asset"."isOffline" = $4
+      and "asset"."isOffline" = $5
+      and "asset"."type" = $6
   ) as "combined"
 order by
   "combined"."fileCreatedAt" desc
 limit
-  $5
+  $7
 
 -- SharedSpaceRepository.getLastAssetAddedAt
 select
