@@ -136,5 +136,6 @@ export const autoPlayVideo = persisted<boolean>('auto-play-video', true, {});
 export const alwaysLoadOriginalVideo = persisted<boolean>('always-load-original-video', false, {});
 
 export const recentAlbumsDropdown = persisted<boolean>('recent-albums-open', true, {});
+export const recentSpacesDropdown = persisted<boolean>('recent-spaces-open', true, {});
 
 export const hideBackupsReminder = persisted<boolean>('hide-backups-reminder', false, {});
