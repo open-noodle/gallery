@@ -51,6 +51,29 @@ test.describe('Spaces Sidebar Dropdown', () => {
       await expect(page.locator('[data-testid="hero-title"]')).toHaveText('Nav Test Space');
     });
 
+    test('should update page content when navigating between spaces via sidebar', async ({ context, page }) => {
+      await utils.resetDatabase();
+      admin = await utils.adminSetup();
+
+      const { space: spaceA } = await createSpaceWithAssets('Space Alpha', 1);
+      const { space: spaceB } = await createSpaceWithAssets('Space Beta', 1);
+
+      await utils.setAuthCookies(context, admin.accessToken);
+
+      // Navigate to space A first
+      await page.goto(`/spaces/${spaceA.id}`);
+      await expect(page.locator('[data-testid="hero-title"]')).toHaveText('Space Alpha');
+
+      // Click space B in the sidebar
+      await page.locator(`a[data-testid="sidebar-space-${spaceB.id}"]`).click();
+      await page.waitForURL(`**/spaces/${spaceB.id}`);
+
+      // Verify page content actually changed (not just URL)
+      // Use both selectors since hero-title is only shown when hero is expanded
+      const spaceTitle = page.locator('[data-testid="hero-title"], [data-testid="hero-collapsed-name"]').first();
+      await expect(spaceTitle).toHaveText('Space Beta');
+    });
+
     test('should show max 3 spaces', async ({ context, page }) => {
       await utils.resetDatabase();
       admin = await utils.adminSetup();
