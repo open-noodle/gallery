@@ -1,13 +1,16 @@
 <script lang="ts">
+  import type { FilterContext } from './filter-panel';
+
   interface Props {
     countries: string[];
     selectedCity?: string;
     selectedCountry?: string;
-    onCityFetch: (country: string) => Promise<string[]>;
+    context?: FilterContext;
+    onCityFetch: (country: string, context?: FilterContext) => Promise<string[]>;
     onSelectionChange: (country?: string, city?: string) => void;
   }
 
-  let { countries, selectedCity, selectedCountry, onCityFetch, onSelectionChange }: Props = $props();
+  let { countries, selectedCity, selectedCountry, context, onCityFetch, onSelectionChange }: Props = $props();
 
   let expandedCountry = $state<string | undefined>(undefined);
   let cities = $state<string[]>([]);
@@ -15,8 +18,9 @@
 
   $effect(() => {
     if (expandedCountry) {
+      const _context = context;
       loadingCities = true;
-      void onCityFetch(expandedCountry).then((result) => {
+      void onCityFetch(expandedCountry, _context).then((result) => {
         cities = result;
         loadingCities = false;
       });

@@ -14,13 +14,14 @@
     mdiImage,
   } from '@mdi/js';
   import type {
+    FilterContext,
     FilterPanelConfig,
     FilterSection as FilterSectionType,
     FilterState,
     PersonOption,
     TagOption,
   } from './filter-panel';
-  import { createFilterState } from './filter-panel';
+  import { buildFilterContext, createFilterState } from './filter-panel';
   import FilterSection from './filter-section.svelte';
   import TemporalPicker from './temporal-picker.svelte';
   import PeopleFilter from './people-filter.svelte';
@@ -44,6 +45,8 @@
   let countries = $state<string[]>([]);
   let cameraMakes = $state<string[]>([]);
   let tags = $state<TagOption[]>([]);
+
+  let filterContext: FilterContext | undefined = $derived(buildFilterContext(filters));
 
   const sectionIcons: Record<string, string> = {
     timeline: mdiCalendar,
@@ -302,9 +305,10 @@
                 {countries}
                 selectedCity={filters.city}
                 selectedCountry={filters.country}
-                onCityFetch={async (country) => {
+                context={filterContext}
+                onCityFetch={async (country, ctx) => {
                   if (config.providers.cities) {
-                    return config.providers.cities(country);
+                    return config.providers.cities(country, ctx);
                   }
                   return [];
                 }}
@@ -315,9 +319,10 @@
                 makes={cameraMakes}
                 selectedMake={filters.make}
                 selectedModel={filters.model}
-                onModelFetch={async (make) => {
+                context={filterContext}
+                onModelFetch={async (make, ctx) => {
                   if (config.providers.cameraModels) {
-                    return config.providers.cameraModels(make);
+                    return config.providers.cameraModels(make, ctx);
                   }
                   return [];
                 }}

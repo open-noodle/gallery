@@ -1,13 +1,16 @@
 <script lang="ts">
+  import type { FilterContext } from './filter-panel';
+
   interface Props {
     makes: string[];
     selectedMake?: string;
     selectedModel?: string;
-    onModelFetch: (make: string) => Promise<string[]>;
+    context?: FilterContext;
+    onModelFetch: (make: string, context?: FilterContext) => Promise<string[]>;
     onSelectionChange: (make?: string, model?: string) => void;
   }
 
-  let { makes, selectedMake, selectedModel, onModelFetch, onSelectionChange }: Props = $props();
+  let { makes, selectedMake, selectedModel, context, onModelFetch, onSelectionChange }: Props = $props();
 
   let expandedMake = $state<string | undefined>(undefined);
   let models = $state<string[]>([]);
@@ -15,8 +18,9 @@
 
   $effect(() => {
     if (expandedMake) {
+      const _context = context;
       loadingModels = true;
-      void onModelFetch(expandedMake).then((result) => {
+      void onModelFetch(expandedMake, _context).then((result) => {
         models = result;
         loadingModels = false;
       });

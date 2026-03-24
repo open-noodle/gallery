@@ -31,7 +31,7 @@ describe('Cascade callbacks pass parent value', () => {
     await fireEvent.click(screen.getByTestId('location-country-Germany'));
 
     await waitFor(() => {
-      expect(citiesFn).toHaveBeenCalledWith('Germany');
+      expect(citiesFn).toHaveBeenCalledWith('Germany', undefined);
     });
   });
 
@@ -64,7 +64,7 @@ describe('Cascade callbacks pass parent value', () => {
     await fireEvent.click(screen.getByTestId('camera-make-Fujifilm'));
 
     await waitFor(() => {
-      expect(modelsFn).toHaveBeenCalledWith('Fujifilm');
+      expect(modelsFn).toHaveBeenCalledWith('Fujifilm', undefined);
     });
   });
 
@@ -137,8 +137,8 @@ describe('Cascade callbacks pass parent value', () => {
     await fireEvent.click(screen.getByTestId('location-country-France'));
 
     await waitFor(() => {
-      expect(citiesFn).toHaveBeenCalledWith('France');
+      expect(citiesFn).toHaveBeenCalledWith('France', undefined);
     });
-    expect(citiesFn).not.toHaveBeenCalledWith('Germany');
+    expect(citiesFn).not.toHaveBeenCalledWith('Germany', undefined);
   });
 });
