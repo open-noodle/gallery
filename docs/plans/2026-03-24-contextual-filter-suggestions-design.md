@@ -23,7 +23,8 @@ misleading filter options and empty-result dead ends.
 | ------------------------- | ---------------------------------------------- |
 | Temporal (year/month)     | People, locations, cameras                     |
 | People, location, camera  | Temporal picker (via existing TimelineManager) |
-| Country (within location) | City (existing cascade)                        |
+| Country (within location) | State, City (existing cascade)                 |
+| State (within location)   | City (existing cascade)                        |
 | Make (within camera)      | Model (existing cascade)                       |
 
 The temporal picker's bidirectional scoping is already handled: `timeBuckets` is
@@ -45,7 +46,9 @@ types are `Date`.
 1. **DTO** (`search.dto.ts`): Add `takenAfter?` and `takenBefore?` with
    `@ValidateDate` to `SearchSuggestionRequestDto`
 2. **Service** (`search.service.ts`): Pass new fields through `getSuggestions()` to
-   all repository methods
+   all repository methods. **Note:** `getCountries` currently only passes
+   `{ spaceId: dto.spaceId }` — it must be updated to also pass temporal fields,
+   unlike other methods which already pass the full dto
 3. **Repository options type**: Add `takenAfter` and `takenBefore` to
    `SpaceScopeOptions` — since all per-field options interfaces (`GetStatesOptions`,
    `GetCitiesOptions`, `GetCameraMakesOptions`, `GetCameraModelsOptions`,
@@ -53,9 +56,11 @@ types are `Date`.
    of them automatically
 4. **`getExifField()` helper** (`search.repository.ts`): Add
    `.$if(!!options?.takenAfter, qb => qb.where('asset.fileCreatedAt', '>=', takenAfter))`
-   and equivalent for `takenBefore`. This is the single place where temporal scoping
-   is applied to all suggestion queries (countries, states, cities, camera makes,
-   camera models, lens models).
+   and `.$if(!!options?.takenBefore, qb => qb.where('asset.fileCreatedAt', '<', takenBefore))`.
+   Use `>=` for `takenAfter` and strict `<` for `takenBefore` (exclusive upper bound).
+   The column `fileCreatedAt` is the EXIF-derived taken date, not the DB insert
+   timestamp (`createdAt`). This is the single place where temporal scoping is applied
+   to all suggestion queries.
 5. **OpenAPI regeneration**: Since `SearchSuggestionRequestDto` changes the API
    contract, run `make open-api-typescript` to regenerate the TypeScript SDK
 
@@ -106,20 +111,54 @@ providers: {
 The page constructs actual API calls — FilterPanel passes context through. This keeps
 FilterPanel reusable across different pages (spaces, albums, future main timeline).
 
+Cascade callbacks (`onCityFetch`, `onModelFetch`) also need temporal context. Redesign
+these to accept both the parent value and `FilterContext`:
+
+```typescript
+onCityFetch: async (country: string, context?: FilterContext) => ...,
+onModelFetch: async (make: string, context?: FilterContext) => ...,
+```
+
+FilterPanel passes the current temporal context to cascade callbacks alongside the
+parent value. This ensures cities are scoped by both country AND date range.
+
+### Temporal range mapping
+
+When the user selects a year/month in the temporal picker, map to ISO strings:
+
+- **Year 2024**: `takenAfter: 2024-01-01T00:00:00.000Z`,
+  `takenBefore: 2025-01-01T00:00:00.000Z` (exclusive upper bound, consistent with
+  server's `<` operator)
+- **June 2024**: `takenAfter: 2024-06-01T00:00:00.000Z`,
+  `takenBefore: 2024-07-01T00:00:00.000Z`
+
+Use start-of-next-period for `takenBefore` (not end-of-period with `.999Z`) to avoid
+boundary precision issues.
+
 ### Re-fetch flow
 
 When a temporal filter changes:
 
-1. 200ms debounce
+1. 200ms debounce (trailing edge — fires 200ms after the last change, so rapid
+   clicks through years don't trigger intermediate fetches)
 2. Re-fetch people, locations, cameras in parallel, passing temporal context
-3. Sections show current suggestions at reduced opacity (0.5) while loading
+3. Sections show current suggestions at reduced opacity (0.5) while loading,
+   implemented via a CSS transition with a 150ms delay (so fast responses under
+   150ms never trigger the fade)
 4. On response, swap suggestions and restore opacity
-5. Skip opacity fade if response arrives within ~150ms (avoid flicker)
 
 ### Stale request handling
 
 `AbortController` per fetch cycle. When a new debounced fetch fires, abort previous
 in-flight requests.
+
+### Error handling
+
+When a provider fetch fails (network error, server error), keep showing the previous
+suggestions unchanged (no opacity fade, no stale indicator). Log the error to console.
+Do not show an error state in the UI — the user can retry by changing the filter again.
+This matches the existing behavior where provider failures on initial load silently
+show empty sections.
 
 ### Orphaned selections
 
@@ -130,6 +169,10 @@ When suggestions narrow and a previously-selected value is no longer in the resu
 - Show it at the top of the suggestion list, visually muted
 - User can deselect manually
 - Filter results remain correct (AND of all active filters)
+- **Cascaded children**: If a parent is still in scope but its child becomes orphaned
+  (e.g., make=Canon still visible but model=EOS R5 gone from scoped results), clear
+  the child selection automatically — the model list re-fetches when temporal changes,
+  and keeping an orphaned child of a cascade is more confusing than helpful
 
 ### Empty sections
 
@@ -191,6 +234,31 @@ If medium tests exist for `search.repository.ts` (real DB via testcontainers):
   `onCityFetch` is called with the selected country string (not ignored).
 - **Camera model cascade fix**: Mount CameraFilter, select a make, assert that
   `onModelFetch` is called with the selected make string (not ignored).
+- **Combined debounce + abort**: Change temporal selection, let debounce fire and
+  fetch start, then change temporal again before fetch resolves. Assert the debounce
+  timer resets, the first in-flight request is aborted, and only the second fetch's
+  results are applied.
+- **Clear all filters resets suggestions**: Set temporal filters, verify scoped
+  suggestions, then call `clearFilters()`. Assert all providers are re-called with
+  no temporal context (restoring full unscoped suggestions).
+- **Error handling on re-fetch**: Mock a provider that rejects. Assert the section
+  keeps showing its previous suggestions unchanged (no opacity change, no error UI).
+- **Section populated → empty → populated**: Apply narrow temporal filter (section
+  collapses to `(0)`), then widen temporal filter. Assert the section re-expands with
+  new suggestions and the `(0)` indicator is removed.
+- **Orphaned selection lifecycle**: Select a person, apply temporal filter that orphans
+  it (muted at top), deselect it, change temporal back so person reappears. Assert
+  person is in the normal suggestion list (not muted) and can be reselected cleanly.
+- **Cascade child auto-clear**: Select make=Canon and model=EOS R5, then apply
+  temporal filter where Canon exists but EOS R5 does not. Assert model selection is
+  cleared automatically while make selection persists.
+- **Cascade callback receives temporal context**: Select a year, then select a country.
+  Assert `onCityFetch` is called with both the country string AND the current
+  `FilterContext` (temporal params).
+- **Temporal range mapping**: Select year 2024 and assert provider receives
+  `takenAfter: 2024-01-01T00:00:00.000Z, takenBefore: 2025-01-01T00:00:00.000Z`.
+  Select June 2024 and assert `takenAfter: 2024-06-01T00:00:00.000Z,
+takenBefore: 2024-07-01T00:00:00.000Z`.
 
 ### E2E API Tests (`e2e/src/specs/server/api/`)
 
@@ -223,6 +291,11 @@ cameras across different years/months):
 - **Cascade correctness under temporal scoping**: Select a year, then select a country
   in the location filter. Assert the city dropdown only shows cities matching both
   the country AND the date range.
+- **Clear filters restores full suggestions**: Apply temporal + location filters,
+  clear all filters, verify all filter sections show full unscoped suggestions.
+- **Section recovery from empty**: Apply a temporal filter that empties the camera
+  section, then clear the temporal filter. Assert the camera section re-expands with
+  all cameras.
 
 ## Deferred Work
 
