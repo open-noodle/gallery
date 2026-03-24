@@ -47,12 +47,21 @@
   let cameraMakes = $state<string[]>([]);
   let tags = $state<TagOption[]>([]);
 
-  let filterContext: FilterContext | undefined = $derived(buildFilterContext(filters));
+  // Memoize filterContext so it keeps the same object reference when temporal values
+  // haven't changed. Without this, every non-temporal filter change (selecting a country,
+  // camera, etc.) creates a new filterContext object, which triggers $effect blocks in
+  // LocationFilter/CameraFilter that depend on the context prop, causing unnecessary
+  // cascade re-fetches and visual flicker.
+  let memoizedContext: FilterContext | undefined = $state();
+  let filterContext: FilterContext | undefined = $derived.by(() => {
+    const next = buildFilterContext(filters);
+    if (memoizedContext?.takenAfter === next?.takenAfter && memoizedContext?.takenBefore === next?.takenBefore) {
+      return memoizedContext;
+    }
+    memoizedContext = next;
+    return next;
+  });
 
-  // Track only the temporal values to avoid re-triggering on non-temporal filter changes.
-  // $derived creates a new object every time filters changes (even if selectedYear/Month
-  // didn't change). By tracking the string values directly, the $effect below only fires
-  // when temporal values actually change, preventing flicker on non-temporal filter clicks.
   let prevTakenAfter: string | undefined = $state();
   let prevTakenBefore: string | undefined = $state();
   let abortController: AbortController | undefined = $state();
