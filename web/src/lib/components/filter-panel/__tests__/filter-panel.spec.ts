@@ -1,5 +1,5 @@
-import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import '@testing-library/jest-dom';
 import { createFilterState } from '../filter-panel';
 import FilterPanel from '../filter-panel.svelte';
 
@@ -118,7 +118,7 @@ describe('FilterPanel', () => {
   });
 
   describe('initialCollapsed prop', () => {
-    it('should start collapsed when initialCollapsed is true', () => {
+    it('should start collapsed when initialCollapsed is true', async () => {
       render(FilterPanel, {
         props: {
           config: { sections: ['rating', 'media'], providers: {} },
@@ -130,7 +130,7 @@ describe('FilterPanel', () => {
       expect(screen.queryByTestId('discovery-panel')).not.toBeInTheDocument();
     });
 
-    it('should start expanded by default (no prop)', () => {
+    it('should start expanded by default (no prop)', async () => {
       render(FilterPanel, {
         props: {
           config: { sections: ['rating', 'media'], providers: {} },
@@ -146,7 +146,7 @@ describe('FilterPanel', () => {
     it('should show generic empty text for people section when no people', async () => {
       render(FilterPanel, {
         props: {
-          config: { sections: ['people'], providers: { people: () => Promise.resolve([]) } },
+          config: { sections: ['people'], providers: { people: async () => [] } },
           timeBuckets: [],
         },
       });
@@ -158,7 +158,7 @@ describe('FilterPanel', () => {
     it('should show generic empty text for location section when no locations', async () => {
       render(FilterPanel, {
         props: {
-          config: { sections: ['location'], providers: { locations: () => Promise.resolve([]) } },
+          config: { sections: ['location'], providers: { locations: async () => [] } },
           timeBuckets: [],
         },
       });
@@ -170,7 +170,7 @@ describe('FilterPanel', () => {
     it('should show generic empty text for camera section when no cameras', async () => {
       render(FilterPanel, {
         props: {
-          config: { sections: ['camera'], providers: { cameras: () => Promise.resolve([]) } },
+          config: { sections: ['camera'], providers: { cameras: async () => [] } },
           timeBuckets: [],
         },
       });
