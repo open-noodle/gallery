@@ -35,7 +35,7 @@ export class SharedSpacePersonTable {
   @Column({ type: 'boolean', default: false })
   isHidden!: Generated<boolean>;
 
-  @Column({ type: 'character varying', default: "'person'" })
+  @Column({ type: 'character varying', default: 'person' })
   type!: Generated<string>;
 
   @Column({ type: 'date', nullable: true })
