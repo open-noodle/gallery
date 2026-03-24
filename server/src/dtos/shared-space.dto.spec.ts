@@ -23,7 +23,7 @@ describe('SharedSpaceAssetAddDto', () => {
   });
 
   it('should accept 9,999 asset IDs', async () => {
-    const dto = plainToInstance(SharedSpaceAssetAddDto, { assetIds: makeUUIDs(9_999) });
+    const dto = plainToInstance(SharedSpaceAssetAddDto, { assetIds: makeUUIDs(9999) });
     const errors = await validate(dto);
     expect(errors).toHaveLength(0);
   });
