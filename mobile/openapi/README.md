@@ -261,6 +261,7 @@ Class | Method | HTTP request | Description
 *SharedLinksApi* | [**updateSharedLink**](doc//SharedLinksApi.md#updatesharedlink) | **PATCH** /shared-links/{id} | Update a shared link
 *SharedSpacesApi* | [**addAssets**](doc//SharedSpacesApi.md#addassets) | **POST** /shared-spaces/{id}/assets | Add assets to a shared space
 *SharedSpacesApi* | [**addMember**](doc//SharedSpacesApi.md#addmember) | **POST** /shared-spaces/{id}/members | Add a member to a shared space
+*SharedSpacesApi* | [**bulkAddAssets**](doc//SharedSpacesApi.md#bulkaddassets) | **POST** /shared-spaces/{id}/assets/bulk-add | Add all user assets to a shared space
 *SharedSpacesApi* | [**createSpace**](doc//SharedSpacesApi.md#createspace) | **POST** /shared-spaces | Create a shared space
 *SharedSpacesApi* | [**deleteSpacePerson**](doc//SharedSpacesApi.md#deletespaceperson) | **DELETE** /shared-spaces/{id}/people/{personId} | Delete a person from a shared space
 *SharedSpacesApi* | [**deleteSpacePersonAlias**](doc//SharedSpacesApi.md#deletespacepersonalias) | **DELETE** /shared-spaces/{id}/people/{personId}/alias | Delete a person alias in a shared space
