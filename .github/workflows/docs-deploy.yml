@@ -13,6 +13,7 @@ jobs:
     name: Deploy Docs to S3
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' }}
+    environment: docs-deploy
     permissions:
       actions: read
     steps:
