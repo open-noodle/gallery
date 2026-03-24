@@ -102,6 +102,7 @@ export interface SearchAlbumOptions {
 
 export interface SearchSpaceOptions {
   spaceId?: string;
+  spacePersonIds?: string[];
 }
 
 export interface SearchOrderOptions {
