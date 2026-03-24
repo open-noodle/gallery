@@ -49,29 +49,47 @@
 
   let filterContext: FilterContext | undefined = $derived(buildFilterContext(filters));
 
-  // Contextual re-fetch state
-  let prevContext: FilterContext | undefined = $state();
+  // Track only the temporal values to avoid re-triggering on non-temporal filter changes.
+  // $derived creates a new object every time filters changes (even if selectedYear/Month
+  // didn't change). By tracking the string values directly, the $effect below only fires
+  // when temporal values actually change, preventing flicker on non-temporal filter clicks.
+  let prevTakenAfter: string | undefined = $state();
+  let prevTakenBefore: string | undefined = $state();
   let abortController: AbortController | undefined = $state();
   let isRefetching = $state(false);
 
-  // Debounced re-fetch when temporal filter changes
+  // Debounced re-fetch when temporal filter changes.
+  // We track filters.selectedYear and filters.selectedMonth directly instead of
+  // filterContext to avoid re-triggering when non-temporal filters change.
   $effect(() => {
-    const currentContext = filterContext;
+    // Track only the two temporal fields — this is what determines re-fetch
+    const year = filters.selectedYear;
+    const month = filters.selectedMonth;
+    // Build context from tracked values (not from filterContext which would track all of filters)
+    const currentContext = buildFilterContext({ selectedYear: year, selectedMonth: month } as FilterState);
+    const currentTakenAfter = currentContext?.takenAfter;
+    const currentTakenBefore = currentContext?.takenBefore;
 
-    // Read prevContext without tracking to avoid re-trigger loops
-    const prev = untrack(() => prevContext);
+    // Read prev values without tracking to avoid re-trigger loops
+    const prevAfter = untrack(() => prevTakenAfter);
+    const prevBefore = untrack(() => prevTakenBefore);
 
     // Skip initial load (both undefined)
-    if (prev === undefined && currentContext === undefined) {
+    if (
+      prevAfter === undefined &&
+      prevBefore === undefined &&
+      currentTakenAfter === undefined &&
+      currentTakenBefore === undefined
+    ) {
       return;
     }
 
     // Skip if context hasn't actually changed
-    if (prev?.takenAfter === currentContext?.takenAfter && prev?.takenBefore === currentContext?.takenBefore) {
+    if (prevAfter === currentTakenAfter && prevBefore === currentTakenBefore) {
       return;
     }
 
-    const isClear = prev !== undefined && currentContext === undefined;
+    const isClear = (prevAfter !== undefined || prevBefore !== undefined) && currentContext === undefined;
     const delay = isClear ? 0 : 200;
 
     // Capture config providers to avoid stale closure warning
@@ -139,7 +157,8 @@
       });
     }, delay);
 
-    prevContext = currentContext;
+    prevTakenAfter = currentTakenAfter;
+    prevTakenBefore = currentTakenBefore;
 
     return () => {
       clearTimeout(timeout);
