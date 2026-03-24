@@ -276,6 +276,11 @@ export interface ISharedSpaceLibraryFaceSyncJob extends IBaseJob {
   libraryId: string;
 }
 
+export interface ISharedSpaceBulkAddAssetsJob extends IBaseJob {
+  spaceId: string;
+  userId: string;
+}
+
 export type EmailImageAttachment = {
   filename: string;
   cid: string;
@@ -473,7 +478,10 @@ export type JobItem =
   | { name: JobName.SharedSpaceFaceMatch; data: ISharedSpaceFaceMatchJob }
   | { name: JobName.SharedSpaceFaceMatchAll; data: ISharedSpaceFaceMatchAllJob }
   | { name: JobName.SharedSpacePersonThumbnail; data: IEntityJob }
-  | { name: JobName.SharedSpaceLibraryFaceSync; data: ISharedSpaceLibraryFaceSyncJob };
+  | { name: JobName.SharedSpaceLibraryFaceSync; data: ISharedSpaceLibraryFaceSyncJob }
+
+  // Shared Space Bulk Operations
+  | { name: JobName.SharedSpaceBulkAddAssets; data: ISharedSpaceBulkAddAssetsJob };
 
 export type VectorExtension = (typeof VECTOR_EXTENSIONS)[number];
 

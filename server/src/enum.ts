@@ -922,6 +922,9 @@ export enum JobName {
   SharedSpaceFaceMatchAll = 'SharedSpaceFaceMatchAll',
   SharedSpacePersonThumbnail = 'SharedSpacePersonThumbnail',
   SharedSpaceLibraryFaceSync = 'SharedSpaceLibraryFaceSync',
+
+  // Shared Space Bulk Operations
+  SharedSpaceBulkAddAssets = 'SharedSpaceBulkAddAssets',
 }
 
 export const JobNameSchema = z.enum(JobName).describe('Job name').meta({ id: 'JobName' });
