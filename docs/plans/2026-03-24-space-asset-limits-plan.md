@@ -177,7 +177,7 @@ git commit -m "feat: add i18n key for space asset limit warning"
 
 ### Task 4: Write Frontend Warning Test
 
-The space page is too complex to render in isolation (route data dependencies, SDK imports, etc.). Extract a small `SpaceAssetLimitWarning.svelte` component that is independently testable.
+The space page is too complex to render in isolation (route data dependencies, SDK imports, etc.). Extract a small `space-asset-limit-warning.svelte` component that is independently testable.
 
 **Files:**
 
@@ -190,7 +190,7 @@ Create `web/src/lib/components/spaces/space-asset-limit-warning.spec.ts`:
 
 ```typescript
 import { render, screen } from '@testing-library/svelte';
-import SpaceAssetLimitWarning from '$lib/components/spaces/SpaceAssetLimitWarning.svelte';
+import SpaceAssetLimitWarning from '$lib/components/spaces/space-asset-limit-warning.svelte';
 
 describe('SpaceAssetLimitWarning', () => {
   it('should not render when selectedCount is within the limit', () => {
@@ -239,12 +239,12 @@ git commit -m "test: add space asset limit warning component tests"
 
 **Files:**
 
-- Create: `web/src/lib/components/spaces/SpaceAssetLimitWarning.svelte`
+- Create: `web/src/lib/components/spaces/space-asset-limit-warning.svelte`
 - Modify: `web/src/routes/(user)/spaces/[spaceId]/[[photos=photos]]/[[assetId=id]]/+page.svelte`
 
 **Step 1: Create the SpaceAssetLimitWarning component**
 
-Create `web/src/lib/components/spaces/SpaceAssetLimitWarning.svelte`:
+Create `web/src/lib/components/spaces/space-asset-limit-warning.svelte`:
 
 ```svelte
 <script lang="ts">
@@ -254,7 +254,7 @@ Create `web/src/lib/components/spaces/SpaceAssetLimitWarning.svelte`:
     selectedCount: number;
   }
 
-  const MAX_SPACE_ASSETS_PER_REQUEST = 10_000;
+  export const MAX_SPACE_ASSETS_PER_REQUEST = 10_000;
 
   let { selectedCount }: Props = $props();
 </script>
@@ -264,21 +264,21 @@ Create `web/src/lib/components/spaces/SpaceAssetLimitWarning.svelte`:
     class="mx-4 mt-2 rounded-lg bg-red-100 p-3 text-sm text-red-800 dark:bg-red-900/30 dark:text-red-200"
     data-testid="asset-limit-warning"
   >
-    <FormatMessage key="space_asset_limit_warning" let:tag let:message>
-      {#if tag === 'link'}
-        <a
-          href="https://github.com/open-noodle/gallery/blob/main/docs/docs/features/shared-spaces.md#got-a-lot-of-photos"
-          class="underline"
-          target="_blank"
-          rel="noopener">{message}</a
-        >
-      {/if}
+    <FormatMessage key="space_asset_limit_warning">
+      {#snippet children({ tag, message })}
+        {#if tag === 'link'}
+          <a
+            href="https://github.com/open-noodle/gallery/blob/main/docs/docs/features/shared-spaces.md#got-a-lot-of-photos"
+            class="underline"
+            target="_blank"
+            rel="noopener">{message}</a
+          >
+        {/if}
+      {/snippet}
     </FormatMessage>
   </div>
 {/if}
 ```
-
-Note: Check the exact `FormatMessage` API (it may use `{#snippet children({ tag, message })}` with Svelte 5 snippets instead of `let:tag`). Follow the pattern used in existing components like `AuthSettings.svelte` or `LibrarySettings.svelte`.
 
 **Step 2: Run the tests**
 
@@ -293,7 +293,9 @@ In `web/src/routes/(user)/spaces/[spaceId]/[[photos=photos]]/[[assetId=id]]/+pag
 1. Import the component and constant:
 
 ```typescript
-import SpaceAssetLimitWarning from '$lib/components/spaces/SpaceAssetLimitWarning.svelte';
+import SpaceAssetLimitWarning, {
+  MAX_SPACE_ASSETS_PER_REQUEST,
+} from '$lib/components/spaces/space-asset-limit-warning.svelte';
 ```
 
 2. In the `handleAddAssets` function, add an early return guard (defense in depth — button is disabled, but prevents programmatic calls):
@@ -301,7 +303,7 @@ import SpaceAssetLimitWarning from '$lib/components/spaces/SpaceAssetLimitWarnin
 ```typescript
 const handleAddAssets = async () => {
   const assetIds = timelineInteraction.selectedAssets.map((a) => a.id);
-  if (assetIds.length === 0 || assetIds.length > 10_000) {
+  if (assetIds.length === 0 || assetIds.length > MAX_SPACE_ASSETS_PER_REQUEST) {
     return;
   }
   // ... rest unchanged
@@ -311,7 +313,7 @@ const handleAddAssets = async () => {
 3. In the selection control bar (around line 885), disable the add button when over limit:
 
 ```svelte
-disabled={!timelineInteraction.selectionActive || timelineInteraction.selectedAssets.length > 10_000}
+disabled={!timelineInteraction.selectionActive || timelineInteraction.selectedAssets.length > MAX_SPACE_ASSETS_PER_REQUEST}
 ```
 
 4. After the `</ControlAppBar>` closing tag, add:
@@ -322,12 +324,12 @@ disabled={!timelineInteraction.selectionActive || timelineInteraction.selectedAs
 
 **Step 4: Run lint and format**
 
-Run: `cd web && npx prettier --write src/lib/components/spaces/SpaceAssetLimitWarning.svelte "src/routes/(user)/spaces/[spaceId]/[[photos=photos]]/[[assetId=id]]/+page.svelte"`
+Run: `cd web && npx prettier --write src/lib/components/spaces/space-asset-limit-warning.svelte "src/routes/(user)/spaces/[spaceId]/[[photos=photos]]/[[assetId=id]]/+page.svelte"`
 
 **Step 5: Commit**
 
 ```bash
-git add web/src/lib/components/spaces/SpaceAssetLimitWarning.svelte "web/src/routes/(user)/spaces/"
+git add web/src/lib/components/spaces/space-asset-limit-warning.svelte "web/src/routes/(user)/spaces/"
 git commit -m "feat: show warning and disable add button when space asset limit exceeded"
 ```
 
