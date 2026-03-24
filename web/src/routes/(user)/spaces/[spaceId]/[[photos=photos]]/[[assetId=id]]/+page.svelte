@@ -91,6 +91,32 @@
   let { data }: Props = $props();
   let space: SharedSpaceResponseDto = $state(data.space);
   let members: SharedSpaceMemberResponseDto[] = $state(data.members);
+
+  // Sync when navigating between spaces (component persists, data updates)
+  $effect(() => {
+    if (data.space.id !== space.id) {
+      space = data.space;
+      members = data.members;
+      filters = createFilterState();
+      activities = [];
+      hasMoreActivities = false;
+      activityOffset = 0;
+      spacePeople = [];
+      personNames = new Map();
+      tagNames = new Map();
+      searchQuery = '';
+      searchResults = [];
+      isSearching = false;
+      showSearchResults = false;
+      heroCollapsed = false;
+      panelOpen = false;
+      viewMode = 'view';
+      repositioning = false;
+      assetInteraction.clearMultiselect();
+      timelineInteraction.clearMultiselect();
+    }
+  });
+
   let viewMode = $state<ViewMode>('view');
   let panelOpen = $state(false);
   let repositioning = $state(false);
@@ -630,14 +656,16 @@
   <div class="flex h-full" data-testid="discovery-timeline">
     <!-- Filter Panel (left sidebar) -->
     {#if viewMode === 'view'}
-      <FilterPanel
-        config={filterConfig}
-        bind:filters
-        timeBuckets={timelineManager?.months?.map((m) => ({
-          timeBucket: `${m.yearMonth.year}-${String(m.yearMonth.month).padStart(2, '0')}-01T00:00:00.000Z`,
-          count: m.assetsCount,
-        })) ?? []}
-      />
+      {#key space.id}
+        <FilterPanel
+          config={filterConfig}
+          bind:filters
+          timeBuckets={timelineManager?.months?.map((m) => ({
+            timeBucket: `${m.yearMonth.year}-${String(m.yearMonth.month).padStart(2, '0')}-01T00:00:00.000Z`,
+            count: m.assetsCount,
+          })) ?? []}
+        />
+      {/key}
     {/if}
 
     <!-- Main Content — pl-4 adds breathing room between filter panel and content -->
