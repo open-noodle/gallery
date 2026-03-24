@@ -60,7 +60,9 @@
     title={space.name}
     aria-current={active ? 'page' : undefined}
     data-testid="sidebar-space-{space.id}"
-    class="flex w-full place-items-center gap-4 rounded-e-full py-3 transition-[padding] delay-100 duration-100 hover:cursor-pointer hover:bg-subtle hover:text-immich-primary dark:text-immich-dark-fg dark:hover:bg-immich-dark-gray dark:hover:text-immich-dark-primary ps-10 group-hover:sm:px-10 md:px-10 {active ? 'bg-primary/10 text-immich-primary dark:text-immich-dark-primary' : ''}"
+    class="flex w-full place-items-center gap-4 rounded-e-full py-3 transition-[padding] delay-100 duration-100 hover:cursor-pointer hover:bg-subtle hover:text-immich-primary dark:text-immich-dark-fg dark:hover:bg-immich-dark-gray dark:hover:text-immich-dark-primary ps-10 group-hover:sm:px-10 md:px-10 {active
+      ? 'bg-primary/10 text-immich-primary dark:text-immich-dark-primary'
+      : ''}"
   >
     <div>
       {#if space.newAssetCount && space.newAssetCount > 0}
