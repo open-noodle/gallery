@@ -1,6 +1,7 @@
-import { fireEvent, render, waitFor } from '@testing-library/svelte';
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import CameraFilter from '../camera-filter.svelte';
 import type { PersonOption } from '../filter-panel';
+import FilterPanel from '../filter-panel.svelte';
 import LocationFilter from '../location-filter.svelte';
 import PeopleFilter from '../people-filter.svelte';
 
@@ -382,5 +383,41 @@ describe('CameraFilter', () => {
     });
 
     expect(getByTestId('camera-empty').textContent).toBe('No cameras in this space');
+  });
+});
+
+describe('storageKey prop', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('should use custom storage key for localStorage persistence', async () => {
+    const customKey = 'gallery-filter-photos';
+    render(FilterPanel, {
+      props: {
+        config: { sections: ['rating', 'media', 'tags'], providers: {} },
+        timeBuckets: [],
+        storageKey: customKey,
+      },
+    });
+    const ratingToggle = screen.getByTestId('section-toggle-rating');
+    await fireEvent.click(ratingToggle);
+    const stored = localStorage.getItem(customKey);
+    expect(stored).toBeTruthy();
+    const parsed = JSON.parse(stored!) as string[];
+    expect(parsed).not.toContain('rating');
+    expect(localStorage.getItem('gallery-filter-visible-sections')).toBeNull();
+  });
+
+  it('should use default key when storageKey not provided', async () => {
+    render(FilterPanel, {
+      props: {
+        config: { sections: ['rating', 'media'], providers: {} },
+        timeBuckets: [],
+      },
+    });
+    const ratingToggle = screen.getByTestId('section-toggle-rating');
+    await fireEvent.click(ratingToggle);
+    expect(localStorage.getItem('gallery-filter-visible-sections')).toBeTruthy();
   });
 });
