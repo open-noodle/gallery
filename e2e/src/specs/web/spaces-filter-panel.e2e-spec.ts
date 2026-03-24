@@ -1641,55 +1641,55 @@ test.describe('Spaces FilterPanel', () => {
   // ────────────────────────────────────────────────────────────────────────────
   // Contextual filter suggestions (6 tests)
   // ────────────────────────────────────────────────────────────────────────────
+  // ─── Helper: create a space with assets that have distinct EXIF metadata per year ───
+  // 2023 assets: Germany/Berlin + Canon EOS R5
+  // 2022 asset:  France/Paris  + Nikon Z6
+  async function createExifPopulatedSpace(name: string) {
+    const space = await utils.createSpace(admin.accessToken, { name });
+
+    const asset2023a = await utils.createAsset(admin.accessToken, {
+      fileCreatedAt: '2023-06-15T10:00:00.000Z',
+      fileModifiedAt: '2023-06-15T10:00:00.000Z',
+    });
+    const asset2023b = await utils.createAsset(admin.accessToken, {
+      fileCreatedAt: '2023-09-20T10:00:00.000Z',
+      fileModifiedAt: '2023-09-20T10:00:00.000Z',
+    });
+    const asset2022 = await utils.createAsset(admin.accessToken, {
+      fileCreatedAt: '2022-03-10T10:00:00.000Z',
+      fileModifiedAt: '2022-03-10T10:00:00.000Z',
+    });
+
+    await utils.addSpaceAssets(admin.accessToken, space.id, [asset2023a.id, asset2023b.id, asset2022.id]);
+
+    // Insert EXIF metadata directly via DB
+    const db = await utils.connectDatabase();
+    await db.query(`UPDATE asset_exif SET country = $1, city = $2, make = $3, model = $4 WHERE "assetId" = $5`, [
+      'Germany',
+      'Berlin',
+      'Canon',
+      'EOS R5',
+      asset2023a.id,
+    ]);
+    await db.query(`UPDATE asset_exif SET country = $1, city = $2, make = $3, model = $4 WHERE "assetId" = $5`, [
+      'Germany',
+      'Munich',
+      'Canon',
+      'EOS R5',
+      asset2023b.id,
+    ]);
+    await db.query(`UPDATE asset_exif SET country = $1, city = $2, make = $3, model = $4 WHERE "assetId" = $5`, [
+      'France',
+      'Paris',
+      'Nikon',
+      'Z6',
+      asset2022.id,
+    ]);
+
+    return { space, assets: { asset2023a, asset2023b, asset2022 } };
+  }
+
   test.describe('Contextual filter suggestions', () => {
-    // Helper: create a space with assets that have distinct EXIF metadata per year.
-    // 2023 assets: Germany/Berlin + Canon EOS R5
-    // 2022 asset:  France/Paris  + Nikon Z6
-    async function createExifPopulatedSpace(name: string) {
-      const space = await utils.createSpace(admin.accessToken, { name });
-
-      const asset2023a = await utils.createAsset(admin.accessToken, {
-        fileCreatedAt: '2023-06-15T10:00:00.000Z',
-        fileModifiedAt: '2023-06-15T10:00:00.000Z',
-      });
-      const asset2023b = await utils.createAsset(admin.accessToken, {
-        fileCreatedAt: '2023-09-20T10:00:00.000Z',
-        fileModifiedAt: '2023-09-20T10:00:00.000Z',
-      });
-      const asset2022 = await utils.createAsset(admin.accessToken, {
-        fileCreatedAt: '2022-03-10T10:00:00.000Z',
-        fileModifiedAt: '2022-03-10T10:00:00.000Z',
-      });
-
-      await utils.addSpaceAssets(admin.accessToken, space.id, [asset2023a.id, asset2023b.id, asset2022.id]);
-
-      // Insert EXIF metadata directly via DB
-      const db = await utils.connectDatabase();
-      await db.query(`UPDATE asset_exif SET country = $1, city = $2, make = $3, model = $4 WHERE "assetId" = $5`, [
-        'Germany',
-        'Berlin',
-        'Canon',
-        'EOS R5',
-        asset2023a.id,
-      ]);
-      await db.query(`UPDATE asset_exif SET country = $1, city = $2, make = $3, model = $4 WHERE "assetId" = $5`, [
-        'Germany',
-        'Munich',
-        'Canon',
-        'EOS R5',
-        asset2023b.id,
-      ]);
-      await db.query(`UPDATE asset_exif SET country = $1, city = $2, make = $3, model = $4 WHERE "assetId" = $5`, [
-        'France',
-        'Paris',
-        'Nikon',
-        'Z6',
-        asset2022.id,
-      ]);
-
-      return { space, assets: { asset2023a, asset2023b, asset2022 } };
-    }
-
     test('temporal scoping narrows location suggestions to selected year', async ({ context, page }) => {
       const { space } = await createExifPopulatedSpace('Temporal Narrows Location');
       await gotoSpace(context, page, space.id);
