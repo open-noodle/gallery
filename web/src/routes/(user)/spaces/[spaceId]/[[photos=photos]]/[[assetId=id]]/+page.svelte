@@ -76,6 +76,7 @@
     mdiFaceRecognition,
     mdiImageOutline,
     mdiImagePlusOutline,
+    mdiPaw,
     mdiPlus,
   } from '@mdi/js';
   import { t } from 'svelte-i18n';
@@ -409,6 +410,19 @@
     }
   };
 
+  const handleTogglePets = async () => {
+    try {
+      const updated = await updateSpace({
+        id: space.id,
+        sharedSpaceUpdateDto: { petsEnabled: !space.petsEnabled },
+      });
+      space = { ...space, petsEnabled: updated.petsEnabled };
+      await loadSpacePeople();
+    } catch (error) {
+      handleError(error, 'Failed to update pets setting');
+    }
+  };
+
   const handleShowMembers = () => {
     panelOpen = !panelOpen;
   };
@@ -572,42 +586,49 @@
           variant="ghost"
           shape="round"
           color="secondary"
-          aria-label={showInTimeline ? $t('spaces_hide_from_timeline') : $t('spaces_show_on_timeline')}
-          title={showInTimeline ? $t('spaces_hide_from_timeline') : $t('spaces_show_on_timeline')}
-          onclick={handleToggleTimeline}
-          icon={showInTimeline ? mdiEyeOutline : mdiEyeOffOutline}
-        />
-
-        <IconButton
-          variant="ghost"
-          shape="round"
-          color="secondary"
           aria-label={$t('members')}
           onclick={handleShowMembers}
           icon={mdiAccountMultipleOutline}
           data-testid="space-members-button"
         />
 
-        {#if isOwner}
-          <IconButton
-            variant="ghost"
-            shape="round"
-            color={space.faceRecognitionEnabled ? 'primary' : 'secondary'}
-            aria-label={space.faceRecognitionEnabled ? 'Disable face recognition' : 'Enable face recognition'}
-            title={space.faceRecognitionEnabled ? 'Disable face recognition' : 'Enable face recognition'}
-            onclick={handleToggleFaceRecognition}
-            icon={mdiFaceRecognition}
+        <ButtonContextMenu
+          direction="left"
+          align="top-right"
+          color="secondary"
+          title="More"
+          icon={mdiDotsVertical}
+        >
+          <MenuOption
+            text={showInTimeline ? $t('spaces_hide_from_timeline') : $t('spaces_show_on_timeline')}
+            icon={showInTimeline ? mdiEyeOutline : mdiEyeOffOutline}
+            onClick={handleToggleTimeline}
           />
-
-          <IconButton
-            variant="ghost"
-            shape="round"
-            color="secondary"
-            aria-label={$t('spaces_delete')}
-            onclick={handleDelete}
-            icon={mdiDeleteOutline}
-          />
-        {/if}
+          {#if isOwner}
+            <hr class="my-1 border-gray-300" />
+            <MenuOption
+              text="People"
+              icon={mdiFaceRecognition}
+              textColor={space.faceRecognitionEnabled ? 'text-immich-primary' : undefined}
+              onClick={handleToggleFaceRecognition}
+            />
+            {#if space.faceRecognitionEnabled}
+              <MenuOption
+                text="Pets"
+                icon={mdiPaw}
+                textColor={space.petsEnabled ? 'text-immich-primary' : undefined}
+                onClick={handleTogglePets}
+              />
+            {/if}
+            <hr class="my-1 border-gray-300" />
+            <MenuOption
+              text={$t('spaces_delete')}
+              icon={mdiDeleteOutline}
+              textColor="text-red-500"
+              onClick={handleDelete}
+            />
+          {/if}
+        </ButtonContextMenu>
       </div>
     {/if}
   {/snippet}
