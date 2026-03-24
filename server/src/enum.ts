@@ -717,6 +717,9 @@ export enum JobName {
   SharedSpaceFaceMatchAll = 'SharedSpaceFaceMatchAll',
   SharedSpacePersonThumbnail = 'SharedSpacePersonThumbnail',
   SharedSpaceLibraryFaceSync = 'SharedSpaceLibraryFaceSync',
+
+  // Shared Space Bulk Operations
+  SharedSpaceBulkAddAssets = 'SharedSpaceBulkAddAssets',
 }
 
 export enum QueueCommand {
