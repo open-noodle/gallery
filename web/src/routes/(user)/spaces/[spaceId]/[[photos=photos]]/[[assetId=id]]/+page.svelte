@@ -592,13 +592,7 @@
           data-testid="space-members-button"
         />
 
-        <ButtonContextMenu
-          direction="left"
-          align="top-right"
-          color="secondary"
-          title="More"
-          icon={mdiDotsVertical}
-        >
+        <ButtonContextMenu direction="left" align="top-right" color="secondary" title="More" icon={mdiDotsVertical}>
           <MenuOption
             text={showInTimeline ? $t('spaces_hide_from_timeline') : $t('spaces_show_on_timeline')}
             icon={showInTimeline ? mdiEyeOutline : mdiEyeOffOutline}

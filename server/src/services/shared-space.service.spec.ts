@@ -1034,9 +1034,7 @@ describe(SharedSpaceService.name, () => {
 
     it('should require owner role when updating petsEnabled', async () => {
       const spaceId = newUuid();
-      mocks.sharedSpace.getMember.mockResolvedValue(
-        makeMemberResult({ spaceId, role: SharedSpaceRole.Editor }),
-      );
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ spaceId, role: SharedSpaceRole.Editor }));
 
       await expect(sut.update(factory.auth(), spaceId, { petsEnabled: false })).rejects.toThrow('Insufficient role');
     });
@@ -1044,9 +1042,7 @@ describe(SharedSpaceService.name, () => {
     it('should pass petsEnabled to repository update', async () => {
       const spaceId = newUuid();
       const space = factory.sharedSpace({ id: spaceId });
-      mocks.sharedSpace.getMember.mockResolvedValue(
-        makeMemberResult({ spaceId, role: SharedSpaceRole.Owner }),
-      );
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ spaceId, role: SharedSpaceRole.Owner }));
       mocks.sharedSpace.getById.mockResolvedValue(space);
       mocks.sharedSpace.update.mockResolvedValue(space);
 
@@ -1057,9 +1053,7 @@ describe(SharedSpaceService.name, () => {
 
     it('should reject editor updating petsEnabled (metadata requires owner)', async () => {
       const spaceId = newUuid();
-      mocks.sharedSpace.getMember.mockResolvedValue(
-        makeMemberResult({ spaceId, role: SharedSpaceRole.Editor }),
-      );
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ spaceId, role: SharedSpaceRole.Editor }));
 
       await expect(
         sut.update(factory.auth(), spaceId, { faceRecognitionEnabled: true, petsEnabled: false }),
