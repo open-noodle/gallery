@@ -139,7 +139,7 @@ That's it. To switch back to upstream Immich, reverse the image names and restor
 
 - [Website](https://opennoodle.de)
 - [Installation](https://opennoodle.de/install)
-- [API Documentation](https://demo.opennoodle.de/doc) — interactive Swagger UI with all endpoints (including fork-specific ones like Shared Spaces, User Groups, and Pet Detection)
+- [API Documentation](https://demo.opennoodle.de/doc) — interactive Swagger UI with all endpoints including fork-specific ones. Also available on your own instance at `/doc`
 - [Roadmap](https://opennoodle.de/roadmap)
 - [Features](#features)
 
