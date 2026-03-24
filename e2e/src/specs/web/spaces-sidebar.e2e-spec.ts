@@ -35,7 +35,7 @@ test.describe('Spaces Sidebar Dropdown', () => {
       await utils.setAuthCookies(context, admin.accessToken);
       await page.goto('/photos');
 
-      await expect(page.locator('[data-testid^="sidebar-space-"]')).toHaveCount(2);
+      await expect(page.locator('a[data-testid^="sidebar-space-"]')).toHaveCount(2);
     });
 
     test('should navigate to space detail page when clicking a space', async ({ context, page }) => {
@@ -59,7 +59,7 @@ test.describe('Spaces Sidebar Dropdown', () => {
       await utils.setAuthCookies(context, admin.accessToken);
       await page.goto('/photos');
 
-      await expect(page.locator('[data-testid^="sidebar-space-"]')).toHaveCount(3);
+      await expect(page.locator('a[data-testid^="sidebar-space-"]')).toHaveCount(3);
     });
 
     test('should render empty when no spaces exist', async ({ context, page }) => {
@@ -69,7 +69,7 @@ test.describe('Spaces Sidebar Dropdown', () => {
       await utils.setAuthCookies(context, admin.accessToken);
       await page.goto('/photos');
 
-      await expect(page.locator('[data-testid^="sidebar-space-"]')).toHaveCount(0);
+      await expect(page.locator('a[data-testid^="sidebar-space-"]')).toHaveCount(0);
     });
   });
 
@@ -93,7 +93,7 @@ test.describe('Spaces Sidebar Dropdown', () => {
       // Navigate to photos to see the sidebar
       await page.goto('/photos');
 
-      const sidebarLinks = page.locator('[data-testid^="sidebar-space-"]');
+      const sidebarLinks = page.locator('a[data-testid^="sidebar-space-"]');
       await expect(sidebarLinks).toHaveCount(2);
 
       // Pinned space should appear first regardless of activity
@@ -143,25 +143,25 @@ test.describe('Spaces Sidebar Dropdown', () => {
       await utils.setAuthCookies(context, admin.accessToken);
       await page.goto('/photos');
 
-      await expect(page.locator('[data-testid^="sidebar-space-"]').first()).toBeVisible();
+      await expect(page.locator('a[data-testid^="sidebar-space-"]').first()).toBeVisible();
 
       const spacesNavItem = page.locator('nav').getByRole('link', { name: 'Spaces' }).locator('..');
       const chevron = spacesNavItem.locator('button').first();
       await chevron.click();
 
-      await expect(page.locator('[data-testid^="sidebar-space-"]')).toHaveCount(0);
+      await expect(page.locator('a[data-testid^="sidebar-space-"]')).toHaveCount(0);
 
       await page.reload();
-      await expect(page.locator('[data-testid^="sidebar-space-"]')).toHaveCount(0);
+      await expect(page.locator('a[data-testid^="sidebar-space-"]')).toHaveCount(0);
 
       const spacesNavItem2 = page.locator('nav').getByRole('link', { name: 'Spaces' }).locator('..');
       const chevron2 = spacesNavItem2.locator('button').first();
       await chevron2.click();
 
-      await expect(page.locator('[data-testid^="sidebar-space-"]').first()).toBeVisible();
+      await expect(page.locator('a[data-testid^="sidebar-space-"]').first()).toBeVisible();
 
       await page.reload();
-      await expect(page.locator('[data-testid^="sidebar-space-"]').first()).toBeVisible();
+      await expect(page.locator('a[data-testid^="sidebar-space-"]').first()).toBeVisible();
     });
   });
 
@@ -176,7 +176,7 @@ test.describe('Spaces Sidebar Dropdown', () => {
       await utils.setAuthCookies(context, admin.accessToken);
       await page.goto('/photos');
 
-      await expect(page.locator('[data-testid^="sidebar-space-"]')).toHaveCount(2);
+      await expect(page.locator('a[data-testid^="sidebar-space-"]')).toHaveCount(2);
 
       await page.goto(`/spaces/${emptySpace.id}`);
 
@@ -185,7 +185,7 @@ test.describe('Spaces Sidebar Dropdown', () => {
 
       await page.goto('/photos');
 
-      await expect(page.locator('[data-testid^="sidebar-space-"]')).toHaveCount(2);
+      await expect(page.locator('a[data-testid^="sidebar-space-"]')).toHaveCount(2);
     });
   });
 });
