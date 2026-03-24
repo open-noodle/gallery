@@ -7,6 +7,7 @@ const DownloadInfoSchema = z
     assetIds: z.array(z.uuidv4()).optional().describe('Asset IDs to download'),
     albumId: z.uuidv4().optional().describe('Album ID to download'),
     userId: z.uuidv4().optional().describe('User ID to download assets from'),
+    spaceId: z.uuidv4().optional().describe('Shared space ID to download all assets from'),
     archiveSize: z.int().min(1).optional().describe('Archive size limit in bytes'),
   })
   .meta({ id: 'DownloadInfoDto' });
