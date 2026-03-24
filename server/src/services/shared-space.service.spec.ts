@@ -1641,6 +1641,71 @@ describe(SharedSpaceService.name, () => {
     });
   });
 
+  describe('queueBulkAdd', () => {
+    it('should queue SharedSpaceBulkAddAssets job when called by editor', async () => {
+      const auth = factory.auth();
+      const spaceId = newUuid();
+      const editorMember = makeMemberResult({ spaceId, userId: auth.user.id, role: SharedSpaceRole.Editor });
+
+      mocks.sharedSpace.getMember.mockResolvedValue(editorMember);
+
+      await sut.queueBulkAdd(auth, spaceId);
+
+      expect(mocks.job.queue).toHaveBeenCalledWith({
+        name: JobName.SharedSpaceBulkAddAssets,
+        data: { spaceId, userId: auth.user.id },
+      });
+    });
+
+    it('should queue job when called by owner', async () => {
+      const auth = factory.auth();
+      const spaceId = newUuid();
+      const ownerMember = makeMemberResult({ spaceId, userId: auth.user.id, role: SharedSpaceRole.Owner });
+
+      mocks.sharedSpace.getMember.mockResolvedValue(ownerMember);
+
+      await sut.queueBulkAdd(auth, spaceId);
+
+      expect(mocks.job.queue).toHaveBeenCalledWith({
+        name: JobName.SharedSpaceBulkAddAssets,
+        data: { spaceId, userId: auth.user.id },
+      });
+    });
+
+    it('should throw ForbiddenException when called by viewer', async () => {
+      const auth = factory.auth();
+      const spaceId = newUuid();
+      const viewerMember = makeMemberResult({ spaceId, userId: auth.user.id, role: SharedSpaceRole.Viewer });
+
+      mocks.sharedSpace.getMember.mockResolvedValue(viewerMember);
+
+      await expect(sut.queueBulkAdd(auth, spaceId)).rejects.toBeInstanceOf(ForbiddenException);
+      expect(mocks.job.queue).not.toHaveBeenCalled();
+    });
+
+    it('should throw ForbiddenException when called by non-member', async () => {
+      const auth = factory.auth();
+      const spaceId = newUuid();
+
+      mocks.sharedSpace.getMember.mockResolvedValue(void 0);
+
+      await expect(sut.queueBulkAdd(auth, spaceId)).rejects.toBeInstanceOf(ForbiddenException);
+      expect(mocks.job.queue).not.toHaveBeenCalled();
+    });
+
+    it('should return spaceId', async () => {
+      const auth = factory.auth();
+      const spaceId = newUuid();
+      const editorMember = makeMemberResult({ spaceId, userId: auth.user.id, role: SharedSpaceRole.Editor });
+
+      mocks.sharedSpace.getMember.mockResolvedValue(editorMember);
+
+      const result = await sut.queueBulkAdd(auth, spaceId);
+
+      expect(result).toEqual({ spaceId });
+    });
+  });
+
   describe('removeAssets', () => {
     beforeEach(() => {
       mocks.sharedSpace.removePersonFacesByAssetIds.mockResolvedValue(void 0);

@@ -423,6 +423,15 @@ export class SharedSpaceService extends BaseService {
     }
   }
 
+  async queueBulkAdd(auth: AuthDto, spaceId: string): Promise<{ spaceId: string }> {
+    await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
+    await this.jobRepository.queue({
+      name: JobName.SharedSpaceBulkAddAssets,
+      data: { spaceId, userId: auth.user.id },
+    });
+    return { spaceId };
+  }
+
   async linkLibrary(auth: AuthDto, spaceId: string, dto: SharedSpaceLibraryLinkDto): Promise<void> {
     if (!auth.user.isAdmin) {
       throw new ForbiddenException('Only admins can link libraries to spaces');
