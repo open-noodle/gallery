@@ -68,7 +68,7 @@ export function getActiveFilterCount(state: FilterState): number {
     (state.tagIds.length > 0 ? 1 : 0) +
     (state.rating === undefined ? 0 : 1) +
     (state.mediaType === 'all' ? 0 : 1) +
-    (state.selectedYear !== undefined ? 1 : 0)
+    (state.selectedYear === undefined ? 0 : 1)
   );
 }
 
