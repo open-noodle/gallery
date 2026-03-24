@@ -44,9 +44,7 @@ export class DownloadRepository {
       .where('shared_space_asset.spaceId', '=', spaceId);
 
     const library = builder(this.db)
-      .innerJoin('shared_space_library', (join) =>
-        join.onRef('shared_space_library.libraryId', '=', 'asset.libraryId'),
-      )
+      .innerJoin('shared_space_library', (join) => join.onRef('shared_space_library.libraryId', '=', 'asset.libraryId'))
       .where('shared_space_library.spaceId', '=', spaceId)
       .where('asset.isOffline', '=', false);
 
