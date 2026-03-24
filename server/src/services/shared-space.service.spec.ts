@@ -3848,7 +3848,16 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.bulkAddUserAssets.mockResolvedValue(5);
       mocks.sharedSpace.update.mockResolvedValue(space);
       mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
-      mocks.notification.create.mockResolvedValue({ id: 'n1', createdAt: new Date(), level: 'success', type: 'Custom', title: '', description: null, data: null, readAt: null } as any);
+      mocks.notification.create.mockResolvedValue({
+        id: 'n1',
+        createdAt: new Date(),
+        level: 'success',
+        type: 'Custom',
+        title: '',
+        description: null,
+        data: null,
+        readAt: null,
+      } as any);
 
       await sut.handleSharedSpaceBulkAddAssets({ spaceId, userId });
 
@@ -3866,7 +3875,16 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.bulkAddUserAssets.mockResolvedValue(10);
       mocks.sharedSpace.update.mockResolvedValue(space);
       mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
-      mocks.notification.create.mockResolvedValue({ id: 'n1', createdAt: new Date(), level: 'success', type: 'Custom', title: '', description: null, data: null, readAt: null } as any);
+      mocks.notification.create.mockResolvedValue({
+        id: 'n1',
+        createdAt: new Date(),
+        level: 'success',
+        type: 'Custom',
+        title: '',
+        description: null,
+        data: null,
+        readAt: null,
+      } as any);
 
       await sut.handleSharedSpaceBulkAddAssets({ spaceId, userId });
 
@@ -3884,7 +3902,16 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.bulkAddUserAssets.mockResolvedValue(42);
       mocks.sharedSpace.update.mockResolvedValue(space);
       mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
-      mocks.notification.create.mockResolvedValue({ id: 'n1', createdAt: new Date(), level: 'success', type: 'Custom', title: '', description: null, data: null, readAt: null } as any);
+      mocks.notification.create.mockResolvedValue({
+        id: 'n1',
+        createdAt: new Date(),
+        level: 'success',
+        type: 'Custom',
+        title: '',
+        description: null,
+        data: null,
+        readAt: null,
+      } as any);
 
       await sut.handleSharedSpaceBulkAddAssets({ spaceId, userId });
 
@@ -3939,7 +3966,16 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.bulkAddUserAssets.mockResolvedValue(100);
       mocks.sharedSpace.update.mockResolvedValue(space);
       mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
-      mocks.notification.create.mockResolvedValue({ id: 'n1', createdAt: new Date(), level: 'success', type: 'Custom', title: '', description: null, data: null, readAt: null } as any);
+      mocks.notification.create.mockResolvedValue({
+        id: 'n1',
+        createdAt: new Date(),
+        level: 'success',
+        type: 'Custom',
+        title: '',
+        description: null,
+        data: null,
+        readAt: null,
+      } as any);
 
       await sut.handleSharedSpaceBulkAddAssets({ spaceId, userId });
 
@@ -3960,7 +3996,16 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.bulkAddUserAssets.mockResolvedValue(10);
       mocks.sharedSpace.update.mockResolvedValue(space);
       mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
-      mocks.notification.create.mockResolvedValue({ id: 'n1', createdAt: new Date(), level: 'success', type: 'Custom', title: '', description: null, data: null, readAt: null } as any);
+      mocks.notification.create.mockResolvedValue({
+        id: 'n1',
+        createdAt: new Date(),
+        level: 'success',
+        type: 'Custom',
+        title: '',
+        description: null,
+        data: null,
+        readAt: null,
+      } as any);
 
       await sut.handleSharedSpaceBulkAddAssets({ spaceId, userId });
 
@@ -3980,7 +4025,16 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.bulkAddUserAssets.mockResolvedValue(200);
       mocks.sharedSpace.update.mockResolvedValue(space);
       mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
-      mocks.notification.create.mockResolvedValue({ id: 'n1', createdAt: new Date(), level: 'success', type: 'Custom', title: 'Bulk add complete', description: '200 photos added to space', data: null, readAt: null } as any);
+      mocks.notification.create.mockResolvedValue({
+        id: 'n1',
+        createdAt: new Date(),
+        level: 'success',
+        type: 'Custom',
+        title: 'Bulk add complete',
+        description: '200 photos added to space',
+        data: null,
+        readAt: null,
+      } as any);
 
       await sut.handleSharedSpaceBulkAddAssets({ spaceId, userId });
 
@@ -4020,7 +4074,16 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.bulkAddUserAssets.mockResolvedValue(5);
       mocks.sharedSpace.update.mockResolvedValue(space);
       mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
-      mocks.notification.create.mockResolvedValue({ id: 'n1', createdAt: new Date(), level: 'success', type: 'Custom', title: '', description: null, data: null, readAt: null } as any);
+      mocks.notification.create.mockResolvedValue({
+        id: 'n1',
+        createdAt: new Date(),
+        level: 'success',
+        type: 'Custom',
+        title: '',
+        description: null,
+        data: null,
+        readAt: null,
+      } as any);
 
       const result = await sut.handleSharedSpaceBulkAddAssets({ spaceId, userId });
 

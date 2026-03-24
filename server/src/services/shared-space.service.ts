@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { SharedSpacePerson } from 'src/database';
 import { OnJob } from 'src/decorators';
 import { AuthDto } from 'src/dtos/auth.dto';
+import { mapNotification } from 'src/dtos/notification.dto';
 import {
   SharedSpacePersonAliasDto,
   SharedSpacePersonMergeDto,
@@ -22,7 +23,6 @@ import {
   SharedSpaceResponseDto,
   SharedSpaceUpdateDto,
 } from 'src/dtos/shared-space.dto';
-import { mapNotification } from 'src/dtos/notification.dto';
 import {
   CacheControl,
   JobName,
