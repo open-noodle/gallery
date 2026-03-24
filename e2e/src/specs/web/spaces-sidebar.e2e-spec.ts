@@ -46,6 +46,9 @@ test.describe('Spaces Sidebar Dropdown', () => {
 
       await page.locator(`[data-testid="sidebar-space-${space.id}"]`).click();
       await page.waitForURL(`**/spaces/${space.id}`);
+
+      // Verify the space page actually loaded (not just URL change)
+      await expect(page.locator('[data-testid="hero-title"]')).toHaveText('Nav Test Space');
     });
 
     test('should show max 3 spaces', async ({ context, page }) => {
