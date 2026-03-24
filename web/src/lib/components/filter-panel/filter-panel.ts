@@ -26,7 +26,9 @@ export interface FilterPanelConfig {
   providers: {
     people?: () => Promise<PersonOption[]>;
     locations?: () => Promise<LocationOption[]>;
+    cities?: (country: string) => Promise<string[]>;
     cameras?: () => Promise<CameraOption[]>;
+    cameraModels?: (make: string) => Promise<string[]>;
     tags?: () => Promise<TagOption[]>;
   };
 }

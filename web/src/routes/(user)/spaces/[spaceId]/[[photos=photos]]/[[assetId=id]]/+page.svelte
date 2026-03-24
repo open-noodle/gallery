@@ -169,9 +169,25 @@
         const countries = await getSearchSuggestions({ $type: SearchSuggestionType.Country, spaceId: space.id });
         return countries.filter(Boolean).map((c) => ({ value: c!, type: 'country' as const }));
       },
+      cities: async (country: string) => {
+        const cities = await getSearchSuggestions({
+          $type: SearchSuggestionType.City,
+          spaceId: space.id,
+          country,
+        });
+        return cities.filter(Boolean) as string[];
+      },
       cameras: async () => {
         const makes = await getSearchSuggestions({ $type: SearchSuggestionType.CameraMake, spaceId: space.id });
         return makes.filter(Boolean).map((m) => ({ value: m!, type: 'make' as const }));
+      },
+      cameraModels: async (make: string) => {
+        const models = await getSearchSuggestions({
+          $type: SearchSuggestionType.CameraModel,
+          spaceId: space.id,
+          make,
+        });
+        return models.filter(Boolean) as string[];
       },
       tags: async () => {
         const tags = await getAllTags();

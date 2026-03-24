@@ -302,10 +302,9 @@
                 {countries}
                 selectedCity={filters.city}
                 selectedCountry={filters.country}
-                onCityFetch={async (_) => {
-                  if (config.providers.locations) {
-                    const result = await config.providers.locations();
-                    return result.filter((l) => l.type === 'city').map((l) => l.value);
+                onCityFetch={async (country) => {
+                  if (config.providers.cities) {
+                    return config.providers.cities(country);
                   }
                   return [];
                 }}
@@ -316,10 +315,9 @@
                 makes={cameraMakes}
                 selectedMake={filters.make}
                 selectedModel={filters.model}
-                onModelFetch={async (_) => {
-                  if (config.providers.cameras) {
-                    const result = await config.providers.cameras();
-                    return result.filter((c) => c.type === 'model').map((c) => c.value);
+                onModelFetch={async (make) => {
+                  if (config.providers.cameraModels) {
+                    return config.providers.cameraModels(make);
                   }
                   return [];
                 }}
