@@ -692,6 +692,70 @@ describe('/shared-spaces', () => {
       expect(status1).toBe(202);
       expect(status2).toBe(202);
     });
+
+    it('should add all user assets after job completes', async () => {
+      const space = await utils.createSpace(user1.accessToken, { name: 'Bulk Job Verify' });
+
+      // user1 has user1Asset1 and user1Asset2 from beforeAll
+      const { status } = await request(app)
+        .post(`/shared-spaces/${space.id}/assets/bulk-add`)
+        .set('Authorization', `Bearer ${user1.accessToken}`);
+
+      expect(status).toBe(202);
+
+      // Wait for the background task queue to process the job
+      await utils.waitForQueueFinish(user1.accessToken, 'backgroundTask');
+
+      // Verify all user1's assets are now in the space
+      const { body: spaceDetail } = await request(app)
+        .get(`/shared-spaces/${space.id}`)
+        .set('Authorization', `Bearer ${user1.accessToken}`);
+
+      expect(spaceDetail.assetCount).toBe(2);
+    });
+
+    it('should not add other users assets', async () => {
+      const space = await utils.createSpace(user2.accessToken, { name: 'Bulk Isolation' });
+
+      const { status } = await request(app)
+        .post(`/shared-spaces/${space.id}/assets/bulk-add`)
+        .set('Authorization', `Bearer ${user2.accessToken}`);
+
+      expect(status).toBe(202);
+
+      await utils.waitForQueueFinish(user2.accessToken, 'backgroundTask');
+
+      // user2 has only user2Asset1
+      const { body: spaceDetail } = await request(app)
+        .get(`/shared-spaces/${space.id}`)
+        .set('Authorization', `Bearer ${user2.accessToken}`);
+
+      expect(spaceDetail.assetCount).toBe(1);
+    });
+
+    it('should be idempotent after job completes', async () => {
+      const space = await utils.createSpace(user1.accessToken, { name: 'Bulk Idempotent Job' });
+
+      await request(app)
+        .post(`/shared-spaces/${space.id}/assets/bulk-add`)
+        .set('Authorization', `Bearer ${user1.accessToken}`);
+
+      await utils.waitForQueueFinish(user1.accessToken, 'backgroundTask');
+
+      // Run again — should not duplicate
+      await request(app)
+        .post(`/shared-spaces/${space.id}/assets/bulk-add`)
+        .set('Authorization', `Bearer ${user1.accessToken}`);
+
+      await utils.waitForQueueFinish(user1.accessToken, 'backgroundTask');
+
+      const { body: spaceDetail } = await request(app)
+        .get(`/shared-spaces/${space.id}`)
+        .set('Authorization', `Bearer ${user1.accessToken}`);
+
+      // Still only 2 assets, not 4
+      expect(spaceDetail.assetCount).toBe(2);
+    });
   });
 
   describe('DELETE /shared-spaces/:id/assets', () => {
