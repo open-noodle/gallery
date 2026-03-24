@@ -319,15 +319,23 @@ Note: `tags-filter.svelte` already says "No tags available" which is generic —
 Run: `cd web && pnpm test -- --run src/lib/components/filter-panel/__tests__/filter-panel.spec.ts`
 Expected: PASS
 
-**Step 5: Run all existing tests for regressions**
+**Step 5: Update existing tests that assert old "in this space" text**
+
+Three existing tests in `filter-sections.spec.ts` assert the old text and will break:
+
+- Line 165: `expect(getByTestId('people-empty').textContent).toBe('No people in this space');` → change to `'No people found'`
+- Line 278: `expect(getByTestId('location-empty').textContent).toBe('No locations in this space');` → change to `'No locations found'`
+- Line 384: `expect(getByTestId('camera-empty').textContent).toBe('No cameras in this space');` → change to `'No cameras found'`
+
+**Step 6: Run all existing tests for regressions**
 
 Run: `cd web && pnpm test -- --run src/lib/components/filter-panel/`
-Expected: All PASS — check that existing spaces tests don't assert on the old "in this space" text
+Expected: All PASS
 
-**Step 6: Commit**
+**Step 7: Commit**
 
 ```bash
-git add web/src/lib/components/filter-panel/people-filter.svelte web/src/lib/components/filter-panel/location-filter.svelte web/src/lib/components/filter-panel/camera-filter.svelte web/src/lib/components/filter-panel/__tests__/filter-panel.spec.ts
+git add web/src/lib/components/filter-panel/people-filter.svelte web/src/lib/components/filter-panel/location-filter.svelte web/src/lib/components/filter-panel/camera-filter.svelte web/src/lib/components/filter-panel/__tests__/filter-panel.spec.ts web/src/lib/components/filter-panel/__tests__/filter-sections.spec.ts
 git commit -m "feat: add emptyText prop to filter sub-components with generic defaults"
 ```
 
@@ -430,29 +438,24 @@ describe('buildPhotosTimelineOptions', () => {
     expect(options.order).toBe(AssetOrder.Asc);
   });
 
-  it('should set year-only date range', () => {
+  it('should set year-only date range using UTC (consistent with buildFilterContext)', () => {
     const filters = { ...createFilterState(), selectedYear: 2023 };
     const options = buildPhotosTimelineOptions(filters);
 
     expect(options.takenAfter).toBeDefined();
     expect(options.takenBefore).toBeDefined();
-    const after = new Date(options.takenAfter as string);
-    const before = new Date(options.takenBefore as string);
-    expect(after.getFullYear()).toBe(2023);
-    expect(after.getMonth()).toBe(0);
-    expect(before.getFullYear()).toBe(2023);
-    expect(before.getMonth()).toBe(11);
+    // buildFilterContext uses UTC: Jan 1 2023 to Jan 1 2024 (exclusive end)
+    expect(options.takenAfter).toBe('2023-01-01T00:00:00.000Z');
+    expect(options.takenBefore).toBe('2024-01-01T00:00:00.000Z');
   });
 
-  it('should set year+month date range', () => {
+  it('should set year+month date range using UTC (consistent with buildFilterContext)', () => {
     const filters = { ...createFilterState(), selectedYear: 2023, selectedMonth: 8 };
     const options = buildPhotosTimelineOptions(filters);
 
-    const after = new Date(options.takenAfter as string);
-    const before = new Date(options.takenBefore as string);
-    expect(after.getFullYear()).toBe(2023);
-    expect(after.getMonth()).toBe(7); // 0-indexed: August
-    expect(before.getMonth()).toBe(7); // Last day of August
+    // buildFilterContext uses UTC: Aug 1 2023 to Sep 1 2023 (exclusive end)
+    expect(options.takenAfter).toBe('2023-08-01T00:00:00.000Z');
+    expect(options.takenBefore).toBe('2023-09-01T00:00:00.000Z');
   });
 
   it('should preserve withPartners and withSharedSpaces when filters are active', () => {
@@ -527,6 +530,7 @@ Create `web/src/lib/utils/photos-filter-options.ts`:
 ```typescript
 import { AssetOrder, AssetTypeEnum, AssetVisibility } from '@immich/sdk';
 import type { FilterState } from '$lib/components/filter-panel/filter-panel';
+import { buildFilterContext } from '$lib/components/filter-panel/filter-panel';
 
 export function buildPhotosTimelineOptions(filters: FilterState): Record<string, unknown> {
   const base: Record<string, unknown> = {
@@ -562,14 +566,11 @@ export function buildPhotosTimelineOptions(filters: FilterState): Record<string,
   }
   base.order = filters.sortOrder === 'asc' ? AssetOrder.Asc : AssetOrder.Desc;
 
-  if (filters.selectedYear && filters.selectedMonth) {
-    const start = new Date(filters.selectedYear, filters.selectedMonth - 1, 1);
-    const end = new Date(filters.selectedYear, filters.selectedMonth, 0, 23, 59, 59, 999);
-    base.takenAfter = start.toISOString();
-    base.takenBefore = end.toISOString();
-  } else if (filters.selectedYear) {
-    base.takenAfter = new Date(filters.selectedYear, 0, 1).toISOString();
-    base.takenBefore = new Date(filters.selectedYear, 11, 31, 23, 59, 59, 999).toISOString();
+  // Reuse buildFilterContext for consistent UTC date range computation
+  const context = buildFilterContext(filters);
+  if (context) {
+    base.takenAfter = context.takenAfter;
+    base.takenBefore = context.takenBefore;
   }
 
   return base;
