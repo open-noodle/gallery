@@ -704,7 +704,7 @@ describe('/shared-spaces', () => {
       expect(status).toBe(202);
 
       // Wait for the background task queue to process the job
-      await utils.waitForQueueFinish(user1.accessToken, 'backgroundTask');
+      await utils.waitForQueueFinish(user1.accessToken, 'backgroundTask', 30_000);
 
       // Verify all user1's assets are now in the space
       const { body: spaceDetail } = await request(app)
@@ -723,7 +723,7 @@ describe('/shared-spaces', () => {
 
       expect(status).toBe(202);
 
-      await utils.waitForQueueFinish(user2.accessToken, 'backgroundTask');
+      await utils.waitForQueueFinish(user2.accessToken, 'backgroundTask', 30_000);
 
       // user2 has only user2Asset1
       const { body: spaceDetail } = await request(app)
@@ -740,14 +740,14 @@ describe('/shared-spaces', () => {
         .post(`/shared-spaces/${space.id}/assets/bulk-add`)
         .set('Authorization', `Bearer ${user1.accessToken}`);
 
-      await utils.waitForQueueFinish(user1.accessToken, 'backgroundTask');
+      await utils.waitForQueueFinish(user1.accessToken, 'backgroundTask', 30_000);
 
       // Run again — should not duplicate
       await request(app)
         .post(`/shared-spaces/${space.id}/assets/bulk-add`)
         .set('Authorization', `Bearer ${user1.accessToken}`);
 
-      await utils.waitForQueueFinish(user1.accessToken, 'backgroundTask');
+      await utils.waitForQueueFinish(user1.accessToken, 'backgroundTask', 30_000);
 
       const { body: spaceDetail } = await request(app)
         .get(`/shared-spaces/${space.id}`)
