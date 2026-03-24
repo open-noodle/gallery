@@ -80,6 +80,7 @@
     mdiPlus,
   } from '@mdi/js';
   import { t } from 'svelte-i18n';
+  import { SvelteMap } from 'svelte/reactivity';
   import type { PageData } from './$types';
 
   type ViewMode = 'view' | 'select-assets' | 'select-cover';
@@ -107,8 +108,8 @@
 
   // Filter state
   let filters = $state(createFilterState());
-  let personNames = $state(new Map<string, string>());
-  let tagNames = $state(new Map<string, string>());
+  let personNames = $state(new SvelteMap<string, string>());
+  let tagNames = $state(new SvelteMap<string, string>());
 
   let heroCollapsed = $state(false);
   let prevFilterCount = 0;
