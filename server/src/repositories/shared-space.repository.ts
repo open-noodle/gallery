@@ -473,7 +473,7 @@ export class SharedSpaceRepository {
           eb.exists(
             eb
               .selectFrom('shared_space_person_face')
-              .innerJoin('asset_face', 'asset_face.id', 'shared_space_person_face.faceId')
+              .innerJoin('asset_face', 'asset_face.id', 'shared_space_person_face.assetFaceId')
               .innerJoin('asset', 'asset.id', 'asset_face.assetId')
               .whereRef('shared_space_person_face.personId', '=', 'shared_space_person.id')
               .$if(!!options?.takenAfter, (qb2) => qb2.where('asset.fileCreatedAt', '>=', options!.takenAfter!))
