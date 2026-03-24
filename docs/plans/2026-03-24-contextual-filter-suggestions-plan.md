@@ -62,6 +62,109 @@ it('should pass temporal fields to getStates', async () => {
   );
 });
 
+// Repeat the same pattern for CITY, CAMERA_MAKE, CAMERA_MODEL, CAMERA_LENS_MODEL:
+// Each test passes takenAfter/takenBefore in the DTO and asserts the corresponding
+// repository method (getCities, getCameraMakes, getCameraModels, getCameraLensModels)
+// receives them via expect.objectContaining({ takenAfter, takenBefore }).
+
+it('should pass temporal fields to getCities', async () => {
+  const takenAfter = new Date('2024-01-01');
+  const takenBefore = new Date('2025-01-01');
+  mocks.search.getCities.mockResolvedValue(['Berlin']);
+  mocks.partner.getAll.mockResolvedValue([]);
+
+  await sut.getSearchSuggestions(authStub.user1, {
+    includeNull: false,
+    type: SearchSuggestionType.CITY,
+    takenAfter,
+    takenBefore,
+  });
+
+  expect(mocks.search.getCities).toHaveBeenCalledWith(
+    [authStub.user1.user.id],
+    expect.objectContaining({ takenAfter, takenBefore }),
+  );
+});
+
+it('should pass temporal fields to getCameraMakes', async () => {
+  const takenAfter = new Date('2024-01-01');
+  const takenBefore = new Date('2025-01-01');
+  mocks.search.getCameraMakes.mockResolvedValue(['Canon']);
+  mocks.partner.getAll.mockResolvedValue([]);
+
+  await sut.getSearchSuggestions(authStub.user1, {
+    includeNull: false,
+    type: SearchSuggestionType.CAMERA_MAKE,
+    takenAfter,
+    takenBefore,
+  });
+
+  expect(mocks.search.getCameraMakes).toHaveBeenCalledWith(
+    [authStub.user1.user.id],
+    expect.objectContaining({ takenAfter, takenBefore }),
+  );
+});
+
+it('should pass temporal fields to getCameraModels', async () => {
+  const takenAfter = new Date('2024-01-01');
+  const takenBefore = new Date('2025-01-01');
+  mocks.search.getCameraModels.mockResolvedValue(['EOS R5']);
+  mocks.partner.getAll.mockResolvedValue([]);
+
+  await sut.getSearchSuggestions(authStub.user1, {
+    includeNull: false,
+    type: SearchSuggestionType.CAMERA_MODEL,
+    takenAfter,
+    takenBefore,
+  });
+
+  expect(mocks.search.getCameraModels).toHaveBeenCalledWith(
+    [authStub.user1.user.id],
+    expect.objectContaining({ takenAfter, takenBefore }),
+  );
+});
+
+it('should pass temporal fields to getCameraLensModels', async () => {
+  const takenAfter = new Date('2024-01-01');
+  const takenBefore = new Date('2025-01-01');
+  mocks.search.getCameraLensModels.mockResolvedValue(['RF 50mm']);
+  mocks.partner.getAll.mockResolvedValue([]);
+
+  await sut.getSearchSuggestions(authStub.user1, {
+    includeNull: false,
+    type: SearchSuggestionType.CAMERA_LENS_MODEL,
+    takenAfter,
+    takenBefore,
+  });
+
+  expect(mocks.search.getCameraLensModels).toHaveBeenCalledWith(
+    [authStub.user1.user.id],
+    expect.objectContaining({ takenAfter, takenBefore }),
+  );
+});
+
+it('should pass spaceId + temporal fields together', async () => {
+  const takenAfter = new Date('2024-01-01');
+  const takenBefore = new Date('2025-01-01');
+  const spaceId = 'space-uuid';
+  mocks.search.getCountries.mockResolvedValue(['Germany']);
+  mocks.partner.getAll.mockResolvedValue([]);
+  mocks.access.checkAccess.mockResolvedValue(new Set([spaceId]));
+
+  await sut.getSearchSuggestions(authStub.user1, {
+    includeNull: false,
+    type: SearchSuggestionType.COUNTRY,
+    spaceId,
+    takenAfter,
+    takenBefore,
+  });
+
+  expect(mocks.search.getCountries).toHaveBeenCalledWith(
+    [authStub.user1.user.id],
+    expect.objectContaining({ spaceId, takenAfter, takenBefore }),
+  );
+});
+
 it('should not pass temporal fields when not provided', async () => {
   mocks.search.getCountries.mockResolvedValue(['Germany']);
   mocks.partner.getAll.mockResolvedValue([]);
@@ -245,7 +348,15 @@ it('should filter people by temporal range', async () => {
 it('should return all people when no temporal params provided', async () => {
   // Setup: same mock
   // Call getSpacePeople without temporal params
-  // Assert backward compatibility
+  // Assert backward compatibility — uses getPersonsBySpaceId (not temporal method)
+});
+
+it('should exclude person with zero face assets in date range', async () => {
+  // Setup: mock space with face recognition enabled
+  // Mock getPersonsBySpaceIdWithTemporalFilter to return only persons with faces in range
+  // Call getSpacePeople with narrow takenAfter/takenBefore
+  // Assert person with faces only outside range is NOT in results (excluded entirely,
+  // not returned with count 0)
 });
 ```
 
@@ -533,14 +644,15 @@ export function buildFilterContext(state: FilterState): FilterContext | undefine
   if (state.selectedMonth) {
     const year = state.selectedYear;
     const month = state.selectedMonth;
+    // Use Date.UTC to ensure UTC midnight, not local timezone
     return {
-      takenAfter: new Date(year, month - 1, 1).toISOString(),
-      takenBefore: new Date(year, month, 1).toISOString(),
+      takenAfter: new Date(Date.UTC(year, month - 1, 1)).toISOString(),
+      takenBefore: new Date(Date.UTC(year, month, 1)).toISOString(),
     };
   }
   return {
-    takenAfter: new Date(state.selectedYear, 0, 1).toISOString(),
-    takenBefore: new Date(state.selectedYear + 1, 0, 1).toISOString(),
+    takenAfter: new Date(Date.UTC(state.selectedYear, 0, 1)).toISOString(),
+    takenBefore: new Date(Date.UTC(state.selectedYear + 1, 0, 1)).toISOString(),
   };
 }
 ```
@@ -628,13 +740,29 @@ Test cases (adapt to actual component rendering patterns):
 
 1. **Re-fetch on temporal change** — mount FilterPanel with mock providers, simulate
    year selection, assert providers re-called with `FilterContext`.
-2. **Debounce behavior** — rapidly change temporal, assert providers called once after
+2. **Year-only selection triggers re-fetch** — select year without month, assert
+   full-year bounds (`takenAfter: 2024-01-01T00:00:00.000Z`,
+   `takenBefore: 2025-01-01T00:00:00.000Z`).
+3. **Debounce behavior** — rapidly change temporal, assert providers called once after
    200ms.
-3. **Non-temporal changes do not trigger re-fetch** — change rating/mediaType, assert
-   providers NOT re-called.
-4. **Clear filters bypasses debounce** — set temporal, clear all, assert immediate
-   re-fetch with no context.
-5. **Year-only selection** — select year without month, assert full-year bounds.
+4. **AbortController cancellation** — start slow provider fetch (delayed mock), change
+   temporal before it resolves. Assert first fetch aborted, only second results applied.
+5. **Combined debounce + abort** — change temporal, let debounce fire and fetch start,
+   then change temporal again before fetch resolves. Assert debounce timer resets, first
+   request aborted, only second results applied.
+6. **Abort race condition** — start fetch, trigger abort at same moment response
+   arrives. Assert no stale data applied (signal check on response handling).
+7. **Non-temporal changes do not trigger re-fetch** — change rating/mediaType/sortOrder,
+   assert providers NOT re-called.
+8. **Clear filters bypasses debounce** — set temporal, clear all, assert immediate
+   re-fetch with no context (no 200ms wait).
+9. **Error handling on re-fetch** — mock provider that rejects. Assert section keeps
+   showing previous suggestions unchanged (no opacity change, no error UI).
+10. **Temporal range mapping** — select year 2024, assert provider receives exact UTC
+    ISO strings. Select June 2024, assert month bounds.
+11. **Component unmount cleanup** — mount FilterPanel, trigger temporal change (starting
+    debounced fetch), unmount before it resolves. Assert no errors or state updates
+    after unmount.
 
 **Step 2: Run tests to verify they fail**
 
@@ -738,6 +866,18 @@ $effect(() => {
 });
 ```
 
+**Important implementation notes for the re-fetch code above:**
+
+- The `.catch` handlers must NOT set `isRefetching = false` individually. On error,
+  keep stale data unchanged — no opacity fade, no error UI (design requirement). The
+  `Promise.allSettled` handler at the end resets `isRefetching` after all settle.
+- The CSS opacity transition uses a 150ms delay, so errors that resolve quickly
+  (which most network errors do) will never trigger visible opacity change.
+- Cascade child auto-clear: After cameraMakes update, `CameraFilter`'s `$effect`
+  re-fetches models for the expanded make. If `selectedModel` is not in the new model
+  list, `CameraFilter` should call `onSelectionChange(selectedMake, undefined)` to
+  clear the child. Same logic applies to `LocationFilter` for orphaned cities.
+
 **Step 4: Add CSS for opacity fade during re-fetch**
 
 Add a CSS class and apply it to sections while `isRefetching` is true:
@@ -781,13 +921,25 @@ Add to the contextual-refetch test file (or a new file):
 
 1. **Orphaned selections preserved** — select a person, re-fetch with scoped
    suggestions that exclude that person. Assert person stays in `filters.personIds`
-   and appears muted at top of list.
-2. **Empty section collapse** — mock provider returning `[]`. Assert section header
-   shows `(0)` and content is collapsed.
-3. **Section populated → empty → populated** — narrow then widen temporal. Assert
-   section re-expands.
-4. **Cascade child auto-clear** — select make + model, temporal scoping removes model.
-   Assert model selection cleared, make preserved.
+   and appears muted at top of list with `aria-selected="true"`.
+2. **Orphaned selection lifecycle** — select person, apply temporal filter that orphans
+   it (muted at top), deselect it, change temporal back so person reappears. Assert
+   person is in normal suggestion list (not muted) and can be reselected cleanly.
+3. **Empty section collapse** — mock provider returning `[]`. Assert section header
+   shows `(0)` and content is collapsed. Verify no layout shifts (section header
+   remains in same position).
+4. **Section populated → empty → populated** — narrow then widen temporal. Assert
+   section re-expands with new suggestions and `(0)` indicator is removed.
+5. **Cascade child auto-clear (camera)** — select make=Canon + model=EOS R5, temporal
+   scoping removes model but not make. Assert model selection cleared, make preserved.
+6. **Cascade child auto-clear (location)** — select country=Germany + city=Berlin,
+   temporal scoping removes Berlin but not Germany. Assert city cleared, country kept.
+7. **Cascade callback receives temporal context** — select a year, then expand a
+   country. Assert `onCityFetch` called with both country string AND current
+   `FilterContext`.
+8. **Cascade re-fetch on temporal change** — expand a country (cities loaded), then
+   change temporal filter. Assert `onCityFetch` re-called with same country but
+   updated temporal context.
 
 **Step 2: Run tests to verify they fail**
 
@@ -798,8 +950,11 @@ Run: `cd web && pnpm test -- --run src/lib/components/filter-panel/__tests__/`
 In `people-filter.svelte` (and similarly for location/camera), when rendering the list:
 
 - Compute orphaned items: items in `selectedPersonIds` but not in current `people` list
-- Render orphaned items at top of list with muted styling and `aria-selected="true"`
+- Render orphaned items at top of list with muted styling (e.g., `opacity-50`) AND
+  `aria-selected="true"` for accessibility (screen readers must convey active state)
 - Keep them in `filters.personIds` (already the case since we don't remove them)
+- Apply the same pattern in LocationFilter (orphaned country) and CameraFilter
+  (orphaned make)
 
 **Step 4: Implement cascade child auto-clear**
 
@@ -844,6 +999,11 @@ When `count === 0`, show the header as muted with `(0)` and collapse content:
 
 Pass `count` from `filter-panel.svelte` for each section based on suggestion array
 length.
+
+**Layout shift prevention:** The section header must remain in the same position when
+content collapses. Since we only hide the content (not the header), and the header
+has a fixed height, this is natural. Ensure no margin/padding changes on the header
+when `count === 0` — only the content area collapses.
 
 **Step 6: Run tests**
 
@@ -982,7 +1142,47 @@ git commit -m "chore: regenerate SQL query documentation"
 
 ---
 
-## Task 10: E2E API tests for temporal suggestion scoping
+## Task 10: Medium tests for temporal suggestion queries (if infrastructure exists)
+
+**Files:**
+
+- Test: `server/src/repositories/search.repository.spec.ts` (or equivalent medium test file)
+
+**Prerequisite:** Check if medium tests exist for `search.repository.ts` by grepping
+for `getCountries` or `getExifField` in `server/src/**/*.spec.ts`. If no medium test
+infrastructure exists for this repository, skip this task and note it in the PR
+description.
+
+**Step 1: Write medium tests (if infrastructure exists)**
+
+- **`getExifField` with temporal bounds**: Insert assets with known `fileCreatedAt`
+  dates. Query `getCountries` with `takenAfter`/`takenBefore` and verify only
+  countries from assets within the range are returned.
+- **Temporal + space combined**: Insert assets in and out of a space, with varied
+  dates. Verify the intersection (space AND temporal) is correct.
+- **Boundary inclusivity**: Test `takenAfter` with `>=` (asset at exact boundary IS
+  included) and `takenBefore` with `<` (asset at exact boundary is NOT included).
+  Test `takenBefore` before all assets returns empty result.
+- **All repository methods forward temporal fields**: Verify `getStates`, `getCities`,
+  `getCameraMakes`, `getCameraModels`, `getCameraLensModels` all respect temporal
+  bounds (not just `getCountries`), catching any destructuring bugs.
+
+**Step 2: Run medium tests**
+
+Run: `cd server && pnpm test:medium`
+
+**Step 3: Commit (if tests written)**
+
+```bash
+git add server/src/
+git commit -m "test: medium tests for temporal suggestion scoping"
+```
+
+---
+
+## Task 11: E2E API tests for temporal suggestion scoping
+
+**Note:** Task numbers shifted — old Task 10 is now Task 11.
 
 **Files:**
 
@@ -1080,7 +1280,7 @@ git commit -m "test: E2E API tests for temporal suggestion scoping"
 
 ---
 
-## Task 11: E2E Playwright tests for filter panel
+## Task 12: E2E Playwright tests for filter panel
 
 **Files:**
 
@@ -1123,6 +1323,19 @@ test('cascade works under temporal scoping', async ({ page }) => {
   // Select country
   // Assert cities match both country AND year
 });
+
+test('orphaned selection visual state', async ({ page }) => {
+  // Select a person
+  // Apply temporal filter that excludes that person
+  // Assert person chip remains visible with muted/dimmed styling
+});
+
+test('section recovery from empty', async ({ page }) => {
+  // Apply temporal filter that empties camera section
+  // Assert camera section shows (0)
+  // Clear temporal filter
+  // Assert camera section re-expands with all cameras
+});
 ```
 
 **Step 3: Run Playwright tests**
@@ -1138,7 +1351,7 @@ git commit -m "test: Playwright E2E tests for contextual filter suggestions"
 
 ---
 
-## Task 12: Final verification
+## Task 13: Final verification
 
 **Step 1: Run full test suites sequentially**
 
