@@ -1,1 +1,5 @@
 blank_issues_enabled: false
+contact_links:
+  - name: Feature request
+    url: https://github.com/open-noodle/gallery/discussions/new?category=ideas
+    about: Suggest a new feature or improvement in Discussions.

@@ -1,5 +1,5 @@
-name: Submit an issue
-description: Report a bug, request a feature, or ask a question about Gallery
+name: Bug report
+description: Report a bug in Gallery
 body:
   - type: textarea
     validations:
@@ -7,8 +7,8 @@ body:
     attributes:
       label: Description
       description: >-
-        Describe the issue, feature request, or question. If reporting a bug,
-        include steps to reproduce and what you expected to happen.
+        Describe the bug you are experiencing. Include steps to reproduce
+        and what you expected to happen.
 
   - type: input
     attributes:
