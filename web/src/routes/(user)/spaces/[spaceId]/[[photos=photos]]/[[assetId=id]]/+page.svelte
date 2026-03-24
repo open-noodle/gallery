@@ -108,8 +108,8 @@
 
   // Filter state
   let filters = $state(createFilterState());
-  let personNames = $state(new SvelteMap<string, string>());
-  let tagNames = $state(new SvelteMap<string, string>());
+  let personNames = new SvelteMap<string, string>();
+  let tagNames = new SvelteMap<string, string>();
 
   let heroCollapsed = $state(false);
   let prevFilterCount = 0;
