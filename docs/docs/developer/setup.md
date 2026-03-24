@@ -9,9 +9,9 @@ Make sure to read the [`CONTRIBUTING.md`](https://github.com/immich-app/immich/b
 :::
 
 :::note
-If there's a feature you're planning to work on, just give us a heads up in [#contributing](https://discord.com/channels/979116623879368755/1071165397228855327) on [our Discord](https://discord.immich.app) so we can:
+If there's a feature you're planning to work on, just give us a heads up on [our Discord](https://discord.gg/cxBfbuxyG4) so we can:
 
-1. Let you know if it's something we would accept into Immich
+1. Let you know if it's something we would accept into Gallery
 2. Provide any guidance on how something like that would ideally be implemented
 3. Ensure nobody is already working on that issue/feature so we don't duplicate effort
 
@@ -81,9 +81,9 @@ mise //web:start
 
 #### `@immich/ui`
 
-To see local changes to `@immich/ui` in Immich, do the following:
+To see local changes to `@immich/ui` in Gallery, do the following:
 
-1. Install `@immich/ui` as a sibling to `immich/`, for example `/home/user/immich` and `/home/user/ui`
+1. Install `@immich/ui` as a sibling to `gallery/`, for example `/home/user/gallery` and `/home/user/ui`
 2. Build the `@immich/ui` project via `pnpm run build`
 3. Uncomment the corresponding volume in web service of the `docker/docker-compose.dev.yml` file (`../../ui:/usr/src/ui`)
 4. Uncomment the corresponding alias in the `web/vite.config.ts` file (`'@immich/ui': path.resolve(\_\_dirname, '../../ui/packages/ui')`)
@@ -116,7 +116,7 @@ The environment values are used across Immich's targets and schemes to prevent r
 
 #### Translation
 
-To add a new translation text, enter the key-value pair in the `i18n/en.json` in the root of the immich project. Then run:
+To add a new translation text, enter the key-value pair in the `i18n/en.json` in the root of the Gallery project. Then run:
 
 ```bash
 mise //mobile:translation
