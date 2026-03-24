@@ -18,8 +18,8 @@ The 10,000 limit is performance-driven (avoiding large synchronous DB writes), n
 
 ## Web Frontend Changes
 
-- Define `const MAX_SPACE_ASSETS_PER_REQUEST = 10_000` in the space page
-- When `selectedAssets.size > 10_000` in asset selection mode:
+- Extract a `SpaceAssetLimitWarning` component with `selectedCount` prop and `MAX_SPACE_ASSETS_PER_REQUEST = 10_000` constant
+- When `selectedAssets.length > 10_000` in asset selection mode:
   - Disable the "Add to Space" button
   - Show a red warning banner with the message below
 - When within the limit, normal behavior
