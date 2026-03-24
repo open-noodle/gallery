@@ -16,6 +16,9 @@
   let models = $state<string[]>([]);
   let loadingModels = $state(false);
 
+  // Orphaned make: selected but not in current results
+  let orphanedMake = $derived(selectedMake && !makes.includes(selectedMake) ? selectedMake : undefined);
+
   $effect(() => {
     if (expandedMake) {
       const _context = context;
@@ -23,6 +26,11 @@
       void onModelFetch(expandedMake, _context).then((result) => {
         models = result;
         loadingModels = false;
+
+        // Cascade child auto-clear: if selected model is not in new results, clear it
+        if (selectedModel && result.length > 0 && !result.includes(selectedModel)) {
+          onSelectionChange(expandedMake!, undefined);
+        }
       });
     } else {
       models = [];
@@ -53,9 +61,27 @@
 </script>
 
 <div data-testid="camera-filter">
-  {#if makes.length === 0}
+  {#if makes.length === 0 && !orphanedMake}
     <p class="text-sm text-gray-400 dark:text-gray-500" data-testid="camera-empty">No cameras in this space</p>
   {:else}
+    <!-- Orphaned make (selected but no longer in suggestions) -->
+    {#if orphanedMake}
+      <button
+        type="button"
+        class="-mx-2 flex w-[calc(100%+1rem)] items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium opacity-50 hover:bg-subtle"
+        onclick={() => handleMakeClick(orphanedMake!)}
+        aria-selected="true"
+        data-testid="camera-make-{orphanedMake}"
+      >
+        <div
+          class="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full border-2 border-immich-primary bg-immich-primary dark:border-immich-dark-primary dark:bg-immich-dark-primary"
+        >
+          <div class="h-1.5 w-1.5 rounded-full bg-white dark:bg-black"></div>
+        </div>
+        <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-left">{orphanedMake}</span>
+      </button>
+    {/if}
+
     {#each makes as make (make)}
       {@const isMakeSelected = selectedMake === make}
       <!-- Make row -->
