@@ -119,6 +119,7 @@
 
   const hasActiveFilters = $derived(getActiveFilterCount(filters) > 0);
   const totalAssetCount = $derived(timelineManager?.assetCount ?? 0);
+  const isTimelineEmpty = $derived(timelineManager?.isInitialized && totalAssetCount === 0 && !hasActiveFilters);
 
   let selectedAssets = $derived(assetMultiSelectManager.assets);
   let isAssetStackSelected = $derived(selectedAssets.length === 1 && !!selectedAssets[0].stack);
@@ -179,6 +180,7 @@
       })) ?? []}
       initialCollapsed={true}
       storageKey="gallery-filter-visible-sections-photos"
+      hidden={isTimelineEmpty}
     />
     <div class="flex-1 overflow-hidden pl-4">
       {#if hasActiveFilters}
