@@ -44,7 +44,7 @@ Server enriches with `originalDuration` (float seconds) before storing to JSONB,
 
 ### Validation Split
 
-- **DTO layer:** `startTime >= 0`, `endTime > startTime`, at most one Trim per edit sequence
+- **DTO layer:** `startTime >= 0`, `endTime > startTime`, at most one Trim per edit sequence, must actually trim something (`startTime > 0 OR endTime < duration` — enforced at service layer since DTO doesn't have duration)
 - **Service layer:** asset must be `AssetType.Video` (not image, live photo, panorama, GIF), `endTime <= parsedDuration`, no in-progress transcode/edit jobs, local storage only, must have video streams (excludes audio-only files stored as Video type)
 
 ### Validation Refactor
@@ -97,7 +97,7 @@ Calls `generateEditedThumbnails()` → applies spatial transforms → syncs file
 **Video path (new):**
 
 1. Ensure local file availability
-2. Select input: existing encoded video if available, otherwise original upload
+2. Select input: **always use the original source** — the non-edited encoded video or the original upload. Never use a previously trimmed (edited) version as input, since widening a trim requires access to the full original content.
 3. Run `MediaRepository.trim()` → write to edited `EncodedVideo` path (`isEdited: true`)
 4. Re-probe trimmed output for actual resulting duration
 5. Update `asset.duration` via `assetRepository.update({ id, duration })` (not done by the existing handler — new call)
@@ -123,11 +123,11 @@ Check for in-progress edit jobs before accepting new trim requests. Reject with 
 
 ### Trim Eligibility
 
-For v1, trim eligibility is determined **client-side** using data already available in the asset DTO: `asset.type === Video && !asset.isExternal && asset.duration != null && !asset.livePhotoVideoId`. The `isExternal` flag covers both S3 and external library assets.
+For v1, trim eligibility is determined **client-side** for basic checks: `asset.type === Video && asset.duration != null && !asset.livePhotoVideoId`. These cover the common cases (images, live photos, unprocessed videos).
 
-The server provides a second line of defense — the `editAsset()` service method validates all constraints (storage type, job status, video streams) and returns a clear error if the client bypasses the UI check.
+**S3 detection requires a server check.** The `isExternal` flag only covers external library imports, not S3-stored uploads. Since the frontend cannot determine the storage backend, the `editAsset()` service method validates storage type and returns a specific error (`"Video trimming is not available for cloud-stored videos"`). The frontend shows this error if it occurs on save. This is an acceptable UX trade-off for v1 — S3 setups are less common, and adding a storage flag to the asset DTO would be a larger API change.
 
-_Note: A server-driven `X-Available-Tools` header was considered but deferred because oazapfts-generated SDK clients discard response headers, requiring a custom fetch wrapper. The client-side check is sufficient for v1._
+The server also validates all other constraints (job status, video streams, audio-only exclusion) as a second line of defense.
 
 ## 3. Frontend: TrimManager & Editor Integration
 
@@ -235,17 +235,20 @@ Shared spaces: same permission model as existing edits. No special handling.
 
 ## 6. Edge Cases
 
-| Scenario                 | Behavior                                                                   |
-| ------------------------ | -------------------------------------------------------------------------- |
-| No encoded video yet     | Trim operates on original upload, output is edited `EncodedVideo`          |
-| Video still transcoding  | Trim disabled on frontend (duration null), rejected by server if bypassed  |
-| Very short videos (< 2s) | Trim disabled — minimum output is 1 second                                 |
-| Duration not yet known   | Trim disabled until metadata extraction completes                          |
-| Keyframe imprecision     | After trim, server re-probes for actual duration and updates asset         |
-| Live photos              | Trim not available (treated as images)                                     |
-| Concurrent edit requests | Service rejects if edit job already in progress                            |
-| S3-backed videos         | Trim disabled on frontend, rejected by server                              |
-| Audio-only files         | Stored as `AssetType.Video` but excluded — server checks for video streams |
+| Scenario                 | Behavior                                                                                        |
+| ------------------------ | ----------------------------------------------------------------------------------------------- |
+| No encoded video yet     | Trim operates on original upload, output is edited `EncodedVideo`                               |
+| Video still transcoding  | Trim disabled on frontend (duration null), rejected by server if bypassed                       |
+| Very short videos (< 2s) | Trim disabled — minimum output is 1 second                                                      |
+| Duration not yet known   | Trim disabled until metadata extraction completes                                               |
+| Keyframe imprecision     | After trim, server re-probes for actual duration and updates asset                              |
+| Live photos              | Trim not available (treated as images)                                                          |
+| Concurrent edit requests | Service rejects if edit job already in progress                                                 |
+| S3-backed videos         | Trim disabled on frontend, rejected by server                                                   |
+| Audio-only files         | Stored as `AssetType.Video` but excluded — server checks for video streams                      |
+| Trim to full duration    | Rejected — `startTime > 0 OR endTime < duration` required (no-op prevention)                    |
+| Re-trimming              | Always trims from original source, not previous trim output — widening works                    |
+| FFmpeg failure           | Job handler catches error, cleans up partial output, surfaces failure via WebSocket error event |
 
 ## 7. Not Included (YAGNI)
 
@@ -272,6 +275,7 @@ Shared spaces: same permission model as existing edits. No special handling.
 - `editAsset()` rejects Trim when another edit job is in progress
 - `editAsset()` rejects Trim when asset is on S3/external storage
 - `editAsset()` rejects mixed spatial + trim edits
+- `editAsset()` rejects full-duration trim (start=0, end=duration — no-op)
 - Duration string-to-float parsing: `"0:00:00.000000"`, `"1:23:45.678901"`, null
 
 **Data flow:**
@@ -293,6 +297,8 @@ Shared spaces: same permission model as existing edits. No special handling.
 - Video path extracts frame from trimmed video for thumbnails
 - Undo path deletes edited encoded video via `syncFiles()`
 - `asset.duration` is updated after trim, restored after undo
+- Re-trim uses original source (non-edited encoded video or original upload), not previous trim output
+- FFmpeg failure: partial output cleaned up, error surfaced to client
 
 ### FFmpeg Command Tests
 
@@ -310,9 +316,10 @@ Shared spaces: same permission model as existing edits. No special handling.
 
 ### E2E Tests
 
-- Full trim flow: upload video → open editor → set trim points → save → verify playback serves trimmed version
-- Undo: trim then undo → verify original duration restored and original video served
-- Eligibility: S3 video shows no edit button, very short video (< 2s) shows disabled trim
+- Full trim flow: upload video → open editor → set trim points → save → verify `asset.duration` changed via API
+- Re-trim: trim → open editor again → widen trim → save → verify new duration reflects wider range
+- Undo: trim then undo → verify original duration restored via API
+- Eligibility: very short video (< 2s) shows disabled trim
 - Permissions: space member with edit access can trim, member without cannot
 
 ### Known Limitations
