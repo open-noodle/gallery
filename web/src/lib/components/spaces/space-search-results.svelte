@@ -1,8 +1,8 @@
 <script lang="ts">
   import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
+  import Portal from '$lib/elements/Portal.svelte';
   import type { AssetCursor } from '$lib/components/asset-viewer/asset-viewer.svelte';
   import { authManager } from '$lib/managers/auth-manager.svelte';
-  import { assetViewingStore } from '$lib/stores/asset-viewing.store';
   import { type AssetResponseDto, getAssetInfo } from '@immich/sdk';
   import { t } from 'svelte-i18n';
 
@@ -87,12 +87,14 @@
   {/if}
 </section>
 
-{#if cursor}
-  {#await import('$lib/components/asset-viewer/asset-viewer.svelte') then { default: AssetViewer }}
-    <AssetViewer
-      {cursor}
-      isShared={true}
-      onClose={handleClose}
-    />
-  {/await}
-{/if}
+<Portal target="body">
+  {#if cursor}
+    {#await import('$lib/components/asset-viewer/asset-viewer.svelte') then { default: AssetViewer }}
+      <AssetViewer
+        {cursor}
+        isShared={true}
+        onClose={handleClose}
+      />
+    {/await}
+  {/if}
+</Portal>
