@@ -118,7 +118,7 @@ describe('FilterPanel', () => {
   });
 
   describe('initialCollapsed prop', () => {
-    it('should start collapsed when initialCollapsed is true', async () => {
+    it('should start collapsed when initialCollapsed is true', () => {
       render(FilterPanel, {
         props: {
           config: { sections: ['rating', 'media'], providers: {} },
@@ -130,7 +130,7 @@ describe('FilterPanel', () => {
       expect(screen.queryByTestId('discovery-panel')).not.toBeInTheDocument();
     });
 
-    it('should start expanded by default (no prop)', async () => {
+    it('should start expanded by default (no prop)', () => {
       render(FilterPanel, {
         props: {
           config: { sections: ['rating', 'media'], providers: {} },
@@ -146,7 +146,7 @@ describe('FilterPanel', () => {
     it('should show generic empty text for people section when no people', async () => {
       render(FilterPanel, {
         props: {
-          config: { sections: ['people'], providers: { people: async () => [] } },
+          config: { sections: ['people'], providers: { people: () => Promise.resolve([]) } },
           timeBuckets: [],
         },
       });
@@ -158,7 +158,7 @@ describe('FilterPanel', () => {
     it('should show generic empty text for location section when no locations', async () => {
       render(FilterPanel, {
         props: {
-          config: { sections: ['location'], providers: { locations: async () => [] } },
+          config: { sections: ['location'], providers: { locations: () => Promise.resolve([]) } },
           timeBuckets: [],
         },
       });
@@ -170,7 +170,7 @@ describe('FilterPanel', () => {
     it('should show generic empty text for camera section when no cameras', async () => {
       render(FilterPanel, {
         props: {
-          config: { sections: ['camera'], providers: { cameras: async () => [] } },
+          config: { sections: ['camera'], providers: { cameras: () => Promise.resolve([]) } },
           timeBuckets: [],
         },
       });
