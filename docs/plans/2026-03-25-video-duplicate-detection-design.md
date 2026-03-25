@@ -141,13 +141,47 @@ function elementWiseMean(vectors: number[][]): number[] {
 
 ## Testing
 
-- **Unit tests** for the video branch in `handleEncodeClip`: mock probe, frame
-  extraction, and ML encoding. Verify correct number of frames for various durations
-  (0, 1s, 5s, 60s).
-- **Unit test** for `elementWiseMean` utility.
-- **Unit test** for `extractVideoFrames` in media repository.
-- **Integration verification**: confirm `streamForEncodeClip` returns video assets
-  (no type filter exists, but worth an explicit test).
+### Test fixtures
+
+Download a few short royalty-free stock videos (e.g., from Pexels or Pixabay) and add
+them to `e2e/test-assets/`:
+
+- `videos/normal.mp4` — 5-10 second clip (normal case, produces 8 frames)
+- `videos/short.mp4` — ~1 second clip (edge case, produces 1 frame)
+- `videos/normal-reencoded.mp4` — same content as `normal.mp4` re-encoded at a
+  different resolution or bitrate (validates that duplicates are detected across
+  encodes)
+
+Keep files small (<2 MB each) to avoid bloating the submodule.
+
+### Unit tests
+
+- **`handleEncodeClip` video branch** (`smart-info.service.spec.ts`): mock probe,
+  frame extraction, and ML encoding. Test cases:
+  - Normal video (duration 10s) → 8 timestamps, 8 encodeImage calls, averaged result
+  - Short video (duration 1s) → 1 timestamp at midpoint
+  - Missing duration (null) → 1 timestamp at t=0
+  - Partial frame extraction failure (3 of 8 succeed) → averages 3 embeddings
+  - All frames fail → returns `JobStatus.Failed`
+  - Probe failure → returns `JobStatus.Failed`
+  - Temp directory cleaned up in all cases (success and failure)
+- **`elementWiseMean`**: basic averaging, single vector passthrough, dimension
+  consistency.
+- **`extractVideoFrames`** (`media.repository.spec.ts`): mock ffmpeg calls, verify
+  correct `-ss` timestamps and output paths.
+
+### Integration tests
+
+- Confirm `streamForEncodeClip` returns video assets (no type filter exists, but worth
+  an explicit test).
+- Confirm `getForClipEncoding` returns `type` and `originalPath` for video assets.
+
+### E2E tests (with ML disabled)
+
+- Upload `normal.mp4` and `normal-reencoded.mp4` to the same user.
+- Trigger smart search + duplicate detection jobs.
+- Verify both videos end up in the same duplicate group.
+- Upload `short.mp4` and verify it does not match the other two.
 
 ## Future Phases
 
