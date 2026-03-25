@@ -58,8 +58,8 @@ test.describe('Spaces Search', () => {
     await clearButton.click();
 
     // Search results should disappear, timeline should return
-    await expect(page.getByTestId('result-count')).not.toBeVisible({ timeout: 5_000 });
-    await expect(page.getByTestId('search-empty')).not.toBeVisible({ timeout: 5_000 });
+    await expect(page.getByTestId('result-count')).not.toBeVisible({ timeout: 5000 });
+    await expect(page.getByTestId('search-empty')).not.toBeVisible({ timeout: 5000 });
   });
 
   test('search chip appears and is removable', async ({ context, page }) => {
@@ -82,7 +82,7 @@ test.describe('Spaces Search', () => {
     await page.getByTestId('search-chip-close').click();
 
     // Search should be cleared
-    await expect(page.getByTestId('search-chip')).not.toBeVisible({ timeout: 5_000 });
+    await expect(page.getByTestId('search-chip')).not.toBeVisible({ timeout: 5000 });
   });
 
   test('escape key clears search results', async ({ context, page }) => {
@@ -102,7 +102,7 @@ test.describe('Spaces Search', () => {
     await page.keyboard.press('Escape');
 
     // Search results should be gone
-    await expect(page.getByTestId('result-count')).not.toBeVisible({ timeout: 5_000 });
-    await expect(page.getByTestId('search-empty')).not.toBeVisible({ timeout: 5_000 });
+    await expect(page.getByTestId('result-count')).not.toBeVisible({ timeout: 5000 });
+    await expect(page.getByTestId('search-empty')).not.toBeVisible({ timeout: 5000 });
   });
 });
