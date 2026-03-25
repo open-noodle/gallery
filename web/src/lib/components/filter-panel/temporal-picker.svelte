@@ -13,19 +13,6 @@
 
   let { timeBuckets, selectedYear, selectedMonth, onYearSelect, onMonthSelect }: Props = $props();
 
-  // Track the last known height to use as min-height during re-renders,
-  // preventing layout shift when timeBuckets briefly goes empty during
-  // TimelineManager re-init.
-  let containerRef = $state<HTMLDivElement>();
-  let minHeight = $state(0);
-
-  $effect(() => {
-    if (containerRef && timeBuckets.length > 0) {
-      // Capture height when we have content
-      minHeight = containerRef.offsetHeight;
-    }
-  });
-
   let years = $derived(aggregateYears(timeBuckets));
   let months = $derived(selectedYear === undefined ? [] : getMonthsForYear(timeBuckets, selectedYear));
 
@@ -53,7 +40,7 @@
   }
 </script>
 
-<div data-testid="temporal-picker" bind:this={containerRef} style="min-height: {minHeight}px">
+<div data-testid="temporal-picker">
   {#if selectedYear !== undefined}
     <!-- Breadcrumb -->
     <div class="mb-2 flex items-center gap-1 text-xs text-gray-500 dark:text-gray-300">
