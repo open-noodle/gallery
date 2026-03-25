@@ -96,13 +96,13 @@ Add this method to the `SharedSpaceRepository` class (after the existing `getMap
 
 ```typescript
 import { searchAssetBuilder } from 'src/utils/database';
-import { AssetType, AssetVisibility } from 'src/enum';
+import { AssetVisibility } from 'src/enum';
 import type { AssetSearchBuilderOptions } from 'src/repositories/search.repository';
 ```
 
 ```typescript
 @GenerateSql({
-  params: [{ userIds: [DummyValue.UUID], visibility: 'AssetVisibility.Timeline' }],
+  params: [{ userIds: [DummyValue.UUID], visibility: AssetVisibility.Timeline }],
 })
 getFilteredMapMarkers(options: AssetSearchBuilderOptions) {
   return searchAssetBuilder(this.db, options)
@@ -163,7 +163,8 @@ async getFilteredMapMarkers(auth: AuthDto, dto: FilteredMapMarkerDto): Promise<M
   const markers = await this.sharedSpaceRepository.getFilteredMapMarkers({
     userIds: dto.spaceId ? undefined : [auth.user.id],
     spaceId: dto.spaceId,
-    personIds: dto.personIds,
+    personIds: dto.spaceId ? undefined : dto.personIds,
+    spacePersonIds: dto.spaceId ? dto.personIds : undefined,
     tagIds: dto.tagIds,
     make: dto.make,
     model: dto.model,
@@ -776,9 +777,6 @@ The `OnEvents` component uses named callback props derived from event names (e.g
     // Trigger re-fetch by creating a new filters reference
     filters = { ...filters };
   }}
-  onAssetsTrash={() => {
-    filters = { ...filters };
-  }}
 />
 ```
 
@@ -1144,30 +1142,50 @@ git commit -m "feat(web): add no-results overlay on map when filters eliminate a
 
 - Modify: `web/src/routes/(user)/map/[[photos=photos]]/[[assetId=id]]/+page.svelte`
 
-**Step 1: Hide FilterPanel on mobile, show toggle button**
+**Step 1: Use single FilterPanel with conditional rendering**
 
-Add a state variable:
+Use `{#if}` to avoid mounting two FilterPanel instances (which would cause duplicate provider API calls). Add state:
 
 ```typescript
 let showMobileFilters = $state(false);
+let isMobile = $state(false);
 ```
 
-Wrap the FilterPanel in the template with responsive classes:
+Add a resize observer to detect mobile viewport:
+
+```typescript
+function checkMobile() {
+  isMobile = window.innerWidth < 640; // sm breakpoint
+  if (!isMobile) showMobileFilters = false;
+}
+
+onMount(() => {
+  checkMobile();
+  window.addEventListener('resize', checkMobile);
+  return () => window.removeEventListener('resize', checkMobile);
+});
+```
+
+Import `onMount` from `svelte`.
+
+**Step 2: Conditional rendering in template**
+
+Replace the FilterPanel markup from Task 12 with:
 
 ```svelte
-<!-- Desktop: always visible -->
-<div class="hidden sm:block">
+<!-- Desktop: inline sidebar -->
+{#if !isMobile}
   <FilterPanel
     bind:filters
     config={filterConfig}
     {timeBuckets}
     storageKey="gallery-filter-visible-sections-map"
   />
-</div>
+{/if}
 
 <!-- Mobile: slide-out overlay -->
-{#if showMobileFilters}
-  <div class="fixed inset-0 z-30 sm:hidden">
+{#if isMobile && showMobileFilters}
+  <div class="fixed inset-0 z-30">
     <button
       type="button"
       class="absolute inset-0 bg-black/50"
@@ -1185,18 +1203,21 @@ Wrap the FilterPanel in the template with responsive classes:
 {/if}
 ```
 
-**Step 2: Add mobile filter toggle button**
+Only one FilterPanel is mounted at a time — no duplicate provider fetches.
+
+**Step 3: Add mobile filter toggle button**
 
 In the `UserPageLayout` header area (the `leading` snippet), add a filter toggle button visible only on mobile:
 
 ```svelte
-<button
-  type="button"
-  class="sm:hidden"
-  onclick={() => (showMobileFilters = !showMobileFilters)}
->
-  <Icon icon={mdiFilterVariant} size="24" />
-</button>
+{#if isMobile}
+  <button
+    type="button"
+    onclick={() => (showMobileFilters = !showMobileFilters)}
+  >
+    <Icon icon={mdiFilterVariant} size="24" />
+  </button>
+{/if}
 ```
 
 Import `mdiFilterVariant` from `@mdi/js`.
@@ -1214,34 +1235,36 @@ git commit -m "feat(web): responsive FilterPanel with mobile overlay on map page
 
 **Files:**
 
-- Create: `e2e/src/web/specs/map-filter-panel.e2e-spec.ts`
+- Create: `e2e/src/specs/web/map-filter-panel.e2e-spec.ts`
+
+Note: E2E web tests live at `e2e/src/specs/web/` (not `e2e/src/web/specs/`). Follow the patterns in existing tests like `auth.e2e-spec.ts`.
 
 **Step 1: Write E2E tests**
 
 ```typescript
-import { test, expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import { utils } from 'src/utils';
 
 test.describe('Map FilterPanel', () => {
-  test.beforeAll(async () => {
-    await utils.initSuite();
+  let admin: { accessToken: string };
+
+  test.beforeAll(() => {
+    utils.initSdk();
   });
 
-  test('should show filter panel on map page', async ({ page }) => {
-    await utils.setAuthCookies(page);
+  test.beforeEach(async () => {
+    await utils.resetDatabase();
+    admin = await utils.adminSetup();
+  });
+
+  test('should show filter panel on map page', async ({ context, page }) => {
+    await utils.setAuthCookies(context, admin.accessToken);
     await page.goto('/map');
     await expect(page.getByTestId('discovery-panel')).toBeVisible();
   });
 
-  test('should show filter panel on space map page', async ({ page }) => {
-    await utils.setAuthCookies(page);
-    // Navigate to a space map - adjust spaceId as needed for test fixtures
-    await page.goto('/map');
-    await expect(page.getByTestId('discovery-panel')).toBeVisible();
-  });
-
-  test('should collapse and expand filter panel', async ({ page }) => {
-    await utils.setAuthCookies(page);
+  test('should collapse and expand filter panel', async ({ context, page }) => {
+    await utils.setAuthCookies(context, admin.accessToken);
     await page.goto('/map');
 
     // Panel starts expanded
@@ -1256,30 +1279,28 @@ test.describe('Map FilterPanel', () => {
     await expect(page.getByTestId('discovery-panel')).toBeVisible();
   });
 
-  test('should show favorites filter section', async ({ page }) => {
-    await utils.setAuthCookies(page);
+  test('should show favorites filter section', async ({ context, page }) => {
+    await utils.setAuthCookies(context, admin.accessToken);
     await page.goto('/map');
     await expect(page.getByTestId('favorites-filter')).toBeVisible();
   });
 
-  test('should not show location filter section on map', async ({ page }) => {
-    await utils.setAuthCookies(page);
+  test('should not show location filter section on map', async ({ context, page }) => {
+    await utils.setAuthCookies(context, admin.accessToken);
     await page.goto('/map');
     await expect(page.getByTestId('location')).not.toBeVisible();
   });
 });
 ```
 
-Note: E2E test patterns and utilities (`utils.initSuite`, `utils.setAuthCookies`) should match the existing e2e test patterns in `e2e/src/web/specs/`. Adjust imports and setup based on how other e2e tests are structured.
-
 **Step 2: Run E2E tests**
 
-Run: `cd e2e && npx playwright test src/web/specs/map-filter-panel.e2e-spec.ts`
+Run: `cd e2e && npx playwright test src/specs/web/map-filter-panel.e2e-spec.ts`
 Expected: Tests pass (or adjust based on actual test fixture setup).
 
 **Step 3: Commit**
 
 ```bash
-git add e2e/src/web/specs/map-filter-panel.e2e-spec.ts
+git add e2e/src/specs/web/map-filter-panel.e2e-spec.ts
 git commit -m "test(e2e): add Playwright tests for map filter panel"
 ```

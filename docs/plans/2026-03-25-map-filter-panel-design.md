@@ -45,7 +45,8 @@ All fork-only files — zero upstream server changes.
 **Implementation:**
 
 ```typescript
-searchAssetBuilder(this.db, { ...options, withExif: true })
+searchAssetBuilder(this.db, options)
+  .innerJoin('asset_exif', 'asset.id', 'asset_exif.assetId')
   .where('asset_exif.latitude', 'is not', null)
   .where('asset_exif.longitude', 'is not', null)
   .select([
@@ -59,7 +60,7 @@ searchAssetBuilder(this.db, { ...options, withExif: true })
   .execute();
 ```
 
-Uses `withExif: true` to trigger the builder's own `innerJoin('asset_exif', ...)`, avoiding duplicate join issues with `DeduplicateJoinsPlugin`.
+Uses an explicit `innerJoin` with selective columns instead of `withExif: true` (which would add a wasteful `toJson(asset_exif)` select). The `DeduplicateJoinsPlugin` handles cases where `searchAssetBuilder` also adds the join for exif filter fields.
 
 **Access control:**
 
