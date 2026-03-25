@@ -15,6 +15,7 @@
   import ControlAppBar from '$lib/components/shared-components/control-app-bar.svelte';
   import ButtonContextMenu from '$lib/components/shared-components/context-menu/button-context-menu.svelte';
   import SpaceHero from '$lib/components/spaces/space-hero.svelte';
+  import SpaceSearchResults from '$lib/components/spaces/space-search-results.svelte';
   import SpaceMap from '$lib/components/spaces/space-map.svelte';
   import SpaceNewAssetsDivider from '$lib/components/spaces/space-new-assets-divider.svelte';
   import SpaceOnboardingBanner from '$lib/components/spaces/space-onboarding-banner.svelte';
@@ -44,7 +45,6 @@
   import { preferences, user } from '$lib/stores/user.store';
   import { cancelMultiselect } from '$lib/utils/asset-utils';
   import { handleError } from '$lib/utils/handle-error';
-  import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
   import {
     addAssets,
     bulkAddAssets,
@@ -70,6 +70,7 @@
     type SharedSpaceMemberResponseDto,
     type SharedSpacePersonResponseDto,
     type SharedSpaceResponseDto,
+    type SmartSearchDto,
   } from '@immich/sdk';
   import { IconButton, modalManager, toastManager } from '@immich/ui';
   import {
@@ -113,10 +114,13 @@
       spacePeople = [];
       personNames.clear();
       tagNames.clear();
+      searchAbortController?.abort();
       searchQuery = '';
       searchResults = [];
       isSearching = false;
       showSearchResults = false;
+      searchPage = 1;
+      hasMoreResults = false;
       heroCollapsed = false;
       panelOpen = false;
       viewMode = 'view';
@@ -559,37 +563,141 @@
     await Promise.all([refreshSpace(), loadActivities()]);
   };
 
+  const SEARCH_FILTER_DEBOUNCE_MS = 250;
+
   let searchQuery = $state('');
   let searchResults = $state<AssetResponseDto[]>([]);
   let isSearching = $state(false);
   let showSearchResults = $state(false);
+  let searchPage = $state(1);
+  let hasMoreResults = $state(false);
+  let searchAbortController: AbortController | undefined;
 
-  const handleSearchSubmit = async () => {
+  const buildSearchParams = (): SmartSearchDto => {
+    const params: SmartSearchDto = {
+      query: searchQuery.trim(),
+      spaceId: space.id,
+    };
+    if (filters.personIds.length > 0) {
+      params.spacePersonIds = filters.personIds;
+    }
+    if (filters.city) {
+      params.city = filters.city;
+    }
+    if (filters.country) {
+      params.country = filters.country;
+    }
+    if (filters.make) {
+      params.make = filters.make;
+    }
+    if (filters.model) {
+      params.model = filters.model;
+    }
+    if (filters.tagIds.length > 0) {
+      params.tagIds = filters.tagIds;
+    }
+    if (filters.rating !== undefined) {
+      params.rating = filters.rating;
+    }
+    if (filters.mediaType !== 'all') {
+      params.type = filters.mediaType === 'image' ? AssetTypeEnum.Image : AssetTypeEnum.Video;
+    }
+    if (filters.selectedYear && filters.selectedMonth) {
+      const start = new Date(filters.selectedYear, filters.selectedMonth - 1, 1);
+      const end = new Date(filters.selectedYear, filters.selectedMonth, 0, 23, 59, 59, 999);
+      params.takenAfter = start.toISOString();
+      params.takenBefore = end.toISOString();
+    } else if (filters.selectedYear) {
+      params.takenAfter = new Date(filters.selectedYear, 0, 1).toISOString();
+      params.takenBefore = new Date(filters.selectedYear, 11, 31, 23, 59, 59, 999).toISOString();
+    }
+    return params;
+  };
+
+  const executeSearch = async (page: number, append: boolean) => {
     const query = searchQuery.trim();
     if (!query) {
-      clearSearch();
       return;
     }
 
+    searchAbortController?.abort();
+    const controller = new AbortController();
+    searchAbortController = controller;
+
     isSearching = true;
-    showSearchResults = true;
     try {
       const { assets } = await searchSmart({
-        smartSearchDto: { query, spaceId: space.id },
+        smartSearchDto: { ...buildSearchParams(), page, size: 100 },
       });
-      searchResults = assets.items;
+
+      if (controller.signal.aborted) {
+        return;
+      }
+
+      searchResults = append ? [...searchResults, ...assets.items] : assets.items;
+      searchPage = page;
+      hasMoreResults = assets.nextPage !== null;
+      showSearchResults = true;
     } catch {
-      searchResults = [];
+      if (controller.signal.aborted) {
+        return;
+      }
+      searchResults = append ? searchResults : [];
+      hasMoreResults = false;
     } finally {
-      isSearching = false;
+      if (!controller.signal.aborted) {
+        isSearching = false;
+      }
     }
   };
 
+  const handleSearchSubmit = () => {
+    searchPage = 1;
+    void executeSearch(1, false);
+  };
+
+  const handleLoadMore = () => {
+    void executeSearch(searchPage + 1, true);
+  };
+
   const clearSearch = () => {
+    searchAbortController?.abort();
     searchQuery = '';
     searchResults = [];
     showSearchResults = false;
+    searchPage = 1;
+    hasMoreResults = false;
+    isSearching = false;
   };
+
+  $effect(() => {
+    const _ = [
+      filters.personIds,
+      filters.city,
+      filters.country,
+      filters.make,
+      filters.model,
+      filters.tagIds,
+      filters.rating,
+      filters.mediaType,
+      filters.selectedYear,
+      filters.selectedMonth,
+    ];
+
+    if (!showSearchResults || !searchQuery.trim()) {
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      searchPage = 1;
+      void executeSearch(1, false);
+    }, SEARCH_FILTER_DEBOUNCE_MS);
+
+    return () => {
+      clearTimeout(timeout);
+      searchAbortController?.abort();
+    };
+  });
 
   const gradientClasses: Record<string, string> = {
     [UserAvatarColor.Primary]: 'from-immich-primary/60 to-immich-primary',
@@ -655,12 +763,14 @@
           </div>
         {/if}
 
-        <SortToggle
-          sortOrder={filters.sortOrder}
-          onToggle={(order) => {
-            filters = { ...filters, sortOrder: order };
-          }}
-        />
+        {#if !showSearchResults}
+          <SortToggle
+            sortOrder={filters.sortOrder}
+            onToggle={(order) => {
+              filters = { ...filters, sortOrder: order };
+            }}
+          />
+        {/if}
 
         {#if isEditor}
           <IconButton
@@ -749,47 +859,30 @@
     <!-- Main Content — pl-4 adds breathing room between filter panel and content -->
     <div class="flex flex-1 flex-col overflow-hidden pl-4">
       <!-- Active filter chips -->
-      {#if viewMode === 'view' && getActiveFilterCount(filters) > 0}
+      {#if viewMode === 'view' && (getActiveFilterCount(filters) > 0 || searchQuery.trim().length > 0)}
         <ActiveFiltersBar
           {filters}
-          resultCount={totalAssetCount}
+          resultCount={showSearchResults ? searchResults.length : totalAssetCount}
           {personNames}
           {tagNames}
           onRemoveFilter={handleRemoveFilter}
           onClearAll={() => {
             filters = clearFilters(filters);
           }}
+          {searchQuery}
+          onClearSearch={clearSearch}
         />
       {/if}
 
       {#if showSearchResults}
-        <section class="px-4 py-4">
-          {#if isSearching}
-            <div class="flex justify-center py-8">
-              <LoadingSpinner />
-            </div>
-          {:else if searchResults.length === 0}
-            <p class="mt-8 text-center text-gray-500 dark:text-gray-400">{$t('search_no_result')}</p>
-          {:else}
-            <p class="mb-4 text-sm text-gray-500 dark:text-gray-400">
-              {searchResults.length} results
-            </p>
-            <div class="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-1">
-              {#each searchResults as asset (asset.id)}
-                <a
-                  href="{Route.viewSpace({ id: space.id })}/photos/{asset.id}"
-                  class="aspect-square cursor-pointer overflow-hidden rounded"
-                >
-                  <img
-                    src="/api/assets/{asset.id}/thumbnail"
-                    alt={asset.originalFileName}
-                    class="h-full w-full object-cover"
-                  />
-                </a>
-              {/each}
-            </div>
-          {/if}
-        </section>
+        <SpaceSearchResults
+          results={searchResults}
+          spaceId={space.id}
+          isLoading={isSearching}
+          hasMore={hasMoreResults}
+          totalLoaded={searchResults.length}
+          onLoadMore={handleLoadMore}
+        />
       {/if}
 
       {#if !showSearchResults}

@@ -40,11 +40,7 @@
           href="{Route.viewSpace({ id: spaceId })}/photos/{asset.id}"
           class="aspect-square cursor-pointer overflow-hidden rounded"
         >
-          <img
-            src="/api/assets/{asset.id}/thumbnail"
-            alt={asset.originalFileName}
-            class="h-full w-full object-cover"
-          />
+          <img src="/api/assets/{asset.id}/thumbnail" alt={asset.originalFileName} class="h-full w-full object-cover" />
         </a>
       {/each}
     </div>
