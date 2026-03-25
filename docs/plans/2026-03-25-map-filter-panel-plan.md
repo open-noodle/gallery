@@ -697,8 +697,7 @@ import FilterPanel from '$lib/components/filter-panel/filter-panel.svelte';
 import { createFilterState, buildFilterContext } from '$lib/components/filter-panel/filter-panel';
 import type { FilterState } from '$lib/components/filter-panel/filter-panel';
 import { buildMapFilterConfig } from '$lib/utils/map-filter-config';
-import { getTimeBuckets, type MapMarkerResponseDto } from '@immich/sdk';
-import type { TimeBucketAssetResponseDto } from '@immich/sdk';
+import { AssetVisibility, getFilteredMapMarkers, getTimeBuckets, type MapMarkerResponseDto } from '@immich/sdk';
 import OnEvents from '$lib/components/OnEvents.svelte';
 ```
 
@@ -720,10 +719,7 @@ Fetch time buckets on mount:
 $effect(() => {
   const currentSpaceId = spaceId;
   void getTimeBuckets({
-    size: 'MONTH',
-    ...(currentSpaceId
-      ? { spaceId: currentSpaceId }
-      : { visibility: 'TIMELINE', withPartners: true, withSharedSpaces: true }),
+    ...(currentSpaceId ? { spaceId: currentSpaceId } : { visibility: AssetVisibility.Timeline }),
   }).then((buckets) => {
     timeBuckets = buckets.map((b) => ({ timeBucket: b.timeBucket, count: b.count }));
   });
@@ -744,19 +740,18 @@ $effect(() => {
   clearTimeout(fetchTimeout);
   fetchTimeout = setTimeout(async () => {
     try {
-      const params: Record<string, unknown> = {};
-      if (currentSpaceId) params.spaceId = currentSpaceId;
-      if (personIds.length > 0) params.personIds = personIds;
-      if (make) params.make = make;
-      if (model) params.model = model;
-      if (tagIds.length > 0) params.tagIds = tagIds;
-      if (rating !== undefined) params.rating = rating;
-      if (mediaType !== 'all') params.type = mediaType === 'image' ? 'IMAGE' : 'VIDEO';
-      if (isFavorite !== undefined) params.isFavorite = isFavorite;
-      if (context?.takenAfter) params.takenAfter = context.takenAfter;
-      if (context?.takenBefore) params.takenBefore = context.takenBefore;
-
-      const result = await getFilteredMapMarkers(params);
+      const result = await getFilteredMapMarkers({
+        ...(currentSpaceId && { spaceId: currentSpaceId }),
+        ...(personIds.length > 0 && { personIds }),
+        ...(make && { make }),
+        ...(model && { model }),
+        ...(tagIds.length > 0 && { tagIds }),
+        ...(rating !== undefined && { rating }),
+        ...(mediaType !== 'all' && { type: mediaType === 'image' ? 'IMAGE' : 'VIDEO' }),
+        ...(isFavorite !== undefined && { isFavorite }),
+        ...(context?.takenAfter && { takenAfter: context.takenAfter }),
+        ...(context?.takenBefore && { takenBefore: context.takenBefore }),
+      });
       mapMarkers = result;
     } catch (error) {
       console.error('Failed to fetch filtered map markers:', error);
@@ -1288,7 +1283,7 @@ test.describe('Map FilterPanel', () => {
   test('should not show location filter section on map', async ({ context, page }) => {
     await utils.setAuthCookies(context, admin.accessToken);
     await page.goto('/map');
-    await expect(page.getByTestId('location')).not.toBeVisible();
+    await expect(page.getByTestId('filter-section-location')).not.toBeVisible();
   });
 });
 ```
