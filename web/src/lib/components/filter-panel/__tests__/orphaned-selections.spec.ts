@@ -13,7 +13,7 @@ describe('Orphaned selections', () => {
     vi.useRealTimers();
   });
 
-  it('should show orphaned person at top of list with opacity-50 and aria-selected', async () => {
+  it('should show orphaned person at top of list with opacity-50 and aria-pressed', async () => {
     // Person p3 is selected but NOT in the people results
     const filters = createFilterState();
     filters.personIds = ['p3'];
@@ -41,7 +41,7 @@ describe('Orphaned selections', () => {
     // p3 should be rendered as orphaned
     const orphanedItem = screen.getByTestId('people-item-p3');
     expect(orphanedItem).toBeTruthy();
-    expect(orphanedItem.getAttribute('aria-selected')).toBe('true');
+    expect(orphanedItem.getAttribute('aria-pressed')).toBe('true');
     expect(orphanedItem.className).toContain('opacity-50');
   });
 
@@ -105,7 +105,7 @@ describe('Orphaned selections', () => {
     // Japan should be rendered as orphaned
     const orphanedItem = screen.getByTestId('location-country-Japan');
     expect(orphanedItem).toBeTruthy();
-    expect(orphanedItem.getAttribute('aria-selected')).toBe('true');
+    expect(orphanedItem.getAttribute('aria-pressed')).toBe('true');
     expect(orphanedItem.className).toContain('opacity-50');
   });
 
@@ -136,7 +136,7 @@ describe('Orphaned selections', () => {
     // Nikon should be rendered as orphaned
     const orphanedItem = screen.getByTestId('camera-make-Nikon');
     expect(orphanedItem).toBeTruthy();
-    expect(orphanedItem.getAttribute('aria-selected')).toBe('true');
+    expect(orphanedItem.getAttribute('aria-pressed')).toBe('true');
     expect(orphanedItem.className).toContain('opacity-50');
   });
 });
