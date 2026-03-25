@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { AssetOrder, AssetTypeEnum, AssetVisibility } from '@immich/sdk';
 import { createFilterState } from '$lib/components/filter-panel/filter-panel';
-import { buildPhotosTimelineOptions } from '$lib/utils/photos-filter-options';
+import { buildPhotosTimelineOptions, handlePhotosRemoveFilter } from '$lib/utils/photos-filter-options';
 
 describe('buildPhotosTimelineOptions', () => {
   it('should return base options with no filters', () => {
@@ -136,5 +136,66 @@ describe('buildPhotosTimelineOptions', () => {
     expect(options).not.toHaveProperty('rating');
     expect(options).not.toHaveProperty('takenAfter');
     expect(options).not.toHaveProperty('takenBefore');
+  });
+});
+
+describe('handlePhotosRemoveFilter', () => {
+  it('should remove a specific person from personIds', () => {
+    const filters = { ...createFilterState(), personIds: ['p1', 'p2', 'p3'] };
+    const result = handlePhotosRemoveFilter(filters, 'person', 'p2');
+    expect(result.personIds).toEqual(['p1', 'p3']);
+  });
+
+  it('should clear location (both country and city)', () => {
+    const filters = { ...createFilterState(), country: 'Germany', city: 'Berlin' };
+    const result = handlePhotosRemoveFilter(filters, 'location');
+    expect(result.country).toBeUndefined();
+    expect(result.city).toBeUndefined();
+  });
+
+  it('should clear camera (both make and model)', () => {
+    const filters = { ...createFilterState(), make: 'Sony', model: 'A7III' };
+    const result = handlePhotosRemoveFilter(filters, 'camera');
+    expect(result.make).toBeUndefined();
+    expect(result.model).toBeUndefined();
+  });
+
+  it('should remove a specific tag from tagIds', () => {
+    const filters = { ...createFilterState(), tagIds: ['t1', 't2'] };
+    const result = handlePhotosRemoveFilter(filters, 'tag', 't1');
+    expect(result.tagIds).toEqual(['t2']);
+  });
+
+  it('should clear rating', () => {
+    const filters = { ...createFilterState(), rating: 4 };
+    const result = handlePhotosRemoveFilter(filters, 'rating');
+    expect(result.rating).toBeUndefined();
+  });
+
+  it('should reset mediaType to all', () => {
+    const filters = { ...createFilterState(), mediaType: 'video' as const };
+    const result = handlePhotosRemoveFilter(filters, 'media');
+    expect(result.mediaType).toBe('all');
+  });
+
+  it('should handle mediaType alias', () => {
+    const filters = { ...createFilterState(), mediaType: 'image' as const };
+    const result = handlePhotosRemoveFilter(filters, 'mediaType');
+    expect(result.mediaType).toBe('all');
+  });
+
+  it('should preserve sortOrder when removing filters', () => {
+    const filters = { ...createFilterState(), sortOrder: 'asc' as const, rating: 5 };
+    const result = handlePhotosRemoveFilter(filters, 'rating');
+    expect(result.sortOrder).toBe('asc');
+    expect(result.rating).toBeUndefined();
+  });
+
+  it('should preserve other filters when removing one', () => {
+    const filters = { ...createFilterState(), country: 'Germany', rating: 4, personIds: ['p1'] };
+    const result = handlePhotosRemoveFilter(filters, 'rating');
+    expect(result.country).toBe('Germany');
+    expect(result.personIds).toEqual(['p1']);
+    expect(result.rating).toBeUndefined();
   });
 });

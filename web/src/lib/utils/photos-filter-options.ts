@@ -44,3 +44,30 @@ export function buildPhotosTimelineOptions(filters: FilterState): Record<string,
 
   return base;
 }
+
+export function handlePhotosRemoveFilter(filters: FilterState, type: string, id?: string): FilterState {
+  switch (type) {
+    case 'person': {
+      return { ...filters, personIds: filters.personIds.filter((p) => p !== id) };
+    }
+    case 'location': {
+      return { ...filters, city: undefined, country: undefined };
+    }
+    case 'camera': {
+      return { ...filters, make: undefined, model: undefined };
+    }
+    case 'tag': {
+      return { ...filters, tagIds: filters.tagIds.filter((t) => t !== id) };
+    }
+    case 'rating': {
+      return { ...filters, rating: undefined };
+    }
+    case 'media':
+    case 'mediaType': {
+      return { ...filters, mediaType: 'all' };
+    }
+    default: {
+      return filters;
+    }
+  }
+}
