@@ -17,7 +17,52 @@ No schema, API, or frontend changes.
 
 ---
 
-### Task 1: Add `elementWiseMean` utility
+### Task 1: Generate test video fixtures
+
+We need these before any integration tests. Generate them synthetically with ffmpeg's
+`testsrc` — no download needed, fully reproducible, tiny files.
+
+**Files:**
+
+- Create: `server/test/fixtures/videos/normal.mp4`
+- Create: `server/test/fixtures/videos/short.mp4`
+- Create: `server/test/fixtures/videos/normal-reencoded.mp4`
+
+**Step 1: Create the test fixtures**
+
+```bash
+mkdir -p server/test/fixtures/videos
+
+# Normal: 4 seconds, 720p, no audio, ~100-200 KB
+ffmpeg -f lavfi -i testsrc=duration=4:size=1280x720:rate=24 \
+  -an -c:v libx264 -crf 30 server/test/fixtures/videos/normal.mp4
+
+# Short: 1 second
+ffmpeg -f lavfi -i testsrc=duration=1:size=1280x720:rate=24 \
+  -an -c:v libx264 -crf 30 server/test/fixtures/videos/short.mp4
+
+# Re-encoded: same content as normal at lower resolution/bitrate
+ffmpeg -i server/test/fixtures/videos/normal.mp4 \
+  -vf scale=640:360 -b:v 300k -an server/test/fixtures/videos/normal-reencoded.mp4
+```
+
+**Step 2: Verify file sizes**
+
+```bash
+ls -lh server/test/fixtures/videos/
+```
+
+Each file should be under 500 KB. If too large, increase `-crf`.
+
+**Step 3: Commit**
+
+```
+test: add synthetic video fixtures for duplicate detection tests
+```
+
+---
+
+### Task 2: Add `elementWiseMean` utility
 
 **Files:**
 
@@ -53,6 +98,15 @@ describe('elementWiseMean', () => {
     expect(result[0]).toBeCloseTo(0.2);
     expect(result[1]).toBeCloseTo(0.3);
   });
+
+  it('should handle 512-dim vectors (CLIP embedding size)', () => {
+    const a = Array.from({ length: 512 }, () => Math.random());
+    const b = Array.from({ length: 512 }, () => Math.random());
+    const result = elementWiseMean([a, b]);
+    expect(result).toHaveLength(512);
+    expect(result[0]).toBeCloseTo((a[0] + b[0]) / 2);
+    expect(result[511]).toBeCloseTo((a[511] + b[511]) / 2);
+  });
 });
 ```
 
@@ -84,7 +138,7 @@ export function elementWiseMean(vectors: number[][]): number[] {
 **Step 4: Run test to verify it passes**
 
 Run: `cd server && npx vitest run src/utils/vector.spec.ts`
-Expected: PASS — all 3 tests
+Expected: PASS — all 4 tests
 
 **Step 5: Commit**
 
@@ -94,7 +148,7 @@ feat: add elementWiseMean vector utility
 
 ---
 
-### Task 2: Add `extractVideoFrames` to media repository
+### Task 3: Add `extractVideoFrames` to media repository
 
 **Files:**
 
@@ -158,7 +212,100 @@ feat: add extractVideoFrames to media repository
 
 ---
 
-### Task 3: Add `type` and `originalPath` to `getForClipEncoding` query
+### Task 4: Integration test for `extractVideoFrames`
+
+Uses the real ffmpeg + test video fixtures from Task 1. This verifies actual frame
+extraction works, not just that the mock is wired up.
+
+**Files:**
+
+- Create: `server/src/repositories/media.repository.extract.spec.ts`
+
+**Step 1: Write the integration test**
+
+```typescript
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { MediaRepository } from 'src/repositories/media.repository';
+
+// This test uses real ffmpeg — runs slower than unit tests but verifies actual behavior
+describe('MediaRepository.extractVideoFrames (integration)', () => {
+  let sut: MediaRepository;
+  let outputDir: string;
+
+  const fixturesDir = path.resolve(__dirname, '../../test/fixtures/videos');
+
+  beforeEach(async () => {
+    sut = new MediaRepository() as any; // logger is injected, but warn/error are no-ops in test
+    outputDir = await fs.mkdtemp(path.join(os.tmpdir(), 'immich-test-'));
+  });
+
+  afterEach(async () => {
+    await fs.rm(outputDir, { recursive: true, force: true });
+  });
+
+  it('should extract frames from a normal video', async () => {
+    const input = path.join(fixturesDir, 'normal.mp4');
+    const timestamps = [0.5, 1.5, 2.5, 3.5];
+
+    const results = await sut.extractVideoFrames(input, timestamps, outputDir);
+
+    expect(results).toHaveLength(4);
+    for (const framePath of results) {
+      const stat = await fs.stat(framePath);
+      expect(stat.size).toBeGreaterThan(0);
+      expect(framePath).toMatch(/\.jpg$/);
+    }
+  });
+
+  it('should extract a single frame from a short video', async () => {
+    const input = path.join(fixturesDir, 'short.mp4');
+    const timestamps = [0.5];
+
+    const results = await sut.extractVideoFrames(input, timestamps, outputDir);
+
+    expect(results).toHaveLength(1);
+  });
+
+  it('should skip frames that fail and return successful ones', async () => {
+    const input = path.join(fixturesDir, 'short.mp4');
+    // Timestamp 999 is way past the end of a 1-second video
+    const timestamps = [0.5, 999];
+
+    const results = await sut.extractVideoFrames(input, timestamps, outputDir);
+
+    // Should get at least the first frame; the 999s one may fail or produce empty
+    expect(results.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('should throw when no frames can be extracted', async () => {
+    const input = '/nonexistent/video.mp4';
+    const timestamps = [0];
+
+    await expect(sut.extractVideoFrames(input, timestamps, outputDir)).rejects.toThrow('Failed to extract any frames');
+  });
+});
+```
+
+**Step 2: Run the integration test**
+
+Run: `cd server && npx vitest run src/repositories/media.repository.extract.spec.ts`
+Expected: PASS — requires ffmpeg installed locally
+
+Note: The `MediaRepository` constructor expects a `LoggingRepository` to be injected.
+If instantiation fails, use `newTestService` pattern or construct with a mock logger.
+Adapt the instantiation as needed to get the test running.
+
+**Step 3: Commit**
+
+```
+test: add integration tests for extractVideoFrames
+```
+
+---
+
+### Task 5: Add `type` and `originalPath` to `getForClipEncoding` query
 
 **Files:**
 
@@ -201,7 +348,7 @@ feat: include asset type and originalPath in clip encoding query
 
 ---
 
-### Task 4: Add video CLIP encoding to `handleEncodeClip`
+### Task 6: Add video CLIP encoding to `handleEncodeClip`
 
 **Files:**
 
@@ -211,17 +358,29 @@ feat: include asset type and originalPath in clip encoding query
 **Step 1: Write failing tests for the video branch**
 
 Add these tests inside the existing `describe('handleEncodeClip', ...)` block in
-`server/src/services/smart-info.service.spec.ts`:
+`server/src/services/smart-info.service.spec.ts`.
+
+The `probe` mock must satisfy the full `VideoInfo` type. Create a helper at the top
+of the test file:
 
 ```typescript
-import { AssetType } from 'src/enum';
-// ... (add to existing imports at top)
+import { VideoInfo } from 'src/types';
 
+const probeStub = (duration: number): VideoInfo => ({
+  format: { formatName: 'mov,mp4', formatLongName: 'QuickTime / MOV', duration, bitrate: 0 },
+  videoStreams: [],
+  audioStreams: [],
+});
+```
+
+Then add the tests:
+
+```typescript
 describe('video CLIP encoding', () => {
   it('should extract 8 frames for a normal video and average embeddings', async () => {
     const asset = AssetFactory.from({ type: AssetType.Video }).file({ type: AssetFileType.Preview }).build();
     mocks.assetJob.getForClipEncoding.mockResolvedValue(asset);
-    mocks.media.probe.mockResolvedValue({ format: { duration: 10 } });
+    mocks.media.probe.mockResolvedValue(probeStub(10));
     mocks.media.extractVideoFrames.mockResolvedValue([
       '/tmp/f1.jpg',
       '/tmp/f2.jpg',
@@ -246,10 +405,29 @@ describe('video CLIP encoding', () => {
     expect(mocks.search.upsert).toHaveBeenCalledWith(asset.id, expect.any(String));
   });
 
+  it('should verify 8 timestamps are evenly spaced from 5% to 95%', async () => {
+    const asset = AssetFactory.from({ type: AssetType.Video }).file({ type: AssetFileType.Preview }).build();
+    mocks.assetJob.getForClipEncoding.mockResolvedValue(asset);
+    mocks.media.probe.mockResolvedValue(probeStub(100));
+    mocks.media.extractVideoFrames.mockResolvedValue(['/tmp/f1.jpg']);
+    mocks.machineLearning.encodeImage.mockResolvedValue('[1,0,0]');
+
+    await sut.handleEncodeClip({ id: asset.id });
+
+    const timestamps = mocks.media.extractVideoFrames.mock.calls[0][1] as number[];
+    expect(timestamps).toHaveLength(8);
+    expect(timestamps[0]).toBeCloseTo(5); // 5% of 100
+    expect(timestamps[7]).toBeCloseTo(95); // 95% of 100
+    // Verify monotonically increasing
+    for (let i = 1; i < timestamps.length; i++) {
+      expect(timestamps[i]).toBeGreaterThan(timestamps[i - 1]);
+    }
+  });
+
   it('should extract 1 frame for a short video (< 2s)', async () => {
     const asset = AssetFactory.from({ type: AssetType.Video }).file({ type: AssetFileType.Preview }).build();
     mocks.assetJob.getForClipEncoding.mockResolvedValue(asset);
-    mocks.media.probe.mockResolvedValue({ format: { duration: 1.5 } });
+    mocks.media.probe.mockResolvedValue(probeStub(1.5));
     mocks.media.extractVideoFrames.mockResolvedValue(['/tmp/f1.jpg']);
     mocks.machineLearning.encodeImage.mockResolvedValue('[1,0,0]');
 
@@ -259,10 +437,22 @@ describe('video CLIP encoding', () => {
     expect(mocks.machineLearning.encodeImage).toHaveBeenCalledTimes(1);
   });
 
-  it('should extract 1 frame at t=0 when duration is missing', async () => {
+  it('should extract 1 frame at t=0 when duration is zero', async () => {
     const asset = AssetFactory.from({ type: AssetType.Video }).file({ type: AssetFileType.Preview }).build();
     mocks.assetJob.getForClipEncoding.mockResolvedValue(asset);
-    mocks.media.probe.mockResolvedValue({ format: { duration: 0 } });
+    mocks.media.probe.mockResolvedValue(probeStub(0));
+    mocks.media.extractVideoFrames.mockResolvedValue(['/tmp/f1.jpg']);
+    mocks.machineLearning.encodeImage.mockResolvedValue('[1,0,0]');
+
+    expect(await sut.handleEncodeClip({ id: asset.id })).toEqual(JobStatus.Success);
+
+    expect(mocks.media.extractVideoFrames).toHaveBeenCalledWith(asset.originalPath, [0], expect.any(String));
+  });
+
+  it('should extract 1 frame at t=0 when duration is NaN', async () => {
+    const asset = AssetFactory.from({ type: AssetType.Video }).file({ type: AssetFileType.Preview }).build();
+    mocks.assetJob.getForClipEncoding.mockResolvedValue(asset);
+    mocks.media.probe.mockResolvedValue(probeStub(Number.NaN));
     mocks.media.extractVideoFrames.mockResolvedValue(['/tmp/f1.jpg']);
     mocks.machineLearning.encodeImage.mockResolvedValue('[1,0,0]');
 
@@ -274,7 +464,7 @@ describe('video CLIP encoding', () => {
   it('should average embeddings from partial frame extraction', async () => {
     const asset = AssetFactory.from({ type: AssetType.Video }).file({ type: AssetFileType.Preview }).build();
     mocks.assetJob.getForClipEncoding.mockResolvedValue(asset);
-    mocks.media.probe.mockResolvedValue({ format: { duration: 10 } });
+    mocks.media.probe.mockResolvedValue(probeStub(10));
     // Only 3 frames succeeded (extractVideoFrames handles partial failure internally)
     mocks.media.extractVideoFrames.mockResolvedValue(['/tmp/f1.jpg', '/tmp/f2.jpg', '/tmp/f3.jpg']);
     mocks.machineLearning.encodeImage
@@ -306,12 +496,36 @@ describe('video CLIP encoding', () => {
   it('should fail when all frames fail to extract', async () => {
     const asset = AssetFactory.from({ type: AssetType.Video }).file({ type: AssetFileType.Preview }).build();
     mocks.assetJob.getForClipEncoding.mockResolvedValue(asset);
-    mocks.media.probe.mockResolvedValue({ format: { duration: 10 } });
+    mocks.media.probe.mockResolvedValue(probeStub(10));
     mocks.media.extractVideoFrames.mockRejectedValue(new Error('Failed to extract any frames'));
 
     expect(await sut.handleEncodeClip({ id: asset.id })).toEqual(JobStatus.Failed);
 
     expect(mocks.search.upsert).not.toHaveBeenCalled();
+  });
+
+  it('should skip hidden video assets', async () => {
+    const asset = AssetFactory.from({
+      type: AssetType.Video,
+      visibility: AssetVisibility.Hidden,
+    })
+      .file({ type: AssetFileType.Preview })
+      .build();
+    mocks.assetJob.getForClipEncoding.mockResolvedValue(asset);
+
+    expect(await sut.handleEncodeClip({ id: asset.id })).toEqual(JobStatus.Skipped);
+
+    expect(mocks.media.probe).not.toHaveBeenCalled();
+    expect(mocks.machineLearning.encodeImage).not.toHaveBeenCalled();
+  });
+
+  it('should fail for video without preview file', async () => {
+    const asset = AssetFactory.from({ type: AssetType.Video }).build();
+    mocks.assetJob.getForClipEncoding.mockResolvedValue(asset);
+
+    expect(await sut.handleEncodeClip({ id: asset.id })).toEqual(JobStatus.Failed);
+
+    expect(mocks.media.probe).not.toHaveBeenCalled();
   });
 
   it('should still encode images via preview file (no regression)', async () => {
@@ -340,16 +554,19 @@ Expected: FAIL — video tests fail because `handleEncodeClip` doesn't branch on
 **Step 3: Implement the video branch**
 
 Replace `handleEncodeClip` in `server/src/services/smart-info.service.ts` (lines
-95-127):
+95-127). Add new imports at top of file:
 
 ```typescript
-import { AssetType } from 'src/enum';
+import { AssetType } from 'src/enum'; // add to existing enum import
 import { elementWiseMean } from 'src/utils/vector';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-// (add these to the existing imports at top of file)
+```
 
+New `handleEncodeClip` and private `encodeVideoClip`:
+
+```typescript
 @OnJob({ name: JobName.SmartSearch, queue: QueueName.SmartSearch })
 async handleEncodeClip({ id }: JobOf<JobName.SmartSearch>): Promise<JobStatus> {
   const { machineLearning } = await this.getConfig({ withCache: true });
@@ -374,7 +591,10 @@ async handleEncodeClip({ id }: JobOf<JobName.SmartSearch>): Promise<JobStatus> {
     }
     embedding = result;
   } else {
-    embedding = await this.machineLearningRepository.encodeImage(asset.files[0].path, machineLearning.clip);
+    embedding = await this.machineLearningRepository.encodeImage(
+      asset.files[0].path,
+      machineLearning.clip,
+    );
   }
 
   if (this.databaseRepository.isBusy(DatabaseLock.CLIPDimSize)) {
@@ -424,7 +644,10 @@ private async encodeVideoClip(
 
     const embeddings: number[][] = [];
     for (const framePath of framePaths) {
-      const embeddingStr = await this.machineLearningRepository.encodeImage(framePath, clipConfig);
+      const embeddingStr = await this.machineLearningRepository.encodeImage(
+        framePath,
+        clipConfig,
+      );
       embeddings.push(JSON.parse(embeddingStr));
     }
 
@@ -442,7 +665,7 @@ private async encodeVideoClip(
 **Step 4: Run tests to verify they pass**
 
 Run: `cd server && npx vitest run src/services/smart-info.service.spec.ts`
-Expected: PASS — all existing + new video tests
+Expected: PASS — all existing + 11 new video tests
 
 **Step 5: Commit**
 
@@ -452,53 +675,80 @@ feat: add video CLIP encoding with multi-frame extraction
 
 ---
 
-### Task 5: Download test video fixtures
+### Task 7: Add E2E test for video duplicate grouping
+
+The existing `duplicates.e2e-spec.ts` manually sets `duplicateId` on assets — no ML
+needed. We follow the same pattern: upload video assets, manually assign duplicate
+groups, and verify the API returns them correctly. This validates the full stack handles
+video duplicate groups without requiring the ML service.
 
 **Files:**
 
-- Create: `server/test/fixtures/videos/normal.mp4`
-- Create: `server/test/fixtures/videos/short.mp4`
-- Create: `server/test/fixtures/videos/normal-reencoded.mp4`
+- Modify: `e2e/src/specs/web/duplicates.e2e-spec.ts` (or create a new
+  `e2e/src/specs/server/api/duplicate-video.e2e-spec.ts`)
 
-**Step 1: Download a short royalty-free stock video**
+**Step 1: Add video duplicate E2E test**
 
-Find a 5-10 second CC0/royalty-free clip from Pexels or Pixabay. Download it.
+```typescript
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 
-**Step 2: Create the test fixtures**
+test.describe('Video Duplicate Groups', () => {
+  let admin: LoginResponseDto;
 
-```bash
-mkdir -p server/test/fixtures/videos
+  test.beforeAll(async () => {
+    utils.initSdk();
+    await utils.resetDatabase();
+    admin = await utils.adminSetup();
+  });
 
-# Normal: 4 seconds, 720p, no audio, small file
-ffmpeg -i source.mp4 -t 4 -vf scale=1280:720 -an -c:v libx264 -crf 28 \
-  server/test/fixtures/videos/normal.mp4
+  test('should display video duplicates in the duplicates page', async ({ context, page }) => {
+    // Upload two video assets with real video bytes
+    const videoBytes = await readFile(path.resolve(__dirname, '../../../../server/test/fixtures/videos/normal.mp4'));
+    const [videoA, videoB] = await Promise.all([
+      utils.createAsset(admin.accessToken, {
+        deviceAssetId: 'video-dup-a',
+        assetData: { bytes: videoBytes, filename: 'video-a.mp4' },
+      }),
+      utils.createAsset(admin.accessToken, {
+        deviceAssetId: 'video-dup-b',
+        assetData: { bytes: videoBytes, filename: 'video-b.mp4' },
+      }),
+    ]);
 
-# Short: 1 second, same source
-ffmpeg -i source.mp4 -t 1 -vf scale=1280:720 -an -c:v libx264 -crf 28 \
-  server/test/fixtures/videos/short.mp4
+    // Manually group them as duplicates (same as existing pattern)
+    await updateAssets(
+      {
+        assetBulkUpdateDto: {
+          ids: [videoA.id, videoB.id],
+          duplicateId: crypto.randomUUID(),
+        },
+      },
+      { headers: asBearerAuth(admin.accessToken) },
+    );
 
-# Re-encoded: same content as normal, different resolution and bitrate
-ffmpeg -i server/test/fixtures/videos/normal.mp4 -vf scale=640:360 -b:v 300k -an \
-  server/test/fixtures/videos/normal-reencoded.mp4
+    await utils.setAuthCookies(context, admin.accessToken);
+    await page.goto('/utilities/duplicates');
+
+    // Verify the duplicate group is shown
+    await expect(page.getByText('1 / 1')).toBeVisible();
+  });
+});
 ```
 
-**Step 3: Verify file sizes**
+**Step 2: Run the E2E test**
 
-```bash
-ls -lh server/test/fixtures/videos/
-```
+Run: `cd e2e && npx playwright test src/specs/web/duplicates.e2e-spec.ts`
 
-Each file should be under 500 KB. If too large, increase `-crf` or reduce duration.
-
-**Step 4: Commit**
+**Step 3: Commit**
 
 ```
-test: add stock video fixtures for duplicate detection tests
+test(e2e): add video duplicate group E2E test
 ```
 
 ---
 
-### Task 6: Run lint and type checks
+### Task 8: Run lint, type checks, and full test suite
 
 **Step 1: Run server lint**
 
@@ -512,49 +762,38 @@ Run: `cd server && npx tsc --noEmit`
 
 Fix any type errors. Common issues:
 
-- `probe` return type might not have `format.duration` as `number | undefined` — check
-  the `VideoInfo` type and handle accordingly.
-- `asset.type` and `asset.originalPath` might need type narrowing after the query
-  change.
+- `probe` returns `VideoInfo` which has `format.duration: number` (not optional). The
+  `!duration` check still works for `0` and the `Number.isFinite` check catches `NaN`.
+- `asset.type` and `asset.originalPath` are now on the query result type automatically
+  via Kysely inference.
+- `encodeVideoClip`'s `clipConfig` parameter typed as `{ modelName: string }` — verify
+  this is compatible with what `machineLearningRepository.encodeImage` expects (it
+  accepts `CLIPConfig` which is `{ modelName: string }` from `src/config.ts`).
 
 **Step 3: Run prettier**
 
-Run: `cd server && npx prettier --write src/utils/vector.ts src/utils/vector.spec.ts src/services/smart-info.service.ts src/services/smart-info.service.spec.ts src/repositories/media.repository.ts src/repositories/asset-job.repository.ts`
+Run: `cd server && npx prettier --write src/utils/vector.ts src/utils/vector.spec.ts src/services/smart-info.service.ts src/services/smart-info.service.spec.ts src/repositories/media.repository.ts src/repositories/media.repository.extract.spec.ts src/repositories/asset-job.repository.ts`
 
-**Step 4: Commit any fixes**
-
-```
-chore: fix lint and type errors
-```
-
----
-
-### Task 7: Run full server test suite
-
-**Step 1: Run all server unit tests**
+**Step 4: Run full server unit tests**
 
 Run: `cd server && pnpm test`
 
-Expected: PASS — no regressions.
-
-**Step 2: Fix any failures**
-
-If tests fail, investigate and fix. Common issues:
+Expected: PASS — no regressions. If tests fail, investigate. Common issues:
 
 - Other tests that mock `getForClipEncoding` may need updating if they assert on
   the return shape (now includes `type` and `originalPath`).
 - The `AssetFactory.create()` default type is `AssetType.Image`, so existing tests
   should still pass for the image path.
 
-**Step 3: Commit any fixes**
+**Step 5: Commit any fixes**
 
 ```
-fix: resolve test regressions from clip encoding query change
+chore: fix lint, types, and test regressions
 ```
 
 ---
 
-### Task 8: Regenerate SQL query documentation
+### Task 9: Regenerate SQL query documentation
 
 **Step 1: Check if `make sql` can run**
 
