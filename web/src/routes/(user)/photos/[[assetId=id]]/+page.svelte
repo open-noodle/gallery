@@ -57,12 +57,12 @@
 
   let { isViewing: showAssetViewer } = assetViewingStore;
   let timelineManager = $state<TimelineManager>() as TimelineManager;
-  const options = $derived(buildPhotosTimelineOptions(filters));
 
   const assetInteraction = new AssetInteraction();
 
   // Filter state
   let filters = $state(createFilterState());
+  const options = $derived(buildPhotosTimelineOptions(filters));
   let personNames = new SvelteMap<string, string>();
   let tagNames = new SvelteMap<string, string>();
 
