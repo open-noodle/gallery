@@ -2710,6 +2710,8 @@ export type SharedSpaceResponseDto = {
     description?: string | null;
     /** Whether face recognition is enabled for this space */
     faceRecognitionEnabled?: boolean;
+    /** Whether any pet-type persons exist in this space */
+    hasPets?: boolean;
     /** Space ID */
     id: string;
     /** Last activity timestamp (most recent asset add) */
