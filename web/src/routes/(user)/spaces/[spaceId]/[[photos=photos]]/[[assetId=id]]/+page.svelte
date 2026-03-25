@@ -839,10 +839,6 @@
           hasMore={hasMoreResults}
           totalLoaded={searchResults.length}
           onLoadMore={handleLoadMore}
-          onAssetClick={(asset) => {
-            showSearchResults = false;
-            void goto(`${Route.viewSpace({ id: space.id })}/photos/${asset.id}`);
-          }}
         />
       {/if}
 

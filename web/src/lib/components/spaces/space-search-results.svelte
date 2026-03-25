@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Route } from '$lib/route';
   import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
   import type { AssetResponseDto } from '@immich/sdk';
   import { t } from 'svelte-i18n';
@@ -10,10 +11,9 @@
     hasMore: boolean;
     totalLoaded: number;
     onLoadMore: () => void;
-    onAssetClick: (asset: AssetResponseDto) => void;
   }
 
-  let { results, spaceId, isLoading, hasMore, totalLoaded, onLoadMore, onAssetClick }: Props = $props();
+  let { results, spaceId, isLoading, hasMore, totalLoaded, onLoadMore }: Props = $props();
 </script>
 
 <section class="px-4 py-4">
@@ -36,13 +36,12 @@
     </div>
     <div class="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-1">
       {#each results as asset (asset.id)}
-        <button
-          type="button"
+        <a
+          href="{Route.viewSpace({ id: spaceId })}/photos/{asset.id}"
           class="aspect-square cursor-pointer overflow-hidden rounded"
-          onclick={() => onAssetClick(asset)}
         >
           <img src="/api/assets/{asset.id}/thumbnail" alt={asset.originalFileName} class="h-full w-full object-cover" />
-        </button>
+        </a>
       {/each}
     </div>
     {#if hasMore}
