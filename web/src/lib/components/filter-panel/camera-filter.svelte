@@ -8,18 +8,9 @@
     context?: FilterContext;
     onModelFetch: (make: string, context?: FilterContext) => Promise<string[]>;
     onSelectionChange: (make?: string, model?: string) => void;
-    emptyText?: string;
   }
 
-  let {
-    makes,
-    selectedMake,
-    selectedModel,
-    context,
-    onModelFetch,
-    onSelectionChange,
-    emptyText = 'No cameras found',
-  }: Props = $props();
+  let { makes, selectedMake, selectedModel, context, onModelFetch, onSelectionChange }: Props = $props();
 
   let expandedMake = $state<string | undefined>(undefined);
   let models = $state<string[]>([]);
@@ -71,7 +62,7 @@
 
 <div data-testid="camera-filter">
   {#if makes.length === 0 && !orphanedMake}
-    <p class="text-sm text-gray-400 dark:text-gray-500" data-testid="camera-empty">{emptyText}</p>
+    <p class="text-sm text-gray-400 dark:text-gray-500" data-testid="camera-empty">No cameras in this space</p>
   {:else}
     <!-- Orphaned make (selected but no longer in suggestions) -->
     {#if orphanedMake}
