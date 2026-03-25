@@ -47,19 +47,18 @@
   let cameraMakes = $state<string[]>([]);
   let tags = $state<TagOption[]>([]);
 
-  // Memoize filterContext so it keeps the same object reference when temporal values
-  // haven't changed. Without this, every non-temporal filter change (selecting a country,
-  // camera, etc.) creates a new filterContext object, which triggers $effect blocks in
-  // LocationFilter/CameraFilter that depend on the context prop, causing unnecessary
-  // cascade re-fetches and visual flicker.
-  let memoizedContext: FilterContext | undefined = $state();
-  let filterContext: FilterContext | undefined = $derived.by(() => {
-    const next = buildFilterContext(filters);
-    if (memoizedContext?.takenAfter === next?.takenAfter && memoizedContext?.takenBefore === next?.takenBefore) {
-      return memoizedContext;
+  // Stable filterContext that only updates when temporal values actually change.
+  // Derived directly from selectedYear/selectedMonth (not the full filters object)
+  // to prevent $effect blocks in LocationFilter/CameraFilter from re-triggering
+  // on non-temporal filter changes.
+  let filterContext: FilterContext | undefined = $state();
+  $effect(() => {
+    const year = filters.selectedYear;
+    const month = filters.selectedMonth;
+    const next = buildFilterContext({ selectedYear: year, selectedMonth: month } as FilterState);
+    if (filterContext?.takenAfter !== next?.takenAfter || filterContext?.takenBefore !== next?.takenBefore) {
+      filterContext = next;
     }
-    memoizedContext = next;
-    return next;
   });
 
   let prevTakenAfter: string | undefined = $state();
