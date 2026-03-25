@@ -14,7 +14,7 @@ describe('SpaceSearchResults', () => {
     render(SpaceSearchResults, {
       props: {
         results: mockAssets,
-        spaceId: 'space-1',
+
         isLoading: false,
         hasMore: false,
         totalLoaded: 3,
@@ -29,7 +29,7 @@ describe('SpaceSearchResults', () => {
     render(SpaceSearchResults, {
       props: {
         results: mockAssets,
-        spaceId: 'space-1',
+
         isLoading: false,
         hasMore: true,
         totalLoaded: 100,
@@ -43,7 +43,7 @@ describe('SpaceSearchResults', () => {
     render(SpaceSearchResults, {
       props: {
         results: mockAssets,
-        spaceId: 'space-1',
+
         isLoading: false,
         hasMore: false,
         totalLoaded: 3,
@@ -58,7 +58,7 @@ describe('SpaceSearchResults', () => {
     render(SpaceSearchResults, {
       props: {
         results: mockAssets,
-        spaceId: 'space-1',
+
         isLoading: false,
         hasMore: true,
         totalLoaded: 100,
@@ -72,7 +72,7 @@ describe('SpaceSearchResults', () => {
     render(SpaceSearchResults, {
       props: {
         results: mockAssets,
-        spaceId: 'space-1',
+
         isLoading: false,
         hasMore: false,
         totalLoaded: 3,
@@ -86,7 +86,7 @@ describe('SpaceSearchResults', () => {
     render(SpaceSearchResults, {
       props: {
         results: mockAssets,
-        spaceId: 'space-1',
+
         isLoading: true,
         hasMore: true,
         totalLoaded: 100,
@@ -116,7 +116,7 @@ describe('SpaceSearchResults', () => {
     render(SpaceSearchResults, {
       props: {
         results: [],
-        spaceId: 'space-1',
+
         isLoading: false,
         hasMore: false,
         totalLoaded: 0,

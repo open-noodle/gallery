@@ -11,14 +11,13 @@
 
   interface Props {
     results: AssetResponseDto[];
-    spaceId: string;
     isLoading: boolean;
     hasMore: boolean;
     totalLoaded: number;
     onLoadMore: () => void;
   }
 
-  let { results, spaceId, isLoading, hasMore, totalLoaded, onLoadMore }: Props = $props();
+  let { results, isLoading, hasMore, totalLoaded, onLoadMore }: Props = $props();
 
   let isViewerOpen = $state(false);
 
@@ -109,11 +108,7 @@
 <Portal target="body">
   {#if isViewerOpen && cursor}
     {#await import('$lib/components/asset-viewer/asset-viewer.svelte') then { default: AssetViewer }}
-      <AssetViewer
-        {cursor}
-        isShared={true}
-        onClose={() => handlePromiseError(handleClose())}
-      />
+      <AssetViewer {cursor} isShared={true} onClose={() => handlePromiseError(handleClose())} />
     {/await}
   {/if}
 </Portal>

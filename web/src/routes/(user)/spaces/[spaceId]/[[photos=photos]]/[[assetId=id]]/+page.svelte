@@ -834,7 +834,6 @@
       {#if showSearchResults}
         <SpaceSearchResults
           results={searchResults}
-          spaceId={space.id}
           isLoading={isSearching}
           hasMore={hasMoreResults}
           totalLoaded={searchResults.length}
