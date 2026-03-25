@@ -135,6 +135,9 @@ const SearchSuggestionRequestSchema = z
     make: z.string().optional().describe('Filter by camera make'),
     model: z.string().optional().describe('Filter by camera model'),
     lensModel: z.string().optional().describe('Filter by lens model'),
+    takenAfter: isoDatetimeToDate.optional().describe('Filter suggestions by taken date (after)'),
+    takenBefore: isoDatetimeToDate.optional().describe('Filter suggestions by taken date (before)'),
+    spaceId: z.uuidv4().optional().describe('Scope suggestions to a specific shared space'),
     includeNull: stringToBool
       .optional()
       .describe('Include null values in suggestions')
