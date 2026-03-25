@@ -425,15 +425,17 @@
             title={sectionTitles[section]}
             testId={section}
             refetching={isRefetching && section !== 'timeline'}
-            count={section === 'people'
-              ? people.length
-              : section === 'location'
-                ? countries.length
-                : section === 'camera'
-                  ? cameraMakes.length
-                  : section === 'tags'
-                    ? tags.length
-                    : undefined}
+            count={filterContext
+              ? section === 'people'
+                ? people.length
+                : section === 'location'
+                  ? countries.length
+                  : section === 'camera'
+                    ? cameraMakes.length
+                    : section === 'tags'
+                      ? tags.length
+                      : undefined
+              : undefined}
           >
             {#if section === 'timeline'}
               <TemporalPicker

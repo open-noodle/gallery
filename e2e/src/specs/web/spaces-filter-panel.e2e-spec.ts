@@ -221,6 +221,9 @@ test.describe('Spaces FilterPanel', () => {
       // Click rating 5 — likely no photos have 5-star rating
       await page.locator('[data-testid="rating-star-5"]').click();
 
+      // Wait for TimelineManager to re-fetch timeBuckets with the rating filter applied
+      await page.waitForTimeout(2000);
+
       // The temporal picker div is always in the DOM but may have zero height when
       // timeBuckets is empty (no year chips to render). Check it exists in the DOM
       // rather than asserting visibility, which fails when the div has no content.
