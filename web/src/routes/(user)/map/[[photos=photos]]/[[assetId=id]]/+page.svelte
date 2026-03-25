@@ -2,7 +2,7 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import FilterPanel from '$lib/components/filter-panel/filter-panel.svelte';
-  import { buildFilterContext, createFilterState } from '$lib/components/filter-panel/filter-panel';
+  import { buildFilterContext, createFilterState, getActiveFilterCount } from '$lib/components/filter-panel/filter-panel';
   import type { FilterState } from '$lib/components/filter-panel/filter-panel';
   import UserPageLayout from '$lib/components/layouts/user-page-layout.svelte';
   import OnEvents from '$lib/components/OnEvents.svelte';
@@ -44,6 +44,8 @@
   let mapMarkers = $state<MapMarkerResponseDto[]>([]);
   let timeBuckets = $state<Array<{ timeBucket: string; count: number }>>([]);
   const filterConfig = $derived(buildMapFilterConfig(spaceId));
+  const hasActiveFilters = $derived(getActiveFilterCount(filters) > 0);
+  const noResults = $derived(mapMarkers.length === 0 && hasActiveFilters);
 
   // Fetch time buckets for the temporal picker
   $effect(() => {
@@ -140,7 +142,7 @@
       <div class="flex min-h-0 min-w-0 flex-1 flex-col sm:flex-row">
         <div
           class={[
-            'min-h-0',
+            'relative min-h-0',
             isTimelinePanelVisible ? 'h-1/2 w-full pb-2 sm:h-full sm:w-2/3 sm:pe-2 sm:pb-0' : 'h-full w-full',
           ]}
         >
@@ -153,6 +155,15 @@
           {:then { default: Map }}
             <Map hash onSelect={onViewAssets} {onClusterSelect} {spaceId} showSettings={false} {mapMarkers} />
           {/await}
+          {#if noResults}
+            <div class="pointer-events-none absolute inset-0 flex items-center justify-center">
+              <div
+                class="pointer-events-auto rounded-lg bg-white/90 px-4 py-3 text-sm text-gray-600 shadow dark:bg-gray-800/90 dark:text-gray-300"
+              >
+                No matching photos
+              </div>
+            </div>
+          {/if}
         </div>
 
         {#if isTimelinePanelVisible && selectedClusterBBox}
