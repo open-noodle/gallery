@@ -461,6 +461,18 @@ describe('video CLIP encoding', () => {
     expect(mocks.media.extractVideoFrames).toHaveBeenCalledWith(asset.originalPath, [0], expect.any(String));
   });
 
+  it('should extract 1 frame at t=0 when duration is negative', async () => {
+    const asset = AssetFactory.from({ type: AssetType.Video }).file({ type: AssetFileType.Preview }).build();
+    mocks.assetJob.getForClipEncoding.mockResolvedValue(asset);
+    mocks.media.probe.mockResolvedValue(probeStub(-5));
+    mocks.media.extractVideoFrames.mockResolvedValue(['/tmp/f1.jpg']);
+    mocks.machineLearning.encodeImage.mockResolvedValue('[1,0,0]');
+
+    expect(await sut.handleEncodeClip({ id: asset.id })).toEqual(JobStatus.Success);
+
+    expect(mocks.media.extractVideoFrames).toHaveBeenCalledWith(asset.originalPath, [0], expect.any(String));
+  });
+
   it('should average embeddings from partial frame extraction', async () => {
     const asset = AssetFactory.from({ type: AssetType.Video }).file({ type: AssetFileType.Preview }).build();
     mocks.assetJob.getForClipEncoding.mockResolvedValue(asset);
@@ -665,7 +677,7 @@ private async encodeVideoClip(
 **Step 4: Run tests to verify they pass**
 
 Run: `cd server && npx vitest run src/services/smart-info.service.spec.ts`
-Expected: PASS — all existing + 11 new video tests
+Expected: PASS — all existing + 12 new video tests
 
 **Step 5: Commit**
 
@@ -687,11 +699,27 @@ video duplicate groups without requiring the ML service.
 - Modify: `e2e/src/specs/web/duplicates.e2e-spec.ts` (or create a new
   `e2e/src/specs/server/api/duplicate-video.e2e-spec.ts`)
 
-**Step 1: Add video duplicate E2E test**
+**Step 1: Copy video fixtures to e2e test-assets**
+
+The E2E test runner mounts `e2e/test-assets/` into the Docker container. Copy the
+video fixtures there so they're accessible at runtime:
+
+```bash
+mkdir -p e2e/test-assets/videos
+cp server/test/fixtures/videos/normal.mp4 e2e/test-assets/videos/
+cp server/test/fixtures/videos/normal-reencoded.mp4 e2e/test-assets/videos/
+```
+
+Note: `e2e/test-assets/` is a git submodule pointing to `immich-app/test-assets`.
+Since we can't push to the upstream submodule, add the videos directory to
+`.gitignore` inside `e2e/` or track them separately. Alternatively, generate them
+in a `beforeAll` hook using ffmpeg if available in the E2E environment.
+
+**Step 2: Add video duplicate E2E test**
 
 ```typescript
+import { resolve } from 'node:path';
 import { readFile } from 'node:fs/promises';
-import path from 'node:path';
 
 test.describe('Video Duplicate Groups', () => {
   let admin: LoginResponseDto;
@@ -703,20 +731,23 @@ test.describe('Video Duplicate Groups', () => {
   });
 
   test('should display video duplicates in the duplicates page', async ({ context, page }) => {
-    // Upload two video assets with real video bytes
-    const videoBytes = await readFile(path.resolve(__dirname, '../../../../server/test/fixtures/videos/normal.mp4'));
+    // Use two different video files (different checksums) to avoid the
+    // (ownerId, checksum) unique constraint blocking the second upload
+    const normalBytes = await readFile(resolve(testAssetDir, 'videos/normal.mp4'));
+    const reencodedBytes = await readFile(resolve(testAssetDir, 'videos/normal-reencoded.mp4'));
+
     const [videoA, videoB] = await Promise.all([
       utils.createAsset(admin.accessToken, {
         deviceAssetId: 'video-dup-a',
-        assetData: { bytes: videoBytes, filename: 'video-a.mp4' },
+        assetData: { bytes: normalBytes, filename: 'video-a.mp4' },
       }),
       utils.createAsset(admin.accessToken, {
         deviceAssetId: 'video-dup-b',
-        assetData: { bytes: videoBytes, filename: 'video-b.mp4' },
+        assetData: { bytes: reencodedBytes, filename: 'video-b.mp4' },
       }),
     ]);
 
-    // Manually group them as duplicates (same as existing pattern)
+    // Manually group them as duplicates (same pattern as existing duplicates E2E)
     await updateAssets(
       {
         assetBulkUpdateDto: {
