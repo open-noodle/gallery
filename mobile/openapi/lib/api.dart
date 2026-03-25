@@ -41,6 +41,7 @@ part 'api/deprecated_api.dart';
 part 'api/download_api.dart';
 part 'api/duplicates_api.dart';
 part 'api/faces_api.dart';
+part 'api/gallery_map_api.dart';
 part 'api/jobs_api.dart';
 part 'api/libraries_api.dart';
 part 'api/maintenance_admin_api.dart';
