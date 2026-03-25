@@ -1044,26 +1044,31 @@ describe('/search', () => {
       expect(status).toBe(400);
     });
 
-    it('should accept spacePersonIds with spaceId', async () => {
+    it('should not reject spacePersonIds when spaceId is provided', async () => {
       const space = await utils.createSpace(admin.accessToken, { name: 'Search PersonIds Test' });
       const asset = await utils.createAsset(admin.accessToken);
       await utils.addSpaceAssets(admin.accessToken, space.id, [asset.id]);
 
-      const { status } = await request(app)
+      const { status, body } = await request(app)
         .post('/search/smart')
         .set('Authorization', `Bearer ${admin.accessToken}`)
         .send({ query: 'test', spaceId: space.id, spacePersonIds: [admin.userId] });
 
-      // Should not 400 — the person may not match but the request is valid
-      expect(status).toBe(200);
+      // 200 if ML enabled, 400 "Smart search is not enabled" if ML disabled
+      // but never 400 "spacePersonIds requires spaceId" — that's the validation we're testing
+      if (status === 400) {
+        expect(body.message).toBe('Smart search is not enabled');
+      } else {
+        expect(status).toBe(200);
+      }
     });
 
-    it('should accept structured filters within a space', async () => {
+    it('should not reject structured filters within a space', async () => {
       const space = await utils.createSpace(admin.accessToken, { name: 'Filter Test Space' });
       const asset = await utils.createAsset(admin.accessToken);
       await utils.addSpaceAssets(admin.accessToken, space.id, [asset.id]);
 
-      const { status } = await request(app)
+      const { status, body } = await request(app)
         .post('/search/smart')
         .set('Authorization', `Bearer ${admin.accessToken}`)
         .send({
@@ -1073,7 +1078,11 @@ describe('/search', () => {
           rating: 5,
         });
 
-      expect(status).toBe(200);
+      if (status === 400) {
+        expect(body.message).toBe('Smart search is not enabled');
+      } else {
+        expect(status).toBe(200);
+      }
     });
   });
   describe('GET /search/suggestions (temporal scoping)', () => {
