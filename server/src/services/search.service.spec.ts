@@ -523,7 +523,7 @@ describe(SearchService.name, () => {
     it('should search by queryAssetId instead of query', async () => {
       const assetId = newUuid();
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([assetId]));
-      mocks.search.getEmbedding.mockResolvedValue({ assetId, embedding: '[4, 5, 6]' });
+      mocks.search.getEmbedding.mockResolvedValue('[4, 5, 6]');
 
       await sut.searchSmart(authStub.user1, { queryAssetId: assetId });
 
