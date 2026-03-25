@@ -68,6 +68,7 @@ const BaseSearchSchema = z.object({
   // Fork field: no V3 `filter` equivalent exists, so it is NOT marked DEPRECATED_FLAT_FIELD —
   // that meta advertises a structured replacement, and there is none for shared spaces.
   spaceId: z.uuidv4().optional().describe('Shared space ID to filter by'),
+  spacePersonIds: z.array(z.uuidv4()).optional().describe('Shared space person IDs to filter by'),
 });
 
 const BaseSearchWithResultsSchema = BaseSearchSchema.extend({
