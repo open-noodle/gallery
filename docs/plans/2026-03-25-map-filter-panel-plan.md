@@ -103,7 +103,7 @@ import type { AssetSearchBuilderOptions } from 'src/repositories/search.reposito
 
 ```typescript
 @GenerateSql({
-  params: [{ userIds: [DummyValue.UUID], withExif: true, visibility: 'AssetVisibility.Timeline' }],
+  params: [{ userIds: [DummyValue.UUID], visibility: 'AssetVisibility.Timeline' }],
 })
 getFilteredMapMarkers(options: AssetSearchBuilderOptions) {
   return searchAssetBuilder(this.db, options)
@@ -123,7 +123,7 @@ getFilteredMapMarkers(options: AssetSearchBuilderOptions) {
 }
 ```
 
-Note: `searchAssetBuilder` already conditionally joins `asset_exif` when exif filter options are set. The `DeduplicateJoinsPlugin` on the Kysely instance handles duplicate `innerJoin('asset_exif', 'asset.id', 'asset_exif.assetId')` calls by deduplicating identical join signatures. Make sure the join uses the exact same three-argument form: `'asset_exif', 'asset.id', 'asset_exif.assetId'`.
+Note: Do NOT pass `withExif: true` in the options — that would cause `searchAssetBuilder` to add its own `innerJoin('asset_exif', ...)` plus a `toJson(asset_exif).as('exifInfo')` select, which is wasteful. Instead, we add our own explicit `innerJoin` with only the columns we need. The `DeduplicateJoinsPlugin` handles cases where `searchAssetBuilder` also adds the join (e.g., when exif filter fields like `make` or `city` are set) — it deduplicates identical join signatures. Make sure the join uses the exact same three-argument form: `'asset_exif', 'asset.id', 'asset_exif.assetId'`.
 
 **Step 2: Verify it compiles**
 
@@ -174,7 +174,6 @@ async getFilteredMapMarkers(auth: AuthDto, dto: FilteredMapMarkerDto): Promise<M
     takenBefore: dto.takenBefore,
     isFavorite: dto.isFavorite,
     visibility: AssetVisibility.Timeline,
-    withExif: true,
   });
 
   return markers.map((marker) => ({
@@ -290,7 +289,6 @@ describe('getFilteredMapMarkers', () => {
         userIds: [authStub.user1.user.id],
         personIds: ['person-1'],
         visibility: expect.anything(),
-        withExif: true,
       }),
     );
   });
@@ -393,19 +391,11 @@ Add after the `mediaType` field (around line 46):
 isFavorite?: boolean;
 ```
 
-**Step 3: Add `showSort` to FilterPanelConfig**
-
-Add to the `FilterPanelConfig` interface:
-
-```typescript
-showSort?: boolean;
-```
-
-**Step 4: Update `clearFilters` to reset `isFavorite`**
+**Step 3: Update `clearFilters` to reset `isFavorite`**
 
 In the `clearFilters` function, add `isFavorite: undefined` to the returned object.
 
-**Step 5: Update `getActiveFilterCount` to count `isFavorite`**
+**Step 4: Update `getActiveFilterCount` to count `isFavorite`**
 
 In the `getActiveFilterCount` function, add a check:
 
@@ -415,12 +405,12 @@ if (state.isFavorite !== undefined) {
 }
 ```
 
-**Step 6: Verify it compiles**
+**Step 5: Verify it compiles**
 
 Run: `cd web && npx svelte-check --tsconfig ./tsconfig.json 2>&1 | tail -5`
 Expected: May show errors in filter-panel.svelte (needs favorites case) — that's fine, we handle it in Task 8.
 
-**Step 7: Commit**
+**Step 6: Commit**
 
 ```bash
 git add web/src/lib/components/filter-panel/filter-panel.ts
@@ -486,7 +476,7 @@ git commit -m "feat(web): add favorites filter toggle component"
 
 ---
 
-## Task 9: Web — Wire favorites into FilterPanel and add sort toggle control
+## Task 9: Web — Wire favorites into FilterPanel
 
 **Files:**
 
@@ -534,26 +524,16 @@ In the `{#each config.sections}` block (around line 470), add before the closing
 
 Import `FavoritesFilter` from `'./favorites-filter.svelte'`.
 
-**Step 4: Hide sort toggle based on config**
-
-Find the sort toggle rendering area. Wrap it with:
-
-```svelte
-{#if config.showSort !== false}
-  <!-- existing sort toggle markup -->
-{/if}
-```
-
-**Step 5: Run existing filter panel tests**
+**Step 4: Run existing filter panel tests**
 
 Run: `cd web && pnpm test -- --run src/lib/components/filter-panel/__tests__/filter-panel.spec.ts`
 Expected: All existing tests pass (favorites section not in their configs so no interference).
 
-**Step 6: Commit**
+**Step 5: Commit**
 
 ```bash
 git add web/src/lib/components/filter-panel/filter-panel.svelte
-git commit -m "feat(web): wire favorites filter and sort toggle control into filter panel"
+git commit -m "feat(web): wire favorites filter into filter panel"
 ```
 
 ---
@@ -585,7 +565,6 @@ export function buildMapFilterConfig(spaceId?: string): FilterPanelConfig {
   if (spaceId) {
     return {
       sections: [...sections],
-      showSort: false,
       providers: {
         people: (context?: FilterContext) =>
           getSpacePeople({ id: spaceId }).then((people) =>
@@ -638,13 +617,9 @@ export function buildMapFilterConfig(spaceId?: string): FilterPanelConfig {
     },
   };
 }
-
-export async function fetchFilteredMapMarkers(filters: Record<string, unknown>): Promise<MapMarkerResponseDto[]> {
-  return getFilteredMapMarkers(filters);
-}
 ```
 
-Note: The exact SDK function name for the new endpoint will be determined after OpenAPI generation in Task 6. Adjust the import accordingly.
+Note: The exact SDK function name for the new endpoint will be determined after OpenAPI generation in Task 6. Adjust the import accordingly. Remove the `getFilteredMapMarkers` and `MapMarkerResponseDto` imports from this file — the API call is made in the map page, not here.
 
 **Step 2: Verify it compiles**
 
@@ -792,11 +767,15 @@ $effect(() => {
 
 **Step 3: Add deletion re-fetch handler**
 
+The `OnEvents` component uses named callback props derived from event names (e.g., event `AssetsDelete` becomes prop `onAssetsDelete`). See `web/src/lib/components/OnEvents.svelte` and `web/src/lib/managers/event-manager.svelte.ts` for the full event list.
+
 ```svelte
 <OnEvents
-  events={['on_asset_delete', 'on_asset_trash']}
-  do={() => {
+  onAssetsDelete={() => {
     // Trigger re-fetch by creating a new filters reference
+    filters = { ...filters };
+  }}
+  onAssetsTrash={() => {
     filters = { ...filters };
   }}
 />
@@ -977,11 +956,6 @@ describe('buildMapFilterConfig', () => {
     expect(config.sections).toContain('favorites');
   });
 
-  it('should disable sort toggle', () => {
-    const config = buildMapFilterConfig();
-    expect(config.showSort).toBe(false);
-  });
-
   it('should provide all required providers', () => {
     const config = buildMapFilterConfig();
     expect(config.providers.people).toBeDefined();
@@ -1113,4 +1087,198 @@ cd web && pnpm test -- --run
 ```bash
 git add -A
 git commit -m "chore: lint, format, and fix type errors"
+```
+
+---
+
+## Task 17: Web — "No matching photos" overlay
+
+**Files:**
+
+- Modify: `web/src/routes/(user)/map/[[photos=photos]]/[[assetId=id]]/+page.svelte`
+
+**Step 1: Add active filter detection**
+
+Import `getActiveFilterCount` from the filter panel utilities:
+
+```typescript
+import { getActiveFilterCount } from '$lib/components/filter-panel/filter-panel';
+```
+
+Add a derived:
+
+```typescript
+const hasActiveFilters = $derived(getActiveFilterCount(filters) > 0);
+const noResults = $derived(mapMarkers.length === 0 && hasActiveFilters);
+```
+
+**Step 2: Add overlay to the map container**
+
+Inside the map container div (the one that wraps the `{#await import(...)}` block), add after the Map component:
+
+```svelte
+{#if noResults}
+  <div class="pointer-events-none absolute inset-0 flex items-center justify-center">
+    <div class="pointer-events-auto rounded-lg bg-white/90 px-4 py-3 text-sm text-gray-600 shadow dark:bg-gray-800/90 dark:text-gray-300">
+      No matching photos
+    </div>
+  </div>
+{/if}
+```
+
+Make sure the map container div has `relative` in its class list for the absolute positioning to work.
+
+**Step 3: Commit**
+
+```bash
+git add web/src/routes/\(user\)/map/\[\[photos=photos\]\]/\[\[assetId=id\]\]/+page.svelte
+git commit -m "feat(web): add no-results overlay on map when filters eliminate all markers"
+```
+
+---
+
+## Task 18: Web — Mobile-responsive FilterPanel
+
+**Files:**
+
+- Modify: `web/src/routes/(user)/map/[[photos=photos]]/[[assetId=id]]/+page.svelte`
+
+**Step 1: Hide FilterPanel on mobile, show toggle button**
+
+Add a state variable:
+
+```typescript
+let showMobileFilters = $state(false);
+```
+
+Wrap the FilterPanel in the template with responsive classes:
+
+```svelte
+<!-- Desktop: always visible -->
+<div class="hidden sm:block">
+  <FilterPanel
+    bind:filters
+    config={filterConfig}
+    {timeBuckets}
+    storageKey="gallery-filter-visible-sections-map"
+  />
+</div>
+
+<!-- Mobile: slide-out overlay -->
+{#if showMobileFilters}
+  <div class="fixed inset-0 z-30 sm:hidden">
+    <button
+      type="button"
+      class="absolute inset-0 bg-black/50"
+      onclick={() => (showMobileFilters = false)}
+    ></button>
+    <div class="absolute inset-y-0 left-0 w-72 bg-light shadow-xl dark:bg-immich-dark-bg">
+      <FilterPanel
+        bind:filters
+        config={filterConfig}
+        {timeBuckets}
+        storageKey="gallery-filter-visible-sections-map"
+      />
+    </div>
+  </div>
+{/if}
+```
+
+**Step 2: Add mobile filter toggle button**
+
+In the `UserPageLayout` header area (the `leading` snippet), add a filter toggle button visible only on mobile:
+
+```svelte
+<button
+  type="button"
+  class="sm:hidden"
+  onclick={() => (showMobileFilters = !showMobileFilters)}
+>
+  <Icon icon={mdiFilterVariant} size="24" />
+</button>
+```
+
+Import `mdiFilterVariant` from `@mdi/js`.
+
+**Step 3: Commit**
+
+```bash
+git add web/src/routes/\(user\)/map/\[\[photos=photos\]\]/\[\[assetId=id\]\]/+page.svelte
+git commit -m "feat(web): responsive FilterPanel with mobile overlay on map page"
+```
+
+---
+
+## Task 19: E2E — Map filter panel tests
+
+**Files:**
+
+- Create: `e2e/src/web/specs/map-filter-panel.e2e-spec.ts`
+
+**Step 1: Write E2E tests**
+
+```typescript
+import { test, expect } from '@playwright/test';
+import { utils } from 'src/utils';
+
+test.describe('Map FilterPanel', () => {
+  test.beforeAll(async () => {
+    await utils.initSuite();
+  });
+
+  test('should show filter panel on map page', async ({ page }) => {
+    await utils.setAuthCookies(page);
+    await page.goto('/map');
+    await expect(page.getByTestId('discovery-panel')).toBeVisible();
+  });
+
+  test('should show filter panel on space map page', async ({ page }) => {
+    await utils.setAuthCookies(page);
+    // Navigate to a space map - adjust spaceId as needed for test fixtures
+    await page.goto('/map');
+    await expect(page.getByTestId('discovery-panel')).toBeVisible();
+  });
+
+  test('should collapse and expand filter panel', async ({ page }) => {
+    await utils.setAuthCookies(page);
+    await page.goto('/map');
+
+    // Panel starts expanded
+    await expect(page.getByTestId('discovery-panel')).toBeVisible();
+
+    // Collapse
+    await page.getByTestId('collapse-panel-btn').click();
+    await expect(page.getByTestId('collapsed-icon-strip')).toBeVisible();
+
+    // Expand
+    await page.getByTestId('expand-panel-btn').click();
+    await expect(page.getByTestId('discovery-panel')).toBeVisible();
+  });
+
+  test('should show favorites filter section', async ({ page }) => {
+    await utils.setAuthCookies(page);
+    await page.goto('/map');
+    await expect(page.getByTestId('favorites-filter')).toBeVisible();
+  });
+
+  test('should not show location filter section on map', async ({ page }) => {
+    await utils.setAuthCookies(page);
+    await page.goto('/map');
+    await expect(page.getByTestId('location')).not.toBeVisible();
+  });
+});
+```
+
+Note: E2E test patterns and utilities (`utils.initSuite`, `utils.setAuthCookies`) should match the existing e2e test patterns in `e2e/src/web/specs/`. Adjust imports and setup based on how other e2e tests are structured.
+
+**Step 2: Run E2E tests**
+
+Run: `cd e2e && npx playwright test src/web/specs/map-filter-panel.e2e-spec.ts`
+Expected: Tests pass (or adjust based on actual test fixture setup).
+
+**Step 3: Commit**
+
+```bash
+git add e2e/src/web/specs/map-filter-panel.e2e-spec.ts
+git commit -m "test(e2e): add Playwright tests for map filter panel"
 ```
