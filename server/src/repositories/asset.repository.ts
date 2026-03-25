@@ -1321,7 +1321,7 @@ export class AssetRepository {
   async getForEdit(id: string) {
     return this.db
       .selectFrom('asset')
-      .select(['asset.type', 'asset.livePhotoVideoId', 'asset.originalPath', 'asset.originalFileName'])
+      .select(['asset.type', 'asset.livePhotoVideoId', 'asset.originalPath', 'asset.originalFileName', 'asset.duration'])
       .where('asset.id', '=', id)
       .innerJoin('asset_exif', (join) => join.onRef('asset_exif.assetId', '=', 'asset.id'))
       .select([

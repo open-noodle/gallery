@@ -695,6 +695,7 @@ select
   "asset"."livePhotoVideoId",
   "asset"."originalPath",
   "asset"."originalFileName",
+  "asset"."duration",
   "asset_exif"."exifImageWidth",
   "asset_exif"."exifImageHeight",
   "asset_exif"."orientation",
