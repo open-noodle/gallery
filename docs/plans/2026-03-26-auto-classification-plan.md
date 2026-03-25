@@ -1417,7 +1417,7 @@ test(e2e): add classification API e2e tests
 
 ---
 
-### Task 17: Medium Tests — Repository (Optional)
+### Task 17: Medium Tests — Repository
 
 **Files:**
 
