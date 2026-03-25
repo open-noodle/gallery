@@ -1,8 +1,11 @@
 <script lang="ts">
+  import { page } from '$app/state';
   import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
   import Portal from '$lib/elements/Portal.svelte';
   import type { AssetCursor } from '$lib/components/asset-viewer/asset-viewer.svelte';
   import { authManager } from '$lib/managers/auth-manager.svelte';
+  import { handlePromiseError } from '$lib/utils';
+  import { navigate } from '$lib/utils/navigation';
   import { type AssetResponseDto, getAssetInfo } from '@immich/sdk';
   import { t } from 'svelte-i18n';
 
@@ -17,7 +20,7 @@
 
   let { results, spaceId, isLoading, hasMore, totalLoaded, onLoadMore }: Props = $props();
 
-  let viewingAsset = $state<AssetResponseDto | undefined>();
+  let isViewerOpen = $state(false);
 
   const getFullAsset = async (id: string): Promise<AssetResponseDto> => {
     return getAssetInfo({ ...authManager.params, id });
@@ -25,20 +28,36 @@
 
   let cursor = $state<AssetCursor | undefined>();
 
-  const openAsset = async (asset: AssetResponseDto) => {
-    const idx = results.findIndex((a) => a.id === asset.id);
+  const buildCursor = async (assetId: string) => {
+    const idx = results.findIndex((a) => a.id === assetId);
+    if (idx === -1) {
+      return;
+    }
     const [current, prev, next] = await Promise.all([
-      getFullAsset(asset.id),
+      getFullAsset(assetId),
       idx > 0 ? getFullAsset(results[idx - 1].id) : Promise.resolve(undefined),
       idx < results.length - 1 ? getFullAsset(results[idx + 1].id) : Promise.resolve(undefined),
     ]);
-    viewingAsset = current;
     cursor = { current, previousAsset: prev, nextAsset: next };
   };
 
-  const handleClose = () => {
-    viewingAsset = undefined;
+  const openAsset = async (asset: AssetResponseDto) => {
+    isViewerOpen = true;
+    await buildCursor(asset.id);
+  };
+
+  // React to URL changes from AssetViewer's next/prev navigation
+  $effect(() => {
+    const assetId = page.params?.assetId;
+    if (isViewerOpen && assetId) {
+      handlePromiseError(buildCursor(assetId));
+    }
+  });
+
+  const handleClose = async () => {
+    isViewerOpen = false;
     cursor = undefined;
+    await navigate({ targetRoute: 'current', assetId: null });
   };
 </script>
 
@@ -88,12 +107,12 @@
 </section>
 
 <Portal target="body">
-  {#if cursor}
+  {#if isViewerOpen && cursor}
     {#await import('$lib/components/asset-viewer/asset-viewer.svelte') then { default: AssetViewer }}
       <AssetViewer
         {cursor}
         isShared={true}
-        onClose={handleClose}
+        onClose={() => handlePromiseError(handleClose())}
       />
     {/await}
   {/if}
