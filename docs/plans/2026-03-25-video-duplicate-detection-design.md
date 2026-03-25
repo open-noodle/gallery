@@ -143,16 +143,20 @@ function elementWiseMean(vectors: number[][]): number[] {
 
 ### Test fixtures
 
-Download a few short royalty-free stock videos (e.g., from Pexels or Pixabay) and add
-them to `e2e/test-assets/`:
+Add small stock videos to `server/test/fixtures/videos/` (not the upstream
+`e2e/test-assets` submodule, which we don't control):
 
-- `videos/normal.mp4` — 5-10 second clip (normal case, produces 8 frames)
-- `videos/short.mp4` — ~1 second clip (edge case, produces 1 frame)
-- `videos/normal-reencoded.mp4` — same content as `normal.mp4` re-encoded at a
-  different resolution or bitrate (validates that duplicates are detected across
-  encodes)
+- `normal.mp4` — 3-5 second clip, 720p, ~200-500 KB. Download a royalty-free clip
+  from Pexels or Pixabay and trim with ffmpeg:
+  `ffmpeg -i source.mp4 -t 4 -vf scale=1280:720 -an normal.mp4`
+- `short.mp4` — ~1 second clip derived from the same source:
+  `ffmpeg -i source.mp4 -t 1 -vf scale=1280:720 -an short.mp4`
+- `normal-reencoded.mp4` — same content as `normal.mp4` re-encoded at lower
+  resolution/bitrate (guarantees identical visual content, different file hash):
+  `ffmpeg -i normal.mp4 -vf scale=640:360 -b:v 300k normal-reencoded.mp4`
 
-Keep files small (<2 MB each) to avoid bloating the submodule.
+Keep files under 500 KB each. Use `-an` to strip audio (smaller files, avoids
+audio-only edge cases in unrelated tests).
 
 ### Unit tests
 
@@ -176,12 +180,19 @@ Keep files small (<2 MB each) to avoid bloating the submodule.
   an explicit test).
 - Confirm `getForClipEncoding` returns `type` and `originalPath` for video assets.
 
-### E2E tests (with ML disabled)
+### E2E tests
+
+These tests require the full ML stack (CLIP model loaded) and are gated the same way
+as existing smart search E2E tests — skipped when ML is unavailable.
 
 - Upload `normal.mp4` and `normal-reencoded.mp4` to the same user.
-- Trigger smart search + duplicate detection jobs.
-- Verify both videos end up in the same duplicate group.
+- Trigger smart search + duplicate detection jobs, wait for completion.
+- Verify both videos end up in the same duplicate group via `GET /duplicates`.
 - Upload `short.mp4` and verify it does not match the other two.
+
+If ML-dependent E2E tests are too expensive for regular CI, these can be run manually
+or in a dedicated ML-enabled CI job. The unit tests (which mock all external calls)
+provide the primary CI safety net.
 
 ## Future Phases
 
