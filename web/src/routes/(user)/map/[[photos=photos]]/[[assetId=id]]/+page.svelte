@@ -59,29 +59,30 @@
   let fetchTimeout: ReturnType<typeof setTimeout> | undefined;
 
   $effect(() => {
-    const { personIds, make, model, tagIds, rating, mediaType, isFavorite, selectedYear, selectedMonth } = filters;
+    const { personIds, make, model, tagIds, rating, mediaType, isFavorite } = filters;
     const currentSpaceId = spaceId;
     const context = buildFilterContext(filters);
 
     clearTimeout(fetchTimeout);
-    fetchTimeout = setTimeout(async () => {
-      try {
-        const result = await getFilteredMapMarkers({
-          ...(currentSpaceId && { spaceId: currentSpaceId }),
-          ...(personIds.length > 0 && { personIds }),
-          ...(make && { make }),
-          ...(model && { model }),
-          ...(tagIds.length > 0 && { tagIds }),
-          ...(rating !== undefined && { rating }),
-          ...(mediaType !== 'all' && { $type: mediaType === 'image' ? 'IMAGE' : 'VIDEO' }),
-          ...(isFavorite !== undefined && { isFavorite }),
-          ...(context?.takenAfter && { takenAfter: context.takenAfter }),
-          ...(context?.takenBefore && { takenBefore: context.takenBefore }),
+    fetchTimeout = setTimeout(() => {
+      void getFilteredMapMarkers({
+        ...(currentSpaceId && { spaceId: currentSpaceId }),
+        ...(personIds.length > 0 && { personIds }),
+        ...(make && { make }),
+        ...(model && { model }),
+        ...(tagIds.length > 0 && { tagIds }),
+        ...(rating !== undefined && { rating }),
+        ...(mediaType !== 'all' && { $type: mediaType === 'image' ? 'IMAGE' : 'VIDEO' }),
+        ...(isFavorite !== undefined && { isFavorite }),
+        ...(context?.takenAfter && { takenAfter: context.takenAfter }),
+        ...(context?.takenBefore && { takenBefore: context.takenBefore }),
+      })
+        .then((result) => {
+          mapMarkers = result;
+        })
+        .catch((error: unknown) => {
+          console.error('Failed to fetch filtered map markers:', error);
         });
-        mapMarkers = result;
-      } catch (error) {
-        console.error('Failed to fetch filtered map markers:', error);
-      }
     }, 200);
 
     return () => clearTimeout(fetchTimeout);

@@ -37,7 +37,7 @@ export function buildMapFilterConfig(spaceId?: string): FilterPanelConfig {
   return {
     sections: [...sections],
     providers: {
-      people: (context?: FilterContext) =>
+      people: () =>
         getAllPeople({ withHidden: false }).then((response) =>
           response.people
             .filter((p) => p.name)

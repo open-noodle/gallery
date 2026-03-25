@@ -21,17 +21,17 @@ describe('FavoritesFilter', () => {
     expect(favBtn.className).toContain('border-immich-primary');
   });
 
-  it('should call onToggle with true when Favorites clicked', async () => {
+  it('should call onToggle with true when Favorites clicked', () => {
     const onToggle = vi.fn();
     render(FavoritesFilter, { props: { selected: undefined, onToggle } });
-    await screen.getByTestId('favorites-only').click();
+    screen.getByTestId('favorites-only').click();
     expect(onToggle).toHaveBeenCalledWith(true);
   });
 
-  it('should call onToggle with undefined when All clicked', async () => {
+  it('should call onToggle with undefined when All clicked', () => {
     const onToggle = vi.fn();
     render(FavoritesFilter, { props: { selected: true, onToggle } });
-    await screen.getByTestId('favorites-all').click();
+    screen.getByTestId('favorites-all').click();
     expect(onToggle).toHaveBeenCalledWith(undefined);
   });
 });

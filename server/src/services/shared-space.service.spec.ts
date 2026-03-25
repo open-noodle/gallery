@@ -4176,10 +4176,9 @@ describe(SharedSpaceService.name, () => {
   describe('getFilteredMapMarkers', () => {
     it('should return filtered map markers for the authenticated user', async () => {
       const auth = factory.auth();
-      const mockMarkers = [
+      mocks.sharedSpace.getFilteredMapMarkers.mockResolvedValue([
         { id: 'asset-1', lat: 48.8566, lon: 2.3522, city: 'Paris', state: 'Île-de-France', country: 'France' },
-      ];
-      mocks.sharedSpace.getFilteredMapMarkers.mockResolvedValue(mockMarkers);
+      ] as any);
 
       const result = await sut.getFilteredMapMarkers(auth, { personIds: ['person-1'] });
 
@@ -4225,8 +4224,8 @@ describe(SharedSpaceService.name, () => {
       const auth = factory.auth();
 
       mocks.sharedSpace.getFilteredMapMarkers.mockResolvedValue([
-        { id: 'asset-1', lat: 0, lon: 0, city: undefined, state: undefined, country: undefined },
-      ]);
+        { id: 'asset-1', lat: 0, lon: 0, city: null, state: null, country: null },
+      ] as any);
 
       const result = await sut.getFilteredMapMarkers(auth, {});
 

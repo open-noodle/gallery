@@ -1,9 +1,9 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { Endpoint, HistoryBuilder } from 'src/decorators';
 import { AuthDto } from 'src/dtos/auth.dto';
 import { FilteredMapMarkerDto } from 'src/dtos/gallery-map.dto';
 import { MapMarkerResponseDto } from 'src/dtos/map.dto';
-import { Endpoint, HistoryBuilder } from 'src/decorators';
 import { Auth, Authenticated } from 'src/middleware/auth.guard';
 import { SharedSpaceService } from 'src/services/shared-space.service';
 
