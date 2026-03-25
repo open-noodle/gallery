@@ -18,9 +18,9 @@
   import { buildMapFilterConfig } from '$lib/utils/map-filter-config';
   import { navigate } from '$lib/utils/navigation';
   import { AssetVisibility, getFilteredMapMarkers, getTimeBuckets, type MapMarkerResponseDto } from '@immich/sdk';
-  import { IconButton } from '@immich/ui';
-  import { mdiArrowLeft } from '@mdi/js';
-  import { onDestroy } from 'svelte';
+  import { Icon, IconButton } from '@immich/ui';
+  import { mdiArrowLeft, mdiFilterVariant } from '@mdi/js';
+  import { onDestroy, onMount } from 'svelte';
   import { t } from 'svelte-i18n';
   import type { PageData } from './$types';
   import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
@@ -38,6 +38,21 @@
   let selectedClusterIds = $state.raw(new Set<string>());
   let selectedClusterBBox = $state.raw<SelectionBBox>();
   let isTimelinePanelVisible = $state(false);
+  let showMobileFilters = $state(false);
+  let isMobile = $state(false);
+
+  function checkMobile() {
+    isMobile = window.innerWidth < 640;
+    if (!isMobile) {
+      showMobileFilters = false;
+    }
+  }
+
+  onMount(() => {
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  });
 
   // Filter state
   let filters = $state<FilterState>(createFilterState());
@@ -131,6 +146,11 @@
           icon={mdiArrowLeft}
         />
       {/if}
+      {#if isMobile}
+        <button type="button" onclick={() => (showMobileFilters = !showMobileFilters)}>
+          <Icon icon={mdiFilterVariant} size="24" />
+        </button>
+      {/if}
     {/snippet}
     <OnEvents
       onAssetsDelete={() => {
@@ -138,7 +158,28 @@
       }}
     />
     <div class="isolate flex h-full w-full">
-      <FilterPanel bind:filters config={filterConfig} {timeBuckets} storageKey="gallery-filter-visible-sections-map" />
+      {#if !isMobile}
+        <FilterPanel
+          bind:filters
+          config={filterConfig}
+          {timeBuckets}
+          storageKey="gallery-filter-visible-sections-map"
+        />
+      {/if}
+      {#if isMobile && showMobileFilters}
+        <div class="fixed inset-0 z-30">
+          <button type="button" class="absolute inset-0 bg-black/50" onclick={() => (showMobileFilters = false)}
+          ></button>
+          <div class="absolute inset-y-0 left-0 w-72 bg-light shadow-xl dark:bg-immich-dark-bg">
+            <FilterPanel
+              bind:filters
+              config={filterConfig}
+              {timeBuckets}
+              storageKey="gallery-filter-visible-sections-map"
+            />
+          </div>
+        </div>
+      {/if}
       <div class="flex min-h-0 min-w-0 flex-1 flex-col sm:flex-row">
         <div
           class={[
