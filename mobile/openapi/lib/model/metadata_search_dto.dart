@@ -43,6 +43,7 @@ class MetadataSearchDto {
     this.rating,
     this.size,
     this.spaceId,
+    this.spacePersonIds = const [],
     this.state,
     this.tagIds = const [],
     this.takenAfter,
@@ -284,6 +285,9 @@ class MetadataSearchDto {
   ///
   String? spaceId;
 
+  /// Shared space person IDs to filter by
+  List<String> spacePersonIds;
+
   /// Filter by state/province name
   String? state;
 
@@ -439,6 +443,7 @@ class MetadataSearchDto {
     other.rating == rating &&
     other.size == size &&
     other.spaceId == spaceId &&
+    _deepEquality.equals(other.spacePersonIds, spacePersonIds) &&
     other.state == state &&
     _deepEquality.equals(other.tagIds, tagIds) &&
     other.takenAfter == takenAfter &&
@@ -488,6 +493,7 @@ class MetadataSearchDto {
     (rating == null ? 0 : rating!.hashCode) +
     (size == null ? 0 : size!.hashCode) +
     (spaceId == null ? 0 : spaceId!.hashCode) +
+    (spacePersonIds.hashCode) +
     (state == null ? 0 : state!.hashCode) +
     (tagIds == null ? 0 : tagIds!.hashCode) +
     (takenAfter == null ? 0 : takenAfter!.hashCode) +
@@ -505,7 +511,7 @@ class MetadataSearchDto {
     (withStacked == null ? 0 : withStacked!.hashCode);
 
   @override
-  String toString() => 'MetadataSearchDto[albumIds=$albumIds, checksum=$checksum, city=$city, country=$country, createdAfter=$createdAfter, createdBefore=$createdBefore, description=$description, deviceAssetId=$deviceAssetId, deviceId=$deviceId, encodedVideoPath=$encodedVideoPath, id=$id, isEncoded=$isEncoded, isFavorite=$isFavorite, isMotion=$isMotion, isNotInAlbum=$isNotInAlbum, isOffline=$isOffline, lensModel=$lensModel, libraryId=$libraryId, make=$make, model=$model, ocr=$ocr, order=$order, originalFileName=$originalFileName, originalPath=$originalPath, page=$page, personIds=$personIds, previewPath=$previewPath, rating=$rating, size=$size, spaceId=$spaceId, state=$state, tagIds=$tagIds, takenAfter=$takenAfter, takenBefore=$takenBefore, thumbnailPath=$thumbnailPath, trashedAfter=$trashedAfter, trashedBefore=$trashedBefore, type=$type, updatedAfter=$updatedAfter, updatedBefore=$updatedBefore, visibility=$visibility, withDeleted=$withDeleted, withExif=$withExif, withPeople=$withPeople, withStacked=$withStacked]';
+  String toString() => 'MetadataSearchDto[albumIds=$albumIds, checksum=$checksum, city=$city, country=$country, createdAfter=$createdAfter, createdBefore=$createdBefore, description=$description, deviceAssetId=$deviceAssetId, deviceId=$deviceId, encodedVideoPath=$encodedVideoPath, id=$id, isEncoded=$isEncoded, isFavorite=$isFavorite, isMotion=$isMotion, isNotInAlbum=$isNotInAlbum, isOffline=$isOffline, lensModel=$lensModel, libraryId=$libraryId, make=$make, model=$model, ocr=$ocr, order=$order, originalFileName=$originalFileName, originalPath=$originalPath, page=$page, personIds=$personIds, previewPath=$previewPath, rating=$rating, size=$size, spaceId=$spaceId, spacePersonIds=$spacePersonIds, state=$state, tagIds=$tagIds, takenAfter=$takenAfter, takenBefore=$takenBefore, thumbnailPath=$thumbnailPath, trashedAfter=$trashedAfter, trashedBefore=$trashedBefore, type=$type, updatedAfter=$updatedAfter, updatedBefore=$updatedBefore, visibility=$visibility, withDeleted=$withDeleted, withExif=$withExif, withPeople=$withPeople, withStacked=$withStacked]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -647,6 +653,7 @@ class MetadataSearchDto {
     } else {
     //  json[r'spaceId'] = null;
     }
+      json[r'spacePersonIds'] = this.spacePersonIds;
     if (this.state != null) {
       json[r'state'] = this.state;
     } else {
@@ -774,6 +781,9 @@ class MetadataSearchDto {
             ? null
             : num.parse('${json[r'size']}'),
         spaceId: mapValueOfType<String>(json, r'spaceId'),
+        spacePersonIds: json[r'spacePersonIds'] is Iterable
+            ? (json[r'spacePersonIds'] as Iterable).cast<String>().toList(growable: false)
+            : const [],
         state: mapValueOfType<String>(json, r'state'),
         tagIds: json[r'tagIds'] is Iterable
             ? (json[r'tagIds'] as Iterable).cast<String>().toList(growable: false)
