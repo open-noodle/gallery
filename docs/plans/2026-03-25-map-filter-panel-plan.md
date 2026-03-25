@@ -23,8 +23,7 @@
 ```typescript
 import { ApiProperty } from '@nestjs/swagger';
 import { IsEnum, Max, Min } from 'class-validator';
-import { Optional } from 'src/decorators';
-import { ValidateBoolean, ValidateDate, ValidateUUID } from 'src/validation';
+import { Optional, ValidateBoolean, ValidateDate, ValidateUUID } from 'src/validation';
 
 export enum MapMediaType {
   Image = 'IMAGE',
@@ -216,7 +215,8 @@ import { ApiTags } from '@nestjs/swagger';
 import { AuthDto } from 'src/dtos/auth.dto';
 import { FilteredMapMarkerDto } from 'src/dtos/gallery-map.dto';
 import { MapMarkerResponseDto } from 'src/dtos/map.dto';
-import { Auth, Authenticated, Endpoint, HistoryBuilder } from 'src/middleware/auth.guard';
+import { Endpoint, HistoryBuilder } from 'src/decorators';
+import { Auth, Authenticated } from 'src/middleware/auth.guard';
 import { SharedSpaceService } from 'src/services/shared-space.service';
 
 @ApiTags('Gallery Map')
@@ -567,9 +567,11 @@ export function buildMapFilterConfig(spaceId?: string): FilterPanelConfig {
       sections: [...sections],
       providers: {
         people: (context?: FilterContext) =>
-          getSpacePeople({ id: spaceId }).then((people) =>
-            people.map((p) => ({ id: p.id, name: p.name, thumbnailPath: p.thumbnailPath })),
-          ),
+          getSpacePeople({
+            id: spaceId,
+            ...(context?.takenAfter && { takenAfter: context.takenAfter }),
+            ...(context?.takenBefore && { takenBefore: context.takenBefore }),
+          }).then((people) => people.map((p) => ({ id: p.id, name: p.name, thumbnailPath: p.thumbnailPath }))),
         cameras: (context?: FilterContext) =>
           getSearchSuggestions({
             $type: SearchSuggestionType.CameraMake,
@@ -592,7 +594,6 @@ export function buildMapFilterConfig(spaceId?: string): FilterPanelConfig {
 
   return {
     sections: [...sections],
-    showSort: false,
     providers: {
       people: (context?: FilterContext) =>
         getAllPeople({ withHidden: false }).then((response) =>
@@ -655,7 +656,7 @@ After the existing `{#if showSettings}` block (around line 366-374), add a new c
         }}
       >
         <Icon
-          icon={$mapSettings.allowDarkMode ? mdiBrightness4 : mdiBrightness7}
+          icon={mdiThemeLightDark}
           size="100%"
           class="text-black/80"
         />
@@ -665,7 +666,7 @@ After the existing `{#if showSettings}` block (around line 366-374), add a new c
 {/if}
 ```
 
-Add imports: `mdiBrightness4, mdiBrightness7` from `@mdi/js`.
+Add import: `mdiThemeLightDark` from `@mdi/js` (already used elsewhere in the codebase for dark mode toggles).
 
 **Step 2: Verify it compiles**
 
