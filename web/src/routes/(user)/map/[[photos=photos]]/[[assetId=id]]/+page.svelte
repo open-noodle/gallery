@@ -2,7 +2,11 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import FilterPanel from '$lib/components/filter-panel/filter-panel.svelte';
-  import { buildFilterContext, createFilterState, getActiveFilterCount } from '$lib/components/filter-panel/filter-panel';
+  import {
+    buildFilterContext,
+    createFilterState,
+    getActiveFilterCount,
+  } from '$lib/components/filter-panel/filter-panel';
   import type { FilterState } from '$lib/components/filter-panel/filter-panel';
   import UserPageLayout from '$lib/components/layouts/user-page-layout.svelte';
   import OnEvents from '$lib/components/OnEvents.svelte';
