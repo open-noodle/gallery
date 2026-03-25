@@ -614,6 +614,7 @@ export enum QueueName {
   Workflow = 'workflow',
   Editor = 'editor',
   StorageBackendMigration = 'storageBackendMigration',
+  Classification = 'classification',
 }
 
 export enum QueueJobStatus {
@@ -719,6 +720,10 @@ export enum JobName {
 
   // Shared Space Bulk Operations
   SharedSpaceBulkAddAssets = 'SharedSpaceBulkAddAssets',
+
+  // Classification
+  AssetClassifyQueueAll = 'AssetClassifyQueueAll',
+  AssetClassify = 'AssetClassify',
 }
 
 export enum QueueCommand {
@@ -912,6 +917,7 @@ export enum ApiTag {
   Authentication = 'Authentication',
   AuthenticationAdmin = 'Authentication (admin)',
   Assets = 'Assets',
+  Classification = 'Classification',
   DatabaseBackups = 'Database Backups (admin)',
   Deprecated = 'Deprecated',
   Download = 'Download',
