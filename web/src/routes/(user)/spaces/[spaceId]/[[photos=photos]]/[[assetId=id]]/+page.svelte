@@ -45,6 +45,7 @@
   import { preferences, user } from '$lib/stores/user.store';
   import { cancelMultiselect } from '$lib/utils/asset-utils';
   import { handleError } from '$lib/utils/handle-error';
+  import { buildSmartSearchParams, SEARCH_FILTER_DEBOUNCE_MS } from '$lib/utils/space-search';
   import {
     addAssets,
     bulkAddAssets,
@@ -70,7 +71,6 @@
     type SharedSpaceMemberResponseDto,
     type SharedSpacePersonResponseDto,
     type SharedSpaceResponseDto,
-    type SmartSearchDto,
   } from '@immich/sdk';
   import { IconButton, modalManager, toastManager } from '@immich/ui';
   import {
@@ -563,8 +563,6 @@
     await Promise.all([refreshSpace(), loadActivities()]);
   };
 
-  const SEARCH_FILTER_DEBOUNCE_MS = 250;
-
   let searchQuery = $state('');
   let searchResults = $state<AssetResponseDto[]>([]);
   let isSearching = $state(false);
@@ -572,47 +570,6 @@
   let searchPage = $state(1);
   let hasMoreResults = $state(false);
   let searchAbortController: AbortController | undefined;
-
-  const buildSearchParams = (): SmartSearchDto => {
-    const params: SmartSearchDto = {
-      query: searchQuery.trim(),
-      spaceId: space.id,
-    };
-    if (filters.personIds.length > 0) {
-      params.spacePersonIds = filters.personIds;
-    }
-    if (filters.city) {
-      params.city = filters.city;
-    }
-    if (filters.country) {
-      params.country = filters.country;
-    }
-    if (filters.make) {
-      params.make = filters.make;
-    }
-    if (filters.model) {
-      params.model = filters.model;
-    }
-    if (filters.tagIds.length > 0) {
-      params.tagIds = filters.tagIds;
-    }
-    if (filters.rating !== undefined) {
-      params.rating = filters.rating;
-    }
-    if (filters.mediaType !== 'all') {
-      params.type = filters.mediaType === 'image' ? AssetTypeEnum.Image : AssetTypeEnum.Video;
-    }
-    if (filters.selectedYear && filters.selectedMonth) {
-      const start = new Date(filters.selectedYear, filters.selectedMonth - 1, 1);
-      const end = new Date(filters.selectedYear, filters.selectedMonth, 0, 23, 59, 59, 999);
-      params.takenAfter = start.toISOString();
-      params.takenBefore = end.toISOString();
-    } else if (filters.selectedYear) {
-      params.takenAfter = new Date(filters.selectedYear, 0, 1).toISOString();
-      params.takenBefore = new Date(filters.selectedYear, 11, 31, 23, 59, 59, 999).toISOString();
-    }
-    return params;
-  };
 
   const executeSearch = async (page: number, append: boolean) => {
     const query = searchQuery.trim();
@@ -627,7 +584,7 @@
     isSearching = true;
     try {
       const { assets } = await searchSmart({
-        smartSearchDto: { ...buildSearchParams(), page, size: 100 },
+        smartSearchDto: { ...buildSmartSearchParams(searchQuery.trim(), space.id, filters), page, size: 100 },
       });
 
       if (controller.signal.aborted) {
