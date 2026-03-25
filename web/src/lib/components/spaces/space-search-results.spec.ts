@@ -1,4 +1,5 @@
 import SpaceSearchResults from '$lib/components/spaces/space-search-results.svelte';
+import type { AssetResponseDto } from '@immich/sdk';
 import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 
@@ -6,7 +7,7 @@ const mockAssets = [
   { id: 'asset-1', originalFileName: 'photo1.jpg' },
   { id: 'asset-2', originalFileName: 'photo2.jpg' },
   { id: 'asset-3', originalFileName: 'photo3.jpg' },
-] as any[];
+] as AssetResponseDto[];
 
 describe('SpaceSearchResults', () => {
   it('should render thumbnail grid from search results', () => {

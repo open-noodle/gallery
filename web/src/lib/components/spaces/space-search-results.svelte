@@ -47,6 +47,7 @@
     {#if hasMore}
       <div class="mt-4 flex justify-center">
         <button
+          type="button"
           data-testid="load-more-btn"
           disabled={isLoading}
           onclick={onLoadMore}
