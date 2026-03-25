@@ -10,7 +10,9 @@
 
 **Design doc:** `docs/plans/2026-03-26-auto-classification-design.md`
 
-**Review fixes applied:** Fixed `Generated`/`InjectKysely`/`GenerateSql` import sources, added `JobItem` type union entries, added controller/queue registration, fixed `upsertAssetIds` call signature, fixed `@OnEvent` decorator syntax, used `NotFoundException` instead of generic `Error`, added `mapCategory` helper to reduce duplication, fixed N+1 query in `getCategories`.
+**Review fixes applied (round 1):** Fixed `Generated`/`InjectKysely`/`GenerateSql` import sources, added `JobItem` type union entries, added controller/queue registration, fixed `upsertAssetIds` call signature, fixed `@OnEvent` decorator syntax, used `NotFoundException` instead of generic `Error`, added `mapCategory` helper to reduce duplication, fixed N+1 query in `getCategories`.
+
+**Review fixes applied (round 2):** Added repository/service index registration, fixed `ArgOf`/`OnEvent` import paths, fixed automock constructor args, added `@IsIn` validator on action field, added `@ArrayMinSize(1)` on prompts, added `@ApiProperty` to response DTO, added FK index on `categoryId`, added medium tests task, expanded unit/web test lists.
 
 ---
 
@@ -204,6 +206,11 @@ export async function up(db: Kysely<any>): Promise<void> {
     )
   `.execute(db);
 
+  // Index on FK column (PostgreSQL does not auto-index FK columns)
+  await sql`
+    CREATE INDEX "IDX_classification_prompt_embedding_categoryId" ON "classification_prompt_embedding" ("categoryId")
+  `.execute(db);
+
   // classifiedAt column on asset_job_status
   await sql`
     ALTER TABLE "asset_job_status" ADD "classifiedAt" timestamp with time zone
@@ -294,7 +301,7 @@ feat(server): add classification enums, job types, and API tag
 
 ```typescript
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsNotEmpty, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
+import { ArrayMinSize, IsBoolean, IsIn, IsNotEmpty, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
 
 export class ClassificationCategoryCreateDto {
   @IsString()
@@ -304,6 +311,7 @@ export class ClassificationCategoryCreateDto {
 
   @IsString({ each: true })
   @IsNotEmpty({ each: true })
+  @ArrayMinSize(1)
   @ApiProperty({ description: 'Text prompts for CLIP matching', type: [String] })
   prompts!: string[];
 
@@ -315,6 +323,7 @@ export class ClassificationCategoryCreateDto {
   similarity?: number;
 
   @IsString()
+  @IsIn(['tag', 'tag_and_archive'])
   @IsOptional()
   @ApiPropertyOptional({ description: 'Action on match', default: 'tag', enum: ['tag', 'tag_and_archive'] })
   action?: string;
@@ -329,6 +338,7 @@ export class ClassificationCategoryUpdateDto {
 
   @IsString({ each: true })
   @IsNotEmpty({ each: true })
+  @ArrayMinSize(1)
   @IsOptional()
   @ApiPropertyOptional({ description: 'Text prompts for CLIP matching', type: [String] })
   prompts?: string[];
@@ -341,6 +351,7 @@ export class ClassificationCategoryUpdateDto {
   similarity?: number;
 
   @IsString()
+  @IsIn(['tag', 'tag_and_archive'])
   @IsOptional()
   @ApiPropertyOptional({ description: 'Action on match', enum: ['tag', 'tag_and_archive'] })
   action?: string;
@@ -352,14 +363,31 @@ export class ClassificationCategoryUpdateDto {
 }
 
 export class ClassificationCategoryResponseDto {
+  @ApiProperty()
   id!: string;
+
+  @ApiProperty()
   name!: string;
+
+  @ApiProperty({ type: [String] })
   prompts!: string[];
+
+  @ApiProperty()
   similarity!: number;
+
+  @ApiProperty({ enum: ['tag', 'tag_and_archive'] })
   action!: string;
+
+  @ApiProperty()
   enabled!: boolean;
+
+  @ApiProperty({ nullable: true, type: String })
   tagId!: string | null;
+
+  @ApiProperty()
   createdAt!: string;
+
+  @ApiProperty()
   updatedAt!: string;
 }
 ```
@@ -532,7 +560,15 @@ export class ClassificationRepository {
 }
 ```
 
-**Step 2: Commit**
+**Step 2: Register in `server/src/repositories/index.ts`**
+
+Add import and add `ClassificationRepository` to the `repositories` array (alphabetically after `ConfigRepository`). Without this, NestJS dependency injection will fail at startup.
+
+```typescript
+import { ClassificationRepository } from 'src/repositories/classification.repository';
+```
+
+**Step 3: Commit**
 
 ```
 feat(server): add classification repository
@@ -584,8 +620,10 @@ classification: ClassificationRepository;
 3. Add to `getMocks` function (alphabetically after `config`):
 
 ```typescript
-  classification: automock(ClassificationRepository),
+  classification: automock(ClassificationRepository, { args: [, loggerMock], strict: false }),
 ```
+
+Note: The constructor calls `this.logger.setContext()`, so a logger mock must be provided via `args`. This matches the pattern used for `DatabaseRepository`, `CronRepository`, etc.
 
 4. Add to the `newTestService` constructor invocation (same position as in `BASE_SERVICE_DEPENDENCIES`).
 
@@ -618,16 +656,15 @@ Key differences from the previous draft:
 
 ```typescript
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { OnJob } from 'src/decorators';
+import { OnEvent, OnJob } from 'src/decorators';
 import { AuthDto } from 'src/dtos/auth.dto';
 import {
   ClassificationCategoryCreateDto,
   ClassificationCategoryResponseDto,
   ClassificationCategoryUpdateDto,
 } from 'src/dtos/classification.dto';
-import { AssetVisibility, JobName, JobStatus, QueueName } from 'src/enum';
-import { ImmichWorker } from 'src/enum';
-import { ArgOf, OnEvent } from 'src/interfaces/event.interface';
+import { AssetVisibility, ImmichWorker, JobName, JobStatus, QueueName } from 'src/enum';
+import { ArgOf } from 'src/repositories/event.repository';
 import { BaseService } from 'src/services/base.service';
 import { upsertTags } from 'src/utils/tag';
 
@@ -922,7 +959,15 @@ export class ClassificationService extends BaseService {
 }
 ```
 
-**Step 2: Commit**
+**Step 2: Register in `server/src/services/index.ts`**
+
+Add import and add `ClassificationService` to the `services` array (alphabetically). Without this, the `@OnEvent` and `@OnJob` decorators will never be discovered at boot time.
+
+```typescript
+import { ClassificationService } from 'src/services/classification.service';
+```
+
+**Step 3: Commit**
 
 ```
 feat(server): add classification service with CRUD, events, and job handlers
@@ -1140,20 +1185,25 @@ Use the `newTestService(ClassificationService)` factory from `server/test/utils.
 12. `updateCategory` throws `NotFoundException` for non-existent category
 13. `updateCategory` throws `NotFoundException` for category owned by different user
 14. `updateCategory` re-encodes prompts when prompts change
-15. `updateCategory` deletes old tag when name changes
-16. `deleteCategory` deletes associated tag
-17. `deleteCategory` throws `NotFoundException` for non-existent category
-18. `getCategories` returns categories with prompts grouped correctly
+15. `updateCategory` does NOT re-encode when only name/similarity/action change
+16. `updateCategory` deletes old tag when name changes
+17. `deleteCategory` deletes associated tag
+18. `deleteCategory` throws `NotFoundException` for non-existent category
+19. `getCategories` returns categories with prompts grouped correctly
+20. `scanLibrary` resets classifiedAt and queues AssetClassifyQueueAll
 
 **Event tests:**
 
-19. `onConfigUpdate` re-encodes all prompts when CLIP model changes
-20. `onConfigUpdate` does nothing when CLIP model unchanged
+21. `onConfigUpdate` re-encodes all prompts when CLIP model changes
+22. `onConfigUpdate` does nothing when CLIP model unchanged
+23. `onConfigUpdate` skips if no categories exist
 
-**Cosine similarity tests:**
+**Cosine similarity / edge case tests:**
 
-21. `cosineSimilarity` returns 1.0 for identical vectors
-22. `cosineSimilarity` returns 0.0 for orthogonal vectors
+24. `cosineSimilarity` returns 1.0 for identical vectors
+25. `cosineSimilarity` returns 0.0 for orthogonal vectors
+26. `handleClassify` handles malformed embedding gracefully (NaN similarity < threshold)
+27. `handleClassifyQueueAll` flushes exactly at 1000 boundary
 
 **Step 2: Run tests**
 
@@ -1271,6 +1321,10 @@ Using `@testing-library/svelte` with `render` and `screen`:
 4. Displays category name and metadata when categories loaded (mock SDK)
 5. Shows edit form when edit button clicked
 6. Calls delete SDK method when delete confirmed
+7. Similarity slider renders with default value (0.28)
+8. Error notification shown when SDK call fails
+9. Enabled toggle calls update SDK method
+10. Create form validates non-empty name and prompts before save
 
 **Step 2: Run tests**
 
@@ -1359,4 +1413,39 @@ cd e2e && pnpm test -- --run src/specs/api/classification.e2e-spec.ts
 
 ```
 test(e2e): add classification API e2e tests
+```
+
+---
+
+### Task 17: Medium Tests — Repository (Optional)
+
+**Files:**
+
+- Create: `server/src/repositories/classification.repository.spec.ts`
+
+Medium tests use a real database via testcontainers. These catch SQL errors that unit tests with mocks cannot.
+
+**Step 1: Write medium tests**
+
+Follow existing medium test patterns in `server/src/repositories/`. Tests to write:
+
+1. `getEnabledCategoriesWithEmbeddings` returns correct JOIN results
+2. `streamUnclassifiedAssets` returns only assets without `classifiedAt`
+3. `streamUnclassifiedAssets` with `userId` filter only returns that user's assets
+4. `resetClassifiedAt` clears timestamps for the correct user only
+5. Cascade delete: deleting a category cascades to prompt embeddings
+6. Cascade delete: deleting a user cascades to categories
+7. `setClassifiedAt` sets timestamp on correct asset
+8. Unique constraint: cannot create two categories with same name for same user
+
+**Step 2: Run medium tests**
+
+```bash
+cd server && pnpm test:medium -- --run src/repositories/classification.repository.spec.ts
+```
+
+**Step 3: Commit**
+
+```
+test(server): add classification repository medium tests
 ```
