@@ -48,6 +48,7 @@ const BaseSearchSchema = z.object({
     }),
   ocr: z.string().optional().describe('Filter by OCR text content'),
   spaceId: z.uuidv4().optional().describe('Shared space ID to filter by'),
+  spacePersonIds: z.array(z.uuidv4()).optional().describe('Shared space person IDs to filter by'),
 });
 
 const BaseSearchWithResultsSchema = BaseSearchSchema.extend({
