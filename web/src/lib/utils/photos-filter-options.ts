@@ -1,6 +1,6 @@
-import { AssetOrder, AssetTypeEnum, AssetVisibility } from '@immich/sdk';
 import type { FilterState } from '$lib/components/filter-panel/filter-panel';
 import { buildFilterContext } from '$lib/components/filter-panel/filter-panel';
+import { AssetOrder, AssetTypeEnum, AssetVisibility } from '@immich/sdk';
 
 export function buildPhotosTimelineOptions(filters: FilterState): Record<string, unknown> {
   const base: Record<string, unknown> = {
