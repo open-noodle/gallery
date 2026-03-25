@@ -45,7 +45,17 @@ Server enriches with `originalDuration` (float seconds) before storing to JSONB,
 ### Validation Split
 
 - **DTO layer:** `startTime >= 0`, `endTime > startTime`, at most one Trim per edit sequence
-- **Service layer:** asset must be `AssetType.Video` (not image, live photo, panorama, GIF), `endTime <= parsedDuration`, no in-progress transcode/edit jobs, local storage only
+- **Service layer:** asset must be `AssetType.Video` (not image, live photo, panorama, GIF), `endTime <= parsedDuration`, no in-progress transcode/edit jobs, local storage only, must have video streams (excludes audio-only files stored as Video type)
+
+### Validation Refactor
+
+The existing `editAsset()` method has a hard gate: `if (asset.type !== AssetType.Image) throw`. This must be restructured to:
+
+1. If edits contain only spatial actions (Crop/Rotate/Mirror) → require `AssetType.Image` (existing behavior)
+2. If edits contain a Trim action → require `AssetType.Video` + additional video-specific checks
+3. Reject mixed spatial + trim edits (v1 constraint)
+
+The `getForEdit()` query must also be extended to select `asset.duration` (currently not included), needed for trim validation.
 
 ### Storage
 
@@ -75,20 +85,28 @@ Runs: `ffmpeg -ss {startTime} -i {input} -t {duration} -c copy -avoid_negative_t
 
 ### Video Playback Serving
 
-`getForVideo()` in the asset repository must prefer `isEdited: true` encoded video when one exists, mirroring how thumbnail serving works for edited images.
+`getForVideo()` in the asset repository must prefer `isEdited: true` encoded video when one exists. The shared `withFilePath` helper does not filter by `isEdited`, so a **custom subquery** is needed specifically for `getForVideo()` — do not modify `withFilePath` as it is used across many queries. The custom subquery should `ORDER BY isEdited DESC LIMIT 1` to prefer the edited version when it exists.
 
 ### Job Handler
 
-Extend `handleAssetEditThumbnailGeneration()`. When edits include a Trim action:
+Extend `handleAssetEditThumbnailGeneration()` with an explicit **branch for video vs image**. The current handler calls `generateEditedThumbnails()` which has an early return for non-images (`asset.type !== AssetType.Image`). The video path must be a separate code branch, not a modification of the image path.
+
+**Image path (existing, unchanged):**
+Calls `generateEditedThumbnails()` → applies spatial transforms → syncs files.
+
+**Video path (new):**
 
 1. Ensure local file availability
 2. Select input: existing encoded video if available, otherwise original upload
 3. Run `MediaRepository.trim()` → write to edited `EncodedVideo` path (`isEdited: true`)
-4. Re-probe trimmed output for actual resulting duration, update `asset.duration`
-5. Extract a frame from the trimmed video (~10% in) via ffmpeg
-6. Generate thumbnail/preview/fullsize from that extracted frame — separate code path from image edit pipeline (which applies spatial transforms)
-7. Sync files via existing `syncFiles()` mechanism
-8. Emit `AssetEditReadyV1` WebSocket event
+4. Re-probe trimmed output for actual resulting duration
+5. Update `asset.duration` via `assetRepository.update({ id, duration })` (not done by the existing handler — new call)
+6. Extract a frame from the trimmed video (~10% in) via `MediaRepository.probe()` + ffmpeg frame extraction
+7. Generate thumbnail/preview/fullsize from that extracted frame
+8. Sync files via existing `syncFiles()` mechanism
+9. Emit `AssetEditReadyV1` WebSocket event
+
+**Undo video path:** When edits are empty and the asset is a video, skip the image thumbnail logic. `syncFiles()` handles deleting the orphaned edited encoded video. Thumbnails regenerate from the original video via the standard thumbnail generation path.
 
 ### Undo Flow
 
@@ -103,16 +121,13 @@ In `removeAssetEdits()` service method, **before clearing edits:**
 
 Check for in-progress edit jobs before accepting new trim requests. Reject with a clear error if one is already running.
 
-### Available Tools Header
+### Trim Eligibility
 
-The GET `/assets/:id/edits` endpoint returns tool availability as a **response header** (`X-Available-Tools`) rather than changing the response body shape. The response remains an array of edits — no breaking API change.
+For v1, trim eligibility is determined **client-side** using data already available in the asset DTO: `asset.type === Video && !asset.isExternal && asset.duration != null && !asset.livePhotoVideoId`. The `isExternal` flag covers both S3 and external library assets.
 
-Server logic for computing available tools:
+The server provides a second line of defense — the `editAsset()` service method validates all constraints (storage type, job status, video streams) and returns a clear error if the client bypasses the UI check.
 
-- Image → `Transform`
-- Video + local storage + duration known + no active transcode/edit jobs → `Trim`
-- Video + S3, or duration null, or job in progress → (empty)
-- Live photo → `Transform`
+_Note: A server-driven `X-Available-Tools` header was considered but deferred because oazapfts-generated SDK clients discard response headers, requiring a custom fetch wrapper. The client-side check is sufficient for v1._
 
 ## 3. Frontend: TrimManager & Editor Integration
 
@@ -141,9 +156,10 @@ New class at `web/src/lib/managers/edit/trim-manager.svelte.ts`. Svelte 5 runes.
 ### Editor Integration
 
 - Add `EditToolType.Trim` to tool types
-- `EditManager.activateTool()` reads `X-Available-Tools` header from GET edits response. If Trim isn't available, editor shows a message with the reason — user never sees controls they can't use.
+- `EditorPanel` selects tool based on `asset.type`: Trim for videos, Transform for images. Currently hardcodes `activateTool(EditToolType.Transform)` on mount — must be changed.
 - `EditorPanel` becomes a shell delegating to `ImageEditorLayout` (canvas-based, for transform tool) or `VideoEditorLayout` (keeps video player visible, adds timeline below, sidebar has trim controls). Shell handles shared concerns (save/cancel, edit loading, WebSocket wait). **This is the highest-risk frontend change.**
-- `canEdit` guard in `web/src/lib/services/asset.service.ts` expanded to allow videos (currently returns `false` for non-images).
+- **`canEdit` split:** The current `canEdit()` guard is used by both the edit button AND rotate actions. Expanding it to allow videos would incorrectly show rotate actions for videos. Solution: split into `canEditImage()` (used by rotate actions, existing logic) and `canEdit()` (used by the edit button, allows both images and eligible videos).
+- **Native video controls hidden during editing:** The `<video>` element's `controls` attribute is removed when the trim editor is active, preventing spacebar conflict between browser controls and TrimTimeline's play/pause handler.
 - WebSocket timeout for `AssetEditReadyV1` made asset-type-aware (longer for video).
 
 ### Sidebar Controls (when Trim is active)
@@ -212,23 +228,24 @@ New component `TrimTimeline.svelte`, positioned below the video player in `Video
 **No new endpoints.** Trim uses the existing edit endpoints:
 
 - **PUT** `/assets/:id/edits` — save trim (`AssetEditCreate` permission)
-- **GET** `/assets/:id/edits` — load edits + `X-Available-Tools` header (`AssetEditGet` permission)
+- **GET** `/assets/:id/edits` — load edits (`AssetEditGet` permission)
 - **DELETE** `/assets/:id/edits` — undo/clear (`AssetEditDelete` permission)
 
 Shared spaces: same permission model as existing edits. No special handling.
 
 ## 6. Edge Cases
 
-| Scenario                 | Behavior                                                           |
-| ------------------------ | ------------------------------------------------------------------ |
-| No encoded video yet     | Trim operates on original upload, output is edited `EncodedVideo`  |
-| Video still transcoding  | Trim excluded from `X-Available-Tools`, editor shows message       |
-| Very short videos (< 2s) | Trim disabled — minimum output is 1 second                         |
-| Duration not yet known   | Trim disabled until metadata extraction completes                  |
-| Keyframe imprecision     | After trim, server re-probes for actual duration and updates asset |
-| Live photos              | Trim not available (treated as images)                             |
-| Concurrent edit requests | Service rejects if edit job already in progress                    |
-| S3-backed videos         | Trim excluded from `X-Available-Tools`                             |
+| Scenario                 | Behavior                                                                   |
+| ------------------------ | -------------------------------------------------------------------------- |
+| No encoded video yet     | Trim operates on original upload, output is edited `EncodedVideo`          |
+| Video still transcoding  | Trim disabled on frontend (duration null), rejected by server if bypassed  |
+| Very short videos (< 2s) | Trim disabled — minimum output is 1 second                                 |
+| Duration not yet known   | Trim disabled until metadata extraction completes                          |
+| Keyframe imprecision     | After trim, server re-probes for actual duration and updates asset         |
+| Live photos              | Trim not available (treated as images)                                     |
+| Concurrent edit requests | Service rejects if edit job already in progress                            |
+| S3-backed videos         | Trim disabled on frontend, rejected by server                              |
+| Audio-only files         | Stored as `AssetType.Video` but excluded — server checks for video streams |
 
 ## 7. Not Included (YAGNI)
 
@@ -241,3 +258,63 @@ Shared spaces: same permission model as existing edits. No special handling.
 - No mobile support
 - No S3 storage support
 - No undo history / multiple versions
+
+## 8. Testing
+
+### Server Unit Tests
+
+**Validation:**
+
+- `editAsset()` accepts Trim on video assets
+- `editAsset()` rejects Trim on images, live photos, panoramas, GIFs
+- `editAsset()` rejects Trim on audio-only files (no video streams)
+- `editAsset()` rejects `startTime < 0`, `endTime <= startTime`, `endTime > duration`
+- `editAsset()` rejects Trim when another edit job is in progress
+- `editAsset()` rejects Trim when asset is on S3/external storage
+- `editAsset()` rejects mixed spatial + trim edits
+- Duration string-to-float parsing: `"0:00:00.000000"`, `"1:23:45.678901"`, null
+
+**Data flow:**
+
+- `originalDuration` is enriched into JSONB (not sent by client)
+- `removeAssetEdits()` reads `originalDuration` and restores `asset.duration` before clearing
+- `removeAssetEdits()` handles missing `originalDuration` gracefully
+
+### Repository Tests
+
+- `getForVideo()` returns edited encoded video when both edited and non-edited exist
+- `getForVideo()` returns non-edited path when no edited version exists
+- `getForEdit()` includes `duration` field in result
+
+### Media Service / Job Handler Tests
+
+- `handleAssetEditThumbnailGeneration()` branches to video path for video assets with Trim
+- Video path calls `MediaRepository.trim()` with correct parameters
+- Video path extracts frame from trimmed video for thumbnails
+- Undo path deletes edited encoded video via `syncFiles()`
+- `asset.duration` is updated after trim, restored after undo
+
+### FFmpeg Command Tests
+
+- Verify exact command: `-ss {start} -i {input} -t {duration} -c copy -avoid_negative_ts make_zero {output}`
+- Verify `duration` computed as `endTime - startTime`
+
+### Frontend Unit Tests
+
+- `TrimManager`: initial state from asset duration, `hasChanges` derivation
+- Handle clamping: start past end clamps to `end - 1s`, end before start clamps to `start + 1s`
+- Constrained playback: pauses at `endTime`, seeks to `startTime`
+- Keyboard shortcuts: `I`/`O` set in/out, suppressed on focused inputs
+- `canEdit` vs `canEditImage` split: rotate actions hidden for videos, edit button visible
+- `EditorPanel` activates Trim for videos, Transform for images
+
+### E2E Tests
+
+- Full trim flow: upload video → open editor → set trim points → save → verify playback serves trimmed version
+- Undo: trim then undo → verify original duration restored and original video served
+- Eligibility: S3 video shows no edit button, very short video (< 2s) shows disabled trim
+- Permissions: space member with edit access can trim, member without cannot
+
+### Known Limitations
+
+- `originalDuration` stored in Trim JSONB parameters — works for v1 where trim is the only video edit. If spatial video edits are added later and `replaceAll(id, [])` clears all edits at once, original duration must be preserved differently (e.g., asset-level column).
