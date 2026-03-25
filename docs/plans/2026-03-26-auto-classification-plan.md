@@ -10,6 +10,8 @@
 
 **Design doc:** `docs/plans/2026-03-26-auto-classification-design.md`
 
+**Review fixes applied:** Fixed `Generated`/`InjectKysely`/`GenerateSql` import sources, added `JobItem` type union entries, added controller/queue registration, fixed `upsertAssetIds` call signature, fixed `@OnEvent` decorator syntax, used `NotFoundException` instead of generic `Error`, added `mapCategory` helper to reduce duplication, fixed N+1 query in `getCategories`.
+
 ---
 
 ### Task 1: Schema — Table Definitions
@@ -24,20 +26,22 @@
 
 **Step 1: Create `classification-category.table.ts`**
 
+Note: `Generated` is imported from `@immich/sql-tools` (not `kysely`) — this is the codebase convention for table definitions.
+
 ```typescript
 import {
   Column,
   CreateDateColumn,
   ForeignKeyColumn,
+  Generated,
   PrimaryGeneratedColumn,
   Table,
   Timestamp,
+  Unique,
   UpdateDateColumn,
   UpdatedAtTrigger,
   UpdateIdColumn,
-  Unique,
 } from '@immich/sql-tools';
-import { Generated } from 'kysely';
 import { TagTable } from 'src/schema/tables/tag.table';
 import { UserTable } from 'src/schema/tables/user.table';
 
@@ -84,12 +88,12 @@ import {
   Column,
   CreateDateColumn,
   ForeignKeyColumn,
+  Generated,
   PrimaryGeneratedColumn,
   Table,
   Timestamp,
   UpdateDateColumn,
 } from '@immich/sql-tools';
-import { Generated } from 'kysely';
 import { ClassificationCategoryTable } from 'src/schema/tables/classification-category.table';
 
 @Table('classification_prompt_embedding')
@@ -127,7 +131,13 @@ After line 22 (`petsDetectedAt`), add:
 
 Import the two new table classes at the top of the file. Add them to both:
 
-- The `tables` array (around line 92-162)
+- The `tables` array (around line 92-162), alphabetically:
+
+```typescript
+    ClassificationCategoryTable,
+    ClassificationPromptEmbeddingTable,
+```
+
 - The `DB` interface (around line 194-294):
 
 ```typescript
@@ -219,16 +229,18 @@ feat(server): add classification database migration
 
 ---
 
-### Task 3: Enums — Queue and Job Names
+### Task 3: Enums, Job Types, and Queue Registration
 
 **Files:**
 
 - Modify: `server/src/enum.ts:596-617` (add `QueueName.Classification`)
 - Modify: `server/src/enum.ts:628-723` (add `JobName.AssetClassifyQueueAll` and `JobName.AssetClassify`)
+- Modify: `server/src/enum.ts` (add `ApiTag.Classification`)
+- Modify: `server/src/types.ts:337-457` (add `JobItem` union entries)
 
 **Step 1: Add queue name**
 
-In the `QueueName` enum (after line 616, `StorageBackendMigration`), add:
+In the `QueueName` enum (after `StorageBackendMigration`), add:
 
 ```typescript
   Classification = 'classification',
@@ -236,7 +248,7 @@ In the `QueueName` enum (after line 616, `StorageBackendMigration`), add:
 
 **Step 2: Add job names**
 
-In the `JobName` enum (after line 722, `SharedSpaceBulkAddAssets`), add:
+In the `JobName` enum (after `SharedSpaceBulkAddAssets`), add:
 
 ```typescript
   // Classification
@@ -244,10 +256,30 @@ In the `JobName` enum (after line 722, `SharedSpaceBulkAddAssets`), add:
   AssetClassify = 'AssetClassify',
 ```
 
-**Step 3: Commit**
+**Step 3: Add API tag**
+
+In the `ApiTag` enum, add:
+
+```typescript
+  Classification = 'Classification',
+```
+
+**Step 4: Add `JobItem` union entries in `server/src/types.ts`**
+
+Before the closing semicolon of the `JobItem` type union (after the `SharedSpaceBulkAddAssets` entry around line 457), add:
+
+```typescript
+  // Classification
+  | { name: JobName.AssetClassifyQueueAll; data: { userId?: string } }
+  | { name: JobName.AssetClassify; data: IEntityJob }
+```
+
+Import `IEntityJob` is already in scope since it's used elsewhere in the file.
+
+**Step 5: Commit**
 
 ```
-feat(server): add classification queue and job name enums
+feat(server): add classification enums, job types, and API tag
 ```
 
 ---
@@ -262,8 +294,7 @@ feat(server): add classification queue and job name enums
 
 ```typescript
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
-import { Optional, ValidateUUID } from 'src/validation';
+import { IsBoolean, IsNotEmpty, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
 
 export class ClassificationCategoryCreateDto {
   @IsString()
@@ -314,6 +345,7 @@ export class ClassificationCategoryUpdateDto {
   @ApiPropertyOptional({ description: 'Action on match', enum: ['tag', 'tag_and_archive'] })
   action?: string;
 
+  @IsBoolean()
   @IsOptional()
   @ApiPropertyOptional({ description: 'Enable or disable category' })
   enabled?: boolean;
@@ -348,16 +380,17 @@ feat(server): add classification DTOs
 
 **Step 1: Create the repository**
 
+Note: `InjectKysely` is imported from `nestjs-kysely` (not `@immich/sql-tools`). `GenerateSql` and `DummyValue` are imported from `src/decorators` (not `src/sql-tools/*`).
+
 ```typescript
 import { Injectable } from '@nestjs/common';
-import { InjectKysely } from '@immich/sql-tools';
+import { InjectKysely } from 'nestjs-kysely';
 import { Insertable, Kysely, Updateable } from 'kysely';
 import { DB } from 'src/schema';
 import { ClassificationCategoryTable } from 'src/schema/tables/classification-category.table';
 import { ClassificationPromptEmbeddingTable } from 'src/schema/tables/classification-prompt-embedding.table';
 import { LoggingRepository } from 'src/repositories/logging.repository';
-import { GenerateSql } from 'src/sql-tools/generate-sql';
-import { DummyValue } from 'src/sql-tools/dummy-value';
+import { DummyValue, GenerateSql } from 'src/decorators';
 
 @Injectable()
 export class ClassificationRepository {
@@ -375,6 +408,27 @@ export class ClassificationRepository {
       .selectAll()
       .where('userId', '=', userId)
       .orderBy('name', 'asc')
+      .execute();
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID] })
+  getCategoriesWithPrompts(userId: string) {
+    return this.db
+      .selectFrom('classification_category as c')
+      .leftJoin('classification_prompt_embedding as p', 'p.categoryId', 'c.id')
+      .select([
+        'c.id',
+        'c.name',
+        'c.similarity',
+        'c.action',
+        'c.enabled',
+        'c.tagId',
+        'c.createdAt',
+        'c.updatedAt',
+        'p.prompt',
+      ])
+      .where('c.userId', '=', userId)
+      .orderBy('c.name', 'asc')
       .execute();
   }
 
@@ -407,6 +461,10 @@ export class ClassificationRepository {
       .selectAll()
       .where('categoryId', '=', categoryId)
       .execute();
+  }
+
+  getAllCategories() {
+    return this.db.selectFrom('classification_category').selectAll().execute();
   }
 
   @GenerateSql({ params: [DummyValue.UUID] })
@@ -486,20 +544,22 @@ feat(server): add classification repository
 
 **Files:**
 
-- Modify: `server/src/services/base.service.ts` (add import, add to `BASE_SERVICE_DEPENDENCIES` array, add to constructor)
-- Modify: `server/test/utils.ts` (add to test mock setup)
+- Modify: `server/src/services/base.service.ts`
+- Modify: `server/test/utils.ts`
 
 **Step 1: Add to BaseService**
 
-Add import at top:
+Three changes in `server/src/services/base.service.ts`:
+
+1. Add import at top (alphabetically):
 
 ```typescript
 import { ClassificationRepository } from 'src/repositories/classification.repository';
 ```
 
-Add `ClassificationRepository` to the `BASE_SERVICE_DEPENDENCIES` array (alphabetically after `ConfigRepository`).
+2. Add `ClassificationRepository` to the `BASE_SERVICE_DEPENDENCIES` array (alphabetically — after `ConfigRepository`, before `CronRepository`).
 
-Add to the constructor (alphabetically):
+3. Add to the `BaseService` constructor (must be in the same position as the array — after `configRepository`, before `cronRepository`):
 
 ```typescript
     protected classificationRepository: ClassificationRepository,
@@ -507,7 +567,29 @@ Add to the constructor (alphabetically):
 
 **Step 2: Add to test utils**
 
-Add the same import and mock entry in `server/test/utils.ts` following the existing pattern for other repositories.
+Three changes in `server/test/utils.ts`:
+
+1. Add import:
+
+```typescript
+import { ClassificationRepository } from 'src/repositories/classification.repository';
+```
+
+2. Add to the `ServiceOverrides` type (alphabetically after `config`):
+
+```typescript
+classification: ClassificationRepository;
+```
+
+3. Add to `getMocks` function (alphabetically after `config`):
+
+```typescript
+  classification: automock(ClassificationRepository),
+```
+
+4. Add to the `newTestService` constructor invocation (same position as in `BASE_SERVICE_DEPENDENCIES`).
+
+**CRITICAL:** The positional order in the constructor must match `BASE_SERVICE_DEPENDENCIES` exactly. Count the position where `ClassificationRepository` was inserted in the array and use the same position in all three places.
 
 **Step 3: Commit**
 
@@ -525,8 +607,17 @@ feat(server): register classification repository in BaseService
 
 **Step 1: Create the service**
 
+Key differences from the previous draft:
+
+- Uses `NotFoundException` (not generic `Error`) for proper HTTP 404 responses
+- `mapCategory` helper reduces response-mapping duplication
+- `getCategories` uses a JOIN query (no N+1)
+- `upsertAssetIds` called with `[{ tagId, assetId }]` array (matching actual signature)
+- `@OnEvent` uses correct PascalCase event name with `ArgOf<>` type
+- `reEncodeAllPrompts` method defined inline
+
 ```typescript
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { OnJob } from 'src/decorators';
 import { AuthDto } from 'src/dtos/auth.dto';
 import {
@@ -535,33 +626,58 @@ import {
   ClassificationCategoryUpdateDto,
 } from 'src/dtos/classification.dto';
 import { AssetVisibility, JobName, JobStatus, QueueName } from 'src/enum';
+import { ImmichWorker } from 'src/enum';
+import { ArgOf, OnEvent } from 'src/interfaces/event.interface';
 import { BaseService } from 'src/services/base.service';
 import { upsertTags } from 'src/utils/tag';
 
 @Injectable()
 export class ClassificationService extends BaseService {
+  // --- Helpers ---
+
+  private mapCategory(
+    category: {
+      id: string;
+      name: string;
+      similarity: number;
+      action: string;
+      enabled: boolean;
+      tagId: string | null;
+      createdAt: unknown;
+      updatedAt: unknown;
+    },
+    prompts: string[],
+  ): ClassificationCategoryResponseDto {
+    return {
+      id: category.id,
+      name: category.name,
+      prompts,
+      similarity: category.similarity,
+      action: category.action,
+      enabled: category.enabled,
+      tagId: category.tagId,
+      createdAt: String(category.createdAt),
+      updatedAt: String(category.updatedAt),
+    };
+  }
+
   // --- CRUD ---
 
   async getCategories(auth: AuthDto): Promise<ClassificationCategoryResponseDto[]> {
-    const categories = await this.classificationRepository.getCategories(auth.user.id);
-    const result: ClassificationCategoryResponseDto[] = [];
+    const rows = await this.classificationRepository.getCategoriesWithPrompts(auth.user.id);
 
-    for (const category of categories) {
-      const prompts = await this.classificationRepository.getPromptEmbeddings(category.id);
-      result.push({
-        id: category.id,
-        name: category.name,
-        prompts: prompts.map((p) => p.prompt),
-        similarity: category.similarity,
-        action: category.action,
-        enabled: category.enabled,
-        tagId: category.tagId,
-        createdAt: String(category.createdAt),
-        updatedAt: String(category.updatedAt),
-      });
+    // Group by category
+    const categoryMap = new Map<string, { category: (typeof rows)[0]; prompts: string[] }>();
+    for (const row of rows) {
+      if (!categoryMap.has(row.id)) {
+        categoryMap.set(row.id, { category: row, prompts: [] });
+      }
+      if (row.prompt) {
+        categoryMap.get(row.id)!.prompts.push(row.prompt);
+      }
     }
 
-    return result;
+    return [...categoryMap.values()].map(({ category, prompts }) => this.mapCategory(category, prompts));
   }
 
   async createCategory(
@@ -577,7 +693,6 @@ export class ClassificationService extends BaseService {
       action: dto.action,
     });
 
-    // Encode and store prompt embeddings
     for (const prompt of dto.prompts) {
       const embedding = await this.machineLearningRepository.encodeText(prompt, {
         modelName: machineLearning.clip.modelName,
@@ -589,17 +704,7 @@ export class ClassificationService extends BaseService {
       });
     }
 
-    return {
-      id: category.id,
-      name: category.name,
-      prompts: dto.prompts,
-      similarity: category.similarity,
-      action: category.action,
-      enabled: category.enabled,
-      tagId: category.tagId,
-      createdAt: String(category.createdAt),
-      updatedAt: String(category.updatedAt),
-    };
+    return this.mapCategory(category, dto.prompts);
   }
 
   async updateCategory(
@@ -609,12 +714,11 @@ export class ClassificationService extends BaseService {
   ): Promise<ClassificationCategoryResponseDto> {
     const existing = await this.classificationRepository.getCategory(id);
     if (!existing || existing.userId !== auth.user.id) {
-      throw new Error('Category not found');
+      throw new NotFoundException('Category not found');
     }
 
     const updateValues: Record<string, unknown> = {};
     if (dto.name !== void 0) {
-      // If name changed, delete old tag and clear tagId
       if (dto.name !== existing.name && existing.tagId) {
         await this.tagRepository.delete(existing.tagId);
         updateValues.tagId = null;
@@ -633,7 +737,6 @@ export class ClassificationService extends BaseService {
 
     const category = await this.classificationRepository.updateCategory(id, updateValues);
 
-    // Re-encode prompts if changed
     if (dto.prompts !== void 0) {
       const { machineLearning } = await this.getConfig({ withCache: true });
       await this.classificationRepository.deletePromptEmbeddingsByCategory(id);
@@ -649,27 +752,19 @@ export class ClassificationService extends BaseService {
       }
     }
 
-    const prompts = await this.classificationRepository.getPromptEmbeddings(id);
-    return {
-      id: category.id,
-      name: category.name,
-      prompts: prompts.map((p) => p.prompt),
-      similarity: category.similarity,
-      action: category.action,
-      enabled: category.enabled,
-      tagId: category.tagId,
-      createdAt: String(category.createdAt),
-      updatedAt: String(category.updatedAt),
-    };
+    const promptRows = await this.classificationRepository.getPromptEmbeddings(id);
+    return this.mapCategory(
+      category,
+      promptRows.map((p) => p.prompt),
+    );
   }
 
   async deleteCategory(auth: AuthDto, id: string): Promise<void> {
     const category = await this.classificationRepository.getCategory(id);
     if (!category || category.userId !== auth.user.id) {
-      throw new Error('Category not found');
+      throw new NotFoundException('Category not found');
     }
 
-    // Delete associated tag
     if (category.tagId) {
       await this.tagRepository.delete(category.tagId);
     }
@@ -685,13 +780,40 @@ export class ClassificationService extends BaseService {
     });
   }
 
+  // --- Events ---
+
+  @OnEvent({ name: 'ConfigUpdate', workers: [ImmichWorker.Microservices], server: true })
+  async onConfigUpdate({ oldConfig, newConfig }: ArgOf<'ConfigUpdate'>) {
+    if (oldConfig.machineLearning.clip.modelName !== newConfig.machineLearning.clip.modelName) {
+      this.logger.log('CLIP model changed, re-encoding classification prompt embeddings');
+      await this.reEncodeAllPrompts(newConfig.machineLearning.clip.modelName);
+      await this.jobRepository.queue({ name: JobName.AssetClassifyQueueAll, data: {} });
+    }
+  }
+
+  private async reEncodeAllPrompts(modelName: string) {
+    const categories = await this.classificationRepository.getAllCategories();
+    for (const category of categories) {
+      const prompts = await this.classificationRepository.getPromptEmbeddings(category.id);
+      await this.classificationRepository.deletePromptEmbeddingsByCategory(category.id);
+      for (const { prompt } of prompts) {
+        const embedding = await this.machineLearningRepository.encodeText(prompt, { modelName });
+        await this.classificationRepository.upsertPromptEmbedding({
+          categoryId: category.id,
+          prompt,
+          embedding,
+        });
+      }
+    }
+  }
+
   // --- Jobs ---
 
   @OnJob({ name: JobName.AssetClassifyQueueAll, queue: QueueName.Classification })
   async handleClassifyQueueAll(data: { userId?: string }): Promise<JobStatus> {
     const stream = this.classificationRepository.streamUnclassifiedAssets(data.userId);
 
-    let queue: Array<{ name: JobName; data: { id: string } }> = [];
+    let queue: Array<{ name: JobName.AssetClassify; data: { id: string } }> = [];
     for await (const asset of stream) {
       queue.push({ name: JobName.AssetClassify, data: { id: asset.id } });
       if (queue.length >= 1000) {
@@ -706,7 +828,6 @@ export class ClassificationService extends BaseService {
 
   @OnJob({ name: JobName.AssetClassify, queue: QueueName.Classification })
   async handleClassify({ id }: { id: string }): Promise<JobStatus> {
-    // Load asset with its embedding
     const asset = await this.assetRepository.getById(id);
     if (!asset) {
       return JobStatus.Failed;
@@ -717,7 +838,6 @@ export class ClassificationService extends BaseService {
       return JobStatus.Skipped;
     }
 
-    // Load owner's categories with prompt embeddings
     const rows = await this.classificationRepository.getEnabledCategoriesWithEmbeddings(asset.ownerId);
     if (rows.length === 0) {
       await this.classificationRepository.setClassifiedAt(id);
@@ -767,8 +887,8 @@ export class ClassificationService extends BaseService {
           await this.classificationRepository.updateCategory(categoryId, { tagId });
         }
 
-        // Apply tag (idempotent)
-        await this.tagRepository.upsertAssetIds(tagId, [id]);
+        // Apply tag (idempotent) — upsertAssetIds takes array of {tagId, assetId} objects
+        await this.tagRepository.upsertAssetIds([{ tagId, assetId: id }]);
 
         if (category.action === 'tag_and_archive') {
           shouldArchive = true;
@@ -776,7 +896,6 @@ export class ClassificationService extends BaseService {
       }
     }
 
-    // Archive if any matched category requires it and asset is on timeline
     if (shouldArchive && asset.visibility === AssetVisibility.Timeline) {
       await this.assetRepository.updateAll([id], { visibility: AssetVisibility.Archive });
     }
@@ -785,10 +904,7 @@ export class ClassificationService extends BaseService {
     return JobStatus.Success;
   }
 
-  // --- Helpers ---
-
   private parseEmbedding(raw: string): number[] {
-    // PostgreSQL vector format: "[0.1,0.2,...]"
     return raw.replace(/[[\]]/g, '').split(',').map(Number);
   }
 
@@ -809,7 +925,7 @@ export class ClassificationService extends BaseService {
 **Step 2: Commit**
 
 ```
-feat(server): add classification service with CRUD and job handlers
+feat(server): add classification service with CRUD, events, and job handlers
 ```
 
 ---
@@ -820,9 +936,7 @@ feat(server): add classification service with CRUD and job handlers
 
 - Modify: `server/src/repositories/search.repository.ts`
 
-**Step 1: Add a method to retrieve an asset's CLIP embedding**
-
-Add this method to `SearchRepository`:
+**Step 1: Add method to retrieve an asset's CLIP embedding**
 
 ```typescript
   @GenerateSql({ params: [DummyValue.UUID] })
@@ -844,36 +958,16 @@ feat(server): add getEmbedding method to search repository
 
 ---
 
-### Task 9: Add `upsertAssetIds` to Tag Repository (if missing)
-
-**Files:**
-
-- Modify: `server/src/repositories/tag.repository.ts`
-
-**Step 1: Check if `upsertAssetIds` exists with a single-tag signature**
-
-The existing `upsertAssetIds` takes an array of `{ tagId, assetId }`. We need a convenience method
-that takes a single tagId and array of assetIds. Check if one exists; if not, the service can build
-the items array inline (as `bulkTagAssets` does in `tag.service.ts:79-99`). If building inline, no
-change is needed here.
-
-**Step 2: Commit (if changes made)**
-
-```
-feat(server): add single-tag upsertAssetIds convenience method
-```
-
----
-
-### Task 10: Chain Classification in Job Service
+### Task 9: Chain Classification in Job Service + Queue Registration
 
 **Files:**
 
 - Modify: `server/src/services/job.service.ts:217-222`
+- Modify: `server/src/services/queue.service.ts` (add `QueueName.Classification` case)
 
-**Step 1: Add classification chaining after SmartSearch**
+**Step 1: Chain classification after SmartSearch**
 
-In the `onDone` handler, after the `SmartSearch` case (line 217-222), update to also queue `AssetClassify`:
+In `job.service.ts`, update the `SmartSearch` case in the `onDone` handler:
 
 ```typescript
       case JobName.SmartSearch: {
@@ -885,24 +979,34 @@ In the `onDone` handler, after the `SmartSearch` case (line 217-222), update to 
       }
 ```
 
-Note: `AssetClassify` fires on ALL SmartSearch completions (not just uploads), so assets re-encoded
-after a CLIP model change also get reclassified.
+**Step 2: Add queue command handler**
 
-**Step 2: Commit**
+In `queue.service.ts`, find the `handleQueueCommand` switch statement and add a case for Classification (after `PetDetection` around line 251):
+
+```typescript
+      case QueueName.Classification: {
+        return this.jobRepository.queue({ name: JobName.AssetClassifyQueueAll, data: {} });
+      }
+```
+
+**Step 3: Commit**
 
 ```
-feat(server): chain classification job after SmartSearch
+feat(server): chain classification after SmartSearch and register queue
 ```
 
 ---
 
-### Task 11: Controller
+### Task 10: Controller + Registration
 
 **Files:**
 
 - Create: `server/src/controllers/classification.controller.ts`
+- Modify: `server/src/controllers/index.ts` (register controller)
 
 **Step 1: Create the controller**
+
+Note: no `Permission` import — these endpoints are accessible to any authenticated user managing their own categories.
 
 ```typescript
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Put } from '@nestjs/common';
@@ -914,7 +1018,7 @@ import {
   ClassificationCategoryResponseDto,
   ClassificationCategoryUpdateDto,
 } from 'src/dtos/classification.dto';
-import { ApiTag, Permission } from 'src/enum';
+import { ApiTag } from 'src/enum';
 import { Auth, Authenticated } from 'src/middleware/auth.guard';
 import { ClassificationService } from 'src/services/classification.service';
 import { UUIDParamDto } from 'src/validation';
@@ -985,39 +1089,71 @@ export class ClassificationController {
 }
 ```
 
-**Step 2: Add `Classification` to `ApiTag` enum in `server/src/enum.ts`**
+**Step 2: Register in `server/src/controllers/index.ts`**
 
-Find the `ApiTag` enum and add:
+Add import:
 
 ```typescript
-  Classification = 'Classification',
+import { ClassificationController } from 'src/controllers/classification.controller';
+```
+
+Add to the `controllers` array (alphabetically, after `AuthAdminController`):
+
+```typescript
+  ClassificationController,
 ```
 
 **Step 3: Commit**
 
 ```
-feat(server): add classification controller
+feat(server): add classification controller with registration
 ```
 
 ---
 
-### Task 12: Unit Tests — Classification Service
+### Task 11: Unit Tests — Classification Service
 
 **Files:**
 
 - Create: `server/src/services/classification.service.spec.ts`
 
-**Step 1: Write tests for the classification job handler**
+**Step 1: Write tests**
 
-Use the `newTestService(ClassificationService)` pattern from `server/test/utils.ts`. Test:
+Use the `newTestService(ClassificationService)` factory from `server/test/utils.ts`. Tests to write:
 
-1. `handleClassify` returns `Skipped` when no embedding exists
-2. `handleClassify` returns `Skipped` when user has no categories
-3. `handleClassify` tags asset when similarity exceeds threshold
-4. `handleClassify` does not tag when similarity is below threshold
-5. `handleClassify` archives when action is `tag_and_archive` and asset is on timeline
-6. `handleClassify` does not archive when asset is already archived
-7. `handleClassifyQueueAll` streams and queues jobs
+**Job handler tests:**
+
+1. `handleClassify` returns `Failed` when asset not found
+2. `handleClassify` returns `Skipped` when no CLIP embedding exists
+3. `handleClassify` returns `Skipped` when user has no enabled categories
+4. `handleClassify` tags asset when similarity exceeds threshold
+5. `handleClassify` does NOT tag when similarity is below threshold
+6. `handleClassify` archives when action is `tag_and_archive` and asset visibility is Timeline
+7. `handleClassify` does NOT archive when asset is already archived
+8. `handleClassify` creates `Auto/{name}` tag when tagId is null
+9. `handleClassify` handles multiple categories matching the same asset
+10. `handleClassifyQueueAll` streams unclassified assets and queues jobs in batches
+
+**CRUD tests:**
+
+11. `createCategory` encodes prompts via ML service and stores embeddings
+12. `updateCategory` throws `NotFoundException` for non-existent category
+13. `updateCategory` throws `NotFoundException` for category owned by different user
+14. `updateCategory` re-encodes prompts when prompts change
+15. `updateCategory` deletes old tag when name changes
+16. `deleteCategory` deletes associated tag
+17. `deleteCategory` throws `NotFoundException` for non-existent category
+18. `getCategories` returns categories with prompts grouped correctly
+
+**Event tests:**
+
+19. `onConfigUpdate` re-encodes all prompts when CLIP model changes
+20. `onConfigUpdate` does nothing when CLIP model unchanged
+
+**Cosine similarity tests:**
+
+21. `cosineSimilarity` returns 1.0 for identical vectors
+22. `cosineSimilarity` returns 0.0 for orthogonal vectors
 
 **Step 2: Run tests**
 
@@ -1031,13 +1167,13 @@ test(server): add classification service unit tests
 
 ---
 
-### Task 13: OpenAPI Generation
+### Task 12: OpenAPI Generation
 
 **Files:**
 
 - Regenerate: OpenAPI spec and TypeScript SDK
 
-**Step 1: Build server and regenerate**
+**Step 1: Build and regenerate**
 
 ```bash
 cd server && pnpm build
@@ -1045,7 +1181,13 @@ cd server && pnpm sync:open-api
 make open-api-typescript
 ```
 
-**Step 2: Commit**
+**Step 2: Verify the generated SDK includes the new endpoints**
+
+Check that `getClassificationCategories`, `createClassificationCategory`,
+`updateClassificationCategory`, `deleteClassificationCategory`, and
+`scanClassificationLibrary` are present in the generated SDK.
+
+**Step 3: Commit**
 
 ```
 chore: regenerate OpenAPI spec for classification endpoints
@@ -1053,7 +1195,7 @@ chore: regenerate OpenAPI spec for classification endpoints
 
 ---
 
-### Task 14: Web — Settings UI Component
+### Task 13: Web — Settings UI Component
 
 **Files:**
 
@@ -1062,304 +1204,42 @@ chore: regenerate OpenAPI spec for classification endpoints
 
 **Step 1: Create the classification settings component**
 
+Build a Svelte 5 component using runes (`$state`, `$effect`, `$props`) that:
+
+- Loads categories via the generated SDK (`getClassificationCategories`)
+- Renders a list of category cards showing name, prompt count, similarity label, action badge, enabled toggle
+- Has an edit form for creating/editing categories with:
+  - Name text input
+  - Multi-line textarea for prompts (one per line)
+  - Similarity slider (range 0.15-0.45, labels: Loose/Normal/Strict, default 0.28)
+  - Action dropdown (Tag only / Tag and archive)
+  - Save/Cancel buttons
+- "Add Category" button
+- "Scan Library" button that calls `scanClassificationLibrary` and shows a toast
+- Uses `notificationController` for success/error feedback
+- Uses `@immich/ui` components where appropriate (Button, etc.)
+- Uses Gallery's design tokens (`bg-light`, `dark:` prefix) not hardcoded colors
+
+**Step 2: Add to `user-settings-list.svelte`**
+
+Import the component and add a new `SettingAccordion`:
+
 ```svelte
-<script lang="ts">
-  import { mdiPlus, mdiDelete, mdiPencil, mdiMagnifyScan } from '@mdi/js';
-  import {
-    getClassificationCategories,
-    createClassificationCategory,
-    updateClassificationCategory,
-    deleteClassificationCategory,
-    scanClassificationLibrary,
-  } from '@immich/sdk';
-  import type { ClassificationCategoryResponseDto } from '@immich/sdk';
-  import { Button, Input, Slider } from '@immich/ui';
-  import { t } from 'svelte-i18n';
-  import { notificationController } from '$lib/components/shared-components/notification/notification';
-
-  let categories = $state<ClassificationCategoryResponseDto[]>([]);
-  let editingId = $state<string | null>(null);
-  let editName = $state('');
-  let editPrompts = $state('');
-  let editSimilarity = $state(0.28);
-  let editAction = $state('tag');
-  let isCreating = $state(false);
-  let isLoading = $state(true);
-
-  const similarityLabels = [
-    { value: 0.2, label: 'Loose' },
-    { value: 0.28, label: 'Normal' },
-    { value: 0.35, label: 'Strict' },
-  ];
-
-  function getSimilarityLabel(value: number): string {
-    if (value <= 0.23) return 'Loose';
-    if (value <= 0.31) return 'Normal';
-    return 'Strict';
-  }
-
-  async function loadCategories() {
-    isLoading = true;
-    try {
-      categories = await getClassificationCategories();
-    } finally {
-      isLoading = false;
-    }
-  }
-
-  function startCreate() {
-    isCreating = true;
-    editingId = null;
-    editName = '';
-    editPrompts = '';
-    editSimilarity = 0.28;
-    editAction = 'tag';
-  }
-
-  function startEdit(category: ClassificationCategoryResponseDto) {
-    isCreating = false;
-    editingId = category.id;
-    editName = category.name;
-    editPrompts = category.prompts.join('\n');
-    editSimilarity = category.similarity;
-    editAction = category.action;
-  }
-
-  function cancelEdit() {
-    editingId = null;
-    isCreating = false;
-  }
-
-  async function saveCategory() {
-    const prompts = editPrompts
-      .split('\n')
-      .map((p) => p.trim())
-      .filter(Boolean);
-
-    if (!editName || prompts.length === 0) {
-      return;
-    }
-
-    try {
-      if (isCreating) {
-        await createClassificationCategory({
-          classificationCategoryCreateDto: {
-            name: editName,
-            prompts,
-            similarity: editSimilarity,
-            action: editAction,
-          },
-        });
-        notificationController.show({ message: `Category "${editName}" created`, type: 'info' });
-      } else if (editingId) {
-        await updateClassificationCategory({
-          id: editingId,
-          classificationCategoryUpdateDto: {
-            name: editName,
-            prompts,
-            similarity: editSimilarity,
-            action: editAction,
-          },
-        });
-        notificationController.show({ message: `Category "${editName}" updated`, type: 'info' });
-      }
-      cancelEdit();
-      await loadCategories();
-    } catch (error) {
-      notificationController.show({ message: 'Failed to save category', type: 'error' });
-    }
-  }
-
-  async function handleDelete(id: string, name: string) {
-    if (!confirm(`Delete category "${name}"? This will also delete the Auto/${name} tag.`)) {
-      return;
-    }
-
-    try {
-      await deleteClassificationCategory({ id });
-      notificationController.show({ message: `Category "${name}" deleted`, type: 'info' });
-      await loadCategories();
-    } catch (error) {
-      notificationController.show({ message: 'Failed to delete category', type: 'error' });
-    }
-  }
-
-  async function handleToggleEnabled(category: ClassificationCategoryResponseDto) {
-    await updateClassificationCategory({
-      id: category.id,
-      classificationCategoryUpdateDto: { enabled: !category.enabled },
-    });
-    await loadCategories();
-  }
-
-  async function handleScanLibrary() {
-    try {
-      await scanClassificationLibrary();
-      notificationController.show({
-        message: 'Library scan queued. Classification will run in the background.',
-        type: 'info',
-      });
-    } catch (error) {
-      notificationController.show({ message: 'Failed to start library scan', type: 'error' });
-    }
-  }
-
-  $effect(() => {
-    loadCategories();
-  });
+<script>
+  import ClassificationSettings from '$lib/components/user-settings-page/classification-settings.svelte';
+  // Add to existing imports:
+  import { mdiMagnifyScan } from '@mdi/js';
 </script>
 
-<div class="flex flex-col gap-4">
-  {#if isLoading}
-    <p class="text-sm text-gray-500 dark:text-gray-400">Loading...</p>
-  {:else}
-    <!-- Category list -->
-    {#each categories as category (category.id)}
-      {#if editingId === category.id}
-        <!-- Edit form (see below) -->
-      {:else}
-        <div class="flex items-center justify-between rounded-lg border p-3 dark:border-gray-700">
-          <div class="flex flex-col gap-1">
-            <span class="font-medium" class:opacity-50={!category.enabled}>{category.name}</span>
-            <span class="text-xs text-gray-500">
-              {category.prompts.length} prompt{category.prompts.length !== 1 ? 's' : ''} &middot;
-              {getSimilarityLabel(category.similarity)} &middot;
-              {category.action === 'tag_and_archive' ? 'Tag + Archive' : 'Tag only'}
-            </span>
-          </div>
-          <div class="flex items-center gap-2">
-            <label class="flex items-center gap-1">
-              <input
-                type="checkbox"
-                checked={category.enabled}
-                onchange={() => handleToggleEnabled(category)}
-              />
-            </label>
-            <button onclick={() => startEdit(category)} class="rounded p-1 hover:bg-gray-100 dark:hover:bg-gray-800">
-              <svg class="h-4 w-4"><path d={mdiPencil} /></svg>
-            </button>
-            <button
-              onclick={() => handleDelete(category.id, category.name)}
-              class="rounded p-1 hover:bg-gray-100 dark:hover:bg-gray-800"
-            >
-              <svg class="h-4 w-4"><path d={mdiDelete} /></svg>
-            </button>
-          </div>
-        </div>
-      {/if}
-    {/each}
-
-    <!-- Create/Edit form -->
-    {#if isCreating || editingId}
-      <div class="rounded-lg border p-4 dark:border-gray-700">
-        <div class="flex flex-col gap-3">
-          <div>
-            <label class="text-sm font-medium">Name</label>
-            <input
-              type="text"
-              bind:value={editName}
-              placeholder="e.g., Screenshots"
-              class="mt-1 w-full rounded border px-3 py-2 dark:border-gray-600 dark:bg-gray-800"
-            />
-          </div>
-
-          <div>
-            <label class="text-sm font-medium">Prompts (one per line)</label>
-            <textarea
-              bind:value={editPrompts}
-              placeholder="screenshot of a phone screen&#10;screenshot of a computer screen"
-              rows="4"
-              class="mt-1 w-full rounded border px-3 py-2 dark:border-gray-600 dark:bg-gray-800"
-            ></textarea>
-            <p class="mt-1 text-xs text-gray-500">Describe what these images look like. Multiple prompts improve accuracy.</p>
-          </div>
-
-          <div>
-            <label class="text-sm font-medium">
-              Sensitivity: {getSimilarityLabel(editSimilarity)} ({Math.round(editSimilarity * 100)}%)
-            </label>
-            <input
-              type="range"
-              bind:value={editSimilarity}
-              min="0.15"
-              max="0.45"
-              step="0.01"
-              class="mt-1 w-full"
-            />
-            <div class="flex justify-between text-xs text-gray-500">
-              <span>Loose (more matches)</span>
-              <span>Strict (fewer matches)</span>
-            </div>
-          </div>
-
-          <div>
-            <label class="text-sm font-medium">Action</label>
-            <select
-              bind:value={editAction}
-              class="mt-1 w-full rounded border px-3 py-2 dark:border-gray-600 dark:bg-gray-800"
-            >
-              <option value="tag">Tag only</option>
-              <option value="tag_and_archive">Tag and archive</option>
-            </select>
-          </div>
-
-          <div class="flex gap-2">
-            <button
-              onclick={saveCategory}
-              class="rounded bg-primary px-4 py-2 text-white"
-            >
-              Save
-            </button>
-            <button
-              onclick={cancelEdit}
-              class="rounded border px-4 py-2 dark:border-gray-600"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      </div>
-    {/if}
-
-    <!-- Action buttons -->
-    <div class="flex gap-2">
-      {#if !isCreating && !editingId}
-        <button onclick={startCreate} class="flex items-center gap-1 rounded border px-3 py-2 dark:border-gray-600">
-          <svg class="h-4 w-4"><path d={mdiPlus} /></svg>
-          Add Category
-        </button>
-      {/if}
-      <button onclick={handleScanLibrary} class="flex items-center gap-1 rounded border px-3 py-2 dark:border-gray-600">
-        <svg class="h-4 w-4"><path d={mdiMagnifyScan} /></svg>
-        Scan Library
-      </button>
-    </div>
-  {/if}
-</div>
+<SettingAccordion
+  icon={mdiMagnifyScan}
+  key="auto-classification"
+  title="Auto-Classification"
+  subtitle="Automatically tag and archive photos by category"
+>
+  <ClassificationSettings />
+</SettingAccordion>
 ```
-
-**Step 2: Add to user-settings-list.svelte**
-
-Import the new component and add a new `SettingAccordion` section:
-
-```svelte
-import ClassificationSettings from '$lib/components/user-settings-page/classification-settings.svelte';
-```
-
-Add after an existing section (e.g., after the download settings accordion):
-
-```svelte
-  <SettingAccordion
-    icon={mdiMagnifyScan}
-    key="auto-classification"
-    title="Auto-Classification"
-    subtitle="Automatically tag and archive photos by category"
-  >
-    <ClassificationSettings />
-  </SettingAccordion>
-```
-
-Import `mdiMagnifyScan` from `@mdi/js`.
 
 **Step 3: Run web lint and type-check**
 
@@ -1375,21 +1255,22 @@ feat(web): add auto-classification settings UI
 
 ---
 
-### Task 15: Web Unit Tests
+### Task 14: Web Unit Tests
 
 **Files:**
 
 - Create: `web/src/lib/components/user-settings-page/classification-settings.spec.ts`
 
-**Step 1: Write basic tests**
+**Step 1: Write tests**
 
-Test:
+Using `@testing-library/svelte` with `render` and `screen`:
 
-1. Renders empty state with "Add Category" button
-2. Opens create form when "Add Category" clicked
-3. Displays categories when loaded
-
-Use `@testing-library/svelte` with `render` and `screen` following existing test patterns in `web/src/lib/components/`.
+1. Renders "Add Category" button in empty state
+2. Renders "Scan Library" button
+3. Opens create form when "Add Category" clicked
+4. Displays category name and metadata when categories loaded (mock SDK)
+5. Shows edit form when edit button clicked
+6. Calls delete SDK method when delete confirmed
 
 **Step 2: Run tests**
 
@@ -1403,64 +1284,7 @@ test(web): add classification settings component tests
 
 ---
 
-### Task 16: CLIP Model Change Hook
-
-**Files:**
-
-- Modify: `server/src/services/classification.service.ts`
-
-**Step 1: Add ConfigUpdate event handler**
-
-Add an `init` method to `ClassificationService` that listens for CLIP model changes:
-
-```typescript
-  @OnEvent({ name: 'config.update' })
-  async onConfigUpdate({ oldConfig, newConfig }: { oldConfig: SystemConfig; newConfig: SystemConfig }) {
-    if (oldConfig.machineLearning.clip.modelName !== newConfig.machineLearning.clip.modelName) {
-      this.logger.log('CLIP model changed, re-encoding classification prompt embeddings');
-      await this.reEncodeAllPrompts(newConfig.machineLearning.clip.modelName);
-      await this.jobRepository.queue({ name: JobName.AssetClassifyQueueAll, data: {} });
-    }
-  }
-
-  private async reEncodeAllPrompts(modelName: string) {
-    // Get all categories across all users
-    const categories = await this.db
-      .selectFrom('classification_category')
-      .selectAll()
-      .execute();
-
-    for (const category of categories) {
-      const prompts = await this.classificationRepository.getPromptEmbeddings(category.id);
-      await this.classificationRepository.deletePromptEmbeddingsByCategory(category.id);
-      for (const { prompt } of prompts) {
-        const embedding = await this.machineLearningRepository.encodeText(prompt, { modelName });
-        await this.classificationRepository.upsertPromptEmbedding({
-          categoryId: category.id,
-          prompt,
-          embedding,
-        });
-      }
-    }
-  }
-```
-
-Note: The exact event decorator pattern should match `SmartInfoService.init()` — check the `@OnEvent`
-decorator import and signature used there.
-
-**Step 2: Commit**
-
-```
-feat(server): re-encode classification prompts on CLIP model change
-```
-
----
-
-### Task 17: SQL Generation and Final Checks
-
-**Files:**
-
-- Regenerate SQL query documentation
+### Task 15: SQL Generation and Final Checks
 
 **Step 1: Run SQL generation**
 
@@ -1468,7 +1292,7 @@ feat(server): re-encode classification prompts on CLIP model change
 make sql
 ```
 
-**Step 2: Run all linters**
+**Step 2: Run all linters (sequentially, not parallel)**
 
 ```bash
 make check-server
@@ -1497,7 +1321,7 @@ chore: regenerate SQL queries and fix lint issues
 
 ---
 
-### Task 18: E2E Test (API)
+### Task 16: E2E Test (API)
 
 **Files:**
 
@@ -1505,14 +1329,23 @@ chore: regenerate SQL queries and fix lint issues
 
 **Step 1: Write API E2E tests**
 
-Test the full CRUD flow:
+Note: E2E tests may not have the ML service running. The `createCategory` endpoint calls
+`encodeText` which requires the ML service. If ML is not available, either:
 
-1. Create a category → 201 with correct response
-2. Get categories → returns the created category
-3. Update category name and prompts → 200 with updated values
-4. Delete category → 204
-5. Get categories → empty array
-6. Scan library → 204
+- Mock the ML response at the E2E level, or
+- Test only the endpoints that don't require ML (get, delete, scan), or
+- Skip prompt encoding in the test environment
+
+Test the CRUD flow:
+
+1. `GET /classification/categories` returns empty array for new user
+2. `POST /classification/categories` creates a category (if ML available)
+3. `GET /classification/categories` returns the created category
+4. `PUT /classification/categories/:id` updates name and similarity
+5. `DELETE /classification/categories/:id` returns 204
+6. `GET /classification/categories` returns empty array after delete
+7. `POST /classification/categories/scan` returns 204
+8. Authorization: cannot access another user's categories (404 on update/delete)
 
 Follow existing E2E patterns in `e2e/src/specs/api/` (setup with admin/user tokens, cleanup).
 
