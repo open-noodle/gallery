@@ -40,6 +40,8 @@ import { AssetMetadataAuditTable } from 'src/schema/tables/asset-metadata-audit.
 import { AssetMetadataTable } from 'src/schema/tables/asset-metadata.table';
 import { AssetOcrTable } from 'src/schema/tables/asset-ocr.table';
 import { AssetTable } from 'src/schema/tables/asset.table';
+import { ClassificationCategoryTable } from 'src/schema/tables/classification-category.table';
+import { ClassificationPromptEmbeddingTable } from 'src/schema/tables/classification-prompt-embedding.table';
 import { AuditTable } from 'src/schema/tables/audit.table';
 import { FaceSearchTable } from 'src/schema/tables/face-search.table';
 import { GeodataPlacesTable } from 'src/schema/tables/geodata-places.table';
@@ -111,6 +113,8 @@ export class ImmichDatabase {
     AssetFileTable,
     AuditTable,
     AssetExifTable,
+    ClassificationCategoryTable,
+    ClassificationPromptEmbeddingTable,
     FaceSearchTable,
     GeodataPlacesTable,
     LibraryTable,
@@ -220,6 +224,9 @@ export interface DB {
   ocr_search: OcrSearchTable;
 
   audit: AuditTable;
+
+  classification_category: ClassificationCategoryTable;
+  classification_prompt_embedding: ClassificationPromptEmbeddingTable;
 
   face_search: FaceSearchTable;
 
