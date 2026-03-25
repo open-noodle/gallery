@@ -1034,6 +1034,50 @@ describe('/search', () => {
     });
   });
 
+  describe('POST /search/smart with spacePersonIds', () => {
+    it('should return 400 when spacePersonIds sent without spaceId', async () => {
+      const { status } = await request(app)
+        .post('/search/smart')
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .send({ query: 'test', spacePersonIds: [admin.userId] });
+
+      expect(status).toBe(400);
+    });
+
+    it('should accept spacePersonIds with spaceId', async () => {
+      const space = await utils.createSpace(admin.accessToken, { name: 'Search PersonIds Test' });
+      const asset = await utils.createAsset(admin.accessToken);
+      await utils.addSpaceAssets(admin.accessToken, space.id, [asset.id]);
+
+      const { status } = await request(app)
+        .post('/search/smart')
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .send({ query: 'test', spaceId: space.id, spacePersonIds: [admin.userId] });
+
+      // Should not 400 — the person may not match but the request is valid
+      expect(status).toBe(200);
+    });
+
+    it('should filter by structured filters within a space', async () => {
+      const space = await utils.createSpace(admin.accessToken, { name: 'Filter Test Space' });
+      const asset = await utils.createAsset(admin.accessToken);
+      await utils.addSpaceAssets(admin.accessToken, space.id, [asset.id]);
+
+      const { status, body } = await request(app)
+        .post('/search/smart')
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .send({
+          query: 'test',
+          spaceId: space.id,
+          city: 'NonexistentCity',
+          rating: 5,
+        });
+
+      expect(status).toBe(200);
+      // With nonexistent city filter, no results expected
+      expect(body.assets.items).toEqual([]);
+    });
+  });
   describe('GET /search/suggestions (temporal scoping)', () => {
     // Upload assets with specific fileCreatedAt dates and different countries/cameras
     // so we can test that temporal params narrow suggestions correctly.
