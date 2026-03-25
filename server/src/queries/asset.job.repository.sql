@@ -425,6 +425,8 @@ where
 select
   "asset"."id",
   "asset"."visibility",
+  "asset"."type",
+  "asset"."originalPath",
   (
     select
       coalesce(json_agg(agg), '[]')
