@@ -8,9 +8,8 @@ import {
   Timestamp,
   Unique,
   UpdateDateColumn,
-  UpdatedAtTrigger,
-  UpdateIdColumn,
 } from '@immich/sql-tools';
+import { UpdatedAtTrigger, UpdateIdColumn } from 'src/decorators';
 import { TagTable } from 'src/schema/tables/tag.table';
 import { UserTable } from 'src/schema/tables/user.table';
 
