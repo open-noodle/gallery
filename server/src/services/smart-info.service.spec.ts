@@ -373,6 +373,18 @@ describe(SmartInfoService.name, () => {
         expect(mocks.search.upsert).not.toHaveBeenCalled();
       });
 
+      it('should fail when ML encode throws', async () => {
+        const asset = AssetFactory.from({ type: AssetType.Video }).file({ type: AssetFileType.Preview }).build();
+        mocks.assetJob.getForClipEncoding.mockResolvedValue(asset);
+        mocks.media.probe.mockResolvedValue(probeStub(10));
+        mocks.media.extractVideoFrames.mockResolvedValue(['/tmp/f1.jpg']);
+        mocks.machineLearning.encodeImage.mockRejectedValue(new Error('ML service unavailable'));
+
+        expect(await sut.handleEncodeClip({ id: asset.id })).toEqual(JobStatus.Failed);
+
+        expect(mocks.search.upsert).not.toHaveBeenCalled();
+      });
+
       it('should fail when all frames fail to extract', async () => {
         const asset = AssetFactory.from({ type: AssetType.Video }).file({ type: AssetFileType.Preview }).build();
         mocks.assetJob.getForClipEncoding.mockResolvedValue(asset);

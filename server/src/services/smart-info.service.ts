@@ -9,7 +9,7 @@ import { CLIPConfig } from 'src/dtos/model-config.dto';
 import { AssetType, AssetVisibility, DatabaseLock, ImmichWorker, JobName, JobStatus, QueueName } from 'src/enum';
 import { ArgOf } from 'src/repositories/event.repository';
 import { BaseService } from 'src/services/base.service';
-import { JobItem, JobOf } from 'src/types';
+import { JobItem, JobOf, VideoInfo } from 'src/types';
 import { getCLIPModelInfo, isSmartSearchEnabled } from 'src/utils/misc';
 import { elementWiseMean } from 'src/utils/vector';
 
@@ -141,7 +141,7 @@ export class SmartInfoService extends BaseService {
   }
 
   private async encodeVideoClip(originalPath: string, clipConfig: CLIPConfig): Promise<string | null> {
-    let videoInfo;
+    let videoInfo: VideoInfo;
     try {
       videoInfo = await this.mediaRepository.probe(originalPath);
     } catch (error) {
@@ -170,10 +170,16 @@ export class SmartInfoService extends BaseService {
         return null;
       }
 
-      const embeddings: number[][] = [];
-      for (const framePath of framePaths) {
-        const raw = await this.machineLearningRepository.encodeImage(framePath, clipConfig);
-        embeddings.push(JSON.parse(raw));
+      let embeddings: number[][];
+      try {
+        embeddings = [];
+        for (const framePath of framePaths) {
+          const raw = await this.machineLearningRepository.encodeImage(framePath, clipConfig);
+          embeddings.push(JSON.parse(raw));
+        }
+      } catch (error) {
+        this.logger.error(`Failed to encode video frames: ${originalPath}`, error);
+        return null;
       }
 
       const averaged = elementWiseMean(embeddings);

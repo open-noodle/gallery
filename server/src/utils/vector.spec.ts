@@ -23,6 +23,10 @@ describe('elementWiseMean', () => {
     expect(result[1]).toBeCloseTo(0.3);
   });
 
+  it('should throw for empty input', () => {
+    expect(() => elementWiseMean([])).toThrow('Cannot compute mean of empty array');
+  });
+
   it('should handle 512-dim vectors (CLIP embedding size)', () => {
     const a = Array.from({ length: 512 }, () => Math.random());
     const b = Array.from({ length: 512 }, () => Math.random());
