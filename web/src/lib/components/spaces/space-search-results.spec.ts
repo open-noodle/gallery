@@ -19,6 +19,7 @@ describe('SpaceSearchResults', () => {
         hasMore: false,
         totalLoaded: 3,
         onLoadMore: vi.fn(),
+        onAssetClick: vi.fn(),
       },
     });
     const images = screen.getAllByRole('img');
@@ -34,6 +35,7 @@ describe('SpaceSearchResults', () => {
         hasMore: true,
         totalLoaded: 100,
         onLoadMore: vi.fn(),
+        onAssetClick: vi.fn(),
       },
     });
     expect(screen.getByTestId('result-count')).toHaveTextContent('100+');
@@ -48,6 +50,7 @@ describe('SpaceSearchResults', () => {
         hasMore: false,
         totalLoaded: 3,
         onLoadMore: vi.fn(),
+        onAssetClick: vi.fn(),
       },
     });
     expect(screen.getByTestId('result-count')).toHaveTextContent('3');
@@ -63,6 +66,7 @@ describe('SpaceSearchResults', () => {
         hasMore: true,
         totalLoaded: 100,
         onLoadMore: vi.fn(),
+        onAssetClick: vi.fn(),
       },
     });
     expect(screen.getByTestId('load-more-btn')).toBeInTheDocument();
@@ -77,6 +81,7 @@ describe('SpaceSearchResults', () => {
         hasMore: false,
         totalLoaded: 3,
         onLoadMore: vi.fn(),
+        onAssetClick: vi.fn(),
       },
     });
     expect(screen.queryByTestId('load-more-btn')).not.toBeInTheDocument();
@@ -91,6 +96,7 @@ describe('SpaceSearchResults', () => {
         hasMore: true,
         totalLoaded: 100,
         onLoadMore: vi.fn(),
+        onAssetClick: vi.fn(),
       },
     });
     expect(screen.getByTestId('load-more-btn')).toBeDisabled();
@@ -121,6 +127,7 @@ describe('SpaceSearchResults', () => {
         hasMore: false,
         totalLoaded: 0,
         onLoadMore: vi.fn(),
+        onAssetClick: vi.fn(),
       },
     });
     expect(screen.getByTestId('search-empty')).toBeInTheDocument();
