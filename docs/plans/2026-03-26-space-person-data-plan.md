@@ -8,89 +8,19 @@
 
 **Tech Stack:** NestJS + Kysely (server), Svelte 5 (web), Vitest (tests), PostgreSQL migrations
 
----
+**Task ordering rationale:** Bottom-up approach — add JOINs first (backward compatible), update consumers, then remove old code last. This ensures every intermediate commit compiles and tests pass.
 
-### Task 1: Database Migration — Drop `thumbnailPath`, Clear Names
-
-**Files:**
-
-- Create: `server/src/schema/migrations-gallery/1775100000000-DropSpacePersonThumbnailPath.ts`
-
-**Step 1: Write the migration**
-
-```typescript
-import { Kysely } from 'kysely';
-
-export async function up(db: Kysely<unknown>): Promise<void> {
-  // Clear stale name copies (these were copied from personal person at creation,
-  // not intentional overrides — no UI exposes manual naming)
-  await db.updateTable('shared_space_person').set({ name: '' }).execute();
-
-  await db.schema.alterTable('shared_space_person').dropColumn('thumbnailPath').execute();
-}
-
-export async function down(db: Kysely<unknown>): Promise<void> {
-  await db.schema
-    .alterTable('shared_space_person')
-    .addColumn('thumbnailPath', 'character varying', (col) => col.defaultTo('').notNull())
-    .execute();
-}
-```
-
-**Step 2: Commit**
-
-```bash
-git add server/src/schema/migrations-gallery/1775100000000-DropSpacePersonThumbnailPath.ts
-git commit -m "feat: add migration to drop thumbnailPath from shared_space_person"
-```
+**Enriched type used throughout:** Repository queries return `SharedSpacePerson & { personalName: string | null; personalThumbnailPath: string | null }`. Tests mock this by spreading factory output: `{ ...factory.sharedSpacePerson({...}), personalName: 'Alice', personalThumbnailPath: '/path' }`.
 
 ---
 
-### Task 2: Update Schema, Types, and Factory — Remove `thumbnailPath`
-
-**Files:**
-
-- Modify: `server/src/schema/tables/shared-space-person.table.ts` — remove thumbnailPath column
-- Modify: `server/src/database.ts` — remove thumbnailPath from SharedSpacePerson type
-- Modify: `server/test/small.factory.ts` — remove thumbnailPath from factory
-
-**Step 1: Remove `thumbnailPath` from table schema**
-
-In `server/src/schema/tables/shared-space-person.table.ts`, remove:
-
-```typescript
-  @Column({ default: '', type: 'character varying' })
-  thumbnailPath!: Generated<string>;
-```
-
-**Step 2: Remove `thumbnailPath` from database type**
-
-In `server/src/database.ts`, remove `thumbnailPath: string;` from the `SharedSpacePerson` type (around line 368).
-
-**Step 3: Remove `thumbnailPath` from factory**
-
-In `server/test/small.factory.ts`, remove `thumbnailPath: '',` from the `sharedSpacePersonFactory` (around line 433).
-
-**Step 4: Verify compile errors surface**
-
-Run: `cd server && node_modules/.bin/tsc --noEmit 2>&1 | head -60`
-
-Expected: Compile errors in shared-space.service.ts and shared-space.service.spec.ts where `thumbnailPath` is referenced. These will be fixed in subsequent tasks.
-
-**Step 5: Commit**
-
-```bash
-git add server/src/schema/tables/shared-space-person.table.ts server/src/database.ts server/test/small.factory.ts
-git commit -m "refactor: remove thumbnailPath from SharedSpacePerson schema and type"
-```
-
----
-
-### Task 3: Repository — Add JOINs for Personal Person Data
+### Task 1: Repository — Add JOINs for Personal Person Data
 
 **Files:**
 
 - Modify: `server/src/repositories/shared-space.repository.ts` — update 3 query methods
+
+This is backward compatible — adds extra fields to query results without breaking existing consumers.
 
 **Step 1: Update `getPersonsBySpaceId()`**
 
@@ -161,7 +91,13 @@ getPersonById(id: string) {
 }
 ```
 
-**Step 4: Commit**
+**Step 4: Run server tests to verify nothing breaks**
+
+Run: `cd server && node_modules/.bin/vitest run src/services/shared-space.service.spec.ts 2>&1 | tail -30`
+
+Expected: All existing tests still pass (extra fields are ignored by current consumers).
+
+**Step 5: Commit**
 
 ```bash
 git add server/src/repositories/shared-space.repository.ts
@@ -170,22 +106,23 @@ git commit -m "feat: add personal person JOINs to space person queries"
 
 ---
 
-### Task 4: Service — TDD for `getSpacePeople()` Name and Thumbnail Resolution
+### Task 2: Service — TDD for `getSpacePeople()` Name and Thumbnail Resolution
 
 **Files:**
 
-- Modify: `server/src/services/shared-space.service.spec.ts` — update existing tests, add new tests
+- Modify: `server/src/services/shared-space.service.spec.ts` — add new tests, update existing tests
 - Modify: `server/src/services/shared-space.service.ts` — update `getSpacePeople()` and `mapSpacePerson()`
 
 **Step 1: Write failing test — resolves name from personal person**
 
-In `shared-space.service.spec.ts`, find the `getSpacePeople` describe block (around line 2513). Update the mock data shape to include `personalName` and `personalThumbnailPath` (since the repository now returns these). Add this new test:
+In `shared-space.service.spec.ts`, find the `getSpacePeople` describe block (around line 2513). Add:
 
 ```typescript
 it('should resolve name from personal person when space person has no name override', async () => {
   const person = factory.sharedSpacePerson({
     id: personId,
     name: '',
+    thumbnailPath: '',
     representativeFaceId: faceId,
   });
 
@@ -212,6 +149,7 @@ it('should use space person name as override when set', async () => {
   const person = factory.sharedSpacePerson({
     id: personId,
     name: 'Grandpa',
+    thumbnailPath: '/path/to/thumb.jpg',
     representativeFaceId: faceId,
   });
 
@@ -230,13 +168,14 @@ it('should use space person name as override when set', async () => {
 });
 ```
 
-**Step 3: Write failing test — filters out persons with no thumbnail from either source**
+**Step 3: Write failing test — filters out persons with no thumbnail from personal person**
 
 ```typescript
 it('should exclude persons with no thumbnail from personal person', async () => {
   const person = factory.sharedSpacePerson({
     id: personId,
     name: '',
+    thumbnailPath: '',
     representativeFaceId: faceId,
   });
 
@@ -252,52 +191,87 @@ it('should exclude persons with no thumbnail from personal person', async () => 
 });
 ```
 
-**Step 4: Run tests to verify they fail**
+**Step 4: Write failing test — filters out persons with null JOIN data (no linked personal person)**
+
+```typescript
+it('should exclude persons with null personal thumbnail (no linked personal person)', async () => {
+  const person = factory.sharedSpacePerson({
+    id: personId,
+    name: '',
+    thumbnailPath: '',
+    representativeFaceId: null,
+  });
+
+  mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ faceRecognitionEnabled: true }));
+  mocks.sharedSpace.getPersonsBySpaceId.mockResolvedValue([
+    { ...person, personalName: null, personalThumbnailPath: null },
+  ]);
+  mocks.sharedSpace.getAliasesBySpaceAndUser.mockResolvedValue([]);
+
+  const result = await sut.getSpacePeople(auth, spaceId);
+
+  expect(result).toHaveLength(0);
+});
+```
+
+**Step 5: Write failing test — space person name override with no personal person name**
+
+```typescript
+it('should use space person name override even when personal person has no name', async () => {
+  const person = factory.sharedSpacePerson({
+    id: personId,
+    name: 'Custom Name',
+    thumbnailPath: '',
+    representativeFaceId: faceId,
+  });
+
+  mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ faceRecognitionEnabled: true }));
+  mocks.sharedSpace.getPersonsBySpaceId.mockResolvedValue([
+    { ...person, personalName: '', personalThumbnailPath: '/path/to/thumb.jpg' },
+  ]);
+  mocks.sharedSpace.getAliasesBySpaceAndUser.mockResolvedValue([]);
+  mocks.sharedSpace.getPersonFaceCount.mockResolvedValue(1);
+  mocks.sharedSpace.getPersonAssetCount.mockResolvedValue(1);
+
+  const result = await sut.getSpacePeople(auth, spaceId);
+
+  expect(result).toHaveLength(1);
+  expect(result[0].name).toBe('Custom Name');
+});
+```
+
+**Step 6: Run tests to verify the new tests fail**
 
 Run: `cd server && node_modules/.bin/vitest run src/services/shared-space.service.spec.ts 2>&1 | tail -30`
 
-Expected: Tests fail because the service still uses `person.thumbnailPath` (which no longer exists on the type) and doesn't read `personalName`/`personalThumbnailPath`.
+Expected: New tests fail because the service doesn't read `personalName`/`personalThumbnailPath`.
 
-**Step 5: Update existing tests to use new mock shape**
+**Step 7: Update existing `getSpacePeople` tests to use enriched mock shape**
 
-All existing `getSpacePeople` tests that mock `getPersonsBySpaceId` or `getPersonsBySpaceIdWithTemporalFilter` need their mock return values updated to include `personalName` and `personalThumbnailPath`. For example, the existing test "should return enriched person list" (around line 2533) should change its mock person from:
+All existing tests that mock `getPersonsBySpaceId` or `getPersonsBySpaceIdWithTemporalFilter` need enriched mock data. This includes:
 
-```typescript
-const person = factory.sharedSpacePerson({
-  id: personId,
-  name: 'Alice',
-  thumbnailPath: '/path/to/thumb.jpg',
-});
-```
+- "should return enriched person list" (~line 2533): Add `personalName`/`personalThumbnailPath` to mock
+- "should sort people by asset count descending" (~line 2565): Same
+- "should exclude people without thumbnails" (~line 2609): Change to test `personalThumbnailPath: ''` instead of `thumbnailPath: ''`
+- "should filter out pets when petsEnabled is false" (~line 2639): Add enriched fields
+- "should include pets when petsEnabled is true" (~line 2658): Add enriched fields
+- "should filter people by temporal range" (~line 2677): Add enriched fields to temporal mock
+- "should return all people when no temporal params" (~line 2708): Same
+- "should exclude person with zero face assets" (~line 2733): Same
 
-to:
+Pattern for each: change `factory.sharedSpacePerson({ ..., thumbnailPath: '/x' })` to `{ ...factory.sharedSpacePerson({ ... }), personalName: 'Name', personalThumbnailPath: '/x' }` in mock return values.
 
-```typescript
-const person = factory.sharedSpacePerson({
-  id: personId,
-  name: 'Alice',
-  representativeFaceId: faceId,
-});
-// Mock return includes JOIN data:
-mocks.sharedSpace.getPersonsBySpaceId.mockResolvedValue([
-  { ...person, personalName: 'Alice', personalThumbnailPath: '/path/to/thumb.jpg' },
-]);
-```
+**Step 8: Implement `getSpacePeople()` changes**
 
-The existing "should exclude people without thumbnails" test (around line 2609) should be updated to test against `personalThumbnailPath` being empty instead of `thumbnailPath`.
-
-**Step 6: Implement `getSpacePeople()` changes**
-
-In `shared-space.service.ts`, update `getSpacePeople()` (around line 569-589):
+In `shared-space.service.ts`, update `getSpacePeople()` (~line 569-589):
 
 - Replace `if (!person.thumbnailPath) { continue; }` with `if (!person.personalThumbnailPath) { continue; }`
-- Pass resolved name and thumbnail to `mapSpacePerson()`
 
-Update `mapSpacePerson()` to accept the enriched person type:
+Update `mapSpacePerson()` to accept the enriched type with optional new fields (optional so it also works for `getSpacePerson` and `updateSpacePerson` which will be updated in Task 4):
 
 ```typescript
 private mapSpacePerson(
-  person: SharedSpacePerson & { personalName: string | null; personalThumbnailPath: string | null },
+  person: SharedSpacePerson & { personalName?: string | null; personalThumbnailPath?: string | null },
   faceCount: number,
   assetCount: number,
   alias: string | null,
@@ -306,7 +280,7 @@ private mapSpacePerson(
     id: person.id,
     spaceId: person.spaceId,
     name: person.name || person.personalName || '',
-    thumbnailPath: person.personalThumbnailPath || '',
+    thumbnailPath: person.personalThumbnailPath || person.thumbnailPath || '',
     isHidden: person.isHidden,
     birthDate: person.birthDate,
     representativeFaceId: person.representativeFaceId,
@@ -320,13 +294,15 @@ private mapSpacePerson(
 }
 ```
 
-**Step 7: Run tests to verify they pass**
+Note: `person.thumbnailPath` is kept as a secondary fallback temporarily. It will be removed in Task 7 when the column is dropped.
+
+**Step 9: Run tests to verify they pass**
 
 Run: `cd server && node_modules/.bin/vitest run src/services/shared-space.service.spec.ts 2>&1 | tail -30`
 
 Expected: All tests pass.
 
-**Step 8: Commit**
+**Step 10: Commit**
 
 ```bash
 git add server/src/services/shared-space.service.ts server/src/services/shared-space.service.spec.ts
@@ -335,25 +311,27 @@ git commit -m "feat: resolve space person name and thumbnail from personal perso
 
 ---
 
-### Task 5: Service — TDD for `getSpacePersonThumbnail()` Using JOIN Data
+### Task 3: Service — TDD for `getSpacePersonThumbnail()` Using JOIN Data
 
 **Files:**
 
 - Modify: `server/src/services/shared-space.service.spec.ts` — update thumbnail endpoint tests
 - Modify: `server/src/services/shared-space.service.ts` — simplify `getSpacePersonThumbnail()`
 
-**Step 1: Write failing test — serves thumbnail from personal person via JOIN**
+**Step 1: Write failing test — serves thumbnail from personal person via JOIN, no fallback chain**
 
-Find the `getSpacePersonThumbnail` describe block in the spec file. Add:
+Find the `getSpacePersonThumbnail` describe block in the spec file (~line 2820). Add:
 
 ```typescript
-it('should serve thumbnail from personal person via JOIN data', async () => {
+it('should serve thumbnail from personal person via JOIN data without fallback chain', async () => {
   const person = factory.sharedSpacePerson({
     id: personId,
     spaceId,
+    thumbnailPath: '',
     representativeFaceId: faceId,
   });
 
+  mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
   mocks.sharedSpace.getPersonById.mockResolvedValue({
     ...person,
     personalName: 'Alice',
@@ -367,15 +345,45 @@ it('should serve thumbnail from personal person via JOIN data', async () => {
 });
 ```
 
-**Step 2: Run test to verify it fails**
+**Step 2: Write failing test — throws when personal person has no thumbnail**
 
-Run: `cd server && node_modules/.bin/vitest run src/services/shared-space.service.spec.ts -t "should serve thumbnail from personal person via JOIN" 2>&1 | tail -20`
+```typescript
+it('should throw NotFoundException when personal person has no thumbnail', async () => {
+  const person = factory.sharedSpacePerson({
+    id: personId,
+    spaceId,
+    thumbnailPath: '',
+    representativeFaceId: faceId,
+  });
 
-Expected: Fails because current code still calls `getFaceById` and `getById` in the fallback chain.
+  mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
+  mocks.sharedSpace.getPersonById.mockResolvedValue({
+    ...person,
+    personalName: 'Alice',
+    personalThumbnailPath: null,
+  });
 
-**Step 3: Implement simplified `getSpacePersonThumbnail()`**
+  await expect(sut.getSpacePersonThumbnail(auth, spaceId, personId)).rejects.toThrow('Not Found');
+});
+```
 
-Replace the method (around line 612-640) with:
+**Step 3: Run tests to verify new tests fail**
+
+Run: `cd server && node_modules/.bin/vitest run src/services/shared-space.service.spec.ts -t "getSpacePersonThumbnail" 2>&1 | tail -20`
+
+Expected: First test fails because current code still calls `getFaceById`/`getById` in the fallback chain.
+
+**Step 4: Update existing thumbnail tests to use enriched mock shape**
+
+All `getSpacePersonThumbnail` tests that mock `getPersonById` need enriched data:
+
+- "should throw NotFoundException when person has no thumbnail" (~line 2834): Change `thumbnailPath: ''` to also add `personalThumbnailPath: null`
+- "should fallback to personal person thumbnail" tests: Replace with the new JOIN-based behavior
+- "should throw NotFoundException when person is in different space" (~line 2897): Add enriched fields
+
+**Step 5: Implement simplified `getSpacePersonThumbnail()`**
+
+Replace the method (~line 612-640) with:
 
 ```typescript
 async getSpacePersonThumbnail(auth: AuthDto, spaceId: string, personId: string): Promise<ImmichMediaResponse> {
@@ -395,17 +403,13 @@ async getSpacePersonThumbnail(auth: AuthDto, spaceId: string, personId: string):
 }
 ```
 
-**Step 4: Update existing thumbnail tests**
+**Step 6: Run tests to verify they pass**
 
-Update existing tests to use the new mock shape (add `personalName` and `personalThumbnailPath` to `getPersonById` mock return values). Remove tests for the old fallback chain that no longer exists.
-
-**Step 5: Run tests to verify they pass**
-
-Run: `cd server && node_modules/.bin/vitest run src/services/shared-space.service.spec.ts 2>&1 | tail -30`
+Run: `cd server && node_modules/.bin/vitest run src/services/shared-space.service.spec.ts -t "getSpacePersonThumbnail" 2>&1 | tail -20`
 
 Expected: All tests pass.
 
-**Step 6: Commit**
+**Step 7: Commit**
 
 ```bash
 git add server/src/services/shared-space.service.ts server/src/services/shared-space.service.spec.ts
@@ -414,26 +418,141 @@ git commit -m "feat: simplify space person thumbnail to use JOIN data"
 
 ---
 
-### Task 6: Remove `SharedSpacePersonThumbnail` Job
+### Task 4: Service — Fix `getSpacePerson()` and `updateSpacePerson()` for Enriched Type
 
 **Files:**
 
-- Modify: `server/src/services/shared-space.service.ts` — remove handler + queue calls
+- Modify: `server/src/services/shared-space.service.ts` — update both methods
+- Modify: `server/src/services/shared-space.service.spec.ts` — update tests
+
+**Step 1: Write failing test — `getSpacePerson` resolves name from personal person**
+
+In the `getSpacePerson` describe block (~line 2762), add:
+
+```typescript
+it('should resolve name from personal person when no override', async () => {
+  const auth = factory.auth();
+  const spaceId = newUuid();
+  const personId = newUuid();
+  const person = factory.sharedSpacePerson({ id: personId, spaceId, name: '' });
+  const space = factory.sharedSpace({ id: spaceId });
+
+  mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
+  mocks.sharedSpace.getPersonById.mockResolvedValue({
+    ...person,
+    personalName: 'Bob',
+    personalThumbnailPath: '/thumb.jpg',
+  });
+  mocks.sharedSpace.getById.mockResolvedValue(space);
+  mocks.sharedSpace.getPersonFaceCount.mockResolvedValue(10);
+  mocks.sharedSpace.getPersonAssetCount.mockResolvedValue(7);
+  mocks.sharedSpace.getAlias.mockResolvedValue(void 0);
+
+  const result = await sut.getSpacePerson(auth, spaceId, personId);
+
+  expect(result.name).toBe('Bob');
+});
+```
+
+**Step 2: Write failing test — `updateSpacePerson` returns enriched data after update**
+
+In the `updateSpacePerson` describe block (~line 2907), add:
+
+```typescript
+it('should return enriched person with personal name after update', async () => {
+  const auth = factory.auth();
+  const spaceId = newUuid();
+  const personId = newUuid();
+  const person = factory.sharedSpacePerson({ id: personId, spaceId });
+  const updatedPerson = factory.sharedSpacePerson({ id: personId, spaceId, isHidden: true });
+
+  mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
+  mocks.sharedSpace.getPersonById
+    .mockResolvedValueOnce(person)
+    .mockResolvedValueOnce({ ...updatedPerson, personalName: 'Alice', personalThumbnailPath: '/thumb.jpg' });
+  mocks.sharedSpace.updatePerson.mockResolvedValue(updatedPerson);
+  mocks.sharedSpace.getPersonFaceCount.mockResolvedValue(5);
+  mocks.sharedSpace.getPersonAssetCount.mockResolvedValue(3);
+  mocks.sharedSpace.getAlias.mockResolvedValue(void 0);
+  mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
+
+  const result = await sut.updateSpacePerson(auth, spaceId, personId, { isHidden: true });
+
+  expect(result.name).toBe('Alice');
+  expect(result.thumbnailPath).toBe('/thumb.jpg');
+});
+```
+
+**Step 3: Run tests to verify they fail**
+
+Run: `cd server && node_modules/.bin/vitest run src/services/shared-space.service.spec.ts -t "should resolve name from personal person when no override|should return enriched person with personal name" 2>&1 | tail -20`
+
+Expected: Fails because `getSpacePerson` and `updateSpacePerson` don't use enriched data yet.
+
+**Step 4: Update existing tests**
+
+- `getSpacePerson` "should return enriched person" (~line 2783): Add enriched fields to `getPersonById` mock
+- `getSpacePerson` "should reject access to pet person" (~line 2806): Same
+- `updateSpacePerson` "should update person name" (~line 2925): Mock `getPersonById` twice — first for the initial lookup, second for the re-fetch after update, with enriched fields
+
+**Step 5: Implement fixes**
+
+In `getSpacePerson()` (~line 592-610): The `getPersonById` call already returns enriched data from Task 1 JOINs. `mapSpacePerson` already accepts optional enriched fields from Task 2. So `getSpacePerson` should work without code changes — verify by running tests.
+
+In `updateSpacePerson()` (~line 642-681): After `updatePerson()`, re-fetch via `getPersonById()` to get enriched data:
+
+```typescript
+// Replace line 680:
+// return this.mapSpacePerson(updated, faceCount, assetCount, alias?.alias ?? null);
+// With:
+const enriched = await this.sharedSpaceRepository.getPersonById(personId);
+if (!enriched) {
+  throw new BadRequestException('Person not found');
+}
+return this.mapSpacePerson(enriched, faceCount, assetCount, alias?.alias ?? null);
+```
+
+Also update `deleteSpacePerson()` (~line 697) to use resolved name for the activity log:
+
+```typescript
+data: { personId, personName: person.name || person.personalName || '' },
+```
+
+**Step 6: Run tests to verify they pass**
+
+Run: `cd server && node_modules/.bin/vitest run src/services/shared-space.service.spec.ts 2>&1 | tail -30`
+
+Expected: All tests pass.
+
+**Step 7: Commit**
+
+```bash
+git add server/src/services/shared-space.service.ts server/src/services/shared-space.service.spec.ts
+git commit -m "feat: fix getSpacePerson and updateSpacePerson for enriched type"
+```
+
+---
+
+### Task 5: Remove `SharedSpacePersonThumbnail` Job and Name Copying
+
+**Files:**
+
+- Modify: `server/src/services/shared-space.service.ts` — remove handler + queue calls + name copying
 - Modify: `server/src/services/shared-space.service.spec.ts` — remove/update tests
 - Modify: `server/src/enum.ts` — remove enum value
 - Modify: `server/src/types.ts` — remove job type
 
 **Step 1: Remove handler `handleSharedSpacePersonThumbnail()`**
 
-Delete the method (around line 896-921) from `shared-space.service.ts`.
+Delete the entire method (~line 896-921) from `shared-space.service.ts`.
 
 **Step 2: Remove queue calls in `processSpaceFaceMatch()`**
 
-Remove the two `jobRepository.queue({ name: JobName.SharedSpacePersonThumbnail, ... })` calls (around lines 962-965 and 1006-1009).
+Remove the two `jobRepository.queue({ name: JobName.SharedSpacePersonThumbnail, ... })` calls (~lines 962-965 and 1006-1009).
 
 **Step 3: Stop copying name at creation time**
 
-In `processSpaceFaceMatch()` (around line 949-953), replace:
+In `processSpaceFaceMatch()`, replace the name lookup (~lines 949-953):
 
 ```typescript
 let name = '';
@@ -443,19 +562,17 @@ if (personalPerson?.name) {
 }
 ```
 
-with just:
+with:
 
 ```typescript
 const name = '';
 ```
 
-Do the same for the pet face creation path (around line 993-997).
-
-Note: Remove the `personalPerson` lookup calls since they're no longer needed. The `personRepository.getById` calls for name lookup can be removed entirely.
+Do the same for the pet face creation path (~lines 993-997). Remove the `personRepository.getById` calls entirely.
 
 **Step 4: Remove enum value**
 
-In `server/src/enum.ts`, remove:
+In `server/src/enum.ts` (~line 718), remove:
 
 ```typescript
 SharedSpacePersonThumbnail = 'SharedSpacePersonThumbnail',
@@ -463,7 +580,7 @@ SharedSpacePersonThumbnail = 'SharedSpacePersonThumbnail',
 
 **Step 5: Remove job type**
 
-In `server/src/types.ts`, remove from the JobItem union:
+In `server/src/types.ts` (~line 453), remove:
 
 ```typescript
 | { name: JobName.SharedSpacePersonThumbnail; data: IEntityJob }
@@ -471,9 +588,11 @@ In `server/src/types.ts`, remove from the JobItem union:
 
 **Step 6: Update tests**
 
-- Delete the entire `handleSharedSpacePersonThumbnail` describe block (around line 2453-2511)
-- Update `handleSharedSpaceFaceMatch` tests that assert `JobName.SharedSpacePersonThumbnail` was queued — remove those assertions
-- Update tests that mock `personalPerson` lookup for name copying — they should now expect `name: ''` always
+- Delete the entire `handleSharedSpacePersonThumbnail` describe block (~lines 2453-2511)
+- In `handleSharedSpaceFaceMatch` tests: remove assertions that `JobName.SharedSpacePersonThumbnail` was queued (~lines 2185-2188 and similar)
+- "should copy personal person name when creating space person" (~line 2267): Update to expect `name: ''` always (no longer copies)
+- "should use empty name when personal person has no name" (~line 2321): Should still pass (already expects empty)
+- Pet person creation tests: Remove thumbnail job queue assertions
 
 **Step 7: Run tests**
 
@@ -490,7 +609,103 @@ git commit -m "refactor: remove SharedSpacePersonThumbnail job and name copying"
 
 ---
 
-### Task 7: Web — TDD for Filter Panel Thumbnails
+### Task 6: Remove `thumbnailPath` from Schema, Types, and Factory
+
+**Files:**
+
+- Modify: `server/src/schema/tables/shared-space-person.table.ts` — remove column
+- Modify: `server/src/database.ts` — remove from type
+- Modify: `server/test/small.factory.ts` — remove from factory
+- Modify: `server/src/services/shared-space.service.ts` — remove `thumbnailPath` fallback from `mapSpacePerson`
+- Modify: `server/src/services/shared-space.service.spec.ts` — remove all `thumbnailPath` references in mocks
+
+**Step 1: Remove `thumbnailPath` from table schema**
+
+In `server/src/schema/tables/shared-space-person.table.ts`, remove:
+
+```typescript
+@Column({ default: '', type: 'character varying' })
+thumbnailPath!: Generated<string>;
+```
+
+**Step 2: Remove `thumbnailPath` from database type**
+
+In `server/src/database.ts`, remove `thumbnailPath: string;` from the `SharedSpacePerson` type (~line 368).
+
+**Step 3: Remove `thumbnailPath` from factory**
+
+In `server/test/small.factory.ts`, remove `thumbnailPath: '',` from the `sharedSpacePersonFactory` (~line 433).
+
+**Step 4: Update `mapSpacePerson` — remove `thumbnailPath` fallback**
+
+In `mapSpacePerson()`, change:
+
+```typescript
+thumbnailPath: person.personalThumbnailPath || person.thumbnailPath || '',
+```
+
+to:
+
+```typescript
+thumbnailPath: person.personalThumbnailPath || '',
+```
+
+**Step 5: Fix all remaining `thumbnailPath` references in tests**
+
+Search for `thumbnailPath` in `shared-space.service.spec.ts` and remove all instances from `factory.sharedSpacePerson({...})` calls. The compiler will guide you — any `thumbnailPath` in a `SharedSpacePerson` context is now invalid.
+
+**Step 6: Run tests to verify everything compiles and passes**
+
+Run: `cd server && node_modules/.bin/vitest run src/services/shared-space.service.spec.ts 2>&1 | tail -30`
+
+Expected: All tests pass.
+
+**Step 7: Commit**
+
+```bash
+git add server/src/schema/tables/shared-space-person.table.ts server/src/database.ts server/test/small.factory.ts server/src/services/shared-space.service.ts server/src/services/shared-space.service.spec.ts
+git commit -m "refactor: remove thumbnailPath from SharedSpacePerson schema and type"
+```
+
+---
+
+### Task 7: Database Migration
+
+**Files:**
+
+- Create: `server/src/schema/migrations-gallery/1775100000000-DropSpacePersonThumbnailPath.ts`
+
+**Step 1: Write the migration**
+
+```typescript
+import { Kysely } from 'kysely';
+
+export async function up(db: Kysely<unknown>): Promise<void> {
+  // Clear stale name copies (these were copied from personal person at creation,
+  // not intentional overrides — no UI exposes manual naming)
+  await db.updateTable('shared_space_person').set({ name: '' }).execute();
+
+  await db.schema.alterTable('shared_space_person').dropColumn('thumbnailPath').execute();
+}
+
+export async function down(db: Kysely<unknown>): Promise<void> {
+  await db.schema
+    .alterTable('shared_space_person')
+    .addColumn('thumbnailPath', 'character varying', (col) => col.defaultTo('').notNull())
+    .execute();
+}
+```
+
+**Step 2: Commit**
+
+```bash
+git add server/src/schema/migrations-gallery/1775100000000-DropSpacePersonThumbnailPath.ts
+git commit -m "feat: add migration to drop thumbnailPath from shared_space_person"
+```
+
+---
+
+### Task 8: Web — TDD for Filter Panel Thumbnails
 
 **Files:**
 
@@ -500,7 +715,7 @@ git commit -m "refactor: remove SharedSpacePersonThumbnail job and name copying"
 
 **Step 1: Write failing test — renders thumbnail image when URL provided**
 
-In `filter-sections.spec.ts`, find the PeopleFilter describe block (around line 18). Add:
+In `filter-sections.spec.ts`, find the PeopleFilter describe block (~line 18). Add:
 
 ```typescript
 it('should render thumbnail images when thumbnailUrl is provided', async () => {
@@ -543,7 +758,7 @@ Expected: Fails because `thumbnailUrl` doesn't exist on `PersonOption` and no `<
 
 **Step 4: Update `PersonOption` interface**
 
-In `filter-panel.ts`, change:
+In `filter-panel.ts`, change `thumbnailPath?: string` to `thumbnailUrl?: string`:
 
 ```typescript
 export interface PersonOption {
@@ -555,7 +770,7 @@ export interface PersonOption {
 
 **Step 5: Update `people-filter.svelte` — render thumbnails**
 
-Replace the avatar div (around lines 140-146) with:
+Replace the avatar div in the main people list (~lines 140-146) with:
 
 ```svelte
 <!-- Avatar -->
@@ -575,7 +790,7 @@ Replace the avatar div (around lines 140-146) with:
 {/if}
 ```
 
-Do the same for the orphaned people avatar section (around lines 104-109).
+The orphaned people section (~lines 104-109) keeps the gradient avatar since orphaned people are constructed from bare IDs and never have a `thumbnailUrl`.
 
 **Step 6: Run tests to verify they pass**
 
@@ -583,9 +798,9 @@ Run: `cd web && node_modules/.bin/vitest run src/lib/components/filter-panel/__t
 
 Expected: All tests pass.
 
-**Step 7: Update existing tests**
+**Step 7: Update existing tests that use `thumbnailPath` on `PersonOption`**
 
-Update any existing tests that create `PersonOption` objects with `thumbnailPath` to use `thumbnailUrl` instead.
+Search the test file for any existing references to `thumbnailPath` in `PersonOption` objects and rename to `thumbnailUrl`.
 
 **Step 8: Commit**
 
@@ -596,7 +811,7 @@ git commit -m "feat: render face thumbnails in filter panel people section"
 
 ---
 
-### Task 8: Web — Update Filter Providers to Pass Thumbnail URLs
+### Task 9: Web — Update Filter Providers to Pass Thumbnail URLs
 
 **Files:**
 
@@ -605,7 +820,7 @@ git commit -m "feat: render face thumbnails in filter panel people section"
 
 **Step 1: Update space page filter provider**
 
-In the space page `+page.svelte` (around line 166-176), update the people provider to construct thumbnail URLs:
+In the space page `+page.svelte` (~line 166-176), update the people provider to construct thumbnail URLs:
 
 ```typescript
 people: async (context?: FilterContext) => {
@@ -629,7 +844,7 @@ people: async (context?: FilterContext) => {
 
 **Step 2: Update photos page filter provider**
 
-In the photos page `+page.svelte` (around line 72-80), update:
+In the photos page `+page.svelte` (~line 72-80), update:
 
 ```typescript
 people: async () => {
@@ -662,50 +877,52 @@ git commit -m "feat: pass thumbnail URLs to filter panel people providers"
 
 ---
 
-### Task 9: Lint and Type Check
+### Task 10: Lint, Type Check, and Final Verification
 
-**Step 1: Run server lint + type check**
+**Step 1: Run server type check**
 
 Run: `cd server && node_modules/.bin/tsc --noEmit 2>&1 | tail -20`
+
+Fix any issues.
+
+**Step 2: Run server lint**
+
 Run: `cd server && node_modules/.bin/eslint --fix 'src/**/*.ts' 2>&1 | tail -20`
 
 Fix any issues.
 
-**Step 2: Run web lint + type check**
+**Step 3: Run web type check**
 
-Run: `cd web && node_modules/.bin/svelte-check --tsconfig ./tsconfig.json 2>&1 | tail -20`
+Run: `cd web && node_modules/.bin/svelte-check --tsconfig ./tsconfig.json 2>&1 | tail -40`
 
 Fix any issues.
 
-**Step 3: Run format**
+**Step 4: Format**
 
 Run: `cd server && npx prettier --write 'src/**/*.ts' 'test/**/*.ts'`
 Run: `cd web && npx prettier --write 'src/**/*.svelte' 'src/**/*.ts'`
 
-**Step 4: Commit any fixes**
-
-```bash
-git add -A && git commit -m "chore: lint and format fixes"
-```
-
----
-
-### Task 10: Final Verification
-
-**Step 1: Run all server tests**
+**Step 5: Run all server tests**
 
 Run: `cd server && node_modules/.bin/vitest run 2>&1 | tail -30`
 
 Expected: All tests pass.
 
-**Step 2: Run all web tests**
+**Step 6: Run all web tests**
 
 Run: `cd web && node_modules/.bin/vitest run 2>&1 | tail -30`
 
 Expected: All tests pass.
 
-**Step 3: Verify no references to removed code**
+**Step 7: Verify no stale references**
 
-Grep for `SharedSpacePersonThumbnail` — should only appear in the migration file (if at all).
-Grep for `thumbnailPath` in `shared-space-person.table.ts` — should not exist.
-Grep for `thumbnailPath` in `filter-panel.ts` — should not exist (replaced by `thumbnailUrl`).
+- Grep for `SharedSpacePersonThumbnail` — should not appear except in migration file
+- Grep for `thumbnailPath` in `shared-space-person.table.ts` — should not exist
+- Grep for `thumbnailPath` in `filter-panel.ts` — should not exist (replaced by `thumbnailUrl`)
+- Grep for `thumbnailPath` in `small.factory.ts` near `sharedSpacePerson` — should not exist
+
+**Step 8: Commit any fixes**
+
+```bash
+git add -A && git commit -m "chore: lint and format fixes"
+```
