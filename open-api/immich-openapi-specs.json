@@ -20411,7 +20411,6 @@
       "ClassificationCategoryCreateDto": {
         "properties": {
           "action": {
-            "default": "tag",
             "description": "Action on match",
             "enum": [
               "tag",

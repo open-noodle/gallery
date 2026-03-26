@@ -23,7 +23,7 @@ export class ClassificationCategoryCreateDto {
   @IsString()
   @IsIn(['tag', 'tag_and_archive'])
   @IsOptional()
-  @ApiPropertyOptional({ description: 'Action on match', default: 'tag', enum: ['tag', 'tag_and_archive'] })
+  @ApiPropertyOptional({ description: 'Action on match', enum: ['tag', 'tag_and_archive'] })
   action?: string;
 }
 

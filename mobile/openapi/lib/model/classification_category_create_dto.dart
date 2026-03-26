@@ -13,14 +13,14 @@ part of openapi.api;
 class ClassificationCategoryCreateDto {
   /// Returns a new [ClassificationCategoryCreateDto] instance.
   ClassificationCategoryCreateDto({
-    this.action = const ClassificationCategoryCreateDtoActionEnum._('tag'),
+    this.action,
     required this.name,
     this.prompts = const [],
     this.similarity = 0.28,
   });
 
   /// Action on match
-  ClassificationCategoryCreateDtoActionEnum action;
+  ClassificationCategoryCreateDtoActionEnum? action;
 
   /// Category name
   String name;
@@ -44,7 +44,7 @@ class ClassificationCategoryCreateDto {
   @override
   int get hashCode =>
     // ignore: unnecessary_parenthesis
-    (action.hashCode) +
+    (action == null ? 0 : action!.hashCode) +
     (name.hashCode) +
     (prompts.hashCode) +
     (similarity.hashCode);
@@ -54,7 +54,11 @@ class ClassificationCategoryCreateDto {
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
+    if (this.action != null) {
       json[r'action'] = this.action;
+    } else {
+    //  json[r'action'] = null;
+    }
       json[r'name'] = this.name;
       json[r'prompts'] = this.prompts;
       json[r'similarity'] = this.similarity;
@@ -70,7 +74,7 @@ class ClassificationCategoryCreateDto {
       final json = value.cast<String, dynamic>();
 
       return ClassificationCategoryCreateDto(
-        action: ClassificationCategoryCreateDtoActionEnum.fromJson(json[r'action']) ?? ClassificationCategoryCreateDtoActionEnum.tag,
+        action: ClassificationCategoryCreateDtoActionEnum.fromJson(json[r'action']),
         name: mapValueOfType<String>(json, r'name')!,
         prompts: json[r'prompts'] is Iterable
             ? (json[r'prompts'] as Iterable).cast<String>().toList(growable: false)
