@@ -2957,74 +2957,58 @@ describe(SharedSpaceService.name, () => {
       await expect(sut.getSpacePersonThumbnail(factory.auth(), 'space-1', 'person-1')).rejects.toThrow('Not Found');
     });
 
-    it('should throw NotFoundException when person has no thumbnail', async () => {
-      const spaceId = newUuid();
-      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
-      mocks.sharedSpace.getPersonById.mockResolvedValue(
-        factory.sharedSpacePerson({ spaceId, thumbnailPath: '', representativeFaceId: null }),
-      );
-
-      await expect(sut.getSpacePersonThumbnail(factory.auth(), spaceId, 'person-1')).rejects.toThrow('Not Found');
-    });
-
-    it('should fall back to personal person thumbnail when space person has no thumbnail', async () => {
+    it('should serve thumbnail from personal person via JOIN data without fallback chain', async () => {
       const spaceId = newUuid();
       const personId = newUuid();
       const faceId = newUuid();
-      const personalPersonId = newUuid();
-      const personalPerson = factory.person({ id: personalPersonId, thumbnailPath: '/path/to/thumbnail.jpg' });
-
+      const person = factory.sharedSpacePerson({ id: personId, spaceId, thumbnailPath: '', representativeFaceId: faceId });
       mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
-      mocks.sharedSpace.getPersonById.mockResolvedValue(
-        factory.sharedSpacePerson({ id: personId, spaceId, thumbnailPath: '', representativeFaceId: faceId }),
-      );
-      mocks.person.getFaceById.mockResolvedValue({ id: faceId, personId: personalPersonId } as any);
-      mocks.person.getById.mockResolvedValue(personalPerson);
-      mocks.sharedSpace.updatePerson.mockResolvedValue(
-        factory.sharedSpacePerson({ id: personId, thumbnailPath: '/path/to/thumbnail.jpg' }),
-      );
+      mocks.sharedSpace.getPersonById.mockResolvedValue({
+        ...person,
+        personalName: 'Alice',
+        personalThumbnailPath: '/upload/thumbs/person.jpg',
+      });
       vi.spyOn(sut as any, 'serveFromBackend').mockResolvedValue({} as any);
 
-      await expect(sut.getSpacePersonThumbnail(factory.auth(), spaceId, personId)).resolves.toBeDefined();
+      await sut.getSpacePersonThumbnail(factory.auth(), spaceId, personId);
+      expect(mocks.person.getFaceById).not.toHaveBeenCalled();
+      expect(mocks.person.getById).not.toHaveBeenCalled();
+    });
 
-      expect(mocks.sharedSpace.updatePerson).toHaveBeenCalledWith(personId, {
-        thumbnailPath: '/path/to/thumbnail.jpg',
+    it('should throw NotFoundException when personal person has no thumbnail', async () => {
+      const spaceId = newUuid();
+      const personId = newUuid();
+      const faceId = newUuid();
+      const person = factory.sharedSpacePerson({ id: personId, spaceId, thumbnailPath: '', representativeFaceId: faceId });
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
+      mocks.sharedSpace.getPersonById.mockResolvedValue({
+        ...person,
+        personalName: 'Alice',
+        personalThumbnailPath: null,
       });
+
+      await expect(sut.getSpacePersonThumbnail(factory.auth(), spaceId, personId)).rejects.toThrow('Not Found');
     });
 
-    it('should throw NotFoundException when fallback face has no personId', async () => {
+    it('should throw NotFoundException when person has no thumbnail and no personal person', async () => {
       const spaceId = newUuid();
-      const faceId = newUuid();
-
       mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
-      mocks.sharedSpace.getPersonById.mockResolvedValue(
-        factory.sharedSpacePerson({ spaceId, thumbnailPath: '', representativeFaceId: faceId }),
-      );
-      mocks.person.getFaceById.mockResolvedValue({ id: faceId, personId: null } as any);
-
-      await expect(sut.getSpacePersonThumbnail(factory.auth(), spaceId, 'person-1')).rejects.toThrow('Not Found');
-    });
-
-    it('should throw NotFoundException when fallback personal person has no thumbnail', async () => {
-      const spaceId = newUuid();
-      const faceId = newUuid();
-      const personalPersonId = newUuid();
-
-      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
-      mocks.sharedSpace.getPersonById.mockResolvedValue(
-        factory.sharedSpacePerson({ spaceId, thumbnailPath: '', representativeFaceId: faceId }),
-      );
-      mocks.person.getFaceById.mockResolvedValue({ id: faceId, personId: personalPersonId } as any);
-      mocks.person.getById.mockResolvedValue(factory.person({ id: personalPersonId, thumbnailPath: '' }));
+      mocks.sharedSpace.getPersonById.mockResolvedValue({
+        ...factory.sharedSpacePerson({ spaceId, thumbnailPath: '', representativeFaceId: null }),
+        personalName: null,
+        personalThumbnailPath: null,
+      });
 
       await expect(sut.getSpacePersonThumbnail(factory.auth(), spaceId, 'person-1')).rejects.toThrow('Not Found');
     });
 
     it('should throw NotFoundException when person belongs to different space', async () => {
       mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
-      mocks.sharedSpace.getPersonById.mockResolvedValue(
-        factory.sharedSpacePerson({ spaceId: 'other-space', thumbnailPath: '/path/to/thumb.jpg' }),
-      );
+      mocks.sharedSpace.getPersonById.mockResolvedValue({
+        ...factory.sharedSpacePerson({ spaceId: 'other-space', thumbnailPath: '/path/to/thumb.jpg' }),
+        personalName: null,
+        personalThumbnailPath: null,
+      });
 
       await expect(sut.getSpacePersonThumbnail(factory.auth(), 'space-1', 'person-1')).rejects.toThrow('Not Found');
     });
