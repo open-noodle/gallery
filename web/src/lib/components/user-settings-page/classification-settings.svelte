@@ -5,7 +5,7 @@
     createCategory,
     deleteCategory,
     getCategories,
-    scanLibrary,
+    scanClassification,
     updateCategory,
     type ClassificationCategoryResponseDto,
   } from '@immich/sdk';
@@ -148,7 +148,7 @@
   const handleScan = async () => {
     isScanning = true;
     try {
-      await scanLibrary();
+      await scanClassification();
       toastManager.primary('Library scan started');
     } catch (error) {
       handleError(error, 'Unable to start library scan');

@@ -4855,7 +4855,7 @@ export function createCategory({ classificationCategoryCreateDto }: {
 /**
  * Scan library for classification
  */
-export function scanLibrary(opts?: Oazapfts.RequestOpts) {
+export function scanClassification(opts?: Oazapfts.RequestOpts) {
     return oazapfts.ok(oazapfts.fetchText("/classification/categories/scan", {
         ...opts,
         method: "POST"
@@ -5163,7 +5163,7 @@ export function updateLibrary({ id, updateLibraryDto }: {
 /**
  * Scan a library
  */
-export function scanLibrary2({ id }: {
+export function scanLibrary({ id }: {
     id: string;
 }, opts?: Oazapfts.RequestOpts) {
     return oazapfts.ok(oazapfts.fetchText(`/libraries/${encodeURIComponent(id)}/scan`, {

@@ -334,6 +334,12 @@ class ApiClient {
           return CheckExistingAssetsDto.fromJson(value);
         case 'CheckExistingAssetsResponseDto':
           return CheckExistingAssetsResponseDto.fromJson(value);
+        case 'ClassificationCategoryCreateDto':
+          return ClassificationCategoryCreateDto.fromJson(value);
+        case 'ClassificationCategoryResponseDto':
+          return ClassificationCategoryResponseDto.fromJson(value);
+        case 'ClassificationCategoryUpdateDto':
+          return ClassificationCategoryUpdateDto.fromJson(value);
         case 'Colorspace':
           return ColorspaceTypeTransformer().decode(value);
         case 'ContributorCountResponseDto':
@@ -868,8 +874,6 @@ class ApiClient {
           return TranscodePolicyTypeTransformer().decode(value);
         case 'TrashResponseDto':
           return TrashResponseDto.fromJson(value);
-        case 'TrimParameters':
-          return TrimParameters.fromJson(value);
         case 'UpdateAlbumDto':
           return UpdateAlbumDto.fromJson(value);
         case 'UpdateAlbumUserDto':

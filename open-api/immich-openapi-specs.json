@@ -5155,7 +5155,7 @@
     },
     "/classification/categories/scan": {
       "post": {
-        "operationId": "scanLibrary",
+        "operationId": "scanClassification",
         "parameters": [],
         "responses": {
           "204": {

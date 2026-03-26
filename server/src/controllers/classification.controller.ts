@@ -72,7 +72,7 @@ export class ClassificationController {
     summary: 'Scan library for classification',
     history: new HistoryBuilder().added('v1'),
   })
-  scanLibrary(@Auth() auth: AuthDto): Promise<void> {
+  scanClassification(@Auth() auth: AuthDto): Promise<void> {
     return this.service.scanLibrary(auth);
   }
 }
