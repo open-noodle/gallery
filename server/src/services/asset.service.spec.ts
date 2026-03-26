@@ -1847,7 +1847,7 @@ describe(AssetService.name, () => {
         {
           id: newUuid(),
           action: AssetEditAction.Trim,
-          parameters: { startTime: 5, endTime: 25, originalDuration: 30 },
+          parameters: { startTime: 5, endTime: 25, originalDuration: 30 } as any,
         },
       ]);
       mocks.assetEdit.replaceAll.mockResolvedValue([]);
