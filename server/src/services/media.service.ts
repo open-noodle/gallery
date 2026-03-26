@@ -309,11 +309,18 @@ export class MediaService extends BaseService {
       return JobStatus.Failed;
     }
 
-    // Re-probe for actual duration
+    // Re-probe for actual duration and update asset
     const probeResult = await this.mediaRepository.probe(outputPath);
-    if (probeResult.format.duration) {
-      const newDuration = formatSecondsToDuration(probeResult.format.duration);
+    const probedDuration = probeResult.format.duration;
+    if (probedDuration && probedDuration > 0) {
+      const newDuration = formatSecondsToDuration(probedDuration);
+      this.logger.debug(`Trim: updating duration from probe: ${newDuration} (${probedDuration}s)`);
       await this.assetRepository.update({ id: asset.id, duration: newDuration });
+    } else {
+      // Probe didn't return duration — use calculated duration from trim parameters
+      const calculatedDuration = formatSecondsToDuration(params.endTime - params.startTime);
+      this.logger.debug(`Trim: probe duration unavailable, using calculated: ${calculatedDuration}`);
+      await this.assetRepository.update({ id: asset.id, duration: calculatedDuration });
     }
 
     // Extract a frame at ~10% into the trimmed video for thumbnail generation
