@@ -1827,6 +1827,7 @@ describe(AssetService.name, () => {
       const asset = AssetFactory.create();
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
       mocks.asset.getById.mockResolvedValue(asset as any);
+      mocks.assetEdit.getAll.mockResolvedValue([]);
       mocks.assetEdit.replaceAll.mockResolvedValue([]);
 
       await sut.removeAssetEdits(authStub.admin, asset.id);
@@ -1836,6 +1837,62 @@ describe(AssetService.name, () => {
         name: JobName.AssetEditThumbnailGeneration,
         data: { id: asset.id },
       });
+    });
+
+    it('should restore original duration when removing trim edits', async () => {
+      const asset = AssetFactory.create({ type: AssetType.Video });
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getById.mockResolvedValue(asset as any);
+      mocks.assetEdit.getAll.mockResolvedValue([
+        {
+          id: newUuid(),
+          action: AssetEditAction.Trim,
+          parameters: { startTime: 5, endTime: 25, originalDuration: 30 },
+        },
+      ]);
+      mocks.assetEdit.replaceAll.mockResolvedValue([]);
+
+      await sut.removeAssetEdits(authStub.admin, asset.id);
+
+      expect(mocks.asset.update).toHaveBeenCalledWith({
+        id: asset.id,
+        duration: expect.any(String),
+      });
+      expect(mocks.assetEdit.replaceAll).toHaveBeenCalledWith(asset.id, []);
+    });
+
+    it('should handle missing originalDuration gracefully on undo', async () => {
+      const asset = AssetFactory.create({ type: AssetType.Video });
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getById.mockResolvedValue(asset as any);
+      mocks.assetEdit.getAll.mockResolvedValue([
+        {
+          id: newUuid(),
+          action: AssetEditAction.Trim,
+          parameters: { startTime: 5, endTime: 25 },
+        },
+      ]);
+      mocks.assetEdit.replaceAll.mockResolvedValue([]);
+
+      await sut.removeAssetEdits(authStub.admin, asset.id);
+
+      // Should not crash, should not update duration
+      expect(mocks.asset.update).not.toHaveBeenCalled();
+      expect(mocks.assetEdit.replaceAll).toHaveBeenCalledWith(asset.id, []);
+    });
+
+    it('should not update duration when removing non-trim edits', async () => {
+      const asset = AssetFactory.create();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getById.mockResolvedValue(asset as any);
+      mocks.assetEdit.getAll.mockResolvedValue([
+        { id: newUuid(), action: AssetEditAction.Rotate, parameters: { angle: 90 } },
+      ]);
+      mocks.assetEdit.replaceAll.mockResolvedValue([]);
+
+      await sut.removeAssetEdits(authStub.admin, asset.id);
+
+      expect(mocks.asset.update).not.toHaveBeenCalled();
     });
   });
 });

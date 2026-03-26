@@ -54,7 +54,7 @@ import {
 } from 'src/utils/asset.util';
 import { updateLockedColumns } from 'src/utils/database';
 import { extractTimeZone } from 'src/utils/date';
-import { parseDurationToSeconds } from 'src/utils/duration';
+import { formatSecondsToDuration, parseDurationToSeconds } from 'src/utils/duration';
 import { transformOcrBoundingBox } from 'src/utils/transform';
 
 @Injectable()
@@ -686,6 +686,17 @@ export class AssetService extends BaseService {
     const asset = await this.assetRepository.getById(id);
     if (!asset) {
       throw new BadRequestException('Asset not found');
+    }
+
+    // Read existing edits to check for trim (need originalDuration for restore)
+    const existingEdits = await this.assetEditRepository.getAll(id);
+    const trimEdit = existingEdits.find((e) => e.action === AssetEditAction.Trim);
+    if (trimEdit) {
+      const params = trimEdit.parameters as TrimParameters & { originalDuration?: number };
+      if (params.originalDuration) {
+        const restoredDuration = formatSecondsToDuration(params.originalDuration);
+        await this.assetRepository.update({ id, duration: restoredDuration });
+      }
     }
 
     await this.assetEditRepository.replaceAll(id, []);
