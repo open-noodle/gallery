@@ -4426,6 +4426,47 @@ describe(SharedSpaceService.name, () => {
       );
     });
 
+    it('should pass city and country to repository', async () => {
+      const auth = factory.auth();
+      mocks.sharedSpace.getFilteredMapMarkers.mockResolvedValue([]);
+
+      await sut.getFilteredMapMarkers(auth, { city: 'Paris', country: 'France' });
+
+      expect(mocks.sharedSpace.getFilteredMapMarkers).toHaveBeenCalledWith(
+        expect.objectContaining({
+          city: 'Paris',
+          country: 'France',
+        }),
+      );
+    });
+
+    it('should pass all filters together to repository', async () => {
+      const auth = factory.auth();
+      mocks.sharedSpace.getFilteredMapMarkers.mockResolvedValue([]);
+
+      await sut.getFilteredMapMarkers(auth, {
+        personIds: ['person-1'],
+        tagIds: ['tag-1'],
+        city: 'Paris',
+        country: 'France',
+        rating: 4,
+        make: 'Canon',
+      });
+
+      expect(mocks.sharedSpace.getFilteredMapMarkers).toHaveBeenCalledWith(
+        expect.objectContaining({
+          personIds: ['person-1'],
+          tagIds: ['tag-1'],
+          city: 'Paris',
+          country: 'France',
+          rating: 4,
+          make: 'Canon',
+          personMatchAny: true,
+          tagMatchAny: true,
+        }),
+      );
+    });
+
     it('should map undefined city/state/country to null', async () => {
       const auth = factory.auth();
 
