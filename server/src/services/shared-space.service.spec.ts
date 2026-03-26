@@ -2539,12 +2539,13 @@ describe(SharedSpaceService.name, () => {
         id: personId,
         spaceId,
         name: 'Alice',
-        thumbnailPath: '/path/to/thumb.jpg',
       });
 
       mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
       mocks.sharedSpace.getById.mockResolvedValue(space);
-      mocks.sharedSpace.getPersonsBySpaceId.mockResolvedValue([person]);
+      mocks.sharedSpace.getPersonsBySpaceId.mockResolvedValue([
+        { ...person, personalName: 'Alice', personalThumbnailPath: '/path/to/thumb.jpg' },
+      ]);
       mocks.sharedSpace.getPersonFaceCount.mockResolvedValue(5);
       mocks.sharedSpace.getPersonAssetCount.mockResolvedValue(3);
       mocks.sharedSpace.getAliasesBySpaceAndUser.mockResolvedValue([
@@ -2569,25 +2570,26 @@ describe(SharedSpaceService.name, () => {
         id: newUuid(),
         spaceId,
         name: 'Few Photos',
-        thumbnailPath: '/path/to/thumb.jpg',
       });
       const person2 = factory.sharedSpacePerson({
         id: newUuid(),
         spaceId,
         name: 'Many Photos',
-        thumbnailPath: '/path/to/thumb.jpg',
       });
       const person3 = factory.sharedSpacePerson({
         id: newUuid(),
         spaceId,
         name: 'Some Photos',
-        thumbnailPath: '/path/to/thumb.jpg',
       });
       const space = factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true });
 
       mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
       mocks.sharedSpace.getById.mockResolvedValue(space);
-      mocks.sharedSpace.getPersonsBySpaceId.mockResolvedValue([person1, person2, person3]);
+      mocks.sharedSpace.getPersonsBySpaceId.mockResolvedValue([
+        { ...person1, personalName: 'Few Photos', personalThumbnailPath: '/path/to/thumb.jpg' },
+        { ...person2, personalName: 'Many Photos', personalThumbnailPath: '/path/to/thumb.jpg' },
+        { ...person3, personalName: 'Some Photos', personalThumbnailPath: '/path/to/thumb.jpg' },
+      ]);
       mocks.sharedSpace.getPersonFaceCount.mockResolvedValue(1);
       mocks.sharedSpace.getPersonAssetCount
         .mockResolvedValueOnce(2) // person1: Few Photos
@@ -2614,18 +2616,19 @@ describe(SharedSpaceService.name, () => {
         id: newUuid(),
         spaceId,
         name: 'Has Thumb',
-        thumbnailPath: '/path/to/thumb.jpg',
       });
       const personWithoutThumb = factory.sharedSpacePerson({
         id: newUuid(),
         spaceId,
         name: 'No Thumb',
-        thumbnailPath: '',
       });
 
       mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
       mocks.sharedSpace.getById.mockResolvedValue(space);
-      mocks.sharedSpace.getPersonsBySpaceId.mockResolvedValue([personWithThumb, personWithoutThumb]);
+      mocks.sharedSpace.getPersonsBySpaceId.mockResolvedValue([
+        { ...personWithThumb, personalName: 'Has Thumb', personalThumbnailPath: '/path/to/thumb.jpg' },
+        { ...personWithoutThumb, personalName: 'No Thumb', personalThumbnailPath: '' },
+      ]);
       mocks.sharedSpace.getPersonFaceCount.mockResolvedValue(1);
       mocks.sharedSpace.getPersonAssetCount.mockResolvedValue(1);
       mocks.sharedSpace.getAliasesBySpaceAndUser.mockResolvedValue([]);
@@ -2639,12 +2642,15 @@ describe(SharedSpaceService.name, () => {
     it('should filter out pets when petsEnabled is false', async () => {
       const spaceId = newUuid();
       const space = factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true, petsEnabled: false });
-      const humanPerson = factory.sharedSpacePerson({ spaceId, thumbnailPath: '/thumb.jpg', type: 'person' });
-      const petPerson = factory.sharedSpacePerson({ spaceId, thumbnailPath: '/pet.jpg', type: 'pet' });
+      const humanPerson = factory.sharedSpacePerson({ spaceId, type: 'person' });
+      const petPerson = factory.sharedSpacePerson({ spaceId, type: 'pet' });
 
       mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
       mocks.sharedSpace.getById.mockResolvedValue(space);
-      mocks.sharedSpace.getPersonsBySpaceId.mockResolvedValue([humanPerson, petPerson]);
+      mocks.sharedSpace.getPersonsBySpaceId.mockResolvedValue([
+        { ...humanPerson, personalName: 'Human', personalThumbnailPath: '/thumb.jpg' },
+        { ...petPerson, personalName: 'Pet', personalThumbnailPath: '/pet.jpg' },
+      ]);
       mocks.sharedSpace.getAliasesBySpaceAndUser.mockResolvedValue([]);
       mocks.sharedSpace.getPersonFaceCount.mockResolvedValue(1);
       mocks.sharedSpace.getPersonAssetCount.mockResolvedValue(1);
@@ -2658,12 +2664,15 @@ describe(SharedSpaceService.name, () => {
     it('should include pets when petsEnabled is true', async () => {
       const spaceId = newUuid();
       const space = factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true, petsEnabled: true });
-      const humanPerson = factory.sharedSpacePerson({ spaceId, thumbnailPath: '/thumb.jpg', type: 'person' });
-      const petPerson = factory.sharedSpacePerson({ spaceId, thumbnailPath: '/pet.jpg', type: 'pet' });
+      const humanPerson = factory.sharedSpacePerson({ spaceId, type: 'person' });
+      const petPerson = factory.sharedSpacePerson({ spaceId, type: 'pet' });
 
       mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
       mocks.sharedSpace.getById.mockResolvedValue(space);
-      mocks.sharedSpace.getPersonsBySpaceId.mockResolvedValue([humanPerson, petPerson]);
+      mocks.sharedSpace.getPersonsBySpaceId.mockResolvedValue([
+        { ...humanPerson, personalName: 'Human', personalThumbnailPath: '/thumb.jpg' },
+        { ...petPerson, personalName: 'Pet', personalThumbnailPath: '/pet.jpg' },
+      ]);
       mocks.sharedSpace.getAliasesBySpaceAndUser.mockResolvedValue([]);
       mocks.sharedSpace.getPersonFaceCount.mockResolvedValue(1);
       mocks.sharedSpace.getPersonAssetCount.mockResolvedValue(1);
@@ -2682,14 +2691,15 @@ describe(SharedSpaceService.name, () => {
         id: newUuid(),
         spaceId,
         name: 'Temporal Person',
-        thumbnailPath: '/path/to/thumb.jpg',
       });
       const takenAfter = new Date('2025-01-01');
       const takenBefore = new Date('2025-12-31');
 
       mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
       mocks.sharedSpace.getById.mockResolvedValue(space);
-      mocks.sharedSpace.getPersonsBySpaceIdWithTemporalFilter.mockResolvedValue([person]);
+      mocks.sharedSpace.getPersonsBySpaceIdWithTemporalFilter.mockResolvedValue([
+        { ...person, personalName: 'Temporal Person', personalThumbnailPath: '/path/to/thumb.jpg' },
+      ]);
       mocks.sharedSpace.getPersonFaceCount.mockResolvedValue(3);
       mocks.sharedSpace.getPersonAssetCount.mockResolvedValue(2);
       mocks.sharedSpace.getAliasesBySpaceAndUser.mockResolvedValue([]);
@@ -2713,12 +2723,13 @@ describe(SharedSpaceService.name, () => {
         id: newUuid(),
         spaceId,
         name: 'All People',
-        thumbnailPath: '/path/to/thumb.jpg',
       });
 
       mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
       mocks.sharedSpace.getById.mockResolvedValue(space);
-      mocks.sharedSpace.getPersonsBySpaceId.mockResolvedValue([person]);
+      mocks.sharedSpace.getPersonsBySpaceId.mockResolvedValue([
+        { ...person, personalName: 'All People', personalThumbnailPath: '/path/to/thumb.jpg' },
+      ]);
       mocks.sharedSpace.getPersonFaceCount.mockResolvedValue(1);
       mocks.sharedSpace.getPersonAssetCount.mockResolvedValue(1);
       mocks.sharedSpace.getAliasesBySpaceAndUser.mockResolvedValue([]);
@@ -2738,7 +2749,6 @@ describe(SharedSpaceService.name, () => {
         id: newUuid(),
         spaceId,
         name: 'In Range',
-        thumbnailPath: '/path/to/thumb.jpg',
       });
       // The temporal filter query naturally excludes persons with zero faces in range,
       // so only personInRange is returned by the repository
@@ -2746,7 +2756,9 @@ describe(SharedSpaceService.name, () => {
 
       mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
       mocks.sharedSpace.getById.mockResolvedValue(space);
-      mocks.sharedSpace.getPersonsBySpaceIdWithTemporalFilter.mockResolvedValue([personInRange]);
+      mocks.sharedSpace.getPersonsBySpaceIdWithTemporalFilter.mockResolvedValue([
+        { ...personInRange, personalName: 'In Range', personalThumbnailPath: '/path/to/thumb.jpg' },
+      ]);
       mocks.sharedSpace.getPersonFaceCount.mockResolvedValue(1);
       mocks.sharedSpace.getPersonAssetCount.mockResolvedValue(1);
       mocks.sharedSpace.getAliasesBySpaceAndUser.mockResolvedValue([]);
@@ -2756,6 +2768,120 @@ describe(SharedSpaceService.name, () => {
       expect(result).toHaveLength(1);
       expect(result[0].name).toBe('In Range');
       expect(mocks.sharedSpace.getPersonsBySpaceIdWithTemporalFilter).toHaveBeenCalledWith(spaceId, { takenAfter });
+    });
+
+    it('should resolve name from personal person when space person has no name override', async () => {
+      const auth = factory.auth();
+      const spaceId = newUuid();
+      const personId = newUuid();
+      const faceId = newUuid();
+      const person = factory.sharedSpacePerson({
+        id: personId,
+        name: '',
+        thumbnailPath: '',
+        representativeFaceId: faceId,
+      });
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
+      mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ faceRecognitionEnabled: true }));
+      mocks.sharedSpace.getPersonsBySpaceId.mockResolvedValue([
+        { ...person, personalName: 'Alice', personalThumbnailPath: '/path/to/thumb.jpg' },
+      ]);
+      mocks.sharedSpace.getAliasesBySpaceAndUser.mockResolvedValue([]);
+      mocks.sharedSpace.getPersonFaceCount.mockResolvedValue(3);
+      mocks.sharedSpace.getPersonAssetCount.mockResolvedValue(2);
+      const result = await sut.getSpacePeople(auth, spaceId);
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('Alice');
+      expect(result[0].thumbnailPath).toBe('/path/to/thumb.jpg');
+    });
+
+    it('should use space person name as override when set', async () => {
+      const auth = factory.auth();
+      const spaceId = newUuid();
+      const personId = newUuid();
+      const faceId = newUuid();
+      const person = factory.sharedSpacePerson({
+        id: personId,
+        name: 'Grandpa',
+        thumbnailPath: '/path/to/thumb.jpg',
+        representativeFaceId: faceId,
+      });
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
+      mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ faceRecognitionEnabled: true }));
+      mocks.sharedSpace.getPersonsBySpaceId.mockResolvedValue([
+        { ...person, personalName: 'Hans', personalThumbnailPath: '/path/to/thumb.jpg' },
+      ]);
+      mocks.sharedSpace.getAliasesBySpaceAndUser.mockResolvedValue([]);
+      mocks.sharedSpace.getPersonFaceCount.mockResolvedValue(3);
+      mocks.sharedSpace.getPersonAssetCount.mockResolvedValue(2);
+      const result = await sut.getSpacePeople(auth, spaceId);
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('Grandpa');
+    });
+
+    it('should exclude persons with no thumbnail from personal person', async () => {
+      const auth = factory.auth();
+      const spaceId = newUuid();
+      const personId = newUuid();
+      const faceId = newUuid();
+      const person = factory.sharedSpacePerson({
+        id: personId,
+        name: '',
+        thumbnailPath: '',
+        representativeFaceId: faceId,
+      });
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
+      mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ faceRecognitionEnabled: true }));
+      mocks.sharedSpace.getPersonsBySpaceId.mockResolvedValue([
+        { ...person, personalName: 'Alice', personalThumbnailPath: '' },
+      ]);
+      mocks.sharedSpace.getAliasesBySpaceAndUser.mockResolvedValue([]);
+      const result = await sut.getSpacePeople(auth, spaceId);
+      expect(result).toHaveLength(0);
+    });
+
+    it('should exclude persons with null personal thumbnail (no linked personal person)', async () => {
+      const auth = factory.auth();
+      const spaceId = newUuid();
+      const personId = newUuid();
+      const person = factory.sharedSpacePerson({
+        id: personId,
+        name: '',
+        thumbnailPath: '',
+        representativeFaceId: null,
+      });
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
+      mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ faceRecognitionEnabled: true }));
+      mocks.sharedSpace.getPersonsBySpaceId.mockResolvedValue([
+        { ...person, personalName: null, personalThumbnailPath: null },
+      ]);
+      mocks.sharedSpace.getAliasesBySpaceAndUser.mockResolvedValue([]);
+      const result = await sut.getSpacePeople(auth, spaceId);
+      expect(result).toHaveLength(0);
+    });
+
+    it('should use space person name override even when personal person has no name', async () => {
+      const auth = factory.auth();
+      const spaceId = newUuid();
+      const personId = newUuid();
+      const faceId = newUuid();
+      const person = factory.sharedSpacePerson({
+        id: personId,
+        name: 'Custom Name',
+        thumbnailPath: '',
+        representativeFaceId: faceId,
+      });
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
+      mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ faceRecognitionEnabled: true }));
+      mocks.sharedSpace.getPersonsBySpaceId.mockResolvedValue([
+        { ...person, personalName: '', personalThumbnailPath: '/path/to/thumb.jpg' },
+      ]);
+      mocks.sharedSpace.getAliasesBySpaceAndUser.mockResolvedValue([]);
+      mocks.sharedSpace.getPersonFaceCount.mockResolvedValue(1);
+      mocks.sharedSpace.getPersonAssetCount.mockResolvedValue(1);
+      const result = await sut.getSpacePeople(auth, spaceId);
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('Custom Name');
     });
   });
 

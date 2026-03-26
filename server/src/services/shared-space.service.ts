@@ -578,7 +578,7 @@ export class SharedSpaceService extends BaseService {
       if (!space.petsEnabled && person.type === 'pet') {
         continue;
       }
-      if (!person.thumbnailPath) {
+      if (!person.personalThumbnailPath) {
         continue;
       }
       const faceCount = await this.sharedSpaceRepository.getPersonFaceCount(person.id);
@@ -1084,7 +1084,7 @@ export class SharedSpaceService extends BaseService {
   }
 
   private mapSpacePerson(
-    person: SharedSpacePerson,
+    person: SharedSpacePerson & { personalName?: string | null; personalThumbnailPath?: string | null },
     faceCount: number,
     assetCount: number,
     alias: string | null,
@@ -1092,8 +1092,8 @@ export class SharedSpaceService extends BaseService {
     return {
       id: person.id,
       spaceId: person.spaceId,
-      name: person.name,
-      thumbnailPath: person.thumbnailPath,
+      name: person.name || person.personalName || '',
+      thumbnailPath: person.personalThumbnailPath || person.thumbnailPath || '',
       isHidden: person.isHidden,
       birthDate: person.birthDate,
       representativeFaceId: person.representativeFaceId,
