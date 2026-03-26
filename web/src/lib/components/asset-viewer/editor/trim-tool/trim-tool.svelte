@@ -1,6 +1,5 @@
 <script lang="ts">
   import { trimManager } from '$lib/managers/edit/trim-manager.svelte';
-  import { t } from 'svelte-i18n';
 
   function formatTime(seconds: number): string {
     if (seconds < 0) {
@@ -71,7 +70,7 @@
   <!-- Trimmed Duration -->
   <div class="flex flex-col gap-1">
     <span class="text-[0.65rem] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-semibold">
-      {$t('trimmed_duration', { default: 'Trimmed Duration' })}
+      Trimmed Duration
     </span>
     <span class="text-2xl font-bold text-immich-fg dark:text-immich-dark-fg tabular-nums tracking-tight">
       {formatTime(trimManager.trimmedDuration)}
@@ -83,7 +82,7 @@
     <div class="flex gap-2">
       <div class="flex-1 flex flex-col gap-1">
         <label for="trim-in" class="text-[0.6rem] uppercase tracking-wide text-gray-500 dark:text-gray-400 font-medium">
-          {$t('in', { default: 'In' })}
+          In
         </label>
         <input
           id="trim-in"
@@ -100,7 +99,7 @@
           for="trim-out"
           class="text-[0.6rem] uppercase tracking-wide text-gray-500 dark:text-gray-400 font-medium"
         >
-          {$t('out', { default: 'Out' })}
+          Out
         </label>
         <input
           id="trim-out"
@@ -121,7 +120,7 @@
         class="flex-1 flex items-center justify-center gap-1 bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs font-medium text-gray-400 hover:bg-gray-700 hover:text-gray-300 hover:border-gray-600 transition-all cursor-pointer"
         onclick={setIn}
       >
-        {$t('set_in', { default: 'Set In' })}
+        Set In
         <kbd class="text-[0.6rem] bg-gray-700 rounded px-1 text-gray-500">I</kbd>
       </button>
       <button
@@ -129,7 +128,7 @@
         class="flex-1 flex items-center justify-center gap-1 bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs font-medium text-gray-400 hover:bg-gray-700 hover:text-gray-300 hover:border-gray-600 transition-all cursor-pointer"
         onclick={setOut}
       >
-        {$t('set_out', { default: 'Set Out' })}
+        Set Out
         <kbd class="text-[0.6rem] bg-gray-700 rounded px-1 text-gray-500">O</kbd>
       </button>
     </div>
@@ -140,7 +139,7 @@
   <!-- Original Duration -->
   <div class="flex flex-col gap-1">
     <span class="text-[0.65rem] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-semibold">
-      {$t('original', { default: 'Original' })}
+      Original
     </span>
     <span class="text-sm text-gray-500 tabular-nums">
       {formatTime(trimManager.duration)}
@@ -154,7 +153,7 @@
       class="text-xs text-gray-500 hover:text-gray-300 transition-colors cursor-pointer self-start"
       onclick={() => trimManager.resetAllChanges()}
     >
-      {$t('reset_to_full_duration', { default: 'Reset to full duration' })}
+      Reset to full duration
     </button>
   {/if}
 </div>
