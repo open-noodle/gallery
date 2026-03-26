@@ -70,7 +70,7 @@ class ClassificationCategoryCreateDto {
       final json = value.cast<String, dynamic>();
 
       return ClassificationCategoryCreateDto(
-        action: ClassificationCategoryCreateDtoActionEnum.fromJson(json[r'action']) ?? 'tag',
+        action: ClassificationCategoryCreateDtoActionEnum.fromJson(json[r'action']) ?? ClassificationCategoryCreateDtoActionEnum.tag,
         name: mapValueOfType<String>(json, r'name')!,
         prompts: json[r'prompts'] is Iterable
             ? (json[r'prompts'] as Iterable).cast<String>().toList(growable: false)
