@@ -348,9 +348,12 @@ export class MediaService extends BaseService {
       newFiles,
     );
 
-    if (thumbnailResult.thumbhash && (!asset.thumbhash || Buffer.compare(asset.thumbhash, thumbnailResult.thumbhash) !== 0)) {
-        await this.assetRepository.update({ id: asset.id, thumbhash: thumbnailResult.thumbhash });
-      }
+    if (
+      thumbnailResult.thumbhash &&
+      (!asset.thumbhash || Buffer.compare(asset.thumbhash, thumbnailResult.thumbhash) !== 0)
+    ) {
+      await this.assetRepository.update({ id: asset.id, thumbhash: thumbnailResult.thumbhash });
+    }
 
     return JobStatus.Success;
   }

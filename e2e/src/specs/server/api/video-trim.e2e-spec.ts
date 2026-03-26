@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import { Socket } from 'socket.io-client';
 import { createUserDto } from 'src/fixtures';
 import { errorDto } from 'src/responses';
-import { app, asBearerAuth, utils } from 'src/utils';
+import { app, utils } from 'src/utils';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
