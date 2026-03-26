@@ -170,7 +170,7 @@
           takenAfter: context?.takenAfter,
           takenBefore: context?.takenBefore,
         });
-        const named = people.filter((p) => p.name);
+        const named = people.filter((p) => !p.isHidden && p.name);
         for (const p of named) {
           personNames.set(p.id, p.name);
         }

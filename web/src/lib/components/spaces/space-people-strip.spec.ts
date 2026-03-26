@@ -67,6 +67,18 @@ describe('SpacePeopleStrip', () => {
     expect(screen.queryByTestId('people-strip')).not.toBeInTheDocument();
   });
 
+  it('should exclude hidden people', () => {
+    const people = [
+      makePerson({ id: 'p1', name: 'Alice', isHidden: false }),
+      makePerson({ id: 'p2', name: 'Bob', isHidden: true }),
+      makePerson({ id: 'p3', name: 'Carol', isHidden: false }),
+    ];
+    render(SpacePeopleStrip, { people, spaceId: 'space-1' });
+    expect(screen.getByTestId('person-thumb-p1')).toBeInTheDocument();
+    expect(screen.queryByTestId('person-thumb-p2')).not.toBeInTheDocument();
+    expect(screen.getByTestId('person-thumb-p3')).toBeInTheDocument();
+  });
+
   it('should keep people with alias even if name is empty', () => {
     const people = [makePerson({ id: 'p1', name: '', alias: 'Mom' })];
     render(SpacePeopleStrip, { people, spaceId: 'space-1' });

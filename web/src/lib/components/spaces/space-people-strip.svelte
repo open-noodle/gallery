@@ -14,7 +14,7 @@
 
   let { people, spaceId, selectedPersonIds = [], onPersonClick }: Props = $props();
 
-  const namedPeople = $derived(people.filter((p) => p.alias || p.name));
+  const namedPeople = $derived(people.filter((p) => !p.isHidden && (p.alias || p.name)));
 
   const SEE_ALL_THRESHOLD = 6;
 

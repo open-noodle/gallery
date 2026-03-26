@@ -90,6 +90,19 @@ describe('buildMapFilterConfig', () => {
       expect(people.map((p) => p.name)).toEqual(['Alice', 'Bob']);
     });
 
+    it('should exclude hidden people in space config', async () => {
+      vi.mocked(getSpacePeople).mockResolvedValue([
+        { id: '1', name: 'Alice', isHidden: false },
+        { id: '2', name: 'Bob', isHidden: true },
+      ] as any);
+
+      const config = buildMapFilterConfig('space-123');
+      const people = await config.providers.people!();
+
+      expect(people).toHaveLength(1);
+      expect(people[0].name).toBe('Alice');
+    });
+
     it('should map thumbnailUrl correctly in space config', async () => {
       vi.mocked(getSpacePeople).mockResolvedValue([
         { id: '1', name: 'Alice', thumbnailPath: '/thumb/1', updatedAt: '2025-01-01' },

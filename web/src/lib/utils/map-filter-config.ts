@@ -16,7 +16,7 @@ export function buildMapFilterConfig(spaceId?: string): FilterPanelConfig {
             ...(context?.takenBefore && { takenBefore: context.takenBefore }),
           }).then((people) =>
             people
-              .filter((p) => p.name)
+              .filter((p) => !p.isHidden && p.name)
               .map((p) => ({
                 id: p.id,
                 name: p.name,
