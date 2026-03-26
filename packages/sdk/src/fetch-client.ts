@@ -1717,6 +1717,20 @@ export type FaceDto = {
     /** Face ID */
     id: string;
 };
+export type MapMarkerResponseDto = {
+    /** City name */
+    city: string | null;
+    /** Country name */
+    country: string | null;
+    /** Asset ID */
+    id: string;
+    /** Latitude */
+    lat: number;
+    /** Longitude */
+    lon: number;
+    /** State/Province name */
+    state: string | null;
+};
 export type QueueStatisticsDto = {
     /** Number of active jobs */
     active: number;
@@ -5464,6 +5478,39 @@ export function reassignFacesById({ id, faceDto }: {
         method: "PUT",
         body: faceDto
     })));
+}
+/**
+ * Get filtered map markers
+ */
+export function getFilteredMapMarkers({ isFavorite, make, model, personIds, rating, spaceId, tagIds, takenAfter, takenBefore, $type }: {
+    isFavorite?: boolean;
+    make?: string;
+    model?: string;
+    personIds?: string[];
+    rating?: number;
+    spaceId?: string;
+    tagIds?: string[];
+    takenAfter?: string;
+    takenBefore?: string;
+    $type?: "IMAGE" | "VIDEO";
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: MapMarkerResponseDto[];
+    }>(`/gallery/map/markers${QS.query(QS.explode({
+        isFavorite,
+        make,
+        model,
+        personIds,
+        rating,
+        spaceId,
+        tagIds,
+        takenAfter,
+        takenBefore,
+        "type": $type
+    }))}`, {
+        ...opts
+    }));
 }
 /**
  * Retrieve queue counts and status

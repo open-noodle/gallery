@@ -15,6 +15,7 @@ import { DatabaseBackupController } from 'src/controllers/database-backup.contro
 import { DownloadController } from 'src/controllers/download.controller';
 import { DuplicateController } from 'src/controllers/duplicate.controller';
 import { FaceController } from 'src/controllers/face.controller';
+import { GalleryMapController } from 'src/controllers/gallery-map.controller';
 import { IntegrityAdminController } from 'src/controllers/integrity-admin.controller';
 import { JobController } from 'src/controllers/job.controller';
 import { LibraryController } from 'src/controllers/library.controller';
@@ -66,6 +67,7 @@ export const controllers = [
   DownloadController,
   DuplicateController,
   FaceController,
+  GalleryMapController,
   IntegrityAdminController,
   JobController,
   LibraryController,
