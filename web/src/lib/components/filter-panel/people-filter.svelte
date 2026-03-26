@@ -139,7 +139,22 @@
 
         <!-- Avatar -->
         {#if person.thumbnailUrl}
-          <img src={person.thumbnailUrl} alt={person.name} class="h-5 w-5 flex-shrink-0 rounded-full object-cover" />
+          <img
+            src={person.thumbnailUrl}
+            alt={person.name}
+            class="h-5 w-5 flex-shrink-0 rounded-full object-cover"
+            onerror={(e) => {
+              const img = e.currentTarget as HTMLImageElement;
+              img.style.display = 'none';
+              img.nextElementSibling?.removeAttribute('style');
+            }}
+          />
+          <div
+            class="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full text-[9px] font-semibold text-white"
+            style="display: none; background: {getAvatarGradient(person.name)}"
+          >
+            {getInitial(person.name)}
+          </div>
         {:else}
           <div
             class="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full text-[9px] font-semibold text-white"
