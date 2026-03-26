@@ -160,6 +160,7 @@
     aria-valuemax={Math.round(trimManager.duration)}
     bind:this={trackElement}
     onclick={onTrackClick}
+    onkeydown={handleKeydown}
   >
     <!-- Dimmed left region -->
     <div class="absolute top-0 left-0 h-full rounded-l-md bg-black/70 z-[2]" style:width={startPctStyle}></div>
