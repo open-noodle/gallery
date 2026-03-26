@@ -4390,6 +4390,42 @@ describe(SharedSpaceService.name, () => {
       await expect(sut.getFilteredMapMarkers(auth, { spaceId })).rejects.toThrow();
     });
 
+    it('should pass personMatchAny and tagMatchAny flags to repository', async () => {
+      const auth = factory.auth();
+      mocks.sharedSpace.getFilteredMapMarkers.mockResolvedValue([]);
+
+      await sut.getFilteredMapMarkers(auth, {
+        personIds: ['person-1'],
+        tagIds: ['tag-1'],
+      });
+
+      expect(mocks.sharedSpace.getFilteredMapMarkers).toHaveBeenCalledWith(
+        expect.objectContaining({
+          personIds: ['person-1'],
+          tagIds: ['tag-1'],
+          personMatchAny: true,
+          tagMatchAny: true,
+        }),
+      );
+    });
+
+    it('should pass personMatchAny for space person IDs', async () => {
+      const auth = factory.auth();
+      const spaceId = newUuid();
+      mocks.access.sharedSpace.checkMemberAccess.mockResolvedValue(new Set([spaceId]));
+      mocks.sharedSpace.getFilteredMapMarkers.mockResolvedValue([]);
+
+      await sut.getFilteredMapMarkers(auth, { spaceId, personIds: ['person-1'] });
+
+      expect(mocks.sharedSpace.getFilteredMapMarkers).toHaveBeenCalledWith(
+        expect.objectContaining({
+          spacePersonIds: ['person-1'],
+          personMatchAny: true,
+          tagMatchAny: true,
+        }),
+      );
+    });
+
     it('should map undefined city/state/country to null', async () => {
       const auth = factory.auth();
 

@@ -577,6 +577,8 @@ export class SharedSpaceService extends BaseService {
       takenBefore: dto.takenBefore,
       isFavorite: dto.isFavorite,
       visibility: AssetVisibility.Timeline,
+      personMatchAny: true,
+      tagMatchAny: true,
     });
 
     return markers.map((marker) => ({
