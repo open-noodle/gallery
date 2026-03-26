@@ -272,7 +272,7 @@ export class ClassificationService extends BaseService {
   }
 
   private parseEmbedding(raw: string): number[] {
-    return raw.replace(/[[\]]/g, '').split(',').map(Number);
+    return raw.replaceAll(/[[\]]/g, '').split(',').map(Number);
   }
 
   private cosineSimilarity(a: number[], b: number[]): number {

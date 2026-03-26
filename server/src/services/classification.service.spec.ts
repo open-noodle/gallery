@@ -9,6 +9,10 @@ describe(ClassificationService.name, () => {
   let sut: ClassificationService;
   let mocks: ServiceMocks;
 
+  const makeConfig = (modelName: string) => ({
+    machineLearning: { clip: { modelName } },
+  });
+
   beforeEach(() => {
     ({ sut, mocks } = newTestService(ClassificationService));
   });
@@ -376,7 +380,11 @@ describe(ClassificationService.name, () => {
 
     it('should delete old tag when name changes', async () => {
       mocks.classification.getCategory.mockResolvedValue(existingCategory as any);
-      mocks.classification.updateCategory.mockResolvedValue({ ...existingCategory, name: 'New Name', tagId: null } as any);
+      mocks.classification.updateCategory.mockResolvedValue({
+        ...existingCategory,
+        name: 'New Name',
+        tagId: null,
+      } as any);
       mocks.classification.getPromptEmbeddings.mockResolvedValue([{ prompt: 'p' }] as any);
 
       await sut.updateCategory(authStub.user1, 'cat-1', { name: 'New Name' });
@@ -472,10 +480,6 @@ describe(ClassificationService.name, () => {
   });
 
   describe('onConfigUpdate', () => {
-    const makeConfig = (modelName: string) => ({
-      machineLearning: { clip: { modelName } },
-    });
-
     it('should re-encode all prompts when CLIP model changes', async () => {
       mocks.classification.getAllCategories.mockResolvedValue([{ id: 'cat-1' }] as any);
       mocks.classification.getPromptEmbeddings.mockResolvedValue([{ prompt: 'sunset' }] as any);
@@ -519,12 +523,12 @@ describe(ClassificationService.name, () => {
   describe('cosineSimilarity (indirect)', () => {
     it('should return 1.0 for identical vectors', () => {
       const result = (sut as any).cosineSimilarity([1, 2, 3], [1, 2, 3]);
-      expect(result).toBeCloseTo(1.0);
+      expect(result).toBeCloseTo(1);
     });
 
     it('should return 0.0 for orthogonal vectors', () => {
       const result = (sut as any).cosineSimilarity([1, 0, 0], [0, 1, 0]);
-      expect(result).toBeCloseTo(0.0);
+      expect(result).toBeCloseTo(0);
     });
   });
 });

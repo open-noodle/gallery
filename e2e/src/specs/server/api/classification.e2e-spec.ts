@@ -108,9 +108,7 @@ describe('/classification/categories', () => {
 
   describe('DELETE /classification/categories/:id', () => {
     it('should require authentication', async () => {
-      const { status, body } = await request(app).delete(
-        `/classification/categories/${uuidDto.notFound}`,
-      );
+      const { status, body } = await request(app).delete(`/classification/categories/${uuidDto.notFound}`);
       expect(status).toBe(401);
       expect(body).toEqual(errorDto.unauthorized);
     });
