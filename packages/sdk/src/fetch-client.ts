@@ -1,6 +1,6 @@
 /**
  * Immich
- * 3.4.1
+ * 3.4.0-rc.0
  * DO NOT MODIFY - This file has been generated using oazapfts.
  * See https://www.npmjs.com/package/oazapfts
  */
@@ -63,8 +63,6 @@ export type AdminConfigDatabaseBackupDto = {
     keepLastAmount: number;
 };
 export type AdminConfigBackupsDto = {
-    /** Whether the backups feature is enabled */
-    beta?: boolean;
     database: AdminConfigDatabaseBackupDto;
 };
 export type AdminConfigFFmpegRealtimeDto = {
@@ -471,10 +469,6 @@ export type SetMaintenanceModeDto = {
     action: MaintenanceAction;
     /** Restore backup filename */
     restoreBackupFilename?: string;
-    /** Rollback repository ID */
-    rollbackRepositoryId?: string;
-    /** Rollback snapshot ID */
-    rollbackSnapshotId?: string;
 };
 export type MaintenanceDetectInstallStorageFolderDto = {
     /** Number of files in the folder */
@@ -500,8 +494,6 @@ export type MaintenanceStatusResponseDto = {
     action: MaintenanceAction;
     active: boolean;
     error?: string;
-    /** FUTO Backups job ID */
-    futoBackupsJobId?: string;
     progress?: number;
     task?: string;
 };
@@ -1760,6 +1752,20 @@ export type FaceDto = {
     /** Face ID */
     id: string;
 };
+export type MapMarkerResponseDto = {
+    /** City name */
+    city: string | null;
+    /** Country name */
+    country: string | null;
+    /** Asset ID */
+    id: string;
+    /** Latitude */
+    lat: number;
+    /** Longitude */
+    lon: number;
+    /** State/Province name */
+    state: string | null;
+};
 export type QueueStatisticsDto = {
     /** Number of active jobs */
     active: number;
@@ -2837,8 +2843,6 @@ export type ServerConfigDto = {
     userDeleteDelay: number;
 };
 export type ServerFeaturesDto = {
-    /** Whether the backups feature is enabled */
-    backups: boolean;
     /** Whether config file is available */
     configFile: boolean;
     /** Whether duplicate detection is enabled */
@@ -5628,6 +5632,39 @@ export function reassignFacesById({ id, faceDto }: {
     })));
 }
 /**
+ * Get filtered map markers
+ */
+export function getFilteredMapMarkers({ isFavorite, make, model, personIds, rating, spaceId, tagIds, takenAfter, takenBefore, $type }: {
+    isFavorite?: boolean;
+    make?: string;
+    model?: string;
+    personIds?: string[];
+    rating?: number;
+    spaceId?: string;
+    tagIds?: string[];
+    takenAfter?: string;
+    takenBefore?: string;
+    $type?: "IMAGE" | "VIDEO";
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: MapMarkerResponseDto[];
+    }>(`/gallery/map/markers${QS.query(QS.explode({
+        isFavorite,
+        make,
+        model,
+        personIds,
+        rating,
+        spaceId,
+        tagIds,
+        takenAfter,
+        takenBefore,
+        "type": $type
+    }))}`, {
+        ...opts
+    }));
+}
+/**
  * Retrieve queue counts and status
  */
 export function getQueuesLegacy(opts?: Oazapfts.RequestOpts) {
@@ -8283,8 +8320,7 @@ export enum MaintenanceAction {
     Start = "start",
     End = "end",
     SelectDatabaseRestore = "select_database_restore",
-    RestoreDatabase = "restore_database",
-    Rollback = "rollback"
+    RestoreDatabase = "restore_database"
 }
 export enum StorageFolder {
     EncodedVideo = "encoded-video",
@@ -8664,8 +8700,7 @@ export enum QueueJobStatus {
     Failed = "failed",
     Completed = "completed",
     Delayed = "delayed",
-    Waiting = "waiting",
-    Paused = "paused"
+    Waiting = "waiting"
 }
 export enum JobName {
     AssetDelete = "AssetDelete",
