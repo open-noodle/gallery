@@ -5,13 +5,13 @@ import { authStub } from 'test/fixtures/auth.stub';
 import { makeStream, newTestService, ServiceMocks } from 'test/utils';
 import { beforeEach, describe, expect, it } from 'vitest';
 
+const makeConfig = (modelName: string) => ({
+  machineLearning: { clip: { modelName } },
+});
+
 describe(ClassificationService.name, () => {
   let sut: ClassificationService;
   let mocks: ServiceMocks;
-
-  const makeConfig = (modelName: string) => ({
-    machineLearning: { clip: { modelName } },
-  });
 
   beforeEach(() => {
     ({ sut, mocks } = newTestService(ClassificationService));
