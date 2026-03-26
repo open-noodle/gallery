@@ -16,9 +16,19 @@ describe('/assets/:id/edits (video trim)', () => {
   let user1: LoginResponseDto;
   let websocket: Socket;
 
-  let videoAssetId: string;
+  // Each test group gets its own assets to avoid shared state
   let imageAssetId: string;
   let shortVideoAssetId: string;
+
+  // Helper to upload a fresh 4s video
+  const uploadVideo = async () => {
+    const videoBytes = await readFile(`${videoFixtureDir}/normal.mp4`);
+    const asset = await utils.createAsset(admin.accessToken, {
+      assetData: { filename: 'normal.mp4', bytes: videoBytes },
+    });
+    await utils.waitForWebsocketEvent({ event: 'assetUpload', id: asset.id });
+    return asset.id;
+  };
 
   beforeAll(async () => {
     await utils.resetDatabase();
@@ -28,14 +38,6 @@ describe('/assets/:id/edits (video trim)', () => {
       utils.connectWebsocket(admin.accessToken),
       utils.userSetup(admin.accessToken, createUserDto.create('trim-user')),
     ]);
-
-    // Upload a real 4-second video for trim tests
-    const videoBytes = await readFile(`${videoFixtureDir}/normal.mp4`);
-    const videoAsset = await utils.createAsset(admin.accessToken, {
-      assetData: { filename: 'normal.mp4', bytes: videoBytes },
-    });
-    videoAssetId = videoAsset.id;
-    await utils.waitForWebsocketEvent({ event: 'assetUpload', id: videoAssetId });
 
     // Upload an image for rejection test
     const imageAsset = await utils.createAsset(admin.accessToken);
@@ -55,78 +57,9 @@ describe('/assets/:id/edits (video trim)', () => {
     utils.disconnectWebsocket(websocket);
   });
 
-  describe('PUT /assets/:id/edits (trim)', () => {
-    it('should trim a video and store edit', async () => {
-      const { status, body } = await request(app)
-        .put(`/assets/${videoAssetId}/edits`)
-        .set('Authorization', `Bearer ${admin.accessToken}`)
-        .send({
-          edits: [{ action: 'trim', parameters: { startTime: 1, endTime: 3 } }],
-        });
+  // --- Rejection tests (run on untrimmed assets, no shared state issues) ---
 
-      expect(status).toBe(200);
-      expect(body).toEqual(
-        expect.objectContaining({
-          assetId: videoAssetId,
-          edits: expect.arrayContaining([
-            expect.objectContaining({
-              action: 'trim',
-              parameters: expect.objectContaining({
-                startTime: 1,
-                endTime: 3,
-              }),
-            }),
-          ]),
-        }),
-      );
-    });
-
-    it('should re-trim (widen) and verify updated edit', async () => {
-      // Apply a wider trim
-      const { status, body } = await request(app)
-        .put(`/assets/${videoAssetId}/edits`)
-        .set('Authorization', `Bearer ${admin.accessToken}`)
-        .send({
-          edits: [{ action: 'trim', parameters: { startTime: 0, endTime: 3 } }],
-        });
-
-      expect(status).toBe(200);
-      expect(body.edits).toHaveLength(1);
-      expect(body.edits[0]).toEqual(
-        expect.objectContaining({
-          action: 'trim',
-          parameters: expect.objectContaining({
-            startTime: 0,
-            endTime: 3,
-          }),
-        }),
-      );
-    });
-
-    it('should undo trim by deleting edits', async () => {
-      // First apply a trim
-      const trimResult = await request(app)
-        .put(`/assets/${videoAssetId}/edits`)
-        .set('Authorization', `Bearer ${admin.accessToken}`)
-        .send({
-          edits: [{ action: 'trim', parameters: { startTime: 1, endTime: 3 } }],
-        });
-      expect(trimResult.status).toBe(200);
-
-      // Delete all edits (undo)
-      const deleteResult = await request(app)
-        .delete(`/assets/${videoAssetId}/edits`)
-        .set('Authorization', `Bearer ${admin.accessToken}`);
-      expect(deleteResult.status).toBe(204);
-
-      // Verify edits are empty
-      const getResult = await request(app)
-        .get(`/assets/${videoAssetId}/edits`)
-        .set('Authorization', `Bearer ${admin.accessToken}`);
-      expect(getResult.status).toBe(200);
-      expect(getResult.body.edits).toHaveLength(0);
-    });
-
+  describe('PUT /assets/:id/edits (trim rejections)', () => {
     it('should reject trim on image asset (400)', async () => {
       const { status, body } = await request(app)
         .put(`/assets/${imageAssetId}/edits`)
@@ -137,30 +70,6 @@ describe('/assets/:id/edits (video trim)', () => {
 
       expect(status).toBe(400);
       expect(body).toEqual(errorDto.badRequest('Trim is only supported for video assets'));
-    });
-
-    it('should reject endTime exceeding duration (400)', async () => {
-      const { status, body } = await request(app)
-        .put(`/assets/${videoAssetId}/edits`)
-        .set('Authorization', `Bearer ${admin.accessToken}`)
-        .send({
-          edits: [{ action: 'trim', parameters: { startTime: 0, endTime: 999 } }],
-        });
-
-      expect(status).toBe(400);
-      expect(body).toEqual(errorDto.badRequest('End time exceeds video duration'));
-    });
-
-    it('should reject full-duration trim / no-op (400)', async () => {
-      const { status, body } = await request(app)
-        .put(`/assets/${videoAssetId}/edits`)
-        .set('Authorization', `Bearer ${admin.accessToken}`)
-        .send({
-          edits: [{ action: 'trim', parameters: { startTime: 0, endTime: 4 } }],
-        });
-
-      expect(status).toBe(400);
-      expect(body).toEqual(errorDto.badRequest('Trim must actually remove content'));
     });
 
     it('should reject very short video (400)', async () => {
@@ -176,8 +85,9 @@ describe('/assets/:id/edits (video trim)', () => {
     });
 
     it('should reject mixed spatial + trim edits (400)', async () => {
+      const videoId = await uploadVideo();
       const { status, body } = await request(app)
-        .put(`/assets/${videoAssetId}/edits`)
+        .put(`/assets/${videoId}/edits`)
         .set('Authorization', `Bearer ${admin.accessToken}`)
         .send({
           edits: [
@@ -190,9 +100,36 @@ describe('/assets/:id/edits (video trim)', () => {
       expect(body).toEqual(errorDto.badRequest('Cannot combine trim with spatial edits'));
     });
 
-    it('should require authentication', async () => {
+    it('should reject endTime exceeding duration (400)', async () => {
+      const videoId = await uploadVideo();
       const { status, body } = await request(app)
-        .put(`/assets/${videoAssetId}/edits`)
+        .put(`/assets/${videoId}/edits`)
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .send({
+          edits: [{ action: 'trim', parameters: { startTime: 0, endTime: 999 } }],
+        });
+
+      expect(status).toBe(400);
+      expect(body).toEqual(errorDto.badRequest('End time exceeds video duration'));
+    });
+
+    it('should reject full-duration trim / no-op (400)', async () => {
+      const videoId = await uploadVideo();
+      const { status, body } = await request(app)
+        .put(`/assets/${videoId}/edits`)
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .send({
+          edits: [{ action: 'trim', parameters: { startTime: 0, endTime: 4 } }],
+        });
+
+      expect(status).toBe(400);
+      expect(body).toEqual(errorDto.badRequest('Trim must actually remove content'));
+    });
+
+    it('should require authentication', async () => {
+      const videoId = await uploadVideo();
+      const { status, body } = await request(app)
+        .put(`/assets/${videoId}/edits`)
         .send({
           edits: [{ action: 'trim', parameters: { startTime: 1, endTime: 3 } }],
         });
@@ -202,8 +139,9 @@ describe('/assets/:id/edits (video trim)', () => {
     });
 
     it('should require asset access', async () => {
+      const videoId = await uploadVideo();
       const { status, body } = await request(app)
-        .put(`/assets/${videoAssetId}/edits`)
+        .put(`/assets/${videoId}/edits`)
         .set('Authorization', `Bearer ${user1.accessToken}`)
         .send({
           edits: [{ action: 'trim', parameters: { startTime: 1, endTime: 3 } }],
@@ -211,6 +149,95 @@ describe('/assets/:id/edits (video trim)', () => {
 
       expect(status).toBe(400);
       expect(body).toEqual(errorDto.noPermission);
+    });
+  });
+
+  // --- Mutation tests (each gets a fresh asset to avoid shared state) ---
+
+  describe('PUT /assets/:id/edits (trim mutations)', () => {
+    it('should trim a video and store edit', async () => {
+      const videoId = await uploadVideo();
+      const { status, body } = await request(app)
+        .put(`/assets/${videoId}/edits`)
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .send({
+          edits: [{ action: 'trim', parameters: { startTime: 1, endTime: 3 } }],
+        });
+
+      expect(status).toBe(200);
+      expect(body).toEqual(
+        expect.objectContaining({
+          assetId: videoId,
+          edits: expect.arrayContaining([
+            expect.objectContaining({
+              action: 'trim',
+              parameters: expect.objectContaining({
+                startTime: 1,
+                endTime: 3,
+              }),
+            }),
+          ]),
+        }),
+      );
+    });
+
+    it('should re-trim (widen) on a fresh asset', async () => {
+      const videoId = await uploadVideo();
+
+      // First trim
+      const trim1 = await request(app)
+        .put(`/assets/${videoId}/edits`)
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .send({
+          edits: [{ action: 'trim', parameters: { startTime: 2, endTime: 3 } }],
+        });
+      expect(trim1.status).toBe(200);
+
+      // Re-trim immediately (before async job modifies duration)
+      const { status, body } = await request(app)
+        .put(`/assets/${videoId}/edits`)
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .send({
+          edits: [{ action: 'trim', parameters: { startTime: 1, endTime: 3 } }],
+        });
+
+      expect(status).toBe(200);
+      expect(body.edits).toHaveLength(1);
+      expect(body.edits[0]).toEqual(
+        expect.objectContaining({
+          action: 'trim',
+          parameters: expect.objectContaining({
+            startTime: 1,
+            endTime: 3,
+          }),
+        }),
+      );
+    });
+
+    it('should undo trim by deleting edits', async () => {
+      const videoId = await uploadVideo();
+
+      // Apply trim
+      const trimResult = await request(app)
+        .put(`/assets/${videoId}/edits`)
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .send({
+          edits: [{ action: 'trim', parameters: { startTime: 1, endTime: 3 } }],
+        });
+      expect(trimResult.status).toBe(200);
+
+      // Delete all edits (undo)
+      const deleteResult = await request(app)
+        .delete(`/assets/${videoId}/edits`)
+        .set('Authorization', `Bearer ${admin.accessToken}`);
+      expect(deleteResult.status).toBe(204);
+
+      // Verify edits are empty
+      const getResult = await request(app)
+        .get(`/assets/${videoId}/edits`)
+        .set('Authorization', `Bearer ${admin.accessToken}`);
+      expect(getResult.status).toBe(200);
+      expect(getResult.body.edits).toHaveLength(0);
     });
   });
 });
