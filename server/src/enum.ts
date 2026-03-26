@@ -920,7 +920,6 @@ export enum JobName {
   // Shared Space Face Recognition
   SharedSpaceFaceMatch = 'SharedSpaceFaceMatch',
   SharedSpaceFaceMatchAll = 'SharedSpaceFaceMatchAll',
-  SharedSpacePersonThumbnail = 'SharedSpacePersonThumbnail',
   SharedSpaceLibraryFaceSync = 'SharedSpaceLibraryFaceSync',
 
   // Shared Space Bulk Operations
