@@ -1,6 +1,7 @@
 <script lang="ts">
   import { shortcut } from '$lib/actions/shortcut';
   import { editManager, EditToolType } from '$lib/managers/edit/edit-manager.svelte';
+  import { trimManager } from '$lib/managers/edit/trim-manager.svelte';
   import { websocketEvents } from '$lib/stores/websocket';
   import { AssetTypeEnum, getAssetEdits, type AssetResponseDto } from '@immich/sdk';
   import { Button, HStack, IconButton } from '@immich/ui';
@@ -18,6 +19,7 @@
 
   interface Props {
     asset: AssetResponseDto;
+    videoElement?: HTMLVideoElement;
     onClose: () => void;
   }
 
@@ -45,7 +47,14 @@
     }
   }
 
-  let { asset = $bindable(), onClose }: Props = $props();
+  let { asset = $bindable(), videoElement, onClose }: Props = $props();
+
+  // Pass video element to TrimManager when in trim mode
+  $effect(() => {
+    if (editManager.selectedTool?.type === EditToolType.Trim) {
+      trimManager.setVideoElement(videoElement);
+    }
+  });
 </script>
 
 <svelte:document use:shortcut={{ shortcut: { key: 'Escape' }, onShortcut: onClose }} />
