@@ -371,6 +371,7 @@ export type SharedSpacePerson = {
   createdAt: Date;
   updatedAt: Date;
   updateId: string;
+  // Populated via LEFT JOIN to asset_face → person in repository queries
   personalName: string | null;
   personalThumbnailPath: string | null;
 };
