@@ -884,33 +884,6 @@ export class SharedSpaceService extends BaseService {
     return JobStatus.Success;
   }
 
-  @OnJob({ name: JobName.SharedSpacePersonThumbnail, queue: QueueName.ThumbnailGeneration })
-  async handleSharedSpacePersonThumbnail({ id }: JobOf<JobName.SharedSpacePersonThumbnail>): Promise<JobStatus> {
-    const person = await this.sharedSpaceRepository.getPersonById(id);
-    if (!person || !person.representativeFaceId) {
-      return JobStatus.Skipped;
-    }
-
-    // Look up the actual face to find the personal person ID for thumbnail generation
-    const face = await this.personRepository.getFaceById(person.representativeFaceId);
-    if (!face) {
-      return JobStatus.Skipped;
-    }
-
-    // If the face's personal person has a thumbnail, copy its path
-    if (face.personId) {
-      const personalPerson = await this.personRepository.getById(face.personId);
-      if (personalPerson?.thumbnailPath) {
-        await this.sharedSpaceRepository.updatePerson(id, {
-          thumbnailPath: personalPerson.thumbnailPath,
-        });
-        return JobStatus.Success;
-      }
-    }
-
-    return JobStatus.Skipped;
-  }
-
   private async processSpaceFaceMatch(spaceId: string, assetId: string): Promise<void> {
     const { machineLearning } = await this.getConfig({ withCache: true });
     const maxDistance = machineLearning.facialRecognition.maxDistance;
@@ -937,23 +910,13 @@ export class SharedSpaceService extends BaseService {
           continue;
         }
 
-        let name = '';
-        const personalPerson = await this.personRepository.getById(face.personId);
-        if (personalPerson?.name) {
-          name = personalPerson.name;
-        }
-
         const newPerson = await this.sharedSpaceRepository.createPerson({
           spaceId,
-          name,
+          name: '',
           representativeFaceId: face.id,
           type: 'person',
         });
         personId = newPerson.id;
-        await this.jobRepository.queue({
-          name: JobName.SharedSpacePersonThumbnail,
-          data: { id: newPerson.id },
-        });
       }
 
       await this.sharedSpaceRepository.addPersonFaces([{ personId, assetFaceId: face.id }]);
@@ -981,23 +944,13 @@ export class SharedSpaceService extends BaseService {
       if (existingSpacePerson) {
         personId = existingSpacePerson.id;
       } else {
-        let name = '';
-        const personalPerson = await this.personRepository.getById(petFace.personId);
-        if (personalPerson?.name) {
-          name = personalPerson.name;
-        }
-
         const newPerson = await this.sharedSpaceRepository.createPerson({
           spaceId,
-          name,
+          name: '',
           representativeFaceId: petFace.id,
           type: 'pet',
         });
         personId = newPerson.id;
-        await this.jobRepository.queue({
-          name: JobName.SharedSpacePersonThumbnail,
-          data: { id: newPerson.id },
-        });
       }
 
       await this.sharedSpaceRepository.addPersonFaces([{ personId, assetFaceId: petFace.id }]);
