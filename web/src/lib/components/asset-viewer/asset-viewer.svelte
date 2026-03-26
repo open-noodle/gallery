@@ -46,6 +46,7 @@
   import ActivityViewer from './activity-viewer.svelte';
   import DetailPanel from './detail-panel.svelte';
   import EditorPanel from './editor/editor-panel.svelte';
+  import TrimTimeline from './editor/trim-tool/trim-timeline.svelte';
   import CropArea from './editor/transform-tool/crop-area.svelte';
   import ImagePanoramaViewer from './image-panorama-viewer.svelte';
   import OcrButton from './ocr-button.svelte';
@@ -552,6 +553,12 @@
         onVideoElementReady={(el) => (videoElement = el)}
         {playOriginalVideo}
       />
+    {/if}
+
+    {#if assetViewerManager.isShowEditor && editManager.selectedTool?.type === EditToolType.Trim}
+      <div class="absolute bottom-0 left-0 right-0 z-10 px-4 pb-4">
+        <TrimTimeline />
+      </div>
     {/if}
 
     {#if showActivityStatus}
