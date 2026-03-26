@@ -2714,7 +2714,11 @@ describe(SharedSpaceService.name, () => {
 
       expect(result).toHaveLength(1);
       expect(result[0].name).toBe('In Range');
-      expect(mocks.sharedSpace.getPersonsBySpaceIdWithTemporalFilter).toHaveBeenCalledWith(spaceId, { takenAfter }, false);
+      expect(mocks.sharedSpace.getPersonsBySpaceIdWithTemporalFilter).toHaveBeenCalledWith(
+        spaceId,
+        { takenAfter },
+        false,
+      );
     });
 
     it('should resolve name from personal person when space person has no name override', async () => {
