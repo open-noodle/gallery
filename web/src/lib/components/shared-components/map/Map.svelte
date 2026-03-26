@@ -18,7 +18,7 @@
   import { getAssetMediaUrl, handlePromiseError } from '$lib/utils';
   import { getMapMarkers, getSpaceMapMarkers, type MapMarkerResponseDto } from '@immich/sdk';
   import { Alert, Container, Icon, modalManager, Text, Theme, themeManager } from '@immich/ui';
-  import { mdiCog, mdiImageMultiple, mdiMap, mdiMapMarker } from '@mdi/js';
+import { mdiCog, mdiImageMultiple, mdiMap, mdiMapMarker, mdiThemeLightDark } from '@mdi/js';
   import type { Feature, GeoJsonProperties, Geometry, Point } from 'geojson';
   import { isEqual, omit } from 'lodash-es';
   import { DateTime, Duration } from 'luxon';
@@ -421,6 +421,20 @@
           <ControlGroup>
             <ControlButton onclick={handleSettingsClick}>
               <Icon icon={mdiCog} size="70%" class="text-black/80" />
+            </ControlButton>
+          </ControlGroup>
+        </Control>
+      {/if}
+
+      {#if !showSettings}
+        <Control>
+          <ControlGroup>
+            <ControlButton
+              onclick={() => {
+                $mapSettings = { ...$mapSettings, allowDarkMode: !$mapSettings.allowDarkMode };
+              }}
+            >
+              <Icon icon={mdiThemeLightDark} size="100%" class="text-black/80" />
             </ControlButton>
           </ControlGroup>
         </Control>
