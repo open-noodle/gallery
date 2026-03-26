@@ -43,7 +43,12 @@ export class TrimManager implements EditToolManager {
     // Restore existing trim edits if any
     const existingTrim = edits.find((e) => e.action === 'trim');
     if (existingTrim) {
-      const params = existingTrim.parameters as { startTime: number; endTime: number };
+      const params = existingTrim.parameters as { startTime: number; endTime: number; originalDuration?: number };
+      // Use originalDuration so the timeline shows the full video range, not the trimmed range
+      if (params.originalDuration && params.originalDuration > this.duration) {
+        this.duration = params.originalDuration;
+        this.endTime = this.duration;
+      }
       this.startTime = params.startTime;
       this.endTime = params.endTime;
       this.hasChanges = true;
