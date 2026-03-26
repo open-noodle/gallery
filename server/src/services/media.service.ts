@@ -294,17 +294,11 @@ export class MediaService extends BaseService {
     const duration = params.endTime - params.startTime;
 
     // Select input: prefer non-edited encoded video, fall back to original
-    const existingEncoded = asset.files.find(
-      (f) => f.type === AssetFileType.EncodedVideo && !f.isEdited,
-    );
+    const existingEncoded = asset.files.find((f) => f.type === AssetFileType.EncodedVideo && !f.isEdited);
     const inputPath = existingEncoded?.path || localPath;
 
     // Output path for edited encoded video in EncodedVideo directory
-    const outputPath = StorageCore.getNestedPath(
-      StorageFolder.EncodedVideo,
-      asset.ownerId,
-      `${asset.id}_edited.mp4`,
-    );
+    const outputPath = StorageCore.getNestedPath(StorageFolder.EncodedVideo, asset.ownerId, `${asset.id}_edited.mp4`);
     this.storageCore.ensureFolders(outputPath);
 
     try {
@@ -354,11 +348,9 @@ export class MediaService extends BaseService {
       newFiles,
     );
 
-    if (thumbnailResult.thumbhash) {
-      if (!asset.thumbhash || Buffer.compare(asset.thumbhash, thumbnailResult.thumbhash) !== 0) {
+    if (thumbnailResult.thumbhash && (!asset.thumbhash || Buffer.compare(asset.thumbhash, thumbnailResult.thumbhash) !== 0)) {
         await this.assetRepository.update({ id: asset.id, thumbhash: thumbnailResult.thumbhash });
       }
-    }
 
     return JobStatus.Success;
   }

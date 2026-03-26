@@ -1481,18 +1481,16 @@ describe(MediaService.name, () => {
         .edit({ action: AssetEditAction.Trim, parameters: { startTime: 5, endTime: 25 } as any })
         .build();
       mocks.assetJob.getForGenerateThumbnailJob.mockResolvedValue(getForGenerateThumbnail(asset));
-      mocks.media.probe.mockResolvedValue({ ...probeStub.noAudioStreams, format: { ...probeStub.noAudioStreams.format, duration: 20 } });
+      mocks.media.probe.mockResolvedValue({
+        ...probeStub.noAudioStreams,
+        format: { ...probeStub.noAudioStreams.format, duration: 20 },
+      });
       mocks.media.decodeImage.mockResolvedValue({ data: rawBuffer, info: rawInfo as OutputInfo });
       mocks.media.getImageMetadata.mockResolvedValue({ width: 1920, height: 1080, isTransparent: false });
 
       await sut.handleAssetEditThumbnailGeneration({ id: asset.id });
 
-      expect(mocks.media.trim).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.any(String),
-        5,
-        20,
-      );
+      expect(mocks.media.trim).toHaveBeenCalledWith(expect.any(String), expect.any(String), 5, 20);
     });
 
     it('should update asset duration after trimming', async () => {
@@ -1501,7 +1499,10 @@ describe(MediaService.name, () => {
         .edit({ action: AssetEditAction.Trim, parameters: { startTime: 5, endTime: 25 } as any })
         .build();
       mocks.assetJob.getForGenerateThumbnailJob.mockResolvedValue(getForGenerateThumbnail(asset));
-      mocks.media.probe.mockResolvedValue({ ...probeStub.noAudioStreams, format: { ...probeStub.noAudioStreams.format, duration: 19.5 } });
+      mocks.media.probe.mockResolvedValue({
+        ...probeStub.noAudioStreams,
+        format: { ...probeStub.noAudioStreams.format, duration: 19.5 },
+      });
       mocks.media.decodeImage.mockResolvedValue({ data: rawBuffer, info: rawInfo as OutputInfo });
       mocks.media.getImageMetadata.mockResolvedValue({ width: 1920, height: 1080, isTransparent: false });
 
@@ -1518,7 +1519,10 @@ describe(MediaService.name, () => {
         .edit({ action: AssetEditAction.Trim, parameters: { startTime: 0, endTime: 10 } as any })
         .build();
       mocks.assetJob.getForGenerateThumbnailJob.mockResolvedValue(getForGenerateThumbnail(asset));
-      mocks.media.probe.mockResolvedValue({ ...probeStub.noAudioStreams, format: { ...probeStub.noAudioStreams.format, duration: 10 } });
+      mocks.media.probe.mockResolvedValue({
+        ...probeStub.noAudioStreams,
+        format: { ...probeStub.noAudioStreams.format, duration: 10 },
+      });
       mocks.media.decodeImage.mockResolvedValue({ data: rawBuffer, info: rawInfo as OutputInfo });
       mocks.media.getImageMetadata.mockResolvedValue({ width: 1920, height: 1080, isTransparent: false });
 

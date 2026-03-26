@@ -38,7 +38,6 @@ import {
   withExif,
   withFaces,
   withFacesAndPeople,
-  withFilePath,
   withFiles,
   withLibrary,
   withOwner,
@@ -1330,7 +1329,13 @@ export class AssetRepository {
   async getForEdit(id: string) {
     return this.db
       .selectFrom('asset')
-      .select(['asset.type', 'asset.livePhotoVideoId', 'asset.originalPath', 'asset.originalFileName', 'asset.duration'])
+      .select([
+        'asset.type',
+        'asset.livePhotoVideoId',
+        'asset.originalPath',
+        'asset.originalFileName',
+        'asset.duration',
+      ])
       .where('asset.id', '=', id)
       .innerJoin('asset_exif', (join) => join.onRef('asset_exif.assetId', '=', 'asset.id'))
       .select([

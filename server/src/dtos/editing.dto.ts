@@ -1,7 +1,13 @@
 import { ApiExtraModels, ApiProperty, getSchemaPath } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { ArrayMinSize, IsEnum, IsInt, IsNumber, Min, ValidateNested } from 'class-validator';
-import { IsAxisAlignedRotation, IsGreaterThanProperty, IsUniqueEditActions, ValidateEnum, ValidateUUID } from 'src/validation';
+import {
+  IsAxisAlignedRotation,
+  IsGreaterThanProperty,
+  IsUniqueEditActions,
+  ValidateEnum,
+  ValidateUUID,
+} from 'src/validation';
 
 export enum AssetEditAction {
   Crop = 'crop',

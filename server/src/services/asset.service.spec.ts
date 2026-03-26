@@ -1592,7 +1592,7 @@ describe(AssetService.name, () => {
         audioStreams: [{}],
         format: {},
       } as any);
-      mocks.job.getJobCounts.mockResolvedValue({ active: 0, completed: 0, failed: 0, delayed: 0, waiting: 0 });
+      mocks.job.getJobCounts.mockResolvedValue({ active: 0, completed: 0, failed: 0, delayed: 0, waiting: 0, paused: 0 });
       mocks.assetEdit.replaceAll.mockResolvedValue([]);
 
       await sut.editAsset(authStub.admin, assetId, {
@@ -1643,7 +1643,7 @@ describe(AssetService.name, () => {
         audioStreams: [{}],
         format: {},
       } as any);
-      mocks.job.getJobCounts.mockResolvedValue({ active: 0, completed: 0, failed: 0, delayed: 0, waiting: 0 });
+      mocks.job.getJobCounts.mockResolvedValue({ active: 0, completed: 0, failed: 0, delayed: 0, waiting: 0, paused: 0 });
 
       await expect(
         sut.editAsset(authStub.admin, assetId, {
@@ -1772,7 +1772,7 @@ describe(AssetService.name, () => {
         audioStreams: [],
         format: {},
       } as any);
-      mocks.job.getJobCounts.mockResolvedValue({ active: 1, completed: 0, failed: 0, delayed: 0, waiting: 0 });
+      mocks.job.getJobCounts.mockResolvedValue({ active: 1, completed: 0, failed: 0, delayed: 0, waiting: 0, paused: 0 });
 
       await expect(
         sut.editAsset(authStub.admin, assetId, {
@@ -1800,7 +1800,7 @@ describe(AssetService.name, () => {
         audioStreams: [],
         format: {},
       } as any);
-      mocks.job.getJobCounts.mockResolvedValue({ active: 0, completed: 0, failed: 0, delayed: 0, waiting: 0 });
+      mocks.job.getJobCounts.mockResolvedValue({ active: 0, completed: 0, failed: 0, delayed: 0, waiting: 0, paused: 0 });
 
       await expect(
         sut.editAsset(authStub.admin, assetId, {
