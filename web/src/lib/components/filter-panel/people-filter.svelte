@@ -138,12 +138,20 @@
         </div>
 
         <!-- Avatar -->
-        <div
-          class="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full text-[9px] font-semibold text-white"
-          style="background: {getAvatarGradient(person.name)}"
-        >
-          {getInitial(person.name)}
-        </div>
+        {#if person.thumbnailUrl}
+          <img
+            src={person.thumbnailUrl}
+            alt={person.name}
+            class="h-5 w-5 flex-shrink-0 rounded-full object-cover"
+          />
+        {:else}
+          <div
+            class="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full text-[9px] font-semibold text-white"
+            style="background: {getAvatarGradient(person.name)}"
+          >
+            {getInitial(person.name)}
+          </div>
+        {/if}
 
         <!-- Label -->
         <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-left">{person.name}</span>
