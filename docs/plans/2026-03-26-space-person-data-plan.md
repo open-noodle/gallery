@@ -267,7 +267,7 @@ In `shared-space.service.ts`, update `getSpacePeople()` (~line 569-589):
 
 - Replace `if (!person.thumbnailPath) { continue; }` with `if (!person.personalThumbnailPath) { continue; }`
 
-Update `mapSpacePerson()` to accept the enriched type with optional new fields (optional so it also works for `getSpacePerson` and `updateSpacePerson` which will be updated in Task 4):
+Update `mapSpacePerson()` (~line 1086) to accept the enriched type with optional new fields (optional so it also works for `getSpacePerson` and `updateSpacePerson` which will be updated in Task 4):
 
 ```typescript
 private mapSpacePerson(
@@ -493,7 +493,7 @@ Expected: Fails because `getSpacePerson` and `updateSpacePerson` don't use enric
 
 - `getSpacePerson` "should return enriched person" (~line 2783): Add enriched fields to `getPersonById` mock
 - `getSpacePerson` "should reject access to pet person" (~line 2806): Same
-- `updateSpacePerson` "should update person name" (~line 2925): Mock `getPersonById` twice — first for the initial lookup, second for the re-fetch after update, with enriched fields
+- `updateSpacePerson` "should update person name" (~line 2925): Mock `getPersonById` twice — first for the initial lookup, second for the re-fetch after update, with enriched fields. **All** `updateSpacePerson` tests that reach the `updatePerson` call need this double mock pattern (including "should allow representativeFaceId" at ~line 2964).
 
 **Step 5: Implement fixes**
 
@@ -592,7 +592,6 @@ In `server/src/types.ts` (~line 453), remove:
 - In `handleSharedSpaceFaceMatch` tests: remove assertions that `JobName.SharedSpacePersonThumbnail` was queued (~lines 2185-2188 and similar)
 - "should copy personal person name when creating space person" (~line 2267): Update to expect `name: ''` always (no longer copies)
 - "should use empty name when personal person has no name" (~line 2321): Should still pass (already expects empty)
-- Pet person creation tests: Remove thumbnail job queue assertions
 
 **Step 7: Run tests**
 
@@ -820,7 +819,13 @@ git commit -m "feat: render face thumbnails in filter panel people section"
 
 **Step 1: Update space page filter provider**
 
-In the space page `+page.svelte` (~line 166-176), update the people provider to construct thumbnail URLs:
+In the space page `+page.svelte` (~line 166-176), first add the import for `createUrl`:
+
+```typescript
+import { createUrl } from '$lib/utils';
+```
+
+Then update the people provider to construct thumbnail URLs:
 
 ```typescript
 people: async (context?: FilterContext) => {
