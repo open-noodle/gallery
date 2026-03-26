@@ -52,9 +52,9 @@
 
   let selectHidden = $state(false);
   const visiblePeople = $derived(
-    people
+    [...people]
       .filter((p) => !p.isHidden)
-      .toSorted((a, b) => {
+      .sort((a, b) => {
         const aHasName = a.name ? 0 : 1;
         const bHasName = b.name ? 0 : 1;
         if (aHasName !== bHasName) {
@@ -138,6 +138,8 @@
       onclick={() => goto(`/spaces/${space.id}`)}
       icon={mdiArrowLeft}
     />
+  {/snippet}
+  {#snippet buttons()}
     {#if isEditor}
       <Button
         leadingIcon={mdiEyeOutline}

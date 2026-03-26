@@ -54,7 +54,7 @@ describe('buildMapFilterConfig', () => {
           { id: '2', name: '', thumbnailPath: '/thumb/2' },
           { id: '3', name: 'Bob', thumbnailPath: '/thumb/3' },
         ],
-      } as any);
+      } as never);
 
       const config = buildMapFilterConfig();
       const people = await config.providers.people!();
@@ -68,7 +68,7 @@ describe('buildMapFilterConfig', () => {
         total: 1,
         visible: 1,
         people: [{ id: '1', name: 'Alice', thumbnailPath: '/thumb/1' }],
-      } as any);
+      } as never);
 
       const config = buildMapFilterConfig();
       const people = await config.providers.people!();
@@ -81,7 +81,7 @@ describe('buildMapFilterConfig', () => {
         { id: '1', name: 'Alice', thumbnailPath: '/thumb/1' },
         { id: '2', name: '', thumbnailPath: '/thumb/2' },
         { id: '3', name: 'Bob', thumbnailPath: '/thumb/3' },
-      ] as any);
+      ] as never);
 
       const config = buildMapFilterConfig('space-123');
       const people = await config.providers.people!();
@@ -94,7 +94,7 @@ describe('buildMapFilterConfig', () => {
       vi.mocked(getSpacePeople).mockResolvedValue([
         { id: '1', name: 'Alice', isHidden: false },
         { id: '2', name: 'Bob', isHidden: true },
-      ] as any);
+      ] as never);
 
       const config = buildMapFilterConfig('space-123');
       const people = await config.providers.people!();
@@ -106,7 +106,7 @@ describe('buildMapFilterConfig', () => {
     it('should map thumbnailUrl correctly in space config', async () => {
       vi.mocked(getSpacePeople).mockResolvedValue([
         { id: '1', name: 'Alice', thumbnailPath: '/thumb/1', updatedAt: '2025-01-01' },
-      ] as any);
+      ] as never);
 
       const config = buildMapFilterConfig('space-123');
       const people = await config.providers.people!();

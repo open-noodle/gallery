@@ -15,9 +15,7 @@
   let { people, spaceId, selectedPersonIds = [], onPersonClick }: Props = $props();
 
   const namedPeople = $derived(
-    people
-      .filter((p) => !p.isHidden && (p.alias || p.name))
-      .toSorted((a, b) => b.assetCount - a.assetCount),
+    [...people].filter((p) => !p.isHidden && (p.alias || p.name)).sort((a, b) => b.assetCount - a.assetCount),
   );
 
   const SEE_ALL_THRESHOLD = 6;

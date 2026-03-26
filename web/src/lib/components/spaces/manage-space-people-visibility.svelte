@@ -100,6 +100,17 @@
     [ToggleVisibility.SHOW_ALL]: { icon: mdiEye, label: $t('show_all_people') },
   });
   let toggleButton = $derived(toggleButtonOptions[getNextVisibility(toggleVisibility)]);
+
+  const sortedPeople = $derived(
+    [...people].sort((a, b) => {
+      const aHasName = a.name ? 0 : 1;
+      const bHasName = b.name ? 0 : 1;
+      if (aHasName !== bHasName) {
+        return aHasName - bHasName;
+      }
+      return b.assetCount - a.assetCount;
+    }),
+  );
 </script>
 
 <svelte:document use:shortcut={{ shortcut: { key: 'Escape' }, onShortcut: onClose }} />
@@ -109,35 +120,41 @@
     class="sticky top-0 z-1 flex h-16 w-full items-center justify-between border-b bg-white p-1 dark:border-immich-dark-gray dark:bg-black dark:text-immich-dark-fg md:p-8"
   >
     <div class="flex items-center">
-      <IconButton
-        shape="round"
-        color="secondary"
-        variant="ghost"
-        aria-label={$t('close')}
-        icon={mdiClose}
-        onclick={onClose}
-        data-testid="close-visibility"
-      />
+      <span title={$t('close')}>
+        <IconButton
+          shape="round"
+          color="secondary"
+          variant="ghost"
+          aria-label={$t('close')}
+          icon={mdiClose}
+          onclick={onClose}
+          data-testid="close-visibility"
+        />
+      </span>
       <p class="ms-2">{$t('show_and_hide_people')}</p>
     </div>
     <div class="flex items-center justify-end">
       <div class="flex items-center md:me-4">
-        <IconButton
-          shape="round"
-          color="secondary"
-          variant="ghost"
-          aria-label={$t('reset_people_visibility')}
-          icon={mdiRestart}
-          onclick={() => overrides.clear()}
-        />
-        <IconButton
-          shape="round"
-          color="secondary"
-          variant="ghost"
-          aria-label={toggleButton.label}
-          icon={toggleButton.icon}
-          onclick={handleToggleVisibility}
-        />
+        <span title={$t('reset_people_visibility')}>
+          <IconButton
+            shape="round"
+            color="secondary"
+            variant="ghost"
+            aria-label={$t('reset_people_visibility')}
+            icon={mdiRestart}
+            onclick={() => overrides.clear()}
+          />
+        </span>
+        <span title={toggleButton.label}>
+          <IconButton
+            shape="round"
+            color="secondary"
+            variant="ghost"
+            aria-label={toggleButton.label}
+            icon={toggleButton.icon}
+            onclick={handleToggleVisibility}
+          />
+        </span>
       </div>
       <Button loading={showLoadingSpinner} onclick={handleSave} size="small" data-testid="save-visibility"
         >{$t('done')}</Button
@@ -146,7 +163,7 @@
   </div>
 
   <div class="flex flex-wrap gap-1 p-2 pb-8 md:px-8">
-    {#each people as person (person.id)}
+    {#each sortedPeople as person (person.id)}
       {@const hidden = overrides.get(person.id) ?? person.isHidden}
       <button
         type="button"
