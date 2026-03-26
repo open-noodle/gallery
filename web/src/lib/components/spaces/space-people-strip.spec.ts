@@ -44,10 +44,34 @@ describe('SpacePeopleStrip', () => {
     expect(screen.getByTestId('person-label-p1')).toHaveTextContent('Alice Johnson');
   });
 
-  it('should not show label when no name or alias', () => {
-    const people = [makePerson({ id: 'p1', name: '', alias: null })];
+  it('should exclude unnamed people entirely', () => {
+    const people = [
+      makePerson({ id: 'p1', name: 'Alice' }),
+      makePerson({ id: 'p2', name: '', alias: null }),
+      makePerson({ id: 'p3', name: '', alias: null }),
+      makePerson({ id: 'p4', name: 'Bob' }),
+    ];
     render(SpacePeopleStrip, { people, spaceId: 'space-1' });
-    expect(screen.queryByTestId('person-label-p1')).not.toBeInTheDocument();
+    expect(screen.getByTestId('person-thumb-p1')).toBeInTheDocument();
+    expect(screen.queryByTestId('person-thumb-p2')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('person-thumb-p3')).not.toBeInTheDocument();
+    expect(screen.getByTestId('person-thumb-p4')).toBeInTheDocument();
+  });
+
+  it('should render nothing when all people are unnamed', () => {
+    const people = [
+      makePerson({ id: 'p1', name: '', alias: null }),
+      makePerson({ id: 'p2', name: '', alias: null }),
+    ];
+    render(SpacePeopleStrip, { people, spaceId: 'space-1' });
+    expect(screen.queryByTestId('people-strip')).not.toBeInTheDocument();
+  });
+
+  it('should keep people with alias even if name is empty', () => {
+    const people = [makePerson({ id: 'p1', name: '', alias: 'Mom' })];
+    render(SpacePeopleStrip, { people, spaceId: 'space-1' });
+    expect(screen.getByTestId('person-thumb-p1')).toBeInTheDocument();
+    expect(screen.getByTestId('person-label-p1')).toHaveTextContent('Mom');
   });
 
   it('should show selected state with ring when person is in selectedPersonIds', () => {
