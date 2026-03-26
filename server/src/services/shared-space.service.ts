@@ -605,16 +605,17 @@ export class SharedSpaceService extends BaseService {
       return [];
     }
 
+    const withHidden = query?.withHidden ?? false;
     const hasTemporal = query?.takenAfter || query?.takenBefore;
     const persons = hasTemporal
-      ? await this.sharedSpaceRepository.getPersonsBySpaceIdWithTemporalFilter(spaceId, query)
-      : await this.sharedSpaceRepository.getPersonsBySpaceId(spaceId);
+      ? await this.sharedSpaceRepository.getPersonsBySpaceIdWithTemporalFilter(spaceId, query, withHidden)
+      : await this.sharedSpaceRepository.getPersonsBySpaceId(spaceId, withHidden);
     const aliases = await this.sharedSpaceRepository.getAliasesBySpaceAndUser(spaceId, auth.user.id);
     const aliasMap = new Map(aliases.map((a) => [a.personId, a.alias]));
 
     const results: SharedSpacePersonResponseDto[] = [];
     for (const person of persons) {
-      if (person.isHidden) {
+      if (!withHidden && person.isHidden) {
         continue;
       }
       if (!space.petsEnabled && person.type === 'pet') {

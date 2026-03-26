@@ -13042,6 +13042,14 @@
               "format": "date-time",
               "type": "string"
             }
+          },
+          {
+            "name": "withHidden",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
