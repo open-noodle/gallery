@@ -39,7 +39,6 @@ import {
   withExif,
   withFaces,
   withFacesAndPeople,
-  withFilePath,
   withFiles,
   withLibrary,
   withOwner,
@@ -1274,7 +1273,16 @@ export class AssetRepository {
     return this.db
       .selectFrom('asset')
       .select(['asset.originalPath'])
-      .select((eb) => withFilePath(eb, AssetFileType.EncodedVideo).as('encodedVideoPath'))
+      .select((eb) =>
+        eb
+          .selectFrom('asset_file')
+          .select('asset_file.path')
+          .whereRef('asset_file.assetId', '=', 'asset.id')
+          .where('asset_file.type', '=', AssetFileType.EncodedVideo)
+          .orderBy('asset_file.isEdited', 'desc')
+          .limit(1)
+          .as('encodedVideoPath'),
+      )
       .where('asset.id', '=', id)
       .where('asset.type', '=', AssetType.Video)
       .executeTakeFirst();
@@ -1295,7 +1303,13 @@ export class AssetRepository {
   async getForEdit(id: string) {
     return this.db
       .selectFrom('asset')
-      .select(['asset.type', 'asset.livePhotoVideoId', 'asset.originalPath', 'asset.originalFileName'])
+      .select([
+        'asset.type',
+        'asset.livePhotoVideoId',
+        'asset.originalPath',
+        'asset.originalFileName',
+        'asset.duration',
+      ])
       .where('asset.id', '=', id)
       .innerJoin('asset_exif', (join) => join.onRef('asset_exif.assetId', '=', 'asset.id'))
       .select([

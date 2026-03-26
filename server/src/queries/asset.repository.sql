@@ -605,14 +605,17 @@ select
       "asset_file"
     where
       "asset_file"."assetId" = "asset"."id"
-      and "asset_file"."type" = 'encoded_video'
-      and "asset_file"."isEdited" = false
+      and "asset_file"."type" = $1
+    order by
+      "asset_file"."isEdited" desc
+    limit
+      $2
   ) as "encodedVideoPath"
 from
   "asset"
 where
-  "asset"."id" = $1
-  and "asset"."type" = $2
+  "asset"."id" = $3
+  and "asset"."type" = $4
 
 -- AssetRepository.getForOcr
 select
@@ -645,6 +648,7 @@ select
   "asset"."livePhotoVideoId",
   "asset"."originalPath",
   "asset"."originalFileName",
+  "asset"."duration",
   "asset_exif"."exifImageWidth",
   "asset_exif"."exifImageHeight",
   "asset_exif"."orientation",
