@@ -645,7 +645,7 @@ export class SharedSpaceService extends BaseService {
       }
     }
 
-    const updated = await this.sharedSpaceRepository.updatePerson(personId, {
+    await this.sharedSpaceRepository.updatePerson(personId, {
       name: dto.name,
       isHidden: dto.isHidden,
       birthDate: dto.birthDate,
@@ -1028,7 +1028,7 @@ export class SharedSpaceService extends BaseService {
   }
 
   private mapSpacePerson(
-    person: SharedSpacePerson & { personalName?: string | null; personalThumbnailPath?: string | null },
+    person: SharedSpacePerson,
     faceCount: number,
     assetCount: number,
     alias: string | null,

@@ -371,6 +371,8 @@ export type SharedSpacePerson = {
   createdAt: Date;
   updatedAt: Date;
   updateId: string;
+  personalName: string | null;
+  personalThumbnailPath: string | null;
 };
 
 export type SharedSpacePersonFace = {

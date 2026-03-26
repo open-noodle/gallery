@@ -436,6 +436,8 @@ const sharedSpacePersonFactory = (data: Partial<SharedSpacePerson> = {}): Shared
   createdAt: newDate(),
   updatedAt: newDate(),
   updateId: newUuidV7(),
+  personalName: null,
+  personalThumbnailPath: null,
   ...data,
 });
 
