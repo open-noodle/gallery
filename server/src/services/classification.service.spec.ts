@@ -25,7 +25,7 @@ describe(ClassificationService.name, () => {
 
     it('should return Skipped when no CLIP embedding exists', async () => {
       mocks.asset.getById.mockResolvedValue({ id: 'asset-1', ownerId: 'user-1' } as any);
-      mocks.search.getEmbedding.mockResolvedValue(void 0);
+      mocks.search.getEmbedding.mockResolvedValue(null);
 
       await expect(sut.handleClassify({ id: 'asset-1' })).resolves.toBe(JobStatus.Skipped);
     });
@@ -56,6 +56,8 @@ describe(ClassificationService.name, () => {
           similarity: 0.8,
           action: 'tag',
           tagId: 'tag-1',
+          promptId: 'prompt-1',
+          prompt: 'sunset sky',
           embedding: '[1,0,0]',
         },
       ]);
@@ -82,6 +84,8 @@ describe(ClassificationService.name, () => {
           similarity: 0.8,
           action: 'tag',
           tagId: 'tag-1',
+          promptId: 'prompt-1',
+          prompt: 'sunset sky',
           embedding: '[0,1,0]',
         },
       ]);
@@ -106,6 +110,8 @@ describe(ClassificationService.name, () => {
           similarity: 0.5,
           action: 'tag_and_archive',
           tagId: 'tag-1',
+          promptId: 'prompt-1',
+          prompt: 'sunset sky',
           embedding: '[1,0,0]',
         },
       ]);
@@ -130,6 +136,8 @@ describe(ClassificationService.name, () => {
           similarity: 0.5,
           action: 'tag_and_archive',
           tagId: 'tag-1',
+          promptId: 'prompt-1',
+          prompt: 'sunset sky',
           embedding: '[1,0,0]',
         },
       ]);
@@ -154,6 +162,8 @@ describe(ClassificationService.name, () => {
           similarity: 0.5,
           action: 'tag',
           tagId: null,
+          promptId: 'prompt-1',
+          prompt: 'sunset sky',
           embedding: '[1,0,0]',
         },
       ]);
@@ -183,6 +193,8 @@ describe(ClassificationService.name, () => {
           similarity: 0.5,
           action: 'tag',
           tagId: 'tag-1',
+          promptId: 'prompt-1',
+          prompt: 'sunset sky',
           embedding: '[1,0,0]',
         },
         {
@@ -191,6 +203,8 @@ describe(ClassificationService.name, () => {
           similarity: 0.5,
           action: 'tag',
           tagId: 'tag-2',
+          promptId: 'prompt-2',
+          prompt: 'nature scene',
           embedding: '[1,0,0]',
         },
       ]);
@@ -219,6 +233,8 @@ describe(ClassificationService.name, () => {
           similarity: 0.5,
           action: 'tag',
           tagId: 'tag-1',
+          promptId: 'prompt-1',
+          prompt: 'sunset sky',
           embedding: '[1,0,0]',
         },
       ]);
@@ -232,7 +248,11 @@ describe(ClassificationService.name, () => {
 
   describe('handleClassifyQueueAll', () => {
     it('should stream unclassified assets and queue jobs in batches', async () => {
-      const assets = [{ id: 'a1' }, { id: 'a2' }, { id: 'a3' }];
+      const assets = [
+        { id: 'a1', ownerId: 'user-1' },
+        { id: 'a2', ownerId: 'user-1' },
+        { id: 'a3', ownerId: 'user-1' },
+      ];
       mocks.classification.streamUnclassifiedAssets.mockReturnValue(makeStream(assets));
 
       const result = await sut.handleClassifyQueueAll({ userId: 'user-1' });
@@ -247,7 +267,7 @@ describe(ClassificationService.name, () => {
     });
 
     it('should flush exactly at 1000 boundary', async () => {
-      const assets = Array.from({ length: 1000 }, (_, i) => ({ id: `asset-${i}` }));
+      const assets = Array.from({ length: 1000 }, (_, i) => ({ id: `asset-${i}`, ownerId: 'user-1' }));
       mocks.classification.streamUnclassifiedAssets.mockReturnValue(makeStream(assets));
 
       await sut.handleClassifyQueueAll({});
@@ -273,7 +293,7 @@ describe(ClassificationService.name, () => {
         createdAt: new Date('2026-01-01'),
         updatedAt: new Date('2026-01-01'),
       } as any);
-      mocks.machineLearning.encodeText.mockResolvedValue([0.1, 0.2, 0.3]);
+      mocks.machineLearning.encodeText.mockResolvedValue('[0.1,0.2,0.3]');
       mocks.classification.upsertPromptEmbedding.mockResolvedValue(void 0 as any);
 
       const result = await sut.createCategory(authStub.user1, {
@@ -291,7 +311,7 @@ describe(ClassificationService.name, () => {
       expect(mocks.classification.upsertPromptEmbedding).toHaveBeenCalledWith({
         categoryId: 'cat-1',
         prompt: 'golden hour',
-        embedding: [0.1, 0.2, 0.3],
+        embedding: '[0.1,0.2,0.3]',
       });
     });
   });
@@ -326,7 +346,7 @@ describe(ClassificationService.name, () => {
     it('should re-encode prompts when prompts change', async () => {
       mocks.classification.getCategory.mockResolvedValue(existingCategory as any);
       mocks.classification.updateCategory.mockResolvedValue(existingCategory as any);
-      mocks.machineLearning.encodeText.mockResolvedValue([0.5, 0.5, 0.5]);
+      mocks.machineLearning.encodeText.mockResolvedValue('[0.5,0.5,0.5]');
       mocks.classification.deletePromptEmbeddingsByCategory.mockResolvedValue(void 0 as any);
       mocks.classification.upsertPromptEmbedding.mockResolvedValue(void 0 as any);
       mocks.classification.getPromptEmbeddings.mockResolvedValue([{ prompt: 'new prompt' }] as any);
@@ -338,7 +358,7 @@ describe(ClassificationService.name, () => {
       expect(mocks.classification.upsertPromptEmbedding).toHaveBeenCalledWith({
         categoryId: 'cat-1',
         prompt: 'new prompt',
-        embedding: [0.5, 0.5, 0.5],
+        embedding: '[0.5,0.5,0.5]',
       });
     });
 
@@ -460,7 +480,7 @@ describe(ClassificationService.name, () => {
       mocks.classification.getAllCategories.mockResolvedValue([{ id: 'cat-1' }] as any);
       mocks.classification.getPromptEmbeddings.mockResolvedValue([{ prompt: 'sunset' }] as any);
       mocks.classification.deletePromptEmbeddingsByCategory.mockResolvedValue(void 0 as any);
-      mocks.machineLearning.encodeText.mockResolvedValue([0.1, 0.2, 0.3]);
+      mocks.machineLearning.encodeText.mockResolvedValue('[0.1,0.2,0.3]');
       mocks.classification.upsertPromptEmbedding.mockResolvedValue(void 0 as any);
 
       await sut.onConfigUpdate({
