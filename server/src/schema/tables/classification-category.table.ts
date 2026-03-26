@@ -29,7 +29,7 @@ export class ClassificationCategoryTable {
   @Column({ type: 'real', default: 0.28 })
   similarity!: Generated<number>;
 
-  @Column({ type: 'character varying', default: "'tag'" })
+  @Column({ type: 'character varying', default: 'tag' })
   action!: Generated<string>;
 
   @Column({ type: 'boolean', default: true })

@@ -13,18 +13,22 @@ export async function up(db: Kysely<any>): Promise<void> {
       "createdAt" timestamp with time zone NOT NULL DEFAULT now(),
       "updatedAt" timestamp with time zone NOT NULL DEFAULT now(),
       "updateId" uuid NOT NULL DEFAULT immich_uuid_v7(),
-      CONSTRAINT "UQ_classification_category_userId_name" UNIQUE ("userId", "name")
+      CONSTRAINT "classification_category_userId_name_uq" UNIQUE ("userId", "name")
     )
   `.execute(db);
 
   await sql`
-    CREATE INDEX "IDX_classification_category_updateId" ON "classification_category" ("updateId")
+    CREATE INDEX "classification_category_updateId_idx" ON "classification_category" ("updateId")
   `.execute(db);
 
   await sql`
-    CREATE TRIGGER "classification_category_updatedAt"
+    CREATE INDEX "classification_category_tagId_idx" ON "classification_category" ("tagId")
+  `.execute(db);
+
+  await sql`
+    CREATE OR REPLACE TRIGGER "classification_category_updatedAt"
     BEFORE UPDATE ON "classification_category"
-    FOR EACH ROW EXECUTE FUNCTION updated_at('updatedAt')
+    FOR EACH ROW EXECUTE FUNCTION updated_at()
   `.execute(db);
 
   await sql`
@@ -39,7 +43,7 @@ export async function up(db: Kysely<any>): Promise<void> {
   `.execute(db);
 
   await sql`
-    CREATE INDEX "IDX_classification_prompt_embedding_categoryId" ON "classification_prompt_embedding" ("categoryId")
+    CREATE INDEX "classification_prompt_embedding_categoryId_idx" ON "classification_prompt_embedding" ("categoryId")
   `.execute(db);
 
   await sql`
