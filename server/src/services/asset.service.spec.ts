@@ -1819,6 +1819,43 @@ describe(AssetService.name, () => {
         }),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
+
+    it('should allow full-duration trim when undoing an existing trim', async () => {
+      const assetId = newUuid();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([assetId]));
+      // Existing trim with originalDuration — user is dragging handles back to full range
+      mocks.assetEdit.getAll.mockResolvedValue([
+        {
+          id: 'edit-1',
+          action: AssetEditAction.Trim,
+          parameters: { startTime: 10, endTime: 20, originalDuration: 30 },
+        },
+      ] as any);
+      mocks.asset.getForEdit.mockResolvedValue({
+        type: AssetType.Video,
+        livePhotoVideoId: null,
+        originalPath: '/data/library/video.mp4',
+        originalFileName: 'video.mp4',
+        duration: '0:00:10.000000',
+        exifImageWidth: 1920,
+        exifImageHeight: 1080,
+        orientation: null,
+        projectionType: null,
+      });
+      mocks.media.probe.mockResolvedValue({
+        videoStreams: [{ width: 1920, height: 1080 }],
+        audioStreams: [{}],
+        format: {},
+      } as any);
+      mocks.assetEdit.replaceAll.mockResolvedValue([]);
+
+      // Full-range trim (start=0, end=originalDuration) should succeed when undoing
+      await sut.editAsset(authStub.admin, assetId, {
+        edits: [{ action: AssetEditAction.Trim, parameters: { startTime: 0, endTime: 30 } }],
+      });
+
+      expect(mocks.assetEdit.replaceAll).toHaveBeenCalled();
+    });
   });
 
   describe('removeAssetEdits', () => {

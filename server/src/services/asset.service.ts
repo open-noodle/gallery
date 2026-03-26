@@ -626,7 +626,7 @@ export class AssetService extends BaseService {
         throw new BadRequestException('End time exceeds video duration');
       }
 
-      if (startTime === 0 && endTime >= durationSeconds) {
+      if (startTime === 0 && endTime >= durationSeconds && !existingTrim) {
         throw new BadRequestException('Trim must actually remove content');
       }
 
