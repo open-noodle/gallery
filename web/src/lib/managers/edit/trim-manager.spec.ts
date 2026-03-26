@@ -24,9 +24,7 @@ describe('TrimManager', () => {
     });
 
     it('should restore existing trim edits', async () => {
-      const edits: EditActions = [
-        { action: AssetEditAction.Trim, parameters: { startTime: 5, endTime: 25 } },
-      ];
+      const edits: EditActions = [{ action: AssetEditAction.Trim, parameters: { startTime: 5, endTime: 25 } }];
       await manager.onActivate(assetWithDuration('0:00:30.000000'), edits);
       expect(manager.startTime).toBe(5);
       expect(manager.endTime).toBe(25);

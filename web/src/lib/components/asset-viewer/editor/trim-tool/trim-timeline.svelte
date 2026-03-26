@@ -158,7 +158,19 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <div class="select-none">
-  <div class="relative h-12 rounded-md bg-gray-800 cursor-pointer" bind:this={trackElement} onclick={onTrackClick}>
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div
+    class="relative h-12 rounded-md bg-gray-800 cursor-pointer"
+    role="slider"
+    tabindex="-1"
+    aria-label="Video timeline"
+    aria-valuenow={Math.round(trimManager.currentTime)}
+    aria-valuemin={0}
+    aria-valuemax={Math.round(trimManager.duration)}
+    bind:this={trackElement}
+    onclick={onTrackClick}
+    onkeydown={() => {}}
+  >
     <!-- Dimmed left region -->
     <div class="absolute top-0 left-0 h-full rounded-l-md bg-black/70 z-[2]" style:width={startPctStyle}></div>
 
