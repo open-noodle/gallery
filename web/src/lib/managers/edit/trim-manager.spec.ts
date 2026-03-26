@@ -3,6 +3,16 @@ import { AssetEditAction, type AssetResponseDto } from '@immich/sdk';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TrimManager } from './trim-manager.svelte';
 
+// originalDuration is server-enriched at runtime, not part of the SDK type
+function trimEditWithOriginalDuration(startTime: number, endTime: number, originalDuration: number): EditActions {
+  return [
+    {
+      action: AssetEditAction.Trim,
+      parameters: { startTime, endTime, originalDuration } as unknown as { startTime: number; endTime: number },
+    },
+  ];
+}
+
 function assetWithDuration(duration: string): AssetResponseDto {
   return { duration } as AssetResponseDto;
 }
@@ -35,13 +45,7 @@ describe('TrimManager', () => {
       // After trimming, asset.duration is the trimmed duration (10s),
       // but the edit parameters store originalDuration (30s).
       // The timeline should show the full 30s range so the user can widen the trim.
-      const edits: EditActions = [
-        {
-          action: AssetEditAction.Trim,
-          parameters: { startTime: 10, endTime: 20, originalDuration: 30 },
-        },
-      ];
-      await manager.onActivate(assetWithDuration('0:00:10.000000'), edits);
+      await manager.onActivate(assetWithDuration('0:00:10.000000'), trimEditWithOriginalDuration(10, 20, 30));
       expect(manager.duration).toBe(30); // full original range, not 10
       expect(manager.startTime).toBe(10);
       expect(manager.endTime).toBe(20);
@@ -137,12 +141,7 @@ describe('TrimManager', () => {
     it('should allow widening trim beyond current trimmed duration', async () => {
       // Video was 120s, trimmed to 30-90 (60s). asset.duration is now 60s.
       // User re-opens editor — should be able to set start to 10 (before previous start).
-      const edits: EditActions = [
-        {
-          action: AssetEditAction.Trim,
-          parameters: { startTime: 30, endTime: 90, originalDuration: 120 },
-        },
-      ];
+      const edits = trimEditWithOriginalDuration(30, 90, 120);
       await manager.onActivate(assetWithDuration('0:01:00.000000'), edits);
 
       // Can set start earlier than previous trim
@@ -155,12 +154,7 @@ describe('TrimManager', () => {
     });
 
     it('should reset to full original duration, not trimmed duration', async () => {
-      const edits: EditActions = [
-        {
-          action: AssetEditAction.Trim,
-          parameters: { startTime: 30, endTime: 90, originalDuration: 120 },
-        },
-      ];
+      const edits = trimEditWithOriginalDuration(30, 90, 120);
       await manager.onActivate(assetWithDuration('0:01:00.000000'), edits);
 
       await manager.resetAllChanges();
@@ -170,12 +164,7 @@ describe('TrimManager', () => {
     });
 
     it('should clamp to original duration, not trimmed duration', async () => {
-      const edits: EditActions = [
-        {
-          action: AssetEditAction.Trim,
-          parameters: { startTime: 10, endTime: 20, originalDuration: 30 },
-        },
-      ];
+      const edits = trimEditWithOriginalDuration(10, 20, 30);
       await manager.onActivate(assetWithDuration('0:00:10.000000'), edits);
 
       // End should clamp to original 30s, not trimmed 10s
@@ -196,12 +185,7 @@ describe('TrimManager', () => {
 
     it('should not shrink duration if originalDuration is smaller than asset duration', async () => {
       // Edge case: originalDuration is somehow less than current — use the larger value
-      const edits: EditActions = [
-        {
-          action: AssetEditAction.Trim,
-          parameters: { startTime: 5, endTime: 15, originalDuration: 10 },
-        },
-      ];
+      const edits = trimEditWithOriginalDuration(5, 15, 10);
       await manager.onActivate(assetWithDuration('0:00:20.000000'), edits);
 
       // asset.duration (20s) > originalDuration (10s) — keep 20s
@@ -209,12 +193,7 @@ describe('TrimManager', () => {
     });
 
     it('should produce correct edits after widening a previous trim', async () => {
-      const edits: EditActions = [
-        {
-          action: AssetEditAction.Trim,
-          parameters: { startTime: 30, endTime: 90, originalDuration: 120 },
-        },
-      ];
+      const edits = trimEditWithOriginalDuration(30, 90, 120);
       await manager.onActivate(assetWithDuration('0:01:00.000000'), edits);
 
       // Widen the trim
