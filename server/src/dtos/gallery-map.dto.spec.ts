@@ -2,11 +2,11 @@ import { plainToInstance } from 'class-transformer';
 import { validateSync } from 'class-validator';
 import { FilteredMapMarkerDto } from 'src/dtos/gallery-map.dto';
 
-describe('FilteredMapMarkerDto', () => {
-  function transform(plain: Record<string, unknown>): FilteredMapMarkerDto {
-    return plainToInstance(FilteredMapMarkerDto, plain, { enableImplicitConversion: false });
-  }
+function transform(plain: Record<string, unknown>): FilteredMapMarkerDto {
+  return plainToInstance(FilteredMapMarkerDto, plain, { enableImplicitConversion: false });
+}
 
+describe('FilteredMapMarkerDto', () => {
   describe('personIds', () => {
     it('should normalize a single string to an array', () => {
       const dto = transform({ personIds: '7e57d004-2b97-0e7a-b45f-5387367791cd' });

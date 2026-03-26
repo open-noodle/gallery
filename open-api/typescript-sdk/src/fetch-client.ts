@@ -4924,7 +4924,9 @@ export function reassignFacesById({ id, faceDto }: {
 /**
  * Get filtered map markers
  */
-export function getFilteredMapMarkers({ isFavorite, make, model, personIds, rating, spaceId, tagIds, takenAfter, takenBefore, $type }: {
+export function getFilteredMapMarkers({ city, country, isFavorite, make, model, personIds, rating, spaceId, tagIds, takenAfter, takenBefore, $type }: {
+    city?: string;
+    country?: string;
     isFavorite?: boolean;
     make?: string;
     model?: string;
@@ -4940,6 +4942,8 @@ export function getFilteredMapMarkers({ isFavorite, make, model, personIds, rati
         status: 200;
         data: MapMarkerResponseDto[];
     }>(`/gallery/map/markers${QS.query(QS.explode({
+        city,
+        country,
         isFavorite,
         make,
         model,
