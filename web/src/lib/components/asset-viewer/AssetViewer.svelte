@@ -1,17 +1,18 @@
 <script lang="ts">
+  import { browser } from '$app/env';
   import { focusTrap } from '#lib/actions/focus-trap.ts';
   import { shortcuts } from '#lib/actions/shortcut.ts';
-  import OnEvents from '#lib/components/OnEvents.svelte';
-  import AssetViewerNavBar from '#lib/components/asset-viewer/AssetViewerNavBar.svelte';
-  import { preloadManager } from '#lib/components/asset-viewer/PreloadManager.svelte.ts';
+  import type { Action, OnAction, PreAction } from '#lib/components/asset-viewer/actions/action.ts';
   import NextAssetAction from '#lib/components/asset-viewer/actions/NextAssetAction.svelte';
   import PreviousAssetAction from '#lib/components/asset-viewer/actions/PreviousAssetAction.svelte';
-  import type { Action, OnAction, PreAction } from '#lib/components/asset-viewer/actions/action.ts';
+  import AssetViewerNavBar from '#lib/components/asset-viewer/AssetViewerNavBar.svelte';
+  import { preloadManager } from '#lib/components/asset-viewer/PreloadManager.svelte.ts';
+  import OnEvents from '#lib/components/OnEvents.svelte';
   import { AssetAction, ProjectionType } from '#lib/constants.ts';
   import { activityManager } from '#lib/managers/activity-manager.svelte.ts';
   import { assetViewerManager } from '#lib/managers/asset-viewer-manager.svelte.ts';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
-  import { EditToolType, editManager } from '#lib/managers/edit/edit-manager.svelte.ts';
+  import { editManager, EditToolType } from '#lib/managers/edit/edit-manager.svelte.ts';
   import { eventManager } from '#lib/managers/event-manager.svelte.ts';
   import type { TimelineAsset } from '#lib/managers/timeline-manager/types.ts';
   import { getAssetActions } from '#lib/services/asset.service.ts';
@@ -23,8 +24,8 @@
   import type { OnUndoDelete } from '#lib/utils/actions.ts';
   import { navigateToAsset } from '#lib/utils/asset-utils.ts';
   import { handleError } from '#lib/utils/handle-error.ts';
-  import { InvocationTracker } from '#lib/utils/invocationTracker.ts';
   import { navigate } from '#lib/utils/navigation.ts';
+  import { InvocationTracker } from '#lib/utils/invocationTracker.ts';
   import { SlideshowHistory } from '#lib/utils/slideshow-history.ts';
   import { toTimelineAsset } from '#lib/utils/timeline-util.ts';
   import {
@@ -41,19 +42,19 @@
   import type { SwipeCustomEvent } from 'svelte-gestures';
   import { t } from 'svelte-i18n';
   import { fly } from 'svelte/transition';
-  import { browser } from '$app/env';
   import Thumbnail from '../assets/thumbnail/Thumbnail.svelte';
   import ActivityStatus from './ActivityStatus.svelte';
   import ActivityViewer from './ActivityViewer.svelte';
   import DetailPanel from './DetailPanel.svelte';
+  import EditorPanel from './editor/EditorPanel.svelte';
+  import TrimArea from './editor/trim-tool/trim-area.svelte';
+  import CropArea from './editor/transform-tool/CropArea.svelte';
   import ImagePanoramaViewer from './ImagePanoramaViewer.svelte';
   import OcrButton from './OcrButton.svelte';
   import PhotoViewer from './PhotoViewer.svelte';
   import SlideshowBar from './SlideshowBar.svelte';
   import SlideshowMetadataOverlay from './SlideshowMetadataOverlay.svelte';
   import VideoViewer from './VideoWrapperViewer.svelte';
-  import EditorPanel from './editor/EditorPanel.svelte';
-  import CropArea from './editor/transform-tool/CropArea.svelte';
 
   export type AssetCursor = {
     current: AssetResponseDto;
@@ -104,7 +105,6 @@
 
   let previewStackedAsset: AssetResponseDto | undefined = $state();
   let stack: StackResponseDto | undefined = $state();
-
   const asset = $derived(previewStackedAsset ?? cursor.current);
   const nextAsset = $derived(cursor.nextAsset);
   const previousAsset = $derived(cursor.previousAsset);
@@ -431,6 +431,9 @@
     if (previewStackedAsset) {
       return previewStackedAsset.type === AssetTypeEnum.Image ? 'PhotoViewer' : 'StackVideoViewer';
     }
+    if (assetViewerManager.isShowEditor && editManager.selectedTool?.type === EditToolType.Trim) {
+      return 'TrimArea';
+    }
     if (asset.type === AssetTypeEnum.Video) {
       return 'VideoViewer';
     }
@@ -549,7 +552,7 @@
   {/if}
 
   <!-- Asset Viewer -->
-  <div data-testid="viewer-content" class="relative z-[-1] col-span-4 col-start-1 row-span-full row-start-1">
+  <div data-viewer-content class="relative z-[-1] col-span-4 col-start-1 row-span-full row-start-1">
     {#if viewerKind === 'StackVideoViewer'}
       <VideoViewer
         asset={previewStackedAsset!}
@@ -577,6 +580,8 @@
       />
     {:else if viewerKind === 'ImagePanaramaViewer'}
       <ImagePanoramaViewer {asset} />
+    {:else if viewerKind === 'TrimArea'}
+      <TrimArea {asset} />
     {:else if viewerKind === 'CropArea'}
       <CropArea {asset} />
     {:else if viewerKind === 'PhotoViewer'}
@@ -629,7 +634,7 @@
   {#if showDetailPanel || assetViewerManager.isShowEditor}
     <div
       transition:fly={{ duration: 150 }}
-      data-testid="detail-panel"
+      id="detail-panel"
       class={[
         'row-span-4 row-start-1 overflow-y-auto bg-light transition-all dark:border-l dark:border-s-immich-dark-gray',
         showDetailPanel ? 'w-90' : 'w-100',
@@ -645,7 +650,7 @@
   {/if}
 
   {#if stack && withStacked && !assetViewerManager.isShowEditor && $slideshowState === SlideshowState.None}
-    <div data-testid="stack-slideshow" class="absolute bottom-0 col-span-4 col-start-1 w-fit max-w-full">
+    <div id="stack-slideshow" class="absolute bottom-0 col-span-4 col-start-1 w-fit max-w-full">
       <div class="no-wrap horizontal-scrollbar relative flex flex-row overflow-x-auto overflow-y-hidden">
         {#each stack.assets as stackedAsset (stackedAsset.id)}
           <div
