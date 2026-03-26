@@ -150,9 +150,8 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-<div class="select-none">
   <div
-    class="relative h-12 rounded-md bg-gray-800 cursor-pointer"
+    class="relative h-12 rounded-md bg-gray-800 cursor-pointer select-none"
     role="slider"
     tabindex="-1"
     aria-label="Video timeline"
@@ -245,4 +244,3 @@
       <span>{label}</span>
     {/each}
   </div>
-</div>
