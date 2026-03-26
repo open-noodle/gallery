@@ -73,7 +73,7 @@ describe('buildMapFilterConfig', () => {
       const config = buildMapFilterConfig();
       const people = await config.providers.people!();
 
-      expect(people[0].thumbnailUrl).toBe('/people/1/thumbnail');
+      expect(people[0].thumbnailUrl).toContain('/people/1/thumbnail');
     });
 
     it('should exclude unnamed people in space config', async () => {

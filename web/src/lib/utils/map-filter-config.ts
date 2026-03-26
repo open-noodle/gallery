@@ -50,7 +50,11 @@ export function buildMapFilterConfig(spaceId?: string): FilterPanelConfig {
         getAllPeople({ withHidden: false }).then((response) =>
           response.people
             .filter((p) => p.name)
-            .map((p) => ({ id: p.id, name: p.name, thumbnailUrl: `/people/${p.id}/thumbnail` })),
+            .map((p) => ({
+              id: p.id,
+              name: p.name,
+              thumbnailUrl: createUrl(`/people/${p.id}/thumbnail`, { updatedAt: p.updatedAt }),
+            })),
         ),
       cameras: (context?: FilterContext) =>
         getSearchSuggestions({
