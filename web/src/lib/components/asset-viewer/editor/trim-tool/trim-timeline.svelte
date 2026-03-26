@@ -150,98 +150,98 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
+<div
+  class="relative h-12 rounded-md bg-gray-800 cursor-pointer select-none"
+  role="slider"
+  tabindex="-1"
+  aria-label="Video timeline"
+  aria-valuenow={Math.round(trimManager.currentTime)}
+  aria-valuemin={0}
+  aria-valuemax={Math.round(trimManager.duration)}
+  bind:this={trackElement}
+  onclick={onTrackClick}
+  onkeydown={handleKeydown}
+>
+  <!-- Dimmed left region -->
+  <div class="absolute top-0 left-0 h-full rounded-l-md bg-black/70 z-[2]" style:width={startPctStyle}></div>
+
+  <!-- Dimmed right region -->
+  <div class="absolute top-0 right-0 h-full rounded-r-md bg-black/70 z-[2]" style:width={endPctStyle}></div>
+
+  <!-- Trim region (kept) -->
   <div
-    class="relative h-12 rounded-md bg-gray-800 cursor-pointer select-none"
-    role="slider"
-    tabindex="-1"
-    aria-label="Video timeline"
-    aria-valuenow={Math.round(trimManager.currentTime)}
-    aria-valuemin={0}
-    aria-valuemax={Math.round(trimManager.duration)}
-    bind:this={trackElement}
-    onclick={onTrackClick}
-    onkeydown={handleKeydown}
+    class="absolute top-0 h-full z-[1] border-t-2 border-b-2 border-immich-primary/60"
+    style:left={startPctStyle}
+    style:right={endPctStyle}
   >
-    <!-- Dimmed left region -->
-    <div class="absolute top-0 left-0 h-full rounded-l-md bg-black/70 z-[2]" style:width={startPctStyle}></div>
-
-    <!-- Dimmed right region -->
-    <div class="absolute top-0 right-0 h-full rounded-r-md bg-black/70 z-[2]" style:width={endPctStyle}></div>
-
-    <!-- Trim region (kept) -->
-    <div
-      class="absolute top-0 h-full z-[1] border-t-2 border-b-2 border-immich-primary/60"
-      style:left={startPctStyle}
-      style:right={endPctStyle}
-    >
-      <!-- Time labels above trim region -->
-      <div class="absolute -top-5.5 z-[6] flex w-full justify-between pointer-events-none">
-        <span class="text-[0.65rem] font-medium text-immich-primary tabular-nums bg-gray-900/80 px-1 rounded-sm">
-          {formatTime(trimManager.startTime)}
-        </span>
-        <span class="text-[0.65rem] font-medium text-immich-primary tabular-nums bg-gray-900/80 px-1 rounded-sm">
-          {formatTime(trimManager.endTime)}
-        </span>
-      </div>
-    </div>
-
-    <!-- In handle -->
-    <div
-      class="absolute -top-0.5 w-3.5 z-[4] flex items-center justify-center rounded-l bg-immich-primary/85 hover:bg-immich-primary cursor-col-resize transition-colors"
-      style:left={handleInStyle}
-      style:height="calc(100% + 4px)"
-      role="slider"
-      tabindex={0}
-      aria-label="Trim start"
-      aria-valuenow={Math.round(trimManager.startTime * 10) / 10}
-      aria-valuemin={0}
-      aria-valuemax={Math.round(trimManager.endTime * 10) / 10}
-      onpointerdown={(e) => onHandlePointerDown('start', e)}
-      onkeydown={(e) => onHandleKeydown('start', e)}
-    >
-      <div class="flex flex-col gap-[3px]">
-        <span class="block w-1.5 h-[1.5px] bg-black/70 rounded-sm"></span>
-        <span class="block w-1.5 h-[1.5px] bg-black/70 rounded-sm"></span>
-        <span class="block w-1.5 h-[1.5px] bg-black/70 rounded-sm"></span>
-      </div>
-    </div>
-
-    <!-- Out handle -->
-    <div
-      class="absolute -top-0.5 w-3.5 z-[4] flex items-center justify-center rounded-r bg-immich-primary/85 hover:bg-immich-primary cursor-col-resize transition-colors"
-      style:left={handleOutStyle}
-      style:height="calc(100% + 4px)"
-      role="slider"
-      tabindex={0}
-      aria-label="Trim end"
-      aria-valuenow={Math.round(trimManager.endTime * 10) / 10}
-      aria-valuemin={Math.round(trimManager.startTime * 10) / 10}
-      aria-valuemax={Math.round(trimManager.duration * 10) / 10}
-      onpointerdown={(e) => onHandlePointerDown('end', e)}
-      onkeydown={(e) => onHandleKeydown('end', e)}
-    >
-      <div class="flex flex-col gap-[3px]">
-        <span class="block w-1.5 h-[1.5px] bg-black/70 rounded-sm"></span>
-        <span class="block w-1.5 h-[1.5px] bg-black/70 rounded-sm"></span>
-        <span class="block w-1.5 h-[1.5px] bg-black/70 rounded-sm"></span>
-      </div>
-    </div>
-
-    <!-- Playhead -->
-    <div
-      class="absolute -top-1 w-0.5 z-[5] bg-white rounded-sm pointer-events-none shadow-[0_0_6px_rgba(255,255,255,0.3)]"
-      style:left={playheadPctStyle}
-      style:height="calc(100% + 8px)"
-    >
-      <div
-        class="absolute -top-[3px] left-1/2 -translate-x-1/2 w-2 h-2 bg-white rounded-full shadow-[0_0_4px_rgba(255,255,255,0.4)]"
-      ></div>
+    <!-- Time labels above trim region -->
+    <div class="absolute -top-5.5 z-[6] flex w-full justify-between pointer-events-none">
+      <span class="text-[0.65rem] font-medium text-immich-primary tabular-nums bg-gray-900/80 px-1 rounded-sm">
+        {formatTime(trimManager.startTime)}
+      </span>
+      <span class="text-[0.65rem] font-medium text-immich-primary tabular-nums bg-gray-900/80 px-1 rounded-sm">
+        {formatTime(trimManager.endTime)}
+      </span>
     </div>
   </div>
 
-  <!-- Full duration tick labels -->
-  <div class="flex justify-between mt-2 px-0.5 text-[0.7rem] text-gray-500 tabular-nums">
-    {#each timeLabels as label, i (i)}
-      <span>{label}</span>
-    {/each}
+  <!-- In handle -->
+  <div
+    class="absolute -top-0.5 w-3.5 z-[4] flex items-center justify-center rounded-l bg-immich-primary/85 hover:bg-immich-primary cursor-col-resize transition-colors"
+    style:left={handleInStyle}
+    style:height="calc(100% + 4px)"
+    role="slider"
+    tabindex={0}
+    aria-label="Trim start"
+    aria-valuenow={Math.round(trimManager.startTime * 10) / 10}
+    aria-valuemin={0}
+    aria-valuemax={Math.round(trimManager.endTime * 10) / 10}
+    onpointerdown={(e) => onHandlePointerDown('start', e)}
+    onkeydown={(e) => onHandleKeydown('start', e)}
+  >
+    <div class="flex flex-col gap-[3px]">
+      <span class="block w-1.5 h-[1.5px] bg-black/70 rounded-sm"></span>
+      <span class="block w-1.5 h-[1.5px] bg-black/70 rounded-sm"></span>
+      <span class="block w-1.5 h-[1.5px] bg-black/70 rounded-sm"></span>
+    </div>
   </div>
+
+  <!-- Out handle -->
+  <div
+    class="absolute -top-0.5 w-3.5 z-[4] flex items-center justify-center rounded-r bg-immich-primary/85 hover:bg-immich-primary cursor-col-resize transition-colors"
+    style:left={handleOutStyle}
+    style:height="calc(100% + 4px)"
+    role="slider"
+    tabindex={0}
+    aria-label="Trim end"
+    aria-valuenow={Math.round(trimManager.endTime * 10) / 10}
+    aria-valuemin={Math.round(trimManager.startTime * 10) / 10}
+    aria-valuemax={Math.round(trimManager.duration * 10) / 10}
+    onpointerdown={(e) => onHandlePointerDown('end', e)}
+    onkeydown={(e) => onHandleKeydown('end', e)}
+  >
+    <div class="flex flex-col gap-[3px]">
+      <span class="block w-1.5 h-[1.5px] bg-black/70 rounded-sm"></span>
+      <span class="block w-1.5 h-[1.5px] bg-black/70 rounded-sm"></span>
+      <span class="block w-1.5 h-[1.5px] bg-black/70 rounded-sm"></span>
+    </div>
+  </div>
+
+  <!-- Playhead -->
+  <div
+    class="absolute -top-1 w-0.5 z-[5] bg-white rounded-sm pointer-events-none shadow-[0_0_6px_rgba(255,255,255,0.3)]"
+    style:left={playheadPctStyle}
+    style:height="calc(100% + 8px)"
+  >
+    <div
+      class="absolute -top-[3px] left-1/2 -translate-x-1/2 w-2 h-2 bg-white rounded-full shadow-[0_0_4px_rgba(255,255,255,0.4)]"
+    ></div>
+  </div>
+</div>
+
+<!-- Full duration tick labels -->
+<div class="flex justify-between mt-2 px-0.5 text-[0.7rem] text-gray-500 tabular-nums">
+  {#each timeLabels as label, i (i)}
+    <span>{label}</span>
+  {/each}
+</div>
