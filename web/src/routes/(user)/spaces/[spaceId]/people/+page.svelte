@@ -141,12 +141,9 @@
   {/snippet}
   {#snippet buttons()}
     {#if isEditor}
-      <Button
-        leadingIcon={mdiEyeOutline}
-        onclick={openVisibilityModal}
-        size="small"
-        variant="ghost"
-        color="secondary">{$t('show_and_hide_people')}</Button>
+      <Button leadingIcon={mdiEyeOutline} onclick={openVisibilityModal} size="small" variant="ghost" color="secondary"
+        >{$t('show_and_hide_people')}</Button
+      >
     {/if}
   {/snippet}
 

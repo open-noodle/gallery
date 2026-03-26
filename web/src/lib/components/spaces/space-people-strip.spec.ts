@@ -59,10 +59,7 @@ describe('SpacePeopleStrip', () => {
   });
 
   it('should render nothing when all people are unnamed', () => {
-    const people = [
-      makePerson({ id: 'p1', name: '', alias: null }),
-      makePerson({ id: 'p2', name: '', alias: null }),
-    ];
+    const people = [makePerson({ id: 'p1', name: '', alias: null }), makePerson({ id: 'p2', name: '', alias: null })];
     render(SpacePeopleStrip, { people, spaceId: 'space-1' });
     expect(screen.queryByTestId('people-strip')).not.toBeInTheDocument();
   });

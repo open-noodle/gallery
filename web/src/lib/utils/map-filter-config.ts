@@ -20,7 +20,9 @@ export function buildMapFilterConfig(spaceId?: string): FilterPanelConfig {
               .map((p) => ({
                 id: p.id,
                 name: p.name,
-                thumbnailUrl: createUrl(`/shared-spaces/${spaceId}/people/${p.id}/thumbnail`, { updatedAt: p.updatedAt }),
+                thumbnailUrl: createUrl(`/shared-spaces/${spaceId}/people/${p.id}/thumbnail`, {
+                  updatedAt: p.updatedAt,
+                }),
               })),
           ),
         cameras: (context?: FilterContext) =>
