@@ -22,5 +22,5 @@ export function formatSecondsToDuration(seconds: number): string {
   const secs = seconds % 60;
   const wholeSecs = Math.floor(secs);
   const fractional = (secs - wholeSecs).toFixed(6).slice(2);
-  return `${hours}:${String(minutes).padStart(2, '0')}:${String(wholeSecs).padStart(2, '0')}.${fractional}`;
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(wholeSecs).padStart(2, '0')}.${fractional}`;
 }

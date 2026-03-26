@@ -24,15 +24,30 @@ describe('parseDurationToSeconds', () => {
 });
 
 describe('formatSecondsToDuration', () => {
-  it('should format seconds to HH:MM:SS.ffffff', () => {
-    expect(formatSecondsToDuration(323.456_789)).toBe('0:05:23.456789');
+  it('should format seconds to ISO HH:MM:SS.ffffff format', () => {
+    expect(formatSecondsToDuration(323.456_789)).toBe('00:05:23.456789');
   });
 
   it('should format zero', () => {
-    expect(formatSecondsToDuration(0)).toBe('0:00:00.000000');
+    expect(formatSecondsToDuration(0)).toBe('00:00:00.000000');
   });
 
-  it('should format hours', () => {
-    expect(formatSecondsToDuration(5025)).toBe('1:23:45.000000');
+  it('should format hours with zero-padding', () => {
+    expect(formatSecondsToDuration(5025)).toBe('01:23:45.000000');
+  });
+
+  it('should produce a duration parseable by luxon Duration.fromISOTime', () => {
+    // This is critical: the thumbnail display uses Duration.fromISOTime()
+    // which requires HH:MM:SS format (not H:MM:SS)
+    const formatted = formatSecondsToDuration(65.5);
+    expect(formatted).toBe('00:01:05.500000');
+    expect(formatted).toMatch(/^\d{2}:\d{2}:\d{2}\.\d+$/);
+  });
+
+  it('should roundtrip with parseDurationToSeconds', () => {
+    const original = 185.75;
+    const formatted = formatSecondsToDuration(original);
+    const parsed = parseDurationToSeconds(formatted);
+    expect(parsed).toBeCloseTo(original);
   });
 });
