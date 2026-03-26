@@ -46,7 +46,7 @@
   import ActivityViewer from './activity-viewer.svelte';
   import DetailPanel from './detail-panel.svelte';
   import EditorPanel from './editor/editor-panel.svelte';
-  import TrimTimeline from './editor/trim-tool/trim-timeline.svelte';
+  import TrimArea from './editor/trim-tool/trim-area.svelte';
   import CropArea from './editor/transform-tool/crop-area.svelte';
   import ImagePanoramaViewer from './image-panorama-viewer.svelte';
   import OcrButton from './ocr-button.svelte';
@@ -396,6 +396,9 @@
     if (previewStackedAsset) {
       return previewStackedAsset.type === AssetTypeEnum.Image ? 'PhotoViewer' : 'StackVideoViewer';
     }
+    if (assetViewerManager.isShowEditor && editManager.selectedTool?.type === EditToolType.Trim) {
+      return 'TrimArea';
+    }
     if (asset.type === AssetTypeEnum.Video) {
       return 'VideoViewer';
     }
@@ -534,6 +537,8 @@
       />
     {:else if viewerKind === 'ImagePanaramaViewer'}
       <ImagePanoramaViewer {asset} />
+    {:else if viewerKind === 'TrimArea'}
+      <TrimArea {asset} />
     {:else if viewerKind === 'CropArea'}
       <CropArea {asset} />
     {:else if viewerKind === 'PhotoViewer'}
@@ -553,12 +558,6 @@
         onVideoElementReady={(el) => (videoElement = el)}
         {playOriginalVideo}
       />
-    {/if}
-
-    {#if assetViewerManager.isShowEditor && editManager.selectedTool?.type === EditToolType.Trim}
-      <div class="absolute bottom-0 left-0 right-0 z-10 px-4 pb-4">
-        <TrimTimeline />
-      </div>
     {/if}
 
     {#if showActivityStatus}
@@ -599,7 +598,7 @@
         </div>
       {:else if assetViewerManager.isShowEditor}
         <div class="w-100 h-full">
-          <EditorPanel {asset} {videoElement} onClose={closeEditor} />
+          <EditorPanel {asset} onClose={closeEditor} />
         </div>
       {/if}
     </div>
