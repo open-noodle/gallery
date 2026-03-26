@@ -601,12 +601,20 @@ export class AssetService extends BaseService {
         throw new BadRequestException('Cannot trim audio-only files');
       }
 
-      const durationSeconds = parseDurationToSeconds(asset.duration);
+      // When re-trimming, asset.duration reflects the previous trim.
+      // Use originalDuration from the existing trim edit if available.
+      const existingEdits = await this.assetEditRepository.getAll(id);
+      const existingTrim = existingEdits.find((e) => e.action === AssetEditAction.Trim);
+      const existingOriginalDuration = existingTrim
+        ? (existingTrim.parameters as TrimParameters & { originalDuration?: number }).originalDuration
+        : undefined;
+
+      const durationSeconds = existingOriginalDuration ?? parseDurationToSeconds(asset.duration);
       if (durationSeconds === null || durationSeconds <= 0) {
         throw new BadRequestException('Video duration is not available');
       }
 
-      // Very short video check
+      // Very short video check (against original duration)
       if (durationSeconds < 2) {
         throw new BadRequestException('Video is too short to trim (minimum 2 seconds)');
       }
@@ -622,7 +630,7 @@ export class AssetService extends BaseService {
         throw new BadRequestException('Trim must actually remove content');
       }
 
-      // Enrich with originalDuration before storing
+      // Enrich with originalDuration before storing (preserve original, not current trimmed)
       (trim.parameters as TrimParameters & { originalDuration: number }).originalDuration = durationSeconds;
     } else {
       // Existing image validation

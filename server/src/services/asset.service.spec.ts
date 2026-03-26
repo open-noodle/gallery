@@ -1576,6 +1576,7 @@ describe(AssetService.name, () => {
     it('should accept trim on video assets', async () => {
       const assetId = newUuid();
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([assetId]));
+      mocks.assetEdit.getAll.mockResolvedValue([]);
       mocks.asset.getForEdit.mockResolvedValue({
         type: AssetType.Video,
         livePhotoVideoId: null,
@@ -1609,6 +1610,44 @@ describe(AssetService.name, () => {
       expect(mocks.assetEdit.replaceAll).toHaveBeenCalled();
     });
 
+    it('should allow re-trimming wider than current trimmed duration using originalDuration', async () => {
+      const assetId = newUuid();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([assetId]));
+      // Current duration is the trimmed duration (10s), not the original (30s)
+      mocks.asset.getForEdit.mockResolvedValue({
+        type: AssetType.Video,
+        livePhotoVideoId: null,
+        originalPath: '/data/library/video.mp4',
+        originalFileName: 'video.mp4',
+        duration: '0:00:10.000000',
+        exifImageWidth: 1920,
+        exifImageHeight: 1080,
+        orientation: null,
+        projectionType: null,
+      });
+      mocks.media.probe.mockResolvedValue({
+        videoStreams: [{ width: 1920, height: 1080 }],
+        audioStreams: [{}],
+        format: {},
+      } as any);
+      // Existing trim edit has originalDuration of 30s
+      mocks.assetEdit.getAll.mockResolvedValue([
+        {
+          id: 'edit-1',
+          action: AssetEditAction.Trim,
+          parameters: { startTime: 10, endTime: 20, originalDuration: 30 },
+        },
+      ] as any);
+      mocks.assetEdit.replaceAll.mockResolvedValue([]);
+
+      // Re-trim to 5-25 (wider than current 10s duration, but within original 30s)
+      await sut.editAsset(authStub.admin, assetId, {
+        edits: [{ action: AssetEditAction.Trim, parameters: { startTime: 5, endTime: 25 } }],
+      });
+
+      expect(mocks.assetEdit.replaceAll).toHaveBeenCalled();
+    });
+
     it('should reject trim on image assets', async () => {
       const assetId = newUuid();
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([assetId]));
@@ -1634,6 +1673,7 @@ describe(AssetService.name, () => {
     it('should reject trim with endTime exceeding duration', async () => {
       const assetId = newUuid();
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([assetId]));
+      mocks.assetEdit.getAll.mockResolvedValue([]);
       mocks.asset.getForEdit.mockResolvedValue({
         type: AssetType.Video,
         livePhotoVideoId: null,
@@ -1743,6 +1783,7 @@ describe(AssetService.name, () => {
     it('should reject trim on very short videos', async () => {
       const assetId = newUuid();
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([assetId]));
+      mocks.assetEdit.getAll.mockResolvedValue([]);
       mocks.asset.getForEdit.mockResolvedValue({
         type: AssetType.Video,
         livePhotoVideoId: null,
@@ -1770,6 +1811,7 @@ describe(AssetService.name, () => {
     it('should reject full-duration trim (no-op)', async () => {
       const assetId = newUuid();
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([assetId]));
+      mocks.assetEdit.getAll.mockResolvedValue([]);
       mocks.asset.getForEdit.mockResolvedValue({
         type: AssetType.Video,
         livePhotoVideoId: null,
