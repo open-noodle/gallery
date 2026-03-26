@@ -21,7 +21,14 @@ import {
   mapStats,
 } from 'src/dtos/asset.dto';
 import { AuthDto } from 'src/dtos/auth.dto';
-import { AssetEditAction, AssetEditActionItem, AssetEditsCreateDto, AssetEditsResponseDto } from 'src/dtos/editing.dto';
+import { StorageCore } from 'src/cores/storage.core';
+import {
+  AssetEditAction,
+  AssetEditActionItem,
+  AssetEditsCreateDto,
+  AssetEditsResponseDto,
+  TrimParameters,
+} from 'src/dtos/editing.dto';
 import { AssetOcrResponseDto } from 'src/dtos/ocr.dto';
 import {
   AssetFileType,
@@ -47,6 +54,7 @@ import {
 } from 'src/utils/asset.util';
 import { updateLockedColumns } from 'src/utils/database';
 import { extractTimeZone } from 'src/utils/date';
+import { parseDurationToSeconds } from 'src/utils/duration';
 import { transformOcrBoundingBox } from 'src/utils/transform';
 
 @Injectable()
@@ -561,57 +569,111 @@ export class AssetService extends BaseService {
       throw new BadRequestException('Asset not found');
     }
 
-    if (asset.type !== AssetType.Image) {
-      throw new BadRequestException('Only images can be edited');
-    }
-
-    if (asset.livePhotoVideoId) {
-      throw new BadRequestException('Editing live photos is not supported');
-    }
-
-    if (isPanorama(asset)) {
-      throw new BadRequestException('Editing panorama images is not supported');
-    }
-
-    if (asset.originalPath?.toLowerCase().endsWith('.gif')) {
-      throw new BadRequestException('Editing GIF images is not supported');
-    }
-
-    if (asset.originalPath?.toLowerCase().endsWith('.svg')) {
-      throw new BadRequestException('Editing SVG images is not supported');
-    }
-
-    // check that crop parameters will not go out of bounds
-    const { width: assetWidth, height: assetHeight } = getDimensions(asset);
-
-    if (!assetWidth || !assetHeight) {
-      throw new BadRequestException('Asset dimensions are not available for editing');
-    }
-
     const edits = dto.edits as AssetEditActionItem[];
-    const crop = edits.find((e) => e.action === AssetEditAction.Crop);
-    if (crop) {
-      if (edits[0].action !== AssetEditAction.Crop) {
-        throw new BadRequestException('Crop action must be the first edit action');
+    const hasTrim = edits.some((e) => e.action === AssetEditAction.Trim);
+    const hasSpatial = edits.some((e) =>
+      [AssetEditAction.Crop, AssetEditAction.Rotate, AssetEditAction.Mirror].includes(e.action),
+    );
+
+    // Reject mixed spatial + trim edits
+    if (hasTrim && hasSpatial) {
+      throw new BadRequestException('Cannot combine trim with spatial edits');
+    }
+
+    if (hasTrim) {
+      // Video trim validation
+      if (asset.type !== AssetType.Video) {
+        throw new BadRequestException('Trim is only supported for video assets');
       }
 
-      // check that crop parameters will not go out of bounds
-      const { width: assetWidth, height: assetHeight } = getDimensions(asset);
+      if (asset.livePhotoVideoId) {
+        throw new BadRequestException('Trimming live photos is not supported');
+      }
 
+      // S3/cloud storage check
+      if (!StorageCore.isImmichPath(asset.originalPath)) {
+        throw new BadRequestException('Video trimming is not available for cloud-stored videos');
+      }
+
+      // Audio-only file check
+      const probeResult = await this.mediaRepository.probe(asset.originalPath);
+      if (!probeResult.videoStreams || probeResult.videoStreams.length === 0) {
+        throw new BadRequestException('Cannot trim audio-only files');
+      }
+
+      const durationSeconds = parseDurationToSeconds(asset.duration);
+      if (durationSeconds === null || durationSeconds <= 0) {
+        throw new BadRequestException('Video duration is not available');
+      }
+
+      // Very short video check
+      if (durationSeconds < 2) {
+        throw new BadRequestException('Video is too short to trim (minimum 2 seconds)');
+      }
+
+      // Concurrent edit job check
+      const activeJobs = await this.jobRepository.getJobCounts(QueueName.Editor);
+      if (activeJobs.active > 0) {
+        throw new BadRequestException('An edit is already in progress for this asset');
+      }
+
+      const trim = edits.find((e) => e.action === AssetEditAction.Trim)!;
+      const { startTime, endTime } = trim.parameters as TrimParameters;
+
+      if (endTime > durationSeconds) {
+        throw new BadRequestException('End time exceeds video duration');
+      }
+
+      if (startTime === 0 && endTime >= durationSeconds) {
+        throw new BadRequestException('Trim must actually remove content');
+      }
+
+      // Enrich with originalDuration before storing
+      (trim.parameters as TrimParameters & { originalDuration: number }).originalDuration = durationSeconds;
+    } else {
+      // Existing image validation
+      if (asset.type !== AssetType.Image) {
+        throw new BadRequestException('Only images can be edited');
+      }
+
+      if (asset.livePhotoVideoId) {
+        throw new BadRequestException('Editing live photos is not supported');
+      }
+
+      if (isPanorama(asset)) {
+        throw new BadRequestException('Editing panorama images is not supported');
+      }
+
+      if (asset.originalPath?.toLowerCase().endsWith('.gif')) {
+        throw new BadRequestException('Editing GIF images is not supported');
+      }
+
+      if (asset.originalPath?.toLowerCase().endsWith('.svg')) {
+        throw new BadRequestException('Editing SVG images is not supported');
+      }
+
+      // Crop bounds validation
+      const { width: assetWidth, height: assetHeight } = getDimensions(asset);
       if (!assetWidth || !assetHeight) {
         throw new BadRequestException('Asset dimensions are not available for editing');
       }
 
-      const { x, y, width, height } = crop.parameters;
-      if (x + width > assetWidth || y + height > assetHeight) {
-        throw new BadRequestException('Crop parameters are out of bounds');
+      const crop = edits.find((e) => e.action === AssetEditAction.Crop);
+      if (crop) {
+        if (edits[0].action !== AssetEditAction.Crop) {
+          throw new BadRequestException('Crop action must be the first edit action');
+        }
+
+        const { x, y, width, height } = crop.parameters;
+        if (x + width > assetWidth || y + height > assetHeight) {
+          throw new BadRequestException('Crop parameters are out of bounds');
+        }
       }
     }
 
     const newEdits = await this.assetEditRepository.replaceAll(id, edits);
     await this.jobRepository.queue({ name: JobName.AssetEditThumbnailGeneration, data: { id } });
 
-    // Return the asset and its applied edits
     return {
       assetId: id,
       edits: newEdits,
