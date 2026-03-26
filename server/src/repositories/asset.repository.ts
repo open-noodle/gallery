@@ -1300,7 +1300,16 @@ export class AssetRepository {
     return this.db
       .selectFrom('asset')
       .select(['asset.originalPath'])
-      .select((eb) => withFilePath(eb, AssetFileType.EncodedVideo).as('encodedVideoPath'))
+      .select((eb) =>
+        eb
+          .selectFrom('asset_file')
+          .select('asset_file.path')
+          .whereRef('asset_file.assetId', '=', 'asset.id')
+          .where('asset_file.type', '=', AssetFileType.EncodedVideo)
+          .orderBy('asset_file.isEdited', 'desc')
+          .limit(1)
+          .as('encodedVideoPath'),
+      )
       .where('asset.id', '=', id)
       .where('asset.type', '=', AssetType.Video)
       .executeTakeFirst();
