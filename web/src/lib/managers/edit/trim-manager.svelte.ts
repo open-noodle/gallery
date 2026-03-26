@@ -35,7 +35,7 @@ export class TrimManager implements EditToolManager {
     ] as EditAction[];
   });
 
-  async onActivate(asset: AssetResponseDto, edits: EditActions): Promise<void> {
+  onActivate(asset: AssetResponseDto, edits: EditActions): Promise<void> {
     this.duration = this.parseDuration(asset.duration);
     this.startTime = 0;
     this.endTime = this.duration;
@@ -49,6 +49,7 @@ export class TrimManager implements EditToolManager {
       this.endTime = params.endTime;
       this.hasChanges = true;
     }
+    return Promise.resolve();
   }
 
   onDeactivate(): void {
@@ -57,10 +58,11 @@ export class TrimManager implements EditToolManager {
     this.videoElement = undefined;
   }
 
-  async resetAllChanges(): Promise<void> {
+  resetAllChanges(): Promise<void> {
     this.startTime = 0;
     this.endTime = this.duration;
     this.hasChanges = false;
+    return Promise.resolve();
   }
 
   setVideoElement(element: HTMLVideoElement | undefined): void {
@@ -113,6 +115,21 @@ export class TrimManager implements EditToolManager {
   seekTo(time: number): void {
     if (this.videoElement) {
       this.videoElement.currentTime = time;
+    }
+  }
+
+  togglePlayPause(): void {
+    if (!this.videoElement) {
+      return;
+    }
+    if (this.videoElement.paused) {
+      // If playhead is outside trim range, move to start
+      if (this.currentTime < this.startTime || this.currentTime >= this.endTime) {
+        this.videoElement.currentTime = this.startTime;
+      }
+      void this.videoElement.play();
+    } else {
+      this.videoElement.pause();
     }
   }
 
