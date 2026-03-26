@@ -51,7 +51,18 @@
   });
 
   let selectHidden = $state(false);
-  const visiblePeople = $derived(people.filter((p) => !p.isHidden));
+  const visiblePeople = $derived(
+    people
+      .filter((p) => !p.isHidden)
+      .toSorted((a, b) => {
+        const aHasName = a.name ? 0 : 1;
+        const bHasName = b.name ? 0 : 1;
+        if (aHasName !== bHasName) {
+          return aHasName - bHasName;
+        }
+        return b.assetCount - a.assetCount;
+      }),
+  );
   let allPeople = $state<SharedSpacePersonResponseDto[]>([]);
 
   // Name editing state

@@ -126,6 +126,20 @@ describe('SpacePeopleStrip', () => {
     expect(onPersonClick).toHaveBeenCalledWith('p1');
   });
 
+  it('should display named people sorted by assetCount descending', () => {
+    const people = [
+      makePerson({ id: 'named-few', name: 'Alice', assetCount: 2 }),
+      makePerson({ id: 'named-many', name: 'Bob', assetCount: 50 }),
+      makePerson({ id: 'unnamed-many', name: '', assetCount: 100 }),
+    ];
+    render(SpacePeopleStrip, { people, spaceId: 'space-1' });
+
+    const buttons = screen.getAllByTestId(/^person-thumb-/);
+    // Named only (unnamed filtered out), sorted by assetCount desc
+    expect(buttons[0]).toHaveAttribute('data-testid', 'person-thumb-named-many');
+    expect(buttons[1]).toHaveAttribute('data-testid', 'person-thumb-named-few');
+  });
+
   it('should show "See all" link when people count exceeds threshold', () => {
     const people = Array.from({ length: 8 }, (_, i) => makePerson({ id: `p${i}`, name: `Person ${i}` }));
     render(SpacePeopleStrip, { people, spaceId: 'space-1' });
