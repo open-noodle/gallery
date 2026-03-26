@@ -133,7 +133,7 @@ export class EditManager {
   async applyEdits(): Promise<boolean> {
     this.isApplyingEdits = true;
 
-    const edits = this.tools.flatMap((tool) => tool.manager.edits);
+    const edits = this.selectedTool ? this.selectedTool.manager.edits : [];
     if (!this.currentAsset) {
       return false;
     }
