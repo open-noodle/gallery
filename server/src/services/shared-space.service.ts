@@ -663,7 +663,12 @@ export class SharedSpaceService extends BaseService {
       data: { personId },
     });
 
-    return this.mapSpacePerson(updated, faceCount, assetCount, alias?.alias ?? null);
+    const enriched = await this.sharedSpaceRepository.getPersonById(personId);
+    if (!enriched) {
+      throw new BadRequestException('Person not found');
+    }
+
+    return this.mapSpacePerson(enriched, faceCount, assetCount, alias?.alias ?? null);
   }
 
   async deleteSpacePerson(auth: AuthDto, spaceId: string, personId: string): Promise<void> {
@@ -680,7 +685,7 @@ export class SharedSpaceService extends BaseService {
       spaceId,
       userId: auth.user.id,
       type: SharedSpaceActivityType.PersonDelete,
-      data: { personId, personName: person.name },
+      data: { personId, personName: person.name || person.personalName || '' },
     });
   }
 
