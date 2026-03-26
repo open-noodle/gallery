@@ -5,6 +5,7 @@ export enum AssetEditAction {
   Crop = 'crop',
   Rotate = 'rotate',
   Mirror = 'mirror',
+  Trim = 'trim',
 }
 
 export const AssetEditActionSchema = z
@@ -45,28 +46,48 @@ const MirrorParametersSchema = z
   })
   .meta({ id: 'MirrorParameters' });
 
+const TrimParametersSchema = z
+  .object({
+    startTime: z.number().min(0).describe('Start time in seconds'),
+    endTime: z.number().min(0).describe('End time in seconds'),
+  })
+  .refine((params) => params.endTime > params.startTime, {
+    error: 'endTime must be greater than startTime',
+    path: ['endTime'],
+  })
+  .meta({ id: 'TrimParameters' });
+
 // TODO: ideally we would use the discriminated union directly in the future not only for type support but also for validation and openapi generation
 const __AssetEditActionItemSchema = z.discriminatedUnion('action', [
   z.object({ action: AssetEditActionSchema.extract(['Crop']), parameters: CropParametersSchema }),
   z.object({ action: AssetEditActionSchema.extract(['Rotate']), parameters: RotateParametersSchema }),
   z.object({ action: AssetEditActionSchema.extract(['Mirror']), parameters: MirrorParametersSchema }),
+  z.object({ action: AssetEditActionSchema.extract(['Trim']), parameters: TrimParametersSchema }),
 ]);
 
 const AssetEditParametersSchema = z
-  .union([CropParametersSchema, RotateParametersSchema, MirrorParametersSchema], {
+  .union([CropParametersSchema, RotateParametersSchema, MirrorParametersSchema, TrimParametersSchema], {
     error: getExpectedKeysByActionMessage,
   })
-  .describe('List of edit actions to apply (crop, rotate, or mirror)');
+  .describe('List of edit actions to apply (crop, rotate, mirror, or trim)');
 
 const actionParameterMap = {
   [AssetEditAction.Crop]: CropParametersSchema,
   [AssetEditAction.Rotate]: RotateParametersSchema,
   [AssetEditAction.Mirror]: MirrorParametersSchema,
+  [AssetEditAction.Trim]: TrimParametersSchema,
+} as const;
+
+const actionParameterKeys = {
+  [AssetEditAction.Crop]: Object.keys(CropParametersSchema.shape),
+  [AssetEditAction.Rotate]: Object.keys(RotateParametersSchema.shape),
+  [AssetEditAction.Mirror]: Object.keys(MirrorParametersSchema.shape),
+  [AssetEditAction.Trim]: ['startTime', 'endTime'],
 } as const;
 
 function getExpectedKeysByActionMessage(): string {
   const expectedByAction = Object.entries(actionParameterMap)
-    .map(([action, schema]) => `${action}: [${Object.keys(schema.shape).join(', ')}]`)
+    .map(([action]) => `${action}: [${actionParameterKeys[action as AssetEditAction].join(', ')}]`)
     .join('; ');
 
   return `Invalid parameters for action, expected keys by action: ${expectedByAction}`;
@@ -86,7 +107,7 @@ const AssetEditActionItemSchema = z
       ctx.addIssue({
         code: 'custom',
         path: ['parameters'],
-        message: `Invalid parameters for action '${edit.action}', expecting keys: ${Object.keys(actionParameterMap[edit.action].shape).join(', ')}`,
+        message: `Invalid parameters for action '${edit.action}', expecting keys: ${actionParameterKeys[edit.action].join(', ')}`,
       });
     }
   })
@@ -112,7 +133,7 @@ const AssetEditsCreateSchema = z
     edits: z
       .array(AssetEditActionItemSchema)
       .min(1)
-      .describe('List of edit actions to apply (crop, rotate, or mirror)')
+      .describe('List of edit actions to apply (crop, rotate, mirror, or trim)')
       .refine(uniqueEditActions, { error: 'Duplicate edit actions are not allowed' }),
   })
   .meta({ id: 'AssetEditsCreateDto' });
@@ -132,3 +153,4 @@ export class AssetEditActionItemResponseDto extends createZodDto(AssetEditAction
 export class AssetEditsCreateDto extends createZodDto(AssetEditsCreateSchema) {}
 export class AssetEditsResponseDto extends createZodDto(AssetEditsResponseSchema) {}
 export type CropParameters = z.infer<typeof CropParametersSchema>;
+export type TrimParameters = z.infer<typeof TrimParametersSchema>;
