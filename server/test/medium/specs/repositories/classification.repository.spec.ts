@@ -90,10 +90,7 @@ describe(ClassificationRepository.name, () => {
 
       // Insert smart_search entry so the JOIN succeeds
       const embedding = `[${Array.from({ length: 512 }, () => '0.01').join(',')}]`;
-      await ctx.database
-        .insertInto('smart_search')
-        .values({ assetId: asset.id, embedding })
-        .execute();
+      await ctx.database.insertInto('smart_search').values({ assetId: asset.id, embedding }).execute();
 
       // Override classifiedAt to null (newJobStatus sets defaults)
       await ctx.database
@@ -124,10 +121,7 @@ describe(ClassificationRepository.name, () => {
       const embedding = `[${Array.from({ length: 512 }, () => '0.01').join(',')}]`;
       for (const asset of [asset1, asset2]) {
         await ctx.newJobStatus({ assetId: asset.id });
-        await ctx.database
-          .insertInto('smart_search')
-          .values({ assetId: asset.id, embedding })
-          .execute();
+        await ctx.database.insertInto('smart_search').values({ assetId: asset.id, embedding }).execute();
         await ctx.database
           .updateTable('asset_job_status')
           .set({ classifiedAt: null })

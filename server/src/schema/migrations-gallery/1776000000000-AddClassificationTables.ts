@@ -50,7 +50,9 @@ export async function up(db: Kysely<any>): Promise<void> {
     ALTER TABLE "asset_job_status" ADD "classifiedAt" timestamp with time zone
   `.execute(db);
 
-  await sql`INSERT INTO "migration_overrides" ("name", "value") VALUES ('trigger_classification_category_updatedAt', '{"type":"trigger","name":"classification_category_updatedAt","sql":"CREATE OR REPLACE TRIGGER \\"classification_category_updatedAt\\"\\n  BEFORE UPDATE ON \\"classification_category\\"\\n  FOR EACH ROW\\n  EXECUTE FUNCTION updated_at();"}'::jsonb)`.execute(db);
+  await sql`INSERT INTO "migration_overrides" ("name", "value") VALUES ('trigger_classification_category_updatedAt', '{"type":"trigger","name":"classification_category_updatedAt","sql":"CREATE OR REPLACE TRIGGER \\"classification_category_updatedAt\\"\\n  BEFORE UPDATE ON \\"classification_category\\"\\n  FOR EACH ROW\\n  EXECUTE FUNCTION updated_at();"}'::jsonb)`.execute(
+    db,
+  );
 }
 
 export async function down(db: Kysely<any>): Promise<void> {

@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { InjectKysely } from 'nestjs-kysely';
 import { Insertable, Kysely, Updateable } from 'kysely';
+import { InjectKysely } from 'nestjs-kysely';
+import { DummyValue, GenerateSql } from 'src/decorators';
+import { LoggingRepository } from 'src/repositories/logging.repository';
 import { DB } from 'src/schema';
 import { ClassificationCategoryTable } from 'src/schema/tables/classification-category.table';
 import { ClassificationPromptEmbeddingTable } from 'src/schema/tables/classification-prompt-embedding.table';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { DummyValue, GenerateSql } from 'src/decorators';
 
 @Injectable()
 export class ClassificationRepository {
