@@ -611,12 +611,6 @@ export class AssetService extends BaseService {
         throw new BadRequestException('Video is too short to trim (minimum 2 seconds)');
       }
 
-      // Concurrent edit job check
-      const activeJobs = await this.jobRepository.getJobCounts(QueueName.Editor);
-      if (activeJobs.active > 0) {
-        throw new BadRequestException('An edit is already in progress for this asset');
-      }
-
       const trim = edits.find((e) => e.action === AssetEditAction.Trim)!;
       const { startTime, endTime } = trim.parameters as TrimParameters;
 

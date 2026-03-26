@@ -1767,41 +1767,6 @@ describe(AssetService.name, () => {
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
-    it('should reject trim when edit job is in progress', async () => {
-      const assetId = newUuid();
-      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([assetId]));
-      mocks.asset.getForEdit.mockResolvedValue({
-        type: AssetType.Video,
-        livePhotoVideoId: null,
-        originalPath: '/data/library/video.mp4',
-        originalFileName: 'video.mp4',
-        duration: '0:00:30.000000',
-        exifImageWidth: 1920,
-        exifImageHeight: 1080,
-        orientation: null,
-        projectionType: null,
-      });
-      mocks.media.probe.mockResolvedValue({
-        videoStreams: [{ width: 1920, height: 1080 }],
-        audioStreams: [],
-        format: {},
-      } as any);
-      mocks.job.getJobCounts.mockResolvedValue({
-        active: 1,
-        completed: 0,
-        failed: 0,
-        delayed: 0,
-        waiting: 0,
-        paused: 0,
-      });
-
-      await expect(
-        sut.editAsset(authStub.admin, assetId, {
-          edits: [{ action: AssetEditAction.Trim, parameters: { startTime: 5, endTime: 25 } }],
-        }),
-      ).rejects.toThrow('edit is already in progress');
-    });
-
     it('should reject full-duration trim (no-op)', async () => {
       const assetId = newUuid();
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([assetId]));
