@@ -22,13 +22,11 @@
     loopVideo: boolean;
     cacheKey: string | null;
     playOriginalVideo: boolean;
-    isEditing?: boolean;
     onPreviousAsset?: () => void;
     onNextAsset?: () => void;
     onVideoEnded?: () => void;
     onVideoStarted?: () => void;
     onClose?: () => void;
-    onVideoElementReady?: (element: HTMLVideoElement) => void;
   }
 
   let {
@@ -36,13 +34,11 @@
     loopVideo,
     cacheKey,
     playOriginalVideo,
-    isEditing = false,
     onPreviousAsset = () => {},
     onNextAsset = () => {},
     onVideoEnded = () => {},
     onVideoStarted = () => {},
     onClose = () => {},
-    onVideoElementReady,
   }: Props = $props();
 
   let videoPlayer: HTMLVideoElement | undefined = $state();
@@ -123,12 +119,6 @@
       videoPlayer?.pause();
     }
   });
-
-  $effect(() => {
-    if (videoPlayer) {
-      onVideoElementReady?.(videoPlayer);
-    }
-  });
 </script>
 
 {#if showVideo}
@@ -153,7 +143,7 @@
         loop={$loopVideoPreference && loopVideo}
         autoplay={$autoPlayVideo}
         playsinline
-        controls={!isEditing}
+        controls
         disablePictureInPicture
         class="h-full object-contain"
         {...useSwipe(onSwipe)}

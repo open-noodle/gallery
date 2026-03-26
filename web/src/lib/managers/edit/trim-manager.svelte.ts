@@ -7,7 +7,6 @@ export class TrimManager implements EditToolManager {
   duration = $state(0);
   currentTime = $state(0);
   isPlaying = $state(false);
-  activeHandle = $state<'start' | 'end' | null>(null);
 
   hasChanges = $state(false);
   canReset = $derived(this.hasChanges);
@@ -131,6 +130,15 @@ export class TrimManager implements EditToolManager {
     } else {
       this.videoElement.pause();
     }
+  }
+
+  static formatTime(seconds: number): string {
+    if (seconds < 0) {
+      seconds = 0;
+    }
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toFixed(1).padStart(4, '0')}`;
   }
 
   private parseDuration(duration: string | null | undefined): number {

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { TrimManager } from '$lib/managers/edit/trim-manager.svelte';
+  import { TrimManager } from '$lib/managers/edit/trim-manager.svelte';
 
   interface Props {
     trimManager: TrimManager;
@@ -12,14 +12,7 @@
   let lastSeekTime = 0;
   const SEEK_THROTTLE_MS = 100;
 
-  function formatTime(seconds: number): string {
-    if (seconds < 0) {
-      seconds = 0;
-    }
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m}:${s.toFixed(1).padStart(4, '0')}`;
-  }
+  const formatTime = TrimManager.formatTime;
 
   function pctToTime(pct: number): number {
     return Math.max(0, Math.min(trimManager.duration, pct * trimManager.duration));

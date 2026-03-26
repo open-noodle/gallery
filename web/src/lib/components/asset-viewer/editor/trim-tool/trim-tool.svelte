@@ -1,14 +1,7 @@
 <script lang="ts">
-  import { trimManager } from '$lib/managers/edit/trim-manager.svelte';
+  import { trimManager, TrimManager } from '$lib/managers/edit/trim-manager.svelte';
 
-  function formatTime(seconds: number): string {
-    if (seconds < 0) {
-      seconds = 0;
-    }
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m}:${s.toFixed(1).padStart(4, '0')}`;
-  }
+  const formatTime = TrimManager.formatTime;
 
   function parseTime(value: string): number | undefined {
     const match = value.match(/^(\d+):(\d{2})(?:\.(\d))?$/);
