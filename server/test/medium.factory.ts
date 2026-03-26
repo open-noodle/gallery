@@ -19,6 +19,7 @@ import {
 } from 'src/enum';
 import { AccessRepository } from 'src/repositories/access.repository';
 import { ActivityRepository } from 'src/repositories/activity.repository';
+import { ClassificationRepository } from 'src/repositories/classification.repository';
 import { AlbumUserRepository } from 'src/repositories/album-user.repository';
 import { AlbumRepository } from 'src/repositories/album.repository';
 import { AssetEditRepository } from 'src/repositories/asset-edit.repository';
@@ -511,6 +512,7 @@ const newRealRepository = <T>(key: ClassConstructor<T>, db: Kysely<DB>): T => {
       return new key(LoggingRepository.create());
     }
 
+    case ClassificationRepository:
     case TagRepository: {
       return new key(db, LoggingRepository.create());
     }
@@ -531,6 +533,7 @@ const newMockRepository = <T>(key: ClassConstructor<T>) => {
     case AlbumRepository:
     case AssetRepository:
     case AssetJobRepository:
+    case ClassificationRepository:
     case ConfigRepository:
     case CryptoRepository:
     case MemoryRepository:
