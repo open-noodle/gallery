@@ -2702,7 +2702,6 @@ describe(SharedSpaceService.name, () => {
       const person = factory.sharedSpacePerson({
         id: personId,
         name: '',
-        thumbnailPath: '',
         representativeFaceId: faceId,
       });
       mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
@@ -2727,7 +2726,6 @@ describe(SharedSpaceService.name, () => {
       const person = factory.sharedSpacePerson({
         id: personId,
         name: 'Grandpa',
-        thumbnailPath: '/path/to/thumb.jpg',
         representativeFaceId: faceId,
       });
       mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
@@ -2751,7 +2749,6 @@ describe(SharedSpaceService.name, () => {
       const person = factory.sharedSpacePerson({
         id: personId,
         name: '',
-        thumbnailPath: '',
         representativeFaceId: faceId,
       });
       mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
@@ -2771,7 +2768,6 @@ describe(SharedSpaceService.name, () => {
       const person = factory.sharedSpacePerson({
         id: personId,
         name: '',
-        thumbnailPath: '',
         representativeFaceId: null,
       });
       mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
@@ -2792,7 +2788,6 @@ describe(SharedSpaceService.name, () => {
       const person = factory.sharedSpacePerson({
         id: personId,
         name: 'Custom Name',
-        thumbnailPath: '',
         representativeFaceId: faceId,
       });
       mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
@@ -2915,7 +2910,7 @@ describe(SharedSpaceService.name, () => {
       const spaceId = newUuid();
       const personId = newUuid();
       const faceId = newUuid();
-      const person = factory.sharedSpacePerson({ id: personId, spaceId, thumbnailPath: '', representativeFaceId: faceId });
+      const person = factory.sharedSpacePerson({ id: personId, spaceId, representativeFaceId: faceId });
       mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
       mocks.sharedSpace.getPersonById.mockResolvedValue({
         ...person,
@@ -2933,7 +2928,7 @@ describe(SharedSpaceService.name, () => {
       const spaceId = newUuid();
       const personId = newUuid();
       const faceId = newUuid();
-      const person = factory.sharedSpacePerson({ id: personId, spaceId, thumbnailPath: '', representativeFaceId: faceId });
+      const person = factory.sharedSpacePerson({ id: personId, spaceId, representativeFaceId: faceId });
       mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
       mocks.sharedSpace.getPersonById.mockResolvedValue({
         ...person,
@@ -2948,7 +2943,7 @@ describe(SharedSpaceService.name, () => {
       const spaceId = newUuid();
       mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
       mocks.sharedSpace.getPersonById.mockResolvedValue({
-        ...factory.sharedSpacePerson({ spaceId, thumbnailPath: '', representativeFaceId: null }),
+        ...factory.sharedSpacePerson({ spaceId, representativeFaceId: null }),
         personalName: null,
         personalThumbnailPath: null,
       });
@@ -2959,7 +2954,7 @@ describe(SharedSpaceService.name, () => {
     it('should throw NotFoundException when person belongs to different space', async () => {
       mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
       mocks.sharedSpace.getPersonById.mockResolvedValue({
-        ...factory.sharedSpacePerson({ spaceId: 'other-space', thumbnailPath: '/path/to/thumb.jpg' }),
+        ...factory.sharedSpacePerson({ spaceId: 'other-space' }),
         personalName: null,
         personalThumbnailPath: null,
       });

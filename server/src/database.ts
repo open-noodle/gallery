@@ -365,7 +365,6 @@ export type SharedSpacePerson = {
   spaceId: string;
   name: string;
   representativeFaceId: string | null;
-  thumbnailPath: string;
   isHidden: boolean;
   type: string;
   birthDate: string | null;

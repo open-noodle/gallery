@@ -1037,7 +1037,7 @@ export class SharedSpaceService extends BaseService {
       id: person.id,
       spaceId: person.spaceId,
       name: person.name || person.personalName || '',
-      thumbnailPath: person.personalThumbnailPath || person.thumbnailPath || '',
+      thumbnailPath: person.personalThumbnailPath || '',
       isHidden: person.isHidden,
       birthDate: person.birthDate,
       representativeFaceId: person.representativeFaceId,
