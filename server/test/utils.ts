@@ -27,6 +27,8 @@ import { AssetEditRepository } from 'src/repositories/asset-edit.repository';
 import { AssetFileRepository } from 'src/repositories/asset-file.repository';
 import { AssetJobRepository } from 'src/repositories/asset-job.repository';
 import { AssetRepository } from 'src/repositories/asset.repository';
+import { AuditRepository } from 'src/repositories/audit.repository';
+import { ClassificationRepository } from 'src/repositories/classification.repository';
 import { ClusterGroupRepository } from 'src/repositories/cluster-group.repository';
 import { ConfigRepository } from 'src/repositories/config.repository';
 import { CronRepository } from 'src/repositories/cron.repository';
@@ -246,6 +248,7 @@ export type ServiceOverrides = {
   assetFile: AssetFileRepository;
   assetJob: AssetJobRepository;
   clusterGroup: ClusterGroupRepository;
+  classification: ClassificationRepository;
   config: ConfigRepository;
   cron: CronRepository;
   crypto: CryptoRepository;
@@ -335,6 +338,8 @@ export const getMocks = () => {
     assetJob: automock(AssetJobRepository),
     clusterGroup: automock(ClusterGroupRepository),
     app: automock(AppRepository, { strict: false }),
+    // eslint-disable-next-line no-sparse-arrays
+    classification: automock(ClassificationRepository, { args: [, loggerMock], strict: false }),
     config: newConfigRepositoryMock(),
     database: databaseMock,
     downloadRepository: automock(DownloadRepository, { strict: false }),
@@ -413,6 +418,7 @@ export const newTestService = <T extends BaseService>(
     overrides.assetJob || (mocks.assetJob as As<AssetJobRepository>),
     overrides.clusterGroup || (mocks.clusterGroup as As<ClusterGroupRepository>),
     overrides.config || (mocks.config as As<ConfigRepository> as ConfigRepository),
+    overrides.classification || (mocks.classification as As<ClassificationRepository>),
     overrides.cron || (mocks.cron as As<CronRepository>),
     overrides.crypto || (mocks.crypto as As<CryptoRepository>),
     overrides.database || (mocks.database as As<DatabaseRepository>),

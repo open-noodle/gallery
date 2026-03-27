@@ -172,7 +172,7 @@ describe(JobService.name, () => {
       },
       {
         item: { name: JobName.SmartSearch, data: { id: 'asset-1' } },
-        jobs: [],
+        jobs: [JobName.AssetClassify],
       },
       {
         item: { name: JobName.AssetDetectFaces, data: { id: 'asset-1' } },
@@ -703,7 +703,14 @@ describe(JobService.name, () => {
         data: { id },
       });
 
-      expect(mocks.job.queue).not.toHaveBeenCalled();
+      expect(mocks.job.queue).not.toHaveBeenCalledWith({
+        name: JobName.AssetDetectDuplicates,
+        data: expect.anything(),
+      });
+      expect(mocks.job.queue).toHaveBeenCalledWith({
+        name: JobName.AssetClassify,
+        data: { id },
+      });
     });
 
     it('should not queue AssetDetectDuplicates when source is sidecar-write', async () => {
@@ -715,7 +722,14 @@ describe(JobService.name, () => {
         data: { id, source: 'sidecar-write' },
       });
 
-      expect(mocks.job.queue).not.toHaveBeenCalled();
+      expect(mocks.job.queue).not.toHaveBeenCalledWith({
+        name: JobName.AssetDetectDuplicates,
+        data: expect.anything(),
+      });
+      expect(mocks.job.queue).toHaveBeenCalledWith({
+        name: JobName.AssetClassify,
+        data: { id },
+      });
     });
   });
 
