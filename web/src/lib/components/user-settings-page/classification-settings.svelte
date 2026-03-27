@@ -165,7 +165,8 @@
 
       <div class="flex flex-col gap-4">
         <div>
-          <label for="category-name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name</label>
+          <label for="category-name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name</label
+          >
           <input
             id="category-name"
             type="text"
@@ -268,7 +269,9 @@
                 </span>
               </div>
               <Text size="tiny" color="muted">
-                {category.prompts.length} prompt{category.prompts.length === 1 ? '' : 's'} &middot; {getSimilarityLabel(category.similarity)}
+                {category.prompts.length} prompt{category.prompts.length === 1 ? '' : 's'} &middot; {getSimilarityLabel(
+                  category.similarity,
+                )}
                 ({category.similarity.toFixed(2)})
               </Text>
             </div>
