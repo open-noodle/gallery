@@ -874,6 +874,8 @@ class ApiClient {
           return TranscodePolicyTypeTransformer().decode(value);
         case 'TrashResponseDto':
           return TrashResponseDto.fromJson(value);
+        case 'TrimParameters':
+          return TrimParameters.fromJson(value);
         case 'UpdateAlbumDto':
           return UpdateAlbumDto.fromJson(value);
         case 'UpdateAlbumUserDto':

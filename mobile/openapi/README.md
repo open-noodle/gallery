@@ -719,6 +719,7 @@ Class | Method | HTTP request | Description
  - [TranscodeHWAccel](doc//TranscodeHWAccel.md)
  - [TranscodePolicy](doc//TranscodePolicy.md)
  - [TrashResponseDto](doc//TrashResponseDto.md)
+ - [TrimParameters](doc//TrimParameters.md)
  - [UpdateAlbumDto](doc//UpdateAlbumDto.md)
  - [UpdateAlbumUserDto](doc//UpdateAlbumUserDto.md)
  - [UpdateAssetDto](doc//UpdateAssetDto.md)
