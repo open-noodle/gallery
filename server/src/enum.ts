@@ -912,6 +912,7 @@ export enum QueueName {
   IntegrityCheck = 'integrityCheck',
   Editor = 'editor',
   StorageBackendMigration = 'storageBackendMigration',
+  Classification = 'classification',
 }
 
 export const QueueNameSchema = z.enum(QueueName).describe('Queue name').meta({ id: 'QueueName' });
@@ -1037,6 +1038,10 @@ export enum JobName {
 
   // Shared Space Bulk Operations
   SharedSpaceBulkAddAssets = 'SharedSpaceBulkAddAssets',
+
+  // Classification
+  AssetClassifyQueueAll = 'AssetClassifyQueueAll',
+  AssetClassify = 'AssetClassify',
 }
 
 export const JobNameSchema = z.enum(JobName).describe('Job name').meta({ id: 'JobName' });
@@ -1326,6 +1331,8 @@ export enum ApiTag {
   AuthenticationAdmin = 'Authentication (admin)',
   Assets = 'Assets',
   AssetFiles = 'Asset files',
+  Backups = 'Backups',
+  Classification = 'Classification',
   ConfigUser = 'Config (user)',
   ConfigAdmin = 'Config (admin)',
   ConfigPublic = 'Config (public)',
