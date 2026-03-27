@@ -12,7 +12,7 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions: {}
 
@@ -23,6 +23,7 @@ jobs:
     permissions:
       contents: read
     outputs:
+      skip: ${{ steps.version.outputs.skip }}
       version: ${{ steps.version.outputs.version }}
       major: ${{ steps.version.outputs.major }}
     steps:
@@ -39,6 +40,21 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           INPUT_VERSION: ${{ inputs.version }}
         run: |
+          # Check for changelog:skip label on the merged PR (skip for manual dispatch)
+          if [[ -z "$INPUT_VERSION" ]]; then
+            commit_msg_check=$(git log -1 --pretty=%B)
+            pr_num=$(echo "$commit_msg_check" | grep -oP '#\K[0-9]+' | head -1)
+            if [[ -n "$pr_num" ]]; then
+              pr_labels=$(gh pr view "$pr_num" --json labels --jq '.labels[].name' 2>/dev/null || true)
+              if echo "$pr_labels" | grep -q 'changelog:skip'; then
+                echo "skip=true" >> "$GITHUB_OUTPUT"
+                echo "Skipping release — changelog:skip label found on PR #${pr_num}"
+                exit 0
+              fi
+            fi
+          fi
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
           if [[ -n "$INPUT_VERSION" ]]; then
             echo "version=$INPUT_VERSION" >> "$GITHUB_OUTPUT"
           else
@@ -87,6 +103,7 @@ jobs:
 
   build-server:
     name: Build Server (${{ matrix.platform }})
+    if: needs.version.outputs.skip != 'true'
     needs: version
     runs-on: ${{ matrix.runner }}
     permissions:
@@ -159,6 +176,7 @@ jobs:
 
   merge-server:
     name: Merge Server Manifest
+    if: needs.version.outputs.skip != 'true'
     needs: [version, build-server]
     runs-on: ubuntu-latest
     permissions:
@@ -195,6 +213,7 @@ jobs:
 
   build-ml:
     name: Build ML ${{ matrix.device }} (${{ matrix.platform }})
+    if: needs.version.outputs.skip != 'true'
     needs: version
     runs-on: ${{ matrix.runner }}
     permissions:
@@ -269,6 +288,7 @@ jobs:
 
   merge-ml:
     name: Merge ML Manifest (${{ matrix.device }})
+    if: needs.version.outputs.skip != 'true'
     needs: [version, build-ml]
     runs-on: ubuntu-latest
     permissions:
@@ -314,6 +334,7 @@ jobs:
 
   tag:
     name: Create Git Tag
+    if: needs.version.outputs.skip != 'true'
     needs: [version, merge-server, merge-ml]
     runs-on: ubuntu-latest
     permissions:
