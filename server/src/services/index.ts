@@ -56,6 +56,7 @@ import { PetDetectionService } from 'src/services/pet-detection.service.js';
 import { SharedSpaceService } from 'src/services/shared-space.service.js';
 import { StorageMigrationService } from 'src/services/storage-migration.service.js';
 import { UserGroupService } from 'src/services/user-group.service.js';
+import { ClassificationService } from 'src/services/classification.service.js';
 
 export const services = [
   ApiKeyService,
@@ -67,6 +68,7 @@ export const services = [
   AssetService,
   AuthService,
   AuthAdminService,
+  ClassificationService,
   CliService,
   DatabaseBackupService,
   DatabaseService,
