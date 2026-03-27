@@ -57,6 +57,7 @@
     [QueueName.Editor]: $t('editor'),
     [QueueName.IntegrityCheck]: $t('integrity_checks'),
     [QueueName.StorageBackendMigration]: 'Storage Backend Migration',
+    [QueueName.Classification]: 'Auto-Classification',
   });
 </script>
 
