@@ -991,6 +991,7 @@
   "duplicates_description": "Resolve each group by indicating which, if any, are duplicates.",
   "duration": "Duration",
   "edit": "Edit",
+  "edited": "Edited",
   "edit_album": "Edit album",
   "edit_avatar": "Edit avatar",
   "edit_birthday": "Edit birthday",
