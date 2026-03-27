@@ -434,6 +434,7 @@ describe(QueueService.name, () => {
         [QueueName.Workflow]: expected,
         [QueueName.IntegrityCheck]: expected,
         [QueueName.Editor]: expected,
+        [QueueName.Classification]: expected,
         [QueueName.StorageBackendMigration]: expected,
       });
     });

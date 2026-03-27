@@ -80,6 +80,10 @@
       allText: $t('all'),
       missingText: $t('missing'),
     },
+    [QueueName.Classification]: {
+      allText: $t('all'),
+      missingText: $t('missing'),
+    },
     [QueueName.VideoConversion]: {
       allText: $t('all'),
       missingText: $t('missing'),
