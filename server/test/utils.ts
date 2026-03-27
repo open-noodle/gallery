@@ -92,6 +92,7 @@ import { ITelemetryRepositoryMock, newTelemetryRepositoryMock } from 'test/repos
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { StorageMigrationRepository } from 'src/repositories/storage-migration.repository.js';
 import { UserGroupRepository } from 'src/repositories/user-group.repository.js';
+import { ClassificationRepository } from 'src/repositories/classification.repository.js';
 import { RepositoryInterface } from 'src/types.js';
 
 export type ControllerContext = {
@@ -247,6 +248,7 @@ export type ServiceOverrides = {
   assetFile: AssetFileRepository;
   assetJob: AssetJobRepository;
   clusterGroup: ClusterGroupRepository;
+  classification: ClassificationRepository;
   config: ConfigRepository;
   cron: CronRepository;
   crypto: CryptoRepository;
@@ -337,6 +339,8 @@ export const getMocks = () => {
     assetJob: automock(AssetJobRepository),
     clusterGroup: automock(ClusterGroupRepository),
     app: automock(AppRepository, { strict: false }),
+    // eslint-disable-next-line no-sparse-arrays
+    classification: automock(ClassificationRepository, { args: [, loggerMock], strict: false }),
     config: newConfigRepositoryMock(),
     database: databaseMock,
     downloadRepository: automock(DownloadRepository, { strict: false }),
@@ -415,6 +419,7 @@ export const newTestService = <T extends BaseService>(
     overrides.assetJob || (mocks.assetJob as As<AssetJobRepository>),
     overrides.clusterGroup || (mocks.clusterGroup as As<ClusterGroupRepository>),
     overrides.config || (mocks.config as As<ConfigRepository> as ConfigRepository),
+    overrides.classification || (mocks.classification as As<ClassificationRepository>),
     overrides.cron || (mocks.cron as As<CronRepository>),
     overrides.crypto || (mocks.crypto as As<CryptoRepository>),
     overrides.database || (mocks.database as As<DatabaseRepository>),

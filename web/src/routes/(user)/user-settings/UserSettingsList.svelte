@@ -1,5 +1,6 @@
 <script lang="ts">
   import { page } from '$app/stores';
+  import ClassificationSettings from '$lib/components/user-settings-page/classification-settings.svelte';
   import GroupSettings from '$lib/components/user-settings-page/group-settings.svelte';
   import ChangePinCodeSettings from './PinCodeSettings.svelte';
   import DownloadSettings from './DownloadSettings.svelte';
@@ -25,6 +26,7 @@
     mdiFormTextboxPassword,
     mdiKeyOutline,
     mdiLockSmart,
+    mdiMagnifyScan,
     mdiServerOutline,
     mdiTwoFactorAuthentication,
   } from '@mdi/js';
@@ -100,6 +102,15 @@
   subtitle={$t('features_setting_description')}
 >
   <FeatureSettings />
+</SettingAccordion>
+
+<SettingAccordion
+  icon={mdiMagnifyScan}
+  key="auto-classification"
+  title="Auto-Classification"
+  subtitle="Automatically tag and archive photos by category"
+>
+  <ClassificationSettings />
 </SettingAccordion>
 
 <SettingAccordion
