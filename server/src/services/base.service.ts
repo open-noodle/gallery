@@ -79,6 +79,8 @@ import { StorageMigrationRepository } from 'src/repositories/storage-migration.r
 import { ClassConstructor } from 'src/types.js';
 import { ImmichFileResponse, ImmichMediaResponse, ImmichRedirectResponse, ImmichStreamResponse } from 'src/utils/file.js';
 import { UserGroupRepository } from 'src/repositories/user-group.repository.js';
+import { AuditRepository } from 'src/repositories/audit.repository.js';
+import { ClassificationRepository } from 'src/repositories/classification.repository.js';
 
 export const BASE_SERVICE_DEPENDENCIES = [
   LoggingRepository,
@@ -94,6 +96,7 @@ export const BASE_SERVICE_DEPENDENCIES = [
   AssetJobRepository,
   ClusterGroupRepository,
   ConfigRepository,
+  ClassificationRepository,
   CronRepository,
   CryptoRepository,
   DatabaseRepository,
@@ -160,6 +163,7 @@ export class BaseService {
     protected assetJobRepository: AssetJobRepository,
     protected clusterGroupRepository: ClusterGroupRepository,
     protected configRepository: ConfigRepository,
+    protected classificationRepository: ClassificationRepository,
     protected cronRepository: CronRepository,
     protected cryptoRepository: CryptoRepository,
     protected databaseRepository: DatabaseRepository,
