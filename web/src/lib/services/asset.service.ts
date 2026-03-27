@@ -509,7 +509,7 @@ const handleQuickRotate = async (asset: AssetResponseDto, angle: number) => {
     await editCompleted;
 
     const refreshedAsset = await getAssetInfo({ id: asset.id });
-    assetViewingStore.setAsset(refreshedAsset);
+    assetViewerManager.setAsset(refreshedAsset);
     eventManager.emit('AssetUpdate', refreshedAsset);
     eventManager.emit('AssetEditsApplied', asset.id);
   } catch (error) {
