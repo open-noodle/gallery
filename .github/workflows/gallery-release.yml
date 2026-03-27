@@ -382,12 +382,7 @@ jobs:
 
           notes="Based on [Immich v${upstream_version}](https://github.com/immich-app/immich/releases/tag/v${upstream_version})"
           if [[ -n "$changelog" ]]; then
-            notes="${notes}
-
-${changelog}"
+            printf -v notes '%s\n\n%s' "$notes" "$changelog"
           fi
 
-          gh release create "$VERSION" \
-            --title "$VERSION" \
-            --latest \
-            -n "$notes"
+          gh release create "$VERSION" --title "$VERSION" --latest -n "$notes"
