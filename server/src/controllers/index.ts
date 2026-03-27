@@ -49,6 +49,7 @@ import { WorkflowController } from 'src/controllers/workflow.controller.js';
 import { SharedSpaceController } from 'src/controllers/shared-space.controller.js';
 import { StorageMigrationController } from 'src/controllers/storage-migration.controller.js';
 import { UserGroupController } from 'src/controllers/user-group.controller.js';
+import { ClassificationController } from 'src/controllers/classification.controller.js';
 
 export const controllers = [
   ApiKeyController,
@@ -61,6 +62,7 @@ export const controllers = [
   AuthController,
   AuthAdminController,
   ClusterGroupController,
+  ClassificationController,
   ConfigUserController,
   ConfigAdminController,
   ConfigPublicController,
