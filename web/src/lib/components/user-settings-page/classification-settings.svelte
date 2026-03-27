@@ -216,7 +216,7 @@
             bind:value={formAction}
             class="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:border-immich-primary focus:outline-none"
           >
-            {#each Object.values(Action2) as action}
+            {#each Object.values(Action2) as action (action)}
               <option value={action}>{actionLabels[action]}</option>
             {/each}
           </select>
