@@ -25,8 +25,8 @@ vitest.mock('#lib/utils/i18n.js', () => ({
 
 vitest.mock('@immich/sdk');
 
-vitest.mock('#lib/stores/asset-viewing.store.js', () => ({
-  assetViewingStore: {
+vitest.mock('#lib/managers/asset-viewer-manager.svelte.js', () => ({
+  assetViewerManager: {
     setAsset: vitest.fn(),
   },
 }));
