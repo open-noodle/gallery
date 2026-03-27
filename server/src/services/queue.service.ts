@@ -247,6 +247,10 @@ export class QueueService extends BaseService {
         return this.jobRepository.queue({ name: JobName.PetDetectionQueueAll, data: { force } });
       }
 
+      case QueueName.Classification: {
+        return this.jobRepository.queue({ name: JobName.AssetClassifyQueueAll, data: {} });
+      }
+
       case QueueName.StorageBackendMigration: {
         throw new BadRequestException('Use POST /storage-migration/start to begin a storage migration');
       }

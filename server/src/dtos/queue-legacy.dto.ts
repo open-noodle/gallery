@@ -39,6 +39,7 @@ const QueuesResponseLegacySchema = z
     [QueueName.Workflow]: QueueResponseLegacySchema,
     [QueueName.Editor]: QueueResponseLegacySchema,
     [QueueName.StorageBackendMigration]: QueueResponseLegacySchema,
+    [QueueName.Classification]: QueueResponseLegacySchema,
   })
   .meta({ id: 'QueuesResponseLegacyDto' });
 

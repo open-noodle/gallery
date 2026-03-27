@@ -29,6 +29,7 @@ import {
   mdiStateMachine,
   mdiTable,
   mdiTagFaces,
+  mdiTagMultipleOutline,
   mdiTrashCanOutline,
   mdiTrayFull,
   mdiVideo,
@@ -255,6 +256,11 @@ export const asQueueItem = ($t: MessageFormatter, queue: { name: QueueName }): Q
     [QueueName.StorageBackendMigration]: {
       icon: mdiCloudSyncOutline,
       title: 'Storage Backend Migration',
+    },
+    [QueueName.Classification]: {
+      icon: mdiTagMultipleOutline,
+      title: 'Auto-Classification',
+      subtitle: 'Automatically classify and tag photos',
     },
   };
 

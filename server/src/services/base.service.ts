@@ -16,6 +16,8 @@ import { AppRepository } from 'src/repositories/app.repository';
 import { AssetEditRepository } from 'src/repositories/asset-edit.repository';
 import { AssetJobRepository } from 'src/repositories/asset-job.repository';
 import { AssetRepository } from 'src/repositories/asset.repository';
+import { AuditRepository } from 'src/repositories/audit.repository';
+import { ClassificationRepository } from 'src/repositories/classification.repository';
 import { ConfigRepository } from 'src/repositories/config.repository';
 import { CronRepository } from 'src/repositories/cron.repository';
 import { CryptoRepository } from 'src/repositories/crypto.repository';
@@ -79,6 +81,7 @@ export const BASE_SERVICE_DEPENDENCIES = [
   AssetEditRepository,
   AssetJobRepository,
   ConfigRepository,
+  ClassificationRepository,
   CronRepository,
   CryptoRepository,
   DatabaseRepository,
@@ -141,6 +144,7 @@ export class BaseService {
     protected assetEditRepository: AssetEditRepository,
     protected assetJobRepository: AssetJobRepository,
     protected configRepository: ConfigRepository,
+    protected classificationRepository: ClassificationRepository,
     protected cronRepository: CronRepository,
     protected cryptoRepository: CryptoRepository,
     protected databaseRepository: DatabaseRepository,
