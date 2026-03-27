@@ -366,8 +366,9 @@ export class SearchService extends BaseService {
 
     if (dto.queryAssetId) {
       await this.requireAccess({ auth, permission: Permission.AssetRead, ids: [dto.queryAssetId] });
-      const getEmbeddingResponse = await this.searchRepository.getEmbedding(dto.queryAssetId);
-      const assetEmbedding = getEmbeddingResponse?.embedding;
+      // Fork: searchRepository.getEmbedding returns the embedding directly (string | null),
+      // not upstream's { embedding } row — see search.repository.ts.
+      const assetEmbedding = await this.searchRepository.getEmbedding(dto.queryAssetId);
       if (!assetEmbedding) {
         throw new BadRequestException(`Asset ${dto.queryAssetId} has no embedding`);
       }
