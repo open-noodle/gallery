@@ -11,8 +11,7 @@
   import { createMutation } from '@tanstack/svelte-query';
   import { oauth } from '#lib/utils.ts';
   import { getServerErrorMessage, handleError } from '#lib/utils/handle-error.ts';
-  import { demoLogin, login, type LoginResponseDto } from '@immich/sdk';
-  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+  import { login, type LoginResponseDto } from '@immich/sdk';
   import { Alert, Button, Field, Input, PasswordInput, Stack } from '@immich/ui';
   import { mdiShieldKeyOutline } from '@mdi/js';
   import { onMount } from 'svelte';
@@ -31,8 +30,6 @@
   let oauthError = $state('');
   let loading = $state(false);
   let oauthLoading = $state(true);
-  let demoLoading = $state(false);
-
   const queries = {
     publicConfig: createPreloadedQuery(getPublicConfigQuery),
     serverConfig: createPreloadedQuery(getServerConfigQuery),
@@ -145,19 +142,6 @@
     }
   };
 
-  const handleDemoLogin = async () => {
-    try {
-      demoLoading = true;
-      errorMessage = '';
-      const user = await demoLogin();
-      authManager.isDemo = true;
-      await onSuccess(user);
-    } catch (error) {
-      errorMessage = getServerErrorMessage(error) || 'Unable to start demo';
-      demoLoading = false;
-    }
-  };
-
   const onsubmit = async (event: Event) => {
     event.preventDefault();
     await handleLogin();
@@ -240,28 +224,6 @@
         onclick={handleOAuthLogin}
       >
         {publicConfig.oauth.buttonText}
-      </Button>
-    {/if}
-
-    {#if serverConfig.demoMode}
-      <div class="inline-flex w-full items-center justify-center my-4">
-        <hr class="my-4 h-px w-3/4 border-0 bg-gray-200 dark:bg-gray-600" />
-        <span
-          class="absolute start-1/2 -translate-x-1/2 bg-gray-50 px-3 font-medium text-gray-900 dark:bg-neutral-900 dark:text-white uppercase"
-        >
-          {$t('or')}
-        </span>
-      </div>
-      <Button
-        shape="round"
-        size="large"
-        fullWidth
-        color="secondary"
-        loading={demoLoading}
-        disabled={demoLoading}
-        onclick={handleDemoLogin}
-      >
-        Try Demo
       </Button>
     {/if}
 
