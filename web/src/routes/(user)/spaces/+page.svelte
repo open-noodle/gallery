@@ -46,11 +46,7 @@
   {/snippet}
 
   {#if spaces.length === 0}
-    <EmptyPlaceholder
-      text={$t('spaces_empty')}
-      onClick={handleCreate}
-      class="mt-10 mx-auto"
-    />
+    <EmptyPlaceholder text={$t('spaces_empty')} onClick={handleCreate} class="mt-10 mx-auto" />
   {:else}
     <SpacesControls {spaces} onSorted={(sorted) => (sortedSpaces = sorted)} />
 

@@ -103,8 +103,6 @@ export interface EnvData {
     allow: boolean;
   };
 
-
-
   telemetry: {
     apiPort: number;
     microservicesPort: number;
