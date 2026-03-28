@@ -124,9 +124,7 @@
 
   <NavbarItem title={$t('utilities')} href={Route.utilities()} icon={mdiToolboxOutline} activeIcon={mdiToolbox} />
 
-  {#if !authManager.isDemo}
-    <NavbarItem title={$t('import')} href={Route.import()} icon={mdiDatabaseImportOutline} />
-  {/if}
+  <NavbarItem title={$t('import')} href={Route.import()} icon={mdiDatabaseImportOutline} />
 
   <NavbarItem
     title={$t('archive')}
@@ -137,7 +135,7 @@
 
   <NavbarItem title={$t('locked_folder')} href={Route.locked()} icon={mdiLockOutline} activeIcon={mdiLock} />
 
-  {#if !authManager.isDemo && config.trash.enabled}
+  {#if config.trash.enabled}
     <NavbarItem title={$t('trash')} href={Route.trash()} icon={mdiTrashCanOutline} activeIcon={mdiTrashCan} />
   {/if}
 
