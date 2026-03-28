@@ -115,7 +115,6 @@ export class ServerService extends BaseService {
   }
 
   async getSystemConfig(): Promise<ServerConfigDto> {
-    const { demo } = this.configRepository.getEnv();
     const config = await this.getConfig({ withCache: false });
     const isInitialized = !(await this.isSetupAvailable());
     const onboarding = await this.systemMetadataRepository.get(SystemMetadataKey.AdminOnboarding);
@@ -134,7 +133,6 @@ export class ServerService extends BaseService {
       mapLightStyleUrl: config.map.lightStyle,
       maintenanceMode: false,
       minFaces: config.machineLearning.facialRecognition.minFaces,
-      demoMode: demo.enabled,
     };
   }
 
