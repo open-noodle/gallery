@@ -99,11 +99,6 @@ jobs:
             device: rknn
             suffixes: '-rknn'
             platforms: linux/arm64
-          - image: immich-machine-learning
-            device: rocm
-            suffixes: '-rocm'
-            platforms: linux/amd64
-            runner-mapping: '{"linux/amd64": "pokedex-large"}'
     steps:
       - name: Login to GitHub Container Registry
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
