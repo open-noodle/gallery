@@ -1367,6 +1367,12 @@ export type ChangePasswordDto = {
     /** Current password */
     password: string;
 };
+export type LoginCredentialDto = {
+    /** User email */
+    email: string;
+    /** User password */
+    password: string;
+};
 export type LoginResponseDto = {
     /** Access token */
     accessToken: string;
@@ -1384,12 +1390,6 @@ export type LoginResponseDto = {
     userEmail: string;
     /** User ID */
     userId: string;
-};
-export type LoginCredentialDto = {
-    /** User email */
-    email: string;
-    /** User password */
-    password: string;
 };
 export type LogoutResponseDto = {
     /** Redirect URI */
@@ -2429,8 +2429,6 @@ export type ServerApkLinksDto = {
     x86_64: string;
 };
 export type ServerConfigDto = {
-    /** Whether demo mode is active */
-    demoMode: boolean;
     /** External domain URL */
     externalDomain: string;
     /** Whether the server has been initialized */
@@ -5079,18 +5077,6 @@ export function changePassword({ changePasswordDto }: {
         method: "POST",
         body: changePasswordDto
     })));
-}
-/**
- * Demo login
- */
-export function demoLogin(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 201;
-        data: LoginResponseDto;
-    }>("/auth/demo-login", {
-        ...opts,
-        method: "POST"
-    }));
 }
 /**
  * Login

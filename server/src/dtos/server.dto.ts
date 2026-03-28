@@ -152,12 +152,140 @@ export class ServerVersionResponseDto extends createZodDto(ServerVersionResponse
   }
 }
 
-export class ServerVersionHistoryResponseDto extends createZodDto(ServerVersionHistoryResponseSchema) {}
-export class UsageByUserDto extends createZodDto(UsageByUserSchema) {}
-export class ServerStatsResponseDto extends createZodDto(ServerStatsResponseSchema) {}
-export class ServerMediaTypesResponseDto extends createZodDto(ServerMediaTypesResponseSchema) {}
-export class ServerConfigDto extends createZodDto(ServerConfigSchema) {}
-export class ServerFeaturesDto extends createZodDto(ServerFeaturesSchema) {}
+export class ServerVersionHistoryResponseDto {
+  @ApiProperty({ description: 'Version history entry ID' })
+  id!: string;
+  @ApiProperty({ description: 'When this version was first seen', format: 'date-time' })
+  createdAt!: Date;
+  @ApiProperty({ description: 'Version string' })
+  version!: string;
+}
+
+export class UsageByUserDto {
+  @ApiProperty({ type: 'string', description: 'User ID' })
+  userId!: string;
+  @ApiProperty({ type: 'string', description: 'User name' })
+  userName!: string;
+  @ApiProperty({ type: 'integer', description: 'Number of photos' })
+  photos!: number;
+  @ApiProperty({ type: 'integer', description: 'Number of videos' })
+  videos!: number;
+  @ApiProperty({ type: 'integer', format: 'int64', description: 'Total storage usage in bytes' })
+  usage!: number;
+  @ApiProperty({ type: 'integer', format: 'int64', description: 'Storage usage for photos in bytes' })
+  usagePhotos!: number;
+  @ApiProperty({ type: 'integer', format: 'int64', description: 'Storage usage for videos in bytes' })
+  usageVideos!: number;
+  @ApiProperty({
+    type: 'integer',
+    format: 'int64',
+    nullable: true,
+    description: 'User quota size in bytes (null if unlimited)',
+  })
+  quotaSizeInBytes!: number | null;
+}
+
+export class ServerStatsResponseDto {
+  @ApiProperty({ type: 'integer', description: 'Total number of photos' })
+  photos = 0;
+
+  @ApiProperty({ type: 'integer', description: 'Total number of videos' })
+  videos = 0;
+
+  @ApiProperty({ type: 'integer', format: 'int64', description: 'Total storage usage in bytes' })
+  usage = 0;
+
+  @ApiProperty({ type: 'integer', format: 'int64', description: 'Storage usage for photos in bytes' })
+  usagePhotos = 0;
+
+  @ApiProperty({ type: 'integer', format: 'int64', description: 'Storage usage for videos in bytes' })
+  usageVideos = 0;
+
+  @ApiProperty({
+    isArray: true,
+    type: UsageByUserDto,
+    title: 'Array of usage for each user',
+    example: [
+      {
+        photos: 1,
+        videos: 1,
+        diskUsageRaw: 2,
+        usagePhotos: 1,
+        usageVideos: 1,
+      },
+    ],
+  })
+  usageByUser: UsageByUserDto[] = [];
+}
+
+export class ServerMediaTypesResponseDto {
+  @ApiProperty({ description: 'Supported video MIME types' })
+  video!: string[];
+  @ApiProperty({ description: 'Supported image MIME types' })
+  image!: string[];
+  @ApiProperty({ description: 'Supported sidecar MIME types' })
+  sidecar!: string[];
+}
+
+export class ServerThemeDto extends SystemConfigThemeDto {}
+
+export class ServerConfigDto {
+  @ApiProperty({ description: 'OAuth button text' })
+  oauthButtonText!: string;
+  @ApiProperty({ description: 'Login page message' })
+  loginPageMessage!: string;
+  @ApiProperty({ type: 'integer', description: 'Number of days before trashed assets are permanently deleted' })
+  trashDays!: number;
+  @ApiProperty({ type: 'integer', description: 'Delay in days before deleted users are permanently removed' })
+  userDeleteDelay!: number;
+  @ApiProperty({ description: 'Whether the server has been initialized' })
+  isInitialized!: boolean;
+  @ApiProperty({ description: 'Whether the admin has completed onboarding' })
+  isOnboarded!: boolean;
+  @ApiProperty({ description: 'External domain URL' })
+  externalDomain!: string;
+  @ApiProperty({ description: 'Whether public user registration is enabled' })
+  publicUsers!: boolean;
+  @ApiProperty({ description: 'Map dark style URL' })
+  mapDarkStyleUrl!: string;
+  @ApiProperty({ description: 'Map light style URL' })
+  mapLightStyleUrl!: string;
+  @ApiProperty({ description: 'Whether maintenance mode is active' })
+  maintenanceMode!: boolean;
+}
+
+export class ServerFeaturesDto {
+  @ApiProperty({ description: 'Whether smart search is enabled' })
+  smartSearch!: boolean;
+  @ApiProperty({ description: 'Whether duplicate detection is enabled' })
+  duplicateDetection!: boolean;
+  @ApiProperty({ description: 'Whether config file is available' })
+  configFile!: boolean;
+  @ApiProperty({ description: 'Whether facial recognition is enabled' })
+  facialRecognition!: boolean;
+  @ApiProperty({ description: 'Whether map feature is enabled' })
+  map!: boolean;
+  @ApiProperty({ description: 'Whether trash feature is enabled' })
+  trash!: boolean;
+  @ApiProperty({ description: 'Whether reverse geocoding is enabled' })
+  reverseGeocoding!: boolean;
+  @ApiProperty({ description: 'Whether face import is enabled' })
+  importFaces!: boolean;
+  @ApiProperty({ description: 'Whether OAuth is enabled' })
+  oauth!: boolean;
+  @ApiProperty({ description: 'Whether OAuth auto-launch is enabled' })
+  oauthAutoLaunch!: boolean;
+  @ApiProperty({ description: 'Whether password login is enabled' })
+  passwordLogin!: boolean;
+  @ApiProperty({ description: 'Whether sidecar files are supported' })
+  sidecar!: boolean;
+  @ApiProperty({ description: 'Whether search is enabled' })
+  search!: boolean;
+  @ApiProperty({ description: 'Whether email notifications are enabled' })
+  email!: boolean;
+  @ApiProperty({ description: 'Whether OCR is enabled' })
+  ocr!: boolean;
+}
 
 export interface ReleaseNotification {
   isAvailable: boolean;
