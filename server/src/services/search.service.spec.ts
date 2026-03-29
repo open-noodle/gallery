@@ -514,6 +514,63 @@ describe(SearchService.name, () => {
     });
   });
 
+  describe('getTagSuggestions', () => {
+    it('should return accessible tags for personal timeline', async () => {
+      const tags = [
+        { id: 'tag-1', value: 'Vacation' },
+        { id: 'tag-2', value: 'Family' },
+      ];
+      mocks.search.getAccessibleTags.mockResolvedValue(tags);
+
+      const result = await sut.getTagSuggestions(authStub.user1, {});
+      expect(result).toEqual(tags);
+      expect(mocks.search.getAccessibleTags).toHaveBeenCalledWith([authStub.user1.user.id], {});
+    });
+
+    it('should include partner IDs in user search', async () => {
+      mocks.partner.getAll.mockResolvedValue([
+        {
+          sharedById: 'partner-1',
+          sharedBy: { id: 'partner-1' },
+          sharedWithId: authStub.user1.user.id,
+          sharedWith: { id: authStub.user1.user.id },
+          inTimeline: true,
+        } as any,
+      ]);
+      mocks.search.getAccessibleTags.mockResolvedValue([]);
+
+      await sut.getTagSuggestions(authStub.user1, {});
+      expect(mocks.search.getAccessibleTags).toHaveBeenCalledWith(
+        expect.arrayContaining([authStub.user1.user.id, 'partner-1']),
+        {},
+      );
+    });
+
+    it('should check space access when spaceId is provided', async () => {
+      const spaceId = newUuid();
+      mocks.access.sharedSpace.checkMemberAccess.mockResolvedValue(new Set([spaceId]));
+      mocks.search.getAccessibleTags.mockResolvedValue([]);
+
+      await sut.getTagSuggestions(authStub.user1, { spaceId });
+      expect(mocks.search.getAccessibleTags).toHaveBeenCalledWith(
+        expect.any(Array),
+        expect.objectContaining({ spaceId }),
+      );
+    });
+
+    it('should pass temporal options through', async () => {
+      const takenAfter = new Date('2024-01-01');
+      const takenBefore = new Date('2025-01-01');
+      mocks.search.getAccessibleTags.mockResolvedValue([]);
+
+      await sut.getTagSuggestions(authStub.user1, { takenAfter, takenBefore });
+      expect(mocks.search.getAccessibleTags).toHaveBeenCalledWith(
+        expect.any(Array),
+        expect.objectContaining({ takenAfter, takenBefore }),
+      );
+    });
+  });
+
   describe('searchSmart', () => {
     beforeEach(() => {
       mocks.search.searchSmart.mockResolvedValue({ hasNextPage: false, items: [] });
