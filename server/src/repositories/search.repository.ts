@@ -522,6 +522,44 @@ export class SearchRepository {
     return res.map((row) => row.lensModel!);
   }
 
+  @GenerateSql({ params: [[DummyValue.UUID]] })
+  async getAccessibleTags(
+    userIds: string[],
+    options?: SpaceScopeOptions,
+  ): Promise<Array<{ id: string; value: string }>> {
+    return this.db
+      .selectFrom('tag')
+      .select(['tag.id', 'tag.value'])
+      .distinct()
+      .innerJoin('tag_asset', 'tag.id', 'tag_asset.tagId')
+      .innerJoin('asset', 'tag_asset.assetId', 'asset.id')
+      .where('asset.visibility', '=', AssetVisibility.Timeline)
+      .where('asset.deletedAt', 'is', null)
+      .$if(!options?.spaceId, (qb) => qb.where('asset.ownerId', '=', anyUuid(userIds)))
+      .$if(!!options?.spaceId, (qb) =>
+        qb.where((eb) =>
+          eb.or([
+            eb.exists(
+              eb
+                .selectFrom('shared_space_asset')
+                .whereRef('shared_space_asset.assetId', '=', 'asset.id')
+                .where('shared_space_asset.spaceId', '=', asUuid(options!.spaceId!)),
+            ),
+            eb.exists(
+              eb
+                .selectFrom('shared_space_library')
+                .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
+                .where('shared_space_library.spaceId', '=', asUuid(options!.spaceId!)),
+            ),
+          ]),
+        ),
+      )
+      .$if(!!options?.takenAfter, (qb) => qb.where('asset.fileCreatedAt', '>=', options!.takenAfter!))
+      .$if(!!options?.takenBefore, (qb) => qb.where('asset.fileCreatedAt', '<', options!.takenBefore!))
+      .orderBy('tag.value')
+      .execute();
+  }
+
   private getExifField<K extends 'city' | 'state' | 'country' | 'make' | 'model' | 'lensModel'>(
     field: K,
     userIds: string[],
