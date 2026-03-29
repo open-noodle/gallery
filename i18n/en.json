@@ -1482,6 +1482,8 @@
   "manage_media_access_subtitle": "Allow the Immich app to manage and move media files.",
   "manage_media_access_title": "Media Management Access",
   "manage_oauth_account": "Manage OAuth Account",
+  "manage_people": "Manage people",
+  "manage_shared_links": "Manage shared links",
   "manage_sharing_with_other_users": "Manage sharing with other users",
   "manage_sharing_with_partners": "Manage sharing with partners",
   "manage_the_app_settings": "Manage the app settings",
