@@ -485,51 +485,6 @@ export class SharedSpaceRepository {
     return result.count > 0;
   }
 
-  @GenerateSql({ params: [DummyValue.UUID, false] })
-  getPersonsBySpaceId(spaceId: string, withHidden = false) {
-    return this.db
-      .selectFrom('shared_space_person')
-      .leftJoin('asset_face', 'asset_face.id', 'shared_space_person.representativeFaceId')
-      .leftJoin('person', 'person.id', 'asset_face.personId')
-      .selectAll('shared_space_person')
-      .select(['person.name as personalName', 'person.thumbnailPath as personalThumbnailPath'])
-      .where('shared_space_person.spaceId', '=', spaceId)
-      .$if(!withHidden, (qb) => qb.where('shared_space_person.isHidden', '=', false))
-      .orderBy('shared_space_person.name', 'asc')
-      .execute();
-  }
-
-  @GenerateSql({ params: [DummyValue.UUID, { takenAfter: DummyValue.DATE, takenBefore: DummyValue.DATE }, false] })
-  getPersonsBySpaceIdWithTemporalFilter(
-    spaceId: string,
-    options?: { takenAfter?: Date; takenBefore?: Date },
-    withHidden = false,
-  ) {
-    return this.db
-      .selectFrom('shared_space_person')
-      .leftJoin('asset_face', 'asset_face.id', 'shared_space_person.representativeFaceId')
-      .leftJoin('person', 'person.id', 'asset_face.personId')
-      .selectAll('shared_space_person')
-      .select(['person.name as personalName', 'person.thumbnailPath as personalThumbnailPath'])
-      .where('shared_space_person.spaceId', '=', spaceId)
-      .$if(!withHidden, (qb) => qb.where('shared_space_person.isHidden', '=', false))
-      .$if(!!options?.takenAfter || !!options?.takenBefore, (qb) =>
-        qb.where((eb) =>
-          eb.exists(
-            eb
-              .selectFrom('shared_space_person_face')
-              .innerJoin('asset_face as af2', 'af2.id', 'shared_space_person_face.assetFaceId')
-              .innerJoin('asset', 'asset.id', 'af2.assetId')
-              .whereRef('shared_space_person_face.personId', '=', 'shared_space_person.id')
-              .$if(!!options?.takenAfter, (qb2) => qb2.where('asset.fileCreatedAt', '>=', options!.takenAfter!))
-              .$if(!!options?.takenBefore, (qb2) => qb2.where('asset.fileCreatedAt', '<', options!.takenBefore!)),
-          ),
-        ),
-      )
-      .orderBy('shared_space_person.name', 'asc')
-      .execute();
-  }
-
   @GenerateSql({
     params: [DummyValue.UUID, { withHidden: false, petsEnabled: true, limit: 10 }],
   })
