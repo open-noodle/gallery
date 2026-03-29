@@ -5010,4 +5010,24 @@ describe(SharedSpaceService.name, () => {
       expect(result[0].country).toBeNull();
     });
   });
+
+  describe('deduplicateSpacePeople', () => {
+    it('should require owner role', async () => {
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
+
+      await expect(sut.deduplicateSpacePeople(factory.auth(), newUuid())).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should queue dedup job for owner', async () => {
+      const spaceId = newUuid();
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Owner }));
+
+      await sut.deduplicateSpacePeople(factory.auth(), spaceId);
+
+      expect(mocks.job.queue).toHaveBeenCalledWith({
+        name: JobName.SharedSpacePersonDedup,
+        data: { spaceId },
+      });
+    });
+  });
 });

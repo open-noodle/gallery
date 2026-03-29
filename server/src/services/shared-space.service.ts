@@ -732,6 +732,15 @@ export class SharedSpaceService extends BaseService {
     });
   }
 
+  async deduplicateSpacePeople(auth: AuthDto, spaceId: string): Promise<void> {
+    await this.requireRole(auth, spaceId, SharedSpaceRole.Owner);
+
+    await this.jobRepository.queue({
+      name: JobName.SharedSpacePersonDedup,
+      data: { spaceId },
+    });
+  }
+
   async mergeSpacePeople(
     auth: AuthDto,
     spaceId: string,
