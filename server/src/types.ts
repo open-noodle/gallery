@@ -456,7 +456,7 @@ export type JobItem =
   | { name: JobName.SharedSpaceBulkAddAssets; data: ISharedSpaceBulkAddAssetsJob }
 
   // Classification
-  | { name: JobName.AssetClassifyQueueAll; data: { userId?: string } }
+  | { name: JobName.AssetClassifyQueueAll; data: Record<string, never> }
   | { name: JobName.AssetClassify; data: IEntityJob };
 
 export type VectorExtension = (typeof VECTOR_EXTENSIONS)[number];
