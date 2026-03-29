@@ -542,6 +542,93 @@ describe('handleSharedSpacePersonDedup', () => {
     expect(mocks.sharedSpace.deletePerson).toHaveBeenCalledWith(personC);
   });
 
+  it('should gracefully handle person deleted between fetch and merge (concurrent safety)', async () => {
+    const spaceId = newUuid();
+    const personA = newUuid();
+    const personB = newUuid();
+
+    mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
+    mocks.sharedSpace.getSpacePersonsWithEmbeddings
+      .mockResolvedValueOnce([
+        { id: personA, name: '', type: 'person', isHidden: false, embedding: '[0.1,0.2]' },
+        { id: personB, name: '', type: 'person', isHidden: false, embedding: '[0.11,0.21]' },
+      ])
+      .mockResolvedValueOnce([]);
+    mocks.sharedSpace.getPersonFaceCount.mockResolvedValueOnce(5).mockResolvedValueOnce(2);
+    mocks.sharedSpace.findClosestSpacePerson.mockResolvedValueOnce([{ personId: personB, name: '', distance: 0.1 }]);
+    mocks.sharedSpace.reassignPersonFacesSafe.mockResolvedValue(void 0);
+    mocks.sharedSpace.migrateAliases.mockResolvedValue(void 0);
+    // updatePerson throws because target was concurrently deleted
+    mocks.sharedSpace.updatePerson.mockRejectedValue(new Error('no result'));
+    mocks.sharedSpace.deletePerson.mockResolvedValue(void 0);
+
+    const result = await sut.handleSharedSpacePersonDedup({ spaceId });
+    // Should succeed despite the error — graceful skip
+    expect(result).toBe(JobStatus.Success);
+  });
+
+  it('should skip match when findClosestSpacePerson returns a person already merged in this pass', async () => {
+    const spaceId = newUuid();
+    const personA = newUuid();
+    const personB = newUuid();
+    const personC = newUuid();
+
+    mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
+    mocks.sharedSpace.getSpacePersonsWithEmbeddings
+      .mockResolvedValueOnce([
+        { id: personA, name: '', type: 'person', isHidden: false, embedding: '[0.1,0.2]' },
+        { id: personB, name: '', type: 'person', isHidden: false, embedding: '[0.11,0.21]' },
+        { id: personC, name: '', type: 'person', isHidden: false, embedding: '[0.12,0.22]' },
+      ])
+      .mockResolvedValueOnce([{ id: personA, name: '', type: 'person', isHidden: false, embedding: '[0.1,0.2]' }]);
+    mocks.sharedSpace.getPersonFaceCount.mockResolvedValue(3);
+    // A matches B, then C also matches B (already deleted)
+    mocks.sharedSpace.findClosestSpacePerson
+      .mockResolvedValueOnce([{ personId: personB, name: '', distance: 0.1 }]) // A's match
+      .mockResolvedValueOnce([{ personId: personB, name: '', distance: 0.1 }]) // C tries B (already in deletedIds)
+      .mockResolvedValue([]); // subsequent passes
+    mocks.sharedSpace.reassignPersonFacesSafe.mockResolvedValue(void 0);
+    mocks.sharedSpace.migrateAliases.mockResolvedValue(void 0);
+    mocks.sharedSpace.updatePerson.mockResolvedValue(void 0);
+    mocks.sharedSpace.deletePerson.mockResolvedValue(void 0);
+
+    const result = await sut.handleSharedSpacePersonDedup({ spaceId });
+    expect(result).toBe(JobStatus.Success);
+    // B should be deleted (merged into A), but C should NOT be merged
+    // because B was already in deletedIds when C's match returned it
+    expect(mocks.sharedSpace.deletePerson).toHaveBeenCalledTimes(1);
+    expect(mocks.sharedSpace.deletePerson).toHaveBeenCalledWith(personB);
+  });
+
+  it('should skip person that was already merged as a source earlier in same pass', async () => {
+    const spaceId = newUuid();
+    const personA = newUuid();
+    const personB = newUuid();
+
+    mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
+    // persons list has B after A; A merges B, then loop reaches B
+    mocks.sharedSpace.getSpacePersonsWithEmbeddings
+      .mockResolvedValueOnce([
+        { id: personA, name: '', type: 'person', isHidden: false, embedding: '[0.1,0.2]' },
+        { id: personB, name: '', type: 'person', isHidden: false, embedding: '[0.11,0.21]' },
+      ])
+      .mockResolvedValueOnce([{ id: personA, name: '', type: 'person', isHidden: false, embedding: '[0.1,0.2]' }]);
+    mocks.sharedSpace.getPersonFaceCount.mockResolvedValueOnce(5).mockResolvedValueOnce(2);
+    mocks.sharedSpace.findClosestSpacePerson
+      .mockResolvedValueOnce([{ personId: personB, name: '', distance: 0.1 }])
+      .mockResolvedValue([]);
+    mocks.sharedSpace.reassignPersonFacesSafe.mockResolvedValue(void 0);
+    mocks.sharedSpace.migrateAliases.mockResolvedValue(void 0);
+    mocks.sharedSpace.updatePerson.mockResolvedValue(void 0);
+    mocks.sharedSpace.deletePerson.mockResolvedValue(void 0);
+
+    const result = await sut.handleSharedSpacePersonDedup({ spaceId });
+    expect(result).toBe(JobStatus.Success);
+    // B should be skipped when loop reaches it (in deletedIds)
+    // findClosestSpacePerson should only be called once for A (B is skipped)
+    expect(mocks.sharedSpace.reassignPersonFacesSafe).toHaveBeenCalledTimes(1);
+  });
+
   it('should not merge people of different types', async () => {
     const spaceId = newUuid();
     const personA = newUuid();
@@ -645,17 +732,29 @@ In `server/src/services/shared-space.service.ts`, add after `handleSharedSpaceLi
   async handleSharedSpacePersonDedup(job: JobOf<JobName.SharedSpacePersonDedup>): Promise<JobStatus> {
     const space = await this.sharedSpaceRepository.getById(job.spaceId);
     if (!space || !space.faceRecognitionEnabled) {
+      this.logger.debug(`Dedup skipped for space ${job.spaceId}: ${!space ? 'not found' : 'face recognition disabled'}`);
       return JobStatus.Skipped;
     }
 
     const { machineLearning } = await this.getConfig({ withCache: true });
     const maxDistance = machineLearning.facialRecognition.maxDistance;
 
+    let totalMerges = 0;
+    let pass = 0;
     let mergedAny = true;
+
     while (mergedAny) {
       mergedAny = false;
+      pass++;
       const persons = await this.sharedSpaceRepository.getSpacePersonsWithEmbeddings(job.spaceId);
+      this.logger.log(`Dedup pass ${pass} for space ${job.spaceId}: ${persons.length} persons to check`);
+
+      if (persons.length <= 1) {
+        break;
+      }
+
       const deletedIds = new Set<string>();
+      let passMerges = 0;
 
       for (const person of persons) {
         if (deletedIds.has(person.id)) {
@@ -676,6 +775,9 @@ In `server/src/services/shared-space.service.ts`, add after `handleSharedSpaceLi
         const match = matches[0];
         const matchPerson = persons.find((p) => p.id === match.personId);
         if (!matchPerson || deletedIds.has(match.personId)) {
+          this.logger.debug(
+            `Dedup: skipping stale match ${match.personId} for person ${person.id} (already merged in this pass)`,
+          );
           continue;
         }
 
@@ -685,6 +787,14 @@ In `server/src/services/shared-space.service.ts`, add after `handleSharedSpaceLi
 
         const [target, source] =
           personFaceCount >= matchFaceCount ? [person, matchPerson] : [matchPerson, person];
+
+        this.logger.log(
+          `Dedup: merging person ${source.id} (${source.name || 'unnamed'}, ${
+            personFaceCount >= matchFaceCount ? matchFaceCount : personFaceCount
+          } faces) into ${target.id} (${target.name || 'unnamed'}, ${
+            personFaceCount >= matchFaceCount ? personFaceCount : matchFaceCount
+          } faces), distance=${match.distance.toFixed(4)}`,
+        );
 
         // Reassign faces and migrate aliases
         await this.sharedSpaceRepository.reassignPersonFacesSafe(source.id, target.id);
@@ -704,17 +814,26 @@ In `server/src/services/shared-space.service.ts`, add after `handleSharedSpaceLi
             await this.sharedSpaceRepository.updatePerson(target.id, updates);
           }
           await this.sharedSpaceRepository.deletePerson(source.id);
-        } catch {
-          // Person may have been concurrently deleted by another dedup pass — skip gracefully
-          this.logger.warn(`Dedup merge skipped: person ${source.id} or ${target.id} no longer exists`);
+        } catch (error) {
+          // Person may have been concurrently deleted by another operation — skip gracefully
+          this.logger.warn(
+            `Dedup merge failed for ${source.id} -> ${target.id}: ${error}. Skipping — person may have been concurrently deleted.`,
+          );
           continue;
         }
 
         deletedIds.add(source.id);
+        passMerges++;
         mergedAny = true;
       }
+
+      totalMerges += passMerges;
+      this.logger.log(`Dedup pass ${pass} complete: ${passMerges} merges`);
     }
 
+    this.logger.log(
+      `Dedup finished for space ${job.spaceId}: ${totalMerges} total merges across ${pass} pass${pass === 1 ? '' : 'es'}`,
+    );
     return JobStatus.Success;
   }
 ```
