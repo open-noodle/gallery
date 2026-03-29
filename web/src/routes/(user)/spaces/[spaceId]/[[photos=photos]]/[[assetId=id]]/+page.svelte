@@ -355,7 +355,7 @@
       return;
     }
     try {
-      spacePeople = await getSpacePeople({ id: space.id });
+      spacePeople = await getSpacePeople({ id: space.id, top: 10 });
     } catch (error) {
       handleError(error, 'Failed to load space people');
     }
@@ -895,9 +895,9 @@
                   {repositioning}
                   onSavePosition={handleSavePosition}
                   onCancelReposition={handleCancelReposition}
-                  peopleCount={spacePeople.length}
                   faceRecognitionEnabled={space.faceRecognitionEnabled}
                   spaceId={space.id}
+                  onShowMembers={handleShowMembers}
                   collapsed={heroCollapsed}
                   onToggleCollapse={() => (heroCollapsed = !heroCollapsed)}
                 />
