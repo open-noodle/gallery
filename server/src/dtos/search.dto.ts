@@ -352,6 +352,25 @@ export class SearchSuggestionRequestDto {
   includeNull?: boolean;
 }
 
+export class TagSuggestionRequestDto {
+  @ValidateUUID({ optional: true, description: 'Scope suggestions to a specific shared space' })
+  spaceId?: string;
+
+  @ValidateDate({ optional: true, description: 'Filter suggestions by taken date (after)' })
+  takenAfter?: Date;
+
+  @ValidateDate({ optional: true, description: 'Filter suggestions by taken date (before)' })
+  takenBefore?: Date;
+}
+
+export class TagSuggestionResponseDto {
+  @ApiProperty({ description: 'Tag ID' })
+  id!: string;
+
+  @ApiProperty({ description: 'Tag value/name' })
+  value!: string;
+}
+
 class SearchFacetCountResponseDto {
   @ApiProperty({ type: 'integer', description: 'Number of assets with this facet value' })
   count!: number;
