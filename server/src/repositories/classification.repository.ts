@@ -18,11 +18,7 @@ export class ClassificationRepository {
 
   @GenerateSql()
   getCategories() {
-    return this.db
-      .selectFrom('classification_category')
-      .selectAll()
-      .orderBy('name', 'asc')
-      .execute();
+    return this.db.selectFrom('classification_category').selectAll().orderBy('name', 'asc').execute();
   }
 
   @GenerateSql()
@@ -30,16 +26,7 @@ export class ClassificationRepository {
     return this.db
       .selectFrom('classification_category as c')
       .leftJoin('classification_prompt_embedding as p', 'p.categoryId', 'c.id')
-      .select([
-        'c.id',
-        'c.name',
-        'c.similarity',
-        'c.action',
-        'c.enabled',
-        'c.createdAt',
-        'c.updatedAt',
-        'p.prompt',
-      ])
+      .select(['c.id', 'c.name', 'c.similarity', 'c.action', 'c.enabled', 'c.createdAt', 'c.updatedAt', 'p.prompt'])
       .orderBy('c.name', 'asc')
       .execute();
   }

@@ -37,7 +37,7 @@ export class ClassificationService extends BaseService {
     };
   }
 
-  async getCategories(auth: AuthDto): Promise<ClassificationCategoryResponseDto[]> {
+  async getCategories(_auth: AuthDto): Promise<ClassificationCategoryResponseDto[]> {
     const rows = await this.classificationRepository.getCategoriesWithPrompts();
 
     const categoryMap = new Map<string, { category: (typeof rows)[0]; prompts: string[] }>();
@@ -127,7 +127,7 @@ export class ClassificationService extends BaseService {
     );
   }
 
-  async deleteCategory(auth: AuthDto, id: string): Promise<void> {
+  async deleteCategory(_auth: AuthDto, id: string): Promise<void> {
     const category = await this.classificationRepository.getCategory(id);
     if (!category) {
       throw new NotFoundException('Category not found');
@@ -136,7 +136,7 @@ export class ClassificationService extends BaseService {
     await this.classificationRepository.deleteCategory(id);
   }
 
-  async scanLibrary(auth: AuthDto): Promise<void> {
+  async scanLibrary(_auth: AuthDto): Promise<void> {
     await this.classificationRepository.resetClassifiedAt();
     await this.jobRepository.queue({
       name: JobName.AssetClassifyQueueAll,
@@ -204,10 +204,7 @@ export class ClassificationService extends BaseService {
       return JobStatus.Skipped;
     }
 
-    const categories = new Map<
-      string,
-      { name: string; similarity: number; action: string; embeddings: string[] }
-    >();
+    const categories = new Map<string, { name: string; similarity: number; action: string; embeddings: string[] }>();
     for (const row of rows) {
       if (!categories.has(row.categoryId)) {
         categories.set(row.categoryId, {

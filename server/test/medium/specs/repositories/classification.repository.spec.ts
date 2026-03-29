@@ -25,7 +25,7 @@ describe(ClassificationRepository.name, () => {
   describe('getEnabledCategoriesWithEmbeddings', () => {
     it('should return categories with their prompt embeddings via JOIN', async () => {
       const { ctx, sut } = setup();
-      const { user } = await ctx.newUser();
+      await ctx.newUser();
 
       const category = await sut.createCategory({
         name: 'Animals',
@@ -56,7 +56,7 @@ describe(ClassificationRepository.name, () => {
 
     it('should not return disabled categories', async () => {
       const { ctx, sut } = setup();
-      const { user } = await ctx.newUser();
+      await ctx.newUser();
 
       const category = await sut.createCategory({
         name: 'Disabled',
@@ -150,7 +150,7 @@ describe(ClassificationRepository.name, () => {
   describe('cascade deletes', () => {
     it('should cascade delete prompt embeddings when category is deleted', async () => {
       const { ctx, sut } = setup();
-      const { user } = await ctx.newUser();
+      await ctx.newUser();
 
       const category = await sut.createCategory({
         name: 'CascadeTest',
@@ -207,7 +207,7 @@ describe(ClassificationRepository.name, () => {
 
   describe('unique constraint', () => {
     it('should not allow two categories with the same name', async () => {
-      const { ctx, sut } = setup();
+      const { sut } = setup();
 
       await sut.createCategory({
         name: 'Duplicate',
