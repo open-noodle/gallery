@@ -111,7 +111,7 @@
     icon={mdiMagnifyScan}
     key="auto-classification"
     title="Auto-Classification"
-    subtitle="Automatically tag and archive photos by category"
+    subtitle="View classification categories configured by your administrator"
   >
     <ClassificationSettings />
   </SettingAccordion>
