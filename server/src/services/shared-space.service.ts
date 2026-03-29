@@ -953,13 +953,23 @@ export class SharedSpaceService extends BaseService {
           continue;
         }
 
-        const newPerson = await this.sharedSpaceRepository.createPerson({
+        // Layer 1 dedup: check if a space person already exists for this personal person
+        const existingSpacePerson = await this.sharedSpaceRepository.findSpacePersonByLinkedPersonId(
           spaceId,
-          name: '',
-          representativeFaceId: face.id,
-          type: 'person',
-        });
-        personId = newPerson.id;
+          face.personId,
+        );
+
+        if (existingSpacePerson) {
+          personId = existingSpacePerson.id;
+        } else {
+          const newPerson = await this.sharedSpaceRepository.createPerson({
+            spaceId,
+            name: '',
+            representativeFaceId: face.id,
+            type: 'person',
+          });
+          personId = newPerson.id;
+        }
       }
 
       await this.sharedSpaceRepository.addPersonFaces([{ personId, assetFaceId: face.id }]);

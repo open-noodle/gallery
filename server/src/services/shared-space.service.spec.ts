@@ -2166,6 +2166,7 @@ describe(SharedSpaceService.name, () => {
       ]);
       mocks.sharedSpace.isPersonFaceAssigned.mockResolvedValue(false);
       mocks.sharedSpace.findClosestSpacePerson.mockResolvedValue([]);
+      mocks.sharedSpace.findSpacePersonByLinkedPersonId.mockResolvedValue(undefined);
       mocks.sharedSpace.createPerson.mockResolvedValue(newPerson);
       mocks.sharedSpace.addPersonFaces.mockResolvedValue([]);
       mocks.sharedSpace.getPetFacesForAsset.mockResolvedValue([]);
@@ -2199,6 +2200,7 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.isPersonFaceAssigned.mockResolvedValue(false);
       // Returns empty array because the findClosestSpacePerson query already filters by maxDistance
       mocks.sharedSpace.findClosestSpacePerson.mockResolvedValue([]);
+      mocks.sharedSpace.findSpacePersonByLinkedPersonId.mockResolvedValue(undefined);
       mocks.sharedSpace.createPerson.mockResolvedValue(newPerson);
       mocks.sharedSpace.addPersonFaces.mockResolvedValue([]);
       mocks.sharedSpace.getPetFacesForAsset.mockResolvedValue([]);
@@ -2245,6 +2247,7 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.findClosestSpacePerson
         .mockResolvedValueOnce([{ personId, name: 'Alice', distance: 0.3 }])
         .mockResolvedValueOnce([]);
+      mocks.sharedSpace.findSpacePersonByLinkedPersonId.mockResolvedValue(undefined);
       mocks.sharedSpace.createPerson.mockResolvedValue(newPerson);
       mocks.sharedSpace.addPersonFaces.mockResolvedValue([]);
       mocks.person.getById.mockResolvedValue(personalPerson);
@@ -2271,6 +2274,7 @@ describe(SharedSpaceService.name, () => {
       ]);
       mocks.sharedSpace.isPersonFaceAssigned.mockResolvedValue(false);
       mocks.sharedSpace.findClosestSpacePerson.mockResolvedValue([]);
+      mocks.sharedSpace.findSpacePersonByLinkedPersonId.mockResolvedValue(undefined);
       mocks.sharedSpace.createPerson.mockResolvedValue(newPerson);
       mocks.sharedSpace.addPersonFaces.mockResolvedValue([]);
       mocks.sharedSpace.getPetFacesForAsset.mockResolvedValue([]);
@@ -2323,6 +2327,7 @@ describe(SharedSpaceService.name, () => {
       ]);
       mocks.sharedSpace.isPersonFaceAssigned.mockResolvedValue(false);
       mocks.sharedSpace.findClosestSpacePerson.mockResolvedValue([]);
+      mocks.sharedSpace.findSpacePersonByLinkedPersonId.mockResolvedValue(undefined);
       mocks.sharedSpace.createPerson.mockResolvedValue(newPerson);
       mocks.sharedSpace.addPersonFaces.mockResolvedValue([]);
       mocks.sharedSpace.getPetFacesForAsset.mockResolvedValue([]);
@@ -2375,6 +2380,7 @@ describe(SharedSpaceService.name, () => {
       ]);
       mocks.sharedSpace.isPersonFaceAssigned.mockResolvedValue(false);
       mocks.sharedSpace.findClosestSpacePerson.mockResolvedValue([]);
+      mocks.sharedSpace.findSpacePersonByLinkedPersonId.mockResolvedValue(undefined);
       mocks.sharedSpace.createPerson.mockResolvedValue(newPerson);
       mocks.sharedSpace.addPersonFaces.mockResolvedValue([]);
       mocks.sharedSpace.getPetFacesForAsset.mockResolvedValue([]);
@@ -4030,6 +4036,7 @@ describe(SharedSpaceService.name, () => {
       ]);
       mocks.sharedSpace.isPersonFaceAssigned.mockResolvedValue(false);
       mocks.sharedSpace.findClosestSpacePerson.mockResolvedValue([]);
+      mocks.sharedSpace.findSpacePersonByLinkedPersonId.mockResolvedValue(undefined);
       mocks.sharedSpace.addPersonFaces.mockResolvedValue([]);
       mocks.sharedSpace.createPerson.mockResolvedValue(factory.sharedSpacePerson({ spaceId }));
       mocks.person.getById.mockResolvedValue(factory.person({ id: personalPersonId }));
@@ -4055,6 +4062,7 @@ describe(SharedSpaceService.name, () => {
       ]);
       mocks.sharedSpace.isPersonFaceAssigned.mockResolvedValue(false);
       mocks.sharedSpace.findClosestSpacePerson.mockResolvedValue([]);
+      mocks.sharedSpace.findSpacePersonByLinkedPersonId.mockResolvedValue(undefined);
       mocks.sharedSpace.createPerson.mockResolvedValue(factory.sharedSpacePerson({ spaceId }));
       mocks.sharedSpace.addPersonFaces.mockResolvedValue([]);
       mocks.person.getById.mockResolvedValue(factory.person({ id: personalPersonId }));
@@ -4090,6 +4098,93 @@ describe(SharedSpaceService.name, () => {
         { personId: existingPersonId, assetFaceId: faceId },
       ]);
       expect(mocks.sharedSpace.createPerson).not.toHaveBeenCalled();
+    });
+
+    it('should reuse existing space person when face personId matches (Layer 1 dedup)', async () => {
+      const spaceId = newUuid();
+      const libraryId = newUuid();
+      const assetId = newUuid();
+      const faceId = newUuid();
+      const personalPersonId = newUuid();
+      const existingSpacePersonId = newUuid();
+
+      mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
+      mocks.sharedSpace.hasLibraryLink.mockResolvedValue(true);
+      mocks.asset.getByLibraryIdWithFaces.mockResolvedValueOnce([{ id: assetId }]).mockResolvedValueOnce([]);
+      mocks.sharedSpace.getAssetFacesForMatching.mockResolvedValue([
+        { id: faceId, assetId, personId: personalPersonId, embedding: '[0.1,0.2]' },
+      ]);
+      mocks.sharedSpace.isPersonFaceAssigned.mockResolvedValue(false);
+      mocks.sharedSpace.findClosestSpacePerson.mockResolvedValue([]); // No embedding match
+      mocks.sharedSpace.findSpacePersonByLinkedPersonId.mockResolvedValue(
+        factory.sharedSpacePerson({ id: existingSpacePersonId, spaceId }),
+      );
+      mocks.sharedSpace.addPersonFaces.mockResolvedValue([]);
+      mocks.sharedSpace.getPetFacesForAsset.mockResolvedValue([]);
+
+      await sut.handleSharedSpaceLibraryFaceSync({ spaceId, libraryId });
+
+      // Should NOT create a new person
+      expect(mocks.sharedSpace.createPerson).not.toHaveBeenCalled();
+      // Should assign face to the existing space person found by personId
+      expect(mocks.sharedSpace.addPersonFaces).toHaveBeenCalledWith([
+        { personId: existingSpacePersonId, assetFaceId: faceId },
+      ]);
+    });
+
+    it('should prefer embedding match over personId fallback', async () => {
+      const spaceId = newUuid();
+      const libraryId = newUuid();
+      const assetId = newUuid();
+      const faceId = newUuid();
+      const personalPersonId = newUuid();
+      const embeddingMatchPersonId = newUuid();
+
+      mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
+      mocks.sharedSpace.hasLibraryLink.mockResolvedValue(true);
+      mocks.asset.getByLibraryIdWithFaces.mockResolvedValueOnce([{ id: assetId }]).mockResolvedValueOnce([]);
+      mocks.sharedSpace.getAssetFacesForMatching.mockResolvedValue([
+        { id: faceId, assetId, personId: personalPersonId, embedding: '[0.1,0.2]' },
+      ]);
+      mocks.sharedSpace.isPersonFaceAssigned.mockResolvedValue(false);
+      mocks.sharedSpace.findClosestSpacePerson.mockResolvedValue([
+        { personId: embeddingMatchPersonId, name: '', distance: 0.3 },
+      ]);
+      mocks.sharedSpace.addPersonFaces.mockResolvedValue([]);
+      mocks.sharedSpace.getPetFacesForAsset.mockResolvedValue([]);
+
+      await sut.handleSharedSpaceLibraryFaceSync({ spaceId, libraryId });
+
+      // Embedding match should be used — personId fallback should NOT be called
+      expect(mocks.sharedSpace.findSpacePersonByLinkedPersonId).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.addPersonFaces).toHaveBeenCalledWith([
+        { personId: embeddingMatchPersonId, assetFaceId: faceId },
+      ]);
+    });
+
+    it('should create new space person only when no personId match exists', async () => {
+      const spaceId = newUuid();
+      const libraryId = newUuid();
+      const assetId = newUuid();
+      const faceId = newUuid();
+      const personalPersonId = newUuid();
+
+      mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
+      mocks.sharedSpace.hasLibraryLink.mockResolvedValue(true);
+      mocks.asset.getByLibraryIdWithFaces.mockResolvedValueOnce([{ id: assetId }]).mockResolvedValueOnce([]);
+      mocks.sharedSpace.getAssetFacesForMatching.mockResolvedValue([
+        { id: faceId, assetId, personId: personalPersonId, embedding: '[0.1,0.2]' },
+      ]);
+      mocks.sharedSpace.isPersonFaceAssigned.mockResolvedValue(false);
+      mocks.sharedSpace.findClosestSpacePerson.mockResolvedValue([]); // No embedding match
+      mocks.sharedSpace.findSpacePersonByLinkedPersonId.mockResolvedValue(undefined); // No personId match either
+      mocks.sharedSpace.createPerson.mockResolvedValue(factory.sharedSpacePerson({ spaceId }));
+      mocks.sharedSpace.addPersonFaces.mockResolvedValue([]);
+      mocks.sharedSpace.getPetFacesForAsset.mockResolvedValue([]);
+
+      await sut.handleSharedSpaceLibraryFaceSync({ spaceId, libraryId });
+
+      expect(mocks.sharedSpace.createPerson).toHaveBeenCalled();
     });
   });
 
