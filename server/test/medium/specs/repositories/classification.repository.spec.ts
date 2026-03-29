@@ -22,10 +22,15 @@ beforeAll(async () => {
 });
 
 describe(ClassificationRepository.name, () => {
+  // Clean up categories between tests to avoid global unique constraint collisions
+  beforeEach(async () => {
+    await defaultDatabase.deleteFrom('classification_prompt_embedding').execute();
+    await defaultDatabase.deleteFrom('classification_category').execute();
+  });
+
   describe('getEnabledCategoriesWithEmbeddings', () => {
     it('should return categories with their prompt embeddings via JOIN', async () => {
-      const { ctx, sut } = setup();
-      await ctx.newUser();
+      const { sut } = setup();
 
       const category = await sut.createCategory({
         name: 'Animals',
@@ -55,8 +60,7 @@ describe(ClassificationRepository.name, () => {
     });
 
     it('should not return disabled categories', async () => {
-      const { ctx, sut } = setup();
-      await ctx.newUser();
+      const { sut } = setup();
 
       const category = await sut.createCategory({
         name: 'Disabled',
@@ -83,14 +87,11 @@ describe(ClassificationRepository.name, () => {
       const { user } = await ctx.newUser();
       const { asset } = await ctx.newAsset({ ownerId: user.id });
 
-      // Create job status with no classifiedAt
       await ctx.newJobStatus({ assetId: asset.id });
 
-      // Insert smart_search entry so the JOIN succeeds
       const embedding = `[${Array.from({ length: 512 }, () => '0.01').join(',')}]`;
       await ctx.database.insertInto('smart_search').values({ assetId: asset.id, embedding }).execute();
 
-      // Override classifiedAt to null (newJobStatus sets defaults)
       await ctx.database
         .updateTable('asset_job_status')
         .set({ classifiedAt: null })
@@ -150,7 +151,6 @@ describe(ClassificationRepository.name, () => {
   describe('cascade deletes', () => {
     it('should cascade delete prompt embeddings when category is deleted', async () => {
       const { ctx, sut } = setup();
-      await ctx.newUser();
 
       const category = await sut.createCategory({
         name: 'CascadeTest',
@@ -170,7 +170,6 @@ describe(ClassificationRepository.name, () => {
 
       await sut.deleteCategory(category.id);
 
-      // Verify embeddings were cascade deleted via direct DB query
       const afterDelete = await ctx.database
         .selectFrom('classification_prompt_embedding')
         .selectAll()
