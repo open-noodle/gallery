@@ -282,10 +282,7 @@ export class SharedSpaceController {
     description: 'Queue a background job to find and merge duplicate people in a shared space.',
     history: new HistoryBuilder().added('v1').beta('v1'),
   })
-  deduplicateSpacePeople(
-    @Auth() auth: AuthDto,
-    @Param('id') id: string,
-  ): Promise<void> {
+  deduplicateSpacePeople(@Auth() auth: AuthDto, @Param('id') id: string): Promise<void> {
     return this.service.deduplicateSpacePeople(auth, id);
   }
 

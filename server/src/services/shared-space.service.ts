@@ -896,9 +896,7 @@ export class SharedSpaceService extends BaseService {
   async handleSharedSpacePersonDedup(job: JobOf<JobName.SharedSpacePersonDedup>): Promise<JobStatus> {
     const space = await this.sharedSpaceRepository.getById(job.spaceId);
     if (!space || !space.faceRecognitionEnabled) {
-      this.logger.debug(
-        `Dedup skipped for space ${job.spaceId}: ${!space ? 'not found' : 'face recognition disabled'}`,
-      );
+      this.logger.debug(`Dedup skipped for space ${job.spaceId}: ${space ? 'face recognition disabled' : 'not found'}`);
       return JobStatus.Skipped;
     }
 
@@ -963,11 +961,13 @@ export class SharedSpaceService extends BaseService {
         const [target, source] = personFaceCount >= matchFaceCount ? [person, matchPerson] : [matchPerson, person];
 
         this.logger.log(
-          `Dedup: merging person ${source.id} (${source.name || 'unnamed'}, ${
-            personFaceCount >= matchFaceCount ? matchFaceCount : personFaceCount
-          } faces) into ${target.id} (${target.name || 'unnamed'}, ${
-            personFaceCount >= matchFaceCount ? personFaceCount : matchFaceCount
-          } faces), distance=${match.distance.toFixed(4)}`,
+          `Dedup: merging person ${source.id} (${source.name || 'unnamed'}, ${Math.min(
+            personFaceCount,
+            matchFaceCount,
+          )} faces) into ${target.id} (${target.name || 'unnamed'}, ${Math.max(
+            personFaceCount,
+            matchFaceCount,
+          )} faces), distance=${match.distance.toFixed(4)}`,
         );
 
         // Reassign faces and migrate aliases
