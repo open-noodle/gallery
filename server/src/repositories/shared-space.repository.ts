@@ -693,7 +693,11 @@ export class SharedSpaceRepository {
   @GenerateSql({
     params: [DummyValue.UUID, DummyValue.VECTOR, { maxDistance: 0.6, numResults: 1 }],
   })
-  findClosestSpacePerson(spaceId: string, embedding: string, options: { maxDistance: number; numResults: number }) {
+  findClosestSpacePerson(
+    spaceId: string,
+    embedding: string,
+    options: { maxDistance: number; numResults: number; excludePersonIds?: string[]; type?: string },
+  ) {
     return this.db.transaction().execute(async (trx) => {
       await sql`set local vchordrq.probes = ${sql.lit(probes[VectorIndex.Face])}`.execute(trx);
       return await trx
@@ -708,6 +712,10 @@ export class SharedSpaceRepository {
               sql<number>`face_search.embedding <=> ${embedding}`.as('distance'),
             ])
             .where('shared_space_person.spaceId', '=', spaceId)
+            .$if(!!options.excludePersonIds?.length, (qb) =>
+              qb.where('shared_space_person.id', 'not in', options.excludePersonIds!),
+            )
+            .$if(!!options.type, (qb) => qb.where('shared_space_person.type', '=', options.type!))
             .orderBy('distance')
             .limit(options.numResults),
         )
