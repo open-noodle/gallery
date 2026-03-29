@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ClassificationSettings from '$lib/components/admin-settings/ClassificationSettings.svelte';
   import AuthSettings from '$lib/components/admin-settings/AuthSettings.svelte';
   import BackupSettings from '$lib/components/admin-settings/BackupSettings.svelte';
   import FFmpegSettings from '$lib/components/admin-settings/FFmpegSettings.svelte';
@@ -37,6 +38,7 @@
     mdiFolderOutline,
     mdiImageOutline,
     mdiLockOutline,
+    mdiMagnifyScan,
     mdiMapMarkerOutline,
     mdiPaletteOutline,
     mdiRobotOutline,
@@ -111,6 +113,13 @@
       subtitle: $t('admin.machine_learning_settings_description'),
       key: 'machine-learning',
       icon: mdiRobotOutline,
+    },
+    {
+      component: ClassificationSettings,
+      title: $t('admin.classification_settings'),
+      subtitle: $t('admin.classification_settings_description'),
+      key: 'classification',
+      icon: mdiMagnifyScan,
     },
     {
       component: MapSettings,
