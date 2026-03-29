@@ -565,6 +565,8 @@ describe('handleSharedSpacePersonDedup', () => {
     const result = await sut.handleSharedSpacePersonDedup({ spaceId });
     // Should succeed despite the error — graceful skip
     expect(result).toBe(JobStatus.Success);
+    // deletePerson should still be called even though updatePerson failed
+    expect(mocks.sharedSpace.deletePerson).toHaveBeenCalledWith(personB);
   });
 
   it('should skip match when findClosestSpacePerson returns a person already merged in this pass', async () => {
@@ -639,12 +641,22 @@ describe('handleSharedSpacePersonDedup', () => {
       { id: personA, name: '', type: 'person', isHidden: false, embedding: '[0.1,0.2]' },
       { id: petB, name: '', type: 'pet', isHidden: false, embedding: '[0.11,0.21]' },
     ]);
-    // findClosestSpacePerson is called with type filter, returns no match
     mocks.sharedSpace.findClosestSpacePerson.mockResolvedValue([]);
 
     const result = await sut.handleSharedSpacePersonDedup({ spaceId });
     expect(result).toBe(JobStatus.Success);
     expect(mocks.sharedSpace.reassignPersonFacesSafe).not.toHaveBeenCalled();
+    // Verify type filter was passed — each person's type should be used
+    expect(mocks.sharedSpace.findClosestSpacePerson).toHaveBeenCalledWith(
+      spaceId,
+      expect.any(String),
+      expect.objectContaining({ type: 'person' }),
+    );
+    expect(mocks.sharedSpace.findClosestSpacePerson).toHaveBeenCalledWith(
+      spaceId,
+      expect.any(String),
+      expect.objectContaining({ type: 'pet' }),
+    );
   });
 
   it('should preserve non-empty name when merging', async () => {
@@ -739,6 +751,7 @@ In `server/src/services/shared-space.service.ts`, add after `handleSharedSpaceLi
     const { machineLearning } = await this.getConfig({ withCache: true });
     const maxDistance = machineLearning.facialRecognition.maxDistance;
 
+    const MAX_PASSES = 100;
     let totalMerges = 0;
     let pass = 0;
     let mergedAny = true;
@@ -746,6 +759,12 @@ In `server/src/services/shared-space.service.ts`, add after `handleSharedSpaceLi
     while (mergedAny) {
       mergedAny = false;
       pass++;
+
+      if (pass > MAX_PASSES) {
+        this.logger.error(`Dedup for space ${job.spaceId} exceeded ${MAX_PASSES} passes — aborting to prevent infinite loop`);
+        break;
+      }
+
       const persons = await this.sharedSpaceRepository.getSpacePersonsWithEmbeddings(job.spaceId);
       this.logger.log(`Dedup pass ${pass} for space ${job.spaceId}: ${persons.length} persons to check`);
 
@@ -801,7 +820,7 @@ In `server/src/services/shared-space.service.ts`, add after `handleSharedSpaceLi
         await this.sharedSpaceRepository.migrateAliases(source.id, target.id);
 
         // Determine merged properties
-        const updates: Record<string, any> = {};
+        const updates: Partial<{ name: string; isHidden: boolean }> = {};
         if (!target.name && source.name) {
           updates.name = source.name;
         }
@@ -809,17 +828,21 @@ In `server/src/services/shared-space.service.ts`, add after `handleSharedSpaceLi
           updates.isHidden = false;
         }
 
+        // Update and delete separately so deletePerson still runs if updatePerson fails
         try {
           if (Object.keys(updates).length > 0) {
             await this.sharedSpaceRepository.updatePerson(target.id, updates);
           }
+        } catch (error) {
+          // Target may have been concurrently deleted — faces were already reassigned, continue to delete source
+          this.logger.warn(`Dedup: updatePerson failed for target ${target.id}: ${error}`);
+        }
+
+        try {
           await this.sharedSpaceRepository.deletePerson(source.id);
         } catch (error) {
-          // Person may have been concurrently deleted by another operation — skip gracefully
-          this.logger.warn(
-            `Dedup merge failed for ${source.id} -> ${target.id}: ${error}. Skipping — person may have been concurrently deleted.`,
-          );
-          continue;
+          // Source may have been concurrently deleted — safe to ignore
+          this.logger.warn(`Dedup: deletePerson failed for source ${source.id}: ${error}`);
         }
 
         deletedIds.add(source.id);
@@ -860,7 +883,7 @@ await this.jobRepository.queue({
 });
 ```
 
-**Important:** Update existing `handleSharedSpaceLibraryFaceSync` tests to account for the new `jobRepository.queue` call. Add `mocks.job.queue.mockResolvedValue(void 0)` to the `beforeEach` or to each existing test that calls `handleSharedSpaceLibraryFaceSync`.
+**Important:** Update existing tests for both `handleSharedSpaceLibraryFaceSync` and `handleSharedSpaceFaceMatchAll` to account for the new `jobRepository.queue` call. Add `mocks.job.queue.mockResolvedValue(void 0)` to the `beforeEach` of each `describe` block, or to each existing test that calls these handlers. Specifically, the `handleSharedSpaceFaceMatchAll` tests "should queue SharedSpaceFaceMatch for each asset in the space" and "should succeed with no assets" will break without this mock.
 
 **Step 4: Run tests to verify they pass**
 
