@@ -727,6 +727,22 @@ export class SharedSpaceRepository {
   }
 
   @GenerateSql({ params: [DummyValue.UUID] })
+  getSpacePersonsWithEmbeddings(spaceId: string) {
+    return this.db
+      .selectFrom('shared_space_person')
+      .innerJoin('face_search', 'face_search.faceId', 'shared_space_person.representativeFaceId')
+      .select([
+        'shared_space_person.id',
+        'shared_space_person.name',
+        'shared_space_person.type',
+        'shared_space_person.isHidden',
+        'face_search.embedding',
+      ])
+      .where('shared_space_person.spaceId', '=', spaceId)
+      .execute();
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID] })
   getAssetFacesForMatching(assetId: string) {
     return this.db
       .selectFrom('asset_face')
