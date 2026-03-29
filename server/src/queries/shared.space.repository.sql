@@ -568,7 +568,7 @@ from
   "cte"
 where
   "cte"."distance" <= $4
-commit
+rollback
 
 -- SharedSpaceRepository.getAssetFacesForMatching
 select

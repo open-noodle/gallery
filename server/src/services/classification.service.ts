@@ -54,7 +54,7 @@ export class ClassificationService extends BaseService {
   }
 
   async createCategory(
-    auth: AuthDto,
+    _auth: AuthDto,
     dto: ClassificationCategoryCreateDto,
   ): Promise<ClassificationCategoryResponseDto> {
     const { machineLearning } = await this.getConfig({ withCache: true });
@@ -80,7 +80,7 @@ export class ClassificationService extends BaseService {
   }
 
   async updateCategory(
-    auth: AuthDto,
+    _auth: AuthDto,
     id: string,
     dto: ClassificationCategoryUpdateDto,
   ): Promise<ClassificationCategoryResponseDto> {
