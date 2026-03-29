@@ -26,7 +26,7 @@ import { Kysely, sql } from 'kysely';
 export async function up(db: Kysely<any>): Promise<void> {
   // Step 1: Find the admin user (first admin by creation date)
   const admin = await sql<{ id: string }>`
-    SELECT "id" FROM "users" WHERE "isAdmin" = true ORDER BY "createdAt" ASC LIMIT 1
+    SELECT "id" FROM "user" WHERE "isAdmin" = true ORDER BY "createdAt" ASC LIMIT 1
   `.execute(db);
 
   if (admin.rows.length === 0) {
@@ -40,7 +40,7 @@ export async function up(db: Kysely<any>): Promise<void> {
     await sql`
       UPDATE "classification_category" cc
       SET "name" = cc."name" || ' (' || u."name" || ')'
-      FROM "users" u
+      FROM "user" u
       WHERE cc."userId" = u."id"
         AND cc."userId" != ${adminId}
         AND EXISTS (
@@ -76,7 +76,7 @@ export async function down(db: Kysely<any>): Promise<void> {
   await sql`ALTER TABLE "classification_category" DROP CONSTRAINT IF EXISTS "classification_category_name_uq"`.execute(
     db,
   );
-  await sql`ALTER TABLE "classification_category" ADD COLUMN "userId" uuid REFERENCES "users"("id") ON UPDATE CASCADE ON DELETE CASCADE`.execute(
+  await sql`ALTER TABLE "classification_category" ADD COLUMN "userId" uuid REFERENCES "user"("id") ON UPDATE CASCADE ON DELETE CASCADE`.execute(
     db,
   );
   await sql`ALTER TABLE "classification_category" ADD COLUMN "tagId" uuid REFERENCES "tag"("id") ON DELETE SET NULL`.execute(
@@ -178,6 +178,7 @@ Changes:
 - `resetClassifiedAt()`: Remove `userId` param. Change the body to update all rows: `.set({ classifiedAt: null }).where('classifiedAt', 'is not', null)` (remove the subquery).
 - `streamUnclassifiedAssets()`: Remove `userId` param and the conditional `if (userId)` block.
 - `createCategory()`: No change needed (the Insertable type will automatically exclude userId/tagId since the schema table no longer has them).
+- **Consolidation note**: After these changes, `getCategories()` and `getAllCategories()` are identical. Remove `getAllCategories()` and update `reEncodeAllPrompts()` in the service to call `getCategories()` instead.
 
 The full updated file:
 
@@ -244,10 +245,6 @@ export class ClassificationRepository {
       .selectAll()
       .where('categoryId', '=', categoryId)
       .execute();
-  }
-
-  getAllCategories() {
-    return this.db.selectFrom('classification_category').selectAll().execute();
   }
 
   @GenerateSql()
@@ -501,7 +498,7 @@ export class ClassificationService extends BaseService {
   }
 
   private async reEncodeAllPrompts(modelName: string) {
-    const categories = await this.classificationRepository.getAllCategories();
+    const categories = await this.classificationRepository.getCategories();
     for (const category of categories) {
       const prompts = await this.classificationRepository.getPromptEmbeddings(category.id);
       await this.classificationRepository.deletePromptEmbeddingsByCategory(category.id);
@@ -814,6 +811,7 @@ Key changes:
 - `handleClassifyQueueAll`: Change `{ userId: 'user-1' }` → `{}`. Change `streamUnclassifiedAssets` expectation from `('user-1')` → `()`.
 - `scanLibrary`: Change `resetClassifiedAt` expectation from `('user-id')` → `()`. Change job data from `{ userId: 'user-id' }` → `{}`.
 - `getEnabledCategoriesWithEmbeddings` mock calls: Remove the `asset.ownerId` argument.
+- `onConfigUpdate` tests: Change `mocks.classification.getAllCategories` → `mocks.classification.getCategories` (method consolidated).
 
 See design doc for the full behavioral spec. Write tests that verify:
 
@@ -839,7 +837,43 @@ git commit -m "test: update classification unit tests for admin-scoped behavior"
 
 ---
 
-### Task 9: Regenerate OpenAPI + SQL
+### Task 9: Update Medium Tests
+
+**Files:**
+
+- Modify: `server/test/medium/specs/repositories/classification.repository.spec.ts`
+
+**Step 1: Update tests for admin-scoped schema**
+
+Key changes — the `userId` column no longer exists, so all `createCategory` calls lose the `userId` field, all parameterized queries lose their userId arguments, and user-scoping tests are replaced with global behavior tests:
+
+- `createCategory({ userId, name, ... })` → `createCategory({ name, ... })` (all occurrences)
+- `getEnabledCategoriesWithEmbeddings(user.id)` → `getEnabledCategoriesWithEmbeddings()`
+- `getCategories(user.id)` → `getCategories()`
+- `resetClassifiedAt(user.id)` → `resetClassifiedAt()`
+- `streamUnclassifiedAssets(user1.id)` → `streamUnclassifiedAssets()`
+- **Remove** "should filter by userId when provided" test (this functionality no longer exists)
+- **Remove** "should cascade delete categories when user is deleted" test (no FK to user anymore)
+- **Remove** "should allow same category name for different users" test (now globally unique)
+- **Update** "should clear classifiedAt for only the specified user" → "should clear classifiedAt for all assets" (verify both users' assets get reset)
+- **Update** unique constraint test: "should not allow two categories with the same name" (no userId, just name uniqueness)
+
+**Step 2: Run medium tests**
+
+Run: `cd server && pnpm test:medium -- --run test/medium/specs/repositories/classification.repository.spec.ts`
+
+Expected: All pass.
+
+**Step 3: Commit**
+
+```bash
+git add server/test/medium/specs/repositories/classification.repository.spec.ts
+git commit -m "test: update classification medium tests for admin-scoped schema"
+```
+
+---
+
+### Task 10: Regenerate OpenAPI + SQL
 
 **Step 1: Build server and regenerate specs**
 
@@ -865,7 +899,7 @@ git commit -m "chore: regenerate OpenAPI specs and SQL queries"
 
 ---
 
-### Task 10: Move Web Component to Admin Settings
+### Task 11: Move Web Component to Admin Settings
 
 **Files:**
 
@@ -902,12 +936,14 @@ Add to the `settings` array (after MachineLearningSettings is a natural fit):
 ```typescript
 {
   component: ClassificationSettings,
-  title: 'Auto-Classification',
-  subtitle: 'Manage classification categories for automatic photo tagging',
+  title: $t('admin.classification_settings'),
+  subtitle: $t('admin.classification_settings_description'),
   key: 'classification',
   icon: mdiMagnifyScan,
 },
 ```
+
+Note: The i18n keys `admin.classification_settings` ("Auto-Classification") and `admin.classification_settings_description` ("Manage classification categories for automatic photo tagging") need to be added to the i18n translation file. After adding, run `pnpm --filter=immich-i18n format:fix` to sort keys.
 
 **Step 3: Commit**
 
@@ -918,7 +954,7 @@ git commit -m "feat: move classification settings to admin panel"
 
 ---
 
-### Task 11: Replace User Settings with Read-Only View
+### Task 12: Replace User Settings with Read-Only View
 
 **Files:**
 
@@ -1020,7 +1056,48 @@ git commit -m "feat: replace user classification settings with read-only view"
 
 ---
 
-### Task 12: Update E2E Tests
+### Task 13: Update Web Component Tests
+
+**Files:**
+
+- Modify: `web/src/lib/components/user-settings-page/classification-settings.spec.ts`
+
+**Step 1: Rewrite tests for read-only component**
+
+The existing spec has 9 tests for CRUD functionality (Add Category button, Scan Library button, edit form, delete, toggle, similarity slider, create form validation). Since the component is now read-only, replace all CRUD tests with read-only behavior tests.
+
+Key changes:
+
+- Remove `tagId` from `makeCategory` factory (field no longer in DTO)
+- Remove `Action2` import (use plain strings)
+- Remove all SDK mutation mocks (`createCategory`, `deleteCategory`, `updateCategory`, `scanClassification`)
+- Keep `getCategories` mock
+
+New tests to write:
+
+1. "renders admin info text" — verify "Classification categories are managed by your administrator" is visible
+2. "displays category name and metadata" — load categories, verify name, action badge, similarity label
+3. "shows disabled state for disabled categories" — verify `opacity-50` class
+4. "shows empty state when no categories" — verify "No classification categories configured."
+5. "does not render Add Category or Scan buttons" — verify these buttons are absent
+6. "error notification shown when SDK call fails" — keep this test, it still applies
+
+**Step 2: Run web tests**
+
+Run: `cd web && pnpm test -- --run src/lib/components/user-settings-page/classification-settings.spec.ts`
+
+Expected: All pass.
+
+**Step 3: Commit**
+
+```bash
+git add web/src/lib/components/user-settings-page/classification-settings.spec.ts
+git commit -m "test: rewrite classification settings spec for read-only component"
+```
+
+---
+
+### Task 14: Update E2E Tests
 
 **Files:**
 
@@ -1217,7 +1294,7 @@ git commit -m "test: update classification e2e tests for admin-only mutations"
 
 ---
 
-### Task 13: Lint, Format, Type Check
+### Task 15: Lint, Format, Type Check
 
 **Step 1: Run server lint and format**
 
@@ -1248,7 +1325,7 @@ git commit -m "chore: fix lint and formatting issues"
 
 ---
 
-### Task 14: Final Verification
+### Task 16: Final Verification
 
 **Step 1: Run server unit tests**
 
