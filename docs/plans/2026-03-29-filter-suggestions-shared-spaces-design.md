@@ -46,7 +46,11 @@ When `withSharedSpaces` is true:
 2. If any spaces found, pass `timelineSpaceIds` array to repository methods
 3. If no spaces, fall through to existing owner-only behavior
 
-This mirrors the pattern in `TimelineService.getTimeBucketOptions()` (lines 60-65).
+This mirrors the pattern in `TimelineService.getTimeBucketOptions()`.
+
+Note: `getSuggestions()` currently passes the full DTO to repository methods. The service must translate
+`withSharedSpaces` into `timelineSpaceIds` on the options object before passing to the repository, since
+the repository expects `SpaceScopeOptions` (not the DTO directly).
 
 ### 3. Repository Change (`SearchRepository.getExifField`)
 
@@ -64,7 +68,7 @@ appears once regardless of source).
 ### 4. Frontend Changes
 
 **Photos page** (`+page.svelte`) — add `withSharedSpaces: true` to all suggestion provider calls:
-`locations`, `cities`, `states`, `cameras`, `cameraModels`, `lensModels`.
+`locations`, `cities`, `cameras`, `cameraModels`.
 
 **Map filter config** (`map-filter-config.ts`) — add `withSharedSpaces: true` to the non-space branch
 providers: `cameras`, `cameraModels`.
@@ -92,6 +96,8 @@ providers: `cameras`, `cameraModels`.
 
 - `SearchService.getSearchSuggestions` with `withSharedSpaces: true` verifies space IDs are fetched and
   passed to repository
+- `SearchService.getSearchSuggestions` with `withSharedSpaces` absent preserves existing owner-only
+  behavior (regression)
 - `SearchService.getSearchSuggestions` rejects `spaceId` + `withSharedSpaces` combination
 - Repository-level tests for `getExifField` with `timelineSpaceIds`
 
@@ -104,6 +110,8 @@ providers: `cameras`, `cameraModels`.
 
 - Non-admin user with space membership sees Location suggestions from space content on Photos page
 - Non-admin user with space membership sees Camera suggestions from space content on Photos page
+- Non-admin user with space membership sees Camera suggestions from space content on Map page
+- Cascading filter: selecting a country returns cities from space content with `withSharedSpaces`
 
 ## Files to Modify
 
