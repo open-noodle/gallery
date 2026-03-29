@@ -71,6 +71,8 @@ GET /search/suggestions/tags?spaceId=&takenAfter=&takenBefore=
 ```
 
 - Permission: `Permission.AssetRead` (consistent with existing suggestions endpoint)
+- `@Endpoint` decorator with history metadata (matching other search controller methods)
+- `@ApiOkResponse({ type: [TagSuggestionResponseDto] })` for array response type inference
 - DTO: `TagSuggestionRequestDto` with optional `spaceId`, `takenAfter`, `takenBefore`
 - Response: `TagSuggestionResponseDto[]` — `Array<{ id: string; value: string }>`
 
@@ -84,12 +86,17 @@ GET /search/suggestions/tags?spaceId=&takenAfter=&takenBefore=
 
 `TagSuggestionResponseDto` in `search.dto.ts`:
 
-- `id: string`
-- `value: string`
+- `id: string` (`@ApiProperty`)
+- `value: string` (`@ApiProperty`)
+
+### 5. `@GenerateSql` decorator + `make sql`
+
+The new `getAccessibleTags` repository method must have the `@GenerateSql` decorator for query
+documentation. Run `make sql` after implementation to regenerate SQL query docs.
 
 ## Frontend Changes
 
-### 5. Update `FilterPanelConfig` type
+### 6. Update `FilterPanelConfig` type
 
 Change tags provider signature for temporal scoping consistency:
 
@@ -101,7 +108,14 @@ tags?: () => Promise<TagOption[]>;
 tags?: (context?: FilterContext) => Promise<TagOption[]>;
 ```
 
-### 6. Update filter configs (3 locations)
+### 7. Update filter panel re-fetch logic
+
+The filter panel's debounced `$effect` block in `filter-panel.svelte` (lines ~84-186) re-fetches
+people, locations, and cameras when temporal context changes, but **tags are currently excluded**.
+The `$effect` must be updated to also re-fetch tags with the new `FilterContext` when temporal
+filters change. Without this, temporal scoping will not work despite the type signature change.
+
+### 8. Update filter configs (3 locations)
 
 **Photos page** (`routes/(user)/photos/[[assetId=id]]/+page.svelte`):
 
@@ -119,7 +133,7 @@ tags?: (context?: FilterContext) => Promise<TagOption[]>;
 - Replace `getAllTags()` with `getTagSuggestions()` / `getTagSuggestions({ spaceId })`
 - Pass `FilterContext`
 
-### 7. SDK regeneration
+### 9. SDK regeneration
 
 Run `make open-api-typescript` after server changes. No Dart changes needed (mobile does not
 use the FilterPanel).
@@ -134,8 +148,37 @@ use the FilterPanel).
 
 ## Testing
 
-- Unit tests for `getAccessibleTags` repository method
-- Unit tests for `getTagSuggestions` service method
-- Verify tags from library-linked space assets appear for non-admin members
-- Verify temporal scoping narrows tag suggestions correctly
-- Verify personal timeline includes partner tags
+### Repository (`getAccessibleTags`) unit tests
+
+- Own tags only: user with no spaces or partners sees only tags on their own assets
+- Partner tags included: user sees tags from partner assets on personal timeline
+- Space — direct assets: tags from assets added directly to a space via `shared_space_asset`
+- Space — library-linked assets: tags from assets in a library linked via `shared_space_library`
+- Deleted asset exclusion: tags only on soft-deleted assets (`deletedAt IS NOT NULL`) are excluded
+- Visibility filtering: tags only on archived assets (`visibility != Timeline`) are excluded
+- Temporal scoping — `takenAfter`: only tags from assets after the date
+- Temporal scoping — `takenBefore`: only tags from assets before the date
+- Temporal scoping — range: combined `takenAfter` + `takenBefore` narrows correctly
+- Deduplication: same tag attached to multiple accessible assets returns one row
+- Cross-user same-value tags: two users each have a tag named "Vacation" (different IDs) — both
+  appear when both users' assets are in the same space
+- Empty results: user with no tagged accessible assets gets empty array
+- Ordering: results are alphabetically ordered by `tag.value`
+- Tag with no assets: a tag that exists but has no `tag_asset` rows does not appear
+
+### Service (`getTagSuggestions`) unit tests
+
+- Partner inclusion: `getUserIdsToSearch` is called and partner IDs are forwarded
+- Space permission check: `SharedSpaceRead` is required when `spaceId` is provided
+- Non-member rejection: user who is not a space member gets authorization error
+- No spaceId — personal scope: without `spaceId`, uses owner-based scoping
+- Admin vs non-admin: both go through the same code path (no special admin handling)
+
+### Frontend unit tests
+
+- Tags provider re-fetched on temporal change: filter panel calls tags provider with updated
+  `FilterContext` when year/month changes (matching people/cameras behavior)
+- Tags provider called without context on mount: initial load passes undefined context
+- `tagNames` map populated: response from new endpoint populates the `SvelteMap` correctly
+- Space page passes spaceId: spaces page config passes `spaceId` to the SDK call
+- Map page handles both scoped and unscoped: map filter config works with and without `spaceId`
