@@ -895,6 +895,9 @@
                   {repositioning}
                   onSavePosition={handleSavePosition}
                   onCancelReposition={handleCancelReposition}
+                  faceRecognitionEnabled={space.faceRecognitionEnabled}
+                  spaceId={space.id}
+                  onShowMembers={handleShowMembers}
                   collapsed={heroCollapsed}
                   onToggleCollapse={() => (heroCollapsed = !heroCollapsed)}
                 />

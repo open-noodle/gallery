@@ -375,4 +375,72 @@ describe('SpaceHero component', () => {
     expect(screen.getByTestId('reposition-controls')).toBeInTheDocument();
     expect(screen.queryByTestId('hero-collapsed-bar')).not.toBeInTheDocument();
   });
+
+  // --- Member count clickable ---
+
+  it('should call onShowMembers when member count is clicked in expanded view', () => {
+    const onShowMembers = vi.fn();
+    render(SpaceHero, {
+      space: makeSpace(),
+      memberCount: 3,
+      assetCount: 42,
+      onShowMembers,
+    });
+    screen.getByTestId('hero-member-count').click();
+    expect(onShowMembers).toHaveBeenCalled();
+  });
+
+  it('should call onShowMembers when member count is clicked in collapsed view', () => {
+    const onShowMembers = vi.fn();
+    render(SpaceHero, {
+      space: makeSpace(),
+      memberCount: 3,
+      assetCount: 42,
+      collapsed: true,
+      onToggleCollapse: vi.fn(),
+      onShowMembers,
+    });
+    screen.getByTestId('hero-collapsed-member-count').click();
+    expect(onShowMembers).toHaveBeenCalled();
+  });
+
+  // --- Manage people link ---
+
+  it('should show manage people link when faceRecognitionEnabled', () => {
+    render(SpaceHero, {
+      space: makeSpace(),
+      memberCount: 3,
+      assetCount: 42,
+      faceRecognitionEnabled: true,
+      spaceId: 'space-1',
+    });
+    const link = screen.getByTestId('hero-manage-people');
+    expect(link).toHaveTextContent('manage_people');
+    expect(link).toHaveAttribute('href', '/spaces/space-1/people');
+  });
+
+  it('should not show manage people link when faceRecognitionEnabled is false', () => {
+    render(SpaceHero, {
+      space: makeSpace(),
+      memberCount: 3,
+      assetCount: 42,
+      faceRecognitionEnabled: false,
+      spaceId: 'space-1',
+    });
+    expect(screen.queryByTestId('hero-manage-people')).not.toBeInTheDocument();
+  });
+
+  it('should show manage people link in collapsed view', () => {
+    render(SpaceHero, {
+      space: makeSpace(),
+      memberCount: 3,
+      assetCount: 42,
+      collapsed: true,
+      onToggleCollapse: vi.fn(),
+      faceRecognitionEnabled: true,
+      spaceId: 'space-1',
+    });
+    const link = screen.getByTestId('hero-collapsed-manage-people');
+    expect(link).toHaveAttribute('href', '/spaces/space-1/people');
+  });
 });
