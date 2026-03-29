@@ -36,7 +36,7 @@
       onLoad={() => adaptiveImageLoader.onLoad(quality)}
       onError={() => adaptiveImageLoader.onError(quality)}
       bind:ref
-      class="pointer-events-auto size-full bg-transparent"
+      class="pointer-events-auto size-full bg-transparent object-contain"
       {alt}
       {role}
       draggable={false}
