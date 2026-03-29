@@ -57,20 +57,20 @@ Split auth levels:
 
 - `getCategories()`: Remove userId filter — return all categories.
 - `createCategory(auth, dto)`: Remove `userId` from insert values. Auth param kept for admin guard.
-- `updateCategory(auth, id, dto)`: Remove userId ownership check. Remove the tag-rename-deletion block (`if (dto.name !== existing.name && existing.tagId) { ... }`) — tagId column no longer exists.
-- `deleteCategory(auth, id)`: Remove userId ownership check. Remove `tagRepository.delete(category.tagId)` call.
+- `updateCategory(auth, id, dto)`: Remove userId ownership check (keep the `getCategory` existence check + NotFoundException). Remove the tag-rename-deletion block (`if (dto.name !== existing.name && existing.tagId) { ... }`) — tagId column no longer exists.
+- `deleteCategory(auth, id)`: Remove userId ownership check (keep existence check). Remove `tagRepository.delete(category.tagId)` call.
 - `scanLibrary(auth)`: Call `resetClassifiedAt()` with no userId (resets ALL assets). Queue `AssetClassifyQueueAll` with no userId.
-- `handleClassify({ id })`: Call `getEnabledCategoriesWithEmbeddings()` with no userId — load all enabled categories. Tag creation always calls `upsertTags({ userId: asset.ownerId, tags: ['Auto/{name}'] })` on every match (no tagId cache). This is an N+1 per-asset pattern; acceptable for now, could be optimized with in-memory caching per job batch later.
+- `handleClassify({ id })`: Call `getEnabledCategoriesWithEmbeddings()` with no userId — load all enabled categories. Tag creation always calls `upsertTags({ userId: asset.ownerId, tags: ['Auto/{name}'] })` on every match. Note: the current code caches a `tagId` on the category row to avoid repeated tag lookups; dropping the `tagId` column removes this optimization, introducing an N+1 upsert-per-match pattern. Acceptable for now; could be optimized with in-memory caching per job batch later.
 - `mapCategory()`: Remove `tagId` from type signature and mapping body.
-- `onConfigUpdate`: Already works globally (`getAllCategories()` + empty job data) — no changes needed.
+- `onConfigUpdate`: Already works globally (`getAllCategories()` + `data: {}` which makes the optional userId undefined) — no changes needed.
 
 ### Repository (`classification.repository.ts`)
 
 - `getCategories()`: Remove `userId` parameter and WHERE clause.
 - `getCategoriesWithPrompts()`: Remove `userId` parameter and WHERE clause.
 - `getEnabledCategoriesWithEmbeddings()`: Remove `userId` parameter and WHERE clause. Remove `tagId` from select.
-- `resetClassifiedAt()`: Remove `userId` parameter. Update all rows: `SET classifiedAt = NULL WHERE classifiedAt IS NOT NULL`.
-- `streamUnclassifiedAssets()`: Remove `userId` parameter. Stream all unclassified assets.
+- `resetClassifiedAt()`: Remove `userId` parameter. Update all rows: `SET classifiedAt = NULL WHERE classifiedAt IS NOT NULL` (the `IS NOT NULL` guard is a new optimization to avoid touching already-null rows).
+- `streamUnclassifiedAssets()`: Remove the optional `userId` parameter (currently `userId?: string`). Always stream all unclassified assets.
 
 ### DTOs (`classification.dto.ts`)
 
@@ -102,7 +102,7 @@ Split auth levels:
 
 ## Job Pipeline
 
-- `AssetClassifyQueueAll`: Remove `userId` from job data type. Always processes all unclassified assets.
+- `AssetClassifyQueueAll`: Change job data type from `{ userId?: string }` to `{}`. Always processes all unclassified assets.
 - `AssetClassify`: Loads categories globally, applies to any asset. Tags created with `asset.ownerId`.
 - `onConfigUpdate` path already works this way — no changes.
 
@@ -129,7 +129,7 @@ Split auth levels:
 
 ## Known Trade-offs
 
-- **Tag upsert N+1**: Every asset×category match calls `upsertTags`. Acceptable at current scale; can add per-batch in-memory cache if performance becomes an issue.
+- **Tag upsert N+1 (regression)**: The current code caches a `tagId` on the category row to skip repeated tag lookups. Dropping the `tagId` column removes this optimization — every asset×category match now calls `upsertTags`. Acceptable at current scale; can add per-batch in-memory cache if performance becomes an issue.
 - **resetClassifiedAt full table update**: Touches every row in `asset_job_status`. Confirmation dialog in UI mitigates accidental triggers. No index needed — the UPDATE with `WHERE classifiedAt IS NOT NULL` is efficient enough.
 - **Trashed assets re-scanned**: `resetClassifiedAt` without userId filter includes trashed assets. Wasted cycles are minimal; trashed assets won't meaningfully match categories.
 - **Orphaned tags on rename/delete**: By design. Tags are independent metadata once applied.
