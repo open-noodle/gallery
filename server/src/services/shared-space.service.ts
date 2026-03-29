@@ -606,30 +606,21 @@ export class SharedSpaceService extends BaseService {
     }
 
     const withHidden = query?.withHidden ?? false;
-    const hasTemporal = query?.takenAfter || query?.takenBefore;
-    const persons = hasTemporal
-      ? await this.sharedSpaceRepository.getPersonsBySpaceIdWithTemporalFilter(spaceId, query, withHidden)
-      : await this.sharedSpaceRepository.getPersonsBySpaceId(spaceId, withHidden);
-    const aliases = await this.sharedSpaceRepository.getAliasesBySpaceAndUser(spaceId, auth.user.id);
+    const persons = await this.sharedSpaceRepository.getPersonsBySpaceIdWithCounts(spaceId, {
+      withHidden,
+      petsEnabled: space.petsEnabled,
+      limit: query?.top,
+      takenAfter: query?.takenAfter,
+      takenBefore: query?.takenBefore,
+    });
+
+    const aliases =
+      persons.length > 0 ? await this.sharedSpaceRepository.getAliasesBySpaceAndUser(spaceId, auth.user.id) : [];
     const aliasMap = new Map(aliases.map((a) => [a.personId, a.alias]));
 
-    const results: SharedSpacePersonResponseDto[] = [];
-    for (const person of persons) {
-      if (!withHidden && person.isHidden) {
-        continue;
-      }
-      if (!space.petsEnabled && person.type === 'pet') {
-        continue;
-      }
-      if (!person.personalThumbnailPath) {
-        continue;
-      }
-      const faceCount = await this.sharedSpaceRepository.getPersonFaceCount(person.id);
-      const assetCount = await this.sharedSpaceRepository.getPersonAssetCount(person.id);
-      results.push(this.mapSpacePerson(person, faceCount, assetCount, aliasMap.get(person.id) ?? null));
-    }
-
-    return results.toSorted((a, b) => b.assetCount - a.assetCount);
+    return persons.map((person) =>
+      this.mapSpacePerson(person, Number(person.faceCount), Number(person.assetCount), aliasMap.get(person.id) ?? null),
+    );
   }
 
   async getSpacePerson(auth: AuthDto, spaceId: string, personId: string): Promise<SharedSpacePersonResponseDto> {

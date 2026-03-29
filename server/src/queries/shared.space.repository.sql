@@ -380,46 +380,40 @@ where
   "spaceId" = $1
   and "type" = $2
 
--- SharedSpaceRepository.getPersonsBySpaceId
+-- SharedSpaceRepository.getPersonsBySpaceIdWithCounts
 select
-  "shared_space_person".*,
+  "shared_space_person"."id",
+  "shared_space_person"."spaceId",
+  "shared_space_person"."name",
+  "shared_space_person"."isHidden",
+  "shared_space_person"."type",
+  "shared_space_person"."birthDate",
+  "shared_space_person"."representativeFaceId",
+  "shared_space_person"."createdAt",
+  "shared_space_person"."updatedAt",
+  "shared_space_person"."updateId",
   "person"."name" as "personalName",
-  "person"."thumbnailPath" as "personalThumbnailPath"
+  "person"."thumbnailPath" as "personalThumbnailPath",
+  count(*) as "faceCount",
+  count(distinct ("asset_face"."assetId")) as "assetCount"
 from
   "shared_space_person"
-  left join "asset_face" on "asset_face"."id" = "shared_space_person"."representativeFaceId"
+  inner join "shared_space_person_face" on "shared_space_person_face"."personId" = "shared_space_person"."id"
+  inner join "asset_face" on "asset_face"."id" = "shared_space_person_face"."assetFaceId"
   left join "person" on "person"."id" = "asset_face"."personId"
 where
   "shared_space_person"."spaceId" = $1
   and "shared_space_person"."isHidden" = $2
+  and "person"."thumbnailPath" is not null
+  and "person"."thumbnailPath" != $3
+group by
+  "shared_space_person"."id",
+  "person"."name",
+  "person"."thumbnailPath"
 order by
-  "shared_space_person"."name" asc
-
--- SharedSpaceRepository.getPersonsBySpaceIdWithTemporalFilter
-select
-  "shared_space_person".*,
-  "person"."name" as "personalName",
-  "person"."thumbnailPath" as "personalThumbnailPath"
-from
-  "shared_space_person"
-  left join "asset_face" on "asset_face"."id" = "shared_space_person"."representativeFaceId"
-  left join "person" on "person"."id" = "asset_face"."personId"
-where
-  "shared_space_person"."spaceId" = $1
-  and "shared_space_person"."isHidden" = $2
-  and exists (
-    select
-    from
-      "shared_space_person_face"
-      inner join "asset_face" as "af2" on "af2"."id" = "shared_space_person_face"."assetFaceId"
-      inner join "asset" on "asset"."id" = "af2"."assetId"
-    where
-      "shared_space_person_face"."personId" = "shared_space_person"."id"
-      and "asset"."fileCreatedAt" >= $3
-      and "asset"."fileCreatedAt" < $4
-  )
-order by
-  "shared_space_person"."name" asc
+  "assetCount" desc
+limit
+  $4
 
 -- SharedSpaceRepository.getPersonById
 select
