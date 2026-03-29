@@ -2166,7 +2166,7 @@ describe(SharedSpaceService.name, () => {
       ]);
       mocks.sharedSpace.isPersonFaceAssigned.mockResolvedValue(false);
       mocks.sharedSpace.findClosestSpacePerson.mockResolvedValue([]);
-      mocks.sharedSpace.findSpacePersonByLinkedPersonId.mockResolvedValue();
+      mocks.sharedSpace.findSpacePersonByLinkedPersonId.mockResolvedValue(void 0 as any);
       mocks.sharedSpace.createPerson.mockResolvedValue(newPerson);
       mocks.sharedSpace.addPersonFaces.mockResolvedValue([]);
       mocks.sharedSpace.getPetFacesForAsset.mockResolvedValue([]);
@@ -2200,7 +2200,7 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.isPersonFaceAssigned.mockResolvedValue(false);
       // Returns empty array because the findClosestSpacePerson query already filters by maxDistance
       mocks.sharedSpace.findClosestSpacePerson.mockResolvedValue([]);
-      mocks.sharedSpace.findSpacePersonByLinkedPersonId.mockResolvedValue();
+      mocks.sharedSpace.findSpacePersonByLinkedPersonId.mockResolvedValue(void 0 as any);
       mocks.sharedSpace.createPerson.mockResolvedValue(newPerson);
       mocks.sharedSpace.addPersonFaces.mockResolvedValue([]);
       mocks.sharedSpace.getPetFacesForAsset.mockResolvedValue([]);
@@ -2247,7 +2247,7 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.findClosestSpacePerson
         .mockResolvedValueOnce([{ personId, name: 'Alice', distance: 0.3 }])
         .mockResolvedValueOnce([]);
-      mocks.sharedSpace.findSpacePersonByLinkedPersonId.mockResolvedValue();
+      mocks.sharedSpace.findSpacePersonByLinkedPersonId.mockResolvedValue(void 0 as any);
       mocks.sharedSpace.createPerson.mockResolvedValue(newPerson);
       mocks.sharedSpace.addPersonFaces.mockResolvedValue([]);
       mocks.person.getById.mockResolvedValue(personalPerson);
@@ -2274,7 +2274,7 @@ describe(SharedSpaceService.name, () => {
       ]);
       mocks.sharedSpace.isPersonFaceAssigned.mockResolvedValue(false);
       mocks.sharedSpace.findClosestSpacePerson.mockResolvedValue([]);
-      mocks.sharedSpace.findSpacePersonByLinkedPersonId.mockResolvedValue();
+      mocks.sharedSpace.findSpacePersonByLinkedPersonId.mockResolvedValue(void 0 as any);
       mocks.sharedSpace.createPerson.mockResolvedValue(newPerson);
       mocks.sharedSpace.addPersonFaces.mockResolvedValue([]);
       mocks.sharedSpace.getPetFacesForAsset.mockResolvedValue([]);
@@ -2327,7 +2327,7 @@ describe(SharedSpaceService.name, () => {
       ]);
       mocks.sharedSpace.isPersonFaceAssigned.mockResolvedValue(false);
       mocks.sharedSpace.findClosestSpacePerson.mockResolvedValue([]);
-      mocks.sharedSpace.findSpacePersonByLinkedPersonId.mockResolvedValue();
+      mocks.sharedSpace.findSpacePersonByLinkedPersonId.mockResolvedValue(void 0 as any);
       mocks.sharedSpace.createPerson.mockResolvedValue(newPerson);
       mocks.sharedSpace.addPersonFaces.mockResolvedValue([]);
       mocks.sharedSpace.getPetFacesForAsset.mockResolvedValue([]);
@@ -2380,7 +2380,7 @@ describe(SharedSpaceService.name, () => {
       ]);
       mocks.sharedSpace.isPersonFaceAssigned.mockResolvedValue(false);
       mocks.sharedSpace.findClosestSpacePerson.mockResolvedValue([]);
-      mocks.sharedSpace.findSpacePersonByLinkedPersonId.mockResolvedValue();
+      mocks.sharedSpace.findSpacePersonByLinkedPersonId.mockResolvedValue(void 0 as any);
       mocks.sharedSpace.createPerson.mockResolvedValue(newPerson);
       mocks.sharedSpace.addPersonFaces.mockResolvedValue([]);
       mocks.sharedSpace.getPetFacesForAsset.mockResolvedValue([]);
@@ -3200,7 +3200,7 @@ describe(SharedSpaceService.name, () => {
         personalName: null,
         personalThumbnailPath: null,
       });
-      mocks.sharedSpace.deletePerson.mockResolvedValue(void 0);
+      mocks.sharedSpace.deletePerson.mockResolvedValue(void 0 as any);
       mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
 
       await sut.deleteSpacePerson(auth, spaceId, personId);
@@ -3220,7 +3220,7 @@ describe(SharedSpaceService.name, () => {
         personalName: null,
         personalThumbnailPath: null,
       });
-      mocks.sharedSpace.deletePerson.mockResolvedValue(void 0);
+      mocks.sharedSpace.deletePerson.mockResolvedValue(void 0 as any);
       mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
 
       await sut.deleteSpacePerson(auth, spaceId, personId);
@@ -3276,7 +3276,7 @@ describe(SharedSpaceService.name, () => {
         .mockResolvedValueOnce(target) // target lookup
         .mockResolvedValueOnce(source); // source lookup
       mocks.sharedSpace.reassignPersonFaces.mockResolvedValue(void 0);
-      mocks.sharedSpace.deletePerson.mockResolvedValue(void 0);
+      mocks.sharedSpace.deletePerson.mockResolvedValue(void 0 as any);
       mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
 
       await sut.mergeSpacePeople(auth, spaceId, targetId, { ids: [sourceId] });
@@ -3333,7 +3333,7 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
       mocks.sharedSpace.getPersonById.mockResolvedValueOnce(target).mockResolvedValueOnce(source);
       mocks.sharedSpace.reassignPersonFaces.mockResolvedValue(void 0);
-      mocks.sharedSpace.deletePerson.mockResolvedValue(void 0);
+      mocks.sharedSpace.deletePerson.mockResolvedValue(void 0 as any);
       mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
 
       await sut.mergeSpacePeople(factory.auth(), spaceId, targetId, { ids: [sourceId] });
@@ -4052,7 +4052,7 @@ describe(SharedSpaceService.name, () => {
       ]);
       mocks.sharedSpace.isPersonFaceAssigned.mockResolvedValue(false);
       mocks.sharedSpace.findClosestSpacePerson.mockResolvedValue([]);
-      mocks.sharedSpace.findSpacePersonByLinkedPersonId.mockResolvedValue();
+      mocks.sharedSpace.findSpacePersonByLinkedPersonId.mockResolvedValue(void 0 as any);
       mocks.sharedSpace.addPersonFaces.mockResolvedValue([]);
       mocks.sharedSpace.createPerson.mockResolvedValue(factory.sharedSpacePerson({ spaceId }));
       mocks.person.getById.mockResolvedValue(factory.person({ id: personalPersonId }));
@@ -4082,7 +4082,7 @@ describe(SharedSpaceService.name, () => {
       ]);
       mocks.sharedSpace.isPersonFaceAssigned.mockResolvedValue(false);
       mocks.sharedSpace.findClosestSpacePerson.mockResolvedValue([]);
-      mocks.sharedSpace.findSpacePersonByLinkedPersonId.mockResolvedValue();
+      mocks.sharedSpace.findSpacePersonByLinkedPersonId.mockResolvedValue(void 0 as any);
       mocks.sharedSpace.createPerson.mockResolvedValue(factory.sharedSpacePerson({ spaceId }));
       mocks.sharedSpace.addPersonFaces.mockResolvedValue([]);
       mocks.person.getById.mockResolvedValue(factory.person({ id: personalPersonId }));
@@ -4213,7 +4213,7 @@ describe(SharedSpaceService.name, () => {
       ]);
       mocks.sharedSpace.isPersonFaceAssigned.mockResolvedValue(false);
       mocks.sharedSpace.findClosestSpacePerson.mockResolvedValue([]); // No embedding match
-      mocks.sharedSpace.findSpacePersonByLinkedPersonId.mockResolvedValue(); // No personId match either
+      mocks.sharedSpace.findSpacePersonByLinkedPersonId.mockResolvedValue(void 0 as any); // No personId match either
       mocks.sharedSpace.createPerson.mockResolvedValue(factory.sharedSpacePerson({ spaceId }));
       mocks.sharedSpace.addPersonFaces.mockResolvedValue([]);
       mocks.sharedSpace.getPetFacesForAsset.mockResolvedValue([]);
@@ -4278,10 +4278,10 @@ describe(SharedSpaceService.name, () => {
           return Promise.resolve([]);
         },
       );
-      mocks.sharedSpace.reassignPersonFacesSafe.mockResolvedValue(void 0);
-      mocks.sharedSpace.migrateAliases.mockResolvedValue(void 0);
-      mocks.sharedSpace.updatePerson.mockResolvedValue(void 0);
-      mocks.sharedSpace.deletePerson.mockResolvedValue(void 0);
+      mocks.sharedSpace.reassignPersonFacesSafe.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.migrateAliases.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.updatePerson.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.deletePerson.mockResolvedValue(void 0 as any);
 
       const result = await sut.handleSharedSpacePersonDedup({ spaceId });
       expect(result).toBe(JobStatus.Success);
@@ -4353,10 +4353,10 @@ describe(SharedSpaceService.name, () => {
         }
         return Promise.resolve([]);
       });
-      mocks.sharedSpace.reassignPersonFacesSafe.mockResolvedValue(void 0);
-      mocks.sharedSpace.migrateAliases.mockResolvedValue(void 0);
-      mocks.sharedSpace.updatePerson.mockResolvedValue(void 0);
-      mocks.sharedSpace.deletePerson.mockResolvedValue(void 0);
+      mocks.sharedSpace.reassignPersonFacesSafe.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.migrateAliases.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.updatePerson.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.deletePerson.mockResolvedValue(void 0 as any);
 
       const result = await sut.handleSharedSpacePersonDedup({ spaceId });
       expect(result).toBe(JobStatus.Success);
@@ -4378,10 +4378,10 @@ describe(SharedSpaceService.name, () => {
         .mockResolvedValueOnce([]);
       mocks.sharedSpace.getPersonFaceCount.mockResolvedValueOnce(5).mockResolvedValueOnce(2);
       mocks.sharedSpace.findClosestSpacePerson.mockResolvedValueOnce([{ personId: personB, name: '', distance: 0.1 }]);
-      mocks.sharedSpace.reassignPersonFacesSafe.mockResolvedValue(void 0);
-      mocks.sharedSpace.migrateAliases.mockResolvedValue(void 0);
+      mocks.sharedSpace.reassignPersonFacesSafe.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.migrateAliases.mockResolvedValue(void 0 as any);
       mocks.sharedSpace.updatePerson.mockRejectedValue(new Error('no result'));
-      mocks.sharedSpace.deletePerson.mockResolvedValue(void 0);
+      mocks.sharedSpace.deletePerson.mockResolvedValue(void 0 as any);
 
       const result = await sut.handleSharedSpacePersonDedup({ spaceId });
       expect(result).toBe(JobStatus.Success);
@@ -4407,10 +4407,10 @@ describe(SharedSpaceService.name, () => {
         .mockResolvedValueOnce([{ personId: personB, name: '', distance: 0.1 }])
         .mockResolvedValueOnce([{ personId: personB, name: '', distance: 0.1 }])
         .mockResolvedValue([]);
-      mocks.sharedSpace.reassignPersonFacesSafe.mockResolvedValue(void 0);
-      mocks.sharedSpace.migrateAliases.mockResolvedValue(void 0);
-      mocks.sharedSpace.updatePerson.mockResolvedValue(void 0);
-      mocks.sharedSpace.deletePerson.mockResolvedValue(void 0);
+      mocks.sharedSpace.reassignPersonFacesSafe.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.migrateAliases.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.updatePerson.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.deletePerson.mockResolvedValue(void 0 as any);
 
       const result = await sut.handleSharedSpacePersonDedup({ spaceId });
       expect(result).toBe(JobStatus.Success);
@@ -4434,10 +4434,10 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.findClosestSpacePerson
         .mockResolvedValueOnce([{ personId: personB, name: '', distance: 0.1 }])
         .mockResolvedValue([]);
-      mocks.sharedSpace.reassignPersonFacesSafe.mockResolvedValue(void 0);
-      mocks.sharedSpace.migrateAliases.mockResolvedValue(void 0);
-      mocks.sharedSpace.updatePerson.mockResolvedValue(void 0);
-      mocks.sharedSpace.deletePerson.mockResolvedValue(void 0);
+      mocks.sharedSpace.reassignPersonFacesSafe.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.migrateAliases.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.updatePerson.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.deletePerson.mockResolvedValue(void 0 as any);
 
       const result = await sut.handleSharedSpacePersonDedup({ spaceId });
       expect(result).toBe(JobStatus.Success);
@@ -4497,10 +4497,10 @@ describe(SharedSpaceService.name, () => {
           return Promise.resolve([]);
         },
       );
-      mocks.sharedSpace.reassignPersonFacesSafe.mockResolvedValue(void 0);
-      mocks.sharedSpace.migrateAliases.mockResolvedValue(void 0);
-      mocks.sharedSpace.updatePerson.mockResolvedValue(void 0);
-      mocks.sharedSpace.deletePerson.mockResolvedValue(void 0);
+      mocks.sharedSpace.reassignPersonFacesSafe.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.migrateAliases.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.updatePerson.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.deletePerson.mockResolvedValue(void 0 as any);
 
       await sut.handleSharedSpacePersonDedup({ spaceId });
 
@@ -4531,10 +4531,10 @@ describe(SharedSpaceService.name, () => {
           return Promise.resolve([]);
         },
       );
-      mocks.sharedSpace.reassignPersonFacesSafe.mockResolvedValue(void 0);
-      mocks.sharedSpace.migrateAliases.mockResolvedValue(void 0);
-      mocks.sharedSpace.updatePerson.mockResolvedValue(void 0);
-      mocks.sharedSpace.deletePerson.mockResolvedValue(void 0);
+      mocks.sharedSpace.reassignPersonFacesSafe.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.migrateAliases.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.updatePerson.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.deletePerson.mockResolvedValue(void 0 as any);
 
       await sut.handleSharedSpacePersonDedup({ spaceId });
 
@@ -4557,10 +4557,10 @@ describe(SharedSpaceService.name, () => {
       ]);
       mocks.sharedSpace.getPersonFaceCount.mockResolvedValue(1);
       mocks.sharedSpace.findClosestSpacePerson.mockResolvedValue([{ personId: personB, name: '', distance: 0.1 }]);
-      mocks.sharedSpace.reassignPersonFacesSafe.mockResolvedValue(void 0);
-      mocks.sharedSpace.migrateAliases.mockResolvedValue(void 0);
-      mocks.sharedSpace.updatePerson.mockResolvedValue(void 0);
-      mocks.sharedSpace.deletePerson.mockResolvedValue(void 0);
+      mocks.sharedSpace.reassignPersonFacesSafe.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.migrateAliases.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.updatePerson.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.deletePerson.mockResolvedValue(void 0 as any);
 
       const result = await sut.handleSharedSpacePersonDedup({ spaceId });
       expect(result).toBe(JobStatus.Success);
