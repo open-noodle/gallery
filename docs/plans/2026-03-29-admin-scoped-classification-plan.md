@@ -320,7 +320,48 @@ git commit -m "feat: remove userId/tagId from classification repository queries"
 
 ---
 
-### Task 4: Update Service
+### Task 4: Update DTOs and Job Type
+
+**Files:**
+
+- Modify: `server/src/dtos/classification.dto.ts`
+- Modify: `server/src/types.ts:458-459`
+
+These must be updated before the service (Task 5) to avoid TypeScript compilation errors.
+
+**Step 1: Remove tagId from response DTO**
+
+In `ClassificationCategoryResponseDto`, remove:
+
+```typescript
+  @ApiProperty({ nullable: true, type: String })
+  tagId!: string | null;
+```
+
+**Step 2: Change the job data type**
+
+In `server/src/types.ts`, change:
+
+```typescript
+| { name: JobName.AssetClassifyQueueAll; data: { userId?: string } }
+```
+
+To:
+
+```typescript
+| { name: JobName.AssetClassifyQueueAll; data: Record<string, never> }
+```
+
+**Step 3: Commit**
+
+```bash
+git add server/src/dtos/classification.dto.ts server/src/types.ts
+git commit -m "feat: remove tagId from DTO and userId from classification job type"
+```
+
+---
+
+### Task 5: Update Service
 
 **Files:**
 
@@ -628,60 +669,7 @@ git commit -m "feat: make classification service admin-scoped and global"
 
 ---
 
-### Task 5: Update Job Type
-
-**Files:**
-
-- Modify: `server/src/types.ts:458-459`
-
-**Step 1: Change the job data type**
-
-Change:
-
-```typescript
-| { name: JobName.AssetClassifyQueueAll; data: { userId?: string } }
-```
-
-To:
-
-```typescript
-| { name: JobName.AssetClassifyQueueAll; data: Record<string, never> }
-```
-
-**Step 2: Commit**
-
-```bash
-git add server/src/types.ts
-git commit -m "feat: remove userId from classification queue job type"
-```
-
----
-
-### Task 6: Update DTOs
-
-**Files:**
-
-- Modify: `server/src/dtos/classification.dto.ts`
-
-**Step 1: Remove tagId from response DTO**
-
-In `ClassificationCategoryResponseDto`, remove:
-
-```typescript
-  @ApiProperty({ nullable: true, type: String })
-  tagId!: string | null;
-```
-
-**Step 2: Commit**
-
-```bash
-git add server/src/dtos/classification.dto.ts
-git commit -m "feat: remove tagId from classification response DTO"
-```
-
----
-
-### Task 7: Update Controller (Admin Auth)
+### Task 6: Update Controller (Admin Auth)
 
 **Files:**
 
@@ -793,7 +781,7 @@ git commit -m "feat: add admin auth guards to classification mutation endpoints"
 
 ---
 
-### Task 8: Update Unit Tests
+### Task 7: Update Unit Tests
 
 **Files:**
 
@@ -812,6 +800,7 @@ Key changes:
 - `scanLibrary`: Change `resetClassifiedAt` expectation from `('user-id')` → `()`. Change job data from `{ userId: 'user-id' }` → `{}`.
 - `getEnabledCategoriesWithEmbeddings` mock calls: Remove the `asset.ownerId` argument.
 - `onConfigUpdate` tests: Change `mocks.classification.getAllCategories` → `mocks.classification.getCategories` (method consolidated).
+- **Mock data structure change**: `getEnabledCategoriesWithEmbeddings` no longer returns `tagId`. Remove `tagId` from all mock objects for this method. Tests that previously relied on `tagId: 'tag-1'` to skip `upsertTags` must now mock `tag.upsertValue` to return a tag, since `upsertTags` is always called.
 
 See design doc for the full behavioral spec. Write tests that verify:
 
@@ -837,7 +826,7 @@ git commit -m "test: update classification unit tests for admin-scoped behavior"
 
 ---
 
-### Task 9: Update Medium Tests
+### Task 8: Update Medium Tests
 
 **Files:**
 
@@ -873,7 +862,7 @@ git commit -m "test: update classification medium tests for admin-scoped schema"
 
 ---
 
-### Task 10: Regenerate OpenAPI + SQL
+### Task 9: Regenerate OpenAPI + SQL
 
 **Step 1: Build server and regenerate specs**
 
@@ -888,7 +877,8 @@ make sql
 
 **Step 2: Verify the generated SDK no longer has tagId in the response type**
 
-Check: `grep -r 'tagId' open-api/typescript-sdk/src/` — should have no classification-related hits.
+Check TypeScript SDK: `grep -r 'tagId' open-api/typescript-sdk/src/` — should have no classification-related hits.
+Check Dart SDK: `grep -r 'tagId' mobile/openapi/lib/model/classification_category_response_dto.dart` — file should no longer contain `tagId`.
 
 **Step 3: Commit all generated files**
 
@@ -899,7 +889,7 @@ git commit -m "chore: regenerate OpenAPI specs and SQL queries"
 
 ---
 
-### Task 11: Move Web Component to Admin Settings
+### Task 10: Move Web Component to Admin Settings
 
 **Files:**
 
@@ -954,7 +944,7 @@ git commit -m "feat: move classification settings to admin panel"
 
 ---
 
-### Task 12: Replace User Settings with Read-Only View
+### Task 11: Replace User Settings with Read-Only View
 
 **Files:**
 
@@ -971,6 +961,7 @@ Rewrite `web/src/lib/components/user-settings-page/classification-settings.svelt
   import { getCategories, type ClassificationCategoryResponseDto } from '@immich/sdk';
   import { Text } from '@immich/ui';
   import { onMount } from 'svelte';
+  import { t } from 'svelte-i18n';
 
   let categories: ClassificationCategoryResponseDto[] = $state([]);
 
@@ -1000,7 +991,7 @@ Rewrite `web/src/lib/components/user-settings-page/classification-settings.svelt
 
 <section class="my-4">
   <Text size="small" color="muted" class="mb-4">
-    Classification categories are managed by your administrator.
+    {$t('classification_managed_by_admin')}
   </Text>
 
   {#if categories.length > 0}
@@ -1029,10 +1020,12 @@ Rewrite `web/src/lib/components/user-settings-page/classification-settings.svelt
       </div>
     {/each}
   {:else}
-    <Text color="muted">No classification categories configured.</Text>
+    <Text color="muted">{$t('no_classification_categories')}</Text>
   {/if}
 </section>
 ```
+
+Note: i18n keys `classification_managed_by_admin` ("Classification categories are managed by your administrator") and `no_classification_categories` ("No classification categories configured") need to be added to the translation file. Run `pnpm --filter=immich-i18n format:fix` after adding.
 
 **Step 2: Update accordion subtitle in user-settings-list.svelte**
 
@@ -1056,7 +1049,7 @@ git commit -m "feat: replace user classification settings with read-only view"
 
 ---
 
-### Task 13: Update Web Component Tests
+### Task 12: Update Web Component Tests
 
 **Files:**
 
@@ -1097,7 +1090,7 @@ git commit -m "test: rewrite classification settings spec for read-only componen
 
 ---
 
-### Task 14: Update E2E Tests
+### Task 13: Update E2E Tests
 
 **Files:**
 
@@ -1294,7 +1287,7 @@ git commit -m "test: update classification e2e tests for admin-only mutations"
 
 ---
 
-### Task 15: Lint, Format, Type Check
+### Task 14: Lint, Format, Type Check
 
 **Step 1: Run server lint and format**
 
@@ -1325,7 +1318,7 @@ git commit -m "chore: fix lint and formatting issues"
 
 ---
 
-### Task 16: Final Verification
+### Task 15: Final Verification
 
 **Step 1: Run server unit tests**
 
