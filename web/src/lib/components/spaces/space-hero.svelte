@@ -24,9 +24,9 @@
     repositioning?: boolean;
     onSavePosition?: (cropY: number) => void;
     onCancelReposition?: () => void;
-    peopleCount?: number;
     faceRecognitionEnabled?: boolean;
     spaceId?: string;
+    onShowMembers?: () => void;
     height?: number;
     collapsed?: boolean;
     onToggleCollapse?: () => void;
@@ -43,9 +43,9 @@
     repositioning = false,
     onSavePosition,
     onCancelReposition,
-    peopleCount,
     faceRecognitionEnabled,
     spaceId,
+    onShowMembers,
     height = 450,
     collapsed = false,
     onToggleCollapse,
@@ -148,23 +148,24 @@
         {assetCount}
         {$t('photos')}
       </span>
-      <span
-        class="hidden items-center gap-1.5 rounded-full bg-white/20 px-2 py-0.5 text-xs text-white backdrop-blur-sm sm:inline-flex"
+      <button
+        type="button"
+        class="hidden items-center gap-1.5 rounded-full bg-white/20 px-2 py-0.5 text-xs text-white backdrop-blur-sm transition-colors hover:bg-white/30 sm:inline-flex"
+        onclick={() => onShowMembers?.()}
         data-testid="hero-collapsed-member-count"
       >
         <Icon icon={mdiAccountMultipleOutline} size="14" />
         {memberCount}
         {$t('members')}
-      </span>
-      {#if faceRecognitionEnabled && peopleCount && peopleCount > 0}
+      </button>
+      {#if faceRecognitionEnabled && spaceId}
         <a
           href="/spaces/{spaceId}/people"
           class="hidden items-center gap-1.5 rounded-full bg-white/20 px-2 py-0.5 text-xs text-white backdrop-blur-sm transition-colors hover:bg-white/30 sm:inline-flex"
-          data-testid="hero-collapsed-people-count"
+          data-testid="hero-collapsed-manage-people"
         >
           <Icon icon={mdiAccountGroupOutline} size="14" />
-          {peopleCount}
-          {$t('people')}
+          {$t('manage_people')}
         </a>
       {/if}
       {#if currentRole}
@@ -289,23 +290,24 @@
           {assetCount}
           {$t('photos')}
         </span>
-        <span
-          class="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-sm backdrop-blur-sm"
+        <button
+          type="button"
+          class="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-sm backdrop-blur-sm transition-colors hover:bg-white/30"
+          onclick={() => onShowMembers?.()}
           data-testid="hero-member-count"
         >
           <Icon icon={mdiAccountMultipleOutline} size="16" />
           {memberCount}
           {$t('members')}
-        </span>
-        {#if faceRecognitionEnabled && peopleCount && peopleCount > 0}
+        </button>
+        {#if faceRecognitionEnabled && spaceId}
           <a
             href="/spaces/{spaceId}/people"
-            class="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-sm backdrop-blur-sm hover:bg-white/30 transition-colors"
-            data-testid="hero-people-count"
+            class="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-sm backdrop-blur-sm transition-colors hover:bg-white/30"
+            data-testid="hero-manage-people"
           >
             <Icon icon={mdiAccountGroupOutline} size="16" />
-            {peopleCount}
-            {$t('people')}
+            {$t('manage_people')}
           </a>
         {/if}
         {#if currentRole}
