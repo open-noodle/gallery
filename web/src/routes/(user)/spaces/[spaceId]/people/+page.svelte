@@ -10,6 +10,7 @@
   import { createUrl } from '$lib/utils';
   import { handleError } from '$lib/utils/handle-error';
   import {
+    deduplicateSpacePeople,
     getSpacePeople,
     Role,
     updateSpacePerson,
@@ -17,7 +18,7 @@
     type SharedSpacePersonResponseDto,
     type SharedSpaceResponseDto,
   } from '@immich/sdk';
-  import { Button, Icon, IconButton } from '@immich/ui';
+  import { Button, Icon, IconButton, toastManager } from '@immich/ui';
   import {
     mdiAccountGroupOutline,
     mdiAccountMultipleCheckOutline,
@@ -126,6 +127,15 @@
   function handleMerge(personId: string) {
     void goto(`/spaces/${space.id}/people/${personId}?action=merge`);
   }
+
+  async function handleDeduplicate() {
+    try {
+      await deduplicateSpacePeople({ id: space.id });
+      toastManager.info($t('dedup_people_started'));
+    } catch (error) {
+      handleError(error, $t('dedup_people_error'));
+    }
+  }
 </script>
 
 <UserPageLayout title={$t('spaces_people_title')}>
@@ -140,6 +150,17 @@
     />
   {/snippet}
   {#snippet buttons()}
+    {#if isOwner}
+      <Button
+        leadingIcon={mdiAccountMultipleCheckOutline}
+        onclick={handleDeduplicate}
+        size="small"
+        variant="ghost"
+        color="secondary"
+      >
+        {$t('deduplicate_people')}
+      </Button>
+    {/if}
     {#if isEditor}
       <Button leadingIcon={mdiEyeOutline} onclick={openVisibilityModal} size="small" variant="ghost" color="secondary"
         >{$t('show_and_hide_people')}</Button
