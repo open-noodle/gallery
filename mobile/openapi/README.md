@@ -269,6 +269,7 @@ Class | Method | HTTP request | Description
 *SharedSpacesApi* | [**addMember**](doc//SharedSpacesApi.md#addmember) | **POST** /shared-spaces/{id}/members | Add a member to a shared space
 *SharedSpacesApi* | [**bulkAddAssets**](doc//SharedSpacesApi.md#bulkaddassets) | **POST** /shared-spaces/{id}/assets/bulk-add | Add all user assets to a shared space
 *SharedSpacesApi* | [**createSpace**](doc//SharedSpacesApi.md#createspace) | **POST** /shared-spaces | Create a shared space
+*SharedSpacesApi* | [**deduplicateSpacePeople**](doc//SharedSpacesApi.md#deduplicatespacepeople) | **POST** /shared-spaces/{id}/people/deduplicate | Deduplicate people in a shared space
 *SharedSpacesApi* | [**deleteSpacePerson**](doc//SharedSpacesApi.md#deletespaceperson) | **DELETE** /shared-spaces/{id}/people/{personId} | Delete a person from a shared space
 *SharedSpacesApi* | [**deleteSpacePersonAlias**](doc//SharedSpacesApi.md#deletespacepersonalias) | **DELETE** /shared-spaces/{id}/people/{personId}/alias | Delete a person alias in a shared space
 *SharedSpacesApi* | [**getAllSpaces**](doc//SharedSpacesApi.md#getallspaces) | **GET** /shared-spaces | Get all shared spaces
