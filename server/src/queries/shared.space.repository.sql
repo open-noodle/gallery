@@ -473,6 +473,24 @@ from
 where
   "shared_space_person_face"."personId" = $1
 
+-- SharedSpaceRepository.reassignPersonFacesSafe
+delete from "shared_space_person_face"
+where
+  "personId" = $1
+  and "assetFaceId" in (
+    select
+      "assetFaceId"
+    from
+      "shared_space_person_face"
+    where
+      "personId" = $2
+  )
+update "shared_space_person_face"
+set
+  "personId" = $1
+where
+  "personId" = $2
+
 -- SharedSpaceRepository.removePersonFacesByAssetIds
 delete from "shared_space_person_face"
 where
@@ -529,6 +547,17 @@ where
   "shared_space_person"."spaceId" = $1
   and "shared_space_person_alias"."userId" = $2
 
+-- SharedSpaceRepository.migrateAliases
+select
+  *
+from
+  "shared_space_person_alias"
+where
+  "personId" = $1
+delete from "shared_space_person_alias"
+where
+  "personId" = $1
+
 -- SharedSpaceRepository.findClosestSpacePerson
 begin
 set
@@ -557,6 +586,19 @@ from
 where
   "cte"."distance" <= $4
 commit
+
+-- SharedSpaceRepository.getSpacePersonsWithEmbeddings
+select
+  "shared_space_person"."id",
+  "shared_space_person"."name",
+  "shared_space_person"."type",
+  "shared_space_person"."isHidden",
+  "face_search"."embedding"
+from
+  "shared_space_person"
+  inner join "face_search" on "face_search"."faceId" = "shared_space_person"."representativeFaceId"
+where
+  "shared_space_person"."spaceId" = $1
 
 -- SharedSpaceRepository.getAssetFacesForMatching
 select
