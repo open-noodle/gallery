@@ -1,6 +1,12 @@
 import type { FilterContext, FilterPanelConfig } from '$lib/components/filter-panel/filter-panel';
 import { createUrl } from '$lib/utils';
-import { getAllPeople, getSearchSuggestions, getSpacePeople, getTagSuggestions, SearchSuggestionType } from '@immich/sdk';
+import {
+  getAllPeople,
+  getSearchSuggestions,
+  getSpacePeople,
+  getTagSuggestions,
+  SearchSuggestionType,
+} from '@immich/sdk';
 
 export function buildMapFilterConfig(spaceId?: string): FilterPanelConfig {
   const sections = ['timeline', 'people', 'camera', 'tags', 'rating', 'media', 'favorites'] as const;

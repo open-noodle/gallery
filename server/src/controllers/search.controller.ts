@@ -154,10 +154,7 @@ export class SearchController {
     description: 'Retrieve tags present on assets accessible to the user, with optional space and temporal scoping.',
     history: new HistoryBuilder().added('v1'),
   })
-  getTagSuggestions(
-    @Auth() auth: AuthDto,
-    @Query() dto: TagSuggestionRequestDto,
-  ): Promise<TagSuggestionResponseDto[]> {
+  getTagSuggestions(@Auth() auth: AuthDto, @Query() dto: TagSuggestionRequestDto): Promise<TagSuggestionResponseDto[]> {
     return this.service.getTagSuggestions(auth, dto);
   }
 }
