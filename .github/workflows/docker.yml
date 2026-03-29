@@ -16,7 +16,6 @@ permissions: {}
 
 env:
   GHCR_NAMESPACE: ghcr.io/${{ github.repository_owner }}
-  DOCKERHUB_NAMESPACE: docker.io/altran1502
 
 jobs:
   pre-job:
@@ -193,59 +192,9 @@ jobs:
       build-args: |
         DEVICE=cpu
 
-  mirror:
-    name: Mirror to Docker Hub
-    needs: [pre-job, machine-learning, server]
-    if: ${{ github.event_name == 'release' && github.event.release.prerelease == false }}
-    permissions:
-      packages: read
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        # Slightly hacky; we reuse the ml matrix but tack on immich-server too
-        image: [immich-server]
-        include: *ml-variants
-    env:
-      IMAGE: ${{ matrix.image }}
-      SUFFIX: ${{ matrix.suffixes }}
-    steps:
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Login to Docker Hub
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Generate docker image tags
-        id: meta
-        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
-        with:
-          flavor: |
-            latest=false
-          images: ${{ env.GHCR_NAMESPACE }}/${{ env.IMAGE }}
-          tags: *tag-rules
-
-      - name: Mirror tags to Docker Hub
-        env:
-          TAGS: ${{ steps.meta.outputs.tags }}
-        run: |
-          for tag in ${TAGS}; do
-            version="${tag##*:}"
-            docker buildx imagetools create \
-              -t "${DOCKERHUB_NAMESPACE}/${IMAGE}:${version}${SUFFIX}" \
-              "${GHCR_NAMESPACE}/${IMAGE}:${version}${SUFFIX}"
-          done
-
   success-check-server:
     name: Docker Build & Push Server Success
-    needs: [server, retag_server, mirror]
+    needs: [server, retag_server]
     permissions: {}
     runs-on: ubuntu-latest
     if: always()
@@ -256,7 +205,7 @@ jobs:
 
   success-check-ml:
     name: Docker Build & Push ML Success
-    needs: [machine-learning, retag_ml, mirror]
+    needs: [machine-learning, retag_ml]
     permissions: {}
     runs-on: ubuntu-latest
     if: always()
