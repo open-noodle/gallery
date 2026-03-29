@@ -4,7 +4,7 @@
 
 **Goal:** Automatically prevent and merge duplicate space persons when multiple external libraries are linked to a shared space.
 
-**Architecture:** Two-layer dedup: (1) `personId` fallback during face sync prevents same-owner duplicates, (2) post-sync merge pass using the vector index catches cross-owner and unmerged-person duplicates. A new background job and API endpoint allow manual trigger from space admins.
+**Architecture:** Two-layer dedup: (1) `personId` fallback during face sync prevents same-owner duplicates, (2) post-sync merge pass using the vector index catches cross-owner and unmerged-person duplicates. A new background job and API endpoint allow manual trigger from space owners.
 
 **Tech Stack:** NestJS services, Kysely queries, BullMQ jobs, Svelte 5 frontend, Vitest tests.
 
@@ -53,6 +53,36 @@ it('should reuse existing space person when face personId matches (Layer 1 dedup
   // Should assign face to the existing space person found by personId
   expect(mocks.sharedSpace.addPersonFaces).toHaveBeenCalledWith([
     { personId: existingSpacePersonId, assetFaceId: faceId },
+  ]);
+});
+
+it('should prefer embedding match over personId fallback', async () => {
+  const spaceId = newUuid();
+  const libraryId = newUuid();
+  const assetId = newUuid();
+  const faceId = newUuid();
+  const personalPersonId = newUuid();
+  const embeddingMatchPersonId = newUuid();
+
+  mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
+  mocks.sharedSpace.hasLibraryLink.mockResolvedValue(true);
+  mocks.asset.getByLibraryIdWithFaces.mockResolvedValueOnce([{ id: assetId }]).mockResolvedValueOnce([]);
+  mocks.sharedSpace.getAssetFacesForMatching.mockResolvedValue([
+    { id: faceId, assetId, personId: personalPersonId, embedding: '[0.1,0.2]' },
+  ]);
+  mocks.sharedSpace.isPersonFaceAssigned.mockResolvedValue(false);
+  mocks.sharedSpace.findClosestSpacePerson.mockResolvedValue([
+    { personId: embeddingMatchPersonId, name: '', distance: 0.3 },
+  ]);
+  mocks.sharedSpace.addPersonFaces.mockResolvedValue([]);
+  mocks.sharedSpace.getPetFacesForAsset.mockResolvedValue([]);
+
+  await sut.handleSharedSpaceLibraryFaceSync({ spaceId, libraryId });
+
+  // Embedding match should be used — personId fallback should NOT be called
+  expect(mocks.sharedSpace.findSpacePersonByLinkedPersonId).not.toHaveBeenCalled();
+  expect(mocks.sharedSpace.addPersonFaces).toHaveBeenCalledWith([
+    { personId: embeddingMatchPersonId, assetFaceId: faceId },
   ]);
 });
 
@@ -296,6 +326,7 @@ git commit -m "feat: add getSpacePersonsWithEmbeddings repository method"
 Near the existing `reassignPersonFaces` method (~line 609), add:
 
 ```typescript
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
   async reassignPersonFacesSafe(fromPersonId: string, toPersonId: string) {
     // Delete faces that already exist on the target to avoid PK violation
     await this.db
@@ -321,6 +352,7 @@ Near the existing `reassignPersonFaces` method (~line 609), add:
 Near the alias methods (~line 687), add:
 
 ```typescript
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
   async migrateAliases(fromPersonId: string, toPersonId: string) {
     // Get aliases from the source person
     const sourceAliases = await this.db
@@ -397,10 +429,12 @@ describe('handleSharedSpacePersonDedup', () => {
     const personB = newUuid();
 
     mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
-    mocks.sharedSpace.getSpacePersonsWithEmbeddings.mockResolvedValue([
-      { id: personA, name: 'Alice', type: 'person', isHidden: false, embedding: '[0.1,0.2]' },
-      { id: personB, name: '', type: 'person', isHidden: false, embedding: '[0.11,0.21]' },
-    ]);
+    mocks.sharedSpace.getSpacePersonsWithEmbeddings
+      .mockResolvedValueOnce([
+        { id: personA, name: 'Alice', type: 'person', isHidden: false, embedding: '[0.1,0.2]' },
+        { id: personB, name: '', type: 'person', isHidden: false, embedding: '[0.11,0.21]' },
+      ])
+      .mockResolvedValueOnce([{ id: personA, name: 'Alice', type: 'person', isHidden: false, embedding: '[0.1,0.2]' }]);
     // personA has more faces -> becomes target
     mocks.sharedSpace.getPersonFaceCount.mockResolvedValueOnce(5).mockResolvedValueOnce(2);
     mocks.sharedSpace.findClosestSpacePerson.mockImplementation(
@@ -419,18 +453,93 @@ describe('handleSharedSpacePersonDedup', () => {
     mocks.sharedSpace.updatePerson.mockResolvedValue(void 0);
     mocks.sharedSpace.deletePerson.mockResolvedValue(void 0);
 
-    // Second pass: no more merges (only personA left)
-    mocks.sharedSpace.getSpacePersonsWithEmbeddings
-      .mockResolvedValueOnce([
-        { id: personA, name: 'Alice', type: 'person', isHidden: false, embedding: '[0.1,0.2]' },
-        { id: personB, name: '', type: 'person', isHidden: false, embedding: '[0.11,0.21]' },
-      ])
-      .mockResolvedValueOnce([{ id: personA, name: 'Alice', type: 'person', isHidden: false, embedding: '[0.1,0.2]' }]);
-
     const result = await sut.handleSharedSpacePersonDedup({ spaceId });
     expect(result).toBe(JobStatus.Success);
     expect(mocks.sharedSpace.reassignPersonFacesSafe).toHaveBeenCalledWith(personB, personA);
     expect(mocks.sharedSpace.deletePerson).toHaveBeenCalledWith(personB);
+  });
+
+  it('should succeed with no merges when space has one person (self-exclusion)', async () => {
+    const spaceId = newUuid();
+    const personA = newUuid();
+
+    mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
+    mocks.sharedSpace.getSpacePersonsWithEmbeddings.mockResolvedValue([
+      { id: personA, name: 'Alice', type: 'person', isHidden: false, embedding: '[0.1,0.2]' },
+    ]);
+    mocks.sharedSpace.findClosestSpacePerson.mockResolvedValue([]);
+
+    const result = await sut.handleSharedSpacePersonDedup({ spaceId });
+    expect(result).toBe(JobStatus.Success);
+    expect(mocks.sharedSpace.reassignPersonFacesSafe).not.toHaveBeenCalled();
+  });
+
+  it('should succeed with no merges when all persons are unique', async () => {
+    const spaceId = newUuid();
+
+    mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
+    mocks.sharedSpace.getSpacePersonsWithEmbeddings.mockResolvedValue([
+      { id: newUuid(), name: 'Alice', type: 'person', isHidden: false, embedding: '[0.1,0.2]' },
+      { id: newUuid(), name: 'Bob', type: 'person', isHidden: false, embedding: '[0.9,0.8]' },
+    ]);
+    mocks.sharedSpace.findClosestSpacePerson.mockResolvedValue([]);
+
+    const result = await sut.handleSharedSpacePersonDedup({ spaceId });
+    expect(result).toBe(JobStatus.Success);
+    expect(mocks.sharedSpace.reassignPersonFacesSafe).not.toHaveBeenCalled();
+  });
+
+  it('should handle transitive merge chains (A matches B, B matches C)', async () => {
+    const spaceId = newUuid();
+    const personA = newUuid();
+    const personB = newUuid();
+    const personC = newUuid();
+
+    mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
+    // Pass 1: A matches B, merge B into A
+    mocks.sharedSpace.getSpacePersonsWithEmbeddings
+      .mockResolvedValueOnce([
+        { id: personA, name: '', type: 'person', isHidden: false, embedding: '[0.1,0.2]' },
+        { id: personB, name: '', type: 'person', isHidden: false, embedding: '[0.11,0.21]' },
+        { id: personC, name: '', type: 'person', isHidden: false, embedding: '[0.12,0.22]' },
+      ])
+      // Pass 2: merged A now matches C
+      .mockResolvedValueOnce([
+        { id: personA, name: '', type: 'person', isHidden: false, embedding: '[0.1,0.2]' },
+        { id: personC, name: '', type: 'person', isHidden: false, embedding: '[0.12,0.22]' },
+      ])
+      // Pass 3: only A remains, no more merges
+      .mockResolvedValueOnce([{ id: personA, name: '', type: 'person', isHidden: false, embedding: '[0.1,0.2]' }]);
+
+    mocks.sharedSpace.getPersonFaceCount.mockResolvedValue(3);
+    let callCount = 0;
+    mocks.sharedSpace.findClosestSpacePerson.mockImplementation(async () => {
+      callCount++;
+      // Pass 1: A finds B
+      if (callCount === 1) {
+        return [{ personId: personB, name: '', distance: 0.1 }];
+      }
+      // Pass 1: B already deleted, C finds nothing (A excluded, B deleted)
+      if (callCount === 2) {
+        return [];
+      }
+      // Pass 2: A finds C
+      if (callCount === 3) {
+        return [{ personId: personC, name: '', distance: 0.15 }];
+      }
+      // Pass 3: A finds nothing
+      return [];
+    });
+    mocks.sharedSpace.reassignPersonFacesSafe.mockResolvedValue(void 0);
+    mocks.sharedSpace.migrateAliases.mockResolvedValue(void 0);
+    mocks.sharedSpace.updatePerson.mockResolvedValue(void 0);
+    mocks.sharedSpace.deletePerson.mockResolvedValue(void 0);
+
+    const result = await sut.handleSharedSpacePersonDedup({ spaceId });
+    expect(result).toBe(JobStatus.Success);
+    // Both B and C should be merged into A
+    expect(mocks.sharedSpace.deletePerson).toHaveBeenCalledWith(personB);
+    expect(mocks.sharedSpace.deletePerson).toHaveBeenCalledWith(personC);
   });
 
   it('should not merge people of different types', async () => {
@@ -589,11 +698,18 @@ In `server/src/services/shared-space.service.ts`, add after `handleSharedSpaceLi
         if (target.isHidden && !source.isHidden) {
           updates.isHidden = false;
         }
-        if (Object.keys(updates).length > 0) {
-          await this.sharedSpaceRepository.updatePerson(target.id, updates);
+
+        try {
+          if (Object.keys(updates).length > 0) {
+            await this.sharedSpaceRepository.updatePerson(target.id, updates);
+          }
+          await this.sharedSpaceRepository.deletePerson(source.id);
+        } catch {
+          // Person may have been concurrently deleted by another dedup pass — skip gracefully
+          this.logger.warn(`Dedup merge skipped: person ${source.id} or ${target.id} no longer exists`);
+          continue;
         }
 
-        await this.sharedSpaceRepository.deletePerson(source.id);
         deletedIds.add(source.id);
         mergedAny = true;
       }
@@ -614,6 +730,18 @@ await this.jobRepository.queue({
 
 return JobStatus.Success;
 ```
+
+Also update `handleSharedSpaceFaceMatchAll` (~line 856-872) to queue dedup after queuing all individual face match jobs. Add before `return JobStatus.Success`:
+
+```typescript
+// Queue dedup pass after all face matches complete
+await this.jobRepository.queue({
+  name: JobName.SharedSpacePersonDedup,
+  data: { spaceId },
+});
+```
+
+**Important:** Update existing `handleSharedSpaceLibraryFaceSync` tests to account for the new `jobRepository.queue` call. Add `mocks.job.queue.mockResolvedValue(void 0)` to the `beforeEach` or to each existing test that calls `handleSharedSpaceLibraryFaceSync`.
 
 **Step 4: Run tests to verify they pass**
 
@@ -643,13 +771,13 @@ In the spec file, add a new `describe('deduplicateSpacePeople')` block:
 
 ```typescript
 describe('deduplicateSpacePeople', () => {
-  it('should require admin role', async () => {
+  it('should require owner role', async () => {
     mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
 
     await expect(sut.deduplicateSpacePeople(factory.auth(), newUuid())).rejects.toThrow(ForbiddenException);
   });
 
-  it('should queue dedup job for admin', async () => {
+  it('should queue dedup job for owner', async () => {
     const spaceId = newUuid();
     mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Owner }));
 
@@ -674,7 +802,7 @@ In `server/src/services/shared-space.service.ts`, add a public method:
 
 ```typescript
   async deduplicateSpacePeople(auth: AuthDto, spaceId: string): Promise<void> {
-    await this.requireRole(auth, spaceId, SharedSpaceRole.Admin);
+    await this.requireRole(auth, spaceId, SharedSpaceRole.Owner);
 
     await this.jobRepository.queue({
       name: JobName.SharedSpacePersonDedup,
@@ -682,8 +810,6 @@ In `server/src/services/shared-space.service.ts`, add a public method:
     });
   }
 ```
-
-Note: Check if `SharedSpaceRole.Admin` exists. If the role hierarchy is `Owner > Editor > Viewer`, then use `SharedSpaceRole.Owner` instead. Look at `requireRole` implementation and the `SharedSpaceRole` enum to confirm. The design says "Admin role" but the space role system may use "Owner" for admin-level permissions.
 
 **Step 4: Add the controller endpoint**
 
@@ -822,7 +948,7 @@ cd web && npx svelte-check --threshold warning
 
 ```bash
 git add web/src/routes/\(user\)/spaces/\[spaceId\]/people/+page.svelte i18n/en.json
-git commit -m "feat: add Deduplicate People button for space admins"
+git commit -m "feat: add Deduplicate People button for space owners"
 ```
 
 ---

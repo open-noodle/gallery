@@ -48,7 +48,7 @@ After library face sync completes, a dedup job runs that compares all space pers
 ### New job
 
 - `JobName.SharedSpacePersonDedup` on the `FacialRecognition` queue
-- `handleSharedSpaceLibraryFaceSync` queues this job after finishing (instead of running merge inline)
+- Queued automatically after: `handleSharedSpaceLibraryFaceSync`, `handleSharedSpaceFaceMatchAll`
 - BullMQ serializes jobs on the same queue, solving concurrent sync concerns naturally
 
 ### Algorithm (`deduplicateSpacePeople(spaceId)`)
@@ -92,13 +92,13 @@ Two concurrent library syncs can create duplicates via TOCTOU in both the embedd
 ### Endpoint
 
 - `POST /spaces/:id/people/deduplicate`
-- Requires **Admin** role on the space
+- Requires **Owner** role on the space
 - Queues the same `SharedSpacePersonDedup` job (shared code path with post-sync trigger)
 - Returns immediately (background job)
 
 ### UI
 
-- "Deduplicate people" button in space settings, visible to space admins only
+- "Deduplicate people" button in space settings, visible to space owners only
 
 ## No Schema Changes
 
@@ -119,4 +119,8 @@ Two concurrent library syncs can create duplicates via TOCTOU in both the embedd
   - Transitive merge convergence
   - Idempotency (running twice is safe)
   - Self-exclusion (person doesn't match itself)
-- E2E test for the deduplicate endpoint (admin role check)
+- E2E test for the deduplicate endpoint (owner role check)
+
+## Known Limitations
+
+- Space persons whose `representativeFaceId` points to a deleted face (missing `face_search` row) are invisible to the dedup algorithm. These orphaned persons require manual merge.
