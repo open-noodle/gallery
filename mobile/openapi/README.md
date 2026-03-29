@@ -141,7 +141,7 @@ Class | Method | HTTP request | Description
 *ClassificationApi* | [**createCategory**](doc//ClassificationApi.md#createcategory) | **POST** /classification/categories | Create a classification category
 *ClassificationApi* | [**deleteCategory**](doc//ClassificationApi.md#deletecategory) | **DELETE** /classification/categories/{id} | Delete a classification category
 *ClassificationApi* | [**getCategories**](doc//ClassificationApi.md#getcategories) | **GET** /classification/categories | Get classification categories
-*ClassificationApi* | [**scanClassification**](doc//ClassificationApi.md#scanclassification) | **POST** /classification/categories/scan | Scan library for classification
+*ClassificationApi* | [**scanClassification**](doc//ClassificationApi.md#scanclassification) | **POST** /classification/categories/scan | Scan all libraries for classification
 *ClassificationApi* | [**updateCategory**](doc//ClassificationApi.md#updatecategory) | **PUT** /classification/categories/{id} | Update a classification category
 *DatabaseBackupsAdminApi* | [**deleteDatabaseBackup**](doc//DatabaseBackupsAdminApi.md#deletedatabasebackup) | **DELETE** /admin/database-backups | Delete database backup
 *DatabaseBackupsAdminApi* | [**downloadDatabaseBackup**](doc//DatabaseBackupsAdminApi.md#downloaddatabasebackup) | **GET** /admin/database-backups/{filename} | Download database backup
