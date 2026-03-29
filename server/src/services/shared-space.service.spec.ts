@@ -2509,9 +2509,27 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.getById.mockResolvedValue(space);
       // Repository returns pre-sorted by asset count descending
       mocks.sharedSpace.getPersonsBySpaceIdWithCounts.mockResolvedValue([
-        { ...person1, personalName: 'Many Photos', personalThumbnailPath: '/path/to/thumb.jpg', faceCount: 1, assetCount: 10 },
-        { ...person2, personalName: 'Some Photos', personalThumbnailPath: '/path/to/thumb.jpg', faceCount: 1, assetCount: 5 },
-        { ...person3, personalName: 'Few Photos', personalThumbnailPath: '/path/to/thumb.jpg', faceCount: 1, assetCount: 2 },
+        {
+          ...person1,
+          personalName: 'Many Photos',
+          personalThumbnailPath: '/path/to/thumb.jpg',
+          faceCount: 1,
+          assetCount: 10,
+        },
+        {
+          ...person2,
+          personalName: 'Some Photos',
+          personalThumbnailPath: '/path/to/thumb.jpg',
+          faceCount: 1,
+          assetCount: 5,
+        },
+        {
+          ...person3,
+          personalName: 'Few Photos',
+          personalThumbnailPath: '/path/to/thumb.jpg',
+          faceCount: 1,
+          assetCount: 2,
+        },
       ]);
       mocks.sharedSpace.getAliasesBySpaceAndUser.mockResolvedValue([]);
 
@@ -2540,7 +2558,13 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.getById.mockResolvedValue(space);
       // SQL already filters out persons without thumbnails
       mocks.sharedSpace.getPersonsBySpaceIdWithCounts.mockResolvedValue([
-        { ...personWithThumb, personalName: 'Has Thumb', personalThumbnailPath: '/path/to/thumb.jpg', faceCount: 1, assetCount: 1 },
+        {
+          ...personWithThumb,
+          personalName: 'Has Thumb',
+          personalThumbnailPath: '/path/to/thumb.jpg',
+          faceCount: 1,
+          assetCount: 1,
+        },
       ]);
       mocks.sharedSpace.getAliasesBySpaceAndUser.mockResolvedValue([]);
 
@@ -2651,7 +2675,13 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
       mocks.sharedSpace.getById.mockResolvedValue(space);
       mocks.sharedSpace.getPersonsBySpaceIdWithCounts.mockResolvedValue([
-        { ...person, personalName: 'Temporal Person', personalThumbnailPath: '/path/to/thumb.jpg', faceCount: 3, assetCount: 2 },
+        {
+          ...person,
+          personalName: 'Temporal Person',
+          personalThumbnailPath: '/path/to/thumb.jpg',
+          faceCount: 3,
+          assetCount: 2,
+        },
       ]);
       mocks.sharedSpace.getAliasesBySpaceAndUser.mockResolvedValue([]);
 
@@ -2681,7 +2711,13 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
       mocks.sharedSpace.getById.mockResolvedValue(space);
       mocks.sharedSpace.getPersonsBySpaceIdWithCounts.mockResolvedValue([
-        { ...person, personalName: 'All People', personalThumbnailPath: '/path/to/thumb.jpg', faceCount: 1, assetCount: 1 },
+        {
+          ...person,
+          personalName: 'All People',
+          personalThumbnailPath: '/path/to/thumb.jpg',
+          faceCount: 1,
+          assetCount: 1,
+        },
       ]);
       mocks.sharedSpace.getAliasesBySpaceAndUser.mockResolvedValue([]);
 
@@ -2713,7 +2749,13 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
       mocks.sharedSpace.getById.mockResolvedValue(space);
       mocks.sharedSpace.getPersonsBySpaceIdWithCounts.mockResolvedValue([
-        { ...personInRange, personalName: 'In Range', personalThumbnailPath: '/path/to/thumb.jpg', faceCount: 1, assetCount: 1 },
+        {
+          ...personInRange,
+          personalName: 'In Range',
+          personalThumbnailPath: '/path/to/thumb.jpg',
+          faceCount: 1,
+          assetCount: 1,
+        },
       ]);
       mocks.sharedSpace.getAliasesBySpaceAndUser.mockResolvedValue([]);
 

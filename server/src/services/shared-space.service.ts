@@ -615,9 +615,7 @@ export class SharedSpaceService extends BaseService {
     });
 
     const aliases =
-      persons.length > 0
-        ? await this.sharedSpaceRepository.getAliasesBySpaceAndUser(spaceId, auth.user.id)
-        : [];
+      persons.length > 0 ? await this.sharedSpaceRepository.getAliasesBySpaceAndUser(spaceId, auth.user.id) : [];
     const aliasMap = new Map(aliases.map((a) => [a.personId, a.alias]));
 
     return persons.map((person) =>
