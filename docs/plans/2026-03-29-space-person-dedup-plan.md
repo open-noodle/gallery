@@ -1,0 +1,867 @@
+# Space Person Deduplication Implementation Plan
+
+> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
+
+**Goal:** Automatically prevent and merge duplicate space persons when multiple external libraries are linked to a shared space.
+
+**Architecture:** Two-layer dedup: (1) `personId` fallback during face sync prevents same-owner duplicates, (2) post-sync merge pass using the vector index catches cross-owner and unmerged-person duplicates. A new background job and API endpoint allow manual trigger from space admins.
+
+**Tech Stack:** NestJS services, Kysely queries, BullMQ jobs, Svelte 5 frontend, Vitest tests.
+
+**Design doc:** `docs/plans/2026-03-29-space-person-dedup-design.md`
+
+---
+
+### Task 1: Add `personId` Fallback in `processSpaceFaceMatch` (Layer 1)
+
+**Files:**
+
+- Modify: `server/src/services/shared-space.service.ts:946-963`
+- Test: `server/src/services/shared-space.service.spec.ts`
+
+**Step 1: Write the failing test**
+
+In `shared-space.service.spec.ts`, inside the `handleSharedSpaceLibraryFaceSync` describe block (after line ~4093), add:
+
+```typescript
+it('should reuse existing space person when face personId matches (Layer 1 dedup)', async () => {
+  const spaceId = newUuid();
+  const libraryId = newUuid();
+  const assetId = newUuid();
+  const faceId = newUuid();
+  const personalPersonId = newUuid();
+  const existingSpacePersonId = newUuid();
+
+  mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
+  mocks.sharedSpace.hasLibraryLink.mockResolvedValue(true);
+  mocks.asset.getByLibraryIdWithFaces.mockResolvedValueOnce([{ id: assetId }]).mockResolvedValueOnce([]);
+  mocks.sharedSpace.getAssetFacesForMatching.mockResolvedValue([
+    { id: faceId, assetId, personId: personalPersonId, embedding: '[0.1,0.2]' },
+  ]);
+  mocks.sharedSpace.isPersonFaceAssigned.mockResolvedValue(false);
+  mocks.sharedSpace.findClosestSpacePerson.mockResolvedValue([]); // No embedding match
+  mocks.sharedSpace.findSpacePersonByLinkedPersonId.mockResolvedValue(
+    factory.sharedSpacePerson({ id: existingSpacePersonId, spaceId }),
+  );
+  mocks.sharedSpace.addPersonFaces.mockResolvedValue([]);
+  mocks.sharedSpace.getPetFacesForAsset.mockResolvedValue([]);
+
+  await sut.handleSharedSpaceLibraryFaceSync({ spaceId, libraryId });
+
+  // Should NOT create a new person
+  expect(mocks.sharedSpace.createPerson).not.toHaveBeenCalled();
+  // Should assign face to the existing space person found by personId
+  expect(mocks.sharedSpace.addPersonFaces).toHaveBeenCalledWith([
+    { personId: existingSpacePersonId, assetFaceId: faceId },
+  ]);
+});
+
+it('should create new space person only when no personId match exists', async () => {
+  const spaceId = newUuid();
+  const libraryId = newUuid();
+  const assetId = newUuid();
+  const faceId = newUuid();
+  const personalPersonId = newUuid();
+
+  mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
+  mocks.sharedSpace.hasLibraryLink.mockResolvedValue(true);
+  mocks.asset.getByLibraryIdWithFaces.mockResolvedValueOnce([{ id: assetId }]).mockResolvedValueOnce([]);
+  mocks.sharedSpace.getAssetFacesForMatching.mockResolvedValue([
+    { id: faceId, assetId, personId: personalPersonId, embedding: '[0.1,0.2]' },
+  ]);
+  mocks.sharedSpace.isPersonFaceAssigned.mockResolvedValue(false);
+  mocks.sharedSpace.findClosestSpacePerson.mockResolvedValue([]); // No embedding match
+  mocks.sharedSpace.findSpacePersonByLinkedPersonId.mockResolvedValue(undefined); // No personId match either
+  mocks.sharedSpace.createPerson.mockResolvedValue(factory.sharedSpacePerson({ spaceId }));
+  mocks.sharedSpace.addPersonFaces.mockResolvedValue([]);
+  mocks.sharedSpace.getPetFacesForAsset.mockResolvedValue([]);
+
+  await sut.handleSharedSpaceLibraryFaceSync({ spaceId, libraryId });
+
+  expect(mocks.sharedSpace.createPerson).toHaveBeenCalled();
+});
+```
+
+**Step 2: Run tests to verify they fail**
+
+Run: `cd server && pnpm test -- --run src/services/shared-space.service.spec.ts`
+Expected: First test FAILS (createPerson is called instead of reusing), second test may pass or fail depending on mock.
+
+**Step 3: Implement the `personId` fallback**
+
+In `server/src/services/shared-space.service.ts`, replace lines 949-963 (the `else` branch when no embedding match):
+
+```typescript
+      } else {
+        // Only create a new space person if the face has a linked personal person
+        // (faces without one haven't passed the minFaces threshold yet)
+        if (!face.personId) {
+          continue;
+        }
+
+        // Layer 1 dedup: check if a space person already exists for this personal person
+        const existingSpacePerson = await this.sharedSpaceRepository.findSpacePersonByLinkedPersonId(
+          spaceId,
+          face.personId,
+        );
+
+        if (existingSpacePerson) {
+          personId = existingSpacePerson.id;
+        } else {
+          const newPerson = await this.sharedSpaceRepository.createPerson({
+            spaceId,
+            name: '',
+            representativeFaceId: face.id,
+            type: 'person',
+          });
+          personId = newPerson.id;
+        }
+      }
+```
+
+**Step 4: Run tests to verify they pass**
+
+Run: `cd server && pnpm test -- --run src/services/shared-space.service.spec.ts`
+Expected: PASS
+
+**Step 5: Commit**
+
+```bash
+git add server/src/services/shared-space.service.ts server/src/services/shared-space.service.spec.ts
+git commit -m "feat: add personId fallback to prevent duplicate space persons (Layer 1)"
+```
+
+---
+
+### Task 2: Register `SharedSpacePersonDedup` Job
+
+**Files:**
+
+- Modify: `server/src/enum.ts:724`
+- Modify: `server/src/types.ts:247-256` (interface) and `450-456` (union)
+
+**Step 1: Add the job enum entry**
+
+In `server/src/enum.ts`, after line 724 (`SharedSpaceLibraryFaceSync`), add:
+
+```typescript
+  SharedSpacePersonDedup = 'SharedSpacePersonDedup',
+```
+
+**Step 2: Add the job type interface**
+
+In `server/src/types.ts`, near the other shared space job interfaces (~line 250), add:
+
+```typescript
+export interface ISharedSpacePersonDedupJob extends IBaseJob {
+  spaceId: string;
+}
+```
+
+**Step 3: Add to the JobItem union**
+
+In `server/src/types.ts`, in the `JobItem` union after the `SharedSpaceLibraryFaceSync` entry (~line 453), add:
+
+```typescript
+  | { name: JobName.SharedSpacePersonDedup; data: ISharedSpacePersonDedupJob }
+```
+
+**Step 4: Verify compilation**
+
+Run: `cd server && npx tsc --noEmit`
+Expected: No errors
+
+**Step 5: Commit**
+
+```bash
+git add server/src/enum.ts server/src/types.ts
+git commit -m "feat: register SharedSpacePersonDedup job type"
+```
+
+---
+
+### Task 3: Extend `findClosestSpacePerson` with `excludePersonIds` and `type` Filter
+
+**Files:**
+
+- Modify: `server/src/repositories/shared-space.repository.ts:693-719`
+- Test: `server/src/services/shared-space.service.spec.ts` (existing tests still pass)
+
+**Step 1: Modify the method signature and query**
+
+In `server/src/repositories/shared-space.repository.ts`, update `findClosestSpacePerson` (line 696-718):
+
+```typescript
+  @GenerateSql({
+    params: [DummyValue.UUID, DummyValue.VECTOR, { maxDistance: 0.6, numResults: 1 }],
+  })
+  findClosestSpacePerson(
+    spaceId: string,
+    embedding: string,
+    options: { maxDistance: number; numResults: number; excludePersonIds?: string[]; type?: string },
+  ) {
+    return this.db.transaction().execute(async (trx) => {
+      await sql`set local vchordrq.probes = ${sql.lit(probes[VectorIndex.Face])}`.execute(trx);
+      return await trx
+        .with('cte', (qb) =>
+          qb
+            .selectFrom('shared_space_person')
+            .innerJoin('shared_space_person_face', 'shared_space_person_face.personId', 'shared_space_person.id')
+            .innerJoin('face_search', 'face_search.faceId', 'shared_space_person_face.assetFaceId')
+            .select([
+              'shared_space_person.id as personId',
+              'shared_space_person.name',
+              sql<number>`face_search.embedding <=> ${embedding}`.as('distance'),
+            ])
+            .where('shared_space_person.spaceId', '=', spaceId)
+            .$if(!!options.excludePersonIds?.length, (qb) =>
+              qb.where('shared_space_person.id', 'not in', options.excludePersonIds!),
+            )
+            .$if(!!options.type, (qb) => qb.where('shared_space_person.type', '=', options.type!))
+            .orderBy('distance')
+            .limit(options.numResults),
+        )
+        .selectFrom('cte')
+        .selectAll()
+        .where('cte.distance', '<=', options.maxDistance)
+        .execute();
+    });
+  }
+```
+
+**Step 2: Verify existing tests still pass**
+
+Run: `cd server && pnpm test -- --run src/services/shared-space.service.spec.ts`
+Expected: PASS (existing callers don't pass the new optional params, so behavior is unchanged)
+
+**Step 3: Commit**
+
+```bash
+git add server/src/repositories/shared-space.repository.ts
+git commit -m "feat: add excludePersonIds and type filter to findClosestSpacePerson"
+```
+
+---
+
+### Task 4: Add `getSpacePersonsWithEmbeddings` Repository Method
+
+**Files:**
+
+- Modify: `server/src/repositories/shared-space.repository.ts`
+
+**Step 1: Add the new method**
+
+In `server/src/repositories/shared-space.repository.ts`, in the "Face Matching Queries" section (after `findClosestSpacePerson`, ~line 719), add:
+
+```typescript
+  @GenerateSql({ params: [DummyValue.UUID] })
+  getSpacePersonsWithEmbeddings(spaceId: string) {
+    return this.db
+      .selectFrom('shared_space_person')
+      .innerJoin('face_search', 'face_search.faceId', 'shared_space_person.representativeFaceId')
+      .select([
+        'shared_space_person.id',
+        'shared_space_person.name',
+        'shared_space_person.type',
+        'shared_space_person.isHidden',
+        'face_search.embedding',
+      ])
+      .where('shared_space_person.spaceId', '=', spaceId)
+      .execute();
+  }
+```
+
+**Step 2: Verify compilation**
+
+Run: `cd server && npx tsc --noEmit`
+Expected: No errors
+
+**Step 3: Commit**
+
+```bash
+git add server/src/repositories/shared-space.repository.ts
+git commit -m "feat: add getSpacePersonsWithEmbeddings repository method"
+```
+
+---
+
+### Task 5: Add `reassignPersonFacesConflictSafe` and `migrateAliases` Repository Methods
+
+**Files:**
+
+- Modify: `server/src/repositories/shared-space.repository.ts`
+
+**Step 1: Add conflict-safe face reassignment**
+
+Near the existing `reassignPersonFaces` method (~line 609), add:
+
+```typescript
+  async reassignPersonFacesSafe(fromPersonId: string, toPersonId: string) {
+    // Delete faces that already exist on the target to avoid PK violation
+    await this.db
+      .deleteFrom('shared_space_person_face')
+      .where('personId', '=', fromPersonId)
+      .where(
+        'assetFaceId',
+        'in',
+        this.db.selectFrom('shared_space_person_face').select('assetFaceId').where('personId', '=', toPersonId),
+      )
+      .execute();
+
+    await this.db
+      .updateTable('shared_space_person_face')
+      .set({ personId: toPersonId })
+      .where('personId', '=', fromPersonId)
+      .execute();
+  }
+```
+
+**Step 2: Add alias migration**
+
+Near the alias methods (~line 687), add:
+
+```typescript
+  async migrateAliases(fromPersonId: string, toPersonId: string) {
+    // Get aliases from the source person
+    const sourceAliases = await this.db
+      .selectFrom('shared_space_person_alias')
+      .selectAll()
+      .where('personId', '=', fromPersonId)
+      .execute();
+
+    for (const alias of sourceAliases) {
+      await this.db
+        .insertInto('shared_space_person_alias')
+        .values({ personId: toPersonId, userId: alias.userId, alias: alias.alias })
+        .onConflict((oc) => oc.doNothing())
+        .execute();
+    }
+
+    // Delete source aliases
+    await this.db.deleteFrom('shared_space_person_alias').where('personId', '=', fromPersonId).execute();
+  }
+```
+
+**Step 3: Verify compilation**
+
+Run: `cd server && npx tsc --noEmit`
+Expected: No errors
+
+**Step 4: Commit**
+
+```bash
+git add server/src/repositories/shared-space.repository.ts
+git commit -m "feat: add conflict-safe face reassignment and alias migration methods"
+```
+
+---
+
+### Task 6: Implement `deduplicateSpacePeople` and Job Handler
+
+**Files:**
+
+- Modify: `server/src/services/shared-space.service.ts`
+- Test: `server/src/services/shared-space.service.spec.ts`
+
+**Step 1: Write failing tests**
+
+Add a new `describe('handleSharedSpacePersonDedup')` block in the spec file:
+
+```typescript
+describe('handleSharedSpacePersonDedup', () => {
+  it('should skip when space does not exist', async () => {
+    mocks.sharedSpace.getById.mockResolvedValue(void 0);
+    const result = await sut.handleSharedSpacePersonDedup({ spaceId: newUuid() });
+    expect(result).toBe(JobStatus.Skipped);
+  });
+
+  it('should skip when face recognition is disabled', async () => {
+    const spaceId = newUuid();
+    mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: false }));
+    const result = await sut.handleSharedSpacePersonDedup({ spaceId });
+    expect(result).toBe(JobStatus.Skipped);
+  });
+
+  it('should succeed with no merges when space has no people', async () => {
+    const spaceId = newUuid();
+    mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
+    mocks.sharedSpace.getSpacePersonsWithEmbeddings.mockResolvedValue([]);
+
+    const result = await sut.handleSharedSpacePersonDedup({ spaceId });
+    expect(result).toBe(JobStatus.Success);
+  });
+
+  it('should merge two people of the same type when embedding match found', async () => {
+    const spaceId = newUuid();
+    const personA = newUuid();
+    const personB = newUuid();
+
+    mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
+    mocks.sharedSpace.getSpacePersonsWithEmbeddings.mockResolvedValue([
+      { id: personA, name: 'Alice', type: 'person', isHidden: false, embedding: '[0.1,0.2]' },
+      { id: personB, name: '', type: 'person', isHidden: false, embedding: '[0.11,0.21]' },
+    ]);
+    // personA has more faces -> becomes target
+    mocks.sharedSpace.getPersonFaceCount.mockResolvedValueOnce(5).mockResolvedValueOnce(2);
+    mocks.sharedSpace.findClosestSpacePerson.mockImplementation(
+      async (_spaceId: string, _embedding: string, options: any) => {
+        if (options.excludePersonIds?.includes(personA)) {
+          return [{ personId: personA, name: 'Alice', distance: 0.1 }];
+        }
+        if (options.excludePersonIds?.includes(personB)) {
+          return [{ personId: personB, name: '', distance: 0.1 }];
+        }
+        return [];
+      },
+    );
+    mocks.sharedSpace.reassignPersonFacesSafe.mockResolvedValue(void 0);
+    mocks.sharedSpace.migrateAliases.mockResolvedValue(void 0);
+    mocks.sharedSpace.updatePerson.mockResolvedValue(void 0);
+    mocks.sharedSpace.deletePerson.mockResolvedValue(void 0);
+
+    // Second pass: no more merges (only personA left)
+    mocks.sharedSpace.getSpacePersonsWithEmbeddings
+      .mockResolvedValueOnce([
+        { id: personA, name: 'Alice', type: 'person', isHidden: false, embedding: '[0.1,0.2]' },
+        { id: personB, name: '', type: 'person', isHidden: false, embedding: '[0.11,0.21]' },
+      ])
+      .mockResolvedValueOnce([{ id: personA, name: 'Alice', type: 'person', isHidden: false, embedding: '[0.1,0.2]' }]);
+
+    const result = await sut.handleSharedSpacePersonDedup({ spaceId });
+    expect(result).toBe(JobStatus.Success);
+    expect(mocks.sharedSpace.reassignPersonFacesSafe).toHaveBeenCalledWith(personB, personA);
+    expect(mocks.sharedSpace.deletePerson).toHaveBeenCalledWith(personB);
+  });
+
+  it('should not merge people of different types', async () => {
+    const spaceId = newUuid();
+    const personA = newUuid();
+    const petB = newUuid();
+
+    mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
+    mocks.sharedSpace.getSpacePersonsWithEmbeddings.mockResolvedValue([
+      { id: personA, name: '', type: 'person', isHidden: false, embedding: '[0.1,0.2]' },
+      { id: petB, name: '', type: 'pet', isHidden: false, embedding: '[0.11,0.21]' },
+    ]);
+    // findClosestSpacePerson is called with type filter, returns no match
+    mocks.sharedSpace.findClosestSpacePerson.mockResolvedValue([]);
+
+    const result = await sut.handleSharedSpacePersonDedup({ spaceId });
+    expect(result).toBe(JobStatus.Success);
+    expect(mocks.sharedSpace.reassignPersonFacesSafe).not.toHaveBeenCalled();
+  });
+
+  it('should preserve non-empty name when merging', async () => {
+    const spaceId = newUuid();
+    const personA = newUuid(); // target (more faces), no name
+    const personB = newUuid(); // source, has name
+
+    mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
+    mocks.sharedSpace.getSpacePersonsWithEmbeddings
+      .mockResolvedValueOnce([
+        { id: personA, name: '', type: 'person', isHidden: false, embedding: '[0.1,0.2]' },
+        { id: personB, name: 'Alice', type: 'person', isHidden: false, embedding: '[0.11,0.21]' },
+      ])
+      .mockResolvedValueOnce([{ id: personA, name: 'Alice', type: 'person', isHidden: false, embedding: '[0.1,0.2]' }]);
+    mocks.sharedSpace.getPersonFaceCount.mockResolvedValueOnce(5).mockResolvedValueOnce(2);
+    mocks.sharedSpace.findClosestSpacePerson.mockImplementation(
+      async (_spaceId: string, _embedding: string, options: any) => {
+        if (options.excludePersonIds?.includes(personA)) {
+          return [{ personId: personA, name: '', distance: 0.1 }];
+        }
+        if (options.excludePersonIds?.includes(personB)) {
+          return [{ personId: personB, name: 'Alice', distance: 0.1 }];
+        }
+        return [];
+      },
+    );
+    mocks.sharedSpace.reassignPersonFacesSafe.mockResolvedValue(void 0);
+    mocks.sharedSpace.migrateAliases.mockResolvedValue(void 0);
+    mocks.sharedSpace.updatePerson.mockResolvedValue(void 0);
+    mocks.sharedSpace.deletePerson.mockResolvedValue(void 0);
+
+    await sut.handleSharedSpacePersonDedup({ spaceId });
+
+    // Target (personA) should get the name from source (personB)
+    expect(mocks.sharedSpace.updatePerson).toHaveBeenCalledWith(personA, expect.objectContaining({ name: 'Alice' }));
+  });
+
+  it('should make merged result visible if either person is visible', async () => {
+    const spaceId = newUuid();
+    const personA = newUuid(); // hidden, more faces
+    const personB = newUuid(); // visible
+
+    mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
+    mocks.sharedSpace.getSpacePersonsWithEmbeddings
+      .mockResolvedValueOnce([
+        { id: personA, name: '', type: 'person', isHidden: true, embedding: '[0.1,0.2]' },
+        { id: personB, name: '', type: 'person', isHidden: false, embedding: '[0.11,0.21]' },
+      ])
+      .mockResolvedValueOnce([{ id: personA, name: '', type: 'person', isHidden: false, embedding: '[0.1,0.2]' }]);
+    mocks.sharedSpace.getPersonFaceCount.mockResolvedValueOnce(5).mockResolvedValueOnce(2);
+    mocks.sharedSpace.findClosestSpacePerson.mockImplementation(
+      async (_spaceId: string, _embedding: string, options: any) => {
+        if (options.excludePersonIds?.includes(personA)) {
+          return [{ personId: personA, name: '', distance: 0.1 }];
+        }
+        if (options.excludePersonIds?.includes(personB)) {
+          return [{ personId: personB, name: '', distance: 0.1 }];
+        }
+        return [];
+      },
+    );
+    mocks.sharedSpace.reassignPersonFacesSafe.mockResolvedValue(void 0);
+    mocks.sharedSpace.migrateAliases.mockResolvedValue(void 0);
+    mocks.sharedSpace.updatePerson.mockResolvedValue(void 0);
+    mocks.sharedSpace.deletePerson.mockResolvedValue(void 0);
+
+    await sut.handleSharedSpacePersonDedup({ spaceId });
+
+    expect(mocks.sharedSpace.updatePerson).toHaveBeenCalledWith(personA, expect.objectContaining({ isHidden: false }));
+  });
+});
+```
+
+**Step 2: Run tests to verify they fail**
+
+Run: `cd server && pnpm test -- --run src/services/shared-space.service.spec.ts`
+Expected: FAIL (`handleSharedSpacePersonDedup` method doesn't exist)
+
+**Step 3: Implement the dedup method and job handler**
+
+In `server/src/services/shared-space.service.ts`, add after `handleSharedSpaceLibraryFaceSync` (~line 854):
+
+```typescript
+  @OnJob({ name: JobName.SharedSpacePersonDedup, queue: QueueName.FacialRecognition })
+  async handleSharedSpacePersonDedup(job: JobOf<JobName.SharedSpacePersonDedup>): Promise<JobStatus> {
+    const space = await this.sharedSpaceRepository.getById(job.spaceId);
+    if (!space || !space.faceRecognitionEnabled) {
+      return JobStatus.Skipped;
+    }
+
+    const { machineLearning } = await this.getConfig({ withCache: true });
+    const maxDistance = machineLearning.facialRecognition.maxDistance;
+
+    let mergedAny = true;
+    while (mergedAny) {
+      mergedAny = false;
+      const persons = await this.sharedSpaceRepository.getSpacePersonsWithEmbeddings(job.spaceId);
+      const deletedIds = new Set<string>();
+
+      for (const person of persons) {
+        if (deletedIds.has(person.id)) {
+          continue;
+        }
+
+        const matches = await this.sharedSpaceRepository.findClosestSpacePerson(job.spaceId, person.embedding, {
+          maxDistance,
+          numResults: 1,
+          excludePersonIds: [person.id, ...deletedIds],
+          type: person.type,
+        });
+
+        if (matches.length === 0) {
+          continue;
+        }
+
+        const match = matches[0];
+        const matchPerson = persons.find((p) => p.id === match.personId);
+        if (!matchPerson || deletedIds.has(match.personId)) {
+          continue;
+        }
+
+        // Determine target (more faces) and source
+        const personFaceCount = await this.sharedSpaceRepository.getPersonFaceCount(person.id);
+        const matchFaceCount = await this.sharedSpaceRepository.getPersonFaceCount(match.personId);
+
+        const [target, source] =
+          personFaceCount >= matchFaceCount ? [person, matchPerson] : [matchPerson, person];
+
+        // Reassign faces and migrate aliases
+        await this.sharedSpaceRepository.reassignPersonFacesSafe(source.id, target.id);
+        await this.sharedSpaceRepository.migrateAliases(source.id, target.id);
+
+        // Determine merged properties
+        const updates: Record<string, any> = {};
+        if (!target.name && source.name) {
+          updates.name = source.name;
+        }
+        if (target.isHidden && !source.isHidden) {
+          updates.isHidden = false;
+        }
+        if (Object.keys(updates).length > 0) {
+          await this.sharedSpaceRepository.updatePerson(target.id, updates);
+        }
+
+        await this.sharedSpaceRepository.deletePerson(source.id);
+        deletedIds.add(source.id);
+        mergedAny = true;
+      }
+    }
+
+    return JobStatus.Success;
+  }
+```
+
+Also update `handleSharedSpaceLibraryFaceSync` to queue the dedup job after sync (add before `return JobStatus.Success` at line ~853):
+
+```typescript
+// Queue dedup pass after library sync completes
+await this.jobRepository.queue({
+  name: JobName.SharedSpacePersonDedup,
+  data: { spaceId: job.spaceId },
+});
+
+return JobStatus.Success;
+```
+
+**Step 4: Run tests to verify they pass**
+
+Run: `cd server && pnpm test -- --run src/services/shared-space.service.spec.ts`
+Expected: PASS
+
+**Step 5: Commit**
+
+```bash
+git add server/src/services/shared-space.service.ts server/src/services/shared-space.service.spec.ts
+git commit -m "feat: implement deduplicateSpacePeople job handler (Layer 2)"
+```
+
+---
+
+### Task 7: Add Dedup API Endpoint
+
+**Files:**
+
+- Modify: `server/src/controllers/shared-space.controller.ts`
+- Modify: `server/src/services/shared-space.service.ts`
+- Test: `server/src/services/shared-space.service.spec.ts`
+
+**Step 1: Write the failing test**
+
+In the spec file, add a new `describe('deduplicateSpacePeople')` block:
+
+```typescript
+describe('deduplicateSpacePeople', () => {
+  it('should require admin role', async () => {
+    mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
+
+    await expect(sut.deduplicateSpacePeople(factory.auth(), newUuid())).rejects.toThrow(ForbiddenException);
+  });
+
+  it('should queue dedup job for admin', async () => {
+    const spaceId = newUuid();
+    mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Owner }));
+
+    await sut.deduplicateSpacePeople(factory.auth(), spaceId);
+
+    expect(mocks.job.queue).toHaveBeenCalledWith({
+      name: JobName.SharedSpacePersonDedup,
+      data: { spaceId },
+    });
+  });
+});
+```
+
+**Step 2: Run tests to verify they fail**
+
+Run: `cd server && pnpm test -- --run src/services/shared-space.service.spec.ts`
+Expected: FAIL (`deduplicateSpacePeople` doesn't exist)
+
+**Step 3: Implement the service method**
+
+In `server/src/services/shared-space.service.ts`, add a public method:
+
+```typescript
+  async deduplicateSpacePeople(auth: AuthDto, spaceId: string): Promise<void> {
+    await this.requireRole(auth, spaceId, SharedSpaceRole.Admin);
+
+    await this.jobRepository.queue({
+      name: JobName.SharedSpacePersonDedup,
+      data: { spaceId },
+    });
+  }
+```
+
+Note: Check if `SharedSpaceRole.Admin` exists. If the role hierarchy is `Owner > Editor > Viewer`, then use `SharedSpaceRole.Owner` instead. Look at `requireRole` implementation and the `SharedSpaceRole` enum to confirm. The design says "Admin role" but the space role system may use "Owner" for admin-level permissions.
+
+**Step 4: Add the controller endpoint**
+
+In `server/src/controllers/shared-space.controller.ts`, after the merge endpoint (~line 357), add:
+
+```typescript
+  @Post(':id/people/deduplicate')
+  @Authenticated({ permission: Permission.SharedSpaceUpdate })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Endpoint({
+    summary: 'Deduplicate people in a shared space',
+    description: 'Queue a background job to find and merge duplicate people in a shared space.',
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  deduplicateSpacePeople(
+    @Auth() auth: AuthDto,
+    @Param('id') id: string,
+  ): Promise<void> {
+    return this.service.deduplicateSpacePeople(auth, id);
+  }
+```
+
+**Step 5: Run tests to verify they pass**
+
+Run: `cd server && pnpm test -- --run src/services/shared-space.service.spec.ts`
+Expected: PASS
+
+**Step 6: Commit**
+
+```bash
+git add server/src/controllers/shared-space.controller.ts server/src/services/shared-space.service.ts server/src/services/shared-space.service.spec.ts
+git commit -m "feat: add POST /spaces/:id/people/deduplicate endpoint"
+```
+
+---
+
+### Task 8: Regenerate OpenAPI Specs and SDK
+
+**Files:**
+
+- Modified by generation: `open-api/immich-openapi-specs.json`, `open-api/typescript-sdk/src/fetch-client.ts`, `mobile/openapi/`
+
+**Step 1: Build server and regenerate**
+
+```bash
+cd server && pnpm build
+pnpm sync:open-api
+cd .. && make open-api
+```
+
+**Step 2: Verify the new endpoint appears**
+
+Check that `deduplicateSpacePeople` appears in `open-api/typescript-sdk/src/fetch-client.ts`.
+
+**Step 3: Regenerate SQL queries**
+
+```bash
+make sql
+```
+
+**Step 4: Commit**
+
+```bash
+git add open-api/ mobile/openapi/ server/src/queries/
+git commit -m "chore: regenerate OpenAPI specs, SDK, and SQL queries"
+```
+
+---
+
+### Task 9: Add "Deduplicate People" Button to Space People Page
+
+**Files:**
+
+- Modify: `web/src/routes/(user)/spaces/[spaceId]/people/+page.svelte`
+
+**Step 1: Add the button**
+
+In the people page, the toolbar area where the "Show and hide people" button is rendered for editors (~line 136), add a deduplicate button for owners only:
+
+```svelte
+{#if isOwner}
+  <Button
+    leadingIcon={mdiAccountMultipleCheckOutline}
+    onclick={handleDeduplicate}
+    size="small"
+    variant="ghost"
+    color="secondary"
+  >
+    {$t('deduplicate_people')}
+  </Button>
+{/if}
+```
+
+Add the handler function:
+
+```typescript
+import { deduplicateSpacePeople } from '@immich/sdk';
+import { NotificationType, notificationController } from '$lib/components/shared-components/notification/notification';
+
+async function handleDeduplicate() {
+  try {
+    await deduplicateSpacePeople({ id: space.id });
+    notificationController.show({
+      type: NotificationType.Info,
+      message: $t('dedup_people_started'),
+    });
+  } catch (error) {
+    handleError(error, $t('dedup_people_error'));
+  }
+}
+```
+
+**Step 2: Add i18n keys**
+
+Add to `i18n/en.json` (maintain alphabetical sort):
+
+```json
+"dedup_people_error": "Failed to start deduplication",
+"dedup_people_started": "Deduplication started in background",
+"deduplicate_people": "Deduplicate people",
+```
+
+**Step 3: Run i18n formatting**
+
+```bash
+pnpm --filter=immich-i18n format:fix
+```
+
+**Step 4: Verify web build**
+
+```bash
+cd web && npx svelte-check --threshold warning
+```
+
+**Step 5: Commit**
+
+```bash
+git add web/src/routes/\(user\)/spaces/\[spaceId\]/people/+page.svelte i18n/en.json
+git commit -m "feat: add Deduplicate People button for space admins"
+```
+
+---
+
+### Task 10: Lint, Format, and Final Verification
+
+**Files:** All modified files
+
+**Step 1: Format**
+
+```bash
+make format-server
+make format-web
+```
+
+**Step 2: Lint**
+
+```bash
+make lint-server
+make lint-web
+```
+
+**Step 3: Type check**
+
+```bash
+make check-server
+make check-web
+```
+
+**Step 4: Run all tests**
+
+```bash
+cd server && pnpm test -- --run src/services/shared-space.service.spec.ts
+cd ../web && pnpm test -- --run
+```
+
+**Step 5: Fix any issues and commit**
+
+```bash
+git add -A
+git commit -m "chore: lint and format fixes"
+```
