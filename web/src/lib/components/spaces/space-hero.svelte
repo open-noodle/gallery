@@ -3,7 +3,6 @@
   import { AssetMediaSize, type SharedSpaceResponseDto } from '@immich/sdk';
   import { Icon } from '@immich/ui';
   import {
-    mdiAccountGroupOutline,
     mdiAccountMultipleOutline,
     mdiCameraOutline,
     mdiChevronDown,
@@ -24,9 +23,6 @@
     repositioning?: boolean;
     onSavePosition?: (cropY: number) => void;
     onCancelReposition?: () => void;
-    peopleCount?: number;
-    faceRecognitionEnabled?: boolean;
-    spaceId?: string;
     height?: number;
     collapsed?: boolean;
     onToggleCollapse?: () => void;
@@ -43,9 +39,6 @@
     repositioning = false,
     onSavePosition,
     onCancelReposition,
-    peopleCount,
-    faceRecognitionEnabled,
-    spaceId,
     height = 450,
     collapsed = false,
     onToggleCollapse,
@@ -156,17 +149,6 @@
         {memberCount}
         {$t('members')}
       </span>
-      {#if faceRecognitionEnabled && peopleCount && peopleCount > 0}
-        <a
-          href="/spaces/{spaceId}/people"
-          class="hidden items-center gap-1.5 rounded-full bg-white/20 px-2 py-0.5 text-xs text-white backdrop-blur-sm transition-colors hover:bg-white/30 sm:inline-flex"
-          data-testid="hero-collapsed-people-count"
-        >
-          <Icon icon={mdiAccountGroupOutline} size="14" />
-          {peopleCount}
-          {$t('people')}
-        </a>
-      {/if}
       {#if currentRole}
         <span
           class="hidden items-center rounded-full bg-white/20 px-2 py-0.5 text-xs font-medium capitalize text-white backdrop-blur-sm sm:inline-flex"
@@ -297,17 +279,6 @@
           {memberCount}
           {$t('members')}
         </span>
-        {#if faceRecognitionEnabled && peopleCount && peopleCount > 0}
-          <a
-            href="/spaces/{spaceId}/people"
-            class="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-sm backdrop-blur-sm hover:bg-white/30 transition-colors"
-            data-testid="hero-people-count"
-          >
-            <Icon icon={mdiAccountGroupOutline} size="16" />
-            {peopleCount}
-            {$t('people')}
-          </a>
-        {/if}
         {#if currentRole}
           <span
             class="inline-flex items-center rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-medium capitalize backdrop-blur-sm"
