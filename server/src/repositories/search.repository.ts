@@ -532,9 +532,7 @@ export class SearchRepository {
       .select(field)
       .distinctOn(field)
       .innerJoin('asset', 'asset.id', 'asset_exif.assetId')
-      .$if(!options?.spaceId && !options?.timelineSpaceIds, (qb) =>
-        qb.where('ownerId', '=', anyUuid(userIds)),
-      )
+      .$if(!options?.spaceId && !options?.timelineSpaceIds, (qb) => qb.where('ownerId', '=', anyUuid(userIds)))
       .where('visibility', '=', AssetVisibility.Timeline)
       .where('deletedAt', 'is', null)
       .where(field, 'is not', null)
