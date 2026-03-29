@@ -614,6 +614,26 @@ export class SharedSpaceRepository {
       .execute();
   }
 
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
+  async reassignPersonFacesSafe(fromPersonId: string, toPersonId: string) {
+    // Delete faces that already exist on the target to avoid PK violation
+    await this.db
+      .deleteFrom('shared_space_person_face')
+      .where('personId', '=', fromPersonId)
+      .where(
+        'assetFaceId',
+        'in',
+        this.db.selectFrom('shared_space_person_face').select('assetFaceId').where('personId', '=', toPersonId),
+      )
+      .execute();
+
+    await this.db
+      .updateTable('shared_space_person_face')
+      .set({ personId: toPersonId })
+      .where('personId', '=', fromPersonId)
+      .execute();
+  }
+
   @GenerateSql({ params: [DummyValue.UUID, [DummyValue.UUID]] })
   async removePersonFacesByAssetIds(spaceId: string, assetIds: string[]) {
     await this.db
@@ -684,6 +704,27 @@ export class SharedSpaceRepository {
       .where('shared_space_person_alias.userId', '=', userId)
       .selectAll('shared_space_person_alias')
       .execute();
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
+  async migrateAliases(fromPersonId: string, toPersonId: string) {
+    // Get aliases from the source person
+    const sourceAliases = await this.db
+      .selectFrom('shared_space_person_alias')
+      .selectAll()
+      .where('personId', '=', fromPersonId)
+      .execute();
+
+    for (const alias of sourceAliases) {
+      await this.db
+        .insertInto('shared_space_person_alias')
+        .values({ personId: toPersonId, userId: alias.userId, alias: alias.alias })
+        .onConflict((oc) => oc.doNothing())
+        .execute();
+    }
+
+    // Delete source aliases
+    await this.db.deleteFrom('shared_space_person_alias').where('personId', '=', fromPersonId).execute();
   }
 
   // ==========================================
