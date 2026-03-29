@@ -171,19 +171,35 @@ export class SearchService extends BaseService {
   }
 
   async getSearchSuggestions(auth: AuthDto, dto: SearchSuggestionRequestDto) {
+    if (dto.spaceId && dto.withSharedSpaces) {
+      throw new BadRequestException('Cannot use both spaceId and withSharedSpaces');
+    }
+
     if (dto.spaceId) {
       await this.requireAccess({ auth, permission: Permission.SharedSpaceRead, ids: [dto.spaceId] });
     }
 
     const userIds = await this.getUserIdsToSearch(auth);
-    const suggestions = await this.getSuggestions(userIds, dto);
+
+    let timelineSpaceIds: string[] | undefined;
+    if (dto.withSharedSpaces) {
+      const spaceRows = await this.sharedSpaceRepository.getSpaceIdsForTimeline(auth.user.id);
+      if (spaceRows.length > 0) {
+        timelineSpaceIds = spaceRows.map((row) => row.spaceId);
+      }
+    }
+
+    const suggestions = await this.getSuggestions(userIds, { ...dto, timelineSpaceIds });
     if (dto.includeNull) {
       suggestions.push(null);
     }
     return suggestions;
   }
 
-  private getSuggestions(userIds: string[], dto: SearchSuggestionRequestDto): Promise<Array<string | null>> {
+  private getSuggestions(
+    userIds: string[],
+    dto: SearchSuggestionRequestDto & { timelineSpaceIds?: string[] },
+  ): Promise<Array<string | null>> {
     switch (dto.type) {
       case SearchSuggestionType.COUNTRY: {
         return this.searchRepository.getCountries(userIds, dto);
