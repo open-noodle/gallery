@@ -85,6 +85,7 @@
       locations: async (context?: FilterContext) => {
         const countries = await getSearchSuggestions({
           $type: SearchSuggestionType.Country,
+          withSharedSpaces: true,
           takenAfter: context?.takenAfter,
           takenBefore: context?.takenBefore,
         });
@@ -94,6 +95,7 @@
         const cities = await getSearchSuggestions({
           $type: SearchSuggestionType.City,
           country,
+          withSharedSpaces: true,
           takenAfter: context?.takenAfter,
           takenBefore: context?.takenBefore,
         });
@@ -102,6 +104,7 @@
       cameras: async (context?: FilterContext) => {
         const makes = await getSearchSuggestions({
           $type: SearchSuggestionType.CameraMake,
+          withSharedSpaces: true,
           takenAfter: context?.takenAfter,
           takenBefore: context?.takenBefore,
         });
@@ -111,6 +114,7 @@
         const models = await getSearchSuggestions({
           $type: SearchSuggestionType.CameraModel,
           make,
+          withSharedSpaces: true,
           takenAfter: context?.takenAfter,
           takenBefore: context?.takenBefore,
         });
