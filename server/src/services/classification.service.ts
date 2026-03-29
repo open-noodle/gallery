@@ -20,7 +20,6 @@ export class ClassificationService extends BaseService {
       similarity: number;
       action: string;
       enabled: boolean;
-      tagId: string | null;
       createdAt: unknown;
       updatedAt: unknown;
     },
@@ -33,14 +32,13 @@ export class ClassificationService extends BaseService {
       similarity: category.similarity,
       action: category.action,
       enabled: category.enabled,
-      tagId: category.tagId,
       createdAt: String(category.createdAt),
       updatedAt: String(category.updatedAt),
     };
   }
 
   async getCategories(auth: AuthDto): Promise<ClassificationCategoryResponseDto[]> {
-    const rows = await this.classificationRepository.getCategoriesWithPrompts(auth.user.id);
+    const rows = await this.classificationRepository.getCategoriesWithPrompts();
 
     const categoryMap = new Map<string, { category: (typeof rows)[0]; prompts: string[] }>();
     for (const row of rows) {
@@ -62,7 +60,6 @@ export class ClassificationService extends BaseService {
     const { machineLearning } = await this.getConfig({ withCache: true });
 
     const category = await this.classificationRepository.createCategory({
-      userId: auth.user.id,
       name: dto.name,
       similarity: dto.similarity,
       action: dto.action,
@@ -88,16 +85,12 @@ export class ClassificationService extends BaseService {
     dto: ClassificationCategoryUpdateDto,
   ): Promise<ClassificationCategoryResponseDto> {
     const existing = await this.classificationRepository.getCategory(id);
-    if (!existing || existing.userId !== auth.user.id) {
+    if (!existing) {
       throw new NotFoundException('Category not found');
     }
 
     const updateValues: Record<string, unknown> = {};
     if (dto.name !== void 0) {
-      if (dto.name !== existing.name && existing.tagId) {
-        await this.tagRepository.delete(existing.tagId);
-        updateValues.tagId = null;
-      }
       updateValues.name = dto.name;
     }
     if (dto.similarity !== void 0) {
@@ -136,22 +129,18 @@ export class ClassificationService extends BaseService {
 
   async deleteCategory(auth: AuthDto, id: string): Promise<void> {
     const category = await this.classificationRepository.getCategory(id);
-    if (!category || category.userId !== auth.user.id) {
+    if (!category) {
       throw new NotFoundException('Category not found');
-    }
-
-    if (category.tagId) {
-      await this.tagRepository.delete(category.tagId);
     }
 
     await this.classificationRepository.deleteCategory(id);
   }
 
   async scanLibrary(auth: AuthDto): Promise<void> {
-    await this.classificationRepository.resetClassifiedAt(auth.user.id);
+    await this.classificationRepository.resetClassifiedAt();
     await this.jobRepository.queue({
       name: JobName.AssetClassifyQueueAll,
-      data: { userId: auth.user.id },
+      data: {},
     });
   }
 
@@ -165,7 +154,7 @@ export class ClassificationService extends BaseService {
   }
 
   private async reEncodeAllPrompts(modelName: string) {
-    const categories = await this.classificationRepository.getAllCategories();
+    const categories = await this.classificationRepository.getCategories();
     for (const category of categories) {
       const prompts = await this.classificationRepository.getPromptEmbeddings(category.id);
       await this.classificationRepository.deletePromptEmbeddingsByCategory(category.id);
@@ -181,8 +170,8 @@ export class ClassificationService extends BaseService {
   }
 
   @OnJob({ name: JobName.AssetClassifyQueueAll, queue: QueueName.Classification })
-  async handleClassifyQueueAll(data: { userId?: string }): Promise<JobStatus> {
-    const stream = this.classificationRepository.streamUnclassifiedAssets(data.userId);
+  async handleClassifyQueueAll(_data: Record<string, never>): Promise<JobStatus> {
+    const stream = this.classificationRepository.streamUnclassifiedAssets();
 
     let queue: Array<{ name: JobName.AssetClassify; data: { id: string } }> = [];
     for await (const asset of stream) {
@@ -209,7 +198,7 @@ export class ClassificationService extends BaseService {
       return JobStatus.Skipped;
     }
 
-    const rows = await this.classificationRepository.getEnabledCategoriesWithEmbeddings(asset.ownerId);
+    const rows = await this.classificationRepository.getEnabledCategoriesWithEmbeddings();
     if (rows.length === 0) {
       await this.classificationRepository.setClassifiedAt(id);
       return JobStatus.Skipped;
@@ -217,7 +206,7 @@ export class ClassificationService extends BaseService {
 
     const categories = new Map<
       string,
-      { name: string; similarity: number; action: string; tagId: string | null; embeddings: string[] }
+      { name: string; similarity: number; action: string; embeddings: string[] }
     >();
     for (const row of rows) {
       if (!categories.has(row.categoryId)) {
@@ -225,7 +214,6 @@ export class ClassificationService extends BaseService {
           name: row.name,
           similarity: row.similarity,
           action: row.action,
-          tagId: row.tagId,
           embeddings: [],
         });
       }
@@ -235,7 +223,7 @@ export class ClassificationService extends BaseService {
     const assetEmbedding = this.parseEmbedding(embedding);
     let shouldArchive = false;
 
-    for (const [categoryId, category] of categories) {
+    for (const [, category] of categories) {
       let bestSimilarity = -1;
       for (const promptEmbedding of category.embeddings) {
         const similarity = this.cosineSimilarity(assetEmbedding, this.parseEmbedding(promptEmbedding));
@@ -245,15 +233,11 @@ export class ClassificationService extends BaseService {
       }
 
       if (bestSimilarity >= category.similarity) {
-        let tagId = category.tagId;
-        if (!tagId) {
-          const tags = await upsertTags(this.tagRepository, {
-            userId: asset.ownerId,
-            tags: [`Auto/${category.name}`],
-          });
-          tagId = tags[0].id;
-          await this.classificationRepository.updateCategory(categoryId, { tagId });
-        }
+        const tags = await upsertTags(this.tagRepository, {
+          userId: asset.ownerId,
+          tags: [`Auto/${category.name}`],
+        });
+        const tagId = tags[0].id;
 
         await this.tagRepository.upsertAssetIds([{ tagId, assetId: id }]);
 
