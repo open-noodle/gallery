@@ -181,7 +181,7 @@ it('should fall back to owner-only when withSharedSpaces is true but user has no
   expect(result).toEqual(['USA']);
   expect(mocks.search.getCountries).toHaveBeenCalledWith(
     [authStub.user1.user.id],
-    expect.not.objectContaining({ timelineSpaceIds: expect.anything() }),
+    expect.objectContaining({ timelineSpaceIds: undefined }),
   );
 });
 
@@ -193,6 +193,33 @@ it('should preserve existing behavior when withSharedSpaces is absent', async ()
   });
 
   expect(mocks.sharedSpace.getSpaceIdsForTimeline).not.toHaveBeenCalled();
+});
+
+it('should preserve existing behavior when withSharedSpaces is explicitly false', async () => {
+  mocks.search.getCountries.mockResolvedValue(['USA']);
+
+  await sut.getSearchSuggestions(authStub.user1, {
+    type: SearchSuggestionType.COUNTRY,
+    withSharedSpaces: false,
+  });
+
+  expect(mocks.sharedSpace.getSpaceIdsForTimeline).not.toHaveBeenCalled();
+});
+
+it('should pass timelineSpaceIds through to camera make suggestions', async () => {
+  const spaceId1 = newUuid();
+  mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId: spaceId1 }]);
+  mocks.search.getCameraMakes.mockResolvedValue(['Nikon']);
+
+  await sut.getSearchSuggestions(authStub.user1, {
+    type: SearchSuggestionType.CAMERA_MAKE,
+    withSharedSpaces: true,
+  });
+
+  expect(mocks.search.getCameraMakes).toHaveBeenCalledWith(
+    [authStub.user1.user.id],
+    expect.objectContaining({ timelineSpaceIds: [spaceId1] }),
+  );
 });
 ```
 
@@ -281,7 +308,48 @@ feat: add withSharedSpaces to search suggestions endpoint
 
 ---
 
-### Task 3: Update Photos page filter providers
+### Task 3: Regenerate OpenAPI specs and SDK
+
+This must happen before frontend tasks so `withSharedSpaces` is available in the TypeScript SDK types.
+
+**Files:**
+
+- Generated: `open-api/immich-openapi-specs.json`, `open-api/typescript-sdk/`, `mobile/openapi/`
+
+**Step 1: Build server**
+
+Run: `cd server && pnpm build`
+Expected: Build succeeds
+
+**Step 2: Regenerate OpenAPI spec**
+
+Run: `cd server && pnpm sync:open-api`
+Expected: `open-api/immich-openapi-specs.json` updated with new `withSharedSpaces` parameter on search suggestions endpoint
+
+**Step 3: Regenerate TypeScript SDK**
+
+Run: `make open-api-typescript`
+Expected: TypeScript SDK updated — `getSearchSuggestions` function now accepts `withSharedSpaces` parameter
+
+**Step 4: Regenerate Dart SDK**
+
+Run: `make open-api-dart`
+Expected: Dart client updated (requires Java installed)
+
+**Step 5: Regenerate SQL query docs**
+
+Run: `make sql`
+Expected: SQL documentation updated with new query variants
+
+**Step 6: Commit**
+
+```
+chore: regenerate OpenAPI specs and SDK for withSharedSpaces
+```
+
+---
+
+### Task 4: Update Photos page filter providers
 
 **Files:**
 
@@ -335,9 +403,7 @@ cameraModels: async (make: string, context?: FilterContext) => {
 **Step 2: Run web tests**
 
 Run: `cd web && pnpm test -- --run`
-Expected: PASS (no existing tests for these provider calls; the SDK type will only be available after codegen in Task 5)
-
-Note: This step may fail with a type error until the SDK is regenerated. If so, proceed to Task 4 and Task 5, then come back to verify.
+Expected: PASS (SDK was regenerated in Task 3, so `withSharedSpaces` is a valid type)
 
 **Step 3: Commit**
 
@@ -347,7 +413,7 @@ feat(web): pass withSharedSpaces to Photos page filter providers
 
 ---
 
-### Task 4: Update Map page filter providers
+### Task 5: Update Map page filter providers
 
 **Files:**
 
@@ -359,7 +425,7 @@ feat(web): pass withSharedSpaces to Photos page filter providers
 In `web/src/lib/utils/__tests__/map-filter-config.spec.ts`, add a new test:
 
 ```typescript
-it('should pass withSharedSpaces to camera providers when no spaceId', async () => {
+it('should pass withSharedSpaces to cameras provider when no spaceId', async () => {
   vi.mocked(getSearchSuggestions).mockResolvedValue(['Nikon'] as never);
 
   const config = buildMapFilterConfig();
@@ -367,11 +433,24 @@ it('should pass withSharedSpaces to camera providers when no spaceId', async () 
 
   expect(getSearchSuggestions).toHaveBeenCalledWith(expect.objectContaining({ withSharedSpaces: true }));
 });
+
+it('should pass withSharedSpaces to cameraModels provider when no spaceId', async () => {
+  vi.mocked(getSearchSuggestions).mockResolvedValue(['D850'] as never);
+
+  const config = buildMapFilterConfig();
+  await config.providers.cameraModels!('Nikon');
+
+  expect(getSearchSuggestions).toHaveBeenCalledWith(expect.objectContaining({ withSharedSpaces: true, make: 'Nikon' }));
+});
 ```
 
-Check that `getSearchSuggestions` is imported in the test file — if not, add it to the imports from `@immich/sdk`.
+Note: `getSearchSuggestions` is already mocked in the test file's `vi.mock('@immich/sdk', ...)` block but not imported for assertions. Add it to the import from `@immich/sdk`:
 
-**Step 2: Run test to verify it fails**
+```typescript
+import { getAllPeople, getSearchSuggestions, getSpacePeople } from '@immich/sdk';
+```
+
+**Step 2: Run tests to verify they fail**
 
 Run: `cd web && pnpm test -- --run src/lib/utils/__tests__/map-filter-config.spec.ts`
 Expected: FAIL — `withSharedSpaces` not passed yet
@@ -403,8 +482,6 @@ cameraModels: (make: string, context?: FilterContext) =>
 Run: `cd web && pnpm test -- --run src/lib/utils/__tests__/map-filter-config.spec.ts`
 Expected: PASS
 
-Note: Same caveat as Task 3 — may need SDK regen first for the type.
-
 **Step 5: Commit**
 
 ```
@@ -413,51 +490,9 @@ feat(web): pass withSharedSpaces to Map page filter providers
 
 ---
 
-### Task 5: Regenerate OpenAPI specs and SDK
-
-**Files:**
-
-- Generated: `open-api/immich-openapi-specs.json`, `open-api/typescript-sdk/`, `mobile/openapi/`
-
-**Step 1: Build server**
-
-Run: `cd server && pnpm build`
-Expected: Build succeeds
-
-**Step 2: Regenerate OpenAPI spec**
-
-Run: `cd server && pnpm sync:open-api`
-Expected: `open-api/immich-openapi-specs.json` updated with new `withSharedSpaces` parameter on search suggestions endpoint
-
-**Step 3: Regenerate TypeScript SDK**
-
-Run: `make open-api-typescript`
-Expected: TypeScript SDK updated — `getSearchSuggestions` function now accepts `withSharedSpaces` parameter
-
-**Step 4: Regenerate Dart SDK**
-
-Run: `make open-api-dart`
-Expected: Dart client updated (requires Java installed)
-
-**Step 5: Regenerate SQL query docs**
-
-Run: `make sql`
-Expected: SQL documentation updated with new query variants
-
-**Step 6: Run web tests to confirm type errors are resolved**
-
-Run: `cd web && pnpm test -- --run`
-Expected: All tests PASS
-
-**Step 7: Commit**
-
-```
-chore: regenerate OpenAPI specs and SDK for withSharedSpaces
-```
-
----
-
 ### Task 6: Lint and type-check
+
+Run these sequentially with long timeouts — they take ~10 min each.
 
 **Files:** None (verification only)
 
