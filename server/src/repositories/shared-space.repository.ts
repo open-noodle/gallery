@@ -485,48 +485,62 @@ export class SharedSpaceRepository {
     return result.count > 0;
   }
 
-  @GenerateSql({ params: [DummyValue.UUID, false] })
-  getPersonsBySpaceId(spaceId: string, withHidden = false) {
-    return this.db
-      .selectFrom('shared_space_person')
-      .leftJoin('asset_face', 'asset_face.id', 'shared_space_person.representativeFaceId')
-      .leftJoin('person', 'person.id', 'asset_face.personId')
-      .selectAll('shared_space_person')
-      .select(['person.name as personalName', 'person.thumbnailPath as personalThumbnailPath'])
-      .where('shared_space_person.spaceId', '=', spaceId)
-      .$if(!withHidden, (qb) => qb.where('shared_space_person.isHidden', '=', false))
-      .orderBy('shared_space_person.name', 'asc')
-      .execute();
-  }
-
-  @GenerateSql({ params: [DummyValue.UUID, { takenAfter: DummyValue.DATE, takenBefore: DummyValue.DATE }, false] })
-  getPersonsBySpaceIdWithTemporalFilter(
+  @GenerateSql({
+    params: [DummyValue.UUID, { withHidden: false, petsEnabled: true, limit: 10 }],
+  })
+  getPersonsBySpaceIdWithCounts(
     spaceId: string,
-    options?: { takenAfter?: Date; takenBefore?: Date },
-    withHidden = false,
+    options: {
+      withHidden?: boolean;
+      petsEnabled?: boolean;
+      limit?: number;
+      takenAfter?: Date;
+      takenBefore?: Date;
+    },
   ) {
     return this.db
       .selectFrom('shared_space_person')
-      .leftJoin('asset_face', 'asset_face.id', 'shared_space_person.representativeFaceId')
+      .innerJoin('shared_space_person_face', 'shared_space_person_face.personId', 'shared_space_person.id')
+      .innerJoin('asset_face', 'asset_face.id', 'shared_space_person_face.assetFaceId')
       .leftJoin('person', 'person.id', 'asset_face.personId')
-      .selectAll('shared_space_person')
+      .select([
+        'shared_space_person.id',
+        'shared_space_person.spaceId',
+        'shared_space_person.name',
+        'shared_space_person.isHidden',
+        'shared_space_person.type',
+        'shared_space_person.birthDate',
+        'shared_space_person.representativeFaceId',
+        'shared_space_person.createdAt',
+        'shared_space_person.updatedAt',
+        'shared_space_person.updateId',
+      ])
       .select(['person.name as personalName', 'person.thumbnailPath as personalThumbnailPath'])
+      .select((eb) => [
+        eb.fn.countAll().as('faceCount'),
+        eb.fn.count(eb.fn('distinct', ['asset_face.assetId'])).as('assetCount'),
+      ])
       .where('shared_space_person.spaceId', '=', spaceId)
-      .$if(!withHidden, (qb) => qb.where('shared_space_person.isHidden', '=', false))
-      .$if(!!options?.takenAfter || !!options?.takenBefore, (qb) =>
+      .$if(!options.withHidden, (qb) => qb.where('shared_space_person.isHidden', '=', false))
+      .$if(!options.petsEnabled, (qb) => qb.where('shared_space_person.type', '!=', 'pet'))
+      .where('person.thumbnailPath', 'is not', null)
+      .where('person.thumbnailPath', '!=', '')
+      .$if(!!options.takenAfter || !!options.takenBefore, (qb) =>
         qb.where((eb) =>
           eb.exists(
             eb
-              .selectFrom('shared_space_person_face')
-              .innerJoin('asset_face as af2', 'af2.id', 'shared_space_person_face.assetFaceId')
+              .selectFrom('shared_space_person_face as spf2')
+              .innerJoin('asset_face as af2', 'af2.id', 'spf2.assetFaceId')
               .innerJoin('asset', 'asset.id', 'af2.assetId')
-              .whereRef('shared_space_person_face.personId', '=', 'shared_space_person.id')
-              .$if(!!options?.takenAfter, (qb2) => qb2.where('asset.fileCreatedAt', '>=', options!.takenAfter!))
-              .$if(!!options?.takenBefore, (qb2) => qb2.where('asset.fileCreatedAt', '<', options!.takenBefore!)),
+              .whereRef('spf2.personId', '=', 'shared_space_person.id')
+              .$if(!!options.takenAfter, (qb2) => qb2.where('asset.fileCreatedAt', '>=', options.takenAfter!))
+              .$if(!!options.takenBefore, (qb2) => qb2.where('asset.fileCreatedAt', '<', options.takenBefore!)),
           ),
         ),
       )
-      .orderBy('shared_space_person.name', 'asc')
+      .groupBy(['shared_space_person.id', 'person.name', 'person.thumbnailPath'])
+      .orderBy('assetCount', 'desc')
+      .$if(!!options.limit, (qb) => qb.limit(options.limit!))
       .execute();
   }
 
