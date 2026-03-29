@@ -7098,10 +7098,11 @@ export function updateMember({ id, userId, sharedSpaceMemberUpdateDto }: {
 /**
  * Get people in a shared space
  */
-export function getSpacePeople({ id, takenAfter, takenBefore, withHidden }: {
+export function getSpacePeople({ id, takenAfter, takenBefore, top, withHidden }: {
     id: string;
     takenAfter?: string;
     takenBefore?: string;
+    top?: number;
     withHidden?: boolean;
 }, opts?: Oazapfts.RequestOpts) {
     return oazapfts.ok(oazapfts.fetchJson<{
@@ -7110,6 +7111,7 @@ export function getSpacePeople({ id, takenAfter, takenBefore, withHidden }: {
     }>(`/shared-spaces/${encodeURIComponent(id)}/people${QS.query(QS.explode({
         takenAfter,
         takenBefore,
+        top,
         withHidden
     }))}`, {
         ...opts
