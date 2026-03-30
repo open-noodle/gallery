@@ -24,6 +24,7 @@
     mdiAccountMultipleCheckOutline,
     mdiArrowLeft,
     mdiDotsVertical,
+    mdiEyeOffOutline,
     mdiEyeOutline,
   } from '@mdi/js';
   import { onDestroy } from 'svelte';
@@ -192,6 +193,23 @@
     }
   }
 
+  async function handleHide(person: SharedSpacePersonResponseDto) {
+    try {
+      await updateSpacePerson({
+        id: space.id,
+        personId: person.id,
+        sharedSpacePersonUpdateDto: { isHidden: true },
+      });
+      const idx = people.findIndex((p) => p.id === person.id);
+      if (idx !== -1) {
+        people[idx] = { ...people[idx], isHidden: true };
+      }
+      toastManager.primary($t('changed_visibility_successfully'));
+    } catch (error) {
+      handleError(error, $t('errors.unable_to_hide_person'));
+    }
+  }
+
   let sentinel = $state<HTMLElement>();
 
   const intersectionObserver = new IntersectionObserver((entries) => {
@@ -288,6 +306,7 @@
                 icon={mdiDotsVertical}
                 title={$t('show_person_options')}
               >
+                <MenuOption onClick={() => handleHide(person)} icon={mdiEyeOffOutline} text={$t('hide_person')} />
                 <MenuOption
                   onClick={() => handleMerge(person.id)}
                   icon={mdiAccountMultipleCheckOutline}
