@@ -91,16 +91,11 @@ export class ClassificationService extends BaseService {
     }
 
     const updateValues: Record<string, unknown> = {};
-    let shouldRescan = false;
-
     if (dto.name !== void 0) {
       updateValues.name = dto.name;
     }
     if (dto.similarity !== void 0) {
       updateValues.similarity = dto.similarity;
-      if (dto.similarity !== existing.similarity) {
-        shouldRescan = true;
-      }
     }
     if (dto.action !== void 0) {
       updateValues.action = dto.action;
@@ -112,7 +107,6 @@ export class ClassificationService extends BaseService {
     const category = await this.classificationRepository.updateCategory(id, updateValues);
 
     if (dto.prompts !== void 0) {
-      shouldRescan = true;
       const { machineLearning } = await this.getConfig({ withCache: true });
       await this.classificationRepository.deletePromptEmbeddingsByCategory(id);
       for (const prompt of dto.prompts) {
@@ -125,13 +119,6 @@ export class ClassificationService extends BaseService {
           embedding,
         });
       }
-    }
-
-    if (shouldRescan) {
-      await this.jobRepository.queue({
-        name: JobName.AssetClassifyQueueAll,
-        data: { force: true },
-      });
     }
 
     const promptRows = await this.classificationRepository.getPromptEmbeddings(id);
