@@ -18,6 +18,8 @@ import {
   SearchSuggestionType,
   SmartSearchDto,
   StatisticsSearchDto,
+  TagSuggestionRequestDto,
+  TagSuggestionResponseDto,
   isFullyAlbumConfined,
   isNewShapeRequest,
   mapPlaces,
@@ -247,6 +249,28 @@ export class SearchService extends BaseService {
       suggestions.push(null);
     }
     return suggestions;
+  }
+
+  async getTagSuggestions(auth: AuthDto, dto: TagSuggestionRequestDto): Promise<TagSuggestionResponseDto[]> {
+    if (dto.spaceId && dto.withSharedSpaces) {
+      throw new BadRequestException('Cannot use both spaceId and withSharedSpaces');
+    }
+
+    if (dto.spaceId) {
+      await this.requireAccess({ auth, permission: Permission.SharedSpaceRead, ids: [dto.spaceId] });
+    }
+
+    const userIds = await this.getUserIdsToSearch(auth);
+
+    let timelineSpaceIds: string[] | undefined;
+    if (dto.withSharedSpaces) {
+      const spaceRows = await this.sharedSpaceRepository.getSpaceIdsForTimeline(auth.user.id);
+      if (spaceRows.length > 0) {
+        timelineSpaceIds = spaceRows.map((row) => row.spaceId);
+      }
+    }
+
+    return this.searchRepository.getAccessibleTags(userIds, { ...dto, timelineSpaceIds });
   }
 
   private getSuggestions(

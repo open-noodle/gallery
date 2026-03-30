@@ -1,6 +1,12 @@
 import type { FilterContext, FilterPanelConfig } from '$lib/components/filter-panel/filter-panel';
 import { createUrl } from '$lib/utils';
-import { getAllPeople, getAllTags, getSearchSuggestions, getSpacePeople, SearchSuggestionType } from '@immich/sdk';
+import {
+  getAllPeople,
+  getSearchSuggestions,
+  getSpacePeople,
+  getTagSuggestions,
+  SearchSuggestionType,
+} from '@immich/sdk';
 
 export function buildMapFilterConfig(spaceId?: string): FilterPanelConfig {
   const sections = ['timeline', 'people', 'camera', 'tags', 'rating', 'media', 'favorites'] as const;
@@ -39,7 +45,12 @@ export function buildMapFilterConfig(spaceId?: string): FilterPanelConfig {
             ...(context?.takenAfter && { takenAfter: context.takenAfter }),
             ...(context?.takenBefore && { takenBefore: context.takenBefore }),
           }),
-        tags: () => getAllTags().then((tags) => tags.map((t) => ({ id: t.id, name: t.value }))),
+        tags: (context?: FilterContext) =>
+          getTagSuggestions({
+            spaceId,
+            ...(context?.takenAfter && { takenAfter: context.takenAfter }),
+            ...(context?.takenBefore && { takenBefore: context.takenBefore }),
+          }).then((tags) => tags.map((t) => ({ id: t.id, name: t.value }))),
       },
     };
   }
@@ -72,7 +83,12 @@ export function buildMapFilterConfig(spaceId?: string): FilterPanelConfig {
           ...(context?.takenAfter && { takenAfter: context.takenAfter }),
           ...(context?.takenBefore && { takenBefore: context.takenBefore }),
         }),
-      tags: () => getAllTags().then((tags) => tags.map((t) => ({ id: t.id, name: t.value }))),
+      tags: (context?: FilterContext) =>
+        getTagSuggestions({
+          withSharedSpaces: true,
+          ...(context?.takenAfter && { takenAfter: context.takenAfter }),
+          ...(context?.takenBefore && { takenBefore: context.takenBefore }),
+        }).then((tags) => tags.map((t) => ({ id: t.id, name: t.value }))),
     },
   };
 }
