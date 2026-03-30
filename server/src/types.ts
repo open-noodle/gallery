@@ -273,6 +273,10 @@ export interface ISharedSpaceLibraryFaceSyncJob extends IBaseJob {
   libraryId: string;
 }
 
+export interface ISharedSpacePersonDedupJob extends IBaseJob {
+  spaceId: string;
+}
+
 export interface ISharedSpaceBulkAddAssetsJob extends IBaseJob {
   spaceId: string;
   userId: string;
@@ -509,6 +513,7 @@ export type JobItem =
   | { name: JobName.SharedSpaceFaceMatch; data: ISharedSpaceFaceMatchJob }
   | { name: JobName.SharedSpaceFaceMatchAll; data: ISharedSpaceFaceMatchAllJob }
   | { name: JobName.SharedSpaceLibraryFaceSync; data: ISharedSpaceLibraryFaceSyncJob }
+  | { name: JobName.SharedSpacePersonDedup; data: ISharedSpacePersonDedupJob }
 
   // Shared Space Bulk Operations
   | { name: JobName.SharedSpaceBulkAddAssets; data: ISharedSpaceBulkAddAssetsJob }
