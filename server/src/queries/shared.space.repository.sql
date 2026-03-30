@@ -605,6 +605,7 @@ select
   "shared_space_person"."name",
   "shared_space_person"."type",
   "shared_space_person"."isHidden",
+  "shared_space_person"."faceCount",
   "face_search"."embedding"
 from
   "shared_space_person"
