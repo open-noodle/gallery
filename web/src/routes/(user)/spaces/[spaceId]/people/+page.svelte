@@ -25,6 +25,7 @@
     mdiDotsVertical,
     mdiEyeOutline,
   } from '@mdi/js';
+  import { onDestroy } from 'svelte';
   import { fly } from 'svelte/transition';
   import { quintOut } from 'svelte/easing';
   import { t } from 'svelte-i18n';
@@ -184,6 +185,10 @@
       intersectionObserver.disconnect();
       intersectionObserver.observe(sentinel);
     }
+  });
+
+  onDestroy(() => {
+    intersectionObserver.disconnect();
   });
 </script>
 

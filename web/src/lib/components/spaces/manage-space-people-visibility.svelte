@@ -7,6 +7,7 @@
   import { updateSpacePerson, type SharedSpacePersonResponseDto } from '@immich/sdk';
   import { Button, IconButton, toastManager } from '@immich/ui';
   import { mdiClose, mdiEye, mdiEyeOff, mdiEyeSettings, mdiRestart } from '@mdi/js';
+  import { onDestroy } from 'svelte';
   import { t } from 'svelte-i18n';
   import { SvelteMap } from 'svelte/reactivity';
 
@@ -121,6 +122,10 @@
       visibilityObserver.disconnect();
       visibilityObserver.observe(visibilitySentinel);
     }
+  });
+
+  onDestroy(() => {
+    visibilityObserver.disconnect();
   });
 
   // Re-check after people list changes — if sentinel is still visible, load more
