@@ -2182,10 +2182,9 @@ describe(SharedSpaceService.name, () => {
         representativeFaceId: faceId,
         type: 'person',
       });
-      expect(mocks.sharedSpace.addPersonFaces).toHaveBeenCalledWith(
-        [{ personId: newPersonId, assetFaceId: faceId }],
-        { skipRecount: true },
-      );
+      expect(mocks.sharedSpace.addPersonFaces).toHaveBeenCalledWith([{ personId: newPersonId, assetFaceId: faceId }], {
+        skipRecount: true,
+      });
     });
 
     it('should create new person when distance exceeds threshold', async () => {

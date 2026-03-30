@@ -595,7 +595,6 @@ export class SharedSpaceRepository {
     return result;
   }
 
-
   @GenerateSql({ params: [DummyValue.UUID] })
   getPersonAssetIds(personId: string) {
     return this.db

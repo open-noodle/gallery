@@ -1081,10 +1081,7 @@ export class SharedSpaceService extends BaseService {
     return JobStatus.Success;
   }
 
-  private mapSpacePerson(
-    person: SharedSpacePerson,
-    alias: string | null,
-  ): SharedSpacePersonResponseDto {
+  private mapSpacePerson(person: SharedSpacePerson, alias: string | null): SharedSpacePersonResponseDto {
     return {
       id: person.id,
       spaceId: person.spaceId,
