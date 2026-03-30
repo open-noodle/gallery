@@ -19,21 +19,13 @@ jobs:
       parameters: ${{ steps.parameters.outputs.result }}
       artifact: ${{ steps.get-artifact.outputs.result }}
     steps:
-      - id: token
-        uses: immich-app/devtools/actions/create-workflow-token@1af396ae134e4bc3b63d947e672bc68bf4ff9dc5 # create-workflow-token-action-v3.0.0
-        with:
-          client-id: ${{ secrets.PUSH_O_MATIC_APP_CLIENT_ID }}
-          private-key: ${{ secrets.PUSH_O_MATIC_APP_KEY }}
-          permission-actions: read
-          permission-pull-requests: read
-
       - if: ${{ github.event.workflow_run.conclusion != 'success' }}
         run: echo 'The triggering workflow did not succeed' && exit 1
       - name: Get artifact
         id: get-artifact
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
-          github-token: ${{ steps.token.outputs.token }}
+          github-token: ${{ github.token }}
           script: |
             let allArtifacts = await github.rest.actions.listWorkflowRunArtifacts({
                owner: context.repo.owner,
@@ -54,7 +46,7 @@ jobs:
         env:
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
         with:
-          github-token: ${{ steps.token.outputs.token }}
+          github-token: ${{ github.token }}
           script: |
             const eventType = context.payload.workflow_run.event;
             const isFork = context.payload.workflow_run.repository.fork;
@@ -127,27 +119,17 @@ jobs:
       pull-requests: write
     if: ${{ fromJson(needs.checks.outputs.artifact).found && fromJson(needs.checks.outputs.parameters).shouldDeploy }}
     steps:
-      - id: token
-        uses: immich-app/devtools/actions/create-workflow-token@1af396ae134e4bc3b63d947e672bc68bf4ff9dc5 # create-workflow-token-action-v3.0.0
-        with:
-          client-id: ${{ secrets.PUSH_O_MATIC_APP_CLIENT_ID }}
-          private-key: ${{ secrets.PUSH_O_MATIC_APP_KEY }}
-          permission-contents: read
-          permission-actions: read
-          permission-pull-requests: write
-
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          token: ${{ steps.token.outputs.token }}
 
       - uses: ./.github/actions/apply-branding
 
       - name: Setup Mise
         uses: immich-app/devtools/actions/use-mise@06a9ef925332c91be647d6256642b86b398592c8 # use-mise-action-v3.2.1
         with:
-          github_token: ${{ steps.token.outputs.token }}
+          github_token: ${{ github.token }}
 
       - name: Load parameters
         id: parameters
@@ -155,7 +137,7 @@ jobs:
         env:
           PARAM_JSON: ${{ needs.checks.outputs.parameters }}
         with:
-          github-token: ${{ steps.token.outputs.token }}
+          github-token: ${{ github.token }}
           script: |
             const parameters = JSON.parse(process.env.PARAM_JSON);
             core.setOutput("event", parameters.event);
@@ -168,7 +150,7 @@ jobs:
         env:
           ARTIFACT_JSON: ${{ needs.checks.outputs.artifact }}
         with:
-          github-token: ${{ steps.token.outputs.token }}
+          github-token: ${{ github.token }}
           script: |
             let artifact = JSON.parse(process.env.ARTIFACT_JSON);
             let download = await github.rest.actions.downloadArtifact({
@@ -232,7 +214,7 @@ jobs:
         if: ${{ steps.parameters.outputs.event == 'pr' }}
         with:
           id: docs-pr-url
-          token: ${{ steps.token.outputs.token }}
+          token: ${{ github.token }}
           number: ${{ fromJson(needs.checks.outputs.parameters).pr_number }}
           body: |
             📖 Documentation deployed to [${{ steps.docs-output.outputs.subdomain }}](https://${{ steps.docs-output.outputs.subdomain }})
