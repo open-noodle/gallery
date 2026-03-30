@@ -73,6 +73,7 @@
     onClose?: (asset: AssetResponseDto) => void;
     onRemoveFromAlbum?: (assetIds: string[]) => void;
     onRandom?: () => Promise<{ id: string } | undefined>;
+    spaceId?: string;
   }
 
   let {
@@ -89,6 +90,7 @@
     onClose,
     onRemoveFromAlbum,
     onRandom,
+    spaceId,
   }: Props = $props();
 
   const {
@@ -593,7 +595,7 @@
       translate="yes"
     >
       {#if showDetailPanel}
-        <DetailPanel {asset} currentAlbum={album} />
+        <DetailPanel {asset} currentAlbum={album} {spaceId} />
       {:else if assetViewerManager.isShowEditor}
         <EditorPanel {asset} onClose={closeEditor} />
       {/if}

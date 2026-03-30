@@ -44,6 +44,7 @@
     album?: AlbumResponseDto;
     albumUsers?: UserResponseDto[];
     person?: PersonResponseDto;
+    spaceId?: string;
     onSelect?: (asset: TimelineAsset) => void;
     onEscape?: () => void;
     children?: Snippet;
@@ -76,6 +77,7 @@
     album,
     albumUsers = [],
     person,
+    spaceId,
     onSelect = () => {},
     onEscape = () => {},
     children,
@@ -720,7 +722,7 @@
 
 <Portal target="body">
   {#if assetViewerManager.isViewing}
-    <TimelineAssetViewer bind:invisible {timelineManager} {removeAction} {withStacked} {isShared} {album} {person} />
+    <TimelineAssetViewer bind:invisible {timelineManager} {removeAction} {withStacked} {isShared} {album} {person} {spaceId} />
   {/if}
 </Portal>
 

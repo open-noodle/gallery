@@ -856,6 +856,7 @@
           hasMore={hasMoreResults}
           totalLoaded={searchResults.length}
           onLoadMore={handleLoadMore}
+          spaceId={space.id}
         />
       {/if}
 
@@ -881,6 +882,7 @@
             assetInteraction={currentAssetInteraction}
             {isSelectionMode}
             onEscape={handleEscape}
+            spaceId={space.id}
           >
             {#if viewMode === 'view'}
               <section class="px-4 pt-4">

@@ -13,22 +13,24 @@
   interface Props {
     asset: AssetResponseDto;
     isOwner: boolean;
+    spaceId?: string;
   }
 
-  let { asset = $bindable(), isOwner }: Props = $props();
+  let { asset = $bindable(), isOwner, spaceId }: Props = $props();
+  let isSpaceMember = $derived(!!spaceId);
 
   let tags = $derived(asset.tags || []);
 
   const handleRemove = async (tagId: string) => {
     const ids = await removeTag({ tagIds: [tagId], assetIds: [asset.id], showNotification: false });
     if (ids) {
-      asset = await getAssetInfo({ id: asset.id });
+      asset = await getAssetInfo({ id: asset.id, spaceId });
     }
   };
 
   const onAssetsTag = async (ids: string[]) => {
     if (ids.includes(asset.id)) {
-      asset = await getAssetInfo({ id: asset.id });
+      asset = await getAssetInfo({ id: asset.id, spaceId });
     }
   };
 
@@ -37,7 +39,7 @@
 
 <OnEvents {onAssetsTag} />
 
-{#if isOwner && !authManager.isSharedLink}
+{#if (isOwner || isSpaceMember) && !authManager.isSharedLink}
   <section class="px-4 mt-4">
     <div class="flex h-10 w-full items-center justify-between text-sm">
       <Text color="muted">{$t('tags')}</Text>
@@ -51,17 +53,21 @@
           >
             {tag.value}
           </Link>
-          <IconButton
-            aria-label={$t('remove_tag')}
-            icon={mdiClose}
-            onclick={() => handleRemove(tag.id)}
-            size="tiny"
-            class="hover:bg-primary-400"
-            shape="round"
-          />
+          {#if isOwner}
+            <IconButton
+              aria-label={$t('remove_tag')}
+              icon={mdiClose}
+              onclick={() => handleRemove(tag.id)}
+              size="tiny"
+              class="hover:bg-primary-400"
+              shape="round"
+            />
+          {/if}
         </Badge>
       {/each}
-      <HeaderActionButton action={Tag} />
+      {#if isOwner}
+        <HeaderActionButton action={Tag} />
+      {/if}
     </section>
   </section>
 {/if}

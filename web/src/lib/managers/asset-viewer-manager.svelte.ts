@@ -166,8 +166,8 @@ class AssetViewerManager extends BaseEventManager<Events> {
     this.#viewState = true;
   }
 
-  async setAssetId(id: string): Promise<AssetResponseDto> {
-    const asset = await getAssetInfo({ ...authManager.params, id });
+  async setAssetId(id: string, spaceId?: string): Promise<AssetResponseDto> {
+    const asset = await getAssetInfo({ ...authManager.params, id, spaceId });
     this.setAsset(asset);
     return asset;
   }

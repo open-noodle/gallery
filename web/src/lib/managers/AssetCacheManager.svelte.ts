@@ -50,7 +50,13 @@ class AssetCacheManager {
     });
   }
 
-  async getAsset({ id, key, slug }: { id: string; key?: string; slug?: string }, updateCache = true) {
+  async getAsset(
+    { id, key, slug, spaceId }: { id: string; key?: string; slug?: string; spaceId?: string },
+    updateCache = true,
+  ) {
+    if (spaceId) {
+      return getAssetInfo({ id, key, slug, spaceId });
+    }
     return this.#assetCache.getOrFetch({ id, key, slug }, updateCache);
   }
 

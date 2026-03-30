@@ -3524,7 +3524,7 @@
           },
           {
             "name": "spaceId",
-            "required": true,
+            "required": false,
             "in": "query",
             "schema": {
               "type": "string"

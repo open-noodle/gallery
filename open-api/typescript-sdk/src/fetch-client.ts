@@ -4475,7 +4475,7 @@ export function getAssetInfo({ id, key, slug, spaceId }: {
     id: string;
     key?: string;
     slug?: string;
-    spaceId: string;
+    spaceId?: string;
 }, opts?: Oazapfts.RequestOpts) {
     return oazapfts.ok(oazapfts.fetchJson<{
         status: 200;
