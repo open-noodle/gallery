@@ -7,7 +7,7 @@ export const load = (async ({ url, params }) => {
   const [space, members, people] = await Promise.all([
     getSpace({ id: params.spaceId }),
     getMembers({ id: params.spaceId }),
-    getSpacePeople({ id: params.spaceId }),
+    getSpacePeople({ id: params.spaceId, limit: 100 }),
   ]);
 
   return {
