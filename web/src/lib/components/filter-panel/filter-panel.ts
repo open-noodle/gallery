@@ -29,7 +29,7 @@ export interface FilterPanelConfig {
     cities?: (country: string, context?: FilterContext) => Promise<string[]>;
     cameras?: (context?: FilterContext) => Promise<CameraOption[]>;
     cameraModels?: (make: string, context?: FilterContext) => Promise<string[]>;
-    tags?: () => Promise<TagOption[]>;
+    tags?: (context?: FilterContext) => Promise<TagOption[]>;
   };
 }
 
