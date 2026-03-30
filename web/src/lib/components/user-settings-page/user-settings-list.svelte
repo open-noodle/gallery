@@ -26,6 +26,7 @@
     mdiFormTextboxPassword,
     mdiKeyOutline,
     mdiLockSmart,
+
     mdiServerOutline,
     mdiTwoFactorAuthentication,
   } from '@mdi/js';
@@ -105,6 +106,7 @@
   >
     <FeatureSettings />
   </SettingAccordion>
+
 
   <SettingAccordion
     icon={mdiBellOutline}
