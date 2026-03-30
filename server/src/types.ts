@@ -454,6 +454,7 @@ export type JobItem =
 
   // Shared Space Bulk Operations
   | { name: JobName.SharedSpaceBulkAddAssets; data: ISharedSpaceBulkAddAssetsJob }
+  | { name: JobName.SharedSpaceBackfillPersonCounts; data: IBaseJob }
 
   // Classification
   | { name: JobName.AssetClassifyQueueAll; data: { userId?: string } }
