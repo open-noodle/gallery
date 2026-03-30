@@ -375,7 +375,6 @@ describe(ClassificationService.name, () => {
       expect(mocks.machineLearning.encodeText).not.toHaveBeenCalled();
       expect(mocks.classification.deletePromptEmbeddingsByCategory).not.toHaveBeenCalled();
     });
-
   });
 
   describe('deleteCategory', () => {
