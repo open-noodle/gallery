@@ -40,7 +40,7 @@
   import { getAltText } from '#lib/utils/thumbnail-util.ts';
   import { toTimelineAsset } from '#lib/utils/timeline-util.ts';
   import MemoryCard from '#lib/components/memories/MemoryCard.svelte';
-  import { getAllPeople, getAllTags, getSearchSuggestions, SearchSuggestionType } from '@immich/sdk';
+  import { getAllPeople, getSearchSuggestions, getTagSuggestions, SearchSuggestionType } from '@immich/sdk';
   import { ActionButton, CommandPaletteDefaultProvider, ImageCarousel } from '@immich/ui';
   import { mdiDotsVertical } from '@mdi/js';
   import { DateTime } from 'luxon';
@@ -110,8 +110,12 @@
         });
         return models.filter(Boolean) as string[];
       },
-      tags: async () => {
-        const tags = await getAllTags();
+      tags: async (context?: FilterContext) => {
+        const tags = await getTagSuggestions({
+          withSharedSpaces: true,
+          takenAfter: context?.takenAfter,
+          takenBefore: context?.takenBefore,
+        });
         for (const t of tags) {
           tagNames.set(t.id, t.value);
         }
