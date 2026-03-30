@@ -23,7 +23,6 @@
   <!-- Foreground service permission -->
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
-  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
 
   <application android:label="Noodle Gallery" android:name=".ImmichApp" android:usesCleartextTraffic="true"
     android:icon="@mipmap/ic_launcher" android:requestLegacyExternalStorage="true"
