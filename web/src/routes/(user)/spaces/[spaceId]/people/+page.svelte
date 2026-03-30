@@ -306,11 +306,7 @@
                 icon={mdiDotsVertical}
                 title={$t('show_person_options')}
               >
-                <MenuOption
-                  onClick={() => handleHide(person)}
-                  icon={mdiEyeOffOutline}
-                  text={$t('hide_person')}
-                />
+                <MenuOption onClick={() => handleHide(person)} icon={mdiEyeOffOutline} text={$t('hide_person')} />
                 <MenuOption
                   onClick={() => handleMerge(person.id)}
                   icon={mdiAccountMultipleCheckOutline}

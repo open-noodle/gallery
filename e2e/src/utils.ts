@@ -541,6 +541,18 @@ export const utils = {
     return result.rows[0].id as string;
   },
 
+  createSpacePerson: async (spaceId: string, name: string) => {
+    if (!client) {
+      throw new Error('Database client not connected');
+    }
+    const result = await client.query(
+      `INSERT INTO shared_space_person ("spaceId", name, "isHidden", "faceCount", "assetCount")
+       VALUES ($1, $2, false, 1, 1) RETURNING id`,
+      [spaceId, name],
+    );
+    return result.rows[0].id as string;
+  },
+
   createSharedLink: (accessToken: string, dto: SharedLinkCreateDto) =>
     createSharedLink({ sharedLinkCreateDto: dto }, { headers: asBearerAuth(accessToken) }),
 
