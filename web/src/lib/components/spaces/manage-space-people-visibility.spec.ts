@@ -172,10 +172,7 @@ describe('ManageSpacePeopleVisibility', () => {
     expect(screen.getByTestId('visibility-person-p1')).toHaveAttribute('aria-pressed', 'true');
 
     // Simulate loading more people (rerender with expanded list)
-    const morePeople = [
-      ...people,
-      makePerson({ id: 'p3', name: 'Charlie', isHidden: false }),
-    ];
+    const morePeople = [...people, makePerson({ id: 'p3', name: 'Charlie', isHidden: false })];
     await rerender({
       people: morePeople,
       spaceId: 'space-1',
@@ -192,9 +189,7 @@ describe('ManageSpacePeopleVisibility', () => {
   });
 
   it('should save only overrides for loaded people', async () => {
-    const people = [
-      makePerson({ id: 'p1', name: 'Alice', isHidden: false }),
-    ];
+    const people = [makePerson({ id: 'p1', name: 'Alice', isHidden: false })];
 
     render(ManageSpacePeopleVisibilityWrapper, {
       props: {
@@ -215,9 +210,7 @@ describe('ManageSpacePeopleVisibility', () => {
 
     await waitFor(() => {
       expect(sdkMock.updateSpacePerson).toHaveBeenCalledTimes(1);
-      expect(sdkMock.updateSpacePerson).toHaveBeenCalledWith(
-        expect.objectContaining({ personId: 'p1' }),
-      );
+      expect(sdkMock.updateSpacePerson).toHaveBeenCalledWith(expect.objectContaining({ personId: 'p1' }));
     });
   });
 });
