@@ -4,6 +4,7 @@
   import { createUrl, getAssetMediaUrl } from '$lib/utils';
   import { handleError } from '$lib/utils/handle-error';
   import {
+    getSpacePeople,
     mergeSpacePeople,
     Role,
     type SharedSpaceMemberResponseDto,
@@ -81,6 +82,48 @@
     action = null;
     mergeTargetId = null;
   }
+
+  const PAGE_SIZE = 100;
+  let loadingMore = $state(false);
+  let hasMore = $state(data.allPeople.length >= PAGE_SIZE);
+
+  async function loadMorePeople() {
+    if (loadingMore || !hasMore) {
+      return;
+    }
+    loadingMore = true;
+    try {
+      const more = await getSpacePeople({ id: space.id, limit: PAGE_SIZE, offset: allPeople.length });
+      allPeople = [...allPeople, ...more];
+      hasMore = more.length >= PAGE_SIZE;
+    } catch (error) {
+      handleError(error, $t('spaces_error_loading_people'));
+    } finally {
+      loadingMore = false;
+    }
+    if (hasMore && mergeSentinel) {
+      const rect = mergeSentinel.getBoundingClientRect();
+      if (rect.top < window.innerHeight) {
+        void loadMorePeople();
+      }
+    }
+  }
+
+  let mergeSentinel = $state<HTMLElement>();
+
+  const mergeObserver = new IntersectionObserver((entries) => {
+    const entry = entries.find((e) => e.target === mergeSentinel);
+    if (entry?.isIntersecting) {
+      void loadMorePeople();
+    }
+  });
+
+  $effect(() => {
+    if (mergeSentinel) {
+      mergeObserver.disconnect();
+      mergeObserver.observe(mergeSentinel);
+    }
+  });
 </script>
 
 <UserPageLayout title={displayName}>
@@ -133,14 +176,36 @@
         </div>
       </div>
 
-      <h3 class="mb-3 text-sm font-semibold text-gray-600 dark:text-gray-400">
-        {$t('spaces_merge_into')}
-      </h3>
+      <div
+        class="sticky top-0 z-10 flex items-center justify-between rounded-lg border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800"
+      >
+        <h3 class="text-sm font-semibold text-gray-600 dark:text-gray-400">
+          {$t('spaces_merge_into')}
+        </h3>
+        <div class="flex gap-2">
+          <button
+            type="button"
+            class="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+            onclick={cancelMerge}
+          >
+            {$t('cancel')}
+          </button>
+          <button
+            type="button"
+            class="rounded-lg bg-immich-primary px-4 py-2 text-sm font-medium text-white hover:bg-immich-primary/90 disabled:opacity-50"
+            onclick={handleMerge}
+            disabled={!mergeTargetId}
+            data-testid="confirm-merge-button"
+          >
+            {$t('spaces_confirm_merge')}
+          </button>
+        </div>
+      </div>
 
       {#if otherPeople.length === 0}
         <p class="py-4 text-center text-sm text-gray-500">{$t('spaces_no_other_people')}</p>
       {:else}
-        <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+        <div class="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
           {#each otherPeople as other (other.id)}
             <button
               type="button"
@@ -170,26 +235,14 @@
             </button>
           {/each}
         </div>
+        {#if hasMore}
+          <div bind:this={mergeSentinel} class="flex h-8 w-full items-center justify-center">
+            {#if loadingMore}
+              <span class="text-sm text-gray-500">{$t('loading')}</span>
+            {/if}
+          </div>
+        {/if}
       {/if}
-
-      <div class="mt-6 flex justify-end gap-2">
-        <button
-          type="button"
-          class="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
-          onclick={cancelMerge}
-        >
-          {$t('cancel')}
-        </button>
-        <button
-          type="button"
-          class="rounded-lg bg-immich-primary px-4 py-2 text-sm font-medium text-white hover:bg-immich-primary/90 disabled:opacity-50"
-          onclick={handleMerge}
-          disabled={!mergeTargetId}
-          data-testid="confirm-merge-button"
-        >
-          {$t('spaces_confirm_merge')}
-        </button>
-      </div>
     </section>
   {:else}
     <!-- Person detail: asset grid -->
