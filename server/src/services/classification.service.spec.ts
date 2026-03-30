@@ -375,6 +375,47 @@ describe(ClassificationService.name, () => {
       expect(mocks.machineLearning.encodeText).not.toHaveBeenCalled();
       expect(mocks.classification.deletePromptEmbeddingsByCategory).not.toHaveBeenCalled();
     });
+
+    it('should trigger rescan when similarity changes', async () => {
+      mocks.classification.getCategory.mockResolvedValue(existingCategory as any);
+      mocks.classification.updateCategory.mockResolvedValue({ ...existingCategory, similarity: 0.5 } as any);
+      mocks.classification.getPromptEmbeddings.mockResolvedValue([{ prompt: 'sunset sky' }] as any);
+      mocks.job.queue.mockResolvedValue(void 0 as any);
+
+      await sut.updateCategory(authStub.user1, 'cat-1', { similarity: 0.5 });
+
+      expect(mocks.job.queue).toHaveBeenCalledWith({
+        name: JobName.AssetClassifyQueueAll,
+        data: { force: true },
+      });
+    });
+
+    it('should trigger rescan when prompts change', async () => {
+      mocks.classification.getCategory.mockResolvedValue(existingCategory as any);
+      mocks.classification.updateCategory.mockResolvedValue(existingCategory as any);
+      mocks.machineLearning.encodeText.mockResolvedValue('[0.5,0.5,0.5]');
+      mocks.classification.deletePromptEmbeddingsByCategory.mockResolvedValue(void 0 as any);
+      mocks.classification.upsertPromptEmbedding.mockResolvedValue(void 0 as any);
+      mocks.classification.getPromptEmbeddings.mockResolvedValue([{ prompt: 'new prompt' }] as any);
+      mocks.job.queue.mockResolvedValue(void 0 as any);
+
+      await sut.updateCategory(authStub.user1, 'cat-1', { prompts: ['new prompt'] });
+
+      expect(mocks.job.queue).toHaveBeenCalledWith({
+        name: JobName.AssetClassifyQueueAll,
+        data: { force: true },
+      });
+    });
+
+    it('should NOT trigger rescan when only name or action changes', async () => {
+      mocks.classification.getCategory.mockResolvedValue(existingCategory as any);
+      mocks.classification.updateCategory.mockResolvedValue({ ...existingCategory, name: 'New Name' } as any);
+      mocks.classification.getPromptEmbeddings.mockResolvedValue([{ prompt: 'old prompt' }] as any);
+
+      await sut.updateCategory(authStub.user1, 'cat-1', { name: 'New Name', action: 'tag_and_archive' });
+
+      expect(mocks.job.queue).not.toHaveBeenCalled();
+    });
   });
 
   describe('deleteCategory', () => {
