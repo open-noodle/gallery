@@ -1141,40 +1141,6 @@ export type ValidateAccessTokenResponseDto = {
     /** Authentication status */
     authStatus: boolean;
 };
-export type ClassificationCategoryResponseDto = {
-    action: Action2;
-    createdAt: string;
-    enabled: boolean;
-    id: string;
-    name: string;
-    prompts: string[];
-    similarity: number;
-    updatedAt: string;
-};
-export type ClassificationCategoryCreateDto = {
-    /** Action on match */
-    action?: Action2;
-    /** Category name */
-    name: string;
-    /** Text prompts for CLIP matching */
-    prompts: string[];
-    /** Similarity threshold (0-1, higher = stricter) */
-    similarity?: number;
-};
-export type ClassificationCategoryUpdateDto = {
-    /** Action on match */
-    action?: Action2;
-    /** Enable or disable category */
-    enabled?: boolean;
-    /** Category name */
-    name?: string;
-    /** Text prompts for CLIP matching */
-    prompts?: string[];
-    /** Wipe existing auto-tags for this category and rescan all assets */
-    rescan?: boolean;
-    /** Similarity threshold (0-1, higher = stricter) */
-    similarity?: number;
-};
 export type DownloadArchiveDto = {
     /** Asset IDs */
     assetIds: string[];
@@ -2708,6 +2674,19 @@ export type DatabaseBackupConfig = {
 export type SystemConfigBackupsDto = {
     database: DatabaseBackupConfig;
 };
+export type SystemConfigClassificationCategoryDto = {
+    action: Action2;
+    /** Enable or disable this category */
+    enabled: boolean;
+    name: string;
+    prompts: string[];
+    similarity: number;
+};
+export type SystemConfigClassificationDto = {
+    categories: SystemConfigClassificationCategoryDto[];
+    /** Enable classification globally */
+    enabled: boolean;
+};
 export type SystemConfigFFmpegDto = {
     /** Transcode hardware acceleration */
     accel: TranscodeHWAccel;
@@ -2999,6 +2978,7 @@ export type SystemConfigUserDto = {
 };
 export type SystemConfigDto = {
     backup: SystemConfigBackupsDto;
+    classification: SystemConfigClassificationDto;
     ffmpeg: SystemConfigFFmpegDto;
     image: SystemConfigImageDto;
     job: SystemConfigJobDto;
@@ -4834,66 +4814,13 @@ export function validateAccessToken(opts?: Oazapfts.RequestOpts) {
     }));
 }
 /**
- * Get classification categories
- */
-export function getCategories(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: ClassificationCategoryResponseDto[];
-    }>("/classification/categories", {
-        ...opts
-    }));
-}
-/**
- * Create a classification category
- */
-export function createCategory({ classificationCategoryCreateDto }: {
-    classificationCategoryCreateDto: ClassificationCategoryCreateDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 201;
-        data: ClassificationCategoryResponseDto;
-    }>("/classification/categories", oazapfts.json({
-        ...opts,
-        method: "POST",
-        body: classificationCategoryCreateDto
-    })));
-}
-/**
  * Scan all libraries for classification
  */
 export function scanClassification(opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText("/classification/categories/scan", {
+    return oazapfts.ok(oazapfts.fetchText("/classification/scan", {
         ...opts,
         method: "POST"
     }));
-}
-/**
- * Delete a classification category
- */
-export function deleteCategory({ id }: {
-    id: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchText(`/classification/categories/${encodeURIComponent(id)}`, {
-        ...opts,
-        method: "DELETE"
-    }));
-}
-/**
- * Update a classification category
- */
-export function updateCategory({ id, classificationCategoryUpdateDto }: {
-    id: string;
-    classificationCategoryUpdateDto: ClassificationCategoryUpdateDto;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: ClassificationCategoryResponseDto;
-    }>(`/classification/categories/${encodeURIComponent(id)}`, oazapfts.json({
-        ...opts,
-        method: "PUT",
-        body: classificationCategoryUpdateDto
-    })));
 }
 /**
  * Download asset archive
@@ -8197,10 +8124,6 @@ export enum AssetMediaSize {
     Preview = "preview",
     Thumbnail = "thumbnail"
 }
-export enum Action2 {
-    Tag = "tag",
-    TagAndArchive = "tag_and_archive"
-}
 export enum ManualJobName {
     PersonCleanup = "person-cleanup",
     TagCleanup = "tag-cleanup",
@@ -8455,6 +8378,10 @@ export enum SyncRequestType {
     AssetFacesV1 = "AssetFacesV1",
     AssetFacesV2 = "AssetFacesV2",
     UserMetadataV1 = "UserMetadataV1"
+}
+export enum Action2 {
+    Tag = "tag",
+    TagAndArchive = "tag_and_archive"
 }
 export enum TranscodeHWAccel {
     Nvenc = "nvenc",

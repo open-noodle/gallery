@@ -138,11 +138,7 @@ Class | Method | HTTP request | Description
 *AuthenticationApi* | [**unlockAuthSession**](doc//AuthenticationApi.md#unlockauthsession) | **POST** /auth/session/unlock | Unlock auth session
 *AuthenticationApi* | [**validateAccessToken**](doc//AuthenticationApi.md#validateaccesstoken) | **POST** /auth/validateToken | Validate access token
 *AuthenticationAdminApi* | [**unlinkAllOAuthAccountsAdmin**](doc//AuthenticationAdminApi.md#unlinkalloauthaccountsadmin) | **POST** /admin/auth/unlink-all | Unlink all OAuth accounts
-*ClassificationApi* | [**createCategory**](doc//ClassificationApi.md#createcategory) | **POST** /classification/categories | Create a classification category
-*ClassificationApi* | [**deleteCategory**](doc//ClassificationApi.md#deletecategory) | **DELETE** /classification/categories/{id} | Delete a classification category
-*ClassificationApi* | [**getCategories**](doc//ClassificationApi.md#getcategories) | **GET** /classification/categories | Get classification categories
-*ClassificationApi* | [**scanClassification**](doc//ClassificationApi.md#scanclassification) | **POST** /classification/categories/scan | Scan all libraries for classification
-*ClassificationApi* | [**updateCategory**](doc//ClassificationApi.md#updatecategory) | **PUT** /classification/categories/{id} | Update a classification category
+*ClassificationApi* | [**scanClassification**](doc//ClassificationApi.md#scanclassification) | **POST** /classification/scan | Scan all libraries for classification
 *DatabaseBackupsAdminApi* | [**deleteDatabaseBackup**](doc//DatabaseBackupsAdminApi.md#deletedatabasebackup) | **DELETE** /admin/database-backups | Delete database backup
 *DatabaseBackupsAdminApi* | [**downloadDatabaseBackup**](doc//DatabaseBackupsAdminApi.md#downloaddatabasebackup) | **GET** /admin/database-backups/{filename} | Download database backup
 *DatabaseBackupsAdminApi* | [**listDatabaseBackups**](doc//DatabaseBackupsAdminApi.md#listdatabasebackups) | **GET** /admin/database-backups | List database backups
@@ -451,9 +447,6 @@ Class | Method | HTTP request | Description
  - [ChangePasswordDto](doc//ChangePasswordDto.md)
  - [CheckExistingAssetsDto](doc//CheckExistingAssetsDto.md)
  - [CheckExistingAssetsResponseDto](doc//CheckExistingAssetsResponseDto.md)
- - [ClassificationCategoryCreateDto](doc//ClassificationCategoryCreateDto.md)
- - [ClassificationCategoryResponseDto](doc//ClassificationCategoryResponseDto.md)
- - [ClassificationCategoryUpdateDto](doc//ClassificationCategoryUpdateDto.md)
  - [Colorspace](doc//Colorspace.md)
  - [ContributorCountResponseDto](doc//ContributorCountResponseDto.md)
  - [CreateAlbumDto](doc//CreateAlbumDto.md)
@@ -676,6 +669,8 @@ Class | Method | HTTP request | Description
  - [SyncUserMetadataV1](doc//SyncUserMetadataV1.md)
  - [SyncUserV1](doc//SyncUserV1.md)
  - [SystemConfigBackupsDto](doc//SystemConfigBackupsDto.md)
+ - [SystemConfigClassificationCategoryDto](doc//SystemConfigClassificationCategoryDto.md)
+ - [SystemConfigClassificationDto](doc//SystemConfigClassificationDto.md)
  - [SystemConfigDto](doc//SystemConfigDto.md)
  - [SystemConfigFFmpegDto](doc//SystemConfigFFmpegDto.md)
  - [SystemConfigFacesDto](doc//SystemConfigFacesDto.md)

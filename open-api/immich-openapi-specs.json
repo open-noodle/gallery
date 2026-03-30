@@ -5026,97 +5026,7 @@
         "x-immich-state": "Stable"
       }
     },
-    "/classification/categories": {
-      "get": {
-        "operationId": "getCategories",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/ClassificationCategoryResponseDto"
-                  },
-                  "type": "array"
-                }
-              }
-            },
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          },
-          {
-            "cookie": []
-          },
-          {
-            "api_key": []
-          }
-        ],
-        "summary": "Get classification categories",
-        "tags": [
-          "Classification"
-        ],
-        "x-immich-history": [
-          {
-            "version": "v1",
-            "state": "Added"
-          }
-        ]
-      },
-      "post": {
-        "operationId": "createCategory",
-        "parameters": [],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ClassificationCategoryCreateDto"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "201": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ClassificationCategoryResponseDto"
-                }
-              }
-            },
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          },
-          {
-            "cookie": []
-          },
-          {
-            "api_key": []
-          }
-        ],
-        "summary": "Create a classification category",
-        "tags": [
-          "Classification"
-        ],
-        "x-immich-admin-only": true,
-        "x-immich-history": [
-          {
-            "version": "v1",
-            "state": "Added"
-          }
-        ]
-      }
-    },
-    "/classification/categories/scan": {
+    "/classification/scan": {
       "post": {
         "operationId": "scanClassification",
         "parameters": [],
@@ -5137,107 +5047,6 @@
           }
         ],
         "summary": "Scan all libraries for classification",
-        "tags": [
-          "Classification"
-        ],
-        "x-immich-admin-only": true,
-        "x-immich-history": [
-          {
-            "version": "v1",
-            "state": "Added"
-          }
-        ]
-      }
-    },
-    "/classification/categories/{id}": {
-      "delete": {
-        "operationId": "deleteCategory",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          },
-          {
-            "cookie": []
-          },
-          {
-            "api_key": []
-          }
-        ],
-        "summary": "Delete a classification category",
-        "tags": [
-          "Classification"
-        ],
-        "x-immich-admin-only": true,
-        "x-immich-history": [
-          {
-            "version": "v1",
-            "state": "Added"
-          }
-        ]
-      },
-      "put": {
-        "operationId": "updateCategory",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ClassificationCategoryUpdateDto"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ClassificationCategoryResponseDto"
-                }
-              }
-            },
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          },
-          {
-            "cookie": []
-          },
-          {
-            "api_key": []
-          }
-        ],
-        "summary": "Update a classification category",
         "tags": [
           "Classification"
         ],
@@ -20608,127 +20417,6 @@
         ],
         "type": "object"
       },
-      "ClassificationCategoryCreateDto": {
-        "properties": {
-          "action": {
-            "description": "Action on match",
-            "enum": [
-              "tag",
-              "tag_and_archive"
-            ],
-            "type": "string"
-          },
-          "name": {
-            "description": "Category name",
-            "type": "string"
-          },
-          "prompts": {
-            "description": "Text prompts for CLIP matching",
-            "items": {
-              "type": "string"
-            },
-            "minItems": 1,
-            "type": "array"
-          },
-          "similarity": {
-            "default": 0.28,
-            "description": "Similarity threshold (0-1, higher = stricter)",
-            "maximum": 1,
-            "minimum": 0,
-            "type": "number"
-          }
-        },
-        "required": [
-          "name",
-          "prompts"
-        ],
-        "type": "object"
-      },
-      "ClassificationCategoryResponseDto": {
-        "properties": {
-          "action": {
-            "enum": [
-              "tag",
-              "tag_and_archive"
-            ],
-            "type": "string"
-          },
-          "createdAt": {
-            "type": "string"
-          },
-          "enabled": {
-            "type": "boolean"
-          },
-          "id": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "prompts": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array"
-          },
-          "similarity": {
-            "type": "number"
-          },
-          "updatedAt": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "action",
-          "createdAt",
-          "enabled",
-          "id",
-          "name",
-          "prompts",
-          "similarity",
-          "updatedAt"
-        ],
-        "type": "object"
-      },
-      "ClassificationCategoryUpdateDto": {
-        "properties": {
-          "action": {
-            "description": "Action on match",
-            "enum": [
-              "tag",
-              "tag_and_archive"
-            ],
-            "type": "string"
-          },
-          "enabled": {
-            "description": "Enable or disable category",
-            "type": "boolean"
-          },
-          "name": {
-            "description": "Category name",
-            "type": "string"
-          },
-          "prompts": {
-            "description": "Text prompts for CLIP matching",
-            "items": {
-              "type": "string"
-            },
-            "minItems": 1,
-            "type": "array"
-          },
-          "rescan": {
-            "description": "Wipe existing auto-tags for this category and rescan all assets",
-            "type": "boolean"
-          },
-          "similarity": {
-            "description": "Similarity threshold (0-1, higher = stricter)",
-            "maximum": 1,
-            "minimum": 0,
-            "type": "number"
-          }
-        },
-        "type": "object"
-      },
       "Colorspace": {
         "description": "Colorspace",
         "enum": [
@@ -27973,10 +27661,70 @@
         ],
         "type": "object"
       },
+      "SystemConfigClassificationCategoryDto": {
+        "properties": {
+          "action": {
+            "enum": [
+              "tag",
+              "tag_and_archive"
+            ],
+            "type": "string"
+          },
+          "enabled": {
+            "description": "Enable or disable this category",
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "prompts": {
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "similarity": {
+            "maximum": 1,
+            "minimum": 0,
+            "type": "number"
+          }
+        },
+        "required": [
+          "action",
+          "enabled",
+          "name",
+          "prompts",
+          "similarity"
+        ],
+        "type": "object"
+      },
+      "SystemConfigClassificationDto": {
+        "properties": {
+          "categories": {
+            "items": {
+              "$ref": "#/components/schemas/SystemConfigClassificationCategoryDto"
+            },
+            "type": "array"
+          },
+          "enabled": {
+            "description": "Enable classification globally",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "categories",
+          "enabled"
+        ],
+        "type": "object"
+      },
       "SystemConfigDto": {
         "properties": {
           "backup": {
             "$ref": "#/components/schemas/SystemConfigBackupsDto"
+          },
+          "classification": {
+            "$ref": "#/components/schemas/SystemConfigClassificationDto"
           },
           "ffmpeg": {
             "$ref": "#/components/schemas/SystemConfigFFmpegDto"
@@ -28041,6 +27789,7 @@
         },
         "required": [
           "backup",
+          "classification",
           "ffmpeg",
           "image",
           "job",

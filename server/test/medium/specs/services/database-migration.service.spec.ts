@@ -189,17 +189,24 @@ describe('Database Migration Scenarios', () => {
     }
   });
 
-  // Scenario F: AdminScopedClassification migration data transform
-  describe('AdminScopedClassification migration', () => {
-    it('should merge user categories into admin, suffixing name conflicts', async () => {
+  // Scenario F: Classification migration chain (AdminScopedClassification → MoveClassificationToConfig)
+  describe('Classification migration chain', () => {
+    // Helper: revert past MoveClassificationToConfig and AdminScopedClassification to get per-user schema
+    const revertToPerUserSchema = async (repo: ReturnType<typeof createRepo>) => {
+      const reverted1 = await repo.revertLastMigration();
+      expect(reverted1).toContain('MoveClassificationToConfig');
+      const reverted2 = await repo.revertLastMigration();
+      expect(reverted2).toContain('AdminScopedClassification');
+    };
+
+    it('should merge user categories into admin and then into system config', async () => {
       const db = await createRawDatabase('migration_test_classification');
       try {
         const repo = createRepo(db);
         await repo.runMigrations();
 
-        // Revert the AdminScopedClassification migration to get back the old schema
-        const reverted = await repo.revertLastMigration();
-        expect(reverted).toContain('AdminScopedClassification');
+        // Revert two migrations to get back to per-user schema
+        await revertToPerUserSchema(repo);
 
         // Insert test data with old schema (userId + tagId columns exist)
         const admin = await db
@@ -238,7 +245,7 @@ describe('Database Migration Scenarios', () => {
           .returning('id')
           .executeTakeFirstOrThrow();
 
-        // Admin has "Vacation" and "Work"
+        // Admin has "Vacation" and "Work" — each needs a prompt to survive MoveClassificationToConfig
         await db
           .insertInto('classification_category' as any)
           .values([
@@ -265,34 +272,35 @@ describe('Database Migration Scenarios', () => {
           ] as any)
           .execute();
 
-        // Re-run the migration
+        // Add prompts for all categories (MoveClassificationToConfig skips categories without prompts)
+        const allCategories = await db
+          .selectFrom('classification_category' as any)
+          .select(['id'])
+          .execute();
+        for (const cat of allCategories) {
+          await db
+            .insertInto('classification_prompt_embedding' as any)
+            .values({ categoryId: (cat as any).id, prompt: 'test prompt' } as any)
+            .execute();
+        }
+
+        // Re-run both migrations
         await repo.runMigrations();
 
-        // Verify: all categories exist, conflicts suffixed with username
-        const categories = await db
-          .selectFrom('classification_category')
-          .select(['name', 'similarity', 'action', 'enabled'])
-          .orderBy('name', 'asc')
-          .execute();
+        // Verify: classification_category table is gone (dropped by MoveClassificationToConfig)
+        const tables = await db.introspection.getTables();
+        expect(tables.find((t) => t.name === 'classification_category')).toBeUndefined();
 
-        expect(categories).toEqual([
-          { name: 'Pets', similarity: 0.25, action: 'tag', enabled: true },
-          { name: 'Screenshots', similarity: 0.3, action: 'tag_and_archive', enabled: true },
-          { name: 'Vacation', similarity: 0.28, action: 'tag', enabled: true },
-          { name: 'Vacation (Alice)', similarity: 0.35, action: 'tag_and_archive', enabled: true },
-          { name: 'Vacation (Bob)', similarity: 0.4, action: 'tag', enabled: false },
-          { name: 'Work', similarity: 0.3, action: 'tag', enabled: true },
-        ]);
+        // Verify: categories are in system config with conflicts suffixed
+        const config = await db
+          .selectFrom('system_metadata' as any)
+          .select('value')
+          .where('key' as any, '=', 'system-config')
+          .executeTakeFirst();
 
-        // Verify: userId and tagId columns are gone
-        const columns = await db.introspection.getTables();
-        const classTable = columns.find((t) => t.name === 'classification_category');
-        expect(classTable).toBeDefined();
-        const columnNames = classTable!.columns.map((c) => c.name);
-        expect(columnNames).not.toContain('userId');
-        expect(columnNames).not.toContain('tagId');
-        expect(columnNames).toContain('name');
-        expect(columnNames).toContain('similarity');
+        const categories = ((config as any)?.value?.classification?.categories ?? []) as any[];
+        const names = categories.map((c: any) => c.name).sort();
+        expect(names).toEqual(['Pets', 'Screenshots', 'Vacation', 'Vacation (Alice)', 'Vacation (Bob)', 'Work']);
       } finally {
         await db.destroy();
       }
@@ -304,12 +312,13 @@ describe('Database Migration Scenarios', () => {
         const repo = createRepo(db);
         await repo.runMigrations();
 
-        // Revert and re-run with no classification data
-        await repo.revertLastMigration();
+        // Revert both and re-run with no classification data
+        await revertToPerUserSchema(repo);
         await repo.runMigrations();
 
-        const categories = await db.selectFrom('classification_category').selectAll().execute();
-        expect(categories).toEqual([]);
+        // Table should be gone, no classification in config
+        const tables = await db.introspection.getTables();
+        expect(tables.find((t) => t.name === 'classification_category')).toBeUndefined();
       } finally {
         await db.destroy();
       }
@@ -321,8 +330,8 @@ describe('Database Migration Scenarios', () => {
         const repo = createRepo(db);
         await repo.runMigrations();
 
-        // Revert, create a non-admin user with categories, re-run
-        await repo.revertLastMigration();
+        // Revert both, create a non-admin user with categories, re-run
+        await revertToPerUserSchema(repo);
 
         const user = await db
           .insertInto('user' as any)
@@ -341,12 +350,28 @@ describe('Database Migration Scenarios', () => {
           .values({ userId: user.id, name: 'Orphaned', similarity: 0.28, action: 'tag', enabled: true } as any)
           .execute();
 
-        // Migration should still succeed (schema changes applied, data stays with old userId before column drop)
-        // Note: the userId column is dropped, so the orphaned category loses its user reference
+        // Add a prompt so MoveClassificationToConfig picks it up
+        const cat = await db
+          .selectFrom('classification_category' as any)
+          .select('id')
+          .executeTakeFirstOrThrow();
+        await db
+          .insertInto('classification_prompt_embedding' as any)
+          .values({ categoryId: (cat as any).id, prompt: 'test' } as any)
+          .execute();
+
+        // Migration should still succeed
         await repo.runMigrations();
 
-        const categories = await db.selectFrom('classification_category').select(['name']).execute();
-        expect(categories).toEqual([{ name: 'Orphaned' }]);
+        // Verify category ended up in system config
+        const config = await db
+          .selectFrom('system_metadata' as any)
+          .select('value')
+          .where('key' as any, '=', 'system-config')
+          .executeTakeFirst();
+
+        const categories = ((config as any)?.value?.classification?.categories ?? []) as any[];
+        expect(categories.map((c: any) => c.name)).toEqual(['Orphaned']);
       } finally {
         await db.destroy();
       }
