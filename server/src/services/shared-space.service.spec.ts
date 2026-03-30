@@ -3558,6 +3558,28 @@ describe(SharedSpaceService.name, () => {
 
       expect(mocks.sharedSpace.reassignPersonFaces).toHaveBeenCalledWith(sourceId, targetId);
       expect(mocks.sharedSpace.deletePerson).toHaveBeenCalledWith(sourceId);
+      expect(mocks.sharedSpace.recountPersons).toHaveBeenCalledTimes(1);
+      expect(mocks.sharedSpace.recountPersons).toHaveBeenCalledWith([targetId]);
+    });
+
+    it('should not call recountPersons for deleted source persons', async () => {
+      const auth = factory.auth();
+      const spaceId = newUuid();
+      const targetId = newUuid();
+      const sourceId = newUuid();
+      const target = factory.sharedSpacePerson({ id: targetId, spaceId });
+      const source = factory.sharedSpacePerson({ id: sourceId, spaceId });
+
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
+      mocks.sharedSpace.getPersonById.mockResolvedValueOnce(target).mockResolvedValueOnce(source);
+      mocks.sharedSpace.reassignPersonFaces.mockResolvedValue(void 0);
+      mocks.sharedSpace.deletePerson.mockResolvedValue(void 0);
+      mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
+
+      await sut.mergeSpacePeople(auth, spaceId, targetId, { ids: [sourceId] });
+
+      expect(mocks.sharedSpace.recountPersons).toHaveBeenCalledWith([targetId]);
+      expect(mocks.sharedSpace.recountPersons).not.toHaveBeenCalledWith(expect.arrayContaining([sourceId]));
     });
 
     it('should throw when a source person does not belong to the space', async () => {
@@ -4812,5 +4834,4 @@ describe(SharedSpaceService.name, () => {
       expect(result[0].country).toBeNull();
     });
   });
-
 });
