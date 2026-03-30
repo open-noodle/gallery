@@ -248,7 +248,9 @@
                   curve
                   shadow
                   url={spaceId && person.spacePersonId
-                    ? createUrl(`/shared-spaces/${spaceId}/people/${person.spacePersonId}/thumbnail`, { updatedAt: person.updatedAt })
+                    ? createUrl(`/shared-spaces/${spaceId}/people/${person.spacePersonId}/thumbnail`, {
+                        updatedAt: person.updatedAt,
+                      })
                     : getPeopleThumbnailUrl(person)}
                   altText={person.name}
                   title={person.name}

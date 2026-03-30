@@ -722,7 +722,16 @@
 
 <Portal target="body">
   {#if assetViewerManager.isViewing}
-    <TimelineAssetViewer bind:invisible {timelineManager} {removeAction} {withStacked} {isShared} {album} {person} {spaceId} />
+    <TimelineAssetViewer
+      bind:invisible
+      {timelineManager}
+      {removeAction}
+      {withStacked}
+      {isShared}
+      {album}
+      {person}
+      {spaceId}
+    />
   {/if}
 </Portal>
 
