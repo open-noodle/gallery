@@ -168,14 +168,14 @@
       people: async (context?: FilterContext) => {
         const people = await getSpacePeople({
           id: space.id,
+          named: true,
           takenAfter: context?.takenAfter,
           takenBefore: context?.takenBefore,
         });
-        const named = people.filter((p) => !p.isHidden && p.name);
-        for (const p of named) {
+        for (const p of people) {
           personNames.set(p.id, p.name);
         }
-        return named.map((p) => ({
+        return people.map((p) => ({
           id: p.id,
           name: p.name,
           thumbnailUrl: p.thumbnailPath
@@ -355,7 +355,7 @@
       return;
     }
     try {
-      spacePeople = await getSpacePeople({ id: space.id, top: 10 });
+      spacePeople = await getSpacePeople({ id: space.id, limit: 10 });
     } catch (error) {
       handleError(error, 'Failed to load space people');
     }
