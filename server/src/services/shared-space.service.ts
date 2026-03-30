@@ -926,6 +926,7 @@ export class SharedSpaceService extends BaseService {
   private async processSpaceFaceMatch(spaceId: string, assetId: string): Promise<void> {
     const { machineLearning } = await this.getConfig({ withCache: true });
     const maxDistance = machineLearning.facialRecognition.maxDistance;
+    const affectedPersonIds = new Set<string>();
 
     const faces = await this.sharedSpaceRepository.getAssetFacesForMatching(assetId);
     for (const face of faces) {
@@ -958,7 +959,8 @@ export class SharedSpaceService extends BaseService {
         personId = newPerson.id;
       }
 
-      await this.sharedSpaceRepository.addPersonFaces([{ personId, assetFaceId: face.id }]);
+      await this.sharedSpaceRepository.addPersonFaces([{ personId, assetFaceId: face.id }], { skipRecount: true });
+      affectedPersonIds.add(personId);
     }
 
     // Process pet faces (detected by pet detection, no embeddings)
@@ -992,7 +994,12 @@ export class SharedSpaceService extends BaseService {
         personId = newPerson.id;
       }
 
-      await this.sharedSpaceRepository.addPersonFaces([{ personId, assetFaceId: petFace.id }]);
+      await this.sharedSpaceRepository.addPersonFaces([{ personId, assetFaceId: petFace.id }], { skipRecount: true });
+      affectedPersonIds.add(personId);
+    }
+
+    if (affectedPersonIds.size > 0) {
+      await this.sharedSpaceRepository.recountPersons([...affectedPersonIds]);
     }
   }
 
