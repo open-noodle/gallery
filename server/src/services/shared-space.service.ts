@@ -915,6 +915,7 @@ export class SharedSpaceService extends BaseService {
       }
 
       const deletedIds = new Set<string>();
+      const targetIds = new Set<string>();
       let passMerges = 0;
 
       for (const person of persons) {
@@ -981,8 +982,13 @@ export class SharedSpaceService extends BaseService {
         }
 
         deletedIds.add(source.id);
+        targetIds.add(target.id);
         passMerges++;
         mergedAny = true;
+      }
+
+      if (targetIds.size > 0) {
+        await this.sharedSpaceRepository.recountPersons([...targetIds]);
       }
 
       totalMerges += passMerges;
