@@ -405,8 +405,6 @@ order by
   "shared_space_person"."id"
 limit
   $4
-offset
-  $5
 
 -- SharedSpaceRepository.getPersonById
 select
@@ -434,23 +432,6 @@ delete from "shared_space_person"
 where
   "id" = $1
 
--- SharedSpaceRepository.getPersonFaceCount
-select
-  count(*) as "count"
-from
-  "shared_space_person_face"
-where
-  "personId" = $1
-
--- SharedSpaceRepository.getPersonAssetCount
-select
-  count(distinct ("asset_face"."assetId")) as "count"
-from
-  "shared_space_person_face"
-  inner join "asset_face" on "asset_face"."id" = "shared_space_person_face"."assetFaceId"
-where
-  "shared_space_person_face"."personId" = $1
-
 -- SharedSpaceRepository.getPersonAssetIds
 select distinct
   "asset_face"."assetId"
@@ -461,6 +442,28 @@ where
   "shared_space_person_face"."personId" = $1
 
 -- SharedSpaceRepository.removePersonFacesByAssetIds
+select distinct
+  "personId"
+from
+  "shared_space_person_face"
+where
+  "assetFaceId" in (
+    select
+      "asset_face"."id"
+    from
+      "asset_face"
+    where
+      "asset_face"."assetId" in ($1)
+  )
+  and "personId" in (
+    select
+      "shared_space_person"."id"
+    from
+      "shared_space_person"
+    where
+      "shared_space_person"."spaceId" = $2
+  )
+
 delete from "shared_space_person_face"
 where
   "assetFaceId" in (
