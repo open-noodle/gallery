@@ -26,7 +26,7 @@ rescan?: boolean;
 1. Call `removeAutoTagAssignments(existing.name)` — uses the **pre-update** category name to target the correct `Auto/{name}` tags. This method also unarchives any assets that were tagged (moves them from Archive back to Timeline visibility).
 2. Queue `AssetClassifyQueueAll` with `force: true` — rescans all assets against all categories.
 
-The server honors `rescan: true` unconditionally — it doesn't duplicate the "is it stricter?" check. The UI gates the dialog, but the API is a general-purpose "wipe and rescan this category" operation.
+The wipe (`removeAutoTagAssignments`) runs inline in `updateCategory` — it's a fast SQL DELETE. The rescan is queued as a background job. The server honors `rescan: true` unconditionally — it doesn't duplicate the "is it stricter?" check. The UI gates the dialog, but the API is a general-purpose "wipe and rescan this category" operation.
 
 **New repository method** — `ClassificationRepository.removeAutoTagAssignments(categoryName: string)`:
 
