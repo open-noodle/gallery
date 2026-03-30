@@ -1,4 +1,4 @@
-import { LoginResponseDto } from '@immich/sdk';
+import { LoginResponseDto, QueueCommand } from '@immich/sdk';
 import { createUserDto, uuidDto } from 'src/fixtures';
 import { errorDto } from 'src/responses';
 import { app, utils } from 'src/utils';
@@ -157,6 +157,57 @@ describe('/classification/categories', () => {
         .post('/classification/categories/scan')
         .set('Authorization', `Bearer ${admin.accessToken}`);
       expect(status).toBe(204);
+    });
+  });
+
+  describe('Queue Operations', () => {
+    it('should list classification in queues', async () => {
+      const { status, body } = await request(app).get('/jobs').set('Authorization', `Bearer ${admin.accessToken}`);
+
+      expect(status).toBe(200);
+      expect(body).toHaveProperty('classification');
+    });
+
+    it('should accept start command on classification queue', async () => {
+      const { status, body } = await request(app)
+        .put('/jobs/classification')
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .send({ command: QueueCommand.Start, force: false });
+
+      expect(status).toBe(200);
+      expect(body).toEqual(
+        expect.objectContaining({
+          queueStatus: expect.objectContaining({ isPaused: false }),
+        }),
+      );
+
+      await utils.waitForQueueFinish(admin.accessToken, 'classification');
+    });
+
+    it('should accept start command with force on classification queue', async () => {
+      const { status, body } = await request(app)
+        .put('/jobs/classification')
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .send({ command: QueueCommand.Start, force: true });
+
+      expect(status).toBe(200);
+      expect(body).toEqual(
+        expect.objectContaining({
+          queueStatus: expect.objectContaining({ isPaused: false }),
+        }),
+      );
+
+      await utils.waitForQueueFinish(admin.accessToken, 'classification');
+    });
+
+    it('should trigger job via scan endpoint and complete', async () => {
+      const { status } = await request(app)
+        .post('/classification/categories/scan')
+        .set('Authorization', `Bearer ${admin.accessToken}`);
+
+      expect(status).toBe(204);
+
+      await utils.waitForQueueFinish(admin.accessToken, 'classification');
     });
   });
 });
