@@ -8292,6 +8292,7 @@ export enum JobName {
     SharedSpaceFaceMatchAll = "SharedSpaceFaceMatchAll",
     SharedSpaceLibraryFaceSync = "SharedSpaceLibraryFaceSync",
     SharedSpaceBulkAddAssets = "SharedSpaceBulkAddAssets",
+    SharedSpaceBackfillPersonCounts = "SharedSpaceBackfillPersonCounts",
     AssetClassifyQueueAll = "AssetClassifyQueueAll",
     AssetClassify = "AssetClassify"
 }

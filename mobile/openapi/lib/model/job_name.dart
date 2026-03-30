@@ -87,6 +87,7 @@ class JobName {
   static const sharedSpaceFaceMatchAll = JobName._(r'SharedSpaceFaceMatchAll');
   static const sharedSpaceLibraryFaceSync = JobName._(r'SharedSpaceLibraryFaceSync');
   static const sharedSpaceBulkAddAssets = JobName._(r'SharedSpaceBulkAddAssets');
+  static const sharedSpaceBackfillPersonCounts = JobName._(r'SharedSpaceBackfillPersonCounts');
   static const assetClassifyQueueAll = JobName._(r'AssetClassifyQueueAll');
   static const assetClassify = JobName._(r'AssetClassify');
 
@@ -156,6 +157,7 @@ class JobName {
     sharedSpaceFaceMatchAll,
     sharedSpaceLibraryFaceSync,
     sharedSpaceBulkAddAssets,
+    sharedSpaceBackfillPersonCounts,
     assetClassifyQueueAll,
     assetClassify,
   ];
@@ -260,6 +262,7 @@ class JobNameTypeTransformer {
         case r'SharedSpaceFaceMatchAll': return JobName.sharedSpaceFaceMatchAll;
         case r'SharedSpaceLibraryFaceSync': return JobName.sharedSpaceLibraryFaceSync;
         case r'SharedSpaceBulkAddAssets': return JobName.sharedSpaceBulkAddAssets;
+        case r'SharedSpaceBackfillPersonCounts': return JobName.sharedSpaceBackfillPersonCounts;
         case r'AssetClassifyQueueAll': return JobName.assetClassifyQueueAll;
         case r'AssetClassify': return JobName.assetClassify;
         default:
