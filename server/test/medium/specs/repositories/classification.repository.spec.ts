@@ -1,8 +1,11 @@
 import { Kysely } from 'kysely';
+import { AssetVisibility } from 'src/enum';
 import { ClassificationRepository } from 'src/repositories/classification.repository';
 import { LoggingRepository } from 'src/repositories/logging.repository';
+import { TagRepository } from 'src/repositories/tag.repository';
 import { DB } from 'src/schema';
 import { BaseService } from 'src/services/base.service';
+import { upsertTags } from 'src/utils/tag';
 import { newMediumService } from 'test/medium.factory';
 import { getKyselyDB } from 'test/utils';
 
@@ -221,6 +224,84 @@ describe(ClassificationRepository.name, () => {
           action: 'tag',
         }),
       ).rejects.toThrow();
+    });
+  });
+
+  describe('removeAutoTagAssignments', () => {
+    it('should delete tag_asset rows for Auto/{name} tags and unarchive affected assets', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset: asset1 } = await ctx.newAsset({ ownerId: user.id });
+      const { asset: asset2 } = await ctx.newAsset({ ownerId: user.id });
+
+      const tagRepo = ctx.get(TagRepository);
+      const [tag] = await upsertTags(tagRepo, { userId: user.id, tags: ['Auto/Screenshots'] });
+      await ctx.newTagAsset({ tagIds: [tag.id], assetIds: [asset1.id, asset2.id] });
+
+      // Archive asset1
+      await ctx.database
+        .updateTable('asset')
+        .set({ visibility: AssetVisibility.Archive })
+        .where('id', '=', asset1.id)
+        .execute();
+
+      await sut.removeAutoTagAssignments('Screenshots');
+
+      // Verify tag_asset rows are gone
+      const tagAssets = await ctx.database.selectFrom('tag_asset').selectAll().where('tagId', '=', tag.id).execute();
+      expect(tagAssets).toHaveLength(0);
+
+      // Verify asset1 is unarchived
+      const a1 = await ctx.database
+        .selectFrom('asset')
+        .select('visibility')
+        .where('id', '=', asset1.id)
+        .executeTakeFirstOrThrow();
+      expect(a1.visibility).toBe(AssetVisibility.Timeline);
+
+      // Verify asset2 stayed at timeline
+      const a2 = await ctx.database
+        .selectFrom('asset')
+        .select('visibility')
+        .where('id', '=', asset2.id)
+        .executeTakeFirstOrThrow();
+      expect(a2.visibility).toBe(AssetVisibility.Timeline);
+    });
+
+    it('should not affect other tags', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+
+      const tagRepo = ctx.get(TagRepository);
+      const [autoTag] = await upsertTags(tagRepo, { userId: user.id, tags: ['Auto/Screenshots'] });
+      const [vacationTag] = await upsertTags(tagRepo, { userId: user.id, tags: ['vacation'] });
+      await ctx.newTagAsset({ tagIds: [autoTag.id, vacationTag.id], assetIds: [asset.id] });
+
+      await sut.removeAutoTagAssignments('Screenshots');
+
+      // Auto tag_asset removed
+      const autoTagAssets = await ctx.database
+        .selectFrom('tag_asset')
+        .selectAll()
+        .where('tagId', '=', autoTag.id)
+        .execute();
+      expect(autoTagAssets).toHaveLength(0);
+
+      // Vacation tag_asset untouched
+      const vacationTagAssets = await ctx.database
+        .selectFrom('tag_asset')
+        .selectAll()
+        .where('tagId', '=', vacationTag.id)
+        .execute();
+      expect(vacationTagAssets).toHaveLength(1);
+    });
+
+    it('should be a no-op when no matching tags exist', async () => {
+      const { sut } = setup();
+
+      // Should not throw
+      await expect(sut.removeAutoTagAssignments('NonExistent')).resolves.not.toThrow();
     });
   });
 });
