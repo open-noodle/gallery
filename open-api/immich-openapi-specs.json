@@ -13113,6 +13113,35 @@
             }
           },
           {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum number of people to return (sorted by asset count)",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "type": "number"
+            }
+          },
+          {
+            "name": "named",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "description": "Number of people to skip",
+            "schema": {
+              "minimum": 0,
+              "type": "number"
+            }
+          },
+          {
             "name": "takenAfter",
             "required": false,
             "in": "query",
@@ -13128,17 +13157,6 @@
             "schema": {
               "format": "date-time",
               "type": "string"
-            }
-          },
-          {
-            "name": "top",
-            "required": false,
-            "in": "query",
-            "description": "Maximum number of people to return (sorted by asset count)",
-            "schema": {
-              "minimum": 1,
-              "maximum": 100,
-              "type": "number"
             }
           },
           {
