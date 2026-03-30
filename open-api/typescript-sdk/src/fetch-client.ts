@@ -533,6 +533,8 @@ export type PersonWithFacesResponseDto = {
     isHidden: boolean;
     /** Person name */
     name: string;
+    /** Space person ID (when viewed through a space) */
+    spacePersonId?: string;
     /** Pet species (e.g. dog, cat) */
     species?: string | null;
     /** Thumbnail path */
@@ -4469,17 +4471,19 @@ export function getAssetStatistics({ isFavorite, isTrashed, visibility }: {
 /**
  * Retrieve an asset
  */
-export function getAssetInfo({ id, key, slug }: {
+export function getAssetInfo({ id, key, slug, spaceId }: {
     id: string;
     key?: string;
     slug?: string;
+    spaceId: string;
 }, opts?: Oazapfts.RequestOpts) {
     return oazapfts.ok(oazapfts.fetchJson<{
         status: 200;
         data: AssetResponseDto;
     }>(`/assets/${encodeURIComponent(id)}${QS.query(QS.explode({
         key,
-        slug
+        slug,
+        spaceId
     }))}`, {
         ...opts
     }));

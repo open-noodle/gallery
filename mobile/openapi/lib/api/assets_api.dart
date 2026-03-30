@@ -601,10 +601,12 @@ class AssetsApi {
   ///
   /// * [String] id (required):
   ///
+  /// * [String] spaceId (required):
+  ///
   /// * [String] key:
   ///
   /// * [String] slug:
-  Future<Response> getAssetInfoWithHttpInfo(String id, { String? key, String? slug, }) async {
+  Future<Response> getAssetInfoWithHttpInfo(String id, String spaceId, { String? key, String? slug, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/assets/{id}'
       .replaceAll('{id}', id);
@@ -622,6 +624,7 @@ class AssetsApi {
     if (slug != null) {
       queryParams.addAll(_queryParams('', 'slug', slug));
     }
+      queryParams.addAll(_queryParams('', 'spaceId', spaceId));
 
     const contentTypes = <String>[];
 
@@ -645,11 +648,13 @@ class AssetsApi {
   ///
   /// * [String] id (required):
   ///
+  /// * [String] spaceId (required):
+  ///
   /// * [String] key:
   ///
   /// * [String] slug:
-  Future<AssetResponseDto?> getAssetInfo(String id, { String? key, String? slug, }) async {
-    final response = await getAssetInfoWithHttpInfo(id,  key: key, slug: slug, );
+  Future<AssetResponseDto?> getAssetInfo(String id, String spaceId, { String? key, String? slug, }) async {
+    final response = await getAssetInfoWithHttpInfo(id, spaceId,  key: key, slug: slug, );
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
