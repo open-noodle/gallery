@@ -76,31 +76,18 @@ describe('buildMapFilterConfig', () => {
       expect(people[0].thumbnailUrl).toContain('/people/1/thumbnail');
     });
 
-    it('should exclude unnamed people in space config', async () => {
+    it('should pass named param to server for space config', async () => {
       vi.mocked(getSpacePeople).mockResolvedValue([
         { id: '1', name: 'Alice', thumbnailPath: '/thumb/1' },
-        { id: '2', name: '', thumbnailPath: '/thumb/2' },
-        { id: '3', name: 'Bob', thumbnailPath: '/thumb/3' },
+        { id: '2', name: 'Bob', thumbnailPath: '/thumb/3' },
       ] as never);
 
       const config = buildMapFilterConfig('space-123');
       const people = await config.providers.people!();
 
+      expect(getSpacePeople).toHaveBeenCalledWith(expect.objectContaining({ named: true }));
       expect(people).toHaveLength(2);
       expect(people.map((p) => p.name)).toEqual(['Alice', 'Bob']);
-    });
-
-    it('should exclude hidden people in space config', async () => {
-      vi.mocked(getSpacePeople).mockResolvedValue([
-        { id: '1', name: 'Alice', isHidden: false },
-        { id: '2', name: 'Bob', isHidden: true },
-      ] as never);
-
-      const config = buildMapFilterConfig('space-123');
-      const people = await config.providers.people!();
-
-      expect(people).toHaveLength(1);
-      expect(people[0].name).toBe('Alice');
     });
 
     it('should map thumbnailUrl correctly in space config', async () => {
