@@ -25,6 +25,7 @@
     mdiDotsVertical,
     mdiEyeOutline,
   } from '@mdi/js';
+  import { onDestroy } from 'svelte';
   import { fly } from 'svelte/transition';
   import { quintOut } from 'svelte/easing';
   import { t } from 'svelte-i18n';
@@ -47,22 +48,16 @@
       people = data.people;
       editingName = '';
       hoveredPersonId = null;
+      hasMore = data.people.length >= PAGE_SIZE;
     }
   });
 
+  const PAGE_SIZE = 100;
+  let loading = $state(false);
+  let hasMore = $state(data.people.length >= PAGE_SIZE);
+
   let selectHidden = $state(false);
-  const visiblePeople = $derived(
-    [...people]
-      .filter((p) => !p.isHidden)
-      .sort((a, b) => {
-        const aHasName = a.name ? 0 : 1;
-        const bHasName = b.name ? 0 : 1;
-        if (aHasName !== bHasName) {
-          return aHasName - bHasName;
-        }
-        return b.assetCount - a.assetCount;
-      }),
-  );
+  const visiblePeople = $derived(people.filter((p) => !p.isHidden));
   let allPeople = $state<SharedSpacePersonResponseDto[]>([]);
 
   // Name editing state
@@ -81,20 +76,69 @@
 
   async function refreshPeople() {
     try {
-      people = await getSpacePeople({ id: space.id });
+      people = await getSpacePeople({ id: space.id, limit: PAGE_SIZE });
+      hasMore = people.length >= PAGE_SIZE;
     } catch (error) {
       handleError(error, $t('spaces_error_loading_people'));
     }
   }
 
+  async function loadMore() {
+    if (loading || !hasMore) {
+      return;
+    }
+    loading = true;
+    try {
+      const more = await getSpacePeople({ id: space.id, limit: PAGE_SIZE, offset: people.length });
+      people = [...people, ...more];
+      hasMore = more.length >= PAGE_SIZE;
+    } catch (error) {
+      handleError(error, $t('spaces_error_loading_people'));
+    } finally {
+      loading = false;
+    }
+    // If sentinel is still visible after loading (viewport not filled), load more
+    if (hasMore && sentinel) {
+      const rect = sentinel.getBoundingClientRect();
+      if (rect.top < window.innerHeight) {
+        void loadMore();
+      }
+    }
+  }
+
   async function openVisibilityModal() {
     try {
-      allPeople = await getSpacePeople({ id: space.id, withHidden: true });
+      allPeople = await getSpacePeople({ id: space.id, withHidden: true, limit: PAGE_SIZE });
     } catch (error) {
       handleError(error, $t('spaces_error_loading_people'));
       return;
     }
+    hasMoreVisibility = allPeople.length >= PAGE_SIZE;
     selectHidden = true;
+  }
+
+  let hasMoreVisibility = $state(false);
+  let loadingVisibility = $state(false);
+
+  async function loadMoreVisibility() {
+    if (loadingVisibility || !hasMoreVisibility) {
+      return;
+    }
+    loadingVisibility = true;
+    try {
+      const more = await getSpacePeople({
+        id: space.id,
+        withHidden: true,
+        limit: PAGE_SIZE,
+        offset: allPeople.length,
+      });
+      allPeople = [...allPeople, ...more];
+      hasMoreVisibility = more.length >= PAGE_SIZE;
+    } catch (error) {
+      handleError(error, $t('spaces_error_loading_people'));
+    } finally {
+      loadingVisibility = false;
+    }
   }
 
   const onNameFocus = (person: SharedSpacePersonResponseDto) => {
@@ -126,6 +170,26 @@
   function handleMerge(personId: string) {
     void goto(`/spaces/${space.id}/people/${personId}?action=merge`);
   }
+
+  let sentinel = $state<HTMLElement>();
+
+  const intersectionObserver = new IntersectionObserver((entries) => {
+    const entry = entries.find((e) => e.target === sentinel);
+    if (entry?.isIntersecting) {
+      void loadMore();
+    }
+  });
+
+  $effect(() => {
+    if (sentinel) {
+      intersectionObserver.disconnect();
+      intersectionObserver.observe(sentinel);
+    }
+  });
+
+  onDestroy(() => {
+    intersectionObserver.disconnect();
+  });
 </script>
 
 <UserPageLayout title={$t('spaces_people_title')}>
@@ -218,6 +282,14 @@
         </div>
       {/each}
     </div>
+
+    {#if hasMore}
+      <div bind:this={sentinel} class="h-8 flex items-center justify-center">
+        {#if loading}
+          <span class="text-sm text-gray-500">{$t('loading')}</span>
+        {/if}
+      </div>
+    {/if}
   {/if}
 </UserPageLayout>
 
@@ -233,6 +305,9 @@
       spaceId={space.id}
       onClose={() => (selectHidden = false)}
       onUpdate={() => refreshPeople()}
+      hasMore={hasMoreVisibility}
+      loading={loadingVisibility}
+      onLoadMore={loadMoreVisibility}
     />
   </dialog>
 {/if}
