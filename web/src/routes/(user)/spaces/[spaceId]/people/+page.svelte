@@ -18,7 +18,7 @@
     type SharedSpacePersonResponseDto,
     type SharedSpaceResponseDto,
   } from '@immich/sdk';
-  import { Button, Icon, IconButton, toastManager } from '@immich/ui';
+  import { Button, Icon, IconButton, modalManager, toastManager } from '@immich/ui';
   import {
     mdiAccountGroupOutline,
     mdiAccountMultipleCheckOutline,
@@ -129,6 +129,17 @@
   }
 
   async function handleDeduplicate() {
+    const confirmed = await modalManager.showDialog({
+      title: $t('deduplicate_people'),
+      prompt: $t('dedup_people_confirm'),
+      confirmText: $t('start'),
+      confirmColor: 'primary',
+    });
+
+    if (!confirmed) {
+      return;
+    }
+
     try {
       await deduplicateSpacePeople({ id: space.id });
       toastManager.info($t('dedup_people_started'));
