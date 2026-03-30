@@ -79,9 +79,6 @@ export class ClassificationCategoryResponseDto {
   @ApiProperty()
   enabled!: boolean;
 
-  @ApiProperty({ nullable: true, type: String })
-  tagId!: string | null;
-
   @ApiProperty()
   createdAt!: string;
 

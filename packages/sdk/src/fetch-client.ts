@@ -1445,7 +1445,6 @@ export type ClassificationCategoryResponseDto = {
     name: string;
     prompts: string[];
     similarity: number;
-    tagId: string | null;
     updatedAt: string;
 };
 export type ClassificationCategoryCreateDto = {
@@ -5212,7 +5211,7 @@ export function createCategory({ classificationCategoryCreateDto }: {
     })));
 }
 /**
- * Scan library for classification
+ * Scan all libraries for classification
  */
 export function scanClassification(opts?: Oazapfts.RequestOpts) {
     return oazapfts.ok(oazapfts.fetchText("/classification/categories/scan", {
