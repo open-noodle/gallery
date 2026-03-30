@@ -52,8 +52,7 @@ export class ClassificationService extends BaseService {
   @OnEvent({ name: 'ConfigUpdate', workers: [ImmichWorker.Microservices], server: true })
   async onConfigUpdate({ oldConfig, newConfig }: ArgOf<'ConfigUpdate'>) {
     const clipChanged = oldConfig.machineLearning.clip.modelName !== newConfig.machineLearning.clip.modelName;
-    const classificationChanged =
-      JSON.stringify(oldConfig.classification) !== JSON.stringify(newConfig.classification);
+    const classificationChanged = JSON.stringify(oldConfig.classification) !== JSON.stringify(newConfig.classification);
 
     if (!clipChanged && !classificationChanged) {
       return;

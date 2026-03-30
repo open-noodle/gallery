@@ -30,6 +30,14 @@ const createRawDatabase = async (name: string): Promise<Kysely<DB>> => {
   );
 };
 
+// Helper: revert past MoveClassificationToConfig and AdminScopedClassification to get per-user schema
+const revertToPerUserSchema = async (repo: ReturnType<typeof createRepo>) => {
+  const reverted1 = await repo.revertLastMigration();
+  expect(reverted1).toContain('MoveClassificationToConfig');
+  const reverted2 = await repo.revertLastMigration();
+  expect(reverted2).toContain('AdminScopedClassification');
+};
+
 const createRepo = (db: Kysely<DB>) => {
   const configRepository = new ConfigRepository();
   const logger = LoggingRepository.create();
@@ -191,14 +199,6 @@ describe('Database Migration Scenarios', () => {
 
   // Scenario F: Classification migration chain (AdminScopedClassification → MoveClassificationToConfig)
   describe('Classification migration chain', () => {
-    // Helper: revert past MoveClassificationToConfig and AdminScopedClassification to get per-user schema
-    const revertToPerUserSchema = async (repo: ReturnType<typeof createRepo>) => {
-      const reverted1 = await repo.revertLastMigration();
-      expect(reverted1).toContain('MoveClassificationToConfig');
-      const reverted2 = await repo.revertLastMigration();
-      expect(reverted2).toContain('AdminScopedClassification');
-    };
-
     it('should merge user categories into admin and then into system config', async () => {
       const db = await createRawDatabase('migration_test_classification');
       try {
@@ -299,7 +299,7 @@ describe('Database Migration Scenarios', () => {
           .executeTakeFirst();
 
         const categories = ((config as any)?.value?.classification?.categories ?? []) as any[];
-        const names = categories.map((c: any) => c.name).sort();
+        const names = categories.map((c: any) => c.name).toSorted();
         expect(names).toEqual(['Pets', 'Screenshots', 'Vacation', 'Vacation (Alice)', 'Vacation (Bob)', 'Work']);
       } finally {
         await db.destroy();
