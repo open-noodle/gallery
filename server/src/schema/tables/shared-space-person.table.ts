@@ -16,6 +16,7 @@ import { SharedSpaceTable } from 'src/schema/tables/shared-space.table';
 @Table('shared_space_person')
 @UpdatedAtTrigger('shared_space_person_updatedAt')
 @Index({ name: 'shared_space_person_spaceId_idx', columns: ['spaceId'] })
+@Index({ name: 'shared_space_person_space_count_idx', columns: ['spaceId', 'isHidden', 'assetCount'] })
 export class SharedSpacePersonTable {
   @PrimaryGeneratedColumn()
   id!: Generated<string>;
@@ -37,6 +38,12 @@ export class SharedSpacePersonTable {
 
   @Column({ type: 'date', nullable: true })
   birthDate!: string | null;
+
+  @Column({ type: 'integer', default: 0 })
+  faceCount!: Generated<number>;
+
+  @Column({ type: 'integer', default: 0 })
+  assetCount!: Generated<number>;
 
   @CreateDateColumn()
   createdAt!: Generated<Timestamp>;
