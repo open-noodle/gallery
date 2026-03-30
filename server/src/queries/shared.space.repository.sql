@@ -463,7 +463,6 @@ where
     where
       "shared_space_person"."spaceId" = $2
   )
-
 delete from "shared_space_person_face"
 where
   "assetFaceId" in (
@@ -493,6 +492,29 @@ where
     from
       "shared_space_person_face"
   )
+
+-- SharedSpaceRepository.recountPersons
+UPDATE shared_space_person
+SET
+  "faceCount" = (
+    SELECT
+      count(*)::int
+    FROM
+      shared_space_person_face
+    WHERE
+      shared_space_person_face."personId" = shared_space_person.id
+  ),
+  "assetCount" = (
+    SELECT
+      count(distinct asset_face."assetId")::int
+    FROM
+      shared_space_person_face
+      JOIN asset_face ON asset_face.id = shared_space_person_face."assetFaceId"
+    WHERE
+      shared_space_person_face."personId" = shared_space_person.id
+  )
+WHERE
+  id = ANY ($1)
 
 -- SharedSpaceRepository.getAlias
 select
