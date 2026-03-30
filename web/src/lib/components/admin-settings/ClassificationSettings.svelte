@@ -102,6 +102,14 @@
         });
         toastManager.primary(`Category "${formName}" created`);
       } else if (editingId) {
+        const editedCategory = categories.find((c) => c.id === editingId);
+        const isStricter = editedCategory && formSimilarity > editedCategory.similarity;
+        const shouldRescan =
+          isStricter &&
+          confirm(
+            'This category is now stricter. Would you like to remove existing auto-tags that may no longer match, unarchive affected photos, and rescan all photos?',
+          );
+
         await updateCategory({
           id: editingId,
           classificationCategoryUpdateDto: {
@@ -110,9 +118,13 @@
             similarity: formSimilarity,
             action: formAction,
             enabled: formEnabled,
+            ...(shouldRescan ? { rescan: true } : {}),
           },
         });
         toastManager.primary(`Category "${formName}" updated`);
+        if (shouldRescan) {
+          toastManager.primary('Rescan started — existing auto-tags will be re-evaluated');
+        }
       }
       cancelEdit();
       await refreshCategories();
