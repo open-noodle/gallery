@@ -1,5 +1,5 @@
 import { buildMapFilterConfig } from '$lib/utils/map-filter-config';
-import { getAllPeople, getSpacePeople } from '@immich/sdk';
+import { getAllPeople, getSearchSuggestions, getSpacePeople } from '@immich/sdk';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@immich/sdk', async (importOriginal) => {
@@ -100,5 +100,25 @@ describe('buildMapFilterConfig', () => {
 
       expect(people[0].thumbnailUrl).toContain('/shared-spaces/space-123/people/1/thumbnail');
     });
+  });
+
+  it('should pass withSharedSpaces to cameras provider when no spaceId', async () => {
+    vi.mocked(getSearchSuggestions).mockResolvedValue(['Nikon'] as never);
+
+    const config = buildMapFilterConfig();
+    await config.providers.cameras!();
+
+    expect(getSearchSuggestions).toHaveBeenCalledWith(expect.objectContaining({ withSharedSpaces: true }));
+  });
+
+  it('should pass withSharedSpaces to cameraModels provider when no spaceId', async () => {
+    vi.mocked(getSearchSuggestions).mockResolvedValue(['D850'] as never);
+
+    const config = buildMapFilterConfig();
+    await config.providers.cameraModels!('Nikon');
+
+    expect(getSearchSuggestions).toHaveBeenCalledWith(
+      expect.objectContaining({ withSharedSpaces: true, make: 'Nikon' }),
+    );
   });
 });
