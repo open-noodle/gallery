@@ -2668,6 +2668,12 @@ export type SearchStatisticsResponseDto = {
     /** Total number of matching assets */
     total: number;
 };
+export type TagSuggestionResponseDto = {
+    /** Tag ID */
+    id: string;
+    /** Tag value/name */
+    value: string;
+};
 export type ServerAboutResponseDto = {
     /** Build identifier */
     build?: string;
@@ -6627,6 +6633,27 @@ export function getSearchSuggestions({ country, includeNull, lensModel, make, mo
         spaceId,
         state,
         "type": $type
+    }))}`, {
+        ...opts
+    }));
+}
+/**
+ * Retrieve tag suggestions
+ */
+export function getTagSuggestions({ spaceId, takenAfter, takenBefore, withSharedSpaces }: {
+    spaceId?: string;
+    takenAfter?: string;
+    takenBefore?: string;
+    withSharedSpaces?: boolean;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: TagSuggestionResponseDto[];
+    }>(`/search/suggestions/tags${QS.query(QS.explode({
+        spaceId,
+        takenAfter,
+        takenBefore,
+        withSharedSpaces
     }))}`, {
         ...opts
     }));
