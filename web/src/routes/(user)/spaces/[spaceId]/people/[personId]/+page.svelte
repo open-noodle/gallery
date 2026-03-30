@@ -176,7 +176,9 @@
         </div>
       </div>
 
-      <div class="sticky top-0 z-10 flex items-center justify-between rounded-lg border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+      <div
+        class="sticky top-0 z-10 flex items-center justify-between rounded-lg border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800"
+      >
         <h3 class="text-sm font-semibold text-gray-600 dark:text-gray-400">
           {$t('spaces_merge_into')}
         </h3>
