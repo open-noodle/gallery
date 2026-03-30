@@ -104,7 +104,10 @@ export class ClassificationService extends BaseService {
       updateValues.enabled = dto.enabled;
     }
 
-    const category = await this.classificationRepository.updateCategory(id, updateValues);
+    const category =
+      Object.keys(updateValues).length > 0
+        ? await this.classificationRepository.updateCategory(id, updateValues)
+        : existing;
 
     if (dto.prompts !== void 0) {
       const { machineLearning } = await this.getConfig({ withCache: true });
