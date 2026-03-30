@@ -21392,7 +21392,6 @@
           "SharedSpaceFaceMatchAll",
           "SharedSpaceLibraryFaceSync",
           "SharedSpaceBulkAddAssets",
-          "SharedSpaceBackfillPersonCounts",
           "AssetClassifyQueueAll",
           "AssetClassify"
         ],
