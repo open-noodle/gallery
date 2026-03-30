@@ -6121,10 +6121,11 @@ export function getSearchSuggestions({ country, includeNull, lensModel, make, mo
 /**
  * Retrieve tag suggestions
  */
-export function getTagSuggestions({ spaceId, takenAfter, takenBefore }: {
+export function getTagSuggestions({ spaceId, takenAfter, takenBefore, withSharedSpaces }: {
     spaceId?: string;
     takenAfter?: string;
     takenBefore?: string;
+    withSharedSpaces?: boolean;
 }, opts?: Oazapfts.RequestOpts) {
     return oazapfts.ok(oazapfts.fetchJson<{
         status: 200;
@@ -6132,7 +6133,8 @@ export function getTagSuggestions({ spaceId, takenAfter, takenBefore }: {
     }>(`/search/suggestions/tags${QS.query(QS.explode({
         spaceId,
         takenAfter,
-        takenBefore
+        takenBefore,
+        withSharedSpaces
     }))}`, {
         ...opts
     }));

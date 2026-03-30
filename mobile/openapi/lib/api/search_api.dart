@@ -271,6 +271,98 @@ class SearchApi {
     return null;
   }
 
+  /// Retrieve tag suggestions
+  ///
+  /// Retrieve tags present on assets accessible to the user, with optional space and temporal scoping.
+  ///
+  /// Note: This method returns the HTTP [Response].
+  ///
+  /// Parameters:
+  ///
+  /// * [String] spaceId:
+  ///   Scope suggestions to a specific shared space
+  ///
+  /// * [DateTime] takenAfter:
+  ///   Filter suggestions by taken date (after)
+  ///
+  /// * [DateTime] takenBefore:
+  ///   Filter suggestions by taken date (before)
+  ///
+  /// * [bool] withSharedSpaces:
+  ///   Include suggestions from shared spaces the user is a member of
+  Future<Response> getTagSuggestionsWithHttpInfo({ String? spaceId, DateTime? takenAfter, DateTime? takenBefore, bool? withSharedSpaces, }) async {
+    // ignore: prefer_const_declarations
+    final apiPath = r'/search/suggestions/tags';
+
+    // ignore: prefer_final_locals
+    Object? postBody;
+
+    final queryParams = <QueryParam>[];
+    final headerParams = <String, String>{};
+    final formParams = <String, String>{};
+
+    if (spaceId != null) {
+      queryParams.addAll(_queryParams('', 'spaceId', spaceId));
+    }
+    if (takenAfter != null) {
+      queryParams.addAll(_queryParams('', 'takenAfter', takenAfter));
+    }
+    if (takenBefore != null) {
+      queryParams.addAll(_queryParams('', 'takenBefore', takenBefore));
+    }
+    if (withSharedSpaces != null) {
+      queryParams.addAll(_queryParams('', 'withSharedSpaces', withSharedSpaces));
+    }
+
+    const contentTypes = <String>[];
+
+
+    return apiClient.invokeAPI(
+      apiPath,
+      'GET',
+      queryParams,
+      postBody,
+      headerParams,
+      formParams,
+      contentTypes.isEmpty ? null : contentTypes.first,
+    );
+  }
+
+  /// Retrieve tag suggestions
+  ///
+  /// Retrieve tags present on assets accessible to the user, with optional space and temporal scoping.
+  ///
+  /// Parameters:
+  ///
+  /// * [String] spaceId:
+  ///   Scope suggestions to a specific shared space
+  ///
+  /// * [DateTime] takenAfter:
+  ///   Filter suggestions by taken date (after)
+  ///
+  /// * [DateTime] takenBefore:
+  ///   Filter suggestions by taken date (before)
+  ///
+  /// * [bool] withSharedSpaces:
+  ///   Include suggestions from shared spaces the user is a member of
+  Future<List<TagSuggestionResponseDto>?> getTagSuggestions({ String? spaceId, DateTime? takenAfter, DateTime? takenBefore, bool? withSharedSpaces, }) async {
+    final response = await getTagSuggestionsWithHttpInfo( spaceId: spaceId, takenAfter: takenAfter, takenBefore: takenBefore, withSharedSpaces: withSharedSpaces, );
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
+    }
+    // When a remote server returns no body with a status of 204, we shall not decode it.
+    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
+    // FormatException when trying to decode an empty string.
+    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
+      final responseBody = await _decodeBodyBytes(response);
+      return (await apiClient.deserializeAsync(responseBody, 'List<TagSuggestionResponseDto>') as List)
+        .cast<TagSuggestionResponseDto>()
+        .toList(growable: false);
+
+    }
+    return null;
+  }
+
   /// Search asset statistics
   ///
   /// Retrieve statistical data about assets based on search criteria, such as the total matching count.

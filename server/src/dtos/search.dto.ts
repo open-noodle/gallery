@@ -356,6 +356,9 @@ export class TagSuggestionRequestDto {
   @ValidateUUID({ optional: true, description: 'Scope suggestions to a specific shared space' })
   spaceId?: string;
 
+  @ValidateBoolean({ optional: true, description: 'Include suggestions from shared spaces the user is a member of' })
+  withSharedSpaces?: boolean;
+
   @ValidateDate({ optional: true, description: 'Filter suggestions by taken date (after)' })
   takenAfter?: Date;
 

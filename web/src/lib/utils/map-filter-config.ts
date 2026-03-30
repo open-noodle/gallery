@@ -85,6 +85,7 @@ export function buildMapFilterConfig(spaceId?: string): FilterPanelConfig {
         }),
       tags: (context?: FilterContext) =>
         getTagSuggestions({
+          withSharedSpaces: true,
           ...(context?.takenAfter && { takenAfter: context.takenAfter }),
           ...(context?.takenBefore && { takenBefore: context.takenBefore }),
         }).then((tags) => tags.map((t) => ({ id: t.id, name: t.value }))),

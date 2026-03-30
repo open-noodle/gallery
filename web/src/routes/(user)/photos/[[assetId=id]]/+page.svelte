@@ -122,6 +122,7 @@
       },
       tags: async (context?: FilterContext) => {
         const tags = await getTagSuggestions({
+          withSharedSpaces: true,
           takenAfter: context?.takenAfter,
           takenBefore: context?.takenBefore,
         });
