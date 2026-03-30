@@ -575,17 +575,24 @@ export class SharedSpaceRepository {
     await this.db.deleteFrom('shared_space_person').where('id', '=', id).execute();
   }
 
-  addPersonFaces(values: Insertable<SharedSpacePersonFaceTable>[]) {
+  async addPersonFaces(values: Insertable<SharedSpacePersonFaceTable>[], options?: { skipRecount?: boolean }) {
     if (values.length === 0) {
-      return Promise.resolve([]);
+      return [];
     }
 
-    return this.db
+    const result = await this.db
       .insertInto('shared_space_person_face')
       .values(values)
       .onConflict((oc) => oc.doNothing())
       .returningAll()
       .execute();
+
+    if (!options?.skipRecount && result.length > 0) {
+      const personIds = [...new Set(result.map((r) => r.personId))];
+      await this.recountPersons(personIds);
+    }
+
+    return result;
   }
 
   @GenerateSql({ params: [DummyValue.UUID] })
