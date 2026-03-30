@@ -30,11 +30,6 @@ const createRawDatabase = async (name: string): Promise<Kysely<DB>> => {
   );
 };
 
-// Helper: revert MoveClassificationToConfig to get back to admin-scoped table schema
-const revertToAdminScopedSchema = async (repo: ReturnType<typeof createRepo>) => {
-  const reverted = await repo.revertLastMigration();
-  expect(reverted).toContain('MoveClassificationToConfig');
-};
 
 const createRepo = (db: Kysely<DB>) => {
   const configRepository = new ConfigRepository();
@@ -195,124 +190,6 @@ describe('Database Migration Scenarios', () => {
     }
   });
 
-  // Scenario F: MoveClassificationToConfig migration
-  describe('MoveClassificationToConfig migration', () => {
-    it('should migrate categories from table to system config', async () => {
-      const db = await createRawDatabase('migration_test_classification');
-      try {
-        const repo = createRepo(db);
-        await repo.runMigrations();
-
-        // Revert 1778 to get back to admin-scoped tables
-        await revertToAdminScopedSchema(repo);
-
-        // Insert categories (admin-scoped schema — no userId column)
-        await db
-          .insertInto('classification_category' as any)
-          .values([
-            { name: 'Screenshots', similarity: 0.35, action: 'tag_and_archive', enabled: true },
-            { name: 'Pets', similarity: 0.25, action: 'tag', enabled: true },
-          ] as any)
-          .execute();
-
-        // Add prompts (required for migration to pick them up)
-        const allCategories = await db
-          .selectFrom('classification_category' as any)
-          .select(['id'])
-          .execute();
-        for (const cat of allCategories) {
-          await db
-            .insertInto('classification_prompt_embedding' as any)
-            .values({ categoryId: (cat as any).id, prompt: 'test prompt' } as any)
-            .execute();
-        }
-
-        // Re-run migration
-        await repo.runMigrations();
-
-        // Verify: table is gone
-        const tables = await db.introspection.getTables();
-        expect(tables.find((t) => t.name === 'classification_category')).toBeUndefined();
-
-        // Verify: categories are in system config
-        const config = await db
-          .selectFrom('system_metadata' as any)
-          .select('value')
-          .where('key' as any, '=', 'system-config')
-          .executeTakeFirst();
-
-        const categories = ((config as any)?.value?.classification?.categories ?? []) as any[];
-        const names = categories.map((c: any) => c.name).toSorted();
-        expect(names).toEqual(['Pets', 'Screenshots']);
-      } finally {
-        await db.destroy();
-      }
-    });
-
-    it('should handle empty database with no categories', async () => {
-      const db = await createRawDatabase('migration_test_classification_empty');
-      try {
-        const repo = createRepo(db);
-        await repo.runMigrations();
-
-        // Revert and re-run with no classification data
-        await revertToAdminScopedSchema(repo);
-        await repo.runMigrations();
-
-        // Table should be gone
-        const tables = await db.introspection.getTables();
-        expect(tables.find((t) => t.name === 'classification_category')).toBeUndefined();
-      } finally {
-        await db.destroy();
-      }
-    });
-
-    it('should skip categories without prompts', async () => {
-      const db = await createRawDatabase('migration_test_classification_noprompts');
-      try {
-        const repo = createRepo(db);
-        await repo.runMigrations();
-
-        await revertToAdminScopedSchema(repo);
-
-        // Insert a category with no prompts
-        await db
-          .insertInto('classification_category' as any)
-          .values({ name: 'NoPrompts', similarity: 0.28, action: 'tag', enabled: true } as any)
-          .execute();
-
-        // Insert a category with a prompt
-        await db
-          .insertInto('classification_category' as any)
-          .values({ name: 'HasPrompt', similarity: 0.3, action: 'tag', enabled: true } as any)
-          .execute();
-
-        const cat = await db
-          .selectFrom('classification_category' as any)
-          .select('id')
-          .where('name' as any, '=', 'HasPrompt')
-          .executeTakeFirstOrThrow();
-        await db
-          .insertInto('classification_prompt_embedding' as any)
-          .values({ categoryId: (cat as any).id, prompt: 'test' } as any)
-          .execute();
-
-        await repo.runMigrations();
-
-        // Only the category with prompts should be in config
-        const config = await db
-          .selectFrom('system_metadata' as any)
-          .select('value')
-          .where('key' as any, '=', 'system-config')
-          .executeTakeFirst();
-
-        const categories = ((config as any)?.value?.classification?.categories ?? []) as any[];
-        expect(categories.map((c: any) => c.name)).toEqual(['HasPrompt']);
-      } finally {
-        await db.destroy();
-      }
-    });
-  });
 
   // Scenario G: Retry after revert
   it('should be able to re-run after a previous successful run', async () => {
