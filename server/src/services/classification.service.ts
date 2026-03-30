@@ -9,6 +9,7 @@ import {
 import { AssetVisibility, ImmichWorker, JobName, JobStatus, QueueName } from 'src/enum';
 import { ArgOf } from 'src/repositories/event.repository';
 import { BaseService } from 'src/services/base.service';
+import { JobOf } from 'src/types';
 import { upsertTags } from 'src/utils/tag';
 
 @Injectable()
@@ -137,10 +138,9 @@ export class ClassificationService extends BaseService {
   }
 
   async scanLibrary(_auth: AuthDto): Promise<void> {
-    await this.classificationRepository.resetClassifiedAt();
     await this.jobRepository.queue({
       name: JobName.AssetClassifyQueueAll,
-      data: {},
+      data: { force: true },
     });
   }
 
@@ -149,7 +149,7 @@ export class ClassificationService extends BaseService {
     if (oldConfig.machineLearning.clip.modelName !== newConfig.machineLearning.clip.modelName) {
       this.logger.log('CLIP model changed, re-encoding classification prompt embeddings');
       await this.reEncodeAllPrompts(newConfig.machineLearning.clip.modelName);
-      await this.jobRepository.queue({ name: JobName.AssetClassifyQueueAll, data: {} });
+      await this.jobRepository.queue({ name: JobName.AssetClassifyQueueAll, data: { force: true } });
     }
   }
 
@@ -170,7 +170,11 @@ export class ClassificationService extends BaseService {
   }
 
   @OnJob({ name: JobName.AssetClassifyQueueAll, queue: QueueName.Classification })
-  async handleClassifyQueueAll(_data: Record<string, never>): Promise<JobStatus> {
+  async handleClassifyQueueAll({ force }: JobOf<JobName.AssetClassifyQueueAll>): Promise<JobStatus> {
+    if (force) {
+      await this.classificationRepository.resetClassifiedAt();
+    }
+
     const stream = this.classificationRepository.streamUnclassifiedAssets();
 
     let queue: Array<{ name: JobName.AssetClassify; data: { id: string } }> = [];

@@ -260,12 +260,22 @@ describe(ClassificationService.name, () => {
       const result = await sut.handleClassifyQueueAll({});
 
       expect(result).toBe(JobStatus.Success);
+      expect(mocks.classification.resetClassifiedAt).not.toHaveBeenCalled();
       expect(mocks.classification.streamUnclassifiedAssets).toHaveBeenCalledWith();
       expect(mocks.job.queueAll).toHaveBeenCalledWith([
         { name: JobName.AssetClassify, data: { id: 'a1' } },
         { name: JobName.AssetClassify, data: { id: 'a2' } },
         { name: JobName.AssetClassify, data: { id: 'a3' } },
       ]);
+    });
+
+    it('should reset classifiedAt when force is true', async () => {
+      mocks.classification.resetClassifiedAt.mockResolvedValue(void 0 as any);
+      mocks.classification.streamUnclassifiedAssets.mockReturnValue(makeStream([]));
+
+      await sut.handleClassifyQueueAll({ force: true });
+
+      expect(mocks.classification.resetClassifiedAt).toHaveBeenCalledWith();
     });
 
     it('should flush exactly at 1000 boundary', async () => {
@@ -433,16 +443,14 @@ describe(ClassificationService.name, () => {
   });
 
   describe('scanLibrary', () => {
-    it('should reset classifiedAt and queue AssetClassifyQueueAll', async () => {
-      mocks.classification.resetClassifiedAt.mockResolvedValue(void 0 as any);
+    it('should queue AssetClassifyQueueAll with force', async () => {
       mocks.job.queue.mockResolvedValue(void 0 as any);
 
       await sut.scanLibrary(authStub.user1);
 
-      expect(mocks.classification.resetClassifiedAt).toHaveBeenCalledWith();
       expect(mocks.job.queue).toHaveBeenCalledWith({
         name: JobName.AssetClassifyQueueAll,
-        data: {},
+        data: { force: true },
       });
     });
   });
@@ -461,7 +469,7 @@ describe(ClassificationService.name, () => {
       } as any);
 
       expect(mocks.machineLearning.encodeText).toHaveBeenCalledWith('sunset', { modelName: 'new-model' });
-      expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.AssetClassifyQueueAll, data: {} });
+      expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.AssetClassifyQueueAll, data: { force: true } });
     });
 
     it('should do nothing when CLIP model is unchanged', async () => {
@@ -484,7 +492,7 @@ describe(ClassificationService.name, () => {
 
       // Still queues the classify-all job even with no categories
       expect(mocks.machineLearning.encodeText).not.toHaveBeenCalled();
-      expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.AssetClassifyQueueAll, data: {} });
+      expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.AssetClassifyQueueAll, data: { force: true } });
     });
   });
 
