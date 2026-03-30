@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Insertable, Kysely, Updateable } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { DummyValue, GenerateSql } from 'src/decorators';
+import { AssetVisibility } from 'src/enum';
 import { LoggingRepository } from 'src/repositories/logging.repository';
 import { DB } from 'src/schema';
 import { ClassificationCategoryTable } from 'src/schema/tables/classification-category.table';
@@ -90,6 +91,37 @@ export class ClassificationRepository {
 
   async deletePromptEmbeddingsByCategory(categoryId: string) {
     await this.db.deleteFrom('classification_prompt_embedding').where('categoryId', '=', categoryId).execute();
+  }
+
+  async removeAutoTagAssignments(categoryName: string) {
+    const tagValue = `Auto/${categoryName}`;
+
+    const tags = await this.db.selectFrom('tag').select('id').where('value', '=', tagValue).execute();
+
+    if (tags.length === 0) {
+      return;
+    }
+
+    const tagIds = tags.map((t) => t.id);
+
+    const affectedAssets = await this.db
+      .selectFrom('tag_asset')
+      .select('assetId')
+      .where('tagId', 'in', tagIds)
+      .execute();
+
+    const assetIds = affectedAssets.map((a) => a.assetId);
+
+    if (assetIds.length > 0) {
+      await this.db
+        .updateTable('asset')
+        .set({ visibility: AssetVisibility.Timeline })
+        .where('id', 'in', assetIds)
+        .where('visibility', '=', AssetVisibility.Archive)
+        .execute();
+    }
+
+    await this.db.deleteFrom('tag_asset').where('tagId', 'in', tagIds).execute();
   }
 
   async resetClassifiedAt() {

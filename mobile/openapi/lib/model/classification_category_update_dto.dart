@@ -17,6 +17,7 @@ class ClassificationCategoryUpdateDto {
     this.enabled,
     this.name,
     this.prompts = const [],
+    this.rescan,
     this.similarity,
   });
 
@@ -44,6 +45,15 @@ class ClassificationCategoryUpdateDto {
   /// Text prompts for CLIP matching
   List<String> prompts;
 
+  /// Wipe existing auto-tags for this category and rescan all assets
+  ///
+  /// Please note: This property should have been non-nullable! Since the specification file
+  /// does not include a default value (using the "default:" property), however, the generated
+  /// source code must fall back to having a nullable type.
+  /// Consider adding a "default:" property in the specification file to hide this note.
+  ///
+  bool? rescan;
+
   /// Similarity threshold (0-1, higher = stricter)
   ///
   /// Minimum value: 0
@@ -62,6 +72,7 @@ class ClassificationCategoryUpdateDto {
     other.enabled == enabled &&
     other.name == name &&
     _deepEquality.equals(other.prompts, prompts) &&
+    other.rescan == rescan &&
     other.similarity == similarity;
 
   @override
@@ -71,10 +82,11 @@ class ClassificationCategoryUpdateDto {
     (enabled == null ? 0 : enabled!.hashCode) +
     (name == null ? 0 : name!.hashCode) +
     (prompts.hashCode) +
+    (rescan == null ? 0 : rescan!.hashCode) +
     (similarity == null ? 0 : similarity!.hashCode);
 
   @override
-  String toString() => 'ClassificationCategoryUpdateDto[action=$action, enabled=$enabled, name=$name, prompts=$prompts, similarity=$similarity]';
+  String toString() => 'ClassificationCategoryUpdateDto[action=$action, enabled=$enabled, name=$name, prompts=$prompts, rescan=$rescan, similarity=$similarity]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -94,6 +106,11 @@ class ClassificationCategoryUpdateDto {
     //  json[r'name'] = null;
     }
       json[r'prompts'] = this.prompts;
+    if (this.rescan != null) {
+      json[r'rescan'] = this.rescan;
+    } else {
+    //  json[r'rescan'] = null;
+    }
     if (this.similarity != null) {
       json[r'similarity'] = this.similarity;
     } else {
@@ -117,6 +134,7 @@ class ClassificationCategoryUpdateDto {
         prompts: json[r'prompts'] is Iterable
             ? (json[r'prompts'] as Iterable).cast<String>().toList(growable: false)
             : const [],
+        rescan: mapValueOfType<bool>(json, r'rescan'),
         similarity: json[r'similarity'] == null
             ? null
             : num.parse('${json[r'similarity']}'),
