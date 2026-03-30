@@ -670,21 +670,26 @@ export class SharedSpaceRepository {
       return;
     }
 
-    await sql`
-      UPDATE shared_space_person SET
-        "faceCount" = (
-          SELECT count(*)::int
-          FROM shared_space_person_face
-          WHERE shared_space_person_face."personId" = shared_space_person.id
-        ),
-        "assetCount" = (
-          SELECT count(distinct asset_face."assetId")::int
-          FROM shared_space_person_face
-          JOIN asset_face ON asset_face.id = shared_space_person_face."assetFaceId"
-          WHERE shared_space_person_face."personId" = shared_space_person.id
-        )
-      WHERE id = ANY(${personIds})
-    `.execute(this.db);
+    await this.db
+      .updateTable('shared_space_person')
+      .set((eb) => ({
+        faceCount: eb
+          .selectFrom('shared_space_person_face')
+          .select((eb2) => eb2.fn.countAll().$castTo<number>().as('count'))
+          .whereRef('shared_space_person_face.personId', '=', 'shared_space_person.id'),
+        assetCount: eb
+          .selectFrom('shared_space_person_face')
+          .innerJoin('asset_face', 'asset_face.id', 'shared_space_person_face.assetFaceId')
+          .select((eb2) =>
+            eb2.fn
+              .count(eb2.fn('distinct', ['asset_face.assetId']))
+              .$castTo<number>()
+              .as('count'),
+          )
+          .whereRef('shared_space_person_face.personId', '=', 'shared_space_person.id'),
+      }))
+      .where('id', 'in', personIds)
+      .execute();
   }
 
   // ==========================================

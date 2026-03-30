@@ -494,27 +494,27 @@ where
   )
 
 -- SharedSpaceRepository.recountPersons
-UPDATE shared_space_person
-SET
+update "shared_space_person"
+set
   "faceCount" = (
-    SELECT
-      count(*)::int
-    FROM
-      shared_space_person_face
-    WHERE
-      shared_space_person_face."personId" = shared_space_person.id
+    select
+      count(*) as "count"
+    from
+      "shared_space_person_face"
+    where
+      "shared_space_person_face"."personId" = "shared_space_person"."id"
   ),
   "assetCount" = (
-    SELECT
-      count(distinct asset_face."assetId")::int
-    FROM
-      shared_space_person_face
-      JOIN asset_face ON asset_face.id = shared_space_person_face."assetFaceId"
-    WHERE
-      shared_space_person_face."personId" = shared_space_person.id
+    select
+      count(distinct ("asset_face"."assetId")) as "count"
+    from
+      "shared_space_person_face"
+      inner join "asset_face" on "asset_face"."id" = "shared_space_person_face"."assetFaceId"
+    where
+      "shared_space_person_face"."personId" = "shared_space_person"."id"
   )
-WHERE
-  id = ANY ($1)
+where
+  "id" in ($1)
 
 -- SharedSpaceRepository.getAlias
 select
