@@ -60,6 +60,7 @@ export function buildMapFilterConfig(spaceId?: string): FilterPanelConfig {
       cameras: (context?: FilterContext) =>
         getSearchSuggestions({
           $type: SearchSuggestionType.CameraMake,
+          withSharedSpaces: true,
           ...(context?.takenAfter && { takenAfter: context.takenAfter }),
           ...(context?.takenBefore && { takenBefore: context.takenBefore }),
         }).then((results) => results.map((r) => ({ value: r, type: 'make' as const }))),
@@ -67,6 +68,7 @@ export function buildMapFilterConfig(spaceId?: string): FilterPanelConfig {
         getSearchSuggestions({
           $type: SearchSuggestionType.CameraModel,
           make,
+          withSharedSpaces: true,
           ...(context?.takenAfter && { takenAfter: context.takenAfter }),
           ...(context?.takenBefore && { takenBefore: context.takenBefore }),
         }),
