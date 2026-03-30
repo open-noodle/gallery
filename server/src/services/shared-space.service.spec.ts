@@ -32,6 +32,7 @@ describe(SharedSpaceService.name, () => {
   beforeEach(() => {
     ({ sut, mocks } = newTestService(SharedSpaceService));
     mocks.sharedSpace.hasPetsBySpaceId.mockResolvedValue(false);
+    mocks.sharedSpace.recountPersons.mockResolvedValue(void 0);
   });
 
   it('should work', () => {
@@ -2147,7 +2148,9 @@ describe(SharedSpaceService.name, () => {
       const result = await sut.handleSharedSpaceFaceMatch({ spaceId, assetId });
 
       expect(result).toBe(JobStatus.Success);
-      expect(mocks.sharedSpace.addPersonFaces).toHaveBeenCalledWith([{ personId, assetFaceId: faceId }]);
+      expect(mocks.sharedSpace.addPersonFaces).toHaveBeenCalledWith([{ personId, assetFaceId: faceId }], {
+        skipRecount: true,
+      });
     });
 
     it('should create new person when no match is found', async () => {
@@ -2179,7 +2182,10 @@ describe(SharedSpaceService.name, () => {
         representativeFaceId: faceId,
         type: 'person',
       });
-      expect(mocks.sharedSpace.addPersonFaces).toHaveBeenCalledWith([{ personId: newPersonId, assetFaceId: faceId }]);
+      expect(mocks.sharedSpace.addPersonFaces).toHaveBeenCalledWith(
+        [{ personId: newPersonId, assetFaceId: faceId }],
+        { skipRecount: true },
+      );
     });
 
     it('should create new person when distance exceeds threshold', async () => {
@@ -4227,9 +4233,10 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.getPetFacesForAsset.mockResolvedValue([]);
 
       await sut.handleSharedSpaceLibraryFaceSync({ spaceId, libraryId });
-      expect(mocks.sharedSpace.addPersonFaces).toHaveBeenCalledWith([
-        { personId: existingPersonId, assetFaceId: faceId },
-      ]);
+      expect(mocks.sharedSpace.addPersonFaces).toHaveBeenCalledWith(
+        [{ personId: existingPersonId, assetFaceId: faceId }],
+        { skipRecount: true },
+      );
       expect(mocks.sharedSpace.createPerson).not.toHaveBeenCalled();
     });
   });
