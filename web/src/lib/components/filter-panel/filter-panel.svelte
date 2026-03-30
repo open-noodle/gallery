@@ -170,6 +170,21 @@
         );
       }
 
+      if (providers.tags && sections.includes('tags')) {
+        promises.push(
+          providers
+            .tags(currentContext)
+            .then((result) => {
+              if (!controller.signal.aborted) {
+                tags = result;
+              }
+            })
+            .catch((error: unknown) => {
+              console.error('Failed to re-fetch tags:', error);
+            }),
+        );
+      }
+
       void Promise.allSettled(promises).then(() => {
         if (!controller.signal.aborted) {
           isRefetching = false;
