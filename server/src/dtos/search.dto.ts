@@ -223,12 +223,34 @@ export class SearchSuggestionRequestDto {
   })
   .meta({ id: 'SearchFacetCountResponseDto' });
 
-const SearchFacetResponseSchema = z
-  .object({
-    fieldName: z.string().describe('Facet field name'),
-    counts: z.array(SearchFacetCountResponseSchema),
-  })
-  .meta({ id: 'SearchFacetResponseDto' });
+export class TagSuggestionRequestDto {
+  @ValidateUUID({ optional: true, description: 'Scope suggestions to a specific shared space' })
+  spaceId?: string;
+
+  @ValidateBoolean({ optional: true, description: 'Include suggestions from shared spaces the user is a member of' })
+  withSharedSpaces?: boolean;
+
+  @ValidateDate({ optional: true, description: 'Filter suggestions by taken date (after)' })
+  takenAfter?: Date;
+
+  @ValidateDate({ optional: true, description: 'Filter suggestions by taken date (before)' })
+  takenBefore?: Date;
+}
+
+export class TagSuggestionResponseDto {
+  @ApiProperty({ description: 'Tag ID' })
+  id!: string;
+
+  @ApiProperty({ description: 'Tag value/name' })
+  value!: string;
+}
+
+class SearchFacetCountResponseDto {
+  @ApiProperty({ type: 'integer', description: 'Number of assets with this facet value' })
+  count!: number;
+  @ApiProperty({ description: 'Facet value' })
+  value!: string;
+}
 
 const SearchAlbumResponseSchema = z
   .object({

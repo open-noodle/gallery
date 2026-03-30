@@ -408,6 +408,7 @@ part 'model/tag_bulk_assets_dto.dart';
 part 'model/tag_bulk_assets_response_dto.dart';
 part 'model/tag_create_dto.dart';
 part 'model/tag_response_dto.dart';
+part 'model/tag_suggestion_response_dto.dart';
 part 'model/tag_update_dto.dart';
 part 'model/tag_upsert_dto.dart';
 part 'model/tags_response.dart';

@@ -290,3 +290,18 @@ where
   and "deletedAt" is null
   and "lensModel" is not null
   and "lensModel" != $3
+
+-- SearchRepository.getAccessibleTags
+select distinct
+  "tag"."id",
+  "tag"."value"
+from
+  "tag"
+  inner join "tag_asset" on "tag"."id" = "tag_asset"."tagId"
+  inner join "asset" on "tag_asset"."assetId" = "asset"."id"
+where
+  "asset"."visibility" = $1
+  and "asset"."deletedAt" is null
+  and "asset"."ownerId" = any ($2::uuid[])
+order by
+  "tag"."value"

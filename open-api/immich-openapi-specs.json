@@ -10544,6 +10544,90 @@
         "x-immich-state": "Stable"
       }
     },
+    "/search/suggestions/tags": {
+      "get": {
+        "description": "Retrieve tags present on assets accessible to the user, with optional space and temporal scoping.",
+        "operationId": "getTagSuggestions",
+        "parameters": [
+          {
+            "name": "spaceId",
+            "required": false,
+            "in": "query",
+            "description": "Scope suggestions to a specific shared space",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "takenAfter",
+            "required": false,
+            "in": "query",
+            "description": "Filter suggestions by taken date (after)",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "takenBefore",
+            "required": false,
+            "in": "query",
+            "description": "Filter suggestions by taken date (before)",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "withSharedSpaces",
+            "required": false,
+            "in": "query",
+            "description": "Include suggestions from shared spaces the user is a member of",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TagSuggestionResponseDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Retrieve tag suggestions",
+        "tags": [
+          "Search"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          }
+        ],
+        "x-immich-permission": "asset.read"
+      }
+    },
     "/server/about": {
       "get": {
         "description": "Retrieve a list of information about the server.",
@@ -29014,6 +29098,23 @@
           "id",
           "name",
           "updatedAt",
+          "value"
+        ],
+        "type": "object"
+      },
+      "TagSuggestionResponseDto": {
+        "properties": {
+          "id": {
+            "description": "Tag ID",
+            "type": "string"
+          },
+          "value": {
+            "description": "Tag value/name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
           "value"
         ],
         "type": "object"

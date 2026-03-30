@@ -47,7 +47,7 @@
   import { buildPhotosTimelineOptions, handlePhotosRemoveFilter } from '$lib/utils/photos-filter-options';
   import { getAltText } from '$lib/utils/thumbnail-util';
   import { toTimelineAsset } from '$lib/utils/timeline-util';
-  import { getAllPeople, getAllTags, getSearchSuggestions, SearchSuggestionType } from '@immich/sdk';
+  import { getAllPeople, getSearchSuggestions, getTagSuggestions, SearchSuggestionType } from '@immich/sdk';
   import { ActionButton, CommandPaletteDefaultProvider, ImageCarousel } from '@immich/ui';
   import { mdiDotsVertical } from '@mdi/js';
   import { t } from 'svelte-i18n';
@@ -116,8 +116,12 @@
         });
         return models.filter(Boolean) as string[];
       },
-      tags: async () => {
-        const tags = await getAllTags();
+      tags: async (context?: FilterContext) => {
+        const tags = await getTagSuggestions({
+          withSharedSpaces: true,
+          takenAfter: context?.takenAfter,
+          takenBefore: context?.takenBefore,
+        });
         for (const t of tags) {
           tagNames.set(t.id, t.value);
         }

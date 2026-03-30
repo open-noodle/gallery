@@ -17,6 +17,8 @@ import {
   SearchSuggestionRequestDto,
   SmartSearchDto,
   StatisticsSearchDto,
+  TagSuggestionRequestDto,
+  TagSuggestionResponseDto,
 } from 'src/dtos/search.dto';
 import { ApiTag, Permission } from 'src/enum';
 import { Auth, Authenticated } from 'src/middleware/auth.guard';
@@ -143,5 +145,16 @@ export class SearchController {
   getSearchSuggestions(@Auth() auth: AuthDto, @Query() dto: SearchSuggestionRequestDto): Promise<string[]> {
     // TODO fix open api generation to indicate that results can be nullable
     return this.service.getSearchSuggestions(auth, dto) as Promise<string[]>;
+  }
+
+  @Get('suggestions/tags')
+  @Authenticated({ permission: Permission.AssetRead })
+  @Endpoint({
+    summary: 'Retrieve tag suggestions',
+    description: 'Retrieve tags present on assets accessible to the user, with optional space and temporal scoping.',
+    history: new HistoryBuilder().added('v1'),
+  })
+  getTagSuggestions(@Auth() auth: AuthDto, @Query() dto: TagSuggestionRequestDto): Promise<TagSuggestionResponseDto[]> {
+    return this.service.getTagSuggestions(auth, dto);
   }
 }
