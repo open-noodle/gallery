@@ -4,7 +4,7 @@ import FilterPanel from '../filter-panel.svelte';
 
 function createConfig(overrides: Partial<FilterPanelConfig['providers']> = {}): FilterPanelConfig {
   return {
-    sections: ['timeline', 'people', 'location', 'camera'],
+    sections: ['timeline', 'people', 'location', 'camera', 'tags'],
     providers: {
       people: vi.fn().mockResolvedValue([
         { id: 'p1', name: 'Alice' },
@@ -17,6 +17,10 @@ function createConfig(overrides: Partial<FilterPanelConfig['providers']> = {}): 
       cameras: vi.fn().mockResolvedValue([
         { value: 'Canon', type: 'make' as const },
         { value: 'Sony', type: 'make' as const },
+      ]),
+      tags: vi.fn().mockResolvedValue([
+        { id: 't1', name: 'Vacation' },
+        { id: 't2', name: 'Family' },
       ]),
       ...overrides,
     },
@@ -67,6 +71,35 @@ describe('Contextual re-fetch on temporal change', () => {
       expect(config.providers.people).toHaveBeenLastCalledWith(expectedContext);
       expect(config.providers.locations).toHaveBeenLastCalledWith(expectedContext);
       expect(config.providers.cameras).toHaveBeenLastCalledWith(expectedContext);
+      expect(config.providers.tags).toHaveBeenCalledTimes(2);
+      expect(config.providers.tags).toHaveBeenLastCalledWith(expectedContext);
+    });
+  });
+
+  it('should re-fetch tags with temporal context when a year is selected', async () => {
+    const config = createConfig();
+    render(FilterPanel, {
+      props: { config, timeBuckets },
+    });
+
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(config.providers.tags).toHaveBeenCalledTimes(1);
+
+    // Click year to select 2023
+    await fireEvent.click(screen.getByTestId('year-btn-2023'));
+
+    // Advance past debounce
+    await vi.advanceTimersByTimeAsync(250);
+
+    const expectedContext: FilterContext = {
+      takenAfter: '2023-01-01T00:00:00.000Z',
+      takenBefore: '2024-01-01T00:00:00.000Z',
+    };
+
+    await waitFor(() => {
+      expect(config.providers.tags).toHaveBeenCalledTimes(2);
+      expect(config.providers.tags).toHaveBeenLastCalledWith(expectedContext);
     });
   });
 

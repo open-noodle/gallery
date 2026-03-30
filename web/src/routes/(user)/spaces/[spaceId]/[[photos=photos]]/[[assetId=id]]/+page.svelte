@@ -53,7 +53,7 @@
     AssetOrder,
     AssetTypeEnum,
     AssetVisibility,
-    getAllTags,
+    getTagSuggestions,
     getMembers,
     getSearchSuggestions,
     getSpace,
@@ -221,8 +221,12 @@
         });
         return models.filter(Boolean) as string[];
       },
-      tags: async () => {
-        const tags = await getAllTags();
+      tags: async (context?: FilterContext) => {
+        const tags = await getTagSuggestions({
+          spaceId: space.id,
+          takenAfter: context?.takenAfter,
+          takenBefore: context?.takenBefore,
+        });
         for (const t of tags) {
           tagNames.set(t.id, t.value);
         }
