@@ -164,6 +164,46 @@ from
       )
   ) as "combined"
 
+-- AccessRepository.asset.checkSpaceAccessForSpace
+select
+  "combined"."id",
+  "combined"."livePhotoVideoId"
+from
+  (
+    select
+      "asset"."id",
+      "asset"."livePhotoVideoId"
+    from
+      "shared_space_asset"
+      inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_asset"."spaceId"
+      inner join "asset" on "asset"."id" = "shared_space_asset"."assetId"
+      and "asset"."deletedAt" is null
+    where
+      "shared_space_member"."userId" = $1
+      and "shared_space_asset"."spaceId" = $2
+      and (
+        "asset"."id" in ($3)
+        or "asset"."livePhotoVideoId" in ($4)
+      )
+    union
+    select
+      "asset"."id",
+      "asset"."livePhotoVideoId"
+    from
+      "shared_space_library"
+      inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_library"."spaceId"
+      inner join "asset" on "asset"."libraryId" = "shared_space_library"."libraryId"
+      and "asset"."deletedAt" is null
+      and "asset"."isOffline" = $5
+    where
+      "shared_space_member"."userId" = $6
+      and "shared_space_library"."spaceId" = $7
+      and (
+        "asset"."id" in ($8)
+        or "asset"."livePhotoVideoId" in ($9)
+      )
+  ) as "combined"
+
 -- AccessRepository.asset.checkSpaceEditAccess
 select
   "combined"."id",
