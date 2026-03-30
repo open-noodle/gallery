@@ -100,12 +100,37 @@
 
   async function openVisibilityModal() {
     try {
-      allPeople = await getSpacePeople({ id: space.id, withHidden: true });
+      allPeople = await getSpacePeople({ id: space.id, withHidden: true, limit: PAGE_SIZE });
     } catch (error) {
       handleError(error, $t('spaces_error_loading_people'));
       return;
     }
+    hasMoreVisibility = allPeople.length >= PAGE_SIZE;
     selectHidden = true;
+  }
+
+  let hasMoreVisibility = $state(false);
+  let loadingVisibility = $state(false);
+
+  async function loadMoreVisibility() {
+    if (loadingVisibility || !hasMoreVisibility) {
+      return;
+    }
+    loadingVisibility = true;
+    try {
+      const more = await getSpacePeople({
+        id: space.id,
+        withHidden: true,
+        limit: PAGE_SIZE,
+        offset: allPeople.length,
+      });
+      allPeople = [...allPeople, ...more];
+      hasMoreVisibility = more.length >= PAGE_SIZE;
+    } catch (error) {
+      handleError(error, $t('spaces_error_loading_people'));
+    } finally {
+      loadingVisibility = false;
+    }
   }
 
   const onNameFocus = (person: SharedSpacePersonResponseDto) => {
@@ -268,6 +293,9 @@
       spaceId={space.id}
       onClose={() => (selectHidden = false)}
       onUpdate={() => refreshPeople()}
+      hasMore={hasMoreVisibility}
+      loading={loadingVisibility}
+      onLoadMore={loadMoreVisibility}
     />
   </dialog>
 {/if}
