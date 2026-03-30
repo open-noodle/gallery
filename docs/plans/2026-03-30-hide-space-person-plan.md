@@ -87,7 +87,40 @@ git commit -m "feat: add hide person option to space people context menu"
 
 ---
 
-### Task 2: Add E2E test for hiding a space person
+### Task 2: Add `createSpacePerson` helper to E2E utils
+
+**Files:**
+
+- Modify: `e2e/src/utils.ts`
+
+**Step 1: Add the helper**
+
+Add a `createSpacePerson` method to the `utils` object, after the `createPet` method (around line 542). Follow the same pattern as `createPet` (lines 529-542):
+
+```typescript
+createSpacePerson: async (spaceId: string, name: string) => {
+  if (!client) {
+    throw new Error('Database client not connected');
+  }
+  const result = await client.query(
+    `INSERT INTO shared_space_person ("spaceId", name, "isHidden", "faceCount", "assetCount")
+     VALUES ($1, $2, false, 1, 1) RETURNING id`,
+    [spaceId, name],
+  );
+  return result.rows[0].id as string;
+},
+```
+
+**Note:** The space person will have no `representativeFaceId`, so the thumbnail endpoint will 404. This is fine — the person card still renders (just with a placeholder), which is sufficient for testing the hide action.
+
+**Step 2: Verify it compiles**
+
+Run: `cd e2e && npx tsc --noEmit`
+Expected: No errors
+
+---
+
+### Task 3: Add E2E test for hiding a space person
 
 **Files:**
 
@@ -95,7 +128,7 @@ git commit -m "feat: add hide person option to space people context menu"
 
 **Step 1: Write the E2E test**
 
-Space people are created by ML face detection — there's no creation API. The test must insert a space person directly into the database, matching the pattern used by `utils.createFace` and `utils.setPersonThumbnail` in `e2e/src/utils.ts`.
+Space people are created by ML face detection — there's no creation API. The test uses the `createSpacePerson` helper from Task 2 to insert directly into the database.
 
 ```typescript
 import type { LoginResponseDto, SharedSpaceResponseDto } from '@immich/sdk';
@@ -117,13 +150,7 @@ test.describe('Spaces People', () => {
     await utils.addSpaceAssets(admin.accessToken, space.id, [asset.id]);
 
     // Insert a space person directly (no ML needed)
-    await utils.dbQuery(
-      `
-      INSERT INTO shared_space_person ("spaceId", name, "isHidden", "faceCount", "assetCount")
-      VALUES ($1, 'Alice', false, 1, 1)
-    `,
-      [space.id],
-    );
+    await utils.createSpacePerson(space.id, 'Alice');
   });
 
   async function gotoSpacePeople(
@@ -157,26 +184,14 @@ test.describe('Spaces People', () => {
 });
 ```
 
-**Important:** The test uses `utils.dbQuery()` for direct DB access. Check if this helper exists — `utils.createFace` uses `client.query()` directly. If `dbQuery` doesn't exist, use the same `client` pattern from `createFace`.
-
-**Step 2: Verify the DB helper**
-
-Check `e2e/src/utils.ts` for the DB query pattern. The existing `createFace` (line 513-518) uses:
-
-```typescript
-await client.query('INSERT INTO ...', [params]);
-```
-
-If there's no `dbQuery` wrapper, add one or use the direct `client.query` pattern through an existing utility.
-
-**Step 3: Run the test locally (if E2E stack is available)**
+**Step 2: Run the test locally (if E2E stack is available)**
 
 Run: `cd e2e && pnpm test:web -- --grep "hide person"`
 Expected: PASS
 
-**Step 4: Commit**
+**Step 3: Commit**
 
 ```bash
-git add e2e/src/specs/web/spaces-people.e2e-spec.ts
+git add e2e/src/utils.ts e2e/src/specs/web/spaces-people.e2e-spec.ts
 git commit -m "test: e2e test for hiding person from space people menu"
 ```
