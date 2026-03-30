@@ -103,6 +103,14 @@ describe('/classification/categories', () => {
       expect(status).toBe(400);
       expect(body).toEqual(errorDto.badRequest(['id must be a UUID']));
     });
+
+    it('should accept rescan flag on update', async () => {
+      const { status } = await request(app)
+        .put(`/classification/categories/${uuidDto.notFound}`)
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .send({ similarity: 0.5, rescan: true });
+      expect(status).toBe(404);
+    });
   });
 
   describe('DELETE /classification/categories/:id', () => {
