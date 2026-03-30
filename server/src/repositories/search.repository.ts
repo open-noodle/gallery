@@ -535,9 +535,7 @@ export class SearchRepository {
       .innerJoin('asset', 'tag_asset.assetId', 'asset.id')
       .where('asset.visibility', '=', AssetVisibility.Timeline)
       .where('asset.deletedAt', 'is', null)
-      .$if(!options?.spaceId && !options?.timelineSpaceIds, (qb) =>
-        qb.where('asset.ownerId', '=', anyUuid(userIds)),
-      )
+      .$if(!options?.spaceId && !options?.timelineSpaceIds, (qb) => qb.where('asset.ownerId', '=', anyUuid(userIds)))
       .$if(!!options?.spaceId && !options?.timelineSpaceIds, (qb) =>
         qb.where((eb) =>
           eb.or([
