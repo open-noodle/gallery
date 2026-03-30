@@ -108,8 +108,12 @@ export class AssetController {
     description: 'Retrieve detailed information about a specific asset.',
     history: new HistoryBuilder().added('v1').beta('v1').stable('v2'),
   })
-  getAssetInfo(@Auth() auth: AuthDto, @Param() { id }: UUIDParamDto): Promise<AssetResponseDto> {
-    return this.service.get(auth, id) as Promise<AssetResponseDto>;
+  getAssetInfo(
+    @Auth() auth: AuthDto,
+    @Param() { id }: UUIDParamDto,
+    @Query('spaceId') spaceId?: string,
+  ): Promise<AssetResponseDto> {
+    return this.service.get(auth, id, spaceId) as Promise<AssetResponseDto>;
   }
 
   @Put('copy')

@@ -124,6 +124,8 @@ export class PersonResponseDto {
 export class PersonWithFacesResponseDto extends PersonResponseDto {
   @ApiProperty({ description: 'Face detections' })
   faces!: AssetFaceWithoutPersonResponseDto[];
+  @ApiPropertyOptional({ description: 'Space person ID (when viewed through a space)' })
+  spacePersonId?: string;
 }
 
 export class AssetFaceWithoutPersonResponseDto {

@@ -82,7 +82,7 @@ export class AssetService extends BaseService {
     return this.assetRepository.getAllByDeviceId(auth.user.id, deviceId);
   }
 
-  async get(auth: AuthDto, id: string): Promise<AssetResponseDto | SanitizedAssetResponseDto> {
+  async get(auth: AuthDto, id: string, spaceId?: string): Promise<AssetResponseDto | SanitizedAssetResponseDto> {
     await this.requireAccess({ auth, permission: Permission.AssetRead, ids: [id] });
 
     const asset = await this.assetRepository.getById(id, {

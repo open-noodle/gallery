@@ -267,6 +267,62 @@ class AssetAccess {
       });
   }
 
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID, DummyValue.UUID_SET] })
+  @ChunkedSet({ paramIndex: 2 })
+  async checkSpaceAccessForSpace(userId: string, spaceId: string, assetIds: Set<string>) {
+    if (assetIds.size === 0) {
+      return new Set<string>();
+    }
+
+    return this.db
+      .selectFrom(
+        this.db
+          .selectFrom('shared_space_asset')
+          .innerJoin('shared_space_member', 'shared_space_member.spaceId', 'shared_space_asset.spaceId')
+          .innerJoin('asset', (join) =>
+            join.onRef('asset.id', '=', 'shared_space_asset.assetId').on('asset.deletedAt', 'is', null),
+          )
+          .select(['asset.id', 'asset.livePhotoVideoId'])
+          .where('shared_space_member.userId', '=', userId)
+          .where('shared_space_asset.spaceId', '=', spaceId)
+          .where((eb) =>
+            eb.or([eb('asset.id', 'in', [...assetIds]), eb('asset.livePhotoVideoId', 'in', [...assetIds])]),
+          )
+          .union(
+            this.db
+              .selectFrom('shared_space_library')
+              .innerJoin('shared_space_member', 'shared_space_member.spaceId', 'shared_space_library.spaceId')
+              .innerJoin('asset', (join) =>
+                join
+                  .onRef('asset.libraryId', '=', 'shared_space_library.libraryId')
+                  .on('asset.deletedAt', 'is', null)
+                  .on('asset.isOffline', '=', false),
+              )
+              .select(['asset.id', 'asset.livePhotoVideoId'])
+              .where('shared_space_member.userId', '=', userId)
+              .where('shared_space_library.spaceId', '=', spaceId)
+              .where((eb) =>
+                eb.or([eb('asset.id', 'in', [...assetIds]), eb('asset.livePhotoVideoId', 'in', [...assetIds])]),
+              ),
+          )
+          .as('combined'),
+      )
+      .select(['combined.id', 'combined.livePhotoVideoId'])
+      .execute()
+      .then((assets) => {
+        const allowedIds = new Set<string>();
+        for (const asset of assets) {
+          if (asset.id && assetIds.has(asset.id)) {
+            allowedIds.add(asset.id);
+          }
+          if (asset.livePhotoVideoId && assetIds.has(asset.livePhotoVideoId)) {
+            allowedIds.add(asset.livePhotoVideoId);
+          }
+        }
+        return allowedIds;
+      });
+  }
+
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID_SET] })
   @ChunkedSet({ paramIndex: 1 })
   async checkSpaceEditAccess(userId: string, assetIds: Set<string>) {
