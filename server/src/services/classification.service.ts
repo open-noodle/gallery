@@ -121,6 +121,14 @@ export class ClassificationService extends BaseService {
       }
     }
 
+    if (dto.rescan) {
+      await this.classificationRepository.removeAutoTagAssignments(existing.name);
+      await this.jobRepository.queue({
+        name: JobName.AssetClassifyQueueAll,
+        data: { force: true },
+      });
+    }
+
     const promptRows = await this.classificationRepository.getPromptEmbeddings(id);
     return this.mapCategory(
       category,
