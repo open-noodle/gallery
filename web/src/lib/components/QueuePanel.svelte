@@ -94,10 +94,7 @@
     [QueueName.Migration]: {
       missingText: $t('start'),
     },
-    [QueueName.BackgroundTask]: {
-      missingText: $t('start'),
-    },
-  };
+};
 
   let queueList = Object.entries(queueDetails) as [QueueName, QueueDetails][];
 

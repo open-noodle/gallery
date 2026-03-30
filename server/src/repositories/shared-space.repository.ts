@@ -654,16 +654,6 @@ export class SharedSpaceRepository {
       .execute();
   }
 
-  async getUnbackfilledPersonIds(limit: number) {
-    return this.db
-      .selectFrom('shared_space_person')
-      .select('id')
-      .where('faceCount', '=', 0)
-      .where('id', 'in', this.db.selectFrom('shared_space_person_face').select('personId').distinct())
-      .limit(limit)
-      .execute();
-  }
-
   @GenerateSql({ params: [[DummyValue.UUID]] })
   async recountPersons(personIds: string[]) {
     if (personIds.length === 0) {

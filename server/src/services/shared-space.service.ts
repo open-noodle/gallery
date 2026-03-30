@@ -1065,22 +1065,6 @@ export class SharedSpaceService extends BaseService {
     };
   }
 
-  @OnJob({ name: JobName.SharedSpaceBackfillPersonCounts, queue: QueueName.BackgroundTask })
-  async handleBackfillPersonCounts(): Promise<JobStatus> {
-    const batchSize = 100;
-
-    while (true) {
-      const persons = await this.sharedSpaceRepository.getUnbackfilledPersonIds(batchSize);
-      if (persons.length === 0) {
-        break;
-      }
-
-      await this.sharedSpaceRepository.recountPersons(persons.map((p) => p.id));
-    }
-
-    return JobStatus.Success;
-  }
-
   private mapSpacePerson(person: SharedSpacePerson, alias: string | null): SharedSpacePersonResponseDto {
     return {
       id: person.id,

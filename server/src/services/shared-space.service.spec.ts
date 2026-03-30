@@ -4813,37 +4813,4 @@ describe(SharedSpaceService.name, () => {
     });
   });
 
-  describe('handleBackfillPersonCounts', () => {
-    it('should process persons in batches', async () => {
-      mocks.sharedSpace.getUnbackfilledPersonIds
-        .mockResolvedValueOnce([{ id: 'p1' }, { id: 'p2' }])
-        .mockResolvedValueOnce([{ id: 'p3' }])
-        .mockResolvedValueOnce([]);
-
-      await sut.handleBackfillPersonCounts();
-
-      expect(mocks.sharedSpace.recountPersons).toHaveBeenCalledTimes(2);
-      expect(mocks.sharedSpace.recountPersons).toHaveBeenCalledWith(['p1', 'p2']);
-      expect(mocks.sharedSpace.recountPersons).toHaveBeenCalledWith(['p3']);
-    });
-
-    it('should return Success when no persons need backfill', async () => {
-      mocks.sharedSpace.getUnbackfilledPersonIds.mockResolvedValue([]);
-
-      const result = await sut.handleBackfillPersonCounts();
-
-      expect(result).toBe(JobStatus.Success);
-      expect(mocks.sharedSpace.recountPersons).not.toHaveBeenCalled();
-    });
-
-    it('should be idempotent', async () => {
-      mocks.sharedSpace.getUnbackfilledPersonIds.mockResolvedValue([]);
-
-      const result1 = await sut.handleBackfillPersonCounts();
-      const result2 = await sut.handleBackfillPersonCounts();
-
-      expect(result1).toBe(JobStatus.Success);
-      expect(result2).toBe(JobStatus.Success);
-    });
-  });
 });
