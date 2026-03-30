@@ -9,7 +9,7 @@
     updateCategory,
     type ClassificationCategoryResponseDto,
   } from '@immich/sdk';
-  import { Button, IconButton, Switch, Text, toastManager } from '@immich/ui';
+  import { Button, IconButton, modalManager, Switch, Text, toastManager } from '@immich/ui';
   import { mdiContentSave, mdiDelete, mdiPencil, mdiPlus, mdiUndoVariant } from '@mdi/js';
   import { onMount } from 'svelte';
 
@@ -106,9 +106,10 @@
         const isStricter = editedCategory && formSimilarity > editedCategory.similarity;
         const shouldRescan =
           isStricter &&
-          confirm(
-            'This category is now stricter. Would you like to remove existing auto-tags that may no longer match, unarchive affected photos, and rescan all photos?',
-          );
+          (await modalManager.showDialog({
+            prompt:
+              'This category is now stricter. Would you like to remove existing auto-tags that may no longer match, unarchive affected photos, and rescan all photos?',
+          }));
 
         await updateCategory({
           id: editingId,
@@ -158,7 +159,10 @@
   };
 
   const handleScan = async () => {
-    if (!confirm('This will reclassify all assets across all users. Continue?')) {
+    const confirmed = await modalManager.showDialog({
+      prompt: 'This will reclassify all assets across all users. Continue?',
+    });
+    if (!confirmed) {
       return;
     }
     isScanning = true;
