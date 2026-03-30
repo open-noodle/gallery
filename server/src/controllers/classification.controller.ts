@@ -28,7 +28,7 @@ export class ClassificationController {
   }
 
   @Post()
-  @Authenticated()
+  @Authenticated({ admin: true })
   @Endpoint({
     summary: 'Create a classification category',
     history: new HistoryBuilder().added('v1'),
@@ -41,7 +41,7 @@ export class ClassificationController {
   }
 
   @Put(':id')
-  @Authenticated()
+  @Authenticated({ admin: true })
   @Endpoint({
     summary: 'Update a classification category',
     history: new HistoryBuilder().added('v1'),
@@ -55,7 +55,7 @@ export class ClassificationController {
   }
 
   @Delete(':id')
-  @Authenticated()
+  @Authenticated({ admin: true })
   @HttpCode(HttpStatus.NO_CONTENT)
   @Endpoint({
     summary: 'Delete a classification category',
@@ -66,10 +66,10 @@ export class ClassificationController {
   }
 
   @Post('scan')
-  @Authenticated()
+  @Authenticated({ admin: true })
   @HttpCode(HttpStatus.NO_CONTENT)
   @Endpoint({
-    summary: 'Scan library for classification',
+    summary: 'Scan all libraries for classification',
     history: new HistoryBuilder().added('v1'),
   })
   scanClassification(@Auth() auth: AuthDto): Promise<void> {
