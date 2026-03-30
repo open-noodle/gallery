@@ -614,6 +614,26 @@ export class SharedSpaceRepository {
       .execute();
   }
 
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
+  async reassignPersonFacesSafe(fromPersonId: string, toPersonId: string) {
+    // Delete faces that already exist on the target to avoid PK violation
+    await this.db
+      .deleteFrom('shared_space_person_face')
+      .where('personId', '=', fromPersonId)
+      .where(
+        'assetFaceId',
+        'in',
+        this.db.selectFrom('shared_space_person_face').select('assetFaceId').where('personId', '=', toPersonId),
+      )
+      .execute();
+
+    await this.db
+      .updateTable('shared_space_person_face')
+      .set({ personId: toPersonId })
+      .where('personId', '=', fromPersonId)
+      .execute();
+  }
+
   @GenerateSql({ params: [DummyValue.UUID, [DummyValue.UUID]] })
   async removePersonFacesByAssetIds(spaceId: string, assetIds: string[]) {
     const assetFaceSubquery = this.db
@@ -725,6 +745,27 @@ export class SharedSpaceRepository {
       .execute();
   }
 
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
+  async migrateAliases(fromPersonId: string, toPersonId: string) {
+    // Get aliases from the source person
+    const sourceAliases = await this.db
+      .selectFrom('shared_space_person_alias')
+      .selectAll()
+      .where('personId', '=', fromPersonId)
+      .execute();
+
+    for (const alias of sourceAliases) {
+      await this.db
+        .insertInto('shared_space_person_alias')
+        .values({ personId: toPersonId, userId: alias.userId, alias: alias.alias })
+        .onConflict((oc) => oc.doNothing())
+        .execute();
+    }
+
+    // Delete source aliases
+    await this.db.deleteFrom('shared_space_person_alias').where('personId', '=', fromPersonId).execute();
+  }
+
   // ==========================================
   // Face Matching Queries
   // ==========================================
@@ -732,7 +773,11 @@ export class SharedSpaceRepository {
   @GenerateSql({
     params: [DummyValue.UUID, DummyValue.VECTOR, { maxDistance: 0.6, numResults: 1 }],
   })
-  findClosestSpacePerson(spaceId: string, embedding: string, options: { maxDistance: number; numResults: number }) {
+  findClosestSpacePerson(
+    spaceId: string,
+    embedding: string,
+    options: { maxDistance: number; numResults: number; excludePersonIds?: string[]; type?: string },
+  ) {
     return this.db.transaction().execute(async (trx) => {
       await sql`set local vchordrq.probes = ${sql.lit(probes[VectorIndex.Face])}`.execute(trx);
       return await trx
@@ -747,6 +792,10 @@ export class SharedSpaceRepository {
               sql<number>`face_search.embedding <=> ${embedding}`.as('distance'),
             ])
             .where('shared_space_person.spaceId', '=', spaceId)
+            .$if(!!options.excludePersonIds?.length, (qb) =>
+              qb.where('shared_space_person.id', 'not in', options.excludePersonIds!),
+            )
+            .$if(!!options.type, (qb) => qb.where('shared_space_person.type', '=', options.type!))
             .orderBy('distance')
             .limit(options.numResults),
         )
@@ -755,6 +804,23 @@ export class SharedSpaceRepository {
         .where('cte.distance', '<=', options.maxDistance)
         .execute();
     });
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID] })
+  getSpacePersonsWithEmbeddings(spaceId: string) {
+    return this.db
+      .selectFrom('shared_space_person')
+      .innerJoin('face_search', 'face_search.faceId', 'shared_space_person.representativeFaceId')
+      .select([
+        'shared_space_person.id',
+        'shared_space_person.name',
+        'shared_space_person.type',
+        'shared_space_person.isHidden',
+        'shared_space_person.faceCount',
+        'face_search.embedding',
+      ])
+      .where('shared_space_person.spaceId', '=', spaceId)
+      .execute();
   }
 
   @GenerateSql({ params: [DummyValue.UUID] })
