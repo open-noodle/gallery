@@ -345,10 +345,7 @@ describe('Database Migration Scenarios', () => {
         // Note: the userId column is dropped, so the orphaned category loses its user reference
         await repo.runMigrations();
 
-        const categories = await db
-          .selectFrom('classification_category')
-          .select(['name'])
-          .execute();
+        const categories = await db.selectFrom('classification_category').select(['name']).execute();
         expect(categories).toEqual([{ name: 'Orphaned' }]);
       } finally {
         await db.destroy();
