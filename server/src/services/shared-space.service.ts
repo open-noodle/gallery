@@ -762,6 +762,8 @@ export class SharedSpaceService extends BaseService {
       await this.sharedSpaceRepository.deletePerson(source.id);
     }
 
+    await this.sharedSpaceRepository.recountPersons([targetPersonId]);
+
     await this.sharedSpaceRepository.logActivity({
       spaceId,
       userId: auth.user.id,
