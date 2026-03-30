@@ -22,13 +22,17 @@ beforeAll(async () => {
 });
 
 describe(ClassificationRepository.name, () => {
+  // Clean up categories between tests to avoid global unique constraint collisions
+  beforeEach(async () => {
+    await defaultDatabase.deleteFrom('classification_prompt_embedding').execute();
+    await defaultDatabase.deleteFrom('classification_category').execute();
+  });
+
   describe('getEnabledCategoriesWithEmbeddings', () => {
     it('should return categories with their prompt embeddings via JOIN', async () => {
-      const { ctx, sut } = setup();
-      const { user } = await ctx.newUser();
+      const { sut } = setup();
 
       const category = await sut.createCategory({
-        userId: user.id,
         name: 'Animals',
         similarity: 0.3,
         action: 'tag',
@@ -42,7 +46,7 @@ describe(ClassificationRepository.name, () => {
         embedding,
       });
 
-      const results = await sut.getEnabledCategoriesWithEmbeddings(user.id);
+      const results = await sut.getEnabledCategoriesWithEmbeddings();
 
       expect(results).toHaveLength(1);
       expect(results[0]).toMatchObject({
@@ -56,11 +60,9 @@ describe(ClassificationRepository.name, () => {
     });
 
     it('should not return disabled categories', async () => {
-      const { ctx, sut } = setup();
-      const { user } = await ctx.newUser();
+      const { sut } = setup();
 
       const category = await sut.createCategory({
-        userId: user.id,
         name: 'Disabled',
         similarity: 0.3,
         action: 'tag',
@@ -74,7 +76,7 @@ describe(ClassificationRepository.name, () => {
         embedding,
       });
 
-      const results = await sut.getEnabledCategoriesWithEmbeddings(user.id);
+      const results = await sut.getEnabledCategoriesWithEmbeddings();
       expect(results).toHaveLength(0);
     });
   });
@@ -85,14 +87,11 @@ describe(ClassificationRepository.name, () => {
       const { user } = await ctx.newUser();
       const { asset } = await ctx.newAsset({ ownerId: user.id });
 
-      // Create job status with no classifiedAt
       await ctx.newJobStatus({ assetId: asset.id });
 
-      // Insert smart_search entry so the JOIN succeeds
       const embedding = `[${Array.from({ length: 512 }, () => '0.01').join(',')}]`;
       await ctx.database.insertInto('smart_search').values({ assetId: asset.id, embedding }).execute();
 
-      // Override classifiedAt to null (newJobStatus sets defaults)
       await ctx.database
         .updateTable('asset_job_status')
         .set({ classifiedAt: null })
@@ -109,39 +108,10 @@ describe(ClassificationRepository.name, () => {
       expect(found).toBeDefined();
       expect(found!.ownerId).toBe(user.id);
     });
-
-    it('should filter by userId when provided', async () => {
-      const { ctx, sut } = setup();
-      const { user: user1 } = await ctx.newUser();
-      const { user: user2 } = await ctx.newUser();
-
-      const { asset: asset1 } = await ctx.newAsset({ ownerId: user1.id });
-      const { asset: asset2 } = await ctx.newAsset({ ownerId: user2.id });
-
-      const embedding = `[${Array.from({ length: 512 }, () => '0.01').join(',')}]`;
-      for (const asset of [asset1, asset2]) {
-        await ctx.newJobStatus({ assetId: asset.id });
-        await ctx.database.insertInto('smart_search').values({ assetId: asset.id, embedding }).execute();
-        await ctx.database
-          .updateTable('asset_job_status')
-          .set({ classifiedAt: null })
-          .where('assetId', '=', asset.id)
-          .execute();
-      }
-
-      const stream = sut.streamUnclassifiedAssets(user1.id);
-      const results: Array<{ id: string; ownerId: string }> = [];
-      for await (const row of stream) {
-        results.push(row);
-      }
-
-      expect(results.some((r) => r.id === asset1.id)).toBe(true);
-      expect(results.some((r) => r.id === asset2.id)).toBe(false);
-    });
   });
 
   describe('resetClassifiedAt', () => {
-    it('should clear classifiedAt for only the specified user', async () => {
+    it('should clear classifiedAt for all assets', async () => {
       const { ctx, sut } = setup();
       const { user: user1 } = await ctx.newUser();
       const { user: user2 } = await ctx.newUser();
@@ -159,7 +129,7 @@ describe(ClassificationRepository.name, () => {
           .execute();
       }
 
-      await sut.resetClassifiedAt(user1.id);
+      await sut.resetClassifiedAt();
 
       const status1 = await ctx.database
         .selectFrom('asset_job_status')
@@ -174,17 +144,15 @@ describe(ClassificationRepository.name, () => {
         .executeTakeFirstOrThrow();
 
       expect(status1.classifiedAt).toBeNull();
-      expect(status2.classifiedAt).not.toBeNull();
+      expect(status2.classifiedAt).toBeNull();
     });
   });
 
   describe('cascade deletes', () => {
     it('should cascade delete prompt embeddings when category is deleted', async () => {
       const { ctx, sut } = setup();
-      const { user } = await ctx.newUser();
 
       const category = await sut.createCategory({
-        userId: user.id,
         name: 'CascadeTest',
         similarity: 0.3,
         action: 'tag',
@@ -202,33 +170,11 @@ describe(ClassificationRepository.name, () => {
 
       await sut.deleteCategory(category.id);
 
-      // Verify embeddings were cascade deleted via direct DB query
       const afterDelete = await ctx.database
         .selectFrom('classification_prompt_embedding')
         .selectAll()
         .where('categoryId', '=', category.id)
         .execute();
-      expect(afterDelete).toHaveLength(0);
-    });
-
-    it('should cascade delete categories when user is deleted', async () => {
-      const { ctx, sut } = setup();
-      const { user } = await ctx.newUser();
-
-      await sut.createCategory({
-        userId: user.id,
-        name: 'UserCascadeTest',
-        similarity: 0.3,
-        action: 'tag',
-      });
-
-      const beforeDelete = await sut.getCategories(user.id);
-      expect(beforeDelete).toHaveLength(1);
-
-      // Delete user via DB
-      await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
-
-      const afterDelete = await sut.getCategories(user.id);
       expect(afterDelete).toHaveLength(0);
     });
   });
@@ -259,12 +205,10 @@ describe(ClassificationRepository.name, () => {
   });
 
   describe('unique constraint', () => {
-    it('should not allow two categories with the same name for the same user', async () => {
-      const { ctx, sut } = setup();
-      const { user } = await ctx.newUser();
+    it('should not allow two categories with the same name', async () => {
+      const { sut } = setup();
 
       await sut.createCategory({
-        userId: user.id,
         name: 'Duplicate',
         similarity: 0.3,
         action: 'tag',
@@ -272,34 +216,11 @@ describe(ClassificationRepository.name, () => {
 
       await expect(
         sut.createCategory({
-          userId: user.id,
           name: 'Duplicate',
           similarity: 0.5,
           action: 'tag',
         }),
       ).rejects.toThrow();
-    });
-
-    it('should allow same category name for different users', async () => {
-      const { ctx, sut } = setup();
-      const { user: user1 } = await ctx.newUser();
-      const { user: user2 } = await ctx.newUser();
-
-      await sut.createCategory({
-        userId: user1.id,
-        name: 'SharedName',
-        similarity: 0.3,
-        action: 'tag',
-      });
-
-      const cat2 = await sut.createCategory({
-        userId: user2.id,
-        name: 'SharedName',
-        similarity: 0.3,
-        action: 'tag',
-      });
-
-      expect(cat2.name).toBe('SharedName');
     });
   });
 });

@@ -5,8 +5,6 @@ select
   *
 from
   "classification_category"
-where
-  "userId" = $1
 order by
   "name" asc
 
@@ -17,15 +15,12 @@ select
   "c"."similarity",
   "c"."action",
   "c"."enabled",
-  "c"."tagId",
   "c"."createdAt",
   "c"."updatedAt",
   "p"."prompt"
 from
   "classification_category" as "c"
   left join "classification_prompt_embedding" as "p" on "p"."categoryId" = "c"."id"
-where
-  "c"."userId" = $1
 order by
   "c"."name" asc
 
@@ -51,7 +46,6 @@ select
   "c"."name",
   "c"."similarity",
   "c"."action",
-  "c"."tagId",
   "p"."id" as "promptId",
   "p"."prompt",
   "p"."embedding"
@@ -59,5 +53,4 @@ from
   "classification_category" as "c"
   inner join "classification_prompt_embedding" as "p" on "p"."categoryId" = "c"."id"
 where
-  "c"."userId" = $1
-  and "c"."enabled" = $2
+  "c"."enabled" = $1

@@ -59,18 +59,18 @@ describe(ClassificationService.name, () => {
           name: 'Sunsets',
           similarity: 0.8,
           action: 'tag',
-          tagId: 'tag-1',
           promptId: 'prompt-1',
           prompt: 'sunset sky',
           embedding: '[1,0,0]',
         },
       ]);
+      mocks.tag.upsertValue.mockResolvedValue({ id: 'new-tag-id', value: 'Auto/Sunsets' } as any);
       mocks.tag.upsertAssetIds.mockResolvedValue(void 0 as any);
 
       const result = await sut.handleClassify({ id: 'asset-1' });
 
       expect(result).toBe(JobStatus.Success);
-      expect(mocks.tag.upsertAssetIds).toHaveBeenCalledWith([{ tagId: 'tag-1', assetId: 'asset-1' }]);
+      expect(mocks.tag.upsertAssetIds).toHaveBeenCalledWith([{ tagId: 'new-tag-id', assetId: 'asset-1' }]);
     });
 
     it('should NOT tag when similarity is below threshold', async () => {
@@ -87,7 +87,6 @@ describe(ClassificationService.name, () => {
           name: 'Sunsets',
           similarity: 0.8,
           action: 'tag',
-          tagId: 'tag-1',
           promptId: 'prompt-1',
           prompt: 'sunset sky',
           embedding: '[0,1,0]',
@@ -113,12 +112,12 @@ describe(ClassificationService.name, () => {
           name: 'Screenshots',
           similarity: 0.5,
           action: 'tag_and_archive',
-          tagId: 'tag-1',
           promptId: 'prompt-1',
           prompt: 'sunset sky',
           embedding: '[1,0,0]',
         },
       ]);
+      mocks.tag.upsertValue.mockResolvedValue({ id: 'new-tag-id', value: 'Auto/Screenshots' } as any);
       mocks.tag.upsertAssetIds.mockResolvedValue(void 0 as any);
 
       await sut.handleClassify({ id: 'asset-1' });
@@ -139,12 +138,12 @@ describe(ClassificationService.name, () => {
           name: 'Screenshots',
           similarity: 0.5,
           action: 'tag_and_archive',
-          tagId: 'tag-1',
           promptId: 'prompt-1',
           prompt: 'sunset sky',
           embedding: '[1,0,0]',
         },
       ]);
+      mocks.tag.upsertValue.mockResolvedValue({ id: 'new-tag-id', value: 'Auto/Screenshots' } as any);
       mocks.tag.upsertAssetIds.mockResolvedValue(void 0 as any);
 
       await sut.handleClassify({ id: 'asset-1' });
@@ -152,7 +151,7 @@ describe(ClassificationService.name, () => {
       expect(mocks.asset.updateAll).not.toHaveBeenCalled();
     });
 
-    it('should create Auto/{name} tag when tagId is null', async () => {
+    it('should always call upsertTags with asset.ownerId', async () => {
       mocks.asset.getById.mockResolvedValue({
         id: 'asset-1',
         ownerId: 'user-1',
@@ -165,7 +164,6 @@ describe(ClassificationService.name, () => {
           name: 'Sunsets',
           similarity: 0.5,
           action: 'tag',
-          tagId: null,
           promptId: 'prompt-1',
           prompt: 'sunset sky',
           embedding: '[1,0,0]',
@@ -173,13 +171,11 @@ describe(ClassificationService.name, () => {
       ]);
       mocks.tag.upsertValue.mockResolvedValue({ id: 'new-tag-id', value: 'Auto/Sunsets' } as any);
       mocks.tag.upsertAssetIds.mockResolvedValue(void 0 as any);
-      mocks.classification.updateCategory.mockResolvedValue(void 0 as any);
 
       await sut.handleClassify({ id: 'asset-1' });
 
       // upsertTags calls upsertValue for 'Auto' and then 'Auto/Sunsets'
       expect(mocks.tag.upsertValue).toHaveBeenCalledTimes(2);
-      expect(mocks.classification.updateCategory).toHaveBeenCalledWith('cat-1', { tagId: 'new-tag-id' });
       expect(mocks.tag.upsertAssetIds).toHaveBeenCalledWith([{ tagId: 'new-tag-id', assetId: 'asset-1' }]);
     });
 
@@ -196,7 +192,6 @@ describe(ClassificationService.name, () => {
           name: 'Sunsets',
           similarity: 0.5,
           action: 'tag',
-          tagId: 'tag-1',
           promptId: 'prompt-1',
           prompt: 'sunset sky',
           embedding: '[1,0,0]',
@@ -206,20 +201,24 @@ describe(ClassificationService.name, () => {
           name: 'Nature',
           similarity: 0.5,
           action: 'tag',
-          tagId: 'tag-2',
           promptId: 'prompt-2',
           prompt: 'nature scene',
           embedding: '[1,0,0]',
         },
       ]);
+      mocks.tag.upsertValue
+        .mockResolvedValueOnce({ id: 'tag-auto', value: 'Auto' } as any)
+        .mockResolvedValueOnce({ id: 'tag-sunsets', value: 'Auto/Sunsets' } as any)
+        .mockResolvedValueOnce({ id: 'tag-auto', value: 'Auto' } as any)
+        .mockResolvedValueOnce({ id: 'tag-nature', value: 'Auto/Nature' } as any);
       mocks.tag.upsertAssetIds.mockResolvedValue(void 0 as any);
 
       const result = await sut.handleClassify({ id: 'asset-1' });
 
       expect(result).toBe(JobStatus.Success);
       expect(mocks.tag.upsertAssetIds).toHaveBeenCalledTimes(2);
-      expect(mocks.tag.upsertAssetIds).toHaveBeenCalledWith([{ tagId: 'tag-1', assetId: 'asset-1' }]);
-      expect(mocks.tag.upsertAssetIds).toHaveBeenCalledWith([{ tagId: 'tag-2', assetId: 'asset-1' }]);
+      expect(mocks.tag.upsertAssetIds).toHaveBeenCalledWith([{ tagId: 'tag-sunsets', assetId: 'asset-1' }]);
+      expect(mocks.tag.upsertAssetIds).toHaveBeenCalledWith([{ tagId: 'tag-nature', assetId: 'asset-1' }]);
     });
 
     it('should handle malformed embedding gracefully (NaN similarity < threshold)', async () => {
@@ -236,7 +235,6 @@ describe(ClassificationService.name, () => {
           name: 'Test',
           similarity: 0.5,
           action: 'tag',
-          tagId: 'tag-1',
           promptId: 'prompt-1',
           prompt: 'sunset sky',
           embedding: '[1,0,0]',
@@ -259,15 +257,25 @@ describe(ClassificationService.name, () => {
       ];
       mocks.classification.streamUnclassifiedAssets.mockReturnValue(makeStream(assets));
 
-      const result = await sut.handleClassifyQueueAll({ userId: 'user-1' });
+      const result = await sut.handleClassifyQueueAll({});
 
       expect(result).toBe(JobStatus.Success);
-      expect(mocks.classification.streamUnclassifiedAssets).toHaveBeenCalledWith('user-1');
+      expect(mocks.classification.resetClassifiedAt).not.toHaveBeenCalled();
+      expect(mocks.classification.streamUnclassifiedAssets).toHaveBeenCalledWith();
       expect(mocks.job.queueAll).toHaveBeenCalledWith([
         { name: JobName.AssetClassify, data: { id: 'a1' } },
         { name: JobName.AssetClassify, data: { id: 'a2' } },
         { name: JobName.AssetClassify, data: { id: 'a3' } },
       ]);
+    });
+
+    it('should reset classifiedAt when force is true', async () => {
+      mocks.classification.resetClassifiedAt.mockResolvedValue(void 0 as any);
+      mocks.classification.streamUnclassifiedAssets.mockReturnValue(makeStream([]));
+
+      await sut.handleClassifyQueueAll({ force: true });
+
+      expect(mocks.classification.resetClassifiedAt).toHaveBeenCalledWith();
     });
 
     it('should flush exactly at 1000 boundary', async () => {
@@ -293,7 +301,6 @@ describe(ClassificationService.name, () => {
         similarity: 0.8,
         action: 'tag',
         enabled: true,
-        tagId: null,
         createdAt: new Date('2026-01-01'),
         updatedAt: new Date('2026-01-01'),
       } as any);
@@ -323,12 +330,10 @@ describe(ClassificationService.name, () => {
   describe('updateCategory', () => {
     const existingCategory = {
       id: 'cat-1',
-      userId: 'user-id',
       name: 'Sunsets',
       similarity: 0.8,
       action: 'tag',
       enabled: true,
-      tagId: 'tag-1',
       createdAt: new Date('2026-01-01'),
       updatedAt: new Date('2026-01-01'),
     };
@@ -339,12 +344,6 @@ describe(ClassificationService.name, () => {
       await expect(sut.updateCategory(authStub.user1, 'non-existent', { name: 'New' })).rejects.toThrow(
         NotFoundException,
       );
-    });
-
-    it('should throw NotFoundException for category owned by different user', async () => {
-      mocks.classification.getCategory.mockResolvedValue({ ...existingCategory, userId: 'other-user' } as any);
-
-      await expect(sut.updateCategory(authStub.user1, 'cat-1', { name: 'New' })).rejects.toThrow(NotFoundException);
     });
 
     it('should re-encode prompts when prompts change', async () => {
@@ -370,43 +369,25 @@ describe(ClassificationService.name, () => {
       mocks.classification.getCategory.mockResolvedValue(existingCategory as any);
       mocks.classification.updateCategory.mockResolvedValue({ ...existingCategory, name: 'New Name' } as any);
       mocks.classification.getPromptEmbeddings.mockResolvedValue([{ prompt: 'old prompt' }] as any);
-      mocks.tag.delete.mockResolvedValue(void 0 as any);
 
       await sut.updateCategory(authStub.user1, 'cat-1', { name: 'New Name', similarity: 0.9, action: 'tag' });
 
       expect(mocks.machineLearning.encodeText).not.toHaveBeenCalled();
       expect(mocks.classification.deletePromptEmbeddingsByCategory).not.toHaveBeenCalled();
     });
-
-    it('should delete old tag when name changes', async () => {
-      mocks.classification.getCategory.mockResolvedValue(existingCategory as any);
-      mocks.classification.updateCategory.mockResolvedValue({
-        ...existingCategory,
-        name: 'New Name',
-        tagId: null,
-      } as any);
-      mocks.classification.getPromptEmbeddings.mockResolvedValue([{ prompt: 'p' }] as any);
-
-      await sut.updateCategory(authStub.user1, 'cat-1', { name: 'New Name' });
-
-      expect(mocks.tag.delete).toHaveBeenCalledWith('tag-1');
-    });
   });
 
   describe('deleteCategory', () => {
-    it('should delete associated tag', async () => {
+    it('should delete category without tag cleanup', async () => {
       mocks.classification.getCategory.mockResolvedValue({
         id: 'cat-1',
-        userId: 'user-id',
-        tagId: 'tag-1',
       } as any);
-      mocks.tag.delete.mockResolvedValue(void 0 as any);
       mocks.classification.deleteCategory.mockResolvedValue(void 0 as any);
 
       await sut.deleteCategory(authStub.user1, 'cat-1');
 
-      expect(mocks.tag.delete).toHaveBeenCalledWith('tag-1');
       expect(mocks.classification.deleteCategory).toHaveBeenCalledWith('cat-1');
+      expect(mocks.tag.delete).not.toHaveBeenCalled();
     });
 
     it('should throw NotFoundException for non-existent category', async () => {
@@ -425,7 +406,6 @@ describe(ClassificationService.name, () => {
           similarity: 0.8,
           action: 'tag',
           enabled: true,
-          tagId: null,
           createdAt: new Date('2026-01-01'),
           updatedAt: new Date('2026-01-01'),
           prompt: 'golden hour',
@@ -436,7 +416,6 @@ describe(ClassificationService.name, () => {
           similarity: 0.8,
           action: 'tag',
           enabled: true,
-          tagId: null,
           createdAt: new Date('2026-01-01'),
           updatedAt: new Date('2026-01-01'),
           prompt: 'sunset sky',
@@ -447,7 +426,6 @@ describe(ClassificationService.name, () => {
           similarity: 0.7,
           action: 'tag_and_archive',
           enabled: true,
-          tagId: 'tag-2',
           createdAt: new Date('2026-01-02'),
           updatedAt: new Date('2026-01-02'),
           prompt: 'cute dog',
@@ -465,23 +443,21 @@ describe(ClassificationService.name, () => {
   });
 
   describe('scanLibrary', () => {
-    it('should reset classifiedAt and queue AssetClassifyQueueAll', async () => {
-      mocks.classification.resetClassifiedAt.mockResolvedValue(void 0 as any);
+    it('should queue AssetClassifyQueueAll with force', async () => {
       mocks.job.queue.mockResolvedValue(void 0 as any);
 
       await sut.scanLibrary(authStub.user1);
 
-      expect(mocks.classification.resetClassifiedAt).toHaveBeenCalledWith('user-id');
       expect(mocks.job.queue).toHaveBeenCalledWith({
         name: JobName.AssetClassifyQueueAll,
-        data: { userId: 'user-id' },
+        data: { force: true },
       });
     });
   });
 
   describe('onConfigUpdate', () => {
     it('should re-encode all prompts when CLIP model changes', async () => {
-      mocks.classification.getAllCategories.mockResolvedValue([{ id: 'cat-1' }] as any);
+      mocks.classification.getCategories.mockResolvedValue([{ id: 'cat-1' }] as any);
       mocks.classification.getPromptEmbeddings.mockResolvedValue([{ prompt: 'sunset' }] as any);
       mocks.classification.deletePromptEmbeddingsByCategory.mockResolvedValue(void 0 as any);
       mocks.machineLearning.encodeText.mockResolvedValue('[0.1,0.2,0.3]');
@@ -493,7 +469,7 @@ describe(ClassificationService.name, () => {
       } as any);
 
       expect(mocks.machineLearning.encodeText).toHaveBeenCalledWith('sunset', { modelName: 'new-model' });
-      expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.AssetClassifyQueueAll, data: {} });
+      expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.AssetClassifyQueueAll, data: { force: true } });
     });
 
     it('should do nothing when CLIP model is unchanged', async () => {
@@ -502,12 +478,12 @@ describe(ClassificationService.name, () => {
         newConfig: makeConfig('same-model'),
       } as any);
 
-      expect(mocks.classification.getAllCategories).not.toHaveBeenCalled();
+      expect(mocks.classification.getCategories).not.toHaveBeenCalled();
       expect(mocks.machineLearning.encodeText).not.toHaveBeenCalled();
     });
 
     it('should skip if no categories exist', async () => {
-      mocks.classification.getAllCategories.mockResolvedValue([]);
+      mocks.classification.getCategories.mockResolvedValue([]);
 
       await sut.onConfigUpdate({
         oldConfig: makeConfig('old-model'),
@@ -516,7 +492,7 @@ describe(ClassificationService.name, () => {
 
       // Still queues the classify-all job even with no categories
       expect(mocks.machineLearning.encodeText).not.toHaveBeenCalled();
-      expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.AssetClassifyQueueAll, data: {} });
+      expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.AssetClassifyQueueAll, data: { force: true } });
     });
   });
 

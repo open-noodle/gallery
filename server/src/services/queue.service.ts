@@ -254,7 +254,7 @@ export class QueueService extends BaseService {
       }
 
       case QueueName.Classification: {
-        return this.jobRepository.queue({ name: JobName.AssetClassifyQueueAll, data: {} });
+        return this.jobRepository.queue({ name: JobName.AssetClassifyQueueAll, data: { force } });
       }
 
       case QueueName.StorageBackendMigration: {

@@ -20,7 +20,6 @@ class ClassificationCategoryResponseDto {
     required this.name,
     this.prompts = const [],
     required this.similarity,
-    required this.tagId,
     required this.updatedAt,
   });
 
@@ -38,8 +37,6 @@ class ClassificationCategoryResponseDto {
 
   num similarity;
 
-  String? tagId;
-
   String updatedAt;
 
   @override
@@ -51,7 +48,6 @@ class ClassificationCategoryResponseDto {
     other.name == name &&
     _deepEquality.equals(other.prompts, prompts) &&
     other.similarity == similarity &&
-    other.tagId == tagId &&
     other.updatedAt == updatedAt;
 
   @override
@@ -64,11 +60,10 @@ class ClassificationCategoryResponseDto {
     (name.hashCode) +
     (prompts.hashCode) +
     (similarity.hashCode) +
-    (tagId == null ? 0 : tagId!.hashCode) +
     (updatedAt.hashCode);
 
   @override
-  String toString() => 'ClassificationCategoryResponseDto[action=$action, createdAt=$createdAt, enabled=$enabled, id=$id, name=$name, prompts=$prompts, similarity=$similarity, tagId=$tagId, updatedAt=$updatedAt]';
+  String toString() => 'ClassificationCategoryResponseDto[action=$action, createdAt=$createdAt, enabled=$enabled, id=$id, name=$name, prompts=$prompts, similarity=$similarity, updatedAt=$updatedAt]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -79,11 +74,6 @@ class ClassificationCategoryResponseDto {
       json[r'name'] = this.name;
       json[r'prompts'] = this.prompts;
       json[r'similarity'] = this.similarity;
-    if (this.tagId != null) {
-      json[r'tagId'] = this.tagId;
-    } else {
-    //  json[r'tagId'] = null;
-    }
       json[r'updatedAt'] = this.updatedAt;
     return json;
   }
@@ -106,7 +96,6 @@ class ClassificationCategoryResponseDto {
             ? (json[r'prompts'] as Iterable).cast<String>().toList(growable: false)
             : const [],
         similarity: num.parse('${json[r'similarity']}'),
-        tagId: mapValueOfType<String>(json, r'tagId'),
         updatedAt: mapValueOfType<String>(json, r'updatedAt')!,
       );
     }
@@ -162,7 +151,6 @@ class ClassificationCategoryResponseDto {
     'name',
     'prompts',
     'similarity',
-    'tagId',
     'updatedAt',
   };
 }
