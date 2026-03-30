@@ -2,6 +2,8 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
   ArrayMinSize,
+  IsArray,
+  IsIn,
   IsInt,
   IsNotEmpty,
   IsNumber,
@@ -11,8 +13,11 @@ import {
   IsUrl,
   Max,
   Min,
+  Validate,
   ValidateIf,
   ValidateNested,
+  ValidatorConstraint,
+  ValidatorConstraintInterface,
 } from 'class-validator';
 import { SystemConfig } from 'src/config';
 import {
@@ -725,6 +730,55 @@ class SystemConfigTrashDto {
   days!: number;
 }
 
+@ValidatorConstraint({ name: 'UniqueNames', async: false })
+class UniqueNames implements ValidatorConstraintInterface {
+  validate(categories: SystemConfigClassificationCategoryDto[]) {
+    if (!Array.isArray(categories)) {
+      return true;
+    }
+    const names = categories.map((c) => c.name);
+    return new Set(names).size === names.length;
+  }
+}
+
+class SystemConfigClassificationCategoryDto {
+  @IsString()
+  @IsNotEmpty()
+  name!: string;
+
+  @IsString({ each: true })
+  @IsNotEmpty({ each: true })
+  @ArrayMinSize(1)
+  @ApiProperty({ type: [String] })
+  prompts!: string[];
+
+  @IsNumber()
+  @Min(0)
+  @Max(1)
+  @Type(() => Number)
+  @ApiProperty({ type: 'number' })
+  similarity!: number;
+
+  @IsString()
+  @IsIn(['tag', 'tag_and_archive'])
+  action!: 'tag' | 'tag_and_archive';
+
+  @ValidateBoolean({ description: 'Enable or disable this category' })
+  enabled!: boolean;
+}
+
+class SystemConfigClassificationDto {
+  @ValidateBoolean({ description: 'Enable classification globally' })
+  enabled!: boolean;
+
+  @ValidateNested({ each: true })
+  @Type(() => SystemConfigClassificationCategoryDto)
+  @IsArray()
+  @ApiProperty({ type: [SystemConfigClassificationCategoryDto] })
+  @Validate(UniqueNames, { message: 'Category names must be unique' })
+  categories!: SystemConfigClassificationCategoryDto[];
+}
+
 class SystemConfigUserDto {
   @IsInt()
   @Min(1)
@@ -873,6 +927,13 @@ export class SystemConfigDto implements SystemConfig {
   @ValidateNested()
   @IsObject()
   server!: SystemConfigServerDto;
+
+  // Description lives on schema to avoid duplication
+  @ApiProperty({ description: undefined })
+  @Type(() => SystemConfigClassificationDto)
+  @ValidateNested()
+  @IsObject()
+  classification!: SystemConfigClassificationDto;
 
   // Description lives on schema to avoid duplication
   @ApiProperty({ description: undefined })
