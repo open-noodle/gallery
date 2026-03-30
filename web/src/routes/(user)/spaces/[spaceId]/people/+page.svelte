@@ -96,6 +96,13 @@
     } finally {
       loading = false;
     }
+    // If sentinel is still visible after loading (viewport not filled), load more
+    if (hasMore && sentinel) {
+      const rect = sentinel.getBoundingClientRect();
+      if (rect.top < window.innerHeight) {
+        void loadMore();
+      }
+    }
   }
 
   async function openVisibilityModal() {

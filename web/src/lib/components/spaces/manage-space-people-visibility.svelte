@@ -122,6 +122,21 @@
       visibilityObserver.observe(visibilitySentinel);
     }
   });
+
+  // Re-check after people list changes — if sentinel is still visible, load more
+  $effect(() => {
+    void people.length;
+    if (hasMore && !loading && visibilitySentinel) {
+      requestAnimationFrame(() => {
+        if (visibilitySentinel) {
+          const rect = visibilitySentinel.getBoundingClientRect();
+          if (rect.top < window.innerHeight) {
+            onLoadMore?.();
+          }
+        }
+      });
+    }
+  });
 </script>
 
 <svelte:document use:shortcut={{ shortcut: { key: 'Escape' }, onShortcut: onClose }} />
