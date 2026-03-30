@@ -1,7 +1,6 @@
 import {
   Column,
   CreateDateColumn,
-  ForeignKeyColumn,
   Generated,
   PrimaryGeneratedColumn,
   Table,
@@ -10,18 +9,13 @@ import {
   UpdateDateColumn,
 } from '@immich/sql-tools';
 import { UpdatedAtTrigger, UpdateIdColumn } from 'src/decorators';
-import { TagTable } from 'src/schema/tables/tag.table';
-import { UserTable } from 'src/schema/tables/user.table';
 
 @Table('classification_category')
 @UpdatedAtTrigger('classification_category_updatedAt')
-@Unique({ columns: ['userId', 'name'] })
+@Unique({ columns: ['name'] })
 export class ClassificationCategoryTable {
   @PrimaryGeneratedColumn()
   id!: Generated<string>;
-
-  @ForeignKeyColumn(() => UserTable, { onUpdate: 'CASCADE', onDelete: 'CASCADE', index: false })
-  userId!: string;
 
   @Column()
   name!: string;
@@ -34,9 +28,6 @@ export class ClassificationCategoryTable {
 
   @Column({ type: 'boolean', default: true })
   enabled!: Generated<boolean>;
-
-  @ForeignKeyColumn(() => TagTable, { nullable: true, onDelete: 'SET NULL' })
-  tagId!: string | null;
 
   @CreateDateColumn()
   createdAt!: Generated<Timestamp>;

@@ -189,7 +189,171 @@ describe('Database Migration Scenarios', () => {
     }
   });
 
-  // Scenario F: Retry after revert
+  // Scenario F: AdminScopedClassification migration data transform
+  describe('AdminScopedClassification migration', () => {
+    it('should merge user categories into admin, suffixing name conflicts', async () => {
+      const db = await createRawDatabase('migration_test_classification');
+      try {
+        const repo = createRepo(db);
+        await repo.runMigrations();
+
+        // Revert the AdminScopedClassification migration to get back the old schema
+        const reverted = await repo.revertLastMigration();
+        expect(reverted).toContain('AdminScopedClassification');
+
+        // Insert test data with old schema (userId + tagId columns exist)
+        const admin = await db
+          .insertInto('user' as any)
+          .values({
+            email: 'admin@test.com',
+            name: 'Admin',
+            isAdmin: true,
+            password: 'hashed',
+            storageLabel: 'admin',
+          } as any)
+          .returning('id')
+          .executeTakeFirstOrThrow();
+
+        const user1 = await db
+          .insertInto('user' as any)
+          .values({
+            email: 'user1@test.com',
+            name: 'Alice',
+            isAdmin: false,
+            password: 'hashed',
+            storageLabel: 'alice',
+          } as any)
+          .returning('id')
+          .executeTakeFirstOrThrow();
+
+        const user2 = await db
+          .insertInto('user' as any)
+          .values({
+            email: 'user2@test.com',
+            name: 'Bob',
+            isAdmin: false,
+            password: 'hashed',
+            storageLabel: 'bob',
+          } as any)
+          .returning('id')
+          .executeTakeFirstOrThrow();
+
+        // Admin has "Vacation" and "Work"
+        await db
+          .insertInto('classification_category' as any)
+          .values([
+            { userId: admin.id, name: 'Vacation', similarity: 0.28, action: 'tag', enabled: true },
+            { userId: admin.id, name: 'Work', similarity: 0.3, action: 'tag', enabled: true },
+          ] as any)
+          .execute();
+
+        // Alice has "Vacation" (conflicts with admin) and "Pets" (unique)
+        await db
+          .insertInto('classification_category' as any)
+          .values([
+            { userId: user1.id, name: 'Vacation', similarity: 0.35, action: 'tag_and_archive', enabled: true },
+            { userId: user1.id, name: 'Pets', similarity: 0.25, action: 'tag', enabled: true },
+          ] as any)
+          .execute();
+
+        // Bob has "Vacation" (also conflicts) and "Screenshots" (unique)
+        await db
+          .insertInto('classification_category' as any)
+          .values([
+            { userId: user2.id, name: 'Vacation', similarity: 0.4, action: 'tag', enabled: false },
+            { userId: user2.id, name: 'Screenshots', similarity: 0.3, action: 'tag_and_archive', enabled: true },
+          ] as any)
+          .execute();
+
+        // Re-run the migration
+        await repo.runMigrations();
+
+        // Verify: all categories exist, conflicts suffixed with username
+        const categories = await db
+          .selectFrom('classification_category')
+          .select(['name', 'similarity', 'action', 'enabled'])
+          .orderBy('name', 'asc')
+          .execute();
+
+        expect(categories).toEqual([
+          { name: 'Pets', similarity: 0.25, action: 'tag', enabled: true },
+          { name: 'Screenshots', similarity: 0.3, action: 'tag_and_archive', enabled: true },
+          { name: 'Vacation', similarity: 0.28, action: 'tag', enabled: true },
+          { name: 'Vacation (Alice)', similarity: 0.35, action: 'tag_and_archive', enabled: true },
+          { name: 'Vacation (Bob)', similarity: 0.4, action: 'tag', enabled: false },
+          { name: 'Work', similarity: 0.3, action: 'tag', enabled: true },
+        ]);
+
+        // Verify: userId and tagId columns are gone
+        const columns = await db.introspection.getTables();
+        const classTable = columns.find((t) => t.name === 'classification_category');
+        expect(classTable).toBeDefined();
+        const columnNames = classTable!.columns.map((c) => c.name);
+        expect(columnNames).not.toContain('userId');
+        expect(columnNames).not.toContain('tagId');
+        expect(columnNames).toContain('name');
+        expect(columnNames).toContain('similarity');
+      } finally {
+        await db.destroy();
+      }
+    });
+
+    it('should handle empty database with no categories', async () => {
+      const db = await createRawDatabase('migration_test_classification_empty');
+      try {
+        const repo = createRepo(db);
+        await repo.runMigrations();
+
+        // Revert and re-run with no classification data
+        await repo.revertLastMigration();
+        await repo.runMigrations();
+
+        const categories = await db.selectFrom('classification_category').selectAll().execute();
+        expect(categories).toEqual([]);
+      } finally {
+        await db.destroy();
+      }
+    });
+
+    it('should handle database with no admin user', async () => {
+      const db = await createRawDatabase('migration_test_classification_noadmin');
+      try {
+        const repo = createRepo(db);
+        await repo.runMigrations();
+
+        // Revert, create a non-admin user with categories, re-run
+        await repo.revertLastMigration();
+
+        const user = await db
+          .insertInto('user' as any)
+          .values({
+            email: 'user@test.com',
+            name: 'User',
+            isAdmin: false,
+            password: 'hashed',
+            storageLabel: 'user',
+          } as any)
+          .returning('id')
+          .executeTakeFirstOrThrow();
+
+        await db
+          .insertInto('classification_category' as any)
+          .values({ userId: user.id, name: 'Orphaned', similarity: 0.28, action: 'tag', enabled: true } as any)
+          .execute();
+
+        // Migration should still succeed (schema changes applied, data stays with old userId before column drop)
+        // Note: the userId column is dropped, so the orphaned category loses its user reference
+        await repo.runMigrations();
+
+        const categories = await db.selectFrom('classification_category').select(['name']).execute();
+        expect(categories).toEqual([{ name: 'Orphaned' }]);
+      } finally {
+        await db.destroy();
+      }
+    });
+  });
+
+  // Scenario G: Retry after revert
   it('should be able to re-run after a previous successful run', async () => {
     const db = await createRawDatabase('migration_test_retry');
     try {

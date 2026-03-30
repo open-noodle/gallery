@@ -104,14 +104,16 @@
   <FeatureSettings />
 </SettingAccordion>
 
-<SettingAccordion
-  icon={mdiMagnifyScan}
-  key="auto-classification"
-  title="Auto-Classification"
-  subtitle="Automatically tag and archive photos by category"
->
-  <ClassificationSettings />
-</SettingAccordion>
+{#if !authManager.user.isAdmin}
+  <SettingAccordion
+    icon={mdiMagnifyScan}
+    key="auto-classification"
+    title="Auto-Classification"
+    subtitle="View classification categories configured by your administrator"
+  >
+    <ClassificationSettings />
+  </SettingAccordion>
+{/if}
 
 <SettingAccordion
   icon={mdiBellOutline}
