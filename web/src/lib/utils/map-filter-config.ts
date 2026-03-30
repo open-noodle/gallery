@@ -12,18 +12,17 @@ export function buildMapFilterConfig(spaceId?: string): FilterPanelConfig {
         people: (context?: FilterContext) =>
           getSpacePeople({
             id: spaceId,
+            named: true,
             ...(context?.takenAfter && { takenAfter: context.takenAfter }),
             ...(context?.takenBefore && { takenBefore: context.takenBefore }),
           }).then((people) =>
-            people
-              .filter((p) => !p.isHidden && p.name)
-              .map((p) => ({
-                id: p.id,
-                name: p.name,
-                thumbnailUrl: createUrl(`/shared-spaces/${spaceId}/people/${p.id}/thumbnail`, {
-                  updatedAt: p.updatedAt,
-                }),
-              })),
+            people.map((p) => ({
+              id: p.id,
+              name: p.name,
+              thumbnailUrl: createUrl(`/shared-spaces/${spaceId}/people/${p.id}/thumbnail`, {
+                updatedAt: p.updatedAt,
+              }),
+            })),
           ),
         cameras: (context?: FilterContext) =>
           getSearchSuggestions({
@@ -61,6 +60,7 @@ export function buildMapFilterConfig(spaceId?: string): FilterPanelConfig {
       cameras: (context?: FilterContext) =>
         getSearchSuggestions({
           $type: SearchSuggestionType.CameraMake,
+          withSharedSpaces: true,
           ...(context?.takenAfter && { takenAfter: context.takenAfter }),
           ...(context?.takenBefore && { takenBefore: context.takenBefore }),
         }).then((results) => results.map((r) => ({ value: r, type: 'make' as const }))),
@@ -68,6 +68,7 @@ export function buildMapFilterConfig(spaceId?: string): FilterPanelConfig {
         getSearchSuggestions({
           $type: SearchSuggestionType.CameraModel,
           make,
+          withSharedSpaces: true,
           ...(context?.takenAfter && { takenAfter: context.takenAfter }),
           ...(context?.takenBefore && { takenBefore: context.takenBefore }),
         }),

@@ -69,7 +69,7 @@
         class="flex shrink-0 items-center gap-0.5 whitespace-nowrap py-4 text-xs font-medium text-immich-primary hover:underline"
         data-testid="see-all-people"
       >
-        {$t('spaces_see_all_people', { values: { count: namedPeople.length } })}
+        {$t('see_all_people')}
         <Icon icon={mdiChevronRight} size="14" />
       </a>
     {/if}

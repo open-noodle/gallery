@@ -1149,7 +1149,6 @@ export type ClassificationCategoryResponseDto = {
     name: string;
     prompts: string[];
     similarity: number;
-    tagId: string | null;
     updatedAt: string;
 };
 export type ClassificationCategoryCreateDto = {
@@ -4853,7 +4852,7 @@ export function createCategory({ classificationCategoryCreateDto }: {
     })));
 }
 /**
- * Scan library for classification
+ * Scan all libraries for classification
  */
 export function scanClassification(opts?: Oazapfts.RequestOpts) {
     return oazapfts.ok(oazapfts.fetchText("/classification/categories/scan", {
@@ -6081,7 +6080,7 @@ export function searchAssetStatistics({ statisticsSearchDto }: {
 /**
  * Retrieve search suggestions
  */
-export function getSearchSuggestions({ country, includeNull, lensModel, make, model, spaceId, state, takenAfter, takenBefore, $type }: {
+export function getSearchSuggestions({ country, includeNull, lensModel, make, model, spaceId, state, takenAfter, takenBefore, $type, withSharedSpaces }: {
     country?: string;
     includeNull?: boolean;
     lensModel?: string;
@@ -6092,6 +6091,7 @@ export function getSearchSuggestions({ country, includeNull, lensModel, make, mo
     takenAfter?: string;
     takenBefore?: string;
     $type: SearchSuggestionType;
+    withSharedSpaces?: boolean;
 }, opts?: Oazapfts.RequestOpts) {
     return oazapfts.ok(oazapfts.fetchJson<{
         status: 200;
@@ -6106,7 +6106,8 @@ export function getSearchSuggestions({ country, includeNull, lensModel, make, mo
         state,
         takenAfter,
         takenBefore,
-        "type": $type
+        "type": $type,
+        withSharedSpaces
     }))}`, {
         ...opts
     }));
@@ -6739,8 +6740,11 @@ export function updateMember({ id, userId, sharedSpaceMemberUpdateDto }: {
 /**
  * Get people in a shared space
  */
-export function getSpacePeople({ id, takenAfter, takenBefore, withHidden }: {
+export function getSpacePeople({ id, limit, named, offset, takenAfter, takenBefore, withHidden }: {
     id: string;
+    limit?: number;
+    named?: boolean;
+    offset?: number;
     takenAfter?: string;
     takenBefore?: string;
     withHidden?: boolean;
@@ -6749,6 +6753,9 @@ export function getSpacePeople({ id, takenAfter, takenBefore, withHidden }: {
         status: 200;
         data: SharedSpacePersonResponseDto[];
     }>(`/shared-spaces/${encodeURIComponent(id)}/people${QS.query(QS.explode({
+        limit,
+        named,
+        offset,
         takenAfter,
         takenBefore,
         withHidden

@@ -392,34 +392,19 @@ from
 where
   "shared_space_person"."spaceId" = $1
   and "shared_space_person"."isHidden" = $2
+  and "person"."thumbnailPath" is not null
+  and "person"."thumbnailPath" != $3
 order by
-  "shared_space_person"."name" asc
-
--- SharedSpaceRepository.getPersonsBySpaceIdWithTemporalFilter
-select
-  "shared_space_person".*,
-  "person"."name" as "personalName",
-  "person"."thumbnailPath" as "personalThumbnailPath"
-from
-  "shared_space_person"
-  left join "asset_face" on "asset_face"."id" = "shared_space_person"."representativeFaceId"
-  left join "person" on "person"."id" = "asset_face"."personId"
-where
-  "shared_space_person"."spaceId" = $1
-  and "shared_space_person"."isHidden" = $2
-  and exists (
-    select
-    from
-      "shared_space_person_face"
-      inner join "asset_face" as "af2" on "af2"."id" = "shared_space_person_face"."assetFaceId"
-      inner join "asset" on "asset"."id" = "af2"."assetId"
-    where
-      "shared_space_person_face"."personId" = "shared_space_person"."id"
-      and "asset"."fileCreatedAt" >= $3
-      and "asset"."fileCreatedAt" < $4
-  )
-order by
-  "shared_space_person"."name" asc
+  CASE
+    WHEN shared_space_person.name != '' THEN 0
+    WHEN person.name IS NOT NULL
+    AND person.name != '' THEN 0
+    ELSE 1
+  END,
+  "shared_space_person"."assetCount" desc,
+  "shared_space_person"."id"
+limit
+  $4
 
 -- SharedSpaceRepository.getPersonById
 select
@@ -446,23 +431,6 @@ returning
 delete from "shared_space_person"
 where
   "id" = $1
-
--- SharedSpaceRepository.getPersonFaceCount
-select
-  count(*) as "count"
-from
-  "shared_space_person_face"
-where
-  "personId" = $1
-
--- SharedSpaceRepository.getPersonAssetCount
-select
-  count(distinct ("asset_face"."assetId")) as "count"
-from
-  "shared_space_person_face"
-  inner join "asset_face" on "asset_face"."id" = "shared_space_person_face"."assetFaceId"
-where
-  "shared_space_person_face"."personId" = $1
 
 -- SharedSpaceRepository.getPersonAssetIds
 select distinct
@@ -492,6 +460,27 @@ where
   "personId" = $2
 
 -- SharedSpaceRepository.removePersonFacesByAssetIds
+select distinct
+  "personId"
+from
+  "shared_space_person_face"
+where
+  "assetFaceId" in (
+    select
+      "asset_face"."id"
+    from
+      "asset_face"
+    where
+      "asset_face"."assetId" in ($1)
+  )
+  and "personId" in (
+    select
+      "shared_space_person"."id"
+    from
+      "shared_space_person"
+    where
+      "shared_space_person"."spaceId" = $2
+  )
 delete from "shared_space_person_face"
 where
   "assetFaceId" in (
@@ -521,6 +510,29 @@ where
     from
       "shared_space_person_face"
   )
+
+-- SharedSpaceRepository.recountPersons
+update "shared_space_person"
+set
+  "faceCount" = (
+    select
+      count(*) as "count"
+    from
+      "shared_space_person_face"
+    where
+      "shared_space_person_face"."personId" = "shared_space_person"."id"
+  ),
+  "assetCount" = (
+    select
+      count(distinct ("asset_face"."assetId")) as "count"
+    from
+      "shared_space_person_face"
+      inner join "asset_face" on "asset_face"."id" = "shared_space_person_face"."assetFaceId"
+    where
+      "shared_space_person_face"."personId" = "shared_space_person"."id"
+  )
+where
+  "id" in ($1)
 
 -- SharedSpaceRepository.getAlias
 select

@@ -5107,6 +5107,7 @@
         "tags": [
           "Classification"
         ],
+        "x-immich-admin-only": true,
         "x-immich-history": [
           {
             "version": "v1",
@@ -5135,10 +5136,11 @@
             "api_key": []
           }
         ],
-        "summary": "Scan library for classification",
+        "summary": "Scan all libraries for classification",
         "tags": [
           "Classification"
         ],
+        "x-immich-admin-only": true,
         "x-immich-history": [
           {
             "version": "v1",
@@ -5181,6 +5183,7 @@
         "tags": [
           "Classification"
         ],
+        "x-immich-admin-only": true,
         "x-immich-history": [
           {
             "version": "v1",
@@ -5238,6 +5241,7 @@
         "tags": [
           "Classification"
         ],
+        "x-immich-admin-only": true,
         "x-immich-history": [
           {
             "version": "v1",
@@ -10573,6 +10577,15 @@
             "schema": {
               "$ref": "#/components/schemas/SearchSuggestionType"
             }
+          },
+          {
+            "name": "withSharedSpaces",
+            "required": false,
+            "in": "query",
+            "description": "Include suggestions from shared spaces the user is a member of",
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -13264,6 +13277,35 @@
             "schema": {
               "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum number of people to return (sorted by asset count)",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "type": "number"
+            }
+          },
+          {
+            "name": "named",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "description": "Number of people to skip",
+            "schema": {
+              "minimum": 0,
+              "type": "number"
             }
           },
           {
@@ -20548,10 +20590,6 @@
           "similarity": {
             "type": "number"
           },
-          "tagId": {
-            "nullable": true,
-            "type": "string"
-          },
           "updatedAt": {
             "type": "string"
           }
@@ -20564,7 +20602,6 @@
           "name",
           "prompts",
           "similarity",
-          "tagId",
           "updatedAt"
         ],
         "type": "object"

@@ -341,6 +341,9 @@ export class SearchSuggestionRequestDto {
   @ValidateUUID({ optional: true, description: 'Scope suggestions to a specific shared space' })
   spaceId?: string;
 
+  @ValidateBoolean({ optional: true, description: 'Include suggestions from shared spaces the user is a member of' })
+  withSharedSpaces?: boolean;
+
   @ValidateBoolean({
     optional: true,
     description: 'Include null values in suggestions',

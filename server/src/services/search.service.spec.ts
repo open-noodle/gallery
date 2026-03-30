@@ -429,6 +429,88 @@ describe(SearchService.name, () => {
           }),
         ).rejects.toThrow();
       });
+
+      it('should reject when both spaceId and withSharedSpaces are set', async () => {
+        await expect(
+          sut.getSearchSuggestions(authStub.user1, {
+            type: SearchSuggestionType.COUNTRY,
+            spaceId: newUuid(),
+            withSharedSpaces: true,
+          }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+      });
+
+      it('should fetch timeline space IDs when withSharedSpaces is true', async () => {
+        const spaceId1 = newUuid();
+        const spaceId2 = newUuid();
+        mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId: spaceId1 }, { spaceId: spaceId2 }]);
+        mocks.search.getCountries.mockResolvedValue(['Germany', 'France']);
+
+        const result = await sut.getSearchSuggestions(authStub.user1, {
+          type: SearchSuggestionType.COUNTRY,
+          withSharedSpaces: true,
+        });
+
+        expect(result).toEqual(['Germany', 'France']);
+        expect(mocks.sharedSpace.getSpaceIdsForTimeline).toHaveBeenCalledWith(authStub.user1.user.id);
+        expect(mocks.search.getCountries).toHaveBeenCalledWith(
+          [authStub.user1.user.id],
+          expect.objectContaining({ timelineSpaceIds: [spaceId1, spaceId2] }),
+        );
+      });
+
+      it('should fall back to owner-only when withSharedSpaces is true but user has no spaces', async () => {
+        mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
+        mocks.search.getCountries.mockResolvedValue(['USA']);
+
+        const result = await sut.getSearchSuggestions(authStub.user1, {
+          type: SearchSuggestionType.COUNTRY,
+          withSharedSpaces: true,
+        });
+
+        expect(result).toEqual(['USA']);
+        expect(mocks.search.getCountries).toHaveBeenCalledWith(
+          [authStub.user1.user.id],
+          expect.objectContaining({ timelineSpaceIds: undefined }),
+        );
+      });
+
+      it('should preserve existing behavior when withSharedSpaces is absent', async () => {
+        mocks.search.getCountries.mockResolvedValue(['USA']);
+
+        await sut.getSearchSuggestions(authStub.user1, {
+          type: SearchSuggestionType.COUNTRY,
+        });
+
+        expect(mocks.sharedSpace.getSpaceIdsForTimeline).not.toHaveBeenCalled();
+      });
+
+      it('should preserve existing behavior when withSharedSpaces is explicitly false', async () => {
+        mocks.search.getCountries.mockResolvedValue(['USA']);
+
+        await sut.getSearchSuggestions(authStub.user1, {
+          type: SearchSuggestionType.COUNTRY,
+          withSharedSpaces: false,
+        });
+
+        expect(mocks.sharedSpace.getSpaceIdsForTimeline).not.toHaveBeenCalled();
+      });
+
+      it('should pass timelineSpaceIds through to camera make suggestions', async () => {
+        const spaceId1 = newUuid();
+        mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId: spaceId1 }]);
+        mocks.search.getCameraMakes.mockResolvedValue(['Nikon']);
+
+        await sut.getSearchSuggestions(authStub.user1, {
+          type: SearchSuggestionType.CAMERA_MAKE,
+          withSharedSpaces: true,
+        });
+
+        expect(mocks.search.getCameraMakes).toHaveBeenCalledWith(
+          [authStub.user1.user.id],
+          expect.objectContaining({ timelineSpaceIds: [spaceId1] }),
+        );
+      });
     });
   });
 

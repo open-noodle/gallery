@@ -605,31 +605,21 @@ export class SharedSpaceService extends BaseService {
       return [];
     }
 
-    const withHidden = query?.withHidden ?? false;
-    const hasTemporal = query?.takenAfter || query?.takenBefore;
-    const persons = hasTemporal
-      ? await this.sharedSpaceRepository.getPersonsBySpaceIdWithTemporalFilter(spaceId, query, withHidden)
-      : await this.sharedSpaceRepository.getPersonsBySpaceId(spaceId, withHidden);
-    const aliases = await this.sharedSpaceRepository.getAliasesBySpaceAndUser(spaceId, auth.user.id);
+    const persons = await this.sharedSpaceRepository.getPersonsBySpaceId(spaceId, {
+      withHidden: query?.withHidden ?? false,
+      petsEnabled: space.petsEnabled,
+      limit: query?.limit,
+      offset: query?.offset,
+      named: query?.named,
+      takenAfter: query?.takenAfter,
+      takenBefore: query?.takenBefore,
+    });
+
+    const aliases =
+      persons.length > 0 ? await this.sharedSpaceRepository.getAliasesBySpaceAndUser(spaceId, auth.user.id) : [];
     const aliasMap = new Map(aliases.map((a) => [a.personId, a.alias]));
 
-    const results: SharedSpacePersonResponseDto[] = [];
-    for (const person of persons) {
-      if (!withHidden && person.isHidden) {
-        continue;
-      }
-      if (!space.petsEnabled && person.type === 'pet') {
-        continue;
-      }
-      if (!person.personalThumbnailPath) {
-        continue;
-      }
-      const faceCount = await this.sharedSpaceRepository.getPersonFaceCount(person.id);
-      const assetCount = await this.sharedSpaceRepository.getPersonAssetCount(person.id);
-      results.push(this.mapSpacePerson(person, faceCount, assetCount, aliasMap.get(person.id) ?? null));
-    }
-
-    return results.toSorted((a, b) => b.assetCount - a.assetCount);
+    return persons.map((person) => this.mapSpacePerson(person, aliasMap.get(person.id) ?? null));
   }
 
   async getSpacePerson(auth: AuthDto, spaceId: string, personId: string): Promise<SharedSpacePersonResponseDto> {
@@ -645,11 +635,9 @@ export class SharedSpaceService extends BaseService {
       throw new BadRequestException('Person not found');
     }
 
-    const faceCount = await this.sharedSpaceRepository.getPersonFaceCount(personId);
-    const assetCount = await this.sharedSpaceRepository.getPersonAssetCount(personId);
     const alias = await this.sharedSpaceRepository.getAlias(personId, auth.user.id);
 
-    return this.mapSpacePerson(person, faceCount, assetCount, alias?.alias ?? null);
+    return this.mapSpacePerson(person, alias?.alias ?? null);
   }
 
   async getSpacePersonThumbnail(auth: AuthDto, spaceId: string, personId: string): Promise<ImmichMediaResponse> {
@@ -695,8 +683,6 @@ export class SharedSpaceService extends BaseService {
       representativeFaceId: dto.representativeFaceId,
     });
 
-    const faceCount = await this.sharedSpaceRepository.getPersonFaceCount(personId);
-    const assetCount = await this.sharedSpaceRepository.getPersonAssetCount(personId);
     const alias = await this.sharedSpaceRepository.getAlias(personId, auth.user.id);
 
     await this.sharedSpaceRepository.logActivity({
@@ -711,7 +697,7 @@ export class SharedSpaceService extends BaseService {
       throw new BadRequestException('Person not found');
     }
 
-    return this.mapSpacePerson(enriched, faceCount, assetCount, alias?.alias ?? null);
+    return this.mapSpacePerson(enriched, alias?.alias ?? null);
   }
 
   async deleteSpacePerson(auth: AuthDto, spaceId: string, personId: string): Promise<void> {
@@ -774,6 +760,8 @@ export class SharedSpaceService extends BaseService {
       await this.sharedSpaceRepository.reassignPersonFaces(source.id, targetPersonId);
       await this.sharedSpaceRepository.deletePerson(source.id);
     }
+
+    await this.sharedSpaceRepository.recountPersons([targetPersonId]);
 
     await this.sharedSpaceRepository.logActivity({
       spaceId,
@@ -955,19 +943,11 @@ export class SharedSpaceService extends BaseService {
         }
 
         // Determine target (more faces) and source
-        const personFaceCount = await this.sharedSpaceRepository.getPersonFaceCount(person.id);
-        const matchFaceCount = await this.sharedSpaceRepository.getPersonFaceCount(match.personId);
-
-        const [target, source] = personFaceCount >= matchFaceCount ? [person, matchPerson] : [matchPerson, person];
+        const [target, source] =
+          person.faceCount >= matchPerson.faceCount ? [person, matchPerson] : [matchPerson, person];
 
         this.logger.log(
-          `Dedup: merging person ${source.id} (${source.name || 'unnamed'}, ${Math.min(
-            personFaceCount,
-            matchFaceCount,
-          )} faces) into ${target.id} (${target.name || 'unnamed'}, ${Math.max(
-            personFaceCount,
-            matchFaceCount,
-          )} faces), distance=${match.distance.toFixed(4)}`,
+          `Dedup: merging person ${source.id} (${source.name || 'unnamed'}, ${source.faceCount} faces) into ${target.id} (${target.name || 'unnamed'}, ${target.faceCount} faces), distance=${match.distance.toFixed(4)}`,
         );
 
         // Reassign faces and migrate aliases
@@ -1074,6 +1054,7 @@ export class SharedSpaceService extends BaseService {
   private async processSpaceFaceMatch(spaceId: string, assetId: string): Promise<void> {
     const { machineLearning } = await this.getConfig({ withCache: true });
     const maxDistance = machineLearning.facialRecognition.maxDistance;
+    const affectedPersonIds = new Set<string>();
 
     const faces = await this.sharedSpaceRepository.getAssetFacesForMatching(assetId);
     for (const face of faces) {
@@ -1116,7 +1097,8 @@ export class SharedSpaceService extends BaseService {
         }
       }
 
-      await this.sharedSpaceRepository.addPersonFaces([{ personId, assetFaceId: face.id }]);
+      await this.sharedSpaceRepository.addPersonFaces([{ personId, assetFaceId: face.id }], { skipRecount: true });
+      affectedPersonIds.add(personId);
     }
 
     // Process pet faces (detected by pet detection, no embeddings)
@@ -1150,7 +1132,12 @@ export class SharedSpaceService extends BaseService {
         personId = newPerson.id;
       }
 
-      await this.sharedSpaceRepository.addPersonFaces([{ personId, assetFaceId: petFace.id }]);
+      await this.sharedSpaceRepository.addPersonFaces([{ personId, assetFaceId: petFace.id }], { skipRecount: true });
+      affectedPersonIds.add(personId);
+    }
+
+    if (affectedPersonIds.size > 0) {
+      await this.sharedSpaceRepository.recountPersons([...affectedPersonIds]);
     }
   }
 
@@ -1224,12 +1211,7 @@ export class SharedSpaceService extends BaseService {
     };
   }
 
-  private mapSpacePerson(
-    person: SharedSpacePerson,
-    faceCount: number,
-    assetCount: number,
-    alias: string | null,
-  ): SharedSpacePersonResponseDto {
+  private mapSpacePerson(person: SharedSpacePerson, alias: string | null): SharedSpacePersonResponseDto {
     return {
       id: person.id,
       spaceId: person.spaceId,
@@ -1238,8 +1220,8 @@ export class SharedSpaceService extends BaseService {
       isHidden: person.isHidden,
       birthDate: person.birthDate,
       representativeFaceId: person.representativeFaceId,
-      faceCount,
-      assetCount,
+      faceCount: person.faceCount,
+      assetCount: person.assetCount,
       alias,
       createdAt: (person.createdAt as unknown as Date).toISOString(),
       updatedAt: (person.updatedAt as unknown as Date).toISOString(),

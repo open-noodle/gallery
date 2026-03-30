@@ -1,5 +1,5 @@
 import { buildMapFilterConfig } from '$lib/utils/map-filter-config';
-import { getAllPeople, getSpacePeople } from '@immich/sdk';
+import { getAllPeople, getSearchSuggestions, getSpacePeople } from '@immich/sdk';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@immich/sdk', async (importOriginal) => {
@@ -76,31 +76,18 @@ describe('buildMapFilterConfig', () => {
       expect(people[0].thumbnailUrl).toContain('/people/1/thumbnail');
     });
 
-    it('should exclude unnamed people in space config', async () => {
+    it('should pass named param to server for space config', async () => {
       vi.mocked(getSpacePeople).mockResolvedValue([
         { id: '1', name: 'Alice', thumbnailPath: '/thumb/1' },
-        { id: '2', name: '', thumbnailPath: '/thumb/2' },
-        { id: '3', name: 'Bob', thumbnailPath: '/thumb/3' },
+        { id: '2', name: 'Bob', thumbnailPath: '/thumb/3' },
       ] as never);
 
       const config = buildMapFilterConfig('space-123');
       const people = await config.providers.people!();
 
+      expect(getSpacePeople).toHaveBeenCalledWith(expect.objectContaining({ named: true }));
       expect(people).toHaveLength(2);
       expect(people.map((p) => p.name)).toEqual(['Alice', 'Bob']);
-    });
-
-    it('should exclude hidden people in space config', async () => {
-      vi.mocked(getSpacePeople).mockResolvedValue([
-        { id: '1', name: 'Alice', isHidden: false },
-        { id: '2', name: 'Bob', isHidden: true },
-      ] as never);
-
-      const config = buildMapFilterConfig('space-123');
-      const people = await config.providers.people!();
-
-      expect(people).toHaveLength(1);
-      expect(people[0].name).toBe('Alice');
     });
 
     it('should map thumbnailUrl correctly in space config', async () => {
@@ -113,5 +100,25 @@ describe('buildMapFilterConfig', () => {
 
       expect(people[0].thumbnailUrl).toContain('/shared-spaces/space-123/people/1/thumbnail');
     });
+  });
+
+  it('should pass withSharedSpaces to cameras provider when no spaceId', async () => {
+    vi.mocked(getSearchSuggestions).mockResolvedValue(['Nikon'] as never);
+
+    const config = buildMapFilterConfig();
+    await config.providers.cameras!();
+
+    expect(getSearchSuggestions).toHaveBeenCalledWith(expect.objectContaining({ withSharedSpaces: true }));
+  });
+
+  it('should pass withSharedSpaces to cameraModels provider when no spaceId', async () => {
+    vi.mocked(getSearchSuggestions).mockResolvedValue(['D850'] as never);
+
+    const config = buildMapFilterConfig();
+    await config.providers.cameraModels!('Nikon');
+
+    expect(getSearchSuggestions).toHaveBeenCalledWith(
+      expect.objectContaining({ withSharedSpaces: true, make: 'Nikon' }),
+    );
   });
 });

@@ -143,7 +143,7 @@ jobs:
       platforms: ${{ matrix.platforms }}
       runner-mapping: ${{ matrix.runner-mapping }}
       suffixes: ${{ matrix.suffixes }}
-      dockerhub-push: ${{ github.event_name == 'release' }}
+      dockerhub-push: false
       build-args: |
         DEVICE=${{ matrix.device }}
 
@@ -163,7 +163,7 @@ jobs:
       image: immich-server
       context: .
       dockerfile: server/Dockerfile
-      dockerhub-push: ${{ github.event_name == 'release' }}
+      dockerhub-push: false
       build-args: |
         DEVICE=cpu
 

@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsInt, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 import { Optional, ValidateBoolean, ValidateDate, ValidateUUID } from 'src/validation';
 
 export class SpacePeopleQueryDto {
@@ -11,6 +12,31 @@ export class SpacePeopleQueryDto {
 
   @ValidateBoolean({ optional: true })
   withHidden?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Maximum number of people to return (sorted by asset count)',
+    minimum: 1,
+    maximum: 100,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number;
+
+  @ApiPropertyOptional({
+    description: 'Number of people to skip',
+    minimum: 0,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  offset?: number;
+
+  @ValidateBoolean({ optional: true })
+  named?: boolean;
 }
 
 export class SharedSpacePersonUpdateDto {
