@@ -8,6 +8,9 @@
     spaceId: string;
     onClose: () => void;
     onUpdate: (people: SharedSpacePersonResponseDto[]) => void;
+    hasMore?: boolean;
+    loading?: boolean;
+    onLoadMore?: () => void;
   }
 
   let props: Props = $props();
