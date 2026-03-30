@@ -36,11 +36,14 @@ test.describe('Spaces People', () => {
     const personCard = page.locator('[role="group"]').first();
     await expect(personCard).toBeVisible();
 
-    // Hover to reveal context menu
+    // Hover to reveal context menu (dispatchEvent ensures mouseenter fires in headless)
     await personCard.hover();
+    await personCard.dispatchEvent('mouseenter');
 
-    // Click three-dot menu
-    await page.getByTitle('Show person options').click();
+    // Wait for and click three-dot menu
+    const menuButton = page.getByTitle('Show person options');
+    await expect(menuButton).toBeVisible({ timeout: 5000 });
+    await menuButton.click();
 
     // Click "Hide person"
     await page.getByText('Hide person').click();
