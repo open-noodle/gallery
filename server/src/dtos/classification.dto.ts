@@ -58,6 +58,11 @@ export class ClassificationCategoryUpdateDto {
   @IsOptional()
   @ApiPropertyOptional({ description: 'Enable or disable category' })
   enabled?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  @ApiPropertyOptional({ description: 'Wipe existing auto-tags for this category and rescan all assets' })
+  rescan?: boolean;
 }
 
 export class ClassificationCategoryResponseDto {
