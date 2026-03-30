@@ -7,6 +7,7 @@
   import { updateSpacePerson, type SharedSpacePersonResponseDto } from '@immich/sdk';
   import { Button, IconButton, toastManager } from '@immich/ui';
   import { mdiClose, mdiEye, mdiEyeOff, mdiEyeSettings, mdiRestart } from '@mdi/js';
+  import { onDestroy } from 'svelte';
   import { t } from 'svelte-i18n';
   import { SvelteMap } from 'svelte/reactivity';
 
@@ -15,9 +16,12 @@
     spaceId: string;
     onClose: () => void;
     onUpdate: (people: SharedSpacePersonResponseDto[]) => void;
+    hasMore?: boolean;
+    loading?: boolean;
+    onLoadMore?: () => void;
   }
 
-  let { people, spaceId, onClose, onUpdate }: Props = $props();
+  let { people, spaceId, onClose, onUpdate, hasMore = false, loading = false, onLoadMore }: Props = $props();
 
   let toggleVisibility = $state(ToggleVisibility.SHOW_ALL);
   let showLoadingSpinner = $state(false);
@@ -101,16 +105,43 @@
   });
   let toggleButton = $derived(toggleButtonOptions[getNextVisibility(toggleVisibility)]);
 
-  const sortedPeople = $derived(
-    [...people].sort((a, b) => {
-      const aHasName = a.name ? 0 : 1;
-      const bHasName = b.name ? 0 : 1;
-      if (aHasName !== bHasName) {
-        return aHasName - bHasName;
-      }
-      return b.assetCount - a.assetCount;
-    }),
-  );
+  // Server provides correct sort order (named first, then by assetCount DESC)
+  // No client-side sort needed with pagination
+
+  let visibilitySentinel = $state<HTMLElement>();
+
+  const visibilityObserver = new IntersectionObserver((entries) => {
+    const entry = entries.find((e) => e.target === visibilitySentinel);
+    if (entry?.isIntersecting) {
+      onLoadMore?.();
+    }
+  });
+
+  $effect(() => {
+    if (visibilitySentinel) {
+      visibilityObserver.disconnect();
+      visibilityObserver.observe(visibilitySentinel);
+    }
+  });
+
+  onDestroy(() => {
+    visibilityObserver.disconnect();
+  });
+
+  // Re-check after people list changes — if sentinel is still visible, load more
+  $effect(() => {
+    void people.length;
+    if (hasMore && !loading && visibilitySentinel) {
+      requestAnimationFrame(() => {
+        if (visibilitySentinel) {
+          const rect = visibilitySentinel.getBoundingClientRect();
+          if (rect.top < window.innerHeight) {
+            onLoadMore?.();
+          }
+        }
+      });
+    }
+  });
 </script>
 
 <svelte:document use:shortcut={{ shortcut: { key: 'Escape' }, onShortcut: onClose }} />
@@ -163,7 +194,7 @@
   </div>
 
   <div class="flex flex-wrap gap-1 p-2 pb-8 md:px-8">
-    {#each sortedPeople as person (person.id)}
+    {#each people as person (person.id)}
       {@const hidden = overrides.get(person.id) ?? person.isHidden}
       <button
         type="button"
@@ -189,5 +220,12 @@
         {/if}
       </button>
     {/each}
+    {#if hasMore}
+      <div bind:this={visibilitySentinel} class="flex h-8 w-full items-center justify-center">
+        {#if loading}
+          <span class="text-sm text-gray-500">{$t('loading')}</span>
+        {/if}
+      </div>
+    {/if}
   </div>
 </div>
