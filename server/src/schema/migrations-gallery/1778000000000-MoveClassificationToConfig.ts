@@ -91,7 +91,7 @@ export async function down(db: Kysely<any>): Promise<void> {
       "createdAt" timestamptz NOT NULL DEFAULT now(),
       "updatedAt" timestamptz NOT NULL DEFAULT now(),
       "updateId" uuid NOT NULL DEFAULT gen_random_uuid(),
-      UNIQUE (name)
+      CONSTRAINT "classification_category_name_uq" UNIQUE (name)
     )
   `.execute(db);
 
