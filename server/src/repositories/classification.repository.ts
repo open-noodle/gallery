@@ -16,33 +16,17 @@ export class ClassificationRepository {
     this.logger.setContext(ClassificationRepository.name);
   }
 
-  @GenerateSql({ params: [DummyValue.UUID] })
-  getCategories(userId: string) {
-    return this.db
-      .selectFrom('classification_category')
-      .selectAll()
-      .where('userId', '=', userId)
-      .orderBy('name', 'asc')
-      .execute();
+  @GenerateSql()
+  getCategories() {
+    return this.db.selectFrom('classification_category').selectAll().orderBy('name', 'asc').execute();
   }
 
-  @GenerateSql({ params: [DummyValue.UUID] })
-  getCategoriesWithPrompts(userId: string) {
+  @GenerateSql()
+  getCategoriesWithPrompts() {
     return this.db
       .selectFrom('classification_category as c')
       .leftJoin('classification_prompt_embedding as p', 'p.categoryId', 'c.id')
-      .select([
-        'c.id',
-        'c.name',
-        'c.similarity',
-        'c.action',
-        'c.enabled',
-        'c.tagId',
-        'c.createdAt',
-        'c.updatedAt',
-        'p.prompt',
-      ])
-      .where('c.userId', '=', userId)
+      .select(['c.id', 'c.name', 'c.similarity', 'c.action', 'c.enabled', 'c.createdAt', 'c.updatedAt', 'p.prompt'])
       .orderBy('c.name', 'asc')
       .execute();
   }
@@ -78,12 +62,8 @@ export class ClassificationRepository {
       .execute();
   }
 
-  getAllCategories() {
-    return this.db.selectFrom('classification_category').selectAll().execute();
-  }
-
-  @GenerateSql({ params: [DummyValue.UUID] })
-  getEnabledCategoriesWithEmbeddings(userId: string) {
+  @GenerateSql()
+  getEnabledCategoriesWithEmbeddings() {
     return this.db
       .selectFrom('classification_category as c')
       .innerJoin('classification_prompt_embedding as p', 'p.categoryId', 'c.id')
@@ -92,12 +72,10 @@ export class ClassificationRepository {
         'c.name',
         'c.similarity',
         'c.action',
-        'c.tagId',
         'p.id as promptId',
         'p.prompt',
         'p.embedding',
       ])
-      .where('c.userId', '=', userId)
       .where('c.enabled', '=', true)
       .execute();
   }
@@ -114,11 +92,11 @@ export class ClassificationRepository {
     await this.db.deleteFrom('classification_prompt_embedding').where('categoryId', '=', categoryId).execute();
   }
 
-  async resetClassifiedAt(userId: string) {
+  async resetClassifiedAt() {
     await this.db
       .updateTable('asset_job_status')
       .set({ classifiedAt: null })
-      .where('assetId', 'in', this.db.selectFrom('asset').select('id').where('ownerId', '=', userId))
+      .where('classifiedAt', 'is not', null)
       .execute();
   }
 
@@ -130,18 +108,13 @@ export class ClassificationRepository {
       .execute();
   }
 
-  streamUnclassifiedAssets(userId?: string) {
-    let query = this.db
+  streamUnclassifiedAssets() {
+    return this.db
       .selectFrom('asset_job_status as ajs')
       .innerJoin('asset as a', 'a.id', 'ajs.assetId')
       .innerJoin('smart_search as ss', 'ss.assetId', 'a.id')
       .select(['a.id', 'a.ownerId'])
-      .where('ajs.classifiedAt', 'is', null);
-
-    if (userId) {
-      query = query.where('a.ownerId', '=', userId);
-    }
-
-    return query.stream();
+      .where('ajs.classifiedAt', 'is', null)
+      .stream();
   }
 }

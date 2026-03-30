@@ -1,5 +1,23 @@
 <script lang="ts">
+  import ClassificationSettings from '#lib/components/admin-settings/ClassificationSettings.svelte';
+  import AuthSettings from '#lib/components/admin-settings/AuthSettings.svelte';
+  import BackupSettings from '#lib/components/admin-settings/BackupSettings.svelte';
+  import FFmpegSettings from '#lib/components/admin-settings/FFmpegSettings.svelte';
+  import ImageSettings from '#lib/components/admin-settings/ImageSettings.svelte';
+  import JobSettings from '#lib/components/admin-settings/JobSettings.svelte';
+  import LibrarySettings from '#lib/components/admin-settings/LibrarySettings.svelte';
+  import LoggingSettings from '#lib/components/admin-settings/LoggingSettings.svelte';
+  import MachineLearningSettings from '#lib/components/admin-settings/MachineLearningSettings.svelte';
+  import MapSettings from '#lib/components/admin-settings/MapSettings.svelte';
+  import MetadataSettings from '#lib/components/admin-settings/MetadataSettings.svelte';
+  import NewVersionCheckSettings from '#lib/components/admin-settings/NewVersionCheckSettings.svelte';
+  import NightlyTasksSettings from '#lib/components/admin-settings/NightlyTasksSettings.svelte';
+  import NotificationSettings from '#lib/components/admin-settings/NotificationSettings.svelte';
+  import ServerSettings from '#lib/components/admin-settings/ServerSettings.svelte';
   import StorageTemplateSettings from '#lib/components/admin-settings/StorageTemplateSettings.svelte';
+  import ThemeSettings from './ThemeSettings.svelte';
+  import TrashSettings from './TrashSettings.svelte';
+  import UserSettings from './UserSettings.svelte';
   import AdminPageLayout from '#lib/components/layouts/AdminPageLayout.svelte';
   import SettingAccordion from '#lib/components/shared-components/settings/SettingAccordion.svelte';
   import SearchBar from '#lib/elements/SearchBar.svelte';
@@ -20,6 +38,7 @@
     mdiFolderOutline,
     mdiImageOutline,
     mdiLockOutline,
+    mdiMagnifyScan,
     mdiMapMarkerOutline,
     mdiPaletteOutline,
     mdiRobotOutline,
@@ -32,24 +51,7 @@
   import type { Component } from 'svelte';
   import { t } from 'svelte-i18n';
   import type { PageData } from './$types';
-  import AuthSettings from './AuthSettings.svelte';
-  import BackupSettings from './BackupSettings.svelte';
-  import FFmpegSettings from './FFmpegSettings.svelte';
-  import ImageSettings from './ImageSettings.svelte';
   import IntegrityChecksSettings from './IntegrityChecksSettings.svelte';
-  import JobSettings from './JobSettings.svelte';
-  import LibrarySettings from './LibrarySettings.svelte';
-  import LoggingSettings from './LoggingSettings.svelte';
-  import MachineLearningSettings from './MachineLearningSettings.svelte';
-  import MapSettings from './MapSettings.svelte';
-  import MetadataSettings from './MetadataSettings.svelte';
-  import NewVersionCheckSettings from './NewVersionCheckSettings.svelte';
-  import NightlyTasksSettings from './NightlyTasksSettings.svelte';
-  import NotificationSettings from './NotificationSettings.svelte';
-  import ServerSettings from './ServerSettings.svelte';
-  import ThemeSettings from './ThemeSettings.svelte';
-  import TrashSettings from './TrashSettings.svelte';
-  import UserSettings from './UserSettings.svelte';
 
   type Props = {
     data: PageData;
@@ -122,6 +124,13 @@
       subtitle: $t('admin.machine_learning_settings_description'),
       key: 'machine-learning',
       icon: mdiRobotOutline,
+    },
+    {
+      component: ClassificationSettings,
+      title: $t('admin.classification_settings'),
+      subtitle: $t('admin.classification_settings_description'),
+      key: 'classification',
+      icon: mdiMagnifyScan,
     },
     {
       component: MapSettings,
