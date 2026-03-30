@@ -375,6 +375,54 @@ describe(ClassificationService.name, () => {
       expect(mocks.machineLearning.encodeText).not.toHaveBeenCalled();
       expect(mocks.classification.deletePromptEmbeddingsByCategory).not.toHaveBeenCalled();
     });
+
+    it('should wipe auto-tags and queue rescan when rescan is true', async () => {
+      mocks.classification.getCategory.mockResolvedValue(existingCategory as any);
+      mocks.classification.updateCategory.mockResolvedValue(existingCategory as any);
+      mocks.classification.getPromptEmbeddings.mockResolvedValue([{ prompt: 'sunset sky' }] as any);
+      mocks.classification.removeAutoTagAssignments.mockResolvedValue(void 0 as any);
+
+      await sut.updateCategory(authStub.user1, 'cat-1', { similarity: 0.9, rescan: true });
+
+      expect(mocks.classification.removeAutoTagAssignments).toHaveBeenCalledWith('Sunsets');
+      expect(mocks.job.queue).toHaveBeenCalledWith({
+        name: JobName.AssetClassifyQueueAll,
+        data: { force: true },
+      });
+    });
+
+    it('should NOT wipe or rescan when rescan is false', async () => {
+      mocks.classification.getCategory.mockResolvedValue(existingCategory as any);
+      mocks.classification.updateCategory.mockResolvedValue(existingCategory as any);
+      mocks.classification.getPromptEmbeddings.mockResolvedValue([{ prompt: 'sunset sky' }] as any);
+
+      await sut.updateCategory(authStub.user1, 'cat-1', { similarity: 0.9, rescan: false });
+
+      expect(mocks.classification.removeAutoTagAssignments).not.toHaveBeenCalled();
+      expect(mocks.job.queue).not.toHaveBeenCalled();
+    });
+
+    it('should NOT wipe or rescan when rescan is undefined', async () => {
+      mocks.classification.getCategory.mockResolvedValue(existingCategory as any);
+      mocks.classification.updateCategory.mockResolvedValue(existingCategory as any);
+      mocks.classification.getPromptEmbeddings.mockResolvedValue([{ prompt: 'sunset sky' }] as any);
+
+      await sut.updateCategory(authStub.user1, 'cat-1', { similarity: 0.9 });
+
+      expect(mocks.classification.removeAutoTagAssignments).not.toHaveBeenCalled();
+      expect(mocks.job.queue).not.toHaveBeenCalled();
+    });
+
+    it('should use old category name for wipe when name also changes', async () => {
+      mocks.classification.getCategory.mockResolvedValue(existingCategory as any);
+      mocks.classification.updateCategory.mockResolvedValue({ ...existingCategory, name: 'New Name' } as any);
+      mocks.classification.getPromptEmbeddings.mockResolvedValue([{ prompt: 'sunset sky' }] as any);
+      mocks.classification.removeAutoTagAssignments.mockResolvedValue(void 0 as any);
+
+      await sut.updateCategory(authStub.user1, 'cat-1', { name: 'New Name', rescan: true });
+
+      expect(mocks.classification.removeAutoTagAssignments).toHaveBeenCalledWith('Sunsets');
+    });
   });
 
   describe('deleteCategory', () => {
