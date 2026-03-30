@@ -166,10 +166,60 @@ export function mapPlaces(place: Place): PlacesResponseDto {
   };
 }
 
-const SearchFacetCountResponseSchema = z
-  .object({
-    count: z.int().min(0).describe('Number of assets with this facet value'),
-    value: z.string().describe('Facet value'),
+export enum SearchSuggestionType {
+  COUNTRY = 'country',
+  STATE = 'state',
+  CITY = 'city',
+  CAMERA_MAKE = 'camera-make',
+  CAMERA_MODEL = 'camera-model',
+  CAMERA_LENS_MODEL = 'camera-lens-model',
+}
+
+export class SearchSuggestionRequestDto {
+  @ValidateEnum({ enum: SearchSuggestionType, name: 'SearchSuggestionType', description: 'Suggestion type' })
+  type!: SearchSuggestionType;
+
+  @ApiPropertyOptional({ description: 'Filter by country' })
+  @IsString()
+  @Optional()
+  country?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by state/province' })
+  @IsString()
+  @Optional()
+  state?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by camera make' })
+  @IsString()
+  @Optional()
+  make?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by camera model' })
+  @IsString()
+  @Optional()
+  model?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by lens model' })
+  @IsString()
+  @Optional()
+  lensModel?: string;
+
+  @ValidateDate({ optional: true, description: 'Filter suggestions by taken date (after)' })
+  takenAfter?: Date;
+
+  @ValidateDate({ optional: true, description: 'Filter suggestions by taken date (before)' })
+  takenBefore?: Date;
+
+  @ValidateUUID({ optional: true, description: 'Scope suggestions to a specific shared space' })
+  spaceId?: string;
+
+  @ValidateBoolean({ optional: true, description: 'Include suggestions from shared spaces the user is a member of' })
+  withSharedSpaces?: boolean;
+
+  @ValidateBoolean({
+    optional: true,
+    description: 'Include null values in suggestions',
+    history: new HistoryBuilder().added('v1.111.0').stable('v2'),
   })
   .meta({ id: 'SearchFacetCountResponseDto' });
 

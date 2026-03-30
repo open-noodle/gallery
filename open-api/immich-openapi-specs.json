@@ -10481,6 +10481,15 @@
             "schema": {
               "$ref": "#/components/schemas/SearchSuggestionType"
             }
+          },
+          {
+            "name": "withSharedSpaces",
+            "required": false,
+            "in": "query",
+            "description": "Include suggestions from shared spaces the user is a member of",
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {

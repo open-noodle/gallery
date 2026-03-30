@@ -975,6 +975,60 @@ describe('/search', () => {
     });
   });
 
+  describe('GET /search/suggestions (withSharedSpaces)', () => {
+    let memberUser: LoginResponseDto;
+    let sharedSpace: SharedSpaceResponseDto;
+
+    beforeAll(async () => {
+      // Create a non-admin user and a space owned by admin with assetFalcon (Paris, France, Canon EOS R5)
+      memberUser = await utils.userSetup(admin.accessToken, {
+        email: 'with-shared-spaces@immich.cloud',
+        name: 'WithSharedSpaces User',
+        password: 'Password123!',
+      });
+      sharedSpace = await utils.createSpace(admin.accessToken, { name: 'SharedSpaces Test' });
+      await utils.addSpaceAssets(admin.accessToken, sharedSpace.id, [assetFalcon.id]);
+      await utils.addSpaceMember(admin.accessToken, sharedSpace.id, { userId: memberUser.userId });
+    });
+
+    it('should return space country suggestions for member with withSharedSpaces=true', async () => {
+      const { status, body } = await request(app)
+        .get('/search/suggestions?type=country&withSharedSpaces=true')
+        .set('Authorization', `Bearer ${memberUser.accessToken}`);
+      expect(status).toBe(200);
+      expect(Array.isArray(body)).toBe(true);
+      // memberUser has no own assets but is a member of a space containing assetFalcon (France)
+      expect(body).toContain('France');
+    });
+
+    it('should return space camera-make suggestions for member with withSharedSpaces=true', async () => {
+      const { status, body } = await request(app)
+        .get('/search/suggestions?type=camera-make&withSharedSpaces=true')
+        .set('Authorization', `Bearer ${memberUser.accessToken}`);
+      expect(status).toBe(200);
+      expect(Array.isArray(body)).toBe(true);
+      // assetFalcon was taken with a Canon camera
+      expect(body).toContain('Canon');
+    });
+
+    it('should reject when both spaceId and withSharedSpaces are provided', async () => {
+      const { status } = await request(app)
+        .get(`/search/suggestions?type=country&spaceId=${sharedSpace.id}&withSharedSpaces=true`)
+        .set('Authorization', `Bearer ${memberUser.accessToken}`);
+      expect(status).toBe(400);
+    });
+
+    it('should not return space content without withSharedSpaces flag', async () => {
+      const { status, body } = await request(app)
+        .get('/search/suggestions?type=country')
+        .set('Authorization', `Bearer ${memberUser.accessToken}`);
+      expect(status).toBe(200);
+      expect(Array.isArray(body)).toBe(true);
+      // memberUser has no own assets, so no countries should be returned
+      expect(body).toEqual([]);
+    });
+  });
+
   describe('POST /search/random (spaceId access)', () => {
     let space: SharedSpaceResponseDto;
     let outsider: LoginResponseDto;

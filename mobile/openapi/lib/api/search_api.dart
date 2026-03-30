@@ -155,7 +155,10 @@ class SearchApi {
   ///
   /// * [DateTime] takenBefore:
   ///   Filter suggestions by taken date (before)
-  Future<Response> getSearchSuggestionsWithHttpInfo(SearchSuggestionType type, { String? country, bool? includeNull, String? lensModel, String? make, String? model, String? spaceId, String? state, DateTime? takenAfter, DateTime? takenBefore, }) async {
+  ///
+  /// * [bool] withSharedSpaces:
+  ///   Include suggestions from shared spaces the user is a member of
+  Future<Response> getSearchSuggestionsWithHttpInfo(SearchSuggestionType type, { String? country, bool? includeNull, String? lensModel, String? make, String? model, String? spaceId, String? state, DateTime? takenAfter, DateTime? takenBefore, bool? withSharedSpaces, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/search/suggestions';
 
@@ -194,6 +197,9 @@ class SearchApi {
       queryParams.addAll(_queryParams('', 'takenBefore', takenBefore));
     }
       queryParams.addAll(_queryParams('', 'type', type));
+    if (withSharedSpaces != null) {
+      queryParams.addAll(_queryParams('', 'withSharedSpaces', withSharedSpaces));
+    }
 
     const contentTypes = <String>[];
 
@@ -244,8 +250,11 @@ class SearchApi {
   ///
   /// * [DateTime] takenBefore:
   ///   Filter suggestions by taken date (before)
-  Future<List<String>?> getSearchSuggestions(SearchSuggestionType type, { String? country, bool? includeNull, String? lensModel, String? make, String? model, String? spaceId, String? state, DateTime? takenAfter, DateTime? takenBefore, }) async {
-    final response = await getSearchSuggestionsWithHttpInfo(type,  country: country, includeNull: includeNull, lensModel: lensModel, make: make, model: model, spaceId: spaceId, state: state, takenAfter: takenAfter, takenBefore: takenBefore, );
+  ///
+  /// * [bool] withSharedSpaces:
+  ///   Include suggestions from shared spaces the user is a member of
+  Future<List<String>?> getSearchSuggestions(SearchSuggestionType type, { String? country, bool? includeNull, String? lensModel, String? make, String? model, String? spaceId, String? state, DateTime? takenAfter, DateTime? takenBefore, bool? withSharedSpaces, }) async {
+    final response = await getSearchSuggestionsWithHttpInfo(type,  country: country, includeNull: includeNull, lensModel: lensModel, make: make, model: model, spaceId: spaceId, state: state, takenAfter: takenAfter, takenBefore: takenBefore, withSharedSpaces: withSharedSpaces, );
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }

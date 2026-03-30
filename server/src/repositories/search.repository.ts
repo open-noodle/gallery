@@ -165,6 +165,7 @@ export interface AssetDuplicateResult {
 
 export interface SpaceScopeOptions {
   spaceId?: string;
+  timelineSpaceIds?: string[];
   takenAfter?: Date;
   takenBefore?: Date;
 }
@@ -518,12 +519,12 @@ export class SearchRepository {
       .select(field)
       .distinctOn(field)
       .innerJoin('asset', 'asset.id', 'asset_exif.assetId')
-      .$if(!options?.spaceId, (qb) => qb.where('ownerId', '=', anyUuid(userIds)))
+      .$if(!options?.spaceId && !options?.timelineSpaceIds, (qb) => qb.where('ownerId', '=', anyUuid(userIds)))
       .where('visibility', '=', AssetVisibility.Timeline)
       .where('deletedAt', 'is', null)
       .where(field, 'is not', null)
       .where(field, '!=', '' as any)
-      .$if(!!options?.spaceId, (qb) =>
+      .$if(!!options?.spaceId && !options?.timelineSpaceIds, (qb) =>
         qb.where((eb) =>
           eb.or([
             eb.exists(
@@ -537,6 +538,25 @@ export class SearchRepository {
                 .selectFrom('shared_space_library')
                 .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
                 .where('shared_space_library.spaceId', '=', asUuid(options!.spaceId!)),
+            ),
+          ]),
+        ),
+      )
+      .$if(!!options?.timelineSpaceIds, (qb) =>
+        qb.where((eb) =>
+          eb.or([
+            eb('ownerId', '=', anyUuid(userIds)),
+            eb.exists(
+              eb
+                .selectFrom('shared_space_asset')
+                .whereRef('shared_space_asset.assetId', '=', 'asset.id')
+                .where('shared_space_asset.spaceId', '=', anyUuid(options!.timelineSpaceIds!)),
+            ),
+            eb.exists(
+              eb
+                .selectFrom('shared_space_library')
+                .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
+                .where('shared_space_library.spaceId', '=', anyUuid(options!.timelineSpaceIds!)),
             ),
           ]),
         ),
