@@ -1466,6 +1466,8 @@ export type ClassificationCategoryUpdateDto = {
     name?: string;
     /** Text prompts for CLIP matching */
     prompts?: string[];
+    /** Wipe existing auto-tags for this category and rescan all assets */
+    rescan?: boolean;
     /** Similarity threshold (0-1, higher = stricter) */
     similarity?: number;
 };
