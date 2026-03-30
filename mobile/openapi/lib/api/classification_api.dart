@@ -160,7 +160,7 @@ class ClassificationApi {
     return null;
   }
 
-  /// Scan library for classification
+  /// Scan all libraries for classification
   ///
   /// Note: This method returns the HTTP [Response].
   Future<Response> scanClassificationWithHttpInfo() async {
@@ -188,7 +188,7 @@ class ClassificationApi {
     );
   }
 
-  /// Scan library for classification
+  /// Scan all libraries for classification
   Future<void> scanClassification() async {
     final response = await scanClassificationWithHttpInfo();
     if (response.statusCode >= HttpStatus.badRequest) {
