@@ -274,6 +274,18 @@ export class SharedSpaceController {
     return this.service.getSpacePeople(auth, id, query);
   }
 
+  @Post(':id/people/deduplicate')
+  @Authenticated({ permission: Permission.SharedSpaceUpdate })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Endpoint({
+    summary: 'Deduplicate people in a shared space',
+    description: 'Queue a background job to find and merge duplicate people in a shared space.',
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  deduplicateSpacePeople(@Auth() auth: AuthDto, @Param('id') id: string): Promise<void> {
+    return this.service.deduplicateSpacePeople(auth, id);
+  }
+
   @Get(':id/people/:personId')
   @Authenticated({ permission: Permission.SharedSpaceRead })
   @Endpoint({
