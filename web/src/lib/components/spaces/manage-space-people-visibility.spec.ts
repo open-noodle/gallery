@@ -114,4 +114,103 @@ describe('ManageSpacePeopleVisibility', () => {
 
     expect(onClose).toHaveBeenCalledTimes(1);
   });
+
+  // --- Pagination tests ---
+
+  it('should render loading text when hasMore and loading are true', () => {
+    const people = [makePerson({ id: 'p1' })];
+    render(ManageSpacePeopleVisibilityWrapper, {
+      props: {
+        people,
+        spaceId: 'space-1',
+        onClose,
+        onUpdate,
+        hasMore: true,
+        loading: true,
+        onLoadMore: vi.fn(),
+      },
+    });
+
+    expect(screen.getByText('loading')).toBeInTheDocument();
+  });
+
+  it('should not render loading text when hasMore is false', () => {
+    const people = [makePerson({ id: 'p1' })];
+    render(ManageSpacePeopleVisibilityWrapper, {
+      props: {
+        people,
+        spaceId: 'space-1',
+        onClose,
+        onUpdate,
+        hasMore: false,
+        onLoadMore: vi.fn(),
+      },
+    });
+
+    expect(screen.queryByText('loading')).not.toBeInTheDocument();
+  });
+
+  it('should preserve toggle overrides when people list grows via pagination', async () => {
+    const people = [
+      makePerson({ id: 'p1', name: 'Alice', isHidden: false }),
+      makePerson({ id: 'p2', name: 'Bob', isHidden: false }),
+    ];
+
+    const { rerender } = render(ManageSpacePeopleVisibilityWrapper, {
+      props: {
+        people,
+        spaceId: 'space-1',
+        onClose,
+        onUpdate,
+        hasMore: true,
+        onLoadMore: vi.fn(),
+      },
+    });
+
+    // Toggle p1 to hidden
+    await fireEvent.click(screen.getByTestId('visibility-person-p1'));
+    expect(screen.getByTestId('visibility-person-p1')).toHaveAttribute('aria-pressed', 'true');
+
+    // Simulate loading more people (rerender with expanded list)
+    const morePeople = [...people, makePerson({ id: 'p3', name: 'Charlie', isHidden: false })];
+    await rerender({
+      people: morePeople,
+      spaceId: 'space-1',
+      onClose,
+      onUpdate,
+      hasMore: false,
+      onLoadMore: vi.fn(),
+    });
+
+    // p1 override should be preserved
+    expect(screen.getByTestId('visibility-person-p1')).toHaveAttribute('aria-pressed', 'true');
+    // p3 should be visible (not toggled)
+    expect(screen.getByTestId('visibility-person-p3')).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('should save only overrides for loaded people', async () => {
+    const people = [makePerson({ id: 'p1', name: 'Alice', isHidden: false })];
+
+    render(ManageSpacePeopleVisibilityWrapper, {
+      props: {
+        people,
+        spaceId: 'space-1',
+        onClose,
+        onUpdate,
+        hasMore: true,
+        onLoadMore: vi.fn(),
+      },
+    });
+
+    // Toggle p1
+    await fireEvent.click(screen.getByTestId('visibility-person-p1'));
+
+    // Save
+    await fireEvent.click(screen.getByTestId('save-visibility'));
+
+    await waitFor(() => {
+      expect(sdkMock.updateSpacePerson).toHaveBeenCalledTimes(1);
+      expect(sdkMock.updateSpacePerson).toHaveBeenCalledWith(expect.objectContaining({ personId: 'p1' }));
+    });
+  });
 });
