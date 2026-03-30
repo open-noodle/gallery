@@ -248,11 +248,7 @@ describe(ClassificationRepository.name, () => {
       await sut.removeAutoTagAssignments('Screenshots');
 
       // Verify tag_asset rows are gone
-      const tagAssets = await ctx.database
-        .selectFrom('tag_asset')
-        .selectAll()
-        .where('tagId', '=', tag.id)
-        .execute();
+      const tagAssets = await ctx.database.selectFrom('tag_asset').selectAll().where('tagId', '=', tag.id).execute();
       expect(tagAssets).toHaveLength(0);
 
       // Verify asset1 is unarchived

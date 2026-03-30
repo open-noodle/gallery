@@ -20584,6 +20584,10 @@
             "minItems": 1,
             "type": "array"
           },
+          "rescan": {
+            "description": "Wipe existing auto-tags for this category and rescan all assets",
+            "type": "boolean"
+          },
           "similarity": {
             "description": "Similarity threshold (0-1, higher = stricter)",
             "maximum": 1,
