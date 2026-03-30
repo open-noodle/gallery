@@ -235,6 +235,55 @@ class SharedSpacesApi {
     return null;
   }
 
+  /// Deduplicate people in a shared space
+  ///
+  /// Queue a background job to find and merge duplicate people in a shared space.
+  ///
+  /// Note: This method returns the HTTP [Response].
+  ///
+  /// Parameters:
+  ///
+  /// * [String] id (required):
+  Future<Response> deduplicateSpacePeopleWithHttpInfo(String id,) async {
+    // ignore: prefer_const_declarations
+    final apiPath = r'/shared-spaces/{id}/people/deduplicate'
+      .replaceAll('{id}', id);
+
+    // ignore: prefer_final_locals
+    Object? postBody;
+
+    final queryParams = <QueryParam>[];
+    final headerParams = <String, String>{};
+    final formParams = <String, String>{};
+
+    const contentTypes = <String>[];
+
+
+    return apiClient.invokeAPI(
+      apiPath,
+      'POST',
+      queryParams,
+      postBody,
+      headerParams,
+      formParams,
+      contentTypes.isEmpty ? null : contentTypes.first,
+    );
+  }
+
+  /// Deduplicate people in a shared space
+  ///
+  /// Queue a background job to find and merge duplicate people in a shared space.
+  ///
+  /// Parameters:
+  ///
+  /// * [String] id (required):
+  Future<void> deduplicateSpacePeople(String id,) async {
+    final response = await deduplicateSpacePeopleWithHttpInfo(id,);
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
+    }
+  }
+
   /// Delete a person from a shared space
   ///
   /// Permanently delete a person and their face assignments from a shared space.
