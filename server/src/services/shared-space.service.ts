@@ -718,6 +718,15 @@ export class SharedSpaceService extends BaseService {
     });
   }
 
+  async deduplicateSpacePeople(auth: AuthDto, spaceId: string): Promise<void> {
+    await this.requireRole(auth, spaceId, SharedSpaceRole.Owner);
+
+    await this.jobRepository.queue({
+      name: JobName.SharedSpacePersonDedup,
+      data: { spaceId },
+    });
+  }
+
   async mergeSpacePeople(
     auth: AuthDto,
     spaceId: string,
@@ -838,6 +847,12 @@ export class SharedSpaceService extends BaseService {
       offset += assets.length;
     }
 
+    // Queue dedup pass after library sync completes
+    await this.jobRepository.queue({
+      name: JobName.SharedSpacePersonDedup,
+      data: { spaceId: job.spaceId },
+    });
+
     return JobStatus.Success;
   }
 
@@ -856,6 +871,127 @@ export class SharedSpaceService extends BaseService {
       })),
     );
 
+    // Queue dedup pass after all face matches complete
+    await this.jobRepository.queue({
+      name: JobName.SharedSpacePersonDedup,
+      data: { spaceId },
+    });
+
+    return JobStatus.Success;
+  }
+
+  @OnJob({ name: JobName.SharedSpacePersonDedup, queue: QueueName.FacialRecognition })
+  async handleSharedSpacePersonDedup(job: JobOf<JobName.SharedSpacePersonDedup>): Promise<JobStatus> {
+    const space = await this.sharedSpaceRepository.getById(job.spaceId);
+    if (!space || !space.faceRecognitionEnabled) {
+      this.logger.debug(`Dedup skipped for space ${job.spaceId}: ${space ? 'face recognition disabled' : 'not found'}`);
+      return JobStatus.Skipped;
+    }
+
+    const { machineLearning } = await this.getConfig({ withCache: true });
+    const maxDistance = machineLearning.facialRecognition.maxDistance;
+
+    const MAX_PASSES = 100;
+    let totalMerges = 0;
+    let pass = 0;
+    let mergedAny = true;
+
+    while (mergedAny) {
+      mergedAny = false;
+      pass++;
+
+      if (pass > MAX_PASSES) {
+        this.logger.error(
+          `Dedup for space ${job.spaceId} exceeded ${MAX_PASSES} passes — aborting to prevent infinite loop`,
+        );
+        break;
+      }
+
+      const persons = await this.sharedSpaceRepository.getSpacePersonsWithEmbeddings(job.spaceId);
+      this.logger.log(`Dedup pass ${pass} for space ${job.spaceId}: ${persons.length} persons to check`);
+
+      if (persons.length <= 1) {
+        break;
+      }
+
+      const deletedIds = new Set<string>();
+      let passMerges = 0;
+
+      for (const person of persons) {
+        if (deletedIds.has(person.id)) {
+          continue;
+        }
+
+        const matches = await this.sharedSpaceRepository.findClosestSpacePerson(job.spaceId, person.embedding, {
+          maxDistance,
+          numResults: 1,
+          excludePersonIds: [person.id, ...deletedIds],
+          type: person.type,
+        });
+
+        if (matches.length === 0) {
+          continue;
+        }
+
+        const match = matches[0];
+        const matchPerson = persons.find((p) => p.id === match.personId);
+        if (!matchPerson || deletedIds.has(match.personId)) {
+          this.logger.debug(
+            `Dedup: skipping stale match ${match.personId} for person ${person.id} (already merged in this pass)`,
+          );
+          continue;
+        }
+
+        // Determine target (more faces) and source
+        const [target, source] =
+          person.faceCount >= matchPerson.faceCount ? [person, matchPerson] : [matchPerson, person];
+
+        this.logger.log(
+          `Dedup: merging person ${source.id} (${source.name || 'unnamed'}, ${source.faceCount} faces) into ${target.id} (${target.name || 'unnamed'}, ${target.faceCount} faces), distance=${match.distance.toFixed(4)}`,
+        );
+
+        // Reassign faces and migrate aliases
+        await this.sharedSpaceRepository.reassignPersonFacesSafe(source.id, target.id);
+        await this.sharedSpaceRepository.migrateAliases(source.id, target.id);
+
+        // Determine merged properties
+        const updates: Partial<{ name: string; isHidden: boolean }> = {};
+        if (!target.name && source.name) {
+          updates.name = source.name;
+        }
+        if (target.isHidden && !source.isHidden) {
+          updates.isHidden = false;
+        }
+
+        // Update and delete separately so deletePerson still runs if updatePerson fails
+        try {
+          if (Object.keys(updates).length > 0) {
+            await this.sharedSpaceRepository.updatePerson(target.id, updates);
+          }
+        } catch (error) {
+          // Target may have been concurrently deleted — faces were already reassigned, continue to delete source
+          this.logger.warn(`Dedup: updatePerson failed for target ${target.id}: ${error}`);
+        }
+
+        try {
+          await this.sharedSpaceRepository.deletePerson(source.id);
+        } catch (error) {
+          // Source may have been concurrently deleted — safe to ignore
+          this.logger.warn(`Dedup: deletePerson failed for source ${source.id}: ${error}`);
+        }
+
+        deletedIds.add(source.id);
+        passMerges++;
+        mergedAny = true;
+      }
+
+      totalMerges += passMerges;
+      this.logger.log(`Dedup pass ${pass} complete: ${passMerges} merges`);
+    }
+
+    this.logger.log(
+      `Dedup finished for space ${job.spaceId}: ${totalMerges} total merges across ${pass} pass${pass === 1 ? '' : 'es'}`,
+    );
     return JobStatus.Success;
   }
 
@@ -942,13 +1078,23 @@ export class SharedSpaceService extends BaseService {
           continue;
         }
 
-        const newPerson = await this.sharedSpaceRepository.createPerson({
+        // Layer 1 dedup: check if a space person already exists for this personal person
+        const existingSpacePerson = await this.sharedSpaceRepository.findSpacePersonByLinkedPersonId(
           spaceId,
-          name: '',
-          representativeFaceId: face.id,
-          type: 'person',
-        });
-        personId = newPerson.id;
+          face.personId,
+        );
+
+        if (existingSpacePerson) {
+          personId = existingSpacePerson.id;
+        } else {
+          const newPerson = await this.sharedSpaceRepository.createPerson({
+            spaceId,
+            name: '',
+            representativeFaceId: face.id,
+            type: 'person',
+          });
+          personId = newPerson.id;
+        }
       }
 
       await this.sharedSpaceRepository.addPersonFaces([{ personId, assetFaceId: face.id }], { skipRecount: true });
