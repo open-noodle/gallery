@@ -13309,6 +13309,54 @@
         "x-immich-state": "Beta"
       }
     },
+    "/shared-spaces/{id}/people/deduplicate": {
+      "post": {
+        "description": "Queue a background job to find and merge duplicate people in a shared space.",
+        "operationId": "deduplicateSpacePeople",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Deduplicate people in a shared space",
+        "tags": [
+          "Shared Spaces"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "sharedSpace.update",
+        "x-immich-state": "Beta"
+      }
+    },
     "/shared-spaces/{id}/people/{personId}": {
       "delete": {
         "description": "Permanently delete a person and their face assignments from a shared space.",
@@ -21163,6 +21211,7 @@
           "SharedSpaceFaceMatch",
           "SharedSpaceFaceMatchAll",
           "SharedSpaceLibraryFaceSync",
+          "SharedSpacePersonDedup",
           "SharedSpaceBulkAddAssets",
           "AssetClassifyQueueAll",
           "AssetClassify"

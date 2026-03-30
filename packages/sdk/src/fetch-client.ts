@@ -7150,6 +7150,17 @@ export function getSpacePeople({ id, limit, named, offset, takenAfter, takenBefo
     }));
 }
 /**
+ * Deduplicate people in a shared space
+ */
+export function deduplicateSpacePeople({ id }: {
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/people/deduplicate`, {
+        ...opts,
+        method: "POST"
+    }));
+}
+/**
  * Delete a person from a shared space
  */
 export function deleteSpacePerson({ id, personId }: {
@@ -8683,6 +8694,7 @@ export enum JobName {
     SharedSpaceFaceMatch = "SharedSpaceFaceMatch",
     SharedSpaceFaceMatchAll = "SharedSpaceFaceMatchAll",
     SharedSpaceLibraryFaceSync = "SharedSpaceLibraryFaceSync",
+    SharedSpacePersonDedup = "SharedSpacePersonDedup",
     SharedSpaceBulkAddAssets = "SharedSpaceBulkAddAssets",
     AssetClassifyQueueAll = "AssetClassifyQueueAll",
     AssetClassify = "AssetClassify"
