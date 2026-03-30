@@ -14,10 +14,10 @@ export const load = (async ({ url, params }) => {
     getSpacePersonAssets({ id: params.spaceId, personId: params.personId }),
   ]);
 
-  // Only fetch all people if merging
+  // Only fetch first page of people if merging
   let allPeople: Awaited<ReturnType<typeof getSpacePeople>> = [];
   if (action === 'merge') {
-    allPeople = await getSpacePeople({ id: params.spaceId });
+    allPeople = await getSpacePeople({ id: params.spaceId, limit: 100 });
   }
 
   return {

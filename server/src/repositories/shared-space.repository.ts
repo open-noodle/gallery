@@ -486,45 +486,39 @@ export class SharedSpaceRepository {
   }
 
   @GenerateSql({
-    params: [DummyValue.UUID, { withHidden: false, petsEnabled: true, limit: 10 }],
+    params: [DummyValue.UUID, { withHidden: false, petsEnabled: true, limit: 50, offset: 0, named: false }],
   })
-  getPersonsBySpaceIdWithCounts(
+  getPersonsBySpaceId(
     spaceId: string,
     options: {
       withHidden?: boolean;
       petsEnabled?: boolean;
       limit?: number;
+      offset?: number;
+      named?: boolean;
       takenAfter?: Date;
       takenBefore?: Date;
     },
   ) {
     return this.db
       .selectFrom('shared_space_person')
-      .innerJoin('shared_space_person_face', 'shared_space_person_face.personId', 'shared_space_person.id')
-      .innerJoin('asset_face', 'asset_face.id', 'shared_space_person_face.assetFaceId')
+      .leftJoin('asset_face', 'asset_face.id', 'shared_space_person.representativeFaceId')
       .leftJoin('person', 'person.id', 'asset_face.personId')
-      .select([
-        'shared_space_person.id',
-        'shared_space_person.spaceId',
-        'shared_space_person.name',
-        'shared_space_person.isHidden',
-        'shared_space_person.type',
-        'shared_space_person.birthDate',
-        'shared_space_person.representativeFaceId',
-        'shared_space_person.createdAt',
-        'shared_space_person.updatedAt',
-        'shared_space_person.updateId',
-      ])
+      .selectAll('shared_space_person')
       .select(['person.name as personalName', 'person.thumbnailPath as personalThumbnailPath'])
-      .select((eb) => [
-        eb.fn.countAll().as('faceCount'),
-        eb.fn.count(eb.fn('distinct', ['asset_face.assetId'])).as('assetCount'),
-      ])
       .where('shared_space_person.spaceId', '=', spaceId)
       .$if(!options.withHidden, (qb) => qb.where('shared_space_person.isHidden', '=', false))
       .$if(!options.petsEnabled, (qb) => qb.where('shared_space_person.type', '!=', 'pet'))
       .where('person.thumbnailPath', 'is not', null)
       .where('person.thumbnailPath', '!=', '')
+      .$if(!!options.named, (qb) =>
+        qb.where((eb) =>
+          eb.or([
+            eb('shared_space_person.name', '!=', ''),
+            eb.and([eb('person.name', 'is not', null), eb('person.name', '!=', '')]),
+          ]),
+        ),
+      )
       .$if(!!options.takenAfter || !!options.takenBefore, (qb) =>
         qb.where((eb) =>
           eb.exists(
@@ -538,9 +532,15 @@ export class SharedSpaceRepository {
           ),
         ),
       )
-      .groupBy(['shared_space_person.id', 'person.name', 'person.thumbnailPath'])
-      .orderBy('assetCount', 'desc')
+      .orderBy(
+        sql`CASE WHEN shared_space_person.name != '' THEN 0
+             WHEN person.name IS NOT NULL AND person.name != '' THEN 0
+             ELSE 1 END`,
+      )
+      .orderBy('shared_space_person.assetCount', 'desc')
+      .orderBy('shared_space_person.id')
       .$if(!!options.limit, (qb) => qb.limit(options.limit!))
+      .$if(!!options.offset, (qb) => qb.offset(options.offset!))
       .execute();
   }
 
@@ -575,38 +575,24 @@ export class SharedSpaceRepository {
     await this.db.deleteFrom('shared_space_person').where('id', '=', id).execute();
   }
 
-  addPersonFaces(values: Insertable<SharedSpacePersonFaceTable>[]) {
+  async addPersonFaces(values: Insertable<SharedSpacePersonFaceTable>[], options?: { skipRecount?: boolean }) {
     if (values.length === 0) {
-      return Promise.resolve([]);
+      return [];
     }
 
-    return this.db
+    const result = await this.db
       .insertInto('shared_space_person_face')
       .values(values)
       .onConflict((oc) => oc.doNothing())
       .returningAll()
       .execute();
-  }
 
-  @GenerateSql({ params: [DummyValue.UUID] })
-  async getPersonFaceCount(personId: string): Promise<number> {
-    const result = await this.db
-      .selectFrom('shared_space_person_face')
-      .select((eb) => eb.fn.countAll().as('count'))
-      .where('personId', '=', personId)
-      .executeTakeFirstOrThrow();
-    return Number(result.count);
-  }
+    if (!options?.skipRecount && result.length > 0) {
+      const personIds = [...new Set(result.map((r) => r.personId))];
+      await this.recountPersons(personIds);
+    }
 
-  @GenerateSql({ params: [DummyValue.UUID] })
-  async getPersonAssetCount(personId: string): Promise<number> {
-    const result = await this.db
-      .selectFrom('shared_space_person_face')
-      .innerJoin('asset_face', 'asset_face.id', 'shared_space_person_face.assetFaceId')
-      .select((eb) => eb.fn.count(eb.fn('distinct', ['asset_face.assetId'])).as('count'))
-      .where('shared_space_person_face.personId', '=', personId)
-      .executeTakeFirstOrThrow();
-    return Number(result.count);
+    return result;
   }
 
   @GenerateSql({ params: [DummyValue.UUID] })
@@ -630,22 +616,33 @@ export class SharedSpaceRepository {
 
   @GenerateSql({ params: [DummyValue.UUID, [DummyValue.UUID]] })
   async removePersonFacesByAssetIds(spaceId: string, assetIds: string[]) {
+    const assetFaceSubquery = this.db
+      .selectFrom('asset_face')
+      .select('asset_face.id')
+      .where('asset_face.assetId', 'in', assetIds);
+
+    const spacePersonSubquery = this.db
+      .selectFrom('shared_space_person')
+      .select('shared_space_person.id')
+      .where('shared_space_person.spaceId', '=', spaceId);
+
+    const affectedPersonIds = await this.db
+      .selectFrom('shared_space_person_face')
+      .select('personId')
+      .distinct()
+      .where('assetFaceId', 'in', assetFaceSubquery)
+      .where('personId', 'in', spacePersonSubquery)
+      .execute();
+
     await this.db
       .deleteFrom('shared_space_person_face')
-      .where(
-        'assetFaceId',
-        'in',
-        this.db.selectFrom('asset_face').select('asset_face.id').where('asset_face.assetId', 'in', assetIds),
-      )
-      .where(
-        'personId',
-        'in',
-        this.db
-          .selectFrom('shared_space_person')
-          .select('shared_space_person.id')
-          .where('shared_space_person.spaceId', '=', spaceId),
-      )
+      .where('assetFaceId', 'in', assetFaceSubquery)
+      .where('personId', 'in', spacePersonSubquery)
       .execute();
+
+    if (affectedPersonIds.length > 0) {
+      await this.recountPersons(affectedPersonIds.map((r) => r.personId));
+    }
   }
 
   @GenerateSql({ params: [DummyValue.UUID] })
@@ -654,6 +651,34 @@ export class SharedSpaceRepository {
       .deleteFrom('shared_space_person')
       .where('spaceId', '=', spaceId)
       .where('id', 'not in', this.db.selectFrom('shared_space_person_face').select('personId'))
+      .execute();
+  }
+
+  @GenerateSql({ params: [[DummyValue.UUID]] })
+  async recountPersons(personIds: string[]) {
+    if (personIds.length === 0) {
+      return;
+    }
+
+    await this.db
+      .updateTable('shared_space_person')
+      .set((eb) => ({
+        faceCount: eb
+          .selectFrom('shared_space_person_face')
+          .select((eb2) => eb2.fn.countAll().$castTo<number>().as('count'))
+          .whereRef('shared_space_person_face.personId', '=', 'shared_space_person.id'),
+        assetCount: eb
+          .selectFrom('shared_space_person_face')
+          .innerJoin('asset_face', 'asset_face.id', 'shared_space_person_face.assetFaceId')
+          .select((eb2) =>
+            eb2.fn
+              .count(eb2.fn('distinct', ['asset_face.assetId']))
+              .$castTo<number>()
+              .as('count'),
+          )
+          .whereRef('shared_space_person_face.personId', '=', 'shared_space_person.id'),
+      }))
+      .where('id', 'in', personIds)
       .execute();
   }
 

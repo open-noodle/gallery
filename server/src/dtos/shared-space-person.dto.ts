@@ -23,7 +23,20 @@ export class SpacePeopleQueryDto {
   @IsInt()
   @Min(1)
   @Max(100)
-  top?: number;
+  limit?: number;
+
+  @ApiPropertyOptional({
+    description: 'Number of people to skip',
+    minimum: 0,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  offset?: number;
+
+  @ValidateBoolean({ optional: true })
+  named?: boolean;
 }
 
 export class SharedSpacePersonUpdateDto {

@@ -656,15 +656,20 @@ class SharedSpacesApi {
   ///
   /// * [String] id (required):
   ///
+  /// * [num] limit:
+  ///   Maximum number of people to return (sorted by asset count)
+  ///
+  /// * [bool] named:
+  ///
+  /// * [num] offset:
+  ///   Number of people to skip
+  ///
   /// * [DateTime] takenAfter:
   ///
   /// * [DateTime] takenBefore:
   ///
-  /// * [num] top:
-  ///   Maximum number of people to return (sorted by asset count)
-  ///
   /// * [bool] withHidden:
-  Future<Response> getSpacePeopleWithHttpInfo(String id, { DateTime? takenAfter, DateTime? takenBefore, num? top, bool? withHidden, }) async {
+  Future<Response> getSpacePeopleWithHttpInfo(String id, { num? limit, bool? named, num? offset, DateTime? takenAfter, DateTime? takenBefore, bool? withHidden, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/shared-spaces/{id}/people'
       .replaceAll('{id}', id);
@@ -676,14 +681,20 @@ class SharedSpacesApi {
     final headerParams = <String, String>{};
     final formParams = <String, String>{};
 
+    if (limit != null) {
+      queryParams.addAll(_queryParams('', 'limit', limit));
+    }
+    if (named != null) {
+      queryParams.addAll(_queryParams('', 'named', named));
+    }
+    if (offset != null) {
+      queryParams.addAll(_queryParams('', 'offset', offset));
+    }
     if (takenAfter != null) {
       queryParams.addAll(_queryParams('', 'takenAfter', takenAfter));
     }
     if (takenBefore != null) {
       queryParams.addAll(_queryParams('', 'takenBefore', takenBefore));
-    }
-    if (top != null) {
-      queryParams.addAll(_queryParams('', 'top', top));
     }
     if (withHidden != null) {
       queryParams.addAll(_queryParams('', 'withHidden', withHidden));
@@ -711,16 +722,21 @@ class SharedSpacesApi {
   ///
   /// * [String] id (required):
   ///
+  /// * [num] limit:
+  ///   Maximum number of people to return (sorted by asset count)
+  ///
+  /// * [bool] named:
+  ///
+  /// * [num] offset:
+  ///   Number of people to skip
+  ///
   /// * [DateTime] takenAfter:
   ///
   /// * [DateTime] takenBefore:
   ///
-  /// * [num] top:
-  ///   Maximum number of people to return (sorted by asset count)
-  ///
   /// * [bool] withHidden:
-  Future<List<SharedSpacePersonResponseDto>?> getSpacePeople(String id, { DateTime? takenAfter, DateTime? takenBefore, num? top, bool? withHidden, }) async {
-    final response = await getSpacePeopleWithHttpInfo(id,  takenAfter: takenAfter, takenBefore: takenBefore, top: top, withHidden: withHidden, );
+  Future<List<SharedSpacePersonResponseDto>?> getSpacePeople(String id, { num? limit, bool? named, num? offset, DateTime? takenAfter, DateTime? takenBefore, bool? withHidden, }) async {
+    final response = await getSpacePeopleWithHttpInfo(id,  limit: limit, named: named, offset: offset, takenAfter: takenAfter, takenBefore: takenBefore, withHidden: withHidden, );
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
