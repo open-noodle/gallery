@@ -9,7 +9,7 @@
     updateCategory,
     type ClassificationCategoryResponseDto,
   } from '@immich/sdk';
-  import { Button, IconButton, Switch, Text, toastManager } from '@immich/ui';
+  import { Button, IconButton, modalManager, Switch, Text, toastManager } from '@immich/ui';
   import { mdiContentSave, mdiDelete, mdiPencil, mdiPlus, mdiUndoVariant } from '@mdi/js';
   import { onMount } from 'svelte';
 
@@ -102,6 +102,9 @@
         });
         toastManager.primary(`Category "${formName}" created`);
       } else if (editingId) {
+        const editedCategory = categories.find((c) => c.id === editingId);
+        const isStricter = editedCategory && formSimilarity > editedCategory.similarity;
+
         await updateCategory({
           id: editingId,
           classificationCategoryUpdateDto: {
@@ -113,6 +116,23 @@
           },
         });
         toastManager.primary(`Category "${formName}" updated`);
+
+        if (isStricter) {
+          const shouldRescan = await modalManager.showDialog({
+            title: 'Rescan photos?',
+            prompt:
+              'This category is now stricter. Would you like to remove existing auto-tags that may no longer match, unarchive affected photos, and rescan all photos?',
+            confirmText: 'Yes',
+          });
+
+          if (shouldRescan) {
+            await updateCategory({
+              id: editingId,
+              classificationCategoryUpdateDto: { rescan: true },
+            });
+            toastManager.primary('Rescan started — existing auto-tags will be re-evaluated');
+          }
+        }
       }
       cancelEdit();
       await refreshCategories();
@@ -146,7 +166,10 @@
   };
 
   const handleScan = async () => {
-    if (!confirm('This will reclassify all assets across all users. Continue?')) {
+    const confirmed = await modalManager.showDialog({
+      prompt: 'This will reclassify all assets across all users. Continue?',
+    });
+    if (!confirmed) {
       return;
     }
     isScanning = true;
