@@ -51,7 +51,7 @@
     }
   });
 
-  const PAGE_SIZE = 50;
+  const PAGE_SIZE = 100;
   let loading = $state(false);
   let hasMore = $state(data.people.length >= PAGE_SIZE);
 
