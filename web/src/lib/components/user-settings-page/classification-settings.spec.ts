@@ -3,28 +3,12 @@ import TestWrapper from '$lib/components/TestWrapper.svelte';
 import ClassificationSettings from '$lib/components/user-settings-page/classification-settings.svelte';
 import { Action2, type ClassificationCategoryResponseDto } from '@immich/sdk';
 import { render, screen, waitFor } from '@testing-library/svelte';
-import userEvent from '@testing-library/user-event';
 import type { Component } from 'svelte';
 import { tick } from 'svelte';
 
 vi.mock('$lib/utils/handle-error', () => ({
   handleError: vi.fn(),
 }));
-
-// Mock toastManager to prevent toast animations in test environment
-vi.mock('@immich/ui', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@immich/ui')>();
-  return {
-    ...actual,
-    toastManager: {
-      primary: vi.fn(),
-      success: vi.fn(),
-      danger: vi.fn(),
-      warning: vi.fn(),
-      info: vi.fn(),
-    },
-  };
-});
 
 import { handleError } from '$lib/utils/handle-error';
 
@@ -39,7 +23,6 @@ const makeCategory = (
   enabled: true,
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
-  tagId: null,
   ...overrides,
 });
 
@@ -60,34 +43,16 @@ const flushAsync = async () => {
   await tick();
 };
 
-describe('ClassificationSettings', () => {
+describe('ClassificationSettings (read-only)', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     sdkMock.getCategories.mockResolvedValue([]);
   });
 
-  it('renders "Add Category" button in empty state', async () => {
+  it('displays admin info text', async () => {
     renderComponent();
     await flushAsync();
-    expect(screen.getByText('Add Category')).toBeInTheDocument();
-  });
-
-  it('renders "Scan Library" button', async () => {
-    renderComponent();
-    await flushAsync();
-    expect(screen.getByText('Scan Library')).toBeInTheDocument();
-  });
-
-  it('opens create form when "Add Category" clicked', async () => {
-    const user = userEvent.setup();
-    renderComponent();
-    await flushAsync();
-
-    await user.click(screen.getByText('Add Category'));
-    await flushAsync();
-
-    expect(screen.getByText('New Category')).toBeInTheDocument();
-    expect(screen.getByLabelText('Name')).toBeInTheDocument();
+    expect(screen.getByText('classification_managed_by_admin')).toBeInTheDocument();
   });
 
   it('displays category name and metadata when categories loaded', async () => {
@@ -99,56 +64,32 @@ describe('ClassificationSettings', () => {
     });
 
     expect(screen.getByText('Tag only')).toBeInTheDocument();
-    expect(screen.getByText(/2 prompts/)).toBeInTheDocument();
     expect(screen.getByText(/Normal/)).toBeInTheDocument();
   });
 
-  it('shows edit form when edit button clicked', async () => {
-    const user = userEvent.setup();
-    sdkMock.getCategories.mockResolvedValue([makeCategory()]);
+  it('shows disabled state for disabled categories', async () => {
+    sdkMock.getCategories.mockResolvedValue([makeCategory({ enabled: false })]);
     renderComponent();
 
     await waitFor(() => {
       expect(screen.getByText('Screenshots')).toBeInTheDocument();
     });
 
-    const editButton = screen.getByRole('button', { name: 'Edit' });
-    await user.click(editButton);
-    await flushAsync();
-
-    expect(screen.getByText('Edit Category')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('Screenshots')).toBeInTheDocument();
+    expect(screen.getByText('(Disabled)')).toBeInTheDocument();
   });
 
-  it('calls delete SDK method when delete confirmed', async () => {
-    const user = userEvent.setup();
-    sdkMock.getCategories.mockResolvedValueOnce([makeCategory()]);
-    sdkMock.deleteCategory.mockResolvedValue(void 0 as never);
+  it('shows empty state when no categories', async () => {
     renderComponent();
-
-    await waitFor(() => {
-      expect(screen.getByText('Screenshots')).toBeInTheDocument();
-    });
-
-    sdkMock.getCategories.mockResolvedValue([]);
-    const deleteButton = screen.getByRole('button', { name: 'Delete' });
-    await user.click(deleteButton);
-
-    await waitFor(() => {
-      expect(sdkMock.deleteCategory).toHaveBeenCalledWith({ id: 'cat-1' });
-    });
+    await flushAsync();
+    expect(screen.getByText('no_classification_categories')).toBeInTheDocument();
   });
 
-  it('similarity slider renders with default value (0.28)', async () => {
-    const user = userEvent.setup();
+  it('does not render Add Category or Scan buttons', async () => {
     renderComponent();
     await flushAsync();
-
-    await user.click(screen.getByText('Add Category'));
-    await flushAsync();
-
-    expect(screen.getByText(/0\.28/)).toBeInTheDocument();
-    expect(screen.getByText(/Normal/)).toBeInTheDocument();
+    expect(screen.queryByText('Add Category')).not.toBeInTheDocument();
+    expect(screen.queryByText('Scan Library')).not.toBeInTheDocument();
+    expect(screen.queryByText('Scan All Libraries')).not.toBeInTheDocument();
   });
 
   it('error notification shown when SDK call fails', async () => {
@@ -159,41 +100,5 @@ describe('ClassificationSettings', () => {
     await waitFor(() => {
       expect(handleError).toHaveBeenCalledWith(error, 'Unable to load classification categories');
     });
-  });
-
-  it('enabled toggle calls update SDK method', async () => {
-    const user = userEvent.setup();
-    sdkMock.getCategories.mockResolvedValueOnce([makeCategory({ enabled: true })]);
-    sdkMock.updateCategory.mockResolvedValue(makeCategory({ enabled: false }));
-    renderComponent();
-
-    await waitFor(() => {
-      expect(screen.getByText('Screenshots')).toBeInTheDocument();
-    });
-
-    const switches = screen.getAllByRole('switch');
-    expect(switches.length).toBeGreaterThan(0);
-
-    sdkMock.getCategories.mockResolvedValue([makeCategory({ enabled: false })]);
-    await user.click(switches[0]);
-
-    await waitFor(() => {
-      expect(sdkMock.updateCategory).toHaveBeenCalledWith({
-        id: 'cat-1',
-        classificationCategoryUpdateDto: { enabled: false },
-      });
-    });
-  });
-
-  it('create form validates non-empty name — save disabled when name empty', async () => {
-    const user = userEvent.setup();
-    renderComponent();
-    await flushAsync();
-
-    await user.click(screen.getByText('Add Category'));
-    await flushAsync();
-
-    const saveButton = screen.getByText('Save');
-    expect(saveButton.closest('button')).toBeDisabled();
   });
 });
