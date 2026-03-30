@@ -500,6 +500,35 @@ export const utils = {
     return result.rows[0].id as string;
   },
 
+  createSpacePerson: async (spaceId: string, name: string, ownerId: string, assetId: string) => {
+    if (!client) {
+      throw new Error('Database client not connected');
+    }
+
+    // Create a person with a thumbnail (required by getPersonsBySpaceId JOIN)
+    const personResult = await client.query(
+      `INSERT INTO "person" ("ownerId", "name", "thumbnailPath")
+       VALUES ($1, $2, '/my/awesome/thumbnail.jpg') RETURNING id`,
+      [ownerId, name],
+    );
+    const personId = personResult.rows[0].id as string;
+
+    // Create a face linking the asset to the person
+    const faceResult = await client.query(
+      `INSERT INTO "asset_face" ("assetId", "personId") VALUES ($1, $2) RETURNING id`,
+      [assetId, personId],
+    );
+    const faceId = faceResult.rows[0].id as string;
+
+    // Create the space person with representativeFaceId
+    const result = await client.query(
+      `INSERT INTO shared_space_person ("spaceId", name, "isHidden", "faceCount", "assetCount", "representativeFaceId")
+       VALUES ($1, $2, false, 1, 1, $3) RETURNING id`,
+      [spaceId, name, faceId],
+    );
+    return result.rows[0].id as string;
+  },
+
   createSharedLink: (accessToken: string, dto: SharedLinkCreateDto) =>
     createSharedLink({ sharedLinkCreateDto: dto }, { headers: asBearerAuth(accessToken) }),
 
