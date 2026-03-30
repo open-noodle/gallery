@@ -365,6 +365,18 @@ describe(ClassificationService.name, () => {
       });
     });
 
+    it('should skip DB update when only prompts change (no category fields)', async () => {
+      mocks.classification.getCategory.mockResolvedValue(existingCategory as any);
+      mocks.machineLearning.encodeText.mockResolvedValue('[0.5,0.5,0.5]');
+      mocks.classification.deletePromptEmbeddingsByCategory.mockResolvedValue(void 0 as any);
+      mocks.classification.upsertPromptEmbedding.mockResolvedValue(void 0 as any);
+      mocks.classification.getPromptEmbeddings.mockResolvedValue([{ prompt: 'new prompt' }] as any);
+
+      await sut.updateCategory(authStub.user1, 'cat-1', { prompts: ['new prompt'] });
+
+      expect(mocks.classification.updateCategory).not.toHaveBeenCalled();
+    });
+
     it('should NOT re-encode when only name/similarity/action change', async () => {
       mocks.classification.getCategory.mockResolvedValue(existingCategory as any);
       mocks.classification.updateCategory.mockResolvedValue({ ...existingCategory, name: 'New Name' } as any);
