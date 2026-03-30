@@ -16,8 +16,8 @@ test.describe('Spaces People', () => {
     const asset = await utils.createAsset(admin.accessToken);
     await utils.addSpaceAssets(admin.accessToken, space.id, [asset.id]);
 
-    // Insert a space person directly (no ML needed)
-    await utils.createSpacePerson(space.id, 'Alice');
+    // Insert a space person with full face chain (required by server query JOINs)
+    await utils.createSpacePerson(space.id, 'Alice', admin.userId, asset.id);
   });
 
   async function gotoSpacePeople(
