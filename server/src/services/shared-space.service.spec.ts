@@ -4543,6 +4543,10 @@ describe(SharedSpaceService.name, () => {
   });
 
   describe('handleSharedSpacePersonDedup', () => {
+    beforeEach(() => {
+      mocks.sharedSpace.recountPersons.mockResolvedValue(void 0 as any);
+    });
+
     it('should skip when space does not exist', async () => {
       mocks.sharedSpace.getById.mockResolvedValue(void 0);
       const result = await sut.handleSharedSpacePersonDedup({ spaceId: newUuid() });
@@ -4599,6 +4603,7 @@ describe(SharedSpaceService.name, () => {
       expect(result).toBe(JobStatus.Success);
       expect(mocks.sharedSpace.reassignPersonFacesSafe).toHaveBeenCalledWith(personB, personA);
       expect(mocks.sharedSpace.deletePerson).toHaveBeenCalledWith(personB);
+      expect(mocks.sharedSpace.recountPersons).toHaveBeenCalledWith([personA]);
     });
 
     it('should succeed with no merges when space has one person (self-exclusion)', async () => {
