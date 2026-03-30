@@ -370,6 +370,8 @@ export type SharedSpacePerson = {
   isHidden: boolean;
   type: string;
   birthDate: string | null;
+  faceCount: number;
+  assetCount: number;
   createdAt: Date;
   updatedAt: Date;
   updateId: string;

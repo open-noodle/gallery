@@ -619,7 +619,12 @@ export class SharedSpaceService extends BaseService {
     const aliasMap = new Map(aliases.map((a) => [a.personId, a.alias]));
 
     return persons.map((person) =>
-      this.mapSpacePerson(person, Number(person.faceCount), Number(person.assetCount), aliasMap.get(person.id) ?? null),
+      this.mapSpacePerson(
+        { ...person, faceCount: Number(person.faceCount), assetCount: Number(person.assetCount) },
+        Number(person.faceCount),
+        Number(person.assetCount),
+        aliasMap.get(person.id) ?? null,
+      ),
     );
   }
 

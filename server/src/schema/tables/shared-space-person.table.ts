@@ -38,6 +38,12 @@ export class SharedSpacePersonTable {
   @Column({ type: 'date', nullable: true })
   birthDate!: string | null;
 
+  @Column({ type: 'integer', default: 0 })
+  faceCount!: Generated<number>;
+
+  @Column({ type: 'integer', default: 0 })
+  assetCount!: Generated<number>;
+
   @CreateDateColumn()
   createdAt!: Generated<Timestamp>;
 

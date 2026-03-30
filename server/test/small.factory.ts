@@ -433,6 +433,8 @@ const sharedSpacePersonFactory = (data: Partial<SharedSpacePerson> = {}): Shared
   isHidden: false,
   type: 'person',
   birthDate: null,
+  faceCount: 0,
+  assetCount: 0,
   createdAt: newDate(),
   updatedAt: newDate(),
   updateId: newUuidV7(),
