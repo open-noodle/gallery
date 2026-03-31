@@ -43,8 +43,9 @@ describe('ClassificationSettings', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(getConfig).mockResolvedValue(makeConfig());
-    vi.mocked(updateConfig).mockResolvedValue(void 0 as any);
-    vi.mocked(scanClassification).mockResolvedValue(void 0 as any);
+    vi.mocked(updateConfig).mockResolvedValue(void 0 as unknown as SystemConfigDto);
+    // @ts-expect-error mock returns void but SDK type is string
+    vi.mocked(scanClassification).mockResolvedValue(void 0);
   });
 
   it('should render empty state when no categories', async () => {

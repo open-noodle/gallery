@@ -676,7 +676,7 @@ describe(ClassificationService.name, () => {
         { name: 'Screenshots', prompts: ['screenshot'], similarity: 0.28, action: 'tag' },
       ]);
       const newConfig = makeClassificationConfig([
-        { name: 'Screenshots', prompts: ['screenshot'], similarity: 0.40, action: 'tag' },
+        { name: 'Screenshots', prompts: ['screenshot'], similarity: 0.4, action: 'tag' },
       ]);
 
       await sut.onConfigUpdate({ oldConfig, newConfig } as any);
@@ -690,7 +690,7 @@ describe(ClassificationService.name, () => {
         { name: 'Screenshots', prompts: ['screenshot'], similarity: 0.35, action: 'tag' },
       ]);
       const newConfig = makeClassificationConfig([
-        { name: 'Screenshots', prompts: ['screenshot'], similarity: 0.20, action: 'tag' },
+        { name: 'Screenshots', prompts: ['screenshot'], similarity: 0.2, action: 'tag' },
       ]);
 
       await sut.onConfigUpdate({ oldConfig, newConfig } as any);
