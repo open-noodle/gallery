@@ -1,20 +1,15 @@
 <script lang="ts">
   import { handleError } from '$lib/utils/handle-error';
-  import {
-    Action2,
-    createCategory,
-    deleteCategory,
-    getCategories,
-    scanClassification,
-    updateCategory,
-    type ClassificationCategoryResponseDto,
-  } from '@immich/sdk';
+  import { Action2, getConfig, scanClassification, updateConfig, type SystemConfigDto } from '@immich/sdk';
   import { Button, IconButton, modalManager, Switch, Text, toastManager } from '@immich/ui';
   import { mdiContentSave, mdiDelete, mdiPencil, mdiPlus, mdiUndoVariant } from '@mdi/js';
   import { onMount } from 'svelte';
 
-  let categories: ClassificationCategoryResponseDto[] = $state([]);
-  let editingId: string | null = $state(null);
+  type Category = SystemConfigDto['classification']['categories'][number];
+
+  let config: SystemConfigDto | null = $state(null);
+  let categories: Category[] = $state([]);
+  let editingIndex: number | null = $state(null);
   let isCreating = $state(false);
   let isSaving = $state(false);
   let isScanning = $state(false);
@@ -25,41 +20,36 @@
   let formAction: Action2 = $state(Action2.Tag);
   let formEnabled = $state(true);
 
-  const similarityLabels: Record<string, string> = {
-    loose: 'Loose',
-    normal: 'Normal',
-    strict: 'Strict',
+  const actionLabels: Record<string, string> = {
+    tag: 'Tag only',
+    tag_and_archive: 'Tag and archive',
   };
 
   const getSimilarityLabel = (value: number): string => {
     if (value < 0.22) {
-      return similarityLabels.loose;
+      return 'Loose';
     }
     if (value > 0.35) {
-      return similarityLabels.strict;
+      return 'Strict';
     }
-    return similarityLabels.normal;
-  };
-
-  const actionLabels: Record<Action2, string> = {
-    [Action2.Tag]: 'Tag only',
-    [Action2.TagAndArchive]: 'Tag and archive',
+    return 'Normal';
   };
 
   onMount(async () => {
-    await refreshCategories();
+    await refreshConfig();
   });
 
-  const refreshCategories = async () => {
+  const refreshConfig = async () => {
     try {
-      categories = await getCategories();
+      config = await getConfig();
+      categories = config.classification.categories;
     } catch (error) {
-      handleError(error, 'Unable to load classification categories');
+      handleError(error, 'Unable to load classification config');
     }
   };
 
   const startCreate = () => {
-    editingId = null;
+    editingIndex = null;
     isCreating = true;
     formName = '';
     formPrompts = '';
@@ -68,9 +58,10 @@
     formEnabled = true;
   };
 
-  const startEdit = (category: ClassificationCategoryResponseDto) => {
+  const startEdit = (index: number) => {
+    const category = categories[index];
     isCreating = false;
-    editingId = category.id;
+    editingIndex = index;
     formName = category.name;
     formPrompts = category.prompts.join('\n');
     formSimilarity = category.similarity;
@@ -79,8 +70,18 @@
   };
 
   const cancelEdit = () => {
-    editingId = null;
+    editingIndex = null;
     isCreating = false;
+  };
+
+  const saveConfig = async (updatedCategories: Category[]) => {
+    if (!config) {
+      return;
+    }
+    await updateConfig({
+      systemConfigDto: { ...config, classification: { ...config.classification, categories: updatedCategories } },
+    });
+    await refreshConfig();
   };
 
   const handleSave = async () => {
@@ -91,51 +92,25 @@
         .map((p) => p.trim())
         .filter((p) => p.length > 0);
 
+      const category: Category = {
+        name: formName,
+        prompts,
+        similarity: formSimilarity,
+        action: formAction,
+        enabled: formEnabled,
+      };
+
+      const updated = [...categories];
       if (isCreating) {
-        await createCategory({
-          classificationCategoryCreateDto: {
-            name: formName,
-            prompts,
-            similarity: formSimilarity,
-            action: formAction,
-          },
-        });
+        updated.push(category);
         toastManager.primary(`Category "${formName}" created`);
-      } else if (editingId) {
-        const editedCategory = categories.find((c) => c.id === editingId);
-        const isStricter = editedCategory && formSimilarity > editedCategory.similarity;
-
-        await updateCategory({
-          id: editingId,
-          classificationCategoryUpdateDto: {
-            name: formName,
-            prompts,
-            similarity: formSimilarity,
-            action: formAction,
-            enabled: formEnabled,
-          },
-        });
+      } else if (editingIndex !== null) {
+        updated[editingIndex] = category;
         toastManager.primary(`Category "${formName}" updated`);
-
-        if (isStricter) {
-          const shouldRescan = await modalManager.showDialog({
-            title: 'Rescan photos?',
-            prompt:
-              'This category is now stricter. Would you like to remove existing auto-tags that may no longer match, unarchive affected photos, and rescan all photos?',
-            confirmText: 'Yes',
-          });
-
-          if (shouldRescan) {
-            await updateCategory({
-              id: editingId,
-              classificationCategoryUpdateDto: { rescan: true },
-            });
-            toastManager.primary('Rescan started — existing auto-tags will be re-evaluated');
-          }
-        }
       }
+
+      await saveConfig(updated);
       cancelEdit();
-      await refreshCategories();
     } catch (error) {
       handleError(error, 'Unable to save category');
     } finally {
@@ -143,23 +118,21 @@
     }
   };
 
-  const handleDelete = async (category: ClassificationCategoryResponseDto) => {
+  const handleDelete = async (index: number) => {
+    const category = categories[index];
     try {
-      await deleteCategory({ id: category.id });
+      const updated = categories.filter((_, i) => i !== index);
+      await saveConfig(updated);
       toastManager.primary(`Category "${category.name}" deleted`);
-      await refreshCategories();
     } catch (error) {
       handleError(error, 'Unable to delete category');
     }
   };
 
-  const handleToggleEnabled = async (category: ClassificationCategoryResponseDto) => {
+  const handleToggleEnabled = async (index: number) => {
     try {
-      await updateCategory({
-        id: category.id,
-        classificationCategoryUpdateDto: { enabled: !category.enabled },
-      });
-      await refreshCategories();
+      const updated = categories.map((c, i) => (i === index ? { ...c, enabled: !c.enabled } : c));
+      await saveConfig(updated);
     } catch (error) {
       handleError(error, 'Unable to toggle category');
     }
@@ -185,7 +158,7 @@
 </script>
 
 <section class="my-4">
-  {#if isCreating || editingId}
+  {#if isCreating || editingIndex !== null}
     <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-slate-50 dark:bg-gray-900 p-5">
       <Text fontWeight="semi-bold" class="mb-4">{isCreating ? 'New Category' : 'Edit Category'}</Text>
 
@@ -243,13 +216,12 @@
             bind:value={formAction}
             class="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:border-immich-primary focus:outline-none"
           >
-            {#each Object.values(Action2) as action (action)}
-              <option value={action}>{actionLabels[action]}</option>
-            {/each}
+            <option value={Action2.Tag}>{actionLabels.tag}</option>
+            <option value={Action2.TagAndArchive}>{actionLabels.tag_and_archive}</option>
           </select>
         </div>
 
-        {#if editingId}
+        {#if editingIndex !== null}
           <div class="flex items-center gap-2">
             <Switch bind:checked={formEnabled} />
             <Text size="small">{formEnabled ? 'Enabled' : 'Disabled'}</Text>
@@ -275,7 +247,7 @@
   {/if}
 
   {#if categories.length > 0}
-    {#each categories as category (category.id)}
+    {#each categories as category, index (category.name)}
       <div
         class="rounded-2xl border border-gray-200 dark:border-gray-800 mt-4 bg-slate-50 dark:bg-gray-900 p-4"
         class:opacity-50={!category.enabled}
@@ -287,11 +259,11 @@
                 <Text fontWeight="medium">{category.name}</Text>
                 <span
                   class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium
-                    {category.action === Action2.TagAndArchive
+                    {category.action === 'tag_and_archive'
                     ? 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200'
                     : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'}"
                 >
-                  {actionLabels[category.action]}
+                  {actionLabels[category.action] ?? category.action}
                 </span>
               </div>
               <Text size="tiny" color="muted">
@@ -304,14 +276,14 @@
           </div>
 
           <div class="flex items-center gap-2">
-            <Switch checked={category.enabled} onCheckedChange={() => handleToggleEnabled(category)} />
+            <Switch checked={category.enabled} onCheckedChange={() => handleToggleEnabled(index)} />
             <IconButton
               shape="round"
               color="secondary"
               variant="ghost"
               icon={mdiPencil}
               size="small"
-              onclick={() => startEdit(category)}
+              onclick={() => startEdit(index)}
               aria-label="Edit"
             />
             <IconButton
@@ -320,7 +292,7 @@
               variant="ghost"
               icon={mdiDelete}
               size="small"
-              onclick={() => handleDelete(category)}
+              onclick={() => handleDelete(index)}
               aria-label="Delete"
             />
           </div>
@@ -335,7 +307,7 @@
     <Button shape="round" size="small" color="secondary" onclick={handleScan} disabled={isScanning}>
       {isScanning ? 'Scanning...' : 'Scan All Libraries'}
     </Button>
-    {#if !isCreating && !editingId}
+    {#if !isCreating && editingIndex === null}
       <Button shape="round" size="small" onclick={startCreate} leadingIcon={mdiPlus}>Add Category</Button>
     {/if}
   </div>
