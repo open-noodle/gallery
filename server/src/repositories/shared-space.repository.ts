@@ -977,4 +977,29 @@ export class SharedSpaceRepository {
       .limit(1)
       .executeTakeFirst();
   }
+
+  @GenerateSql({ params: [DummyValue.UUID, [DummyValue.UUID]] })
+  async findSpacePersonsByLinkedPersonIds(spaceId: string, personIds: string[]) {
+    if (personIds.length === 0) {
+      return new Map<string, { id: string; isHidden: boolean }>();
+    }
+
+    const results = await this.db
+      .selectFrom('shared_space_person')
+      .innerJoin('shared_space_person_face', 'shared_space_person_face.personId', 'shared_space_person.id')
+      .innerJoin('asset_face', 'asset_face.id', 'shared_space_person_face.assetFaceId')
+      .select(['shared_space_person.id', 'shared_space_person.isHidden', 'asset_face.personId'])
+      .where('shared_space_person.spaceId', '=', spaceId)
+      .where('asset_face.personId', 'in', personIds)
+      .groupBy(['shared_space_person.id', 'shared_space_person.isHidden', 'asset_face.personId'])
+      .execute();
+
+    const map = new Map<string, { id: string; isHidden: boolean }>();
+    for (const row of results) {
+      if (row.personId) {
+        map.set(row.personId, { id: row.id, isHidden: row.isHidden });
+      }
+    }
+    return map;
+  }
 }
