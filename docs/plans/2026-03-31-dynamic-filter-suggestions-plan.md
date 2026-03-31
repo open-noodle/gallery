@@ -4,7 +4,7 @@
 
 **Goal:** When a filter is applied, all other filter panels dynamically update to show only values present in the current filtered result set.
 
-**Architecture:** New unified `GET /search/filter-suggestions` endpoint returns all suggestion categories in one round trip. Uses faceted search (exclude-own-filter) so each category shows values matching all _other_ active filters. FilterPanel gets a new `suggestionsProvider` that replaces individual providers when present.
+**Architecture:** New unified `GET /search/suggestions/filters` endpoint returns all suggestion categories in one round trip. Uses faceted search (exclude-own-filter) so each category shows values matching all _other_ active filters. A shared `buildFilteredAssetIds` helper eliminates duplication across the 6 extraction queries. FilterPanel gets a new `suggestionsProvider` that replaces individual providers when present.
 
 **Tech Stack:** NestJS (server), Kysely (queries), Svelte 5 (web), Vitest (tests)
 
@@ -220,13 +220,15 @@ feat: add FilterSuggestions DTOs for unified filter endpoint
 
 ---
 
-### Task 3: Repository — `FilterSuggestionsOptions` Interface + `getSuggestionValues`
+### Task 3: Repository — `FilterSuggestionsOptions` Interface + Shared `buildFilteredAssetIds` Helper
+
+This task creates the shared helper that all 6 extraction methods will reuse, eliminating ~100 lines of duplicated space/temporal/exif/person/tag/media/favorite filter boilerplate.
 
 **Files:**
 
 - Modify: `server/src/repositories/search.repository.ts`
 
-**Step 1: Add the options interface and `getSuggestionValues` helper**
+**Step 1: Add the options interface**
 
 After the existing `GetCameraLensModelsOptions` interface (line ~198), add:
 
@@ -254,25 +256,83 @@ export interface FilterSuggestionsResult {
 }
 ```
 
-Then add the `getSuggestionValues` private method after the existing `getExifField` method (line ~636). This is a new helper that extends `getExifField` with cross-domain filter joins:
+**Step 2: Add the `buildFilteredAssetIds` private helper**
+
+Add after the existing `getExifField` method (line ~636). This returns a subquery selecting `asset.id` from assets matching all provided filters. Every extraction method will use this as their base, calling `without()` to exclude their own category first.
 
 ```typescript
-private getSuggestionValues<K extends 'city' | 'state' | 'country' | 'make' | 'model' | 'lensModel'>(
-  field: K,
-  userIds: string[],
-  options: FilterSuggestionsOptions,
-) {
-  return this.getExifField(field, userIds, options)
-    // Cross-domain exif filters
-    .$if(options.country !== undefined, (qb) => qb.where('country', '=', options.country!))
-    .$if(options.city !== undefined, (qb) => qb.where('city', '=', options.city!))
-    .$if(options.make !== undefined, (qb) => qb.where('make', '=', options.make!))
-    .$if(options.model !== undefined, (qb) => qb.where('model', '=', options.model!))
-    .$if(options.rating !== undefined, (qb) => qb.where('rating', '=', options.rating!))
-    // Cross-domain asset filters
-    .$if(options.mediaType !== undefined, (qb) => qb.where('asset.type', '=', options.mediaType!))
-    .$if(options.isFavorite !== undefined, (qb) => qb.where('asset.isFavorite', '=', options.isFavorite!))
-    // Cross-domain join filters
+/**
+ * Builds a subquery that selects asset IDs matching all provided filters.
+ * Used as the shared base for all filter suggestion extraction queries.
+ * Each caller passes `without(options, ...)` to exclude their own category.
+ */
+private buildFilteredAssetIds(userIds: string[], options: FilterSuggestionsOptions) {
+  return this.db
+    .selectFrom('asset')
+    .select('asset.id')
+    .where('asset.visibility', '=', AssetVisibility.Timeline)
+    .where('asset.deletedAt', 'is', null)
+    // User/space scoping (same pattern as getExifField)
+    .$if(!options.spaceId && !options.timelineSpaceIds, (qb) =>
+      qb.where('asset.ownerId', '=', anyUuid(userIds)),
+    )
+    .$if(!!options.spaceId && !options.timelineSpaceIds, (qb) =>
+      qb.where((eb) =>
+        eb.or([
+          eb.exists(
+            eb
+              .selectFrom('shared_space_asset')
+              .whereRef('shared_space_asset.assetId', '=', 'asset.id')
+              .where('shared_space_asset.spaceId', '=', asUuid(options.spaceId!)),
+          ),
+          eb.exists(
+            eb
+              .selectFrom('shared_space_library')
+              .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
+              .where('shared_space_library.spaceId', '=', asUuid(options.spaceId!)),
+          ),
+        ]),
+      ),
+    )
+    .$if(!!options.timelineSpaceIds, (qb) =>
+      qb.where((eb) =>
+        eb.or([
+          eb('asset.ownerId', '=', anyUuid(userIds)),
+          eb.exists(
+            eb
+              .selectFrom('shared_space_asset')
+              .whereRef('shared_space_asset.assetId', '=', 'asset.id')
+              .where('shared_space_asset.spaceId', '=', anyUuid(options.timelineSpaceIds!)),
+          ),
+          eb.exists(
+            eb
+              .selectFrom('shared_space_library')
+              .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
+              .where('shared_space_library.spaceId', '=', anyUuid(options.timelineSpaceIds!)),
+          ),
+        ]),
+      ),
+    )
+    // Temporal
+    .$if(!!options.takenAfter, (qb) => qb.where('asset.fileCreatedAt', '>=', options.takenAfter!))
+    .$if(!!options.takenBefore, (qb) => qb.where('asset.fileCreatedAt', '<', options.takenBefore!))
+    // Exif filters — join asset_exif only when at least one exif filter is active
+    .$if(
+      options.country !== undefined ||
+        options.city !== undefined ||
+        options.make !== undefined ||
+        options.model !== undefined ||
+        options.rating !== undefined,
+      (qb) =>
+        qb
+          .innerJoin('asset_exif', 'asset.id', 'asset_exif.assetId')
+          .$if(options.country !== undefined, (qb) => qb.where('asset_exif.country', '=', options.country!))
+          .$if(options.city !== undefined, (qb) => qb.where('asset_exif.city', '=', options.city!))
+          .$if(options.make !== undefined, (qb) => qb.where('asset_exif.make', '=', options.make!))
+          .$if(options.model !== undefined, (qb) => qb.where('asset_exif.model', '=', options.model!))
+          .$if(options.rating !== undefined, (qb) => qb.where('asset_exif.rating', '=', options.rating!)),
+    )
+    // Person filter via EXISTS (no join — avoids name collision with outer queries)
     .$if(!!options.personIds?.length, (qb) =>
       qb.where((eb) =>
         eb.exists(
@@ -284,6 +344,7 @@ private getSuggestionValues<K extends 'city' | 'state' | 'country' | 'make' | 'm
         ),
       ),
     )
+    // Tag filter via EXISTS
     .$if(!!options.tagIds?.length, (qb) =>
       qb.where((eb) =>
         eb.exists(
@@ -293,90 +354,99 @@ private getSuggestionValues<K extends 'city' | 'state' | 'country' | 'make' | 'm
             .where('tag_asset.tagId', '=', anyUuid(options.tagIds!)),
         ),
       ),
-    );
+    )
+    // Asset-level filters
+    .$if(options.mediaType !== undefined, (qb) => qb.where('asset.type', '=', options.mediaType!))
+    .$if(options.isFavorite !== undefined, (qb) => qb.where('asset.isFavorite', '=', options.isFavorite!));
 }
 ```
 
-**Step 2: Verify compilation**
+**Step 3: Verify compilation**
 
 Run: `cd server && npx tsc --noEmit 2>&1 | head -20`
 Expected: No errors
 
-**Step 3: Commit**
+**Step 4: Commit**
 
 ```
-feat: add getSuggestionValues helper with cross-domain filter joins
+feat: add buildFilteredAssetIds shared helper for filter suggestions
 ```
 
 ---
 
-### Task 4: Repository — `getFilteredPeople`, `getFilteredTags`, `getFilteredRatings`, `getFilteredMediaTypes`
+### Task 4: Repository — Six Extraction Methods
+
+All six methods use `buildFilteredAssetIds` via `asset.id IN (subquery)` to avoid join collisions. Each calls `without()` to exclude its own category.
 
 **Files:**
 
 - Modify: `server/src/repositories/search.repository.ts`
 
-**Step 1: Add the four extraction helpers**
+**Step 1: Add `getFilteredCountries` and `getFilteredCameraMakes`**
 
-Add these methods to the `SearchRepository` class, after `getSuggestionValues`:
+These extract DISTINCT exif field values from assets matching the filtered set (with their own category excluded):
 
 ```typescript
-private getFilteredPeople(
+private async getFilteredCountries(userIds: string[], options: FilterSuggestionsOptions): Promise<string[]> {
+  const filteredIds = this.buildFilteredAssetIds(userIds, options);
+  const rows = await this.db
+    .selectFrom('asset_exif')
+    .select('country')
+    .distinctOn('country')
+    .where('country', 'is not', null)
+    .where('country', '!=', '' as any)
+    .where('assetId', 'in', filteredIds)
+    .orderBy('country')
+    .execute();
+  return rows.map((r) => r.country!);
+}
+
+private async getFilteredCameraMakes(userIds: string[], options: FilterSuggestionsOptions): Promise<string[]> {
+  const filteredIds = this.buildFilteredAssetIds(userIds, options);
+  const rows = await this.db
+    .selectFrom('asset_exif')
+    .select('make')
+    .distinctOn('make')
+    .where('make', 'is not', null)
+    .where('make', '!=', '' as any)
+    .where('assetId', 'in', filteredIds)
+    .orderBy('make')
+    .execute();
+  return rows.map((r) => r.make!);
+}
+```
+
+**Step 2: Add `getFilteredTags`**
+
+```typescript
+private async getFilteredTags(
+  userIds: string[],
+  options: FilterSuggestionsOptions,
+): Promise<Array<{ id: string; value: string }>> {
+  const filteredIds = this.buildFilteredAssetIds(userIds, options);
+  return this.db
+    .selectFrom('tag')
+    .select(['tag.id', 'tag.value'])
+    .distinct()
+    .innerJoin('tag_asset', 'tag.id', 'tag_asset.tagId')
+    .where('tag_asset.assetId', 'in', filteredIds)
+    .orderBy('tag.value')
+    .execute();
+}
+```
+
+**Step 3: Add `getFilteredPeople`**
+
+No `asset_face` join in `buildFilteredAssetIds` — the person→face→asset chain is handled here in the outer query to avoid column name collisions:
+
+```typescript
+private async getFilteredPeople(
   userIds: string[],
   options: FilterSuggestionsOptions,
 ): Promise<{ people: Array<{ id: string; name: string }>; hasUnnamedPeople: boolean }> {
-  // Build a base filtered-assets subquery
-  const baseAssets = this.db
-    .selectFrom('asset')
-    .select('asset.id')
-    .innerJoin('asset_face', 'asset_face.assetId', 'asset.id')
-    .where('asset.visibility', '=', AssetVisibility.Timeline)
-    .where('asset.deletedAt', 'is', null)
-    .where('asset_face.deletedAt', 'is', null)
-    .where('asset_face.personId', 'is not', null)
-    // User/space scoping
-    .$if(!options.spaceId && !options.timelineSpaceIds, (qb) => qb.where('asset.ownerId', '=', anyUuid(userIds)))
-    .$if(!!options.spaceId && !options.timelineSpaceIds, (qb) =>
-      qb.where((eb) =>
-        eb.or([
-          eb.exists(eb.selectFrom('shared_space_asset').whereRef('shared_space_asset.assetId', '=', 'asset.id').where('shared_space_asset.spaceId', '=', asUuid(options.spaceId!))),
-          eb.exists(eb.selectFrom('shared_space_library').whereRef('shared_space_library.libraryId', '=', 'asset.libraryId').where('shared_space_library.spaceId', '=', asUuid(options.spaceId!))),
-        ]),
-      ),
-    )
-    .$if(!!options.timelineSpaceIds, (qb) =>
-      qb.where((eb) =>
-        eb.or([
-          eb('asset.ownerId', '=', anyUuid(userIds)),
-          eb.exists(eb.selectFrom('shared_space_asset').whereRef('shared_space_asset.assetId', '=', 'asset.id').where('shared_space_asset.spaceId', '=', anyUuid(options.timelineSpaceIds!))),
-          eb.exists(eb.selectFrom('shared_space_library').whereRef('shared_space_library.libraryId', '=', 'asset.libraryId').where('shared_space_library.spaceId', '=', anyUuid(options.timelineSpaceIds!))),
-        ]),
-      ),
-    )
-    // Temporal
-    .$if(!!options.takenAfter, (qb) => qb.where('asset.fileCreatedAt', '>=', options.takenAfter!))
-    .$if(!!options.takenBefore, (qb) => qb.where('asset.fileCreatedAt', '<', options.takenBefore!))
-    // Cross-domain filters (exif)
-    .$if(options.country !== undefined || options.city !== undefined || options.make !== undefined || options.model !== undefined || options.rating !== undefined, (qb) =>
-      qb
-        .innerJoin('asset_exif', 'asset.id', 'asset_exif.assetId')
-        .$if(options.country !== undefined, (qb) => qb.where('asset_exif.country', '=', options.country!))
-        .$if(options.city !== undefined, (qb) => qb.where('asset_exif.city', '=', options.city!))
-        .$if(options.make !== undefined, (qb) => qb.where('asset_exif.make', '=', options.make!))
-        .$if(options.model !== undefined, (qb) => qb.where('asset_exif.model', '=', options.model!))
-        .$if(options.rating !== undefined, (qb) => qb.where('asset_exif.rating', '=', options.rating!)),
-    )
-    // Cross-domain: tags
-    .$if(!!options.tagIds?.length, (qb) =>
-      qb.where((eb) =>
-        eb.exists(eb.selectFrom('tag_asset').whereRef('tag_asset.assetId', '=', 'asset.id').where('tag_asset.tagId', '=', anyUuid(options.tagIds!))),
-      ),
-    )
-    // Cross-domain: media type and favorites
-    .$if(options.mediaType !== undefined, (qb) => qb.where('asset.type', '=', options.mediaType!))
-    .$if(options.isFavorite !== undefined, (qb) => qb.where('asset.isFavorite', '=', options.isFavorite!));
+  const filteredIds = this.buildFilteredAssetIds(userIds, options);
 
-  // Named people in filtered assets
+  // Named, visible people with thumbnails who appear in filtered assets
   const namedPeopleQuery = this.db
     .selectFrom('person')
     .select(['person.id', 'person.name'])
@@ -390,55 +460,77 @@ private getFilteredPeople(
           .selectFrom('asset_face')
           .whereRef('asset_face.personId', '=', 'person.id')
           .where('asset_face.deletedAt', 'is', null)
-          .where((eb2) => eb2.exists(baseAssets.whereRef('asset.id', '=', 'asset_face.assetId'))),
+          .where('asset_face.assetId', 'in', filteredIds),
       ),
     )
     .orderBy('person.name')
     .execute();
 
-  // Check if unnamed people exist
+  // Check if any unnamed/empty-name people have faces in filtered assets
   const unnamedQuery = this.db
     .selectFrom('person')
     .select(sql`1`.as('exists'))
-    .where((eb) =>
-      eb.or([eb('person.name', '=', ''), eb('person.name', 'is', null)]),
-    )
+    .where((eb) => eb.or([eb('person.name', '=', ''), eb('person.name', 'is', null)]))
     .where((eb) =>
       eb.exists(
         eb
           .selectFrom('asset_face')
           .whereRef('asset_face.personId', '=', 'person.id')
           .where('asset_face.deletedAt', 'is', null)
-          .where((eb2) => eb2.exists(baseAssets.whereRef('asset.id', '=', 'asset_face.assetId'))),
+          .where('asset_face.assetId', 'in', filteredIds),
       ),
     )
     .limit(1)
     .execute();
 
-  return Promise.all([namedPeopleQuery, unnamedQuery]).then(([people, unnamed]) => ({
-    people,
-    hasUnnamedPeople: unnamed.length > 0,
-  }));
+  const [people, unnamed] = await Promise.all([namedPeopleQuery, unnamedQuery]);
+  return { people, hasUnnamedPeople: unnamed.length > 0 };
 }
 ```
 
-For `getFilteredTags`, `getFilteredRatings`, `getFilteredMediaTypes` — follow the same pattern but adapted for each domain. The key approach:
+**Step 4: Add `getFilteredRatings`**
 
-- `getFilteredTags`: query `tag` via `tag_asset` -> `asset`, apply all non-tag filters using the same space/temporal/exif/person/mediaType/favorite filter chain
-- `getFilteredRatings`: `SELECT DISTINCT asset_exif.rating FROM asset_exif JOIN asset ...` with all non-rating filters, return `number[]`
-- `getFilteredMediaTypes`: `SELECT DISTINCT asset.type FROM asset ...` with all non-mediaType filters, return `string[]`
+```typescript
+private async getFilteredRatings(userIds: string[], options: FilterSuggestionsOptions): Promise<number[]> {
+  const filteredIds = this.buildFilteredAssetIds(userIds, options);
+  const rows = await this.db
+    .selectFrom('asset_exif')
+    .select('rating')
+    .distinctOn('rating')
+    .where('rating', 'is not', null)
+    .where('rating', '>', 0)
+    .where('assetId', 'in', filteredIds)
+    .orderBy('rating')
+    .execute();
+  return rows.map((r) => r.rating!);
+}
+```
 
-Each follows the same base pattern: asset scoping (user/space/temporal) + cross-domain filters.
+**Step 5: Add `getFilteredMediaTypes`**
 
-**Step 2: Verify compilation**
+```typescript
+private async getFilteredMediaTypes(userIds: string[], options: FilterSuggestionsOptions): Promise<string[]> {
+  const filteredIds = this.buildFilteredAssetIds(userIds, options);
+  const rows = await this.db
+    .selectFrom('asset')
+    .select('type')
+    .distinct()
+    .where('asset.id', 'in', filteredIds)
+    .orderBy('type')
+    .execute();
+  return rows.map((r) => r.type);
+}
+```
+
+**Step 6: Verify compilation**
 
 Run: `cd server && npx tsc --noEmit 2>&1 | head -20`
 Expected: No errors
 
-**Step 3: Commit**
+**Step 7: Commit**
 
 ```
-feat: add filtered people/tags/ratings/mediaTypes extraction queries
+feat: add six filter suggestion extraction queries using shared base
 ```
 
 ---
@@ -449,18 +541,19 @@ feat: add filtered people/tags/ratings/mediaTypes extraction queries
 
 - Modify: `server/src/repositories/search.repository.ts`
 
-**Step 1: Add the public `getFilterSuggestions` method**
+**Step 1: Add the public `getFilterSuggestions` method with `@GenerateSql`**
 
-Add to the `SearchRepository` class (public methods section, before the private helpers):
+Add to the `SearchRepository` class (public methods section, before the private helpers). Import `without` from `src/utils/filter-suggestions` at the top of the file.
 
 ```typescript
+@GenerateSql({ params: [[DummyValue.UUID]] })
 async getFilterSuggestions(
   userIds: string[],
   options: FilterSuggestionsOptions,
 ): Promise<FilterSuggestionsResult> {
-  const [countries, cameraMakes, tagsResult, peopleResult, ratingsResult, mediaTypesResult] = await Promise.all([
-    this.getSuggestionValues('country', userIds, without(options, 'country', 'city')).execute().then((rows) => rows.map((r) => r.country!)),
-    this.getSuggestionValues('make', userIds, without(options, 'make', 'model')).execute().then((rows) => rows.map((r) => r.make!)),
+  const [countries, cameraMakes, tags, peopleResult, ratings, mediaTypes] = await Promise.all([
+    this.getFilteredCountries(userIds, without(options, 'country', 'city')),
+    this.getFilteredCameraMakes(userIds, without(options, 'make', 'model')),
     this.getFilteredTags(userIds, without(options, 'tagIds')),
     this.getFilteredPeople(userIds, without(options, 'personIds')),
     this.getFilteredRatings(userIds, without(options, 'rating')),
@@ -470,16 +563,14 @@ async getFilterSuggestions(
   return {
     countries,
     cameraMakes,
-    tags: tagsResult,
+    tags,
     people: peopleResult.people,
-    ratings: ratingsResult,
-    mediaTypes: mediaTypesResult,
+    ratings,
+    mediaTypes,
     hasUnnamedPeople: peopleResult.hasUnnamedPeople,
   };
 }
 ```
-
-Import `without` from `src/utils/filter-suggestions` at the top of the file.
 
 **Step 2: Verify compilation**
 
@@ -503,7 +594,7 @@ feat: add getFilterSuggestions orchestrator with faceted exclusion
 
 **Step 1: Add service method**
 
-In `server/src/services/search.service.ts`, add after `getTagSuggestions`:
+In `server/src/services/search.service.ts`, add after `getTagSuggestions`. Update the imports at the top to include `FilterSuggestionsRequestDto` and `FilterSuggestionsResponseDto`.
 
 ```typescript
 async getFilterSuggestions(auth: AuthDto, dto: FilterSuggestionsRequestDto): Promise<FilterSuggestionsResponseDto> {
@@ -529,11 +620,9 @@ async getFilterSuggestions(auth: AuthDto, dto: FilterSuggestionsRequestDto): Pro
 }
 ```
 
-Update the imports at the top to include `FilterSuggestionsRequestDto` and `FilterSuggestionsResponseDto`.
-
 **Step 2: Add controller endpoint**
 
-In `server/src/controllers/search.controller.ts`, add before the closing `}` of the class:
+In `server/src/controllers/search.controller.ts`, add before the closing `}` of the class. Update imports to include `FilterSuggestionsRequestDto` and `FilterSuggestionsResponseDto`.
 
 ```typescript
 @Get('suggestions/filters')
@@ -551,8 +640,6 @@ getFilterSuggestions(
   return this.service.getFilterSuggestions(auth, dto);
 }
 ```
-
-Update the imports at the top to include `FilterSuggestionsRequestDto` and `FilterSuggestionsResponseDto`.
 
 **Step 3: Verify compilation**
 
@@ -579,6 +666,16 @@ Add a new `describe('getFilterSuggestions', ...)` block:
 
 ```typescript
 describe('getFilterSuggestions', () => {
+  const emptyResult = {
+    countries: [],
+    cameraMakes: [],
+    tags: [],
+    people: [],
+    ratings: [],
+    mediaTypes: [],
+    hasUnnamedPeople: false,
+  };
+
   it('should return filter suggestions', async () => {
     const auth = AuthFactory.create();
     mocks.partner.getAll.mockResolvedValue([]);
@@ -596,10 +693,35 @@ describe('getFilterSuggestions', () => {
 
     expect(result.countries).toEqual(['Germany', 'France']);
     expect(result.people).toEqual([{ id: 'p1', name: 'Alice' }]);
+    expect(result.hasUnnamedPeople).toBe(false);
     expect(mocks.search.getFilterSuggestions).toHaveBeenCalledWith(
       [auth.user.id],
       expect.objectContaining({ withSharedSpaces: true }),
     );
+  });
+
+  it('should return empty suggestions when no filters match', async () => {
+    const auth = AuthFactory.create();
+    mocks.partner.getAll.mockResolvedValue([]);
+    mocks.search.getFilterSuggestions.mockResolvedValue(emptyResult);
+
+    const result = await sut.getFilterSuggestions(auth, {});
+
+    expect(result).toEqual(emptyResult);
+  });
+
+  it('should return hasUnnamedPeople true when unnamed people exist', async () => {
+    const auth = AuthFactory.create();
+    mocks.partner.getAll.mockResolvedValue([]);
+    mocks.search.getFilterSuggestions.mockResolvedValue({
+      ...emptyResult,
+      hasUnnamedPeople: true,
+    });
+
+    const result = await sut.getFilterSuggestions(auth, {});
+
+    expect(result.people).toEqual([]);
+    expect(result.hasUnnamedPeople).toBe(true);
   });
 
   it('should throw when both spaceId and withSharedSpaces are set', async () => {
@@ -616,15 +738,7 @@ describe('getFilterSuggestions', () => {
     const spaceId = newUuid();
     mocks.partner.getAll.mockResolvedValue([]);
     mocks.access.checkAccess.mockResolvedValue(new Set([spaceId]));
-    mocks.search.getFilterSuggestions.mockResolvedValue({
-      countries: [],
-      cameraMakes: [],
-      tags: [],
-      people: [],
-      ratings: [],
-      mediaTypes: [],
-      hasUnnamedPeople: false,
-    });
+    mocks.search.getFilterSuggestions.mockResolvedValue(emptyResult);
 
     await sut.getFilterSuggestions(auth, { spaceId });
 
@@ -636,21 +750,36 @@ describe('getFilterSuggestions', () => {
     const spaceId = newUuid();
     mocks.partner.getAll.mockResolvedValue([]);
     mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId }]);
-    mocks.search.getFilterSuggestions.mockResolvedValue({
-      countries: [],
-      cameraMakes: [],
-      tags: [],
-      people: [],
-      ratings: [],
-      mediaTypes: [],
-      hasUnnamedPeople: false,
-    });
+    mocks.search.getFilterSuggestions.mockResolvedValue(emptyResult);
 
     await sut.getFilterSuggestions(auth, { withSharedSpaces: true });
 
     expect(mocks.search.getFilterSuggestions).toHaveBeenCalledWith(
       [auth.user.id],
       expect.objectContaining({ timelineSpaceIds: [spaceId] }),
+    );
+  });
+
+  it('should pass filter params through to repository', async () => {
+    const auth = AuthFactory.create();
+    mocks.partner.getAll.mockResolvedValue([]);
+    mocks.search.getFilterSuggestions.mockResolvedValue(emptyResult);
+
+    await sut.getFilterSuggestions(auth, {
+      country: 'Germany',
+      personIds: ['p1'],
+      rating: 5,
+      mediaType: AssetType.IMAGE,
+    });
+
+    expect(mocks.search.getFilterSuggestions).toHaveBeenCalledWith(
+      [auth.user.id],
+      expect.objectContaining({
+        country: 'Germany',
+        personIds: ['p1'],
+        rating: 5,
+        mediaType: AssetType.IMAGE,
+      }),
     );
   });
 });
@@ -758,7 +887,7 @@ feat(web): add FilterSuggestionsResponse type and suggestionsProvider config
 
 **Step 1: Update RatingFilter**
 
-In `rating-filter.svelte`, add `availableRatings` prop and filter the stars:
+In `rating-filter.svelte`, add `availableRatings` prop. Selected ratings not in the available list are shown as orphaned (dimmed):
 
 ```svelte
 <script lang="ts">
@@ -782,7 +911,9 @@ In `rating-filter.svelte`, add `availableRatings` prop and filter the stars:
   }
 
   let visibleStars = $derived(
-    availableRatings ? [1, 2, 3, 4, 5].filter((s) => availableRatings.includes(s) || s === selectedRating) : [1, 2, 3, 4, 5],
+    availableRatings
+      ? [1, 2, 3, 4, 5].filter((s) => availableRatings.includes(s) || s === selectedRating)
+      : [1, 2, 3, 4, 5],
   );
 </script>
 
@@ -804,7 +935,7 @@ In `rating-filter.svelte`, add `availableRatings` prop and filter the stars:
 
 **Step 2: Update MediaTypeFilter**
 
-In `media-type-filter.svelte`, add `availableMediaTypes` prop and filter:
+In `media-type-filter.svelte`, add `availableMediaTypes` prop. Selected types not in the available list are shown as orphaned (dimmed) — consistent with RatingFilter's orphaned styling:
 
 ```svelte
 <script lang="ts">
@@ -824,7 +955,9 @@ In `media-type-filter.svelte`, add `availableMediaTypes` prop and filter:
 
   let options = $derived(
     availableMediaTypes
-      ? allOptions.filter((o) => o.value === 'all' || o.value === selected || availableMediaTypes.includes(o.assetType!))
+      ? allOptions.filter(
+          (o) => o.value === 'all' || o.value === selected || availableMediaTypes.includes(o.assetType!),
+        )
       : allOptions,
   );
 </script>
@@ -832,9 +965,12 @@ In `media-type-filter.svelte`, add `availableMediaTypes` prop and filter:
 <div class="flex gap-1.5" data-testid="media-type-filter">
   {#each options as option (option.value)}
     {@const isActive = selected === option.value}
+    {@const isOrphaned =
+      availableMediaTypes !== undefined && option.assetType !== undefined && !availableMediaTypes.includes(option.assetType)}
     <button
       type="button"
-      class="rounded-lg border px-2.5 py-1 text-xs {isActive
+      class="rounded-lg border px-2.5 py-1 text-xs {isOrphaned ? 'opacity-50' : ''}
+        {isActive
         ? 'border-immich-primary bg-immich-primary/10 text-immich-primary dark:border-immich-dark-primary dark:bg-immich-dark-primary/20 dark:text-immich-dark-primary'
         : 'border-gray-200 text-gray-500 dark:border-gray-700 dark:text-gray-400'}"
       onclick={() => onTypeChange(option.value)}
@@ -862,9 +998,9 @@ This is the core web change. The FilterPanel gets a new `$effect` that, when `su
 
 - Modify: `web/src/lib/components/filter-panel/filter-panel.svelte`
 
-**Step 1: Add new state variables and the unified effect**
+**Step 1: Add new state variables**
 
-At the top of the `<script>` block, add new state:
+At the top of the `<script>` block, alongside existing state (line ~57):
 
 ```typescript
 let availableRatings = $state<number[] | undefined>();
@@ -875,11 +1011,11 @@ The `hasUnnamedPeople` state already exists at line 58.
 
 **Step 2: Add the unified `$effect` block**
 
-Add after the existing `filterContext` effect (line 74), BEFORE the temporal re-fetch effect (line 84):
+Add after the existing `filterContext` effect (line 74), BEFORE the temporal re-fetch effect (line 84). Use explicit field comparison (not JSON.stringify) to avoid serialization pitfalls with undefined and Date values:
 
 ```typescript
 // Unified suggestions re-fetch: replaces mount effects + temporal re-fetch when suggestionsProvider is set
-let prevFilterSnapshot: string | undefined = $state();
+let prevFilters: FilterState | undefined = $state();
 let unifiedAbortController: AbortController | undefined = $state();
 
 $effect(() => {
@@ -887,39 +1023,37 @@ $effect(() => {
     return;
   }
 
-  // Track all filter fields
-  const snapshot = JSON.stringify({
+  // Track all filter fields — reading them registers as dependencies
+  const current: FilterState = {
     personIds: filters.personIds,
-    country: filters.country,
     city: filters.city,
+    country: filters.country,
     make: filters.make,
     model: filters.model,
     tagIds: filters.tagIds,
     rating: filters.rating,
     mediaType: filters.mediaType,
     isFavorite: filters.isFavorite,
+    sortOrder: filters.sortOrder,
     selectedYear: filters.selectedYear,
     selectedMonth: filters.selectedMonth,
-  });
+  };
 
-  const prevSnapshot = untrack(() => prevFilterSnapshot);
+  const prev = untrack(() => prevFilters);
 
-  // Skip if nothing changed
-  if (snapshot === prevSnapshot) {
-    return;
-  }
+  // Determine what changed for debounce timing
+  const isInitialMount = prev === undefined;
+  const temporalChanged =
+    !isInitialMount && (prev.selectedYear !== current.selectedYear || prev.selectedMonth !== current.selectedMonth);
+  const isTemporalClear = temporalChanged && current.selectedYear === undefined;
 
-  // Determine debounce delay
-  const prev = prevSnapshot ? JSON.parse(prevSnapshot) : undefined;
-  const yearChanged =
-    prev && (prev.selectedYear !== filters.selectedYear || prev.selectedMonth !== filters.selectedMonth);
-  const isTemporalClear = yearChanged && !filters.selectedYear;
-  const isTemporalOnly = yearChanged && !prev ? false : yearChanged;
-  const delay = prevSnapshot === undefined ? 0 : isTemporalClear ? 0 : isTemporalOnly ? 200 : 50;
+  // Debounce: 0ms initial mount + clear, 200ms temporal, 50ms discrete
+  const delay = isInitialMount || isTemporalClear ? 0 : temporalChanged ? 200 : 50;
 
   const provider = config.suggestionsProvider;
   const providers = config.providers;
-  const currentFilters = { ...filters };
+  const currentFilters = { ...current };
+  const ctx = filterContext;
 
   const timeout = setTimeout(() => {
     unifiedAbortController?.abort();
@@ -940,12 +1074,12 @@ $effect(() => {
         availableMediaTypes = result.mediaTypes;
         hasUnnamedPeople = result.hasUnnamedPeople;
 
-        // Cascading child re-fetch
+        // Cascading child re-fetch: only if parent is still in suggestions (not orphaned)
         if (currentFilters.country && result.countries.includes(currentFilters.country) && providers?.cities) {
-          void providers.cities(currentFilters.country, filterContext);
+          void providers.cities(currentFilters.country, ctx);
         }
         if (currentFilters.make && result.cameraMakes.includes(currentFilters.make) && providers?.cameraModels) {
-          void providers.cameraModels(currentFilters.make, filterContext);
+          void providers.cameraModels(currentFilters.make, ctx);
         }
       })
       .catch((error: unknown) => {
@@ -960,7 +1094,7 @@ $effect(() => {
       });
   }, delay);
 
-  prevFilterSnapshot = snapshot;
+  prevFilters = current;
 
   return () => {
     clearTimeout(timeout);
@@ -970,13 +1104,13 @@ $effect(() => {
 
 **Step 3: Guard existing effects with `!config.suggestionsProvider`**
 
-Wrap the temporal re-fetch effect (lines 84-201) with:
+Wrap the temporal re-fetch effect (lines 84-201) body with:
 
 ```typescript
 if (!config.suggestionsProvider) { ... existing effect body ... }
 ```
 
-Wrap each of the 4 mount effects (lines 278-313) with the same guard:
+Wrap each of the 4 mount effects (lines 278-313) body with the same guard:
 
 ```typescript
 if (!config.suggestionsProvider) { ... existing effect body ... }
@@ -984,7 +1118,7 @@ if (!config.suggestionsProvider) { ... existing effect body ... }
 
 **Step 4: Update `providers` references to use optional chaining**
 
-Since `providers` is now optional on `FilterPanelConfig`, update all references in the template and script from `config.providers.X` to `config.providers?.X`.
+Since `providers` is now optional on `FilterPanelConfig`, update all references in the template and script from `config.providers.X` to `config.providers?.X`. Key locations: lines 117, 129, 143, 158, 173, 279, 282, 283, 292, 300, 308, 500, 514.
 
 **Step 5: Pass new props to RatingFilter and MediaTypeFilter**
 
@@ -1018,9 +1152,69 @@ feat(web): add unified suggestionsProvider effect with debounce and cascading
 
 **Step 1: Replace the filterConfig**
 
-Replace the existing `filterConfig` (lines 68-135) with the new version from the design doc. Import `getFilterSuggestions` from the generated SDK. The key change: add `suggestionsProvider` function, keep only `cities` and `cameraModels` in `providers`.
+Replace the existing `filterConfig` (lines 68-135) with the new version. Import `getFilterSuggestions` from the generated SDK (check the exact function name in `open-api/typescript-sdk/src/fetch-client.ts` after Task 8).
 
-Refer to the design doc section "Photos Page Integration" for the exact code — it constructs `PersonOption[]` with `thumbnailUrl`, populates `personNames`/`tagNames` maps, and maps tag `value` to `name`.
+```typescript
+const filterConfig: FilterPanelConfig = {
+  sections: ['timeline', 'people', 'location', 'camera', 'tags', 'rating', 'media'],
+  suggestionsProvider: async (filters: FilterState) => {
+    const context = buildFilterContext(filters);
+    const response = await getFilterSuggestions({
+      personIds: filters.personIds.length > 0 ? filters.personIds : undefined,
+      country: filters.country,
+      city: filters.city,
+      make: filters.make,
+      model: filters.model,
+      tagIds: filters.tagIds.length > 0 ? filters.tagIds : undefined,
+      rating: filters.rating,
+      mediaType: filters.mediaType === 'all' ? undefined : filters.mediaType,
+      isFavorite: filters.isFavorite,
+      takenAfter: context?.takenAfter,
+      takenBefore: context?.takenBefore,
+      withSharedSpaces: true,
+    });
+    // Map server response to FilterSuggestionsResponse
+    const mappedPeople = response.people.map((p) => ({
+      id: p.id,
+      name: p.name,
+      thumbnailUrl: `/people/${p.id}/thumbnail`,
+    }));
+    // Populate name maps for ActiveFiltersBar
+    for (const p of response.people) {
+      personNames.set(p.id, p.name);
+    }
+    for (const t of response.tags) {
+      tagNames.set(t.id, t.value);
+    }
+    return {
+      countries: response.countries,
+      cameraMakes: response.cameraMakes,
+      tags: response.tags.map((t) => ({ id: t.id, name: t.value })),
+      people: mappedPeople,
+      ratings: response.ratings,
+      mediaTypes: response.mediaTypes,
+      hasUnnamedPeople: response.hasUnnamedPeople,
+    };
+  },
+  providers: {
+    // Hierarchical children still fetched on-demand for cascading
+    cities: async (country, context) =>
+      getSearchSuggestions({
+        $type: SearchSuggestionType.City,
+        country,
+        withSharedSpaces: true,
+        ...context,
+      }),
+    cameraModels: async (make, context) =>
+      getSearchSuggestions({
+        $type: SearchSuggestionType.CameraModel,
+        make,
+        withSharedSpaces: true,
+        ...context,
+      }),
+  },
+};
+```
 
 **Step 2: Verify type check**
 
@@ -1043,44 +1237,391 @@ feat(web): wire up dynamic filter suggestions on photos page
 
 **Step 1: Write comprehensive tests**
 
-This test file should cover:
-
-1. **Initial mount fires `suggestionsProvider` with default filter state**
-2. **Filter change triggers `suggestionsProvider` with updated state**
-3. **Suggestions update in the DOM after response**
-4. **50ms debounce for discrete changes** (use `vi.useFakeTimers`, advance by 50ms)
-5. **200ms debounce for temporal changes**
-6. **0ms debounce for clear-all**
-7. **AbortController: rapid changes cancel stale requests**
-8. **Backward compat: `providers`-only config still works** (no `suggestionsProvider`)
-9. **`isRefetching` flag set during fetch**
-10. **`availableRatings` hides unavailable stars**
-11. **`availableMediaTypes` hides unavailable buttons**
-12. **`hasUnnamedPeople` shows correct empty text**
-
-Follow the patterns in `contextual-refetch.spec.ts` for test structure: create a mock config, render FilterPanel, interact via `fireEvent`, advance timers, assert with `waitFor`.
-
-Example test for debounce:
+Follow the patterns in `contextual-refetch.spec.ts` for test structure. Create a mock config with `suggestionsProvider`, render FilterPanel, interact via `fireEvent`, advance timers, assert with `waitFor`.
 
 ```typescript
-it('should debounce discrete filter changes at 50ms', async () => {
-  const suggestionsProvider = vi.fn().mockResolvedValue(defaultResponse);
-  const config = { sections: ['people', 'location'], suggestionsProvider };
-  render(FilterPanel, { props: { config, timeBuckets } });
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import type { FilterPanelConfig, FilterSuggestionsResponse } from '../filter-panel';
+import FilterPanel from '../filter-panel.svelte';
 
-  await vi.advanceTimersByTimeAsync(0); // initial mount
-  expect(suggestionsProvider).toHaveBeenCalledTimes(1);
+const defaultResponse: FilterSuggestionsResponse = {
+  countries: ['Germany', 'France'],
+  cameraMakes: ['Canon', 'Sony'],
+  tags: [
+    { id: 't1', name: 'Vacation' },
+    { id: 't2', name: 'Family' },
+  ],
+  people: [
+    { id: 'p1', name: 'Alice', thumbnailUrl: '/people/p1/thumbnail' },
+    { id: 'p2', name: 'Bob', thumbnailUrl: '/people/p2/thumbnail' },
+  ],
+  ratings: [3, 4, 5],
+  mediaTypes: ['IMAGE', 'VIDEO'],
+  hasUnnamedPeople: false,
+};
 
-  // Simulate filter change by clicking a person checkbox
-  // ... click person checkbox ...
+const emptyResponse: FilterSuggestionsResponse = {
+  countries: [],
+  cameraMakes: [],
+  tags: [],
+  people: [],
+  ratings: [],
+  mediaTypes: [],
+  hasUnnamedPeople: false,
+};
 
-  // Should NOT have fired yet
-  expect(suggestionsProvider).toHaveBeenCalledTimes(1);
+const timeBuckets = [
+  { timeBucket: '2023-06-01', count: 100 },
+  { timeBucket: '2024-03-01', count: 50 },
+];
 
-  await vi.advanceTimersByTimeAsync(50);
+function createUnifiedConfig(overrides: Partial<FilterPanelConfig> = {}): FilterPanelConfig {
+  return {
+    sections: ['timeline', 'people', 'location', 'camera', 'tags', 'rating', 'media'],
+    suggestionsProvider: vi.fn().mockResolvedValue(defaultResponse),
+    providers: {
+      cities: vi.fn().mockResolvedValue(['Munich', 'Berlin']),
+      cameraModels: vi.fn().mockResolvedValue(['EOS R5', 'EOS R6']),
+    },
+    ...overrides,
+  };
+}
 
-  await waitFor(() => {
-    expect(suggestionsProvider).toHaveBeenCalledTimes(2);
+describe('Unified suggestionsProvider', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    localStorage.removeItem('gallery-filter-visible-sections');
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('should fire suggestionsProvider on initial mount with default state', async () => {
+    const config = createUnifiedConfig();
+    render(FilterPanel, { props: { config, timeBuckets } });
+
+    await vi.advanceTimersByTimeAsync(0);
+
+    await waitFor(() => {
+      expect(config.suggestionsProvider).toHaveBeenCalledTimes(1);
+      expect(config.suggestionsProvider).toHaveBeenCalledWith(
+        expect.objectContaining({
+          personIds: [],
+          tagIds: [],
+          mediaType: 'all',
+          sortOrder: 'desc',
+        }),
+      );
+    });
+  });
+
+  it('should update suggestions in DOM after response', async () => {
+    const config = createUnifiedConfig();
+    render(FilterPanel, { props: { config, timeBuckets } });
+
+    await vi.advanceTimersByTimeAsync(0);
+
+    await waitFor(() => {
+      expect(screen.getByText('Alice')).toBeTruthy();
+      expect(screen.getByText('Germany')).toBeTruthy();
+    });
+  });
+
+  it('should debounce discrete filter changes at 50ms', async () => {
+    const config = createUnifiedConfig();
+    render(FilterPanel, { props: { config, timeBuckets } });
+
+    await vi.advanceTimersByTimeAsync(0); // initial mount
+    expect(config.suggestionsProvider).toHaveBeenCalledTimes(1);
+
+    // Click a person checkbox to trigger a filter change
+    await waitFor(() => expect(screen.getByText('Alice')).toBeTruthy());
+    await fireEvent.click(screen.getByText('Alice'));
+
+    // Should NOT have fired yet (50ms debounce)
+    expect(config.suggestionsProvider).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(50);
+
+    await waitFor(() => {
+      expect(config.suggestionsProvider).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it('should debounce temporal changes at 200ms', async () => {
+    const config = createUnifiedConfig();
+    render(FilterPanel, { props: { config, timeBuckets } });
+
+    await vi.advanceTimersByTimeAsync(0); // initial mount
+
+    // Click a year
+    await fireEvent.click(screen.getByTestId('year-btn-2023'));
+
+    // Should not have fired at 50ms
+    await vi.advanceTimersByTimeAsync(50);
+    expect(config.suggestionsProvider).toHaveBeenCalledTimes(1);
+
+    // Should fire after 200ms
+    await vi.advanceTimersByTimeAsync(150);
+
+    await waitFor(() => {
+      expect(config.suggestionsProvider).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it('should cancel stale requests via AbortController on rapid changes', async () => {
+    let resolveFirst: (v: FilterSuggestionsResponse) => void;
+    const firstCall = new Promise<FilterSuggestionsResponse>((r) => {
+      resolveFirst = r;
+    });
+
+    const provider = vi
+      .fn()
+      .mockReturnValueOnce(Promise.resolve(defaultResponse)) // initial mount
+      .mockReturnValueOnce(firstCall) // first discrete change (will be superseded)
+      .mockResolvedValueOnce({
+        ...defaultResponse,
+        countries: ['Japan'],
+      }); // second discrete change
+
+    const config = createUnifiedConfig({ suggestionsProvider: provider });
+    render(FilterPanel, { props: { config, timeBuckets } });
+
+    await vi.advanceTimersByTimeAsync(0); // initial mount
+
+    // First change
+    await waitFor(() => expect(screen.getByText('Alice')).toBeTruthy());
+    await fireEvent.click(screen.getByText('Alice'));
+    await vi.advanceTimersByTimeAsync(50);
+
+    // Second change before first resolves — should abort first
+    await fireEvent.click(screen.getByText('Alice')); // toggle off
+    await vi.advanceTimersByTimeAsync(50);
+
+    // Resolve the first (aborted) call
+    resolveFirst!(defaultResponse);
+    await vi.advanceTimersByTimeAsync(0);
+
+    // Should show results from the third call, not the aborted first
+    await waitFor(() => {
+      expect(screen.getByText('Japan')).toBeTruthy();
+    });
+  });
+
+  it('should set isRefetching during unified fetch', async () => {
+    let resolveProvider: (v: FilterSuggestionsResponse) => void;
+    const pendingPromise = new Promise<FilterSuggestionsResponse>((r) => {
+      resolveProvider = r;
+    });
+
+    const config = createUnifiedConfig({
+      suggestionsProvider: vi.fn().mockReturnValue(pendingPromise),
+    });
+    render(FilterPanel, { props: { config, timeBuckets } });
+
+    await vi.advanceTimersByTimeAsync(0);
+
+    // While request is in-flight, sections should show refetching state
+    const section = screen.getByTestId('filter-section-people');
+    expect(section.className).toContain('refetching');
+
+    resolveProvider!(defaultResponse);
+    await vi.advanceTimersByTimeAsync(0);
+
+    await waitFor(() => {
+      expect(section.className).not.toContain('refetching');
+    });
+  });
+
+  it('should cascade child re-fetch when parent is still in suggestions', async () => {
+    // Initial response has Germany selected and Germany in suggestions
+    const narrowedResponse: FilterSuggestionsResponse = {
+      ...defaultResponse,
+      countries: ['Germany'], // Germany still in list
+    };
+    const config = createUnifiedConfig({
+      suggestionsProvider: vi
+        .fn()
+        .mockResolvedValueOnce(defaultResponse) // initial
+        .mockResolvedValueOnce(narrowedResponse), // after person selection
+    });
+
+    const { component } = render(FilterPanel, { props: { config, timeBuckets } });
+
+    await vi.advanceTimersByTimeAsync(0); // initial mount
+    await waitFor(() => expect(screen.getByText('Germany')).toBeTruthy());
+
+    // Select Germany
+    await fireEvent.click(screen.getByText('Germany'));
+
+    // Select a person to trigger re-fetch
+    await waitFor(() => expect(screen.getByText('Alice')).toBeTruthy());
+    await fireEvent.click(screen.getByText('Alice'));
+    await vi.advanceTimersByTimeAsync(50);
+
+    await waitFor(() => {
+      // cities provider should have been called since Germany is still in suggestions
+      expect(config.providers!.cities).toHaveBeenCalledWith('Germany', expect.anything());
+    });
+  });
+
+  it('should skip child re-fetch when parent becomes orphaned', async () => {
+    const narrowedResponse: FilterSuggestionsResponse = {
+      ...defaultResponse,
+      countries: [], // Germany no longer in suggestions
+    };
+    const config = createUnifiedConfig({
+      suggestionsProvider: vi.fn().mockResolvedValueOnce(defaultResponse).mockResolvedValueOnce(narrowedResponse),
+    });
+
+    render(FilterPanel, { props: { config, timeBuckets } });
+
+    await vi.advanceTimersByTimeAsync(0);
+    await waitFor(() => expect(screen.getByText('Germany')).toBeTruthy());
+
+    // Select Germany, then trigger re-fetch that removes it
+    await fireEvent.click(screen.getByText('Germany'));
+    await fireEvent.click(screen.getByText('Alice'));
+    await vi.advanceTimersByTimeAsync(50);
+
+    await waitFor(() => {
+      // cities provider should NOT have been called — parent is orphaned
+      expect(config.providers!.cities).not.toHaveBeenCalled();
+    });
+  });
+
+  it('should show hasUnnamedPeople empty text when people list is empty', async () => {
+    const config = createUnifiedConfig({
+      suggestionsProvider: vi.fn().mockResolvedValue({
+        ...emptyResponse,
+        hasUnnamedPeople: true,
+      }),
+    });
+    render(FilterPanel, { props: { config, timeBuckets } });
+
+    await vi.advanceTimersByTimeAsync(0);
+
+    await waitFor(() => {
+      expect(screen.getByText('Name people to use this filter')).toBeTruthy();
+    });
+  });
+
+  it('should hide unavailable ratings', async () => {
+    const config = createUnifiedConfig({
+      suggestionsProvider: vi.fn().mockResolvedValue({
+        ...defaultResponse,
+        ratings: [4, 5], // only 4 and 5 available
+      }),
+    });
+    render(FilterPanel, { props: { config, timeBuckets } });
+
+    await vi.advanceTimersByTimeAsync(0);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('rating-star-4')).toBeTruthy();
+      expect(screen.getByTestId('rating-star-5')).toBeTruthy();
+      expect(screen.queryByTestId('rating-star-1')).toBeNull();
+      expect(screen.queryByTestId('rating-star-2')).toBeNull();
+      expect(screen.queryByTestId('rating-star-3')).toBeNull();
+    });
+  });
+
+  it('should show all ratings when availableRatings is undefined (backward compat)', async () => {
+    // providers-only config — no suggestionsProvider
+    const config: FilterPanelConfig = {
+      sections: ['rating'],
+      providers: {},
+    };
+    render(FilterPanel, { props: { config, timeBuckets } });
+
+    await vi.advanceTimersByTimeAsync(0);
+
+    for (const star of [1, 2, 3, 4, 5]) {
+      expect(screen.getByTestId(`rating-star-${star}`)).toBeTruthy();
+    }
+  });
+
+  it('should hide unavailable media types', async () => {
+    const config = createUnifiedConfig({
+      suggestionsProvider: vi.fn().mockResolvedValue({
+        ...defaultResponse,
+        mediaTypes: ['IMAGE'], // only photos
+      }),
+    });
+    render(FilterPanel, { props: { config, timeBuckets } });
+
+    await vi.advanceTimersByTimeAsync(0);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('media-type-all')).toBeTruthy();
+      expect(screen.getByTestId('media-type-image')).toBeTruthy();
+      expect(screen.queryByTestId('media-type-video')).toBeNull();
+    });
+  });
+
+  it('should show orphaned media type button dimmed when selected but unavailable', async () => {
+    // First response has both, second has only IMAGE
+    const config = createUnifiedConfig({
+      suggestionsProvider: vi
+        .fn()
+        .mockResolvedValueOnce(defaultResponse) // has both IMAGE + VIDEO
+        .mockResolvedValueOnce({
+          ...defaultResponse,
+          mediaTypes: ['IMAGE'], // only IMAGE after filter change
+        }),
+    });
+    render(FilterPanel, { props: { config, timeBuckets } });
+
+    await vi.advanceTimersByTimeAsync(0);
+    await waitFor(() => expect(screen.getByTestId('media-type-video')).toBeTruthy());
+
+    // Select Videos
+    await fireEvent.click(screen.getByTestId('media-type-video'));
+
+    // Trigger a re-fetch that removes VIDEO from available
+    await fireEvent.click(screen.getByText('Alice'));
+    await vi.advanceTimersByTimeAsync(50);
+
+    await waitFor(() => {
+      // Video button should still be visible (selected) but dimmed
+      const videoBtn = screen.getByTestId('media-type-video');
+      expect(videoBtn).toBeTruthy();
+      expect(videoBtn.className).toContain('opacity-50');
+    });
+  });
+
+  it('should fall back to providers-based behavior when suggestionsProvider is not set', async () => {
+    const peopleProvider = vi.fn().mockResolvedValue([{ id: 'p1', name: 'Alice' }]);
+    const config: FilterPanelConfig = {
+      sections: ['people'],
+      providers: {
+        people: peopleProvider,
+      },
+    };
+    render(FilterPanel, { props: { config, timeBuckets } });
+
+    await vi.advanceTimersByTimeAsync(0);
+
+    await waitFor(() => {
+      expect(peopleProvider).toHaveBeenCalledTimes(1);
+      expect(screen.getByText('Alice')).toBeTruthy();
+    });
+  });
+
+  it('should gracefully handle suggestionsProvider without providers (no cascading)', async () => {
+    const config: FilterPanelConfig = {
+      sections: ['people', 'location'],
+      suggestionsProvider: vi.fn().mockResolvedValue(defaultResponse),
+      // No providers — cascading should be skipped without error
+    };
+    render(FilterPanel, { props: { config, timeBuckets } });
+
+    await vi.advanceTimersByTimeAsync(0);
+
+    await waitFor(() => {
+      expect(screen.getByText('Germany')).toBeTruthy();
+    });
   });
 });
 ```
@@ -1100,19 +1641,15 @@ test(web): add component tests for unified suggestionsProvider
 
 ### Task 14: Regenerate SQL Query Files
 
-If any repository methods use `@GenerateSql`, the SQL query documentation needs to be regenerated.
+**Step 1: Regenerate**
 
-**Step 1: Check for `@GenerateSql` on new methods**
-
-The new `getFilterSuggestions` method is public and should have `@GenerateSql` if it follows the existing pattern. Check if the other suggestion methods (`getCountries`, etc.) have it — they do. Add `@GenerateSql` to `getFilterSuggestions`.
-
-**Step 2: Regenerate**
+Since `@GenerateSql` was added to `getFilterSuggestions` in Task 5, the SQL query documentation needs regenerating.
 
 Run: `make sql` (requires running DB via `make dev`)
 
 If no local DB is available, apply the CI diff manually — CI will show the expected SQL file content.
 
-**Step 3: Commit**
+**Step 2: Commit**
 
 ```
 chore: regenerate SQL query documentation

@@ -31,7 +31,7 @@ When a filter is applied, all other filter panels dynamically update to show onl
 
 ## API
 
-### `GET /search/filter-suggestions`
+### `GET /search/suggestions/filters`
 
 **Request** (`FilterSuggestionsRequestDto`):
 
