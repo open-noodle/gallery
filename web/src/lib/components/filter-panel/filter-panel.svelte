@@ -617,7 +617,11 @@
             {:else if section === 'rating'}
               <RatingFilter selectedRating={filters.rating} {availableRatings} onRatingChange={handleRatingChange} />
             {:else if section === 'media'}
-              <MediaTypeFilter selected={filters.mediaType} {availableMediaTypes} onTypeChange={handleMediaTypeChange} />
+              <MediaTypeFilter
+                selected={filters.mediaType}
+                {availableMediaTypes}
+                onTypeChange={handleMediaTypeChange}
+              />
             {:else if section === 'favorites'}
               <FavoritesFilter
                 selected={filters.isFavorite}

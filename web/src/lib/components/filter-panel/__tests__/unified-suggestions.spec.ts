@@ -18,7 +18,6 @@ const defaultResponse: FilterSuggestionsResponse = {
   hasUnnamedPeople: false,
 };
 
-
 const timeBuckets = [
   { timeBucket: '2023-06-01', count: 100 },
   { timeBucket: '2024-03-01', count: 50 },
