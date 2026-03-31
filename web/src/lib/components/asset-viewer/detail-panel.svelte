@@ -57,7 +57,8 @@
   }
 
   let { asset, currentAlbum = null, spaceId }: Props = $props();
-  let isSpaceMember = $derived(!!spaceId);
+  let effectiveSpaceId = $derived(spaceId || asset.resolvedSpaceId);
+  let isSpaceMember = $derived(!!effectiveSpaceId);
 
   let showAssetPath = $state(false);
   let showEditFaces = $state(false);
@@ -124,7 +125,7 @@
   };
 
   const handleRefreshPeople = async () => {
-    asset = await getAssetInfo({ id: asset.id, spaceId });
+    asset = await getAssetInfo({ id: asset.id, spaceId: effectiveSpaceId });
     showEditFaces = false;
   };
 
@@ -235,8 +236,8 @@
           {#if showingHiddenPeople || !person.isHidden}
             <a
               class="w-22"
-              href={spaceId && person.spacePersonId
-                ? Route.viewSpacePerson(spaceId, person.spacePersonId)
+              href={effectiveSpaceId && person.spacePersonId
+                ? Route.viewSpacePerson(effectiveSpaceId, person.spacePersonId)
                 : Route.viewPerson(person, { previousRoute })}
               onfocus={() => ($boundingBoxesArray = people[index].faces)}
               onblur={() => ($boundingBoxesArray = [])}
@@ -247,8 +248,8 @@
                 <ImageThumbnail
                   curve
                   shadow
-                  url={spaceId && person.spacePersonId
-                    ? createUrl(`/shared-spaces/${spaceId}/people/${person.spacePersonId}/thumbnail`, {
+                  url={effectiveSpaceId && person.spacePersonId
+                    ? createUrl(`/shared-spaces/${effectiveSpaceId}/people/${person.spacePersonId}/thumbnail`, {
                         updatedAt: person.updatedAt,
                       })
                     : getPeopleThumbnailUrl(person)}
@@ -577,7 +578,7 @@
 
 {#if $preferences?.tags?.enabled}
   <section class="relative px-2 pb-12 dark:bg-immich-dark-bg dark:text-immich-dark-fg">
-    <DetailPanelTags {asset} {isOwner} {spaceId} />
+    <DetailPanelTags {asset} {isOwner} spaceId={effectiveSpaceId} />
   </section>
 {/if}
 

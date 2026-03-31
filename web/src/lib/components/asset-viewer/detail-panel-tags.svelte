@@ -17,20 +17,21 @@
   }
 
   let { asset = $bindable(), isOwner, spaceId }: Props = $props();
-  let isSpaceMember = $derived(!!spaceId);
+  let effectiveSpaceId = $derived(spaceId || asset.resolvedSpaceId);
+  let isSpaceMember = $derived(!!effectiveSpaceId);
 
   let tags = $derived(asset.tags || []);
 
   const handleRemove = async (tagId: string) => {
     const ids = await removeTag({ tagIds: [tagId], assetIds: [asset.id], showNotification: false });
     if (ids) {
-      asset = await getAssetInfo({ id: asset.id, spaceId });
+      asset = await getAssetInfo({ id: asset.id, spaceId: effectiveSpaceId });
     }
   };
 
   const onAssetsTag = async (ids: string[]) => {
     if (ids.includes(asset.id)) {
-      asset = await getAssetInfo({ id: asset.id, spaceId });
+      asset = await getAssetInfo({ id: asset.id, spaceId: effectiveSpaceId });
     }
   };
 
