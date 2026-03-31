@@ -223,6 +223,7 @@ Class | Method | HTTP request | Description
 *QueuesApi* | [**updateQueue**](doc//QueuesApi.md#updatequeue) | **PUT** /queues/{name} | Update a queue
 *SearchApi* | [**getAssetsByCity**](doc//SearchApi.md#getassetsbycity) | **GET** /search/cities | Retrieve assets by city
 *SearchApi* | [**getExploreData**](doc//SearchApi.md#getexploredata) | **GET** /search/explore | Retrieve explore data
+*SearchApi* | [**getFilterSuggestions**](doc//SearchApi.md#getfiltersuggestions) | **GET** /search/suggestions/filters | Retrieve dynamic filter suggestions
 *SearchApi* | [**getSearchSuggestions**](doc//SearchApi.md#getsearchsuggestions) | **GET** /search/suggestions | Retrieve search suggestions
 *SearchApi* | [**getTagSuggestions**](doc//SearchApi.md#gettagsuggestions) | **GET** /search/suggestions/tags | Retrieve tag suggestions
 *SearchApi* | [**searchAssetStatistics**](doc//SearchApi.md#searchassetstatistics) | **POST** /search/statistics | Search asset statistics
@@ -472,6 +473,9 @@ Class | Method | HTTP request | Description
  - [ExifResponseDto](doc//ExifResponseDto.md)
  - [FaceDto](doc//FaceDto.md)
  - [FacialRecognitionConfig](doc//FacialRecognitionConfig.md)
+ - [FilterSuggestionsPersonDto](doc//FilterSuggestionsPersonDto.md)
+ - [FilterSuggestionsResponseDto](doc//FilterSuggestionsResponseDto.md)
+ - [FilterSuggestionsTagDto](doc//FilterSuggestionsTagDto.md)
  - [FoldersResponse](doc//FoldersResponse.md)
  - [FoldersUpdate](doc//FoldersUpdate.md)
  - [ImageFormat](doc//ImageFormat.md)

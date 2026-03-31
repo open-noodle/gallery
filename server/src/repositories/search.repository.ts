@@ -603,10 +603,7 @@ export class SearchRepository {
   }
 
   @GenerateSql({ params: [[DummyValue.UUID]] })
-  async getFilterSuggestions(
-    userIds: string[],
-    options: FilterSuggestionsOptions,
-  ): Promise<FilterSuggestionsResult> {
+  async getFilterSuggestions(userIds: string[], options: FilterSuggestionsOptions): Promise<FilterSuggestionsResult> {
     const [countries, cameraMakes, tags, peopleResult, ratings, mediaTypes] = await Promise.all([
       this.getFilteredCountries(userIds, without(options, 'country', 'city')),
       this.getFilteredCameraMakes(userIds, without(options, 'make', 'model')),
@@ -691,9 +688,7 @@ export class SearchRepository {
       .select('asset.id')
       .where('asset.visibility', '=', AssetVisibility.Timeline)
       .where('asset.deletedAt', 'is', null)
-      .$if(!options.spaceId && !options.timelineSpaceIds, (qb) =>
-        qb.where('asset.ownerId', '=', anyUuid(userIds)),
-      )
+      .$if(!options.spaceId && !options.timelineSpaceIds, (qb) => qb.where('asset.ownerId', '=', anyUuid(userIds)))
       .$if(!!options.spaceId && !options.timelineSpaceIds, (qb) =>
         qb.where((eb) =>
           eb.or([
@@ -768,10 +763,7 @@ export class SearchRepository {
       );
   }
 
-  private async getFilteredCountries(
-    userIds: string[],
-    options: FilterSuggestionsOptions,
-  ): Promise<string[]> {
+  private async getFilteredCountries(userIds: string[], options: FilterSuggestionsOptions): Promise<string[]> {
     const filteredIds = this.buildFilteredAssetIds(userIds, options);
     const res = await this.db
       .selectFrom('asset_exif')
@@ -785,10 +777,7 @@ export class SearchRepository {
     return res.map((row) => row.country!);
   }
 
-  private async getFilteredCameraMakes(
-    userIds: string[],
-    options: FilterSuggestionsOptions,
-  ): Promise<string[]> {
+  private async getFilteredCameraMakes(userIds: string[], options: FilterSuggestionsOptions): Promise<string[]> {
     const filteredIds = this.buildFilteredAssetIds(userIds, options);
     const res = await this.db
       .selectFrom('asset_exif')
@@ -843,9 +832,7 @@ export class SearchRepository {
     const unnamed = await this.db
       .selectFrom('person')
       .select(sql`1`.as('exists'))
-      .where((eb) =>
-        eb.or([eb('person.name', '=', ''), eb('person.name', 'is', null)]),
-      )
+      .where((eb) => eb.or([eb('person.name', '=', ''), eb('person.name', 'is', null)]))
       .where((eb) =>
         eb.exists(
           eb
@@ -860,10 +847,7 @@ export class SearchRepository {
     return { people, hasUnnamedPeople: !!unnamed };
   }
 
-  private async getFilteredRatings(
-    userIds: string[],
-    options: FilterSuggestionsOptions,
-  ): Promise<number[]> {
+  private async getFilteredRatings(userIds: string[], options: FilterSuggestionsOptions): Promise<number[]> {
     const filteredIds = this.buildFilteredAssetIds(userIds, options);
     const res = await this.db
       .selectFrom('asset_exif')
@@ -877,10 +861,7 @@ export class SearchRepository {
     return res.map((row) => row.rating!);
   }
 
-  private async getFilteredMediaTypes(
-    userIds: string[],
-    options: FilterSuggestionsOptions,
-  ): Promise<string[]> {
+  private async getFilteredMediaTypes(userIds: string[], options: FilterSuggestionsOptions): Promise<string[]> {
     const filteredIds = this.buildFilteredAssetIds(userIds, options);
     const res = await this.db
       .selectFrom('asset')
