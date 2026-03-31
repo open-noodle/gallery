@@ -409,11 +409,7 @@ describe(DuplicateService.name, () => {
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset2.id, asset3.id]));
       mocks.duplicateRepository.get.mockResolvedValue({
         duplicateId: 'group-1',
-        assets: [
-          asset1 as unknown as MapAsset,
-          asset2 as unknown as MapAsset,
-          asset3 as unknown as MapAsset,
-        ],
+        assets: [asset1 as unknown as MapAsset, asset2 as unknown as MapAsset, asset3 as unknown as MapAsset],
       });
       mocks.asset.getChecksumsByIds.mockResolvedValue([
         { id: asset2.id, checksum: checksum2 },
@@ -421,9 +417,7 @@ describe(DuplicateService.name, () => {
       ]);
 
       const result = await sut.resolve(authStub.admin, {
-        groups: [
-          { duplicateId: 'group-1', keepAssetIds: [asset1.id], trashAssetIds: [asset2.id, asset3.id] },
-        ],
+        groups: [{ duplicateId: 'group-1', keepAssetIds: [asset1.id], trashAssetIds: [asset2.id, asset3.id] }],
       });
 
       expect(result[0].success).toBe(true);
@@ -442,18 +436,12 @@ describe(DuplicateService.name, () => {
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset3.id]));
       mocks.duplicateRepository.get.mockResolvedValue({
         duplicateId: 'group-1',
-        assets: [
-          asset1 as unknown as MapAsset,
-          asset2 as unknown as MapAsset,
-          asset3 as unknown as MapAsset,
-        ],
+        assets: [asset1 as unknown as MapAsset, asset2 as unknown as MapAsset, asset3 as unknown as MapAsset],
       });
       mocks.asset.getChecksumsByIds.mockResolvedValue([{ id: asset3.id, checksum }]);
 
       const result = await sut.resolve(authStub.admin, {
-        groups: [
-          { duplicateId: 'group-1', keepAssetIds: [asset1.id, asset2.id], trashAssetIds: [asset3.id] },
-        ],
+        groups: [{ duplicateId: 'group-1', keepAssetIds: [asset1.id, asset2.id], trashAssetIds: [asset3.id] }],
       });
 
       expect(result[0].success).toBe(true);

@@ -686,9 +686,7 @@ export class AssetRepository {
     const seen = new Set(assetResults.map((r) => r.checksum.toString('hex')));
     return [
       ...assetResults,
-      ...tombstoneResults
-        .filter((r) => !seen.has(r.checksum.toString('hex')))
-        .map((r) => ({ ...r, deletedAt: null })),
+      ...tombstoneResults.filter((r) => !seen.has(r.checksum.toString('hex'))).map((r) => ({ ...r, deletedAt: null })),
     ];
   }
 
@@ -725,7 +723,15 @@ export class AssetRepository {
       return [];
     }
 
-    return this.db.selectFrom('asset').select(['id', 'checksum']).where('id', 'in', ids.map(asUuid)).execute();
+    return this.db
+      .selectFrom('asset')
+      .select(['id', 'checksum'])
+      .where(
+        'id',
+        'in',
+        ids.map((id) => asUuid(id)),
+      )
+      .execute();
   }
 
   findLivePhotoMatch(options: LivePhotoSearchOptions) {

@@ -235,9 +235,7 @@ export class DuplicateRepository {
   @GenerateSql({
     params: [[{ assetId: DummyValue.UUID, ownerId: DummyValue.UUID, checksum: DummyValue.BUFFER }]],
   })
-  async createChecksumTombstones(
-    items: { assetId: string; ownerId: string; checksum: Buffer }[],
-  ): Promise<void> {
+  async createChecksumTombstones(items: { assetId: string; ownerId: string; checksum: Buffer }[]): Promise<void> {
     if (items.length === 0) {
       return;
     }
@@ -269,7 +267,14 @@ export class DuplicateRepository {
       .where(
         'checksum',
         'in',
-        this.db.selectFrom('asset').select('checksum').where('id', 'in', assetIds.map(asUuid)),
+        this.db
+          .selectFrom('asset')
+          .select('checksum')
+          .where(
+            'id',
+            'in',
+            assetIds.map((id) => asUuid(id)),
+          ),
       )
       .execute();
   }
