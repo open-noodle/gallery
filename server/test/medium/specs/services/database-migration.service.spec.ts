@@ -30,7 +30,6 @@ const createRawDatabase = async (name: string): Promise<Kysely<DB>> => {
   );
 };
 
-
 const createRepo = (db: Kysely<DB>) => {
   const configRepository = new ConfigRepository();
   const logger = LoggingRepository.create();
@@ -189,7 +188,6 @@ describe('Database Migration Scenarios', () => {
       await db.destroy();
     }
   });
-
 
   // Scenario G: Retry after revert
   it('should be able to re-run after a previous successful run', async () => {
