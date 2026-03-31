@@ -10,6 +10,7 @@ import { LoggingRepository } from 'src/repositories/logging.repository';
 import { OcrRepository } from 'src/repositories/ocr.repository';
 import { SharedLinkAssetRepository } from 'src/repositories/shared-link-asset.repository';
 import { SharedLinkRepository } from 'src/repositories/shared-link.repository';
+import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
 import { StackRepository } from 'src/repositories/stack.repository';
 import { StorageRepository } from 'src/repositories/storage.repository';
 import { UserRepository } from 'src/repositories/user.repository';
@@ -31,6 +32,7 @@ const setup = (db?: Kysely<DB>) => {
       AlbumRepository,
       AccessRepository,
       SharedLinkAssetRepository,
+      SharedSpaceRepository,
       StackRepository,
       UserRepository,
       SharedLinkRepository,

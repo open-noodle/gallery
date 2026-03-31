@@ -25,6 +25,7 @@ export interface FilterPanelConfig {
   sections: FilterSection[];
   providers: {
     people?: (context?: FilterContext) => Promise<PersonOption[]>;
+    allPeople?: () => Promise<PersonOption[]>;
     locations?: (context?: FilterContext) => Promise<LocationOption[]>;
     cities?: (country: string, context?: FilterContext) => Promise<string[]>;
     cameras?: (context?: FilterContext) => Promise<CameraOption[]>;
