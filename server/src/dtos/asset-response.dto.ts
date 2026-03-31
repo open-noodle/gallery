@@ -138,6 +138,9 @@ export class AssetResponseDto extends SanitizedAssetResponseDto {
   resized?: boolean;
   @Property({ description: 'Is edited', history: new HistoryBuilder().added('v2.5.0').beta('v2.5.0') })
   isEdited!: boolean;
+
+  @ApiPropertyOptional({ description: 'Resolved space ID (when server auto-detects space context)' })
+  resolvedSpaceId?: string;
 }
 
 export type MapAsset = {
