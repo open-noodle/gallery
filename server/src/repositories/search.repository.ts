@@ -741,4 +741,128 @@ export class SearchRepository {
         qb.where('asset.isFavorite', '=', options.isFavorite!),
       );
   }
+
+  private async getFilteredCountries(
+    userIds: string[],
+    options: FilterSuggestionsOptions,
+  ): Promise<string[]> {
+    const filteredIds = this.buildFilteredAssetIds(userIds, options);
+    const res = await this.db
+      .selectFrom('asset_exif')
+      .select('country')
+      .distinct()
+      .where('assetId', 'in', filteredIds)
+      .where('country', 'is not', null)
+      .where('country', '!=', '')
+      .orderBy('country')
+      .execute();
+    return res.map((row) => row.country!);
+  }
+
+  private async getFilteredCameraMakes(
+    userIds: string[],
+    options: FilterSuggestionsOptions,
+  ): Promise<string[]> {
+    const filteredIds = this.buildFilteredAssetIds(userIds, options);
+    const res = await this.db
+      .selectFrom('asset_exif')
+      .select('make')
+      .distinct()
+      .where('assetId', 'in', filteredIds)
+      .where('make', 'is not', null)
+      .where('make', '!=', '')
+      .orderBy('make')
+      .execute();
+    return res.map((row) => row.make!);
+  }
+
+  private async getFilteredTags(
+    userIds: string[],
+    options: FilterSuggestionsOptions,
+  ): Promise<Array<{ id: string; value: string }>> {
+    const filteredIds = this.buildFilteredAssetIds(userIds, options);
+    return this.db
+      .selectFrom('tag')
+      .select(['tag.id', 'tag.value'])
+      .distinct()
+      .innerJoin('tag_asset', 'tag.id', 'tag_asset.tagId')
+      .where('tag_asset.assetId', 'in', filteredIds)
+      .orderBy('tag.value')
+      .execute();
+  }
+
+  private async getFilteredPeople(
+    userIds: string[],
+    options: FilterSuggestionsOptions,
+  ): Promise<{ people: Array<{ id: string; name: string }>; hasUnnamedPeople: boolean }> {
+    const filteredIds = this.buildFilteredAssetIds(userIds, options);
+
+    const people = await this.db
+      .selectFrom('person')
+      .select(['person.id', 'person.name'])
+      .where('person.name', '!=', '')
+      .where('person.isHidden', '=', false)
+      .where('person.thumbnailPath', '!=', '')
+      .where((eb) =>
+        eb.exists(
+          eb
+            .selectFrom('asset_face')
+            .whereRef('asset_face.personId', '=', 'person.id')
+            .where('asset_face.assetId', 'in', filteredIds),
+        ),
+      )
+      .orderBy('person.name')
+      .execute();
+
+    const unnamed = await this.db
+      .selectFrom('person')
+      .select(sql`1`.as('exists'))
+      .where((eb) =>
+        eb.or([eb('person.name', '=', ''), eb('person.name', 'is', null)]),
+      )
+      .where((eb) =>
+        eb.exists(
+          eb
+            .selectFrom('asset_face')
+            .whereRef('asset_face.personId', '=', 'person.id')
+            .where('asset_face.assetId', 'in', filteredIds),
+        ),
+      )
+      .limit(1)
+      .executeTakeFirst();
+
+    return { people, hasUnnamedPeople: !!unnamed };
+  }
+
+  private async getFilteredRatings(
+    userIds: string[],
+    options: FilterSuggestionsOptions,
+  ): Promise<number[]> {
+    const filteredIds = this.buildFilteredAssetIds(userIds, options);
+    const res = await this.db
+      .selectFrom('asset_exif')
+      .select('rating')
+      .distinct()
+      .where('assetId', 'in', filteredIds)
+      .where('rating', 'is not', null)
+      .where('rating', '>', 0)
+      .orderBy('rating')
+      .execute();
+    return res.map((row) => row.rating!);
+  }
+
+  private async getFilteredMediaTypes(
+    userIds: string[],
+    options: FilterSuggestionsOptions,
+  ): Promise<string[]> {
+    const filteredIds = this.buildFilteredAssetIds(userIds, options);
+    const res = await this.db
+      .selectFrom('asset')
+      .select('type')
+      .distinct()
+      .where('id', 'in', filteredIds)
+      .orderBy('type')
+      .execute();
+    return res.map((row) => row.type);
+  }
 }
