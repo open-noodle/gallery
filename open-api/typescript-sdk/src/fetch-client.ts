@@ -620,6 +620,8 @@ export type AssetResponseDto = {
     people?: PersonWithFacesResponseDto[];
     /** Is resized */
     resized?: boolean;
+    /** Resolved space ID (when server auto-detects space context) */
+    resolvedSpaceId?: string;
     stack?: (AssetStackResponseDto) | null;
     tags?: TagResponseDto[];
     /** Thumbhash for thumbnail generation (base64) also used as the c query param for thumbnail cache busting. */

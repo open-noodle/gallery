@@ -20250,6 +20250,10 @@
             ],
             "x-immich-state": "Deprecated"
           },
+          "resolvedSpaceId": {
+            "description": "Resolved space ID (when server auto-detects space context)",
+            "type": "string"
+          },
           "stack": {
             "allOf": [
               {
