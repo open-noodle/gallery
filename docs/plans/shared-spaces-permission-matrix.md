@@ -4,26 +4,26 @@
 
 ## Roles
 
-| Role       | Hierarchy | Description                      |
-| ---------- | --------- | -------------------------------- |
-| **Owner**  | 2         | Full control — created the space |
-| **Editor** | 1         | Can add assets, edit metadata    |
-| **Viewer** | 0         | Read-only access                 |
+| Role       | Hierarchy | Description                                         |
+| ---------- | --------- | --------------------------------------------------- |
+| **Owner**  | 2         | Full control — created the space                    |
+| **Editor** | 1         | Can add/remove assets, edit metadata, manage people |
+| **Viewer** | 0         | Read-only access                                    |
 
 ## Asset Access Permissions (Server)
 
-| Permission          | Owner | Space Editor | Space Viewer | Partner | Album Member | Shared Link            |
-| ------------------- | ----- | ------------ | ------------ | ------- | ------------ | ---------------------- |
-| **AssetRead**       | Yes   | Yes          | Yes          | Yes     | Yes          | Yes                    |
-| **AssetView**       | Yes   | Yes          | Yes          | Yes     | Yes          | Yes (if showExif)      |
-| **AssetDownload**   | Yes   | Yes          | Yes          | Yes     | Yes          | Yes (if allowDownload) |
-| **AssetUpdate**     | Yes   | Yes          | No           | No      | No           | No                     |
-| **AssetDelete**     | Yes   | No           | No           | No      | No           | No                     |
-| **AssetShare**      | Yes   | No           | No           | Yes     | No           | No                     |
-| **AssetCopy**       | Yes   | No           | No           | No      | No           | No                     |
-| **AssetEditGet**    | Yes   | No           | No           | No      | No           | No                     |
-| **AssetEditCreate** | Yes   | No           | No           | No      | No           | No                     |
-| **AssetEditDelete** | Yes   | No           | No           | No      | No           | No                     |
+| Permission          | Owner | Space Editor | Space Viewer | Partner | Album Member | Shared Link                      |
+| ------------------- | ----- | ------------ | ------------ | ------- | ------------ | -------------------------------- |
+| **AssetRead**       | Yes   | Yes          | Yes          | Yes     | Yes          | Yes                              |
+| **AssetView**       | Yes   | Yes          | Yes          | Yes     | Yes          | Yes (EXIF stripped if !showExif) |
+| **AssetDownload**   | Yes   | Yes          | Yes          | Yes     | Yes          | Yes (if allowDownload)           |
+| **AssetUpdate**     | Yes   | Yes          | No           | No      | No           | No                               |
+| **AssetDelete**     | Yes   | No           | No           | No      | No           | No                               |
+| **AssetShare**      | Yes   | No           | No           | Yes     | No           | No                               |
+| **AssetCopy**       | Yes   | No           | No           | No      | No           | No                               |
+| **AssetEditGet**    | Yes   | No           | No           | No      | No           | No                               |
+| **AssetEditCreate** | Yes   | No           | No           | No      | No           | No                               |
+| **AssetEditDelete** | Yes   | No           | No           | No      | No           | No                               |
 
 ## Asset Detail Panel — Metadata Visibility
 
@@ -33,7 +33,7 @@
 | **Date/time**                | Edit  | View   | View   | View       | Edit button gated by `isOwner`                                          |
 | **Location**                 | Edit  | View   | View   | View       | Edit pencil gated by `isOwner`                                          |
 | **Description**              | Edit  | View   | View   | View       | Read-only for non-owners if exists                                      |
-| **Rating**                   | Edit  | View   | View   | View       | `readOnly={!isOwner}`                                                   |
+| **Rating**                   | Edit  | View   | View   | View       | `readOnly={!isOwner}`, requires `$preferences.ratings.enabled`          |
 | **People**                   | Edit  | View   | View   | Hidden     | `isOwner \|\| isSpaceMember` gate                                       |
 | **Tags**                     | Edit  | View   | View   | Hidden     | `isOwner \|\| isSpaceMember` gate, requires `$preferences.tags.enabled` |
 | **File path**                | View  | Hidden | Hidden | Hidden     | `isOwner` only                                                          |
@@ -53,42 +53,47 @@
 
 | Entry Point               | `spaceId` source                      | People/Tags visible for space member? |
 | ------------------------- | ------------------------------------- | ------------------------------------- |
-| Space page                | Explicit prop                         | Yes                                   |
-| Timeline (showInTimeline) | Server fallback via `resolvedSpaceId` | Yes (after PR #243)                   |
-| Search results            | Server fallback via `resolvedSpaceId` | Yes (after PR #243)                   |
-| Direct URL                | Server fallback via `resolvedSpaceId` | Yes (after PR #243)                   |
+| Space page                | Explicit prop from route              | Yes                                   |
+| Timeline (showInTimeline) | Server fallback via `resolvedSpaceId` | Yes (PR #243)                         |
+| Search results            | Server fallback via `resolvedSpaceId` | Yes (PR #243)                         |
+| Direct URL                | Server fallback via `resolvedSpaceId` | Yes (PR #243)                         |
+
+Note: PR #243 adds `findSpaceForAssetAndUser` which auto-resolves space context when `spaceId` is not explicitly passed. The server returns `resolvedSpaceId` on the asset response.
 
 ## Asset Viewer Nav Bar — Actions
 
-| Action                  | Owner | Editor | Viewer | Non-member |
-| ----------------------- | ----- | ------ | ------ | ---------- |
-| **Download**            | Yes   | Yes    | Yes    | Yes        |
-| **Download original**   | Yes   | Yes    | Yes    | Yes        |
-| **Share**               | Yes   | Yes    | Yes    | Yes        |
-| **Favorite/unfavorite** | Yes   | Yes    | Yes    | Yes        |
-| **Edit (crop/rotate)**  | Yes   | Yes    | Yes    | Yes        |
-| **Add to album**        | Yes   | Yes    | Yes    | Yes        |
-| **Slideshow**           | Yes   | Yes    | Yes    | Yes        |
-| **View similar**        | Yes   | Yes    | Yes    | Yes        |
-| **Delete**              | Yes   | No     | No     | No         |
-| **Archive**             | Yes   | No     | No     | No         |
-| **Rating**              | Yes   | No     | No     | No         |
-| **Restore from trash**  | Yes   | No     | No     | No         |
-| **Stack operations**    | Yes   | No     | No     | No         |
-| **Set visibility**      | Yes   | No     | No     | No         |
-| **ML jobs**             | Yes   | No     | No     | No         |
-| **Remove from album**   | Yes\* | No     | No     | No         |
+| Action                  | Owner   | Editor | Viewer | Non-member |
+| ----------------------- | ------- | ------ | ------ | ---------- |
+| **Download**            | Yes     | Yes    | Yes    | Yes        |
+| **Download original**   | Yes     | Yes    | Yes    | Yes        |
+| **Share**               | Yes     | No\*   | No\*   | No\*       |
+| **Favorite/unfavorite** | Yes     | No     | No     | No         |
+| **Edit (crop/rotate)**  | Yes     | No     | No     | No         |
+| **Add to album**        | Yes     | Yes    | Yes    | Yes        |
+| **Slideshow**           | Yes     | Yes    | Yes    | Yes        |
+| **View similar**        | Yes     | Yes    | Yes    | Yes        |
+| **View in timeline**    | Yes     | No     | No     | No         |
+| **Delete**              | Yes     | No     | No     | No         |
+| **Archive**             | Yes     | No     | No     | No         |
+| **Rating**              | Yes     | No     | No     | No         |
+| **Restore from trash**  | Yes     | No     | No     | No         |
+| **Stack operations**    | Yes     | No     | No     | No         |
+| **Set visibility**      | Yes     | No     | No     | No         |
+| **ML jobs**             | Yes     | No     | No     | No         |
+| **Remove from album**   | Yes\*\* | No     | No     | No         |
 
-\* Asset owner or album owner
+\* Share button is visible to all users but the server rejects the shared link creation for non-owners (AssetShare is owner + partner only). This is a frontend gap.
+\*\* Asset owner or album owner
 
 ## Space Management Endpoints
 
-| Action                                             | Owner    | Editor   | Viewer   |
-| -------------------------------------------------- | -------- | -------- | -------- |
-| **Create space**                                   | Any user | Any user | Any user |
-| **View space**                                     | Yes      | Yes      | Yes      |
-| **Update space** (name, description, color, cover) | Yes      | No       | No       |
-| **Delete space**                                   | Yes      | No       | No       |
+| Action                                                | Owner    | Editor   | Viewer   |
+| ----------------------------------------------------- | -------- | -------- | -------- |
+| **Create space**                                      | Any user | Any user | Any user |
+| **View space**                                        | Yes      | Yes      | Yes      |
+| **Update space** (name, description, color, settings) | Yes      | No       | No       |
+| **Update space cover photo**                          | Yes      | Yes      | No       |
+| **Delete space**                                      | Yes      | No       | No       |
 
 ## Member Management
 
@@ -106,7 +111,7 @@
 | ----------------------- | ----- | ------ | ------ |
 | **Add assets**          | Yes   | Yes    | No     |
 | **Bulk add all assets** | Yes   | Yes    | No     |
-| **Remove assets**       | Yes   | No     | No     |
+| **Remove assets**       | Yes   | Yes    | No     |
 
 ## Space People Management
 
@@ -116,9 +121,9 @@
 | **View person detail**                           | Yes   | Yes    | Yes    |
 | **View person thumbnail**                        | Yes   | Yes    | Yes    |
 | **View person assets**                           | Yes   | Yes    | Yes    |
-| **Update person** (name, visibility, birth date) | Yes   | No     | No     |
-| **Delete person**                                | Yes   | No     | No     |
-| **Merge people**                                 | Yes   | No     | No     |
+| **Update person** (name, visibility, birth date) | Yes   | Yes    | No     |
+| **Delete person**                                | Yes   | Yes    | No     |
+| **Merge people**                                 | Yes   | Yes    | No     |
 | **Deduplicate people**                           | Yes   | No     | No     |
 | **Set personal alias**                           | Yes   | Yes    | Yes    |
 | **Delete personal alias**                        | Yes   | Yes    | Yes    |
@@ -170,6 +175,5 @@
 1. **Tag editing for space members** — `TagAsset` permission is owner-only. Space editors cannot add/remove tags on space assets. Requires extending the tag permission model.
 2. **Photos page people filter** — Uses `getAllPeople()` which returns only the user's own people. Space people not included. Needs cross-space person dedup logic.
 3. **`$preferences.tags.enabled`** — Space members must enable tags in their personal settings to see them. No automatic bypass for space context.
-4. **Nav bar actions for editors** — Some actions (archive, rating, delete) are hidden for non-owners even when editors have `AssetUpdate` server permission. Frontend gates are stricter than server allows.
-5. **Space editors cannot delete assets** — Only the original owner can delete. Editors who add assets cannot remove them.
-6. **No shared links from space context** — Space members cannot create shared links for space assets. Only the asset owner can share.
+4. **Nav bar actions for editors** — Several actions (favorite, archive, edit/crop/rotate, rating) are gated by `isOwner` in the frontend even though space editors have `AssetUpdate` permission on the server. The Share button is visible to all but fails server-side for non-owners.
+5. **No shared links from space context** — Space members cannot create shared links for space assets. Only the asset owner and partners can share via `AssetShare`.
