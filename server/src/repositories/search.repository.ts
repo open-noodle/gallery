@@ -9,6 +9,7 @@ import { probes } from 'src/repositories/database.repository';
 import { DB } from 'src/schema';
 import { AssetExifTable } from 'src/schema/tables/asset-exif.table';
 import { anyUuid, asUuid, searchAssetBuilder, withExifInner } from 'src/utils/database';
+import { without } from 'src/utils/filter-suggestions';
 import { paginationHelper } from 'src/utils/pagination';
 import { isValidInteger } from 'src/validation';
 
@@ -599,6 +600,31 @@ export class SearchRepository {
       .$if(!!options?.takenBefore, (qb) => qb.where('asset.fileCreatedAt', '<', options!.takenBefore!))
       .orderBy('tag.value')
       .execute();
+  }
+
+  @GenerateSql({ params: [[DummyValue.UUID]] })
+  async getFilterSuggestions(
+    userIds: string[],
+    options: FilterSuggestionsOptions,
+  ): Promise<FilterSuggestionsResult> {
+    const [countries, cameraMakes, tags, peopleResult, ratings, mediaTypes] = await Promise.all([
+      this.getFilteredCountries(userIds, without(options, 'country', 'city')),
+      this.getFilteredCameraMakes(userIds, without(options, 'make', 'model')),
+      this.getFilteredTags(userIds, without(options, 'tagIds')),
+      this.getFilteredPeople(userIds, without(options, 'personIds')),
+      this.getFilteredRatings(userIds, without(options, 'rating')),
+      this.getFilteredMediaTypes(userIds, without(options, 'mediaType')),
+    ]);
+
+    return {
+      countries,
+      cameraMakes,
+      tags,
+      people: peopleResult.people,
+      ratings,
+      mediaTypes,
+      hasUnnamedPeople: peopleResult.hasUnnamedPeople,
+    };
   }
 
   private getExifField<K extends 'city' | 'state' | 'country' | 'make' | 'model' | 'lensModel'>(
