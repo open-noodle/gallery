@@ -101,15 +101,32 @@
       };
 
       const updated = [...categories];
+      let isStricter = false;
       if (isCreating) {
         updated.push(category);
         toastManager.primary(`Category "${formName}" created`);
       } else if (editingIndex !== null) {
+        isStricter = formSimilarity > categories[editingIndex].similarity;
         updated[editingIndex] = category;
         toastManager.primary(`Category "${formName}" updated`);
       }
 
       await saveConfig(updated);
+
+      if (isStricter) {
+        const shouldRescan = await modalManager.showDialog({
+          title: 'Rescan photos?',
+          prompt:
+            'This category is now stricter. Would you like to remove existing auto-tags that may no longer match, unarchive affected photos, and rescan all photos?',
+          confirmText: 'Yes',
+        });
+
+        if (shouldRescan) {
+          await scanClassification();
+          toastManager.primary('Rescan started — existing auto-tags will be re-evaluated');
+        }
+      }
+
       cancelEdit();
     } catch (error) {
       handleError(error, 'Unable to save category');
