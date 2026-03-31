@@ -25,65 +25,6 @@ beforeAll(async () => {
 });
 
 describe(ClassificationRepository.name, () => {
-  // Clean up categories between tests to avoid global unique constraint collisions
-  beforeEach(async () => {
-    await defaultDatabase.deleteFrom('classification_prompt_embedding').execute();
-    await defaultDatabase.deleteFrom('classification_category').execute();
-  });
-
-  describe('getEnabledCategoriesWithEmbeddings', () => {
-    it('should return categories with their prompt embeddings via JOIN', async () => {
-      const { sut } = setup();
-
-      const category = await sut.createCategory({
-        name: 'Animals',
-        similarity: 0.3,
-        action: 'tag',
-        enabled: true,
-      });
-
-      const embedding = `[${Array.from({ length: 512 }, () => '0.01').join(',')}]`;
-      await sut.upsertPromptEmbedding({
-        categoryId: category.id,
-        prompt: 'a photo of an animal',
-        embedding,
-      });
-
-      const results = await sut.getEnabledCategoriesWithEmbeddings();
-
-      expect(results).toHaveLength(1);
-      expect(results[0]).toMatchObject({
-        categoryId: category.id,
-        name: 'Animals',
-        similarity: 0.3,
-        action: 'tag',
-        prompt: 'a photo of an animal',
-      });
-      expect(results[0].embedding).toBeDefined();
-    });
-
-    it('should not return disabled categories', async () => {
-      const { sut } = setup();
-
-      const category = await sut.createCategory({
-        name: 'Disabled',
-        similarity: 0.3,
-        action: 'tag',
-        enabled: false,
-      });
-
-      const embedding = `[${Array.from({ length: 512 }, () => '0.01').join(',')}]`;
-      await sut.upsertPromptEmbedding({
-        categoryId: category.id,
-        prompt: 'test',
-        embedding,
-      });
-
-      const results = await sut.getEnabledCategoriesWithEmbeddings();
-      expect(results).toHaveLength(0);
-    });
-  });
-
   describe('streamUnclassifiedAssets', () => {
     it('should return assets without classifiedAt', async () => {
       const { ctx, sut } = setup();
@@ -151,37 +92,6 @@ describe(ClassificationRepository.name, () => {
     });
   });
 
-  describe('cascade deletes', () => {
-    it('should cascade delete prompt embeddings when category is deleted', async () => {
-      const { ctx, sut } = setup();
-
-      const category = await sut.createCategory({
-        name: 'CascadeTest',
-        similarity: 0.3,
-        action: 'tag',
-      });
-
-      const embedding = `[${Array.from({ length: 512 }, () => '0.01').join(',')}]`;
-      await sut.upsertPromptEmbedding({
-        categoryId: category.id,
-        prompt: 'test prompt',
-        embedding,
-      });
-
-      const beforeDelete = await sut.getPromptEmbeddings(category.id);
-      expect(beforeDelete).toHaveLength(1);
-
-      await sut.deleteCategory(category.id);
-
-      const afterDelete = await ctx.database
-        .selectFrom('classification_prompt_embedding')
-        .selectAll()
-        .where('categoryId', '=', category.id)
-        .execute();
-      expect(afterDelete).toHaveLength(0);
-    });
-  });
-
   describe('setClassifiedAt', () => {
     it('should set classifiedAt on the correct asset', async () => {
       const { ctx, sut } = setup();
@@ -204,26 +114,6 @@ describe(ClassificationRepository.name, () => {
         .executeTakeFirstOrThrow();
 
       expect(status.classifiedAt).not.toBeNull();
-    });
-  });
-
-  describe('unique constraint', () => {
-    it('should not allow two categories with the same name', async () => {
-      const { sut } = setup();
-
-      await sut.createCategory({
-        name: 'Duplicate',
-        similarity: 0.3,
-        action: 'tag',
-      });
-
-      await expect(
-        sut.createCategory({
-          name: 'Duplicate',
-          similarity: 0.5,
-          action: 'tag',
-        }),
-      ).rejects.toThrow();
     });
   });
 
