@@ -83,6 +83,7 @@ export const PersonResponseSchema = z
       .meta(new HistoryBuilder().added('v1.126.0').stable('v2').getExtensions()),
     type: z.string().default('person').describe('Entity type (person or pet)'),
     species: z.string().nullable().optional().describe('Pet species (e.g. dog, cat)'),
+    spacePersonId: z.string().optional().describe('Space person ID when viewed through a shared space'),
   })
   .meta({ id: 'PersonResponseDto' });
 

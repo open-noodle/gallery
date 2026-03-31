@@ -26,6 +26,7 @@
     album?: AlbumResponseDto;
     person?: PersonResponseDto;
     removeAction?: AssetAction.UNARCHIVE | AssetAction.ARCHIVE | AssetAction.SET_VISIBILITY_TIMELINE | null;
+    spaceId?: string;
   }
 
   let {
@@ -37,11 +38,12 @@
     isShared = false,
     album,
     person,
+    spaceId,
   }: Props = $props();
 
   const getAsset = (id: string) => {
     return handleErrorAsync(
-      () => assetCacheManager.getAsset({ ...authManager.params, id }),
+      () => assetCacheManager.getAsset({ ...authManager.params, id, spaceId }),
       $t('error_retrieving_asset_information'),
     );
   };
@@ -204,7 +206,7 @@
     }
 
     const restoredAsset = assets[0];
-    const asset = await getAssetInfo({ ...authManager.params, id: restoredAsset.id });
+    const asset = await getAssetInfo({ ...authManager.params, id: restoredAsset.id, spaceId });
     assetViewerManager.setAsset(asset);
     await navigate({ targetRoute: 'current', assetId: restoredAsset.id });
   };
@@ -239,6 +241,7 @@
     {isShared}
     {album}
     {person}
+    {spaceId}
     onAssetChange={(asset) => {
       timelineManager?.upsertAssets([toTimelineAsset(asset)]);
     }}

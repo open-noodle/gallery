@@ -37,9 +37,10 @@
   interface Props {
     asset: AssetResponseDto;
     currentAlbum?: AlbumResponseDto | null;
+    spaceId?: string;
   }
 
-  let { asset, currentAlbum = null }: Props = $props();
+  let { asset, currentAlbum = null, spaceId }: Props = $props();
 
   let isOwner = $derived(authManager.authenticated && authManager.user.id === asset.ownerId);
   let latlng = $derived(
@@ -95,7 +96,7 @@
   };
 
   const handleRefreshPeople = async () => {
-    asset = await getAssetInfo({ id: asset.id });
+    asset = await getAssetInfo({ id: asset.id, spaceId });
     assetViewerManager.closeEditFacesPanel();
   };
 
@@ -149,7 +150,7 @@
 
     <DetailPanelDescription {asset} {isOwner} />
     <DetailPanelRating {asset} {isOwner} />
-    <DetailPanelPeople {asset} {isOwner} {previousRoute} />
+    <DetailPanelPeople {asset} {isOwner} {previousRoute} {spaceId} />
 
     <div class="p-4">
       {#if asset.exifInfo}
@@ -375,7 +376,7 @@
 
   {#if authManager.authenticated && authManager.preferences.tags.enabled}
     <section class="relative px-2 pb-12 dark:bg-immich-dark-bg dark:text-immich-dark-fg">
-      <DetailPanelTags {asset} {isOwner} />
+      <DetailPanelTags {asset} {isOwner} {spaceId} />
     </section>
   {/if}
 {/if}

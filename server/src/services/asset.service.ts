@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import _ from 'lodash';
 import { DateTime, Duration } from 'luxon';
 import { JOBS_ASSET_PAGINATION_SIZE } from 'src/constants';
@@ -67,7 +67,21 @@ export class AssetService extends BaseService {
     return mapStats(stats);
   }
 
-  async get(auth: AuthDto, id: string): Promise<AssetResponseDto | SanitizedAssetResponseDto> {
+  async getRandom(auth: AuthDto, count: number): Promise<AssetResponseDto[]> {
+    const partnerIds = await getMyPartnerIds({
+      userId: auth.user.id,
+      repository: this.partnerRepository,
+      timelineEnabled: true,
+    });
+    const assets = await this.assetRepository.getRandom([auth.user.id, ...partnerIds], count);
+    return assets.map((a) => mapAsset(a, { auth }));
+  }
+
+  async getUserAssetsByDeviceId(auth: AuthDto, deviceId: string) {
+    return this.assetRepository.getAllByDeviceId(auth.user.id, deviceId);
+  }
+
+  async get(auth: AuthDto, id: string, spaceId?: string): Promise<AssetResponseDto | SanitizedAssetResponseDto> {
     await this.requireAccess({ auth, permission: Permission.AssetRead, ids: [id] });
 
     const asset = await this.assetRepository.getById(id, {
@@ -93,8 +107,39 @@ export class AssetService extends BaseService {
       delete data.owner;
     }
 
-    if (data.ownerId !== auth.user.id || auth.sharedLink) {
+    if (auth.sharedLink) {
       data.people = [];
+    } else if (data.ownerId !== auth.user.id) {
+      if (spaceId) {
+        const member = await this.sharedSpaceRepository.getMember(spaceId, auth.user.id);
+        if (!member) {
+          throw new ForbiddenException('Not a member of this space');
+        }
+
+        const hasSpaceAccess = await this.accessRepository.asset.checkSpaceAccessForSpace(
+          auth.user.id,
+          spaceId,
+          new Set([id]),
+        );
+        if (hasSpaceAccess.size === 0 || !data.people) {
+          data.people = [];
+        } else {
+          const globalPersonIds = data.people.map((p) => p.id);
+          const spacePersonMap = await this.sharedSpaceRepository.findSpacePersonsByLinkedPersonIds(
+            spaceId,
+            globalPersonIds,
+          );
+          for (const person of data.people) {
+            const spacePerson = spacePersonMap.get(person.id);
+            if (spacePerson) {
+              person.spacePersonId = spacePerson.id;
+            }
+          }
+          data.people = data.people.filter((p) => p.spacePersonId && !spacePersonMap.get(p.id)?.isHidden);
+        }
+      } else {
+        data.people = [];
+      }
     }
 
     return data;
