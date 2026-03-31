@@ -769,3 +769,20 @@ where
   and "asset_face"."personId" = $2
 limit
   $3
+
+-- SharedSpaceRepository.findSpacePersonsByLinkedPersonIds
+select
+  "shared_space_person"."id",
+  "shared_space_person"."isHidden",
+  "asset_face"."personId"
+from
+  "shared_space_person"
+  inner join "shared_space_person_face" on "shared_space_person_face"."personId" = "shared_space_person"."id"
+  inner join "asset_face" on "asset_face"."id" = "shared_space_person_face"."assetFaceId"
+where
+  "shared_space_person"."spaceId" = $1
+  and "asset_face"."personId" in ($2)
+group by
+  "shared_space_person"."id",
+  "shared_space_person"."isHidden",
+  "asset_face"."personId"
