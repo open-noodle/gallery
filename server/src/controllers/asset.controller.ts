@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Put, Query } from '@nestjs/common';
-import { ApiExcludeEndpoint, ApiTags } from '@nestjs/swagger';
+import { ApiExcludeEndpoint, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Endpoint, HistoryBuilder } from 'src/decorators';
 import { AssetResponseDto } from 'src/dtos/asset-response.dto';
 import {
@@ -96,8 +96,13 @@ export class AssetController {
     description: 'Retrieve detailed information about a specific asset.',
     history: new HistoryBuilder().added('v1').beta('v1').stable('v2'),
   })
-  getAssetInfo(@Auth() auth: AuthDto, @Param() { id }: UUIDParamDto): Promise<AssetResponseDto> {
-    return this.service.get(auth, id) as Promise<AssetResponseDto>;
+  @ApiQuery({ name: 'spaceId', required: false, type: String })
+  getAssetInfo(
+    @Auth() auth: AuthDto,
+    @Param() { id }: UUIDParamDto,
+    @Query('spaceId') spaceId?: string,
+  ): Promise<AssetResponseDto> {
+    return this.service.get(auth, id, spaceId) as Promise<AssetResponseDto>;
   }
 
   @Put('copy')
