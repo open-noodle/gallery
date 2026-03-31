@@ -25,6 +25,7 @@
     QueueName.Migration,
     QueueName.Ocr,
     QueueName.PetDetection,
+    QueueName.Classification,
   ];
 
   function isSystemConfigJobDto(jobName: string): jobName is keyof SystemConfigJobDto {
