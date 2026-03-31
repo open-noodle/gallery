@@ -265,6 +265,10 @@ const updatedConfig = Object.freeze<SystemConfig>({
       albumUpdateTemplate: '',
     },
   },
+  classification: {
+    enabled: true,
+    categories: [],
+  },
 });
 
 describe(SystemConfigService.name, () => {
