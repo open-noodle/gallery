@@ -153,9 +153,7 @@ export class AssetService extends BaseService {
               person.spacePersonId = spacePerson.id;
             }
           }
-          data.people = (data.people || []).filter(
-            (p) => p.spacePersonId && !spacePersonMap.get(p.id)?.isHidden,
-          );
+          data.people = (data.people || []).filter((p) => p.spacePersonId && !spacePersonMap.get(p.id)?.isHidden);
           data.resolvedSpaceId = spaceForAsset.spaceId;
         } else {
           data.people = [];
