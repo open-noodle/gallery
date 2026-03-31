@@ -51,8 +51,6 @@ import { AssetOcrAuditTable } from 'src/schema/tables/asset-ocr-audit.table.js';
 import { AssetOcrTable } from 'src/schema/tables/asset-ocr.table.js';
 import { AssetTable } from 'src/schema/tables/asset.table.js';
 import { AuditTable } from 'src/schema/tables/audit.table.js';
-import { ClassificationCategoryTable } from 'src/schema/tables/classification-category.table.js';
-import { ClassificationPromptEmbeddingTable } from 'src/schema/tables/classification-prompt-embedding.table.js';
 import { ClusterGroupRequestTable } from 'src/schema/tables/cluster-group-request.table.js';
 import { ClusterGroupTable } from 'src/schema/tables/cluster-group.table.js';
 import { FaceSearchTable } from 'src/schema/tables/face-search.table.js';
@@ -139,8 +137,6 @@ export class ImmichDatabase {
     AssetExifTable,
     ClusterGroupTable,
     ClusterGroupRequestTable,
-    ClassificationCategoryTable,
-    ClassificationPromptEmbeddingTable,
     FaceSearchTable,
     GeodataPlacesTable,
     IntegrityReportTable,
@@ -267,9 +263,6 @@ export interface DB {
   ocr_search: OcrSearchTable;
 
   audit: AuditTable;
-
-  classification_category: ClassificationCategoryTable;
-  classification_prompt_embedding: ClassificationPromptEmbeddingTable;
 
   face_search: FaceSearchTable;
 
