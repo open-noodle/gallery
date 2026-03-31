@@ -241,7 +241,7 @@
       }
 
       if ($slideshowRepeat && slideshowStartAssetId) {
-        await assetViewerManager.setAssetId(slideshowStartAssetId);
+        await assetViewerManager.setAssetId(slideshowStartAssetId, spaceId);
         $restartSlideshowProgress = true;
         return;
       }
@@ -257,7 +257,7 @@
   let assetViewerHtmlElement = $state<HTMLElement>();
 
   const slideshowHistory = new SlideshowHistory((asset) => {
-    handlePromiseError(assetViewerManager.setAssetId(asset.id).then(() => ($restartSlideshowProgress = true)));
+    handlePromiseError(assetViewerManager.setAssetId(asset.id, spaceId).then(() => ($restartSlideshowProgress = true)));
   });
 
   const handleVideoStarted = () => {

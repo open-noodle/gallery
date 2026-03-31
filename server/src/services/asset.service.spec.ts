@@ -319,6 +319,36 @@ describe(AssetService.name, () => {
       expect(result).toHaveProperty('people', []);
     });
 
+    it('should still strip people for shared link access', async () => {
+      const asset = AssetFactory.from()
+        .exif()
+        .face({}, (f) => f.person({ id: 'person-1', name: 'Test Person' }))
+        .build();
+      mocks.access.asset.checkSharedLinkAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getById.mockResolvedValue(asset as any);
+
+      const result = await sut.get(
+        { ...authStub.adminSharedLink, sharedLink: { ...authStub.adminSharedLink.sharedLink!, showExif: true } },
+        asset.id,
+      );
+
+      expect(result).toHaveProperty('people', []);
+    });
+
+    it('should preserve people for owner access', async () => {
+      const asset = AssetFactory.from({ ownerId: authStub.admin.user.id })
+        .exif()
+        .face({}, (f) => f.person({ id: 'person-1', name: 'Test Person' }))
+        .build();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getById.mockResolvedValue(asset as any);
+
+      const result = await sut.get(authStub.admin, asset.id);
+
+      expect(result).toHaveProperty('people');
+      expect((result as any).people.length).toBeGreaterThan(0);
+    });
+
     it('should strip people when asset is not in the specified space', async () => {
       const asset = AssetFactory.from()
         .exif()
