@@ -62,11 +62,16 @@ export class ClassificationService extends BaseService {
     this.pendingEncodes.clear();
 
     if (classificationChanged) {
-      const oldNames = new Set(oldConfig.classification.categories.map((c) => c.name));
+      const oldByName = new Map(oldConfig.classification.categories.map((c) => [c.name, c]));
       const newNames = new Set(newConfig.classification.categories.map((c) => c.name));
 
-      for (const name of oldNames) {
-        if (!newNames.has(name)) {
+      for (const [name, oldCategory] of oldByName) {
+        if (newNames.has(name)) {
+          const newCategory = newConfig.classification.categories.find((c) => c.name === name);
+          if (newCategory && newCategory.similarity > oldCategory.similarity) {
+            await this.classificationRepository.removeAutoTagAssignments(name);
+          }
+        } else {
           await this.classificationRepository.removeAutoTagAssignments(name);
         }
       }
