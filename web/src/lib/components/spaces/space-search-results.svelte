@@ -15,14 +15,15 @@
     hasMore: boolean;
     totalLoaded: number;
     onLoadMore: () => void;
+    spaceId?: string;
   }
 
-  let { results, isLoading, hasMore, totalLoaded, onLoadMore }: Props = $props();
+  let { results, isLoading, hasMore, totalLoaded, onLoadMore, spaceId }: Props = $props();
 
   let isViewerOpen = $state(false);
 
   const getFullAsset = async (id: string): Promise<AssetResponseDto> => {
-    return getAssetInfo({ ...authManager.params, id });
+    return getAssetInfo({ ...authManager.params, id, spaceId });
   };
 
   let cursor = $state<AssetCursor | undefined>();
@@ -108,7 +109,7 @@
 <Portal target="body">
   {#if isViewerOpen && cursor}
     {#await import('$lib/components/asset-viewer/asset-viewer.svelte') then { default: AssetViewer }}
-      <AssetViewer {cursor} isShared={true} onClose={() => handlePromiseError(handleClose())} />
+      <AssetViewer {cursor} isShared={true} {spaceId} onClose={() => handlePromiseError(handleClose())} />
     {/await}
   {/if}
 </Portal>
