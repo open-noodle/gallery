@@ -1,6 +1,5 @@
 <script lang="ts">
   import { page } from '$app/state';
-  import ClassificationSettings from '#lib/components/user-settings-page/classification-settings.svelte';
   import GroupSettings from '#lib/components/user-settings-page/group-settings.svelte';
   import ChangePinCodeSettings from './PinCodeSettings.svelte';
   import DownloadSettings from './DownloadSettings.svelte';
@@ -24,7 +23,6 @@
     mdiFormTextboxPassword,
     mdiKeyOutline,
     mdiLockSmart,
-    mdiMagnifyScan,
     mdiServerOutline,
     mdiShieldKeyOutline,
     mdiTwoFactorAuthentication,
@@ -100,17 +98,6 @@
 >
   <FeatureSettings />
 </SettingAccordion>
-
-{#if !authManager.user.isAdmin}
-  <SettingAccordion
-    icon={mdiMagnifyScan}
-    key="auto-classification"
-    title="Auto-Classification"
-    subtitle="View classification categories configured by your administrator"
-  >
-    <ClassificationSettings />
-  </SettingAccordion>
-{/if}
 
 <SettingAccordion
   icon={mdiBellOutline}
