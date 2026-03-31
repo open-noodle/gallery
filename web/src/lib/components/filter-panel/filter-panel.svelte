@@ -55,6 +55,7 @@
 
   // Fetched data for filter sections
   let people = $state<PersonOption[]>([]);
+  let hasUnnamedPeople = $state(false);
   let countries = $state<string[]>([]);
   let cameraMakes = $state<string[]>([]);
   let tags = $state<TagOption[]>([]);
@@ -278,6 +279,11 @@
     if (config.providers.people && config.sections.includes('people')) {
       void config.providers.people().then((result) => {
         people = result;
+        if (result.length === 0 && config.providers.allPeople) {
+          void config.providers.allPeople().then((all) => {
+            hasUnnamedPeople = all.length > 0;
+          });
+        }
       });
     }
   });
@@ -478,7 +484,12 @@
                 onMonthSelect={handleMonthSelect}
               />
             {:else if section === 'people'}
-              <PeopleFilter {people} selectedIds={filters.personIds} onSelectionChange={handlePeopleChange} />
+              <PeopleFilter
+                {people}
+                selectedIds={filters.personIds}
+                onSelectionChange={handlePeopleChange}
+                emptyText={hasUnnamedPeople ? 'Name people to use this filter' : undefined}
+              />
             {:else if section === 'location'}
               <LocationFilter
                 {countries}
