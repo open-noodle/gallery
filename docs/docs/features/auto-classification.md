@@ -10,16 +10,71 @@ Gallery can automatically tag and optionally archive photos based on their visua
 - **Nature/Pets** — Auto-tag outdoor scenes or pet photos
 - **Sensitive content** — Auto-archive content you don't want visible on the timeline
 
-## Creating a Category
+## Configuration
 
-1. Go to **User Settings > Classification**
+Classification categories are managed through Gallery's system configuration. There are three ways to configure them:
+
+### Option 1: Admin UI
+
+1. Go to **Administration** > **Settings** > **Classification**
 2. Click **Add Category**
 3. Fill in:
    - **Name** — A descriptive label (e.g., "Screenshots"). Matching assets get tagged as `Auto/Screenshots`.
    - **Prompts** — One per line. Describe what the photos look like in natural language. Use 2-5 prompts for best results.
-   - **Similarity** — How closely a photo must match your prompts to be classified (see below).
+   - **Similarity** — How closely a photo must match your prompts (see below).
    - **Action** — "Tag only" or "Tag and archive".
 4. Click **Save**
+
+Categories can be enabled/disabled individually without deleting them. The global **Enabled** toggle disables all classification processing.
+
+### Option 2: Config File (YAML)
+
+If you use `IMMICH_CONFIG_FILE`, add categories directly to your YAML configuration:
+
+```yaml
+classification:
+  enabled: true
+  categories:
+    - name: Screenshots
+      prompts:
+        - 'a screenshot of a phone screen'
+        - 'a screenshot of a website'
+        - 'a screenshot of a chat conversation'
+      similarity: 0.28
+      action: tag
+      enabled: true
+    - name: Receipts
+      prompts:
+        - 'a photo of a paper receipt'
+        - 'a receipt from a store'
+        - 'a restaurant bill'
+      similarity: 0.28
+      action: tag_and_archive
+      enabled: true
+```
+
+### Option 3: API
+
+Classification categories are part of the system config endpoint:
+
+```bash
+# Read current config
+curl -s -H "Authorization: Bearer $TOKEN" http://localhost:2283/api/system-config | jq '.classification'
+
+# Update config (sends full config object)
+curl -X PUT -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  http://localhost:2283/api/system-config -d @config.json
+```
+
+### Category Fields
+
+| Field        | Type     | Required | Description                                                          |
+| ------------ | -------- | -------- | -------------------------------------------------------------------- |
+| `name`       | string   | Yes      | Category name. Must be unique. Used as the tag name (`Auto/{name}`). |
+| `prompts`    | string[] | Yes      | At least one text prompt describing photos to match.                 |
+| `similarity` | number   | Yes      | Threshold 0-1. Higher = stricter matching. Default: 0.28.            |
+| `action`     | string   | Yes      | `tag` (tag only) or `tag_and_archive` (tag and move to archive).     |
+| `enabled`    | boolean  | Yes      | Whether this category is active. Disabled categories are skipped.    |
 
 ### Writing Good Prompts
 
@@ -49,23 +104,61 @@ The default is **0.28** (Normal). Start there and adjust based on results.
 
 ### Actions
 
-- **Tag only** — Matching photos get an `Auto/{category name}` tag. They stay on your timeline.
-- **Tag and archive** — Matching photos get tagged AND moved to the Archive. Useful for screenshots or receipts you want organized but not on your timeline.
-
-## Managing Categories
-
-- **Enable/disable** — Toggle a category on or off without deleting it. Disabled categories are skipped during classification.
-- **Edit** — Change the name, prompts, similarity, or action at any time. Prompt changes trigger re-encoding.
-- **Delete** — Removes the category and its associated `Auto/` tag.
+- **Tag only** (`tag`) — Matching photos get an `Auto/{category name}` tag. They stay on your timeline.
+- **Tag and archive** (`tag_and_archive`) — Matching photos get tagged AND moved to the Archive. Useful for screenshots or receipts you want organized but not on your timeline.
 
 ## Scanning Your Library
 
-New uploads are classified automatically. To classify existing photos:
+New uploads are classified automatically. To classify your existing library:
 
-1. Go to **User Settings > Classification**
-2. Click **Scan Library**
+1. Go to **Administration** > **Settings** > **Classification**
+2. Click **Scan All Libraries**
 
-This queues all your assets for classification. It's additive — existing tags are kept, and new matches get tagged. Assets that no longer match are NOT untagged (remove stale tags manually if needed).
+Or via API:
+
+```bash
+curl -X POST -H "Authorization: Bearer $TOKEN" http://localhost:2283/api/classification/scan
+```
+
+This queues all assets across all users for classification. It's additive — existing tags are kept, and new matches get tagged.
+
+## Job Concurrency
+
+Classification runs as a dedicated job queue. By default, it processes one asset at a time (concurrency 1). You can increase this for faster processing:
+
+1. Go to **Administration** > **Jobs**
+2. Find the **Classification** queue
+3. Adjust the concurrency slider
+
+Higher concurrency is safe — prompt embeddings are cached in memory and deduplicated across concurrent jobs. On machines with fast ML inference (GPU), increasing concurrency to 3-5 can significantly speed up library scans.
+
+You can also configure concurrency via the system config:
+
+```yaml
+job:
+  classification:
+    concurrency: 3
+```
+
+## Behavior on Config Changes
+
+When you modify classification categories, Gallery handles changes automatically:
+
+| Change                              | Behavior                                                                                                                                         |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Add a category**                  | New category takes effect on next classification run. Run "Scan All Libraries" to classify existing assets.                                      |
+| **Remove a category**               | Existing `Auto/{name}` tags are cleaned up and affected archived assets are unarchived.                                                          |
+| **Rename a category**               | Old tags are cleaned up (treated as removal + addition). Run scan to re-tag with the new name.                                                   |
+| **Change similarity**               | Takes effect on next classification run. Stricter thresholds may cause previously matched assets to no longer match — run scan to re-evaluate.   |
+| **Change prompts**                  | Prompt embedding cache is cleared. New prompts are encoded on next classification run.                                                           |
+| **Change action**                   | Takes effect on next classification run. Changing to `tag_and_archive` does not retroactively archive already-tagged assets — run scan to apply. |
+| **Disable/enable a category**       | Immediate. Disabled categories are skipped during classification.                                                                                |
+| **Disable classification globally** | All classification jobs are skipped. No assets are processed until re-enabled.                                                                   |
+| **CLIP model change**               | Embedding cache is automatically cleared. All prompts are re-encoded with the new model on next use.                                             |
+
+:::note
+Removing a category unarchives assets that were archived by that category's `tag_and_archive` action. If you independently archived a photo that also happened to be auto-tagged, removing the category will unarchive it.
+:::
 
 ## How It Works
 
@@ -77,17 +170,27 @@ Multiple categories can match the same photo. If any matching category has the "
 
 ### Architecture
 
-Classification is a per-user feature built on top of Gallery's existing CLIP Smart Search infrastructure. Each user defines categories with text prompts. Prompts are encoded into CLIP embedding vectors and stored in the database. When an asset is processed, its image embedding is compared against all of the user's prompt embeddings using cosine similarity.
+Classification categories are stored in Gallery's system configuration (the same `system_metadata` table or YAML config file used for all admin settings). This means categories can be managed through the Admin UI, API, or config file — all three are interchangeable.
 
-### Data Model
+Prompt embeddings (CLIP text vectors) are **not stored in the database**. They are computed lazily by the ML service and cached in memory on the microservices worker. The cache is keyed by `{modelName}::{prompt}` and is cleared automatically when the classification config or CLIP model changes.
 
-**`classification_category`** — One row per category per user:
+### Embedding Cache
 
-- `userId`, `name` (unique per user), `similarity` threshold (0-1), `action` (tag / tag_and_archive), `enabled`, `tagId` (FK to auto-generated tag)
+```
+handleClassify(assetId)
+       │
+       ├─ getConfig() → classification.categories
+       ├─ For each enabled category:
+       │   └─ For each prompt:
+       │       └─ getOrEncodePrompt(prompt, modelName)
+       │           ├─ Check embeddingCache → hit? return cached
+       │           ├─ Check pendingEncodes → in-flight? await same promise
+       │           └─ Miss? call ML encodeText(), cache result
+       │
+       └─ Compare cosine similarity, tag/archive as needed
+```
 
-**`classification_prompt_embedding`** — One row per prompt:
-
-- `categoryId` (FK, cascade delete), `prompt` (text), `embedding` (512-dim vector)
+The cache ensures each unique prompt is encoded exactly once, regardless of how many assets are processed. Concurrent jobs that need the same prompt share a single in-flight encode via promise deduplication.
 
 ### Job Flow
 
@@ -98,29 +201,31 @@ Upload / Re-encode
   Smart Search (CLIP encode image)
        │
        ▼
-  Asset Classify (dedicated queue)
+  Asset Classify (dedicated queue, configurable concurrency)
        │
        ├─ Load asset embedding from smart_search table
-       ├─ Load all enabled categories + prompt embeddings for asset owner
-       ├─ For each category: max cosine similarity across prompts
+       ├─ Load config: classification.categories (enabled only)
+       ├─ For each category: encode prompts (cached), compute max cosine similarity
        ├─ If max similarity ≥ threshold → match
        │   ├─ Create/reuse Auto/{name} tag
        │   ├─ Apply tag to asset
        │   └─ If action = tag_and_archive → archive
-       └─ Mark asset as classified
+       └─ Mark asset as classified (classifiedAt timestamp)
 ```
 
-Classification chains after Smart Search for all completions (uploads and re-encodes), so assets reprocessed after a CLIP model change are reclassified automatically.
+### Config Change Handling (onConfigUpdate)
 
-### Prompt Embedding Management
+When system configuration changes, the classification service compares old and new config:
 
-- Prompts are encoded via the ML service's CLIP text encoder on category create/update
-- When the CLIP model changes (detected via `ConfigUpdate` event), all prompt embeddings are re-encoded automatically
-- No HNSW index on prompt embeddings — the number of prompts per user is too small to benefit from indexing
+1. If neither classification config nor CLIP model name changed → no action (unrelated config changes like SMTP don't affect classification)
+2. Clear embedding cache (prompts or model may have changed)
+3. For each category name present in old config but absent in new → call `removeAutoTagAssignments` to clean up `Auto/{name}` tags and unarchive affected assets
 
 ### Key Details
 
 - **Cosine similarity** computed in-process (dot product / magnitude product), not via database query
 - **Batch processing** — `scanLibrary` streams unclassified assets and queues individual jobs in batches of 1,000
-- **Idempotent tagging** — Re-classification never duplicates tags
-- **Tag lifecycle** — Deleting a category cascade-deletes its prompt embeddings and explicitly deletes the auto-generated tag. If a tag is manually deleted, it's recreated on next classification.
+- **Idempotent tagging** — Re-classification never duplicates tags (uses upsert)
+- **Global kill switch** — `classification.enabled: false` short-circuits both the queue-all job and individual classify jobs without processing any assets
+- **Duplicate name validation** — Category names must be unique (enforced by DTO validation)
+- **Error resilience** — If the ML service is down, individual classify jobs fail and are retried by BullMQ. Failed encodes are not cached, so the next attempt re-tries the ML call.
