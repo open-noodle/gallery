@@ -5,7 +5,7 @@
   import { Route } from '$lib/route';
   import { faceManager } from '$lib/stores/face.svelte';
   import { locale } from '$lib/stores/preferences.store';
-  import { getPeopleThumbnailUrl } from '$lib/utils';
+  import { createUrl, getPeopleThumbnailUrl } from '$lib/utils';
   import { type AssetResponseDto } from '@immich/sdk';
   import { IconButton, Text } from '@immich/ui';
   import { mdiEye, mdiEyeOff, mdiPencil, mdiPlus } from '@mdi/js';
@@ -16,11 +16,13 @@
     asset: AssetResponseDto;
     isOwner: boolean;
     previousRoute: string;
+    spaceId?: string;
   };
 
-  const { asset, isOwner, previousRoute }: Props = $props();
+  const { asset, isOwner, previousRoute, spaceId }: Props = $props();
 
-  const people = $derived(Array.from(faceManager.people));
+  const isSpaceMember = $derived(!!spaceId);
+  const people = $derived(isSpaceMember && !isOwner ? asset.people || [] : Array.from(faceManager.people));
   const visiblePeople = $derived(
     people
       .filter((p) => assetViewerManager.isShowingHiddenPeople || !p.isHidden)
@@ -57,7 +59,7 @@
   );
 </script>
 
-{#if !authManager.isSharedLink}
+{#if !authManager.isSharedLink && (isOwner || isSpaceMember)}
   <section class="px-4 pt-4 text-sm">
     {#if isOwner || visiblePeople.length > 0}
       <div class="flex h-10 w-full items-center justify-between">
@@ -107,7 +109,9 @@
         {@const isHighlighted = personFaces.some((f) => assetViewerManager.highlightedFaces.some((b) => b.id === f.id))}
         <a
           class="group outline-none"
-          href={Route.viewPerson(person, { previousRoute })}
+          href={spaceId && person.spacePersonId
+            ? Route.viewSpacePerson(spaceId, person.spacePersonId)
+            : Route.viewPerson(person, { previousRoute })}
           onfocus={() => assetViewerManager.setHighlightedFaces(personFaces)}
           onblur={() => assetViewerManager.clearHighlightedFaces()}
           onpointerenter={() => assetViewerManager.setHighlightedFaces(personFaces)}
@@ -116,7 +120,11 @@
           <ImageThumbnail
             curve
             shadow
-            url={getPeopleThumbnailUrl(person)}
+            url={spaceId && person.spacePersonId
+              ? createUrl(`/shared-spaces/${spaceId}/people/${person.spacePersonId}/thumbnail`, {
+                  updatedAt: person.updatedAt,
+                })
+              : getPeopleThumbnailUrl(person)}
             altText={person.name}
             title={person.name}
             widthStyle="100%"
