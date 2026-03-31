@@ -230,6 +230,26 @@ export class DuplicateService extends BaseService {
       });
     }
 
+    // Create checksum tombstones so the mobile app won't re-upload trashed duplicates
+    if (idsToTrash.length > 0 && idsToKeep.length > 0) {
+      try {
+        const trashedChecksums = await this.assetRepository.getChecksumsByIds(idsToTrash);
+        const keepAssetId = idsToKeep[0];
+        await this.duplicateRepository.createChecksumTombstones(
+          trashedChecksums.map(({ checksum }) => ({
+            assetId: keepAssetId,
+            ownerId: auth.user.id,
+            checksum,
+          })),
+        );
+      } catch (error: Error | any) {
+        this.logger.error(
+          `Failed to create checksum tombstones for duplicate group ${duplicateId}: ${error}`,
+          error?.stack,
+        );
+      }
+    }
+
     return { id: duplicateId, success: true };
   }
 

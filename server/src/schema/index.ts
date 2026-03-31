@@ -28,6 +28,7 @@ import { AlbumUserAuditTable } from 'src/schema/tables/album-user-audit.table';
 import { AlbumUserTable } from 'src/schema/tables/album-user.table';
 import { AlbumTable } from 'src/schema/tables/album.table';
 import { ApiKeyTable } from 'src/schema/tables/api-key.table';
+import { AssetDuplicateChecksumTable } from 'src/schema/tables/asset-duplicate-checksum.table';
 import { AssetAuditTable } from 'src/schema/tables/asset-audit.table';
 import { AssetEditAuditTable } from 'src/schema/tables/asset-edit-audit.table';
 import { AssetEditTable } from 'src/schema/tables/asset-edit.table';
@@ -101,6 +102,7 @@ export class ImmichDatabase {
     AlbumTable,
     ApiKeyTable,
     AssetAuditTable,
+    AssetDuplicateChecksumTable,
     AssetEditTable,
     AssetEditAuditTable,
     AssetFaceTable,
@@ -211,6 +213,7 @@ export interface DB {
 
   asset: AssetTable;
   asset_audit: AssetAuditTable;
+  asset_duplicate_checksum: AssetDuplicateChecksumTable;
   asset_edit: AssetEditTable;
   asset_edit_audit: AssetEditAuditTable;
   asset_exif: AssetExifTable;
