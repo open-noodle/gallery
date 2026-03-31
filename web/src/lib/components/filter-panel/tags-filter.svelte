@@ -1,6 +1,7 @@
 <script lang="ts">
   import { Icon } from '@immich/ui';
   import { mdiMagnify } from '@mdi/js';
+  import { SvelteMap } from 'svelte/reactivity';
   import type { TagOption } from './filter-panel';
 
   interface Props {
@@ -17,7 +18,7 @@
   const INITIAL_SHOW_COUNT = 10;
 
   // Cache tag names so orphaned tags can display their name even after removal from results
-  const tagNameCache = new Map<string, string>();
+  const tagNameCache = new SvelteMap<string, string>();
   $effect(() => {
     for (const tag of tags) {
       tagNameCache.set(tag.id, tag.name);
