@@ -670,6 +670,46 @@ describe(ClassificationService.name, () => {
       expect(mocks.classification.removeAutoTagAssignments).toHaveBeenCalledWith('OldName');
       expect(mocks.classification.removeAutoTagAssignments).toHaveBeenCalledTimes(1);
     });
+
+    it('should clean up tags when similarity is increased (stricter)', async () => {
+      const oldConfig = makeClassificationConfig([
+        { name: 'Screenshots', prompts: ['screenshot'], similarity: 0.28, action: 'tag' },
+      ]);
+      const newConfig = makeClassificationConfig([
+        { name: 'Screenshots', prompts: ['screenshot'], similarity: 0.4, action: 'tag' },
+      ]);
+
+      await sut.onConfigUpdate({ oldConfig, newConfig } as any);
+
+      expect(mocks.classification.removeAutoTagAssignments).toHaveBeenCalledWith('Screenshots');
+      expect(mocks.classification.removeAutoTagAssignments).toHaveBeenCalledTimes(1);
+    });
+
+    it('should NOT clean up tags when similarity is decreased (looser)', async () => {
+      const oldConfig = makeClassificationConfig([
+        { name: 'Screenshots', prompts: ['screenshot'], similarity: 0.35, action: 'tag' },
+      ]);
+      const newConfig = makeClassificationConfig([
+        { name: 'Screenshots', prompts: ['screenshot'], similarity: 0.2, action: 'tag' },
+      ]);
+
+      await sut.onConfigUpdate({ oldConfig, newConfig } as any);
+
+      expect(mocks.classification.removeAutoTagAssignments).not.toHaveBeenCalled();
+    });
+
+    it('should NOT clean up tags when similarity stays the same', async () => {
+      const oldConfig = makeClassificationConfig([
+        { name: 'Screenshots', prompts: ['screenshot'], similarity: 0.28, action: 'tag' },
+      ]);
+      const newConfig = makeClassificationConfig([
+        { name: 'Screenshots', prompts: ['screenshot changed'], similarity: 0.28, action: 'tag' },
+      ]);
+
+      await sut.onConfigUpdate({ oldConfig, newConfig } as any);
+
+      expect(mocks.classification.removeAutoTagAssignments).not.toHaveBeenCalled();
+    });
   });
 
   describe('cosineSimilarity (indirect)', () => {
