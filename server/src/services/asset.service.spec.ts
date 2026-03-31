@@ -1,4 +1,4 @@
-import { BadRequestException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { DateTime } from 'luxon';
 import { AssetJobName, AssetStatsResponseDto } from 'src/dtos/asset.dto';
 import { AssetEditAction } from 'src/dtos/editing.dto';
@@ -178,12 +178,152 @@ describe(AssetService.name, () => {
       expect(mocks.access.asset.checkSpaceAccess).toHaveBeenCalledWith(authStub.admin.user.id, new Set([asset.id]));
     });
 
-    it('should clear people for shared space access (non-owner)', async () => {
-      const asset = AssetFactory.from().exif().build();
+    it('should keep people for space member with spaceId', async () => {
+      const asset = AssetFactory.from()
+        .exif()
+        .face({}, (f) => f.person({ id: 'person-1', name: 'Test Person' }))
+        .build();
+      mocks.access.asset.checkSpaceAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getById.mockResolvedValue(asset as any);
+      mocks.sharedSpace.getMember.mockResolvedValue({ userId: authStub.admin.user.id } as any);
+      mocks.access.asset.checkSpaceAccessForSpace.mockResolvedValue(new Set([asset.id]));
+      mocks.sharedSpace.findSpacePersonsByLinkedPersonIds.mockResolvedValue(
+        new Map([['person-1', { id: 'space-person-1', isHidden: false }]]),
+      );
+
+      const result = await sut.get(authStub.admin, asset.id, 'space-id');
+
+      expect(result).toHaveProperty('people');
+      expect((result as any).people.length).toBeGreaterThan(0);
+      expect((result as any).people[0].spacePersonId).toBe('space-person-1');
+    });
+
+    it('should strip people for space member without spaceId', async () => {
+      const asset = AssetFactory.from()
+        .exif()
+        .face({}, (f) => f.person({ id: 'person-1', name: 'Test Person' }))
+        .build();
       mocks.access.asset.checkSpaceAccess.mockResolvedValue(new Set([asset.id]));
       mocks.asset.getById.mockResolvedValue(asset as any);
 
       const result = await sut.get(authStub.admin, asset.id);
+
+      expect(result).toHaveProperty('people', []);
+    });
+
+    it('should reject non-member spaceId', async () => {
+      const asset = AssetFactory.from()
+        .exif()
+        .face({}, (f) => f.person({ id: 'person-1', name: 'Test Person' }))
+        .build();
+      mocks.access.asset.checkSpaceAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getById.mockResolvedValue(asset as any);
+      mocks.sharedSpace.getMember.mockResolvedValue(void 0 as any);
+
+      await expect(sut.get(authStub.admin, asset.id, 'space-id')).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('should filter hidden space persons', async () => {
+      const asset = AssetFactory.from()
+        .exif()
+        .face({}, (f) => f.person({ id: 'person-1', name: 'Test Person' }))
+        .build();
+      mocks.access.asset.checkSpaceAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getById.mockResolvedValue(asset as any);
+      mocks.sharedSpace.getMember.mockResolvedValue({ userId: authStub.admin.user.id } as any);
+      mocks.access.asset.checkSpaceAccessForSpace.mockResolvedValue(new Set([asset.id]));
+      mocks.sharedSpace.findSpacePersonsByLinkedPersonIds.mockResolvedValue(
+        new Map([['person-1', { id: 'space-person-1', isHidden: true }]]),
+      );
+
+      const result = await sut.get(authStub.admin, asset.id, 'space-id');
+
+      expect(result).toHaveProperty('people', []);
+    });
+
+    it('should filter persons without space person mapping', async () => {
+      const asset = AssetFactory.from()
+        .exif()
+        .face({}, (f) => f.person({ id: 'person-1', name: 'Test Person' }))
+        .build();
+      mocks.access.asset.checkSpaceAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getById.mockResolvedValue(asset as any);
+      mocks.sharedSpace.getMember.mockResolvedValue({ userId: authStub.admin.user.id } as any);
+      mocks.access.asset.checkSpaceAccessForSpace.mockResolvedValue(new Set([asset.id]));
+      mocks.sharedSpace.findSpacePersonsByLinkedPersonIds.mockResolvedValue(new Map());
+
+      const result = await sut.get(authStub.admin, asset.id, 'space-id');
+
+      expect(result).toHaveProperty('people', []);
+    });
+
+    it('should still strip people for partner access', async () => {
+      const asset = AssetFactory.from()
+        .exif()
+        .face({}, (f) => f.person({ id: 'person-1', name: 'Test Person' }))
+        .build();
+      mocks.access.asset.checkPartnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getById.mockResolvedValue(asset as any);
+
+      const result = await sut.get(authStub.admin, asset.id);
+
+      expect(result).toHaveProperty('people', []);
+    });
+
+    it('should still strip people for album access', async () => {
+      const asset = AssetFactory.from()
+        .exif()
+        .face({}, (f) => f.person({ id: 'person-1', name: 'Test Person' }))
+        .build();
+      mocks.access.asset.checkAlbumAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getById.mockResolvedValue(asset as any);
+
+      const result = await sut.get(authStub.admin, asset.id);
+
+      expect(result).toHaveProperty('people', []);
+    });
+
+    it('should still strip people for shared link access', async () => {
+      const asset = AssetFactory.from()
+        .exif()
+        .face({}, (f) => f.person({ id: 'person-1', name: 'Test Person' }))
+        .build();
+      mocks.access.asset.checkSharedLinkAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getById.mockResolvedValue(asset as any);
+
+      const result = await sut.get(
+        { ...authStub.adminSharedLink, sharedLink: { ...authStub.adminSharedLink.sharedLink!, showExif: true } },
+        asset.id,
+      );
+
+      expect(result).toHaveProperty('people', []);
+    });
+
+    it('should preserve people for owner access', async () => {
+      const asset = AssetFactory.from({ ownerId: authStub.admin.user.id })
+        .exif()
+        .face({}, (f) => f.person({ id: 'person-1', name: 'Test Person' }))
+        .build();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getById.mockResolvedValue(asset as any);
+
+      const result = await sut.get(authStub.admin, asset.id);
+
+      expect(result).toHaveProperty('people');
+      expect((result as any).people.length).toBeGreaterThan(0);
+    });
+
+    it('should strip people when asset is not in the specified space', async () => {
+      const asset = AssetFactory.from()
+        .exif()
+        .face({}, (f) => f.person({ id: 'person-1', name: 'Test Person' }))
+        .build();
+      mocks.access.asset.checkSpaceAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getById.mockResolvedValue(asset as any);
+      mocks.sharedSpace.getMember.mockResolvedValue({ userId: authStub.admin.user.id } as any);
+      mocks.access.asset.checkSpaceAccessForSpace.mockResolvedValue(new Set());
+
+      const result = await sut.get(authStub.admin, asset.id, 'space-id');
 
       expect(result).toHaveProperty('people', []);
     });
