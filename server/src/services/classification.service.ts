@@ -1,11 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { OnEvent, OnJob } from 'src/decorators';
 import { AuthDto } from 'src/dtos/auth.dto';
-import {
-  ClassificationCategoryCreateDto,
-  ClassificationCategoryResponseDto,
-  ClassificationCategoryUpdateDto,
-} from 'src/dtos/classification.dto';
 import { AssetVisibility, ImmichWorker, JobName, JobStatus, QueueName } from 'src/enum';
 import { ArgOf } from 'src/repositories/event.repository';
 import { BaseService } from 'src/services/base.service';
@@ -14,138 +9,37 @@ import { upsertTags } from 'src/utils/tag';
 
 @Injectable()
 export class ClassificationService extends BaseService {
-  private mapCategory(
-    category: {
-      id: string;
-      name: string;
-      similarity: number;
-      action: string;
-      enabled: boolean;
-      createdAt: unknown;
-      updatedAt: unknown;
-    },
-    prompts: string[],
-  ): ClassificationCategoryResponseDto {
-    return {
-      id: category.id,
-      name: category.name,
-      prompts,
-      similarity: category.similarity,
-      action: category.action,
-      enabled: category.enabled,
-      createdAt: String(category.createdAt),
-      updatedAt: String(category.updatedAt),
-    };
-  }
+  private embeddingCache = new Map<string, number[]>();
+  private pendingEncodes = new Map<string, Promise<number[]>>();
 
-  async getCategories(_auth: AuthDto): Promise<ClassificationCategoryResponseDto[]> {
-    const rows = await this.classificationRepository.getCategoriesWithPrompts();
+  private async getOrEncodePrompt(prompt: string, modelName: string): Promise<number[]> {
+    const key = `${modelName}::${prompt}`;
 
-    const categoryMap = new Map<string, { category: (typeof rows)[0]; prompts: string[] }>();
-    for (const row of rows) {
-      if (!categoryMap.has(row.id)) {
-        categoryMap.set(row.id, { category: row, prompts: [] });
-      }
-      if (row.prompt) {
-        categoryMap.get(row.id)!.prompts.push(row.prompt);
-      }
+    const cached = this.embeddingCache.get(key);
+    if (cached) {
+      return cached;
     }
 
-    return [...categoryMap.values()].map(({ category, prompts }) => this.mapCategory(category, prompts));
-  }
+    const pending = this.pendingEncodes.get(key);
+    if (pending) {
+      return pending;
+    }
 
-  async createCategory(
-    _auth: AuthDto,
-    dto: ClassificationCategoryCreateDto,
-  ): Promise<ClassificationCategoryResponseDto> {
-    const { machineLearning } = await this.getConfig({ withCache: true });
-
-    const category = await this.classificationRepository.createCategory({
-      name: dto.name,
-      similarity: dto.similarity,
-      action: dto.action,
-    });
-
-    for (const prompt of dto.prompts) {
-      const embedding = await this.machineLearningRepository.encodeText(prompt, {
-        modelName: machineLearning.clip.modelName,
+    const promise = this.machineLearningRepository
+      .encodeText(prompt, { modelName })
+      .then((raw) => {
+        const embedding = typeof raw === 'string' ? this.parseEmbedding(raw) : (raw as number[]);
+        this.embeddingCache.set(key, embedding);
+        this.pendingEncodes.delete(key);
+        return embedding;
+      })
+      .catch((error) => {
+        this.pendingEncodes.delete(key);
+        throw error;
       });
-      await this.classificationRepository.upsertPromptEmbedding({
-        categoryId: category.id,
-        prompt,
-        embedding,
-      });
-    }
 
-    return this.mapCategory(category, dto.prompts);
-  }
-
-  async updateCategory(
-    _auth: AuthDto,
-    id: string,
-    dto: ClassificationCategoryUpdateDto,
-  ): Promise<ClassificationCategoryResponseDto> {
-    const existing = await this.classificationRepository.getCategory(id);
-    if (!existing) {
-      throw new NotFoundException('Category not found');
-    }
-
-    const updateValues: Record<string, unknown> = {};
-    if (dto.name !== void 0) {
-      updateValues.name = dto.name;
-    }
-    if (dto.similarity !== void 0) {
-      updateValues.similarity = dto.similarity;
-    }
-    if (dto.action !== void 0) {
-      updateValues.action = dto.action;
-    }
-    if (dto.enabled !== void 0) {
-      updateValues.enabled = dto.enabled;
-    }
-
-    const category =
-      Object.keys(updateValues).length > 0
-        ? await this.classificationRepository.updateCategory(id, updateValues)
-        : existing;
-
-    if (dto.prompts !== void 0) {
-      const { machineLearning } = await this.getConfig({ withCache: true });
-      await this.classificationRepository.deletePromptEmbeddingsByCategory(id);
-      for (const prompt of dto.prompts) {
-        const embedding = await this.machineLearningRepository.encodeText(prompt, {
-          modelName: machineLearning.clip.modelName,
-        });
-        await this.classificationRepository.upsertPromptEmbedding({
-          categoryId: id,
-          prompt,
-          embedding,
-        });
-      }
-    }
-
-    if (dto.rescan) {
-      await this.classificationRepository.removeAutoTagAssignments(existing.name);
-      await this.jobRepository.queue({
-        name: JobName.AssetClassifyQueueAll,
-        data: { force: true },
-      });
-    }
-
-    const promptRows = await this.classificationRepository.getPromptEmbeddings(id);
-    return this.mapCategory(
-      category,
-      promptRows.map((p) => p.prompt),
-    );
-  }
-
-  async deleteCategory(_auth: AuthDto, id: string): Promise<void> {
-    const category = await this.classificationRepository.getCategory(id);
-    if (!category) {
-      throw new NotFoundException('Category not found');
-    }
-
-    await this.classificationRepository.deleteCategory(id);
+    this.pendingEncodes.set(key, promise);
+    return promise;
   }
 
   async scanLibrary(_auth: AuthDto): Promise<void> {
@@ -157,31 +51,36 @@ export class ClassificationService extends BaseService {
 
   @OnEvent({ name: 'ConfigUpdate', workers: [ImmichWorker.Microservices], server: true })
   async onConfigUpdate({ oldConfig, newConfig }: ArgOf<'ConfigUpdate'>) {
-    if (oldConfig.machineLearning.clip.modelName !== newConfig.machineLearning.clip.modelName) {
-      this.logger.log('CLIP model changed, re-encoding classification prompt embeddings');
-      await this.reEncodeAllPrompts(newConfig.machineLearning.clip.modelName);
-      await this.jobRepository.queue({ name: JobName.AssetClassifyQueueAll, data: { force: true } });
-    }
-  }
+    const clipChanged = oldConfig.machineLearning.clip.modelName !== newConfig.machineLearning.clip.modelName;
+    const classificationChanged = JSON.stringify(oldConfig.classification) !== JSON.stringify(newConfig.classification);
 
-  private async reEncodeAllPrompts(modelName: string) {
-    const categories = await this.classificationRepository.getCategories();
-    for (const category of categories) {
-      const prompts = await this.classificationRepository.getPromptEmbeddings(category.id);
-      await this.classificationRepository.deletePromptEmbeddingsByCategory(category.id);
-      for (const { prompt } of prompts) {
-        const embedding = await this.machineLearningRepository.encodeText(prompt, { modelName });
-        await this.classificationRepository.upsertPromptEmbedding({
-          categoryId: category.id,
-          prompt,
-          embedding,
-        });
+    if (!clipChanged && !classificationChanged) {
+      return;
+    }
+
+    this.embeddingCache.clear();
+    this.pendingEncodes.clear();
+
+    if (classificationChanged) {
+      const oldNames = new Set(oldConfig.classification.categories.map((c) => c.name));
+      const newNames = new Set(newConfig.classification.categories.map((c) => c.name));
+
+      for (const name of oldNames) {
+        if (!newNames.has(name)) {
+          await this.classificationRepository.removeAutoTagAssignments(name);
+        }
       }
     }
   }
 
   @OnJob({ name: JobName.AssetClassifyQueueAll, queue: QueueName.Classification })
   async handleClassifyQueueAll({ force }: JobOf<JobName.AssetClassifyQueueAll>): Promise<JobStatus> {
+    const { classification } = await this.getConfig({ withCache: true });
+
+    if (!classification.enabled) {
+      return JobStatus.Skipped;
+    }
+
     if (force) {
       await this.classificationRepository.resetClassifiedAt();
     }
@@ -208,37 +107,31 @@ export class ClassificationService extends BaseService {
       return JobStatus.Failed;
     }
 
+    const { classification, machineLearning } = await this.getConfig({ withCache: true });
+
+    if (!classification.enabled) {
+      return JobStatus.Skipped;
+    }
+
     const embedding = await this.searchRepository.getEmbedding(id);
     if (!embedding) {
       return JobStatus.Skipped;
     }
 
-    const rows = await this.classificationRepository.getEnabledCategoriesWithEmbeddings();
-    if (rows.length === 0) {
+    const enabledCategories = classification.categories.filter((c) => c.enabled);
+    if (enabledCategories.length === 0) {
       await this.classificationRepository.setClassifiedAt(id);
       return JobStatus.Skipped;
-    }
-
-    const categories = new Map<string, { name: string; similarity: number; action: string; embeddings: string[] }>();
-    for (const row of rows) {
-      if (!categories.has(row.categoryId)) {
-        categories.set(row.categoryId, {
-          name: row.name,
-          similarity: row.similarity,
-          action: row.action,
-          embeddings: [],
-        });
-      }
-      categories.get(row.categoryId)!.embeddings.push(row.embedding);
     }
 
     const assetEmbedding = this.parseEmbedding(embedding);
     let shouldArchive = false;
 
-    for (const [, category] of categories) {
+    for (const category of enabledCategories) {
       let bestSimilarity = -1;
-      for (const promptEmbedding of category.embeddings) {
-        const similarity = this.cosineSimilarity(assetEmbedding, this.parseEmbedding(promptEmbedding));
+      for (const prompt of category.prompts) {
+        const promptEmbedding = await this.getOrEncodePrompt(prompt, machineLearning.clip.modelName);
+        const similarity = this.cosineSimilarity(assetEmbedding, promptEmbedding);
         if (similarity > bestSimilarity) {
           bestSimilarity = similarity;
         }
@@ -250,7 +143,6 @@ export class ClassificationService extends BaseService {
           tags: [`Auto/${category.name}`],
         });
         const tagId = tags[0].id;
-
         await this.tagRepository.upsertAssetIds([{ tagId, assetId: id }]);
 
         if (category.action === 'tag_and_archive') {
