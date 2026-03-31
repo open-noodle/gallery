@@ -68,25 +68,25 @@ curl -X PUT -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json
 
 ### Category Fields
 
-| Field        | Type     | Required | Description                                                          |
-| ------------ | -------- | -------- | -------------------------------------------------------------------- |
-| `name`       | string   | Yes      | Category name. Must be unique. Used as the tag name (`Auto/{name}`). |
-| `prompts`    | string[] | Yes      | At least one text prompt describing photos to match.                 |
-| `similarity` | number   | Yes      | Threshold 0-1. Higher = stricter matching. Default: 0.28.            |
-| `action`     | string   | Yes      | `tag` (tag only) or `tag_and_archive` (tag and move to archive).     |
-| `enabled`    | boolean  | Yes      | Whether this category is active. Disabled categories are skipped.    |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | Yes | Category name. Must be unique. Used as the tag name (`Auto/{name}`). |
+| `prompts` | string[] | Yes | At least one text prompt describing photos to match. |
+| `similarity` | number | Yes | Threshold 0-1. Higher = stricter matching. Default: 0.28. |
+| `action` | string | Yes | `tag` (tag only) or `tag_and_archive` (tag and move to archive). |
+| `enabled` | boolean | Yes | Whether this category is active. Disabled categories are skipped. |
 
 ### Writing Good Prompts
 
 Prompts describe the visual content of photos you want to match. Write them as if describing what you see in the image:
 
-| Category    | Example Prompts                                                                                      |
-| ----------- | ---------------------------------------------------------------------------------------------------- |
+| Category | Example Prompts |
+|----------|----------------|
 | Screenshots | `a screenshot of a phone screen`, `a screenshot of a website`, `a screenshot of a chat conversation` |
-| Receipts    | `a photo of a paper receipt`, `a receipt from a store`, `a restaurant bill`                          |
-| Documents   | `a scanned document`, `a photo of a printed page`, `a page of text`                                  |
-| Nature      | `a landscape photo of mountains`, `a photo of a forest`, `a sunset over water`                       |
-| Pets        | `a photo of a dog`, `a photo of a cat playing`, `a close-up of a pet`                                |
+| Receipts | `a photo of a paper receipt`, `a receipt from a store`, `a restaurant bill` |
+| Documents | `a scanned document`, `a photo of a printed page`, `a page of text` |
+| Nature | `a landscape photo of mountains`, `a photo of a forest`, `a sunset over water` |
+| Pets | `a photo of a dog`, `a photo of a cat playing`, `a close-up of a pet` |
 
 More prompts covering different angles and variations of the same concept improve recall without hurting precision.
 
@@ -94,11 +94,11 @@ More prompts covering different angles and variations of the same concept improv
 
 The similarity slider controls how closely a photo must match your prompts:
 
-| Range       | Label  | Behavior                                              |
-| ----------- | ------ | ----------------------------------------------------- |
-| 0.15 - 0.22 | Loose  | Catches more matches but may include unrelated photos |
-| 0.22 - 0.35 | Normal | Recommended. Good balance of coverage and accuracy    |
-| 0.35 - 0.45 | Strict | Only very strong matches. May miss borderline photos  |
+| Range | Label | Behavior |
+|-------|-------|----------|
+| 0.15 - 0.22 | Loose | Catches more matches but may include unrelated photos |
+| 0.22 - 0.35 | Normal | Recommended. Good balance of coverage and accuracy |
+| 0.35 - 0.45 | Strict | Only very strong matches. May miss borderline photos |
 
 The default is **0.28** (Normal). Start there and adjust based on results.
 
@@ -144,17 +144,17 @@ job:
 
 When you modify classification categories, Gallery handles changes automatically:
 
-| Change                              | Behavior                                                                                                                                         |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Add a category**                  | New category takes effect on next classification run. Run "Scan All Libraries" to classify existing assets.                                      |
-| **Remove a category**               | Existing `Auto/{name}` tags are cleaned up and affected archived assets are unarchived.                                                          |
-| **Rename a category**               | Old tags are cleaned up (treated as removal + addition). Run scan to re-tag with the new name.                                                   |
-| **Change similarity**               | Takes effect on next classification run. Stricter thresholds may cause previously matched assets to no longer match — run scan to re-evaluate.   |
-| **Change prompts**                  | Prompt embedding cache is cleared. New prompts are encoded on next classification run.                                                           |
-| **Change action**                   | Takes effect on next classification run. Changing to `tag_and_archive` does not retroactively archive already-tagged assets — run scan to apply. |
-| **Disable/enable a category**       | Immediate. Disabled categories are skipped during classification.                                                                                |
-| **Disable classification globally** | All classification jobs are skipped. No assets are processed until re-enabled.                                                                   |
-| **CLIP model change**               | Embedding cache is automatically cleared. All prompts are re-encoded with the new model on next use.                                             |
+| Change | Behavior |
+|--------|----------|
+| **Add a category** | New category takes effect on next classification run. Run "Scan All Libraries" to classify existing assets. |
+| **Remove a category** | Existing `Auto/{name}` tags are cleaned up and affected archived assets are unarchived. |
+| **Rename a category** | Old tags are cleaned up (treated as removal + addition). Run scan to re-tag with the new name. |
+| **Change similarity** | Takes effect on next classification run. Stricter thresholds may cause previously matched assets to no longer match — run scan to re-evaluate. |
+| **Change prompts** | Prompt embedding cache is cleared. New prompts are encoded on next classification run. |
+| **Change action** | Takes effect on next classification run. Changing to `tag_and_archive` does not retroactively archive already-tagged assets — run scan to apply. |
+| **Disable/enable a category** | Immediate. Disabled categories are skipped during classification. |
+| **Disable classification globally** | All classification jobs are skipped. No assets are processed until re-enabled. |
+| **CLIP model change** | Embedding cache is automatically cleared. All prompts are re-encoded with the new model on next use. |
 
 :::note
 Removing a category unarchives assets that were archived by that category's `tag_and_archive` action. If you independently archived a photo that also happened to be auto-tagged, removing the category will unarchive it.
