@@ -40,6 +40,7 @@
   }
 
   let { asset, currentAlbum = null, spaceId }: Props = $props();
+  let effectiveSpaceId = $derived(spaceId || asset.resolvedSpaceId);
 
   let isOwner = $derived(authManager.authenticated && authManager.user.id === asset.ownerId);
   let latlng = $derived(
@@ -86,7 +87,7 @@
   };
 
   const handleRefreshPeople = async () => {
-    asset = await getAssetInfo({ id: asset.id, spaceId });
+    asset = await getAssetInfo({ id: asset.id, spaceId: effectiveSpaceId });
     assetViewerManager.closeEditFacesPanel();
     faceManager.clear();
     await faceManager.getAssetFaces(asset.id);
@@ -140,7 +141,7 @@
 
     <DetailPanelDescription {asset} {isOwner} />
     <DetailPanelRating {asset} {isOwner} />
-    <DetailPanelPeople {asset} {isOwner} {previousRoute} {spaceId} />
+    <DetailPanelPeople {asset} {isOwner} {previousRoute} spaceId={effectiveSpaceId} />
 
     <div class="p-4">
       {#if asset.exifInfo}
@@ -363,7 +364,7 @@
 
   {#if authManager.authenticated && authManager.preferences.tags.enabled}
     <section class="relative px-2 pb-12 dark:bg-immich-dark-bg dark:text-immich-dark-fg">
-      <DetailPanelTags {asset} {isOwner} {spaceId} />
+      <DetailPanelTags {asset} {isOwner} spaceId={effectiveSpaceId} />
     </section>
   {/if}
 {/if}
