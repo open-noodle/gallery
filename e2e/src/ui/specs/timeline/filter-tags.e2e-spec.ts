@@ -24,13 +24,14 @@ function generateTags(count: number): MockTag[] {
 }
 
 async function setupTagRoutes(context: BrowserContext, tags: MockTag[]) {
-  await context.route('**/api/tags/suggestions*', async (route) => {
-    return route.fulfill({ status: 200, contentType: 'application/json', json: tags });
-  });
   await context.route('**/api/people*', async (route) => {
     return route.fulfill({ status: 200, contentType: 'application/json', json: { total: 0, people: [] } });
   });
   await context.route('**/api/search/suggestions*', async (route) => {
+    // Match general search suggestions but not /tags sub-path
+    if (route.request().url().includes('/suggestions/tags')) {
+      return route.fulfill({ status: 200, contentType: 'application/json', json: tags });
+    }
     return route.fulfill({ status: 200, contentType: 'application/json', json: [] });
   });
 }
@@ -110,9 +111,9 @@ test.describe('Filter Panel - Tags', () => {
     await setupTagRoutes(context, tags);
     await openFilterPanel(page);
 
-    // Search input should be visible
+    // Search input should be visible (wait for tags to load from API)
     const searchInput = page.getByTestId('tags-search-input');
-    await expect(searchInput).toBeVisible();
+    await expect(searchInput).toBeVisible({ timeout: 10_000 });
 
     // Only first 10 tags should be visible initially
     await expect(page.getByTestId(`tags-item-${tags[9].id}`)).toBeVisible();
@@ -135,7 +136,9 @@ test.describe('Filter Panel - Tags', () => {
     await setupTagRoutes(context, tags);
     await openFilterPanel(page);
 
-    await page.getByTestId('tags-search-input').fill('nonexistent');
+    const searchInput = page.getByTestId('tags-search-input');
+    await expect(searchInput).toBeVisible({ timeout: 10_000 });
+    await searchInput.fill('nonexistent');
     await expect(page.getByTestId('tags-no-results')).toContainText('No matching tags');
   });
 
@@ -144,6 +147,8 @@ test.describe('Filter Panel - Tags', () => {
     await setupTagRoutes(context, tags);
     await openFilterPanel(page);
 
+    // Wait for tags to load
+    await expect(page.getByTestId('tags-show-more')).toBeVisible({ timeout: 10_000 });
     await expect(page.getByTestId(`tags-item-${tags[10].id}`)).not.toBeVisible();
     await page.getByTestId('tags-show-more').click();
     await expect(page.getByTestId(`tags-item-${tags[11].id}`)).toBeVisible();
