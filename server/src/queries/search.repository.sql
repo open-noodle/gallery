@@ -389,25 +389,6 @@ where
   )
 order by
   "tag"."value"
-select distinct
-  "rating"
-from
-  "asset_exif"
-where
-  "assetId" in (
-    select
-      "asset"."id"
-    from
-      "asset"
-    where
-      "asset"."visibility" = $1
-      and "asset"."deletedAt" is null
-      and "asset"."ownerId" = any ($2::uuid[])
-  )
-  and "rating" is not null
-  and "rating" > $3
-order by
-  "rating"
 select
   "person"."id",
   "person"."name"
@@ -453,6 +434,25 @@ where
   )
 order by
   "type"
+select distinct
+  "rating"
+from
+  "asset_exif"
+where
+  "assetId" in (
+    select
+      "asset"."id"
+    from
+      "asset"
+    where
+      "asset"."visibility" = $1
+      and "asset"."deletedAt" is null
+      and "asset"."ownerId" = any ($2::uuid[])
+  )
+  and "rating" is not null
+  and "rating" > $3
+order by
+  "rating"
 select
   1 as "exists"
 from
