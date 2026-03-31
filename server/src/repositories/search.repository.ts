@@ -197,6 +197,28 @@ export interface GetCameraLensModelsOptions extends SpaceScopeOptions {
   model?: string;
 }
 
+export interface FilterSuggestionsOptions extends SpaceScopeOptions {
+  personIds?: string[];
+  country?: string;
+  city?: string;
+  make?: string;
+  model?: string;
+  tagIds?: string[];
+  rating?: number;
+  mediaType?: AssetType;
+  isFavorite?: boolean;
+}
+
+export interface FilterSuggestionsResult {
+  countries: string[];
+  cameraMakes: string[];
+  tags: Array<{ id: string; value: string }>;
+  people: Array<{ id: string; name: string }>;
+  ratings: number[];
+  mediaTypes: string[];
+  hasUnnamedPeople: boolean;
+}
+
 @Injectable()
 export class SearchRepository {
   constructor(@InjectKysely() private db: Kysely<DB>) {}
@@ -633,5 +655,90 @@ export class SearchRepository {
       )
       .$if(!!options?.takenAfter, (qb) => qb.where('asset.fileCreatedAt', '>=', options!.takenAfter!))
       .$if(!!options?.takenBefore, (qb) => qb.where('asset.fileCreatedAt', '<', options!.takenBefore!));
+  }
+
+  private buildFilteredAssetIds(userIds: string[], options: FilterSuggestionsOptions) {
+    const needsExifJoin = !!(options.country || options.city || options.make || options.model || options.rating);
+
+    return this.db
+      .selectFrom('asset')
+      .select('asset.id')
+      .where('asset.visibility', '=', AssetVisibility.Timeline)
+      .where('asset.deletedAt', 'is', null)
+      .$if(!options.spaceId && !options.timelineSpaceIds, (qb) =>
+        qb.where('asset.ownerId', '=', anyUuid(userIds)),
+      )
+      .$if(!!options.spaceId && !options.timelineSpaceIds, (qb) =>
+        qb.where((eb) =>
+          eb.or([
+            eb.exists(
+              eb
+                .selectFrom('shared_space_asset')
+                .whereRef('shared_space_asset.assetId', '=', 'asset.id')
+                .where('shared_space_asset.spaceId', '=', asUuid(options.spaceId!)),
+            ),
+            eb.exists(
+              eb
+                .selectFrom('shared_space_library')
+                .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
+                .where('shared_space_library.spaceId', '=', asUuid(options.spaceId!)),
+            ),
+          ]),
+        ),
+      )
+      .$if(!!options.timelineSpaceIds, (qb) =>
+        qb.where((eb) =>
+          eb.or([
+            eb('asset.ownerId', '=', anyUuid(userIds)),
+            eb.exists(
+              eb
+                .selectFrom('shared_space_asset')
+                .whereRef('shared_space_asset.assetId', '=', 'asset.id')
+                .where('shared_space_asset.spaceId', '=', anyUuid(options.timelineSpaceIds!)),
+            ),
+            eb.exists(
+              eb
+                .selectFrom('shared_space_library')
+                .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
+                .where('shared_space_library.spaceId', '=', anyUuid(options.timelineSpaceIds!)),
+            ),
+          ]),
+        ),
+      )
+      .$if(!!options.takenAfter, (qb) => qb.where('asset.fileCreatedAt', '>=', options.takenAfter!))
+      .$if(!!options.takenBefore, (qb) => qb.where('asset.fileCreatedAt', '<', options.takenBefore!))
+      .$if(needsExifJoin, (qb) =>
+        qb
+          .innerJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
+          .$if(!!options.country, (qb) => qb.where('asset_exif.country', '=', options.country!))
+          .$if(!!options.city, (qb) => qb.where('asset_exif.city', '=', options.city!))
+          .$if(!!options.make, (qb) => qb.where('asset_exif.make', '=', options.make!))
+          .$if(!!options.model, (qb) => qb.where('asset_exif.model', '=', options.model!))
+          .$if(!!options.rating, (qb) => qb.where('asset_exif.rating', '=', options.rating!)),
+      )
+      .$if(!!options.personIds?.length, (qb) =>
+        qb.where((eb) =>
+          eb.exists(
+            eb
+              .selectFrom('asset_face')
+              .whereRef('asset_face.assetId', '=', 'asset.id')
+              .where('asset_face.personId', '=', anyUuid(options.personIds!)),
+          ),
+        ),
+      )
+      .$if(!!options.tagIds?.length, (qb) =>
+        qb.where((eb) =>
+          eb.exists(
+            eb
+              .selectFrom('tag_asset')
+              .whereRef('tag_asset.assetId', '=', 'asset.id')
+              .where('tag_asset.tagId', '=', anyUuid(options.tagIds!)),
+          ),
+        ),
+      )
+      .$if(!!options.mediaType, (qb) => qb.where('asset.type', '=', options.mediaType!))
+      .$if(options.isFavorite !== undefined && options.isFavorite !== null, (qb) =>
+        qb.where('asset.isFavorite', '=', options.isFavorite!),
+      );
   }
 }
