@@ -183,6 +183,10 @@
             : undefined,
         }));
       },
+      allPeople: async () => {
+        const people = await getSpacePeople({ id: space.id, limit: 1 });
+        return people.map((p) => ({ id: p.id, name: p.name, thumbnailUrl: '' }));
+      },
       locations: async (context?: FilterContext) => {
         const countries = await getSearchSuggestions({
           $type: SearchSuggestionType.Country,

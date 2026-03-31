@@ -138,7 +138,25 @@ export class AssetService extends BaseService {
           data.people = data.people.filter((p) => p.spacePersonId && !spacePersonMap.get(p.id)?.isHidden);
         }
       } else {
-        data.people = [];
+        // No spaceId — try to find a space containing this asset for this user
+        const spaceForAsset = await this.sharedSpaceRepository.findSpaceForAssetAndUser(id, auth.user.id);
+        if (spaceForAsset) {
+          const globalPersonIds = (data.people || []).map((p) => p.id);
+          const spacePersonMap = await this.sharedSpaceRepository.findSpacePersonsByLinkedPersonIds(
+            spaceForAsset.spaceId,
+            globalPersonIds,
+          );
+          for (const person of data.people || []) {
+            const spacePerson = spacePersonMap.get(person.id);
+            if (spacePerson) {
+              person.spacePersonId = spacePerson.id;
+            }
+          }
+          data.people = (data.people || []).filter((p) => p.spacePersonId && !spacePersonMap.get(p.id)?.isHidden);
+          data.resolvedSpaceId = spaceForAsset.spaceId;
+        } else {
+          data.people = [];
+        }
       }
     }
 
