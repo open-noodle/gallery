@@ -1002,4 +1002,38 @@ export class SharedSpaceRepository {
     }
     return map;
   }
+
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
+  async findSpaceForAssetAndUser(assetId: string, userId: string) {
+    return this.db
+      .selectFrom(
+        this.db
+          .selectFrom('shared_space_asset')
+          .innerJoin('shared_space_member', 'shared_space_member.spaceId', 'shared_space_asset.spaceId')
+          .innerJoin('asset', (join) =>
+            join.onRef('asset.id', '=', 'shared_space_asset.assetId').on('asset.deletedAt', 'is', null),
+          )
+          .select('shared_space_asset.spaceId')
+          .where('shared_space_asset.assetId', '=', assetId)
+          .where('shared_space_member.userId', '=', userId)
+          .union(
+            this.db
+              .selectFrom('shared_space_library')
+              .innerJoin('shared_space_member', 'shared_space_member.spaceId', 'shared_space_library.spaceId')
+              .innerJoin('asset', (join) =>
+                join
+                  .onRef('asset.libraryId', '=', 'shared_space_library.libraryId')
+                  .on('asset.id', '=', assetId)
+                  .on('asset.deletedAt', 'is', null)
+                  .on('asset.isOffline', '=', false),
+              )
+              .select('shared_space_library.spaceId')
+              .where('shared_space_member.userId', '=', userId),
+          )
+          .as('combined'),
+      )
+      .select('combined.spaceId')
+      .limit(1)
+      .executeTakeFirst();
+  }
 }
