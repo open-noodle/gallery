@@ -1051,9 +1051,7 @@ $effect(() => {
   const delay = isInitialMount || isTemporalClear ? 0 : temporalChanged ? 200 : 50;
 
   const provider = config.suggestionsProvider;
-  const providers = config.providers;
   const currentFilters = { ...current };
-  const ctx = filterContext;
 
   const timeout = setTimeout(() => {
     unifiedAbortController?.abort();
@@ -1071,16 +1069,14 @@ $effect(() => {
         cameraMakes = result.cameraMakes;
         tags = result.tags;
         availableRatings = result.ratings;
+        availableRatings = result.ratings;
         availableMediaTypes = result.mediaTypes;
         hasUnnamedPeople = result.hasUnnamedPeople;
 
-        // Cascading child re-fetch: only if parent is still in suggestions (not orphaned)
-        if (currentFilters.country && result.countries.includes(currentFilters.country) && providers?.cities) {
-          void providers.cities(currentFilters.country, ctx);
-        }
-        if (currentFilters.make && result.cameraMakes.includes(currentFilters.make) && providers?.cameraModels) {
-          void providers.cameraModels(currentFilters.make, ctx);
-        }
+        // Note: child values (cities, camera models) are NOT re-fetched here.
+        // LocationFilter and CameraFilter manage their own child state internally
+        // and re-fetch when their parent selection or filterContext changes.
+        // Cross-filter scoping for children is out of scope for this PR.
       })
       .catch((error: unknown) => {
         if (!controller.signal.aborted) {
@@ -1116,9 +1112,22 @@ Wrap each of the 4 mount effects (lines 278-313) body with the same guard:
 if (!config.suggestionsProvider) { ... existing effect body ... }
 ```
 
-**Step 4: Update `providers` references to use optional chaining**
+**Step 4: Handle `providers` being optional**
 
-Since `providers` is now optional on `FilterPanelConfig`, update all references in the template and script from `config.providers.X` to `config.providers?.X`. Key locations: lines 117, 129, 143, 158, 173, 279, 282, 283, 292, 300, 308, 500, 514.
+Since `providers` is now optional on `FilterPanelConfig`, add a normalized variable at the top of the `<script>` block (after the `$props()` destructuring):
+
+```typescript
+// Normalize providers to avoid optional chaining everywhere
+const providers = config.providers ?? {};
+```
+
+Then replace ALL references to `config.providers` with just `providers` throughout the file. This affects ~16 locations:
+
+- Line 117: `const providers = config.providers` → remove (already declared above)
+- Lines 129, 143, 158, 173: `providers.people`, `providers.locations`, `providers.cameras`, `providers.tags` (already use local `providers` variable inside temporal effect — but the initialization `const providers = config.providers` at line 117 is inside the effect, not at module level. Replace that with the module-level const.)
+- Lines 279-309: `config.providers.people`, `config.providers.allPeople`, `config.providers.locations`, `config.providers.cameras`, `config.providers.tags` → `providers.people`, `providers.allPeople`, etc.
+- Lines 500-501: `config.providers.cities` → `providers.cities`
+- Lines 514-515: `config.providers.cameraModels` → `providers.cameraModels`
 
 **Step 5: Pass new props to RatingFilter and MediaTypeFilter**
 
@@ -1139,7 +1148,7 @@ Expected: No errors
 **Step 7: Commit**
 
 ```
-feat(web): add unified suggestionsProvider effect with debounce and cascading
+feat(web): add unified suggestionsProvider effect with debounce
 ```
 
 ---
@@ -1167,7 +1176,12 @@ const filterConfig: FilterPanelConfig = {
       model: filters.model,
       tagIds: filters.tagIds.length > 0 ? filters.tagIds : undefined,
       rating: filters.rating,
-      mediaType: filters.mediaType === 'all' ? undefined : filters.mediaType,
+      mediaType:
+        filters.mediaType === 'all'
+          ? undefined
+          : filters.mediaType === 'image'
+            ? AssetTypeEnum.Image
+            : AssetTypeEnum.Video,
       isFavorite: filters.isFavorite,
       takenAfter: context?.takenAfter,
       takenBefore: context?.takenBefore,
@@ -1197,7 +1211,7 @@ const filterConfig: FilterPanelConfig = {
     };
   },
   providers: {
-    // Hierarchical children still fetched on-demand for cascading
+    // Hierarchical children still fetched on-demand via LocationFilter/CameraFilter
     cities: async (country, context) =>
       getSearchSuggestions({
         $type: SearchSuggestionType.City,
@@ -1279,10 +1293,6 @@ function createUnifiedConfig(overrides: Partial<FilterPanelConfig> = {}): Filter
   return {
     sections: ['timeline', 'people', 'location', 'camera', 'tags', 'rating', 'media'],
     suggestionsProvider: vi.fn().mockResolvedValue(defaultResponse),
-    providers: {
-      cities: vi.fn().mockResolvedValue(['Munich', 'Berlin']),
-      cameraModels: vi.fn().mockResolvedValue(['EOS R5', 'EOS R6']),
-    },
     ...overrides,
   };
 }
@@ -1434,63 +1444,6 @@ describe('Unified suggestionsProvider', () => {
     });
   });
 
-  it('should cascade child re-fetch when parent is still in suggestions', async () => {
-    // Initial response has Germany selected and Germany in suggestions
-    const narrowedResponse: FilterSuggestionsResponse = {
-      ...defaultResponse,
-      countries: ['Germany'], // Germany still in list
-    };
-    const config = createUnifiedConfig({
-      suggestionsProvider: vi
-        .fn()
-        .mockResolvedValueOnce(defaultResponse) // initial
-        .mockResolvedValueOnce(narrowedResponse), // after person selection
-    });
-
-    const { component } = render(FilterPanel, { props: { config, timeBuckets } });
-
-    await vi.advanceTimersByTimeAsync(0); // initial mount
-    await waitFor(() => expect(screen.getByText('Germany')).toBeTruthy());
-
-    // Select Germany
-    await fireEvent.click(screen.getByText('Germany'));
-
-    // Select a person to trigger re-fetch
-    await waitFor(() => expect(screen.getByText('Alice')).toBeTruthy());
-    await fireEvent.click(screen.getByText('Alice'));
-    await vi.advanceTimersByTimeAsync(50);
-
-    await waitFor(() => {
-      // cities provider should have been called since Germany is still in suggestions
-      expect(config.providers!.cities).toHaveBeenCalledWith('Germany', expect.anything());
-    });
-  });
-
-  it('should skip child re-fetch when parent becomes orphaned', async () => {
-    const narrowedResponse: FilterSuggestionsResponse = {
-      ...defaultResponse,
-      countries: [], // Germany no longer in suggestions
-    };
-    const config = createUnifiedConfig({
-      suggestionsProvider: vi.fn().mockResolvedValueOnce(defaultResponse).mockResolvedValueOnce(narrowedResponse),
-    });
-
-    render(FilterPanel, { props: { config, timeBuckets } });
-
-    await vi.advanceTimersByTimeAsync(0);
-    await waitFor(() => expect(screen.getByText('Germany')).toBeTruthy());
-
-    // Select Germany, then trigger re-fetch that removes it
-    await fireEvent.click(screen.getByText('Germany'));
-    await fireEvent.click(screen.getByText('Alice'));
-    await vi.advanceTimersByTimeAsync(50);
-
-    await waitFor(() => {
-      // cities provider should NOT have been called — parent is orphaned
-      expect(config.providers!.cities).not.toHaveBeenCalled();
-    });
-  });
-
   it('should show hasUnnamedPeople empty text when people list is empty', async () => {
     const config = createUnifiedConfig({
       suggestionsProvider: vi.fn().mockResolvedValue({
@@ -1609,11 +1562,11 @@ describe('Unified suggestionsProvider', () => {
     });
   });
 
-  it('should gracefully handle suggestionsProvider without providers (no cascading)', async () => {
+  it('should work with suggestionsProvider and no providers', async () => {
     const config: FilterPanelConfig = {
       sections: ['people', 'location'],
       suggestionsProvider: vi.fn().mockResolvedValue(defaultResponse),
-      // No providers — cascading should be skipped without error
+      // No providers — should work without error
     };
     render(FilterPanel, { props: { config, timeBuckets } });
 

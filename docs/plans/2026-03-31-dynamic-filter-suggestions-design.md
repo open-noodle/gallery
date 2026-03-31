@@ -180,12 +180,7 @@ This mapping lives in the page component (not FilterPanel) because different pag
 
 **Distinguishing temporal vs discrete changes:** The effect compares `selectedYear` and `selectedMonth` against previous values. If only temporal fields changed, use 200ms debounce. If temporal fields cleared (both became undefined), use 0ms. Otherwise (any non-temporal field changed), use 50ms.
 
-**Cascading child re-fetch:** When the unified response arrives:
-
-1. If `filters.country` is set AND the country is still in the new suggestions (not orphaned), trigger a re-fetch of cities via `providers.cities(filters.country, filterContext)`
-2. If `filters.make` is set AND the make is still in the new suggestions, trigger a re-fetch of camera models via `providers.cameraModels(filters.make, filterContext)`
-3. If the parent became orphaned (no longer in suggestions), skip the child re-fetch — the child values are stale but the user will see the orphaned parent and likely deselect it
-4. These child re-fetches are fire-and-forget — if the user changes filters again before they complete, the next unified call + cascade will supersede them
+**Child values (cities, camera models):** NOT re-fetched by the unified effect. LocationFilter and CameraFilter manage their own child state internally and re-fetch via their `onCityFetch`/`onModelFetch` callbacks when the parent selection or `filterContext` (temporal) changes. Cross-filter scoping for child values (e.g., narrowing cities by person) is out of scope — the top-level country/make lists already narrow correctly, which provides the main value.
 
 **Backward compatibility:** When `suggestionsProvider` is not set, FilterPanel falls back to existing `providers`-based behavior. All existing mount effects and temporal re-fetch logic remain active. Map and spaces pages continue working unchanged.
 
@@ -226,7 +221,12 @@ const filterConfig: FilterPanelConfig = {
       model: filters.model,
       tagIds: filters.tagIds.length > 0 ? filters.tagIds : undefined,
       rating: filters.rating,
-      mediaType: filters.mediaType === 'all' ? undefined : filters.mediaType,
+      mediaType:
+        filters.mediaType === 'all'
+          ? undefined
+          : filters.mediaType === 'image'
+            ? AssetTypeEnum.Image
+            : AssetTypeEnum.Video,
       isFavorite: filters.isFavorite,
       takenAfter: context?.takenAfter,
       takenBefore: context?.takenBefore,
@@ -256,7 +256,7 @@ const filterConfig: FilterPanelConfig = {
     };
   },
   providers: {
-    // Hierarchical children still fetched on-demand for cascading
+    // Hierarchical children still fetched on-demand via LocationFilter/CameraFilter
     cities: async (country, context) =>
       getSearchSuggestions({
         $type: SearchSuggestionType.City,
@@ -297,8 +297,7 @@ const filterConfig: FilterPanelConfig = {
 - Debounce: rapid clicks batch into single request (50ms)
 - Debounce: temporal changes use 200ms, clear uses 0ms
 - AbortController: stale requests cancelled
-- Cascading: child values re-fetched when parent selected and still in suggestions
-- Cascading: child re-fetch skipped when parent becomes orphaned
+- Child values (cities/models) managed by LocationFilter/CameraFilter internally
 - Rating/MediaType hide unavailable options
 - Rating/MediaType show all options when `availableRatings`/`availableMediaTypes` is undefined
 - `hasUnnamedPeople` drives PeopleFilter empty text
@@ -314,13 +313,13 @@ Deferred -- requires ML pipeline for people detection and complex test data with
 
 **In scope (this PR):**
 
-- New `GET /search/filter-suggestions` endpoint with DTO/response types
+- New `GET /search/suggestions/filters` endpoint with DTO/response types
 - Repository queries for all 6 suggestion categories with faceted exclude-own-filter logic
 - `without()` utility with unit tests
 - `hasUnnamedPeople` flag in response
 - FilterPanel `suggestionsProvider` mechanism with debounce and abort
 - Response-to-state mapping in photos page wrapper
-- Cascading child re-fetch logic
+- `providers` normalized to `config.providers ?? {}` for safe access
 - RatingFilter and MediaTypeFilter dynamic availability props
 - Photos page integration
 - OpenAPI spec regeneration
