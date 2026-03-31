@@ -786,3 +786,34 @@ group by
   "shared_space_person"."id",
   "shared_space_person"."isHidden",
   "asset_face"."personId"
+
+-- SharedSpaceRepository.findSpaceForAssetAndUser
+select
+  "combined"."spaceId"
+from
+  (
+    select
+      "shared_space_asset"."spaceId"
+    from
+      "shared_space_asset"
+      inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_asset"."spaceId"
+      inner join "asset" on "asset"."id" = "shared_space_asset"."assetId"
+      and "asset"."deletedAt" is null
+    where
+      "shared_space_asset"."assetId" = $1
+      and "shared_space_member"."userId" = $2
+    union
+    select
+      "shared_space_library"."spaceId"
+    from
+      "shared_space_library"
+      inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_library"."spaceId"
+      inner join "asset" on "asset"."libraryId" = "shared_space_library"."libraryId"
+      and "asset"."id" = $3
+      and "asset"."deletedAt" is null
+      and "asset"."isOffline" = $4
+    where
+      "shared_space_member"."userId" = $5
+  ) as "combined"
+limit
+  $6
