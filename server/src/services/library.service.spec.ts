@@ -2,6 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { Stats } from 'node:fs';
 import { defaults, SystemConfig } from 'src/config';
 import { JOBS_LIBRARY_PAGINATION_SIZE } from 'src/constants';
+import { DATABASE_PARAMETER_CHUNK_SIZE } from 'src/decorators';
 import { mapLibrary } from 'src/dtos/library.dto';
 import { AssetType, CronJob, ImmichWorker, JobName, JobStatus } from 'src/enum';
 import { LibraryService } from 'src/services/library.service';
@@ -615,6 +616,31 @@ describe(LibraryService.name, () => {
           },
         },
       ]);
+    });
+
+    it('should chunk createAll calls to stay within postgres parameter limit', async () => {
+      const library = factory.library();
+
+      // Each asset insert has ~14 columns, so with DATABASE_PARAMETER_CHUNK_SIZE (65500)
+      // the max rows per batch is floor(65500/14) = 4678. Generate enough paths to require 2 batches.
+      const columnsPerAsset = 14;
+      const maxPerChunk = Math.floor(DATABASE_PARAMETER_CHUNK_SIZE / columnsPerAsset);
+      const totalPaths = maxPerChunk + 100;
+      const paths = Array.from({ length: totalPaths }, (_, i) => `/data/user1/photo${i}.jpg`);
+
+      const mockLibraryJob: ILibraryFileJob = {
+        libraryId: library.id,
+        paths,
+      };
+
+      mocks.asset.createAll.mockResolvedValue([]);
+      mocks.library.get.mockResolvedValue(library);
+
+      await expect(sut.handleSyncFiles(mockLibraryJob)).resolves.toBe(JobStatus.Success);
+
+      expect(mocks.asset.createAll).toHaveBeenCalledTimes(2);
+      expect(mocks.asset.createAll.mock.calls[0][0]).toHaveLength(maxPerChunk);
+      expect(mocks.asset.createAll.mock.calls[1][0]).toHaveLength(100);
     });
 
     it('should not import an asset to a soft deleted library', async () => {
