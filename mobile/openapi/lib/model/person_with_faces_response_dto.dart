@@ -20,6 +20,7 @@ class PersonWithFacesResponseDto {
     this.isFavorite,
     required this.isHidden,
     required this.name,
+    this.spacePersonId,
     this.species,
     required this.thumbnailPath,
     this.type = 'person',
@@ -58,6 +59,15 @@ class PersonWithFacesResponseDto {
   /// Person name
   String name;
 
+  /// Space person ID (when viewed through a space)
+  ///
+  /// Please note: This property should have been non-nullable! Since the specification file
+  /// does not include a default value (using the "default:" property), however, the generated
+  /// source code must fall back to having a nullable type.
+  /// Consider adding a "default:" property in the specification file to hide this note.
+  ///
+  String? spacePersonId;
+
   /// Pet species (e.g. dog, cat)
   String? species;
 
@@ -85,6 +95,7 @@ class PersonWithFacesResponseDto {
     other.isFavorite == isFavorite &&
     other.isHidden == isHidden &&
     other.name == name &&
+    other.spacePersonId == spacePersonId &&
     other.species == species &&
     other.thumbnailPath == thumbnailPath &&
     other.type == type &&
@@ -100,13 +111,14 @@ class PersonWithFacesResponseDto {
     (isFavorite == null ? 0 : isFavorite!.hashCode) +
     (isHidden.hashCode) +
     (name.hashCode) +
+    (spacePersonId == null ? 0 : spacePersonId!.hashCode) +
     (species == null ? 0 : species!.hashCode) +
     (thumbnailPath.hashCode) +
     (type.hashCode) +
     (updatedAt == null ? 0 : updatedAt!.hashCode);
 
   @override
-  String toString() => 'PersonWithFacesResponseDto[birthDate=$birthDate, color=$color, faces=$faces, id=$id, isFavorite=$isFavorite, isHidden=$isHidden, name=$name, species=$species, thumbnailPath=$thumbnailPath, type=$type, updatedAt=$updatedAt]';
+  String toString() => 'PersonWithFacesResponseDto[birthDate=$birthDate, color=$color, faces=$faces, id=$id, isFavorite=$isFavorite, isHidden=$isHidden, name=$name, spacePersonId=$spacePersonId, species=$species, thumbnailPath=$thumbnailPath, type=$type, updatedAt=$updatedAt]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -129,6 +141,11 @@ class PersonWithFacesResponseDto {
     }
       json[r'isHidden'] = this.isHidden;
       json[r'name'] = this.name;
+    if (this.spacePersonId != null) {
+      json[r'spacePersonId'] = this.spacePersonId;
+    } else {
+    //  json[r'spacePersonId'] = null;
+    }
     if (this.species != null) {
       json[r'species'] = this.species;
     } else {
@@ -160,6 +177,7 @@ class PersonWithFacesResponseDto {
         isFavorite: mapValueOfType<bool>(json, r'isFavorite'),
         isHidden: mapValueOfType<bool>(json, r'isHidden')!,
         name: mapValueOfType<String>(json, r'name')!,
+        spacePersonId: mapValueOfType<String>(json, r'spacePersonId'),
         species: mapValueOfType<String>(json, r'species'),
         thumbnailPath: mapValueOfType<String>(json, r'thumbnailPath')!,
         type: mapValueOfType<String>(json, r'type')!,
