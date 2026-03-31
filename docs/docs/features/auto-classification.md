@@ -144,17 +144,18 @@ job:
 
 When you modify classification categories, Gallery handles changes automatically:
 
-| Change                              | Behavior                                                                                                                                         |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Add a category**                  | New category takes effect on next classification run. Run "Scan All Libraries" to classify existing assets.                                      |
-| **Remove a category**               | Existing `Auto/{name}` tags are cleaned up and affected archived assets are unarchived.                                                          |
-| **Rename a category**               | Old tags are cleaned up (treated as removal + addition). Run scan to re-tag with the new name.                                                   |
-| **Change similarity**               | Takes effect on next classification run. Stricter thresholds may cause previously matched assets to no longer match — run scan to re-evaluate.   |
-| **Change prompts**                  | Prompt embedding cache is cleared. New prompts are encoded on next classification run.                                                           |
-| **Change action**                   | Takes effect on next classification run. Changing to `tag_and_archive` does not retroactively archive already-tagged assets — run scan to apply. |
-| **Disable/enable a category**       | Immediate. Disabled categories are skipped during classification.                                                                                |
-| **Disable classification globally** | All classification jobs are skipped. No assets are processed until re-enabled.                                                                   |
-| **CLIP model change**               | Embedding cache is automatically cleared. All prompts are re-encoded with the new model on next use.                                             |
+| Change                              | Behavior                                                                                                                                          |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Add a category**                  | New category takes effect on next classification run. Run "Scan All Libraries" to classify existing assets.                                       |
+| **Remove a category**               | Existing `Auto/{name}` tags are cleaned up and affected archived assets are unarchived.                                                           |
+| **Rename a category**               | Old tags are cleaned up (treated as removal + addition). Run scan to re-tag with the new name.                                                    |
+| **Increase similarity (stricter)**  | Existing auto-tags are removed, archived assets are unarchived. The UI prompts to rescan so only assets matching the new threshold get re-tagged. |
+| **Decrease similarity (looser)**    | Takes effect on next classification run. Run scan to find newly-matching assets.                                                                  |
+| **Change prompts**                  | Prompt embedding cache is cleared. New prompts are encoded on next classification run.                                                            |
+| **Change action**                   | Takes effect on next classification run. Changing to `tag_and_archive` does not retroactively archive already-tagged assets — run scan to apply.  |
+| **Disable/enable a category**       | Immediate. Disabled categories are skipped during classification.                                                                                 |
+| **Disable classification globally** | All classification jobs are skipped. No assets are processed until re-enabled.                                                                    |
+| **CLIP model change**               | Embedding cache is automatically cleared. All prompts are re-encoded with the new model on next use.                                              |
 
 :::note
 Removing a category unarchives assets that were archived by that category's `tag_and_archive` action. If you independently archived a photo that also happened to be auto-tagged, removing the category will unarchive it.
