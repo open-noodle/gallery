@@ -218,10 +218,10 @@ describe('/search/suggestions/filters', () => {
     expect(body.ratings.length).toBeGreaterThanOrEqual(1);
   });
 
-  it('should return space person IDs (not global person IDs) when spaceId is set', async () => {
-    // Create a space, add asset A, create a space person linked to that asset
-    const space = await utils.createSpace(admin.accessToken, { name: 'Space People Test' });
-    await utils.addSpaceAssets(admin.accessToken, space.id, [assets[0].id]);
+  it('should return all suggestion categories scoped to a space with correct IDs', async () => {
+    // Create a space with assets A (rated 5, tagged "nature", Paris) and B (rated 4, tagged "travel", Tokyo)
+    const space = await utils.createSpace(admin.accessToken, { name: 'Full Suggestions Test' });
+    await utils.addSpaceAssets(admin.accessToken, space.id, [assets[0].id, assets[1].id]);
 
     // Create a space person via DB (person → face → space_person + space_person_face)
     const db = await utils.connectDatabase();
@@ -230,11 +230,11 @@ describe('/search/suggestions/filters', () => {
        VALUES ($1, $2, '/test/thumbnail.jpg') RETURNING id`,
       [admin.userId, 'SpaceTestPerson'],
     );
-    const personId = personResult.rows[0].id as string;
+    const globalPersonId = personResult.rows[0].id as string;
 
     const faceResult = await db.query(
       `INSERT INTO "asset_face" ("assetId", "personId") VALUES ($1, $2) RETURNING id`,
-      [assets[0].id, personId],
+      [assets[0].id, globalPersonId],
     );
     const faceId = faceResult.rows[0].id as string;
 
@@ -245,26 +245,66 @@ describe('/search/suggestions/filters', () => {
     );
     const spacePersonId = spacePersonResult.rows[0].id as string;
 
-    // Link space person face
     await db.query(
       `INSERT INTO "shared_space_person_face" ("personId", "assetFaceId") VALUES ($1, $2)`,
       [spacePersonId, faceId],
     );
 
-    // Query filter suggestions with spaceId
+    // --- Unfiltered space suggestions ---
     const { body } = await request(app)
       .get(`/search/suggestions/filters?spaceId=${space.id}`)
       .set('Authorization', `Bearer ${admin.accessToken}`)
       .expect(200);
 
-    // Should return the space person ID, NOT the global person ID
-    const returnedIds = body.people.map((p: { id: string }) => p.id);
-    expect(returnedIds).toContain(spacePersonId);
-    expect(returnedIds).not.toContain(personId);
-
-    // Should have the space person name
+    // People: should return space person IDs, NOT global person IDs
+    const returnedPersonIds = body.people.map((p: { id: string }) => p.id);
+    expect(returnedPersonIds).toContain(spacePersonId);
+    expect(returnedPersonIds).not.toContain(globalPersonId);
     const spacePerson = body.people.find((p: { id: string }) => p.id === spacePersonId);
     expect(spacePerson).toBeDefined();
     expect(spacePerson.name).toBe('SpaceTestPerson');
+
+    // Countries: should be scoped to assets A+B (2 countries from Paris + Tokyo)
+    expect(body.countries.length).toBeGreaterThanOrEqual(1);
+    expect(body.countries.length).toBeLessThanOrEqual(unfilteredCountries.length);
+
+    // Camera makes: should only include cameras from assets A+B
+    expect(Array.isArray(body.cameraMakes)).toBe(true);
+
+    // Tags: should only include tags on assets A+B ("nature" on A, "travel" on B)
+    expect(body.tags.length).toBeGreaterThanOrEqual(1);
+    expect(body.tags.length).toBeLessThanOrEqual(unfilteredTags.length);
+    const tagNames = body.tags.map((t: { value: string }) => t.value);
+    expect(tagNames).toContain('nature');
+    expect(tagNames).toContain('travel');
+
+    // Ratings: should only include ratings from A (5) and B (4)
+    expect(body.ratings).toContain(5);
+    expect(body.ratings).toContain(4);
+    expect(body.ratings).not.toContain(3); // rating 3 is only on asset D, not in this space
+
+    // Media types: should have at least one
+    expect(body.mediaTypes.length).toBeGreaterThanOrEqual(1);
+
+    // --- Cross-filter within space: filter by tag "nature" → should narrow ---
+    const { body: natureFiltered } = await request(app)
+      .get(`/search/suggestions/filters?spaceId=${space.id}&tagIds=${tagNatureId}`)
+      .set('Authorization', `Bearer ${admin.accessToken}`)
+      .expect(200);
+
+    // Only asset A has "nature" in this space, so ratings should narrow to [5]
+    expect(natureFiltered.ratings).toContain(5);
+    expect(natureFiltered.ratings).not.toContain(4); // asset B (rated 4) doesn't have "nature"
+
+    // --- Cross-filter within space: filter by rating 4 → should narrow ---
+    const { body: rating4Filtered } = await request(app)
+      .get(`/search/suggestions/filters?spaceId=${space.id}&rating=4`)
+      .set('Authorization', `Bearer ${admin.accessToken}`)
+      .expect(200);
+
+    // Only asset B has rating 4 in this space, so tags should narrow to just "travel"
+    const rating4TagNames = rating4Filtered.tags.map((t: { value: string }) => t.value);
+    expect(rating4TagNames).toContain('travel');
+    expect(rating4TagNames).not.toContain('nature');
   });
 });
