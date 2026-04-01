@@ -1,7 +1,7 @@
 import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { mapAsset } from 'src/dtos/asset-response.dto';
 import { SearchSuggestionType } from 'src/dtos/search.dto';
-import { AssetVisibility } from 'src/enum';
+import { AssetType, AssetVisibility } from 'src/enum';
 import { SearchService } from 'src/services/search.service';
 import { AssetFactory } from 'test/factories/asset.factory';
 import { AuthFactory } from 'test/factories/auth.factory';
@@ -1130,6 +1130,154 @@ describe(SearchService.name, () => {
 
       expect(mocks.search.getAssetsByCity).toHaveBeenCalledWith([authStub.user1.user.id]);
       expect(result).toHaveLength(1);
+    });
+  });
+
+  describe('getFilterSuggestions', () => {
+    const emptyResult = {
+      countries: [],
+      cameraMakes: [],
+      tags: [],
+      people: [],
+      ratings: [],
+      mediaTypes: [],
+      hasUnnamedPeople: false,
+    };
+
+    it('should return filter suggestions', async () => {
+      const auth = AuthFactory.create();
+      mocks.partner.getAll.mockResolvedValue([]);
+      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
+      mocks.search.getFilterSuggestions.mockResolvedValue({
+        countries: ['Germany', 'France'],
+        cameraMakes: ['Canon'],
+        tags: [{ id: 't1', value: 'Vacation' }],
+        people: [{ id: 'p1', name: 'Alice' }],
+        ratings: [4, 5],
+        mediaTypes: ['IMAGE', 'VIDEO'],
+        hasUnnamedPeople: false,
+      });
+
+      const result = await sut.getFilterSuggestions(auth, { withSharedSpaces: true });
+
+      expect(result.countries).toEqual(['Germany', 'France']);
+      expect(result.people).toEqual([{ id: 'p1', name: 'Alice' }]);
+      expect(result.hasUnnamedPeople).toBe(false);
+      expect(mocks.search.getFilterSuggestions).toHaveBeenCalledWith(
+        [auth.user.id],
+        expect.objectContaining({ withSharedSpaces: true }),
+      );
+    });
+
+    it('should return empty suggestions when no filters match', async () => {
+      const auth = AuthFactory.create();
+      mocks.partner.getAll.mockResolvedValue([]);
+      mocks.search.getFilterSuggestions.mockResolvedValue(emptyResult);
+
+      const result = await sut.getFilterSuggestions(auth, {});
+
+      expect(result).toEqual(emptyResult);
+    });
+
+    it('should return hasUnnamedPeople true when unnamed people exist', async () => {
+      const auth = AuthFactory.create();
+      mocks.partner.getAll.mockResolvedValue([]);
+      mocks.search.getFilterSuggestions.mockResolvedValue({
+        ...emptyResult,
+        hasUnnamedPeople: true,
+      });
+
+      const result = await sut.getFilterSuggestions(auth, {});
+
+      expect(result.people).toEqual([]);
+      expect(result.hasUnnamedPeople).toBe(true);
+    });
+
+    it('should throw when both spaceId and withSharedSpaces are set', async () => {
+      const auth = AuthFactory.create();
+      mocks.partner.getAll.mockResolvedValue([]);
+
+      await expect(
+        sut.getFilterSuggestions(auth, { spaceId: newUuid(), withSharedSpaces: true }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('should check space access when spaceId is set', async () => {
+      const auth = AuthFactory.create();
+      const spaceId = newUuid();
+      mocks.partner.getAll.mockResolvedValue([]);
+      mocks.access.sharedSpace.checkMemberAccess.mockResolvedValue(new Set([spaceId]));
+      mocks.search.getFilterSuggestions.mockResolvedValue(emptyResult);
+
+      await sut.getFilterSuggestions(auth, { spaceId });
+
+      expect(mocks.access.sharedSpace.checkMemberAccess).toHaveBeenCalled();
+    });
+
+    it('should resolve timelineSpaceIds when withSharedSpaces is set', async () => {
+      const auth = AuthFactory.create();
+      const spaceId = newUuid();
+      mocks.partner.getAll.mockResolvedValue([]);
+      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId }]);
+      mocks.search.getFilterSuggestions.mockResolvedValue(emptyResult);
+
+      await sut.getFilterSuggestions(auth, { withSharedSpaces: true });
+
+      expect(mocks.search.getFilterSuggestions).toHaveBeenCalledWith(
+        [auth.user.id],
+        expect.objectContaining({ timelineSpaceIds: [spaceId] }),
+      );
+    });
+
+    it('should pass all filter dimensions through to repository', async () => {
+      const auth = AuthFactory.create();
+      const personId = newUuid();
+      const tagId = newUuid();
+      const takenAfter = new Date('2024-01-01');
+      const takenBefore = new Date('2024-12-31');
+      mocks.partner.getAll.mockResolvedValue([]);
+      mocks.search.getFilterSuggestions.mockResolvedValue(emptyResult);
+
+      await sut.getFilterSuggestions(auth, {
+        country: 'Germany',
+        city: 'Munich',
+        make: 'Canon',
+        model: 'EOS R5',
+        personIds: [personId],
+        tagIds: [tagId],
+        rating: 5,
+        mediaType: AssetType.Image,
+        isFavorite: true,
+        takenAfter,
+        takenBefore,
+      });
+
+      expect(mocks.search.getFilterSuggestions).toHaveBeenCalledWith(
+        [auth.user.id],
+        expect.objectContaining({
+          country: 'Germany',
+          city: 'Munich',
+          make: 'Canon',
+          model: 'EOS R5',
+          personIds: [personId],
+          tagIds: [tagId],
+          rating: 5,
+          mediaType: AssetType.Image,
+          isFavorite: true,
+          takenAfter,
+          takenBefore,
+        }),
+      );
+    });
+
+    it('should pass empty/undefined filters without error', async () => {
+      const auth = AuthFactory.create();
+      mocks.partner.getAll.mockResolvedValue([]);
+      mocks.search.getFilterSuggestions.mockResolvedValue(emptyResult);
+
+      await sut.getFilterSuggestions(auth, {});
+
+      expect(mocks.search.getFilterSuggestions).toHaveBeenCalledWith([auth.user.id], expect.objectContaining({}));
     });
   });
 

@@ -2670,6 +2670,34 @@ export type SearchStatisticsResponseDto = {
     /** Total number of matching assets */
     total: number;
 };
+export type FilterSuggestionsPersonDto = {
+    /** Person ID */
+    id: string;
+    /** Person name */
+    name: string;
+};
+export type FilterSuggestionsTagDto = {
+    /** Tag ID */
+    id: string;
+    /** Tag value/name */
+    value: string;
+};
+export type FilterSuggestionsResponseDto = {
+    /** Available camera makes */
+    cameraMakes: string[];
+    /** Available countries */
+    countries: string[];
+    /** Whether unnamed people exist in the filtered set */
+    hasUnnamedPeople: boolean;
+    /** Available media types */
+    mediaTypes: string[];
+    /** Available people (named, non-hidden, with thumbnails) */
+    people: FilterSuggestionsPersonDto[];
+    /** Available ratings */
+    ratings: number[];
+    /** Available tags */
+    tags: FilterSuggestionsTagDto[];
+};
 export type TagSuggestionResponseDto = {
     /** Tag ID */
     id: string;
@@ -6635,6 +6663,45 @@ export function getSearchSuggestions({ country, includeNull, lensModel, make, mo
         spaceId,
         state,
         "type": $type
+    }))}`, {
+        ...opts
+    }));
+}
+/**
+ * Retrieve dynamic filter suggestions
+ */
+export function getFilterSuggestions({ city, country, isFavorite, make, mediaType, model, personIds, rating, spaceId, tagIds, takenAfter, takenBefore, withSharedSpaces }: {
+    city?: string;
+    country?: string;
+    isFavorite?: boolean;
+    make?: string;
+    mediaType?: AssetTypeEnum;
+    model?: string;
+    personIds?: string[];
+    rating?: number;
+    spaceId?: string;
+    tagIds?: string[];
+    takenAfter?: string;
+    takenBefore?: string;
+    withSharedSpaces?: boolean;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: FilterSuggestionsResponseDto;
+    }>(`/search/suggestions/filters${QS.query(QS.explode({
+        city,
+        country,
+        isFavorite,
+        make,
+        mediaType,
+        model,
+        personIds,
+        rating,
+        spaceId,
+        tagIds,
+        takenAfter,
+        takenBefore,
+        withSharedSpaces
     }))}`, {
         ...opts
     }));
