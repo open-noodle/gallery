@@ -246,6 +246,14 @@ export class SmartSearchDto extends BaseSearchWithResultsDto {
   @Optional()
   language?: string;
 
+  @ValidateEnum({
+    enum: AssetOrder,
+    name: 'AssetOrder',
+    optional: true,
+    description: 'Sort order (omit for relevance)',
+  })
+  order?: AssetOrder;
+
   @ApiPropertyOptional({ type: 'number', description: 'Page number', minimum: 1 })
   @IsInt()
   @Min(1)
