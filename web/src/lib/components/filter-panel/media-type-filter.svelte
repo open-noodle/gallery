@@ -14,7 +14,7 @@
   ];
 
   let options = $derived(
-    availableMediaTypes
+    availableMediaTypes && availableMediaTypes.length > 0
       ? allOptions.filter(
           (o) => o.value === 'all' || o.value === selected || availableMediaTypes.includes(o.assetType!),
         )
