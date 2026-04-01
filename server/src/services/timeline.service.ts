@@ -88,11 +88,6 @@ export class TimelineService extends BaseService {
       }
     }
 
-    const allTagIds = dto.tagIds ?? (dto.tagId ? [dto.tagId] : []);
-    if (allTagIds.length > 0) {
-      await this.requireAccess({ auth, permission: Permission.TagRead, ids: allTagIds });
-    }
-
     if (dto.withPartners) {
       const requestedArchived = dto.visibility === AssetVisibility.Archive || dto.visibility === undefined;
       const requestedFavorite = dto.isFavorite === true || dto.isFavorite === false;
