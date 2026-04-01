@@ -48,12 +48,12 @@
 
   {#if open}
     <div
-      class="absolute right-0 top-full z-10 mt-1 min-w-[160px] rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-800"
+      class="absolute right-0 top-full z-10 mt-1 min-w-[160px] rounded-lg border border-gray-200 bg-light py-1 shadow-lg dark:border-gray-700"
     >
       {#each options as option (option.value)}
         <button
           type="button"
-          class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+          class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-subtle"
           class:font-semibold={option.value === sortOrder}
           onclick={() => handleSelect(option.value)}
         >

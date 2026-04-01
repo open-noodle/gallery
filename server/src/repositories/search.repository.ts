@@ -361,11 +361,12 @@ export class SearchRepository {
         const items = await trx
           .selectFrom(candidates)
           .selectAll()
+          // sql.raw is safe here — orderDirection is validated to 'asc'|'desc' by the AssetOrder enum
           .orderBy(sql`"candidates"."fileCreatedAt" ${sql.raw(orderDirection)} nulls last`)
           .limit(pagination.size + 1)
           .offset((pagination.page - 1) * pagination.size)
           .execute();
-        return paginationHelper(items, pagination.size) as any;
+        return paginationHelper(items as MapAsset[], pagination.size);
       }
 
       const items = await baseQuery

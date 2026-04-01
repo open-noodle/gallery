@@ -35,6 +35,7 @@
     if (sentinelElement) {
       observer.disconnect();
       observer.observe(sentinelElement);
+      return () => observer.disconnect();
     }
   });
 
@@ -90,7 +91,7 @@
 
       if (key !== currentKey) {
         const label = date
-          ? date.toLocaleDateString(undefined, { year: 'numeric', month: 'long', timeZone: 'UTC' })
+          ? date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', timeZone: 'UTC' })
           : 'Unknown date';
         currentGroup = { label, assets: [] };
         groups.push(currentGroup);
