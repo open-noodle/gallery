@@ -32,15 +32,15 @@ describe('buildMapFilterConfig', () => {
 
   it('should provide all required providers', () => {
     const config = buildMapFilterConfig();
-    expect(config.providers.people).toBeDefined();
-    expect(config.providers.cameras).toBeDefined();
-    expect(config.providers.cameraModels).toBeDefined();
-    expect(config.providers.tags).toBeDefined();
+    expect(config.providers!.people).toBeDefined();
+    expect(config.providers!.cameras).toBeDefined();
+    expect(config.providers!.cameraModels).toBeDefined();
+    expect(config.providers!.tags).toBeDefined();
   });
 
   it('should provide space-scoped providers when spaceId given', () => {
     const config = buildMapFilterConfig('space-123');
-    expect(config.providers.people).toBeDefined();
+    expect(config.providers!.people).toBeDefined();
     expect(config.sections).not.toContain('location');
   });
 
@@ -57,7 +57,7 @@ describe('buildMapFilterConfig', () => {
       } as never);
 
       const config = buildMapFilterConfig();
-      const people = await config.providers.people!();
+      const people = await config.providers!.people!();
 
       expect(people).toHaveLength(2);
       expect(people.map((p) => p.name)).toEqual(['Alice', 'Bob']);
@@ -71,7 +71,7 @@ describe('buildMapFilterConfig', () => {
       } as never);
 
       const config = buildMapFilterConfig();
-      const people = await config.providers.people!();
+      const people = await config.providers!.people!();
 
       expect(people[0].thumbnailUrl).toContain('/people/1/thumbnail');
     });
@@ -83,7 +83,7 @@ describe('buildMapFilterConfig', () => {
       ] as never);
 
       const config = buildMapFilterConfig('space-123');
-      const people = await config.providers.people!();
+      const people = await config.providers!.people!();
 
       expect(getSpacePeople).toHaveBeenCalledWith(expect.objectContaining({ named: true }));
       expect(people).toHaveLength(2);
@@ -96,7 +96,7 @@ describe('buildMapFilterConfig', () => {
       ] as never);
 
       const config = buildMapFilterConfig('space-123');
-      const people = await config.providers.people!();
+      const people = await config.providers!.people!();
 
       expect(people[0].thumbnailUrl).toContain('/shared-spaces/space-123/people/1/thumbnail');
     });
@@ -106,7 +106,7 @@ describe('buildMapFilterConfig', () => {
     vi.mocked(getSearchSuggestions).mockResolvedValue(['Nikon'] as never);
 
     const config = buildMapFilterConfig();
-    await config.providers.cameras!();
+    await config.providers!.cameras!();
 
     expect(getSearchSuggestions).toHaveBeenCalledWith(expect.objectContaining({ withSharedSpaces: true }));
   });
@@ -115,7 +115,7 @@ describe('buildMapFilterConfig', () => {
     vi.mocked(getSearchSuggestions).mockResolvedValue(['D850'] as never);
 
     const config = buildMapFilterConfig();
-    await config.providers.cameraModels!('Nikon');
+    await config.providers!.cameraModels!('Nikon');
 
     expect(getSearchSuggestions).toHaveBeenCalledWith(
       expect.objectContaining({ withSharedSpaces: true, make: 'Nikon' }),
