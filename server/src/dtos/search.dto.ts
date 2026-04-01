@@ -327,6 +327,7 @@ export class FilterSuggestionsRequestDto {
   @IsInt()
   @Min(1)
   @Max(5)
+  @Type(() => Number)
   rating?: number;
 
   @ValidateEnum({ enum: AssetType, name: 'AssetTypeEnum', optional: true, description: 'Filter by asset type' })

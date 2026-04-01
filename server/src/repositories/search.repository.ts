@@ -798,6 +798,42 @@ export class SearchRepository {
   ): Promise<{ people: Array<{ id: string; name: string }>; hasUnnamedPeople: boolean }> {
     const filteredIds = this.buildFilteredAssetIds(userIds, options);
 
+    // When spaceId is set, return shared_space_person records (space-specific IDs and names)
+    if (options.spaceId) {
+      const spacePeople = await this.db
+        .selectFrom('shared_space_person')
+        .leftJoin('asset_face', 'asset_face.id', 'shared_space_person.representativeFaceId')
+        .leftJoin('person', 'person.id', 'asset_face.personId')
+        .select(['shared_space_person.id', 'shared_space_person.name'])
+        .select('person.name as personalName')
+        .where('shared_space_person.spaceId', '=', asUuid(options.spaceId))
+        .where('shared_space_person.isHidden', '=', false)
+        .where((eb) =>
+          eb.exists(
+            eb
+              .selectFrom('shared_space_person_face')
+              .innerJoin('asset_face as af', 'af.id', 'shared_space_person_face.assetFaceId')
+              .whereRef('shared_space_person_face.personId', '=', 'shared_space_person.id')
+              .where('af.assetId', 'in', filteredIds),
+          ),
+        )
+        .orderBy('shared_space_person.name')
+        .execute();
+
+      // Use space person name, fallback to global person name
+      const people = spacePeople
+        .map((p) => ({
+          id: p.id,
+          name: p.name || (p as any).personalName || '',
+        }))
+        .filter((p) => p.name !== '');
+
+      const hasUnnamedPeople = spacePeople.some((p) => !p.name && !(p as any).personalName);
+
+      return { people, hasUnnamedPeople };
+    }
+
+    // Global: return person records
     const people = await this.db
       .selectFrom('person')
       .select(['person.id', 'person.name'])
