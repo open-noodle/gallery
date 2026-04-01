@@ -7,6 +7,7 @@
   import { handlePromiseError } from '$lib/utils';
   import { navigate } from '$lib/utils/navigation';
   import { type AssetResponseDto, getAssetInfo } from '@immich/sdk';
+  import { SvelteMap } from 'svelte/reactivity';
   import { t } from 'svelte-i18n';
 
   interface Props {
@@ -84,7 +85,7 @@
   type DateGroup = { key: string; label: string; assets: AssetResponseDto[] };
 
   const groupByMonth = (assets: AssetResponseDto[]): DateGroup[] => {
-    const map = new Map<string, DateGroup>();
+    const map = new SvelteMap<string, DateGroup>();
     for (const asset of assets) {
       const date = asset.fileCreatedAt ? new Date(asset.fileCreatedAt) : undefined;
       const key = date ? `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}` : 'unknown';
