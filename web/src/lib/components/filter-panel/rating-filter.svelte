@@ -19,7 +19,7 @@
   }
 
   let visibleStars = $derived(
-    availableRatings
+    availableRatings && availableRatings.length > 0
       ? [1, 2, 3, 4, 5].filter((s) => availableRatings.includes(s) || s === selectedRating)
       : [1, 2, 3, 4, 5],
   );
