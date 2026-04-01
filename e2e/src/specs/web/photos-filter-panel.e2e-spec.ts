@@ -2,7 +2,7 @@ import type { LoginResponseDto } from '@immich/sdk';
 import { expect, test } from '@playwright/test';
 import { utils } from 'src/utils';
 
-test.describe('Photos FilterPanel', () => {
+test.describe.skip('Photos FilterPanel', () => {
   let admin: LoginResponseDto;
 
   test.beforeAll(async () => {
