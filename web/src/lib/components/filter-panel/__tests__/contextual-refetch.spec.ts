@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import type { FilterContext, FilterPanelConfig } from '../filter-panel';
 import FilterPanel from '../filter-panel.svelte';
 
-function createConfig(overrides: Partial<FilterPanelConfig['providers']> = {}): FilterPanelConfig {
+function createConfig(overrides: Partial<NonNullable<FilterPanelConfig['providers']>> = {}): FilterPanelConfig {
   return {
     sections: ['timeline', 'people', 'location', 'camera', 'tags'],
     providers: {
@@ -51,9 +51,9 @@ describe('Contextual re-fetch on temporal change', () => {
 
     await vi.advanceTimersByTimeAsync(0);
 
-    expect(config.providers.people).toHaveBeenCalledTimes(1);
-    expect(config.providers.locations).toHaveBeenCalledTimes(1);
-    expect(config.providers.cameras).toHaveBeenCalledTimes(1);
+    expect(config.providers!.people).toHaveBeenCalledTimes(1);
+    expect(config.providers!.locations).toHaveBeenCalledTimes(1);
+    expect(config.providers!.cameras).toHaveBeenCalledTimes(1);
 
     // Click year to select 2023
     await fireEvent.click(screen.getByTestId('year-btn-2023'));
@@ -67,12 +67,12 @@ describe('Contextual re-fetch on temporal change', () => {
     };
 
     await waitFor(() => {
-      expect(config.providers.people).toHaveBeenCalledTimes(2);
-      expect(config.providers.people).toHaveBeenLastCalledWith(expectedContext);
-      expect(config.providers.locations).toHaveBeenLastCalledWith(expectedContext);
-      expect(config.providers.cameras).toHaveBeenLastCalledWith(expectedContext);
-      expect(config.providers.tags).toHaveBeenCalledTimes(2);
-      expect(config.providers.tags).toHaveBeenLastCalledWith(expectedContext);
+      expect(config.providers!.people).toHaveBeenCalledTimes(2);
+      expect(config.providers!.people).toHaveBeenLastCalledWith(expectedContext);
+      expect(config.providers!.locations).toHaveBeenLastCalledWith(expectedContext);
+      expect(config.providers!.cameras).toHaveBeenLastCalledWith(expectedContext);
+      expect(config.providers!.tags).toHaveBeenCalledTimes(2);
+      expect(config.providers!.tags).toHaveBeenLastCalledWith(expectedContext);
     });
   });
 
@@ -84,7 +84,7 @@ describe('Contextual re-fetch on temporal change', () => {
 
     await vi.advanceTimersByTimeAsync(0);
 
-    expect(config.providers.tags).toHaveBeenCalledTimes(1);
+    expect(config.providers!.tags).toHaveBeenCalledTimes(1);
 
     // Click year to select 2023
     await fireEvent.click(screen.getByTestId('year-btn-2023'));
@@ -98,8 +98,8 @@ describe('Contextual re-fetch on temporal change', () => {
     };
 
     await waitFor(() => {
-      expect(config.providers.tags).toHaveBeenCalledTimes(2);
-      expect(config.providers.tags).toHaveBeenLastCalledWith(expectedContext);
+      expect(config.providers!.tags).toHaveBeenCalledTimes(2);
+      expect(config.providers!.tags).toHaveBeenLastCalledWith(expectedContext);
     });
   });
 
@@ -115,7 +115,7 @@ describe('Contextual re-fetch on temporal change', () => {
     await vi.advanceTimersByTimeAsync(250);
 
     await waitFor(() => {
-      expect(config.providers.people).toHaveBeenLastCalledWith({
+      expect(config.providers!.people).toHaveBeenLastCalledWith({
         takenAfter: '2024-01-01T00:00:00.000Z',
         takenBefore: '2025-01-01T00:00:00.000Z',
       });
@@ -130,7 +130,7 @@ describe('Contextual re-fetch on temporal change', () => {
 
     await vi.advanceTimersByTimeAsync(0);
 
-    const initialCalls = (config.providers.people as ReturnType<typeof vi.fn>).mock.calls.length;
+    const initialCalls = (config.providers!.people as ReturnType<typeof vi.fn>).mock.calls.length;
 
     // Click year — this triggers a 200ms debounce for the year context
     await fireEvent.click(screen.getByTestId('year-btn-2023'));
@@ -145,7 +145,7 @@ describe('Contextual re-fetch on temporal change', () => {
     await vi.advanceTimersByTimeAsync(250);
 
     await waitFor(() => {
-      const finalCalls = (config.providers.people as ReturnType<typeof vi.fn>).mock.calls.length;
+      const finalCalls = (config.providers!.people as ReturnType<typeof vi.fn>).mock.calls.length;
       // Year triggers 1 re-fetch, month triggers another → exactly 2 extra
       expect(finalCalls - initialCalls).toBe(2);
     });
@@ -162,12 +162,12 @@ describe('Contextual re-fetch on temporal change', () => {
 
     await vi.advanceTimersByTimeAsync(0);
 
-    const initialCalls = (config.providers.people as ReturnType<typeof vi.fn>).mock.calls.length;
+    const initialCalls = (config.providers!.people as ReturnType<typeof vi.fn>).mock.calls.length;
 
     // Advance time — no temporal change happens, so no re-fetch
     await vi.advanceTimersByTimeAsync(500);
 
-    expect((config.providers.people as ReturnType<typeof vi.fn>).mock.calls.length).toBe(initialCalls);
+    expect((config.providers!.people as ReturnType<typeof vi.fn>).mock.calls.length).toBe(initialCalls);
   });
 
   it('should bypass debounce on clear (immediate re-fetch with no context)', async () => {
@@ -182,7 +182,7 @@ describe('Contextual re-fetch on temporal change', () => {
     await fireEvent.click(screen.getByTestId('year-btn-2023'));
     await vi.advanceTimersByTimeAsync(250);
 
-    const callsAfterYear = (config.providers.people as ReturnType<typeof vi.fn>).mock.calls.length;
+    const callsAfterYear = (config.providers!.people as ReturnType<typeof vi.fn>).mock.calls.length;
 
     // Click "All" breadcrumb to clear temporal filter
     await fireEvent.click(screen.getByTestId('temporal-breadcrumb-all'));
@@ -191,9 +191,9 @@ describe('Contextual re-fetch on temporal change', () => {
     await vi.advanceTimersByTimeAsync(1);
 
     await waitFor(() => {
-      const finalCalls = (config.providers.people as ReturnType<typeof vi.fn>).mock.calls.length;
+      const finalCalls = (config.providers!.people as ReturnType<typeof vi.fn>).mock.calls.length;
       expect(finalCalls).toBeGreaterThan(callsAfterYear);
-      expect(config.providers.people).toHaveBeenLastCalledWith(undefined);
+      expect(config.providers!.people).toHaveBeenLastCalledWith(undefined);
     });
   });
 
@@ -242,7 +242,7 @@ describe('Contextual re-fetch on temporal change', () => {
     await vi.advanceTimersByTimeAsync(250);
 
     await waitFor(() => {
-      expect(config.providers.people).toHaveBeenLastCalledWith({
+      expect(config.providers!.people).toHaveBeenLastCalledWith({
         takenAfter: '2023-08-01T00:00:00.000Z',
         takenBefore: '2023-09-01T00:00:00.000Z',
       });
