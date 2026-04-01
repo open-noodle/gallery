@@ -21,9 +21,20 @@ export interface TagOption {
   name: string;
 }
 
+export interface FilterSuggestionsResponse {
+  countries: string[];
+  cameraMakes: string[];
+  tags: TagOption[];
+  people: PersonOption[];
+  ratings: number[];
+  mediaTypes: string[];
+  hasUnnamedPeople: boolean;
+}
+
 export interface FilterPanelConfig {
   sections: FilterSection[];
-  providers: {
+  suggestionsProvider?: (filters: FilterState) => Promise<FilterSuggestionsResponse>;
+  providers?: {
     people?: (context?: FilterContext) => Promise<PersonOption[]>;
     allPeople?: () => Promise<PersonOption[]>;
     locations?: (context?: FilterContext) => Promise<LocationOption[]>;
