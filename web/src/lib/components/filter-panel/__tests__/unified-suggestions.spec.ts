@@ -109,6 +109,24 @@ describe('Unified suggestionsProvider', () => {
     });
   });
 
+  it('should always show all 5 rating stars even when availableRatings is limited', async () => {
+    const config = createUnifiedConfig({
+      suggestionsProvider: vi.fn().mockResolvedValue({
+        ...defaultResponse,
+        ratings: [4, 5],
+      }),
+    });
+    render(FilterPanel, { props: { config, timeBuckets } });
+
+    await vi.advanceTimersByTimeAsync(0);
+
+    await waitFor(() => {
+      for (const star of [1, 2, 3, 4, 5]) {
+        expect(screen.getByTestId(`rating-star-${star}`)).toBeTruthy();
+      }
+    });
+  });
+
   it('should show all ratings when availableRatings is undefined (backward compat)', async () => {
     const config: FilterPanelConfig = {
       sections: ['rating'],
