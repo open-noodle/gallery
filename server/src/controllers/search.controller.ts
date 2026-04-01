@@ -5,6 +5,8 @@ import { AssetResponseDto } from 'src/dtos/asset-response.dto';
 import { AuthDto } from 'src/dtos/auth.dto';
 import { PersonResponseDto } from 'src/dtos/person.dto';
 import {
+  FilterSuggestionsRequestDto,
+  FilterSuggestionsResponseDto,
   LargeAssetSearchDto,
   MetadataSearchDto,
   PlacesResponseDto,
@@ -156,5 +158,20 @@ export class SearchController {
   })
   getTagSuggestions(@Auth() auth: AuthDto, @Query() dto: TagSuggestionRequestDto): Promise<TagSuggestionResponseDto[]> {
     return this.service.getTagSuggestions(auth, dto);
+  }
+
+  @Get('suggestions/filters')
+  @Authenticated({ permission: Permission.AssetRead })
+  @Endpoint({
+    summary: 'Retrieve dynamic filter suggestions',
+    description:
+      'Returns available filter values scoped by all other active filters. Each category excludes its own filter (faceted search).',
+    history: new HistoryBuilder().added('v1'),
+  })
+  getFilterSuggestions(
+    @Auth() auth: AuthDto,
+    @Query() dto: FilterSuggestionsRequestDto,
+  ): Promise<FilterSuggestionsResponseDto> {
+    return this.service.getFilterSuggestions(auth, dto);
   }
 }

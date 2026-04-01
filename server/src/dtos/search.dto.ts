@@ -1,4 +1,6 @@
-import { createZodDto } from 'nestjs-zod';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform, Type } from 'class-transformer';
+import { IsInt, IsNotEmpty, IsString, Max, Min } from 'class-validator';
 import { Place } from 'src/database';
 import { HistoryBuilder } from 'src/decorators';
 import { AlbumResponseSchema } from 'src/dtos/album.dto';
@@ -243,6 +245,107 @@ export class TagSuggestionResponseDto {
 
   @ApiProperty({ description: 'Tag value/name' })
   value!: string;
+}
+
+export class FilterSuggestionsPersonDto {
+  @ApiProperty({ description: 'Person ID' })
+  id!: string;
+
+  @ApiProperty({ description: 'Person name' })
+  name!: string;
+}
+
+export class FilterSuggestionsTagDto {
+  @ApiProperty({ description: 'Tag ID' })
+  id!: string;
+
+  @ApiProperty({ description: 'Tag value/name' })
+  value!: string;
+}
+
+export class FilterSuggestionsResponseDto {
+  @ApiProperty({ type: [String], description: 'Available countries' })
+  countries!: string[];
+
+  @ApiProperty({ type: [String], description: 'Available camera makes' })
+  cameraMakes!: string[];
+
+  @ApiProperty({ type: [FilterSuggestionsTagDto], description: 'Available tags' })
+  tags!: FilterSuggestionsTagDto[];
+
+  @ApiProperty({
+    type: [FilterSuggestionsPersonDto],
+    description: 'Available people (named, non-hidden, with thumbnails)',
+  })
+  people!: FilterSuggestionsPersonDto[];
+
+  @ApiProperty({ type: [Number], description: 'Available ratings' })
+  ratings!: number[];
+
+  @ApiProperty({ type: [String], description: 'Available media types' })
+  mediaTypes!: string[];
+
+  @ApiProperty({ description: 'Whether unnamed people exist in the filtered set' })
+  hasUnnamedPeople!: boolean;
+}
+
+export class FilterSuggestionsRequestDto {
+  @ValidateUUID({ each: true, optional: true, description: 'Filter by person IDs' })
+  @Transform(({ value }) => (value === undefined ? undefined : Array.isArray(value) ? value : [value]), {
+    toClassOnly: true,
+  })
+  personIds?: string[];
+
+  @ApiPropertyOptional({ description: 'Filter by country' })
+  @IsString()
+  @Optional()
+  country?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by city' })
+  @IsString()
+  @Optional()
+  city?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by camera make' })
+  @IsString()
+  @Optional()
+  make?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by camera model' })
+  @IsString()
+  @Optional()
+  model?: string;
+
+  @ValidateUUID({ each: true, optional: true, description: 'Filter by tag IDs' })
+  @Transform(({ value }) => (value === undefined ? undefined : Array.isArray(value) ? value : [value]), {
+    toClassOnly: true,
+  })
+  tagIds?: string[];
+
+  @Property({ type: 'number', description: 'Filter by rating (1-5)', minimum: 1, maximum: 5 })
+  @Optional()
+  @IsInt()
+  @Min(1)
+  @Max(5)
+  rating?: number;
+
+  @ValidateEnum({ enum: AssetType, name: 'AssetTypeEnum', optional: true, description: 'Filter by asset type' })
+  mediaType?: AssetType;
+
+  @ValidateBoolean({ optional: true, description: 'Filter by favorites' })
+  isFavorite?: boolean;
+
+  @ValidateDate({ optional: true, description: 'Filter by taken date (after)' })
+  takenAfter?: Date;
+
+  @ValidateDate({ optional: true, description: 'Filter by taken date (before)' })
+  takenBefore?: Date;
+
+  @ValidateUUID({ optional: true, description: 'Scope to a specific shared space' })
+  spaceId?: string;
+
+  @ValidateBoolean({ optional: true, description: 'Include shared spaces the user is a member of' })
+  withSharedSpaces?: boolean;
 }
 
 class SearchFacetCountResponseDto {

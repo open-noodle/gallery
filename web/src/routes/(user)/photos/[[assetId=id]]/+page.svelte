@@ -3,11 +3,12 @@
   import ActiveFiltersBar from '$lib/components/filter-panel/active-filters-bar.svelte';
   import FilterPanel from '$lib/components/filter-panel/filter-panel.svelte';
   import {
+    buildFilterContext,
     clearFilters,
     createFilterState,
     getActiveFilterCount,
-    type FilterContext,
     type FilterPanelConfig,
+    type FilterState,
   } from '$lib/components/filter-panel/filter-panel';
   import UserPageLayout from '$lib/components/layouts/UserPageLayout.svelte';
   import ButtonContextMenu from '$lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
@@ -47,7 +48,7 @@
   import { buildPhotosTimelineOptions, handlePhotosRemoveFilter } from '$lib/utils/photos-filter-options';
   import { getAltText } from '$lib/utils/thumbnail-util';
   import { toTimelineAsset } from '$lib/utils/timeline-util';
-  import { getAllPeople, getSearchSuggestions, getTagSuggestions, SearchSuggestionType } from '@immich/sdk';
+  import { AssetTypeEnum, getFilterSuggestions, getSearchSuggestions, SearchSuggestionType } from '@immich/sdk';
   import { ActionButton, CommandPaletteDefaultProvider, ImageCarousel } from '@immich/ui';
   import { mdiDotsVertical } from '@mdi/js';
   import { t } from 'svelte-i18n';
@@ -63,70 +64,63 @@
 
   const filterConfig: FilterPanelConfig = {
     sections: ['timeline', 'people', 'location', 'camera', 'tags', 'rating', 'media'],
+    suggestionsProvider: async (filters: FilterState) => {
+      const context = buildFilterContext(filters);
+      const response = await getFilterSuggestions({
+        personIds: filters.personIds.length > 0 ? filters.personIds : undefined,
+        country: filters.country,
+        city: filters.city,
+        make: filters.make,
+        model: filters.model,
+        tagIds: filters.tagIds.length > 0 ? filters.tagIds : undefined,
+        rating: filters.rating,
+        mediaType:
+          filters.mediaType === 'all'
+            ? undefined
+            : filters.mediaType === 'image'
+              ? AssetTypeEnum.Image
+              : AssetTypeEnum.Video,
+        isFavorite: filters.isFavorite,
+        takenAfter: context?.takenAfter,
+        takenBefore: context?.takenBefore,
+        withSharedSpaces: true,
+      });
+      const mappedPeople = response.people.map((p) => ({
+        id: p.id,
+        name: p.name,
+        thumbnailUrl: `/people/${p.id}/thumbnail`,
+      }));
+      for (const p of response.people) {
+        personNames.set(p.id, p.name);
+      }
+      for (const t of response.tags) {
+        tagNames.set(t.id, t.value);
+      }
+      return {
+        countries: response.countries,
+        cameraMakes: response.cameraMakes,
+        tags: response.tags.map((t) => ({ id: t.id, name: t.value })),
+        people: mappedPeople,
+        ratings: response.ratings,
+        mediaTypes: response.mediaTypes,
+        hasUnnamedPeople: response.hasUnnamedPeople,
+      };
+    },
     providers: {
-      people: async () => {
-        const response = await getAllPeople({ withHidden: false });
-        const named = response.people.filter((p) => p.name);
-        for (const p of named) {
-          personNames.set(p.id, p.name);
-        }
-        return named
-          .filter((p) => p.thumbnailPath)
-          .map((p) => ({
-            id: p.id,
-            name: p.name,
-            thumbnailUrl: `/people/${p.id}/thumbnail`,
-          }));
-      },
-      locations: async (context?: FilterContext) => {
-        const countries = await getSearchSuggestions({
-          $type: SearchSuggestionType.Country,
-          withSharedSpaces: true,
-          takenAfter: context?.takenAfter,
-          takenBefore: context?.takenBefore,
-        });
-        return countries.filter(Boolean).map((c) => ({ value: c!, type: 'country' as const }));
-      },
-      cities: async (country: string, context?: FilterContext) => {
-        const cities = await getSearchSuggestions({
+      cities: async (country, context) =>
+        getSearchSuggestions({
           $type: SearchSuggestionType.City,
           country,
           withSharedSpaces: true,
-          takenAfter: context?.takenAfter,
-          takenBefore: context?.takenBefore,
-        });
-        return cities.filter(Boolean) as string[];
-      },
-      cameras: async (context?: FilterContext) => {
-        const makes = await getSearchSuggestions({
-          $type: SearchSuggestionType.CameraMake,
-          withSharedSpaces: true,
-          takenAfter: context?.takenAfter,
-          takenBefore: context?.takenBefore,
-        });
-        return makes.filter(Boolean).map((m) => ({ value: m!, type: 'make' as const }));
-      },
-      cameraModels: async (make: string, context?: FilterContext) => {
-        const models = await getSearchSuggestions({
+          ...context,
+        }),
+      cameraModels: async (make, context) =>
+        getSearchSuggestions({
           $type: SearchSuggestionType.CameraModel,
           make,
           withSharedSpaces: true,
-          takenAfter: context?.takenAfter,
-          takenBefore: context?.takenBefore,
-        });
-        return models.filter(Boolean) as string[];
-      },
-      tags: async (context?: FilterContext) => {
-        const tags = await getTagSuggestions({
-          withSharedSpaces: true,
-          takenAfter: context?.takenAfter,
-          takenBefore: context?.takenBefore,
-        });
-        for (const t of tags) {
-          tagNames.set(t.id, t.value);
-        }
-        return tags.map((t) => ({ id: t.id, name: t.value }));
-      },
+          ...context,
+        }),
     },
   };
 

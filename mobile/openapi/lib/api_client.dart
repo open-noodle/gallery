@@ -384,6 +384,12 @@ class ApiClient {
           return FaceDto.fromJson(value);
         case 'FacialRecognitionConfig':
           return FacialRecognitionConfig.fromJson(value);
+        case 'FilterSuggestionsPersonDto':
+          return FilterSuggestionsPersonDto.fromJson(value);
+        case 'FilterSuggestionsResponseDto':
+          return FilterSuggestionsResponseDto.fromJson(value);
+        case 'FilterSuggestionsTagDto':
+          return FilterSuggestionsTagDto.fromJson(value);
         case 'FoldersResponse':
           return FoldersResponse.fromJson(value);
         case 'FoldersUpdate':

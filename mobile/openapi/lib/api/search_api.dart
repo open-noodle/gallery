@@ -118,6 +118,176 @@ class SearchApi {
     return null;
   }
 
+  /// Retrieve dynamic filter suggestions
+  ///
+  /// Returns available filter values scoped by all other active filters. Each category excludes its own filter (faceted search).
+  ///
+  /// Note: This method returns the HTTP [Response].
+  ///
+  /// Parameters:
+  ///
+  /// * [String] city:
+  ///   Filter by city
+  ///
+  /// * [String] country:
+  ///   Filter by country
+  ///
+  /// * [bool] isFavorite:
+  ///   Filter by favorites
+  ///
+  /// * [String] make:
+  ///   Filter by camera make
+  ///
+  /// * [AssetTypeEnum] mediaType:
+  ///   Filter by asset type
+  ///
+  /// * [String] model:
+  ///   Filter by camera model
+  ///
+  /// * [List<String>] personIds:
+  ///   Filter by person IDs
+  ///
+  /// * [num] rating:
+  ///   Filter by rating (1-5)
+  ///
+  /// * [String] spaceId:
+  ///   Scope to a specific shared space
+  ///
+  /// * [List<String>] tagIds:
+  ///   Filter by tag IDs
+  ///
+  /// * [DateTime] takenAfter:
+  ///   Filter by taken date (after)
+  ///
+  /// * [DateTime] takenBefore:
+  ///   Filter by taken date (before)
+  ///
+  /// * [bool] withSharedSpaces:
+  ///   Include shared spaces the user is a member of
+  Future<Response> getFilterSuggestionsWithHttpInfo({ String? city, String? country, bool? isFavorite, String? make, AssetTypeEnum? mediaType, String? model, List<String>? personIds, num? rating, String? spaceId, List<String>? tagIds, DateTime? takenAfter, DateTime? takenBefore, bool? withSharedSpaces, }) async {
+    // ignore: prefer_const_declarations
+    final apiPath = r'/search/suggestions/filters';
+
+    // ignore: prefer_final_locals
+    Object? postBody;
+
+    final queryParams = <QueryParam>[];
+    final headerParams = <String, String>{};
+    final formParams = <String, String>{};
+
+    if (city != null) {
+      queryParams.addAll(_queryParams('', 'city', city));
+    }
+    if (country != null) {
+      queryParams.addAll(_queryParams('', 'country', country));
+    }
+    if (isFavorite != null) {
+      queryParams.addAll(_queryParams('', 'isFavorite', isFavorite));
+    }
+    if (make != null) {
+      queryParams.addAll(_queryParams('', 'make', make));
+    }
+    if (mediaType != null) {
+      queryParams.addAll(_queryParams('', 'mediaType', mediaType));
+    }
+    if (model != null) {
+      queryParams.addAll(_queryParams('', 'model', model));
+    }
+    if (personIds != null) {
+      queryParams.addAll(_queryParams('multi', 'personIds', personIds));
+    }
+    if (rating != null) {
+      queryParams.addAll(_queryParams('', 'rating', rating));
+    }
+    if (spaceId != null) {
+      queryParams.addAll(_queryParams('', 'spaceId', spaceId));
+    }
+    if (tagIds != null) {
+      queryParams.addAll(_queryParams('multi', 'tagIds', tagIds));
+    }
+    if (takenAfter != null) {
+      queryParams.addAll(_queryParams('', 'takenAfter', takenAfter));
+    }
+    if (takenBefore != null) {
+      queryParams.addAll(_queryParams('', 'takenBefore', takenBefore));
+    }
+    if (withSharedSpaces != null) {
+      queryParams.addAll(_queryParams('', 'withSharedSpaces', withSharedSpaces));
+    }
+
+    const contentTypes = <String>[];
+
+
+    return apiClient.invokeAPI(
+      apiPath,
+      'GET',
+      queryParams,
+      postBody,
+      headerParams,
+      formParams,
+      contentTypes.isEmpty ? null : contentTypes.first,
+    );
+  }
+
+  /// Retrieve dynamic filter suggestions
+  ///
+  /// Returns available filter values scoped by all other active filters. Each category excludes its own filter (faceted search).
+  ///
+  /// Parameters:
+  ///
+  /// * [String] city:
+  ///   Filter by city
+  ///
+  /// * [String] country:
+  ///   Filter by country
+  ///
+  /// * [bool] isFavorite:
+  ///   Filter by favorites
+  ///
+  /// * [String] make:
+  ///   Filter by camera make
+  ///
+  /// * [AssetTypeEnum] mediaType:
+  ///   Filter by asset type
+  ///
+  /// * [String] model:
+  ///   Filter by camera model
+  ///
+  /// * [List<String>] personIds:
+  ///   Filter by person IDs
+  ///
+  /// * [num] rating:
+  ///   Filter by rating (1-5)
+  ///
+  /// * [String] spaceId:
+  ///   Scope to a specific shared space
+  ///
+  /// * [List<String>] tagIds:
+  ///   Filter by tag IDs
+  ///
+  /// * [DateTime] takenAfter:
+  ///   Filter by taken date (after)
+  ///
+  /// * [DateTime] takenBefore:
+  ///   Filter by taken date (before)
+  ///
+  /// * [bool] withSharedSpaces:
+  ///   Include shared spaces the user is a member of
+  Future<FilterSuggestionsResponseDto?> getFilterSuggestions({ String? city, String? country, bool? isFavorite, String? make, AssetTypeEnum? mediaType, String? model, List<String>? personIds, num? rating, String? spaceId, List<String>? tagIds, DateTime? takenAfter, DateTime? takenBefore, bool? withSharedSpaces, }) async {
+    final response = await getFilterSuggestionsWithHttpInfo( city: city, country: country, isFavorite: isFavorite, make: make, mediaType: mediaType, model: model, personIds: personIds, rating: rating, spaceId: spaceId, tagIds: tagIds, takenAfter: takenAfter, takenBefore: takenBefore, withSharedSpaces: withSharedSpaces, );
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
+    }
+    // When a remote server returns no body with a status of 204, we shall not decode it.
+    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
+    // FormatException when trying to decode an empty string.
+    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'FilterSuggestionsResponseDto',) as FilterSuggestionsResponseDto;
+    
+    }
+    return null;
+  }
+
   /// Retrieve search suggestions
   ///
   /// Retrieve search suggestions based on partial input. This endpoint is used for typeahead search features.

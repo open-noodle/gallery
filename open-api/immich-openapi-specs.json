@@ -10361,6 +10361,178 @@
         "x-immich-state": "Stable"
       }
     },
+    "/search/suggestions/filters": {
+      "get": {
+        "description": "Returns available filter values scoped by all other active filters. Each category excludes its own filter (faceted search).",
+        "operationId": "getFilterSuggestions",
+        "parameters": [
+          {
+            "name": "city",
+            "required": false,
+            "in": "query",
+            "description": "Filter by city",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "country",
+            "required": false,
+            "in": "query",
+            "description": "Filter by country",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "isFavorite",
+            "required": false,
+            "in": "query",
+            "description": "Filter by favorites",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "make",
+            "required": false,
+            "in": "query",
+            "description": "Filter by camera make",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "mediaType",
+            "required": false,
+            "in": "query",
+            "description": "Filter by asset type",
+            "schema": {
+              "$ref": "#/components/schemas/AssetTypeEnum"
+            }
+          },
+          {
+            "name": "model",
+            "required": false,
+            "in": "query",
+            "description": "Filter by camera model",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "personIds",
+            "required": false,
+            "in": "query",
+            "description": "Filter by person IDs",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          },
+          {
+            "name": "rating",
+            "required": false,
+            "in": "query",
+            "description": "Filter by rating (1-5)",
+            "schema": {
+              "minimum": 1,
+              "maximum": 5,
+              "type": "number"
+            }
+          },
+          {
+            "name": "spaceId",
+            "required": false,
+            "in": "query",
+            "description": "Scope to a specific shared space",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "tagIds",
+            "required": false,
+            "in": "query",
+            "description": "Filter by tag IDs",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          },
+          {
+            "name": "takenAfter",
+            "required": false,
+            "in": "query",
+            "description": "Filter by taken date (after)",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "takenBefore",
+            "required": false,
+            "in": "query",
+            "description": "Filter by taken date (before)",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "withSharedSpaces",
+            "required": false,
+            "in": "query",
+            "description": "Include shared spaces the user is a member of",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FilterSuggestionsResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Retrieve dynamic filter suggestions",
+        "tags": [
+          "Search"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          }
+        ],
+        "x-immich-permission": "asset.read"
+      }
+    },
     "/search/suggestions/tags": {
       "get": {
         "description": "Retrieve tags present on assets accessible to the user, with optional space and temporal scoping.",
@@ -20798,6 +20970,100 @@
           "minFaces",
           "minScore",
           "modelName"
+        ],
+        "type": "object"
+      },
+      "FilterSuggestionsPersonDto": {
+        "properties": {
+          "id": {
+            "description": "Person ID",
+            "type": "string"
+          },
+          "name": {
+            "description": "Person name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "type": "object"
+      },
+      "FilterSuggestionsResponseDto": {
+        "properties": {
+          "cameraMakes": {
+            "description": "Available camera makes",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "countries": {
+            "description": "Available countries",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "hasUnnamedPeople": {
+            "description": "Whether unnamed people exist in the filtered set",
+            "type": "boolean"
+          },
+          "mediaTypes": {
+            "description": "Available media types",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "people": {
+            "description": "Available people (named, non-hidden, with thumbnails)",
+            "items": {
+              "$ref": "#/components/schemas/FilterSuggestionsPersonDto"
+            },
+            "type": "array"
+          },
+          "ratings": {
+            "description": "Available ratings",
+            "items": {
+              "type": "number"
+            },
+            "type": "array"
+          },
+          "tags": {
+            "description": "Available tags",
+            "items": {
+              "$ref": "#/components/schemas/FilterSuggestionsTagDto"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "cameraMakes",
+          "countries",
+          "hasUnnamedPeople",
+          "mediaTypes",
+          "people",
+          "ratings",
+          "tags"
+        ],
+        "type": "object"
+      },
+      "FilterSuggestionsTagDto": {
+        "properties": {
+          "id": {
+            "description": "Tag ID",
+            "type": "string"
+          },
+          "value": {
+            "description": "Tag value/name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "value"
         ],
         "type": "object"
       },

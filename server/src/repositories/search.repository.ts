@@ -7,6 +7,7 @@ import { probes } from 'src/repositories/database.repository';
 import { DB } from 'src/schema';
 import { AssetExifTable } from 'src/schema/tables/asset-exif.table';
 import { anyUuid, asUuid, searchAssetBuilder, withExifInner } from 'src/utils/database';
+import { without } from 'src/utils/filter-suggestions';
 import { paginationHelper } from 'src/utils/pagination';
 import { isValidInteger } from 'src/validation';
 
@@ -191,6 +192,28 @@ export interface GetCameraMakesOptions extends SpaceScopeOptions {
 export interface GetCameraLensModelsOptions extends SpaceScopeOptions {
   make?: string;
   model?: string;
+}
+
+export interface FilterSuggestionsOptions extends SpaceScopeOptions {
+  personIds?: string[];
+  country?: string;
+  city?: string;
+  make?: string;
+  model?: string;
+  tagIds?: string[];
+  rating?: number;
+  mediaType?: AssetType;
+  isFavorite?: boolean;
+}
+
+export interface FilterSuggestionsResult {
+  countries: string[];
+  cameraMakes: string[];
+  tags: Array<{ id: string; value: string }>;
+  people: Array<{ id: string; name: string }>;
+  ratings: number[];
+  mediaTypes: string[];
+  hasUnnamedPeople: boolean;
 }
 
 @Injectable()
@@ -566,6 +589,27 @@ export class SearchRepository {
       .execute();
   }
 
+  async getFilterSuggestions(userIds: string[], options: FilterSuggestionsOptions): Promise<FilterSuggestionsResult> {
+    const [countries, cameraMakes, tags, peopleResult, ratings, mediaTypes] = await Promise.all([
+      this.getFilteredCountries(userIds, without(options, 'country', 'city')),
+      this.getFilteredCameraMakes(userIds, without(options, 'make', 'model')),
+      this.getFilteredTags(userIds, without(options, 'tagIds')),
+      this.getFilteredPeople(userIds, without(options, 'personIds')),
+      this.getFilteredRatings(userIds, without(options, 'rating')),
+      this.getFilteredMediaTypes(userIds, without(options, 'mediaType')),
+    ]);
+
+    return {
+      countries,
+      cameraMakes,
+      tags,
+      people: peopleResult.people,
+      ratings,
+      mediaTypes,
+      hasUnnamedPeople: peopleResult.hasUnnamedPeople,
+    };
+  }
+
   private getExifField<K extends 'city' | 'state' | 'country' | 'make' | 'model' | 'lensModel'>(
     field: K,
     userIds: string[],
@@ -620,5 +664,198 @@ export class SearchRepository {
       )
       .$if(!!options?.takenAfter, (qb) => qb.where('asset.fileCreatedAt', '>=', options!.takenAfter!))
       .$if(!!options?.takenBefore, (qb) => qb.where('asset.fileCreatedAt', '<', options!.takenBefore!));
+  }
+
+  private buildFilteredAssetIds(userIds: string[], options: FilterSuggestionsOptions) {
+    const needsExifJoin = !!(options.country || options.city || options.make || options.model || options.rating);
+
+    return this.db
+      .selectFrom('asset')
+      .select('asset.id')
+      .where('asset.visibility', '=', AssetVisibility.Timeline)
+      .where('asset.deletedAt', 'is', null)
+      .$if(!options.spaceId && !options.timelineSpaceIds, (qb) => qb.where('asset.ownerId', '=', anyUuid(userIds)))
+      .$if(!!options.spaceId && !options.timelineSpaceIds, (qb) =>
+        qb.where((eb) =>
+          eb.or([
+            eb.exists(
+              eb
+                .selectFrom('shared_space_asset')
+                .whereRef('shared_space_asset.assetId', '=', 'asset.id')
+                .where('shared_space_asset.spaceId', '=', asUuid(options.spaceId!)),
+            ),
+            eb.exists(
+              eb
+                .selectFrom('shared_space_library')
+                .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
+                .where('shared_space_library.spaceId', '=', asUuid(options.spaceId!)),
+            ),
+          ]),
+        ),
+      )
+      .$if(!!options.timelineSpaceIds, (qb) =>
+        qb.where((eb) =>
+          eb.or([
+            eb('asset.ownerId', '=', anyUuid(userIds)),
+            eb.exists(
+              eb
+                .selectFrom('shared_space_asset')
+                .whereRef('shared_space_asset.assetId', '=', 'asset.id')
+                .where('shared_space_asset.spaceId', '=', anyUuid(options.timelineSpaceIds!)),
+            ),
+            eb.exists(
+              eb
+                .selectFrom('shared_space_library')
+                .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
+                .where('shared_space_library.spaceId', '=', anyUuid(options.timelineSpaceIds!)),
+            ),
+          ]),
+        ),
+      )
+      .$if(!!options.takenAfter, (qb) => qb.where('asset.fileCreatedAt', '>=', options.takenAfter!))
+      .$if(!!options.takenBefore, (qb) => qb.where('asset.fileCreatedAt', '<', options.takenBefore!))
+      .$if(needsExifJoin, (qb) =>
+        qb
+          .innerJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
+          .$if(!!options.country, (qb) => qb.where('asset_exif.country', '=', options.country!))
+          .$if(!!options.city, (qb) => qb.where('asset_exif.city', '=', options.city!))
+          .$if(!!options.make, (qb) => qb.where('asset_exif.make', '=', options.make!))
+          .$if(!!options.model, (qb) => qb.where('asset_exif.model', '=', options.model!))
+          .$if(!!options.rating, (qb) => qb.where('asset_exif.rating', '=', options.rating!)),
+      )
+      .$if(!!options.personIds?.length, (qb) =>
+        qb.where((eb) =>
+          eb.exists(
+            eb
+              .selectFrom('asset_face')
+              .whereRef('asset_face.assetId', '=', 'asset.id')
+              .where('asset_face.personId', '=', anyUuid(options.personIds!)),
+          ),
+        ),
+      )
+      .$if(!!options.tagIds?.length, (qb) =>
+        qb.where((eb) =>
+          eb.exists(
+            eb
+              .selectFrom('tag_asset')
+              .whereRef('tag_asset.assetId', '=', 'asset.id')
+              .where('tag_asset.tagId', '=', anyUuid(options.tagIds!)),
+          ),
+        ),
+      )
+      .$if(!!options.mediaType, (qb) => qb.where('asset.type', '=', options.mediaType!))
+      .$if(options.isFavorite !== undefined && options.isFavorite !== null, (qb) =>
+        qb.where('asset.isFavorite', '=', options.isFavorite!),
+      );
+  }
+
+  private async getFilteredCountries(userIds: string[], options: FilterSuggestionsOptions): Promise<string[]> {
+    const filteredIds = this.buildFilteredAssetIds(userIds, options);
+    const res = await this.db
+      .selectFrom('asset_exif')
+      .select('country')
+      .distinct()
+      .where('assetId', 'in', filteredIds)
+      .where('country', 'is not', null)
+      .where('country', '!=', '')
+      .orderBy('country')
+      .execute();
+    return res.map((row) => row.country!);
+  }
+
+  private async getFilteredCameraMakes(userIds: string[], options: FilterSuggestionsOptions): Promise<string[]> {
+    const filteredIds = this.buildFilteredAssetIds(userIds, options);
+    const res = await this.db
+      .selectFrom('asset_exif')
+      .select('make')
+      .distinct()
+      .where('assetId', 'in', filteredIds)
+      .where('make', 'is not', null)
+      .where('make', '!=', '')
+      .orderBy('make')
+      .execute();
+    return res.map((row) => row.make!);
+  }
+
+  private async getFilteredTags(
+    userIds: string[],
+    options: FilterSuggestionsOptions,
+  ): Promise<Array<{ id: string; value: string }>> {
+    const filteredIds = this.buildFilteredAssetIds(userIds, options);
+    return this.db
+      .selectFrom('tag')
+      .select(['tag.id', 'tag.value'])
+      .distinct()
+      .innerJoin('tag_asset', 'tag.id', 'tag_asset.tagId')
+      .where('tag_asset.assetId', 'in', filteredIds)
+      .orderBy('tag.value')
+      .execute();
+  }
+
+  private async getFilteredPeople(
+    userIds: string[],
+    options: FilterSuggestionsOptions,
+  ): Promise<{ people: Array<{ id: string; name: string }>; hasUnnamedPeople: boolean }> {
+    const filteredIds = this.buildFilteredAssetIds(userIds, options);
+
+    const people = await this.db
+      .selectFrom('person')
+      .select(['person.id', 'person.name'])
+      .where('person.name', '!=', '')
+      .where('person.isHidden', '=', false)
+      .where('person.thumbnailPath', '!=', '')
+      .where((eb) =>
+        eb.exists(
+          eb
+            .selectFrom('asset_face')
+            .whereRef('asset_face.personId', '=', 'person.id')
+            .where('asset_face.assetId', 'in', filteredIds),
+        ),
+      )
+      .orderBy('person.name')
+      .execute();
+
+    const unnamed = await this.db
+      .selectFrom('person')
+      .select(sql`1`.as('exists'))
+      .where((eb) => eb.or([eb('person.name', '=', ''), eb('person.name', 'is', null)]))
+      .where((eb) =>
+        eb.exists(
+          eb
+            .selectFrom('asset_face')
+            .whereRef('asset_face.personId', '=', 'person.id')
+            .where('asset_face.assetId', 'in', filteredIds),
+        ),
+      )
+      .limit(1)
+      .executeTakeFirst();
+
+    return { people, hasUnnamedPeople: !!unnamed };
+  }
+
+  private async getFilteredRatings(userIds: string[], options: FilterSuggestionsOptions): Promise<number[]> {
+    const filteredIds = this.buildFilteredAssetIds(userIds, options);
+    const res = await this.db
+      .selectFrom('asset_exif')
+      .select('rating')
+      .distinct()
+      .where('assetId', 'in', filteredIds)
+      .where('rating', 'is not', null)
+      .where('rating', '>', 0)
+      .orderBy('rating')
+      .execute();
+    return res.map((row) => row.rating!);
+  }
+
+  private async getFilteredMediaTypes(userIds: string[], options: FilterSuggestionsOptions): Promise<string[]> {
+    const filteredIds = this.buildFilteredAssetIds(userIds, options);
+    const res = await this.db
+      .selectFrom('asset')
+      .select('type')
+      .distinct()
+      .where('id', 'in', filteredIds)
+      .orderBy('type')
+      .execute();
+    return res.map((row) => row.type);
   }
 }
