@@ -704,12 +704,35 @@ export class AssetRepository {
 
   @GenerateSql({ params: [DummyValue.UUID, [DummyValue.BUFFER]] })
   getByChecksums(userId: string, checksums: Buffer[]) {
-    return this.db
-      .selectFrom('asset')
-      .select(['id', 'checksum', 'deletedAt'])
-      .where('ownerId', '=', asUuid(userId))
-      .where('checksum', 'in', checksums)
-      .execute();
+    if (checksums.length === 0) {
+      return Promise.resolve([]);
+    }
+
+    return this._getByChecksumsWithTombstones(userId, checksums);
+  }
+
+  private async _getByChecksumsWithTombstones(userId: string, checksums: Buffer[]) {
+    const [assetResults, tombstoneResults] = await Promise.all([
+      this.db
+        .selectFrom('asset')
+        .select(['id', 'checksum', 'deletedAt'])
+        .where('ownerId', '=', asUuid(userId))
+        .where('checksum', 'in', checksums)
+        .execute(),
+      this.db
+        .selectFrom('asset_duplicate_checksum')
+        .select(['assetId as id', 'checksum'])
+        .where('ownerId', '=', asUuid(userId))
+        .where('checksum', 'in', checksums)
+        .execute(),
+    ]);
+
+    // Asset-table results take priority over tombstone results
+    const seen = new Set(assetResults.map((r) => r.checksum.toString('hex')));
+    return [
+      ...assetResults,
+      ...tombstoneResults.filter((r) => !seen.has(r.checksum.toString('hex'))).map((r) => ({ ...r, deletedAt: null })),
+    ];
   }
 
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.BUFFER] })
@@ -723,7 +746,37 @@ export class AssetRepository {
       .limit(1)
       .executeTakeFirst();
 
-    return asset?.id;
+    if (asset) {
+      return asset.id;
+    }
+
+    // Fallback to tombstone table
+    const tombstone = await this.db
+      .selectFrom('asset_duplicate_checksum')
+      .select('assetId')
+      .where('ownerId', '=', asUuid(ownerId))
+      .where('checksum', '=', checksum)
+      .limit(1)
+      .executeTakeFirst();
+
+    return tombstone?.assetId;
+  }
+
+  @GenerateSql({ params: [[DummyValue.UUID]] })
+  async getChecksumsByIds(ids: string[]): Promise<{ id: string; checksum: Buffer }[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    return this.db
+      .selectFrom('asset')
+      .select(['id', 'checksum'])
+      .where(
+        'id',
+        'in',
+        ids.map((id) => asUuid(id)),
+      )
+      .execute();
   }
 
   findLivePhotoMatch(options: LivePhotoSearchOptions) {
