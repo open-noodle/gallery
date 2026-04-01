@@ -321,6 +321,8 @@ count format.
   triggers a fresh search from page 1 (not appending to existing results)
 - **Timeline options with `'relevance'`:** Verify `photos-filter-options.ts` and the space page
   timeline options builder both fall back to `AssetOrder.Desc` when `sortOrder` is `'relevance'`
+- **`clearFilters` preserves `'relevance'`:** Verify `clearFilters()` does not reset `sortOrder`
+  when it is `'relevance'` (user is in search mode, clears filters, stays in search)
 - **Existing tests:** Update `filter-state.spec.ts` to account for `'relevance'` as a valid
   `sortOrder` value; update `sort-toggle.spec.ts` if the component interface changes
 
