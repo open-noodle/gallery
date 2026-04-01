@@ -26144,6 +26144,14 @@
             "description": "Filter by OCR text content",
             "type": "string"
           },
+          "order": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AssetOrder"
+              }
+            ],
+            "description": "Sort order (omit for relevance)"
+          },
           "page": {
             "description": "Page number",
             "minimum": 1,
