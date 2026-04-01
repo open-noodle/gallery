@@ -307,10 +307,9 @@ describe(TimelineService.name, () => {
       );
     });
 
-    it('should check permissions to read tag', async () => {
+    it('should pass tagId through to the query', async () => {
       const json = `[{ id: ['asset-id'] }]`;
       mocks.asset.getTimeBucket.mockResolvedValue({ assets: json });
-      mocks.access.tag.checkOwnerAccess.mockResolvedValue(new Set(['tag-123']));
 
       await expect(
         sut.getTimeBucket(authStub.admin, {
@@ -629,13 +628,6 @@ describe(TimelineService.name, () => {
       expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(expect.objectContaining({ assetType: AssetType.Image }));
     });
 
-    it('should check tag access for each tagId in tagIds array', async () => {
-      mocks.asset.getTimeBuckets.mockResolvedValue([]);
-      mocks.access.tag.checkOwnerAccess.mockResolvedValue(new Set(['tag-1', 'tag-2']));
-      await sut.getTimeBuckets(authStub.admin, { tagIds: ['tag-1', 'tag-2'] });
-      expect(mocks.access.tag.checkOwnerAccess).toHaveBeenCalled();
-    });
-
     it('should pass spacePersonIds array through to asset repository for getTimeBuckets', async () => {
       mocks.access.sharedSpace.checkMemberAccess.mockResolvedValue(new Set(['space-id']));
       mocks.asset.getTimeBuckets.mockResolvedValue([]);
@@ -647,9 +639,26 @@ describe(TimelineService.name, () => {
 
     it('should pass tagIds array through to asset repository for getTimeBuckets', async () => {
       mocks.asset.getTimeBuckets.mockResolvedValue([]);
-      mocks.access.tag.checkOwnerAccess.mockResolvedValue(new Set(['tag-1', 'tag-2']));
       await sut.getTimeBuckets(authStub.admin, { tagIds: ['tag-1', 'tag-2'] });
       expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(expect.objectContaining({ tagIds: ['tag-1', 'tag-2'] }));
+    });
+
+    it('should not require tag ownership to filter by tagIds', async () => {
+      mocks.asset.getTimeBuckets.mockResolvedValue([{ timeBucket: '2024-01-01', count: 5 }]);
+      // user1 filters by tags they do not own — should succeed without TagRead check
+      await expect(sut.getTimeBuckets(authStub.user1, { tagIds: ['other-user-tag'] })).resolves.toEqual([
+        { timeBucket: '2024-01-01', count: 5 },
+      ]);
+      expect(mocks.access.tag.checkOwnerAccess).not.toHaveBeenCalled();
+    });
+
+    it('should not require tag ownership to filter by tagIds in a space', async () => {
+      mocks.access.sharedSpace.checkMemberAccess.mockResolvedValue(new Set(['space-id']));
+      mocks.asset.getTimeBuckets.mockResolvedValue([{ timeBucket: '2024-01-01', count: 3 }]);
+      await expect(
+        sut.getTimeBuckets(authStub.user1, { spaceId: 'space-id', tagIds: ['space-owner-tag'] }),
+      ).resolves.toEqual([{ timeBucket: '2024-01-01', count: 3 }]);
+      expect(mocks.access.tag.checkOwnerAccess).not.toHaveBeenCalled();
     });
 
     it('should accept deprecated spacePersonId and normalize to spacePersonIds', async () => {
@@ -661,7 +670,6 @@ describe(TimelineService.name, () => {
 
     it('should accept deprecated tagId and normalize to tagIds', async () => {
       mocks.asset.getTimeBuckets.mockResolvedValue([]);
-      mocks.access.tag.checkOwnerAccess.mockResolvedValue(new Set(['tag-1']));
       await sut.getTimeBuckets(authStub.admin, { tagId: 'tag-1' });
       expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(expect.objectContaining({ tagIds: ['tag-1'] }));
     });
