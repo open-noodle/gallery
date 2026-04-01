@@ -177,6 +177,63 @@ describe('PeopleFilter', () => {
     expect(getByText('A')).toBeTruthy();
   });
 
+  it('should show all search results without truncation', async () => {
+    const { getByTestId, queryByTestId } = render(PeopleFilter, {
+      props: {
+        people: mockPeople,
+        selectedIds: [],
+        onSelectionChange: () => {},
+      },
+    });
+
+    // Search for "Chen" — should match Sarah Chen and Max Chen (2 results)
+    // But also test with more results: search for common substring
+    const searchInput = getByTestId('people-search-input');
+    await fireEvent.input(searchInput, { target: { value: 'Chen' } });
+
+    // Both matches should be visible (not truncated)
+    expect(queryByTestId('people-item-p1')).toBeTruthy();
+    expect(queryByTestId('people-item-p2')).toBeTruthy();
+    // Non-matches hidden
+    expect(queryByTestId('people-item-p3')).toBeNull();
+  });
+
+  it('should show all search results even when more than INITIAL_SHOW_COUNT match', async () => {
+    // Create 8 people with similar names to exceed INITIAL_SHOW_COUNT of 5
+    const manyPeople: PersonOption[] = [
+      { id: 'p1', name: 'Smith Alice' },
+      { id: 'p2', name: 'Smith Bob' },
+      { id: 'p3', name: 'Smith Carol' },
+      { id: 'p4', name: 'Smith Dave' },
+      { id: 'p5', name: 'Smith Eve' },
+      { id: 'p6', name: 'Smith Frank' },
+      { id: 'p7', name: 'Smith Grace' },
+      { id: 'p8', name: 'Jones Hank' },
+    ];
+
+    const { getByTestId, queryByTestId } = render(PeopleFilter, {
+      props: {
+        people: manyPeople,
+        selectedIds: [],
+        onSelectionChange: () => {},
+      },
+    });
+
+    const searchInput = getByTestId('people-search-input');
+    await fireEvent.input(searchInput, { target: { value: 'Smith' } });
+
+    // All 7 Smith matches should be visible — no truncation at 5
+    expect(queryByTestId('people-item-p1')).toBeTruthy();
+    expect(queryByTestId('people-item-p2')).toBeTruthy();
+    expect(queryByTestId('people-item-p3')).toBeTruthy();
+    expect(queryByTestId('people-item-p4')).toBeTruthy();
+    expect(queryByTestId('people-item-p5')).toBeTruthy();
+    expect(queryByTestId('people-item-p6')).toBeTruthy();
+    expect(queryByTestId('people-item-p7')).toBeTruthy();
+    // Non-match hidden
+    expect(queryByTestId('people-item-p8')).toBeNull();
+  });
+
   it('should show empty message when no people', () => {
     const { getByTestId } = render(PeopleFilter, {
       props: {
