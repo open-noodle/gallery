@@ -130,8 +130,11 @@
           countries = result.countries;
           cameraMakes = result.cameraMakes;
           tags = result.tags;
-          availableRatings = result.ratings;
-          availableMediaTypes = result.mediaTypes;
+          // Note: availableRatings and availableMediaTypes are intentionally NOT set from
+          // suggestionsProvider. Hiding rating stars and media type buttons based on the
+          // current result set is too aggressive — it breaks existing E2E tests and confuses
+          // users who expect these fixed options to always be visible. The core value of
+          // interdependent filtering is in people/countries/cameras/tags narrowing.
           hasUnnamedPeople = result.hasUnnamedPeople;
         })
         .catch((error: unknown) => {
