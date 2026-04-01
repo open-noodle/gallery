@@ -184,3 +184,39 @@ where
     "duplicateId" = any ($1::uuid[])
     or "id" = any ($2::uuid[])
   )
+
+-- DuplicateRepository.createChecksumTombstones
+insert into
+  "asset_duplicate_checksum" ("assetId", "ownerId", "checksum")
+values
+  ($1::uuid, $2::uuid, $3)
+on conflict ("ownerId", "checksum") do update
+set
+  "assetId" = "excluded"."assetId"
+
+-- DuplicateRepository.deleteConflictingTombstones
+delete from "asset_duplicate_checksum"
+where
+  "ownerId" = $1::uuid
+  and "checksum" in (
+    select
+      "checksum"
+    from
+      "asset"
+    where
+      "id" in ($2::uuid)
+  )
+
+-- DuplicateRepository.deleteConflictingTombstonesForUser
+delete from "asset_duplicate_checksum"
+where
+  "ownerId" = $1::uuid
+  and "checksum" in (
+    select
+      "checksum"
+    from
+      "asset"
+    where
+      "ownerId" = $2::uuid
+      and "status" = $3
+  )
