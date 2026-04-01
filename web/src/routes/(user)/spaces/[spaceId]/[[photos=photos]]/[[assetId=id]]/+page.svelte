@@ -860,6 +860,7 @@
           totalLoaded={searchResults.length}
           onLoadMore={handleLoadMore}
           spaceId={space.id}
+          sortMode={filters.sortOrder}
         />
       {/if}
 
