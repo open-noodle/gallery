@@ -21,6 +21,8 @@ describe(TrashService.name, () => {
 
   beforeEach(() => {
     ({ sut, mocks } = newTestService(TrashService));
+    mocks.duplicateRepository.deleteConflictingTombstones.mockResolvedValue(void 0 as any);
+    mocks.duplicateRepository.deleteConflictingTombstonesForUser.mockResolvedValue(void 0 as any);
   });
 
   describe('restoreAssets', () => {
@@ -46,6 +48,18 @@ describe(TrashService.name, () => {
       expect(mocks.trash.restoreAll).toHaveBeenCalledWith(['asset1', 'asset2']);
       expect(mocks.job.queue.mock.calls).toEqual([]);
     });
+
+    it('should clean up conflicting tombstones on restore', async () => {
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset1', 'asset2']));
+      mocks.trash.restoreAll.mockResolvedValue(0);
+
+      await sut.restoreAssets(authStub.user1, { ids: ['asset1', 'asset2'] });
+
+      expect(mocks.duplicateRepository.deleteConflictingTombstones).toHaveBeenCalledWith('user-id', [
+        'asset1',
+        'asset2',
+      ]);
+    });
   });
 
   describe('restore', () => {
@@ -61,6 +75,18 @@ describe(TrashService.name, () => {
       mocks.trash.restore.mockResolvedValue(1);
       await expect(sut.restore(authStub.user1)).resolves.toEqual({ count: 1 });
       expect(mocks.trash.restore).toHaveBeenCalledWith('user-id');
+    });
+
+    it('should clean up conflicting tombstones for user on restore', async () => {
+      mocks.trash.restore.mockResolvedValue(3);
+      await sut.restore(authStub.user1);
+      expect(mocks.duplicateRepository.deleteConflictingTombstonesForUser).toHaveBeenCalledWith('user-id');
+    });
+
+    it('should skip tombstone cleanup when nothing restored', async () => {
+      mocks.trash.restore.mockResolvedValue(0);
+      await sut.restore(authStub.user1);
+      expect(mocks.duplicateRepository.deleteConflictingTombstonesForUser).not.toHaveBeenCalled();
     });
   });
 
