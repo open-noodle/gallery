@@ -335,10 +335,10 @@ describe('/search/suggestions/filters', () => {
     );
     const globalPersonId = personResult.rows[0].id as string;
 
-    const faceResult = await db.query(
-      `INSERT INTO "asset_face" ("assetId", "personId") VALUES ($1, $2) RETURNING id`,
-      [assets[0].id, globalPersonId],
-    );
+    const faceResult = await db.query(`INSERT INTO "asset_face" ("assetId", "personId") VALUES ($1, $2) RETURNING id`, [
+      assets[0].id,
+      globalPersonId,
+    ]);
     const faceId = faceResult.rows[0].id as string;
 
     const spacePersonResult = await db.query(
@@ -348,10 +348,10 @@ describe('/search/suggestions/filters', () => {
     );
     const spacePersonId = spacePersonResult.rows[0].id as string;
 
-    await db.query(
-      `INSERT INTO "shared_space_person_face" ("personId", "assetFaceId") VALUES ($1, $2)`,
-      [spacePersonId, faceId],
-    );
+    await db.query(`INSERT INTO "shared_space_person_face" ("personId", "assetFaceId") VALUES ($1, $2)`, [
+      spacePersonId,
+      faceId,
+    ]);
 
     // --- Unfiltered space suggestions ---
     const { body } = await request(app)
