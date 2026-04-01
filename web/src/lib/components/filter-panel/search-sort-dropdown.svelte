@@ -20,7 +20,8 @@
 
   let currentOption = $derived(options.find((o) => o.value === sortOrder) ?? options[0]);
 
-  function handleSelect(value: SortMode) {
+  function handleSelect(event: MouseEvent, value: SortMode) {
+    event.stopPropagation();
     open = false;
     onSelect(value);
   }
@@ -55,7 +56,7 @@
           type="button"
           class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-subtle"
           class:font-semibold={option.value === sortOrder}
-          onclick={() => handleSelect(option.value)}
+          onclick={(e) => handleSelect(e, option.value)}
         >
           <Icon icon={option.icon} size="16" />
           <span>{option.label}</span>
