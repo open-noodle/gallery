@@ -91,11 +91,6 @@ export class TimelineService extends BaseService {
       }
     }
 
-    const allTagIds = dto.tagIds ?? (dto.tagId ? [dto.tagId] : []);
-    if (allTagIds.length > 0) {
-      await this.requireAccess({ auth, permission: Permission.TagRead, ids: allTagIds });
-    }
-
     if (auth.sharedLink && !auth.sharedLink.showExif) {
       dto.withCoordinates = false;
     }
