@@ -53,7 +53,7 @@ export type SmartSearchOptions = SearchDateOptions &
   SearchTagOptions &
   SearchOcrOptions &
   SearchSpaceOptions &
-  SearchOrderOptions;  // NEW
+  SearchOrderOptions; // NEW
 ```
 
 ### 3. Repository — Two-Phase CTE in `searchSmart`
@@ -215,6 +215,7 @@ Note: `createFilterState()` still returns `'desc'` — the `'relevance'` overrid
 **Clearing search:** `clearSearch()` adds `filters = { ...filters, sortOrder: 'desc' }` alongside
 its existing reset of `searchQuery`, `searchResults`, etc. This is separate from `clearFilters()`
 which intentionally preserves `sortOrder` as a view preference. The distinction:
+
 - `clearSearch()` = exit search mode entirely → reset sort to timeline default (`'desc'`)
 - `clearFilters()` = clear filter values within current mode → preserve sort preference
 
@@ -222,6 +223,7 @@ which intentionally preserves `sortOrder` as a view preference. The distinction:
 `'asc' | 'desc'`. Since `clearSearch()` always resets to `'desc'`, and `createFilterState()`
 defaults to `'desc'`, `sortOrder` should never be `'relevance'` when the timeline is showing.
 As a safety measure, use an explicit narrowing expression when passing to `SortToggle`:
+
 ```typescript
 sortOrder={filters.sortOrder === 'relevance' ? 'desc' : filters.sortOrder}
 ```
@@ -234,6 +236,7 @@ Replace the "Load more" button with an `IntersectionObserver` sentinel on the la
 (same pattern as `people-infinite-scroll.svelte`).
 
 **Guards:**
+
 - Do not call `onLoadMore` if `isLoading` is true (prevents double-fire)
 - Do not call `onLoadMore` if `hasMore` is false (prevents unnecessary API call when small
   result sets make the sentinel immediately visible)
@@ -257,6 +260,7 @@ month/year using `fileCreatedAt` and render date headers between grid sections:
 When sorted by relevance, keep the current flat grid (no date headers).
 
 **Edge cases:**
+
 - Empty groups: not possible since grouping is derived from the results array
 - Zero results: the existing "No results" empty state renders before the grouped view, so this
   path is unchanged
@@ -336,25 +340,25 @@ count format.
 
 ## Summary of Changes
 
-| Layer | File | Change |
-|-------|------|--------|
-| DTO | `search.dto.ts` | Add `order?: AssetOrder` to `SmartSearchDto` |
-| Types | `search.repository.ts` | Add `SearchOrderOptions` to `SmartSearchOptions` |
-| Repository | `search.repository.ts` | CTE path when `orderDirection` set, `NULLS LAST` |
-| Service | `search.service.ts` | Pass `dto.order` → `orderDirection` |
-| FilterState | `filter-panel.ts` | Extend `sortOrder` with `'relevance'` |
-| Photos filter | `photos-filter-options.ts` | Handle `'relevance'` explicitly |
-| Sort UI | space page | Sort dropdown (3 options) when in search mode |
-| Sort UI | space page | Narrow type for `SortToggle` in timeline mode |
-| Search params | `space-search.ts` | Pass `order` from `filters.sortOrder` when not relevance |
-| Drive-by fix | `space-search.ts` | Add missing `isFavorite` mapping |
-| Drive-by fix | space page `$effect` | Add `isFavorite` to dependency array |
-| Search entry/exit | space page | Set `'relevance'` on search entry, `'desc'` on clear |
-| Pagination reset | space page | Add `sortOrder` to `$effect` deps |
-| Infinite scroll | `space-search-results.svelte` | Replace button with IntersectionObserver |
-| Date grouping | `space-search-results.svelte` | Group by month when date-sorted |
-| Result count | `space-search-results.svelte` | Contextual display for relevance vs date modes |
-| Codegen | OpenAPI + SQL + Dart | Regenerate all |
+| Layer             | File                          | Change                                                   |
+| ----------------- | ----------------------------- | -------------------------------------------------------- |
+| DTO               | `search.dto.ts`               | Add `order?: AssetOrder` to `SmartSearchDto`             |
+| Types             | `search.repository.ts`        | Add `SearchOrderOptions` to `SmartSearchOptions`         |
+| Repository        | `search.repository.ts`        | CTE path when `orderDirection` set, `NULLS LAST`         |
+| Service           | `search.service.ts`           | Pass `dto.order` → `orderDirection`                      |
+| FilterState       | `filter-panel.ts`             | Extend `sortOrder` with `'relevance'`                    |
+| Photos filter     | `photos-filter-options.ts`    | Handle `'relevance'` explicitly                          |
+| Sort UI           | space page                    | Sort dropdown (3 options) when in search mode            |
+| Sort UI           | space page                    | Narrow type for `SortToggle` in timeline mode            |
+| Search params     | `space-search.ts`             | Pass `order` from `filters.sortOrder` when not relevance |
+| Drive-by fix      | `space-search.ts`             | Add missing `isFavorite` mapping                         |
+| Drive-by fix      | space page `$effect`          | Add `isFavorite` to dependency array                     |
+| Search entry/exit | space page                    | Set `'relevance'` on search entry, `'desc'` on clear     |
+| Pagination reset  | space page                    | Add `sortOrder` to `$effect` deps                        |
+| Infinite scroll   | `space-search-results.svelte` | Replace button with IntersectionObserver                 |
+| Date grouping     | `space-search-results.svelte` | Group by month when date-sorted                          |
+| Result count      | `space-search-results.svelte` | Contextual display for relevance vs date modes           |
+| Codegen           | OpenAPI + SQL + Dart          | Regenerate all                                           |
 
 ---
 

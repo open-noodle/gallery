@@ -35,40 +35,40 @@ Smart search (CLIP) results are ordered exclusively by vector cosine distance. U
 
 ### Key Constraints
 
-| Constraint | Detail |
-|-----------|--------|
-| Vector index trigger | Requires `ORDER BY distance LIMIT K` — any other pattern causes sequential scan |
-| Pagination | Offset-based (`OFFSET n`), degrades at scale |
-| Distance hidden | Cosine distance computed for ORDER BY but not SELECTed (face search does return it) |
-| No sort param | `SmartSearchDto` has no `order` field (unlike `MetadataSearchDto`) |
-| Server-driven ordering | Frontend `GalleryViewer` is presentation-only, no client-side reorder |
+| Constraint             | Detail                                                                              |
+| ---------------------- | ----------------------------------------------------------------------------------- |
+| Vector index trigger   | Requires `ORDER BY distance LIMIT K` — any other pattern causes sequential scan     |
+| Pagination             | Offset-based (`OFFSET n`), degrades at scale                                        |
+| Distance hidden        | Cosine distance computed for ORDER BY but not SELECTed (face search does return it) |
+| No sort param          | `SmartSearchDto` has no `order` field (unlike `MetadataSearchDto`)                  |
+| Server-driven ordering | Frontend `GalleryViewer` is presentation-only, no client-side reorder               |
 
 ### Relevant Code Locations
 
-| Component | File | Lines | Notes |
-|-----------|------|-------|-------|
-| Smart search query | `server/src/repositories/search.repository.ts` | 343-358 | CTE + `<=>` operator |
-| Metadata search (has order) | same file | 249-259 | `ORDER BY fileCreatedAt $dir` |
-| Search asset builder | `server/src/utils/database.ts` | 348-488 | 80+ filters, no ORDER BY |
-| SmartSearchDto | `server/src/dtos/search.dto.ts` | 236-255 | No order field |
-| MetadataSearchDto | same file | 168-229 | Has `order?: AssetOrder` |
-| AssetOrder enum | `server/src/enum.ts` | 82-85 | `Asc` / `Desc` |
-| Smart search table | `server/src/schema/tables/smart-search.table.ts` | — | HNSW index, 512D, cosine ops |
-| Frontend search page | `web/src/routes/(user)/search/.../+page.svelte` | 145-149 | Routes to smart or metadata |
-| GalleryViewer | `web/src/lib/components/.../gallery-viewer.svelte` | — | No reordering support |
-| Face search (returns distance) | `search.repository.ts` | 371-405 | Existing pattern for returning distance |
+| Component                      | File                                               | Lines   | Notes                                   |
+| ------------------------------ | -------------------------------------------------- | ------- | --------------------------------------- |
+| Smart search query             | `server/src/repositories/search.repository.ts`     | 343-358 | CTE + `<=>` operator                    |
+| Metadata search (has order)    | same file                                          | 249-259 | `ORDER BY fileCreatedAt $dir`           |
+| Search asset builder           | `server/src/utils/database.ts`                     | 348-488 | 80+ filters, no ORDER BY                |
+| SmartSearchDto                 | `server/src/dtos/search.dto.ts`                    | 236-255 | No order field                          |
+| MetadataSearchDto              | same file                                          | 168-229 | Has `order?: AssetOrder`                |
+| AssetOrder enum                | `server/src/enum.ts`                               | 82-85   | `Asc` / `Desc`                          |
+| Smart search table             | `server/src/schema/tables/smart-search.table.ts`   | —       | HNSW index, 512D, cosine ops            |
+| Frontend search page           | `web/src/routes/(user)/search/.../+page.svelte`    | 145-149 | Routes to smart or metadata             |
+| GalleryViewer                  | `web/src/lib/components/.../gallery-viewer.svelte` | —       | No reordering support                   |
+| Face search (returns distance) | `search.repository.ts`                             | 371-405 | Existing pattern for returning distance |
 
 ---
 
 ## How Other Apps Handle This
 
-| App | Approach | Details |
-|-----|----------|---------|
-| **Google Photos** | Hybrid two-tier | "Top Results" by relevance, remainder chronological. No user toggle. Changed Sep 2024. |
-| **Apple Photos** | Always chronological | ML for filtering, but results always sorted by EXIF date |
-| **PhotoPrism** | No vector search | Label-based search, sorted by date/name/size (9 sort options) |
-| **LibrePhotos** | Relevance only | CLIP search, threshold ~0.27 cosine similarity, no date sort |
-| **Immich upstream** | Relevance only | Pure cosine distance, no sort toggle |
+| App                 | Approach             | Details                                                                                |
+| ------------------- | -------------------- | -------------------------------------------------------------------------------------- |
+| **Google Photos**   | Hybrid two-tier      | "Top Results" by relevance, remainder chronological. No user toggle. Changed Sep 2024. |
+| **Apple Photos**    | Always chronological | ML for filtering, but results always sorted by EXIF date                               |
+| **PhotoPrism**      | No vector search     | Label-based search, sorted by date/name/size (9 sort options)                          |
+| **LibrePhotos**     | Relevance only       | CLIP search, threshold ~0.27 cosine similarity, no date sort                           |
+| **Immich upstream** | Relevance only       | Pure cosine distance, no sort toggle                                                   |
 
 **Takeaway:** No app offers a user-facing relevance/date toggle. Google's two-tier approach is the most sophisticated in production. Nobody has "solved" this well.
 
@@ -108,12 +108,12 @@ LIMIT $size + 1 OFFSET $offset;
 
 **Assessment:**
 
-| Dimension | Rating | Notes |
-|-----------|--------|-------|
-| Complexity | Low | Single CTE wrapping existing query |
+| Dimension   | Rating    | Notes                                                             |
+| ----------- | --------- | ----------------------------------------------------------------- |
+| Complexity  | Low       | Single CTE wrapping existing query                                |
 | Performance | Excellent | Vector index used in inner CTE, outer sort on 500 rows is trivial |
-| UX value | High | Directly solves the #8377 request |
-| Risk | Low | Default behavior unchanged |
+| UX value    | High      | Directly solves the #8377 request                                 |
+| Risk        | Low       | Default behavior unchanged                                        |
 
 **Trade-offs:**
 
@@ -138,12 +138,12 @@ Return results in two sections: "Top Results" (10-20 best by relevance) + "More 
 
 **Assessment:**
 
-| Dimension | Rating | Notes |
-|-----------|--------|-------|
-| Complexity | Medium | New response DTO, two-section UI |
-| Performance | Excellent | Same CTE pattern |
-| UX value | High | Familiar Google-like experience |
-| Risk | Medium | Breaking API change, more UI work |
+| Dimension   | Rating    | Notes                             |
+| ----------- | --------- | --------------------------------- |
+| Complexity  | Medium    | New response DTO, two-section UI  |
+| Performance | Excellent | Same CTE pattern                  |
+| UX value    | High      | Familiar Google-like experience   |
+| Risk        | Medium    | Breaking API change, more UI work |
 
 **Trade-offs:**
 
@@ -161,12 +161,12 @@ Dynamically determine how many results are "relevant" per query using statistica
 **Algorithm:**
 
 ```typescript
-const results = await getTopN(500);  // with distances
+const results = await getTopN(500); // with distances
 const topK = results.slice(0, 20);
-const mean = avg(topK.map(r => r.distance));
-const stddev = std(topK.map(r => r.distance));
+const mean = avg(topK.map((r) => r.distance));
+const stddev = std(topK.map((r) => r.distance));
 const cutoff = mean + 1.5 * stddev;
-const relevant = results.filter(r => r.distance <= cutoff);
+const relevant = results.filter((r) => r.distance <= cutoff);
 return relevant.sort(byDate);
 ```
 
@@ -177,12 +177,12 @@ return relevant.sort(byDate);
 
 **Assessment:**
 
-| Dimension | Rating | Notes |
-|-----------|--------|-------|
-| Complexity | Medium | Distance in SELECT, service-layer post-processing |
-| Performance | Good | Fetches 500, returns variable count |
-| UX value | High | "Smart" result count that feels right |
-| Risk | Medium | Magic numbers (1.5σ, K=20) need tuning per CLIP model |
+| Dimension   | Rating | Notes                                                 |
+| ----------- | ------ | ----------------------------------------------------- |
+| Complexity  | Medium | Distance in SELECT, service-layer post-processing     |
+| Performance | Good   | Fetches 500, returns variable count                   |
+| UX value    | High   | "Smart" result count that feels right                 |
+| Risk        | Medium | Magic numbers (1.5σ, K=20) need tuning per CLIP model |
 
 **Trade-offs:**
 
@@ -215,12 +215,12 @@ ORDER BY score DESC;
 
 **Assessment:**
 
-| Dimension | Rating | Notes |
-|-----------|--------|-------|
-| Complexity | High | Two CTEs + join + RRF formula |
-| Performance | Good | Both CTEs on small sets |
-| UX value | Medium | Blended ranking is hard to explain to users |
-| Risk | Medium | k=60 constant and alpha need tuning |
+| Dimension   | Rating | Notes                                       |
+| ----------- | ------ | ------------------------------------------- |
+| Complexity  | High   | Two CTEs + join + RRF formula               |
+| Performance | Good   | Both CTEs on small sets                     |
+| UX value    | Medium | Blended ranking is hard to explain to users |
+| Risk        | Medium | k=60 constant and alpha need tuning         |
 
 **Trade-offs:**
 
@@ -237,12 +237,12 @@ Return similarity score in the API response. Let the frontend sort within loaded
 
 **Assessment:**
 
-| Dimension | Rating | Notes |
-|-----------|--------|-------|
-| Complexity | Low | Add distance to SELECT and DTO |
-| Performance | Excellent | No extra queries |
-| UX value | Low-Medium | Only sorts within loaded page, not globally |
-| Risk | Low | Additive change |
+| Dimension   | Rating     | Notes                                       |
+| ----------- | ---------- | ------------------------------------------- |
+| Complexity  | Low        | Add distance to SELECT and DTO              |
+| Performance | Excellent  | No extra queries                            |
+| UX value    | Low-Medium | Only sorts within loaded page, not globally |
+| Risk        | Low        | Additive change                             |
 
 **Trade-offs:**
 
