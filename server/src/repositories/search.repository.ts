@@ -723,7 +723,18 @@ export class SearchRepository {
           .$if(!!options.model, (qb) => qb.where('asset_exif.model', '=', options.model!))
           .$if(!!options.rating, (qb) => qb.where('asset_exif.rating', '=', options.rating!)),
       )
-      .$if(!!options.personIds?.length, (qb) =>
+      .$if(!!options.personIds?.length && !!options.spaceId, (qb) =>
+        qb.where((eb) =>
+          eb.exists(
+            eb
+              .selectFrom('shared_space_person_face')
+              .innerJoin('asset_face', 'asset_face.id', 'shared_space_person_face.assetFaceId')
+              .whereRef('asset_face.assetId', '=', 'asset.id')
+              .where('shared_space_person_face.personId', '=', anyUuid(options.personIds!)),
+          ),
+        ),
+      )
+      .$if(!!options.personIds?.length && !options.spaceId, (qb) =>
         qb.where((eb) =>
           eb.exists(
             eb
