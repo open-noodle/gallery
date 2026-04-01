@@ -5,6 +5,8 @@ import { AuthDto } from 'src/dtos/auth.dto.js';
 import { SystemConfig } from 'src/dtos/config.dto.js';
 import { PersonResponseDto, mapPerson } from 'src/dtos/person.dto.js';
 import {
+  FilterSuggestionsRequestDto,
+  FilterSuggestionsResponseDto,
   LargeAssetSearchDto,
   MetadataSearchDto,
   PlacesResponseDto,
@@ -271,6 +273,28 @@ export class SearchService extends BaseService {
     }
 
     return this.searchRepository.getAccessibleTags(userIds, { ...dto, timelineSpaceIds });
+  }
+
+  async getFilterSuggestions(auth: AuthDto, dto: FilterSuggestionsRequestDto): Promise<FilterSuggestionsResponseDto> {
+    if (dto.spaceId && dto.withSharedSpaces) {
+      throw new BadRequestException('Cannot use both spaceId and withSharedSpaces');
+    }
+
+    if (dto.spaceId) {
+      await this.requireAccess({ auth, permission: Permission.SharedSpaceRead, ids: [dto.spaceId] });
+    }
+
+    const userIds = await this.getUserIdsToSearch(auth);
+
+    let timelineSpaceIds: string[] | undefined;
+    if (dto.withSharedSpaces) {
+      const spaceRows = await this.sharedSpaceRepository.getSpaceIdsForTimeline(auth.user.id);
+      if (spaceRows.length > 0) {
+        timelineSpaceIds = spaceRows.map((row) => row.spaceId);
+      }
+    }
+
+    return this.searchRepository.getFilterSuggestions(userIds, { ...dto, timelineSpaceIds });
   }
 
   private getSuggestions(
