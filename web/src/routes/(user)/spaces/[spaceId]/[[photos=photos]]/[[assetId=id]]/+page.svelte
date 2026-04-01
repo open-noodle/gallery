@@ -4,11 +4,12 @@
   import ActiveFiltersBar from '$lib/components/filter-panel/active-filters-bar.svelte';
   import SortToggle from '$lib/components/filter-panel/sort-toggle.svelte';
   import {
+    buildFilterContext,
     createFilterState,
     clearFilters,
     getActiveFilterCount,
-    type FilterContext,
     type FilterPanelConfig,
+    type FilterState,
   } from '$lib/components/filter-panel/filter-panel';
   import OnEvents from '$lib/components/OnEvents.svelte';
   import UserPageLayout from '$lib/components/layouts/user-page-layout.svelte';
@@ -44,7 +45,6 @@
   import { AssetInteraction } from '$lib/stores/asset-interaction.svelte';
   import { preferences, user } from '$lib/stores/user.store';
   import { cancelMultiselect } from '$lib/utils/asset-utils';
-  import { createUrl } from '$lib/utils';
   import { handleError } from '$lib/utils/handle-error';
   import { buildSmartSearchParams, SEARCH_FILTER_DEBOUNCE_MS } from '$lib/utils/space-search';
   import {
@@ -53,7 +53,7 @@
     AssetOrder,
     AssetTypeEnum,
     AssetVisibility,
-    getTagSuggestions,
+    getFilterSuggestions,
     getMembers,
     getSearchSuggestions,
     getSpace,
@@ -164,78 +164,63 @@
 
   const filterConfig: FilterPanelConfig = {
     sections: ['timeline', 'people', 'location', 'camera', 'tags', 'rating', 'media'],
+    suggestionsProvider: async (filters: FilterState) => {
+      const context = buildFilterContext(filters);
+      const response = await getFilterSuggestions({
+        personIds: filters.personIds.length > 0 ? filters.personIds : undefined,
+        country: filters.country,
+        city: filters.city,
+        make: filters.make,
+        model: filters.model,
+        tagIds: filters.tagIds.length > 0 ? filters.tagIds : undefined,
+        rating: filters.rating,
+        mediaType:
+          filters.mediaType === 'all'
+            ? undefined
+            : filters.mediaType === 'image'
+              ? AssetTypeEnum.Image
+              : AssetTypeEnum.Video,
+        isFavorite: filters.isFavorite,
+        takenAfter: context?.takenAfter,
+        takenBefore: context?.takenBefore,
+        spaceId: space.id,
+      });
+      const mappedPeople = response.people.map((p) => ({
+        id: p.id,
+        name: p.name,
+        thumbnailUrl: `/shared-spaces/${space.id}/people/${p.id}/thumbnail`,
+      }));
+      for (const p of response.people) {
+        personNames.set(p.id, p.name);
+      }
+      for (const t of response.tags) {
+        tagNames.set(t.id, t.value);
+      }
+      return {
+        countries: response.countries,
+        cameraMakes: response.cameraMakes,
+        tags: response.tags.map((t) => ({ id: t.id, name: t.value })),
+        people: mappedPeople,
+        ratings: response.ratings,
+        mediaTypes: response.mediaTypes,
+        hasUnnamedPeople: response.hasUnnamedPeople,
+      };
+    },
     providers: {
-      people: async (context?: FilterContext) => {
-        const people = await getSpacePeople({
-          id: space.id,
-          named: true,
-          takenAfter: context?.takenAfter,
-          takenBefore: context?.takenBefore,
-        });
-        for (const p of people) {
-          personNames.set(p.id, p.name);
-        }
-        return people.map((p) => ({
-          id: p.id,
-          name: p.name,
-          thumbnailUrl: p.thumbnailPath
-            ? createUrl(`/shared-spaces/${space.id}/people/${p.id}/thumbnail`, { updatedAt: p.updatedAt })
-            : undefined,
-        }));
-      },
-      allPeople: async () => {
-        const people = await getSpacePeople({ id: space.id, limit: 1 });
-        return people.map((p) => ({ id: p.id, name: p.name, thumbnailUrl: '' }));
-      },
-      locations: async (context?: FilterContext) => {
-        const countries = await getSearchSuggestions({
-          $type: SearchSuggestionType.Country,
-          spaceId: space.id,
-          takenAfter: context?.takenAfter,
-          takenBefore: context?.takenBefore,
-        });
-        return countries.filter(Boolean).map((c) => ({ value: c!, type: 'country' as const }));
-      },
-      cities: async (country: string, context?: FilterContext) => {
-        const cities = await getSearchSuggestions({
+      cities: async (country, context) =>
+        getSearchSuggestions({
           $type: SearchSuggestionType.City,
-          spaceId: space.id,
           country,
-          takenAfter: context?.takenAfter,
-          takenBefore: context?.takenBefore,
-        });
-        return cities.filter(Boolean) as string[];
-      },
-      cameras: async (context?: FilterContext) => {
-        const makes = await getSearchSuggestions({
-          $type: SearchSuggestionType.CameraMake,
           spaceId: space.id,
-          takenAfter: context?.takenAfter,
-          takenBefore: context?.takenBefore,
-        });
-        return makes.filter(Boolean).map((m) => ({ value: m!, type: 'make' as const }));
-      },
-      cameraModels: async (make: string, context?: FilterContext) => {
-        const models = await getSearchSuggestions({
+          ...context,
+        }),
+      cameraModels: async (make, context) =>
+        getSearchSuggestions({
           $type: SearchSuggestionType.CameraModel,
-          spaceId: space.id,
           make,
-          takenAfter: context?.takenAfter,
-          takenBefore: context?.takenBefore,
-        });
-        return models.filter(Boolean) as string[];
-      },
-      tags: async (context?: FilterContext) => {
-        const tags = await getTagSuggestions({
           spaceId: space.id,
-          takenAfter: context?.takenAfter,
-          takenBefore: context?.takenBefore,
-        });
-        for (const t of tags) {
-          tagNames.set(t.id, t.value);
-        }
-        return tags.map((t) => ({ id: t.id, name: t.value }));
-      },
+          ...context,
+        }),
     },
   };
 
