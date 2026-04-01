@@ -217,4 +217,54 @@ describe('/search/suggestions/filters', () => {
     expect(body.countries.length).toBeGreaterThanOrEqual(1);
     expect(body.ratings.length).toBeGreaterThanOrEqual(1);
   });
+
+  it('should return space person IDs (not global person IDs) when spaceId is set', async () => {
+    // Create a space, add asset A, create a space person linked to that asset
+    const space = await utils.createSpace(admin.accessToken, { name: 'Space People Test' });
+    await utils.addSpaceAssets(admin.accessToken, space.id, [assets[0].id]);
+
+    // Create a space person via DB (person → face → space_person + space_person_face)
+    const db = await utils.connectDatabase();
+    const personResult = await db.query(
+      `INSERT INTO "person" ("ownerId", "name", "thumbnailPath")
+       VALUES ($1, $2, '/test/thumbnail.jpg') RETURNING id`,
+      [admin.userId, 'SpaceTestPerson'],
+    );
+    const personId = personResult.rows[0].id as string;
+
+    const faceResult = await db.query(
+      `INSERT INTO "asset_face" ("assetId", "personId") VALUES ($1, $2) RETURNING id`,
+      [assets[0].id, personId],
+    );
+    const faceId = faceResult.rows[0].id as string;
+
+    const spacePersonResult = await db.query(
+      `INSERT INTO "shared_space_person" ("spaceId", "name", "isHidden", "faceCount", "assetCount", "representativeFaceId")
+       VALUES ($1, $2, false, 1, 1, $3) RETURNING id`,
+      [space.id, 'SpaceTestPerson', faceId],
+    );
+    const spacePersonId = spacePersonResult.rows[0].id as string;
+
+    // Link space person face
+    await db.query(
+      `INSERT INTO "shared_space_person_face" ("personId", "assetFaceId") VALUES ($1, $2)`,
+      [spacePersonId, faceId],
+    );
+
+    // Query filter suggestions with spaceId
+    const { body } = await request(app)
+      .get(`/search/suggestions/filters?spaceId=${space.id}`)
+      .set('Authorization', `Bearer ${admin.accessToken}`)
+      .expect(200);
+
+    // Should return the space person ID, NOT the global person ID
+    const returnedIds = body.people.map((p: { id: string }) => p.id);
+    expect(returnedIds).toContain(spacePersonId);
+    expect(returnedIds).not.toContain(personId);
+
+    // Should have the space person name
+    const spacePerson = body.people.find((p: { id: string }) => p.id === spacePersonId);
+    expect(spacePerson).toBeDefined();
+    expect(spacePerson.name).toBe('SpaceTestPerson');
+  });
 });
