@@ -18,11 +18,7 @@
     }
   }
 
-  let visibleStars = $derived(
-    availableRatings && availableRatings.length > 0
-      ? [1, 2, 3, 4, 5].filter((s) => availableRatings.includes(s) || s === selectedRating)
-      : [1, 2, 3, 4, 5],
-  );
+  const visibleStars = [1, 2, 3, 4, 5];
 </script>
 
 <div class="flex gap-1" data-testid="rating-filter">
