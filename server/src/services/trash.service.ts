@@ -17,6 +17,7 @@ export class TrashService extends BaseService {
 
     await this.requireAccess({ auth, permission: Permission.AssetDelete, ids });
     await this.trashRepository.restoreAll(ids);
+    await this.duplicateRepository.deleteConflictingTombstones(auth.user.id, ids);
     await this.eventRepository.emit('AssetRestoreAll', { assetIds: ids, userId: auth.user.id });
 
     this.logger.log(`Restored ${ids.length} asset(s) from trash`);
@@ -27,6 +28,7 @@ export class TrashService extends BaseService {
   async restore(auth: AuthDto): Promise<TrashResponseDto> {
     const count = await this.trashRepository.restore(auth.user.id);
     if (count > 0) {
+      await this.duplicateRepository.deleteConflictingTombstonesForUser(auth.user.id);
       this.logger.log(`Restored ${count} asset(s) from trash`);
     }
     return { count };

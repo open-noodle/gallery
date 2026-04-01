@@ -406,6 +406,137 @@ describe(DuplicateService.name, () => {
     // is thoroughly unit tested.
   });
 
+  describe('resolveGroup tombstones', () => {
+    it('should create checksum tombstone when resolving duplicates', async () => {
+      const asset1 = AssetFactory.create();
+      const asset2 = AssetFactory.create();
+      const checksum = Buffer.from('abc123', 'hex');
+      mocks.access.duplicate.checkOwnerAccess.mockResolvedValue(new Set(['group-1']));
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset2.id]));
+      mocks.duplicateRepository.get.mockResolvedValue({
+        duplicateId: 'group-1',
+        assets: [asset1 as unknown as MapAsset, asset2 as unknown as MapAsset],
+      });
+      mocks.asset.getChecksumsByIds.mockResolvedValue([{ id: asset2.id, checksum }]);
+
+      const result = await sut.resolve(authStub.admin, {
+        groups: [{ duplicateId: 'group-1', keepAssetIds: [asset1.id], trashAssetIds: [asset2.id] }],
+      });
+
+      expect(result[0].success).toBe(true);
+      expect(mocks.asset.getChecksumsByIds).toHaveBeenCalledWith([asset2.id]);
+      expect(mocks.duplicateRepository.createChecksumTombstones).toHaveBeenCalledWith([
+        { assetId: asset1.id, ownerId: authStub.admin.user.id, checksum },
+      ]);
+    });
+
+    it('should create tombstones for multiple trashed assets pointing to first kept asset', async () => {
+      const asset1 = AssetFactory.create();
+      const asset2 = AssetFactory.create();
+      const asset3 = AssetFactory.create();
+      const checksum2 = Buffer.from('aabb', 'hex');
+      const checksum3 = Buffer.from('ccdd', 'hex');
+      mocks.access.duplicate.checkOwnerAccess.mockResolvedValue(new Set(['group-1']));
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset2.id, asset3.id]));
+      mocks.duplicateRepository.get.mockResolvedValue({
+        duplicateId: 'group-1',
+        assets: [asset1 as unknown as MapAsset, asset2 as unknown as MapAsset, asset3 as unknown as MapAsset],
+      });
+      mocks.asset.getChecksumsByIds.mockResolvedValue([
+        { id: asset2.id, checksum: checksum2 },
+        { id: asset3.id, checksum: checksum3 },
+      ]);
+
+      const result = await sut.resolve(authStub.admin, {
+        groups: [{ duplicateId: 'group-1', keepAssetIds: [asset1.id], trashAssetIds: [asset2.id, asset3.id] }],
+      });
+
+      expect(result[0].success).toBe(true);
+      expect(mocks.duplicateRepository.createChecksumTombstones).toHaveBeenCalledWith([
+        { assetId: asset1.id, ownerId: authStub.admin.user.id, checksum: checksum2 },
+        { assetId: asset1.id, ownerId: authStub.admin.user.id, checksum: checksum3 },
+      ]);
+    });
+
+    it('should use first kept asset as tombstone target when multiple are kept', async () => {
+      const asset1 = AssetFactory.create();
+      const asset2 = AssetFactory.create();
+      const asset3 = AssetFactory.create();
+      const checksum = Buffer.from('eeff', 'hex');
+      mocks.access.duplicate.checkOwnerAccess.mockResolvedValue(new Set(['group-1']));
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset3.id]));
+      mocks.duplicateRepository.get.mockResolvedValue({
+        duplicateId: 'group-1',
+        assets: [asset1 as unknown as MapAsset, asset2 as unknown as MapAsset, asset3 as unknown as MapAsset],
+      });
+      mocks.asset.getChecksumsByIds.mockResolvedValue([{ id: asset3.id, checksum }]);
+
+      const result = await sut.resolve(authStub.admin, {
+        groups: [{ duplicateId: 'group-1', keepAssetIds: [asset1.id, asset2.id], trashAssetIds: [asset3.id] }],
+      });
+
+      expect(result[0].success).toBe(true);
+      expect(mocks.duplicateRepository.createChecksumTombstones).toHaveBeenCalledWith([
+        { assetId: asset1.id, ownerId: authStub.admin.user.id, checksum },
+      ]);
+    });
+
+    it('should not create tombstones when all assets are trashed', async () => {
+      const asset1 = AssetFactory.create();
+      const asset2 = AssetFactory.create();
+      mocks.access.duplicate.checkOwnerAccess.mockResolvedValue(new Set(['group-1']));
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset1.id, asset2.id]));
+      mocks.duplicateRepository.get.mockResolvedValue({
+        duplicateId: 'group-1',
+        assets: [asset1 as unknown as MapAsset, asset2 as unknown as MapAsset],
+      });
+
+      const result = await sut.resolve(authStub.admin, {
+        groups: [{ duplicateId: 'group-1', keepAssetIds: [], trashAssetIds: [asset1.id, asset2.id] }],
+      });
+
+      expect(result[0].success).toBe(true);
+      expect(mocks.asset.getChecksumsByIds).not.toHaveBeenCalled();
+      expect(mocks.duplicateRepository.createChecksumTombstones).not.toHaveBeenCalled();
+    });
+
+    it('should succeed even if tombstone insert fails', async () => {
+      const asset1 = AssetFactory.create();
+      const asset2 = AssetFactory.create();
+      mocks.access.duplicate.checkOwnerAccess.mockResolvedValue(new Set(['group-1']));
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset2.id]));
+      mocks.duplicateRepository.get.mockResolvedValue({
+        duplicateId: 'group-1',
+        assets: [asset1 as unknown as MapAsset, asset2 as unknown as MapAsset],
+      });
+      mocks.asset.getChecksumsByIds.mockResolvedValue([{ id: asset2.id, checksum: Buffer.from('aa', 'hex') }]);
+      mocks.duplicateRepository.createChecksumTombstones.mockRejectedValue(new Error('DB error'));
+
+      const result = await sut.resolve(authStub.admin, {
+        groups: [{ duplicateId: 'group-1', keepAssetIds: [asset1.id], trashAssetIds: [asset2.id] }],
+      });
+
+      expect(result[0].success).toBe(true);
+    });
+
+    it('should not create tombstones when idsToTrash is empty after non-member filtering', async () => {
+      const asset1 = AssetFactory.create();
+      mocks.access.duplicate.checkOwnerAccess.mockResolvedValue(new Set(['group-1']));
+      mocks.duplicateRepository.get.mockResolvedValue({
+        duplicateId: 'group-1',
+        assets: [asset1 as unknown as MapAsset],
+      });
+
+      const result = await sut.resolve(authStub.admin, {
+        groups: [{ duplicateId: 'group-1', keepAssetIds: [asset1.id], trashAssetIds: ['non-member'] }],
+      });
+
+      expect(result[0].success).toBe(true);
+      expect(mocks.asset.getChecksumsByIds).not.toHaveBeenCalled();
+      expect(mocks.duplicateRepository.createChecksumTombstones).not.toHaveBeenCalled();
+    });
+  });
+
   describe('handleSearchDuplicates', () => {
     beforeEach(() => {
       mocks.systemMetadata.get.mockResolvedValue({

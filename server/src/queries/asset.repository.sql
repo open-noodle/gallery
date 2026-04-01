@@ -345,6 +345,14 @@ from
 where
   "ownerId" = $1::uuid
   and "checksum" in ($2)
+select
+  "assetId" as "id",
+  "checksum"
+from
+  "asset_duplicate_checksum"
+where
+  "ownerId" = $1::uuid
+  and "checksum" in ($2)
 
 -- AssetRepository.getUploadAssetIdByChecksum
 select
@@ -357,6 +365,24 @@ where
   and "libraryId" is null
 limit
   $3
+select
+  "assetId"
+from
+  "asset_duplicate_checksum"
+where
+  "ownerId" = $1::uuid
+  and "checksum" = $2
+limit
+  $3
+
+-- AssetRepository.getChecksumsByIds
+select
+  "id",
+  "checksum"
+from
+  "asset"
+where
+  "id" in ($1::uuid)
 
 -- AssetRepository.getTimeBuckets
 with
