@@ -28,7 +28,9 @@
     searchQuery.trim() ? people.filter((p) => p.name.toLowerCase().includes(searchQuery.trim().toLowerCase())) : people,
   );
 
-  let visiblePeople = $derived(showAll ? filteredPeople : filteredPeople.slice(0, INITIAL_SHOW_COUNT));
+  let visiblePeople = $derived(
+    searchQuery.trim() || showAll ? filteredPeople : filteredPeople.slice(0, INITIAL_SHOW_COUNT),
+  );
 
   let remainingCount = $derived(filteredPeople.length - INITIAL_SHOW_COUNT);
 
