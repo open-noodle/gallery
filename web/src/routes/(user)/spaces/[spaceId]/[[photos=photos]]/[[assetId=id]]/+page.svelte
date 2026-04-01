@@ -2,6 +2,7 @@
   import { goto } from '$app/navigation';
   import FilterPanel from '$lib/components/filter-panel/filter-panel.svelte';
   import ActiveFiltersBar from '$lib/components/filter-panel/active-filters-bar.svelte';
+  import SearchSortDropdown from '$lib/components/filter-panel/search-sort-dropdown.svelte';
   import SortToggle from '$lib/components/filter-panel/sort-toggle.svelte';
   import {
     buildFilterContext,
@@ -727,7 +728,14 @@
           </div>
         {/if}
 
-        {#if !showSearchResults}
+        {#if showSearchResults}
+          <SearchSortDropdown
+            sortOrder={filters.sortOrder}
+            onSelect={(mode) => {
+              filters = { ...filters, sortOrder: mode };
+            }}
+          />
+        {:else}
           <SortToggle
             sortOrder={filters.sortOrder === 'relevance' ? 'desc' : filters.sortOrder}
             onToggle={(order) => {
