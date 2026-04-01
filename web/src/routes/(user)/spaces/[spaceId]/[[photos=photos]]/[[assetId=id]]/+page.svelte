@@ -292,7 +292,11 @@
     if (filters.mediaType !== 'all') {
       base.$type = filters.mediaType === 'image' ? AssetTypeEnum.Image : AssetTypeEnum.Video;
     }
-    base.order = filters.sortOrder === 'asc' ? AssetOrder.Asc : AssetOrder.Desc;
+    if (filters.sortOrder === 'asc') {
+      base.order = AssetOrder.Asc;
+    } else {
+      base.order = AssetOrder.Desc;
+    }
 
     // Temporal date-range filtering
     if (filters.selectedYear && filters.selectedMonth) {
@@ -608,6 +612,7 @@
   };
 
   const handleSearchSubmit = () => {
+    filters = { ...filters, sortOrder: 'relevance' };
     searchPage = 1;
     void executeSearch(1, false);
   };
@@ -624,6 +629,7 @@
     searchPage = 1;
     hasMoreResults = false;
     isSearching = false;
+    filters = { ...filters, sortOrder: 'desc' };
   };
 
   $effect(() => {
@@ -638,6 +644,8 @@
       filters.mediaType,
       filters.selectedYear,
       filters.selectedMonth,
+      filters.sortOrder,
+      filters.isFavorite,
     ];
 
     if (!showSearchResults || !searchQuery.trim()) {
@@ -721,7 +729,7 @@
 
         {#if !showSearchResults}
           <SortToggle
-            sortOrder={filters.sortOrder}
+            sortOrder={filters.sortOrder === 'relevance' ? 'desc' : filters.sortOrder}
             onToggle={(order) => {
               filters = { ...filters, sortOrder: order };
             }}
