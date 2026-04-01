@@ -23,19 +23,22 @@
 
   let isViewerOpen = $state(false);
   let sentinelElement: HTMLElement | undefined = $state();
-
-  // Infinite scroll observer
-  const observer = new IntersectionObserver((entries) => {
-    if (entries[0]?.isIntersecting && hasMore && !isLoading) {
-      onLoadMore();
-    }
-  });
+  let scrollContainer: HTMLElement | undefined = $state();
+  let observer: IntersectionObserver | undefined;
 
   $effect(() => {
-    if (sentinelElement) {
-      observer.disconnect();
+    if (sentinelElement && scrollContainer) {
+      observer?.disconnect();
+      observer = new IntersectionObserver(
+        (entries) => {
+          if (entries[0]?.isIntersecting && hasMore && !isLoading) {
+            onLoadMore();
+          }
+        },
+        { root: scrollContainer },
+      );
       observer.observe(sentinelElement);
-      return () => observer.disconnect();
+      return () => observer?.disconnect();
     }
   });
 
@@ -78,34 +81,30 @@
   };
 
   // Date grouping for date-sorted modes
-  type DateGroup = { label: string; assets: AssetResponseDto[] };
+  type DateGroup = { key: string; label: string; assets: AssetResponseDto[] };
 
   const groupByMonth = (assets: AssetResponseDto[]): DateGroup[] => {
-    const groups: DateGroup[] = [];
-    let currentKey = '';
-    let currentGroup: DateGroup | undefined;
-
+    const map = new Map<string, DateGroup>();
     for (const asset of assets) {
       const date = asset.fileCreatedAt ? new Date(asset.fileCreatedAt) : undefined;
       const key = date ? `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}` : 'unknown';
-
-      if (key !== currentKey) {
+      let group = map.get(key);
+      if (!group) {
         const label = date
           ? date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', timeZone: 'UTC' })
           : 'Unknown date';
-        currentGroup = { label, assets: [] };
-        groups.push(currentGroup);
-        currentKey = key;
+        group = { key, label, assets: [] };
+        map.set(key, group);
       }
-      currentGroup!.assets.push(asset);
+      group.assets.push(asset);
     }
-    return groups;
+    return [...map.values()];
   };
 
   let dateGroups = $derived(sortMode === 'relevance' ? [] : groupByMonth(results));
 </script>
 
-<section class="px-4 py-4">
+<section bind:this={scrollContainer} class="immich-scrollbar flex-1 overflow-y-auto px-4 py-4">
   {#if isLoading && results.length === 0}
     <div class="flex justify-center py-8" data-testid="search-loading">
       <LoadingSpinner />
@@ -145,7 +144,7 @@
         {/each}
       </div>
     {:else}
-      {#each dateGroups as group, i (group.label)}
+      {#each dateGroups as group, i (group.key)}
         <h3
           class="mb-2 mt-4 text-sm font-medium text-gray-500 first:mt-0 dark:text-gray-400"
           data-testid="date-group-header-{i}"
