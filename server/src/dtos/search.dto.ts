@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { IsInt, IsNotEmpty, IsString, Max, Min } from 'class-validator';
 import { Place } from 'src/database';
 import { HistoryBuilder, Property } from 'src/decorators';
@@ -418,6 +418,9 @@ export class FilterSuggestionsResponseDto {
 
 export class FilterSuggestionsRequestDto {
   @ValidateUUID({ each: true, optional: true, description: 'Filter by person IDs' })
+  @Transform(({ value }) => (value === undefined ? undefined : Array.isArray(value) ? value : [value]), {
+    toClassOnly: true,
+  })
   personIds?: string[];
 
   @ApiPropertyOptional({ description: 'Filter by country' })
@@ -441,6 +444,9 @@ export class FilterSuggestionsRequestDto {
   model?: string;
 
   @ValidateUUID({ each: true, optional: true, description: 'Filter by tag IDs' })
+  @Transform(({ value }) => (value === undefined ? undefined : Array.isArray(value) ? value : [value]), {
+    toClassOnly: true,
+  })
   tagIds?: string[];
 
   @Property({ type: 'number', description: 'Filter by rating (1-5)', minimum: 1, maximum: 5 })

@@ -1139,27 +1139,55 @@ describe(SearchService.name, () => {
       );
     });
 
-    it('should pass filter params through to repository', async () => {
+    it('should pass all filter dimensions through to repository', async () => {
       const auth = AuthFactory.create();
+      const personId = newUuid();
+      const tagId = newUuid();
+      const takenAfter = new Date('2024-01-01');
+      const takenBefore = new Date('2024-12-31');
       mocks.partner.getAll.mockResolvedValue([]);
       mocks.search.getFilterSuggestions.mockResolvedValue(emptyResult);
 
       await sut.getFilterSuggestions(auth, {
         country: 'Germany',
-        personIds: ['p1'],
+        city: 'Munich',
+        make: 'Canon',
+        model: 'EOS R5',
+        personIds: [personId],
+        tagIds: [tagId],
         rating: 5,
         mediaType: AssetType.Image,
+        isFavorite: true,
+        takenAfter,
+        takenBefore,
       });
 
       expect(mocks.search.getFilterSuggestions).toHaveBeenCalledWith(
         [auth.user.id],
         expect.objectContaining({
           country: 'Germany',
-          personIds: ['p1'],
+          city: 'Munich',
+          make: 'Canon',
+          model: 'EOS R5',
+          personIds: [personId],
+          tagIds: [tagId],
           rating: 5,
           mediaType: AssetType.Image,
+          isFavorite: true,
+          takenAfter,
+          takenBefore,
         }),
       );
+    });
+
+    it('should pass empty/undefined filters without error', async () => {
+      const auth = AuthFactory.create();
+      mocks.partner.getAll.mockResolvedValue([]);
+      mocks.search.getFilterSuggestions.mockResolvedValue(emptyResult);
+
+      await sut.getFilterSuggestions(auth, {});
+
+      expect(mocks.search.getFilterSuggestions).toHaveBeenCalledWith([auth.user.id], expect.objectContaining({}));
     });
   });
 
