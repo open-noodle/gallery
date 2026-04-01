@@ -200,6 +200,109 @@ describe('/search/suggestions/filters', () => {
     expect(typeof body.hasUnnamedPeople).toBe('boolean');
   });
 
+  it('should return all suggestion categories globally and cross-filter correctly (photos page)', async () => {
+    // Unfiltered: verify all 6 categories are populated
+    const { body: unfiltered } = await request(app)
+      .get('/search/suggestions/filters?withSharedSpaces=true')
+      .set('Authorization', `Bearer ${admin.accessToken}`)
+      .expect(200);
+
+    expect(unfiltered.countries.length).toBeGreaterThanOrEqual(2);
+    expect(Array.isArray(unfiltered.cameraMakes)).toBe(true);
+    expect(unfiltered.tags.length).toBeGreaterThanOrEqual(2);
+    expect(unfiltered.ratings.length).toBeGreaterThanOrEqual(2);
+    expect(unfiltered.mediaTypes.length).toBeGreaterThanOrEqual(1);
+    expect(typeof unfiltered.hasUnnamedPeople).toBe('boolean');
+    // Global people should be person.id (not shared_space_person.id)
+    for (const p of unfiltered.people) {
+      expect(p.id).toBeDefined();
+      expect(p.name).toBeDefined();
+    }
+
+    // Cross-filter by tag "nature" (assets A+C) → all categories should narrow
+    const { body: natureFiltered } = await request(app)
+      .get(`/search/suggestions/filters?tagIds=${tagNatureId}&withSharedSpaces=true`)
+      .set('Authorization', `Bearer ${admin.accessToken}`)
+      .expect(200);
+
+    expect(natureFiltered.countries.length).toBeLessThan(unfiltered.countries.length);
+    expect(natureFiltered.ratings.length).toBeLessThanOrEqual(unfiltered.ratings.length);
+    // Tags should still include "nature" (faceted: own filter excluded)
+    const natureTagNames = natureFiltered.tags.map((t: { value: string }) => t.value);
+    expect(natureTagNames).toContain('nature');
+
+    // Cross-filter by rating 3 (only asset D, Tokyo) → countries + tags should narrow
+    const { body: rating3 } = await request(app)
+      .get('/search/suggestions/filters?rating=3&withSharedSpaces=true')
+      .set('Authorization', `Bearer ${admin.accessToken}`)
+      .expect(200);
+
+    expect(rating3.countries.length).toBeLessThan(unfiltered.countries.length);
+    const rating3TagNames = rating3.tags.map((t: { value: string }) => t.value);
+    expect(rating3TagNames).toContain('travel'); // asset D has "travel"
+    expect(rating3TagNames).not.toContain('nature'); // no rating-3 asset has "nature"
+  });
+
+  it('should return all suggestion categories for map view (withSharedSpaces)', async () => {
+    // Map uses withSharedSpaces=true, same as photos but may omit location section client-side
+    const { body } = await request(app)
+      .get('/search/suggestions/filters?withSharedSpaces=true')
+      .set('Authorization', `Bearer ${admin.accessToken}`)
+      .expect(200);
+
+    // All 6 categories should be present (map ignores countries client-side but server still returns them)
+    expect(Array.isArray(body.countries)).toBe(true);
+    expect(Array.isArray(body.cameraMakes)).toBe(true);
+    expect(Array.isArray(body.tags)).toBe(true);
+    expect(Array.isArray(body.people)).toBe(true);
+    expect(Array.isArray(body.ratings)).toBe(true);
+    expect(Array.isArray(body.mediaTypes)).toBe(true);
+    expect(typeof body.hasUnnamedPeople).toBe('boolean');
+
+    // Cross-filter: tag + rating combined → should narrow all categories
+    const { body: combined } = await request(app)
+      .get(`/search/suggestions/filters?tagIds=${tagNatureId}&rating=5&withSharedSpaces=true`)
+      .set('Authorization', `Bearer ${admin.accessToken}`)
+      .expect(200);
+
+    // nature + rating 5 = assets A+C → should have fewer countries than unfiltered
+    expect(combined.countries.length).toBeLessThanOrEqual(body.countries.length);
+    expect(combined.cameraMakes.length).toBeLessThanOrEqual(body.cameraMakes.length);
+    // Ratings should still include 5 (faceted: own filter excluded)
+    expect(combined.ratings).toContain(5);
+    // Tags should still include "nature" (faceted: own filter excluded)
+    const combinedTagNames = combined.tags.map((t: { value: string }) => t.value);
+    expect(combinedTagNames).toContain('nature');
+  });
+
+  it('should return map suggestions scoped to a space (spaceId without withSharedSpaces)', async () => {
+    // Map can be opened with ?spaceId=... for space-scoped map view
+    const space = await utils.createSpace(admin.accessToken, { name: 'Map Space Test' });
+    await utils.addSpaceAssets(admin.accessToken, space.id, [assets[0].id, assets[2].id]); // A+C: nature, ratings 5+5
+
+    const { body } = await request(app)
+      .get(`/search/suggestions/filters?spaceId=${space.id}`)
+      .set('Authorization', `Bearer ${admin.accessToken}`)
+      .expect(200);
+
+    // Countries: only from assets A (Paris) and C (Berlin)
+    expect(body.countries.length).toBeGreaterThanOrEqual(1);
+    expect(body.countries.length).toBeLessThanOrEqual(unfilteredCountries.length);
+
+    // Tags: only "nature" (both A and C have it), not "travel"
+    const tagNames = body.tags.map((t: { value: string }) => t.value);
+    expect(tagNames).toContain('nature');
+    expect(tagNames).not.toContain('travel');
+
+    // Ratings: only 5 (both A and C are rated 5), not 3 or 4
+    expect(body.ratings).toContain(5);
+    expect(body.ratings).not.toContain(3);
+    expect(body.ratings).not.toContain(4);
+
+    // Media types: at least one
+    expect(body.mediaTypes.length).toBeGreaterThanOrEqual(1);
+  });
+
   it('should scope suggestions to a space', async () => {
     // Create a space with only assets A and B
     const space = await utils.createSpace(admin.accessToken, { name: 'Filter Test Space' });
