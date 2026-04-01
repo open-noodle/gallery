@@ -410,4 +410,53 @@ describe('/search/suggestions/filters', () => {
     expect(rating4TagNames).toContain('travel');
     expect(rating4TagNames).not.toContain('nature');
   });
+
+  it('should return other filter categories when filtering by space person ID', async () => {
+    // Create a space with assets A (rated 5, tagged "nature", Paris) and B (rated 4, tagged "travel", Tokyo)
+    const space = await utils.createSpace(admin.accessToken, { name: 'Person Cross-Filter Space' });
+    await utils.addSpaceAssets(admin.accessToken, space.id, [assets[0].id, assets[1].id]);
+
+    // Create a global person linked to asset A via asset_face
+    const db = await utils.connectDatabase();
+    const personResult = await db.query(
+      `INSERT INTO "person" ("ownerId", "name", "thumbnailPath")
+       VALUES ($1, $2, '/test/thumbnail.jpg') RETURNING id`,
+      [admin.userId, 'PersonCrossFilter'],
+    );
+    const globalPersonId = personResult.rows[0].id as string;
+
+    const faceResult = await db.query(`INSERT INTO "asset_face" ("assetId", "personId") VALUES ($1, $2) RETURNING id`, [
+      assets[0].id,
+      globalPersonId,
+    ]);
+    const faceId = faceResult.rows[0].id as string;
+
+    // Create a space person + link via shared_space_person_face
+    const spacePersonResult = await db.query(
+      `INSERT INTO "shared_space_person" ("spaceId", "name", "isHidden", "faceCount", "assetCount", "representativeFaceId")
+       VALUES ($1, $2, false, 1, 1, $3) RETURNING id`,
+      [space.id, 'PersonCrossFilter', faceId],
+    );
+    const spacePersonId = spacePersonResult.rows[0].id as string;
+
+    await db.query(`INSERT INTO "shared_space_person_face" ("personId", "assetFaceId") VALUES ($1, $2)`, [
+      spacePersonId,
+      faceId,
+    ]);
+
+    // Filter by space person ID — this is what the frontend sends when a person is selected in a space
+    const { body } = await request(app)
+      .get(`/search/suggestions/filters?spaceId=${space.id}&personIds=${spacePersonId}`)
+      .set('Authorization', `Bearer ${admin.accessToken}`)
+      .expect(200);
+
+    // The space person is linked to asset A (Paris, rated 5, tagged "nature")
+    // All other filter categories should reflect asset A's metadata — NOT be empty
+    expect(body.countries.length).toBeGreaterThanOrEqual(1);
+    expect(body.ratings.length).toBeGreaterThanOrEqual(1);
+    expect(body.ratings).toContain(5);
+    expect(body.tags.length).toBeGreaterThanOrEqual(1);
+    const tagNames = body.tags.map((t: { value: string }) => t.value);
+    expect(tagNames).toContain('nature');
+  });
 });
