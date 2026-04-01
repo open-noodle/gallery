@@ -188,7 +188,7 @@
       const mappedPeople = response.people.map((p) => ({
         id: p.id,
         name: p.name,
-        thumbnailUrl: `/people/${p.id}/thumbnail`,
+        thumbnailUrl: `/shared-spaces/${space.id}/people/${p.id}/thumbnail`,
       }));
       for (const p of response.people) {
         personNames.set(p.id, p.name);
