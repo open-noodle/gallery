@@ -1,6 +1,7 @@
 import type { LoginResponseDto } from '@immich/sdk';
+import { updateAsset } from '@immich/sdk';
 import { expect, test } from '@playwright/test';
-import { utils } from 'src/utils';
+import { asBearerAuth, utils } from 'src/utils';
 
 test.describe('Photos FilterPanel', () => {
   let admin: LoginResponseDto;
@@ -11,7 +12,7 @@ test.describe('Photos FilterPanel', () => {
     admin = await utils.adminSetup();
 
     // Create assets with varied dates so timeline has content
-    await utils.createAsset(admin.accessToken, {
+    const asset1 = await utils.createAsset(admin.accessToken, {
       fileCreatedAt: '2023-08-15T10:00:00.000Z',
       fileModifiedAt: '2023-08-15T10:00:00.000Z',
     });
@@ -23,6 +24,9 @@ test.describe('Photos FilterPanel', () => {
       fileCreatedAt: '2022-12-25T10:00:00.000Z',
       fileModifiedAt: '2022-12-25T10:00:00.000Z',
     });
+
+    // Rate an asset so the rating filter has a visible star
+    await updateAsset({ id: asset1.id, updateAssetDto: { rating: 5 } }, { headers: asBearerAuth(admin.accessToken) });
   });
 
   async function gotoPhotos(context: import('@playwright/test').BrowserContext, page: import('@playwright/test').Page) {
@@ -70,8 +74,9 @@ test.describe('Photos FilterPanel', () => {
   test('should show ActiveFiltersBar and clear all filters', async ({ context, page }) => {
     await gotoPhotos(context, page);
 
-    // Expand, set rating filter
+    // Expand, wait for filter suggestions to load, then set rating filter
     await page.locator('[data-testid="expand-panel-btn"]').click();
+    await page.locator('[data-testid="rating-star-5"]').waitFor({ state: 'visible', timeout: 10_000 });
     const bucketResponse = page.waitForResponse((r) => r.url().includes('/timeline/buckets'));
     await page.locator('[data-testid="rating-star-5"]').click();
     await bucketResponse;

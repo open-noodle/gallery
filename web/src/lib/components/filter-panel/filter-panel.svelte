@@ -53,12 +53,16 @@
   }: Props = $props();
   let collapsed = $state(initialCollapsed);
 
+  const providers = config.providers ?? {};
+
   // Fetched data for filter sections
   let people = $state<PersonOption[]>([]);
   let hasUnnamedPeople = $state(false);
   let countries = $state<string[]>([]);
   let cameraMakes = $state<string[]>([]);
   let tags = $state<TagOption[]>([]);
+  let availableRatings = $state<number[] | undefined>();
+  let availableMediaTypes = $state<string[] | undefined>();
 
   // Stable filterContext that only updates when temporal values actually change.
   // Derived directly from selectedYear/selectedMonth (not the full filters object)
@@ -74,6 +78,81 @@
     }
   });
 
+  // Unified suggestions re-fetch: replaces mount effects + temporal re-fetch when suggestionsProvider is set
+  let prevFilters: FilterState | undefined = $state();
+  let unifiedAbortController: AbortController | undefined = $state();
+
+  $effect(() => {
+    if (!config.suggestionsProvider) {
+      return;
+    }
+
+    // Track all filter fields — reading them registers as dependencies
+    const current: FilterState = {
+      personIds: filters.personIds,
+      city: filters.city,
+      country: filters.country,
+      make: filters.make,
+      model: filters.model,
+      tagIds: filters.tagIds,
+      rating: filters.rating,
+      mediaType: filters.mediaType,
+      isFavorite: filters.isFavorite,
+      sortOrder: filters.sortOrder,
+      selectedYear: filters.selectedYear,
+      selectedMonth: filters.selectedMonth,
+    };
+
+    const prev = untrack(() => prevFilters);
+
+    const isInitialMount = prev === undefined;
+    const temporalChanged =
+      !isInitialMount && (prev.selectedYear !== current.selectedYear || prev.selectedMonth !== current.selectedMonth);
+    const isTemporalClear = temporalChanged && current.selectedYear === undefined;
+
+    const delay = isInitialMount || isTemporalClear ? 0 : temporalChanged ? 200 : 50;
+
+    const provider = config.suggestionsProvider;
+    const currentFilters = { ...current };
+
+    const timeout = setTimeout(() => {
+      unifiedAbortController?.abort();
+      const controller = new AbortController();
+      unifiedAbortController = controller;
+      isRefetching = true;
+
+      void provider(currentFilters)
+        .then((result) => {
+          if (controller.signal.aborted) {
+            return;
+          }
+          people = result.people;
+          countries = result.countries;
+          cameraMakes = result.cameraMakes;
+          tags = result.tags;
+          availableRatings = result.ratings;
+          availableMediaTypes = result.mediaTypes;
+          hasUnnamedPeople = result.hasUnnamedPeople;
+        })
+        .catch((error: unknown) => {
+          if (!controller.signal.aborted) {
+            console.error('Failed to fetch filter suggestions:', error);
+          }
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) {
+            isRefetching = false;
+          }
+        });
+    }, delay);
+
+    prevFilters = current;
+
+    return () => {
+      clearTimeout(timeout);
+    };
+  });
+
   let prevTakenAfter: string | undefined = $state();
   let prevTakenBefore: string | undefined = $state();
   let abortController: AbortController | undefined = $state();
@@ -83,6 +162,10 @@
   // We track filters.selectedYear and filters.selectedMonth directly instead of
   // filterContext to avoid re-triggering when non-temporal filters change.
   $effect(() => {
+    if (config.suggestionsProvider) {
+      return;
+    }
+
     // Track only the two temporal fields — this is what determines re-fetch
     const year = filters.selectedYear;
     const month = filters.selectedMonth;
@@ -113,8 +196,6 @@
     const isClear = (prevAfter !== undefined || prevBefore !== undefined) && currentContext === undefined;
     const delay = isClear ? 0 : 200;
 
-    // Capture config providers to avoid stale closure warning
-    const providers = config.providers;
     const sections = config.sections;
 
     const timeout = setTimeout(() => {
@@ -205,6 +286,7 @@
   $effect(() => {
     return () => {
       abortController?.abort();
+      unifiedAbortController?.abort();
     };
   });
 
@@ -276,11 +358,14 @@
 
   // Fetch data on mount via $effect
   $effect(() => {
-    if (config.providers.people && config.sections.includes('people')) {
-      void config.providers.people().then((result) => {
+    if (config.suggestionsProvider) {
+      return;
+    }
+    if (providers.people && config.sections.includes('people')) {
+      void providers.people().then((result) => {
         people = result;
-        if (result.length === 0 && config.providers.allPeople) {
-          void config.providers.allPeople().then((all) => {
+        if (result.length === 0 && providers.allPeople) {
+          void providers.allPeople().then((all) => {
             hasUnnamedPeople = all.length > 0;
           });
         }
@@ -289,24 +374,33 @@
   });
 
   $effect(() => {
-    if (config.providers.locations && config.sections.includes('location')) {
-      void config.providers.locations().then((result) => {
+    if (config.suggestionsProvider) {
+      return;
+    }
+    if (providers.locations && config.sections.includes('location')) {
+      void providers.locations().then((result) => {
         countries = result.filter((l) => l.type === 'country').map((l) => l.value);
       });
     }
   });
 
   $effect(() => {
-    if (config.providers.cameras && config.sections.includes('camera')) {
-      void config.providers.cameras().then((result) => {
+    if (config.suggestionsProvider) {
+      return;
+    }
+    if (providers.cameras && config.sections.includes('camera')) {
+      void providers.cameras().then((result) => {
         cameraMakes = result.filter((c) => c.type === 'make').map((c) => c.value);
       });
     }
   });
 
   $effect(() => {
-    if (config.providers.tags && config.sections.includes('tags')) {
-      void config.providers.tags().then((result) => {
+    if (config.suggestionsProvider) {
+      return;
+    }
+    if (providers.tags && config.sections.includes('tags')) {
+      void providers.tags().then((result) => {
         tags = result;
       });
     }
@@ -497,8 +591,8 @@
                 selectedCountry={filters.country}
                 context={filterContext}
                 onCityFetch={async (country, ctx) => {
-                  if (config.providers.cities) {
-                    return config.providers.cities(country, ctx);
+                  if (providers.cities) {
+                    return providers.cities(country, ctx);
                   }
                   return [];
                 }}
@@ -511,8 +605,8 @@
                 selectedModel={filters.model}
                 context={filterContext}
                 onModelFetch={async (make, ctx) => {
-                  if (config.providers.cameraModels) {
-                    return config.providers.cameraModels(make, ctx);
+                  if (providers.cameraModels) {
+                    return providers.cameraModels(make, ctx);
                   }
                   return [];
                 }}
@@ -521,9 +615,13 @@
             {:else if section === 'tags'}
               <TagsFilter {tags} selectedIds={filters.tagIds} onSelectionChange={handleTagsChange} />
             {:else if section === 'rating'}
-              <RatingFilter selectedRating={filters.rating} onRatingChange={handleRatingChange} />
+              <RatingFilter selectedRating={filters.rating} {availableRatings} onRatingChange={handleRatingChange} />
             {:else if section === 'media'}
-              <MediaTypeFilter selected={filters.mediaType} onTypeChange={handleMediaTypeChange} />
+              <MediaTypeFilter
+                selected={filters.mediaType}
+                {availableMediaTypes}
+                onTypeChange={handleMediaTypeChange}
+              />
             {:else if section === 'favorites'}
               <FavoritesFilter
                 selected={filters.isFavorite}
