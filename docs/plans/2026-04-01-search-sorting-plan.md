@@ -372,6 +372,44 @@ it('should not include isFavorite when undefined', () => {
 });
 ```
 
+Also update the existing "should handle all filters active simultaneously" test (line ~114) to
+include the new fields:
+
+```typescript
+it('should handle all filters active simultaneously', () => {
+  const filters = {
+    ...createFilterState(),
+    personIds: ['p-1'],
+    city: 'Tokyo',
+    country: 'Japan',
+    make: 'Sony',
+    model: 'A7IV',
+    tagIds: ['t-1', 't-2'],
+    rating: 5,
+    mediaType: 'video' as const,
+    selectedYear: 2025,
+    selectedMonth: 3,
+    sortOrder: 'desc' as const,
+    isFavorite: true,
+  };
+  const result = buildSmartSearchParams('cherry blossoms', 'space-1', filters);
+  expect(result.query).toBe('cherry blossoms');
+  expect(result.spaceId).toBe('space-1');
+  expect(result.spacePersonIds).toEqual(['p-1']);
+  expect(result.city).toBe('Tokyo');
+  expect(result.country).toBe('Japan');
+  expect(result.make).toBe('Sony');
+  expect(result.model).toBe('A7IV');
+  expect(result.tagIds).toEqual(['t-1', 't-2']);
+  expect(result.rating).toBe(5);
+  expect(result.type).toBe(AssetTypeEnum.Video);
+  expect(result.takenAfter).toBeDefined();
+  expect(result.takenBefore).toBeDefined();
+  expect(result.order).toBe(AssetOrder.Desc);
+  expect(result.isFavorite).toBe(true);
+});
+```
+
 Add `import { AssetOrder } from '@immich/sdk';` to the imports if not present.
 
 **Step 2: Run tests to verify they fail**
@@ -380,7 +418,8 @@ Add `import { AssetOrder } from '@immich/sdk';` to the imports if not present.
 cd web && pnpm test -- --run src/lib/utils/space-search.spec.ts
 ```
 
-Expected: Fail — `order` and `isFavorite` not set.
+Expected: The new tests fail because `order` and `isFavorite` are not mapped. The updated
+"all filters" test also fails on the new assertions.
 
 **Step 3: Implement**
 
@@ -428,7 +467,9 @@ This task modifies the space page to:
 2. Reset `sortOrder` to `'desc'` on search clear
 3. Add `sortOrder` and `isFavorite` to `$effect` dependency array
 4. Update timeline options builder for `'relevance'` fallback
-5. Narrow type for `SortToggle`
+
+Note: SortToggle type narrowing is deferred to Task 8 where the full conditional replacement
+happens, to avoid throwaway code.
 
 **Step 1: Update `handleSearchSubmit`**
 
@@ -524,35 +565,7 @@ if (filters.sortOrder === 'asc') {
 }
 ```
 
-**Step 5: Narrow type for SortToggle**
-
-Find the `SortToggle` usage (~line 744):
-
-```svelte
-{#if !showSearchResults}
-  <SortToggle
-    sortOrder={filters.sortOrder}
-    onToggle={(order) => {
-      filters = { ...filters, sortOrder: order };
-    }}
-  />
-{/if}
-```
-
-Change to:
-
-```svelte
-{#if !showSearchResults}
-  <SortToggle
-    sortOrder={filters.sortOrder === 'relevance' ? 'desc' : filters.sortOrder}
-    onToggle={(order) => {
-      filters = { ...filters, sortOrder: order };
-    }}
-  />
-{/if}
-```
-
-**Step 6: Type check**
+**Step 5: Type check**
 
 ```bash
 cd web && npx svelte-check --tsconfig tsconfig.json 2>&1 | head -50
@@ -560,7 +573,7 @@ cd web && npx svelte-check --tsconfig tsconfig.json 2>&1 | head -50
 
 Expected: No errors in the modified file.
 
-**Step 7: Commit**
+**Step 6: Commit**
 
 ```
 feat: space page sort entry/exit/reset behavior
@@ -739,14 +752,14 @@ Add to imports:
 import SearchSortDropdown from '$lib/components/filter-panel/search-sort-dropdown.svelte';
 ```
 
-**Step 2: Replace SortToggle conditional**
+**Step 2: Replace SortToggle conditional with sort dropdown + type narrowing**
 
 Find the `SortToggle` block (~line 743):
 
 ```svelte
 {#if !showSearchResults}
   <SortToggle
-    sortOrder={filters.sortOrder === 'relevance' ? 'desc' : filters.sortOrder}
+    sortOrder={filters.sortOrder}
     onToggle={(order) => {
       filters = { ...filters, sortOrder: order };
     }}
@@ -832,6 +845,12 @@ it('should not render scroll sentinel when hasMore is false', () => {
 ```
 
 Also update all existing test `props` to include `sortMode: 'relevance'` (the new required prop).
+
+**Note:** The test environment (`happy-dom`) may not provide `IntersectionObserver`. The project
+has a mock at `web/src/lib/__mocks__/intersection-observer.mock.ts`. If tests fail with
+"IntersectionObserver is not defined", import the mock at the top of the spec file or add it to
+the vitest setup. Check the existing `people-infinite-scroll.svelte` tests to see how they handle
+this — the mock auto-registers via the setup file.
 
 **Step 2: Run tests to verify they fail**
 
@@ -1233,6 +1252,80 @@ test: update SpaceSearchResults tests for sortMode prop
 
 ---
 
+## Task 14: E2E tests for search sorting and pagination
+
+**Files:**
+
+- Create: `e2e/src/api/specs/search-sorting.e2e-spec.ts` (or add to existing search spec)
+
+E2E tests require a running server with ML disabled and test assets seeded into a shared space.
+Check existing E2E test patterns in `e2e/src/api/specs/` for setup conventions (user creation,
+space creation, asset upload).
+
+**Step 1: Write E2E tests**
+
+```typescript
+describe('Smart search sorting', () => {
+  // Setup: create a shared space, upload 3+ assets with known dates
+
+  it('should return results in date-descending order when order=desc', async () => {
+    const { assets } = await searchSmart({
+      smartSearchDto: { query: 'test', spaceId, order: AssetOrder.Desc },
+    });
+    const dates = assets.items.map((a) => new Date(a.fileCreatedAt).getTime());
+    for (let i = 1; i < dates.length; i++) {
+      expect(dates[i]).toBeLessThanOrEqual(dates[i - 1]);
+    }
+  });
+
+  it('should return results in similarity order when order is omitted', async () => {
+    const { assets } = await searchSmart({
+      smartSearchDto: { query: 'test', spaceId },
+    });
+    // Verify results are returned (similarity order can't be easily asserted
+    // without knowing embeddings, but we verify the endpoint works without order)
+    expect(assets.items.length).toBeGreaterThan(0);
+  });
+
+  it('should paginate date-sorted results', async () => {
+    const page1 = await searchSmart({
+      smartSearchDto: { query: 'test', spaceId, order: AssetOrder.Desc, size: 2, page: 1 },
+    });
+    expect(page1.assets.items).toHaveLength(2);
+    expect(page1.assets.nextPage).not.toBeNull();
+
+    const page2 = await searchSmart({
+      smartSearchDto: { query: 'test', spaceId, order: AssetOrder.Desc, size: 2, page: 2 },
+    });
+    expect(page2.assets.items.length).toBeGreaterThan(0);
+
+    // No overlap between pages
+    const page1Ids = new Set(page1.assets.items.map((a) => a.id));
+    for (const asset of page2.assets.items) {
+      expect(page1Ids.has(asset.id)).toBe(false);
+    }
+  });
+});
+```
+
+**Note:** These tests require the ML service to be available for CLIP encoding, or test assets
+that already have embeddings seeded. If the E2E environment runs without ML, these tests may
+need to be skipped or placed in a separate suite. Check `e2e/` setup to determine feasibility.
+
+**Step 2: Run E2E tests**
+
+```bash
+cd e2e && pnpm test -- --run src/api/specs/search-sorting.e2e-spec.ts
+```
+
+**Step 3: Commit**
+
+```
+test: e2e tests for search sorting and pagination
+```
+
+---
+
 ## Summary
 
 | Task | Description                                            | Type     |
@@ -1244,9 +1337,10 @@ test: update SpaceSearchResults tests for sortMode prop
 | 5    | Add order + isFavorite to buildSmartSearchParams (TDD) | Frontend |
 | 6    | Space page sort entry/exit/reset/$effect               | Frontend |
 | 7    | Sort dropdown component (TDD)                          | Frontend |
-| 8    | Wire dropdown into space page                          | Frontend |
+| 8    | Wire dropdown + SortToggle narrowing into space page   | Frontend |
 | 9    | Infinite scroll (TDD)                                  | Frontend |
 | 10   | Date-grouped display + result count (TDD)              | Frontend |
 | 11   | Pass sortMode prop                                     | Frontend |
 | 12   | Code generation + full verification                    | Codegen  |
 | 13   | Update existing tests                                  | Tests    |
+| 14   | E2E tests for sorting + pagination                     | E2E      |
