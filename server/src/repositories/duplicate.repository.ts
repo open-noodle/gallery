@@ -5,7 +5,7 @@ import { InjectKysely } from 'nestjs-kysely';
 import { columns } from 'src/database.js';
 import { Chunked, DummyValue, GenerateSql } from 'src/decorators.js';
 import { MapAsset } from 'src/dtos/asset-response.dto.js';
-import { AssetType, VectorIndex } from 'src/enum.js';
+import { AssetStatus, AssetType, VectorIndex } from 'src/enum.js';
 import { probes } from 'src/repositories/database.repository.js';
 import { DB } from 'src/schema/index.js';
 import { AssetExifTable } from 'src/schema/tables/asset-exif.table.js';
@@ -228,6 +228,70 @@ export class DuplicateRepository {
       .set({ duplicateId: options.targetId })
       .where((eb) =>
         eb.or([eb('duplicateId', '=', anyUuid(options.sourceIds)), eb('id', '=', anyUuid(options.assetIds))]),
+      )
+      .execute();
+  }
+
+  @GenerateSql({
+    params: [[{ assetId: DummyValue.UUID, ownerId: DummyValue.UUID, checksum: DummyValue.BUFFER }]],
+  })
+  async createChecksumTombstones(items: { assetId: string; ownerId: string; checksum: Buffer }[]): Promise<void> {
+    if (items.length === 0) {
+      return;
+    }
+
+    await this.db
+      .insertInto('asset_duplicate_checksum')
+      .values(
+        items.map(({ assetId, ownerId, checksum }) => ({
+          assetId: asUuid(assetId),
+          ownerId: asUuid(ownerId),
+          checksum,
+        })),
+      )
+      .onConflict((oc) =>
+        oc.columns(['ownerId', 'checksum']).doUpdateSet({ assetId: (eb) => eb.ref('excluded.assetId') }),
+      )
+      .execute();
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID, [DummyValue.UUID]] })
+  async deleteConflictingTombstones(ownerId: string, assetIds: string[]): Promise<void> {
+    if (assetIds.length === 0) {
+      return;
+    }
+
+    await this.db
+      .deleteFrom('asset_duplicate_checksum')
+      .where('ownerId', '=', asUuid(ownerId))
+      .where(
+        'checksum',
+        'in',
+        this.db
+          .selectFrom('asset')
+          .select('checksum')
+          .where(
+            'id',
+            'in',
+            assetIds.map((id) => asUuid(id)),
+          ),
+      )
+      .execute();
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID] })
+  async deleteConflictingTombstonesForUser(ownerId: string): Promise<void> {
+    await this.db
+      .deleteFrom('asset_duplicate_checksum')
+      .where('ownerId', '=', asUuid(ownerId))
+      .where(
+        'checksum',
+        'in',
+        this.db
+          .selectFrom('asset')
+          .select('checksum')
+          .where('ownerId', '=', asUuid(ownerId))
+          .where('status', '=', AssetStatus.Active),
       )
       .execute();
   }
