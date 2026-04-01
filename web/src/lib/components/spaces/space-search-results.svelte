@@ -102,7 +102,7 @@
     return groups;
   };
 
-  let dateGroups = $derived(sortMode !== 'relevance' ? groupByMonth(results) : []);
+  let dateGroups = $derived(sortMode === 'relevance' ? [] : groupByMonth(results));
 </script>
 
 <section class="px-4 py-4">

@@ -34,11 +34,7 @@ export function buildPhotosTimelineOptions(filters: FilterState): Record<string,
   if (filters.mediaType !== 'all') {
     base.$type = filters.mediaType === 'image' ? AssetTypeEnum.Image : AssetTypeEnum.Video;
   }
-  if (filters.sortOrder === 'asc') {
-    base.order = AssetOrder.Asc;
-  } else {
-    base.order = AssetOrder.Desc;
-  }
+  base.order = filters.sortOrder === 'asc' ? AssetOrder.Asc : AssetOrder.Desc;
 
   const context = buildFilterContext(filters);
   if (context) {
