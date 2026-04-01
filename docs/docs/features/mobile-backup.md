@@ -32,6 +32,8 @@ You can select which albums on your mobile device to back up to the server. You 
 
 When you first select albums for backup, Gallery calculates a checksum for each file's content. This checksum identifies assets already on the server—whether uploaded via CLI, web interface, or another device. Files matching existing assets are skipped, preventing duplicate uploads and saving bandwidth.
 
+This also applies to assets that were resolved as visual duplicates via the [Duplicates Utility](/features/duplicates-utility#re-upload-prevention). When you keep one copy and trash the others, Gallery remembers the trashed files' checksums so the mobile app won't re-upload them.
+
 ### Networking requirements
 
 By default, Gallery will only upload photos and videos when connected to Wi-Fi. You can change this behavior in the backup settings page.
