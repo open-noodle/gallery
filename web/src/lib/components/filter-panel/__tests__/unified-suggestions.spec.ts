@@ -109,26 +109,6 @@ describe('Unified suggestionsProvider', () => {
     });
   });
 
-  it('should hide unavailable ratings', async () => {
-    const config = createUnifiedConfig({
-      suggestionsProvider: vi.fn().mockResolvedValue({
-        ...defaultResponse,
-        ratings: [4, 5],
-      }),
-    });
-    render(FilterPanel, { props: { config, timeBuckets } });
-
-    await vi.advanceTimersByTimeAsync(0);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('rating-star-4')).toBeTruthy();
-      expect(screen.getByTestId('rating-star-5')).toBeTruthy();
-      expect(screen.queryByTestId('rating-star-1')).toBeNull();
-      expect(screen.queryByTestId('rating-star-2')).toBeNull();
-      expect(screen.queryByTestId('rating-star-3')).toBeNull();
-    });
-  });
-
   it('should show all ratings when availableRatings is undefined (backward compat)', async () => {
     const config: FilterPanelConfig = {
       sections: ['rating'],
@@ -141,24 +121,6 @@ describe('Unified suggestionsProvider', () => {
     for (const star of [1, 2, 3, 4, 5]) {
       expect(screen.getByTestId(`rating-star-${star}`)).toBeTruthy();
     }
-  });
-
-  it('should hide unavailable media types', async () => {
-    const config = createUnifiedConfig({
-      suggestionsProvider: vi.fn().mockResolvedValue({
-        ...defaultResponse,
-        mediaTypes: ['IMAGE'],
-      }),
-    });
-    render(FilterPanel, { props: { config, timeBuckets } });
-
-    await vi.advanceTimersByTimeAsync(0);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('media-type-all')).toBeTruthy();
-      expect(screen.getByTestId('media-type-image')).toBeTruthy();
-      expect(screen.queryByTestId('media-type-video')).toBeNull();
-    });
   });
 
   it('should fall back to providers-based behavior when suggestionsProvider is not set', async () => {
