@@ -1,6 +1,6 @@
 <script lang="ts">
+  import { assetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
   import { eventManager } from '$lib/managers/event-manager.svelte';
-  import { getAssetControlContext } from '$lib/utils/context';
   import { handleError } from '$lib/utils/handle-error';
   import { removeAssets } from '@immich/sdk';
   import { IconButton, modalManager, toastManager } from '@immich/ui';
@@ -14,10 +14,8 @@
 
   let { spaceId, onRemove }: Props = $props();
 
-  const { getAssets, clearSelect } = getAssetControlContext();
-
   const removeFromSpace = async () => {
-    const assets = [...getAssets()];
+    const assets = [...assetMultiSelectManager.assets];
     const isConfirmed = await modalManager.showDialog({
       prompt: $t('remove_assets_shared_space_confirmation', { values: { count: assets.length } }),
     });
@@ -37,7 +35,7 @@
       onRemove?.(assetIds);
 
       toastManager.success($t('assets_removed_count', { values: { count: assetIds.length } }));
-      clearSelect();
+      assetMultiSelectManager.clear();
     } catch (error) {
       handleError(error, $t('errors.error_removing_assets_from_space'));
     }
