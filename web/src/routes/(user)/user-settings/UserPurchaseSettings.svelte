@@ -97,11 +97,6 @@
       handleError(error, $t('errors.failed_to_remove_product_key'));
     }
   };
-
-  const onProductActivated = async () => {
-    authManager.isPurchased = true;
-    await checkPurchaseInfo();
-  };
 </script>
 
 <section class="my-4">
@@ -179,7 +174,7 @@
         </div>
       {/if}
     {:else}
-      <PurchaseContent onActivate={onProductActivated} showTitle={false} />
+      <PurchaseContent showTitle={false} />
     {/if}
   </div>
 </section>
