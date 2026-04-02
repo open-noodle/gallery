@@ -57,6 +57,7 @@ import ProfileImageCropperModal from '$lib/modals/ProfileImageCropperModal.svelt
 import SharedLinkCreateModal from '$lib/modals/SharedLinkCreateModal.svelte';
 import { Route } from '$lib/route';
 import { SlideshowState, slideshowStore } from '$lib/stores/slideshow.store';
+import { waitForWebsocketEvent } from '$lib/stores/websocket';
 import { getAssetMediaUrl, getSharedLink, sleep } from '$lib/utils';
 import { downloadUrl } from '$lib/utils';
 import { handleError } from '$lib/utils/handle-error';
