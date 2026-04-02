@@ -252,7 +252,6 @@
     }
   }
 
-
   const currentMember = $derived(members.find((m) => m.userId === $user.id));
   const isOwner = $derived(currentMember?.role === Role.Owner);
   const isEditor = $derived(currentMember?.role === Role.Owner || currentMember?.role === Role.Editor);
