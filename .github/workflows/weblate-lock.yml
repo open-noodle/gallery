@@ -23,7 +23,6 @@ jobs:
     outputs:
       should_run: ${{ steps.check.outputs.should_run }}
     steps:
-
       - name: Check what should run
         id: check
         uses: immich-app/devtools/actions/pre-job@91f342bb4477c4bc10c576ae739da875d85aa164 # pre-job-action-v2.0.4
@@ -41,7 +40,6 @@ jobs:
     permissions: {}
     if: ${{ fromJSON(needs.pre-job.outputs.should_run).i18n == true }}
     steps:
-
       - name: Bot review status
         env:
           PR_NUMBER: ${{ github.event.pull_request.number || github.event.pull_request_review.pull_request.number }}
