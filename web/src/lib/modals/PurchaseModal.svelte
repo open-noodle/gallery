@@ -1,5 +1,4 @@
 <script lang="ts">
-  import PurchaseActivationSuccess from '#lib/components/shared-components/purchasing/PurchaseActivationSuccess.svelte';
   import PurchaseContent from '#lib/components/shared-components/purchasing/PurchaseContent.svelte';
   import { Modal, ModalBody } from '@immich/ui';
 
@@ -8,21 +7,10 @@
   }
 
   let { onClose }: Props = $props();
-
-  let showProductActivated = $state(false);
 </script>
 
 <Modal title=" " {onClose} size="large">
   <ModalBody>
-    {#if showProductActivated}
-      <PurchaseActivationSuccess onDone={onClose} />
-    {:else}
-      <PurchaseContent
-        onActivate={() => {
-          showProductActivated = true;
-        }}
-        showMessage={false}
-      />
-    {/if}
+    <PurchaseContent showMessage={false} />
   </ModalBody>
 </Modal>
