@@ -3,13 +3,12 @@
   import { OpenQueryParam } from '$lib/constants';
   import Portal from '$lib/elements/Portal.svelte';
   import { authManager } from '$lib/managers/auth-manager.svelte';
-  import PurchaseModal from '$lib/modals/PurchaseModal.svelte';
   import { Route } from '$lib/route';
   import { getAccountAge } from '$lib/utils/auth';
   import { handleError } from '$lib/utils/handle-error';
   import { getButtonVisibility } from '$lib/utils/purchase-utils';
   import { updateMyPreferences } from '@immich/sdk';
-  import { Button, Icon, IconButton, modalManager, SupporterBadge } from '@immich/ui';
+  import { Button, Icon, IconButton, SupporterBadge } from '@immich/ui';
   import Logo from '$lib/components/shared-components/Logo.svelte';
   import { mdiClose, mdiInformationOutline } from '@mdi/js';
   import { t } from 'svelte-i18n';
@@ -22,10 +21,7 @@
 
   let showBuyButton = $state(getButtonVisibility());
 
-  const openPurchaseModal = async () => {
-    await modalManager.show(PurchaseModal);
-    showMessage = false;
-  };
+  const discordLink = 'https://discord.gg/cxBfbuxyG4';
 
   const onButtonHover = () => {
     showMessage = true;
@@ -82,7 +78,7 @@
   {:else if !authManager.isPurchased && showBuyButton && getAccountAge() > 14}
     <button
       type="button"
-      onclick={openPurchaseModal}
+      onclick={() => window.open(discordLink, '_blank')}
       onmouseover={onButtonHover}
       onmouseleave={() => (hoverButton = false)}
       onfocus={onButtonHover}
@@ -148,9 +144,7 @@
         </p>
       </div>
 
-      <Button shape="round" class="mt-2" fullWidth onclick={openPurchaseModal}
-        >{$t('purchase_button_buy_immich')}</Button
-      >
+      <Button shape="round" class="mt-2" fullWidth href={discordLink}>{$t('purchase_discord_button')}</Button>
       <div class="mt-3 flex gap-4">
         <Button shape="round" size="small" fullWidth color="secondary" variant="ghost" onclick={() => hideButton(true)}>
           {$t('purchase_button_never_show_again')}
