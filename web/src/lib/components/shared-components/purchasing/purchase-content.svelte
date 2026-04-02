@@ -5,7 +5,6 @@
   import { t } from 'svelte-i18n';
 
   interface Props {
-    onActivate?: () => void;
     showTitle?: boolean;
     showMessage?: boolean;
   }
