@@ -1,20 +1,18 @@
 <script lang="ts">
   import MenuOption from '$lib/components/shared-components/context-menu/menu-option.svelte';
+  import { assetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
   import { eventManager } from '$lib/managers/event-manager.svelte';
   import { mergeRotation } from '$lib/services/asset.service';
   import { waitForWebsocketEvent } from '$lib/stores/websocket';
-  import { getAssetControlContext } from '$lib/utils/context';
   import { handleError } from '$lib/utils/handle-error';
   import { editAsset, getAssetEdits, getAssetInfo, removeAssetEdits } from '@immich/sdk';
   import { toastManager } from '@immich/ui';
   import { mdiRotateLeft, mdiRotateRight } from '@mdi/js';
   import { t } from 'svelte-i18n';
 
-  const { clearSelect, getOwnedAssets } = getAssetControlContext();
-
   const handleRotate = async (angle: number) => {
     try {
-      const assets = [...getOwnedAssets()].filter((asset) => asset.isImage);
+      const assets = [...assetMultiSelectManager.getOwnedAssets()].filter((asset) => asset.isImage);
       if (assets.length === 0) {
         return;
       }
@@ -59,7 +57,7 @@
         toastManager.success($t('rotated_count', { values: { count: success } }));
       }
 
-      clearSelect();
+      assetMultiSelectManager.clear();
 
       // Refresh thumbnails in the background after edits complete
       void Promise.allSettled(pendingRefreshes);
