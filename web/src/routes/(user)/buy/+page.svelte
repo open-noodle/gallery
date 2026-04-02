@@ -1,44 +1,20 @@
 <script lang="ts">
   import UserPageLayout from '#lib/components/layouts/UserPageLayout.svelte';
-  import LicenseActivationSuccess from '#lib/components/shared-components/purchasing/PurchaseActivationSuccess.svelte';
-  import LicenseContent from '#lib/components/shared-components/purchasing/PurchaseContent.svelte';
-  import { authManager } from '#lib/managers/auth-manager.svelte.ts';
-  import { Route } from '#lib/route.ts';
-  import { Alert, Container, Stack } from '@immich/ui';
-  import { mdiAlertCircleOutline } from '@mdi/js';
-  import { t } from 'svelte-i18n';
-  import { goto } from '$app/navigation';
+  import PurchaseContent from '#lib/components/shared-components/purchasing/PurchaseContent.svelte';
+  import { Container, Stack } from '@immich/ui';
   import type { PageData } from './$types';
-  import SupporterBadge from './SupporterBadge.svelte';
 
   interface Props {
     data: PageData;
   }
 
   let { data }: Props = $props();
-  let showLicenseActivated = $state(false);
 </script>
 
 <UserPageLayout title={data.meta.title}>
   <Container size="medium" center>
     <Stack gap={4} class="mt-4">
-      {#if data.isActivated === false}
-        <Alert icon={mdiAlertCircleOutline} color="danger" title={$t('purchase_failed_activation')} />
-      {/if}
-
-      {#if authManager.isPurchased}
-        <SupporterBadge logoSize="lg" centered />
-      {/if}
-
-      {#if showLicenseActivated || data.isActivated === true}
-        <LicenseActivationSuccess onDone={() => goto(Route.photos(), { replaceState: false })} />
-      {:else}
-        <LicenseContent
-          onActivate={() => {
-            showLicenseActivated = true;
-          }}
-        />
-      {/if}
+      <PurchaseContent />
     </Stack>
   </Container>
 </UserPageLayout>
