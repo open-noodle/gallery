@@ -4573,7 +4573,7 @@ describe(MediaService.name, () => {
         type: AssetType.Video,
         originalPath: '/original/path.ext',
       })
-        .file({ type: AssetFileType.EncodedVideo, path: '/encoded/path.mp4' })
+        .file({ type: AssetFileType.EncodedVideo, path: '/encoded/path.mp4', isEdited: false })
         .build();
       mocks.assetJob.getForVideoConversion.mockResolvedValue(asset as any);
       sut.videoInterfaces = { dri: ['renderD128'], mali: true };
