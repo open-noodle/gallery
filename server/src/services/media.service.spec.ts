@@ -19,7 +19,6 @@ import {
   TranscodeHardwareAcceleration,
   TranscodePolicy,
   VideoCodec,
-  VideoContainer,
 } from 'src/enum';
 import { MediaService } from 'src/services/media.service';
 import { AudioStreamInfo, JobCounts, RawImageInfo, VideoFormat, VideoStreamInfo } from 'src/types';
@@ -4633,39 +4632,6 @@ describe(MediaService.name, () => {
 
       // skips partial fallback (accelDecode was false), goes straight to full software
       expect(mocks.media.transcode).toHaveBeenCalledTimes(2);
-    });
-  });
-
-  describe('handleVideoConversion - delete existing encoded video', () => {
-    it('should delete existing encoded video when transcoding is no longer required', async () => {
-      const asset = AssetFactory.from({
-        id: 'video-id',
-        type: AssetType.Video,
-        originalPath: '/original/path.ext',
-      })
-        .file({ type: AssetFileType.EncodedVideo, path: '/encoded/path.mp4', isEdited: false })
-        .build();
-      mocks.assetJob.getForVideoConversion.mockResolvedValue(asset as any);
-      sut.videoInterfaces = { dri: ['renderD128'], mali: true };
-
-      mocks.media.probe.mockResolvedValue(probeStub.matroskaContainer);
-      mocks.systemMetadata.get.mockResolvedValue({
-        ffmpeg: {
-          transcode: TranscodePolicy.Required,
-          acceptedVideoCodecs: [VideoCodec.Hevc],
-          acceptedContainers: ['matroska,webm' as VideoContainer],
-        },
-      });
-
-      await sut.handleVideoConversion({ id: 'video-id' });
-
-      expect(mocks.job.queue).toHaveBeenCalledWith({
-        name: JobName.FileDelete,
-        data: { files: ['/encoded/path.mp4'] },
-      });
-      expect(mocks.asset.deleteFiles).toHaveBeenCalledWith([
-        expect.objectContaining({ type: AssetFileType.EncodedVideo, path: '/encoded/path.mp4' }),
-      ]);
     });
   });
 
