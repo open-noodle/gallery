@@ -42,9 +42,8 @@
   import { TimelineManager } from '$lib/managers/timeline-manager/timeline-manager.svelte';
   import { eventManager } from '$lib/managers/event-manager.svelte';
   import { Route } from '$lib/route';
-  import { AssetInteraction } from '$lib/stores/asset-interaction.svelte';
+  import { assetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
   import { preferences, user } from '$lib/stores/user.store';
-  import { cancelMultiselect } from '$lib/utils/asset-utils';
   import { handleError } from '$lib/utils/handle-error';
   import { buildSmartSearchParams, SEARCH_FILTER_DEBOUNCE_MS } from '$lib/utils/space-search';
   import {
@@ -127,8 +126,7 @@
       panelOpen = false;
       viewMode = 'view';
       repositioning = false;
-      assetInteraction.clearMultiselect();
-      timelineInteraction.clearMultiselect();
+      assetMultiSelectManager.clear();
     }
   });
 
@@ -254,8 +252,6 @@
     }
   }
 
-  const assetInteraction = new AssetInteraction();
-  const timelineInteraction = new AssetInteraction();
 
   const currentMember = $derived(members.find((m) => m.userId === $user.id));
   const isOwner = $derived(currentMember?.role === Role.Owner);
@@ -313,7 +309,6 @@
     return base;
   });
 
-  const currentAssetInteraction = $derived(viewMode === 'select-assets' ? timelineInteraction : assetInteraction);
   const isSelectionMode = $derived(viewMode === 'select-assets' || viewMode === 'select-cover');
 
   const refreshSpace = async () => {
@@ -375,20 +370,20 @@
       handleCloseSelectCover();
       return;
     }
-    if (assetInteraction.selectionActive) {
-      cancelMultiselect(assetInteraction);
+    if (assetMultiSelectManager.selectionActive) {
+      assetMultiSelectManager.clear();
       return;
     }
     void goto(Route.spaces());
   };
 
   const handleCloseSelectAssets = () => {
-    timelineInteraction.clearMultiselect();
+    assetMultiSelectManager.clear();
     viewMode = 'view';
   };
 
   const handleCloseSelectCover = () => {
-    assetInteraction.clearMultiselect();
+    assetMultiSelectManager.clear();
     viewMode = 'view';
   };
 
@@ -415,7 +410,7 @@
   };
 
   const handleSetCoverFromSelection = async () => {
-    const assets = assetInteraction.selectedAssets;
+    const assets = assetMultiSelectManager.assets;
     if (assets.length !== 1) {
       return;
     }
@@ -427,7 +422,7 @@
       });
       space = { ...space, thumbnailAssetId: assets[0].id, thumbnailCropY: null };
       toastManager.success($t('space_cover_updated'));
-      assetInteraction.clearMultiselect();
+      assetMultiSelectManager.clear();
       viewMode = 'view';
       repositioning = true;
     } catch (error) {
@@ -436,7 +431,7 @@
   };
 
   const handleAddAssets = async () => {
-    const assetIds = timelineInteraction.selectedAssets.map((a) => a.id);
+    const assetIds = assetMultiSelectManager.assets.map((a) => a.id);
     if (assetIds.length === 0 || assetIds.length > MAX_SPACE_ASSETS_PER_REQUEST) {
       return;
     }
@@ -538,7 +533,7 @@
   };
 
   const handleSetAsCover = async () => {
-    const assets = assetInteraction.selectedAssets;
+    const assets = assetMultiSelectManager.assets;
     if (assets.length !== 1) {
       return;
     }
@@ -550,7 +545,7 @@
       });
       space = { ...space, thumbnailAssetId: assets[0].id, thumbnailCropY: null };
       toastManager.success($t('space_cover_updated'));
-      cancelMultiselect(assetInteraction);
+      assetMultiSelectManager.clear();
       repositioning = true;
     } catch (error) {
       handleError(error, $t('errors.unable_to_update_space_cover'));
@@ -559,7 +554,7 @@
 
   const onSpaceAddAssets = async () => {
     await Promise.all([refreshSpace(), loadActivities()]);
-    timelineInteraction.clearMultiselect();
+    assetMultiSelectManager.clear();
     viewMode = 'view';
   };
 
@@ -689,12 +684,12 @@
 <OnEvents {onSpaceAddAssets} {onSpaceRemoveAssets} onAssetsDelete={refreshSpace} />
 
 <UserPageLayout
-  hideNavbar={assetInteraction.selectionActive || viewMode === 'select-assets' || viewMode === 'select-cover'}
+  hideNavbar={assetMultiSelectManager.selectionActive || viewMode === 'select-assets' || viewMode === 'select-cover'}
   title={viewMode === 'select-assets' || viewMode === 'select-cover' ? undefined : space.name}
   scrollbar={false}
 >
   {#snippet leading()}
-    {#if viewMode === 'view' && !assetInteraction.selectionActive}
+    {#if viewMode === 'view' && !assetMultiSelectManager.selectionActive}
       <IconButton
         variant="ghost"
         shape="round"
@@ -707,7 +702,7 @@
   {/snippet}
 
   {#snippet buttons()}
-    {#if viewMode === 'view' && !assetInteraction.selectionActive}
+    {#if viewMode === 'view' && !assetMultiSelectManager.selectionActive}
       <div class="flex items-center gap-1">
         {#if (space.assetCount ?? 0) > 0}
           <div class="hidden h-10 sm:block sm:w-40 xl:w-60">
@@ -872,7 +867,7 @@
             enableRouting={false}
             bind:timelineManager
             {options}
-            assetInteraction={currentAssetInteraction}
+            assetInteraction={assetMultiSelectManager}
             {isSelectionMode}
             onEscape={handleEscape}
             spaceId={space.id}
@@ -940,37 +935,34 @@
   </div>
 </UserPageLayout>
 
-{#if assetInteraction.selectionActive && viewMode === 'view'}
-  <AssetSelectControlBar
-    assets={assetInteraction.selectedAssets}
-    clearSelect={() => assetInteraction.clearMultiselect()}
-  >
-    <SelectAllAssets {timelineManager} {assetInteraction} />
+{#if assetMultiSelectManager.selectionActive && viewMode === 'view'}
+  <AssetSelectControlBar>
+    <SelectAllAssets {timelineManager} assetInteraction={assetMultiSelectManager} />
     {#if isEditor}
       <RemoveFromSpaceAction spaceId={space.id} onRemove={handleRemoveAssets} />
     {/if}
-    {#if assetInteraction.isAllUserOwned}
+    {#if assetMultiSelectManager.isAllUserOwned}
       <FavoriteAction
-        removeFavorite={assetInteraction.isAllFavorite}
+        removeFavorite={assetMultiSelectManager.isAllFavorite}
         onFavorite={(ids, isFavorite) => timelineManager.update(ids, (asset) => (asset.isFavorite = isFavorite))}
       />
     {/if}
     <ButtonContextMenu icon={mdiDotsVertical} title={$t('menu')} offset={{ x: 175, y: 25 }}>
       <DownloadAction menuItem />
-      {#if assetInteraction.isAllUserOwned}
+      {#if assetMultiSelectManager.isAllUserOwned}
         <ChangeDate menuItem />
         <ChangeDescription menuItem />
         <ChangeLocation menuItem />
         <ArchiveAction
           menuItem
-          unarchive={assetInteraction.isAllArchived}
+          unarchive={assetMultiSelectManager.isAllArchived}
           onArchive={(ids, visibility) => timelineManager.update(ids, (asset) => (asset.visibility = visibility))}
         />
       {/if}
-      {#if $preferences.tags.enabled && assetInteraction.isAllUserOwned}
+      {#if $preferences.tags.enabled && assetMultiSelectManager.isAllUserOwned}
         <TagAction menuItem />
       {/if}
-      {#if isEditor && assetInteraction.selectedAssets.length === 1}
+      {#if isEditor && assetMultiSelectManager.assets.length === 1}
         <MenuOption text={$t('set_as_space_cover')} icon={mdiImageOutline} onClick={handleSetAsCover} />
       {/if}
     </ButtonContextMenu>
@@ -998,10 +990,10 @@
   <ControlAppBar onClose={handleCloseSelectAssets}>
     {#snippet leading()}
       <p class="text-lg dark:text-immich-dark-fg">
-        {#if !timelineInteraction.selectionActive}
+        {#if !assetMultiSelectManager.selectionActive}
           {$t('add_to_space')}
         {:else}
-          {$t('selected_count', { values: { count: timelineInteraction.selectedAssets.length } })}
+          {$t('selected_count', { values: { count: assetMultiSelectManager.assets.length } })}
         {/if}
       </p>
     {/snippet}
@@ -1014,22 +1006,22 @@
         aria-label={$t('add_to_space')}
         onclick={handleAddAssets}
         icon={mdiPlus}
-        disabled={!timelineInteraction.selectionActive ||
-          timelineInteraction.selectedAssets.length > MAX_SPACE_ASSETS_PER_REQUEST}
+        disabled={!assetMultiSelectManager.selectionActive ||
+          assetMultiSelectManager.assets.length > MAX_SPACE_ASSETS_PER_REQUEST}
       />
     {/snippet}
   </ControlAppBar>
-  <SpaceAssetLimitWarning selectedCount={timelineInteraction.selectedAssets.length} />
+  <SpaceAssetLimitWarning selectedCount={assetMultiSelectManager.assets.length} />
 {/if}
 
 {#if viewMode === 'select-cover'}
   <ControlAppBar onClose={handleCloseSelectCover}>
     {#snippet leading()}
       <p class="text-lg dark:text-immich-dark-fg">
-        {#if !assetInteraction.selectionActive}
+        {#if !assetMultiSelectManager.selectionActive}
           {$t('set_cover_photo')}
         {:else}
-          {$t('selected_count', { values: { count: assetInteraction.selectedAssets.length } })}
+          {$t('selected_count', { values: { count: assetMultiSelectManager.assets.length } })}
         {/if}
       </p>
     {/snippet}
@@ -1042,7 +1034,7 @@
         aria-label={$t('set_cover_photo')}
         onclick={handleSetCoverFromSelection}
         icon={mdiImageOutline}
-        disabled={assetInteraction.selectedAssets.length !== 1}
+        disabled={assetMultiSelectManager.assets.length !== 1}
       />
     {/snippet}
   </ControlAppBar>
