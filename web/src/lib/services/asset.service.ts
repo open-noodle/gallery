@@ -13,6 +13,7 @@ import { executeMutation, readPreloadedQuery } from '#lib/queries/client.ts';
 import { getUserConfigQuery } from '#lib/queries/config-user.query.ts';
 import { Route } from '#lib/route.ts';
 import { SlideshowState, slideshowStore } from '#lib/stores/slideshow.store.ts';
+import { waitForWebsocketEvent } from '#lib/stores/websocket.ts';
 import { getAssetMediaUrl, getSharedLink, sleep } from '#lib/utils.ts';
 import { downloadUrl } from '#lib/utils.ts';
 import { handleError } from '#lib/utils/handle-error.ts';
