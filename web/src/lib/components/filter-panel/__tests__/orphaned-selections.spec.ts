@@ -6,7 +6,7 @@ import FilterPanel from '../filter-panel.svelte';
 describe('Orphaned selections', () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    localStorage.removeItem('gallery-filter-visible-sections');
+    localStorage.clear();
   });
 
   afterEach(() => {
@@ -144,7 +144,7 @@ describe('Orphaned selections', () => {
 describe('Empty section collapse', () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    localStorage.removeItem('gallery-filter-visible-sections');
+    localStorage.clear();
   });
 
   afterEach(() => {
@@ -256,7 +256,7 @@ describe('Empty section collapse', () => {
 describe('Cascade child auto-clear', () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    localStorage.removeItem('gallery-filter-visible-sections');
+    localStorage.clear();
   });
 
   afterEach(() => {
