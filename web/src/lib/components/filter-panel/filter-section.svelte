@@ -9,10 +9,11 @@
     children: Snippet;
     refetching?: boolean;
     count?: number;
+    expanded?: boolean;
+    onToggleExpanded?: () => void;
   }
 
-  let { title, testId, children, refetching = false, count }: Props = $props();
-  let expanded = $state(true);
+  let { title, testId, children, refetching = false, count, expanded = true, onToggleExpanded }: Props = $props();
 
   let isEmpty = $derived(count === 0);
 </script>
@@ -22,8 +23,8 @@
     type="button"
     class="flex w-full items-center justify-between px-4 py-3 hover:bg-subtle {isEmpty ? 'opacity-50' : ''}"
     onclick={() => {
-      if (!isEmpty) {
-        expanded = !expanded;
+      if (!isEmpty && onToggleExpanded) {
+        onToggleExpanded();
       }
     }}
     disabled={isEmpty}
