@@ -129,7 +129,7 @@
     </div>
 
     {#if sortMode === 'relevance'}
-      <div class="grid grid-cols-[repeat(auto-fill,minmax(250px,1fr))] gap-1">
+      <div class="grid grid-cols-[repeat(auto-fill,minmax(250px,1fr))] gap-3">
         {#each results as asset (asset.id)}
           <button
             type="button"
@@ -152,7 +152,7 @@
         >
           {group.label}
         </h3>
-        <div class="grid grid-cols-[repeat(auto-fill,minmax(250px,1fr))] gap-1">
+        <div class="grid grid-cols-[repeat(auto-fill,minmax(250px,1fr))] gap-3">
           {#each group.assets as asset (asset.id)}
             <button
               type="button"
