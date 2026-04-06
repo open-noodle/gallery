@@ -123,6 +123,10 @@ export class SearchService extends BaseService {
       requireElevatedPermission(auth);
     }
 
+    if (dto.spaceId && dto.withSharedSpaces) {
+      throw new BadRequestException('Cannot use both spaceId and withSharedSpaces');
+    }
+
     if (dto.spaceId) {
       await this.requireAccess({ auth, permission: Permission.SharedSpaceRead, ids: [dto.spaceId] });
     }
@@ -160,10 +164,20 @@ export class SearchService extends BaseService {
     }
     const page = dto.page ?? 1;
     const size = dto.size || 100;
+
+    let timelineSpaceIds: string[] | undefined;
+    if (dto.withSharedSpaces) {
+      const spaceRows = await this.sharedSpaceRepository.getSpaceIdsForTimeline(auth.user.id);
+      if (spaceRows.length > 0) {
+        timelineSpaceIds = spaceRows.map((row) => row.spaceId);
+      }
+    }
+
     const { hasNextPage, items } = await this.searchRepository.searchSmart(
       { page, size },
       {
         ...dto,
+        timelineSpaceIds,
         userIds: await userIds,
         embedding,
         orderDirection: dto.order,

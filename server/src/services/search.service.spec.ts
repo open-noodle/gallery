@@ -786,14 +786,14 @@ describe(SearchService.name, () => {
             query: 'test',
             spaceId: newUuid(),
             withSharedSpaces: true,
-          } as any),
+          }),
         ).rejects.toBeInstanceOf(BadRequestException);
         await expect(
           sut.searchSmart(authStub.user1, {
             query: 'test',
             spaceId: newUuid(),
             withSharedSpaces: true,
-          } as any),
+          }),
         ).rejects.toThrow('Cannot use both spaceId and withSharedSpaces');
       });
 
@@ -802,7 +802,7 @@ describe(SearchService.name, () => {
         const spaceId2 = newUuid();
         mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId: spaceId1 }, { spaceId: spaceId2 }]);
 
-        await sut.searchSmart(authStub.user1, { query: 'test', withSharedSpaces: true } as any);
+        await sut.searchSmart(authStub.user1, { query: 'test', withSharedSpaces: true });
 
         expect(mocks.sharedSpace.getSpaceIdsForTimeline).toHaveBeenCalledWith(authStub.user1.user.id);
         expect(mocks.search.searchSmart).toHaveBeenCalledWith(
@@ -814,7 +814,7 @@ describe(SearchService.name, () => {
       it('should fall back to owner-only when withSharedSpaces is true but user has no spaces', async () => {
         mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
 
-        await sut.searchSmart(authStub.user1, { query: 'test', withSharedSpaces: true } as any);
+        await sut.searchSmart(authStub.user1, { query: 'test', withSharedSpaces: true });
 
         expect(mocks.sharedSpace.getSpaceIdsForTimeline).toHaveBeenCalledWith(authStub.user1.user.id);
         expect(mocks.search.searchSmart).toHaveBeenCalledWith(
@@ -830,7 +830,7 @@ describe(SearchService.name, () => {
       });
 
       it('should not call getSpaceIdsForTimeline when withSharedSpaces is explicitly false', async () => {
-        await sut.searchSmart(authStub.user1, { query: 'test', withSharedSpaces: false } as any);
+        await sut.searchSmart(authStub.user1, { query: 'test', withSharedSpaces: false });
 
         expect(mocks.sharedSpace.getSpaceIdsForTimeline).not.toHaveBeenCalled();
       });
@@ -850,7 +850,7 @@ describe(SearchService.name, () => {
             query: 'test',
             withSharedSpaces: true,
             spacePersonIds: [newUuid()],
-          } as any),
+          }),
         ).rejects.toBeInstanceOf(BadRequestException);
       });
     });

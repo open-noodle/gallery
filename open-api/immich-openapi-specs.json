@@ -26295,6 +26295,10 @@
           "withExif": {
             "description": "Include EXIF data in response",
             "type": "boolean"
+          },
+          "withSharedSpaces": {
+            "description": "Include shared spaces the user is a member of",
+            "type": "boolean"
           }
         },
         "type": "object"

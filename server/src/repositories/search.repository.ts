@@ -107,6 +107,7 @@ export interface SearchAlbumOptions {
 export interface SearchSpaceOptions {
   spaceId?: string;
   spacePersonIds?: string[];
+  timelineSpaceIds?: string[];
 }
 
 export interface SearchOrderOptions {
