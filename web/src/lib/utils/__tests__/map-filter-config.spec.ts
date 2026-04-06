@@ -20,20 +20,23 @@ vi.mock('@immich/sdk', async (importOriginal) => {
 });
 
 describe('buildMapFilterConfig', () => {
-  it('should return config without location section', () => {
+  it('should include location in sections', () => {
     const config = buildMapFilterConfig();
-    expect(config.sections).not.toContain('location');
+    expect(config.sections).toContain('location');
   });
 
-  it('should include expected sections', () => {
+  it('should include all expected sections', () => {
     const config = buildMapFilterConfig();
-    expect(config.sections).toContain('timeline');
-    expect(config.sections).toContain('people');
-    expect(config.sections).toContain('camera');
-    expect(config.sections).toContain('tags');
-    expect(config.sections).toContain('rating');
-    expect(config.sections).toContain('media');
-    expect(config.sections).toContain('favorites');
+    expect(config.sections).toEqual([
+      'timeline',
+      'people',
+      'location',
+      'camera',
+      'tags',
+      'rating',
+      'media',
+      'favorites',
+    ]);
   });
 
   it('should have suggestionsProvider', () => {
@@ -44,6 +47,11 @@ describe('buildMapFilterConfig', () => {
   it('should have cameraModels fallback provider', () => {
     const config = buildMapFilterConfig();
     expect(config.providers!.cameraModels).toBeDefined();
+  });
+
+  it('should have cities provider', () => {
+    const config = buildMapFilterConfig();
+    expect(config.providers!.cities).toBeDefined();
   });
 
   describe('suggestionsProvider', () => {
@@ -132,5 +140,27 @@ describe('buildMapFilterConfig', () => {
     await config.providers!.cameraModels!('Nikon');
 
     expect(getSearchSuggestions).toHaveBeenCalledWith(expect.objectContaining({ spaceId: 'space-123', make: 'Nikon' }));
+  });
+
+  it('should pass withSharedSpaces to cities provider when no spaceId', async () => {
+    vi.mocked(getSearchSuggestions).mockResolvedValue(['Paris'] as never);
+
+    const config = buildMapFilterConfig();
+    await config.providers!.cities!('France');
+
+    expect(getSearchSuggestions).toHaveBeenCalledWith(
+      expect.objectContaining({ country: 'France', withSharedSpaces: true }),
+    );
+  });
+
+  it('should pass spaceId to cities provider when spaceId given', async () => {
+    vi.mocked(getSearchSuggestions).mockResolvedValue(['Berlin'] as never);
+
+    const config = buildMapFilterConfig('space-123');
+    await config.providers!.cities!('Germany');
+
+    expect(getSearchSuggestions).toHaveBeenCalledWith(
+      expect.objectContaining({ country: 'Germany', spaceId: 'space-123' }),
+    );
   });
 });
