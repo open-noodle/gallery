@@ -148,15 +148,60 @@ const SearchSuggestionRequestSchema = z
   })
   .meta({ id: 'SearchSuggestionRequestDto' });
 
-export class RandomSearchDto extends createZodDto(RandomSearchSchema) {}
-export class LargeAssetSearchDto extends createZodDto(LargeAssetSearchSchema) {}
-export class MetadataSearchDto extends createZodDto(MetadataSearchSchema) {}
-export class StatisticsSearchDto extends createZodDto(StatisticsSearchSchema) {}
-export class SmartSearchDto extends createZodDto(SmartSearchSchema) {}
-export class SearchPlacesDto extends createZodDto(SearchPlacesSchema) {}
-export class SearchPeopleDto extends createZodDto(SearchPeopleSchema) {}
-export class PlacesResponseDto extends createZodDto(PlacesResponseSchema) {}
-export class SearchSuggestionRequestDto extends createZodDto(SearchSuggestionRequestSchema) {}
+  @ValidateUUID({ optional: true, description: 'Asset ID to use as search reference' })
+  queryAssetId?: string;
+
+  @ApiPropertyOptional({ description: 'Search language code' })
+  @IsString()
+  @IsNotEmpty()
+  @Optional()
+  language?: string;
+
+  @ValidateEnum({
+    enum: AssetOrder,
+    name: 'AssetOrder',
+    optional: true,
+    description: 'Sort order (omit for relevance)',
+  })
+  order?: AssetOrder;
+
+  @ApiPropertyOptional({ type: 'number', description: 'Page number', minimum: 1 })
+  @IsInt()
+  @Min(1)
+  @Type(() => Number)
+  @Optional()
+  page?: number;
+}
+
+export class SearchPlacesDto {
+  @ApiProperty({ description: 'Place name to search for' })
+  @IsString()
+  @IsNotEmpty()
+  name!: string;
+}
+
+export class SearchPeopleDto {
+  @ApiProperty({ description: 'Person name to search for' })
+  @IsString()
+  @IsNotEmpty()
+  name!: string;
+
+  @ValidateBoolean({ optional: true, description: 'Include hidden people' })
+  withHidden?: boolean;
+}
+
+export class PlacesResponseDto {
+  @ApiProperty({ description: 'Place name' })
+  name!: string;
+  @ApiProperty({ type: 'number', description: 'Latitude coordinate' })
+  latitude!: number;
+  @ApiProperty({ type: 'number', description: 'Longitude coordinate' })
+  longitude!: number;
+  @ApiPropertyOptional({ description: 'Administrative level 1 name (state/province)' })
+  admin1name?: string;
+  @ApiPropertyOptional({ description: 'Administrative level 2 name (county/district)' })
+  admin2name?: string;
+}
 
 export function mapPlaces(place: Place): PlacesResponseDto {
   return {

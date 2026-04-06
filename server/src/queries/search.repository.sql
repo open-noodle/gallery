@@ -85,33 +85,42 @@ begin
 set
   local vchordrq.probes = 1
 select
-  "asset".*
+  *
 from
-  "asset"
-  inner join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
-  inner join "smart_search" on "asset"."id" = "smart_search"."assetId"
-where
-  "asset"."visibility" = $1
-  and exists (
+  (
     select
+      "asset".*
     from
-      "shared_space_person_face"
-      inner join "asset_face" on "asset_face"."id" = "shared_space_person_face"."assetFaceId"
+      "asset"
+      inner join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
+      inner join "smart_search" on "asset"."id" = "smart_search"."assetId"
     where
-      "asset_face"."assetId" = "asset"."id"
-      and "shared_space_person_face"."personId" = any ($2::uuid[])
-  )
-  and "asset"."fileCreatedAt" >= $3
-  and "asset_exif"."lensModel" = $4
-  and "asset"."ownerId" = any ($5::uuid[])
-  and "asset"."isFavorite" = $6
-  and "asset"."deletedAt" is null
+      "asset"."visibility" = $1
+      and exists (
+        select
+        from
+          "shared_space_person_face"
+          inner join "asset_face" on "asset_face"."id" = "shared_space_person_face"."assetFaceId"
+        where
+          "asset_face"."assetId" = "asset"."id"
+          and "shared_space_person_face"."personId" = any ($2::uuid[])
+      )
+      and "asset"."fileCreatedAt" >= $3
+      and "asset_exif"."lensModel" = $4
+      and "asset"."ownerId" = any ($5::uuid[])
+      and "asset"."isFavorite" = $6
+      and "asset"."deletedAt" is null
+    order by
+      smart_search.embedding <=> $7
+    limit
+      $8
+  ) as "candidates"
 order by
-  smart_search.embedding <=> $7
+  "candidates"."fileCreatedAt" desc nulls last
 limit
-  $8
-offset
   $9
+offset
+  $10
 commit
 
 -- SearchRepository.searchFaces

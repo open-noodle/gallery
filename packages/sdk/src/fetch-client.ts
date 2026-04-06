@@ -2236,6 +2236,8 @@ export type SmartSearchDto = {
     model?: string | null;
     /** Filter by OCR text content */
     ocr?: string;
+    /** Sort order (omit for relevance) */
+    order?: AssetOrder;
     /** Page number */
     page?: number;
     /** Filter by person IDs */

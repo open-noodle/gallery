@@ -139,7 +139,8 @@ export type SmartSearchOptions = SearchDateOptions &
   SearchPeopleOptions &
   SearchTagOptions &
   SearchOcrOptions &
-  SearchSpaceOptions;
+  SearchSpaceOptions &
+  SearchOrderOptions;
 
 export type OcrSearchOptions = SearchDateOptions & SearchOcrOptions;
 
@@ -324,6 +325,7 @@ export class SearchRepository {
         isFavorite: true,
         userIds: [DummyValue.UUID],
         spacePersonIds: [DummyValue.UUID],
+        orderDirection: 'desc',
       },
     ],
   })
@@ -334,10 +336,27 @@ export class SearchRepository {
 
     return this.db.transaction().execute(async (trx) => {
       await sql`set local vchordrq.probes = ${sql.lit(probes[VectorIndex.Clip])}`.execute(trx);
-      const items = await searchAssetBuilder(trx, options)
+
+      const baseQuery = searchAssetBuilder(trx, options)
         .selectAll('asset')
         .innerJoin('smart_search', 'asset.id', 'smart_search.assetId')
-        .orderBy(sql`smart_search.embedding <=> ${options.embedding}`)
+        .orderBy(sql`smart_search.embedding <=> ${options.embedding}`);
+
+      if (options.orderDirection) {
+        const orderDirection = options.orderDirection.toLowerCase() as OrderByDirection;
+        const candidates = baseQuery.limit(500).as('candidates');
+        const items = await trx
+          .selectFrom(candidates)
+          .selectAll()
+          // sql.raw is safe here — orderDirection is validated to 'asc'|'desc' by the AssetOrder enum
+          .orderBy(sql`"candidates"."fileCreatedAt" ${sql.raw(orderDirection)} nulls last`)
+          .limit(pagination.size + 1)
+          .offset((pagination.page - 1) * pagination.size)
+          .execute();
+        return paginationHelper(items as MapAsset[], pagination.size);
+      }
+
+      const items = await baseQuery
         .limit(pagination.size + 1)
         .offset((pagination.page - 1) * pagination.size)
         .execute();
