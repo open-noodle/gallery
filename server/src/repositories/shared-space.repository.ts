@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Insertable, Kysely, NotNull, sql, Updateable } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
-import { ChunkedArray, DummyValue, GenerateSql } from 'src/decorators';
+import { Chunked, ChunkedArray, DummyValue, GenerateSql } from 'src/decorators';
 import { AssetType, AssetVisibility, VectorIndex } from 'src/enum';
 import { probes } from 'src/repositories/database.repository';
 import type { AssetSearchBuilderOptions } from 'src/repositories/search.repository';
@@ -195,6 +195,7 @@ export class SharedSpaceRepository {
   }
 
   @GenerateSql({ params: [DummyValue.UUID, [DummyValue.UUID]] })
+  @Chunked({ paramIndex: 1 })
   async removeAssets(spaceId: string, assetIds: string[]) {
     await this.db
       .deleteFrom('shared_space_asset')
@@ -675,6 +676,7 @@ export class SharedSpaceRepository {
   }
 
   @GenerateSql({ params: [[DummyValue.UUID]] })
+  @Chunked()
   async recountPersons(personIds: string[]) {
     if (personIds.length === 0) {
       return;

@@ -435,6 +435,8 @@ export class PersonService extends BaseService {
       return JobStatus.Skipped;
     }
 
+    // Gallery: ensure vector index matches current face count (upstream only reindexes on startup)
+    await this.databaseRepository.reindexVectorsIfNeeded([VectorIndex.Face]);
     await this.databaseRepository.prewarm(VectorIndex.Face);
 
     const lastRun = new Date().toISOString();
@@ -538,6 +540,10 @@ export class PersonService extends BaseService {
     if (personId) {
       this.logger.debug(`Assigning face ${id} to person ${personId}`);
       await this.personRepository.reassignFaces({ faceIds: [id], newPersonId: personId });
+    } else {
+      this.logger.debug(
+        `Face ${id} not assigned to a person (deferred=${deferred}, matches=${matches.length}, isCore=${isCore})`,
+      );
     }
 
     // Queue shared space face matching for any spaces containing this asset

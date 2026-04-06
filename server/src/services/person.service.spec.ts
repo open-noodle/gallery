@@ -10,6 +10,7 @@ import {
   JobStatus,
   SourceType,
   SystemMetadataKey,
+  VectorIndex,
 } from 'src/enum';
 import { FaceSearchResult } from 'src/repositories/search.repository';
 import { PersonService } from 'src/services/person.service';
@@ -637,6 +638,28 @@ describe(PersonService.name, () => {
         lastRun: expect.any(String),
       });
       expect(mocks.person.vacuum).not.toHaveBeenCalled();
+    });
+
+    it('should reindex vectors before prewarm', async () => {
+      mocks.job.getJobCounts.mockResolvedValue({
+        active: 1,
+        waiting: 0,
+        paused: 0,
+        completed: 0,
+        failed: 0,
+        delayed: 0,
+      });
+      mocks.person.getAllFaces.mockReturnValue(makeStream([]));
+
+      await sut.handleQueueRecognizeFaces({});
+
+      expect(mocks.database.reindexVectorsIfNeeded).toHaveBeenCalledWith([VectorIndex.Face]);
+      expect(mocks.database.prewarm).toHaveBeenCalledWith(VectorIndex.Face);
+
+      // reindex should be called before prewarm
+      const reindexOrder = mocks.database.reindexVectorsIfNeeded.mock.invocationCallOrder[0];
+      const prewarmOrder = mocks.database.prewarm.mock.invocationCallOrder[0];
+      expect(reindexOrder).toBeLessThan(prewarmOrder);
     });
 
     it('should queue all assets', async () => {
