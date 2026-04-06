@@ -24,6 +24,10 @@ The default configuration looks like this:
       "keepLastAmount": 14
     }
   },
+  "classification": {
+    "enabled": true,
+    "categories": []
+  },
   "ffmpeg": {
     "accel": "disabled",
     "accelDecode": false,
@@ -69,6 +73,9 @@ The default configuration looks like this:
   "job": {
     "backgroundTask": {
       "concurrency": 5
+    },
+    "classification": {
+      "concurrency": 1
     },
     "faceDetection": {
       "concurrency": 2
@@ -247,6 +254,10 @@ In Administration > Settings is a button to copy the current configuration to yo
 So you can just grab it from there, paste it into a file and you're pretty much good to go.
 :::
 
+:::info Classification
+The `classification` section configures [Auto-Classification](/features/auto-classification) — automatic tagging and archiving of photos based on visual content. Categories are empty by default; see the [Auto-Classification docs](/features/auto-classification#option-2-config-file-yaml) for YAML examples and category field reference.
+:::
+
 ### Step 2 - Specify the file location
 
 In your `.env` file, set the variable `IMMICH_CONFIG_FILE` to the path of your config.
@@ -263,4 +274,4 @@ volumes:
   - ./configuration.yml:${IMMICH_CONFIG_FILE}
 ```
 
-::
+:::
