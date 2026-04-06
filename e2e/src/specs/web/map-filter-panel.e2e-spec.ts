@@ -39,8 +39,8 @@ test.describe('Map FilterPanel', () => {
     await expect(page.getByTestId('favorites-filter')).toBeVisible();
   });
 
-  test('should not show location filter section on map', async ({ context, page }) => {
+  test('should show location filter section on map', async ({ context, page }) => {
     await gotoMap(context, page);
-    await expect(page.getByTestId('filter-section-location')).not.toBeVisible();
+    await expect(page.getByTestId('filter-section-location')).toBeVisible();
   });
 });
