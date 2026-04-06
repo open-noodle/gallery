@@ -2,6 +2,7 @@
   import { goto } from '$app/navigation';
   import FilterPanel from '$lib/components/filter-panel/filter-panel.svelte';
   import ActiveFiltersBar from '$lib/components/filter-panel/active-filters-bar.svelte';
+  import SearchSortDropdown from '$lib/components/filter-panel/search-sort-dropdown.svelte';
   import SortToggle from '$lib/components/filter-panel/sort-toggle.svelte';
   import {
     buildFilterContext,
@@ -608,6 +609,7 @@
   };
 
   const handleSearchSubmit = () => {
+    filters = { ...filters, sortOrder: 'relevance' };
     searchPage = 1;
     void executeSearch(1, false);
   };
@@ -624,6 +626,7 @@
     searchPage = 1;
     hasMoreResults = false;
     isSearching = false;
+    filters = { ...filters, sortOrder: 'desc' };
   };
 
   $effect(() => {
@@ -638,6 +641,8 @@
       filters.mediaType,
       filters.selectedYear,
       filters.selectedMonth,
+      filters.sortOrder,
+      filters.isFavorite,
     ];
 
     if (!showSearchResults || !searchQuery.trim()) {
@@ -719,9 +724,16 @@
           </div>
         {/if}
 
-        {#if !showSearchResults}
-          <SortToggle
+        {#if showSearchResults}
+          <SearchSortDropdown
             sortOrder={filters.sortOrder}
+            onSelect={(mode) => {
+              filters = { ...filters, sortOrder: mode };
+            }}
+          />
+        {:else}
+          <SortToggle
+            sortOrder={filters.sortOrder === 'relevance' ? 'desc' : filters.sortOrder}
             onToggle={(order) => {
               filters = { ...filters, sortOrder: order };
             }}
@@ -844,6 +856,7 @@
           totalLoaded={searchResults.length}
           onLoadMore={handleLoadMore}
           spaceId={space.id}
+          sortMode={filters.sortOrder}
         />
       {/if}
 
