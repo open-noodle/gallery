@@ -19,6 +19,7 @@ BUNDLE_ID_PROFILE=$(jq -r '.mobile.bundle_id_profile' "$CONFIG")
 DEEP_LINK_SCHEME=$(jq -r '.mobile.deep_link_scheme' "$CONFIG")
 SHARED_GROUP=$(jq -r '.mobile.shared_group' "$CONFIG")
 BG_TASK_PREFIX=$(jq -r '.mobile.background_task_prefix' "$CONFIG")
+APPLE_TEAM_ID=$(jq -r '.mobile.apple_team_id' "$CONFIG")
 
 # Repository
 REPO_NAME=$(jq -r '.repository.name' "$CONFIG")
@@ -328,6 +329,11 @@ patch_ios() {
   sed -i "s/PRODUCT_NAME = \"Immich-Profile\"/PRODUCT_NAME = \"${NAME}-Profile\"/g" "$pbxproj"
   sed -i "s/PRODUCT_NAME = Immich/PRODUCT_NAME = \"${NAME}\"/g" "$pbxproj"
 
+  # project.pbxproj — development team
+  if [[ -n "${APPLE_TEAM_ID:-}" && "$APPLE_TEAM_ID" != "null" ]]; then
+    sed -i "s/DEVELOPMENT_TEAM = [A-Z0-9]*;/DEVELOPMENT_TEAM = ${APPLE_TEAM_ID};/g" "$pbxproj"
+  fi
+
   # Info.plist — bundle name
   sed -i "s|<string>immich_mobile</string>|<string>${NAME_SLUG}</string>|g" "$info_plist"
 
@@ -339,15 +345,29 @@ patch_ios() {
   sed -i "s/app\.alextran\.immich\.backgroundFetch/${BUNDLE_ID}.backgroundFetch/g" "$info_plist"
   sed -i "s/app\.alextran\.immich\.backgroundProcessing/${BUNDLE_ID}.backgroundProcessing/g" "$info_plist"
 
-  # Shared app group
+  # Shared app group — patch entitlements in all targets
   local entitlements
-  for entitlements in "$REPO_ROOT"/mobile/ios/Runner/*.entitlements; do
+  for entitlements in "$REPO_ROOT"/mobile/ios/Runner/*.entitlements \
+                      "$REPO_ROOT"/mobile/ios/ShareExtension/*.entitlements \
+                      "$REPO_ROOT"/mobile/ios/WidgetExtension/*.entitlements; do
     if [[ -f "$entitlements" ]]; then
       sed -i "s/group\.app\.immich\.share/${SHARED_GROUP}/g" "$entitlements"
     fi
   done
 
-  echo "  Patched project.pbxproj, Info.plist, and entitlements"
+  # Shared app group in project.pbxproj (CUSTOM_GROUP_ID)
+  sed -i "s/group\.app\.immich\.share/${SHARED_GROUP}/g" "$pbxproj"
+
+  # Hardcoded app group in Swift source files
+  local swift_file
+  for swift_file in "$REPO_ROOT/mobile/ios/Runner/Core/URLSessionManager.swift" \
+                    "$REPO_ROOT/mobile/ios/WidgetExtension/ImmichAPI.swift"; do
+    if [[ -f "$swift_file" ]]; then
+      sed -i "s/group\.app\.immich\.share/${SHARED_GROUP}/g" "$swift_file"
+    fi
+  done
+
+  echo "  Patched project.pbxproj, Info.plist, entitlements, and Swift sources"
 }
 
 #
