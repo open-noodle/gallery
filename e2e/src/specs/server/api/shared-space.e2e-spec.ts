@@ -2420,6 +2420,100 @@ describe('/shared-spaces', () => {
       });
     });
 
+    describe('DELETE /shared-spaces/:id/libraries/:libraryId (T16)', () => {
+      // T16 covers the unlink-library operation. Same TWO-step gate as T15:
+      // admin gate first (`shared-space.service.ts:480-482`), then `requireRole(Editor)`.
+      //
+      // The repository call is a plain DELETE on the (spaceId, libraryId) pair
+      // (`shared-space.repository.ts:220-226`), with no error if no row matches.
+      // So unlinkLibrary is idempotent at the HTTP level: deleting an
+      // already-unlinked library returns 204.
+      //
+      // T16 reuses the global `admin` user that T15's beforeAll added as Editor
+      // to the test space. New libraries are created per-test so the assertions
+      // are isolated from T15's leftover linked libraries.
+
+      let scratchLibrary: { id: string };
+
+      beforeAll(async () => {
+        scratchLibrary = await utils.createLibrary(admin.accessToken, { ownerId: admin.userId });
+        // Pre-link so we have a link row to delete in the success-path test.
+        const linkRes = await request(app)
+          .put(`/shared-spaces/${spaceId}/libraries`)
+          .set('Authorization', `Bearer ${admin.accessToken}`)
+          .send({ libraryId: scratchLibrary.id });
+        if (linkRes.status !== 204) {
+          throw new Error(`T16 setup: linkLibrary failed (${linkRes.status}): ${JSON.stringify(linkRes.body)}`);
+        }
+      });
+
+      it('non-admin owner of the space cannot unlink (admin gate)', async () => {
+        // The "Only admins" branch fires before requireRole. Same shape as T15
+        // test 1, applied to the unlink endpoint to confirm the gate is duplicated
+        // not just inherited from a shared helper.
+        const { status, body } = await request(app)
+          .delete(`/shared-spaces/${spaceId}/libraries/${scratchLibrary.id}`)
+          .set('Authorization', `Bearer ${owner.accessToken}`);
+        expect(status).toBe(403);
+        expect((body as { message: string }).message).toMatch(/admins/i);
+      });
+
+      it('anon cannot unlink', async () => {
+        const { status } = await request(app).delete(
+          `/shared-spaces/${spaceId}/libraries/${scratchLibrary.id}`,
+        );
+        expect(status).toBe(401);
+      });
+
+      it('admin who is an Editor in the space CAN unlink', async () => {
+        // Pre-condition: scratchLibrary is currently linked (set up in beforeAll).
+        // Verify via DB that the row exists, then unlink, then verify it's gone.
+        const dbClient = await utils.connectDatabase();
+        const before = await dbClient.query(
+          'SELECT 1 FROM shared_space_library WHERE "spaceId" = $1 AND "libraryId" = $2',
+          [spaceId, scratchLibrary.id],
+        );
+        expect(before.rowCount).toBe(1);
+
+        const { status } = await request(app)
+          .delete(`/shared-spaces/${spaceId}/libraries/${scratchLibrary.id}`)
+          .set('Authorization', `Bearer ${admin.accessToken}`);
+        expect(status).toBe(204);
+
+        const after = await dbClient.query(
+          'SELECT 1 FROM shared_space_library WHERE "spaceId" = $1 AND "libraryId" = $2',
+          [spaceId, scratchLibrary.id],
+        );
+        expect(after.rowCount).toBe(0);
+      });
+
+      it('unlinking an already-unlinked library is idempotent (returns 204)', async () => {
+        // The repository's removeLibrary is a plain DELETE — no row, no error.
+        // The service doesn't pre-validate either. So calling unlink on a
+        // (spaceId, libraryId) pair that has no link row returns 204 without
+        // any state mutation.
+        //
+        // We use scratchLibrary which was just unlinked by the previous test,
+        // so the (spaceId, scratchLibrary.id) pair has 0 rows. The second
+        // unlink should still succeed.
+        const { status } = await request(app)
+          .delete(`/shared-spaces/${spaceId}/libraries/${scratchLibrary.id}`)
+          .set('Authorization', `Bearer ${admin.accessToken}`);
+        expect(status).toBe(204);
+      });
+
+      it('unlinking with a non-existent libraryId returns 204 (no existence check)', async () => {
+        // Same idempotency, different angle. The service doesn't check that
+        // the library actually exists in the `library` table — it just deletes
+        // from `shared_space_library` where (spaceId, libraryId) match. A
+        // bogus libraryId UUID is a no-op DELETE → 204.
+        const { status } = await request(app)
+          .delete(`/shared-spaces/${spaceId}/libraries/00000000-0000-4000-a000-000000000099`)
+          .set('Authorization', `Bearer ${admin.accessToken}`);
+        expect(status).toBe(204);
+      });
+    });
+
     it('empty thumbnailPath on the underlying global person excludes the space person', async () => {
       // The fork's "minFaces gate" mechanism. shared-space.repository.ts:512-513
       // filters with `person.thumbnailPath IS NOT NULL AND != ''`. In production
