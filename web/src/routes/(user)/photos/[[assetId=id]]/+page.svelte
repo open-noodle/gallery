@@ -64,14 +64,15 @@
 
   // Filter state
   let filters = $state(createFilterState());
+  // searchQuery is the live SearchBar input value — it updates on every keystroke so the
+  // input reflects what the user is typing. committedQuery is the "applied" query and only
+  // updates on explicit submit (Enter), on clearSearch, or from URL state changes. We key
+  // showSearchResults off committedQuery so typing characters doesn't unmount the Timeline
+  // until the user explicitly submits. This mirrors the spaces page UX.
   let searchQuery = $state(page.url.searchParams.get('q') ?? '');
+  let committedQuery = $state(searchQuery);
   let isLoading = $state(false);
-  // Note: /photos derives `showSearchResults` from the searchQuery value so that navigating
-  // directly to `/photos?q=foo` immediately mounts the search results (rather than waiting
-  // for an explicit submit). The spaces page uses explicit `$state` because spaces has no
-  // URL state for the search query. Both pages end up with the same observable behavior for
-  // explicit submits because `searchQuery` is bound two-way via the SearchBar.
-  const showSearchResults = $derived(searchQuery.trim().length > 0);
+  const showSearchResults = $derived(committedQuery.trim().length > 0);
   const options = $derived(buildPhotosTimelineOptions(filters));
   let personNames = new SvelteMap<string, string>();
   let tagNames = new SvelteMap<string, string>();
@@ -180,17 +181,20 @@
   };
 
   function handleSearchSubmit() {
-    if (!searchQuery.trim()) {
+    const trimmed = searchQuery.trim();
+    if (!trimmed) {
       return;
     }
     filters = { ...filters, sortOrder: 'relevance' };
+    committedQuery = trimmed;
     const url = new URL('/photos', window.location.origin);
-    url.searchParams.set('q', searchQuery.trim());
+    url.searchParams.set('q', trimmed);
     void goto(url.pathname + url.search, { keepFocus: true, noScroll: true });
   }
 
   function clearSearch() {
     searchQuery = '';
+    committedQuery = '';
     isLoading = false;
     filters = { ...filters, sortOrder: 'desc' };
     void goto('/photos', { replaceState: true, keepFocus: true, noScroll: true });
@@ -199,7 +203,8 @@
   $effect(() => {
     const q = page.url.searchParams.get('q') ?? '';
     untrack(() => {
-      if (q !== searchQuery) {
+      if (q !== committedQuery) {
+        committedQuery = q;
         searchQuery = q;
       }
     });
@@ -258,7 +263,7 @@
       {#if hasActiveFilters}
         <ActiveFiltersBar
           {filters}
-          {searchQuery}
+          searchQuery={committedQuery}
           onClearSearch={clearSearch}
           resultCount={showSearchResults ? undefined : totalAssetCount}
           {personNames}
@@ -274,7 +279,7 @@
       {#if showSearchResults}
         <SmartSearchResults
           bind:isLoading
-          {searchQuery}
+          searchQuery={committedQuery}
           {filters}
           isShared={false}
           withSharedSpaces={true}

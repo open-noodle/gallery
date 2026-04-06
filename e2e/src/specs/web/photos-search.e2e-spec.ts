@@ -184,4 +184,95 @@ test.describe('Photos Search', () => {
     // not be visible below the sm breakpoint.
     await expect(page.locator('input[placeholder="Search"]')).not.toBeVisible();
   });
+
+  test('typing characters does not trigger a search or unmount the timeline until Enter is pressed', async ({
+    context,
+    page,
+  }) => {
+    // Regression: /photos previously derived showSearchResults from the live
+    // searchQuery value, so typing a single character unmounted the Timeline,
+    // mounted SmartSearchResults, and kicked off a debounced fetch. The
+    // corrected behavior matches the spaces page: typing just updates the
+    // input value; the Timeline stays mounted until the user explicitly
+    // submits (Enter) or navigates to a ?q=... URL.
+    //
+    // We assert two things:
+    //   1. Timeline remains visible while typing (SmartSearchResults is NOT mounted).
+    //   2. No POST /api/search/smart request fires during typing — only after Enter.
+    await gotoPhotos(context, page);
+
+    // Sanity: timeline is initially visible with thumbnails.
+    await expect(page.locator('#asset-grid img').first()).toBeVisible({ timeout: 15_000 });
+
+    // Capture any /search/smart requests from this point onward.
+    const smartSearchRequests: string[] = [];
+    const requestHandler = (request: import('@playwright/test').Request) => {
+      const url = request.url();
+      if (request.method() === 'POST' && url.includes('/api/search/smart')) {
+        smartSearchRequests.push(url);
+      }
+    };
+    page.on('request', requestHandler);
+
+    const searchInput = page.locator('input[placeholder="Search"]');
+    await expect(searchInput).toBeVisible();
+
+    // Type characters one by one, giving reactivity time to flush between each.
+    // If the bug regresses, even one character would mount SmartSearchResults
+    // and schedule a debounced fetch.
+    for (const ch of 'beach') {
+      await searchInput.evaluate((el, char) => {
+        const input = el as HTMLInputElement;
+        input.value = input.value + char;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      }, ch);
+      // small delay so Svelte reactivity can run between characters
+      await page.waitForTimeout(50);
+    }
+
+    // Wait well past the wrapper's SEARCH_FILTER_DEBOUNCE_MS (250ms) to be sure
+    // any debounced fetch would have fired by now.
+    await page.waitForTimeout(500);
+
+    // Assertion 1: no search request was fired during typing.
+    expect(
+      smartSearchRequests,
+      `expected no POST /api/search/smart during typing, got: ${smartSearchRequests.join(', ')}`,
+    ).toEqual([]);
+
+    // Assertion 2: the timeline is still visible with thumbnails.
+    await expect(page.locator('#asset-grid')).toBeVisible();
+    await expect(page.locator('#asset-grid img').first()).toBeVisible();
+
+    // Assertion 3: URL hasn't changed — still /photos, not /photos?q=beach.
+    expect(new URL(page.url()).search).toBe('');
+
+    // Now press Enter. This should commit the query and trigger the search.
+    // Set up a wait for the request BEFORE pressing Enter so we catch the
+    // debounced fetch even if it fires before our next assertion.
+    const smartSearchRequestPromise = page.waitForRequest(
+      (req) => req.method() === 'POST' && req.url().includes('/api/search/smart'),
+      { timeout: 10_000 },
+    );
+    await searchInput.focus();
+    await searchInput.press('Enter');
+
+    // URL updates to include the query.
+    await expect(page).toHaveURL(/\/photos\?q=beach/, { timeout: 5_000 });
+
+    // Wait for the debounced fetch to fire (250ms debounce + request time).
+    await smartSearchRequestPromise;
+
+    // SmartSearchResults area appears (either result-count or empty state).
+    await expect(page.getByTestId('result-count').or(page.getByTestId('search-empty'))).toBeVisible({
+      timeout: 15_000,
+    });
+
+    // At least one /search/smart request was fired after Enter.
+    // (ML is disabled in the e2e stack so the backend may reject it, but
+    // the request must have been issued.)
+    expect(smartSearchRequests.length).toBeGreaterThan(0);
+
+    page.off('request', requestHandler);
+  });
 });
