@@ -314,26 +314,23 @@ class DriftTimelineRepository extends DriftDatabaseRepository {
         .handleError((error) => const <Bucket>[]);
   }
 
-  Future<List<BaseAsset>> _getSharedSpaceBucketAssets(
-    String spaceId, {
-    required int offset,
-    required int count,
-  }) async {
-    final query = _db.remoteAssetEntity.select().addColumns([_db.localAssetEntity.id]).join([
-      innerJoin(
-        _db.sharedSpaceAssetEntity,
-        _db.sharedSpaceAssetEntity.assetId.equalsExp(_db.remoteAssetEntity.id),
-        useColumns: false,
-      ),
-      leftOuterJoin(
-        _db.localAssetEntity,
-        _db.remoteAssetEntity.checksum.equalsExp(_db.localAssetEntity.checksum),
-        useColumns: false,
-      ),
-    ])
-      ..where(_db.remoteAssetEntity.deletedAt.isNull() & _db.sharedSpaceAssetEntity.spaceId.equals(spaceId))
-      ..orderBy([OrderingTerm.desc(_db.remoteAssetEntity.createdAt)])
-      ..limit(count, offset: offset);
+  Future<List<BaseAsset>> _getSharedSpaceBucketAssets(String spaceId, {required int offset, required int count}) async {
+    final query =
+        _db.remoteAssetEntity.select().addColumns([_db.localAssetEntity.id]).join([
+            innerJoin(
+              _db.sharedSpaceAssetEntity,
+              _db.sharedSpaceAssetEntity.assetId.equalsExp(_db.remoteAssetEntity.id),
+              useColumns: false,
+            ),
+            leftOuterJoin(
+              _db.localAssetEntity,
+              _db.remoteAssetEntity.checksum.equalsExp(_db.localAssetEntity.checksum),
+              useColumns: false,
+            ),
+          ])
+          ..where(_db.remoteAssetEntity.deletedAt.isNull() & _db.sharedSpaceAssetEntity.spaceId.equals(spaceId))
+          ..orderBy([OrderingTerm.desc(_db.remoteAssetEntity.createdAt)])
+          ..limit(count, offset: offset);
 
     return query
         .map((row) => row.readTable(_db.remoteAssetEntity).toDto(localId: row.read(_db.localAssetEntity.id)))

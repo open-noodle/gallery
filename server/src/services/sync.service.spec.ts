@@ -72,6 +72,11 @@ const setupSyncMocks = (mocks: ServiceMocks) => {
     stack: makeSub(),
     user: makeSub(),
     userMetadata: makeSub(),
+    sharedSpace: makeSub(),
+    sharedSpaceMember: makeSub(),
+    sharedSpaceAsset: makeSub(),
+    sharedSpaceAssetExif: makeSub(),
+    sharedSpaceToAsset: makeSub(),
   };
 
   // Assign onto the mock

@@ -5,18 +5,19 @@ import { getKyselyDB } from 'test/utils';
 
 let defaultDatabase: Kysely<DB>;
 
+const setup = () => {
+  const ctx = new SyncTestContext(defaultDatabase);
+  return { ctx, db: defaultDatabase };
+};
+
 beforeAll(async () => {
   defaultDatabase = await getKyselyDB();
 });
 
 describe('shared_space audit triggers', () => {
-  const setup = async () => {
-    const ctx = new SyncTestContext(defaultDatabase);
-    return { ctx, db: defaultDatabase };
-  };
 
   it('fans out shared_space_audit rows to every member on space deletion', async () => {
-    const { ctx, db } = await setup();
+    const { ctx, db } = setup();
     const owner = await ctx.newUser();
     const memberA = await ctx.newUser();
     const memberB = await ctx.newUser();
@@ -38,7 +39,7 @@ describe('shared_space audit triggers', () => {
   });
 
   it('emits shared_space_audit for a single removed member', async () => {
-    const { ctx, db } = await setup();
+    const { ctx, db } = setup();
     const owner = await ctx.newUser();
     const memberA = await ctx.newUser();
     const memberB = await ctx.newUser();
@@ -63,7 +64,7 @@ describe('shared_space audit triggers', () => {
   });
 
   it('fires shared_space_member_audit on member removal', async () => {
-    const { ctx, db } = await setup();
+    const { ctx, db } = setup();
     const owner = await ctx.newUser();
     const memberA = await ctx.newUser();
     const { space } = await ctx.newSharedSpace({ createdById: owner.user.id });
@@ -86,7 +87,7 @@ describe('shared_space audit triggers', () => {
   });
 
   it('does not double-populate shared_space_audit on space-delete cascade', async () => {
-    const { ctx, db } = await setup();
+    const { ctx, db } = setup();
     const owner = await ctx.newUser();
     const memberA = await ctx.newUser();
     const memberB = await ctx.newUser();
@@ -107,7 +108,7 @@ describe('shared_space audit triggers', () => {
   });
 
   it('does not double-populate shared_space_asset_audit on space-delete cascade', async () => {
-    const { ctx, db } = await setup();
+    const { ctx, db } = setup();
     const owner = await ctx.newUser();
     const { space } = await ctx.newSharedSpace({ createdById: owner.user.id });
     const { asset: assetA } = await ctx.newAsset({ ownerId: owner.user.id });
@@ -129,7 +130,7 @@ describe('shared_space audit triggers', () => {
   });
 
   it('emits shared_space_asset_audit when an asset is removed from a space directly', async () => {
-    const { ctx, db } = await setup();
+    const { ctx, db } = setup();
     const owner = await ctx.newUser();
     const { space } = await ctx.newSharedSpace({ createdById: owner.user.id });
     const { asset } = await ctx.newAsset({ ownerId: owner.user.id });
@@ -152,7 +153,7 @@ describe('shared_space audit triggers', () => {
   });
 
   it('emits shared_space_asset_audit when an asset is hard-deleted and cascades', async () => {
-    const { ctx, db } = await setup();
+    const { ctx, db } = setup();
     const owner = await ctx.newUser();
     const { space } = await ctx.newSharedSpace({ createdById: owner.user.id });
     const { asset } = await ctx.newAsset({ ownerId: owner.user.id });
@@ -171,12 +172,15 @@ describe('shared_space audit triggers', () => {
   });
 
   it('bumps shared_space.updateId when a new member is added', async () => {
-    const { ctx, db } = await setup();
+    const { ctx, db } = setup();
     const owner = await ctx.newUser();
     const { space } = await ctx.newSharedSpace({ createdById: owner.user.id });
-    const initialUpdateId = (
-      await db.selectFrom('shared_space').select('updateId').where('id', '=', space.id).executeTakeFirstOrThrow()
-    ).updateId;
+    const initial = await db
+      .selectFrom('shared_space')
+      .select('updateId')
+      .where('id', '=', space.id)
+      .executeTakeFirstOrThrow();
+    const initialUpdateId = initial.updateId;
 
     await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.user.id });
 

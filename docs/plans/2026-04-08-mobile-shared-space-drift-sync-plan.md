@@ -358,11 +358,7 @@ describe('shared_space audit triggers', () => {
 
     await db.deleteFrom('shared_space').where('id', '=', space.id).execute();
 
-    const rows = await db
-      .selectFrom('shared_space_audit')
-      .select(['userId'])
-      .where('spaceId', '=', space.id)
-      .execute();
+    const rows = await db.selectFrom('shared_space_audit').select(['userId']).where('spaceId', '=', space.id).execute();
 
     expect(new Set(rows.map((r) => r.userId))).toEqual(new Set([owner.user.id, memberA.user.id, memberB.user.id]));
   });
@@ -481,8 +477,12 @@ export const shared_space_delete_audit = registerFunction({
     END`,
 });
 
-export const shared_space_member_delete_audit = registerFunction({ /* ... */ });
-export const shared_space_asset_delete_audit = registerFunction({ /* ... */ });
+export const shared_space_member_delete_audit = registerFunction({
+  /* ... */
+});
+export const shared_space_asset_delete_audit = registerFunction({
+  /* ... */
+});
 ```
 
 **Step 1b: Add `@AfterDeleteTrigger` decorators to the three table classes**
@@ -490,7 +490,7 @@ export const shared_space_asset_delete_audit = registerFunction({ /* ... */ });
 For example on `SharedSpaceTable`:
 
 ```typescript
-import { AfterDeleteTrigger, /* ... */ } from '@immich/sql-tools';
+import { AfterDeleteTrigger /* ... */ } from '@immich/sql-tools';
 import { shared_space_delete_audit } from 'src/schema/functions';
 
 @Table('shared_space')
@@ -501,7 +501,9 @@ import { shared_space_delete_audit } from 'src/schema/functions';
   referencingOldTableAs: 'old',
   when: 'pg_trigger_depth() = 0',
 })
-export class SharedSpaceTable { /* ... */ }
+export class SharedSpaceTable {
+  /* ... */
+}
 ```
 
 `SharedSpaceMemberTable` and `SharedSpaceAssetTable` use `when: 'pg_trigger_depth() <= 1'`. Reference: `server/src/schema/tables/album.table.ts` and `album-asset.table.ts`.
@@ -1135,7 +1137,7 @@ from{N}To{N+1}: (m, v{N+1}) async {
 },
 ```
 
-The exact index variable names (`idxSharedSpaceCreatedById`, `idxSharedSpaceAssetSpaceAsset`) come from the `@TableIndex.sql(...)` annotations on the entity classes; drift_dev names them by stripping `idx_` prefix and camelCasing.
+The exact index variable names (`idxSharedSpaceCreatedById`, `idxSharedSpaceAssetSpaceAsset`) come from the `@TableIndex.sql(...)` annotations on the entity classes; drift*dev names them by stripping `idx*` prefix and camelCasing.
 
 Bump `schemaVersion` from `{N}` to `{N+1}` in the same file.
 

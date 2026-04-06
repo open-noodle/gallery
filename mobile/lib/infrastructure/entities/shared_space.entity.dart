@@ -7,9 +7,7 @@ import 'package:immich_mobile/infrastructure/utils/drift_default.mixin.dart';
 // `updatedAt` is set by the updated_at trigger). Mobile only stores user-visible
 // fields. The sync stream uses the cursor columns purely for delta computation
 // and does not persist them locally — same convention as RemoteAlbumEntity.
-@TableIndex.sql(
-  'CREATE INDEX IF NOT EXISTS idx_shared_space_created_by_id ON shared_space_entity (created_by_id)',
-)
+@TableIndex.sql('CREATE INDEX IF NOT EXISTS idx_shared_space_created_by_id ON shared_space_entity (created_by_id)')
 class SharedSpaceEntity extends Table with DriftDefaultsMixin {
   const SharedSpaceEntity();
 

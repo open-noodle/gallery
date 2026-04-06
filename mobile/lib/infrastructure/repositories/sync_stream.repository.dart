@@ -570,10 +570,7 @@ class SyncStreamRepository extends DriftDatabaseRepository {
         for (final member in data) {
           batch.delete(
             _db.sharedSpaceMemberEntity,
-            SharedSpaceMemberEntityCompanion(
-              spaceId: Value(member.spaceId),
-              userId: Value(member.userId),
-            ),
+            SharedSpaceMemberEntityCompanion(spaceId: Value(member.spaceId), userId: Value(member.userId)),
           );
         }
       });
@@ -597,10 +594,7 @@ class SyncStreamRepository extends DriftDatabaseRepository {
     try {
       await _db.batch((batch) {
         for (final join in data) {
-          final companion = SharedSpaceAssetEntityCompanion(
-            spaceId: Value(join.spaceId),
-            assetId: Value(join.assetId),
-          );
+          final companion = SharedSpaceAssetEntityCompanion(spaceId: Value(join.spaceId), assetId: Value(join.assetId));
 
           batch.insert(_db.sharedSpaceAssetEntity, companion, onConflict: DoNothing());
         }
@@ -617,10 +611,7 @@ class SyncStreamRepository extends DriftDatabaseRepository {
         for (final join in data) {
           batch.delete(
             _db.sharedSpaceAssetEntity,
-            SharedSpaceAssetEntityCompanion(
-              spaceId: Value(join.spaceId),
-              assetId: Value(join.assetId),
-            ),
+            SharedSpaceAssetEntityCompanion(spaceId: Value(join.spaceId), assetId: Value(join.assetId)),
           );
         }
       });
