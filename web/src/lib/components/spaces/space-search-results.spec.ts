@@ -163,4 +163,72 @@ describe('SpaceSearchResults', () => {
     });
     expect(screen.getByTestId('result-count')).toHaveTextContent('100 of up to 500');
   });
+
+  it('should show date headers when sortMode is asc', () => {
+    render(SpaceSearchResults, {
+      props: {
+        results: mockAssetsWithDates,
+        isLoading: false,
+        hasMore: false,
+        totalLoaded: 3,
+        onLoadMore: vi.fn(),
+        sortMode: 'asc',
+      },
+    });
+    expect(screen.getByTestId('date-group-header-0')).toBeInTheDocument();
+    expect(screen.getByTestId('date-group-header-1')).toBeInTheDocument();
+  });
+
+  it('should merge assets with same month into one group', () => {
+    const assetsWithSameMonth = [
+      { id: 'b1', originalFileName: 'q1.jpg', fileCreatedAt: '2024-06-20T10:00:00.000Z' },
+      { id: 'b2', originalFileName: 'q2.jpg', fileCreatedAt: '2024-03-15T10:00:00.000Z' },
+      { id: 'b3', originalFileName: 'q3.jpg', fileCreatedAt: '2024-06-05T10:00:00.000Z' },
+    ] as AssetResponseDto[];
+
+    render(SpaceSearchResults, {
+      props: {
+        results: assetsWithSameMonth,
+        isLoading: false,
+        hasMore: false,
+        totalLoaded: 3,
+        onLoadMore: vi.fn(),
+        sortMode: 'desc',
+      },
+    });
+    // June 2024 appears twice in the data but should merge into one group
+    expect(screen.getByTestId('date-group-header-0')).toHaveTextContent('June 2024');
+    expect(screen.getByTestId('date-group-header-1')).toHaveTextContent('March 2024');
+    expect(screen.queryByTestId('date-group-header-2')).not.toBeInTheDocument();
+  });
+
+  it('should show contextual result count for asc mode', () => {
+    render(SpaceSearchResults, {
+      props: {
+        results: mockAssetsWithDates,
+        isLoading: false,
+        hasMore: true,
+        totalLoaded: 50,
+        onLoadMore: vi.fn(),
+        sortMode: 'asc',
+      },
+    });
+    expect(screen.getByTestId('result-count')).toHaveTextContent('50 of up to 500');
+  });
+
+  it('should show exact count in date mode when all loaded', () => {
+    render(SpaceSearchResults, {
+      props: {
+        results: mockAssetsWithDates,
+        isLoading: false,
+        hasMore: false,
+        totalLoaded: 35,
+        onLoadMore: vi.fn(),
+        sortMode: 'desc',
+      },
+    });
+    const text = screen.getByTestId('result-count').textContent;
+    expect(text).toContain('35');
+    expect(text).not.toContain('of up to');
+  });
 });
