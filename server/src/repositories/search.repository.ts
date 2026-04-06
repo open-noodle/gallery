@@ -870,7 +870,7 @@ export class SearchRepository {
           name: p.name || (p as any).personalName || '',
         }))
         .filter((p) => p.name !== '')
-        .sort((a, b) => a.name.localeCompare(b.name));
+        .toSorted((a, b) => a.name.localeCompare(b.name));
 
       const hasUnnamedPeople = spacePeople.some((p) => !p.name && !(p as any).personalName);
 
