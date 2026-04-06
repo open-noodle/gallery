@@ -349,6 +349,7 @@ export class SearchRepository {
       throw new Error(`Invalid value for 'size': ${pagination.size}`);
     }
 
+    // Skip threshold when disabled (0) or at max cosine distance (2) since it would filter nothing
     const hasDistanceThreshold = (options.maxDistance ?? 0) > 0 && (options.maxDistance ?? 0) < 2;
 
     return this.db.transaction().execute(async (trx) => {
