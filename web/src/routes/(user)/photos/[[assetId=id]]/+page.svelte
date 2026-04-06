@@ -186,7 +186,6 @@
         timeBucket: `${m.yearMonth.year}-${String(m.yearMonth.month).padStart(2, '0')}-01T00:00:00.000Z`,
         count: m.assetsCount,
       })) ?? []}
-      initialCollapsed={true}
       storageKey="gallery-filter-visible-sections-photos"
       hidden={isTimelineEmpty}
     />
