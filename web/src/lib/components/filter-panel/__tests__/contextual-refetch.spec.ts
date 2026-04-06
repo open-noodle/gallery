@@ -36,7 +36,7 @@ const timeBuckets = [
 describe('Contextual re-fetch on temporal change', () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    localStorage.removeItem('gallery-filter-visible-sections');
+    localStorage.clear();
   });
 
   afterEach(() => {
