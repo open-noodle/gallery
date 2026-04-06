@@ -2304,6 +2304,122 @@ describe('/shared-spaces', () => {
       });
     });
 
+    describe('PUT /shared-spaces/:id/libraries (T15)', () => {
+      // T15 covers the link-library-to-space operation. The service has a TWO-step
+      // gate (shared-space.service.ts:449-477):
+      //
+      //   1. `if (!auth.user.isAdmin) → ForbiddenException('Only admins can link...')`
+      //      — admin gate, fires FIRST. Non-admin members of the space get 403.
+      //   2. `requireRole(Editor)` — must be a member of the space with Editor or Owner.
+      //      Admin non-members and admin viewers also get 403.
+      //
+      // Then library existence is checked (400 if missing). On success the
+      // addLibrary repository call is idempotent — duplicate (spaceId, libraryId)
+      // returns null without error and skips the face-sync queue.
+      //
+      // To exercise the matrix we need:
+      //   - A non-admin owner of a space (can't link → admin gate)
+      //   - An admin who is an Editor in the space (CAN link)
+      //   - An admin library to link
+      //
+      // The outer file's `admin` (top-level beforeAll) is the only admin user.
+      // We add admin as Editor to the test space at the start of the T15 block.
+
+      let library: { id: string };
+      let secondLibrary: { id: string };
+
+      beforeAll(async () => {
+        // Add admin as Editor to the existing T09 space so the success path tests can run.
+        await utils.addSpaceMember(owner.accessToken, spaceId, {
+          userId: admin.userId,
+          role: SharedSpaceRole.Editor,
+        });
+
+        // Create two libraries owned by the global admin (createLibrary requires admin token).
+        library = await utils.createLibrary(admin.accessToken, { ownerId: admin.userId });
+        secondLibrary = await utils.createLibrary(admin.accessToken, { ownerId: admin.userId });
+      });
+
+      it('non-admin owner of the space cannot link a library (admin gate)', async () => {
+        // The "Only admins" branch fires before requireRole. Even the space owner is
+        // rejected if they're not also a global admin.
+        const { status, body } = await request(app)
+          .put(`/shared-spaces/${spaceId}/libraries`)
+          .set('Authorization', `Bearer ${owner.accessToken}`)
+          .send({ libraryId: library.id });
+        expect(status).toBe(403);
+        expect((body as { message: string }).message).toMatch(/admins/i);
+      });
+
+      it('non-admin editor cannot link a library', async () => {
+        const { status } = await request(app)
+          .put(`/shared-spaces/${spaceId}/libraries`)
+          .set('Authorization', `Bearer ${editor.accessToken}`)
+          .send({ libraryId: library.id });
+        expect(status).toBe(403);
+      });
+
+      it('non-admin viewer cannot link a library', async () => {
+        const { status } = await request(app)
+          .put(`/shared-spaces/${spaceId}/libraries`)
+          .set('Authorization', `Bearer ${viewer.accessToken}`)
+          .send({ libraryId: library.id });
+        expect(status).toBe(403);
+      });
+
+      it('anon cannot link a library', async () => {
+        const { status } = await request(app)
+          .put(`/shared-spaces/${spaceId}/libraries`)
+          .send({ libraryId: library.id });
+        expect(status).toBe(401);
+      });
+
+      it('admin who is an Editor in the space CAN link a library', async () => {
+        // Admin is added as Editor in this block's beforeAll. This test uses
+        // secondLibrary so the idempotency test below has a clean slate on
+        // `library`.
+        const { status } = await request(app)
+          .put(`/shared-spaces/${spaceId}/libraries`)
+          .set('Authorization', `Bearer ${admin.accessToken}`)
+          .send({ libraryId: secondLibrary.id });
+        expect(status).toBe(204);
+      });
+
+      it('linking the same library twice is idempotent (returns 204 both times)', async () => {
+        // shared-space.service.ts:467-476 — addLibrary returns null on duplicate
+        // (existing row), and the face-sync queue is skipped. The HTTP response is
+        // 204 either way.
+        const first = await request(app)
+          .put(`/shared-spaces/${spaceId}/libraries`)
+          .set('Authorization', `Bearer ${admin.accessToken}`)
+          .send({ libraryId: library.id });
+        expect(first.status).toBe(204);
+
+        const second = await request(app)
+          .put(`/shared-spaces/${spaceId}/libraries`)
+          .set('Authorization', `Bearer ${admin.accessToken}`)
+          .send({ libraryId: library.id });
+        expect(second.status).toBe(204);
+
+        // Verify exactly one row exists in shared_space_library for this pair.
+        const dbClient = await utils.connectDatabase();
+        const rows = await dbClient.query(
+          'SELECT 1 FROM shared_space_library WHERE "spaceId" = $1 AND "libraryId" = $2',
+          [spaceId, library.id],
+        );
+        expect(rows.rowCount).toBe(1);
+      });
+
+      it('linking a non-existent libraryId returns 400', async () => {
+        const { status, body } = await request(app)
+          .put(`/shared-spaces/${spaceId}/libraries`)
+          .set('Authorization', `Bearer ${admin.accessToken}`)
+          .send({ libraryId: '00000000-0000-4000-a000-000000000099' });
+        expect(status).toBe(400);
+        expect((body as { message: string }).message).toMatch(/library.*not found/i);
+      });
+    });
+
     it('empty thumbnailPath on the underlying global person excludes the space person', async () => {
       // The fork's "minFaces gate" mechanism. shared-space.repository.ts:512-513
       // filters with `person.thumbnailPath IS NOT NULL AND != ''`. In production
