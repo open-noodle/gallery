@@ -120,7 +120,7 @@ You can add this to the `immich-machine-learning` service instead of extending f
 immich-machine-learning:
   container_name: immich_machine_learning
   # Note the `-cuda` at the end
-  image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION:-release}-cuda
+  image: ghcr.io/open-noodle/gallery-ml:${IMMICH_VERSION:-release}-cuda
   # Note the lack of an `extends` section
   deploy:
     resources:
