@@ -31,21 +31,38 @@ test.describe('Photos FilterPanel', () => {
 
   async function gotoPhotos(context: import('@playwright/test').BrowserContext, page: import('@playwright/test').Page) {
     await utils.setAuthCookies(context, admin.accessToken);
+    // Clear localStorage so each test starts from a clean state
     await page.goto('/photos');
+    await page.evaluate(() => localStorage.clear());
+    await page.reload();
     await page.waitForSelector('[data-testid="collapsed-icon-strip"], [data-testid="discovery-panel"]');
   }
 
-  test('should render FilterPanel collapsed by default on /photos', async ({ context, page }) => {
+  test('should render FilterPanel expanded by default on /photos', async ({ context, page }) => {
     await gotoPhotos(context, page);
 
-    await expect(page.locator('[data-testid="collapsed-icon-strip"]')).toBeVisible();
-    await expect(page.locator('[data-testid="discovery-panel"]')).not.toBeVisible();
+    await expect(page.locator('[data-testid="discovery-panel"]')).toBeVisible();
+    await expect(page.locator('[data-testid="collapsed-icon-strip"]')).not.toBeVisible();
   });
 
-  test('should expand FilterPanel and show all 7 sections', async ({ context, page }) => {
+  test('should collapse FilterPanel and persist state', async ({ context, page }) => {
     await gotoPhotos(context, page);
 
-    await page.locator('[data-testid="expand-panel-btn"]').click();
+    // Panel starts expanded — collapse it
+    await page.locator('[data-testid="collapse-panel-btn"]').click();
+    await expect(page.locator('[data-testid="collapsed-icon-strip"]')).toBeVisible();
+    await expect(page.locator('[data-testid="discovery-panel"]')).not.toBeVisible();
+
+    // Reload — should still be collapsed (persisted in localStorage)
+    await page.reload();
+    await page.waitForSelector('[data-testid="collapsed-icon-strip"]');
+    await expect(page.locator('[data-testid="collapsed-icon-strip"]')).toBeVisible();
+  });
+
+  test('should show all 7 filter sections when expanded', async ({ context, page }) => {
+    await gotoPhotos(context, page);
+
+    // Panel starts expanded — all sections should be visible
     await expect(page.locator('[data-testid="discovery-panel"]')).toBeVisible();
 
     for (const section of ['timeline', 'people', 'location', 'camera', 'tags', 'rating', 'media']) {
@@ -56,10 +73,7 @@ test.describe('Photos FilterPanel', () => {
   test('should filter by media type and show result count', async ({ context, page }) => {
     await gotoPhotos(context, page);
 
-    // Expand panel
-    await page.locator('[data-testid="expand-panel-btn"]').click();
-
-    // Apply image filter and wait for timeline to refetch
+    // Panel starts expanded — apply image filter and wait for timeline to refetch
     const bucketResponse = page.waitForResponse((r) => r.url().includes('/timeline/buckets'));
     await page.locator('[data-testid="media-type-image"]').click();
     await bucketResponse;
@@ -74,8 +88,7 @@ test.describe('Photos FilterPanel', () => {
   test('should show ActiveFiltersBar and clear all filters', async ({ context, page }) => {
     await gotoPhotos(context, page);
 
-    // Expand, wait for filter suggestions to load, then set rating filter
-    await page.locator('[data-testid="expand-panel-btn"]').click();
+    // Panel starts expanded — wait for filter suggestions to load, then set rating filter
     await page.locator('[data-testid="rating-star-5"]').waitFor({ state: 'visible', timeout: 10_000 });
     const bucketResponse = page.waitForResponse((r) => r.url().includes('/timeline/buckets'));
     await page.locator('[data-testid="rating-star-5"]').click();
