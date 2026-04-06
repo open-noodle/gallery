@@ -233,22 +233,26 @@ describe('/timeline', () => {
       expect(total(body)).toBe(3);
     });
 
-    it('withSharedSpaces=true without explicit visibility throws 400', async () => {
+    it('withSharedSpaces=true without explicit visibility throws 400 with the right message', async () => {
       // Pinned by the backlog "Observed invariants" section. timeline.service.ts:103-113
       // treats `visibility === undefined` as `requestedArchived = true` and rejects when
       // either flag is set. Folded into T05 because it's the visibility-semantics task.
-      const { status } = await request(app)
+      // We check the error message specifically so a future unrelated 400 (e.g. a DTO
+      // validation change) doesn't silently still satisfy the test.
+      const { status, body } = await request(app)
         .get('/timeline/buckets?withSharedSpaces=true')
         .set(asBearerAuth(ctx.spaceOwner.token!));
       expect(status).toBe(400);
+      expect((body as { message?: string }).message).toMatch(/withSharedSpaces/);
     });
 
-    it('withPartners=true without explicit visibility throws 400', async () => {
+    it('withPartners=true without explicit visibility throws 400 with the right message', async () => {
       // Same invariant, different flag.
-      const { status } = await request(app)
+      const { status, body } = await request(app)
         .get('/timeline/buckets?withPartners=true')
         .set(asBearerAuth(ctx.spaceOwner.token!));
       expect(status).toBe(400);
+      expect((body as { message?: string }).message).toMatch(/withPartners/);
     });
   });
 
@@ -265,14 +269,17 @@ describe('/timeline', () => {
 
     beforeAll(async () => {
       visibilityUser = await utils.userSetup(ctx.admin.token!, createUserDto.create('visibility'));
-      const [, , , trashedAsset] = await Promise.all([
+      // Three assets in distinct visibility states; created in parallel because none
+      // depend on each other.
+      await Promise.all([
         utils.createAsset(visibilityUser.accessToken),
         utils.createAsset(visibilityUser.accessToken, { visibility: AssetVisibility.Archive }),
         utils.createAsset(visibilityUser.accessToken, { visibility: AssetVisibility.Hidden }),
-        utils.createAsset(visibilityUser.accessToken),
       ]);
-      // Move trashedAsset to trash via DELETE (default is soft delete to trash, not force).
-      await utils.deleteAssets(visibilityUser.accessToken, [trashedAsset.id]);
+      // Fourth asset gets soft-deleted (deletedAt set, asset moved to trash). Pulled out
+      // of the Promise.all because we need its id for the deleteAssets call.
+      const trashed = await utils.createAsset(visibilityUser.accessToken);
+      await utils.deleteAssets(visibilityUser.accessToken, [trashed.id]);
     });
 
     it('default visibility (no param) returns Timeline AND Archive assets', async () => {
@@ -320,10 +327,15 @@ describe('/timeline', () => {
       expect(total(body)).toBe(1);
     });
 
-    it('trashed assets are excluded regardless of visibility filter', async () => {
-      // The trash filter is `deletedAt IS NULL` (asset.repository.ts:942), independent of
-      // visibility. Verify it applies under both the default filter and an explicit
-      // visibility filter — a trash regression would inflate either count by 1.
+    it('soft-deleted (trashed) assets are excluded regardless of visibility filter', async () => {
+      // Trashed assets have `deletedAt` set; the timeline query at asset.repository.ts:942
+      // filters with `deletedAt IS NULL`, independent of visibility. Verify the exclusion
+      // applies under both the default filter and an explicit visibility filter — a
+      // regression in either path would inflate the count by 1.
+      //
+      // Both soft-delete and force-delete set `deletedAt` (asset.service.ts), so this
+      // test characterises the deletedAt-based exclusion, which is what the timeline
+      // actually depends on. Force-deleted assets are exercised by the trash spec.
       const defaultResult = await request(app)
         .get('/timeline/buckets')
         .set(asBearerAuth(visibilityUser.accessToken));
@@ -334,7 +346,7 @@ describe('/timeline', () => {
         .get('/timeline/buckets?visibility=timeline')
         .set(asBearerAuth(visibilityUser.accessToken));
       expect(timelineResult.status).toBe(200);
-      expect(total(timelineResult.body)).toBe(1); // only the live timelineAsset
+      expect(total(timelineResult.body)).toBe(1); // only the live timeline asset
     });
   });
 });
