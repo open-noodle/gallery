@@ -8,6 +8,8 @@
 
 **Tech Stack:** Svelte 5 (`$state`, `$effect`, `SvelteSet`), SvelteKit (`$app/environment` → `browser`), Vitest, @testing-library/svelte
 
+**Task order rationale:** Tasks are grouped to avoid intermediate broken states. The FilterSection refactor (controlled props) and accordion persistence are in one task because splitting them leaves section toggles non-functional between commits. Hero utility (Tasks 1-2) is first because it has zero dependencies.
+
 ---
 
 ### Task 1: Space Hero Storage Utility — Tests
@@ -144,78 +146,7 @@ git commit -m "feat: add space hero localStorage persistence utility"
 
 ---
 
-### Task 3: Make FilterSection Controlled
-
-**Files:**
-
-- Modify: `web/src/lib/components/filter-panel/filter-section.svelte` (entire file, 57 lines)
-
-**Step 1: Update FilterSection to accept `expanded` and `onToggleExpanded` props**
-
-Replace the Props interface and state in `filter-section.svelte`:
-
-```typescript
-// Old (lines 6-14):
-interface Props {
-  title: string;
-  testId: string;
-  children: Snippet;
-  refetching?: boolean;
-  count?: number;
-}
-
-let { title, testId, children, refetching = false, count }: Props = $props();
-let expanded = $state(true);
-
-// New:
-interface Props {
-  title: string;
-  testId: string;
-  children: Snippet;
-  refetching?: boolean;
-  count?: number;
-  expanded?: boolean;
-  onToggleExpanded?: () => void;
-}
-
-let { title, testId, children, refetching = false, count, expanded = true, onToggleExpanded }: Props = $props();
-```
-
-Update the click handler (line 24-28):
-
-```svelte
-<!-- Old: -->
-onclick={() => {
-  if (!isEmpty) {
-    expanded = !expanded;
-  }
-}}
-
-<!-- New: -->
-onclick={() => {
-  if (!isEmpty && onToggleExpanded) {
-    onToggleExpanded();
-  }
-}}
-```
-
-**Important:** When `onToggleExpanded` is not provided (backwards compat during transition), the section becomes inert — it just shows whatever `expanded` is. This is fine because FilterPanel will always provide both props.
-
-**Step 2: Run existing filter-panel tests to verify no regression**
-
-Run: `cd web && pnpm test -- --run src/lib/components/filter-panel/__tests__/filter-panel.spec.ts`
-Expected: PASS — FilterSection still defaults `expanded=true` and existing tests don't click section headers
-
-**Step 3: Commit**
-
-```bash
-git add web/src/lib/components/filter-panel/filter-section.svelte
-git commit -m "refactor: make FilterSection accept controlled expanded prop"
-```
-
----
-
-### Task 4: Filter Panel Collapsed Persistence — Tests
+### Task 3: Filter Panel Collapsed Persistence — Tests
 
 **Files:**
 
@@ -302,6 +233,21 @@ describe('collapsed state persistence', () => {
     });
     expect(screen.getByTestId('discovery-panel')).toBeInTheDocument();
   });
+
+  it('should still allow in-session collapse when persistCollapsed is false', async () => {
+    render(FilterPanel, {
+      props: {
+        config: { sections: ['rating'], providers: {} },
+        timeBuckets: [],
+        persistCollapsed: false,
+      },
+    });
+    await fireEvent.click(screen.getByTestId('collapse-panel-btn'));
+    expect(screen.getByTestId('collapsed-icon-strip')).toBeInTheDocument();
+    expect(screen.queryByTestId('discovery-panel')).not.toBeInTheDocument();
+    // But nothing written to localStorage
+    expect(localStorage.getItem(COLLAPSED_KEY)).toBeNull();
+  });
 });
 ```
 
@@ -334,7 +280,7 @@ it('should render nothing when hidden and collapsed in localStorage', () => {
 **Step 2: Run tests — verify they fail**
 
 Run: `cd web && pnpm test -- --run src/lib/components/filter-panel/__tests__/filter-panel.spec.ts`
-Expected: FAIL — `initialCollapsed` prop removed but component still has it; localStorage tests fail because component doesn't read from it yet
+Expected: FAIL — component still has `initialCollapsed` prop; localStorage tests fail because component doesn't read from it yet
 
 **Step 3: Commit**
 
@@ -345,11 +291,13 @@ git commit -m "test: add failing tests for filter panel collapsed localStorage p
 
 ---
 
-### Task 5: Filter Panel Collapsed Persistence — Implementation
+### Task 4: Filter Panel Collapsed Persistence — Implementation
 
 **Files:**
 
 - Modify: `web/src/lib/components/filter-panel/filter-panel.svelte` (lines 37-54)
+- Modify: `web/src/routes/(user)/photos/[[assetId=id]]/+page.svelte` (line 188)
+- Modify: `web/src/routes/(user)/map/[[photos=photos]]/[[assetId=id]]/+page.svelte` (line 205)
 
 **Step 1: Update FilterPanel Props and collapsed initialization**
 
@@ -377,7 +325,7 @@ interface Props {
 }
 ```
 
-Update the props destructuring (lines 46-53):
+Update the props destructuring (lines 46-54):
 
 ```typescript
 // Old:
@@ -486,13 +434,18 @@ git commit -m "feat: persist filter panel collapsed state in localStorage"
 
 ---
 
-### Task 6: Filter Section Accordion Persistence — Tests
+### Task 5: FilterSection Controlled + Accordion Persistence — Tests
+
+This task combines the FilterSection refactor and accordion persistence tests into one
+task to avoid an intermediate state where section header clicks are non-functional.
 
 **Files:**
 
 - Modify: `web/src/lib/components/filter-panel/__tests__/filter-panel.spec.ts`
 
 **Step 1: Add tests for expanded sections persistence**
+
+Add `import type { FilterSection } from '../filter-panel';` at the top of the test file.
 
 Add a new `describe` block at the bottom of the file:
 
@@ -522,14 +475,14 @@ describe('Section Accordion Persistence', () => {
 
   it('should default all sections to expanded on first visit', () => {
     renderPanel(['people', 'rating']);
-    // Section content should be visible (expanded)
-    expect(screen.getByTestId('filter-section-people')).toBeTruthy();
-    expect(screen.getByTestId('filter-section-rating')).toBeTruthy();
+    const peopleContent = screen.getByTestId('filter-section-people').querySelector('.filter-section-content');
+    const ratingContent = screen.getByTestId('filter-section-rating').querySelector('.filter-section-content');
+    expect(peopleContent).toBeTruthy();
+    expect(ratingContent).toBeTruthy();
   });
 
   it('should persist collapsed section to localStorage when header is clicked', async () => {
     renderPanel(['people', 'rating']);
-    // Click the section header to collapse
     const peopleHeader = screen.getByTestId('filter-section-people').querySelector('button')!;
     await fireEvent.click(peopleHeader);
     const stored = JSON.parse(localStorage.getItem(EXPANDED_KEY) ?? '[]') as string[];
@@ -540,17 +493,24 @@ describe('Section Accordion Persistence', () => {
   it('should restore collapsed sections from localStorage on mount', () => {
     localStorage.setItem(EXPANDED_KEY, JSON.stringify(['rating']));
     renderPanel(['people', 'rating']);
-    // People section content should be hidden (collapsed), rating visible
     const peopleContent = screen.getByTestId('filter-section-people').querySelector('.filter-section-content');
     const ratingContent = screen.getByTestId('filter-section-rating').querySelector('.filter-section-content');
     expect(peopleContent).toBeNull();
     expect(ratingContent).toBeTruthy();
   });
 
+  it('should keep all sections collapsed when localStorage has empty array', () => {
+    localStorage.setItem(EXPANDED_KEY, JSON.stringify([]));
+    renderPanel(['people', 'rating']);
+    const peopleContent = screen.getByTestId('filter-section-people').querySelector('.filter-section-content');
+    const ratingContent = screen.getByTestId('filter-section-rating').querySelector('.filter-section-content');
+    expect(peopleContent).toBeNull();
+    expect(ratingContent).toBeNull();
+  });
+
   it('should ignore unknown section types in localStorage', () => {
     localStorage.setItem(EXPANDED_KEY, JSON.stringify(['people', 'nonexistent']));
     renderPanel(['people', 'rating']);
-    // People is in the stored list so it's expanded, rating is not so it's collapsed
     const peopleContent = screen.getByTestId('filter-section-people').querySelector('.filter-section-content');
     expect(peopleContent).toBeTruthy();
   });
@@ -567,7 +527,6 @@ describe('Section Accordion Persistence', () => {
   it('should expand a collapsed section when header is clicked again', async () => {
     localStorage.setItem(EXPANDED_KEY, JSON.stringify(['rating']));
     renderPanel(['people', 'rating']);
-    // People is collapsed — click to expand
     const peopleHeader = screen.getByTestId('filter-section-people').querySelector('button')!;
     await fireEvent.click(peopleHeader);
     const stored = JSON.parse(localStorage.getItem(EXPANDED_KEY) ?? '[]') as string[];
@@ -577,16 +536,10 @@ describe('Section Accordion Persistence', () => {
 });
 ```
 
-You'll also need to import `FilterSection` type at the top of the test file:
-
-```typescript
-import type { FilterSection } from '../filter-panel';
-```
-
 **Step 2: Run tests — verify they fail**
 
 Run: `cd web && pnpm test -- --run src/lib/components/filter-panel/__tests__/filter-panel.spec.ts`
-Expected: FAIL — persistence tests fail because FilterPanel doesn't pass `expanded`/`onToggleExpanded` to FilterSection yet
+Expected: FAIL — FilterPanel doesn't pass `expanded`/`onToggleExpanded` to FilterSection yet, and section header clicks still use internal state
 
 **Step 3: Commit**
 
@@ -597,15 +550,72 @@ git commit -m "test: add failing tests for filter section accordion localStorage
 
 ---
 
-### Task 7: Filter Section Accordion Persistence — Implementation
+### Task 6: FilterSection Controlled + Accordion Persistence — Implementation
+
+This task does both the FilterSection refactor and the FilterPanel wiring in one step
+so there's no intermediate commit where section toggles are broken.
 
 **Files:**
 
+- Modify: `web/src/lib/components/filter-panel/filter-section.svelte` (entire file, 57 lines)
 - Modify: `web/src/lib/components/filter-panel/filter-panel.svelte`
 
-**Step 1: Add expandedSections state and persistence**
+**Step 1: Make FilterSection controlled**
 
-After `let visibleSections = $state(...)` (line 336), add:
+In `filter-section.svelte`, update the Props interface and state (lines 6-15):
+
+```typescript
+// Old:
+interface Props {
+  title: string;
+  testId: string;
+  children: Snippet;
+  refetching?: boolean;
+  count?: number;
+}
+
+let { title, testId, children, refetching = false, count }: Props = $props();
+let expanded = $state(true);
+
+// New:
+interface Props {
+  title: string;
+  testId: string;
+  children: Snippet;
+  refetching?: boolean;
+  count?: number;
+  expanded?: boolean;
+  onToggleExpanded?: () => void;
+}
+
+let { title, testId, children, refetching = false, count, expanded = true, onToggleExpanded }: Props = $props();
+```
+
+Update the click handler (line 24-28):
+
+```svelte
+<!-- Old: -->
+onclick={() => {
+  if (!isEmpty) {
+    expanded = !expanded;
+  }
+}}
+
+<!-- New: -->
+onclick={() => {
+  if (!isEmpty && onToggleExpanded) {
+    onToggleExpanded();
+  }
+}}
+```
+
+**Note:** The `disabled={isEmpty}` attribute on the button (line 29) already prevents
+clicks on empty sections, so the `!isEmpty` check in the handler is a defense-in-depth
+guard. Both guards stay.
+
+**Step 2: Add expandedSections state and persistence to FilterPanel**
+
+In `filter-panel.svelte`, after `let visibleSections = $state(...)` (line 336), add:
 
 ```typescript
 const EXPANDED_SECTIONS_KEY = 'gallery-filter-expanded-sections';
@@ -614,12 +624,13 @@ function loadExpandedSections(configSections: FilterSectionType[]): SvelteSet<Fi
   if (browser) {
     try {
       const raw = localStorage.getItem(EXPANDED_SECTIONS_KEY);
-      if (raw) {
+      if (raw !== null) {
         const parsed = JSON.parse(raw) as string[];
         const valid = parsed.filter((s): s is FilterSectionType => configSections.includes(s as FilterSectionType));
-        if (valid.length > 0) {
-          return new SvelteSet(valid);
-        }
+        // Return the validated set even if empty — an empty array means the user
+        // explicitly collapsed all sections. Only fall through to default when
+        // there's no localStorage entry at all (raw === null).
+        return new SvelteSet(valid);
       }
     } catch {
       /* corrupted JSON — fall through to default */
@@ -641,6 +652,13 @@ function toggleSectionExpanded(section: FilterSectionType) {
 }
 ```
 
+**Key difference from `loadVisibleSections`:** This function uses `raw !== null` instead
+of `raw` + `valid.length > 0` to distinguish "no localStorage entry" (default to all
+expanded) from "empty array stored" (user collapsed everything, respect that). The
+existing `loadVisibleSections` has this same bug but it's less impactful there (hiding
+all sections shows a "Show all" link). For accordion state, silently re-expanding
+everything the user collapsed would be wrong.
+
 Add a `$effect` to persist (after the collapsed persistence `$effect`):
 
 ```typescript
@@ -655,7 +673,7 @@ $effect(() => {
 });
 ```
 
-**Step 2: Pass `expanded` and `onToggleExpanded` to each FilterSection**
+**Step 3: Pass `expanded` and `onToggleExpanded` to each FilterSection**
 
 In the template `{#each}` block (around line 559), update the `<FilterSection>` tag:
 
@@ -679,21 +697,22 @@ In the template `{#each}` block (around line 559), update the `<FilterSection>` 
 >
 ```
 
-**Step 3: Run tests — verify they pass**
+**Step 4: Run tests — verify they pass**
 
 Run: `cd web && pnpm test -- --run src/lib/components/filter-panel/__tests__/filter-panel.spec.ts`
 Expected: PASS
 
-**Step 4: Commit**
+**Step 5: Commit**
 
 ```bash
-git add web/src/lib/components/filter-panel/filter-panel.svelte
+git add web/src/lib/components/filter-panel/filter-section.svelte \
+       web/src/lib/components/filter-panel/filter-panel.svelte
 git commit -m "feat: persist filter section accordion state in localStorage"
 ```
 
 ---
 
-### Task 8: Space Hero Persistence — Integration
+### Task 7: Space Hero Persistence — Integration
 
 **Files:**
 
@@ -717,6 +736,15 @@ let heroCollapsed = $state(false);
 let heroCollapsed = $state(loadHeroCollapsed(data.space.id));
 ```
 
+Add a named toggle function near `heroCollapsed` declaration:
+
+```typescript
+function toggleHeroCollapsed() {
+  heroCollapsed = !heroCollapsed;
+  persistHeroCollapsed(space.id, heroCollapsed);
+}
+```
+
 Update the space navigation sync effect (line 127):
 
 ```typescript
@@ -727,18 +755,7 @@ heroCollapsed = false;
 heroCollapsed = loadHeroCollapsed(data.space.id);
 ```
 
-Create a named toggle function and update the SpaceHero callback (around line 908-909):
-
-Add this function near `heroCollapsed` declaration:
-
-```typescript
-function toggleHeroCollapsed() {
-  heroCollapsed = !heroCollapsed;
-  persistHeroCollapsed(space.id, heroCollapsed);
-}
-```
-
-Update the SpaceHero props:
+Update the SpaceHero props (around line 908-909):
 
 ```svelte
 <!-- Old: -->
@@ -766,7 +783,7 @@ git commit -m "feat: persist space hero collapsed state per-space in localStorag
 
 ---
 
-### Task 9: Cleanup and Final Verification
+### Task 8: Cleanup and Final Verification
 
 **Files:**
 
