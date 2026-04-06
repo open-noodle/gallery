@@ -1,7 +1,7 @@
 name: Gallery Docs Deploy
 
 on:
-  workflow_run:
+  workflow_run: # zizmor: ignore[dangerous-triggers] no attacker inputs are used
     workflows: ['Docs build']
     types:
       - completed
