@@ -20,7 +20,11 @@ Add a `maxDistance` field to `machineLearning.clip` in SystemConfig. This is app
 clause in `searchSmart()` to exclude results whose cosine distance exceeds the threshold.
 Configurable via the admin UI and YAML config file.
 
-## Default Value: 0.75
+## Default Value: 0 (disabled)
+
+This feature is **opt-in**. The default value of `0` means no relevance threshold is applied,
+preserving the original search behavior. Users who experience irrelevant results when combining
+text search with filters can enable it by setting a value.
 
 The `<=>` cosine distance operator ranges from 0 (identical) to 2 (opposite). Reference points:
 
@@ -29,8 +33,7 @@ The `<=>` cosine distance operator ranges from 0 (identical) to 2 (opposite). Re
 - CLIP text-to-image matching is inherently fuzzier — cross-modal distances are noisier than
   same-modal comparisons, so a looser threshold is needed
 
-  0.75 should exclude clearly irrelevant results while keeping reasonable matches. Users can tune
-  via admin settings. Set to 2.0 to effectively disable the threshold.
+Recommended starting value: **0.75**. Users can tune from there via admin settings.
 
 ## Changes
 
@@ -38,13 +41,13 @@ The `<=>` cosine distance operator ranges from 0 (identical) to 2 (opposite). Re
 
 **File:** `server/src/config.ts`
 
-Add `maxDistance: number` to the `machineLearning.clip` type and set default to `0.75`:
+Add `maxDistance: number` to the `machineLearning.clip` type and set default to `0` (disabled):
 
 ```typescript
 clip: {
   enabled: boolean;
   modelName: string;
-  maxDistance: number; // new
+  maxDistance: number; // new — 0 means disabled
 }
 ```
 
@@ -52,7 +55,7 @@ clip: {
 clip: {
   enabled: true,
   modelName: 'ViT-B-32__openai',
-  maxDistance: 0.75,  // new
+  maxDistance: 0,  // new — 0 = disabled, recommended: 0.75
 },
 ```
 
@@ -65,20 +68,21 @@ Add `maxDistance` to `CLIPConfig` class, following the `FacialRecognitionConfig.
 ```typescript
 export class CLIPConfig extends ModelConfig {
   @IsNumber()
-  @Min(0.3)
+  @Min(0)
   @Max(2)
   @Type(() => Number)
   @ApiProperty({
     type: 'number',
     format: 'double',
-    description: 'Maximum cosine distance for smart search results',
+    description: 'Maximum cosine distance for smart search results. 0 = disabled.',
   })
   maxDistance!: number;
 }
 ```
 
-Min is 0.3 (not 0.1) because CLIP text-to-image distances rarely go below ~0.4 even for
-strong matches. Setting 0.1 would return zero results for virtually any query.
+Min is 0 (disabled). Active range is roughly 0.3–2.0. Values below 0.3 would return zero
+results for most queries since CLIP text-to-image distances rarely go below ~0.4 even for
+strong matches.
 
 ### 3. Search Options Type
 
@@ -157,10 +161,10 @@ LIMIT $size + 1
 OFFSET $offset
 ```
 
-#### Optimization
+#### Skip Condition
 
-Skip the threshold clause entirely when `maxDistance >= 2.0`. Since cosine distance maxes at
-2.0, this is a no-op filter — omitting it avoids unnecessary computation.
+Skip the threshold clause entirely when `maxDistance` is `0` (disabled) or `>= 2.0` (no-op).
+This preserves original behavior and avoids unnecessary computation.
 
 #### Known Limitation
 
@@ -181,7 +185,7 @@ Add a `SettingInputField` inside the "smart-search" accordion (after the model n
   description={$t('admin.machine_learning_clip_max_distance_description')}
   bind:value={configToEdit.machineLearning.clip.maxDistance}
   step="0.05"
-  min={0.3}
+  min={0}
   max={2}
   disabled={disabled || !configToEdit.machineLearning.enabled || !configToEdit.machineLearning.clip.enabled}
   isEdited={configToEdit.machineLearning.clip.maxDistance !== config.machineLearning.clip.maxDistance}
@@ -194,8 +198,8 @@ Add to the English locale file:
 
 - `admin.machine_learning_clip_max_distance`: "Max search distance"
 - `admin.machine_learning_clip_max_distance_description`: "Maximum cosine distance for smart
-  search results. Lower values return fewer but more relevant results. Set to 2.0 to disable.
-  Default: 0.75"
+  search results. Lower values return fewer but more relevant results. Set to 0 to disable
+  (default). Recommended: 0.75"
 
 ### 8. Generated Files
 
@@ -212,7 +216,7 @@ Add `maxDistance` to the clip section in the example config:
 "clip": {
   "enabled": true,
   "modelName": "ViT-B-32__openai",
-  "maxDistance": 0.75
+  "maxDistance": 0
 }
 ```
 
@@ -220,21 +224,20 @@ Add `maxDistance` to the clip section in the example config:
 
 Add a section explaining the relevance threshold:
 
-> **Relevance threshold:** By default, smart search excludes results with a cosine distance
-> greater than 0.75 from the search query. This prevents irrelevant photos from appearing when
-> combining text search with metadata filters (e.g., searching "forest" filtered to a specific
-> country that has no forest photos).
+> **Relevance threshold:** Smart search can optionally exclude results with low similarity to
+> the search query. This prevents irrelevant photos from appearing when combining text search
+> with metadata filters (e.g., searching "forest" filtered to a specific country that has no
+> forest photos).
 >
-> You can adjust this in Administration > Machine Learning > Smart Search, or in your config
-> file under `machineLearning.clip.maxDistance`. Lower values are stricter (fewer, more relevant
-> results). Higher values are more permissive. Set to 2.0 to disable the threshold entirely.
+> By default this is disabled (set to 0). To enable, set `machineLearning.clip.maxDistance` in
+> Administration > Machine Learning > Smart Search, or in your config file.
 >
 > Examples:
 >
+> - `0` — Disabled (default). All results returned regardless of similarity.
 > - `0.5` — Very strict. Only strong visual matches. May miss borderline-relevant results.
-> - `0.75` — Default. Good balance of relevance and recall.
+> - `0.75` — Recommended. Good balance of relevance and recall.
 > - `1.0` — Permissive. Includes weaker matches. Useful for broad or abstract queries.
-> - `2.0` — Disabled. All results returned regardless of similarity (original behavior).
 
 ### 10. Tests
 
@@ -246,7 +249,8 @@ Add a section explaining the relevance threshold:
 
 - Verify distance WHERE clause is applied for relevance ordering (Case A)
 - Verify distance WHERE clause is applied for date ordering (Case B)
-- Verify `maxDistance >= 2.0` skips the threshold clause
+- Verify `maxDistance` of `0` skips the threshold clause (disabled)
+- Verify `maxDistance >= 2.0` skips the threshold clause (no-op)
 - Verify pagination correctness: when threshold filters results, `hasNextPage` is correct
 
 ## What This Does NOT Change
