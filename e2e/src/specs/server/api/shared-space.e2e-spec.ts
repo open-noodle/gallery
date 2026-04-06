@@ -2180,6 +2180,118 @@ describe('/shared-spaces', () => {
       });
     });
 
+    describe('POST /shared-spaces/:id/people/deduplicate (T14)', () => {
+      // T14 covers the manual dedup trigger for space people.
+      //
+      // Service shape (shared-space.service.ts:721-728): requires `Owner` role
+      // (NOT just Editor — distinct from PUT/DELETE/merge which only need Editor).
+      // Queues a SharedSpacePersonDedup job on the FacialRecognition queue with
+      // jobId `space-dedup-${spaceId}` (job.repository.ts:239-241). The jobId is
+      // the load-bearing PR #292 invariant: BullMQ's queue() with a duplicate
+      // jobId is a no-op, so calling deduplicate twice in quick succession enqueues
+      // only one job.
+      //
+      // Each `it()` creates a fresh space + makes the relevant user the Owner so
+      // the access matrix is independent and the queue verification has a clean
+      // slate.
+
+      it('Owner-only access matrix', async () => {
+        // Distinct from PUT/DELETE/merge which require Editor — deduplicate is
+        // Owner-only because it can rewrite the space's person graph.
+        await forEachActor(
+          [ownerActor, editorActor, viewerActor, nonMemberActor, anonActor],
+          (actor) =>
+            request(app)
+              .post(`/shared-spaces/${spaceId}/people/deduplicate`)
+              .set(authHeaders(actor)),
+          { spaceOwner: 204, spaceEditor: 403, spaceViewer: 403, spaceNonMember: 403, anon: 401 },
+        );
+      });
+
+      it('owner happy path returns 204 (queues a SharedSpacePersonDedup job)', async () => {
+        // Sanity check on the success path. Doesn't verify queue state — that's
+        // covered by the next test.
+        const { status } = await request(app)
+          .post(`/shared-spaces/${spaceId}/people/deduplicate`)
+          .set('Authorization', `Bearer ${owner.accessToken}`);
+        expect(status).toBe(204);
+      });
+
+      it('two consecutive owner calls both return 204 (HTTP-level idempotency)', async () => {
+        // The HTTP layer is idempotent regardless of whether BullMQ deduplicates.
+        // The actual jobId-based dedup is verified by the next test via queue
+        // inspection; this test pins the HTTP contract independently.
+        const first = await request(app)
+          .post(`/shared-spaces/${spaceId}/people/deduplicate`)
+          .set('Authorization', `Bearer ${owner.accessToken}`);
+        expect(first.status).toBe(204);
+
+        const second = await request(app)
+          .post(`/shared-spaces/${spaceId}/people/deduplicate`)
+          .set('Authorization', `Bearer ${owner.accessToken}`);
+        expect(second.status).toBe(204);
+      });
+
+      it('jobId dedup: two calls in quick succession enqueue only one job (PR #292)', async () => {
+        // The load-bearing PR #292 invariant. BullMQ's queue() with a duplicate
+        // jobId is a no-op, so the same space's dedup job can't be enqueued twice
+        // while the first is still in the waiting/active state.
+        //
+        // Strategy: pause the FacialRecognition queue so the worker doesn't drain
+        // the job, empty it, trigger dedup twice, count the resulting jobs, restore.
+        //
+        // The pause/restore is bracketed in try/finally so a test failure doesn't
+        // leave the queue paused and break the rest of the suite. The queue
+        // endpoints require admin token (queue.controller.ts:23) — `admin` is
+        // available from the outer beforeAll.
+        const queueName = 'facialRecognition';
+        try {
+          // Pause + empty so the assertions are deterministic.
+          await request(app)
+            .put(`/queues/${queueName}`)
+            .set('Authorization', `Bearer ${admin.accessToken}`)
+            .send({ isPaused: true });
+          await request(app)
+            .delete(`/queues/${queueName}/jobs`)
+            .set('Authorization', `Bearer ${admin.accessToken}`)
+            .send({ statuses: ['waiting', 'delayed', 'active', 'completed', 'failed', 'paused'] });
+
+          // First trigger
+          const t1 = await request(app)
+            .post(`/shared-spaces/${spaceId}/people/deduplicate`)
+            .set('Authorization', `Bearer ${owner.accessToken}`);
+          expect(t1.status).toBe(204);
+
+          // Second trigger immediately after
+          const t2 = await request(app)
+            .post(`/shared-spaces/${spaceId}/people/deduplicate`)
+            .set('Authorization', `Bearer ${owner.accessToken}`);
+          expect(t2.status).toBe(204);
+
+          // Count waiting/paused jobs that match our space's dedup jobId. The job
+          // data is `{spaceId}` and the jobId is `space-dedup-${spaceId}`.
+          const jobs = await request(app)
+            .get(`/queues/${queueName}/jobs`)
+            .set('Authorization', `Bearer ${admin.accessToken}`);
+          expect(jobs.status).toBe(200);
+          const ourJobs = (jobs.body as Array<{ id?: string; data?: { spaceId?: string } }>).filter(
+            (j) => j.data?.spaceId === spaceId || j.id === `space-dedup-${spaceId}`,
+          );
+          expect(ourJobs.length).toBe(1);
+        } finally {
+          // Unpause + drain whatever's left so other tests aren't affected.
+          await request(app)
+            .delete(`/queues/${queueName}/jobs`)
+            .set('Authorization', `Bearer ${admin.accessToken}`)
+            .send({ statuses: ['waiting', 'delayed', 'active', 'completed', 'failed', 'paused'] });
+          await request(app)
+            .put(`/queues/${queueName}`)
+            .set('Authorization', `Bearer ${admin.accessToken}`)
+            .send({ isPaused: false });
+        }
+      });
+    });
+
     it('empty thumbnailPath on the underlying global person excludes the space person', async () => {
       // The fork's "minFaces gate" mechanism. shared-space.repository.ts:512-513
       // filters with `person.thumbnailPath IS NOT NULL AND != ''`. In production
