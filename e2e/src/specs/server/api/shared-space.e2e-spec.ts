@@ -1717,35 +1717,56 @@ describe('/shared-spaces', () => {
       });
 
       describe('GET /shared-spaces/:id/people/:personId/thumbnail', () => {
-        // KNOWN FOOTGUN: utils.createSpacePerson sets person.thumbnailPath to a
-        // fictional fixture string ('/my/awesome/thumbnail.jpg'). The thumbnail
-        // endpoint passes the access check (good) but the file resolution then
-        // fails because the path doesn't exist on disk, returning 500.
+        // Test strategy: the thumbnail endpoint at shared-space.service.ts:643-657
+        // has THREE distinct return paths once the access check passes:
+        //   - person not found OR wrong space → throw NotFoundException → 404
+        //   - thumbnailPath is null/empty → throw NotFoundException → 404
+        //   - thumbnailPath set → serveFromBackend → 200 with bytes (or 500 if file
+        //     doesn't exist on disk)
         //
-        // For T10 we accept the 500 as the success-case shape — the access check
-        // and the file resolution are the load-bearing concerns; the 500 vs 404
-        // distinction is a separate (and minor) server-side issue worth fixing
-        // later but not in scope for T10. Pinned in the backlog as a known footgun.
+        // utils.createSpacePerson sets thumbnailPath to a fictional path ('/my/awesome/
+        // thumbnail.jpg') to satisfy the *listing*'s hard requirement (a non-empty
+        // thumbnailPath) — but that path doesn't exist on disk, so the 200 path would
+        // trip serveFromBackend's 500 case. To keep the test focused on the *access*
+        // path (which is what the controller is responsible for) and away from the
+        // file-resolution side effect, we transiently blank thumbnailPath via DB,
+        // which exercises the graceful 404 path. Restore in try/finally per the
+        // fixture lifetime contract.
+        //
+        // The matrix this test pins:
+        //   - member with empty thumbnailPath → 404 (graceful "no thumbnail" path)
+        //   - non-member → 403 (access check fires before file lookup)
+        //   - anon → 401 (auth middleware denies before service is invoked)
+        // Together this characterises the LAYERED ordering 401 < 403 < 404, which is
+        // exactly what a fully-correct member-success path looks like for a person
+        // that has no thumbnail.
 
-        it('access matrix (member success-case is 500 due to fixture thumbnailPath)', async () => {
-          await forEachActor(
-            [ownerActor, editorActor, viewerActor, nonMemberActor, anonActor],
-            (actor) =>
-              request(app)
-                .get(`/shared-spaces/${spaceId}/people/${namedPersonId}/thumbnail`)
-                .set(authHeaders(actor)),
-            { spaceOwner: 500, spaceEditor: 500, spaceViewer: 500, spaceNonMember: 403, anon: 401 },
-          );
-        });
+        it('access matrix and 401 < 403 < 404 ordering', async () => {
+          const dbClient = await utils.connectDatabase();
+          try {
+            await dbClient.query(
+              `UPDATE person SET "thumbnailPath" = $1
+               WHERE id = (SELECT "personId" FROM asset_face WHERE id =
+                 (SELECT "representativeFaceId" FROM shared_space_person WHERE id = $2))`,
+              ['', namedPersonId],
+            );
 
-        it('non-member 403 fires before file resolution', async () => {
-          // Sanity check on the access-vs-file-resolution ordering. Even with the
-          // fictional thumbnailPath, the access check should fire first for a
-          // non-member — ensuring the 500 path isn't somehow leaking access.
-          const { status } = await request(app)
-            .get(`/shared-spaces/${spaceId}/people/${namedPersonId}/thumbnail`)
-            .set('Authorization', `Bearer ${nonMember.accessToken}`);
-          expect(status).toBe(403);
+            await forEachActor(
+              [ownerActor, editorActor, viewerActor, nonMemberActor, anonActor],
+              (actor) =>
+                request(app)
+                  .get(`/shared-spaces/${spaceId}/people/${namedPersonId}/thumbnail`)
+                  .set(authHeaders(actor)),
+              { spaceOwner: 404, spaceEditor: 404, spaceViewer: 404, spaceNonMember: 403, anon: 401 },
+            );
+          } finally {
+            await dbClient.query(
+              `UPDATE person SET "thumbnailPath" = $1
+               WHERE id = (SELECT "personId" FROM asset_face WHERE id =
+                 (SELECT "representativeFaceId" FROM shared_space_person WHERE id = $2))`,
+              ['/my/awesome/thumbnail.jpg', namedPersonId],
+            );
+          }
         });
       });
 
