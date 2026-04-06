@@ -345,6 +345,7 @@ export class SearchRepository {
         isFavorite: true,
         userIds: [DummyValue.UUID],
         spacePersonIds: [DummyValue.UUID],
+        timelineSpaceIds: [DummyValue.UUID, DummyValue.UUID],
         orderDirection: 'desc',
         maxDistance: 0.75,
       },
