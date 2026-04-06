@@ -51,7 +51,15 @@
         return;
       }
 
-      searchResults = append ? [...searchResults, ...assets.items] : assets.items;
+      if (append) {
+        // Defend against pagination overlaps (e.g., backend tie-breaker gaps or
+        // race-y page boundaries) so Svelte's keyed {#each} doesn't crash on duplicate IDs.
+        const existingIds = new Set(searchResults.map((a) => a.id));
+        const deduped = assets.items.filter((a) => !existingIds.has(a.id));
+        searchResults = [...searchResults, ...deduped];
+      } else {
+        searchResults = assets.items;
+      }
       searchPage = page;
       hasMoreResults = assets.nextPage !== null;
     } catch {

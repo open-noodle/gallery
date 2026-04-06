@@ -367,7 +367,10 @@ export class SearchRepository {
         .$if(hasDistanceThreshold, (qb) =>
           qb.where(sql<SqlBool>`(smart_search.embedding <=> ${options.embedding}) <= ${options.maxDistance!}`),
         )
-        .orderBy(sql`smart_search.embedding <=> ${options.embedding}`);
+        .orderBy(sql`smart_search.embedding <=> ${options.embedding}`)
+        // Stable tiebreaker so offset-based pagination doesn't return overlapping pages
+        // when multiple assets have identical CLIP distances.
+        .orderBy('asset.id');
 
       if (options.orderDirection) {
         const orderDirection = options.orderDirection.toLowerCase() as OrderByDirection;
@@ -377,6 +380,8 @@ export class SearchRepository {
           .selectAll()
           // sql.raw is safe here — orderDirection is validated to 'asc'|'desc' by the AssetOrder enum
           .orderBy(sql`"candidates"."fileCreatedAt" ${sql.raw(orderDirection)} nulls last`)
+          // Stable tiebreaker (same rationale as the base query)
+          .orderBy('candidates.id')
           .limit(pagination.size + 1)
           .offset((pagination.page - 1) * pagination.size)
           .execute();

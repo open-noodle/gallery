@@ -155,12 +155,14 @@ from
       and "asset"."deletedAt" is null
       and (smart_search.embedding <=> $9) <= $10
     order by
-      smart_search.embedding <=> $11
+      smart_search.embedding <=> $11,
+      "asset"."id"
     limit
       $12
   ) as "candidates"
 order by
-  "candidates"."fileCreatedAt" desc nulls last
+  "candidates"."fileCreatedAt" desc nulls last,
+  "candidates"."id"
 limit
   $13
 offset
