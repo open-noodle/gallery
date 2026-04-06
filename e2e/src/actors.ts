@@ -28,6 +28,14 @@ export type Actor = {
   userId?: string;
 };
 
+/**
+ * Build the request `Authorization` header for an actor. Returns an empty object
+ * for `anon` so call sites can do `request(app).get(...).set(authHeaders(actor))`
+ * without conditionals.
+ */
+export const authHeaders = (actor: Actor): Record<string, string> =>
+  actor.token ? { Authorization: `Bearer ${actor.token}` } : {};
+
 export type SpaceContext = {
   admin: Actor;
   spaceOwner: Actor;

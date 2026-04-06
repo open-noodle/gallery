@@ -1,4 +1,4 @@
-import { type Actor, type SpaceContext, buildSpaceContext, forEachActor } from 'src/actors';
+import { type Actor, type SpaceContext, authHeaders, buildSpaceContext, forEachActor } from 'src/actors';
 import { app, asBearerAuth, utils } from 'src/utils';
 import request from 'supertest';
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -18,7 +18,6 @@ describe('/timeline', () => {
 
   beforeAll(async () => {
     await utils.resetDatabase();
-    utils.initSdk();
     ctx = await buildSpaceContext();
   });
 
@@ -26,10 +25,7 @@ describe('/timeline', () => {
     it('requires authentication', async () => {
       await forEachActor(
         [anonActor, ctx.spaceOwner],
-        (actor) =>
-          request(app)
-            .get('/timeline/buckets')
-            .set(actor.token ? asBearerAuth(actor.token) : {}),
+        (actor) => request(app).get('/timeline/buckets').set(authHeaders(actor)),
         { anon: 401, spaceOwner: 200 },
       );
     });
@@ -54,7 +50,7 @@ describe('/timeline', () => {
         (actor) =>
           request(app)
             .get(`/timeline/buckets?spaceId=${ctx.spaceId}`)
-            .set(actor.token ? asBearerAuth(actor.token) : {}),
+            .set(authHeaders(actor)),
         { spaceOwner: 200, spaceEditor: 200, spaceViewer: 200, spaceNonMember: 400, anon: 401 },
       );
     });
@@ -106,7 +102,7 @@ describe('/timeline', () => {
         (actor) =>
           request(app)
             .get(`/timeline/bucket?timeBucket=${currentMonthBucket}`)
-            .set(actor.token ? asBearerAuth(actor.token) : {}),
+            .set(authHeaders(actor)),
         { anon: 401, spaceOwner: 200 },
       );
     });
@@ -119,7 +115,7 @@ describe('/timeline', () => {
         (actor) =>
           request(app)
             .get(`/timeline/bucket?timeBucket=${currentMonthBucket}&spaceId=${ctx.spaceId}`)
-            .set(actor.token ? asBearerAuth(actor.token) : {}),
+            .set(authHeaders(actor)),
         { spaceOwner: 200, spaceEditor: 200, spaceViewer: 200, spaceNonMember: 400, anon: 401 },
       );
     });

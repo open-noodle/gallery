@@ -1,5 +1,5 @@
-import { app, asBearerAuth, utils } from 'src/utils';
-import { type Actor, type SpaceContext, buildSpaceContext, forEachActor } from 'src/actors';
+import { app, utils } from 'src/utils';
+import { type Actor, type SpaceContext, authHeaders, buildSpaceContext, forEachActor } from 'src/actors';
 import request from 'supertest';
 import { beforeAll, describe, expect, it } from 'vitest';
 
@@ -19,7 +19,6 @@ describe('test helpers smoke', () => {
   // (see fixture lifetime section of T02 design doc).
   beforeAll(async () => {
     await utils.resetDatabase();
-    utils.initSdk();
     ctx = await buildSpaceContext();
   });
 
@@ -27,10 +26,7 @@ describe('test helpers smoke', () => {
   it('GET /server/ping is reachable for every actor', async () => {
     await forEachActor(
       [anonActor, ctx.spaceOwner, ctx.spaceViewer, ctx.spaceNonMember],
-      (actor) =>
-        request(app)
-          .get('/server/ping')
-          .set(actor.token ? asBearerAuth(actor.token) : {}),
+      (actor) => request(app).get('/server/ping').set(authHeaders(actor)),
       { anon: 200, spaceOwner: 200, spaceViewer: 200, spaceNonMember: 200 },
     );
   });
@@ -39,10 +35,7 @@ describe('test helpers smoke', () => {
   it('GET /users/me requires auth and returns the right user per actor', async () => {
     await forEachActor(
       [anonActor, ctx.spaceOwner, ctx.spaceViewer],
-      (actor) =>
-        request(app)
-          .get('/users/me')
-          .set(actor.token ? asBearerAuth(actor.token) : {}),
+      (actor) => request(app).get('/users/me').set(authHeaders(actor)),
       { anon: 401, spaceOwner: 200, spaceViewer: 200 },
     );
   });
@@ -66,17 +59,15 @@ describe('test helpers smoke', () => {
     // Verify the junction row exists — this is the load-bearing insert that T07-T14
     // queries traverse (getPersonAssetIds, reassignPersonFaces, faceCount denormalization,
     // takenAfter/takenBefore EXISTS subquery in getPersonsBySpaceId).
+    // We don't disconnect — the pg client gets torn down at worker exit. Disconnecting
+    // here would break any later test in the file that uses utils.createSpacePerson.
     const client = await utils.connectDatabase();
-    try {
-      const result = await client.query(
-        `SELECT "personId", "assetFaceId" FROM "shared_space_person_face"
-         WHERE "personId" = $1 AND "assetFaceId" = $2`,
-        [spacePersonId, faceId],
-      );
-      expect(result.rowCount).toBe(1);
-    } finally {
-      await utils.disconnectDatabase();
-    }
+    const result = await client.query(
+      `SELECT "personId", "assetFaceId" FROM "shared_space_person_face"
+       WHERE "personId" = $1 AND "assetFaceId" = $2`,
+      [spacePersonId, faceId],
+    );
+    expect(result.rowCount).toBe(1);
   });
 
   // Smoke test 4 — role assignment in buildSpaceContext.
@@ -96,7 +87,7 @@ describe('test helpers smoke', () => {
       (actor) =>
         request(app)
           .patch(`/shared-spaces/${ctx.spaceId}`)
-          .set(asBearerAuth(actor.token!))
+          .set(authHeaders(actor))
           .send({ thumbnailCropY: 0 }),
       { spaceOwner: 200, spaceEditor: 200, spaceViewer: 403 },
     );
