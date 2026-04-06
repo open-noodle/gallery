@@ -66,6 +66,17 @@ const config = {
     ],
   ],
 
+  headTags: [
+    {
+      tagName: 'script',
+      attributes: {
+        defer: 'true',
+        src: 'https://analytics.opennoodle.de/script.js',
+        'data-website-id': 'eb4bfa32-e4dd-4227-85e2-3772d24bceab',
+      },
+    },
+  ],
+
   themeConfig:
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
