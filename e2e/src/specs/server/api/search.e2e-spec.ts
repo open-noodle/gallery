@@ -1362,6 +1362,127 @@ describe('/search', () => {
     });
   });
 
+  describe('POST /search/smart pagination stability', () => {
+    // Regression test for identical-embedding pagination overlap: when multiple
+    // assets have byte-identical CLIP embeddings, the cosine-distance order-by
+    // has no natural tiebreaker, so offset-based pagination can return the same
+    // asset on page 1 and page 2. The fix adds asset.id as a stable tiebreaker
+    // to both the relevance-only ordering and the two-phase CTE's outer
+    // fileCreatedAt ordering. See commit 6a4bffc82.
+
+    let paginationUser: LoginResponseDto;
+    let paginationWebsocket: Socket;
+    let paginationAssets: AssetMediaResponseDto[] = [];
+
+    const zeroEmbedding = '[' + Array.from({ length: 512 }, () => '0').join(',') + ']';
+
+    const seedEmbedding = async (assetId: string) => {
+      const db = await utils.connectDatabase();
+      await db.query(
+        `INSERT INTO "smart_search" ("assetId", "embedding") VALUES ($1, $2)
+         ON CONFLICT ("assetId") DO UPDATE SET "embedding" = EXCLUDED."embedding"`,
+        [assetId, zeroEmbedding],
+      );
+    };
+
+    const enableSmartSearch = async () => {
+      const config = await utils.getSystemConfig(admin.accessToken);
+      config.machineLearning.enabled = true;
+      config.machineLearning.clip.enabled = true;
+      await updateConfig({ systemConfigDto: config }, { headers: asBearerAuth(admin.accessToken) });
+    };
+
+    const ASSET_COUNT = 12;
+    const PAGE_SIZE = 5;
+
+    beforeAll(async () => {
+      paginationUser = await utils.userSetup(admin.accessToken, {
+        email: 'smart-pagination@immich.cloud',
+        name: 'Smart Pagination User',
+        password: 'Password123!',
+      });
+      paginationWebsocket = await utils.connectWebsocket(paginationUser.accessToken);
+
+      // Upload N assets — enough to fill at least two PAGE_SIZE pages.
+      paginationAssets = [];
+      for (let i = 0; i < ASSET_COUNT; i++) {
+        const asset = await utils.createAsset(paginationUser.accessToken, {
+          deviceAssetId: `smart-pagination-${i}`,
+        });
+        paginationAssets.push(asset);
+      }
+
+      for (const asset of paginationAssets) {
+        await utils.waitForWebsocketEvent({ event: 'assetUpload', id: asset.id });
+      }
+
+      // Seed IDENTICAL zero-vector embeddings on every asset so the cosine-
+      // distance order-by has no natural tiebreaker. Without the id tiebreaker
+      // fix, offset-based pagination produces overlap across pages.
+      for (const asset of paginationAssets) {
+        await seedEmbedding(asset.id);
+      }
+
+      await enableSmartSearch();
+    }, 60_000);
+
+    afterAll(async () => {
+      utils.disconnectWebsocket(paginationWebsocket);
+      await utils.resetAdminConfig(admin.accessToken);
+    });
+
+    it('should not return duplicate assets across pages when multiple assets have identical embeddings', async () => {
+      const queryAssetId = paginationAssets[0].id;
+
+      const page1Response = await request(app)
+        .post('/search/smart')
+        .set('Authorization', `Bearer ${paginationUser.accessToken}`)
+        .send({ queryAssetId, size: PAGE_SIZE, page: 1 });
+      expect(page1Response.status).toBe(200);
+
+      const page2Response = await request(app)
+        .post('/search/smart')
+        .set('Authorization', `Bearer ${paginationUser.accessToken}`)
+        .send({ queryAssetId, size: PAGE_SIZE, page: 2 });
+      expect(page2Response.status).toBe(200);
+
+      const page1Ids: string[] = page1Response.body.assets.items.map((a: AssetResponseDto) => a.id);
+      const page2Ids: string[] = page2Response.body.assets.items.map((a: AssetResponseDto) => a.id);
+
+      // Regression: no asset should appear on both pages.
+      const overlap = page1Ids.filter((id) => page2Ids.includes(id));
+      expect(overlap).toEqual([]);
+
+      // Each page should be fully populated (we have ASSET_COUNT >= 2 * PAGE_SIZE).
+      expect(page1Ids).toHaveLength(PAGE_SIZE);
+      expect(page2Ids).toHaveLength(PAGE_SIZE);
+
+      // The union of both pages should contain 2 * PAGE_SIZE distinct assets.
+      const uniqueIds = new Set<string>([...page1Ids, ...page2Ids]);
+      expect(uniqueIds.size).toBe(2 * PAGE_SIZE);
+    });
+
+    it('should return a stable ordering when paging with identical embeddings', async () => {
+      const queryAssetId = paginationAssets[0].id;
+
+      const first = await request(app)
+        .post('/search/smart')
+        .set('Authorization', `Bearer ${paginationUser.accessToken}`)
+        .send({ queryAssetId, size: PAGE_SIZE, page: 1 });
+      const second = await request(app)
+        .post('/search/smart')
+        .set('Authorization', `Bearer ${paginationUser.accessToken}`)
+        .send({ queryAssetId, size: PAGE_SIZE, page: 1 });
+
+      expect(first.status).toBe(200);
+      expect(second.status).toBe(200);
+
+      const firstIds: string[] = first.body.assets.items.map((a: AssetResponseDto) => a.id);
+      const secondIds: string[] = second.body.assets.items.map((a: AssetResponseDto) => a.id);
+      expect(firstIds).toEqual(secondIds);
+    });
+  });
+
   describe('GET /search/suggestions (temporal scoping)', () => {
     // Upload assets with specific fileCreatedAt dates and different countries/cameras
     // so we can test that temporal params narrow suggestions correctly.
