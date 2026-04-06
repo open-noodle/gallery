@@ -1,9 +1,10 @@
 import { AssetMediaResponseDto, LoginResponseDto, SharedSpaceRole } from '@immich/sdk';
+import { authHeaders, forEachActor, type Actor } from 'src/actors';
 import { createUserDto } from 'src/fixtures';
 import { errorDto } from 'src/responses';
 import { app, utils } from 'src/utils';
 import request from 'supertest';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 describe('/shared-spaces', () => {
   let admin: LoginResponseDto;
@@ -1426,6 +1427,14 @@ describe('/shared-spaces', () => {
     let hiddenPersonId: string; // Hannah — set isHidden=true
     let petPersonId: string; // Rex — type=pet
     let zeroThumbPersonId: string; // person with empty thumbnailPath — invisible to listing
+    let zeroThumbGlobalId: string; // the underlying global person, for direct mutation in test 11
+
+    // Actor objects for forEachActor — built from the LoginResponseDto bag in beforeAll.
+    let ownerActor: Actor;
+    let editorActor: Actor;
+    let viewerActor: Actor;
+    let nonMemberActor: Actor;
+    const anonActor: Actor = { id: 'anon' };
 
     beforeAll(async () => {
       [owner, editor, viewer, nonMember] = await Promise.all([
@@ -1475,28 +1484,24 @@ describe('/shared-spaces', () => {
       // without depending on creation order.
       const ghostRes = await utils.createSpacePerson(spaceId, 'Ghost', owner.userId, spaceAssetId);
       zeroThumbPersonId = ghostRes.spacePersonId;
-      // Capture the global personId via the read-through JOIN — we need it to mutate
-      // person.thumbnailPath in test 11. The helper returns it on the result.
-      // (Test 11 reads it from the listing response in the body since the helper return
-      // shape exposes both globalPersonId and spacePersonId.)
+      zeroThumbGlobalId = ghostRes.globalPersonId;
+
+      // Build actors once so the access matrix test can use forEachActor.
+      ownerActor = { id: 'spaceOwner', token: owner.accessToken, userId: owner.userId };
+      editorActor = { id: 'spaceEditor', token: editor.accessToken, userId: editor.userId };
+      viewerActor = { id: 'spaceViewer', token: viewer.accessToken, userId: viewer.userId };
+      nonMemberActor = { id: 'spaceNonMember', token: nonMember.accessToken, userId: nonMember.userId };
     });
 
     it('returns the listing for any space member; 403 for non-member, 401 for anon', async () => {
       // Standard access matrix. shared-space endpoints use requireMembership which
       // throws ForbiddenException → 403, distinct from the timeline endpoints which
       // use requireAccess and return 400.
-      const cases: Array<[string | undefined, number]> = [
-        [owner.accessToken, 200],
-        [editor.accessToken, 200],
-        [viewer.accessToken, 200],
-        [nonMember.accessToken, 403],
-        [undefined, 401],
-      ];
-      for (const [token, expected] of cases) {
-        const req = request(app).get(`/shared-spaces/${spaceId}/people`);
-        const { status } = await (token ? req.set('Authorization', `Bearer ${token}`) : req);
-        expect(status, `token=${token ? 'present' : 'anon'}`).toBe(expected);
-      }
+      await forEachActor(
+        [ownerActor, editorActor, viewerActor, nonMemberActor, anonActor],
+        (actor) => request(app).get(`/shared-spaces/${spaceId}/people`).set(authHeaders(actor)),
+        { spaceOwner: 200, spaceEditor: 200, spaceViewer: 200, spaceNonMember: 403, anon: 401 },
+      );
     });
 
     it('returns space person IDs (not global person IDs)', async () => {
@@ -1585,6 +1590,14 @@ describe('/shared-spaces', () => {
         }
       });
 
+      afterAll(async () => {
+        if (extraPersonIds.length === 0) {
+          return;
+        }
+        const dbClient = await utils.connectDatabase();
+        await dbClient.query('DELETE FROM shared_space_person WHERE id = ANY($1::uuid[])', [extraPersonIds]);
+      });
+
       it('?limit=10 caps the response at 10 entries', async () => {
         const { status, body } = await request(app)
           .get(`/shared-spaces/${spaceId}/people?limit=10`)
@@ -1629,21 +1642,11 @@ describe('/shared-spaces', () => {
       // person disappear from the listing — pin so a future query refactor that drops
       // this filter is caught.
       //
-      // We need the global person id, which we can derive from the space person via
-      // the JOIN. Easier: query the database directly for the global person linked
-      // to zeroThumbPerson's representativeFaceId.
+      // The global personId comes straight from createSpacePerson's returned shape
+      // (T02 extension); no JOIN query needed.
       const dbClient = await utils.connectDatabase();
-      const { rows } = await dbClient.query(
-        `SELECT p.id FROM shared_space_person sp
-         JOIN asset_face af ON af.id = sp."representativeFaceId"
-         JOIN person p ON p.id = af."personId"
-         WHERE sp.id = $1`,
-        [zeroThumbPersonId],
-      );
-      const globalId = rows[0].id as string;
-
       try {
-        await dbClient.query('UPDATE person SET "thumbnailPath" = $1 WHERE id = $2', ['', globalId]);
+        await dbClient.query('UPDATE person SET "thumbnailPath" = $1 WHERE id = $2', ['', zeroThumbGlobalId]);
         const { status, body } = await request(app)
           .get(`/shared-spaces/${spaceId}/people`)
           .set('Authorization', `Bearer ${owner.accessToken}`);
@@ -1653,7 +1656,7 @@ describe('/shared-spaces', () => {
       } finally {
         await dbClient.query('UPDATE person SET "thumbnailPath" = $1 WHERE id = $2', [
           '/my/awesome/thumbnail.jpg',
-          globalId,
+          zeroThumbGlobalId,
         ]);
       }
     });
