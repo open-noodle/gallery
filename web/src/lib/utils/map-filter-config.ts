@@ -7,7 +7,7 @@ import { createUrl } from '$lib/utils';
 import { AssetTypeEnum, getFilterSuggestions, getSearchSuggestions, SearchSuggestionType } from '@immich/sdk';
 
 export function buildMapFilterConfig(spaceId?: string): FilterPanelConfig {
-  const sections = ['timeline', 'people', 'camera', 'tags', 'rating', 'media', 'favorites'] as const;
+  const sections = ['timeline', 'people', 'location', 'camera', 'tags', 'rating', 'media', 'favorites'] as const;
 
   const suggestionsProvider = async (filters: FilterState) => {
     const context = buildFilterContext(filters);
@@ -49,6 +49,13 @@ export function buildMapFilterConfig(spaceId?: string): FilterPanelConfig {
     sections: [...sections],
     suggestionsProvider,
     providers: {
+      cities: (country: string, context) =>
+        getSearchSuggestions({
+          $type: SearchSuggestionType.City,
+          country,
+          ...(spaceId ? { spaceId } : { withSharedSpaces: true }),
+          ...context,
+        }),
       cameraModels: (make: string, context) =>
         getSearchSuggestions({
           $type: SearchSuggestionType.CameraModel,
