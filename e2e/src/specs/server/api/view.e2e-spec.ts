@@ -18,7 +18,6 @@ describe('/view', () => {
   let userA: LoginResponseDto;
   let userB: LoginResponseDto;
   let userAAssetId: string;
-  let userBAssetId: string;
   const anonActor: Actor = { id: 'anon' };
 
   beforeAll(async () => {
@@ -29,12 +28,15 @@ describe('/view', () => {
       utils.userSetup(admin.accessToken, createUserDto.create('t21-userB')),
     ]);
 
-    const [assetA, assetB] = await Promise.all([
+    // userA gets a real asset to probe folder browsing against. userB needs an
+    // asset too so the cross-user-isolation tests have a recipient who actually
+    // has folders, but we don't need to track userB's asset id specifically —
+    // the assertions key off "userB does not see userAAssetId".
+    const [assetA] = await Promise.all([
       utils.createAsset(userA.accessToken),
       utils.createAsset(userB.accessToken),
     ]);
     userAAssetId = assetA.id;
-    userBAssetId = assetB.id;
   });
 
   describe('GET /view/folder/unique-paths', () => {
@@ -143,10 +145,4 @@ describe('/view', () => {
     });
   });
 
-  it('userBAssetId fixture is used (sanity check it exists)', () => {
-    // Touched here to keep the lint happy and to document why we created two
-    // user assets in setup — both halves of the cross-user isolation matrix
-    // need their own assets so the test can probe both sides.
-    expect(typeof userBAssetId).toBe('string');
-  });
 });

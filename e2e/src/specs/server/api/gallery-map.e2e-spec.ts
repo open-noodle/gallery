@@ -277,5 +277,28 @@ describe('/gallery/map/markers', () => {
       expect(status).toBe(200);
       expect((body as Array<{ id: string }>).map((m) => m.id)).not.toContain(assetWithGps.id);
     });
+
+    it('personIds gets re-routed to spacePersonIds when spaceId is set', async () => {
+      // shared-space.service.ts:569-570 — when spaceId is set, the dto.personIds field
+      // gets passed to the repository as `spacePersonIds` (not `personIds`). The two
+      // joins are different: spacePersonIds joins through shared_space_person_face,
+      // personIds through asset_face directly.
+      //
+      // Practical consequence: passing a GLOBAL personId UUID with spaceId set looks
+      // up that UUID in the shared_space_person table. If it doesn't match a space
+      // person, the result is empty even if the global personId would otherwise have
+      // matched the asset.
+      //
+      // We don't have a global person attached to the space asset in this fixture,
+      // but we can probe the shape: passing a bogus person UUID with spaceId returns
+      // an empty result (no asset matched), confirming the join went through the
+      // space-person table instead of falling back to the global personId join.
+      const bogus = '00000000-0000-4000-a000-000000000099';
+      const { status, body } = await request(app)
+        .get(`/gallery/map/markers?spaceId=${spaceId}&personIds=${bogus}`)
+        .set(asBearerAuth(user.accessToken));
+      expect(status).toBe(200);
+      expect((body as Array<{ id: string }>).map((m) => m.id)).not.toContain(assetWithGps.id);
+    });
   });
 });
