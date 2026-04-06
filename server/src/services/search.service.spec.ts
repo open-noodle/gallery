@@ -779,6 +779,82 @@ describe(SearchService.name, () => {
       });
     });
 
+    describe('withSharedSpaces', () => {
+      it('should reject when both spaceId and withSharedSpaces are set', async () => {
+        await expect(
+          sut.searchSmart(authStub.user1, {
+            query: 'test',
+            spaceId: newUuid(),
+            withSharedSpaces: true,
+          } as any),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        await expect(
+          sut.searchSmart(authStub.user1, {
+            query: 'test',
+            spaceId: newUuid(),
+            withSharedSpaces: true,
+          } as any),
+        ).rejects.toThrow('Cannot use both spaceId and withSharedSpaces');
+      });
+
+      it('should fetch timeline space IDs and pass them through when withSharedSpaces is true', async () => {
+        const spaceId1 = newUuid();
+        const spaceId2 = newUuid();
+        mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId: spaceId1 }, { spaceId: spaceId2 }]);
+
+        await sut.searchSmart(authStub.user1, { query: 'test', withSharedSpaces: true } as any);
+
+        expect(mocks.sharedSpace.getSpaceIdsForTimeline).toHaveBeenCalledWith(authStub.user1.user.id);
+        expect(mocks.search.searchSmart).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ timelineSpaceIds: [spaceId1, spaceId2] }),
+        );
+      });
+
+      it('should fall back to owner-only when withSharedSpaces is true but user has no spaces', async () => {
+        mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
+
+        await sut.searchSmart(authStub.user1, { query: 'test', withSharedSpaces: true } as any);
+
+        expect(mocks.sharedSpace.getSpaceIdsForTimeline).toHaveBeenCalledWith(authStub.user1.user.id);
+        expect(mocks.search.searchSmart).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ timelineSpaceIds: undefined }),
+        );
+      });
+
+      it('should not call getSpaceIdsForTimeline when withSharedSpaces is absent', async () => {
+        await sut.searchSmart(authStub.user1, { query: 'test' });
+
+        expect(mocks.sharedSpace.getSpaceIdsForTimeline).not.toHaveBeenCalled();
+      });
+
+      it('should not call getSpaceIdsForTimeline when withSharedSpaces is explicitly false', async () => {
+        await sut.searchSmart(authStub.user1, { query: 'test', withSharedSpaces: false } as any);
+
+        expect(mocks.sharedSpace.getSpaceIdsForTimeline).not.toHaveBeenCalled();
+      });
+
+      it('should not call getSpaceIdsForTimeline when spaceId is set', async () => {
+        const spaceId = newUuid();
+        mocks.access.sharedSpace.checkMemberAccess.mockResolvedValue(new Set([spaceId]));
+
+        await sut.searchSmart(authStub.user1, { query: 'test', spaceId });
+
+        expect(mocks.sharedSpace.getSpaceIdsForTimeline).not.toHaveBeenCalled();
+      });
+
+      it('should still reject spacePersonIds without spaceId when withSharedSpaces is true', async () => {
+        await expect(
+          sut.searchSmart(authStub.user1, {
+            query: 'test',
+            withSharedSpaces: true,
+            spacePersonIds: [newUuid()],
+          } as any),
+        ).rejects.toBeInstanceOf(BadRequestException);
+      });
+    });
+
     it('should pass orderDirection when order is set', async () => {
       await sut.searchSmart(authStub.user1, { query: 'test', order: AssetOrder.Desc });
 
