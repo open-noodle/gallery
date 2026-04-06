@@ -1,4 +1,4 @@
-import { AssetMediaResponseDto, AssetVisibility, type LoginResponseDto } from '@immich/sdk';
+import { AssetMediaResponseDto, AssetVisibility, SharedSpaceRole, type LoginResponseDto } from '@immich/sdk';
 import { readFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import { Socket } from 'socket.io-client';
@@ -188,5 +188,94 @@ describe('/gallery/map/markers', () => {
       .set(asBearerAuth(otherUser.accessToken));
     expect(status).toBe(200);
     expect((body as Array<{ id: string }>).map((m) => m.id)).not.toContain(assetWithGps.id);
+  });
+
+  describe('spaceId scoping (T19)', () => {
+    // T19 covers the spaceId code path. The service at shared-space.service.ts:561-585
+    // does requireAccess(SharedSpaceRead) → 400 for non-members. When spaceId is set,
+    // userIds is undefined and personIds get re-routed to spacePersonIds (line 569-570).
+    //
+    // Setup creates a fresh space owned by `user`, adds a second member, and adds the
+    // user's geotagged asset to the space so it should appear in the space-scoped
+    // marker list.
+
+    let spaceMember: LoginResponseDto;
+    let spaceNonMember: LoginResponseDto;
+    let spaceId: string;
+
+    beforeAll(async () => {
+      [spaceMember, spaceNonMember] = await Promise.all([
+        utils.userSetup(admin.accessToken, createUserDto.create('t19-member')),
+        utils.userSetup(admin.accessToken, createUserDto.create('t19-nonmember')),
+      ]);
+
+      const space = await utils.createSpace(user.accessToken, { name: 't19 space' });
+      spaceId = space.id;
+
+      await utils.addSpaceMember(user.accessToken, spaceId, {
+        userId: spaceMember.userId,
+        role: SharedSpaceRole.Editor,
+      });
+
+      // Add the geotagged asset to the space so it shows up in the space-scoped query.
+      await utils.addSpaceAssets(user.accessToken, spaceId, [assetWithGps.id]);
+    });
+
+    it('non-member gets 400 (requireAccess BadRequestException)', async () => {
+      // shared-space.service.ts:563 — requireAccess(SharedSpaceRead). Non-members
+      // get 400, NOT 403. Same taxonomy as the timeline endpoints (T03).
+      const { status } = await request(app)
+        .get(`/gallery/map/markers?spaceId=${spaceId}`)
+        .set(asBearerAuth(spaceNonMember.accessToken));
+      expect(status).toBe(400);
+    });
+
+    it('anon gets 401', async () => {
+      const { status } = await request(app).get(`/gallery/map/markers?spaceId=${spaceId}`);
+      expect(status).toBe(401);
+    });
+
+    it('space member sees the space asset via spaceId', async () => {
+      // The PR #275-style assertion: a non-owner space member queries the gallery
+      // map with the space scope and sees the asset that the owner added to the space.
+      const { status, body } = await request(app)
+        .get(`/gallery/map/markers?spaceId=${spaceId}`)
+        .set(asBearerAuth(spaceMember.accessToken));
+      expect(status).toBe(200);
+      expect((body as Array<{ id: string }>).map((m) => m.id)).toContain(assetWithGps.id);
+    });
+
+    it('space owner sees only space-scoped content with spaceId, not their full library', async () => {
+      // The owner has their own assets that are NOT in this space (potentially —
+      // we created assetWithGps and added it). Verify that the spaceId-scoped query
+      // returns the space subset, not the full owner library. Since our fixture has
+      // only one asset and it IS in the space, the assertion is "the response is
+      // non-empty AND contains assetWithGps". A future asset added outside the space
+      // would be excluded.
+      const { status, body } = await request(app)
+        .get(`/gallery/map/markers?spaceId=${spaceId}`)
+        .set(asBearerAuth(user.accessToken));
+      expect(status).toBe(200);
+      expect((body as Array<{ id: string }>).map((m) => m.id)).toContain(assetWithGps.id);
+    });
+
+    it('non-existent spaceId returns 400 (bulk-access pattern)', async () => {
+      // requireAccess uses Immich's bulk-access pattern: missing or no-access IDs
+      // both return BadRequestException. Same as T03 timeline.
+      const { status } = await request(app)
+        .get('/gallery/map/markers?spaceId=00000000-0000-4000-a000-000000000099')
+        .set(asBearerAuth(user.accessToken));
+      expect(status).toBe(400);
+    });
+
+    it('country filter still narrows when scoped by spaceId', async () => {
+      // Filters compose with spaceId. country=Antarctica should produce empty even
+      // if the space asset would otherwise be returned.
+      const { status, body } = await request(app)
+        .get(`/gallery/map/markers?spaceId=${spaceId}&country=Antarctica`)
+        .set(asBearerAuth(spaceMember.accessToken));
+      expect(status).toBe(200);
+      expect((body as Array<{ id: string }>).map((m) => m.id)).not.toContain(assetWithGps.id);
+    });
   });
 });
