@@ -1,9 +1,14 @@
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import type { FilterSection } from '../filter-panel';
 import { createFilterState } from '../filter-panel';
 import FilterPanel from '../filter-panel.svelte';
 
 describe('FilterPanel', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
   it('should render configured sections only', () => {
     const { queryByTestId } = render(FilterPanel, {
       props: {
@@ -117,20 +122,14 @@ describe('FilterPanel', () => {
     expect(queryByTestId('filter-section-rating')).toBeTruthy();
   });
 
-  describe('initialCollapsed prop', () => {
-    it('should start collapsed when initialCollapsed is true', () => {
-      render(FilterPanel, {
-        props: {
-          config: { sections: ['rating', 'media'], providers: {} },
-          timeBuckets: [],
-          initialCollapsed: true,
-        },
-      });
-      expect(screen.getByTestId('collapsed-icon-strip')).toBeInTheDocument();
-      expect(screen.queryByTestId('discovery-panel')).not.toBeInTheDocument();
+  describe('collapsed state persistence', () => {
+    const COLLAPSED_KEY = 'gallery-filter-collapsed';
+
+    beforeEach(() => {
+      localStorage.clear();
     });
 
-    it('should start expanded by default (no prop)', () => {
+    it('should start expanded when no localStorage entry exists (first visit)', () => {
       render(FilterPanel, {
         props: {
           config: { sections: ['rating', 'media'], providers: {} },
@@ -139,6 +138,80 @@ describe('FilterPanel', () => {
       });
       expect(screen.getByTestId('discovery-panel')).toBeInTheDocument();
       expect(screen.queryByTestId('collapsed-icon-strip')).not.toBeInTheDocument();
+    });
+
+    it('should start collapsed when localStorage has true', () => {
+      localStorage.setItem(COLLAPSED_KEY, JSON.stringify(true));
+      render(FilterPanel, {
+        props: {
+          config: { sections: ['rating', 'media'], providers: {} },
+          timeBuckets: [],
+        },
+      });
+      expect(screen.getByTestId('collapsed-icon-strip')).toBeInTheDocument();
+      expect(screen.queryByTestId('discovery-panel')).not.toBeInTheDocument();
+    });
+
+    it('should persist collapsed state to localStorage when user collapses', async () => {
+      render(FilterPanel, {
+        props: {
+          config: { sections: ['rating'], providers: {} },
+          timeBuckets: [],
+        },
+      });
+      await fireEvent.click(screen.getByTestId('collapse-panel-btn'));
+      expect(JSON.parse(localStorage.getItem(COLLAPSED_KEY) ?? 'null')).toBe(true);
+    });
+
+    it('should persist expanded state to localStorage when user expands', async () => {
+      localStorage.setItem(COLLAPSED_KEY, JSON.stringify(true));
+      render(FilterPanel, {
+        props: {
+          config: { sections: ['rating'], providers: {} },
+          timeBuckets: [],
+        },
+      });
+      await fireEvent.click(screen.getByTestId('expand-panel-btn'));
+      expect(JSON.parse(localStorage.getItem(COLLAPSED_KEY) ?? 'null')).toBe(false);
+    });
+
+    it('should not persist collapsed state when persistCollapsed is false', async () => {
+      render(FilterPanel, {
+        props: {
+          config: { sections: ['rating'], providers: {} },
+          timeBuckets: [],
+          persistCollapsed: false,
+        },
+      });
+      await fireEvent.click(screen.getByTestId('collapse-panel-btn'));
+      expect(localStorage.getItem(COLLAPSED_KEY)).toBeNull();
+    });
+
+    it('should always start expanded when persistCollapsed is false regardless of localStorage', () => {
+      localStorage.setItem(COLLAPSED_KEY, JSON.stringify(true));
+      render(FilterPanel, {
+        props: {
+          config: { sections: ['rating'], providers: {} },
+          timeBuckets: [],
+          persistCollapsed: false,
+        },
+      });
+      expect(screen.getByTestId('discovery-panel')).toBeInTheDocument();
+    });
+
+    it('should still allow in-session collapse when persistCollapsed is false', async () => {
+      render(FilterPanel, {
+        props: {
+          config: { sections: ['rating'], providers: {} },
+          timeBuckets: [],
+          persistCollapsed: false,
+        },
+      });
+      await fireEvent.click(screen.getByTestId('collapse-panel-btn'));
+      expect(screen.getByTestId('collapsed-icon-strip')).toBeInTheDocument();
+      expect(screen.queryByTestId('discovery-panel')).not.toBeInTheDocument();
+      // But nothing written to localStorage
+      expect(localStorage.getItem(COLLAPSED_KEY)).toBeNull();
     });
   });
 
@@ -182,6 +255,10 @@ describe('FilterPanel', () => {
 });
 
 describe('hidden prop', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
   it('should render nothing when hidden is true', () => {
     render(FilterPanel, {
       props: {
@@ -215,13 +292,13 @@ describe('hidden prop', () => {
     expect(screen.getByTestId('discovery-panel')).toBeInTheDocument();
   });
 
-  it('should render nothing when hidden and initialCollapsed are both true', () => {
+  it('should render nothing when hidden and collapsed in localStorage', () => {
+    localStorage.setItem('gallery-filter-collapsed', JSON.stringify(true));
     render(FilterPanel, {
       props: {
         config: { sections: ['rating'], providers: {} },
         timeBuckets: [],
         hidden: true,
-        initialCollapsed: true,
       },
     });
     expect(screen.queryByTestId('discovery-panel')).not.toBeInTheDocument();
@@ -252,7 +329,7 @@ describe('Section Selector', () => {
   }
 
   beforeEach(() => {
-    localStorage.removeItem(STORAGE_KEY);
+    localStorage.clear();
   });
 
   // --- Rendering ---
@@ -528,5 +605,90 @@ describe('Section Selector', () => {
     expect(screen.getByTestId('filter-section-timeline')).toBeTruthy();
     await fireEvent.click(screen.getByTestId('year-btn-2023'));
     expect(screen.getByTestId('filter-section-timeline')).toBeTruthy();
+  });
+});
+
+describe('Section Accordion Persistence', () => {
+  const EXPANDED_KEY = 'gallery-filter-expanded-sections';
+
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  function renderPanel(
+    sections: FilterSection[] = ['timeline', 'people', 'location', 'camera', 'tags', 'rating', 'media'],
+  ) {
+    return render(FilterPanel, {
+      props: {
+        config: { sections: [...sections], providers: {} },
+        timeBuckets: sections.includes('timeline')
+          ? [
+              { timeBucket: '2023-06-01', count: 100 },
+              { timeBucket: '2023-08-01', count: 200 },
+            ]
+          : [],
+      },
+    });
+  }
+
+  it('should default all sections to expanded on first visit', () => {
+    renderPanel(['people', 'rating']);
+    const peopleContent = screen.getByTestId('filter-section-people').querySelector('.filter-section-content');
+    const ratingContent = screen.getByTestId('filter-section-rating').querySelector('.filter-section-content');
+    expect(peopleContent).toBeTruthy();
+    expect(ratingContent).toBeTruthy();
+  });
+
+  it('should persist collapsed section to localStorage when header is clicked', async () => {
+    renderPanel(['people', 'rating']);
+    const peopleHeader = screen.getByTestId('filter-section-people').querySelector('button')!;
+    await fireEvent.click(peopleHeader);
+    const stored = JSON.parse(localStorage.getItem(EXPANDED_KEY) ?? '[]') as string[];
+    expect(stored).not.toContain('people');
+    expect(stored).toContain('rating');
+  });
+
+  it('should restore collapsed sections from localStorage on mount', () => {
+    localStorage.setItem(EXPANDED_KEY, JSON.stringify(['rating']));
+    renderPanel(['people', 'rating']);
+    const peopleContent = screen.getByTestId('filter-section-people').querySelector('.filter-section-content');
+    const ratingContent = screen.getByTestId('filter-section-rating').querySelector('.filter-section-content');
+    expect(peopleContent).toBeNull();
+    expect(ratingContent).toBeTruthy();
+  });
+
+  it('should keep all sections collapsed when localStorage has empty array', () => {
+    localStorage.setItem(EXPANDED_KEY, JSON.stringify([]));
+    renderPanel(['people', 'rating']);
+    const peopleContent = screen.getByTestId('filter-section-people').querySelector('.filter-section-content');
+    const ratingContent = screen.getByTestId('filter-section-rating').querySelector('.filter-section-content');
+    expect(peopleContent).toBeNull();
+    expect(ratingContent).toBeNull();
+  });
+
+  it('should ignore unknown section types in localStorage', () => {
+    localStorage.setItem(EXPANDED_KEY, JSON.stringify(['people', 'nonexistent']));
+    renderPanel(['people', 'rating']);
+    const peopleContent = screen.getByTestId('filter-section-people').querySelector('.filter-section-content');
+    expect(peopleContent).toBeTruthy();
+  });
+
+  it('should fall back to all-expanded when localStorage has invalid JSON', () => {
+    localStorage.setItem(EXPANDED_KEY, 'not-valid-json!!!');
+    renderPanel(['people', 'rating']);
+    const peopleContent = screen.getByTestId('filter-section-people').querySelector('.filter-section-content');
+    const ratingContent = screen.getByTestId('filter-section-rating').querySelector('.filter-section-content');
+    expect(peopleContent).toBeTruthy();
+    expect(ratingContent).toBeTruthy();
+  });
+
+  it('should expand a collapsed section when header is clicked again', async () => {
+    localStorage.setItem(EXPANDED_KEY, JSON.stringify(['rating']));
+    renderPanel(['people', 'rating']);
+    const peopleHeader = screen.getByTestId('filter-section-people').querySelector('button')!;
+    await fireEvent.click(peopleHeader);
+    const stored = JSON.parse(localStorage.getItem(EXPANDED_KEY) ?? '[]') as string[];
+    expect(stored).toContain('people');
+    expect(stored).toContain('rating');
   });
 });
