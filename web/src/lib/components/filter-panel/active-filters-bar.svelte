@@ -75,9 +75,9 @@
     // Timeline chip
     if (filters.selectedYear !== undefined) {
       const label =
-        filters.selectedMonth !== undefined
-          ? `${MONTH_LABELS[filters.selectedMonth - 1]} ${filters.selectedYear}`
-          : `${filters.selectedYear}`;
+        filters.selectedMonth === undefined
+          ? `${filters.selectedYear}`
+          : `${MONTH_LABELS[filters.selectedMonth - 1]} ${filters.selectedYear}`;
       result.push({ type: 'timeline', label });
     }
 

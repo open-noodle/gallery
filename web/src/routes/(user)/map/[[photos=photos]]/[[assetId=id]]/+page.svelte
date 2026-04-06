@@ -69,7 +69,7 @@
 
   const filterConfig = $derived.by(() => {
     const base = buildMapFilterConfig(spaceId);
-    const originalProvider = base.suggestionsProvider;
+    const originalProvider = base.suggestionsProvider!;
     return {
       ...base,
       suggestionsProvider: async (f: FilterState) => {
