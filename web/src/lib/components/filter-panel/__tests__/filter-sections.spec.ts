@@ -358,6 +358,232 @@ describe('LocationFilter', () => {
 
     expect(getByTestId('location-empty').textContent).toBe('No locations found');
   });
+
+  // --- Search tests ---
+  const manyCountries = [
+    'Argentina',
+    'Australia',
+    'Brazil',
+    'Canada',
+    'China',
+    'France',
+    'Germany',
+    'India',
+    'Italy',
+    'Japan',
+    'Mexico',
+    'Spain',
+  ];
+
+  it('should filter countries via search input', async () => {
+    const { getByTestId, queryByTestId } = render(LocationFilter, {
+      props: {
+        countries: manyCountries,
+        onCityFetch: mockCityFetch,
+        onSelectionChange: () => {},
+      },
+    });
+
+    const searchInput = getByTestId('location-search-input');
+    await fireEvent.input(searchInput, { target: { value: 'Ger' } });
+
+    expect(queryByTestId('location-country-Germany')).toBeTruthy();
+    expect(queryByTestId('location-country-France')).toBeNull();
+    expect(queryByTestId('location-country-Italy')).toBeNull();
+  });
+
+  it('should search case-insensitively', async () => {
+    const { getByTestId, queryByTestId } = render(LocationFilter, {
+      props: {
+        countries: manyCountries,
+        onCityFetch: mockCityFetch,
+        onSelectionChange: () => {},
+      },
+    });
+
+    const searchInput = getByTestId('location-search-input');
+    await fireEvent.input(searchInput, { target: { value: 'germany' } });
+
+    expect(queryByTestId('location-country-Germany')).toBeTruthy();
+  });
+
+  it('should show all search results without truncation', async () => {
+    const { getByTestId, queryByTestId } = render(LocationFilter, {
+      props: {
+        countries: manyCountries,
+        onCityFetch: mockCityFetch,
+        onSelectionChange: () => {},
+      },
+    });
+
+    const searchInput = getByTestId('location-search-input');
+    // "an" matches 4 countries — all shown regardless of truncation
+    await fireEvent.input(searchInput, { target: { value: 'an' } });
+
+    expect(queryByTestId('location-country-Canada')).toBeTruthy();
+    expect(queryByTestId('location-country-France')).toBeTruthy();
+    expect(queryByTestId('location-country-Germany')).toBeTruthy();
+    expect(queryByTestId('location-country-Japan')).toBeTruthy();
+    // Non-matches hidden
+    expect(queryByTestId('location-country-Argentina')).toBeNull();
+    expect(queryByTestId('location-country-Brazil')).toBeNull();
+    expect(queryByTestId('location-country-China')).toBeNull();
+    expect(queryByTestId('location-country-Spain')).toBeNull();
+  });
+
+  it('should show "Show N more" when list exceeds 10 countries', () => {
+    const { getByTestId, queryByTestId } = render(LocationFilter, {
+      props: {
+        countries: manyCountries,
+        onCityFetch: mockCityFetch,
+        onSelectionChange: () => {},
+      },
+    });
+
+    // First 10 should be visible
+    expect(queryByTestId('location-country-Argentina')).toBeTruthy();
+    expect(queryByTestId('location-country-Japan')).toBeTruthy();
+    // 11th and 12th should be hidden
+    expect(queryByTestId('location-country-Mexico')).toBeNull();
+    expect(queryByTestId('location-country-Spain')).toBeNull();
+
+    const showMore = getByTestId('location-show-more');
+    expect(showMore.textContent).toContain('Show 2 more');
+  });
+
+  it('should expand list when "Show N more" is clicked', async () => {
+    const { getByTestId, queryByTestId } = render(LocationFilter, {
+      props: {
+        countries: manyCountries,
+        onCityFetch: mockCityFetch,
+        onSelectionChange: () => {},
+      },
+    });
+
+    await fireEvent.click(getByTestId('location-show-more'));
+
+    expect(queryByTestId('location-country-Mexico')).toBeTruthy();
+    expect(queryByTestId('location-country-Spain')).toBeTruthy();
+  });
+
+  it('should show "No matching locations" for empty search results', async () => {
+    const { getByTestId } = render(LocationFilter, {
+      props: {
+        countries: manyCountries,
+        onCityFetch: mockCityFetch,
+        onSelectionChange: () => {},
+      },
+    });
+
+    const searchInput = getByTestId('location-search-input');
+    await fireEvent.input(searchInput, { target: { value: 'zzzzz' } });
+
+    expect(getByTestId('location-no-results').textContent).toBe('No matching locations');
+  });
+
+  it('should keep orphaned country visible during search', async () => {
+    const { getByTestId, queryByTestId } = render(LocationFilter, {
+      props: {
+        countries: mockCountries, // Germany, Italy, France
+        selectedCountry: 'Switzerland', // Not in list = orphaned
+        onCityFetch: mockCityFetch,
+        onSelectionChange: () => {},
+      },
+    });
+
+    const searchInput = getByTestId('location-search-input');
+    await fireEvent.input(searchInput, { target: { value: 'Italy' } });
+
+    // Orphaned country still visible
+    expect(queryByTestId('location-country-Switzerland')).toBeTruthy();
+    // Matched country visible
+    expect(queryByTestId('location-country-Italy')).toBeTruthy();
+    // Non-matched countries hidden
+    expect(queryByTestId('location-country-Germany')).toBeNull();
+  });
+
+  it('should preserve selected country across search/clear cycle', async () => {
+    const { getByTestId, queryByTestId } = render(LocationFilter, {
+      props: {
+        countries: mockCountries,
+        selectedCountry: 'Germany',
+        onCityFetch: mockCityFetch,
+        onSelectionChange: () => {},
+      },
+    });
+
+    const searchInput = getByTestId('location-search-input');
+
+    // Search hides Germany
+    await fireEvent.input(searchInput, { target: { value: 'Italy' } });
+    expect(queryByTestId('location-country-Germany')).toBeNull();
+
+    // Clear search — Germany reappears
+    await fireEvent.input(searchInput, { target: { value: '' } });
+    expect(queryByTestId('location-country-Germany')).toBeTruthy();
+  });
+
+  it('should show cities when searching for a country and clicking it', async () => {
+    const { getByTestId, queryByTestId } = render(LocationFilter, {
+      props: {
+        countries: mockCountries,
+        onCityFetch: mockCityFetch,
+        onSelectionChange: () => {},
+      },
+    });
+
+    const searchInput = getByTestId('location-search-input');
+    await fireEvent.input(searchInput, { target: { value: 'Germany' } });
+    await fireEvent.click(getByTestId('location-country-Germany'));
+
+    await waitFor(() => {
+      expect(queryByTestId('location-city-Munich')).toBeTruthy();
+      expect(queryByTestId('location-city-Berlin')).toBeTruthy();
+      expect(queryByTestId('location-city-Hamburg')).toBeTruthy();
+    });
+  });
+
+  it('should not show search input when no countries exist', () => {
+    const { queryByTestId } = render(LocationFilter, {
+      props: {
+        countries: [],
+        onCityFetch: mockCityFetch,
+        onSelectionChange: () => {},
+      },
+    });
+
+    expect(queryByTestId('location-search-input')).toBeNull();
+    expect(queryByTestId('location-empty')).toBeTruthy();
+  });
+
+  it('should restore expanded country with cities after search is cleared', async () => {
+    const { getByTestId, queryByTestId } = render(LocationFilter, {
+      props: {
+        countries: mockCountries,
+        onCityFetch: mockCityFetch,
+        onSelectionChange: () => {},
+      },
+    });
+
+    // Select and expand Germany to load cities
+    await fireEvent.click(getByTestId('location-country-Germany'));
+    await waitFor(() => {
+      expect(queryByTestId('location-city-Munich')).toBeTruthy();
+    });
+
+    // Search hides Germany (and its cities)
+    const searchInput = getByTestId('location-search-input');
+    await fireEvent.input(searchInput, { target: { value: 'Italy' } });
+    expect(queryByTestId('location-country-Germany')).toBeNull();
+    expect(queryByTestId('location-city-Munich')).toBeNull();
+
+    // Clear search — Germany and cities reappear
+    await fireEvent.input(searchInput, { target: { value: '' } });
+    expect(queryByTestId('location-country-Germany')).toBeTruthy();
+    await waitFor(() => {
+      expect(queryByTestId('location-city-Munich')).toBeTruthy();
+    });
+  });
 });
 
 describe('CameraFilter', () => {
