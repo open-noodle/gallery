@@ -258,7 +258,7 @@ test.describe('Photos Search', () => {
     await searchInput.press('Enter');
 
     // URL updates to include the query.
-    await expect(page).toHaveURL(/\/photos\?q=beach/, { timeout: 5_000 });
+    await expect(page).toHaveURL(/\/photos\?q=beach/, { timeout: 5000 });
 
     // Wait for the debounced fetch to fire (250ms debounce + request time).
     await smartSearchRequestPromise;

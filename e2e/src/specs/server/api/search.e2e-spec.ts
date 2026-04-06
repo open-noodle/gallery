@@ -17,6 +17,16 @@ import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 const today = DateTime.now();
 
+// Shared helper used by multiple withSharedSpaces and pagination describe blocks.
+// Flips the runtime machineLearning config so the e2e stack (which starts with
+// IMMICH_MACHINE_LEARNING_ENABLED=false) lets searchSmart through.
+const enableSmartSearch = async (adminToken: string) => {
+  const config = await utils.getSystemConfig(adminToken);
+  config.machineLearning.enabled = true;
+  config.machineLearning.clip.enabled = true;
+  await updateConfig({ systemConfigDto: config }, { headers: asBearerAuth(adminToken) });
+};
+
 describe('/search', () => {
   let admin: LoginResponseDto;
   let websocket: Socket;
@@ -1172,13 +1182,6 @@ describe('/search', () => {
       );
     };
 
-    const enableSmartSearch = async () => {
-      const config = await utils.getSystemConfig(admin.accessToken);
-      config.machineLearning.enabled = true;
-      config.machineLearning.clip.enabled = true;
-      await updateConfig({ systemConfigDto: config }, { headers: asBearerAuth(admin.accessToken) });
-    };
-
     beforeAll(async () => {
       ownerUser = await utils.userSetup(admin.accessToken, {
         email: 'smart-shared-owner@immich.cloud',
@@ -1222,7 +1225,7 @@ describe('/search', () => {
       await seedEmbedding(outsiderAsset.id);
 
       // Enable smart search via runtime config (overrides IMMICH_MACHINE_LEARNING_ENABLED=false)
-      await enableSmartSearch();
+      await enableSmartSearch(admin.accessToken);
     }, 60_000);
 
     afterAll(async () => {
@@ -1385,13 +1388,6 @@ describe('/search', () => {
       );
     };
 
-    const enableSmartSearch = async () => {
-      const config = await utils.getSystemConfig(admin.accessToken);
-      config.machineLearning.enabled = true;
-      config.machineLearning.clip.enabled = true;
-      await updateConfig({ systemConfigDto: config }, { headers: asBearerAuth(admin.accessToken) });
-    };
-
     const ASSET_COUNT = 12;
     const PAGE_SIZE = 5;
 
@@ -1423,7 +1419,7 @@ describe('/search', () => {
         await seedEmbedding(asset.id);
       }
 
-      await enableSmartSearch();
+      await enableSmartSearch(admin.accessToken);
     }, 60_000);
 
     afterAll(async () => {
