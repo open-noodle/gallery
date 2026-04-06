@@ -66,6 +66,9 @@ export function handlePhotosRemoveFilter(filters: FilterState, type: string, id?
     case 'mediaType': {
       return { ...filters, mediaType: 'all' };
     }
+    case 'timeline': {
+      return { ...filters, selectedYear: undefined, selectedMonth: undefined };
+    }
     default: {
       return filters;
     }
