@@ -1,5 +1,5 @@
 import type { FilterState } from '$lib/components/filter-panel/filter-panel';
-import { AssetTypeEnum, type SmartSearchDto } from '@immich/sdk';
+import { AssetOrder, AssetTypeEnum, type SmartSearchDto } from '@immich/sdk';
 
 export const SEARCH_FILTER_DEBOUNCE_MS = 250;
 
@@ -38,6 +38,16 @@ export function buildSmartSearchParams(query: string, spaceId: string, filters: 
   } else if (filters.selectedYear) {
     params.takenAfter = new Date(filters.selectedYear, 0, 1).toISOString();
     params.takenBefore = new Date(filters.selectedYear, 11, 31, 23, 59, 59, 999).toISOString();
+  }
+
+  if (filters.sortOrder === 'asc') {
+    params.order = AssetOrder.Asc;
+  } else if (filters.sortOrder === 'desc') {
+    params.order = AssetOrder.Desc;
+  }
+
+  if (filters.isFavorite !== undefined) {
+    params.isFavorite = filters.isFavorite;
   }
 
   return params;
