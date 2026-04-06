@@ -3674,6 +3674,27 @@ describe(SharedSpaceService.name, () => {
       });
     });
 
+    it('should queue dedup pass after successful merge', async () => {
+      const spaceId = newUuid();
+      const targetId = newUuid();
+      const sourceId = newUuid();
+      const target = factory.sharedSpacePerson({ id: targetId, spaceId });
+      const source = factory.sharedSpacePerson({ id: sourceId, spaceId });
+
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
+      mocks.sharedSpace.getPersonById.mockResolvedValueOnce(target).mockResolvedValueOnce(source);
+      mocks.sharedSpace.reassignPersonFaces.mockResolvedValue(void 0);
+      mocks.sharedSpace.deletePerson.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
+
+      await sut.mergeSpacePeople(factory.auth(), spaceId, targetId, { ids: [sourceId] });
+
+      expect(mocks.job.queue).toHaveBeenCalledWith({
+        name: JobName.SharedSpacePersonDedup,
+        data: { spaceId },
+      });
+    });
+
     it('should reject merging across different types', async () => {
       const spaceId = newUuid();
       const targetId = newUuid();
