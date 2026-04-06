@@ -2,7 +2,7 @@ import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { beforeEach, vitest } from 'vitest';
 import { mapAsset } from 'src/dtos/asset-response.dto.js';
 import { SearchSuggestionType } from 'src/dtos/search.dto.js';
-import { AssetType, AssetVisibility } from 'src/enum.js';
+import { AssetOrder, AssetType, AssetVisibility } from 'src/enum.js';
 import { SearchService } from 'src/services/search.service.js';
 import { AssetFactory } from 'test/factories/asset.factory.js';
 import { AuthFactory } from 'test/factories/auth.factory.js';
@@ -866,6 +866,24 @@ describe(SearchService.name, () => {
           expect.objectContaining({ spaceId, spacePersonIds, city: 'Paris', rating: 4 }),
         );
       });
+    });
+
+    it('should pass orderDirection when order is set', async () => {
+      await sut.searchSmart(authStub.user1, { query: 'test', order: AssetOrder.Desc });
+
+      expect(mocks.search.searchSmart).toHaveBeenCalledWith(
+        { page: 1, size: 100 },
+        expect.objectContaining({ orderDirection: AssetOrder.Desc }),
+      );
+    });
+
+    it('should not pass orderDirection when order is not set', async () => {
+      await sut.searchSmart(authStub.user1, { query: 'test' });
+
+      expect(mocks.search.searchSmart).toHaveBeenCalledWith(
+        { page: 1, size: 100 },
+        expect.objectContaining({ orderDirection: undefined }),
+      );
     });
   });
 

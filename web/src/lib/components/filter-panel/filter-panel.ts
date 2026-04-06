@@ -55,7 +55,7 @@ export interface FilterState {
   rating?: number;
   mediaType: 'all' | 'image' | 'video';
   isFavorite?: boolean;
-  sortOrder: 'asc' | 'desc';
+  sortOrder: 'asc' | 'desc' | 'relevance';
   selectedYear?: number;
   selectedMonth?: number;
 }
