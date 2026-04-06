@@ -760,7 +760,7 @@
       {#if viewMode === 'view' && (getActiveFilterCount(filters) > 0 || searchQuery.trim().length > 0)}
         <ActiveFiltersBar
           {filters}
-          resultCount={totalAssetCount}
+          resultCount={showSearchResults ? undefined : totalAssetCount}
           {personNames}
           {tagNames}
           onRemoveFilter={handleRemoveFilter}
