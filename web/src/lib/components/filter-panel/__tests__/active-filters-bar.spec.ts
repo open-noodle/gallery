@@ -284,4 +284,45 @@ describe('ActiveFiltersBar', () => {
     expect(resultCount.textContent).toContain('1 result');
     expect(resultCount.textContent).not.toContain('results');
   });
+
+  it('should call onClearSearch when Clear All is clicked and searchQuery is set', async () => {
+    const onClearAll = vi.fn();
+    const onClearSearch = vi.fn();
+    const filters = createFilterState();
+    filters.rating = 4;
+
+    const { getByTestId } = render(ActiveFiltersBar, {
+      props: {
+        filters,
+        onRemoveFilter: () => {},
+        onClearAll,
+        searchQuery: 'mountain',
+        onClearSearch,
+      },
+    });
+
+    await fireEvent.click(getByTestId('clear-all-btn'));
+    expect(onClearAll).toHaveBeenCalled();
+    expect(onClearSearch).toHaveBeenCalled();
+  });
+
+  it('should not call onClearSearch when Clear All is clicked and no searchQuery', async () => {
+    const onClearAll = vi.fn();
+    const onClearSearch = vi.fn();
+    const filters = createFilterState();
+    filters.rating = 4;
+
+    const { getByTestId } = render(ActiveFiltersBar, {
+      props: {
+        filters,
+        onRemoveFilter: () => {},
+        onClearAll,
+        onClearSearch,
+      },
+    });
+
+    await fireEvent.click(getByTestId('clear-all-btn'));
+    expect(onClearAll).toHaveBeenCalled();
+    expect(onClearSearch).not.toHaveBeenCalled();
+  });
 });
