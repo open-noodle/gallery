@@ -2,6 +2,7 @@ import { type LoginResponseDto } from '@immich/sdk';
 import { Socket } from 'socket.io-client';
 import { type Actor, authHeaders } from 'src/actors';
 import { createUserDto } from 'src/fixtures';
+import { errorDto } from 'src/responses';
 import { app, asBearerAuth, utils } from 'src/utils';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -18,6 +19,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 // Image-path validation (no trim):
 //   - asset.type must be Image (not Video)
 //   - rejects live-photo, panorama, .gif, .svg
+//     (NOT pinned here — would need format-specific fixtures, deferred to a follow-up)
 //   - crop bounds must fit asset width/height
 //   - if crop is present, it MUST be the first action in the edits array
 // DTO validation:
@@ -28,7 +30,12 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 // Generated PNGs from `makeRandomImage()` are 1x1, so the only valid crop is
 // x=0,y=0,w=1,h=1 (the whole pixel). That's enough to exercise both the success
 // path and the bounds-error path. Waiting on the `assetUpload` websocket event
-// guarantees the metadata extraction job has populated exifImageWidth/Height.
+// guarantees the metadata extraction job has populated exifImageWidth/Height —
+// `job.service.ts:157` emits `on_upload_success` from the thumbnail-generation
+// handler AFTER `asset.exifInfo` is read on the very next line, so the order is
+// closed in steady state. The bounds-error tests below pin the SPECIFIC error
+// message to defend against a future job-ordering regression silently flipping
+// the failure to "Asset dimensions are not available for editing".
 
 describe('/assets/:id/edits (non-trim)', () => {
   let admin: LoginResponseDto;
@@ -54,7 +61,12 @@ describe('/assets/:id/edits (non-trim)', () => {
     ]);
     websocket = await utils.connectWebsocket(owner.accessToken);
 
-    // Shared, never-mutated asset for read-only GET tests.
+    // Shared, READ-ONLY asset for the GET tests, validation-only PUT tests, and
+    // access-only PUT/DELETE tests. The owner-side mutating tests (rotate, crop,
+    // mirror, delete-roundtrip) all use `uploadFreshImage()` per-test so the
+    // shared asset is never mutated. If you add a successful PUT against
+    // `sharedAssetId`, the GET-empty test below will start failing in mysterious
+    // file-order-dependent ways — use `uploadFreshImage()` instead.
     sharedAssetId = await uploadFreshImage();
   }, 30_000);
 
@@ -64,11 +76,16 @@ describe('/assets/:id/edits (non-trim)', () => {
 
   describe('GET /assets/:id/edits', () => {
     it('requires authentication', async () => {
-      const { status } = await request(app).get(`/assets/${sharedAssetId}/edits`).set(authHeaders(anonActor));
+      const { status, body } = await request(app)
+        .get(`/assets/${sharedAssetId}/edits`)
+        .set(authHeaders(anonActor));
       expect(status).toBe(401);
+      expect(body).toEqual(errorDto.unauthorized);
     });
 
     it('owner gets an empty edits list for a fresh asset', async () => {
+      // Pre-condition: `sharedAssetId` is never mutated by any test in this file.
+      // See the `beforeAll` comment.
       const { status, body } = await request(app)
         .get(`/assets/${sharedAssetId}/edits`)
         .set(asBearerAuth(owner.accessToken));
@@ -77,18 +94,30 @@ describe('/assets/:id/edits (non-trim)', () => {
     });
 
     it('non-owner returns 400 (bulk-access pattern)', async () => {
-      const { status } = await request(app)
+      const { status, body } = await request(app)
         .get(`/assets/${sharedAssetId}/edits`)
         .set(asBearerAuth(other.accessToken));
       expect(status).toBe(400);
+      expect(body).toEqual(errorDto.noPermission);
+    });
+
+    it('admin reading another user\'s asset edits returns 400 (no admin override)', async () => {
+      // The bulk-access pattern for Permission.AssetEditGet is owner-only —
+      // admins do NOT get a blanket asset-read escape hatch. Same taxonomy as T24.
+      const { status, body } = await request(app)
+        .get(`/assets/${sharedAssetId}/edits`)
+        .set(asBearerAuth(admin.accessToken));
+      expect(status).toBe(400);
+      expect(body).toEqual(errorDto.noPermission);
     });
 
     it('non-existent asset returns 400', async () => {
       // requireAccess routes "not found OR no access" through BadRequestException.
-      const { status } = await request(app)
+      const { status, body } = await request(app)
         .get('/assets/00000000-0000-4000-a000-000000000099/edits')
         .set(asBearerAuth(owner.accessToken));
       expect(status).toBe(400);
+      expect(body).toEqual(errorDto.noPermission);
     });
 
     it('malformed asset id returns 400', async () => {
@@ -100,12 +129,31 @@ describe('/assets/:id/edits (non-trim)', () => {
   });
 
   describe('PUT /assets/:id/edits — non-trim mutations', () => {
-    it('non-owner returns 400', async () => {
-      const { status } = await request(app)
+    it('requires authentication', async () => {
+      const { status, body } = await request(app)
+        .put(`/assets/${sharedAssetId}/edits`)
+        .set(authHeaders(anonActor))
+        .send({ edits: [{ action: 'rotate', parameters: { angle: 90 } }] });
+      expect(status).toBe(401);
+      expect(body).toEqual(errorDto.unauthorized);
+    });
+
+    it('non-owner returns 400 (bulk-access pattern)', async () => {
+      const { status, body } = await request(app)
         .put(`/assets/${sharedAssetId}/edits`)
         .set(asBearerAuth(other.accessToken))
         .send({ edits: [{ action: 'rotate', parameters: { angle: 90 } }] });
       expect(status).toBe(400);
+      expect(body).toEqual(errorDto.noPermission);
+    });
+
+    it('admin PUTting another user\'s asset edits returns 400 (no admin override)', async () => {
+      const { status, body } = await request(app)
+        .put(`/assets/${sharedAssetId}/edits`)
+        .set(asBearerAuth(admin.accessToken))
+        .send({ edits: [{ action: 'rotate', parameters: { angle: 90 } }] });
+      expect(status).toBe(400);
+      expect(body).toEqual(errorDto.noPermission);
     });
 
     it('owner can rotate (axis-aligned)', async () => {
@@ -139,6 +187,26 @@ describe('/assets/:id/edits (non-trim)', () => {
           parameters: expect.objectContaining({ axis: 'horizontal' }),
         }),
       );
+    });
+
+    it('two mirrors with DIFFERENT axes are allowed (UniqueEditActions special case)', async () => {
+      // validation.ts:112 — the UniqueEditActions dedup key for `mirror` is
+      // `mirror-${JSON.stringify(parameters)}`, so horizontal + vertical pass.
+      // Every other action uses just the action name as the key. This is the
+      // ONLY non-obvious thing about IsUniqueEditActions; pinning the positive
+      // case keeps the rule legible.
+      const assetId = await uploadFreshImage();
+      const { status, body } = await request(app)
+        .put(`/assets/${assetId}/edits`)
+        .set(asBearerAuth(owner.accessToken))
+        .send({
+          edits: [
+            { action: 'mirror', parameters: { axis: 'horizontal' } },
+            { action: 'mirror', parameters: { axis: 'vertical' } },
+          ],
+        });
+      expect(status).toBe(200);
+      expect(body.edits).toHaveLength(2);
     });
 
     it('owner can crop within bounds (1x1 fixture allows only the whole pixel)', async () => {
@@ -178,9 +246,11 @@ describe('/assets/:id/edits (non-trim)', () => {
     });
 
     it('crop + rotate is rejected when crop is NOT first', async () => {
-      // asset.service.ts:714 — 'Crop action must be the first edit action'.
+      // asset.service.ts:714 — pinning the exact message so a future refactor
+      // that flips this 400 to a different cause (e.g. dimensions-unavailable)
+      // fails this test deliberately.
       const assetId = await uploadFreshImage();
-      const { status } = await request(app)
+      const { status, body } = await request(app)
         .put(`/assets/${assetId}/edits`)
         .set(asBearerAuth(owner.accessToken))
         .send({
@@ -190,20 +260,30 @@ describe('/assets/:id/edits (non-trim)', () => {
           ],
         });
       expect(status).toBe(400);
+      expect(body).toEqual(errorDto.badRequest('Crop action must be the first edit action'));
     });
 
-    it('crop out of bounds returns 400', async () => {
-      // 1x1 image; width=2 trips the `x + width > assetWidth` check at asset.service.ts:719.
+    it('crop out of bounds returns 400 with the bounds-specific message', async () => {
+      // 1x1 image; width=2 trips the `x + width > assetWidth` check at
+      // asset.service.ts:719. The error message must be exactly
+      // "Crop parameters are out of bounds" — if the metadata-extraction job
+      // ever stops populating exifImageWidth/Height before the websocket fires,
+      // this would silently flip to "Asset dimensions are not available for
+      // editing" (also a 400, also matches `errorDto.badRequest()` with no
+      // arg), which would mask the real failure mode.
       const assetId = await uploadFreshImage();
-      const { status } = await request(app)
+      const { status, body } = await request(app)
         .put(`/assets/${assetId}/edits`)
         .set(asBearerAuth(owner.accessToken))
         .send({ edits: [{ action: 'crop', parameters: { x: 0, y: 0, width: 2, height: 2 } }] });
       expect(status).toBe(400);
+      expect(body).toEqual(errorDto.badRequest('Crop parameters are out of bounds'));
     });
 
     it('non-axis-aligned rotation returns 400 (DTO validation)', async () => {
       // IsAxisAlignedRotation only accepts 0/90/180/270; 45 fails the validator.
+      // This is DTO-level — the global ValidationPipe rejects before editAsset()
+      // is even invoked, so it can't mutate state on `sharedAssetId`.
       const { status } = await request(app)
         .put(`/assets/${sharedAssetId}/edits`)
         .set(asBearerAuth(owner.accessToken))
@@ -212,7 +292,8 @@ describe('/assets/:id/edits (non-trim)', () => {
     });
 
     it('empty edits array returns 400 (ArrayMinSize)', async () => {
-      // AssetEditsCreateDto.edits has @ArrayMinSize(1).
+      // AssetEditsCreateDto.edits has @ArrayMinSize(1). Same DTO-level pre-empt;
+      // service is never called. Safe to use sharedAssetId.
       const { status } = await request(app)
         .put(`/assets/${sharedAssetId}/edits`)
         .set(asBearerAuth(owner.accessToken))
@@ -220,10 +301,11 @@ describe('/assets/:id/edits (non-trim)', () => {
       expect(status).toBe(400);
     });
 
-    it('duplicate actions return 400 (UniqueEditActions)', async () => {
-      // IsUniqueEditActions rejects two `rotate` actions in a single edits array.
-      // (Mirror is the one exception — two mirrors with different axes ARE allowed,
-      // because the dedup key includes the parameters for mirror.)
+    it('two rotates with different angles return 400 (UniqueEditActions)', async () => {
+      // IsUniqueEditActions rejects two `rotate` actions even with different
+      // params — the dedup key for non-mirror actions is just `edit.action`.
+      // (The complementary positive case for mirror is pinned in the
+      // dual-axis-mirror test above.) DTO-level rejection.
       const { status } = await request(app)
         .put(`/assets/${sharedAssetId}/edits`)
         .set(asBearerAuth(owner.accessToken))
@@ -238,10 +320,42 @@ describe('/assets/:id/edits (non-trim)', () => {
   });
 
   describe('DELETE /assets/:id/edits', () => {
-    it('non-owner returns 400', async () => {
-      const { status } = await request(app)
+    it('requires authentication', async () => {
+      const { status, body } = await request(app)
+        .delete(`/assets/${sharedAssetId}/edits`)
+        .set(authHeaders(anonActor));
+      expect(status).toBe(401);
+      expect(body).toEqual(errorDto.unauthorized);
+    });
+
+    it('non-owner returns 400 (bulk-access pattern)', async () => {
+      const { status, body } = await request(app)
         .delete(`/assets/${sharedAssetId}/edits`)
         .set(asBearerAuth(other.accessToken));
+      expect(status).toBe(400);
+      expect(body).toEqual(errorDto.noPermission);
+    });
+
+    it('admin DELETEing another user\'s asset edits returns 400 (no admin override)', async () => {
+      const { status, body } = await request(app)
+        .delete(`/assets/${sharedAssetId}/edits`)
+        .set(asBearerAuth(admin.accessToken));
+      expect(status).toBe(400);
+      expect(body).toEqual(errorDto.noPermission);
+    });
+
+    it('non-existent asset returns 400', async () => {
+      const { status, body } = await request(app)
+        .delete('/assets/00000000-0000-4000-a000-000000000099/edits')
+        .set(asBearerAuth(owner.accessToken));
+      expect(status).toBe(400);
+      expect(body).toEqual(errorDto.noPermission);
+    });
+
+    it('malformed asset id returns 400', async () => {
+      const { status } = await request(app)
+        .delete('/assets/not-a-uuid/edits')
+        .set(asBearerAuth(owner.accessToken));
       expect(status).toBe(400);
     });
 
