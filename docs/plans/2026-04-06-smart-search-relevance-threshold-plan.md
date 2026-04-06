@@ -64,7 +64,8 @@ Change to:
 
 Run: `cd server && npx tsc --noEmit 2>&1 | head -20`
 
-Expected: Type errors in `model-config.dto.ts` (CLIPConfig doesn't have maxDistance yet). That's expected — Task 2 fixes it.
+Expected: Clean compile. The `config.ts` type and defaults are self-consistent. The DTO class
+(`CLIPConfig`) is separate and doesn't cause errors here.
 
 **Step 4: Commit**
 
@@ -198,7 +199,7 @@ Change to:
 
 Replace the `searchSmart` method body (line 345-378). The key changes:
 
-1. Add a helper to check if threshold is active: `options.maxDistance && options.maxDistance > 0 && options.maxDistance < 2`
+1. Add a helper to check if threshold is active: `(options.maxDistance ?? 0) > 0 && (options.maxDistance ?? 0) < 2`
 2. Use Kysely `.$if()` to conditionally add the WHERE clause with explicit parentheses
 3. Apply the same condition in both the relevance-ordering and date-ordering paths
 
@@ -249,7 +250,7 @@ Replace with:
       throw new Error(`Invalid value for 'size': ${pagination.size}`);
     }
 
-    const hasDistanceThreshold = !!options.maxDistance && options.maxDistance > 0 && options.maxDistance < 2;
+    const hasDistanceThreshold = (options.maxDistance ?? 0) > 0 && (options.maxDistance ?? 0) < 2;
 
     return this.db.transaction().execute(async (trx) => {
       await sql`set local vchordrq.probes = ${sql.lit(probes[VectorIndex.Clip])}`.execute(trx);
@@ -258,7 +259,7 @@ Replace with:
         .selectAll('asset')
         .innerJoin('smart_search', 'asset.id', 'smart_search.assetId')
         .$if(hasDistanceThreshold, (qb) =>
-          qb.where(sql`(smart_search.embedding <=> ${options.embedding})`, '<=', options.maxDistance!),
+          qb.where(sql`(smart_search.embedding <=> ${options.embedding}) <= ${options.maxDistance!}`),
         )
         .orderBy(sql`smart_search.embedding <=> ${options.embedding}`);
 
@@ -375,7 +376,8 @@ expect(mocks.search.searchSmart).toHaveBeenCalledWith(
 
 **Step 2: Add test for maxDistance passthrough (text query)**
 
-Add after the `'should pass orderDirection when order is not set'` test (around line 797):
+Add **before** the closing `});` of the `searchSmart` describe block (line 797). The new tests go
+inside the describe block, after the `'should not pass orderDirection when order is not set'` test:
 
 ```typescript
 it('should pass maxDistance from config to repository', async () => {
@@ -414,13 +416,25 @@ it('should pass maxDistance from config when using queryAssetId', async () => {
 });
 ```
 
-**Step 4: Run tests**
+**Step 4: Add test for disabled maxDistance (default 0)**
+
+Add right after:
+
+```typescript
+it('should pass maxDistance 0 (disabled) by default', async () => {
+  await sut.searchSmart(authStub.user1, { query: 'test' });
+
+  expect(mocks.search.searchSmart).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ maxDistance: 0 }));
+});
+```
+
+**Step 5: Run tests**
 
 Run: `cd server && pnpm test -- --run src/services/search.service.spec.ts`
 
 Expected: All tests pass. If any other tests have exact-match assertions on `searchSmart` args that break, update them to include `maxDistance: 0`.
 
-**Step 5: Commit**
+**Step 6: Commit**
 
 ```bash
 git add server/src/services/search.service.spec.ts
@@ -440,7 +454,7 @@ git commit -m "test(search): update and add tests for maxDistance config passthr
 Find (line 144-146):
 
 ```svelte
-        </SettingInputField>
+          </SettingInputField>
         </div>
       </SettingAccordion>
 ```
@@ -467,13 +481,10 @@ Replace with:
       </SettingAccordion>
 ```
 
-**Step 2: Verify web types compile**
+**Step 2: Commit**
 
-Run: `cd web && npx svelte-check --tsconfig tsconfig.json 2>&1 | tail -20`
-
-Expected: Clean or only pre-existing warnings. The new field should type-check against the generated SDK's CLIPConfig type (which won't exist yet until OpenAPI regen — this is fine, we regen in Task 9).
-
-**Step 3: Commit**
+Note: Skip svelte-check here — the web types depend on the regenerated `@immich/sdk` which
+won't have `maxDistance` until Task 9. Type checking is deferred to Task 10 (final verification).
 
 ```bash
 git add web/src/lib/components/admin-settings/MachineLearningSettings.svelte
@@ -548,7 +559,9 @@ Change to:
 
 **Step 2: Update searching.md**
 
-Find the "Configuration" section (line 33). After the "CLIP models" subsection (which ends around line 66 with the memory/speed note), add a new subsection:
+Find the end of the "CLIP models" subsection. It ends with a `:::note` block and link references
+around line 1200. Insert the new subsection **before** the link reference definitions at the bottom
+(before the `[huggingface-clip]` line, around line 1202):
 
 ```markdown
 ### Relevance threshold
