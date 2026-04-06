@@ -259,26 +259,36 @@
           }}
         />
       {/if}
-      <Timeline
-        enableRouting={true}
-        bind:timelineManager
-        {options}
-        assetInteraction={assetMultiSelectManager}
-        removeAction={AssetAction.ARCHIVE}
-        onEscape={handleEscape}
-        withStacked
-      >
-        {#if $preferences.memories.enabled && !hasActiveFilters}
-          <ImageCarousel {items} />
-        {/if}
-        {#snippet empty()}
-          <EmptyPlaceholder
-            text={$t('no_assets_message')}
-            onClick={() => openFileUploadDialog()}
-            class="mt-10 mx-auto"
-          />
-        {/snippet}
-      </Timeline>
+      {#if showSearchResults}
+        <SmartSearchResults
+          bind:isLoading
+          {searchQuery}
+          {filters}
+          isShared={false}
+          withSharedSpaces={true}
+        />
+      {:else}
+        <Timeline
+          enableRouting={true}
+          bind:timelineManager
+          {options}
+          assetInteraction={assetMultiSelectManager}
+          removeAction={AssetAction.ARCHIVE}
+          onEscape={handleEscape}
+          withStacked
+        >
+          {#if $preferences.memories.enabled && !hasActiveFilters}
+            <ImageCarousel {items} />
+          {/if}
+          {#snippet empty()}
+            <EmptyPlaceholder
+              text={$t('no_assets_message')}
+              onClick={() => openFileUploadDialog()}
+              class="mt-10 mx-auto"
+            />
+          {/snippet}
+        </Timeline>
+      {/if}
     </div>
   </div>
 </UserPageLayout>
