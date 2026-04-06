@@ -816,6 +816,13 @@ export class SharedSpaceService extends BaseService {
     }
 
     await this.processSpaceFaceMatch(spaceId, assetId);
+
+    // Queue dedup pass (jobId deduplication prevents queue spam)
+    await this.jobRepository.queue({
+      name: JobName.SharedSpacePersonDedup,
+      data: { spaceId },
+    });
+
     return JobStatus.Success;
   }
 
