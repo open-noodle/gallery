@@ -154,13 +154,32 @@ git commit -m "test(search): add failing searchSmart withSharedSpaces tests"
 
 ### Task 2: Implement `withSharedSpaces` in `searchSmart`
 
+**SCOPE CORRECTION (discovered during task 1):** Contrary to the design doc's original claim, `withSharedSpaces` does NOT exist on `SmartSearchDto`. It exists on `SearchSuggestionRequestDto`, `TagSuggestionRequestDto`, and `TimeBucketDto` (lines 353, 368, 484 of `server/src/dtos/search.dto.ts`), but `SmartSearchDto` itself ends at line 263 without the field. This task therefore needs to ADD the DTO field and regenerate the SDK in addition to the service implementation.
+
 **Files:**
 
+- Modify: `server/src/dtos/search.dto.ts` (add field to `SmartSearchDto`)
 - Modify: `server/src/services/search.service.ts` (lines 121-175)
+- Modify: `server/src/services/search.service.spec.ts` (remove `as any` casts added in task 1)
+- Regenerate: `open-api/typescript-sdk/src/fetch-client.ts` (via `make open-api-typescript`)
+- Regenerate: `mobile/openapi/lib/model/smart_search_dto.dart` (via `make open-api-dart`, requires Java)
 
 **Step 1: Read the existing pattern**
 
 Open `server/src/services/search.service.ts:184-202` (the `getSearchSuggestions` implementation) to see the canonical pattern for the conflict rejection and `timelineSpaceIds` resolution.
+
+Also read `server/src/dtos/search.dto.ts:482-485` to see how `withSharedSpaces` is declared on the existing `getFilterSuggestions` DTO — copy the same `@ValidateBoolean({ optional: true, description: '...' })` pattern.
+
+**Step 1b: Add `withSharedSpaces` to `SmartSearchDto`**
+
+In `server/src/dtos/search.dto.ts`, find `class SmartSearchDto` (line 236) and add the new field. The class currently ends at line 263 with `}`. Add inside, before the closing brace:
+
+```typescript
+@ValidateBoolean({ optional: true, description: 'Include shared spaces the user is a member of' })
+withSharedSpaces?: boolean;
+```
+
+Place it logically near `spaceId` if `SmartSearchDto` has one — otherwise put it at the end.
 
 **Step 2: Add the conflict rejection**
 
@@ -204,24 +223,60 @@ const { hasNextPage, items } = await this.searchRepository.searchSmart(
 );
 ```
 
-**Step 5: Run tests, verify they pass**
+**Step 5: Regenerate the OpenAPI spec and SDK**
+
+The DTO change adds a new field, which means clients need to be regenerated.
+
+```bash
+cd server && pnpm build
+pnpm sync:open-api
+cd .. && make open-api-typescript
+```
+
+If `make open-api-dart` fails due to missing Java, that's OK — Dart regen can run on a CI machine or be deferred. The TypeScript SDK is what `/photos` will use directly.
+
+Verify the SDK now declares the field:
+
+```bash
+grep -n "withSharedSpaces" open-api/typescript-sdk/src/fetch-client.ts | head
+```
+
+You should see `withSharedSpaces?: boolean;` listed inside `export type SmartSearchDto = { ... }` (look around line 1909 for the class declaration).
+
+**Step 6: Remove the `as any` casts from task 1's tests**
+
+Task 1 used `as any` casts in `server/src/services/search.service.spec.ts` to work around the missing DTO field. Now that the field exists, remove them. Search the new `withSharedSpaces` describe block (around line 782) for `as any` and delete each one. The tests should still type-check.
+
+**Step 7: Run tests, verify they pass**
 
 Run: `cd server && pnpm test -- --run src/services/search.service.spec.ts -t withSharedSpaces`
 
 Expected: all 7 tests PASS.
 
-**Step 6: Run full server test suite to catch regressions**
+**Step 8: Run full server test suite to catch regressions**
 
 Run: `cd server && pnpm test -- --run src/services/search.service.spec.ts`
 
 Expected: all `search.service.spec.ts` tests pass (no regressions to the existing `searchSmart` or `getSearchSuggestions` tests).
 
-**Step 7: Commit**
+**Step 9: Type check both server and web** (web because the SDK regen may surface issues in spaces' existing call site)
 
 ```bash
-git add server/src/services/search.service.ts
-git commit -m "feat(search): wire withSharedSpaces in searchSmart"
+make check-server
+make check-web
 ```
+
+Expected: no errors. If `make check-web` fails on the spaces page's existing `buildSmartSearchParams` call, the call site still passes positional args (which task 7 will refactor) — confirm the failure is in `space-search.ts:6` or the spaces page, not in new code, and proceed.
+
+**Step 10: Commit (use the dated commit pattern)**
+
+Add all the changed files:
+
+```bash
+git add server/src/dtos/search.dto.ts server/src/services/search.service.ts server/src/services/search.service.spec.ts open-api/typescript-sdk/src/fetch-client.ts mobile/openapi/
+```
+
+Commit message: `feat(search): wire withSharedSpaces in searchSmart`
 
 ---
 
