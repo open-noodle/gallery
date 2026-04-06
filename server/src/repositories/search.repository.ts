@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Kysely, OrderByDirection, Selectable, ShallowDehydrateObject, sql } from 'kysely';
+import { Kysely, OrderByDirection, Selectable, ShallowDehydrateObject, sql, SqlBool } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { randomUUID } from 'node:crypto';
 import { DummyValue, GenerateSql } from 'src/decorators';
@@ -358,7 +358,7 @@ export class SearchRepository {
         .selectAll('asset')
         .innerJoin('smart_search', 'asset.id', 'smart_search.assetId')
         .$if(hasDistanceThreshold, (qb) =>
-          qb.where(sql`(smart_search.embedding <=> ${options.embedding}) <= ${options.maxDistance!}`),
+          qb.where(sql<SqlBool>`(smart_search.embedding <=> ${options.embedding}) <= ${options.maxDistance!}`),
         )
         .orderBy(sql`smart_search.embedding <=> ${options.embedding}`);
 
