@@ -26,19 +26,23 @@ the exact pattern already used for visible sections in `filter-panel.svelte`.
 
 **Changes to `filter-panel.svelte`:**
 
-- Replace `let collapsed = $state(initialCollapsed)` with localStorage-aware init
-- On mount: read `gallery-filter-collapsed`. If present, use it. If absent, default to
-  `false` (expanded)
+- Remove `initialCollapsed` prop entirely — localStorage is the source of truth,
+  default is `false` (expanded)
+- Add `loadCollapsed()` helper: read `gallery-filter-collapsed` from localStorage.
+  If present, use it. If absent, return `false`
+- Replace `let collapsed = $state(initialCollapsed)` with
+  `let collapsed = $state(loadCollapsed())`
 - Add `$effect` to persist `collapsed` on change
-- Keep `initialCollapsed` prop but only as fallback when no localStorage entry exists
-  (for backwards compat and first-visit behavior)
 
 **Changes to parent pages:**
 
-- Photos page: change `initialCollapsed={true}` to `initialCollapsed={false}` (or
-  remove it) — first visit should show the filter panel so users discover it
-- Map page: no change (already defaults to expanded)
-- Spaces page: no change (already defaults to expanded)
+- Photos page: remove `initialCollapsed={true}` prop (no longer exists)
+- Map page: no change
+- Spaces page: no change
+
+**Existing tests:** The `describe('initialCollapsed prop')` block in
+`filter-panel.spec.ts` must be replaced with tests for localStorage persistence
+(read stored value, default when empty, persist on toggle).
 
 **Add `persistCollapsed` prop** (default `true`):
 
@@ -63,7 +67,11 @@ section type names)
 - Make it fully controlled: add `expanded` prop and `onToggleExpanded` callback
 - Remove internal `let expanded = $state(true)`
 - Parent (FilterPanel) owns the state and passes it down
-- Handle `isEmpty` in parent: do not expand a section with zero results
+- `isEmpty` handling: FilterSection still derives `isEmpty` from `count === 0` and
+  renders content only when `expanded && !isEmpty`. The parent passes the stored
+  `expanded` value regardless — an empty section just won't show content even if
+  `expanded` is true. This keeps the accordion header clickable so the user can still
+  toggle it (the click handler already guards `if (!isEmpty)`)
 
 **Changes to `filter-panel.svelte`:**
 
@@ -90,12 +98,21 @@ section type names)
 **Key:** `gallery-space-hero-collapsed` -> `Record<string, boolean>` (spaceId ->
 collapsed)
 
+**Extract hero persistence helpers** into a small utility (e.g.,
+`web/src/lib/utils/space-hero-storage.ts`) for testability:
+
+- `loadHeroCollapsed(spaceId: string): boolean` — read Record from localStorage,
+  return value for spaceId or `false`
+- `persistHeroCollapsed(spaceId: string, collapsed: boolean): void` — read Record,
+  update entry, write back
+
 **Changes to space page (`+page.svelte`):**
 
-- Replace `let heroCollapsed = $state(false)` with localStorage-aware init
-- On mount / space change: read the Record, look up current spaceId. If entry exists,
-  use it. If absent, default to `false` (expanded)
-- On **manual** toggle (chevron click): update Record and persist
+- Replace `let heroCollapsed = $state(false)` with
+  `let heroCollapsed = $state(loadHeroCollapsed(space.id))`
+- On space navigation (the `data.space.id !== space.id` effect): read the new space's
+  persisted value via `loadHeroCollapsed(data.space.id)` instead of resetting to `false`
+- On **manual** toggle (chevron click): update and persist via `persistHeroCollapsed`
 - **Do NOT persist auto-collapse from filter activation** — only persist user-initiated
   toggles via the chevron button
 
@@ -136,15 +153,21 @@ eviction needed.
   renders expanded
 - **`{#key space.id}` remount:** FilterPanel is destroyed/recreated on space navigation,
   correctly re-reading localStorage each time. The `$effect` write-on-mount is harmless.
-- **Empty sections:** FilterPanel must not allow expanding a section with zero results
-  (handle `isEmpty` logic in parent, not in FilterSection)
+- **Empty sections:** FilterSection keeps its `isEmpty` guard — content is only rendered
+  when `expanded && !isEmpty`. Stored `expanded` state is passed through regardless;
+  the section header remains clickable but disabled when empty (existing behavior)
+- **`hidden` prop interaction:** When `hidden={true}` (e.g., `isTimelineEmpty` on photos
+  page), `collapsed` state is still initialized from localStorage before the template
+  checks `hidden`. If the panel becomes unhidden, it correctly restores from storage
 
 ## Testing
 
 - Unit tests for `loadExpandedSections` / persist / toggle (mirror existing
   visible-sections tests)
-- Unit test for filter panel collapsed persistence (read/write/default)
-- Unit test for space hero per-space persistence (read/write/toggle/space-switch)
+- Unit test for filter panel collapsed persistence (read/write/default) — replaces
+  existing `initialCollapsed` test block
+- Unit tests for `loadHeroCollapsed` / `persistHeroCollapsed` helpers (standalone
+  utility, easy to test without mocking page data)
 - No E2E needed — localStorage behavior is well-covered by unit tests
 
 ## localStorage Keys Summary
