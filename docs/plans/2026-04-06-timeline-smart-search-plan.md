@@ -312,26 +312,76 @@ git commit -m "chore(search): regenerate SQL examples for searchSmart timelineSp
 
 - Modify: `e2e/src/specs/server/api/search.e2e-spec.ts` (extend)
 
-**Step 1: Implement test cases 15-20 from the design's Server API E2E section**
+**Step 1: Read the existing patterns**
 
-Add tests covering:
+Open `e2e/src/specs/server/api/search.e2e-spec.ts` and find:
 
-- POST `/search/smart` with `withSharedSpaces: true` returns timeline-pinned space content for a user who is a member
-- POST `/search/smart` with `withSharedSpaces: true` AND `spaceId` returns 400 with the conflict message
-- POST `/search/smart` with `withSharedSpaces: true` for a user with no shared spaces returns owner-only content
-- Cross-user isolation — user A's `withSharedSpaces=true` query never returns assets from spaces user A is not a member of
-- Kicked-from-space regression — user A is removed from a space; subsequent `withSharedSpaces=true` query does NOT return assets from that space
-- `withSharedSpaces=false` (or absent) does NOT include shared-space content even when the user has spaces pinned
+- The existing `searchSmart` describe block (look for `describe('POST /search/smart')` or similar)
+- How users + assets + embeddings are set up (likely via fixtures imported from `e2e/src/fixtures.ts` and `e2e/src/generators.ts`)
+- How shared spaces are created in tests (search for `createSharedSpace` or similar)
+- Whether ML embeddings are real (machine-learning container in docker-compose) or mocked via fixtures
 
-These E2E tests need real assets with embeddings. Use the existing patterns in `search.e2e-spec.ts` for setting up assets and triggering ML processing (or mock embeddings via the test fixtures).
+The test patterns vary by suite, so reading first is essential. If unsure, look at the `getFilterSuggestions` E2E tests in the same file — they cover the same `withSharedSpaces` flag for a different endpoint and are a near-perfect template.
 
-**Step 2: Run the E2E API suite**
+**Step 2: Implement the new tests**
+
+Inside the existing `searchSmart` describe block, add a `withSharedSpaces` sub-describe with these cases:
+
+```typescript
+describe('withSharedSpaces', () => {
+  it('returns timeline-pinned shared space content when withSharedSpaces is true', async () => {
+    // Arrange:
+    // 1. Create user A and user B
+    // 2. User B creates a shared space with showInTimeline=true and adds user A as member
+    // 3. User B uploads an asset to the space (or marks an existing asset as shared)
+    // 4. Wait for ML to process the asset (or mock the embedding)
+    //
+    // Act:
+    // const response = await searchSmart({ smartSearchDto: { query: '<matching text>', withSharedSpaces: true } }, { headers: userA.accessToken });
+    //
+    // Assert:
+    // expect response includes the shared-space asset
+  });
+
+  it('rejects 400 when both spaceId and withSharedSpaces are set', async () => {
+    const response = await request(app)
+      .post('/search/smart')
+      .set('Authorization', `Bearer ${userA.accessToken}`)
+      .send({ query: 'beach', spaceId: someSpaceId, withSharedSpaces: true });
+    expect(response.status).toBe(400);
+    expect(response.body.message).toContain('Cannot use both spaceId and withSharedSpaces');
+  });
+
+  it('falls back to owner-only when user has no shared spaces', async () => {
+    // User with no spaces; query with withSharedSpaces=true; verify only owner-owned assets are returned
+  });
+
+  it('does not return assets from spaces the user is not a member of (cross-user isolation)', async () => {
+    // User A; user B's private space (A is not a member); query with withSharedSpaces=true;
+    // verify B's space content is NOT in results
+  });
+
+  it('does not return assets from spaces the user has been removed from', async () => {
+    // User A is added to space, then removed; query with withSharedSpaces=true;
+    // verify space content is NOT in results
+  });
+
+  it('does not include shared-space content when withSharedSpaces is false or absent (regression)', async () => {
+    // User has space pinned to timeline; query without withSharedSpaces;
+    // verify only owner-owned assets are returned
+  });
+});
+```
+
+**Note on ML embeddings:** smart search requires CLIP embeddings on the assets. Check whether `search.e2e-spec.ts` uses real ML (slow) or mocks the embedding fixtures (fast). If mocked, use the same approach. If real ML, the test setup needs to wait for the smart-search job to finish — search the file for `waitForQueueFinish` or `MachineLearning` to find the existing pattern.
+
+**Step 3: Run the E2E API suite**
 
 Run: `cd e2e && pnpm test -- --run src/specs/server/api/search.e2e-spec.ts`
 
 Expected: all new tests pass against the real server.
 
-**Step 3: Commit**
+**Step 4: Commit**
 
 ```bash
 git add e2e/src/specs/server/api/search.e2e-spec.ts
@@ -880,12 +930,14 @@ git commit -m "feat(search): add SmartSearchResults wrapper skeleton"
 
 **Step 1: Write tests for the core fetch behavior**
 
-Implement test cases 38-57 plus 57b from the design's testing strategy. Use vitest fake timers for debounce assertions and mock `@immich/sdk`'s `searchSmart`. Reference existing tests like `space-search-results.spec.ts` for the testing-library/svelte patterns and `IntersectionObserver` mock.
+This task expands into ~17 test cases. Budget time accordingly. Use vitest fake timers for debounce assertions and mock `@immich/sdk`'s `searchSmart`. Reference existing tests like `space-search-results.spec.ts` for the testing-library/svelte patterns and `IntersectionObserver` mock.
 
 ```typescript
-import { render, screen } from '@testing-library/svelte';
+import { render } from '@testing-library/svelte';
 import SmartSearchResults from '$lib/components/search/smart-search-results.svelte';
 import type { FilterState } from '$lib/components/filter-panel/filter-panel';
+import { getIntersectionObserverMock } from '$lib/__mocks__/intersection-observer.mock';
+import { AssetOrder, type AssetResponseDto } from '@immich/sdk';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const searchSmartMock = vi.fn();
@@ -901,51 +953,223 @@ const baseFilters: FilterState = {
   sortOrder: 'relevance',
 };
 
+const baseProps = {
+  searchQuery: 'beach',
+  filters: baseFilters,
+  isShared: false,
+  withSharedSpaces: true,
+};
+
+const mockEmptyResult = { assets: { items: [], nextPage: null } };
+const mockResultsPage1 = {
+  assets: {
+    items: [{ id: 'a1' }, { id: 'a2' }] as AssetResponseDto[],
+    nextPage: '2',
+  },
+};
+const mockResultsPage2 = {
+  assets: {
+    items: [{ id: 'a3' }, { id: 'a4' }] as AssetResponseDto[],
+    nextPage: null,
+  },
+};
+
 describe('SmartSearchResults', () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    vi.stubGlobal('IntersectionObserver', getIntersectionObserverMock());
     searchSmartMock.mockReset();
-    searchSmartMock.mockResolvedValue({ assets: { items: [], nextPage: null } });
+    searchSmartMock.mockResolvedValue(mockEmptyResult);
   });
 
+  // Test 38
   it('schedules exactly one fetch on mount with non-empty query', async () => {
-    render(SmartSearchResults, {
-      props: { searchQuery: 'beach', filters: baseFilters, isShared: false, withSharedSpaces: true },
-    });
-    await vi.advanceTimersByTimeAsync(250);
+    render(SmartSearchResults, { props: baseProps });
+    await vi.advanceTimersByTimeAsync(SEARCH_FILTER_DEBOUNCE_MS);
     expect(searchSmartMock).toHaveBeenCalledTimes(1);
   });
 
+  // Test 39
   it('does not fetch on mount with empty query', async () => {
-    render(SmartSearchResults, {
-      props: { searchQuery: '', filters: baseFilters, isShared: false },
-    });
+    render(SmartSearchResults, { props: { ...baseProps, searchQuery: '' } });
     await vi.advanceTimersByTimeAsync(500);
     expect(searchSmartMock).not.toHaveBeenCalled();
   });
 
-  // ...add the rest from the design test plan (cases 38-57b)
+  // Test 40
+  it('triggers a new fetch when searchQuery changes, aborting the previous', async () => {
+    const { rerender } = render(SmartSearchResults, { props: baseProps });
+    await vi.advanceTimersByTimeAsync(SEARCH_FILTER_DEBOUNCE_MS);
+    expect(searchSmartMock).toHaveBeenCalledTimes(1);
+
+    await rerender({ ...baseProps, searchQuery: 'mountain' });
+    await vi.advanceTimersByTimeAsync(SEARCH_FILTER_DEBOUNCE_MS);
+    expect(searchSmartMock).toHaveBeenCalledTimes(2);
+    // Verify the second call had the new query
+    expect(searchSmartMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ smartSearchDto: expect.objectContaining({ query: 'mountain' }) }),
+    );
+  });
+
+  // Test 41
+  it('triggers a debounced re-fetch when filters change', async () => {
+    const { rerender } = render(SmartSearchResults, { props: baseProps });
+    await vi.advanceTimersByTimeAsync(SEARCH_FILTER_DEBOUNCE_MS);
+    expect(searchSmartMock).toHaveBeenCalledTimes(1);
+
+    await rerender({ ...baseProps, filters: { ...baseFilters, city: 'Berlin' } });
+    await vi.advanceTimersByTimeAsync(SEARCH_FILTER_DEBOUNCE_MS);
+    expect(searchSmartMock).toHaveBeenCalledTimes(2);
+    expect(searchSmartMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ smartSearchDto: expect.objectContaining({ city: 'Berlin' }) }),
+    );
+  });
+
+  // Test 42
+  it('debounces multiple consecutive filter changes within the window into a single fetch', async () => {
+    const { rerender } = render(SmartSearchResults, { props: baseProps });
+    await vi.advanceTimersByTimeAsync(SEARCH_FILTER_DEBOUNCE_MS);
+    expect(searchSmartMock).toHaveBeenCalledTimes(1);
+
+    // 5 rapid filter changes within the debounce window
+    for (let i = 0; i < 5; i++) {
+      await rerender({ ...baseProps, filters: { ...baseFilters, rating: i + 1 } });
+      await vi.advanceTimersByTimeAsync(50); // < debounce window
+    }
+    // Final advance past the debounce window
+    await vi.advanceTimersByTimeAsync(SEARCH_FILTER_DEBOUNCE_MS);
+
+    // Initial mount (1) + one debounced fetch (1) = 2 total
+    expect(searchSmartMock).toHaveBeenCalledTimes(2);
+  });
+
+  // Test 43
+  it('debounce boundary: 249ms does not fire, 250ms does', async () => {
+    const { rerender } = render(SmartSearchResults, { props: baseProps });
+    await vi.advanceTimersByTimeAsync(SEARCH_FILTER_DEBOUNCE_MS);
+    expect(searchSmartMock).toHaveBeenCalledTimes(1);
+
+    await rerender({ ...baseProps, filters: { ...baseFilters, city: 'Berlin' } });
+    await vi.advanceTimersByTimeAsync(249);
+    expect(searchSmartMock).toHaveBeenCalledTimes(1); // not yet
+    await vi.advanceTimersByTimeAsync(1);
+    expect(searchSmartMock).toHaveBeenCalledTimes(2); // now
+  });
+
+  // Test 44
+  it('does not fetch when filters change while searchQuery is empty', async () => {
+    const { rerender } = render(SmartSearchResults, { props: { ...baseProps, searchQuery: '' } });
+    await rerender({ ...baseProps, searchQuery: '', filters: { ...baseFilters, city: 'Berlin' } });
+    await vi.advanceTimersByTimeAsync(SEARCH_FILTER_DEBOUNCE_MS);
+    expect(searchSmartMock).not.toHaveBeenCalled();
+  });
+
+  // Test 45
+  it('triggers re-fetch with order=Asc when sortOrder changes from relevance to asc', async () => {
+    const { rerender } = render(SmartSearchResults, { props: baseProps });
+    await vi.advanceTimersByTimeAsync(SEARCH_FILTER_DEBOUNCE_MS);
+
+    await rerender({ ...baseProps, filters: { ...baseFilters, sortOrder: 'asc' } });
+    await vi.advanceTimersByTimeAsync(SEARCH_FILTER_DEBOUNCE_MS);
+
+    expect(searchSmartMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ smartSearchDto: expect.objectContaining({ order: AssetOrder.Asc }) }),
+    );
+  });
+
+  // Test 46
+  it('triggers re-fetch with order omitted when sortOrder changes from asc to relevance', async () => {
+    const { rerender } = render(SmartSearchResults, {
+      props: { ...baseProps, filters: { ...baseFilters, sortOrder: 'asc' } },
+    });
+    await vi.advanceTimersByTimeAsync(SEARCH_FILTER_DEBOUNCE_MS);
+
+    await rerender({ ...baseProps, filters: { ...baseFilters, sortOrder: 'relevance' } });
+    await vi.advanceTimersByTimeAsync(SEARCH_FILTER_DEBOUNCE_MS);
+
+    const lastCall = searchSmartMock.mock.lastCall;
+    expect(lastCall[0].smartSearchDto.order).toBeUndefined();
+  });
+
+  // Test 47 — loadMore (requires triggering the dumb grid's IntersectionObserver or direct invocation)
+  // The exact mechanism depends on whether onLoadMore is exposed; you may need to grab the prop
+  // off the rendered SpaceSearchResults via a test export, or simulate the IntersectionObserver
+  // entry firing. See the existing space-search-results.spec.ts for patterns.
+  it.todo('loadMore fetches the next page and appends results');
+
+  // Test 48
+  it.todo('loadMore does nothing when hasMore is false');
+
+  // Test 49
+  it.todo('loadMore while another loadMore is in flight: abort first, second wins');
+
+  // Test 50
+  it.todo('concurrent submit: query A in flight, query B submitted, B wins');
+
+  // Test 51
+  it.todo('submit while loadMore in flight: loadMore aborted, restart from page 1');
+
+  // Test 52
+  it('aborts in-flight request when wrapper unmounts', async () => {
+    let abortedSignal: AbortSignal | undefined;
+    searchSmartMock.mockImplementation(async (_args, opts) => {
+      abortedSignal = opts?.signal;
+      return new Promise(() => {}); // never resolves
+    });
+    const { unmount } = render(SmartSearchResults, { props: baseProps });
+    await vi.advanceTimersByTimeAsync(SEARCH_FILTER_DEBOUNCE_MS);
+    unmount();
+    expect(abortedSignal?.aborted).toBe(true);
+    // (Or assert that the abort controller's cleanup ran via a different observable signal,
+    // depending on whether the SDK actually accepts a signal option.)
+  });
+
+  // Test 53
+  it('catches backend errors and surfaces empty results without crashing', async () => {
+    searchSmartMock.mockRejectedValueOnce(new Error('Smart search is not enabled'));
+    render(SmartSearchResults, { props: baseProps });
+    await vi.advanceTimersByTimeAsync(SEARCH_FILTER_DEBOUNCE_MS);
+    // No exception thrown, component still rendered
+    expect(searchSmartMock).toHaveBeenCalledTimes(1);
+  });
+
+  // Test 54
+  it('handles empty results (0 items) without crashing', async () => {
+    searchSmartMock.mockResolvedValue(mockEmptyResult);
+    render(SmartSearchResults, { props: baseProps });
+    await vi.advanceTimersByTimeAsync(SEARCH_FILTER_DEBOUNCE_MS);
+    // Should render the dumb grid with 0 results
+  });
+
+  // Test 55
+  it('forwards spaceId to buildSmartSearchParams when set', async () => {
+    render(SmartSearchResults, { props: { ...baseProps, spaceId: 'space-1', withSharedSpaces: undefined } });
+    await vi.advanceTimersByTimeAsync(SEARCH_FILTER_DEBOUNCE_MS);
+    expect(searchSmartMock).toHaveBeenCalledWith(
+      expect.objectContaining({ smartSearchDto: expect.objectContaining({ spaceId: 'space-1' }) }),
+    );
+  });
+
+  // Test 56
+  it('forwards withSharedSpaces to buildSmartSearchParams when spaceId is undefined', async () => {
+    render(SmartSearchResults, { props: { ...baseProps, withSharedSpaces: true } });
+    await vi.advanceTimersByTimeAsync(SEARCH_FILTER_DEBOUNCE_MS);
+    expect(searchSmartMock).toHaveBeenCalledWith(
+      expect.objectContaining({ smartSearchDto: expect.objectContaining({ withSharedSpaces: true }) }),
+    );
+  });
+
+  // Test 57 — render assertion for isShared on the dumb grid
+  it.todo('forwards isShared prop to the dumb grid render');
+
+  // Test 57b — bindable isLoading
+  it.todo('isLoading $bindable propagates to parent before/after fetch');
 });
 ```
 
-Implement at minimum:
+`it.todo` tests are placeholders the implementer should fill in. They show up in the test output as "todo" so they're not silently skipped. The interaction-driven tests (loadMore, concurrent submits, isShared rendering) need the actual component contract — fill them in once the wrapper implementation is in place.
 
-- Initial mount with non-empty query → 1 fetch (test 38)
-- Initial mount with empty query → 0 fetches (test 39)
-- searchQuery change → new fetch + abort previous (test 40)
-- Filter change → debounced re-fetch (test 41)
-- Multiple filter changes within debounce window → 1 fetch (test 42)
-- Debounce boundary 249ms vs 250ms (test 43)
-- Filter change with empty searchQuery → no fetch (test 44)
-- Sort change relevance → asc → re-fetch with order (test 45)
-- Sort change asc → relevance → re-fetch without order (test 46)
-- loadMore appends results (test 47)
-- loadMore with hasMore=false → no fetch (test 48)
-- Backend throws → error caught, no crash (test 53)
-- Backend returns empty → searchResults = [] (test 54)
-- spaceId prop forwarded (tests 55, 56)
-- isShared prop forwarded to dumb grid (test 57)
-- isLoading $bindable propagates (test 57b)
+**Note on `SEARCH_FILTER_DEBOUNCE_MS`:** import from `$lib/utils/space-search` so the test stays in sync if the constant ever changes.
 
 **Step 2: Run tests, verify they fail**
 
