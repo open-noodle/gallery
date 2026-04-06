@@ -606,7 +606,7 @@ describe(SearchService.name, () => {
       );
       expect(mocks.search.searchSmart).toHaveBeenCalledWith(
         { page: 1, size: 100 },
-        { query: 'test', embedding: '[1, 2, 3]', userIds: [authStub.user1.user.id] },
+        { query: 'test', embedding: '[1, 2, 3]', userIds: [authStub.user1.user.id], maxDistance: 0 },
       );
     });
 
@@ -793,6 +793,44 @@ describe(SearchService.name, () => {
       expect(mocks.search.searchSmart).toHaveBeenCalledWith(
         { page: 1, size: 100 },
         expect.objectContaining({ orderDirection: undefined }),
+      );
+    });
+
+    it('should pass maxDistance from config to repository', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({
+        machineLearning: { clip: { maxDistance: 0.75 } },
+      });
+
+      await sut.searchSmart(authStub.user1, { query: 'test' });
+
+      expect(mocks.search.searchSmart).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ maxDistance: 0.75 }),
+      );
+    });
+
+    it('should pass maxDistance from config when using queryAssetId', async () => {
+      const assetId = newUuid();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([assetId]));
+      mocks.search.getEmbedding.mockResolvedValue('[4, 5, 6]');
+      mocks.systemMetadata.get.mockResolvedValue({
+        machineLearning: { clip: { maxDistance: 0.75 } },
+      });
+
+      await sut.searchSmart(authStub.user1, { queryAssetId: assetId });
+
+      expect(mocks.search.searchSmart).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ maxDistance: 0.75 }),
+      );
+    });
+
+    it('should pass maxDistance 0 (disabled) by default', async () => {
+      await sut.searchSmart(authStub.user1, { query: 'test' });
+
+      expect(mocks.search.searchSmart).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ maxDistance: 0 }),
       );
     });
   });
