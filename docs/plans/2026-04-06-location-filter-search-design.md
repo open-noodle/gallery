@@ -21,18 +21,22 @@ In a large photo archive spanning many countries, finding a specific location by
 
 Countries only. Cities remain lazy-loaded when a country is expanded. This avoids prefetching all cities and keeps the existing hierarchical interaction model intact.
 
+City sub-lists are unaffected by the search query — they render based on `expandedCountry` state, not the search input. Searching "Germany" and clicking it will show all German cities (Berlin, Munich, etc.) even though they don't match the search text. If a country is expanded and the user types a search that hides it, the cities disappear with the country row. When the search is cleared, the country reappears with its cities still loaded (the `cities` array persists since `expandedCountry` hasn't changed).
+
 ### Behavior
 
-| Scenario                          | Behavior                                                                                  |
-| --------------------------------- | ----------------------------------------------------------------------------------------- |
-| User types in search              | Countries filtered by case-insensitive substring match, all matches shown (no truncation) |
-| Search cleared                    | Returns to truncated view (first 10 countries)                                            |
-| No search matches                 | Shows "No matching locations" message                                                     |
-| No countries at all               | Shows existing "No locations found" message (unchanged)                                   |
-| Orphaned country                  | Always visible above the list regardless of search query                                  |
-| Selected country hidden by search | Selection preserved; reappears with expanded state when search is cleared                 |
-| Countries list changes (refetch)  | Search query auto-clears, `showAll` resets                                                |
-| Section collapsed and re-expanded | Search state cleared (component is destroyed/recreated by FilterSection)                  |
+| Scenario                                | Behavior                                                                                  |
+| --------------------------------------- | ----------------------------------------------------------------------------------------- |
+| User types in search                    | Countries filtered by case-insensitive substring match, all matches shown (no truncation) |
+| Search cleared                          | Returns to truncated view (first 10 countries)                                            |
+| No search matches                       | Shows "No matching locations" message                                                     |
+| No countries at all                     | Shows existing "No locations found" message (unchanged)                                   |
+| Orphaned country                        | Always visible above the list regardless of search query                                  |
+| Selected country hidden by search       | Selection preserved; reappears with cities still loaded when search is cleared            |
+| Search for country, click, expand       | Cities appear normally — search only filters country rows, not city sub-lists             |
+| Country expanded, then hidden by search | Cities disappear with country row; reappear with cities when search is cleared            |
+| Countries list changes (refetch)        | Search query auto-clears, `showAll` resets                                                |
+| Section collapsed and re-expanded       | Search state cleared (component is destroyed/recreated by FilterSection)                  |
 
 ### Truncation
 
@@ -94,7 +98,7 @@ let remainingCount = $derived(Math.max(0, filteredCountries.length - INITIAL_SHO
 
 ## Tests
 
-Eight new tests added to the existing `describe('LocationFilter')` block in `filter-sections.spec.ts`:
+Ten new tests added to the existing `describe('LocationFilter')` block in `filter-sections.spec.ts`:
 
 1. Search filters country list
 2. Case-insensitive matching
@@ -104,10 +108,12 @@ Eight new tests added to the existing `describe('LocationFilter')` block in `fil
 6. "No matching locations" shown for empty search results
 7. Orphaned country remains visible during search
 8. Selected country preserved across search/clear cycle
+9. Search for country, click it, cities load normally
+10. Country expanded then hidden by search, cities reappear when search cleared
 
 ## Files Changed
 
 | File                                                                    | Change                                  |
 | ----------------------------------------------------------------------- | --------------------------------------- |
 | `web/src/lib/components/filter-panel/location-filter.svelte`            | Add search input, filtering, truncation |
-| `web/src/lib/components/filter-panel/__tests__/filter-sections.spec.ts` | 8 new tests                             |
+| `web/src/lib/components/filter-panel/__tests__/filter-sections.spec.ts` | 10 new tests                            |
