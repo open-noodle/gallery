@@ -254,6 +254,62 @@ describe('ActiveFiltersBar', () => {
     expect(chips[1].textContent).toContain('Family');
   });
 
+  it('should render chip for year-only timeline filter', () => {
+    const filters = createFilterState();
+    filters.selectedYear = 2015;
+
+    const { getAllByTestId } = render(ActiveFiltersBar, {
+      props: {
+        filters,
+        onRemoveFilter: () => {},
+        onClearAll: () => {},
+      },
+    });
+
+    const chips = getAllByTestId('active-chip');
+    expect(chips).toHaveLength(1);
+    expect(chips[0].textContent).toContain('2015');
+  });
+
+  it('should render chip for year+month timeline filter as "Mon YYYY"', () => {
+    const filters = createFilterState();
+    filters.selectedYear = 2015;
+    filters.selectedMonth = 12;
+
+    const { getAllByTestId } = render(ActiveFiltersBar, {
+      props: {
+        filters,
+        onRemoveFilter: () => {},
+        onClearAll: () => {},
+      },
+    });
+
+    const chips = getAllByTestId('active-chip');
+    expect(chips).toHaveLength(1);
+    expect(chips[0].textContent).toContain('Dec 2015');
+  });
+
+  it('should remove timeline filter on chip close', async () => {
+    let removedType: string | undefined;
+    const onRemoveFilter = (type: string) => {
+      removedType = type;
+    };
+
+    const filters = createFilterState();
+    filters.selectedYear = 2023;
+
+    const { getByTestId } = render(ActiveFiltersBar, {
+      props: {
+        filters,
+        onRemoveFilter,
+        onClearAll: () => {},
+      },
+    });
+
+    await fireEvent.click(getByTestId('chip-close'));
+    expect(removedType).toBe('timeline');
+  });
+
   it('should not show Clear All when no filters active', () => {
     const filters = createFilterState();
 

@@ -251,6 +251,10 @@
         filters = { ...filters, mediaType: 'all' };
         break;
       }
+      case 'timeline': {
+        filters = { ...filters, selectedYear: undefined, selectedMonth: undefined };
+        break;
+      }
     }
   }
 
