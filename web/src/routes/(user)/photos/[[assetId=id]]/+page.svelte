@@ -248,7 +248,9 @@
       {#if hasActiveFilters}
         <ActiveFiltersBar
           {filters}
-          resultCount={totalAssetCount}
+          {searchQuery}
+          onClearSearch={clearSearch}
+          resultCount={showSearchResults ? undefined : totalAssetCount}
           {personNames}
           {tagNames}
           onRemoveFilter={(type, id) => {
@@ -256,6 +258,7 @@
           }}
           onClearAll={() => {
             filters = clearFilters(filters);
+            clearSearch();
           }}
         />
       {/if}
