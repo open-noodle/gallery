@@ -139,15 +139,9 @@ describe(SyncRequestType.SharedSpaceAssetsV1, () => {
     const { asset: currentAsset } = await ctx.newAsset({ ownerId: auth.user.id });
     await ctx.newSharedSpaceAsset({ spaceId: currentSpace.id, assetId: currentAsset.id });
 
-    const initial = await ctx.syncStream(auth, [
-      SyncRequestType.SharedSpacesV1,
-      SyncRequestType.SharedSpaceAssetsV1,
-    ]);
+    const initial = await ctx.syncStream(auth, [SyncRequestType.SharedSpacesV1, SyncRequestType.SharedSpaceAssetsV1]);
     await ctx.syncAckAll(auth, initial);
-    await ctx.assertSyncIsComplete(auth, [
-      SyncRequestType.SharedSpacesV1,
-      SyncRequestType.SharedSpaceAssetsV1,
-    ]);
+    await ctx.assertSyncIsComplete(auth, [SyncRequestType.SharedSpacesV1, SyncRequestType.SharedSpaceAssetsV1]);
 
     // Auth.user joins the OLD space — gains access to historical asset.
     await ctx.newSharedSpaceMember({
@@ -157,13 +151,9 @@ describe(SyncRequestType.SharedSpaceAssetsV1, () => {
     });
 
     const next = await ctx.syncStream(auth, [SyncRequestType.SharedSpaceAssetsV1]);
-    const backfillEvents = next.filter(
-      (r: { type: string }) => r.type === SyncEntityType.SharedSpaceAssetBackfillV1,
-    );
+    const backfillEvents = next.filter((r: { type: string }) => r.type === SyncEntityType.SharedSpaceAssetBackfillV1);
     expect(backfillEvents.length).toBeGreaterThanOrEqual(1);
-    expect(
-      backfillEvents.some((r: { data: { id: string } }) => r.data.id === oldAsset.id),
-    ).toBe(true);
+    expect(backfillEvents.some((r: { data: { id: string } }) => r.data.id === oldAsset.id)).toBe(true);
   });
 
   it('re-emits an asset on the update path when its metadata changes after the initial ack', async () => {
@@ -184,9 +174,7 @@ describe(SyncRequestType.SharedSpaceAssetsV1, () => {
     await defaultDatabase.updateTable('asset').set({ isFavorite: true }).where('id', '=', asset.id).execute();
 
     const next = await ctx.syncStream(auth, [SyncRequestType.SharedSpaceAssetsV1]);
-    const updateEvents = next.filter(
-      (r: { type: string }) => r.type === SyncEntityType.SharedSpaceAssetUpdateV1,
-    );
+    const updateEvents = next.filter((r: { type: string }) => r.type === SyncEntityType.SharedSpaceAssetUpdateV1);
     expect(updateEvents).toHaveLength(1);
     expect((updateEvents[0] as { data: { id: string; isFavorite: boolean } }).data).toMatchObject({
       id: asset.id,

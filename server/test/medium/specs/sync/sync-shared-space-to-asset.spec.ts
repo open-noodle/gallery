@@ -59,9 +59,7 @@ describe(SyncRequestType.SharedSpaceToAssetsV1, () => {
       .execute();
 
     const next = await ctx.syncStream(auth, [SyncRequestType.SharedSpaceToAssetsV1]);
-    const deleteEvents = next.filter(
-      (r: { type: string }) => r.type === SyncEntityType.SharedSpaceToAssetDeleteV1,
-    );
+    const deleteEvents = next.filter((r: { type: string }) => r.type === SyncEntityType.SharedSpaceToAssetDeleteV1);
     expect(deleteEvents).toHaveLength(1);
     expect((deleteEvents[0] as { data: { spaceId: string; assetId: string } }).data).toMatchObject({
       spaceId: space.id,
@@ -110,15 +108,9 @@ describe(SyncRequestType.SharedSpaceToAssetsV1, () => {
     const { asset: currentAsset } = await ctx.newAsset({ ownerId: auth.user.id });
     await ctx.newSharedSpaceAsset({ spaceId: currentSpace.id, assetId: currentAsset.id });
 
-    const initial = await ctx.syncStream(auth, [
-      SyncRequestType.SharedSpacesV1,
-      SyncRequestType.SharedSpaceToAssetsV1,
-    ]);
+    const initial = await ctx.syncStream(auth, [SyncRequestType.SharedSpacesV1, SyncRequestType.SharedSpaceToAssetsV1]);
     await ctx.syncAckAll(auth, initial);
-    await ctx.assertSyncIsComplete(auth, [
-      SyncRequestType.SharedSpacesV1,
-      SyncRequestType.SharedSpaceToAssetsV1,
-    ]);
+    await ctx.assertSyncIsComplete(auth, [SyncRequestType.SharedSpacesV1, SyncRequestType.SharedSpaceToAssetsV1]);
 
     await ctx.newSharedSpaceMember({
       spaceId: oldSpace.id,
@@ -127,9 +119,7 @@ describe(SyncRequestType.SharedSpaceToAssetsV1, () => {
     });
 
     const next = await ctx.syncStream(auth, [SyncRequestType.SharedSpaceToAssetsV1]);
-    const backfillEvents = next.filter(
-      (r: { type: string }) => r.type === SyncEntityType.SharedSpaceToAssetBackfillV1,
-    );
+    const backfillEvents = next.filter((r: { type: string }) => r.type === SyncEntityType.SharedSpaceToAssetBackfillV1);
     expect(backfillEvents.length).toBeGreaterThanOrEqual(1);
     expect(
       backfillEvents.some(
@@ -158,9 +148,7 @@ describe(SyncRequestType.SharedSpaceToAssetsV1, () => {
       .execute();
 
     const response = await ctx.syncStream(auth, [SyncRequestType.SharedSpaceToAssetsV1]);
-    const deleteEvents = response.filter(
-      (r: { type: string }) => r.type === SyncEntityType.SharedSpaceToAssetDeleteV1,
-    );
+    const deleteEvents = response.filter((r: { type: string }) => r.type === SyncEntityType.SharedSpaceToAssetDeleteV1);
     expect(deleteEvents).toHaveLength(0);
   });
 });

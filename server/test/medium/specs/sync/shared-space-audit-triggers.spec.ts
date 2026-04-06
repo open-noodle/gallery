@@ -15,7 +15,6 @@ beforeAll(async () => {
 });
 
 describe('shared_space audit triggers', () => {
-
   it('fans out shared_space_audit rows to every member on space deletion', async () => {
     const { ctx, db } = setup();
     const owner = await ctx.newUser();
@@ -27,15 +26,9 @@ describe('shared_space audit triggers', () => {
 
     await db.deleteFrom('shared_space').where('id', '=', space.id).execute();
 
-    const rows = await db
-      .selectFrom('shared_space_audit')
-      .select(['userId'])
-      .where('spaceId', '=', space.id)
-      .execute();
+    const rows = await db.selectFrom('shared_space_audit').select(['userId']).where('spaceId', '=', space.id).execute();
 
-    expect(new Set(rows.map((r) => r.userId))).toEqual(
-      new Set([owner.user.id, memberA.user.id, memberB.user.id]),
-    );
+    expect(new Set(rows.map((r) => r.userId))).toEqual(new Set([owner.user.id, memberA.user.id, memberB.user.id]));
   });
 
   it('emits shared_space_audit for a single removed member', async () => {
@@ -53,11 +46,7 @@ describe('shared_space audit triggers', () => {
       .where('userId', '=', memberA.user.id)
       .execute();
 
-    const rows = await db
-      .selectFrom('shared_space_audit')
-      .select(['userId'])
-      .where('spaceId', '=', space.id)
-      .execute();
+    const rows = await db.selectFrom('shared_space_audit').select(['userId']).where('spaceId', '=', space.id).execute();
 
     expect(rows).toHaveLength(1);
     expect(rows[0].userId).toBe(memberA.user.id);
@@ -97,11 +86,7 @@ describe('shared_space audit triggers', () => {
 
     await db.deleteFrom('shared_space').where('id', '=', space.id).execute();
 
-    const rows = await db
-      .selectFrom('shared_space_audit')
-      .selectAll()
-      .where('spaceId', '=', space.id)
-      .execute();
+    const rows = await db.selectFrom('shared_space_audit').selectAll().where('spaceId', '=', space.id).execute();
 
     // Exactly three rows: creator + two members. NOT six (would indicate double-firing).
     expect(rows).toHaveLength(3);
@@ -118,11 +103,7 @@ describe('shared_space audit triggers', () => {
 
     await db.deleteFrom('shared_space').where('id', '=', space.id).execute();
 
-    const rows = await db
-      .selectFrom('shared_space_asset_audit')
-      .selectAll()
-      .where('spaceId', '=', space.id)
-      .execute();
+    const rows = await db.selectFrom('shared_space_asset_audit').selectAll().where('spaceId', '=', space.id).execute();
 
     // Two (space, asset) pairs, exactly once each. NOT four.
     expect(rows).toHaveLength(2);
@@ -136,17 +117,9 @@ describe('shared_space audit triggers', () => {
     const { asset } = await ctx.newAsset({ ownerId: owner.user.id });
     await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
 
-    await db
-      .deleteFrom('shared_space_asset')
-      .where('spaceId', '=', space.id)
-      .where('assetId', '=', asset.id)
-      .execute();
+    await db.deleteFrom('shared_space_asset').where('spaceId', '=', space.id).where('assetId', '=', asset.id).execute();
 
-    const rows = await db
-      .selectFrom('shared_space_asset_audit')
-      .selectAll()
-      .where('spaceId', '=', space.id)
-      .execute();
+    const rows = await db.selectFrom('shared_space_asset_audit').selectAll().where('spaceId', '=', space.id).execute();
 
     expect(rows).toHaveLength(1);
     expect(rows[0].assetId).toBe(asset.id);
@@ -161,11 +134,7 @@ describe('shared_space audit triggers', () => {
 
     await db.deleteFrom('asset').where('id', '=', asset.id).execute();
 
-    const rows = await db
-      .selectFrom('shared_space_asset_audit')
-      .selectAll()
-      .where('spaceId', '=', space.id)
-      .execute();
+    const rows = await db.selectFrom('shared_space_asset_audit').selectAll().where('spaceId', '=', space.id).execute();
 
     expect(rows).toHaveLength(1);
     expect(rows[0].assetId).toBe(asset.id);

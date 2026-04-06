@@ -123,10 +123,7 @@ describe(SyncRequestType.SharedSpaceAssetExifsV1, () => {
       SyncRequestType.SharedSpaceAssetExifsV1,
     ]);
     await ctx.syncAckAll(auth, initial);
-    await ctx.assertSyncIsComplete(auth, [
-      SyncRequestType.SharedSpacesV1,
-      SyncRequestType.SharedSpaceAssetExifsV1,
-    ]);
+    await ctx.assertSyncIsComplete(auth, [SyncRequestType.SharedSpacesV1, SyncRequestType.SharedSpaceAssetExifsV1]);
 
     await ctx.newSharedSpaceMember({
       spaceId: oldSpace.id,
@@ -166,9 +163,7 @@ describe(SyncRequestType.SharedSpaceAssetExifsV1, () => {
     await ctx.newExif({ assetId: asset.id, make: 'NewMake' });
 
     const next = await ctx.syncStream(auth, [SyncRequestType.SharedSpaceAssetExifsV1]);
-    const updateEvents = next.filter(
-      (r: { type: string }) => r.type === SyncEntityType.SharedSpaceAssetExifUpdateV1,
-    );
+    const updateEvents = next.filter((r: { type: string }) => r.type === SyncEntityType.SharedSpaceAssetExifUpdateV1);
     expect(updateEvents).toHaveLength(1);
     expect((updateEvents[0] as { data: { assetId: string; make: string | null } }).data).toMatchObject({
       assetId: asset.id,

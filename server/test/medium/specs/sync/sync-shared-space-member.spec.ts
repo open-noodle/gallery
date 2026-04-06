@@ -156,15 +156,9 @@ describe(SyncRequestType.SharedSpaceMembersV1, () => {
       role: SharedSpaceRole.Owner,
     });
 
-    const initial = await ctx.syncStream(auth, [
-      SyncRequestType.SharedSpacesV1,
-      SyncRequestType.SharedSpaceMembersV1,
-    ]);
+    const initial = await ctx.syncStream(auth, [SyncRequestType.SharedSpacesV1, SyncRequestType.SharedSpaceMembersV1]);
     await ctx.syncAckAll(auth, initial);
-    await ctx.assertSyncIsComplete(auth, [
-      SyncRequestType.SharedSpacesV1,
-      SyncRequestType.SharedSpaceMembersV1,
-    ]);
+    await ctx.assertSyncIsComplete(auth, [SyncRequestType.SharedSpacesV1, SyncRequestType.SharedSpaceMembersV1]);
 
     // Now add auth.user to the OLD space — gains access retroactively to the
     // pre-existing member rows.
@@ -175,14 +169,10 @@ describe(SyncRequestType.SharedSpaceMembersV1, () => {
     });
 
     const next = await ctx.syncStream(auth, [SyncRequestType.SharedSpaceMembersV1]);
-    const backfillEvents = next.filter(
-      (r: { type: string }) => r.type === SyncEntityType.SharedSpaceMemberBackfillV1,
-    );
+    const backfillEvents = next.filter((r: { type: string }) => r.type === SyncEntityType.SharedSpaceMemberBackfillV1);
     // The historical stranger member should arrive as a backfill event.
     expect(backfillEvents.length).toBeGreaterThanOrEqual(1);
-    expect(
-      backfillEvents.some((r: { data: { userId: string } }) => r.data.userId === stranger.id),
-    ).toBe(true);
+    expect(backfillEvents.some((r: { data: { userId: string } }) => r.data.userId === stranger.id)).toBe(true);
   });
 
   it('does NOT emit a member-delete event to the removed user via the member sync channel', async () => {
@@ -216,9 +206,7 @@ describe(SyncRequestType.SharedSpaceMembersV1, () => {
       .execute();
 
     const next = await ctx.syncStream(auth, [SyncRequestType.SharedSpaceMembersV1]);
-    const deleteEvents = next.filter(
-      (r: { type: string }) => r.type === SyncEntityType.SharedSpaceMemberDeleteV1,
-    );
+    const deleteEvents = next.filter((r: { type: string }) => r.type === SyncEntityType.SharedSpaceMemberDeleteV1);
     expect(deleteEvents).toHaveLength(0);
   });
 
