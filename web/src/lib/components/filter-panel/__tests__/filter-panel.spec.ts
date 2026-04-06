@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import type { FilterSection } from '../filter-panel';
 import { createFilterState } from '../filter-panel';
 import FilterPanel from '../filter-panel.svelte';
 
@@ -604,5 +605,90 @@ describe('Section Selector', () => {
     expect(screen.getByTestId('filter-section-timeline')).toBeTruthy();
     await fireEvent.click(screen.getByTestId('year-btn-2023'));
     expect(screen.getByTestId('filter-section-timeline')).toBeTruthy();
+  });
+});
+
+describe('Section Accordion Persistence', () => {
+  const EXPANDED_KEY = 'gallery-filter-expanded-sections';
+
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  function renderPanel(
+    sections: FilterSection[] = ['timeline', 'people', 'location', 'camera', 'tags', 'rating', 'media'],
+  ) {
+    return render(FilterPanel, {
+      props: {
+        config: { sections: [...sections], providers: {} },
+        timeBuckets: sections.includes('timeline')
+          ? [
+              { timeBucket: '2023-06-01', count: 100 },
+              { timeBucket: '2023-08-01', count: 200 },
+            ]
+          : [],
+      },
+    });
+  }
+
+  it('should default all sections to expanded on first visit', () => {
+    renderPanel(['people', 'rating']);
+    const peopleContent = screen.getByTestId('filter-section-people').querySelector('.filter-section-content');
+    const ratingContent = screen.getByTestId('filter-section-rating').querySelector('.filter-section-content');
+    expect(peopleContent).toBeTruthy();
+    expect(ratingContent).toBeTruthy();
+  });
+
+  it('should persist collapsed section to localStorage when header is clicked', async () => {
+    renderPanel(['people', 'rating']);
+    const peopleHeader = screen.getByTestId('filter-section-people').querySelector('button')!;
+    await fireEvent.click(peopleHeader);
+    const stored = JSON.parse(localStorage.getItem(EXPANDED_KEY) ?? '[]') as string[];
+    expect(stored).not.toContain('people');
+    expect(stored).toContain('rating');
+  });
+
+  it('should restore collapsed sections from localStorage on mount', () => {
+    localStorage.setItem(EXPANDED_KEY, JSON.stringify(['rating']));
+    renderPanel(['people', 'rating']);
+    const peopleContent = screen.getByTestId('filter-section-people').querySelector('.filter-section-content');
+    const ratingContent = screen.getByTestId('filter-section-rating').querySelector('.filter-section-content');
+    expect(peopleContent).toBeNull();
+    expect(ratingContent).toBeTruthy();
+  });
+
+  it('should keep all sections collapsed when localStorage has empty array', () => {
+    localStorage.setItem(EXPANDED_KEY, JSON.stringify([]));
+    renderPanel(['people', 'rating']);
+    const peopleContent = screen.getByTestId('filter-section-people').querySelector('.filter-section-content');
+    const ratingContent = screen.getByTestId('filter-section-rating').querySelector('.filter-section-content');
+    expect(peopleContent).toBeNull();
+    expect(ratingContent).toBeNull();
+  });
+
+  it('should ignore unknown section types in localStorage', () => {
+    localStorage.setItem(EXPANDED_KEY, JSON.stringify(['people', 'nonexistent']));
+    renderPanel(['people', 'rating']);
+    const peopleContent = screen.getByTestId('filter-section-people').querySelector('.filter-section-content');
+    expect(peopleContent).toBeTruthy();
+  });
+
+  it('should fall back to all-expanded when localStorage has invalid JSON', () => {
+    localStorage.setItem(EXPANDED_KEY, 'not-valid-json!!!');
+    renderPanel(['people', 'rating']);
+    const peopleContent = screen.getByTestId('filter-section-people').querySelector('.filter-section-content');
+    const ratingContent = screen.getByTestId('filter-section-rating').querySelector('.filter-section-content');
+    expect(peopleContent).toBeTruthy();
+    expect(ratingContent).toBeTruthy();
+  });
+
+  it('should expand a collapsed section when header is clicked again', async () => {
+    localStorage.setItem(EXPANDED_KEY, JSON.stringify(['rating']));
+    renderPanel(['people', 'rating']);
+    const peopleHeader = screen.getByTestId('filter-section-people').querySelector('button')!;
+    await fireEvent.click(peopleHeader);
+    const stored = JSON.parse(localStorage.getItem(EXPANDED_KEY) ?? '[]') as string[];
+    expect(stored).toContain('people');
+    expect(stored).toContain('rating');
   });
 });
