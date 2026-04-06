@@ -136,6 +136,44 @@ test.describe('Photos Search', () => {
     await expect(page.locator('input[placeholder="Search"]')).toHaveValue('');
   });
 
+  test('clearing the search restores the timeline with assets', async ({ context, page }) => {
+    // Regression: after a search is cleared, the /photos timeline re-mounts.
+    // It used to come back empty with no thumbnails even though there were
+    // assets. This test verifies the timeline re-populates with at least one
+    // asset thumbnail after the search is cleared.
+    await gotoPhotos(context, page);
+
+    // Sanity: the timeline grid is visible and has at least one asset thumbnail.
+    // The admin user was seeded with 3 assets in test.beforeAll.
+    const gridImages = page.locator('#asset-grid img');
+    await expect(gridImages.first()).toBeVisible({ timeout: 15_000 });
+    const beforeCount = await gridImages.count();
+    expect(beforeCount).toBeGreaterThan(0);
+
+    // Trigger search mode via the URL (ML disabled → empty results, but the
+    // SmartSearchResults wrapper mounts).
+    await page.goto('/photos?q=something');
+    await expect(page.getByTestId('result-count').or(page.getByTestId('search-empty'))).toBeVisible({
+      timeout: 15_000,
+    });
+    // Timeline grid should not be visible while search is active.
+    await expect(page.locator('[data-testid="timeline"]')).not.toBeVisible();
+
+    // Clear the search via the SearchBar X button.
+    await page.locator('[aria-label="Clear value"]').click();
+
+    // URL should return to /photos with no ?q=
+    await expect(page).toHaveURL(/\/photos(?!\?q=)/, { timeout: 10_000 });
+
+    // Regression assertion: the timeline grid re-appears AND has at least one
+    // asset thumbnail rendered. The previous bug caused the timeline to mount
+    // empty.
+    await expect(page.locator('#asset-grid')).toBeVisible({ timeout: 10_000 });
+    await expect(gridImages.first()).toBeVisible({ timeout: 15_000 });
+    const afterCount = await gridImages.count();
+    expect(afterCount).toBeGreaterThan(0);
+  });
+
   test('mobile viewport hides the SearchBar', async ({ context, page }) => {
     // Gallery's Tailwind theme defines --breakpoint-sm: 639px, so sm:block
     // still matches at 639. Use a clearly-sub-breakpoint width here.
