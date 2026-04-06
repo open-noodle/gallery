@@ -417,18 +417,18 @@ describe('LocationFilter', () => {
     });
 
     const searchInput = getByTestId('location-search-input');
-    // "an" matches 6 countries — all shown regardless of search
+    // "an" matches 4 countries — all shown regardless of truncation
     await fireEvent.input(searchInput, { target: { value: 'an' } });
 
-    expect(queryByTestId('location-country-Argentina')).toBeTruthy();
     expect(queryByTestId('location-country-Canada')).toBeTruthy();
     expect(queryByTestId('location-country-France')).toBeTruthy();
     expect(queryByTestId('location-country-Germany')).toBeTruthy();
     expect(queryByTestId('location-country-Japan')).toBeTruthy();
-    expect(queryByTestId('location-country-Spain')).toBeTruthy();
     // Non-matches hidden
+    expect(queryByTestId('location-country-Argentina')).toBeNull();
     expect(queryByTestId('location-country-Brazil')).toBeNull();
     expect(queryByTestId('location-country-China')).toBeNull();
+    expect(queryByTestId('location-country-Spain')).toBeNull();
   });
 
   it('should show "Show N more" when list exceeds 10 countries', () => {
@@ -560,13 +560,12 @@ describe('LocationFilter', () => {
     const { getByTestId, queryByTestId } = render(LocationFilter, {
       props: {
         countries: mockCountries,
-        selectedCountry: 'Germany',
         onCityFetch: mockCityFetch,
         onSelectionChange: () => {},
       },
     });
 
-    // Expand Germany to load cities
+    // Select and expand Germany to load cities
     await fireEvent.click(getByTestId('location-country-Germany'));
     await waitFor(() => {
       expect(queryByTestId('location-city-Munich')).toBeTruthy();
