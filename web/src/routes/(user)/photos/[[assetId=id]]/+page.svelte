@@ -37,7 +37,8 @@
   import { Route } from '$lib/route';
   import { getAssetBulkActions } from '$lib/services/asset.service';
   import { getStackBulkActions } from '$lib/services/stack.service';
-  import { getAssetMediaUrl, memoryLaneTitle } from '$lib/utils';
+  import { preferences } from '$lib/stores/user.store';
+  import { createUrl, getAssetMediaUrl, memoryLaneTitle } from '$lib/utils';
   import { type OnLink, type OnUnlink } from '$lib/utils/actions';
   import { openFileUploadDialog } from '$lib/utils/file-uploader';
   import { buildPhotosTimelineOptions, handlePhotosRemoveFilter } from '$lib/utils/photos-filter-options';
@@ -84,7 +85,7 @@
       const mappedPeople = response.people.map((p) => ({
         id: p.id,
         name: p.name,
-        thumbnailUrl: `/people/${p.id}/thumbnail`,
+        thumbnailUrl: createUrl(`/people/${p.id}/thumbnail`),
       }));
       for (const p of response.people) {
         personNames.set(p.id, p.name);
