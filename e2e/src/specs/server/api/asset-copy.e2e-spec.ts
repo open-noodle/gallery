@@ -15,6 +15,10 @@ import { beforeAll, describe, expect, it } from 'vitest';
 // Service shape (asset.service.ts:255-298):
 //   - requireAccess(AssetCopy, [sourceId, targetId])  → 400 if caller doesn't own BOTH
 //   - 'Both assets must exist'                        → if either getForCopy returns null
+//                                                       (effectively unreachable via HTTP:
+//                                                        a non-existent UUID trips
+//                                                        requireAccess first; this branch
+//                                                        is intentionally NOT pinned here)
 //   - 'Source and target id must be distinct'         → if sourceId === targetId
 //   - Each opt-in flag (albums/sharedLinks/stack/favorite/sidecar) defaults to true
 //
@@ -129,6 +133,10 @@ describe('PUT /assets/copy', () => {
     // Permission.AssetCopy goes through the same bulk-access pattern as
     // AssetRead — admins do NOT get a blanket override. Pinned to defend
     // against a future "admin can do anything" refactor.
+    //
+    // This test also doubles as the "caller owns NEITHER source nor target" case —
+    // admin owns neither asset since both belong to `owner`. No need for a
+    // separate "case D" test.
     const [sourceId, targetId] = await createOwnerPair();
     const { status, body } = await request(app)
       .put('/assets/copy')
@@ -165,6 +173,12 @@ describe('PUT /assets/copy', () => {
       .get(`/assets/${targetId}`)
       .set(asBearerAuth(owner.accessToken));
     expect((after.body as { isFavorite: boolean }).isFavorite).toBe(true);
+
+    // Source is unchanged — copy is not a move.
+    const sourceAfter = await request(app)
+      .get(`/assets/${sourceId}`)
+      .set(asBearerAuth(owner.accessToken));
+    expect((sourceAfter.body as { isFavorite: boolean }).isFavorite).toBe(true);
   });
 
   it('favorite=false opt-out skips the favorite copy', async () => {
@@ -174,6 +188,13 @@ describe('PUT /assets/copy', () => {
       .put(`/assets/${sourceId}`)
       .set(asBearerAuth(owner.accessToken))
       .send({ isFavorite: true });
+
+    // Sanity-read: target starts as not-favorite, so a working copy WOULD flip it
+    // to true. The opt-out below is the only thing that should prevent that.
+    const before = await request(app)
+      .get(`/assets/${targetId}`)
+      .set(asBearerAuth(owner.accessToken));
+    expect((before.body as { isFavorite: boolean }).isFavorite).toBe(false);
 
     const copy = await request(app)
       .put('/assets/copy')
@@ -224,6 +245,15 @@ describe('PUT /assets/copy', () => {
       albumName: 't26-album-optout',
       assetIds: [sourceId],
     });
+
+    // Sanity-read: target is NOT in the album, so a working copy WOULD add it.
+    // The opt-out below is the only thing that should prevent that.
+    const before = await request(app)
+      .get(`/albums/${album.id}?withoutAssets=false`)
+      .set(asBearerAuth(owner.accessToken));
+    const beforeIds = (before.body as { assets: Array<{ id: string }> }).assets.map((a) => a.id);
+    expect(beforeIds).toContain(sourceId);
+    expect(beforeIds).not.toContain(targetId);
 
     const copy = await request(app)
       .put('/assets/copy')
