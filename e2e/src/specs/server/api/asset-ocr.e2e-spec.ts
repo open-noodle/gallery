@@ -38,8 +38,9 @@ describe('GET /assets/:id/ocr', () => {
   });
 
   it('owner can fetch OCR — empty array for unprocessed asset', async () => {
-    // Generated PNGs from the test stack don't have OCR data extracted; the
-    // happy-path response is an empty array, not 404.
+    // The asset row exists, the ocr-rows table is empty for it. asset.service.ts:461-477
+    // calls ocrRepository.getByAssetId(id) which returns []; the happy-path is [], not 404.
+    // (A missing asset row would surface as a 400 from getForOcr(id) — see the next test.)
     const { status, body } = await request(app)
       .get(`/assets/${assetId}/ocr`)
       .set(asBearerAuth(owner.accessToken));
@@ -52,6 +53,17 @@ describe('GET /assets/:id/ocr', () => {
     const { status } = await request(app)
       .get(`/assets/${assetId}/ocr`)
       .set(asBearerAuth(other.accessToken));
+    expect(status).toBe(400);
+  });
+
+  it('admin reading another user\'s asset OCR returns 400 (no admin override)', async () => {
+    // The bulk-access pattern for Permission.AssetRead is owner-only — admins do NOT
+    // get blanket asset read via checkOwnerAccess. Pin it explicitly here so a future
+    // refactor that adds an admin escape hatch fails this test deliberately. Same
+    // taxonomy as T03/T07/T22 — 400, not 403.
+    const { status } = await request(app)
+      .get(`/assets/${assetId}/ocr`)
+      .set(asBearerAuth(admin.accessToken));
     expect(status).toBe(400);
   });
 
