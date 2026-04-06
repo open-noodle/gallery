@@ -65,6 +65,12 @@ describe('buildPhotosTimelineOptions', () => {
     expect(options).not.toHaveProperty('$type');
   });
 
+  it('should default to desc order when sortOrder is relevance', () => {
+    const filters = { ...createFilterState(), sortOrder: 'relevance' as const };
+    const options = buildPhotosTimelineOptions(filters);
+    expect(options.order).toBe(AssetOrder.Desc);
+  });
+
   it('should set ascending order', () => {
     const filters = { ...createFilterState(), sortOrder: 'asc' as const };
     const options = buildPhotosTimelineOptions(filters);
