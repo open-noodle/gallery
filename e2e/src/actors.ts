@@ -1,6 +1,7 @@
 import { LoginResponseDto, SharedSpaceRole } from '@immich/sdk';
 import { createUserDto } from 'src/fixtures';
-import { utils } from 'src/utils';
+import { app, asBearerAuth, utils } from 'src/utils';
+import request from 'supertest';
 import type { Response } from 'supertest';
 
 // E2E test helpers for actor-matrix-style coverage. See
@@ -18,6 +19,7 @@ export type ActorId =
   | 'spaceEditor'
   | 'spaceViewer'
   | 'spaceNonMember'
+  | 'partner'
   | 'admin';
 
 export type Actor = {
@@ -49,6 +51,19 @@ export type SpaceContext = {
   editorAssetId: string;
   /** Asset owned by spaceOwner AND added to the space via shared_space_asset. */
   spaceAssetId: string;
+  /** Only present when buildSpaceContext was called with `{ withPartner: true }`. */
+  partner?: Actor;
+  /** Only present when buildSpaceContext was called with `{ withPartner: true }`. Owned by `partner`. */
+  partnerAssetId?: string;
+};
+
+export type BuildSpaceContextOptions = {
+  /**
+   * If true, also creates a partner user who has shared their assets with `spaceOwner`,
+   * uploads one asset, and exposes them as `partner` / `partnerAssetId` on the returned
+   * SpaceContext. Costs one extra user setup + one createPartner call.
+   */
+  withPartner?: boolean;
 };
 
 /**
@@ -56,17 +71,21 @@ export type SpaceContext = {
  * a shared space owned by spaceOwner, and three uploaded assets (one for each member
  * with assets, plus one explicitly added to the space).
  *
+ * With `{ withPartner: true }`, also creates a `partner` user who has shared their
+ * assets with `spaceOwner` and uploaded one asset.
+ *
  * Call once in `beforeAll` per spec file. Treat the returned fixtures as read-only;
  * mutating tests must restore state in try/finally (see T02 fixture lifetime contract).
  */
-export const buildSpaceContext = async (): Promise<SpaceContext> => {
+export const buildSpaceContext = async (options: BuildSpaceContextOptions = {}): Promise<SpaceContext> => {
   const adminLogin = await utils.adminSetup();
 
-  const [ownerLogin, editorLogin, viewerLogin, nonMemberLogin] = await Promise.all([
+  const [ownerLogin, editorLogin, viewerLogin, nonMemberLogin, partnerLogin] = await Promise.all([
     utils.userSetup(adminLogin.accessToken, createUserDto.create('owner')),
     utils.userSetup(adminLogin.accessToken, createUserDto.create('editor')),
     utils.userSetup(adminLogin.accessToken, createUserDto.create('viewer')),
     utils.userSetup(adminLogin.accessToken, createUserDto.create('nonmember')),
+    options.withPartner ? utils.userSetup(adminLogin.accessToken, createUserDto.create('partner')) : Promise.resolve(undefined),
   ]);
 
   const space = await utils.createSpace(ownerLogin.accessToken, { name: 'test space' });
@@ -80,13 +99,23 @@ export const buildSpaceContext = async (): Promise<SpaceContext> => {
     role: SharedSpaceRole.Viewer,
   });
 
-  const [ownerAsset, spaceAsset, editorAsset] = await Promise.all([
+  const [ownerAsset, spaceAsset, editorAsset, partnerAsset] = await Promise.all([
     utils.createAsset(ownerLogin.accessToken),
     utils.createAsset(ownerLogin.accessToken),
     utils.createAsset(editorLogin.accessToken),
+    partnerLogin ? utils.createAsset(partnerLogin.accessToken) : Promise.resolve(undefined),
   ]);
 
   await utils.addSpaceAssets(ownerLogin.accessToken, space.id, [spaceAsset.id]);
+
+  if (partnerLogin) {
+    // partner shares their library with spaceOwner; spaceOwner is the recipient.
+    // The recipient (spaceOwner) enables inTimeline so withPartners=true picks them up.
+    await addPartner(
+      { token: partnerLogin.accessToken, userId: partnerLogin.userId },
+      { token: ownerLogin.accessToken, userId: ownerLogin.userId },
+    );
+  }
 
   return {
     admin: actorFrom('admin', adminLogin),
@@ -98,7 +127,37 @@ export const buildSpaceContext = async (): Promise<SpaceContext> => {
     ownerAssetId: ownerAsset.id,
     editorAssetId: editorAsset.id,
     spaceAssetId: spaceAsset.id,
+    partner: partnerLogin ? actorFrom('partner', partnerLogin) : undefined,
+    partnerAssetId: partnerAsset?.id,
   };
+};
+
+/**
+ * Set up a partner relationship: `from` shares their assets WITH `to`. The recipient
+ * can then see the sharer's assets via `?withPartners=true`.
+ *
+ * The default `partner.inTimeline` column is `false` (verified in
+ * `server/src/schema/tables/partner.table.ts:46`), so a fresh `createPartner` call
+ * is invisible to `getMyPartnerIds({ timelineEnabled: true })` which is what
+ * timeline.service.ts uses. To make tests intuitive, this helper auto-enables
+ * `inTimeline` after creation by having the recipient call PUT /partners/:id.
+ *
+ * Pinned in the backlog as an "Observed invariant" — easy to forget, painful to
+ * debug because the empty timeline silently looks correct.
+ */
+export const addPartner = async (
+  from: { token: string; userId: string },
+  to: { token: string; userId: string },
+): Promise<void> => {
+  await utils.createPartner(from.token, to.userId);
+  // recipient enables the partnership in their own timeline
+  const enable = await request(app)
+    .put(`/partners/${from.userId}`)
+    .set(asBearerAuth(to.token))
+    .send({ inTimeline: true });
+  if (enable.status !== 200) {
+    throw new Error(`addPartner: failed to enable inTimeline (${enable.status}): ${JSON.stringify(enable.body)}`);
+  }
 };
 
 const actorFrom = (id: ActorId, login: LoginResponseDto): Actor => ({

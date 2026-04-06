@@ -18,7 +18,7 @@ describe('/timeline', () => {
 
   beforeAll(async () => {
     await utils.resetDatabase();
-    ctx = await buildSpaceContext();
+    ctx = await buildSpaceContext({ withPartner: true });
   });
 
   describe('GET /timeline/buckets', () => {
@@ -148,6 +148,87 @@ describe('/timeline', () => {
       expect(body).toHaveProperty('ownerId');
       expect(body).not.toHaveProperty('count');
       expect(Array.isArray((body as { id: string[] }).id)).toBe(true);
+    });
+  });
+
+  describe('GET /timeline/buckets — withSharedSpaces and withPartners', () => {
+    // These flags are gated server-side: timeline.service.ts:91-113 throws 400 if
+    // visibility is undefined OR set to Archive (because requestedArchived is true in
+    // both cases), so all calls in this block must pass `visibility=TIMELINE` explicitly.
+
+    const total = (body: unknown) => (body as Array<{ count: number }>).reduce((acc, b) => acc + b.count, 0);
+
+    it('withSharedSpaces=true makes a non-owner member see space content via their own timeline', async () => {
+      // spaceEditor owns 1 asset (editorAssetId, NOT in the space). Without withSharedSpaces,
+      // their timeline shows just that one. With withSharedSpaces=true, the union picks up
+      // spaceAssetId via the membership (which has showInTimeline=true by default).
+      const { status: defaultStatus, body: defaultBody } = await request(app)
+        .get('/timeline/buckets?visibility=timeline')
+        .set(asBearerAuth(ctx.spaceEditor.token!));
+      expect(defaultStatus).toBe(200);
+      expect(total(defaultBody)).toBe(1);
+
+      const { status, body } = await request(app)
+        .get('/timeline/buckets?visibility=timeline&withSharedSpaces=true')
+        .set(asBearerAuth(ctx.spaceEditor.token!));
+      expect(status).toBe(200);
+      expect(total(body)).toBe(2);
+    });
+
+    it('toggling showInTimeline=false hides space content from withSharedSpaces=true', async () => {
+      // PATCH /shared-spaces/:id/members/me/timeline persists per-user. Snapshot + restore
+      // in try/finally per the fixture lifetime contract, so this test doesn't pollute
+      // sibling tests in the file.
+      try {
+        const disable = await request(app)
+          .patch(`/shared-spaces/${ctx.spaceId}/members/me/timeline`)
+          .set(asBearerAuth(ctx.spaceEditor.token!))
+          .send({ showInTimeline: false });
+        expect(disable.status).toBe(200);
+
+        const { status, body } = await request(app)
+          .get('/timeline/buckets?visibility=timeline&withSharedSpaces=true')
+          .set(asBearerAuth(ctx.spaceEditor.token!));
+        expect(status).toBe(200);
+        // With showInTimeline=false, the space drops out of getSpaceIdsForTimeline,
+        // so spaceEditor sees only their own 1 asset.
+        expect(total(body)).toBe(1);
+      } finally {
+        await request(app)
+          .patch(`/shared-spaces/${ctx.spaceId}/members/me/timeline`)
+          .set(asBearerAuth(ctx.spaceEditor.token!))
+          .send({ showInTimeline: true });
+      }
+    });
+
+    it('withPartners=true makes spaceOwner see partner-shared assets', async () => {
+      // partner has shared their library with spaceOwner via createPartner. spaceOwner
+      // owns 2 assets (ownerAssetId + spaceAssetId); the partner has 1 (partnerAssetId).
+      // With withPartners=true, total = 3.
+      const { status, body } = await request(app)
+        .get('/timeline/buckets?visibility=timeline&withPartners=true')
+        .set(asBearerAuth(ctx.spaceOwner.token!));
+      expect(status).toBe(200);
+      expect(total(body)).toBe(3);
+    });
+
+    it('default (no withPartners) excludes partner-shared assets', async () => {
+      const { status, body } = await request(app)
+        .get('/timeline/buckets?visibility=timeline')
+        .set(asBearerAuth(ctx.spaceOwner.token!));
+      expect(status).toBe(200);
+      expect(total(body)).toBe(2);
+    });
+
+    it('withSharedSpaces and withPartners can be combined', async () => {
+      // spaceOwner owns 2; partner has 1; the space contributes 0 NEW assets to spaceOwner
+      // (they already own spaceAssetId directly). Total still 3 — verifies the two flags
+      // don't double-count assets that satisfy both branches.
+      const { status, body } = await request(app)
+        .get('/timeline/buckets?visibility=timeline&withPartners=true&withSharedSpaces=true')
+        .set(asBearerAuth(ctx.spaceOwner.token!));
+      expect(status).toBe(200);
+      expect(total(body)).toBe(3);
     });
   });
 });
