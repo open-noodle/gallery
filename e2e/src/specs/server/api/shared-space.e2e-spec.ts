@@ -1924,6 +1924,145 @@ describe('/shared-spaces', () => {
       });
     });
 
+    describe('POST /shared-spaces/:id/people/:personId/merge (T12)', () => {
+      // T12 covers merging space persons. Path :personId is the *target*, body
+      // `{ids: string[]}` lists the *sources*. The service (shared-space.service.ts:730-778)
+      // requires Editor role, validates both sides are in the same space and the same
+      // type, reassigns faces from sources to target, deletes the source rows, recounts
+      // the target's denormalised counts, and queues a dedup pass.
+      //
+      // Each test creates fresh scratch persons (target + sources) per `it()` so the
+      // mutations are isolated.
+
+      it('access matrix', async () => {
+        // Create one target + one source per actor (5 fresh source persons; the target
+        // is shared because the merge would consume the source on a successful run, so
+        // we need a fresh source per attempt).
+        const target = await utils.createSpacePerson(spaceId, 'MergeTarget', owner.userId, spaceAssetId);
+        const sourceByActor: Record<string, string> = {};
+        for (const id of ['spaceOwner', 'spaceEditor', 'spaceViewer', 'spaceNonMember', 'anon']) {
+          const res = await utils.createSpacePerson(spaceId, `MergeSource-${id}`, owner.userId, spaceAssetId);
+          sourceByActor[id] = res.spacePersonId;
+        }
+
+        await forEachActor(
+          [ownerActor, editorActor, viewerActor, nonMemberActor, anonActor],
+          (actor) =>
+            request(app)
+              .post(`/shared-spaces/${spaceId}/people/${target.spacePersonId}/merge`)
+              .set(authHeaders(actor))
+              .send({ ids: [sourceByActor[actor.id]] }),
+          { spaceOwner: 204, spaceEditor: 204, spaceViewer: 403, spaceNonMember: 403, anon: 401 },
+        );
+      });
+
+      it('reassigns the source\'s face and deletes the source row', async () => {
+        // Each scratch person comes with one face attached to spaceAssetId. After merge,
+        // the source's face should belong to the target (verified via direct DB), and
+        // the source's shared_space_person row should be gone.
+        const target = await utils.createSpacePerson(spaceId, 'TgtA', owner.userId, spaceAssetId);
+        const source = await utils.createSpacePerson(spaceId, 'SrcA', owner.userId, spaceAssetId);
+
+        const dbClient = await utils.connectDatabase();
+        // Pre-condition: the source has its junction row pointing at itself.
+        const beforeRes = await dbClient.query(
+          'SELECT "personId" FROM shared_space_person_face WHERE "personId" = $1',
+          [source.spacePersonId],
+        );
+        expect(beforeRes.rowCount).toBe(1);
+
+        const mergeRes = await request(app)
+          .post(`/shared-spaces/${spaceId}/people/${target.spacePersonId}/merge`)
+          .set('Authorization', `Bearer ${owner.accessToken}`)
+          .send({ ids: [source.spacePersonId] });
+        expect(mergeRes.status).toBe(204);
+
+        // The source row is gone
+        const sourceRow = await dbClient.query('SELECT id FROM shared_space_person WHERE id = $1', [
+          source.spacePersonId,
+        ]);
+        expect(sourceRow.rowCount).toBe(0);
+
+        // The junction row that used to belong to the source now belongs to the target
+        const targetJunction = await dbClient.query(
+          'SELECT "personId" FROM shared_space_person_face WHERE "personId" = $1',
+          [target.spacePersonId],
+        );
+        // Target had its own face plus inherited the source's face = 2 junction rows
+        expect(targetJunction.rowCount).toBe(2);
+      });
+
+      it('after merge the target\'s denormalised faceCount and assetCount reflect the recount', async () => {
+        // recountPersons (shared-space.repository.ts:686+) updates faceCount and
+        // assetCount on shared_space_person from the junction table. After merging
+        // 1 source into the target, the target should have 2 faces and 1 unique asset
+        // (both faces are on spaceAssetId, so assetCount stays at 1).
+        const target = await utils.createSpacePerson(spaceId, 'TgtCount', owner.userId, spaceAssetId);
+        const source = await utils.createSpacePerson(spaceId, 'SrcCount', owner.userId, spaceAssetId);
+
+        await request(app)
+          .post(`/shared-spaces/${spaceId}/people/${target.spacePersonId}/merge`)
+          .set('Authorization', `Bearer ${owner.accessToken}`)
+          .send({ ids: [source.spacePersonId] });
+
+        const dbClient = await utils.connectDatabase();
+        const counts = await dbClient.query(
+          'SELECT "faceCount", "assetCount" FROM shared_space_person WHERE id = $1',
+          [target.spacePersonId],
+        );
+        expect(counts.rowCount).toBe(1);
+        expect(counts.rows[0].faceCount).toBe(2);
+        expect(counts.rows[0].assetCount).toBe(1);
+      });
+
+      it('cannot merge a person into themselves', async () => {
+        // shared-space.service.ts:743-745 — explicit BadRequestException with the
+        // distinctive "Cannot merge a person into themselves" message.
+        const target = await utils.createSpacePerson(spaceId, 'SelfMerge', owner.userId, spaceAssetId);
+        const { status, body } = await request(app)
+          .post(`/shared-spaces/${spaceId}/people/${target.spacePersonId}/merge`)
+          .set('Authorization', `Bearer ${owner.accessToken}`)
+          .send({ ids: [target.spacePersonId] });
+        expect(status).toBe(400);
+        expect((body as { message: string }).message).toMatch(/themselves/i);
+      });
+
+      it('cannot merge across types (person ↔ pet)', async () => {
+        // shared-space.service.ts:754-756 — service rejects when source.type !==
+        // target.type. UX consequence: pets and persons cannot be merged into each
+        // other, even if they're in the same space.
+        const personTarget = await utils.createSpacePerson(spaceId, 'TypeP', owner.userId, spaceAssetId);
+        const petSource = await utils.createSpacePerson(spaceId, 'TypePet', owner.userId, spaceAssetId, {
+          type: 'pet',
+        });
+
+        const { status, body } = await request(app)
+          .post(`/shared-spaces/${spaceId}/people/${personTarget.spacePersonId}/merge`)
+          .set('Authorization', `Bearer ${owner.accessToken}`)
+          .send({ ids: [petSource.spacePersonId] });
+        expect(status).toBe(400);
+        expect((body as { message: string }).message).toMatch(/different types/i);
+      });
+
+      it('non-existent target or source returns 400', async () => {
+        const target = await utils.createSpacePerson(spaceId, 'TgtMissing', owner.userId, spaceAssetId);
+
+        // Missing target → "Person not found"
+        const missingTarget = await request(app)
+          .post(`/shared-spaces/${spaceId}/people/00000000-0000-4000-a000-000000000099/merge`)
+          .set('Authorization', `Bearer ${owner.accessToken}`)
+          .send({ ids: [target.spacePersonId] });
+        expect(missingTarget.status).toBe(400);
+
+        // Missing source → "Source person not found in this space"
+        const missingSource = await request(app)
+          .post(`/shared-spaces/${spaceId}/people/${target.spacePersonId}/merge`)
+          .set('Authorization', `Bearer ${owner.accessToken}`)
+          .send({ ids: ['00000000-0000-4000-a000-000000000098'] });
+        expect(missingSource.status).toBe(400);
+      });
+    });
+
     it('empty thumbnailPath on the underlying global person excludes the space person', async () => {
       // The fork's "minFaces gate" mechanism. shared-space.repository.ts:512-513
       // filters with `person.thumbnailPath IS NOT NULL AND != ''`. In production
