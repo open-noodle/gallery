@@ -66,6 +66,11 @@
   let filters = $state(createFilterState());
   let searchQuery = $state(page.url.searchParams.get('q') ?? '');
   let isLoading = $state(false);
+  // Note: /photos derives `showSearchResults` from the searchQuery value so that navigating
+  // directly to `/photos?q=foo` immediately mounts the search results (rather than waiting
+  // for an explicit submit). The spaces page uses explicit `$state` because spaces has no
+  // URL state for the search query. Both pages end up with the same observable behavior for
+  // explicit submits because `searchQuery` is bound two-way via the SearchBar.
   const showSearchResults = $derived(searchQuery.trim().length > 0);
   const options = $derived(buildPhotosTimelineOptions(filters));
   let personNames = new SvelteMap<string, string>();
@@ -261,7 +266,6 @@
           }}
           onClearAll={() => {
             filters = clearFilters(filters);
-            clearSearch();
           }}
         />
       {/if}

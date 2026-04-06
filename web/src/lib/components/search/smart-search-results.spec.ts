@@ -2,7 +2,7 @@ import { getIntersectionObserverMock } from '$lib/__mocks__/intersection-observe
 import type { FilterState } from '$lib/components/filter-panel/filter-panel';
 import SmartSearchResults from '$lib/components/search/smart-search-results.svelte';
 import { SEARCH_FILTER_DEBOUNCE_MS } from '$lib/utils/space-search';
-import { AssetOrder, type AssetResponseDto } from '@immich/sdk';
+import { AssetOrder } from '@immich/sdk';
 import { render } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -27,12 +27,6 @@ const baseProps = {
 };
 
 const mockEmptyResult = { assets: { items: [], nextPage: null } };
-const mockResultsPage1 = {
-  assets: {
-    items: [{ id: 'a1' }, { id: 'a2' }] as AssetResponseDto[],
-    nextPage: '2',
-  },
-};
 
 describe('SmartSearchResults', () => {
   beforeEach(() => {
@@ -170,39 +164,15 @@ describe('SmartSearchResults', () => {
   // Test 51
   it.todo('submit while loadMore in flight: loadMore aborted, restart from page 1');
 
-  // Test 52 — cooperative abort, NOT SDK signal propagation
-  // The wrapper does NOT pass an AbortSignal to searchSmart. It uses cooperative
-  // abort: checks `controller.signal.aborted` *after* the await and discards stale
-  // results. So the test must verify the wrapper doesn't update state when a
-  // resolved-after-unmount response comes in, not that the fetch itself was cancelled.
-  it('discards results from in-flight request after wrapper unmounts', async () => {
-    let resolveFn: ((value: typeof mockResultsPage1) => void) | undefined;
-    searchSmartMock.mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          resolveFn = resolve;
-        }),
-    );
-
-    const { unmount } = render(SmartSearchResults, { props: baseProps });
-    await vi.advanceTimersByTimeAsync(SEARCH_FILTER_DEBOUNCE_MS);
-    // The fetch is in flight (resolveFn is set, promise unresolved)
-
-    unmount();
-    // The wrapper's $effect cleanup ran: setTimeout cleared, controller aborted
-
-    // Now resolve the in-flight promise — this would normally update state, but
-    // the wrapper's `if (controller.signal.aborted) return;` check should swallow it.
-    resolveFn!(mockResultsPage1);
-    await vi.runAllTimersAsync();
-
-    // Assert: vitest emits no "Cannot update state of unmounted component" warning.
-    // (Svelte 5's runtime tolerates writes to unmounted state, so the test relies
-    // on the wrapper's own aborted-check rather than a runtime crash.)
-    // If a stricter assertion is needed, spy on the IIFE that mutates searchResults
-    // and assert it's never called after unmount.
-    expect(true).toBe(true); // smoke check: nothing threw
-  });
+  // Test 52 — cooperative abort on unmount, NOT SDK signal propagation.
+  // The wrapper uses cooperative abort (checks `controller.signal.aborted` *after*
+  // the await and discards stale results). A meaningful assertion would need to
+  // observe that `searchResults`/`isLoading` don't change after unmount, but
+  // Svelte 5's runtime tolerates writes to unmounted state and there's no
+  // observable signal via testing-library to catch a silent write. Covered
+  // indirectly by the E2E abort behavior. Left as todo until we can spy on
+  // an observable side effect.
+  it.todo('discards results from in-flight request after wrapper unmounts');
 
   // Test 53
   it('catches backend errors and surfaces empty results without crashing', async () => {

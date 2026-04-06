@@ -1,5 +1,5 @@
 import type { FilterState } from '$lib/components/filter-panel/filter-panel';
-import { buildSmartSearchParams } from '$lib/utils/space-search';
+import { buildSmartSearchParams, SEARCH_FILTER_DEBOUNCE_MS } from '$lib/utils/space-search';
 import { AssetOrder, AssetTypeEnum } from '@immich/sdk';
 import { describe, expect, it } from 'vitest';
 
@@ -144,5 +144,61 @@ describe('buildSmartSearchParams', () => {
       expect(result.takenAfter).toBe(new Date(2024, 0, 1).toISOString());
       expect(result.takenBefore).toBe(new Date(2024, 11, 31, 23, 59, 59, 999).toISOString());
     });
+  });
+
+  describe('compound cases', () => {
+    it('handles all filters active simultaneously', () => {
+      const result = buildSmartSearchParams({
+        query: 'cherry blossoms',
+        filters: {
+          ...baseFilters,
+          personIds: ['p-1'],
+          city: 'Tokyo',
+          country: 'Japan',
+          make: 'Sony',
+          model: 'A7IV',
+          tagIds: ['t-1', 't-2'],
+          rating: 5,
+          mediaType: 'video',
+          selectedYear: 2025,
+          selectedMonth: 3,
+          sortOrder: 'desc',
+          isFavorite: true,
+        },
+        spaceId: 'space-1',
+      });
+      expect(result.query).toBe('cherry blossoms');
+      expect(result.spaceId).toBe('space-1');
+      expect(result.spacePersonIds).toEqual(['p-1']);
+      expect(result.city).toBe('Tokyo');
+      expect(result.country).toBe('Japan');
+      expect(result.make).toBe('Sony');
+      expect(result.model).toBe('A7IV');
+      expect(result.tagIds).toEqual(['t-1', 't-2']);
+      expect(result.rating).toBe(5);
+      expect(result.type).toBe(AssetTypeEnum.Video);
+      expect(result.takenAfter).toBeDefined();
+      expect(result.takenBefore).toBeDefined();
+      expect(result.order).toBe(AssetOrder.Desc);
+      expect(result.isFavorite).toBe(true);
+    });
+
+    it('does not include empty string fields', () => {
+      const result = buildSmartSearchParams({
+        query: 'beach',
+        filters: { ...baseFilters, city: '', country: '', make: '', model: '' },
+        spaceId: 'space-1',
+      });
+      expect(result.city).toBeUndefined();
+      expect(result.country).toBeUndefined();
+      expect(result.make).toBeUndefined();
+      expect(result.model).toBeUndefined();
+    });
+  });
+});
+
+describe('SEARCH_FILTER_DEBOUNCE_MS', () => {
+  it('is 250ms', () => {
+    expect(SEARCH_FILTER_DEBOUNCE_MS).toBe(250);
   });
 });
