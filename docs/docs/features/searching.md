@@ -1199,6 +1199,19 @@ Memory and execution time estimates were obtained without acceleration on a 7800
 Feel free to make a feature request if there's a model you want to use that we don't currently support.
 :::
 
+### Relevance threshold
+
+Smart search can optionally exclude results with low similarity to the search query. This prevents irrelevant photos from appearing when combining text search with metadata filters (e.g., searching "forest" filtered to a specific country that has no forest photos).
+
+By default this is disabled (set to 0). To enable, set `machineLearning.clip.maxDistance` in Administration > Machine Learning > Smart Search, or in your config file.
+
+| Value  | Behavior                                                                |
+| ------ | ----------------------------------------------------------------------- |
+| `0`    | Disabled (default). All results returned regardless of similarity.      |
+| `0.5`  | Very strict. Only strong visual matches. May miss borderline results.   |
+| `0.75` | Recommended. Good balance of relevance and recall.                      |
+| `1.0`  | Permissive. Includes weaker matches. Useful for broad/abstract queries. |
+
 [huggingface-clip]: https://huggingface.co/collections/immich-app/clip-654eaefb077425890874cd07
 [huggingface-multilingual-clip]: https://huggingface.co/collections/immich-app/multilingual-clip-654eb08c2382f591eeb8c2a7
 [smart-search-settings]: https://my.immich.app/admin/system-settings?isOpen=machine-learning+smart-search
