@@ -27453,6 +27453,14 @@
             ],
             "x-immich-state": "Deprecated"
           },
+          "order": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AssetOrder"
+              }
+            ],
+            "description": "Sort order (omit for relevance)"
+          },
           "page": {
             "deprecated": true,
             "description": "Page number",
