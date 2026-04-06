@@ -1121,6 +1121,27 @@ describe(SearchService.name, () => {
       expect(result.hasUnnamedPeople).toBe(true);
     });
 
+    it('should return people sorted alphabetically by name', async () => {
+      const auth = AuthFactory.create();
+      mocks.partner.getAll.mockResolvedValue([]);
+      mocks.search.getFilterSuggestions.mockResolvedValue({
+        ...emptyResult,
+        people: [
+          { id: 'p3', name: 'Charlie' },
+          { id: 'p1', name: 'Alice' },
+          { id: 'p2', name: 'Bob' },
+        ],
+      });
+
+      const result = await sut.getFilterSuggestions(auth, {});
+
+      expect(result.people).toEqual([
+        { id: 'p1', name: 'Alice' },
+        { id: 'p2', name: 'Bob' },
+        { id: 'p3', name: 'Charlie' },
+      ]);
+    });
+
     it('should throw when both spaceId and withSharedSpaces are set', async () => {
       const auth = AuthFactory.create();
       mocks.partner.getAll.mockResolvedValue([]);
