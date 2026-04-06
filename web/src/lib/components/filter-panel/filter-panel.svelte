@@ -38,20 +38,37 @@
     config: FilterPanelConfig;
     timeBuckets: Array<{ timeBucket: string; count: number }>;
     filters?: FilterState;
-    initialCollapsed?: boolean;
+    persistCollapsed?: boolean;
     storageKey?: string;
     hidden?: boolean;
   }
+
+  const COLLAPSED_KEY = 'gallery-filter-collapsed';
 
   let {
     config,
     timeBuckets,
     filters = $bindable(createFilterState()),
-    initialCollapsed = false,
     storageKey = 'gallery-filter-visible-sections',
     hidden = false,
+    persistCollapsed = true,
   }: Props = $props();
-  let collapsed = $state(initialCollapsed);
+
+  function loadCollapsed(): boolean {
+    if (persistCollapsed && browser) {
+      try {
+        const raw = localStorage.getItem(COLLAPSED_KEY);
+        if (raw !== null) {
+          return JSON.parse(raw) as boolean;
+        }
+      } catch {
+        /* corrupted — fall through */
+      }
+    }
+    return false;
+  }
+
+  let collapsed = $state(loadCollapsed());
 
   const providers = config.providers ?? {};
 
@@ -335,6 +352,39 @@
 
   let visibleSections = $state(loadVisibleSections(config.sections, storageKey));
 
+  const EXPANDED_SECTIONS_KEY = 'gallery-filter-expanded-sections';
+
+  function loadExpandedSections(configSections: FilterSectionType[]): SvelteSet<FilterSectionType> {
+    if (browser) {
+      try {
+        const raw = localStorage.getItem(EXPANDED_SECTIONS_KEY);
+        if (raw !== null) {
+          const parsed = JSON.parse(raw) as string[];
+          const valid = parsed.filter((s): s is FilterSectionType => configSections.includes(s as FilterSectionType));
+          // Return the validated set even if empty — an empty array means the user
+          // explicitly collapsed all sections. Only fall through to default when
+          // there's no localStorage entry at all (raw === null).
+          return new SvelteSet(valid);
+        }
+      } catch {
+        /* corrupted JSON — fall through to default */
+      }
+    }
+    return new SvelteSet(configSections);
+  }
+
+  let expandedSections = $state(loadExpandedSections(config.sections));
+
+  function toggleSectionExpanded(section: FilterSectionType) {
+    const next = new SvelteSet(expandedSections);
+    if (next.has(section)) {
+      next.delete(section);
+    } else {
+      next.add(section);
+    }
+    expandedSections = next;
+  }
+
   function toggleSection(section: FilterSectionType) {
     const next = new SvelteSet(visibleSections);
     if (next.has(section)) {
@@ -353,6 +403,26 @@
     if (browser) {
       try {
         localStorage.setItem(storageKey, JSON.stringify([...visibleSections]));
+      } catch {
+        /* localStorage unavailable */
+      }
+    }
+  });
+
+  $effect(() => {
+    if (persistCollapsed && browser) {
+      try {
+        localStorage.setItem(COLLAPSED_KEY, JSON.stringify(collapsed));
+      } catch {
+        /* localStorage unavailable */
+      }
+    }
+  });
+
+  $effect(() => {
+    if (browser) {
+      try {
+        localStorage.setItem(EXPANDED_SECTIONS_KEY, JSON.stringify([...expandedSections]));
       } catch {
         /* localStorage unavailable */
       }
@@ -560,6 +630,8 @@
             title={sectionTitles[section]}
             testId={section}
             refetching={isRefetching && section !== 'timeline'}
+            expanded={expandedSections.has(section)}
+            onToggleExpanded={() => toggleSectionExpanded(section)}
             count={filterContext
               ? section === 'people'
                 ? people.length
