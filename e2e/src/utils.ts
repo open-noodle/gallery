@@ -510,12 +510,16 @@ export const utils = {
     return person;
   },
 
-  createFace: async ({ assetId, personId }: { assetId: string; personId: string }) => {
+  createFace: async ({ assetId, personId }: { assetId: string; personId: string }): Promise<string> => {
     if (!client) {
-      return;
+      throw new Error('Database client not connected');
     }
 
-    await client.query('INSERT INTO asset_face ("assetId", "personId") VALUES ($1, $2)', [assetId, personId]);
+    const result = await client.query(
+      'INSERT INTO asset_face ("assetId", "personId") VALUES ($1, $2) RETURNING id',
+      [assetId, personId],
+    );
+    return result.rows[0].id as string;
   },
 
   setPersonThumbnail: async (personId: string) => {

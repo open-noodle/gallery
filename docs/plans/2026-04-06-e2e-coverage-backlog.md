@@ -45,7 +45,7 @@ This is the working backlog for closing the e2e API test coverage gaps. Each row
 
 | ID  | Task                                                                                                                                                                        | Size      | Blocked by | Status |
 | --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | ---------- | ------ |
-| T07 | **`face.e2e-spec.ts` — CRUD access matrix**. Create / list / reassign / delete with owner + non-owner. Cross-owner reassign rejected.                                       | ~10 tests | T02        | [ ]    |
+| T07 | **`face.e2e-spec.ts` — CRUD access matrix**. Create / list / reassign / delete with owner + non-owner. Cross-owner reassign rejected. Pinned the non-obvious API shape: PUT `/faces/:personId` with body `{id: faceId}` (path is target person, body is face). Extended `utils.createFace` to return the face id. | 10 tests | T02        | [x]    |
 | T08 | **Face deletion side effects**. Below-`minFaces` faces unaddressable (PR #139), space-person dedup queue triggered with jobId dedup (PR #292), person `assetCount` updates. | ~6 tests  | T02, T07   | [ ]    |
 
 ### Shared space — people sub-tree (`shared-space.e2e-spec.ts` extension)
@@ -154,6 +154,8 @@ Facts about the server code that the tests pin. Distinct from decisions because 
 - **`partner.inTimeline` defaults to `false`** — verified at `server/src/schema/tables/partner.table.ts:46`. Newly-created partnerships are invisible to `getMyPartnerIds({timelineEnabled: true})` until the recipient calls `PUT /partners/:id` with `{inTimeline: true}`. The `addPartner` helper in `e2e/src/actors.ts` auto-enables this so test usage is intuitive — but it's an easy footgun for any future spec that creates partnerships outside the helper. Pinned by T04's withPartners tests.
 - **`withSharedSpaces` and `withPartners` reject undefined visibility** — `timeline.service.ts:91-113` treats `visibility === undefined` as `requestedArchived = true` and throws 400. Tests using these flags MUST pass `visibility=timeline` explicitly. Pinned by T04 tests.
 - **Default visibility filter is permissive (Timeline + Archive)** — `withDefaultVisibility` at `server/src/utils/database.ts:79-81` is `where('asset.visibility', 'in', [Archive, Timeline])`, NOT just `Timeline`. The web UI's "main timeline" view passes `visibility=timeline` explicitly to exclude archive. Tests querying without an explicit visibility include archived assets in the count. Pinned by T05 tests.
+- **`POST /faces` returns void, not the face row** — `person.service.ts:639` declares `Promise<void>`, so callers cannot read back the created face id from the HTTP response. Tests that need the id (T07 PUT/DELETE) use `utils.createFace` which inserts via direct DB and returns the id explicitly. Pinned by T07.
+- **`PUT /faces/:id` semantics is "path = target person, body = face"** — `face.controller.ts:45-58` and `person.service.ts:111-126` confirm: the URL path :id is the *destination person ID* (where to move the face TO), and the body's `{id}` is the *face ID* (which face to move). The shared `FaceDto` is reused across endpoints with different meanings — confusing but stable. Pinned by T07.
 - **Stable space-people sort across paginated calls** — T09's test 10 pins it. T10–T12 inherit the assumption.
 
 ## Open hypotheses
