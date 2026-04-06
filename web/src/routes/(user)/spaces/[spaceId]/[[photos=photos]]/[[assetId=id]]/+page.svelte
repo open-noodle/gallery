@@ -47,6 +47,7 @@
   import { preferences, user } from '$lib/stores/user.store';
   import { createUrl } from '$lib/utils';
   import { handleError } from '$lib/utils/handle-error';
+  import { loadHeroCollapsed, persistHeroCollapsed } from '$lib/utils/space-hero-storage';
   import { buildSmartSearchParams, SEARCH_FILTER_DEBOUNCE_MS } from '$lib/utils/space-search';
   import {
     addAssets,
@@ -124,7 +125,7 @@
       showSearchResults = false;
       searchPage = 1;
       hasMoreResults = false;
-      heroCollapsed = false;
+      heroCollapsed = loadHeroCollapsed(data.space.id);
       panelOpen = false;
       viewMode = 'view';
       repositioning = false;
@@ -151,7 +152,13 @@
   let personNames = new SvelteMap<string, string>();
   let tagNames = new SvelteMap<string, string>();
 
-  let heroCollapsed = $state(false);
+  let heroCollapsed = $state(loadHeroCollapsed(data.space.id));
+
+  function toggleHeroCollapsed() {
+    heroCollapsed = !heroCollapsed;
+    persistHeroCollapsed(space.id, heroCollapsed);
+  }
+
   let prevFilterCount = 0;
 
   $effect(() => {
@@ -906,7 +913,7 @@
                   spaceId={space.id}
                   onShowMembers={handleShowMembers}
                   collapsed={heroCollapsed}
-                  onToggleCollapse={() => (heroCollapsed = !heroCollapsed)}
+                  onToggleCollapse={toggleHeroCollapsed}
                 />
 
                 {#if space.faceRecognitionEnabled && spacePeople.length > 0}

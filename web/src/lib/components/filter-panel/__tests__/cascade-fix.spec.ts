@@ -2,6 +2,10 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import FilterPanel from '../filter-panel.svelte';
 
 describe('Cascade callbacks pass parent value', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
   it('should call cities provider with the selected country', async () => {
     const citiesFn = vi.fn().mockResolvedValue(['Berlin', 'Munich']);
 
