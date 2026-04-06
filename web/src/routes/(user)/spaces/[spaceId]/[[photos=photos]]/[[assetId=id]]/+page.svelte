@@ -596,7 +596,11 @@
     isSearching = true;
     try {
       const { assets } = await searchSmart({
-        smartSearchDto: { ...buildSmartSearchParams(searchQuery.trim(), space.id, filters), page, size: 100 },
+        smartSearchDto: {
+          ...buildSmartSearchParams({ query: searchQuery.trim(), filters, spaceId: space.id }),
+          page,
+          size: 100,
+        },
       });
 
       if (controller.signal.aborted) {
