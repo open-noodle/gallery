@@ -58,7 +58,7 @@ jobs:
             if (eventType == "push") {
               const branch = context.payload.workflow_run.head_branch;
               console.log({branch});
-              const shouldDeploy = !isFork && branch == "main";
+              const shouldDeploy = branch == "main";
               parameters = {
                 event: "branch",
                 name: "main",
@@ -95,7 +95,7 @@ jobs:
               parameters = {
                 event: "release",
                 name: context.payload.workflow_run.head_branch,
-                shouldDeploy: !isFork
+                shouldDeploy: true
               };
             }
 
