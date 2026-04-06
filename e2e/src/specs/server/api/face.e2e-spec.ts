@@ -287,28 +287,46 @@ describe('/faces', () => {
       expect((after.body as { assets: number }).assets).toBe(0);
     });
 
-    it('re-attaching a face on the same asset+person after a soft-delete works', async () => {
-      // Soft-delete leaves the face row in place with deletedAt set; re-attaching
-      // via utils.createFace inserts a NEW row. There's no unique constraint that
-      // would block the second insert — pin that here so a future schema change
-      // (e.g. adding a UNIQUE on (assetId, personId)) is caught.
+    it('re-attaching a face after a soft-delete inserts a new row that the deletedAt filter actually distinguishes', async () => {
+      // Two-asset variant of the re-attach test. Without two assets the stats count
+      // is `count(distinct asset.id)` which would be 1 with or without the deletedAt
+      // filter — that wouldn't actually probe the filter. By putting the soft-deleted
+      // face on asset A and the new face on asset B, the count distinguishes:
+      //
+      //   - With deletedAt filter (correct): 1 (only asset B)
+      //   - Without deletedAt filter (broken): 2 (asset A + asset B)
+      //
+      // Plus: pin that there's no UNIQUE constraint blocking the second insert on
+      // the same asset+person (the soft-deleted row stays in place).
       const sidePerson = await utils.createPerson(ctx.spaceOwner.token!, { name: 'Henry' });
-      const firstFaceId = await utils.createFace({ assetId: ctx.ownerAssetId, personId: sidePerson.id });
+      const secondAsset = await utils.createAsset(ctx.spaceOwner.token!);
 
+      // First face on ownerAssetId; soft-delete it.
+      const firstFaceId = await utils.createFace({ assetId: ctx.ownerAssetId, personId: sidePerson.id });
       await request(app)
         .delete(`/faces/${firstFaceId}`)
         .set(asBearerAuth(ctx.spaceOwner.token!))
         .send({ force: false });
 
-      const secondFaceId = await utils.createFace({ assetId: ctx.ownerAssetId, personId: sidePerson.id });
+      // New face on the second asset.
+      const secondFaceId = await utils.createFace({ assetId: secondAsset.id, personId: sidePerson.id });
       expect(secondFaceId).not.toBe(firstFaceId);
 
-      // Stats reflect the new face — the soft-deleted one is excluded by deletedAt
-      // filter, the new one is counted, total is 1.
+      // Stats count only the new face → 1. If the deletedAt filter were broken,
+      // both faces would be counted via distinct asset ids → 2.
       const stats = await request(app)
         .get(`/people/${sidePerson.id}/statistics`)
         .set(asBearerAuth(ctx.spaceOwner.token!));
       expect((stats.body as { assets: number }).assets).toBe(1);
+
+      // Bonus: re-attaching the same (assetId, personId) on ownerAssetId still works
+      // even with the soft-deleted row in place — there's no UNIQUE constraint.
+      const reAttachId = await utils.createFace({ assetId: ctx.ownerAssetId, personId: sidePerson.id });
+      expect(reAttachId).not.toBe(firstFaceId);
+      const stats2 = await request(app)
+        .get(`/people/${sidePerson.id}/statistics`)
+        .set(asBearerAuth(ctx.spaceOwner.token!));
+      expect((stats2.body as { assets: number }).assets).toBe(2);
     });
   });
 
