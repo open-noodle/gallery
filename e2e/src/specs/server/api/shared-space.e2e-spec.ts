@@ -2234,27 +2234,36 @@ describe('/shared-spaces', () => {
 
       it('jobId dedup: two calls in quick succession enqueue only one job (PR #292)', async () => {
         // The load-bearing PR #292 invariant. BullMQ's queue() with a duplicate
-        // jobId is a no-op, so the same space's dedup job can't be enqueued twice
-        // while the first is still in the waiting/active state.
+        // jobId is a no-op (verified by job.repository.ts:252-259's getJob/remove
+        // pattern — duplicate jobId returns the existing job, not an error), so the
+        // same space's dedup job can't be enqueued twice while the first is waiting.
         //
         // Strategy: pause the FacialRecognition queue so the worker doesn't drain
-        // the job, empty it, trigger dedup twice, count the resulting jobs, restore.
+        // the job, empty it, trigger dedup twice, count the resulting jobs that
+        // match our spaceId, restore.
         //
         // The pause/restore is bracketed in try/finally so a test failure doesn't
-        // leave the queue paused and break the rest of the suite. The queue
-        // endpoints require admin token (queue.controller.ts:23) — `admin` is
-        // available from the outer beforeAll.
+        // leave the queue paused. The queue endpoints require admin token
+        // (queue.controller.ts:23) — `admin` is set in the outer beforeAll.
+        //
+        // QueueDeleteDto only has `failed?: boolean` (queue.dto.ts:24-31) — there
+        // is no statuses-based filter on emptyQueue, the underlying repository
+        // call drains waiting/active/delayed unconditionally. Sending no body is
+        // sufficient.
         const queueName = 'facialRecognition';
         try {
           // Pause + empty so the assertions are deterministic.
-          await request(app)
+          const pauseRes = await request(app)
             .put(`/queues/${queueName}`)
             .set('Authorization', `Bearer ${admin.accessToken}`)
             .send({ isPaused: true });
+          // Assert the pause succeeded — if not, the worker would race the
+          // assertion below and the test would be flaky for a non-test reason.
+          expect(pauseRes.status).toBe(200);
+
           await request(app)
             .delete(`/queues/${queueName}/jobs`)
-            .set('Authorization', `Bearer ${admin.accessToken}`)
-            .send({ statuses: ['waiting', 'delayed', 'active', 'completed', 'failed', 'paused'] });
+            .set('Authorization', `Bearer ${admin.accessToken}`);
 
           // First trigger
           const t1 = await request(app)
@@ -2268,22 +2277,25 @@ describe('/shared-spaces', () => {
             .set('Authorization', `Bearer ${owner.accessToken}`);
           expect(t2.status).toBe(204);
 
-          // Count waiting/paused jobs that match our space's dedup jobId. The job
-          // data is `{spaceId}` and the jobId is `space-dedup-${spaceId}`.
+          // Count jobs whose data matches our space. We don't filter by status
+          // (QueueJobSearchDto.status is the field name, but we want to see all
+          // jobs in any state to be safe), and filter client-side by spaceId.
           const jobs = await request(app)
             .get(`/queues/${queueName}/jobs`)
             .set('Authorization', `Bearer ${admin.accessToken}`);
           expect(jobs.status).toBe(200);
+          // Match strictly on the data.spaceId — the jobId encodes spaceId so
+          // an `||` would only widen if a future refactor decoupled the two,
+          // which is exactly the kind of regression we want to catch.
           const ourJobs = (jobs.body as Array<{ id?: string; data?: { spaceId?: string } }>).filter(
-            (j) => j.data?.spaceId === spaceId || j.id === `space-dedup-${spaceId}`,
+            (j) => j.data?.spaceId === spaceId,
           );
           expect(ourJobs.length).toBe(1);
         } finally {
-          // Unpause + drain whatever's left so other tests aren't affected.
+          // Drain + unpause so other tests aren't affected.
           await request(app)
             .delete(`/queues/${queueName}/jobs`)
-            .set('Authorization', `Bearer ${admin.accessToken}`)
-            .send({ statuses: ['waiting', 'delayed', 'active', 'completed', 'failed', 'paused'] });
+            .set('Authorization', `Bearer ${admin.accessToken}`);
           await request(app)
             .put(`/queues/${queueName}`)
             .set('Authorization', `Bearer ${admin.accessToken}`)
