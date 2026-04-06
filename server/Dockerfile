@@ -45,7 +45,8 @@ RUN --mount=type=cache,id=pnpm-cli,target=/buildcache/pnpm-store \
   --mount=type=bind,source=pnpm-lock.yaml,target=pnpm-lock.yaml \
   --mount=type=bind,source=pnpm-workspace.yaml,target=pnpm-workspace.yaml \
   pnpm --filter @immich/sdk --filter @immich/cli --frozen-lockfile install && \
-  pnpm --filter @immich/sdk --filter @immich/cli build && \
+  pnpm --filter @immich/sdk build && \
+  pnpm --filter @immich/cli build && \
   pnpm --filter @immich/cli --prod --no-optional deploy /output/cli-pruned
 
 FROM builder AS plugins
