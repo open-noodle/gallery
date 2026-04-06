@@ -28,6 +28,10 @@ The default configuration looks like this:
       "keepLastAmount": 14
     }
   },
+  "classification": {
+    "enabled": true,
+    "categories": []
+  },
   "ffmpeg": {
     "accel": "disabled",
     "accelDecode": true,
@@ -73,6 +77,9 @@ The default configuration looks like this:
   "job": {
     "backgroundTask": {
       "concurrency": 5
+    },
+    "classification": {
+      "concurrency": 1
     },
     "faceDetection": {
       "concurrency": 2
@@ -250,6 +257,34 @@ The default configuration looks like this:
 :::tip
 In Administration > Settings is a button to copy the current configuration to your clipboard.
 So you can just grab it from there, paste it into a file and you're pretty much good to go.
+:::
+
+:::info Classification
+The `classification` section configures [Auto-Classification](/features/auto-classification) — automatic tagging and archiving of photos based on visual content. Categories are empty by default. Here's an example with two categories:
+
+```json
+"classification": {
+  "enabled": true,
+  "categories": [
+    {
+      "name": "Nature",
+      "prompts": ["a landscape photo of mountains", "a photo of a forest", "a sunset over water"],
+      "similarity": 0.28,
+      "action": "tag",
+      "enabled": true
+    },
+    {
+      "name": "Screenshots",
+      "prompts": ["a screenshot of a phone screen", "a screenshot of a website"],
+      "similarity": 0.25,
+      "action": "tag_and_archive",
+      "enabled": true
+    }
+  ]
+}
+```
+
+The first category tags matching photos as `Auto/Nature`. The second tags and archives screenshots so they don't clutter your timeline. See the [Auto-Classification docs](/features/auto-classification) for the full field reference and prompt writing tips.
 :::
 
 ### Step 2 - Specify the file location
