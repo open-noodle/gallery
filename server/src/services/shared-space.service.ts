@@ -763,6 +763,12 @@ export class SharedSpaceService extends BaseService {
 
     await this.sharedSpaceRepository.recountPersons([targetPersonId]);
 
+    // Queue dedup pass — merged person's embedding profile may now match other persons
+    await this.jobRepository.queue({
+      name: JobName.SharedSpacePersonDedup,
+      data: { spaceId },
+    });
+
     await this.sharedSpaceRepository.logActivity({
       spaceId,
       userId: auth.user.id,
