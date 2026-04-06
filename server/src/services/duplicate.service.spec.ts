@@ -35,6 +35,9 @@ describe(DuplicateService.name, () => {
     ({ sut, mocks } = newTestService(DuplicateService));
     mocks.duplicateRepository.delete.mockResolvedValue(undefined as any);
     mocks.duplicateRepository.deleteAll.mockResolvedValue(undefined as any);
+    // Default to "no editable spaces" so the new merge branch is a no-op for
+    // existing tests. Tests that exercise the merge override per case.
+    mocks.sharedSpace.getEditableByAssetIds.mockResolvedValue(new Set());
   });
 
   it('should work', () => {
@@ -368,6 +371,140 @@ describe(DuplicateService.name, () => {
 
       // Verify SidecarWrite was queued (to write tags to sidecar)
       expect(mocks.job.queueAll).toHaveBeenCalledWith([{ name: JobName.SidecarWrite, data: { id: asset1.id } }]);
+    });
+
+    describe('shared space sync', () => {
+      const spaceX = 'space-x-id';
+      const spaceY = 'space-y-id';
+
+      const setupBaseDuplicate = (asset1: any, asset2: any) => {
+        mocks.access.duplicate.checkOwnerAccess.mockResolvedValue(new Set(['group-1']));
+        mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset2.id]));
+        mocks.duplicateRepository.get.mockResolvedValue({
+          duplicateId: 'group-1',
+          assets: [asset1 as unknown as MapAsset, asset2 as unknown as MapAsset],
+        });
+      };
+
+      it('adds keeper to spaces the trashed asset was in', async () => {
+        const asset1 = AssetFactory.create();
+        const asset2 = AssetFactory.create();
+        setupBaseDuplicate(asset1, asset2);
+        mocks.sharedSpace.getEditableByAssetIds.mockResolvedValue(new Set([spaceX]));
+        mocks.sharedSpace.addAssets.mockResolvedValue([]);
+
+        const result = await sut.resolve(authStub.admin, {
+          groups: [{ duplicateId: 'group-1', keepAssetIds: [asset1.id], trashAssetIds: [asset2.id] }],
+        });
+
+        expect(result[0].success).toBe(true);
+        expect(mocks.sharedSpace.getEditableByAssetIds).toHaveBeenCalledWith(
+          authStub.admin.user.id,
+          new Set([asset1.id, asset2.id]),
+        );
+        expect(mocks.sharedSpace.addAssets).toHaveBeenCalledWith([
+          { spaceId: spaceX, assetId: asset1.id, addedById: authStub.admin.user.id },
+        ]);
+        expect(mocks.job.queueAll).toHaveBeenCalledWith(
+          expect.arrayContaining([
+            { name: JobName.SharedSpaceFaceMatch, data: { spaceId: spaceX, assetId: asset1.id } },
+          ]),
+        );
+      });
+
+      it('does not call addAssets when the user has no editable spaces containing the group', async () => {
+        const asset1 = AssetFactory.create();
+        const asset2 = AssetFactory.create();
+        setupBaseDuplicate(asset1, asset2);
+        mocks.sharedSpace.getEditableByAssetIds.mockResolvedValue(new Set());
+
+        const result = await sut.resolve(authStub.admin, {
+          groups: [{ duplicateId: 'group-1', keepAssetIds: [asset1.id], trashAssetIds: [asset2.id] }],
+        });
+
+        expect(result[0].success).toBe(true);
+        expect(mocks.sharedSpace.addAssets).not.toHaveBeenCalled();
+        const faceMatchCalls = mocks.job.queueAll.mock.calls
+          .flat(2)
+          .filter((j: any) => j?.name === JobName.SharedSpaceFaceMatch);
+        expect(faceMatchCalls).toHaveLength(0);
+      });
+
+      it('adds keeper to multiple editable spaces', async () => {
+        const asset1 = AssetFactory.create();
+        const asset2 = AssetFactory.create();
+        setupBaseDuplicate(asset1, asset2);
+        mocks.sharedSpace.getEditableByAssetIds.mockResolvedValue(new Set([spaceX, spaceY]));
+        mocks.sharedSpace.addAssets.mockResolvedValue([]);
+
+        const result = await sut.resolve(authStub.admin, {
+          groups: [{ duplicateId: 'group-1', keepAssetIds: [asset1.id], trashAssetIds: [asset2.id] }],
+        });
+
+        expect(result[0].success).toBe(true);
+        const addAssetsArg = mocks.sharedSpace.addAssets.mock.calls[0][0] as Array<{
+          spaceId: string;
+          assetId: string;
+          addedById: string;
+        }>;
+        expect(addAssetsArg).toHaveLength(2);
+        expect(addAssetsArg).toEqual(
+          expect.arrayContaining([
+            { spaceId: spaceX, assetId: asset1.id, addedById: authStub.admin.user.id },
+            { spaceId: spaceY, assetId: asset1.id, addedById: authStub.admin.user.id },
+          ]),
+        );
+
+        const queuedFaceJobs = mocks.job.queueAll.mock.calls
+          .flat(2)
+          .filter((j: any) => j?.name === JobName.SharedSpaceFaceMatch);
+        expect(queuedFaceJobs).toHaveLength(2);
+      });
+
+      it('skips the space sync branch entirely when there are no keepers', async () => {
+        const asset1 = AssetFactory.create();
+        const asset2 = AssetFactory.create();
+        setupBaseDuplicate(asset1, asset2);
+        mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset1.id, asset2.id]));
+
+        const result = await sut.resolve(authStub.admin, {
+          groups: [{ duplicateId: 'group-1', keepAssetIds: [], trashAssetIds: [asset1.id, asset2.id] }],
+        });
+
+        expect(result[0].success).toBe(true);
+        expect(mocks.sharedSpace.getEditableByAssetIds).not.toHaveBeenCalled();
+        expect(mocks.sharedSpace.addAssets).not.toHaveBeenCalled();
+      });
+
+      it('reports failure cleanly if addAssets throws, and NO downstream mutation runs', async () => {
+        // Regression guard for the "place merge first" decision in the design.
+        // If anyone moves the new branch later, downstream mutations would
+        // have already happened before the throw, leaving partial state.
+        const asset1 = AssetFactory.create();
+        const asset2 = AssetFactory.create();
+        setupBaseDuplicate(asset1, asset2);
+        mocks.sharedSpace.getEditableByAssetIds.mockResolvedValue(new Set([spaceX]));
+        mocks.sharedSpace.addAssets.mockRejectedValue(new Error('db exploded'));
+
+        const result = await sut.resolve(authStub.admin, {
+          groups: [{ duplicateId: 'group-1', keepAssetIds: [asset1.id], trashAssetIds: [asset2.id] }],
+        });
+
+        expect(result[0].success).toBe(false);
+        expect(result[0].error).toBe(BulkIdErrorReason.UNKNOWN);
+
+        // None of the downstream merge / mutation steps should have run.
+        expect(mocks.album.addAssetIdsToAlbums).not.toHaveBeenCalled();
+        expect(mocks.tag.replaceAssetTags).not.toHaveBeenCalled();
+        expect(mocks.asset.updateAllExif).not.toHaveBeenCalled();
+
+        // The trash step must NOT have run.
+        const trashCalls = mocks.asset.updateAll.mock.calls.filter(
+          ([_ids, update]: [string[], any]) =>
+            update && (update.deletedAt !== undefined || update.status !== undefined),
+        );
+        expect(trashCalls).toHaveLength(0);
+      });
     });
 
     // NOTE: The following integration-style tests are covered by E2E tests instead
