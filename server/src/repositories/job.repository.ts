@@ -236,6 +236,9 @@ export class JobRepository {
       case JobName.SharedSpaceBulkAddAssets: {
         return { jobId: `bulk-add-${item.data.spaceId}-${item.data.userId}` };
       }
+      case JobName.SharedSpacePersonDedup: {
+        return { jobId: `space-dedup-${item.data.spaceId}` };
+      }
       default: {
         return null;
       }
