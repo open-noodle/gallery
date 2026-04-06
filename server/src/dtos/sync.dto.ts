@@ -488,6 +488,80 @@ export class SyncResetV1 {}
 @ExtraModel()
 export class SyncCompleteV1 {}
 
+// --- gallery-fork: shared-space sync DTOs ---
+
+@ExtraModel()
+export class SyncSharedSpaceDeleteV1 {
+  @ApiProperty({ description: 'Shared space ID' })
+  spaceId!: string;
+}
+
+@ExtraModel()
+export class SyncSharedSpaceToAssetV1 {
+  @ApiProperty({ description: 'Shared space ID' })
+  spaceId!: string;
+  @ApiProperty({ description: 'Asset ID' })
+  assetId!: string;
+}
+
+@ExtraModel()
+export class SyncSharedSpaceToAssetDeleteV1 {
+  @ApiProperty({ description: 'Shared space ID' })
+  spaceId!: string;
+  @ApiProperty({ description: 'Asset ID' })
+  assetId!: string;
+}
+
+@ExtraModel()
+export class SyncSharedSpaceV1 {
+  @ApiProperty({ description: 'Shared space ID' })
+  id!: string;
+  @ApiProperty({ description: 'Space name' })
+  name!: string;
+  @ApiProperty({ description: 'Space description' })
+  description!: string | null;
+  @ApiProperty({ description: 'Color' })
+  color!: string | null;
+  @ApiProperty({ description: 'Created by user ID' })
+  createdById!: string;
+  @ApiProperty({ description: 'Thumbnail asset ID' })
+  thumbnailAssetId!: string | null;
+  @ApiProperty({ description: 'Thumbnail crop Y offset' })
+  thumbnailCropY!: number | null;
+  @ApiProperty({ description: 'Face recognition enabled' })
+  faceRecognitionEnabled!: boolean;
+  @ApiProperty({ description: 'Pets enabled' })
+  petsEnabled!: boolean;
+  @ApiProperty({ description: 'Last activity timestamp' })
+  lastActivityAt!: Date | null;
+  @ApiProperty({ description: 'Created at' })
+  createdAt!: Date;
+  @ApiProperty({ description: 'Updated at' })
+  updatedAt!: Date;
+}
+
+@ExtraModel()
+export class SyncSharedSpaceMemberDeleteV1 {
+  @ApiProperty({ description: 'Shared space ID' })
+  spaceId!: string;
+  @ApiProperty({ description: 'User ID' })
+  userId!: string;
+}
+
+@ExtraModel()
+export class SyncSharedSpaceMemberV1 {
+  @ApiProperty({ description: 'Shared space ID' })
+  spaceId!: string;
+  @ApiProperty({ description: 'User ID' })
+  userId!: string;
+  @ApiProperty({ description: 'Member role' })
+  role!: string;
+  @ApiProperty({ description: 'When the user joined the space' })
+  joinedAt!: Date;
+  @ApiProperty({ description: 'Whether the space contributes to the user timeline' })
+  showInTimeline!: boolean;
+}
+
 export type SyncItem = {
   [SyncEntityType.AuthUserV1]: SyncAuthUserV1;
   [SyncEntityType.UserV1]: SyncUserV1;
@@ -539,6 +613,21 @@ export type SyncItem = {
   [SyncEntityType.SyncAckV1]: SyncAckV1;
   [SyncEntityType.SyncCompleteV1]: SyncCompleteV1;
   [SyncEntityType.SyncResetV1]: SyncResetV1;
+  // gallery-fork shared-space sync types
+  [SyncEntityType.SharedSpaceV1]: SyncSharedSpaceV1;
+  [SyncEntityType.SharedSpaceDeleteV1]: SyncSharedSpaceDeleteV1;
+  [SyncEntityType.SharedSpaceMemberV1]: SyncSharedSpaceMemberV1;
+  [SyncEntityType.SharedSpaceMemberBackfillV1]: SyncSharedSpaceMemberV1;
+  [SyncEntityType.SharedSpaceMemberDeleteV1]: SyncSharedSpaceMemberDeleteV1;
+  [SyncEntityType.SharedSpaceAssetCreateV1]: SyncAssetV1;
+  [SyncEntityType.SharedSpaceAssetUpdateV1]: SyncAssetV1;
+  [SyncEntityType.SharedSpaceAssetBackfillV1]: SyncAssetV1;
+  [SyncEntityType.SharedSpaceAssetExifCreateV1]: SyncAssetExifV1;
+  [SyncEntityType.SharedSpaceAssetExifUpdateV1]: SyncAssetExifV1;
+  [SyncEntityType.SharedSpaceAssetExifBackfillV1]: SyncAssetExifV1;
+  [SyncEntityType.SharedSpaceToAssetV1]: SyncSharedSpaceToAssetV1;
+  [SyncEntityType.SharedSpaceToAssetBackfillV1]: SyncSharedSpaceToAssetV1;
+  [SyncEntityType.SharedSpaceToAssetDeleteV1]: SyncSharedSpaceToAssetDeleteV1;
 };
 
 export class SyncStreamDto {

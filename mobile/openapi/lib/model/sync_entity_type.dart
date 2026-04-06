@@ -70,6 +70,20 @@ class SyncEntityType {
   static const assetFaceDeleteV1 = SyncEntityType._(r'AssetFaceDeleteV1');
   static const userMetadataV1 = SyncEntityType._(r'UserMetadataV1');
   static const userMetadataDeleteV1 = SyncEntityType._(r'UserMetadataDeleteV1');
+  static const sharedSpaceV1 = SyncEntityType._(r'SharedSpaceV1');
+  static const sharedSpaceDeleteV1 = SyncEntityType._(r'SharedSpaceDeleteV1');
+  static const sharedSpaceMemberV1 = SyncEntityType._(r'SharedSpaceMemberV1');
+  static const sharedSpaceMemberDeleteV1 = SyncEntityType._(r'SharedSpaceMemberDeleteV1');
+  static const sharedSpaceMemberBackfillV1 = SyncEntityType._(r'SharedSpaceMemberBackfillV1');
+  static const sharedSpaceAssetCreateV1 = SyncEntityType._(r'SharedSpaceAssetCreateV1');
+  static const sharedSpaceAssetUpdateV1 = SyncEntityType._(r'SharedSpaceAssetUpdateV1');
+  static const sharedSpaceAssetBackfillV1 = SyncEntityType._(r'SharedSpaceAssetBackfillV1');
+  static const sharedSpaceAssetExifCreateV1 = SyncEntityType._(r'SharedSpaceAssetExifCreateV1');
+  static const sharedSpaceAssetExifUpdateV1 = SyncEntityType._(r'SharedSpaceAssetExifUpdateV1');
+  static const sharedSpaceAssetExifBackfillV1 = SyncEntityType._(r'SharedSpaceAssetExifBackfillV1');
+  static const sharedSpaceToAssetV1 = SyncEntityType._(r'SharedSpaceToAssetV1');
+  static const sharedSpaceToAssetDeleteV1 = SyncEntityType._(r'SharedSpaceToAssetDeleteV1');
+  static const sharedSpaceToAssetBackfillV1 = SyncEntityType._(r'SharedSpaceToAssetBackfillV1');
   static const syncAckV1 = SyncEntityType._(r'SyncAckV1');
   static const syncResetV1 = SyncEntityType._(r'SyncResetV1');
   static const syncCompleteV1 = SyncEntityType._(r'SyncCompleteV1');
@@ -123,6 +137,20 @@ class SyncEntityType {
     assetFaceDeleteV1,
     userMetadataV1,
     userMetadataDeleteV1,
+    sharedSpaceV1,
+    sharedSpaceDeleteV1,
+    sharedSpaceMemberV1,
+    sharedSpaceMemberDeleteV1,
+    sharedSpaceMemberBackfillV1,
+    sharedSpaceAssetCreateV1,
+    sharedSpaceAssetUpdateV1,
+    sharedSpaceAssetBackfillV1,
+    sharedSpaceAssetExifCreateV1,
+    sharedSpaceAssetExifUpdateV1,
+    sharedSpaceAssetExifBackfillV1,
+    sharedSpaceToAssetV1,
+    sharedSpaceToAssetDeleteV1,
+    sharedSpaceToAssetBackfillV1,
     syncAckV1,
     syncResetV1,
     syncCompleteV1,
@@ -211,6 +239,20 @@ class SyncEntityTypeTypeTransformer {
         case r'AssetFaceDeleteV1': return SyncEntityType.assetFaceDeleteV1;
         case r'UserMetadataV1': return SyncEntityType.userMetadataV1;
         case r'UserMetadataDeleteV1': return SyncEntityType.userMetadataDeleteV1;
+        case r'SharedSpaceV1': return SyncEntityType.sharedSpaceV1;
+        case r'SharedSpaceDeleteV1': return SyncEntityType.sharedSpaceDeleteV1;
+        case r'SharedSpaceMemberV1': return SyncEntityType.sharedSpaceMemberV1;
+        case r'SharedSpaceMemberDeleteV1': return SyncEntityType.sharedSpaceMemberDeleteV1;
+        case r'SharedSpaceMemberBackfillV1': return SyncEntityType.sharedSpaceMemberBackfillV1;
+        case r'SharedSpaceAssetCreateV1': return SyncEntityType.sharedSpaceAssetCreateV1;
+        case r'SharedSpaceAssetUpdateV1': return SyncEntityType.sharedSpaceAssetUpdateV1;
+        case r'SharedSpaceAssetBackfillV1': return SyncEntityType.sharedSpaceAssetBackfillV1;
+        case r'SharedSpaceAssetExifCreateV1': return SyncEntityType.sharedSpaceAssetExifCreateV1;
+        case r'SharedSpaceAssetExifUpdateV1': return SyncEntityType.sharedSpaceAssetExifUpdateV1;
+        case r'SharedSpaceAssetExifBackfillV1': return SyncEntityType.sharedSpaceAssetExifBackfillV1;
+        case r'SharedSpaceToAssetV1': return SyncEntityType.sharedSpaceToAssetV1;
+        case r'SharedSpaceToAssetDeleteV1': return SyncEntityType.sharedSpaceToAssetDeleteV1;
+        case r'SharedSpaceToAssetBackfillV1': return SyncEntityType.sharedSpaceToAssetBackfillV1;
         case r'SyncAckV1': return SyncEntityType.syncAckV1;
         case r'SyncResetV1': return SyncEntityType.syncResetV1;
         case r'SyncCompleteV1': return SyncEntityType.syncCompleteV1;

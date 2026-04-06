@@ -3617,6 +3617,66 @@ export type SyncPersonV1 = {
     updatedAt: string;
 };
 export type SyncResetV1 = {};
+export type SyncSharedSpaceDeleteV1 = {
+    /** Shared space ID */
+    spaceId: string;
+};
+export type SyncSharedSpaceMemberDeleteV1 = {
+    /** Shared space ID */
+    spaceId: string;
+    /** User ID */
+    userId: string;
+};
+export type SyncSharedSpaceMemberV1 = {
+    /** When the user joined the space */
+    joinedAt: string;
+    /** Member role */
+    role: string;
+    /** Whether the space contributes to the user timeline */
+    showInTimeline: boolean;
+    /** Shared space ID */
+    spaceId: string;
+    /** User ID */
+    userId: string;
+};
+export type SyncSharedSpaceToAssetDeleteV1 = {
+    /** Asset ID */
+    assetId: string;
+    /** Shared space ID */
+    spaceId: string;
+};
+export type SyncSharedSpaceToAssetV1 = {
+    /** Asset ID */
+    assetId: string;
+    /** Shared space ID */
+    spaceId: string;
+};
+export type SyncSharedSpaceV1 = {
+    /** Color */
+    color: string | null;
+    /** Created at */
+    createdAt: string;
+    /** Created by user ID */
+    createdById: string;
+    /** Space description */
+    description: string | null;
+    /** Face recognition enabled */
+    faceRecognitionEnabled: boolean;
+    /** Shared space ID */
+    id: string;
+    /** Last activity timestamp */
+    lastActivityAt: string | null;
+    /** Space name */
+    name: string;
+    /** Pets enabled */
+    petsEnabled: boolean;
+    /** Thumbnail asset ID */
+    thumbnailAssetId: string | null;
+    /** Thumbnail crop Y offset */
+    thumbnailCropY: number | null;
+    /** Updated at */
+    updatedAt: string;
+};
 export type SyncStackDeleteV1 = {
     /** Stack ID */
     stackId: string;
@@ -8431,6 +8491,20 @@ export enum SyncEntityType {
     AssetFaceDeleteV1 = "AssetFaceDeleteV1",
     UserMetadataV1 = "UserMetadataV1",
     UserMetadataDeleteV1 = "UserMetadataDeleteV1",
+    SharedSpaceV1 = "SharedSpaceV1",
+    SharedSpaceDeleteV1 = "SharedSpaceDeleteV1",
+    SharedSpaceMemberV1 = "SharedSpaceMemberV1",
+    SharedSpaceMemberDeleteV1 = "SharedSpaceMemberDeleteV1",
+    SharedSpaceMemberBackfillV1 = "SharedSpaceMemberBackfillV1",
+    SharedSpaceAssetCreateV1 = "SharedSpaceAssetCreateV1",
+    SharedSpaceAssetUpdateV1 = "SharedSpaceAssetUpdateV1",
+    SharedSpaceAssetBackfillV1 = "SharedSpaceAssetBackfillV1",
+    SharedSpaceAssetExifCreateV1 = "SharedSpaceAssetExifCreateV1",
+    SharedSpaceAssetExifUpdateV1 = "SharedSpaceAssetExifUpdateV1",
+    SharedSpaceAssetExifBackfillV1 = "SharedSpaceAssetExifBackfillV1",
+    SharedSpaceToAssetV1 = "SharedSpaceToAssetV1",
+    SharedSpaceToAssetDeleteV1 = "SharedSpaceToAssetDeleteV1",
+    SharedSpaceToAssetBackfillV1 = "SharedSpaceToAssetBackfillV1",
     SyncAckV1 = "SyncAckV1",
     SyncResetV1 = "SyncResetV1",
     SyncCompleteV1 = "SyncCompleteV1"
@@ -8457,7 +8531,12 @@ export enum SyncRequestType {
     PeopleV1 = "PeopleV1",
     AssetFacesV1 = "AssetFacesV1",
     AssetFacesV2 = "AssetFacesV2",
-    UserMetadataV1 = "UserMetadataV1"
+    UserMetadataV1 = "UserMetadataV1",
+    SharedSpacesV1 = "SharedSpacesV1",
+    SharedSpaceMembersV1 = "SharedSpaceMembersV1",
+    SharedSpaceAssetsV1 = "SharedSpaceAssetsV1",
+    SharedSpaceAssetExifsV1 = "SharedSpaceAssetExifsV1",
+    SharedSpaceToAssetsV1 = "SharedSpaceToAssetsV1"
 }
 export enum Action2 {
     Tag = "tag",

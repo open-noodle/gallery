@@ -412,6 +412,10 @@ const sharedSpaceMemberFactory = (data: Partial<SharedSpaceMember> = {}): Shared
   joinedAt: newDate(),
   showInTimeline: true,
   lastViewedAt: null,
+  createdAt: newDate(),
+  updatedAt: newDate(),
+  createId: newUuid(),
+  updateId: newUuid(),
   ...data,
 });
 

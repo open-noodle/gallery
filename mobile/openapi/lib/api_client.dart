@@ -768,6 +768,18 @@ class ApiClient {
           return SyncPersonV1.fromJson(value);
         case 'SyncRequestType':
           return SyncRequestTypeTypeTransformer().decode(value);
+        case 'SyncSharedSpaceDeleteV1':
+          return SyncSharedSpaceDeleteV1.fromJson(value);
+        case 'SyncSharedSpaceMemberDeleteV1':
+          return SyncSharedSpaceMemberDeleteV1.fromJson(value);
+        case 'SyncSharedSpaceMemberV1':
+          return SyncSharedSpaceMemberV1.fromJson(value);
+        case 'SyncSharedSpaceToAssetDeleteV1':
+          return SyncSharedSpaceToAssetDeleteV1.fromJson(value);
+        case 'SyncSharedSpaceToAssetV1':
+          return SyncSharedSpaceToAssetV1.fromJson(value);
+        case 'SyncSharedSpaceV1':
+          return SyncSharedSpaceV1.fromJson(value);
         case 'SyncStackDeleteV1':
           return SyncStackDeleteV1.fromJson(value);
         case 'SyncStackV1':

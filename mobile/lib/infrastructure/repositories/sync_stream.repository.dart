@@ -22,6 +22,9 @@ import 'package:immich_mobile/infrastructure/entities/remote_album_asset.entity.
 import 'package:immich_mobile/infrastructure/entities/remote_album_user.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/remote_asset.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/remote_asset_cloud_id.entity.drift.dart';
+import 'package:immich_mobile/infrastructure/entities/shared_space.entity.drift.dart';
+import 'package:immich_mobile/infrastructure/entities/shared_space_asset.entity.drift.dart';
+import 'package:immich_mobile/infrastructure/entities/shared_space_member.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/stack.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/user.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/user_metadata.entity.drift.dart';
@@ -488,6 +491,141 @@ class SyncStreamRepository extends DriftDatabaseRepository {
       });
     } catch (error, stack) {
       _logger.severe('Error: updateAlbumToAssetsV1 - $debugLabel', error, stack);
+      rethrow;
+    }
+  }
+
+  // --- gallery-fork: shared-space sync handlers ---
+
+  Future<void> updateSharedSpacesV1(Iterable<SyncSharedSpaceV1> data) async {
+    try {
+      await _db.batch((batch) {
+        for (final space in data) {
+          final companion = SharedSpaceEntityCompanion(
+            name: Value(space.name),
+            description: Value(space.description),
+            color: Value(space.color),
+            createdById: Value(space.createdById),
+            thumbnailAssetId: Value(space.thumbnailAssetId),
+            thumbnailCropY: Value(space.thumbnailCropY?.toInt()),
+            faceRecognitionEnabled: Value(space.faceRecognitionEnabled),
+            petsEnabled: Value(space.petsEnabled),
+            lastActivityAt: Value(space.lastActivityAt),
+            createdAt: Value(space.createdAt),
+            updatedAt: Value(space.updatedAt),
+          );
+
+          batch.insert(
+            _db.sharedSpaceEntity,
+            companion.copyWith(id: Value(space.id)),
+            onConflict: DoUpdate((_) => companion),
+          );
+        }
+      });
+    } catch (error, stack) {
+      _logger.severe('Error: updateSharedSpacesV1', error, stack);
+      rethrow;
+    }
+  }
+
+  Future<void> deleteSharedSpacesV1(Iterable<SyncSharedSpaceDeleteV1> data) async {
+    try {
+      await _db.batch((batch) {
+        for (final space in data) {
+          batch.deleteWhere(_db.sharedSpaceEntity, (row) => row.id.equals(space.spaceId));
+        }
+      });
+    } catch (error, stack) {
+      _logger.severe('Error: deleteSharedSpacesV1', error, stack);
+      rethrow;
+    }
+  }
+
+  Future<void> updateSharedSpaceMembersV1(Iterable<SyncSharedSpaceMemberV1> data) async {
+    try {
+      await _db.batch((batch) {
+        for (final member in data) {
+          final companion = SharedSpaceMemberEntityCompanion(
+            role: Value(member.role),
+            joinedAt: Value(member.joinedAt),
+            showInTimeline: Value(member.showInTimeline),
+          );
+
+          batch.insert(
+            _db.sharedSpaceMemberEntity,
+            companion.copyWith(spaceId: Value(member.spaceId), userId: Value(member.userId)),
+            onConflict: DoUpdate((_) => companion),
+          );
+        }
+      });
+    } catch (error, stack) {
+      _logger.severe('Error: updateSharedSpaceMembersV1', error, stack);
+      rethrow;
+    }
+  }
+
+  Future<void> deleteSharedSpaceMembersV1(Iterable<SyncSharedSpaceMemberDeleteV1> data) async {
+    try {
+      await _db.batch((batch) {
+        for (final member in data) {
+          batch.delete(
+            _db.sharedSpaceMemberEntity,
+            SharedSpaceMemberEntityCompanion(
+              spaceId: Value(member.spaceId),
+              userId: Value(member.userId),
+            ),
+          );
+        }
+      });
+    } catch (error, stack) {
+      _logger.severe('Error: deleteSharedSpaceMembersV1', error, stack);
+      rethrow;
+    }
+  }
+
+  // SharedSpaceAssetCreate/Update/Backfill use the same SyncAssetV1 payload as
+  // the regular asset stream. We delegate to updateAssetsV1 to upsert into
+  // remote_asset, which is the source of truth for asset metadata.
+  Future<void> updateSharedSpaceAssetsV1(Iterable<SyncAssetV1> data) =>
+      updateAssetsV1(data, debugLabel: 'shared-space');
+
+  // Same delegation for exif rows.
+  Future<void> updateSharedSpaceAssetExifsV1(Iterable<SyncAssetExifV1> data) =>
+      updateAssetsExifV1(data, debugLabel: 'shared-space');
+
+  Future<void> updateSharedSpaceToAssetsV1(Iterable<SyncSharedSpaceToAssetV1> data) async {
+    try {
+      await _db.batch((batch) {
+        for (final join in data) {
+          final companion = SharedSpaceAssetEntityCompanion(
+            spaceId: Value(join.spaceId),
+            assetId: Value(join.assetId),
+          );
+
+          batch.insert(_db.sharedSpaceAssetEntity, companion, onConflict: DoNothing());
+        }
+      });
+    } catch (error, stack) {
+      _logger.severe('Error: updateSharedSpaceToAssetsV1', error, stack);
+      rethrow;
+    }
+  }
+
+  Future<void> deleteSharedSpaceToAssetsV1(Iterable<SyncSharedSpaceToAssetDeleteV1> data) async {
+    try {
+      await _db.batch((batch) {
+        for (final join in data) {
+          batch.delete(
+            _db.sharedSpaceAssetEntity,
+            SharedSpaceAssetEntityCompanion(
+              spaceId: Value(join.spaceId),
+              assetId: Value(join.assetId),
+            ),
+          );
+        }
+      });
+    } catch (error, stack) {
+      _logger.severe('Error: deleteSharedSpaceToAssetsV1', error, stack);
       rethrow;
     }
   }

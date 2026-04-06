@@ -62,8 +62,11 @@ import { SessionTable } from 'src/schema/tables/session.table';
 import { SharedLinkAssetTable } from 'src/schema/tables/shared-link-asset.table';
 import { SharedLinkTable } from 'src/schema/tables/shared-link.table';
 import { SharedSpaceActivityTable } from 'src/schema/tables/shared-space-activity.table';
+import { SharedSpaceAssetAuditTable } from 'src/schema/tables/shared-space-asset-audit.table';
 import { SharedSpaceAssetTable } from 'src/schema/tables/shared-space-asset.table';
+import { SharedSpaceAuditTable } from 'src/schema/tables/shared-space-audit.table';
 import { SharedSpaceLibraryTable } from 'src/schema/tables/shared-space-library.table';
+import { SharedSpaceMemberAuditTable } from 'src/schema/tables/shared-space-member-audit.table';
 import { SharedSpaceMemberTable } from 'src/schema/tables/shared-space-member.table';
 import { SharedSpacePersonAliasTable } from 'src/schema/tables/shared-space-person-alias.table';
 import { SharedSpacePersonFaceTable } from 'src/schema/tables/shared-space-person-face.table';
@@ -132,8 +135,11 @@ export class ImmichDatabase {
     SharedLinkAssetTable,
     SharedLinkTable,
     SharedSpaceTable,
+    SharedSpaceAuditTable,
     SharedSpaceMemberTable,
+    SharedSpaceMemberAuditTable,
     SharedSpaceAssetTable,
+    SharedSpaceAssetAuditTable,
     SharedSpaceLibraryTable,
     SharedSpaceActivityTable,
     SharedSpacePersonTable,
@@ -256,8 +262,11 @@ export interface DB {
   shared_link_asset: SharedLinkAssetTable;
 
   shared_space: SharedSpaceTable;
+  shared_space_audit: SharedSpaceAuditTable;
   shared_space_member: SharedSpaceMemberTable;
+  shared_space_member_audit: SharedSpaceMemberAuditTable;
   shared_space_asset: SharedSpaceAssetTable;
+  shared_space_asset_audit: SharedSpaceAssetAuditTable;
   shared_space_library: SharedSpaceLibraryTable;
   shared_space_activity: SharedSpaceActivityTable;
   shared_space_person: SharedSpacePersonTable;

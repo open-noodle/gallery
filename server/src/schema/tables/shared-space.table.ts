@@ -6,14 +6,24 @@ import {
   PrimaryGeneratedColumn,
   Table,
   Timestamp,
+  TriggerFunction,
   UpdateDateColumn,
 } from '@immich/sql-tools';
 import { CreateIdColumn, UpdatedAtTrigger, UpdateIdColumn } from 'src/decorators';
+import { shared_space_delete_audit } from 'src/schema/functions';
 import { AssetTable } from 'src/schema/tables/asset.table';
 import { UserTable } from 'src/schema/tables/user.table';
 
 @Table('shared_space')
 @UpdatedAtTrigger('shared_space_updatedAt')
+// BEFORE DELETE row-level so the trigger sees shared_space_member rows that the
+// cascade is about to remove. See shared_space_delete_audit body for the dedup logic.
+@TriggerFunction({
+  timing: 'before',
+  actions: ['delete'],
+  scope: 'row',
+  function: shared_space_delete_audit,
+})
 export class SharedSpaceTable {
   @PrimaryGeneratedColumn()
   id!: Generated<string>;

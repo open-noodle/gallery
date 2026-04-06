@@ -294,6 +294,36 @@ class SyncStreamService {
         return _syncStreamRepository.updateAssetFacesV2(data.cast());
       case SyncEntityType.assetFaceDeleteV1:
         return _syncStreamRepository.deleteAssetFacesV1(data.cast());
+      // --- gallery-fork: shared-space sync dispatch ---
+      case SyncEntityType.sharedSpaceV1:
+        return _syncStreamRepository.updateSharedSpacesV1(data.cast());
+      case SyncEntityType.sharedSpaceDeleteV1:
+        return _syncStreamRepository.deleteSharedSpacesV1(data.cast());
+      case SyncEntityType.sharedSpaceMemberV1:
+        return _syncStreamRepository.updateSharedSpaceMembersV1(data.cast());
+      case SyncEntityType.sharedSpaceMemberBackfillV1:
+        return _syncStreamRepository.updateSharedSpaceMembersV1(data.cast());
+      case SyncEntityType.sharedSpaceMemberDeleteV1:
+        return _syncStreamRepository.deleteSharedSpaceMembersV1(data.cast());
+      case SyncEntityType.sharedSpaceAssetCreateV1:
+      case SyncEntityType.sharedSpaceAssetUpdateV1:
+      case SyncEntityType.sharedSpaceAssetBackfillV1:
+        return _syncStreamRepository.updateSharedSpaceAssetsV1(data.cast());
+      case SyncEntityType.sharedSpaceAssetExifCreateV1:
+      case SyncEntityType.sharedSpaceAssetExifUpdateV1:
+      case SyncEntityType.sharedSpaceAssetExifBackfillV1:
+        return _syncStreamRepository.updateSharedSpaceAssetExifsV1(data.cast());
+      case SyncEntityType.sharedSpaceToAssetV1:
+      case SyncEntityType.sharedSpaceToAssetBackfillV1:
+        return _syncStreamRepository.updateSharedSpaceToAssetsV1(data.cast());
+      case SyncEntityType.sharedSpaceToAssetDeleteV1:
+        return _syncStreamRepository.deleteSharedSpaceToAssetsV1(data.cast());
+      // Forward-compat: any new SyncEntityType added on the server but not yet
+      // wired here lands in this default arm. Must NOT throw — the sync stream
+      // should continue processing subsequent events of known types. The plan's
+      // Task 18 regression contract is enforced by THIS comment plus the
+      // null-check in sync_api.repository.dart's _kResponseMap lookup, which
+      // also logs and skips unknown types at the parsing layer.
       default:
         _logger.warning("Unknown sync data type: $type");
     }

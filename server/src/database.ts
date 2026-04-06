@@ -344,6 +344,10 @@ export type SharedSpaceMember = {
   joinedAt: Date;
   showInTimeline: boolean;
   lastViewedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+  createId: string;
+  updateId: string;
 };
 
 export type SharedSpaceAsset = {
@@ -351,6 +355,10 @@ export type SharedSpaceAsset = {
   assetId: string;
   addedById: string | null;
   addedAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
+  createId: string;
+  updateId: string;
 };
 
 export type SharedSpaceActivity = {

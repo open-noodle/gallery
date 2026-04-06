@@ -194,6 +194,21 @@ const _kResponseMap = <SyncEntityType, Function(Object)>{
   SyncEntityType.assetFaceV2: SyncAssetFaceV2.fromJson,
   SyncEntityType.assetFaceDeleteV1: SyncAssetFaceDeleteV1.fromJson,
   SyncEntityType.syncCompleteV1: _SyncEmptyDto.fromJson,
+  // --- gallery-fork: shared-space sync types ---
+  SyncEntityType.sharedSpaceV1: SyncSharedSpaceV1.fromJson,
+  SyncEntityType.sharedSpaceDeleteV1: SyncSharedSpaceDeleteV1.fromJson,
+  SyncEntityType.sharedSpaceMemberV1: SyncSharedSpaceMemberV1.fromJson,
+  SyncEntityType.sharedSpaceMemberBackfillV1: SyncSharedSpaceMemberV1.fromJson,
+  SyncEntityType.sharedSpaceMemberDeleteV1: SyncSharedSpaceMemberDeleteV1.fromJson,
+  SyncEntityType.sharedSpaceAssetCreateV1: SyncAssetV1.fromJson,
+  SyncEntityType.sharedSpaceAssetUpdateV1: SyncAssetV1.fromJson,
+  SyncEntityType.sharedSpaceAssetBackfillV1: SyncAssetV1.fromJson,
+  SyncEntityType.sharedSpaceAssetExifCreateV1: SyncAssetExifV1.fromJson,
+  SyncEntityType.sharedSpaceAssetExifUpdateV1: SyncAssetExifV1.fromJson,
+  SyncEntityType.sharedSpaceAssetExifBackfillV1: SyncAssetExifV1.fromJson,
+  SyncEntityType.sharedSpaceToAssetV1: SyncSharedSpaceToAssetV1.fromJson,
+  SyncEntityType.sharedSpaceToAssetBackfillV1: SyncSharedSpaceToAssetV1.fromJson,
+  SyncEntityType.sharedSpaceToAssetDeleteV1: SyncSharedSpaceToAssetDeleteV1.fromJson,
 };
 
 class _SyncEmptyDto {

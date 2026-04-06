@@ -299,3 +299,77 @@ export const asset_edit_audit = registerFunction({
       RETURN NULL;
     END`,
 });
+
+// --- gallery-fork: shared-space audit trigger functions ---
+
+export const shared_space_delete_audit = registerFunction({
+  name: 'shared_space_delete_audit',
+  returnType: 'TRIGGER',
+  language: 'PLPGSQL',
+  body: `
+    BEGIN
+      -- BEFORE DELETE row-level trigger so shared_space_member rows are still
+      -- visible. Emits one shared_space_audit row per (member or creator) for the
+      -- deleted space. The UNION dedups the common case where the creator is also
+      -- a member. The companion shared_space_member_delete_audit trigger does NOT
+      -- insert into shared_space_audit during cascade, so this is the single source
+      -- of truth on space deletion.
+      INSERT INTO shared_space_audit ("spaceId", "userId")
+      SELECT DISTINCT "spaceId", "userId" FROM (
+        SELECT ssm."spaceId", ssm."userId"
+        FROM shared_space_member ssm
+        WHERE ssm."spaceId" = OLD."id"
+        UNION
+        SELECT OLD."id" AS "spaceId", OLD."createdById" AS "userId"
+      ) AS targets;
+
+      RETURN OLD;
+    END`,
+});
+
+export const shared_space_member_delete_audit = registerFunction({
+  name: 'shared_space_member_delete_audit',
+  returnType: 'TRIGGER',
+  language: 'PLPGSQL',
+  body: `
+    BEGIN
+      -- Always emit the join-row delete to shared_space_member_audit.
+      INSERT INTO shared_space_member_audit ("spaceId", "userId")
+      SELECT "spaceId", "userId" FROM "old";
+
+      -- Emit to shared_space_audit only when the parent shared_space row still
+      -- exists (i.e. this is a direct member removal, not a cascade from a
+      -- shared_space delete). For cascades, the parent shared_space_delete_audit
+      -- BEFORE-row trigger has already emitted the audit rows.
+      INSERT INTO shared_space_audit ("spaceId", "userId")
+      SELECT o."spaceId", o."userId"
+      FROM "old" o
+      WHERE EXISTS (SELECT 1 FROM shared_space ss WHERE ss.id = o."spaceId");
+
+      RETURN NULL;
+    END`,
+});
+
+export const shared_space_asset_delete_audit = registerFunction({
+  name: 'shared_space_asset_delete_audit',
+  returnType: 'TRIGGER',
+  language: 'PLPGSQL',
+  body: `
+    BEGIN
+      INSERT INTO shared_space_asset_audit ("spaceId", "assetId")
+      SELECT "spaceId", "assetId" FROM "old";
+      RETURN NULL;
+    END`,
+});
+
+export const shared_space_member_after_insert = registerFunction({
+  name: 'shared_space_member_after_insert',
+  returnType: 'TRIGGER',
+  language: 'PLPGSQL',
+  body: `
+    BEGIN
+      UPDATE shared_space SET "updatedAt" = clock_timestamp(), "updateId" = immich_uuid_v7(clock_timestamp())
+      WHERE "id" IN (SELECT DISTINCT "spaceId" FROM inserted_rows);
+      RETURN NULL;
+    END`,
+});

@@ -270,6 +270,76 @@ class DriftTimelineRepository extends DriftDatabaseRepository {
         .get();
   }
 
+  // Mirrors remoteAlbum() but scopes via shared_space_asset. Always orders DESC
+  // (shared spaces have no per-space order setting in PR1).
+  TimelineQuery sharedSpace(String spaceId, GroupAssetsBy groupBy) => (
+    bucketSource: () => _watchSharedSpaceBucket(spaceId, groupBy: groupBy),
+    assetSource: (offset, count) => _getSharedSpaceBucketAssets(spaceId, offset: offset, count: count),
+    origin: TimelineOrigin.remoteSpace,
+  );
+
+  Stream<List<Bucket>> _watchSharedSpaceBucket(String spaceId, {GroupAssetsBy groupBy = GroupAssetsBy.day}) {
+    if (groupBy == GroupAssetsBy.none) {
+      return _db.sharedSpaceAssetEntity
+          .count(where: (row) => row.spaceId.equals(spaceId))
+          .map(_generateBuckets)
+          .watch()
+          .map((results) => results.isNotEmpty ? results.first : const <Bucket>[])
+          .handleError((error) => const <Bucket>[]);
+    }
+
+    final assetCountExp = _db.remoteAssetEntity.id.count();
+    final dateExp = _db.remoteAssetEntity.effectiveCreatedAt(groupBy);
+
+    final query = _db.remoteAssetEntity.selectOnly()
+      ..addColumns([assetCountExp, dateExp])
+      ..join([
+        innerJoin(
+          _db.sharedSpaceAssetEntity,
+          _db.sharedSpaceAssetEntity.assetId.equalsExp(_db.remoteAssetEntity.id),
+          useColumns: false,
+        ),
+      ])
+      ..where(_db.remoteAssetEntity.deletedAt.isNull() & _db.sharedSpaceAssetEntity.spaceId.equals(spaceId))
+      ..groupBy([dateExp])
+      ..orderBy([OrderingTerm.desc(dateExp)]);
+
+    return query
+        .map((row) {
+          final timeline = row.read(dateExp)!.truncateDate(groupBy);
+          final assetCount = row.read(assetCountExp)!;
+          return TimeBucket(date: timeline, assetCount: assetCount);
+        })
+        .watch()
+        .handleError((error) => const <Bucket>[]);
+  }
+
+  Future<List<BaseAsset>> _getSharedSpaceBucketAssets(
+    String spaceId, {
+    required int offset,
+    required int count,
+  }) async {
+    final query = _db.remoteAssetEntity.select().addColumns([_db.localAssetEntity.id]).join([
+      innerJoin(
+        _db.sharedSpaceAssetEntity,
+        _db.sharedSpaceAssetEntity.assetId.equalsExp(_db.remoteAssetEntity.id),
+        useColumns: false,
+      ),
+      leftOuterJoin(
+        _db.localAssetEntity,
+        _db.remoteAssetEntity.checksum.equalsExp(_db.localAssetEntity.checksum),
+        useColumns: false,
+      ),
+    ])
+      ..where(_db.remoteAssetEntity.deletedAt.isNull() & _db.sharedSpaceAssetEntity.spaceId.equals(spaceId))
+      ..orderBy([OrderingTerm.desc(_db.remoteAssetEntity.createdAt)])
+      ..limit(count, offset: offset);
+
+    return query
+        .map((row) => row.readTable(_db.remoteAssetEntity).toDto(localId: row.read(_db.localAssetEntity.id)))
+        .get();
+  }
+
   TimelineQuery fromAssets(List<BaseAsset> assets, TimelineOrigin origin) => (
     bucketSource: () => Stream.value(_generateBuckets(assets.length)),
     assetSource: (offset, count) => Future.value(assets.skip(offset).take(count).toList(growable: false)),

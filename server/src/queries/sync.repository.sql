@@ -1133,3 +1133,485 @@ where
   and "userId" = $3
 order by
   "user_metadata"."updateId" asc
+
+-- SyncRepository.sharedSpace.getCreatedAfter
+select
+  "shared_space_member"."spaceId" as "id",
+  "shared_space_member"."createId"
+from
+  "shared_space_member"
+where
+  "shared_space_member"."userId" = $1
+  and "shared_space_member"."createId" >= $2
+  and "shared_space_member"."createId" < $3
+order by
+  "shared_space_member"."createId" asc
+
+-- SyncRepository.sharedSpace.getDeletes
+select
+  "id",
+  "spaceId"
+from
+  "shared_space_audit" as "shared_space_audit"
+where
+  "shared_space_audit"."id" < $1
+  and "shared_space_audit"."id" > $2
+  and "userId" = $3
+order by
+  "shared_space_audit"."id" asc
+
+-- SyncRepository.sharedSpace.getUpserts
+select
+  "shared_space"."id",
+  "shared_space"."name",
+  "shared_space"."description",
+  "shared_space"."color",
+  "shared_space"."createdById",
+  "shared_space"."thumbnailAssetId",
+  "shared_space"."thumbnailCropY",
+  "shared_space"."faceRecognitionEnabled",
+  "shared_space"."petsEnabled",
+  "shared_space"."lastActivityAt",
+  "shared_space"."createdAt",
+  "shared_space"."updatedAt",
+  "shared_space"."updateId"
+from
+  "shared_space" as "shared_space"
+where
+  "shared_space"."updateId" < $1
+  and "shared_space"."updateId" > $2
+  and "shared_space"."id" in (
+    select
+      "shared_space"."id"
+    from
+      "shared_space"
+    where
+      "shared_space"."createdById" = $3
+    union
+    select
+      "shared_space_member"."spaceId" as "id"
+    from
+      "shared_space_member"
+    where
+      "shared_space_member"."userId" = $4
+  )
+order by
+  "shared_space"."updateId" asc
+
+-- SyncRepository.sharedSpaceMember.getBackfill
+select
+  "shared_space_member"."spaceId",
+  "shared_space_member"."userId",
+  "shared_space_member"."role",
+  "shared_space_member"."joinedAt",
+  "shared_space_member"."showInTimeline",
+  "shared_space_member"."updateId"
+from
+  "shared_space_member" as "shared_space_member"
+where
+  "shared_space_member"."updateId" < $1
+  and "shared_space_member"."updateId" <= $2
+  and "shared_space_member"."updateId" >= $3
+  and "shared_space_member"."spaceId" = $4
+order by
+  "shared_space_member"."updateId" asc
+
+-- SyncRepository.sharedSpaceMember.getDeletes
+select
+  "id",
+  "spaceId",
+  "userId"
+from
+  "shared_space_member_audit" as "shared_space_member_audit"
+where
+  "shared_space_member_audit"."id" < $1
+  and "shared_space_member_audit"."id" > $2
+  and "spaceId" in (
+    select
+      "shared_space"."id"
+    from
+      "shared_space"
+    where
+      "shared_space"."createdById" = $3
+    union
+    select
+      "shared_space_member"."spaceId" as "id"
+    from
+      "shared_space_member"
+    where
+      "shared_space_member"."userId" = $4
+  )
+order by
+  "shared_space_member_audit"."id" asc
+
+-- SyncRepository.sharedSpaceMember.getUpserts
+select
+  "shared_space_member"."spaceId",
+  "shared_space_member"."userId",
+  "shared_space_member"."role",
+  "shared_space_member"."joinedAt",
+  "shared_space_member"."showInTimeline",
+  "shared_space_member"."updateId"
+from
+  "shared_space_member" as "shared_space_member"
+where
+  "shared_space_member"."updateId" < $1
+  and "shared_space_member"."updateId" > $2
+  and "shared_space_member"."spaceId" in (
+    select
+      "shared_space"."id"
+    from
+      "shared_space"
+    where
+      "shared_space"."createdById" = $3
+    union
+    select
+      "shared_space_member"."spaceId" as "id"
+    from
+      "shared_space_member"
+    where
+      "shared_space_member"."userId" = $4
+  )
+order by
+  "shared_space_member"."updateId" asc
+
+-- SyncRepository.sharedSpaceAsset.getBackfill
+select
+  "asset"."id",
+  "asset"."ownerId",
+  "asset"."originalFileName",
+  "asset"."thumbhash",
+  "asset"."checksum",
+  "asset"."fileCreatedAt",
+  "asset"."fileModifiedAt",
+  "asset"."localDateTime",
+  "asset"."type",
+  "asset"."deletedAt",
+  "asset"."isFavorite",
+  "asset"."visibility",
+  "asset"."duration",
+  "asset"."livePhotoVideoId",
+  "asset"."stackId",
+  "asset"."libraryId",
+  "asset"."width",
+  "asset"."height",
+  "asset"."isEdited",
+  "shared_space_asset"."updateId"
+from
+  "shared_space_asset" as "shared_space_asset"
+  inner join "asset" on "asset"."id" = "shared_space_asset"."assetId"
+where
+  "shared_space_asset"."updateId" < $1
+  and "shared_space_asset"."updateId" <= $2
+  and "shared_space_asset"."updateId" >= $3
+  and "shared_space_asset"."spaceId" = $4
+order by
+  "shared_space_asset"."updateId" asc
+
+-- SyncRepository.sharedSpaceAsset.getCreates
+select
+  "asset"."id",
+  "asset"."ownerId",
+  "asset"."originalFileName",
+  "asset"."thumbhash",
+  "asset"."checksum",
+  "asset"."fileCreatedAt",
+  "asset"."fileModifiedAt",
+  "asset"."localDateTime",
+  "asset"."type",
+  "asset"."deletedAt",
+  "asset"."isFavorite",
+  "asset"."visibility",
+  "asset"."duration",
+  "asset"."livePhotoVideoId",
+  "asset"."stackId",
+  "asset"."libraryId",
+  "asset"."width",
+  "asset"."height",
+  "asset"."isEdited",
+  "shared_space_asset"."updateId"
+from
+  "shared_space_asset" as "shared_space_asset"
+  inner join "asset" on "asset"."id" = "shared_space_asset"."assetId"
+where
+  "shared_space_asset"."updateId" < $1
+  and "shared_space_asset"."updateId" > $2
+  and "shared_space_asset"."spaceId" in (
+    select
+      "shared_space"."id"
+    from
+      "shared_space"
+    where
+      "shared_space"."createdById" = $3
+    union
+    select
+      "shared_space_member"."spaceId" as "id"
+    from
+      "shared_space_member"
+    where
+      "shared_space_member"."userId" = $4
+  )
+order by
+  "shared_space_asset"."updateId" asc
+
+-- SyncRepository.sharedSpaceAsset.getUpdates
+select
+  "asset"."id",
+  "asset"."ownerId",
+  "asset"."originalFileName",
+  "asset"."thumbhash",
+  "asset"."checksum",
+  "asset"."fileCreatedAt",
+  "asset"."fileModifiedAt",
+  "asset"."localDateTime",
+  "asset"."type",
+  "asset"."deletedAt",
+  "asset"."isFavorite",
+  "asset"."visibility",
+  "asset"."duration",
+  "asset"."livePhotoVideoId",
+  "asset"."stackId",
+  "asset"."libraryId",
+  "asset"."width",
+  "asset"."height",
+  "asset"."isEdited",
+  "asset"."updateId"
+from
+  "asset" as "asset"
+  inner join "shared_space_asset" on "shared_space_asset"."assetId" = "asset"."id"
+where
+  "asset"."updateId" < $1
+  and "asset"."updateId" > $2
+  and "shared_space_asset"."updateId" <= $3
+  and "shared_space_asset"."spaceId" in (
+    select
+      "shared_space"."id"
+    from
+      "shared_space"
+    where
+      "shared_space"."createdById" = $4
+    union
+    select
+      "shared_space_member"."spaceId" as "id"
+    from
+      "shared_space_member"
+    where
+      "shared_space_member"."userId" = $5
+  )
+order by
+  "asset"."updateId" asc
+
+-- SyncRepository.sharedSpaceAssetExif.getBackfill
+select
+  "asset_exif"."assetId",
+  "asset_exif"."description",
+  "asset_exif"."exifImageWidth",
+  "asset_exif"."exifImageHeight",
+  "asset_exif"."fileSizeInByte",
+  "asset_exif"."orientation",
+  "asset_exif"."dateTimeOriginal",
+  "asset_exif"."modifyDate",
+  "asset_exif"."timeZone",
+  "asset_exif"."latitude",
+  "asset_exif"."longitude",
+  "asset_exif"."projectionType",
+  "asset_exif"."city",
+  "asset_exif"."state",
+  "asset_exif"."country",
+  "asset_exif"."make",
+  "asset_exif"."model",
+  "asset_exif"."lensModel",
+  "asset_exif"."fNumber",
+  "asset_exif"."focalLength",
+  "asset_exif"."iso",
+  "asset_exif"."exposureTime",
+  "asset_exif"."profileDescription",
+  "asset_exif"."rating",
+  "asset_exif"."fps",
+  "shared_space_asset"."updateId"
+from
+  "shared_space_asset" as "shared_space_asset"
+  inner join "asset_exif" on "asset_exif"."assetId" = "shared_space_asset"."assetId"
+where
+  "shared_space_asset"."updateId" < $1
+  and "shared_space_asset"."updateId" <= $2
+  and "shared_space_asset"."updateId" >= $3
+  and "shared_space_asset"."spaceId" = $4
+order by
+  "shared_space_asset"."updateId" asc
+
+-- SyncRepository.sharedSpaceAssetExif.getCreates
+select
+  "asset_exif"."assetId",
+  "asset_exif"."description",
+  "asset_exif"."exifImageWidth",
+  "asset_exif"."exifImageHeight",
+  "asset_exif"."fileSizeInByte",
+  "asset_exif"."orientation",
+  "asset_exif"."dateTimeOriginal",
+  "asset_exif"."modifyDate",
+  "asset_exif"."timeZone",
+  "asset_exif"."latitude",
+  "asset_exif"."longitude",
+  "asset_exif"."projectionType",
+  "asset_exif"."city",
+  "asset_exif"."state",
+  "asset_exif"."country",
+  "asset_exif"."make",
+  "asset_exif"."model",
+  "asset_exif"."lensModel",
+  "asset_exif"."fNumber",
+  "asset_exif"."focalLength",
+  "asset_exif"."iso",
+  "asset_exif"."exposureTime",
+  "asset_exif"."profileDescription",
+  "asset_exif"."rating",
+  "asset_exif"."fps",
+  "shared_space_asset"."updateId"
+from
+  "shared_space_asset" as "shared_space_asset"
+  inner join "asset_exif" on "asset_exif"."assetId" = "shared_space_asset"."assetId"
+where
+  "shared_space_asset"."updateId" < $1
+  and "shared_space_asset"."updateId" > $2
+  and "shared_space_asset"."spaceId" in (
+    select
+      "shared_space"."id"
+    from
+      "shared_space"
+    where
+      "shared_space"."createdById" = $3
+    union
+    select
+      "shared_space_member"."spaceId" as "id"
+    from
+      "shared_space_member"
+    where
+      "shared_space_member"."userId" = $4
+  )
+order by
+  "shared_space_asset"."updateId" asc
+
+-- SyncRepository.sharedSpaceAssetExif.getUpdates
+select
+  "asset_exif"."assetId",
+  "asset_exif"."description",
+  "asset_exif"."exifImageWidth",
+  "asset_exif"."exifImageHeight",
+  "asset_exif"."fileSizeInByte",
+  "asset_exif"."orientation",
+  "asset_exif"."dateTimeOriginal",
+  "asset_exif"."modifyDate",
+  "asset_exif"."timeZone",
+  "asset_exif"."latitude",
+  "asset_exif"."longitude",
+  "asset_exif"."projectionType",
+  "asset_exif"."city",
+  "asset_exif"."state",
+  "asset_exif"."country",
+  "asset_exif"."make",
+  "asset_exif"."model",
+  "asset_exif"."lensModel",
+  "asset_exif"."fNumber",
+  "asset_exif"."focalLength",
+  "asset_exif"."iso",
+  "asset_exif"."exposureTime",
+  "asset_exif"."profileDescription",
+  "asset_exif"."rating",
+  "asset_exif"."fps",
+  "asset_exif"."updateId"
+from
+  "asset_exif" as "asset_exif"
+  inner join "shared_space_asset" on "shared_space_asset"."assetId" = "asset_exif"."assetId"
+where
+  "asset_exif"."updateId" < $1
+  and "asset_exif"."updateId" > $2
+  and "shared_space_asset"."updateId" <= $3
+  and "shared_space_asset"."spaceId" in (
+    select
+      "shared_space"."id"
+    from
+      "shared_space"
+    where
+      "shared_space"."createdById" = $4
+    union
+    select
+      "shared_space_member"."spaceId" as "id"
+    from
+      "shared_space_member"
+    where
+      "shared_space_member"."userId" = $5
+  )
+order by
+  "asset_exif"."updateId" asc
+
+-- SyncRepository.sharedSpaceToAsset.getBackfill
+select
+  "shared_space_asset"."assetId" as "assetId",
+  "shared_space_asset"."spaceId" as "spaceId",
+  "shared_space_asset"."updateId"
+from
+  "shared_space_asset" as "shared_space_asset"
+where
+  "shared_space_asset"."updateId" < $1
+  and "shared_space_asset"."updateId" <= $2
+  and "shared_space_asset"."updateId" >= $3
+  and "shared_space_asset"."spaceId" = $4
+order by
+  "shared_space_asset"."updateId" asc
+
+-- SyncRepository.sharedSpaceToAsset.getDeletes
+select
+  "id",
+  "assetId",
+  "spaceId"
+from
+  "shared_space_asset_audit" as "shared_space_asset_audit"
+where
+  "shared_space_asset_audit"."id" < $1
+  and "shared_space_asset_audit"."id" > $2
+  and "spaceId" in (
+    select
+      "shared_space"."id"
+    from
+      "shared_space"
+    where
+      "shared_space"."createdById" = $3
+    union
+    select
+      "shared_space_member"."spaceId" as "id"
+    from
+      "shared_space_member"
+    where
+      "shared_space_member"."userId" = $4
+  )
+order by
+  "shared_space_asset_audit"."id" asc
+
+-- SyncRepository.sharedSpaceToAsset.getUpserts
+select
+  "shared_space_asset"."assetId" as "assetId",
+  "shared_space_asset"."spaceId" as "spaceId",
+  "shared_space_asset"."updateId"
+from
+  "shared_space_asset" as "shared_space_asset"
+where
+  "shared_space_asset"."updateId" < $1
+  and "shared_space_asset"."updateId" > $2
+  and "shared_space_asset"."spaceId" in (
+    select
+      "shared_space"."id"
+    from
+      "shared_space"
+    where
+      "shared_space"."createdById" = $3
+    union
+    select
+      "shared_space_member"."spaceId" as "id"
+    from
+      "shared_space_member"
+    where
+      "shared_space_member"."userId" = $4
+  )
+order by
+  "shared_space_asset"."updateId" asc

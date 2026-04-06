@@ -59,6 +59,9 @@ class TimelineFactory {
   TimelineService remoteAlbum({required String albumId}) =>
       TimelineService(_timelineRepository.remoteAlbum(albumId, groupBy));
 
+  TimelineService sharedSpace({required String spaceId}) =>
+      TimelineService(_timelineRepository.sharedSpace(spaceId, groupBy));
+
   TimelineService remoteAssets(String userId) => TimelineService(_timelineRepository.remote(userId, groupBy));
 
   TimelineService favorite(String userId) => TimelineService(_timelineRepository.favorite(userId, groupBy));

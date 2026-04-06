@@ -13,6 +13,9 @@ import 'package:immich_mobile/infrastructure/entities/remote_album.entity.drift.
 import 'package:immich_mobile/infrastructure/entities/remote_album_asset.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/remote_asset.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/remote_asset_cloud_id.entity.drift.dart';
+import 'package:immich_mobile/infrastructure/entities/shared_space.entity.drift.dart';
+import 'package:immich_mobile/infrastructure/entities/shared_space_asset.entity.drift.dart';
+import 'package:immich_mobile/infrastructure/entities/shared_space_member.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/user.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
 import 'package:immich_mobile/utils/option.dart';
@@ -242,5 +245,56 @@ class MediumRepositoryContext {
     return db
         .into(db.localAlbumAssetEntity)
         .insert(LocalAlbumAssetEntityCompanion.insert(albumId: albumId, assetId: assetId));
+  }
+
+  Future<SharedSpaceEntityData> newSharedSpace({
+    String? id,
+    String? name,
+    String? description,
+    String? color,
+    required String createdById,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) async {
+    id = id ?? const Uuid().v4();
+    return db
+        .into(db.sharedSpaceEntity)
+        .insertReturning(
+          SharedSpaceEntityCompanion(
+            id: Value(id),
+            name: Value(name ?? 'shared_space_$id'),
+            description: Value(description),
+            color: Value(color),
+            createdById: Value(createdById),
+            createdAt: Value(createdAt ?? DateTime.now()),
+            updatedAt: Value(updatedAt ?? DateTime.now()),
+          ),
+        );
+  }
+
+  Future<void> newSharedSpaceMember({
+    required String spaceId,
+    required String userId,
+    String? role,
+    DateTime? joinedAt,
+    bool? showInTimeline,
+  }) {
+    return db
+        .into(db.sharedSpaceMemberEntity)
+        .insert(
+          SharedSpaceMemberEntityCompanion(
+            spaceId: Value(spaceId),
+            userId: Value(userId),
+            role: Value(role ?? 'editor'),
+            joinedAt: Value(joinedAt ?? DateTime.now()),
+            showInTimeline: Value(showInTimeline ?? true),
+          ),
+        );
+  }
+
+  Future<void> insertSharedSpaceAsset({required String spaceId, required String assetId}) {
+    return db
+        .into(db.sharedSpaceAssetEntity)
+        .insert(SharedSpaceAssetEntityCompanion.insert(spaceId: spaceId, assetId: assetId));
   }
 }
