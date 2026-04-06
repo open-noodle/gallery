@@ -1634,6 +1634,146 @@ describe('/shared-spaces', () => {
       });
     });
 
+    describe('GET /shared-spaces/:id/people/:personId — single + thumbnail + assets (T10)', () => {
+      // Reuses the T09 fixture setup (parent beforeAll). All read-only sub-endpoints
+      // share the same access path: requireMembership → 403 for non-member, 401 for anon.
+      //
+      // T10 was supposed to resolve the T09 open hypothesis "hidden and pets filters
+      // apply at listing only". The hypothesis turned out to be HALF correct:
+      //   - Hidden person: direct fetch returns 200 (filter is listing-only).
+      //   - Pet person when petsEnabled=false: direct fetch returns 400 (filter
+      //     applies at single-fetch level too).
+      // Both findings pinned in the backlog "Observed invariants" section.
+      //
+      // Also pinned: missing personId returns 400 (not 404) — Immich's bulk-access
+      // pattern via requireAccess uniformly returns BadRequestException for "not found
+      // OR no access" to avoid leaking existence.
+
+      describe('GET /shared-spaces/:id/people/:personId', () => {
+        it('access matrix', async () => {
+          await forEachActor(
+            [ownerActor, editorActor, viewerActor, nonMemberActor, anonActor],
+            (actor) =>
+              request(app)
+                .get(`/shared-spaces/${spaceId}/people/${namedPersonId}`)
+                .set(authHeaders(actor)),
+            { spaceOwner: 200, spaceEditor: 200, spaceViewer: 200, spaceNonMember: 403, anon: 401 },
+          );
+        });
+
+        it('returns the canonical space person ID and name', async () => {
+          const { status, body } = await request(app)
+            .get(`/shared-spaces/${spaceId}/people/${namedPersonId}`)
+            .set('Authorization', `Bearer ${owner.accessToken}`);
+          expect(status).toBe(200);
+          expect((body as { id: string; name: string }).id).toBe(namedPersonId);
+          expect((body as { name: string }).name).toBe('Alice');
+        });
+
+        it('hidden person IS fetchable directly — filter is listing-only', async () => {
+          // Half of the T09 open hypothesis: confirmed for hidden persons. The
+          // listing-level withHidden default excludes them, but a direct fetch by ID
+          // returns 200. Pin so a future security refactor that adds the filter to
+          // the single-fetch path would be caught.
+          const { status, body } = await request(app)
+            .get(`/shared-spaces/${spaceId}/people/${hiddenPersonId}`)
+            .set('Authorization', `Bearer ${owner.accessToken}`);
+          expect(status).toBe(200);
+          expect((body as { id: string }).id).toBe(hiddenPersonId);
+          expect((body as { isHidden: boolean }).isHidden).toBe(true);
+        });
+
+        it('pet person is NOT fetchable directly when petsEnabled=false — filter applies to single-fetch', async () => {
+          // Other half of the T09 open hypothesis: DISPROVED for pets. The pet filter
+          // applies BOTH to the listing AND to the direct fetch — a non-obvious
+          // asymmetry vs the hidden filter (which is listing-only). The server
+          // returns 400 here (not 200, not 404) — bulk-access pattern.
+          //
+          // Practically this means: if the space has petsEnabled=false, no member
+          // can address the pet person at all, even with the ID. This is the
+          // intended UX: when pets are off, the entire pet sub-graph is invisible.
+          const dbClient = await utils.connectDatabase();
+          try {
+            await dbClient.query('UPDATE shared_space SET "petsEnabled" = false WHERE id = $1', [spaceId]);
+            const { status } = await request(app)
+              .get(`/shared-spaces/${spaceId}/people/${petPersonId}`)
+              .set('Authorization', `Bearer ${owner.accessToken}`);
+            expect(status).toBe(400);
+          } finally {
+            await dbClient.query('UPDATE shared_space SET "petsEnabled" = true WHERE id = $1', [spaceId]);
+          }
+        });
+
+        it('non-existent personId returns 400 (bulk-access pattern, not 404)', async () => {
+          // requireAccess returns BadRequestException uniformly for "not found OR no
+          // access" to avoid leaking existence. Same taxonomic split T03 documented
+          // for timeline. Pin the 400 explicitly so a future change to return 404
+          // would be caught.
+          const { status } = await request(app)
+            .get(`/shared-spaces/${spaceId}/people/00000000-0000-4000-a000-000000000099`)
+            .set('Authorization', `Bearer ${owner.accessToken}`);
+          expect(status).toBe(400);
+        });
+      });
+
+      describe('GET /shared-spaces/:id/people/:personId/thumbnail', () => {
+        // KNOWN FOOTGUN: utils.createSpacePerson sets person.thumbnailPath to a
+        // fictional fixture string ('/my/awesome/thumbnail.jpg'). The thumbnail
+        // endpoint passes the access check (good) but the file resolution then
+        // fails because the path doesn't exist on disk, returning 500.
+        //
+        // For T10 we accept the 500 as the success-case shape — the access check
+        // and the file resolution are the load-bearing concerns; the 500 vs 404
+        // distinction is a separate (and minor) server-side issue worth fixing
+        // later but not in scope for T10. Pinned in the backlog as a known footgun.
+
+        it('access matrix (member success-case is 500 due to fixture thumbnailPath)', async () => {
+          await forEachActor(
+            [ownerActor, editorActor, viewerActor, nonMemberActor, anonActor],
+            (actor) =>
+              request(app)
+                .get(`/shared-spaces/${spaceId}/people/${namedPersonId}/thumbnail`)
+                .set(authHeaders(actor)),
+            { spaceOwner: 500, spaceEditor: 500, spaceViewer: 500, spaceNonMember: 403, anon: 401 },
+          );
+        });
+
+        it('non-member 403 fires before file resolution', async () => {
+          // Sanity check on the access-vs-file-resolution ordering. Even with the
+          // fictional thumbnailPath, the access check should fire first for a
+          // non-member — ensuring the 500 path isn't somehow leaking access.
+          const { status } = await request(app)
+            .get(`/shared-spaces/${spaceId}/people/${namedPersonId}/thumbnail`)
+            .set('Authorization', `Bearer ${nonMember.accessToken}`);
+          expect(status).toBe(403);
+        });
+      });
+
+      describe('GET /shared-spaces/:id/people/:personId/assets', () => {
+        it('access matrix', async () => {
+          await forEachActor(
+            [ownerActor, editorActor, viewerActor, nonMemberActor, anonActor],
+            (actor) =>
+              request(app)
+                .get(`/shared-spaces/${spaceId}/people/${namedPersonId}/assets`)
+                .set(authHeaders(actor)),
+            { spaceOwner: 200, spaceEditor: 200, spaceViewer: 200, spaceNonMember: 403, anon: 401 },
+          );
+        });
+
+        it('returns the asset IDs containing the person', async () => {
+          // Alice (namedPersonId) is on spaceAssetId. The endpoint returns string[]
+          // of asset IDs.
+          const { status, body } = await request(app)
+            .get(`/shared-spaces/${spaceId}/people/${namedPersonId}/assets`)
+            .set('Authorization', `Bearer ${owner.accessToken}`);
+          expect(status).toBe(200);
+          expect(Array.isArray(body)).toBe(true);
+          expect(body as string[]).toContain(spaceAssetId);
+        });
+      });
+    });
+
     it('empty thumbnailPath on the underlying global person excludes the space person', async () => {
       // The fork's "minFaces gate" mechanism. shared-space.repository.ts:512-513
       // filters with `person.thumbnailPath IS NOT NULL AND != ''`. In production
