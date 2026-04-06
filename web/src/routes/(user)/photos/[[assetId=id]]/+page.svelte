@@ -56,6 +56,7 @@
   import { AssetTypeEnum, getFilterSuggestions, getSearchSuggestions, SearchSuggestionType } from '@immich/sdk';
   import { ActionButton, CommandPaletteDefaultProvider, ImageCarousel } from '@immich/ui';
   import { mdiDotsVertical } from '@mdi/js';
+  import { untrack } from 'svelte';
   import { t } from 'svelte-i18n';
   import { SvelteMap } from 'svelte/reactivity';
 
@@ -192,9 +193,11 @@
 
   $effect(() => {
     const q = page.url.searchParams.get('q') ?? '';
-    if (q !== searchQuery) {
-      searchQuery = q;
-    }
+    untrack(() => {
+      if (q !== searchQuery) {
+        searchQuery = q;
+      }
+    });
   });
 
   const items = $derived(
