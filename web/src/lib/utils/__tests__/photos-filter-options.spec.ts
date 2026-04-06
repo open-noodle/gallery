@@ -204,4 +204,18 @@ describe('handlePhotosRemoveFilter', () => {
     expect(result.personIds).toEqual(['p1']);
     expect(result.rating).toBeUndefined();
   });
+
+  it('should clear timeline (both year and month)', () => {
+    const filters = { ...createFilterState(), selectedYear: 2023, selectedMonth: 8 };
+    const result = handlePhotosRemoveFilter(filters, 'timeline');
+    expect(result.selectedYear).toBeUndefined();
+    expect(result.selectedMonth).toBeUndefined();
+  });
+
+  it('should clear timeline when only year is set', () => {
+    const filters = { ...createFilterState(), selectedYear: 2023 };
+    const result = handlePhotosRemoveFilter(filters, 'timeline');
+    expect(result.selectedYear).toBeUndefined();
+    expect(result.selectedMonth).toBeUndefined();
+  });
 });
