@@ -132,14 +132,15 @@ Two sub-cases based on ordering:
 #### Case A: Relevance Ordering (no `orderDirection`)
 
 Add a WHERE clause directly — no CTE needed. The threshold is applied before LIMIT so
-pagination stays correct:
+pagination stays correct. Use Kysely's `.$if()` pattern with explicit parentheses in the
+`sql` template to avoid operator precedence ambiguity between `<=>` and `<=`:
 
 ```sql
 SELECT asset.*
 FROM asset
   INNER JOIN smart_search ON asset.id = smart_search.assetId
 WHERE [all existing filters]
-  AND smart_search.embedding <=> $embedding <= $maxDistance
+  AND (smart_search.embedding <=> $embedding) <= $maxDistance
 ORDER BY smart_search.embedding <=> $embedding
 LIMIT $size + 1
 OFFSET $offset
@@ -155,7 +156,7 @@ WITH candidates AS (
   FROM asset
     INNER JOIN smart_search ON asset.id = smart_search.assetId
   WHERE [all existing filters]
-    AND smart_search.embedding <=> $embedding <= $maxDistance
+    AND (smart_search.embedding <=> $embedding) <= $maxDistance
   ORDER BY smart_search.embedding <=> $embedding
   LIMIT 500
 )
