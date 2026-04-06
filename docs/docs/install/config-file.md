@@ -255,7 +255,31 @@ So you can just grab it from there, paste it into a file and you're pretty much 
 :::
 
 :::info Classification
-The `classification` section configures [Auto-Classification](/features/auto-classification) — automatic tagging and archiving of photos based on visual content. Categories are empty by default; see the [Auto-Classification docs](/features/auto-classification#option-2-config-file-yaml) for YAML examples and category field reference.
+The `classification` section configures [Auto-Classification](/features/auto-classification) — automatic tagging and archiving of photos based on visual content. Categories are empty by default. Here's an example with two categories:
+
+```json
+"classification": {
+  "enabled": true,
+  "categories": [
+    {
+      "name": "Nature",
+      "prompts": ["a landscape photo of mountains", "a photo of a forest", "a sunset over water"],
+      "similarity": 0.28,
+      "action": "tag",
+      "enabled": true
+    },
+    {
+      "name": "Screenshots",
+      "prompts": ["a screenshot of a phone screen", "a screenshot of a website"],
+      "similarity": 0.25,
+      "action": "tag_and_archive",
+      "enabled": true
+    }
+  ]
+}
+```
+
+The first category tags matching photos as `Auto/Nature`. The second tags and archives screenshots so they don't clutter your timeline. See the [Auto-Classification docs](/features/auto-classification) for the full field reference and prompt writing tips.
 :::
 
 ### Step 2 - Specify the file location
