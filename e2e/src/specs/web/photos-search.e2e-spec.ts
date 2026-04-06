@@ -105,8 +105,12 @@ test.describe('Photos Search', () => {
     // Chip should show the query text
     await expect(page.getByTestId('search-chip')).toContainText('sunset');
 
-    // Remove via the chip's close button — should clear the search entirely
-    await page.getByTestId('search-chip-close').click();
+    // Remove via the chip's close button — should clear the search entirely.
+    // UserPageLayout's header is absolutely positioned over the top of the
+    // content area and Playwright's auto-scroll-into-view lands the chip under
+    // the header overlay. dispatchEvent bypasses both the scroll and intercept
+    // checks and fires the click handler directly on the button.
+    await page.getByTestId('search-chip-close').dispatchEvent('click');
 
     await expect(page).toHaveURL(/\/photos(?!\?q=)/);
     await expect(page.getByTestId('search-chip')).not.toBeVisible();
@@ -133,11 +137,13 @@ test.describe('Photos Search', () => {
   });
 
   test('mobile viewport hides the SearchBar', async ({ context, page }) => {
-    await page.setViewportSize({ width: 639, height: 900 });
+    // Gallery's Tailwind theme defines --breakpoint-sm: 639px, so sm:block
+    // still matches at 639. Use a clearly-sub-breakpoint width here.
+    await page.setViewportSize({ width: 500, height: 900 });
     await gotoPhotos(context, page);
 
     // The SearchBar is inside a hidden sm:block container, so it should
-    // not be visible below the sm breakpoint (640px).
+    // not be visible below the sm breakpoint.
     await expect(page.locator('input[placeholder="Search"]')).not.toBeVisible();
   });
 });
