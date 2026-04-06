@@ -20,7 +20,7 @@
 
 **Step 1: Add test data and 11 new tests**
 
-Inside the existing `describe('LocationFilter')` block (after line 360), add a new country list and all 10 tests. The tests use the existing `mockCityFetch` helper already defined at line 252.
+Inside the existing `describe('LocationFilter')` block, add a new country list and all 11 tests. The tests use the existing `mockCityFetch` helper.
 
 ```typescript
 // --- Search tests ---
@@ -261,7 +261,7 @@ Expected: All 11 new tests FAIL (search input not found, show-more not found, et
 
 ```bash
 git add web/src/lib/components/filter-panel/__tests__/filter-sections.spec.ts
-git commit -m "test: add 10 failing tests for location filter search"
+git commit -m "test: add 11 failing tests for location filter search"
 ```
 
 ---
@@ -274,7 +274,7 @@ git commit -m "test: add 10 failing tests for location filter search"
 
 **Step 1: Add imports**
 
-At the top of the `<script>` block (after line 1), add:
+At the top of the `<script>` block, after the existing `FilterContext` import, add:
 
 ```typescript
 import { Icon } from '@immich/ui';
@@ -283,7 +283,7 @@ import { mdiMagnify } from '@mdi/js';
 
 **Step 2: Add state variables**
 
-After the `emptyText` prop destructuring (after line 22), add:
+After the `emptyText` prop destructuring, add:
 
 ```typescript
 let searchQuery = $state('');
@@ -327,7 +327,7 @@ let remainingCount = $derived(Math.max(0, filteredCountries.length - INITIAL_SHO
 
 **Step 5: Add search input markup**
 
-In the template, inside the `{:else}` block (after line 75, before the orphaned country block), add:
+In the template, inside the `{:else}` block, before the orphaned country block, add:
 
 ```svelte
     <!-- Search input -->
@@ -350,7 +350,7 @@ In the template, inside the `{:else}` block (after line 75, before the orphaned 
 
 **Step 6: Replace countries loop with visibleCountries**
 
-Change line 100 from:
+Change the countries loop from:
 
 ```svelte
     {#each countries as country (country)}
@@ -364,7 +364,7 @@ to:
 
 **Step 7: Add "No results" message**
 
-After the orphaned country block (after line 98) and before the `{#each visibleCountries}` loop, add:
+After the orphaned country block and before the `{#each visibleCountries}` loop, add:
 
 ```svelte
     <!-- Empty search results -->
@@ -377,7 +377,7 @@ After the orphaned country block (after line 98) and before the `{#each visibleC
 
 **Step 8: Add "Show more" button**
 
-After the `{/each}` that closes the countries loop (after line 155), add:
+After the `{/each}` that closes the countries loop, add:
 
 ```svelte
     <!-- Show more link -->
