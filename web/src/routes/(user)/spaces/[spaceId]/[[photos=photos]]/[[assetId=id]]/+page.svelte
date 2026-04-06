@@ -872,6 +872,7 @@
           totalLoaded={searchResults.length}
           onLoadMore={handleLoadMore}
           spaceId={space.id}
+          isShared={true}
           sortMode={filters.sortOrder}
         />
       {/if}
