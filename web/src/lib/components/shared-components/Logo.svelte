@@ -32,7 +32,7 @@
         return theme.value === Theme.Light ? '/gallery-logo-inline-light.svg' : '/gallery-logo-inline-dark.svg';
       }
       default: {
-        return '/gallery-logo-mark.svg';
+        return theme.value === Theme.Light ? '/gallery-logo-mark.svg' : '/gallery-logo-mark-dark.svg';
       }
     }
   });
