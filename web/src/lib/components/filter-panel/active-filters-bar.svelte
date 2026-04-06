@@ -126,7 +126,12 @@
     <button
       type="button"
       class="ml-auto text-xs font-semibold text-immich-primary dark:text-immich-dark-primary"
-      onclick={onClearAll}
+      onclick={() => {
+        onClearAll();
+        if (searchQuery) {
+          onClearSearch?.();
+        }
+      }}
       data-testid="clear-all-btn"
     >
       Clear all
