@@ -7,6 +7,7 @@
   import { handlePromiseError } from '$lib/utils';
   import { navigate } from '$lib/utils/navigation';
   import { type AssetResponseDto, getAssetInfo } from '@immich/sdk';
+  import { SvelteMap } from 'svelte/reactivity';
   import { t } from 'svelte-i18n';
 
   interface Props {
@@ -16,11 +17,31 @@
     totalLoaded: number;
     onLoadMore: () => void;
     spaceId?: string;
+    sortMode: 'relevance' | 'asc' | 'desc';
   }
 
-  let { results, isLoading, hasMore, totalLoaded, onLoadMore, spaceId }: Props = $props();
+  let { results, isLoading, hasMore, totalLoaded, onLoadMore, spaceId, sortMode }: Props = $props();
 
   let isViewerOpen = $state(false);
+  let sentinelElement: HTMLElement | undefined = $state();
+  let scrollContainer: HTMLElement | undefined = $state();
+  let observer: IntersectionObserver | undefined;
+
+  $effect(() => {
+    if (sentinelElement && scrollContainer) {
+      observer?.disconnect();
+      observer = new IntersectionObserver(
+        (entries) => {
+          if (entries[0]?.isIntersecting && hasMore && !isLoading) {
+            onLoadMore();
+          }
+        },
+        { root: scrollContainer },
+      );
+      observer.observe(sentinelElement);
+      return () => observer?.disconnect();
+    }
+  });
 
   const getFullAsset = async (id: string): Promise<AssetResponseDto> => {
     return getAssetInfo({ ...authManager.params, id, spaceId });
@@ -59,9 +80,32 @@
     cursor = undefined;
     await navigate({ targetRoute: 'current', assetId: null });
   };
+
+  // Date grouping for date-sorted modes
+  type DateGroup = { key: string; label: string; assets: AssetResponseDto[] };
+
+  const groupByMonth = (assets: AssetResponseDto[]): DateGroup[] => {
+    const map = new SvelteMap<string, DateGroup>();
+    for (const asset of assets) {
+      const date = asset.fileCreatedAt ? new Date(asset.fileCreatedAt) : undefined;
+      const key = date ? `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}` : 'unknown';
+      let group = map.get(key);
+      if (!group) {
+        const label = date
+          ? date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', timeZone: 'UTC' })
+          : 'Unknown date';
+        group = { key, label, assets: [] };
+        map.set(key, group);
+      }
+      group.assets.push(asset);
+    }
+    return [...map.values()];
+  };
+
+  let dateGroups = $derived(sortMode === 'relevance' ? [] : groupByMonth(results));
 </script>
 
-<section class="px-4 py-4">
+<section bind:this={scrollContainer} class="immich-scrollbar flex-1 overflow-y-auto px-4 py-4">
   {#if isLoading && results.length === 0}
     <div class="flex justify-center py-8" data-testid="search-loading">
       <LoadingSpinner />
@@ -73,34 +117,64 @@
   {:else}
     <div class="mb-4 flex items-center gap-2">
       <span class="text-sm text-gray-500 dark:text-gray-400" data-testid="result-count">
-        {totalLoaded}{hasMore ? '+' : ''} result{totalLoaded === 1 && !hasMore ? '' : 's'}
+        {#if sortMode === 'relevance'}
+          {totalLoaded}{hasMore ? '+' : ''} result{totalLoaded === 1 && !hasMore ? '' : 's'}
+        {:else}
+          {totalLoaded}{hasMore ? ' of up to 500' : ''} result{totalLoaded === 1 && !hasMore ? '' : 's'}
+        {/if}
       </span>
       {#if isLoading}
         <LoadingSpinner size="small" />
       {/if}
     </div>
-    <div class="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-1">
-      {#each results as asset (asset.id)}
-        <button
-          type="button"
-          class="aspect-square cursor-pointer overflow-hidden rounded"
-          onclick={() => openAsset(asset)}
+
+    {#if sortMode === 'relevance'}
+      <div class="grid grid-cols-[repeat(auto-fill,minmax(250px,1fr))] gap-3">
+        {#each results as asset (asset.id)}
+          <button
+            type="button"
+            class="aspect-square cursor-pointer overflow-hidden rounded"
+            onclick={() => openAsset(asset)}
+          >
+            <img
+              src="/api/assets/{asset.id}/thumbnail"
+              alt={asset.originalFileName}
+              class="h-full w-full object-cover"
+            />
+          </button>
+        {/each}
+      </div>
+    {:else}
+      {#each dateGroups as group, i (group.key)}
+        <h3
+          class="mb-2 mt-4 text-sm font-medium text-gray-500 first:mt-0 dark:text-gray-400"
+          data-testid="date-group-header-{i}"
         >
-          <img src="/api/assets/{asset.id}/thumbnail" alt={asset.originalFileName} class="h-full w-full object-cover" />
-        </button>
+          {group.label}
+        </h3>
+        <div class="grid grid-cols-[repeat(auto-fill,minmax(250px,1fr))] gap-3">
+          {#each group.assets as asset (asset.id)}
+            <button
+              type="button"
+              class="aspect-square cursor-pointer overflow-hidden rounded"
+              onclick={() => openAsset(asset)}
+            >
+              <img
+                src="/api/assets/{asset.id}/thumbnail"
+                alt={asset.originalFileName}
+                class="h-full w-full object-cover"
+              />
+            </button>
+          {/each}
+        </div>
       {/each}
-    </div>
+    {/if}
+
     {#if hasMore}
-      <div class="mt-4 flex justify-center">
-        <button
-          type="button"
-          data-testid="load-more-btn"
-          disabled={isLoading}
-          onclick={onLoadMore}
-          class="rounded-lg bg-immich-primary px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-immich-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {$t('spaces_load_more')}
-        </button>
+      <div bind:this={sentinelElement} data-testid="scroll-sentinel" class="flex justify-center py-4">
+        {#if isLoading}
+          <LoadingSpinner size="small" />
+        {/if}
       </div>
     {/if}
   {/if}

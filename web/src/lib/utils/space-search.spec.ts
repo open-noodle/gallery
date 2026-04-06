@@ -1,6 +1,6 @@
 import { createFilterState } from '$lib/components/filter-panel/filter-panel';
 import { buildSmartSearchParams, SEARCH_FILTER_DEBOUNCE_MS } from '$lib/utils/space-search';
-import { AssetTypeEnum } from '@immich/sdk';
+import { AssetOrder, AssetTypeEnum } from '@immich/sdk';
 
 describe('buildSmartSearchParams', () => {
   it('should include query and spaceId', () => {
@@ -111,6 +111,35 @@ describe('buildSmartSearchParams', () => {
     expect(result.takenBefore).toBeUndefined();
   });
 
+  it('should set order to Asc when sortOrder is asc', () => {
+    const filters = { ...createFilterState(), sortOrder: 'asc' as const };
+    const result = buildSmartSearchParams('test', 'space-1', filters);
+    expect(result.order).toBe(AssetOrder.Asc);
+  });
+
+  it('should set order to Desc when sortOrder is desc', () => {
+    const filters = { ...createFilterState(), sortOrder: 'desc' as const };
+    const result = buildSmartSearchParams('test', 'space-1', filters);
+    expect(result.order).toBe(AssetOrder.Desc);
+  });
+
+  it('should not set order when sortOrder is relevance', () => {
+    const filters = { ...createFilterState(), sortOrder: 'relevance' as const };
+    const result = buildSmartSearchParams('test', 'space-1', filters);
+    expect(result.order).toBeUndefined();
+  });
+
+  it('should map isFavorite filter', () => {
+    const filters = { ...createFilterState(), isFavorite: true };
+    const result = buildSmartSearchParams('test', 'space-1', filters);
+    expect(result.isFavorite).toBe(true);
+  });
+
+  it('should not include isFavorite when undefined', () => {
+    const result = buildSmartSearchParams('test', 'space-1', createFilterState());
+    expect(result.isFavorite).toBeUndefined();
+  });
+
   it('should handle all filters active simultaneously', () => {
     const filters = {
       ...createFilterState(),
@@ -124,6 +153,8 @@ describe('buildSmartSearchParams', () => {
       mediaType: 'video' as const,
       selectedYear: 2025,
       selectedMonth: 3,
+      sortOrder: 'desc' as const,
+      isFavorite: true,
     };
     const result = buildSmartSearchParams('cherry blossoms', 'space-1', filters);
     expect(result.query).toBe('cherry blossoms');
@@ -138,6 +169,8 @@ describe('buildSmartSearchParams', () => {
     expect(result.type).toBe(AssetTypeEnum.Video);
     expect(result.takenAfter).toBeDefined();
     expect(result.takenBefore).toBeDefined();
+    expect(result.order).toBe(AssetOrder.Desc);
+    expect(result.isFavorite).toBe(true);
   });
 
   it('should not include empty string fields', () => {
