@@ -73,7 +73,7 @@ This is the working backlog for closing the e2e API test coverage gaps. Each row
 
 | ID  | Task                                                                                                                                                                         | Size      | Blocked by | Status |
 | --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | ---------- | ------ |
-| T18 | **`gallery-map.e2e-spec.ts` — access matrix + filters**. Auth, owner happy path, all filter parameters (people/tags/country/city/make/model/rating/dates/favorite/archived). | ~12 tests | T02        | [ ]    |
+| T18 | **`gallery-map.e2e-spec.ts` — access matrix + filters**. Auth, owner happy path, country/city/isFavorite/takenAfter/takenBefore filters, rating/type validation, archived hidden via hardcoded `visibility=Timeline`, cross-user isolation. | 12 tests | T02        | [x]    |
 | T19 | **`gallery-map` — space scoping**. `spaceId` access matrix + space-linked library visibility + hidden persons exclusion (PR #202).                                           | ~6 tests  | T02, T18   | [ ]    |
 | T20 | **`map.e2e-spec.ts` — space scoping extension**. Add `spaceId` matrix + space-linked library + visibility filters to existing spec.                                          | ~6 tests  | T02        | [ ]    |
 | T21 | **`view.e2e-spec.ts`**. `GET /view/folder/unique-paths`, `GET /view/folder`. Owner-scoped. Verify intent: does folder browse leak space-linked library paths?                | ~8 tests  | T02        | [ ]    |
