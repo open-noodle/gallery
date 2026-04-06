@@ -1,7 +1,11 @@
 <script lang="ts">
+  import { goto } from '$app/navigation';
+  import { page } from '$app/state';
   import ActionMenuItem from '$lib/components/ActionMenuItem.svelte';
   import ActiveFiltersBar from '$lib/components/filter-panel/active-filters-bar.svelte';
   import FilterPanel from '$lib/components/filter-panel/filter-panel.svelte';
+  import SearchSortDropdown from '$lib/components/filter-panel/search-sort-dropdown.svelte';
+  import SmartSearchResults from '$lib/components/search/smart-search-results.svelte';
   import {
     buildFilterContext,
     clearFilters,
@@ -11,6 +15,7 @@
     type FilterState,
   } from '$lib/components/filter-panel/filter-panel';
   import UserPageLayout from '$lib/components/layouts/user-page-layout.svelte';
+  import SearchBar from '$lib/elements/SearchBar.svelte';
   import ButtonContextMenu from '$lib/components/shared-components/context-menu/button-context-menu.svelte';
   import EmptyPlaceholder from '$lib/components/shared-components/empty-placeholder.svelte';
   import ArchiveAction from '$lib/components/timeline/actions/ArchiveAction.svelte';
@@ -58,6 +63,9 @@
 
   // Filter state
   let filters = $state(createFilterState());
+  let searchQuery = $state(page.url.searchParams.get('q') ?? '');
+  let isLoading = $state(false);
+  const showSearchResults = $derived(searchQuery.trim().length > 0);
   const options = $derived(buildPhotosTimelineOptions(filters));
   let personNames = new SvelteMap<string, string>();
   let tagNames = new SvelteMap<string, string>();
@@ -124,7 +132,7 @@
     },
   };
 
-  const hasActiveFilters = $derived(getActiveFilterCount(filters) > 0);
+  const hasActiveFilters = $derived(getActiveFilterCount(filters) > 0 || showSearchResults);
   const totalAssetCount = $derived(timelineManager?.assetCount ?? 0);
   const isTimelineEmpty = $derived(timelineManager?.isInitialized && totalAssetCount === 0 && !hasActiveFilters);
 
@@ -164,6 +172,30 @@
     timelineManager.removeAssets(assetIds);
     assetMultiSelectManager.clear();
   };
+
+  function handleSearchSubmit() {
+    if (!searchQuery.trim()) {
+      return;
+    }
+    filters = { ...filters, sortOrder: 'relevance' };
+    const url = new URL('/photos', window.location.origin);
+    url.searchParams.set('q', searchQuery.trim());
+    void goto(url.pathname + url.search, { keepFocus: true, noScroll: true });
+  }
+
+  function clearSearch() {
+    searchQuery = '';
+    isLoading = false;
+    filters = { ...filters, sortOrder: 'desc' };
+    void goto('/photos', { replaceState: true, keepFocus: true, noScroll: true });
+  }
+
+  $effect(() => {
+    const q = page.url.searchParams.get('q') ?? '';
+    if (q !== searchQuery) {
+      searchQuery = q;
+    }
+  });
 
   const items = $derived(
     memoryManager.memories.map((memory) => ({
