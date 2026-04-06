@@ -1,5 +1,4 @@
 import { type LoginResponseDto } from '@immich/sdk';
-import { type Actor, authHeaders } from 'src/actors';
 import { createUserDto } from 'src/fixtures';
 import { app, asBearerAuth, utils } from 'src/utils';
 import request from 'supertest';
@@ -26,7 +25,6 @@ import { beforeAll, describe, expect, it } from 'vitest';
 describe('/admin/notifications (T37 — content paths)', () => {
   let admin: LoginResponseDto;
   let user: LoginResponseDto;
-  const anonActor: Actor = { id: 'anon' };
 
   beforeAll(async () => {
     await utils.resetDatabase();
@@ -99,13 +97,9 @@ describe('/admin/notifications (T37 — content paths)', () => {
   });
 
   describe('POST /admin/notifications/templates/:name — render happy paths', () => {
-    it('requires authentication', async () => {
-      const { status } = await request(app)
-        .post('/admin/notifications/templates/welcome')
-        .set(authHeaders(anonActor))
-        .send({ template: 'Hello' });
-      expect(status).toBe(401);
-    });
+    // Auth + admin gate matrix is already pinned by T31's notification.e2e-spec.ts
+    // (see the 'POST /admin/notifications/templates/:name' describe there).
+    // T37 only adds the rendering happy paths.
 
     it('renders the welcome template', async () => {
       // notification-admin.service.ts:65-79 — fills in displayName/username/

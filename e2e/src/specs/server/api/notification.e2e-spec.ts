@@ -58,17 +58,29 @@ describe('/notifications', () => {
     });
 
     it('cross-user isolation: userB does not see userA\'s notifications', async () => {
-      // userA's notification from the previous test is still in the DB. userB's
-      // listing must NOT include it.
+      // Seed at least one notification for EACH user so the no-overlap loop is
+      // load-bearing — if userB had none, the assertion would pass vacuously
+      // even if scoping were broken.
+      const aId = await seedNotification(userA, 't31 isolation-A');
+      const bId = await seedNotification(userB, 't31 isolation-B');
+
       const aList = await request(app).get('/notifications').set(asBearerAuth(userA.accessToken));
       const aIds = (aList.body as Array<{ id: string }>).map((n) => n.id);
-      expect(aIds.length).toBeGreaterThan(0);
-
       const bList = await request(app).get('/notifications').set(asBearerAuth(userB.accessToken));
       const bIds = (bList.body as Array<{ id: string }>).map((n) => n.id);
-      // No overlap between the two listings.
-      for (const aId of aIds) {
-        expect(bIds).not.toContain(aId);
+
+      expect(aIds).toContain(aId);
+      expect(bIds).toContain(bId);
+      // Each list contains at least one item — no vacuous pass possible.
+      expect(aIds.length).toBeGreaterThan(0);
+      expect(bIds.length).toBeGreaterThan(0);
+
+      // No overlap in either direction.
+      for (const id of aIds) {
+        expect(bIds).not.toContain(id);
+      }
+      for (const id of bIds) {
+        expect(aIds).not.toContain(id);
       }
     });
   });
@@ -151,10 +163,19 @@ describe('/notifications', () => {
         .send({ ids: [id1, id2], readAt: new Date().toISOString() });
       expect(status).toBe(204);
 
-      const get1 = await request(app).get(`/notifications/${id1}`).set(asBearerAuth(userA.accessToken));
-      const get2 = await request(app).get(`/notifications/${id2}`).set(asBearerAuth(userA.accessToken));
-      expect((get1.body as { readAt: string | null }).readAt).not.toBeNull();
-      expect((get2.body as { readAt: string | null }).readAt).not.toBeNull();
+      // Verify via the LIST endpoint, NOT GET-single (which is upstream-broken
+      // — see the UPSTREAM BUG note in the GET /notifications/:id describe).
+      // The list endpoint correctly filters with `IS NULL` and returns the
+      // updated readAt values.
+      const list = await request(app).get('/notifications').set(asBearerAuth(userA.accessToken));
+      expect(list.status).toBe(200);
+      const items = list.body as Array<{ id: string; readAt: string | null }>;
+      const item1 = items.find((n) => n.id === id1);
+      const item2 = items.find((n) => n.id === id2);
+      expect(item1).toBeDefined();
+      expect(item2).toBeDefined();
+      expect(item1!.readAt).not.toBeNull();
+      expect(item2!.readAt).not.toBeNull();
     });
 
     it('bulk PUT requires non-empty ids (ArrayMinSize)', async () => {

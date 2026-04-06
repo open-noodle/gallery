@@ -147,7 +147,7 @@ describe('/classification', () => {
       });
 
       it('rejects an invalid action with 400 (IsIn validator)', async () => {
-        const { status } = await request(app)
+        const { status, body } = await request(app)
           .put('/system-config')
           .set('Authorization', `Bearer ${admin.accessToken}`)
           .send({
@@ -158,10 +158,14 @@ describe('/classification', () => {
             },
           });
         expect(status).toBe(400);
+        // Pin that the failing field is `action` so a future change in the
+        // payload (or a different validator firing) doesn't silently satisfy
+        // the test.
+        expect(body.message).toEqual(expect.arrayContaining([expect.stringContaining('action')]));
       });
 
       it('rejects similarity < 0 with 400 (Min validator)', async () => {
-        const { status } = await request(app)
+        const { status, body } = await request(app)
           .put('/system-config')
           .set('Authorization', `Bearer ${admin.accessToken}`)
           .send({
@@ -172,10 +176,11 @@ describe('/classification', () => {
             },
           });
         expect(status).toBe(400);
+        expect(body.message).toEqual(expect.arrayContaining([expect.stringContaining('similarity')]));
       });
 
       it('rejects similarity > 1 with 400 (Max validator)', async () => {
-        const { status } = await request(app)
+        const { status, body } = await request(app)
           .put('/system-config')
           .set('Authorization', `Bearer ${admin.accessToken}`)
           .send({
@@ -186,10 +191,11 @@ describe('/classification', () => {
             },
           });
         expect(status).toBe(400);
+        expect(body.message).toEqual(expect.arrayContaining([expect.stringContaining('similarity')]));
       });
 
       it('rejects empty prompts array with 400 (ArrayMinSize validator)', async () => {
-        const { status } = await request(app)
+        const { status, body } = await request(app)
           .put('/system-config')
           .set('Authorization', `Bearer ${admin.accessToken}`)
           .send({
@@ -200,6 +206,7 @@ describe('/classification', () => {
             },
           });
         expect(status).toBe(400);
+        expect(body.message).toEqual(expect.arrayContaining([expect.stringContaining('prompts')]));
       });
     });
 

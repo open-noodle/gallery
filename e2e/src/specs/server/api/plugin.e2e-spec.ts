@@ -74,15 +74,17 @@ describe('/plugins', () => {
       expect(status).toBe(401);
     });
 
-    it('returns the static trigger list (currently AssetCreate)', async () => {
+    it('returns the static trigger list (AssetCreate + PersonRecognized)', async () => {
       const { status, body } = await request(app).get('/plugins/triggers').set(asBearerAuth(user.accessToken));
       expect(status).toBe(200);
       expect(Array.isArray(body)).toBe(true);
-      // PluginTriggerType.AssetCreate is the only trigger emitted by
-      // plugin.service.ts:173 (handleAssetCreate). Pinning it here so a future
-      // trigger addition prompts a deliberate update.
+      // server/src/plugins.ts exports two trigger types: AssetCreate (wired
+      // through plugin.service.handleAssetCreate at line 173) and
+      // PersonRecognized (declared but the handler at line 237 is unimplemented
+      // and currently returns Skipped). Both must appear in the static list.
+      // Pin BOTH so a future removal of either prompts a deliberate update.
       const types = (body as Array<{ type: string }>).map((t) => t.type);
-      expect(types).toContain('AssetCreate');
+      expect(types).toEqual(expect.arrayContaining(['AssetCreate', 'PersonRecognized']));
     });
   });
 

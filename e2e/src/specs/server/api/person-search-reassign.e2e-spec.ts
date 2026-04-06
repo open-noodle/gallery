@@ -96,26 +96,26 @@ describe('person search + reassign', () => {
       expect(ids).not.toContain(bobPersonId);
     });
 
-    it('hidden person is excluded by default', async () => {
-      // Create a hidden person and verify it doesn't show up unless withHidden=true.
+    it('hidden person is excluded by default and included with withHidden=true', async () => {
+      // Combined into one test so the hidden id is in scope for both halves —
+      // the previous structure put `hidden` inside the first `it` and the
+      // second test had to fall back to a vacuous `length > 0` check (which
+      // passed via fuzzy trigram matching against unrelated "Alice" persons).
+      // Now both halves assert against the SAME id, making the inclusion
+      // check load-bearing.
       const hidden = await utils.createPerson(userA.accessToken, { name: 'HiddenAlice', isHidden: true });
 
       const defaultRes = await request(app)
         .get('/search/person?name=HiddenAlice')
         .set(asBearerAuth(userA.accessToken));
-      expect((defaultRes.body as Array<{ id: string }>).map((p) => p.id)).not.toContain(hidden.id);
-    });
+      const defaultIds = (defaultRes.body as Array<{ id: string }>).map((p) => p.id);
+      expect(defaultIds).not.toContain(hidden.id);
 
-    it('withHidden=true includes hidden person', async () => {
-      // Search again, this time with the flag.
       const withHiddenRes = await request(app)
         .get('/search/person?name=HiddenAlice&withHidden=true')
         .set(asBearerAuth(userA.accessToken));
-      const ids = (withHiddenRes.body as Array<{ id: string }>).map((p) => p.id);
-      // The seeded HiddenAlice from the previous test (or this one if order
-      // changes) must be present. We just assert at least one matching person
-      // is returned.
-      expect(ids.length).toBeGreaterThan(0);
+      const withHiddenIds = (withHiddenRes.body as Array<{ id: string }>).map((p) => p.id);
+      expect(withHiddenIds).toContain(hidden.id);
     });
   });
 

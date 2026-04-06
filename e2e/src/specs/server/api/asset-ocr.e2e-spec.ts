@@ -1,9 +1,10 @@
 import { type LoginResponseDto } from '@immich/sdk';
+import { Socket } from 'socket.io-client';
 import { type Actor, authHeaders } from 'src/actors';
 import { createUserDto } from 'src/fixtures';
 import { app, asBearerAuth, utils } from 'src/utils';
 import request from 'supertest';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 // Coverage for the asset OCR endpoint — fork extension on /assets:
 //
@@ -13,11 +14,20 @@ import { beforeAll, describe, expect, it } from 'vitest';
 // which is the bulk-access pattern → 400 for non-owner. The default fixture
 // asset has no OCR data (the OCR job isn't run for generated test PNGs), so the
 // happy-path response is an empty array.
+//
+// IMPORTANT: `asset.service.ts:461-477` calls `assetRepository.getForOcr(id)`
+// which inner-joins `asset_exif`. The exif row is populated asynchronously by
+// the metadata extraction job. Without a websocket wait on `assetUpload`, the
+// happy-path test races: the GET fires before exif extraction completes, the
+// inner-join returns null, and the service throws BadRequestException
+// ('Asset not found') → 400 instead of the expected 200. The wait below
+// closes the race.
 
 describe('GET /assets/:id/ocr', () => {
   let admin: LoginResponseDto;
   let owner: LoginResponseDto;
   let other: LoginResponseDto;
+  let websocket: Socket;
   let assetId: string;
   const anonActor: Actor = { id: 'anon' };
 
@@ -28,8 +38,17 @@ describe('GET /assets/:id/ocr', () => {
       utils.userSetup(admin.accessToken, createUserDto.create('t24-owner')),
       utils.userSetup(admin.accessToken, createUserDto.create('t24-other')),
     ]);
+    websocket = await utils.connectWebsocket(owner.accessToken);
     const asset = await utils.createAsset(owner.accessToken);
     assetId = asset.id;
+    // Wait for the upload pipeline (metadata extraction → thumbnail generation
+    // → on_upload_success). After this fires, asset_exif is populated and
+    // getForOcr's inner-join will succeed.
+    await utils.waitForWebsocketEvent({ event: 'assetUpload', id: assetId });
+  });
+
+  afterAll(() => {
+    utils.disconnectWebsocket(websocket);
   });
 
   it('requires authentication', async () => {

@@ -1428,6 +1428,7 @@ describe('/shared-spaces', () => {
     let petPersonId: string; // Rex — type=pet
     let zeroThumbPersonId: string; // person with empty thumbnailPath — invisible to listing
     let zeroThumbGlobalId: string; // the underlying global person, for direct mutation in test 11
+    let aliceGlobalId: string; // captured for the "space IDs not global IDs" load-bearing assertion
 
     // Actor objects for forEachActor — built from the LoginResponseDto bag in beforeAll.
     let ownerActor: Actor;
@@ -1466,6 +1467,7 @@ describe('/shared-spaces', () => {
       // listing's hard requirement is satisfied.
       const aliceRes = await utils.createSpacePerson(spaceId, 'Alice', owner.userId, spaceAssetId);
       namedPersonId = aliceRes.spacePersonId;
+      aliceGlobalId = aliceRes.globalPersonId;
 
       const unnamedRes = await utils.createSpacePerson(spaceId, '', owner.userId, spaceAssetId);
       unnamedPersonId = unnamedRes.spacePersonId;
@@ -1508,6 +1510,14 @@ describe('/shared-spaces', () => {
       // The canonical assertion for the whole sub-tree (T09-T14): the listing response
       // contains shared_space_person.id values, NOT global person.id values. Every
       // downstream test takes the IDs from this listing and uses them as path params.
+      //
+      // Both halves are load-bearing:
+      //   - toContain(namedPersonId): the space-person id IS in the list
+      //   - not.toContain(aliceGlobalId): the global person id is NOT
+      // Without the negation, a regression that returned the global person.id
+      // (instead of shared_space_person.id) would still satisfy the contains
+      // checks IF the values happened to be the same — they won't, but the
+      // negation pins the contract explicitly.
       const { status, body } = await request(app)
         .get(`/shared-spaces/${spaceId}/people`)
         .set('Authorization', `Bearer ${owner.accessToken}`);
@@ -1516,6 +1526,10 @@ describe('/shared-spaces', () => {
       expect(ids).toContain(namedPersonId);
       expect(ids).toContain(unnamedPersonId);
       expect(ids).toContain(petPersonId);
+      // Sanity check: namedPersonId and aliceGlobalId are different UUIDs.
+      expect(namedPersonId).not.toBe(aliceGlobalId);
+      // The global person id MUST NOT appear in the listing.
+      expect(ids).not.toContain(aliceGlobalId);
     });
 
     it('hidden persons are excluded by default (withHidden omitted)', async () => {
@@ -1687,7 +1701,10 @@ describe('/shared-spaces', () => {
           // Other half of the T09 open hypothesis: DISPROVED for pets. The pet filter
           // applies BOTH to the listing AND to the direct fetch — a non-obvious
           // asymmetry vs the hidden filter (which is listing-only). The server
-          // returns 400 here (not 200, not 404) — bulk-access pattern.
+          // throws BadRequestException('Person not found') at
+          // shared-space.service.ts:633-636. Pinning the message ensures the test
+          // stays load-bearing — a future regression that returns 400 from a
+          // different validator would not satisfy the message check.
           //
           // Practically this means: if the space has petsEnabled=false, no member
           // can address the pet person at all, even with the ID. This is the
@@ -1695,10 +1712,11 @@ describe('/shared-spaces', () => {
           const dbClient = await utils.connectDatabase();
           try {
             await dbClient.query('UPDATE shared_space SET "petsEnabled" = false WHERE id = $1', [spaceId]);
-            const { status } = await request(app)
+            const { status, body } = await request(app)
               .get(`/shared-spaces/${spaceId}/people/${petPersonId}`)
               .set('Authorization', `Bearer ${owner.accessToken}`);
             expect(status).toBe(400);
+            expect((body as { message: string }).message).toMatch(/Person not found/i);
           } finally {
             await dbClient.query('UPDATE shared_space SET "petsEnabled" = true WHERE id = $1', [spaceId]);
           }
@@ -1707,12 +1725,13 @@ describe('/shared-spaces', () => {
         it('non-existent personId returns 400 (bulk-access pattern, not 404)', async () => {
           // requireAccess returns BadRequestException uniformly for "not found OR no
           // access" to avoid leaking existence. Same taxonomic split T03 documented
-          // for timeline. Pin the 400 explicitly so a future change to return 404
-          // would be caught.
-          const { status } = await request(app)
+          // for timeline. Pin the 400 AND the message so a future change to return
+          // 404 OR a 400 from a different validator would be caught.
+          const { status, body } = await request(app)
             .get(`/shared-spaces/${spaceId}/people/00000000-0000-4000-a000-000000000099`)
             .set('Authorization', `Bearer ${owner.accessToken}`);
           expect(status).toBe(400);
+          expect((body as { message: string }).message).toMatch(/Person not found/i);
         });
       });
 
@@ -2252,6 +2271,13 @@ describe('/shared-spaces', () => {
         // sufficient.
         const queueName = 'facialRecognition';
         try {
+          // Drain any in-flight dedup jobs from PRIOR tests in this describe
+          // (the previous "owner happy path" and "two consecutive owner calls"
+          // tests both enqueue dedup jobs). Without this wait, those jobs may
+          // still be active/waiting when we pause+empty below, leading to a
+          // flaky baseline where the spaceId match count is off-by-one.
+          await utils.waitForQueueFinish(admin.accessToken, queueName);
+
           // Pause + empty so the assertions are deterministic.
           const pauseRes = await request(app)
             .put(`/queues/${queueName}`)
@@ -2351,20 +2377,29 @@ describe('/shared-spaces', () => {
         expect((body as { message: string }).message).toMatch(/admins/i);
       });
 
-      it('non-admin editor cannot link a library', async () => {
-        const { status } = await request(app)
+      it('non-admin editor cannot link a library (admin gate fires before role check)', async () => {
+        // Pin the admin-gate message so we know which branch fired. The two-step
+        // gate at shared-space.service.ts:449-477 checks admin BEFORE requireRole,
+        // so a non-admin editor should hit the admin-gate message even though
+        // they would also fail the role check.
+        const { status, body } = await request(app)
           .put(`/shared-spaces/${spaceId}/libraries`)
           .set('Authorization', `Bearer ${editor.accessToken}`)
           .send({ libraryId: library.id });
         expect(status).toBe(403);
+        expect((body as { message: string }).message).toMatch(/admins/i);
       });
 
-      it('non-admin viewer cannot link a library', async () => {
-        const { status } = await request(app)
+      it('non-admin viewer cannot link a library (admin gate fires before role check)', async () => {
+        // Same as above — admin gate at line 451 fires before requireRole at
+        // line 454, so the message is the admin-gate one even though the
+        // viewer would also fail role validation.
+        const { status, body } = await request(app)
           .put(`/shared-spaces/${spaceId}/libraries`)
           .set('Authorization', `Bearer ${viewer.accessToken}`)
           .send({ libraryId: library.id });
         expect(status).toBe(403);
+        expect((body as { message: string }).message).toMatch(/admins/i);
       });
 
       it('anon cannot link a library', async () => {

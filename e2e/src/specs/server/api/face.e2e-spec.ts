@@ -288,16 +288,21 @@ describe('/faces', () => {
     });
 
     it('re-attaching a face after a soft-delete inserts a new row that the deletedAt filter actually distinguishes', async () => {
-      // Two-asset variant of the re-attach test. Without two assets the stats count
-      // is `count(distinct asset.id)` which would be 1 with or without the deletedAt
-      // filter — that wouldn't actually probe the filter. By putting the soft-deleted
-      // face on asset A and the new face on asset B, the count distinguishes:
+      // Two-asset variant of the re-attach test. The test pins TWO things:
       //
-      //   - With deletedAt filter (correct): 1 (only asset B)
-      //   - Without deletedAt filter (broken): 2 (asset A + asset B)
+      // 1) The deletedAt filter on people statistics is load-bearing. With the
+      //    soft-deleted face on asset A and the new face on asset B, the
+      //    `count(distinct asset.id)` distinguishes between filtered and unfiltered:
+      //    - With deletedAt filter (correct):  1 (only asset B)
+      //    - Without deletedAt filter (broken): 2 (asset A + asset B)
+      //    Asserted at line 320 below.
       //
-      // Plus: pin that there's no UNIQUE constraint blocking the second insert on
-      // the same asset+person (the soft-deleted row stays in place).
+      // 2) The (assetId, personId) tuple has no UNIQUE constraint, so a second
+      //    insert on the SAME (assetId, personId) — even while a soft-deleted
+      //    row exists — succeeds and bumps the count from 1 to 2. Asserted by
+      //    the bonus block at lines 322-329 below. This probes the absence of
+      //    a UNIQUE index by actually inserting + counting; without the bonus
+      //    block, the test would only cover the deletedAt filter.
       const sidePerson = await utils.createPerson(ctx.spaceOwner.token!, { name: 'Henry' });
       const secondAsset = await utils.createAsset(ctx.spaceOwner.token!);
 

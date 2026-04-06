@@ -52,18 +52,15 @@ describe('POST /search/smart — sort + validation surface', () => {
     expect(status).toBe(401);
   });
 
-  it('returns 400 when neither query nor queryAssetId is set', async () => {
-    // search.service.ts:159 — 'Either `query` or `queryAssetId` must be set'.
-    // This branch fires AFTER the ML-enabled check, so we have to pass an
-    // ML-enabled-style request shape that fails the body check rather than
-    // the gating check. Actually, the order is: first the visibility check,
-    // then the spaceId check, THEN the ML-enabled check, THEN the body check.
-    // So with ML disabled, we get 'Smart search is not enabled' first.
-    //
-    // Pin the actual observed message; if upstream reorders the checks (e.g.
-    // moves the body check before the ML gate so the missing-body case
-    // surfaces a clearer error), this test will fail and force a deliberate
-    // update.
+  it('with empty body, ML gate fires before the missing-body branch (ordering pin)', async () => {
+    // search.service.ts ordering: visibility check → spaceId check → ML-enabled
+    // check → 'Either query or queryAssetId must be set' branch. With ML
+    // disabled in the e2e stack, the gate at line 135 always fires first, so
+    // an empty body still surfaces the gate message — NOT the missing-body
+    // message at line 159. This test pins that ordering: if upstream reorders
+    // the checks (e.g. moves the body check before the ML gate so the missing-
+    // body case surfaces a clearer error), this test fails and forces a
+    // deliberate update.
     const { status, body } = await request(app)
       .post('/search/smart')
       .set(asBearerAuth(user.accessToken))

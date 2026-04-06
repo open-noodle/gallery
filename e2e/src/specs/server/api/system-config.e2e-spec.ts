@@ -162,8 +162,10 @@ describe('/system-config', () => {
     it('rejects machineLearning.clip.maxDistance below 0 (Min validator) — PR #294', async () => {
       // CLIPConfig.maxDistance has @Min(0) @Max(2). 0 means "disabled" — the
       // smart-search filter is opt-in. Pin both bounds to defend against a
-      // future loosening that would silently break the threshold.
-      const { status } = await request(app)
+      // future loosening that would silently break the threshold. Asserting
+      // the message field references `maxDistance` so a different validator
+      // firing (e.g. urls validation) doesn't satisfy the test.
+      const { status, body } = await request(app)
         .put('/system-config')
         .set('Authorization', `Bearer ${admin.accessToken}`)
         .send({
@@ -174,10 +176,11 @@ describe('/system-config', () => {
           },
         });
       expect(status).toBe(400);
+      expect(body.message).toEqual(expect.arrayContaining([expect.stringContaining('maxDistance')]));
     });
 
     it('rejects machineLearning.clip.maxDistance above 2 (Max validator) — PR #294', async () => {
-      const { status } = await request(app)
+      const { status, body } = await request(app)
         .put('/system-config')
         .set('Authorization', `Bearer ${admin.accessToken}`)
         .send({
@@ -188,6 +191,7 @@ describe('/system-config', () => {
           },
         });
       expect(status).toBe(400);
+      expect(body.message).toEqual(expect.arrayContaining([expect.stringContaining('maxDistance')]));
     });
 
     it('accepts machineLearning.clip.maxDistance = 0 (disabled) and round-trips it', async () => {
@@ -214,8 +218,10 @@ describe('/system-config', () => {
     it('rejects machineLearning.urls = [] when enabled=true (ValidateIf + ArrayMinSize)', async () => {
       // SystemConfigMachineLearningDto.urls has @ValidateIf((dto) => dto.enabled),
       // @ArrayMinSize(1). Disabling enabled would skip validation; enabled=true
-      // requires at least one URL.
-      const { status } = await request(app)
+      // requires at least one URL. Pin the message references `urls` so a
+      // future change in the payload (or different validator firing) doesn't
+      // silently satisfy the test.
+      const { status, body } = await request(app)
         .put('/system-config')
         .set('Authorization', `Bearer ${admin.accessToken}`)
         .send({
@@ -223,6 +229,7 @@ describe('/system-config', () => {
           machineLearning: { ...baseConfig.machineLearning, enabled: true, urls: [] },
         });
       expect(status).toBe(400);
+      expect(body.message).toEqual(expect.arrayContaining([expect.stringContaining('urls')]));
     });
 
     it('round-trips a trash config change', async () => {

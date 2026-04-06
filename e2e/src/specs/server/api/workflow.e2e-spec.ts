@@ -178,7 +178,7 @@ describe('/workflows', () => {
       expect((body as { message: string }).message).toMatch(/no fields/i);
     });
 
-    it('cross-user PUT returns 400', async () => {
+    it('cross-user PUT returns 400 and the workflow is unchanged', async () => {
       const create = await createEmptyWorkflow(userA.accessToken, 'cross-update');
       const id = (create.body as { id: string }).id;
 
@@ -187,6 +187,15 @@ describe('/workflows', () => {
         .set(asBearerAuth(userB.accessToken))
         .send({ name: 'attempted-rename' });
       expect(status).toBe(400);
+
+      // Verify the workflow's name is still 'cross-update' — a leaking fix
+      // could return 400 to the caller while still mutating state. The
+      // follow-up GET as the owner pins that the rename did NOT happen.
+      const followup = await request(app)
+        .get(`/workflows/${id}`)
+        .set(asBearerAuth(userA.accessToken));
+      expect(followup.status).toBe(200);
+      expect((followup.body as { name: string }).name).toBe('cross-update');
     });
   });
 
@@ -207,7 +216,7 @@ describe('/workflows', () => {
       expect(followup.status).toBe(400);
     });
 
-    it('cross-user DELETE returns 400', async () => {
+    it('cross-user DELETE returns 400 and the workflow still exists', async () => {
       const create = await createEmptyWorkflow(userA.accessToken, 'cross-delete');
       const id = (create.body as { id: string }).id;
 
@@ -215,6 +224,15 @@ describe('/workflows', () => {
         .delete(`/workflows/${id}`)
         .set(asBearerAuth(userB.accessToken));
       expect(status).toBe(400);
+
+      // Verify the workflow still exists for the owner — same defensive check
+      // as the cross-user PUT test above. Confirms 400 to caller AND no
+      // mutation behind the scenes.
+      const followup = await request(app)
+        .get(`/workflows/${id}`)
+        .set(asBearerAuth(userA.accessToken));
+      expect(followup.status).toBe(200);
+      expect((followup.body as { name: string }).name).toBe('cross-delete');
     });
   });
 });

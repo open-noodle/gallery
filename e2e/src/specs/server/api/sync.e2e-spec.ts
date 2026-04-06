@@ -24,6 +24,7 @@ describe('/sync', () => {
   let userA: LoginResponseDto;
   let userB: LoginResponseDto;
   let userAAssetId: string;
+  let userBAssetId: string;
   const anonActor: Actor = { id: 'anon' };
 
   beforeAll(async () => {
@@ -34,9 +35,15 @@ describe('/sync', () => {
       utils.userSetup(admin.accessToken, createUserDto.create('t38-userB')),
     ]);
 
-    // userA owns one asset; userB has none.
-    const asset = await utils.createAsset(userA.accessToken);
-    userAAssetId = asset.id;
+    // Both users own their own asset so cross-user isolation tests have a
+    // non-empty baseline on each side. Without userB's asset the cross-user
+    // assertion would be vacuously true (empty list contains nothing).
+    const [assetA, assetB] = await Promise.all([
+      utils.createAsset(userA.accessToken),
+      utils.createAsset(userB.accessToken),
+    ]);
+    userAAssetId = assetA.id;
+    userBAssetId = assetB.id;
   });
 
   describe('POST /sync/full-sync', () => {
@@ -59,13 +66,19 @@ describe('/sync', () => {
       expect(ids).toContain(userAAssetId);
     });
 
-    it('cross-user isolation: userB does not see userA\'s asset in full sync', async () => {
+    it('cross-user isolation: userB sees their own asset but NOT userA\'s', async () => {
+      // Both userA and userB own assets. The sync result for userB must
+      // contain userBAssetId AND must NOT contain userAAssetId. Asserting both
+      // halves makes the test load-bearing — a fully-broken endpoint that
+      // returns an empty list would fail the toContain check, and a leaking
+      // endpoint that returns userA's asset would fail the not.toContain check.
       const { status, body } = await request(app)
         .post('/sync/full-sync')
         .set(asBearerAuth(userB.accessToken))
         .send({ updatedUntil: new Date(Date.now() + 60_000).toISOString(), limit: 100 });
       expect(status).toBe(200);
       const ids = (body as Array<{ id: string }>).map((a) => a.id);
+      expect(ids).toContain(userBAssetId);
       expect(ids).not.toContain(userAAssetId);
     });
   });
@@ -157,8 +170,11 @@ describe('/sync', () => {
         .post('/sync/stream')
         .set(asBearerAuth(userA.accessToken))
         .send({ types: ['NotARealType'] });
-      // The endpoint catches the validation error and writes it to the
-      // response stream, but the status code should still indicate failure.
+      // SyncStreamDto.types has @ValidateEnum, so validation fires in the
+      // global ValidationPipe BEFORE sync.controller.getSyncStream's body is
+      // entered. The controller's try/catch (which is intended for in-stream
+      // service errors) is NOT exercised here — the 400 comes cleanly from the
+      // global exception filter with the standard JSON content type.
       expect(status).toBe(400);
     });
   });
@@ -170,9 +186,12 @@ describe('/sync', () => {
     });
 
     it('returns the user\'s ack list (initially empty)', async () => {
+      // Strong assertion: a fresh user has no acks. Asserting `toEqual([])`
+      // pins the empty initial state — `Array.isArray` alone would pass even
+      // if the endpoint returned a non-empty leak from another user.
       const { status, body } = await request(app).get('/sync/ack').set(asBearerAuth(userA.accessToken));
       expect(status).toBe(200);
-      expect(Array.isArray(body)).toBe(true);
+      expect(body).toEqual([]);
     });
   });
 
