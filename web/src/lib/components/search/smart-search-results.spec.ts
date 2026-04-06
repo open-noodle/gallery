@@ -148,7 +148,8 @@ describe('SmartSearchResults', () => {
     await vi.advanceTimersByTimeAsync(SEARCH_FILTER_DEBOUNCE_MS);
 
     const lastCall = searchSmartMock.mock.lastCall;
-    expect(lastCall[0].smartSearchDto.order).toBeUndefined();
+    expect(lastCall).toBeDefined();
+    expect(lastCall![0].smartSearchDto.order).toBeUndefined();
   });
 
   // Test 47 — loadMore (requires triggering the dumb grid's IntersectionObserver or direct invocation)
