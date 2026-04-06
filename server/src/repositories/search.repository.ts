@@ -856,7 +856,8 @@ export class SearchRepository {
           id: p.id,
           name: p.name || (p as any).personalName || '',
         }))
-        .filter((p) => p.name !== '');
+        .filter((p) => p.name !== '')
+        .toSorted((a, b) => a.name.localeCompare(b.name));
 
       const hasUnnamedPeople = spacePeople.some((p) => !p.name && !(p as any).personalName);
 
