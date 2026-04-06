@@ -762,21 +762,38 @@ const getFullAsset = async (id: string): Promise<AssetResponseDto> => {
 };
 ```
 
-**Step 4: Run tests, verify they pass**
+**Step 4: Update the existing spaces page to pass `isShared={true}` (REQUIRED)**
+
+`isShared` is now a required prop. The spaces page renders `<SpaceSearchResults>` directly (around line 863-872 of `spaces/.../+page.svelte`), so without this update the spaces page fails TypeScript. Find the existing render and add `isShared={true}`:
+
+```svelte
+<SpaceSearchResults
+  results={searchResults}
+  isLoading={isSearching}
+  hasMore={hasMoreResults}
+  totalLoaded={searchResults.length}
+  onLoadMore={handleLoadMore}
+  spaceId={space.id}
+  isShared={true}        ← NEW: required temporarily until task 13 replaces this with the wrapper
+  sortMode={filters.sortOrder}
+/>
+```
+
+This is a temporary edit — task 13 replaces the entire render with `<SmartSearchResults>` and the explicit `isShared={true}` goes away.
+
+**Step 5: Run tests, verify they pass**
 
 Run: `cd web && pnpm test -- --run src/lib/components/spaces/space-search-results.spec.ts`
 
 Expected: all tests pass (existing + new).
 
-**Step 5: Type check**
+**Step 6: Type check**
 
 Run: `make check-web`
 
-Expected: no errors. Note that this may surface a TypeScript error in the spaces page (which doesn't pass `isShared` yet) — that's fine, we'll fix it in the wrapper task.
+Expected: no errors. Both the dumb grid AND the spaces page should now type-check (the latter because we passed `isShared={true}` in step 4).
 
-If the spaces page error is blocking, temporarily add `isShared={true}` to the spaces page's `<SpaceSearchResults>` render. We'll remove it when the wrapper takes over.
-
-**Step 6: Commit**
+**Step 7: Commit**
 
 ```bash
 git add web/src/lib/components/spaces/space-search-results.svelte web/src/routes/\(user\)/spaces/
@@ -1105,13 +1122,20 @@ Delete the `executeSearch` and `handleLoadMore` functions (lines ~586-631).
 
 Delete the effect at lines ~644-673.
 
-**Step 5: Add the bound `isLoading` state**
+**Step 5: Add the bound `isLoading` state and rename surviving `isSearching` references**
 
 ```typescript
 let isLoading = $state(false);
 ```
 
-This replaces `isSearching`. Update all references in the spaces page (e.g., the `<SearchBar showLoadingSpinner={isSearching}>` becomes `showLoadingSpinner={isLoading}`).
+After steps 2-3, the only surviving `isSearching` references in the spaces page are:
+
+1. **Inside `clearSearch` (around line 124 / 640):** `isSearching = false;` → change to `isLoading = false;`
+2. **The SearchBar `showLoadingSpinner` prop (around line 728):** `showLoadingSpinner={isSearching}` → change to `showLoadingSpinner={isLoading}`
+
+The `<SpaceSearchResults>` direct render at line ~866 (which had `isLoading={isSearching}`) is replaced wholesale in step 7, so no rename needed there.
+
+After these renames, `grep isSearching web/src/routes/(user)/spaces/[spaceId]/[[photos=photos]]/[[assetId=id]]/+page.svelte` should return zero results.
 
 **Step 6: Update `handleSearchSubmit` and `clearSearch`**
 
@@ -1313,6 +1337,8 @@ git commit -m "feat(photos): add search state and URL plumbing"
 
 Find `<UserPageLayout hideNavbar={...} scrollbar={false}>` at line 179. Add a `{#snippet buttons()}` block as a direct child:
 
+Insert the new `{#snippet buttons()}` block as the first child of `<UserPageLayout>`, immediately after the opening tag and before the existing `<div class="ml-4 flex h-full">` wrapper. Do NOT remove or modify any existing children — only add the snippet.
+
 ```svelte
 <UserPageLayout hideNavbar={assetMultiSelectManager.selectionActive} scrollbar={false}>
   {#snippet buttons()}
@@ -1339,7 +1365,11 @@ Find `<UserPageLayout hideNavbar={...} scrollbar={false}>` at line 179. Add a `{
     {/if}
   {/snippet}
 
-  <!-- existing content -->
+  <div class="ml-4 flex h-full">
+    <!-- existing FilterPanel + Timeline + ActiveFiltersBar content stays here, unchanged by this task -->
+    ...
+  </div>
+</UserPageLayout>
 ```
 
 **Step 2: Type check**
@@ -1502,7 +1532,9 @@ Open `e2e/src/specs/web/spaces-search.e2e-spec.ts` and `e2e/src/specs/web/photos
 
 **Step 2: Implement the high-priority E2E tests**
 
-Implement tests 62-86 and 87-89 from the design's testing strategy. Start with the high-impact ones:
+Implement tests 62-86 from the design's testing strategy (the new `/photos` E2E coverage). Tests 87-89 are existing spaces specs (`spaces-search.e2e-spec.ts`, `spaces-filter-panel.e2e-spec.ts`, `spaces-p1/p2/p3.e2e-spec.ts`) — those are run as a regression check in task 14, not implemented here.
+
+Start with the high-impact tests:
 
 - Smart search flow (test 62) — submit, sort, clear
 - URL persistence (test 63)
@@ -1537,7 +1569,7 @@ git commit -m "test(photos): add E2E coverage for smart search"
 
 Run: `cd e2e && pnpm test:web -- spaces-search.e2e-spec.ts spaces-filter-panel.e2e-spec.ts`
 
-Expected: all tests pass. (Should be a no-op since `/photos` changes shouldn't touch spaces, but verify.)
+Expected: all tests pass. The wrapper component is shared between both pages, so any changes made after task 13 (wrapper bugfixes triggered by /photos integration, dumb grid changes, etc.) could regress spaces. This re-run is the second safety net.
 
 **Step 2: Run the photos-filter-panel E2E to verify filter panel still works**
 
