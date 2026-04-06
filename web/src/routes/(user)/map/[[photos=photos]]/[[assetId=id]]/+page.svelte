@@ -1,13 +1,16 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
+  import ActiveFiltersBar from '$lib/components/filter-panel/active-filters-bar.svelte';
   import FilterPanel from '$lib/components/filter-panel/filter-panel.svelte';
   import {
     buildFilterContext,
+    clearFilters,
     createFilterState,
     getActiveFilterCount,
   } from '$lib/components/filter-panel/filter-panel';
   import type { FilterState } from '$lib/components/filter-panel/filter-panel';
+  import { handlePhotosRemoveFilter } from '$lib/utils/photos-filter-options';
   import UserPageLayout from '$lib/components/layouts/UserPageLayout.svelte';
   import OnEvents from '$lib/components/OnEvents.svelte';
   import MapTimelinePanel from './MapTimelinePanel.svelte';
@@ -24,6 +27,7 @@
   import { mapSettings } from '$lib/stores/preferences.store';
   import { AssetVisibility, getFilteredMapMarkers, getTimeBuckets, type MapMarkerResponseDto } from '@immich/sdk';
   import { Icon, IconButton } from '@immich/ui';
+  import { SvelteMap } from 'svelte/reactivity';
   import { mdiArrowLeft, mdiFilterVariant } from '@mdi/js';
   import { onDestroy, onMount } from 'svelte';
   import { t } from 'svelte-i18n';
@@ -61,7 +65,26 @@
   let filters = $state<FilterState>(createFilterState());
   let mapMarkers = $state<MapMarkerResponseDto[]>([]);
   let timeBuckets = $state<Array<{ timeBucket: string; count: number }>>([]);
-  const filterConfig = $derived(buildMapFilterConfig(spaceId));
+  let personNames = new SvelteMap<string, string>();
+  let tagNames = new SvelteMap<string, string>();
+
+  const filterConfig = $derived.by(() => {
+    const base = buildMapFilterConfig(spaceId);
+    const originalProvider = base.suggestionsProvider!;
+    return {
+      ...base,
+      suggestionsProvider: async (f: FilterState) => {
+        const result = await originalProvider(f);
+        for (const p of result.people) {
+          personNames.set(p.id, p.name);
+        }
+        for (const t of result.tags) {
+          tagNames.set(t.id, t.name);
+        }
+        return result;
+      },
+    };
+  });
   const hasActiveFilters = $derived(getActiveFilterCount(filters) > 0);
   const noResults = $derived(mapMarkers.length === 0 && hasActiveFilters);
 
@@ -190,6 +213,22 @@
         </div>
       {/if}
       <div class="flex min-h-0 min-w-0 flex-1 flex-col sm:flex-row">
+        {#if hasActiveFilters}
+          <div class="absolute top-0 right-0 left-0 z-10 sm:left-[280px]">
+            <ActiveFiltersBar
+              {filters}
+              resultCount={mapMarkers.length}
+              {personNames}
+              {tagNames}
+              onRemoveFilter={(type, id) => {
+                filters = handlePhotosRemoveFilter(filters, type, id);
+              }}
+              onClearAll={() => {
+                filters = clearFilters(filters);
+              }}
+            />
+          </div>
+        {/if}
         <div
           class={[
             'relative min-h-0',
