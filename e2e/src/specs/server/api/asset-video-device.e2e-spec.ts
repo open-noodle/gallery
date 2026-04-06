@@ -90,9 +90,11 @@ describe('asset video playback + device queries', () => {
     });
 
     it('owner can stream their own video (200 with video/* content-type)', async () => {
-      // Hit the playback endpoint as the owner. We don't read the entire body
-      // (it could be MBs); we just confirm the status, content-type, and that
-      // a non-zero number of bytes is delivered.
+      // Hit the playback endpoint as the owner. supertest buffers the full
+      // response body into a Buffer for non-JSON responses, which is fine for
+      // our small `normal.mp4` fixture. We confirm status, content-type, and
+      // that a non-zero number of bytes is delivered. The shared fixture is
+      // used by video-trim too, so the file size is bounded.
       const { status, headers, body } = await request(app)
         .get(`/assets/${videoAssetId}/video/playback`)
         .set(asBearerAuth(owner.accessToken));
@@ -167,14 +169,15 @@ describe('asset video playback + device queries', () => {
     it('cross-user isolation: another user querying the SAME deviceId sees nothing', async () => {
       // Two users could legitimately have the same deviceId (it's a client
       // string, not a UUID). The service scopes by auth.user.id so the other
-      // user MUST NOT see this user's deviceAssetIds.
+      // user MUST NOT see this user's deviceAssetIds. The other user has zero
+      // assets on this deviceId, so the response should be EXACTLY empty —
+      // not "doesn't include the leaked ids", which would also pass if some
+      // unrelated leak slipped through.
       const { status, body } = await request(app)
         .get(`/assets/device/${ownerDeviceId}`)
         .set(asBearerAuth(other.accessToken));
       expect(status).toBe(200);
-      const ids = body as string[];
-      expect(ids).not.toContain(ownerDeviceAssetId1);
-      expect(ids).not.toContain(ownerDeviceAssetId2);
+      expect(body).toEqual([]);
     });
   });
 });
