@@ -2063,6 +2063,121 @@ describe('/shared-spaces', () => {
       });
     });
 
+    describe('PUT/DELETE /shared-spaces/:id/people/:personId/alias (T13)', () => {
+      // T13 covers per-user alias on a space person.
+      //
+      // CRITICAL invariants this block pins:
+      //
+      // 1. Aliases are PER-USER, not space-wide. The service stores
+      //    `(personId, userId, alias)` and `getAlias(personId, auth.user.id)` retrieves
+      //    only the caller's row (shared-space.service.ts:780-798). Owner setting
+      //    "Mom" as the alias for Alice does NOT show "Mom" to editor or viewer.
+      //
+      // 2. Aliases require `requireMembership` only — NOT `requireRole(Editor)`. So
+      //    Viewer can set their own alias. This is intentional: aliases are personal
+      //    metadata, not space state, and a read-only viewer should still be able to
+      //    label people for themselves.
+      //
+      // 3. Setting an alias does NOT modify the underlying global `person.name`. The
+      //    alias lives in a separate row.
+      //
+      // 4. DELETE alias has NO person existence check (line 800-803) — it just calls
+      //    deleteAlias which is a noop on missing rows. So DELETE returns 204 even
+      //    for non-existent personIds. Asymmetric vs PUT.
+
+      it('access matrix — viewers CAN set their own alias', async () => {
+        const scratch = await utils.createSpacePerson(spaceId, 'AliasMatrix', owner.userId, spaceAssetId);
+        await forEachActor(
+          [ownerActor, editorActor, viewerActor, nonMemberActor, anonActor],
+          (actor) =>
+            request(app)
+              .put(`/shared-spaces/${spaceId}/people/${scratch.spacePersonId}/alias`)
+              .set(authHeaders(actor))
+              .send({ alias: `${actor.id}-alias` }),
+          { spaceOwner: 204, spaceEditor: 204, spaceViewer: 204, spaceNonMember: 403, anon: 401 },
+        );
+      });
+
+      it('alias is per-user — owner sees their alias, editor sees default name', async () => {
+        const scratch = await utils.createSpacePerson(spaceId, 'PerUserAlice', owner.userId, spaceAssetId);
+
+        await request(app)
+          .put(`/shared-spaces/${spaceId}/people/${scratch.spacePersonId}/alias`)
+          .set('Authorization', `Bearer ${owner.accessToken}`)
+          .send({ alias: 'Mom' });
+
+        // Owner sees their alias
+        const ownerView = await request(app)
+          .get(`/shared-spaces/${spaceId}/people/${scratch.spacePersonId}`)
+          .set('Authorization', `Bearer ${owner.accessToken}`);
+        expect(ownerView.status).toBe(200);
+        expect((ownerView.body as { alias?: string | null }).alias).toBe('Mom');
+
+        // Editor sees no alias (their own row doesn't exist)
+        const editorView = await request(app)
+          .get(`/shared-spaces/${spaceId}/people/${scratch.spacePersonId}`)
+          .set('Authorization', `Bearer ${editor.accessToken}`);
+        expect(editorView.status).toBe(200);
+        // alias is null for editor — they haven't set one
+        const editorAlias = (editorView.body as { alias?: string | null }).alias;
+        expect(editorAlias === null || editorAlias === undefined).toBe(true);
+        // The original name 'PerUserAlice' is still visible
+        expect((editorView.body as { name: string }).name).toBe('PerUserAlice');
+      });
+
+      it('alias does NOT modify the underlying global person.name', async () => {
+        const scratch = await utils.createSpacePerson(spaceId, 'OriginalName', owner.userId, spaceAssetId);
+
+        await request(app)
+          .put(`/shared-spaces/${spaceId}/people/${scratch.spacePersonId}/alias`)
+          .set('Authorization', `Bearer ${owner.accessToken}`)
+          .send({ alias: 'AliasName' });
+
+        const dbClient = await utils.connectDatabase();
+        const personRow = await dbClient.query('SELECT name FROM person WHERE id = $1', [scratch.globalPersonId]);
+        expect(personRow.rowCount).toBe(1);
+        expect(personRow.rows[0].name).toBe('OriginalName');
+      });
+
+      it('DELETE removes the alias and is idempotent on missing personId', async () => {
+        const scratch = await utils.createSpacePerson(spaceId, 'DeleteMe', owner.userId, spaceAssetId);
+
+        // Set alias
+        await request(app)
+          .put(`/shared-spaces/${spaceId}/people/${scratch.spacePersonId}/alias`)
+          .set('Authorization', `Bearer ${owner.accessToken}`)
+          .send({ alias: 'Temp' });
+
+        // Delete alias
+        const del = await request(app)
+          .delete(`/shared-spaces/${spaceId}/people/${scratch.spacePersonId}/alias`)
+          .set('Authorization', `Bearer ${owner.accessToken}`);
+        expect(del.status).toBe(204);
+
+        // Verify alias is gone via GET
+        const get = await request(app)
+          .get(`/shared-spaces/${spaceId}/people/${scratch.spacePersonId}`)
+          .set('Authorization', `Bearer ${owner.accessToken}`);
+        expect((get.body as { alias?: string | null }).alias === null || (get.body as { alias?: string | null }).alias === undefined).toBe(true);
+
+        // DELETE on a non-existent personId is also 204 — the service doesn't
+        // check person existence on delete (shared-space.service.ts:800-803),
+        // so the call is a noop. Asymmetric vs PUT (which validates).
+        const idempotent = await request(app)
+          .delete(`/shared-spaces/${spaceId}/people/00000000-0000-4000-a000-000000000099/alias`)
+          .set('Authorization', `Bearer ${owner.accessToken}`);
+        expect(idempotent.status).toBe(204);
+      });
+
+      it('PUT alias on a missing personId returns 400', async () => {
+        const { status } = await request(app)
+          .put(`/shared-spaces/${spaceId}/people/00000000-0000-4000-a000-000000000099/alias`)
+          .set('Authorization', `Bearer ${owner.accessToken}`)
+          .send({ alias: 'Ghost' });
+        expect(status).toBe(400);
+      });
+    });
+
     it('empty thumbnailPath on the underlying global person excludes the space person', async () => {
       // The fork's "minFaces gate" mechanism. shared-space.repository.ts:512-513
       // filters with `person.thumbnailPath IS NOT NULL AND != ''`. In production
