@@ -38,20 +38,37 @@
     config: FilterPanelConfig;
     timeBuckets: Array<{ timeBucket: string; count: number }>;
     filters?: FilterState;
-    initialCollapsed?: boolean;
+    persistCollapsed?: boolean;
     storageKey?: string;
     hidden?: boolean;
   }
+
+  const COLLAPSED_KEY = 'gallery-filter-collapsed';
 
   let {
     config,
     timeBuckets,
     filters = $bindable(createFilterState()),
-    initialCollapsed = false,
     storageKey = 'gallery-filter-visible-sections',
     hidden = false,
+    persistCollapsed = true,
   }: Props = $props();
-  let collapsed = $state(initialCollapsed);
+
+  function loadCollapsed(): boolean {
+    if (persistCollapsed && browser) {
+      try {
+        const raw = localStorage.getItem(COLLAPSED_KEY);
+        if (raw !== null) {
+          return JSON.parse(raw) as boolean;
+        }
+      } catch {
+        /* corrupted — fall through */
+      }
+    }
+    return false;
+  }
+
+  let collapsed = $state(loadCollapsed());
 
   const providers = config.providers ?? {};
 
@@ -353,6 +370,16 @@
     if (browser) {
       try {
         localStorage.setItem(storageKey, JSON.stringify([...visibleSections]));
+      } catch {
+        /* localStorage unavailable */
+      }
+    }
+  });
+
+  $effect(() => {
+    if (persistCollapsed && browser) {
+      try {
+        localStorage.setItem(COLLAPSED_KEY, JSON.stringify(collapsed));
       } catch {
         /* localStorage unavailable */
       }
