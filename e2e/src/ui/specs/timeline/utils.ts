@@ -184,10 +184,16 @@ export const assetViewerUtils = {
 };
 export const pageUtils = {
   async deepLinkPhotosPage(page: Page, assetId: string) {
+    // Collapse the filter panel so the timeline grid has full width.
+    // These layout-sensitive tests were calibrated with the panel collapsed.
+    await page.addInitScript(() => localStorage.setItem('gallery-filter-collapsed', 'true'));
     await page.goto(`/photos?at=${assetId}`);
     await timelineUtils.waitForTimelineLoad(page);
   },
   async openPhotosPage(page: Page) {
+    // Collapse the filter panel so the timeline grid has full width.
+    // These layout-sensitive tests were calibrated with the panel collapsed.
+    await page.addInitScript(() => localStorage.setItem('gallery-filter-collapsed', 'true'));
     await page.goto(`/photos`);
     await timelineUtils.waitForTimelineLoad(page);
   },
