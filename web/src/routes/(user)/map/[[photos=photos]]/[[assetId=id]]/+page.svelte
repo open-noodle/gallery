@@ -1,13 +1,16 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
+  import ActiveFiltersBar from '$lib/components/filter-panel/active-filters-bar.svelte';
   import FilterPanel from '$lib/components/filter-panel/filter-panel.svelte';
   import {
     buildFilterContext,
+    clearFilters,
     createFilterState,
     getActiveFilterCount,
   } from '$lib/components/filter-panel/filter-panel';
   import type { FilterState } from '$lib/components/filter-panel/filter-panel';
+  import { handlePhotosRemoveFilter } from '$lib/utils/photos-filter-options';
   import UserPageLayout from '$lib/components/layouts/user-page-layout.svelte';
   import OnEvents from '$lib/components/OnEvents.svelte';
   import MapTimelinePanel from '$lib/components/shared-components/map/MapTimelinePanel.svelte';
@@ -189,6 +192,20 @@
         </div>
       {/if}
       <div class="flex min-h-0 min-w-0 flex-1 flex-col sm:flex-row">
+        {#if hasActiveFilters}
+          <div class="absolute top-0 right-0 left-0 z-10 sm:left-[280px]">
+            <ActiveFiltersBar
+              {filters}
+              resultCount={mapMarkers.length}
+              onRemoveFilter={(type, id) => {
+                filters = handlePhotosRemoveFilter(filters, type, id);
+              }}
+              onClearAll={() => {
+                filters = clearFilters(filters);
+              }}
+            />
+          </div>
+        {/if}
         <div
           class={[
             'relative min-h-0',
