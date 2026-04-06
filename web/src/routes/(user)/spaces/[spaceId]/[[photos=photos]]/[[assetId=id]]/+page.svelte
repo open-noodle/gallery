@@ -45,6 +45,7 @@
   import { Route } from '$lib/route';
   import { assetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
   import { preferences, user } from '$lib/stores/user.store';
+  import { createUrl } from '$lib/utils';
   import { handleError } from '$lib/utils/handle-error';
   import { buildSmartSearchParams, SEARCH_FILTER_DEBOUNCE_MS } from '$lib/utils/space-search';
   import {
@@ -187,7 +188,7 @@
       const mappedPeople = response.people.map((p) => ({
         id: p.id,
         name: p.name,
-        thumbnailUrl: `/shared-spaces/${space.id}/people/${p.id}/thumbnail`,
+        thumbnailUrl: createUrl(`/shared-spaces/${space.id}/people/${p.id}/thumbnail`),
       }));
       for (const p of response.people) {
         personNames.set(p.id, p.name);
