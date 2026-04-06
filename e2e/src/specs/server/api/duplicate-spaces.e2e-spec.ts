@@ -79,13 +79,14 @@ describe('/duplicates/resolve — shared space sync (fork)', () => {
   });
 
   it('allows an Editor to add their own keeper to a space they edit', async () => {
+    // Fresh editor-owned asset pair so we don't mutate ctx.editorAssetId.
     const editorToken = ctx.spaceEditor.token!;
-    const secondAsset: AssetMediaResponseDto = await utils.createAsset(editorToken);
-
-    await utils.addSpaceAssets(editorToken, ctx.spaceId, [ctx.editorAssetId]);
+    const inSpace = await utils.createAsset(editorToken);
+    const loose = await utils.createAsset(editorToken);
+    await utils.addSpaceAssets(editorToken, ctx.spaceId, [inSpace.id]);
 
     const duplicateId = '00000000-0000-4000-8000-000000000101';
-    await markAsDuplicate(editorToken, duplicateId, [ctx.editorAssetId, secondAsset.id]);
+    await markAsDuplicate(editorToken, duplicateId, [inSpace.id, loose.id]);
 
     const { status, body } = await request(app)
       .post('/duplicates/resolve')
@@ -94,8 +95,8 @@ describe('/duplicates/resolve — shared space sync (fork)', () => {
         groups: [
           {
             duplicateId,
-            keepAssetIds: [secondAsset.id],
-            trashAssetIds: [ctx.editorAssetId],
+            keepAssetIds: [loose.id],
+            trashAssetIds: [inSpace.id],
           },
         ],
       });
@@ -104,8 +105,8 @@ describe('/duplicates/resolve — shared space sync (fork)', () => {
     expect(body).toEqual([{ id: duplicateId, success: true }]);
 
     const ids = await spaceAssetIds(editorToken, ctx.spaceId);
-    expect(ids.has(secondAsset.id)).toBe(true);
-    expect(ids.has(ctx.editorAssetId)).toBe(false);
+    expect(ids.has(loose.id)).toBe(true);
+    expect(ids.has(inSpace.id)).toBe(false);
   });
 
   it('does not alter space membership when no duplicate is in a space', async () => {
