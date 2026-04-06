@@ -1,9 +1,6 @@
-name: Docs deploy
+name: Docs deploy (upstream — disabled)
 on:
-  workflow_run: # zizmor: ignore[dangerous-triggers] no attacker inputs are used here
-    workflows: ['Docs build']
-    types:
-      - completed
+  workflow_dispatch: # Disabled: replaced by gallery-docs-deploy.yml
 
 env:
   TG_NON_INTERACTIVE: 'true'
