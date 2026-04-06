@@ -15,7 +15,18 @@ export class ModelConfig extends TaskConfig {
   modelName!: string;
 }
 
-export class CLIPConfig extends ModelConfig {}
+export class CLIPConfig extends ModelConfig {
+  @IsNumber()
+  @Min(0)
+  @Max(2)
+  @Type(() => Number)
+  @ApiProperty({
+    type: 'number',
+    format: 'double',
+    description: 'Maximum cosine distance for smart search results. 0 = disabled.',
+  })
+  maxDistance!: number;
+}
 
 export class DuplicateDetectionConfig extends TaskConfig {
   @IsNumber()

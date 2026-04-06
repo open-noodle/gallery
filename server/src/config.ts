@@ -62,6 +62,7 @@ export type SystemConfig = {
     clip: {
       enabled: boolean;
       modelName: string;
+      maxDistance: number;
     };
     duplicateDetection: {
       enabled: boolean;
@@ -270,6 +271,7 @@ export const defaults = Object.freeze<SystemConfig>({
     clip: {
       enabled: true,
       modelName: 'ViT-B-32__openai',
+      maxDistance: 0,
     },
     duplicateDetection: {
       enabled: true,
