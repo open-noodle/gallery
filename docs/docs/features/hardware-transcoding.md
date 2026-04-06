@@ -103,7 +103,7 @@ You can add this to the `immich-server` service instead of extending from `hwacc
 ```yaml
 immich-server:
   container_name: immich_server
-  image: ghcr.io/immich-app/immich-server:${IMMICH_VERSION:-release}
+  image: ghcr.io/open-noodle/gallery-server:${IMMICH_VERSION:-release}
   # Note the lack of an `extends` section
   devices:
     - /dev/dri:/dev/dri
