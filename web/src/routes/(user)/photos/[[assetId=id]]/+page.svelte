@@ -254,7 +254,7 @@
       storageKey="gallery-filter-visible-sections-photos"
       hidden={isTimelineEmpty}
     />
-    <div class="flex-1 overflow-hidden pl-4">
+    <div class="flex flex-1 flex-col overflow-hidden pl-4">
       {#if hasActiveFilters}
         <ActiveFiltersBar
           {filters}
