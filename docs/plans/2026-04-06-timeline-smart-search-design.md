@@ -8,6 +8,7 @@
 - 2026-04-06 (initial) — first draft after brainstorming.
 - 2026-04-06 (revised) — corrected after `/review` pass found that `withSharedSpaces` already exists on `SmartSearchDto`, the dumb grid component needs an explicit `isShared` prop, `searchAssetBuilder` already accepts `timelineSpaceIds`, and several edge cases / tests were missing.
 - 2026-04-06 (revised again) — second `/review` pass discovered that spaces _unmounts_ Timeline during search (and uses `enableRouting={false}`); switched `/photos` to the same unmount pattern instead of CSS-hiding to avoid asset-viewer routing conflicts and wasted background bucket refetches. Also tightened the wrapper effect spec, made multi-select handling explicit, and fixed minor inconsistencies.
+- 2026-04-06 (revised, third pass — test thoroughness) — third `/review` pass focused on testing. Found that `space-search.spec.ts` does not exist (creating new, not renaming), the E2E path is `e2e/src/specs/web/` (not `e2e/src/web/specs/`), and several leftover "Timeline mounts hidden" phrases needed updating. Decided not to rename the utility (consistency with the dumb grid). Decided the smart-search-disabled UX. Expanded the test plan with ~30 additional cases across backend, frontend unit, API E2E, and Playwright E2E layers, and called out the spaces regression specs as non-negotiable gates.
 
 ---
 
@@ -23,19 +24,20 @@ Replicate the spaces unified-search UX on `/photos`: a search input in the page 
 
 ## Decisions
 
-| Decision                                        | Choice                                                                                                                     | Why                                                                                                       |
-| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| Search bar placement                            | Page header (`UserPageLayout` `buttons` slot), mirroring spaces                                                            | Spaces parity; the FilterPanel placement was reviewed and rejected for discoverability and mobile cost    |
-| Code reuse                                      | Extract & generalize — new `<SmartSearchResults>` wrapper that owns fetch state, renders the existing dumb grid underneath | One source of truth, fixes apply to both pages                                                            |
-| URL state                                       | `/photos?q=<query>` with `pushState` on submit, `replaceState` on clear                                                    | Shareable links, browser back exits search                                                                |
-| Default sort on submit                          | Relevance                                                                                                                  | Matches spaces                                                                                            |
-| Top global searchbar                            | Untouched, deferred                                                                                                        | Out of scope; still navigates to `/search`                                                                |
-| `/search` route                                 | Untouched                                                                                                                  | Top bar still depends on it                                                                               |
-| Mobile (`<640px`)                               | Hidden under `sm:block`                                                                                                    | Spaces parity; documented regression                                                                      |
-| SortToggle for non-search browsing              | Not added on `/photos`                                                                                                     | Avoid scope creep; `/photos` keeps its current sort behavior                                              |
-| Timeline-pinned space content in search         | Yes — implement existing `withSharedSpaces` flag in `searchSmart`                                                          | Search must match what the user sees in the unfiltered timeline                                           |
-| `/photos` filter trampling on search enter/exit | Match spaces — force `relevance` on submit, `desc` on clear                                                                | Spaces parity                                                                                             |
-| Timeline rendering during search                | Unmount via `{#if !showSearchResults}`, mirroring spaces                                                                   | Spaces parity; avoids asset-viewer routing conflict; bucket refetch on clear is the same cost spaces pays |
+| Decision                                        | Choice                                                                                                                                  | Why                                                                                                                                                                 |
+| ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Search bar placement                            | Page header (`UserPageLayout` `buttons` slot), mirroring spaces                                                                         | Spaces parity; the FilterPanel placement was reviewed and rejected for discoverability and mobile cost                                                              |
+| Code reuse                                      | Extract & generalize — new `<SmartSearchResults>` wrapper that owns fetch state, renders the existing dumb grid underneath              | One source of truth, fixes apply to both pages                                                                                                                      |
+| URL state                                       | `/photos?q=<query>` with `pushState` on submit, `replaceState` on clear                                                                 | Shareable links, browser back exits search                                                                                                                          |
+| Default sort on submit                          | Relevance                                                                                                                               | Matches spaces                                                                                                                                                      |
+| Top global searchbar                            | Untouched, deferred                                                                                                                     | Out of scope; still navigates to `/search`                                                                                                                          |
+| `/search` route                                 | Untouched                                                                                                                               | Top bar still depends on it                                                                                                                                         |
+| Mobile (`<640px`)                               | Hidden under `sm:block`                                                                                                                 | Spaces parity; documented regression                                                                                                                                |
+| SortToggle for non-search browsing              | Not added on `/photos`                                                                                                                  | Avoid scope creep; `/photos` keeps its current sort behavior                                                                                                        |
+| Timeline-pinned space content in search         | Yes — implement existing `withSharedSpaces` flag in `searchSmart`                                                                       | Search must match what the user sees in the unfiltered timeline                                                                                                     |
+| `/photos` filter trampling on search enter/exit | Match spaces — force `relevance` on submit, `desc` on clear                                                                             | Spaces parity                                                                                                                                                       |
+| Timeline rendering during search                | Unmount via `{#if !showSearchResults}`, mirroring spaces                                                                                | Spaces parity; avoids asset-viewer routing conflict; bucket refetch on clear is the same cost spaces pays                                                           |
+| Smart-search-disabled UX                        | SearchBar always rendered; backend `BadRequestException('Smart search is not enabled')` surfaces via the wrapper's existing error state | Spaces parity (spaces' SearchBar is also always shown when assetCount > 0); avoids the cost of plumbing an `isSmartSearchEnabled` config check into the page header |
 
 ---
 
@@ -109,7 +111,7 @@ The DTO field already exists, so the SDK is already generated with `withSharedSp
 
 ### 1. Refactor `buildSmartSearchParams`
 
-**File:** `web/src/lib/utils/space-search.ts` → rename to `web/src/lib/utils/smart-search.ts`
+**File:** `web/src/lib/utils/space-search.ts` (no rename — consistent with keeping `space-search-results.svelte` in place; both filenames retain their `space-` prefix for git history clarity, even though they now serve a generalized purpose)
 
 The current signature is `(query: string, spaceId: string, filters: FilterState)`. `spaceId` is required and positional. The body (`space-search.ts:6-54`) sets `spaceId` unconditionally, maps `personIds → spacePersonIds`, and reads `filters.sortOrder` for the `order` field.
 
@@ -136,11 +138,11 @@ buildSmartSearchParams(args: {
   - Sets `params.withSharedSpaces` from the arg (only when truthy)
 - All other fields (`takenAfter`/`takenBefore` from `selectedYear`/`selectedMonth`, `isFavorite`, `order`, `mediaType → type`, `city`, `country`, `make`, `model`, `tagIds`, `rating`) are mapped identically to the current implementation.
 
-**File reorganization:**
+**Files touched:**
 
-- Rename `web/src/lib/utils/space-search.ts` → `web/src/lib/utils/smart-search.ts`
-- Rename `web/src/lib/utils/space-search.spec.ts` → `web/src/lib/utils/smart-search.spec.ts` (extend with no-`spaceId` and `withSharedSpaces` cases)
-- The exported constant `SEARCH_FILTER_DEBOUNCE_MS = 250` (currently at `space-search.ts:4`) moves with the file. Both consumers (spaces page, new wrapper) import from the new path.
+- `web/src/lib/utils/space-search.ts` — modify `buildSmartSearchParams` body in place. The exported constant `SEARCH_FILTER_DEBOUNCE_MS = 250` stays at line 4.
+- `web/src/lib/utils/__tests__/space-search.spec.ts` — **CREATE** (no existing file). Use the existing convention from `web/src/lib/utils/__tests__/photos-filter-options.spec.ts` (sibling `__tests__/` directory). Cover all cases listed in the test plan below.
+- The wrapper component (Frontend §2) imports `buildSmartSearchParams` and `SEARCH_FILTER_DEBOUNCE_MS` from this same file.
 
 **Update existing call sites:**
 
@@ -487,7 +489,7 @@ These are the "verify in implementation" items extracted explicitly so they don'
 2. User presses Enter → `onSearch({ force: true })` fires → `handleSearchSubmit()` runs.
 3. `handleSearchSubmit` sets `filters.sortOrder = 'relevance'`, then `goto('/photos?q=<encoded>')`.
 4. `$effect` sees the URL change but `q === searchQuery`, no-op.
-5. `showSearchResults` becomes `true` → `<SmartSearchResults>` mounts; `<Timeline>` becomes hidden.
+5. `showSearchResults` becomes `true` → `<SmartSearchResults>` mounts; `<Timeline>` unmounts (or doesn't mount on first load with `?q=foo`).
 6. Wrapper runs `executeSearch(1, false)` → calls `searchSmart({ smartSearchDto: buildSmartSearchParams({ query, filters, withSharedSpaces: true }) })`.
 7. Service resolves `timelineSpaceIds` from `sharedSpaceRepository.getSpaceIdsForTimeline(auth.user.id)`, calls `searchRepository.searchSmart` with the IDs.
 8. Repository runs the two-phase CTE, returns paginated results.
@@ -526,87 +528,194 @@ These are the "verify in implementation" items extracted explicitly so they don'
 
 ## Edge cases
 
-| #   | Case                                                         | Handling                                                                                                                                                                                                                                                                                                                             |
-| --- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 1   | Page loads with `?q=foo` in URL                              | `searchQuery` seeded from URL via initial-value (`let searchQuery = $state(page.url.searchParams.get('q') ?? '')`); `<SmartSearchResults>` mounts on first render; `<Timeline>` mounts hidden in background. No flicker because seeding is synchronous.                                                                              |
-| 2   | First mount with `?q=foo` and `$effect` race                 | The `$effect` guard `if (q !== searchQuery)` prevents a redundant set when the URL value already matches the seeded state. No double-fetch.                                                                                                                                                                                          |
-| 3   | Empty query submitted via Enter                              | `handleSearchSubmit` early-returns (matches spaces). User clears via the explicit X on the search input (`<SearchBar onReset>`) or the chip in `ActiveFiltersBar`.                                                                                                                                                                   |
-| 4   | URL with empty `q` param (`/photos?q=`)                      | `searchQuery` seeded as empty string, `showSearchResults` false, no search runs. URL keeps the empty `q` until next user action — cosmetic, not functional.                                                                                                                                                                          |
-| 5   | Search with no results                                       | Empty state from existing dumb grid component                                                                                                                                                                                                                                                                                        |
-| 6   | Search + active filters                                      | Filters compose with the smart search request via `buildSmartSearchParams`                                                                                                                                                                                                                                                           |
-| 7   | Network error during search                                  | Error state from existing dumb grid (mirrors spaces)                                                                                                                                                                                                                                                                                 |
-| 8   | Special characters in query (`&`, `?`, emoji)                | Encoded via `URLSearchParams`; backend already validates `SmartSearchDto.query` length                                                                                                                                                                                                                                               |
-| 9   | Concurrent submits (user types fast)                         | Wrapper's `searchAbortController` aborts the previous request before starting the new one (same pattern as spaces' `executeSearch:592-594`). Each submit increments the active controller; aborted responses early-return at the `controller.signal.aborted` check.                                                                  |
-| 10  | Submit while `loadMore` is in flight                         | Same abort controller covers both — the in-flight pagination request is aborted by the new submit. New request starts at page 1.                                                                                                                                                                                                     |
-| 11  | Filter change while `loadMore` is in flight                  | Wrapper's debounced filter effect triggers `executeSearch(1, false)` which aborts the in-flight pagination and restarts at page 1.                                                                                                                                                                                                   |
-| 12  | Smart search disabled (`isSmartSearchEnabled` returns false) | Backend throws `BadRequestException('Smart search is not enabled')` at `search.service.ts:135-137`. Frontend wrapper catches in the existing `try/catch` (mirroring spaces) and shows the error state. The `/photos` SearchBar should also be hidden when ML is disabled — verify the existing global condition at the layout level. |
-| 13  | User has `withSharedSpaces=true` but no shared spaces        | Service `timelineSpaceIds` stays `undefined`, falls back to owner-only behavior (matches `getSearchSuggestions` test pattern at `:463-477`)                                                                                                                                                                                          |
-| 14  | User has timeline-pinned space + searches                    | `withSharedSpaces=true` flag ensures search reaches into those spaces                                                                                                                                                                                                                                                                |
-| 15  | Asset deleted/trashed/archived from viewer during search     | Same handling as spaces today: the result set is not auto-refreshed; the deleted asset still appears in the wrapper's `searchResults` until the next manual fetch. Acceptable for parity. Document as known.                                                                                                                         |
-| 16  | Asset multi-selection during search                          | Automatically disabled — `<AssetSelectControlBar>` only renders when `assetMultiSelectManager.selectionActive` is true, and selection is driven by Timeline interactions. Since `<Timeline>` is unmounted during search, no selection can be triggered. No code change needed; spaces parity. Revisit as a follow-up if users ask.   |
-| 17  | Mobile (`<640px`)                                            | Search bar hidden via `sm:block`. Top global searchbar still works (navigates to `/search`). Documented regression.                                                                                                                                                                                                                  |
-| 18  | Asset viewer prev/next at edges                              | Inherits behavior from the existing asset viewer used by spaces — no new logic                                                                                                                                                                                                                                                       |
-| 19  | Closing asset viewer preserves `?q=`                         | The existing `navigate({ targetRoute: 'current', assetId: null })` call is uncertain on `/photos` due to route pattern differences. **Verification task #1** — fall back to a route-aware close handler if needed.                                                                                                                   |
-| 20  | TimelineManager state on clear                               | `<Timeline>` re-mounts on clear, fetches fresh bucket metadata. Same cost spaces pays. Scroll position resets — accepted.                                                                                                                                                                                                            |
-| 21  | FilterPanel collapse state                                   | Independent of search — search works regardless                                                                                                                                                                                                                                                                                      |
-| 22  | User clicks `ActiveFiltersBar` "search:" chip X              | Calls `clearSearch` (existing prop on `ActiveFiltersBar`)                                                                                                                                                                                                                                                                            |
-| 23  | Sharing `/photos?q=beach` URL to another user                | Recipient sees the search but with their own (default) filter state. Filters remain in-memory, not URL-persisted. Same as spaces. Acceptable.                                                                                                                                                                                        |
-| 24  | Page navigation away with active search                      | Component unmounts, all state cleared. Returning to `/photos` (without `?q=`) starts fresh, no stale search.                                                                                                                                                                                                                         |
+| #   | Case                                                         | Handling                                                                                                                                                                                                                                                                                                                                          |
+| --- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Page loads with `?q=foo` in URL                              | `searchQuery` seeded from URL via initial-value (`let searchQuery = $state(page.url.searchParams.get('q') ?? '')`); `<SmartSearchResults>` mounts on first render; `<Timeline>` does NOT mount because `showSearchResults` is true. No flicker because seeding is synchronous.                                                                    |
+| 2   | First mount with `?q=foo` and `$effect` race                 | The `$effect` guard `if (q !== searchQuery)` prevents a redundant set when the URL value already matches the seeded state. No double-fetch.                                                                                                                                                                                                       |
+| 3   | Empty query submitted via Enter                              | `handleSearchSubmit` early-returns (matches spaces). User clears via the explicit X on the search input (`<SearchBar onReset>`) or the chip in `ActiveFiltersBar`.                                                                                                                                                                                |
+| 4   | URL with empty `q` param (`/photos?q=`)                      | `searchQuery` seeded as empty string, `showSearchResults` false, no search runs. URL keeps the empty `q` until next user action — cosmetic, not functional.                                                                                                                                                                                       |
+| 5   | Search with no results                                       | Empty state from existing dumb grid component                                                                                                                                                                                                                                                                                                     |
+| 6   | Search + active filters                                      | Filters compose with the smart search request via `buildSmartSearchParams`                                                                                                                                                                                                                                                                        |
+| 7   | Network error during search                                  | Error state from existing dumb grid (mirrors spaces)                                                                                                                                                                                                                                                                                              |
+| 8   | Special characters in query (`&`, `?`, emoji)                | Encoded via `URLSearchParams`; backend already validates `SmartSearchDto.query` length                                                                                                                                                                                                                                                            |
+| 9   | Concurrent submits (user types fast)                         | Wrapper's `searchAbortController` aborts the previous request before starting the new one (same pattern as spaces' `executeSearch:592-594`). Each submit increments the active controller; aborted responses early-return at the `controller.signal.aborted` check.                                                                               |
+| 10  | Submit while `loadMore` is in flight                         | Same abort controller covers both — the in-flight pagination request is aborted by the new submit. New request starts at page 1.                                                                                                                                                                                                                  |
+| 11  | Filter change while `loadMore` is in flight                  | Wrapper's debounced filter effect triggers `executeSearch(1, false)` which aborts the in-flight pagination and restarts at page 1.                                                                                                                                                                                                                |
+| 12  | Smart search disabled (`isSmartSearchEnabled` returns false) | SearchBar always renders (matches spaces, which doesn't gate on the ML config). On submit, backend throws `BadRequestException('Smart search is not enabled')` at `search.service.ts:135-137`. Wrapper's existing `try/catch` (mirroring spaces' `executeSearch:610-616`) catches and surfaces the empty/error state. No special-cased UI hiding. |
+| 13  | User has `withSharedSpaces=true` but no shared spaces        | Service `timelineSpaceIds` stays `undefined`, falls back to owner-only behavior (matches `getSearchSuggestions` test pattern at `:463-477`)                                                                                                                                                                                                       |
+| 14  | User has timeline-pinned space + searches                    | `withSharedSpaces=true` flag ensures search reaches into those spaces                                                                                                                                                                                                                                                                             |
+| 15  | Asset deleted/trashed/archived from viewer during search     | Same handling as spaces today: the result set is not auto-refreshed; the deleted asset still appears in the wrapper's `searchResults` until the next manual fetch. Acceptable for parity. Document as known.                                                                                                                                      |
+| 16  | Asset multi-selection during search                          | Automatically disabled — `<AssetSelectControlBar>` only renders when `assetMultiSelectManager.selectionActive` is true, and selection is driven by Timeline interactions. Since `<Timeline>` is unmounted during search, no selection can be triggered. No code change needed; spaces parity. Revisit as a follow-up if users ask.                |
+| 17  | Mobile (`<640px`)                                            | Search bar hidden via `sm:block`. Top global searchbar still works (navigates to `/search`). Documented regression.                                                                                                                                                                                                                               |
+| 18  | Asset viewer prev/next at edges                              | Inherits behavior from the existing asset viewer used by spaces — no new logic                                                                                                                                                                                                                                                                    |
+| 19  | Closing asset viewer preserves `?q=`                         | The existing `navigate({ targetRoute: 'current', assetId: null })` call is uncertain on `/photos` due to route pattern differences. **Verification task #1** — fall back to a route-aware close handler if needed.                                                                                                                                |
+| 20  | TimelineManager state on clear                               | `<Timeline>` re-mounts on clear, fetches fresh bucket metadata. Same cost spaces pays. Scroll position resets — accepted.                                                                                                                                                                                                                         |
+| 21  | FilterPanel collapse state                                   | Independent of search — search works regardless                                                                                                                                                                                                                                                                                                   |
+| 22  | User clicks `ActiveFiltersBar` "search:" chip X              | Calls `clearSearch` (existing prop on `ActiveFiltersBar`)                                                                                                                                                                                                                                                                                         |
+| 23  | Sharing `/photos?q=beach` URL to another user                | Recipient sees the search but with their own (default) filter state. Filters remain in-memory, not URL-persisted. Same as spaces. Acceptable.                                                                                                                                                                                                     |
+| 24  | Page navigation away with active search                      | Component unmounts, all state cleared. Returning to `/photos` (without `?q=`) starts fresh, no stale search.                                                                                                                                                                                                                                      |
 
 ---
 
 ## Testing strategy
 
+### Test file locations and naming conventions
+
+- **Server unit tests:** co-located, `*.spec.ts` (e.g., `server/src/services/search.service.spec.ts`)
+- **Web util unit tests:** sibling `__tests__/` directory, `*.spec.ts` (e.g., `web/src/lib/utils/__tests__/space-search.spec.ts`)
+- **Web component unit tests:** sometimes co-located (e.g., `space-search-results.spec.ts`), sometimes in sibling `__tests__/` (e.g., `filter-panel/__tests__/active-filters-bar.spec.ts`). Follow whatever the surrounding directory uses.
+- **Server API E2E:** `e2e/src/specs/server/api/*.e2e-spec.ts`
+- **Playwright web E2E:** `e2e/src/specs/web/*.e2e-spec.ts`
+- **All E2E files end in `.e2e-spec.ts`**, not `.spec.ts`
+
 ### Unit (vitest) — backend
 
-- `search.service.spec.ts`:
-  - `searchSmart` rejects when both `spaceId` and `withSharedSpaces` are set (mirror `:434-442` for suggestions)
-  - `searchSmart` resolves `timelineSpaceIds` when `withSharedSpaces=true` and no `spaceId` (mirror `:444-461`)
-  - `searchSmart` falls back to owner-only when `withSharedSpaces=true` but user has no shared spaces (mirror `:463-477`)
-  - `searchSmart` preserves existing behavior when `withSharedSpaces` is absent or explicitly false (mirror `:479-498`)
-  - `searchSmart` does not call `getSpaceIdsForTimeline` when `spaceId` is set
-- `search.repository.spec.ts`:
-  - Smart search with `timelineSpaceIds` returns assets from those spaces (extend the existing `searchSmart` test, the helper already exists for the suggestions tests)
+**File:** `server/src/services/search.service.spec.ts`
+
+Tests for `searchSmart` + `withSharedSpaces` (mirror the existing patterns in the `getSearchSuggestions` describe block at `:434-498`):
+
+1. **Reject conflict** — `searchSmart` throws `BadRequestException` when both `spaceId` and `withSharedSpaces` are set (with the same error message used by other endpoints: `'Cannot use both spaceId and withSharedSpaces'`)
+2. **Resolve `timelineSpaceIds`** — `searchSmart` calls `sharedSpaceRepository.getSpaceIdsForTimeline(auth.user.id)` when `withSharedSpaces=true` and no `spaceId`, and passes the resolved IDs to `searchRepository.searchSmart`
+3. **Empty-spaces fallback** — `searchSmart` calls the repository with `timelineSpaceIds: undefined` when `withSharedSpaces=true` but `getSpaceIdsForTimeline` returns `[]`
+4. **Absent flag** — `searchSmart` does not call `getSpaceIdsForTimeline` when `withSharedSpaces` is absent
+5. **Explicit false** — `searchSmart` does not call `getSpaceIdsForTimeline` when `withSharedSpaces: false`
+6. **`spaceId` set bypasses lookup** — `searchSmart` does not call `getSpaceIdsForTimeline` when `spaceId` is set, regardless of `withSharedSpaces`
+7. **Composes with filters** — `searchSmart({ query, withSharedSpaces: true, personIds, tagIds, city, country, order })` passes all fields to the repository alongside `timelineSpaceIds` (composition test)
+8. **Composes with sort modes** — `searchSmart({ query, withSharedSpaces: true, order })` passes through `'asc'`, `'desc'`, and `undefined` (relevance) correctly
+9. **Composes with `queryAssetId`** — `searchSmart({ queryAssetId, withSharedSpaces: true })` resolves `timelineSpaceIds` and uses the asset embedding query path
+10. **`spacePersonIds requires spaceId`** still rejects — `searchSmart({ withSharedSpaces: true, spacePersonIds: [...] })` throws because `spacePersonIds` requires `spaceId` (existing guard at `:130-132` must still fire)
+11. **DTO smoke test** — `withSharedSpaces` accepts `true`, `false`, and absent; rejects non-boolean (controller-level validation, can be a single test)
+
+**File:** `server/src/repositories/search.repository.spec.ts`
+
+12. **Repository smart search with `timelineSpaceIds`** returns assets from those spaces (extend the existing `searchSmart` repository test; reuse the helper used by `searchLargeAssets` / `searchExifField` tests)
+13. **Repository smart search with `timelineSpaceIds` excludes archived/trashed assets from those spaces** — ensures the visibility check at `searchAssetBuilder` is respected even when the timeline-spaces join is added
+14. **Repository smart search with `timelineSpaceIds: undefined`** behaves identically to the legacy owner-only case (regression check)
+
+### Server API E2E (vitest, real DB)
+
+**File:** `e2e/src/specs/server/api/search.e2e-spec.ts` (extend)
+
+These run against a live server + database, so they catch wiring bugs the unit tests can't.
+
+15. **`POST /search/smart` with `withSharedSpaces: true`** returns timeline-pinned space content for a user who is a member
+16. **`POST /search/smart` with `withSharedSpaces: true` AND `spaceId`** returns 400 with the conflict message
+17. **`POST /search/smart` with `withSharedSpaces: true`** for a user with no shared spaces returns owner-only content (no error)
+18. **Cross-user isolation** — User A's `withSharedSpaces=true` query never returns assets from a space user A is not a member of, even when user B (the space owner) has a matching asset
+19. **Kicked-from-space regression** — User A is removed from a space after embedding generation. A subsequent `withSharedSpaces=true` query does NOT return assets from that space.
+20. **`withSharedSpaces=false` (or absent)** does NOT include shared-space content even when the user has spaces pinned to their timeline (regression check that the flag is the only switch)
 
 ### Unit (vitest) — frontend
 
-- `smart-search.spec.ts` (renamed from `space-search.spec.ts`):
-  - `buildSmartSearchParams` correctly maps with `spaceId` (existing tests, updated for new args-object signature)
-  - `buildSmartSearchParams` correctly maps without `spaceId` (new): `personIds → personIds`, no `spacePersonIds`, `withSharedSpaces` set when truthy
-  - `buildSmartSearchParams` ignores `withSharedSpaces` when `spaceId` is set
-  - Field mappings preserved across both modes (favorites, sort order, dates, media type)
-- `smart-search-results.spec.ts` (new):
-  - Wrapper mounts → triggers `executeSearch(1, false)`
-  - `searchQuery` change → triggers new `executeSearch`, aborts previous
-  - Filter change → debounced re-fetch (use fake timers)
-  - `loadMore` triggers `executeSearch(2, true)` and appends
-  - `searchQuery` becomes empty → wrapper does NOT fetch
-  - Concurrent submit → previous request aborted, only latest applied
-  - Submit while `loadMore` in flight → loadMore aborted, restart from page 1
-  - Backend throws → wrapper catches and surfaces error state
-- `space-search-results.spec.ts` (extend or add):
-  - `isShared` prop forwarded to `<AssetViewer>` correctly (`true` and `false` cases)
-  - `getAssetInfo` called without `spaceId` field when `spaceId` prop is undefined
+**File:** `web/src/lib/utils/__tests__/space-search.spec.ts` (NEW — does not exist today)
 
-### E2E (Playwright, real-server, in `e2e/src/web/specs/`)
+`buildSmartSearchParams` is a pure function — exhaustive coverage of conditional branches is cheap.
 
-Per `feedback_e2e_mock_filterpanel.md`, FilterPanel-adjacent E2E must use real-server tests.
+21. **`spaceId` provided** — sets `params.spaceId`, maps `personIds → spacePersonIds`, ignores `withSharedSpaces` even when set
+22. **`spaceId` absent** — does NOT set `params.spaceId`, maps `personIds → personIds` directly, sets `withSharedSpaces` from arg when truthy
+23. **`withSharedSpaces: false`** does NOT set the field on the DTO (omitted, not `false`)
+24. **`withSharedSpaces: undefined`** does NOT set the field on the DTO
+25. **`withSharedSpaces: true` + `spaceId` provided** → output has `spaceId` and NO `withSharedSpaces` field (regression for the "ignores" branch)
+26. **Empty `personIds: []`** → no `personIds` and no `spacePersonIds` in output (boundary)
+27. **`selectedYear + selectedMonth`** → `takenAfter`/`takenBefore` correctly span the month (test January → 31 days, February → 28/29, end-of-year boundary)
+28. **`selectedYear` only** → `takenAfter`/`takenBefore` span the full year
+29. **`mediaType: 'all'`** → no `type` field on the DTO
+30. **`mediaType: 'image'`** → `type: AssetTypeEnum.Image`
+31. **`mediaType: 'video'`** → `type: AssetTypeEnum.Video`
+32. **`sortOrder: 'relevance'`** → no `order` field on the DTO (omitted; relevance is signaled by absence)
+33. **`sortOrder: 'asc'`** → `order: AssetOrder.Asc`
+34. **`sortOrder: 'desc'`** → `order: AssetOrder.Desc`
+35. **`isFavorite: false`** → `isFavorite: false` on the DTO (vs `undefined` which is omitted)
+36. **`isFavorite: true`** → `isFavorite: true`
+37. **`isFavorite: undefined`** → field omitted
 
-- `/photos` smart search flow: submit query → results render → sort dropdown appears → switch to "newest first" → date groups appear → switch back to relevance → flat list → clear search → timeline returns at original scroll position
-- URL persistence: navigate to `/photos?q=beach` directly → results render on load
-- Browser back: search → back button → returns to unsearched timeline
-- Browser forward: search → back → forward → returns to search results
-- Filter composition: search → toggle a person filter → results re-fetch with combined params
-- Timeline-pinned space content: with a shared space configured `showInTimeline=true`, search returns assets from that space
-- Asset viewer: open an asset from search results → close → search state preserved (`?q=` still present in URL — covers verification task #1)
-- Smart search disabled: with `isSmartSearchEnabled` returning false, the SearchBar gracefully shows an error or is hidden (verify the chosen behavior)
+**File:** `web/src/lib/components/search/smart-search-results.spec.ts` (NEW)
+
+The wrapper is a self-contained piece of state machinery — unit-testing it well buys correctness without expensive E2E. Use vitest fake timers for debounce assertions.
+
+38. **Initial mount with non-empty `searchQuery`** schedules exactly ONE fetch after the debounce window (validates the "single combined effect" no-double-fire promise)
+39. **Initial mount with empty `searchQuery`** does NOT fetch (gate works)
+40. **`searchQuery` change** triggers a new debounced `executeSearch(1, false)`, aborts the previous if in flight
+41. **Filter change** triggers debounced re-fetch
+42. **Multiple consecutive filter changes within the debounce window** → only ONE fetch fires (debouncing correctness)
+43. **Debounce window boundary** — fake timer advance at 249ms doesn't fire, at 250ms does
+44. **Filter change with empty `searchQuery`** → no fetch (gate works)
+45. **Sort change from `'relevance'` to `'asc'`** triggers re-fetch with `order: AssetOrder.Asc`
+46. **Sort change from `'asc'` to `'relevance'`** triggers re-fetch with `order` omitted
+47. **`loadMore`** triggers `executeSearch(2, true)` and appends to `searchResults`
+48. **`loadMore` with `hasMore: false`** does nothing (boundary)
+49. **`loadMore` while previous `loadMore` in flight** — abort controller cancels the first request; the second request wins. Both calls go through `executeSearch` but only the second result is applied (matches spaces' inherited abort-controller pattern)
+50. **Concurrent submit** — query A in flight, query B submitted; A's response is ignored, B's is applied
+51. **Submit while `loadMore` in flight** — loadMore aborted, restart from page 1
+52. **Wrapper unmount mid-fetch** — abort controller fires, no state update on resolved-after-unmount response
+53. **Backend throws `BadRequestException`** (smart search disabled or other backend error) → wrapper catches in try/catch, sets error state, doesn't crash
+54. **Backend returns `0` results** → `searchResults = []`, empty state propagates to dumb grid
+55. **`spaceId` prop** — when set, wrapper calls `buildSmartSearchParams` with `spaceId`, no `withSharedSpaces`
+56. **`spaceId` prop** — when undefined, wrapper calls `buildSmartSearchParams` with `withSharedSpaces` from prop
+57. **`isShared` prop forwarded** to the dumb grid render
+
+**File:** `web/src/lib/components/spaces/space-search-results.spec.ts` (extend)
+
+58. **`isShared={true}`** — `<AssetViewer>` receives `isShared={true}` (existing behavior, regression test)
+59. **`isShared={false}`** — `<AssetViewer>` receives `isShared={false}` (new behavior)
+60. **`getAssetInfo` called WITH `spaceId`** when `spaceId` prop is set
+61. **`getAssetInfo` called WITHOUT `spaceId` field** when `spaceId` prop is undefined (verify the conditional spread, not just `spaceId: undefined`)
+
+### Playwright web E2E
+
+**File:** `e2e/src/specs/web/photos-search.e2e-spec.ts` (NEW), or extend `photos-filter-panel.e2e-spec.ts`
+
+Per `feedback_e2e_mock_filterpanel.md`, FilterPanel-adjacent E2E must use real-server tests (no mocks).
+
+62. **Smart search flow** — submit query → results render → sort dropdown appears → switch to "newest first" → date group headers appear → switch back to relevance → flat list (no headers) → clear search → timeline returns
+63. **URL persistence** — navigate to `/photos?q=beach` directly → results render on load, no flash of timeline
+64. **Browser back from search** — search → click back → returns to unsearched timeline, `?q=` removed
+65. **Browser forward after back** — search → back → forward → returns to search results, `?q=` restored
+66. **Browser refresh during search** — F5 on `/photos?q=beach` → search results restored
+67. **Empty query submit** — type nothing, press Enter → no-op, no URL change
+68. **Whitespace-only query submit** — type `"   "`, press Enter → no-op
+69. **Special characters in query** — `"beach & sunset?"` → URL encoded round-trip, results render
+70. **Empty `?q=` URL** (`/photos?q=`) → no search runs, FilterPanel + Timeline visible, no spinner
+71. **Filter composition** — search → toggle a person filter → results re-fetch with combined params (verify the request payload via the network layer or by asserting result count change)
+72. **Filter then search** — set people filter first → THEN search → results respect both
+73. **Search with date filter** — search → change date range → date-grouped results update
+74. **Sort UX swap** — sort dropdown (`SearchSortDropdown`) only visible when search active; not visible on plain timeline
+75. **Date grouping appearance** — relevance mode renders flat (no month headers); date mode renders month headers
+76. **Asset viewer open/close preserves `?q=`** — covers verification task #1 directly
+77. **Asset viewer prev/next at first/last result** — boundary navigation behavior
+78. **Cancel search mid-fetch** — search → quickly clear before fetch completes → no flash of stale results
+79. **Multi-select disabled during search** — search → assert `<AssetSelectControlBar>` does not appear (no Timeline interaction surface)
+80. **`<ImageCarousel>` memories hidden during search** — confirm the memory carousel disappears when search is active
+81. **FilterPanel collapse state preserved** — collapse FilterPanel → search → clear → FilterPanel still collapsed
+82. **`<ActiveFiltersBar>` "search:" chip** — search → click X on the search chip → search cleared
+83. **Timeline-pinned space content** — set up a shared space with `showInTimeline=true`, search → results include space content
+84. **Smart search disabled UX** — set `isSmartSearchEnabled=false`, search → wrapper shows error/empty state (matches the locked-in decision in Decisions table)
+85. **Owner actions in asset viewer** — open asset from `/photos` search → asset viewer shows owner actions (delete, edit) because `isShared={false}`
+86. **Mobile viewport** — set viewport to 639px, navigate `/photos`, verify SearchBar is hidden; set to 640px, verify it's visible
+
+### Spaces refactor regression gates (NON-NEGOTIABLE)
+
+The wrapper extraction touches the spaces page. Existing E2E suites MUST pass without modification:
+
+87. **`e2e/src/specs/web/spaces-search.e2e-spec.ts`** — full pass, no test changes allowed (any required test change indicates a behavior regression in spaces)
+88. **`e2e/src/specs/web/spaces-filter-panel.e2e-spec.ts`** — full pass
+89. **`e2e/src/specs/web/spaces-p1.e2e-spec.ts`**, **`p2`**, **`p3`** — full pass
+
+These tests are the safety net for the spaces refactor. The implementation plan must run them as a checkpoint after the wrapper extraction is complete and before the `/photos` integration starts. **Any failure here is a blocker, not a "fix in next PR" deferral.**
 
 ### Manual QA
 
-- Side-by-side parity check: `/photos` search and spaces search feel identical for the same query
-- Verify the new `buttons` snippet on `/photos` doesn't break the existing `UserPageLayout` header layout
-- Verify mobile (`<640px`): SearchBar is hidden, no search affordance on `/photos` (spaces parity); top global searchbar still works
-- Measure clear-search bucket refetch latency on a real-world library; confirm it feels acceptable
+90. **Side-by-side parity** — `/photos` search and spaces search feel identical for the same query
+91. **Layout health** — the new `buttons` snippet on `/photos` doesn't break the existing `UserPageLayout` header layout (visual)
+92. **Mobile** (`<640px`) — SearchBar is hidden, no search affordance on `/photos` (spaces parity); top global searchbar still works
+93. **Clear-search bucket refetch latency** — measure on a real-world library (10k+ assets); confirm acceptable
+94. **First page load with `?q=foo`** — no flash of timeline before search results render
+95. **`<FilterPanel>` doesn't disappear during search** — covers verification task #3
+96. **Visual: dumb grid date headers** look the same on `/photos` as in spaces (same component, but verify consistent context)
+97. **Accessibility: tab order** — SearchBar → SortDropdown → grid results → asset viewer
+98. **Keyboard** — Enter submits, Escape closes asset viewer, focus returns to grid after close
+99. **Real ML instance smoke test** — search a real ML-enabled instance with real photos and verify results match user expectation
+100.  **Owner actions sanity** — open asset from search, delete/archive/edit, verify the result set behaves consistently (deleted item still visible until next refresh — accepted per edge case #15)
 
 ---
 
@@ -626,4 +735,5 @@ Per `feedback_e2e_mock_filterpanel.md`, FilterPanel-adjacent E2E must use real-s
 - Stash-and-restore user sort preference around search — matches spaces' tramping
 - Preserving Timeline scroll position across search clear — matches spaces; would require `timelineManager` instance stashing
 - Asset result invalidation after delete/trash/archive from viewer — matches spaces, follow-up if requested
-- Renaming `space-search-results.svelte` — cosmetic, adds git churn
+- Renaming `space-search-results.svelte` or `space-search.ts` — cosmetic, adds git churn; both keep their `space-` prefix even though the contents are now generic
+- Hiding the SearchBar when smart search is disabled — backend rejection surfaces via the wrapper's existing error state instead
