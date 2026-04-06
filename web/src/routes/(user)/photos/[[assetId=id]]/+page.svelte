@@ -218,27 +218,29 @@
 
 <UserPageLayout hideNavbar={assetMultiSelectManager.selectionActive} scrollbar={false}>
   {#snippet buttons()}
-    <div class="hidden h-10 sm:block sm:w-40 xl:w-60">
-      <SearchBar
-        placeholder={$t('search')}
-        bind:name={searchQuery}
-        showLoadingSpinner={isLoading}
-        onSearch={({ force }) => {
-          if (force) {
-            handleSearchSubmit();
-          }
-        }}
-        onReset={clearSearch}
-      />
+    <div class="flex items-center gap-1">
+      <div class="hidden h-10 sm:block sm:w-40 xl:w-60">
+        <SearchBar
+          placeholder={$t('search')}
+          bind:name={searchQuery}
+          showLoadingSpinner={isLoading}
+          onSearch={({ force }) => {
+            if (force) {
+              handleSearchSubmit();
+            }
+          }}
+          onReset={clearSearch}
+        />
+      </div>
+      {#if showSearchResults}
+        <SearchSortDropdown
+          sortOrder={filters.sortOrder}
+          onSelect={(mode) => {
+            filters = { ...filters, sortOrder: mode };
+          }}
+        />
+      {/if}
     </div>
-    {#if showSearchResults}
-      <SearchSortDropdown
-        sortOrder={filters.sortOrder}
-        onSelect={(mode) => {
-          filters = { ...filters, sortOrder: mode };
-        }}
-      />
-    {/if}
   {/snippet}
 
   <div class="ml-4 flex h-full">
