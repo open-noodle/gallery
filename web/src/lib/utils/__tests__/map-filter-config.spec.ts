@@ -27,7 +27,16 @@ describe('buildMapFilterConfig', () => {
 
   it('should include all expected sections', () => {
     const config = buildMapFilterConfig();
-    expect(config.sections).toEqual(['timeline', 'people', 'location', 'camera', 'tags', 'rating', 'media', 'favorites']);
+    expect(config.sections).toEqual([
+      'timeline',
+      'people',
+      'location',
+      'camera',
+      'tags',
+      'rating',
+      'media',
+      'favorites',
+    ]);
   });
 
   it('should have suggestionsProvider', () => {
