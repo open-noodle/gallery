@@ -167,8 +167,9 @@ export class DuplicateService extends BaseService {
       const editableSpaceIds = await this.sharedSpaceRepository.getEditableByAssetIds(auth.user.id, groupAssetIds);
 
       if (editableSpaceIds.size > 0) {
+        const spaceIds = [...editableSpaceIds];
         await this.sharedSpaceRepository.addAssets(
-          [...editableSpaceIds].flatMap((spaceId) =>
+          spaceIds.flatMap((spaceId) =>
             idsToKeep.map((assetId) => ({ spaceId, assetId, addedById: auth.user.id })),
           ),
         );
@@ -177,9 +178,9 @@ export class DuplicateService extends BaseService {
         // short-circuits when space.faceRecognitionEnabled is false, so a
         // wasted queue entry is cheaper than a pre-filter query.
         await this.jobRepository.queueAll(
-          [...editableSpaceIds].flatMap((spaceId) =>
+          spaceIds.flatMap((spaceId) =>
             idsToKeep.map((assetId) => ({
-              name: JobName.SharedSpaceFaceMatch as const,
+              name: JobName.SharedSpaceFaceMatch,
               data: { spaceId, assetId },
             })),
           ),
