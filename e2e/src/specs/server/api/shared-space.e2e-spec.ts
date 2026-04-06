@@ -2113,14 +2113,15 @@ describe('/shared-spaces', () => {
         expect(ownerView.status).toBe(200);
         expect((ownerView.body as { alias?: string | null }).alias).toBe('Mom');
 
-        // Editor sees no alias (their own row doesn't exist)
+        // Editor sees no alias (their own row doesn't exist).
+        // mapSpacePerson at shared-space.service.ts:~1236 always sets `alias` to
+        // `string | null`, never omits it — assert null specifically so a regression
+        // that drops the field would be caught.
         const editorView = await request(app)
           .get(`/shared-spaces/${spaceId}/people/${scratch.spacePersonId}`)
           .set('Authorization', `Bearer ${editor.accessToken}`);
         expect(editorView.status).toBe(200);
-        // alias is null for editor — they haven't set one
-        const editorAlias = (editorView.body as { alias?: string | null }).alias;
-        expect(editorAlias === null || editorAlias === undefined).toBe(true);
+        expect((editorView.body as { alias: string | null }).alias).toBeNull();
         // The original name 'PerUserAlice' is still visible
         expect((editorView.body as { name: string }).name).toBe('PerUserAlice');
       });
@@ -2154,11 +2155,12 @@ describe('/shared-spaces', () => {
           .set('Authorization', `Bearer ${owner.accessToken}`);
         expect(del.status).toBe(204);
 
-        // Verify alias is gone via GET
+        // Verify alias is gone via GET. Same DTO contract as test 2 — assert null,
+        // not the disjunction.
         const get = await request(app)
           .get(`/shared-spaces/${spaceId}/people/${scratch.spacePersonId}`)
           .set('Authorization', `Bearer ${owner.accessToken}`);
-        expect((get.body as { alias?: string | null }).alias === null || (get.body as { alias?: string | null }).alias === undefined).toBe(true);
+        expect((get.body as { alias: string | null }).alias).toBeNull();
 
         // DELETE on a non-existent personId is also 204 — the service doesn't
         // check person existence on delete (shared-space.service.ts:800-803),
