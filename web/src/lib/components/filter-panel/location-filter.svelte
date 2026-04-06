@@ -1,6 +1,9 @@
 <script lang="ts">
   import type { FilterContext } from './filter-panel';
 
+  import { Icon } from '@immich/ui';
+  import { mdiMagnify } from '@mdi/js';
+
   interface Props {
     countries: string[];
     selectedCity?: string;
@@ -20,6 +23,34 @@
     onSelectionChange,
     emptyText = 'No locations found',
   }: Props = $props();
+
+  let searchQuery = $state('');
+  let showAll = $state(false);
+
+  const INITIAL_SHOW_COUNT = 10;
+
+  // Clear search when countries list changes (e.g. temporal filter refetch)
+  let previousCountriesLength = 0;
+  $effect(() => {
+    const currentLength = countries.length;
+    if (previousCountriesLength > 0 && currentLength !== previousCountriesLength) {
+      searchQuery = '';
+      showAll = false;
+    }
+    previousCountriesLength = currentLength;
+  });
+
+  let filteredCountries = $derived(
+    searchQuery.trim()
+      ? countries.filter((c) => c.toLowerCase().includes(searchQuery.trim().toLowerCase()))
+      : countries,
+  );
+
+  let visibleCountries = $derived(
+    searchQuery.trim() || showAll ? filteredCountries : filteredCountries.slice(0, INITIAL_SHOW_COUNT),
+  );
+
+  let remainingCount = $derived(Math.max(0, filteredCountries.length - INITIAL_SHOW_COUNT));
 
   let expandedCountry = $state<string | undefined>(undefined);
   let cities = $state<string[]>([]);
@@ -73,6 +104,23 @@
   {#if countries.length === 0 && !orphanedCountry}
     <p class="text-sm text-gray-400 dark:text-gray-500" data-testid="location-empty">{emptyText}</p>
   {:else}
+    <!-- Search input -->
+    <div class="relative mb-2">
+      <div class="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500">
+        <Icon icon={mdiMagnify} size="14" />
+      </div>
+      <input
+        type="text"
+        class="immich-form-input h-8 w-full rounded-lg pl-7 pr-2 text-sm"
+        placeholder="Search locations..."
+        bind:value={searchQuery}
+        oninput={() => {
+          showAll = false;
+        }}
+        data-testid="location-search-input"
+      />
+    </div>
+
     <!-- Orphaned country (selected but no longer in suggestions) -->
     {#if orphanedCountry}
       {@const isCountrySelected = true}
@@ -97,7 +145,12 @@
       </button>
     {/if}
 
-    {#each countries as country (country)}
+    <!-- Empty search results -->
+    {#if filteredCountries.length === 0 && searchQuery.trim()}
+      <p class="text-sm text-gray-400 dark:text-gray-500" data-testid="location-no-results">No matching locations</p>
+    {/if}
+
+    {#each visibleCountries as country (country)}
       {@const isCountrySelected = selectedCountry === country}
       <!-- Country row -->
       <button
@@ -153,5 +206,17 @@
         {/each}
       {/if}
     {/each}
+
+    <!-- Show more link -->
+    {#if !showAll && remainingCount > 0 && !searchQuery.trim()}
+      <button
+        type="button"
+        class="py-1 text-xs font-medium text-immich-primary dark:text-immich-dark-primary"
+        onclick={() => (showAll = true)}
+        data-testid="location-show-more"
+      >
+        Show {remainingCount} more
+      </button>
+    {/if}
   {/if}
 </div>
