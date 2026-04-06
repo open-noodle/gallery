@@ -34,7 +34,7 @@ function createUnifiedConfig(overrides: Partial<FilterPanelConfig> = {}): Filter
 describe('Unified suggestionsProvider', () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    localStorage.removeItem('gallery-filter-visible-sections');
+    localStorage.clear();
   });
 
   afterEach(() => {
