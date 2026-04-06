@@ -214,6 +214,7 @@
               config={filterConfig}
               {timeBuckets}
               storageKey="gallery-filter-visible-sections-map"
+              persistCollapsed={false}
             />
           </div>
         </div>
