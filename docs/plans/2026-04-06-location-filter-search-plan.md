@@ -18,7 +18,7 @@
 
 - Test: `web/src/lib/components/filter-panel/__tests__/filter-sections.spec.ts`
 
-**Step 1: Add test data and 10 new tests**
+**Step 1: Add test data and 11 new tests**
 
 Inside the existing `describe('LocationFilter')` block (after line 360), add a new country list and all 10 tests. The tests use the existing `mockCityFetch` helper already defined at line 252.
 
@@ -81,7 +81,7 @@ it('should show all search results without truncation', async () => {
   });
 
   const searchInput = getByTestId('location-search-input');
-  // "an" matches Argentina, Canada, France, Germany, Japan, Spain (6 results > would be truncated at 10? no, all 6 shown)
+  // "an" matches 6 countries — all shown regardless of search
   await fireEvent.input(searchInput, { target: { value: 'an' } });
 
   expect(queryByTestId('location-country-Argentina')).toBeTruthy();
@@ -167,17 +167,12 @@ it('should keep orphaned country visible during search', async () => {
 });
 
 it('should preserve selected country across search/clear cycle', async () => {
-  let lastCountry: string | undefined;
-  const onSelectionChange = (country?: string) => {
-    lastCountry = country;
-  };
-
   const { getByTestId, queryByTestId } = render(LocationFilter, {
     props: {
       countries: mockCountries,
       selectedCountry: 'Germany',
       onCityFetch: mockCityFetch,
-      onSelectionChange,
+      onSelectionChange: () => {},
     },
   });
 
@@ -210,6 +205,19 @@ it('should show cities when searching for a country and clicking it', async () =
     expect(queryByTestId('location-city-Berlin')).toBeTruthy();
     expect(queryByTestId('location-city-Hamburg')).toBeTruthy();
   });
+});
+
+it('should not show search input when no countries exist', () => {
+  const { queryByTestId } = render(LocationFilter, {
+    props: {
+      countries: [],
+      onCityFetch: mockCityFetch,
+      onSelectionChange: () => {},
+    },
+  });
+
+  expect(queryByTestId('location-search-input')).toBeNull();
+  expect(queryByTestId('location-empty')).toBeTruthy();
 });
 
 it('should restore expanded country with cities after search is cleared', async () => {
@@ -247,7 +255,7 @@ it('should restore expanded country with cities after search is cleared', async 
 
 Run: `cd web && pnpm test -- --run src/lib/components/filter-panel/__tests__/filter-sections.spec.ts`
 
-Expected: All 10 new tests FAIL (search input not found, show-more not found, etc.)
+Expected: All 11 new tests FAIL (search input not found, show-more not found, etc.)
 
 **Step 3: Commit failing tests**
 
@@ -389,7 +397,7 @@ After the `{/each}` that closes the countries loop (after line 155), add:
 
 Run: `cd web && pnpm test -- --run src/lib/components/filter-panel/__tests__/filter-sections.spec.ts`
 
-Expected: All tests PASS (existing + 10 new)
+Expected: All tests PASS (existing + 11 new)
 
 **Step 10: Run type check**
 
