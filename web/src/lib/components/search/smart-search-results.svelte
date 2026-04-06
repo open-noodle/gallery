@@ -13,14 +13,7 @@
     isLoading?: boolean;
   }
 
-  let {
-    searchQuery,
-    filters,
-    spaceId,
-    withSharedSpaces,
-    isShared,
-    isLoading = $bindable(false),
-  }: Props = $props();
+  let { searchQuery, filters, spaceId, withSharedSpaces, isShared, isLoading = $bindable(false) }: Props = $props();
 
   let searchResults = $state<AssetResponseDto[]>([]);
   let hasMoreResults = $state(false);

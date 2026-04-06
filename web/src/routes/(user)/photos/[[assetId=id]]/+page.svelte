@@ -187,7 +187,7 @@
     }
     filters = { ...filters, sortOrder: 'relevance' };
     committedQuery = trimmed;
-    const url = new URL('/photos', window.location.origin);
+    const url = new URL('/photos', globalThis.location.origin);
     url.searchParams.set('q', trimmed);
     void goto(url.pathname + url.search, { keepFocus: true, noScroll: true });
   }
