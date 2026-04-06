@@ -227,8 +227,11 @@ On initial mount with a URL-seeded query, this effect fires exactly once: schedu
   spaceId?: string;           // present in spaces, absent on /photos
   withSharedSpaces?: boolean; // true on /photos, undefined in spaces
   isShared: boolean;          // true in spaces, false on /photos
+  isLoading?: boolean;        // $bindable — exposes the wrapper's internal loading state to the page so the SearchBar's `showLoadingSpinner` can reflect it
 }
 ```
+
+The wrapper declares `isLoading` with `$bindable(false)` and writes to it inside `executeSearch` (set true before fetch, false after). The consumer page binds it via `bind:isLoading={isLoading}` so the page-level `<SearchBar>` can pass `showLoadingSpinner={isLoading}`. When the wrapper unmounts (search cleared), the bound value retains its last-written value but the page's local state is reset by `clearSearch` to `false`.
 
 **Render:** the wrapper passes its internal state and `isShared` down to `space-search-results.svelte` (the existing dumb grid):
 
@@ -345,6 +348,7 @@ import SmartSearchResults from '$lib/components/search/smart-search-results.svel
 
 ```typescript
 let searchQuery = $state(page.url.searchParams.get('q') ?? '');
+let isLoading = $state(false); // bound to <SmartSearchResults> isLoading
 const showSearchResults = $derived(searchQuery.trim().length > 0);
 ```
 
@@ -370,6 +374,7 @@ This:
     <SearchBar
       placeholder={$t('search')}
       bind:name={searchQuery}
+      showLoadingSpinner={isLoading}
       onSearch={({ force }) => {
         if (force) {
           handleSearchSubmit();
@@ -389,6 +394,8 @@ This:
 {/snippet}
 ```
 
+`showLoadingSpinner={isLoading}` is required by the `<SearchBar>` interface (`$lib/elements/SearchBar.svelte` declares the prop as required, no `?`). The page reads `isLoading` from its own state, which is two-way bound to `<SmartSearchResults>` via `bind:isLoading` (see Frontend §5e below).
+
 This mirrors the spaces buttons snippet (`spaces/.../+page.svelte:720-753`) exactly, minus the `SortToggle` for non-search browsing (deliberately omitted on `/photos`) and the spaces-specific buttons (members, map, add photos).
 
 `bind:name={searchQuery}` ties the input to the page state, so typing updates `searchQuery` immediately. `onSearch={({ force })}` matches the SearchBar callback shape (verified at `spaces/.../+page.svelte:729`).
@@ -398,6 +405,7 @@ This mirrors the spaces buttons snippet (`spaces/.../+page.svelte:720-753`) exac
 ```svelte
 {#if showSearchResults}
   <SmartSearchResults
+    bind:isLoading
     {searchQuery}
     {filters}
     isShared={false}
@@ -407,6 +415,8 @@ This mirrors the spaces buttons snippet (`spaces/.../+page.svelte:720-753`) exac
   <Timeline {...existingTimelineProps} />
 {/if}
 ```
+
+`bind:isLoading` exposes the wrapper's internal loading state to the page so the `<SearchBar>`'s `showLoadingSpinner` can reflect it. The same pattern is added to the spaces page so the spaces SearchBar continues to show the loading spinner after the wrapper extraction.
 
 **Why unmount, not CSS-hide:** spaces does the same thing (`spaces/.../+page.svelte:875,890`) for two important reasons:
 
@@ -442,13 +452,14 @@ function handleSearchSubmit() {
   filters = { ...filters, sortOrder: 'relevance' };
   const url = new URL('/photos', window.location.origin);
   url.searchParams.set('q', searchQuery.trim());
-  void goto(url.pathname + url.search, { keepFocus: true });
+  void goto(url.pathname + url.search, { keepFocus: true, noScroll: true });
 }
 
 function clearSearch() {
   searchQuery = '';
+  isLoading = false;
   filters = { ...filters, sortOrder: 'desc' };
-  void goto('/photos', { replaceState: true, keepFocus: true });
+  void goto('/photos', { replaceState: true, keepFocus: true, noScroll: true });
 }
 ```
 
@@ -458,6 +469,8 @@ Notes:
 - `goto` with default options uses `pushState` semantics (browser back exits search).
 - `clearSearch` uses `replaceState: true` to avoid polluting history with empty `/photos`.
 - `keepFocus: true` keeps the search input focused after navigation (standard SvelteKit pattern).
+- `noScroll: true` prevents SvelteKit from scrolling to the top on URL update — matches the pattern in `setting-accordion-state.svelte:39`. Without it, every search submit could jump scroll position.
+- `clearSearch` resets `isLoading = false` because the wrapper unmount may not propagate the bound value back to the page in time.
 
 #### h. URL state reactivity
 
@@ -658,6 +671,7 @@ The wrapper is a self-contained piece of state machinery — unit-testing it wel
 55. **`spaceId` prop** — when set, wrapper calls `buildSmartSearchParams` with `spaceId`, no `withSharedSpaces`
 56. **`spaceId` prop** — when undefined, wrapper calls `buildSmartSearchParams` with `withSharedSpaces` from prop
 57. **`isShared` prop forwarded** to the dumb grid render
+    57b. **`isLoading` `$bindable` prop** — wrapper sets `isLoading=true` before fetch, `isLoading=false` after success/error/abort. Two-way binding propagates to parent.
 
 **File:** `web/src/lib/components/spaces/space-search-results.spec.ts` (extend)
 
