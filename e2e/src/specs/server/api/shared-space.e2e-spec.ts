@@ -1401,4 +1401,261 @@ describe('/shared-spaces', () => {
       expect(status).not.toBe(200);
     });
   });
+
+  describe('GET /shared-spaces/:id/people (T09)', () => {
+    // T09 covers the space-people listing endpoint. Uses its own dedicated fixtures
+    // (separate from the outer file's user1/user2/user3) so the test counts are
+    // deterministic and don't depend on what other describes did.
+    //
+    // Endpoint: GET /shared-spaces/:id/people
+    // Permission: SharedSpaceRead
+    // Query params (from server/src/dtos/shared-space-person.dto.ts):
+    //   - limit, offset (1-100), withHidden, named, takenAfter, takenBefore
+    // Pet visibility is server-controlled via shared_space.petsEnabled — not a
+    // query param.
+
+    let owner: LoginResponseDto;
+    let editor: LoginResponseDto;
+    let viewer: LoginResponseDto;
+    let nonMember: LoginResponseDto;
+    let spaceId: string;
+    let spaceAssetId: string;
+
+    let namedPersonId: string; // Alice — has a name
+    let unnamedPersonId: string; // empty name
+    let hiddenPersonId: string; // Hannah — set isHidden=true
+    let petPersonId: string; // Rex — type=pet
+    let zeroThumbPersonId: string; // person with empty thumbnailPath — invisible to listing
+
+    beforeAll(async () => {
+      [owner, editor, viewer, nonMember] = await Promise.all([
+        utils.userSetup(admin.accessToken, createUserDto.create('t09-owner')),
+        utils.userSetup(admin.accessToken, createUserDto.create('t09-editor')),
+        utils.userSetup(admin.accessToken, createUserDto.create('t09-viewer')),
+        utils.userSetup(admin.accessToken, createUserDto.create('t09-nonmember')),
+      ]);
+
+      const spaceRes = await utils.createSpace(owner.accessToken, { name: 't09 space' });
+      spaceId = spaceRes.id;
+
+      await utils.addSpaceMember(owner.accessToken, spaceId, {
+        userId: editor.userId,
+        role: SharedSpaceRole.Editor,
+      });
+      await utils.addSpaceMember(owner.accessToken, spaceId, {
+        userId: viewer.userId,
+        role: SharedSpaceRole.Viewer,
+      });
+
+      const asset = await utils.createAsset(owner.accessToken);
+      spaceAssetId = asset.id;
+      await utils.addSpaceAssets(owner.accessToken, spaceId, [spaceAssetId]);
+
+      // Create the four space-people via the extended utils.createSpacePerson helper.
+      // The helper handles the four-table insert (person + asset_face + shared_space_person
+      // + shared_space_person_face junction) and sets person.thumbnailPath so the
+      // listing's hard requirement is satisfied.
+      const aliceRes = await utils.createSpacePerson(spaceId, 'Alice', owner.userId, spaceAssetId);
+      namedPersonId = aliceRes.spacePersonId;
+
+      const unnamedRes = await utils.createSpacePerson(spaceId, '', owner.userId, spaceAssetId);
+      unnamedPersonId = unnamedRes.spacePersonId;
+
+      const hannahRes = await utils.createSpacePerson(spaceId, 'Hannah', owner.userId, spaceAssetId);
+      hiddenPersonId = hannahRes.spacePersonId;
+      // Set hidden directly via DB to avoid coupling to T11's PUT endpoint coverage.
+      const dbClient = await utils.connectDatabase();
+      await dbClient.query('UPDATE shared_space_person SET "isHidden" = true WHERE id = $1', [hiddenPersonId]);
+
+      const rexRes = await utils.createSpacePerson(spaceId, 'Rex', owner.userId, spaceAssetId, { type: 'pet' });
+      petPersonId = rexRes.spacePersonId;
+
+      // Fifth person whose underlying global thumbnailPath we'll blank — used by test 11
+      // (the "minFaces gate" pin). Created here so test 11 can mutate and restore it
+      // without depending on creation order.
+      const ghostRes = await utils.createSpacePerson(spaceId, 'Ghost', owner.userId, spaceAssetId);
+      zeroThumbPersonId = ghostRes.spacePersonId;
+      // Capture the global personId via the read-through JOIN — we need it to mutate
+      // person.thumbnailPath in test 11. The helper returns it on the result.
+      // (Test 11 reads it from the listing response in the body since the helper return
+      // shape exposes both globalPersonId and spacePersonId.)
+    });
+
+    it('returns the listing for any space member; 403 for non-member, 401 for anon', async () => {
+      // Standard access matrix. shared-space endpoints use requireMembership which
+      // throws ForbiddenException → 403, distinct from the timeline endpoints which
+      // use requireAccess and return 400.
+      const cases: Array<[string | undefined, number]> = [
+        [owner.accessToken, 200],
+        [editor.accessToken, 200],
+        [viewer.accessToken, 200],
+        [nonMember.accessToken, 403],
+        [undefined, 401],
+      ];
+      for (const [token, expected] of cases) {
+        const req = request(app).get(`/shared-spaces/${spaceId}/people`);
+        const { status } = await (token ? req.set('Authorization', `Bearer ${token}`) : req);
+        expect(status, `token=${token ? 'present' : 'anon'}`).toBe(expected);
+      }
+    });
+
+    it('returns space person IDs (not global person IDs)', async () => {
+      // The canonical assertion for the whole sub-tree (T09-T14): the listing response
+      // contains shared_space_person.id values, NOT global person.id values. Every
+      // downstream test takes the IDs from this listing and uses them as path params.
+      const { status, body } = await request(app)
+        .get(`/shared-spaces/${spaceId}/people`)
+        .set('Authorization', `Bearer ${owner.accessToken}`);
+      expect(status).toBe(200);
+      const ids = (body as Array<{ id: string }>).map((p) => p.id);
+      expect(ids).toContain(namedPersonId);
+      expect(ids).toContain(unnamedPersonId);
+      expect(ids).toContain(petPersonId);
+    });
+
+    it('hidden persons are excluded by default (withHidden omitted)', async () => {
+      const { status, body } = await request(app)
+        .get(`/shared-spaces/${spaceId}/people`)
+        .set('Authorization', `Bearer ${owner.accessToken}`);
+      expect(status).toBe(200);
+      const ids = (body as Array<{ id: string }>).map((p) => p.id);
+      expect(ids).not.toContain(hiddenPersonId);
+    });
+
+    it('?withHidden=true includes hidden persons', async () => {
+      const { status, body } = await request(app)
+        .get(`/shared-spaces/${spaceId}/people?withHidden=true`)
+        .set('Authorization', `Bearer ${owner.accessToken}`);
+      expect(status).toBe(200);
+      const ids = (body as Array<{ id: string }>).map((p) => p.id);
+      expect(ids).toContain(hiddenPersonId);
+    });
+
+    it('unnamed persons are included in the default listing', async () => {
+      const { status, body } = await request(app)
+        .get(`/shared-spaces/${spaceId}/people`)
+        .set('Authorization', `Bearer ${owner.accessToken}`);
+      expect(status).toBe(200);
+      const ids = (body as Array<{ id: string }>).map((p) => p.id);
+      expect(ids).toContain(unnamedPersonId);
+    });
+
+    it('?named=true returns only persons with non-empty names', async () => {
+      // The named filter is true if either shared_space_person.name OR the underlying
+      // person.name is non-empty (server/src/repositories/shared-space.repository.ts:514-521).
+      // Alice (named via shared_space_person.name) is in; the truly-unnamed one is out.
+      const { status, body } = await request(app)
+        .get(`/shared-spaces/${spaceId}/people?named=true`)
+        .set('Authorization', `Bearer ${owner.accessToken}`);
+      expect(status).toBe(200);
+      const ids = (body as Array<{ id: string }>).map((p) => p.id);
+      expect(ids).toContain(namedPersonId);
+      expect(ids).not.toContain(unnamedPersonId);
+    });
+
+    it('petsEnabled toggle on the space hides pet persons', async () => {
+      // shared_space_person.type='pet' rows are filtered when shared_space.petsEnabled
+      // is false. Mutate via direct DB and restore in try/finally per the fixture
+      // lifetime contract.
+      const dbClient = await utils.connectDatabase();
+      try {
+        await dbClient.query('UPDATE shared_space SET "petsEnabled" = false WHERE id = $1', [spaceId]);
+        const { status, body } = await request(app)
+          .get(`/shared-spaces/${spaceId}/people`)
+          .set('Authorization', `Bearer ${owner.accessToken}`);
+        expect(status).toBe(200);
+        const ids = (body as Array<{ id: string }>).map((p) => p.id);
+        expect(ids).not.toContain(petPersonId);
+      } finally {
+        await dbClient.query('UPDATE shared_space SET "petsEnabled" = true WHERE id = $1', [spaceId]);
+      }
+    });
+
+    describe('pagination', () => {
+      // Insert 15 extra named persons in this nested describe's beforeAll, deleted in
+      // afterAll. Per the fixture lifetime contract, mutating shared fixtures inside
+      // an `it` block would leak into subsequent tests; the nested describe wrapper
+      // scopes the rows to just the pagination tests.
+      const extraPersonIds: string[] = [];
+
+      beforeAll(async () => {
+        for (let i = 0; i < 15; i++) {
+          const res = await utils.createSpacePerson(spaceId, `Extra ${i}`, owner.userId, spaceAssetId);
+          extraPersonIds.push(res.spacePersonId);
+        }
+      });
+
+      it('?limit=10 caps the response at 10 entries', async () => {
+        const { status, body } = await request(app)
+          .get(`/shared-spaces/${spaceId}/people?limit=10`)
+          .set('Authorization', `Bearer ${owner.accessToken}`);
+        expect(status).toBe(200);
+        expect((body as unknown[]).length).toBeLessThanOrEqual(10);
+      });
+
+      it('?offset paginates without overlap', async () => {
+        const page1 = await request(app)
+          .get(`/shared-spaces/${spaceId}/people?limit=5&offset=0`)
+          .set('Authorization', `Bearer ${owner.accessToken}`);
+        const page2 = await request(app)
+          .get(`/shared-spaces/${spaceId}/people?limit=5&offset=5`)
+          .set('Authorization', `Bearer ${owner.accessToken}`);
+        expect(page1.status).toBe(200);
+        expect(page2.status).toBe(200);
+        const ids1 = (page1.body as Array<{ id: string }>).map((p) => p.id);
+        const ids2 = (page2.body as Array<{ id: string }>).map((p) => p.id);
+        const overlap = ids1.filter((id) => ids2.includes(id));
+        expect(overlap).toHaveLength(0);
+      });
+
+      it('sort order is stable across calls', async () => {
+        const a = await request(app)
+          .get(`/shared-spaces/${spaceId}/people?limit=5`)
+          .set('Authorization', `Bearer ${owner.accessToken}`);
+        const b = await request(app)
+          .get(`/shared-spaces/${spaceId}/people?limit=5`)
+          .set('Authorization', `Bearer ${owner.accessToken}`);
+        const idsA = (a.body as Array<{ id: string }>).map((p) => p.id);
+        const idsB = (b.body as Array<{ id: string }>).map((p) => p.id);
+        expect(idsA).toEqual(idsB);
+      });
+    });
+
+    it('empty thumbnailPath on the underlying global person excludes the space person', async () => {
+      // The fork's "minFaces gate" mechanism. shared-space.repository.ts:512-513
+      // filters with `person.thumbnailPath IS NOT NULL AND != ''`. In production
+      // the dedup job sets this only after a person crosses minFaces faces; in tests
+      // utils.createSpacePerson sets it directly. Blanking it should make the space
+      // person disappear from the listing — pin so a future query refactor that drops
+      // this filter is caught.
+      //
+      // We need the global person id, which we can derive from the space person via
+      // the JOIN. Easier: query the database directly for the global person linked
+      // to zeroThumbPerson's representativeFaceId.
+      const dbClient = await utils.connectDatabase();
+      const { rows } = await dbClient.query(
+        `SELECT p.id FROM shared_space_person sp
+         JOIN asset_face af ON af.id = sp."representativeFaceId"
+         JOIN person p ON p.id = af."personId"
+         WHERE sp.id = $1`,
+        [zeroThumbPersonId],
+      );
+      const globalId = rows[0].id as string;
+
+      try {
+        await dbClient.query('UPDATE person SET "thumbnailPath" = $1 WHERE id = $2', ['', globalId]);
+        const { status, body } = await request(app)
+          .get(`/shared-spaces/${spaceId}/people`)
+          .set('Authorization', `Bearer ${owner.accessToken}`);
+        expect(status).toBe(200);
+        const ids = (body as Array<{ id: string }>).map((p) => p.id);
+        expect(ids).not.toContain(zeroThumbPersonId);
+      } finally {
+        await dbClient.query('UPDATE person SET "thumbnailPath" = $1 WHERE id = $2', [
+          '/my/awesome/thumbnail.jpg',
+          globalId,
+        ]);
+      }
+    });
+  });
 });
