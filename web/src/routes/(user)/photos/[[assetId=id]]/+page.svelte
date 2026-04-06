@@ -37,7 +37,7 @@
   import { Route } from '$lib/route';
   import { getAssetBulkActions } from '$lib/services/asset.service';
   import { preferences } from '$lib/stores/user.store';
-  import { getAssetMediaUrl, memoryLaneTitle } from '$lib/utils';
+  import { createUrl, getAssetMediaUrl, memoryLaneTitle } from '$lib/utils';
   import {
     updateStackedAssetInTimeline,
     updateUnstackedAssetInTimeline,
@@ -88,7 +88,7 @@
       const mappedPeople = response.people.map((p) => ({
         id: p.id,
         name: p.name,
-        thumbnailUrl: `/people/${p.id}/thumbnail`,
+        thumbnailUrl: createUrl(`/people/${p.id}/thumbnail`),
       }));
       for (const p of response.people) {
         personNames.set(p.id, p.name);
