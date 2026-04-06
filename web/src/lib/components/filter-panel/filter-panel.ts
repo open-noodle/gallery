@@ -60,11 +60,6 @@ export interface FilterState {
   selectedMonth?: number;
 }
 
-// Client-only view state (not sent to server)
-export interface FilterViewState {
-  collapsed: boolean;
-}
-
 export function createFilterState(): FilterState {
   return {
     personIds: [],
