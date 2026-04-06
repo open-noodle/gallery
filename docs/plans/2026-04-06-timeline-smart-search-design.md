@@ -331,10 +331,15 @@ The current state of the file (verified):
 ```typescript
 import { goto } from '$app/navigation';
 import { page } from '$app/state';
-import SearchBar from '$lib/components/shared-components/search-bar/search-bar.svelte';
+import SearchBar from '$lib/elements/SearchBar.svelte';
 import SearchSortDropdown from '$lib/components/filter-panel/search-sort-dropdown.svelte';
 import SmartSearchResults from '$lib/components/search/smart-search-results.svelte';
 ```
+
+**Important — pick the right `SearchBar`:** the codebase has TWO components named `SearchBar`:
+
+1. `$lib/elements/SearchBar.svelte` — the small input component used by spaces (`bind:name`, `onSearch({ force })`, `onReset`). **This is the one to import.**
+2. `$lib/components/shared-components/search-bar/search-bar.svelte` — the global top searchbar with history box, search filter modal, and navigation to `/search`. **Do NOT import this** — it's a different component with different responsibilities.
 
 #### b. New page state
 
