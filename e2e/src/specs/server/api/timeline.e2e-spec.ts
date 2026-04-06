@@ -1,4 +1,6 @@
+import { AssetVisibility, type LoginResponseDto } from '@immich/sdk';
 import { type Actor, type SpaceContext, authHeaders, buildSpaceContext, forEachActor } from 'src/actors';
+import { createUserDto } from 'src/fixtures';
 import { app, asBearerAuth, utils } from 'src/utils';
 import request from 'supertest';
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -229,6 +231,110 @@ describe('/timeline', () => {
         .set(asBearerAuth(ctx.spaceOwner.token!));
       expect(status).toBe(200);
       expect(total(body)).toBe(3);
+    });
+
+    it('withSharedSpaces=true without explicit visibility throws 400', async () => {
+      // Pinned by the backlog "Observed invariants" section. timeline.service.ts:103-113
+      // treats `visibility === undefined` as `requestedArchived = true` and rejects when
+      // either flag is set. Folded into T05 because it's the visibility-semantics task.
+      const { status } = await request(app)
+        .get('/timeline/buckets?withSharedSpaces=true')
+        .set(asBearerAuth(ctx.spaceOwner.token!));
+      expect(status).toBe(400);
+    });
+
+    it('withPartners=true without explicit visibility throws 400', async () => {
+      // Same invariant, different flag.
+      const { status } = await request(app)
+        .get('/timeline/buckets?withPartners=true')
+        .set(asBearerAuth(ctx.spaceOwner.token!));
+      expect(status).toBe(400);
+    });
+  });
+
+  describe('GET /timeline/buckets — visibility filters', () => {
+    // Dedicated user with 4 assets in different visibility states. Using a fresh user
+    // (not spaceOwner) keeps the asset counts deterministic and avoids polluting other
+    // describes that already assert specific spaceOwner counts.
+    //
+    // Tests assert on aggregate counts via `total(body)`, not on individual asset IDs,
+    // so the asset references are scoped to beforeAll.
+    let visibilityUser: LoginResponseDto;
+
+    const total = (body: unknown) => (body as Array<{ count: number }>).reduce((acc, b) => acc + b.count, 0);
+
+    beforeAll(async () => {
+      visibilityUser = await utils.userSetup(ctx.admin.token!, createUserDto.create('visibility'));
+      const [, , , trashedAsset] = await Promise.all([
+        utils.createAsset(visibilityUser.accessToken),
+        utils.createAsset(visibilityUser.accessToken, { visibility: AssetVisibility.Archive }),
+        utils.createAsset(visibilityUser.accessToken, { visibility: AssetVisibility.Hidden }),
+        utils.createAsset(visibilityUser.accessToken),
+      ]);
+      // Move trashedAsset to trash via DELETE (default is soft delete to trash, not force).
+      await utils.deleteAssets(visibilityUser.accessToken, [trashedAsset.id]);
+    });
+
+    it('default visibility (no param) returns Timeline AND Archive assets', async () => {
+      // Non-obvious server behaviour: `withDefaultVisibility` at server/src/utils/database.ts:79-81
+      // is `where('asset.visibility', 'in', [Archive, Timeline])` — NOT just Timeline.
+      // The web UI's "main timeline" view must pass `visibility=timeline` explicitly to
+      // exclude archived assets. Hidden + Locked are always excluded by the default filter,
+      // and trashed assets are excluded via `deletedAt IS NULL`.
+      //
+      // This test pins the invariant. visibilityUser has 4 assets: timeline + archive +
+      // hidden + trashed; default returns 2 (timeline + archive).
+      const { status, body } = await request(app)
+        .get('/timeline/buckets')
+        .set(asBearerAuth(visibilityUser.accessToken));
+      expect(status).toBe(200);
+      expect(total(body)).toBe(2);
+    });
+
+    it('visibility=timeline returns only timeline-visible assets', async () => {
+      // The strict view that the web UI's main timeline passes explicitly.
+      const { status, body } = await request(app)
+        .get('/timeline/buckets?visibility=timeline')
+        .set(asBearerAuth(visibilityUser.accessToken));
+      expect(status).toBe(200);
+      expect(total(body)).toBe(1);
+    });
+
+    it('visibility=archive returns only archived assets', async () => {
+      const { status, body } = await request(app)
+        .get('/timeline/buckets?visibility=archive')
+        .set(asBearerAuth(visibilityUser.accessToken));
+      expect(status).toBe(200);
+      expect(total(body)).toBe(1);
+    });
+
+    it('visibility=hidden returns only hidden assets', async () => {
+      // Hidden visibility is normally used for the video part of live photos / motion
+      // photos (per the AssetVisibility enum docstring at server/src/enum.ts:907-909).
+      // Setting it on a regular image works at the schema level and the timeline filter
+      // honours it — pin that here so a future refactor doesn't break the live-photo path.
+      const { status, body } = await request(app)
+        .get('/timeline/buckets?visibility=hidden')
+        .set(asBearerAuth(visibilityUser.accessToken));
+      expect(status).toBe(200);
+      expect(total(body)).toBe(1);
+    });
+
+    it('trashed assets are excluded regardless of visibility filter', async () => {
+      // The trash filter is `deletedAt IS NULL` (asset.repository.ts:942), independent of
+      // visibility. Verify it applies under both the default filter and an explicit
+      // visibility filter — a trash regression would inflate either count by 1.
+      const defaultResult = await request(app)
+        .get('/timeline/buckets')
+        .set(asBearerAuth(visibilityUser.accessToken));
+      expect(defaultResult.status).toBe(200);
+      expect(total(defaultResult.body)).toBe(2); // timeline + archive, NOT trashed
+
+      const timelineResult = await request(app)
+        .get('/timeline/buckets?visibility=timeline')
+        .set(asBearerAuth(visibilityUser.accessToken));
+      expect(timelineResult.status).toBe(200);
+      expect(total(timelineResult.body)).toBe(1); // only the live timelineAsset
     });
   });
 });
