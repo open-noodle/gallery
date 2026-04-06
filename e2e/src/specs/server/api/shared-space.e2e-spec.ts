@@ -1795,6 +1795,135 @@ describe('/shared-spaces', () => {
       });
     });
 
+    describe('PUT/DELETE /shared-spaces/:id/people/:personId (T11)', () => {
+      // T11 covers mutation of a single space person: rename, hide, delete.
+      // PUT and DELETE both go through `requireRole(Editor)` (verified at
+      // shared-space.service.ts:665, 704), so Owner and Editor can mutate but
+      // Viewer is rejected (403). Non-member is also 403 (requireMembership inside
+      // requireRole). anon is 401.
+      //
+      // Tests use scratch space persons created via utils.createSpacePerson per `it`
+      // block so the mutations are fully isolated and don't affect T09's listing
+      // assertions or T10's read-only fixtures.
+
+      describe('PUT /shared-spaces/:id/people/:personId', () => {
+        it('access matrix for rename', async () => {
+          const scratch = await utils.createSpacePerson(spaceId, 'ScratchPut1', owner.userId, spaceAssetId);
+          await forEachActor(
+            [ownerActor, editorActor, viewerActor, nonMemberActor, anonActor],
+            (actor) =>
+              request(app)
+                .put(`/shared-spaces/${spaceId}/people/${scratch.spacePersonId}`)
+                .set(authHeaders(actor))
+                .send({ name: 'Renamed' }),
+            { spaceOwner: 200, spaceEditor: 200, spaceViewer: 403, spaceNonMember: 403, anon: 401 },
+          );
+        });
+
+        it('actually renames the person', async () => {
+          const scratch = await utils.createSpacePerson(spaceId, 'BeforeRename', owner.userId, spaceAssetId);
+          const { status, body } = await request(app)
+            .put(`/shared-spaces/${spaceId}/people/${scratch.spacePersonId}`)
+            .set('Authorization', `Bearer ${owner.accessToken}`)
+            .send({ name: 'AfterRename' });
+          expect(status).toBe(200);
+          expect((body as { name: string }).name).toBe('AfterRename');
+        });
+
+        it('marking isHidden=true hides from the default listing but keeps direct fetch', async () => {
+          // Pairs with T10 test 3 (hidden listing-only). After PUT isHidden=true:
+          //   - GET /people (default) excludes the person
+          //   - GET /people?withHidden=true includes it
+          //   - GET /people/:personId still returns 200 with isHidden=true
+          const scratch = await utils.createSpacePerson(spaceId, 'ToHide', owner.userId, spaceAssetId);
+
+          const putRes = await request(app)
+            .put(`/shared-spaces/${spaceId}/people/${scratch.spacePersonId}`)
+            .set('Authorization', `Bearer ${owner.accessToken}`)
+            .send({ isHidden: true });
+          expect(putRes.status).toBe(200);
+          expect((putRes.body as { isHidden: boolean }).isHidden).toBe(true);
+
+          const listing = await request(app)
+            .get(`/shared-spaces/${spaceId}/people`)
+            .set('Authorization', `Bearer ${owner.accessToken}`);
+          const ids = (listing.body as Array<{ id: string }>).map((p) => p.id);
+          expect(ids).not.toContain(scratch.spacePersonId);
+
+          const direct = await request(app)
+            .get(`/shared-spaces/${spaceId}/people/${scratch.spacePersonId}`)
+            .set('Authorization', `Bearer ${owner.accessToken}`);
+          expect(direct.status).toBe(200);
+          expect((direct.body as { isHidden: boolean }).isHidden).toBe(true);
+        });
+
+        it('non-existent personId returns 400', async () => {
+          // Same manual `BadRequestException('Person not found')` mechanism as
+          // GET /:personId (T10). Pinned at the PUT path too — they share the
+          // same error shape per shared-space.service.ts:668-669.
+          const { status } = await request(app)
+            .put(`/shared-spaces/${spaceId}/people/00000000-0000-4000-a000-000000000099`)
+            .set('Authorization', `Bearer ${owner.accessToken}`)
+            .send({ name: 'doesnt-matter' });
+          expect(status).toBe(400);
+        });
+      });
+
+      describe('DELETE /shared-spaces/:id/people/:personId', () => {
+        it('access matrix', async () => {
+          // Recreate a fresh person per actor that needs a real personId. Owner
+          // and editor will delete it (204); viewer/non-member/anon get rejected
+          // before any DB mutation. We use forEachActor with 5 different scratch
+          // persons so each test is isolated.
+          const scratchByActor: Record<string, string> = {};
+          for (const id of ['spaceOwner', 'spaceEditor', 'spaceViewer', 'spaceNonMember', 'anon']) {
+            const res = await utils.createSpacePerson(spaceId, `ScratchDel-${id}`, owner.userId, spaceAssetId);
+            scratchByActor[id] = res.spacePersonId;
+          }
+          await forEachActor(
+            [ownerActor, editorActor, viewerActor, nonMemberActor, anonActor],
+            (actor) =>
+              request(app)
+                .delete(`/shared-spaces/${spaceId}/people/${scratchByActor[actor.id]}`)
+                .set(authHeaders(actor)),
+            { spaceOwner: 204, spaceEditor: 204, spaceViewer: 403, spaceNonMember: 403, anon: 401 },
+          );
+        });
+
+        it('preserves the underlying global person row', async () => {
+          // Deleting a space person should NOT cascade to the global person table.
+          // Probes that the shared_space_person delete is scoped correctly.
+          const scratch = await utils.createSpacePerson(spaceId, 'ScratchPersist', owner.userId, spaceAssetId);
+
+          // Verify the global person exists before
+          const dbClient = await utils.connectDatabase();
+          const beforeRes = await dbClient.query('SELECT id FROM person WHERE id = $1', [scratch.globalPersonId]);
+          expect(beforeRes.rowCount).toBe(1);
+
+          await request(app)
+            .delete(`/shared-spaces/${spaceId}/people/${scratch.spacePersonId}`)
+            .set('Authorization', `Bearer ${owner.accessToken}`);
+
+          // Global person row still exists after the space person is deleted
+          const afterRes = await dbClient.query('SELECT id FROM person WHERE id = $1', [scratch.globalPersonId]);
+          expect(afterRes.rowCount).toBe(1);
+
+          // The space-person side IS gone
+          const spaceRes = await dbClient.query('SELECT id FROM shared_space_person WHERE id = $1', [
+            scratch.spacePersonId,
+          ]);
+          expect(spaceRes.rowCount).toBe(0);
+        });
+
+        it('non-existent personId returns 400', async () => {
+          const { status } = await request(app)
+            .delete(`/shared-spaces/${spaceId}/people/00000000-0000-4000-a000-000000000099`)
+            .set('Authorization', `Bearer ${owner.accessToken}`);
+          expect(status).toBe(400);
+        });
+      });
+    });
+
     it('empty thumbnailPath on the underlying global person excludes the space person', async () => {
       // The fork's "minFaces gate" mechanism. shared-space.repository.ts:512-513
       // filters with `person.thumbnailPath IS NOT NULL AND != ''`. In production
