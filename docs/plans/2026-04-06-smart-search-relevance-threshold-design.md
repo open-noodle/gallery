@@ -82,7 +82,8 @@ export class CLIPConfig extends ModelConfig {
 
 Min is 0 (disabled). Active range is roughly 0.3–2.0. Values below 0.3 would return zero
 results for most queries since CLIP text-to-image distances rarely go below ~0.4 even for
-strong matches.
+strong matches. Note: image-to-image similarity (via `queryAssetId`) produces different
+distance distributions than text-to-image — users should tune separately if using both.
 
 ### 3. Search Options Type
 
@@ -123,7 +124,10 @@ const { hasNextPage, items } = await this.searchRepository.searchSmart(
 
 **File:** `server/src/repositories/search.repository.ts`
 
-Modify `searchSmart()` to apply the threshold. Two sub-cases based on ordering:
+Modify `searchSmart()` to apply the threshold. Also update the `@GenerateSql` decorator params
+to include `maxDistance: 0.75` so `make sql` generates representative SQL with the WHERE clause.
+
+Two sub-cases based on ordering:
 
 #### Case A: Relevance Ordering (no `orderDirection`)
 
@@ -198,8 +202,8 @@ Add to the English locale file:
 
 - `admin.machine_learning_clip_max_distance`: "Max search distance"
 - `admin.machine_learning_clip_max_distance_description`: "Maximum cosine distance for smart
-  search results. Lower values return fewer but more relevant results. Set to 0 to disable
-  (default). Recommended: 0.75"
+  search results. Lower values return fewer but more relevant results. Values below 0.3 will
+  likely return no results. Set to 0 to disable (default). Recommended: 0.75"
 
 ### 8. Generated Files
 
@@ -241,11 +245,19 @@ Add a section explaining the relevance threshold:
 
 ### 10. Tests
 
-**Service tests** (`server/src/services/search.service.spec.ts`):
+**Existing test updates** (`server/src/services/search.service.spec.ts`):
 
-- Verify `maxDistance` from config is passed to `searchRepository.searchSmart()`
+The `'should work'` test uses exact object matching on the `searchSmart` call args. Adding
+`maxDistance` to the options will break it. Update this test (and any others using exact
+matching instead of `expect.objectContaining`) to include `maxDistance: 0` in the expected
+options.
 
-**Repository tests** (if applicable — medium tests or unit mocks):
+**New service tests** (`server/src/services/search.service.spec.ts`):
+
+- Verify `maxDistance` from config is passed to `searchRepository.searchSmart()` (text query path)
+- Verify `maxDistance` from config is passed to `searchRepository.searchSmart()` (queryAssetId path)
+
+**Repository tests** (medium tests with real DB preferred, since mocking Kysely doesn't verify SQL):
 
 - Verify distance WHERE clause is applied for relevance ordering (Case A)
 - Verify distance WHERE clause is applied for date ordering (Case B)
