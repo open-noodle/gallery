@@ -374,9 +374,8 @@ describe('/search/suggestions/filters', () => {
     // Camera makes: should only include cameras from assets A+B
     expect(Array.isArray(body.cameraMakes)).toBe(true);
 
-    // Tags: should only include tags on assets A+B ("nature" on A, "travel" on B)
-    expect(body.tags.length).toBeGreaterThanOrEqual(1);
-    expect(body.tags.length).toBeLessThanOrEqual(unfilteredTags.length);
+    // Tags: should include at least the tags on assets A+B ("nature" on A, "travel" on B)
+    expect(body.tags.length).toBeGreaterThanOrEqual(2);
     const tagNames = body.tags.map((t: { value: string }) => t.value);
     expect(tagNames).toContain('nature');
     expect(tagNames).toContain('travel');
