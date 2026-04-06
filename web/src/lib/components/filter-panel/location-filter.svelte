@@ -41,7 +41,9 @@
   });
 
   let filteredCountries = $derived(
-    searchQuery.trim() ? countries.filter((c) => c.toLowerCase().includes(searchQuery.trim().toLowerCase())) : countries,
+    searchQuery.trim()
+      ? countries.filter((c) => c.toLowerCase().includes(searchQuery.trim().toLowerCase()))
+      : countries,
   );
 
   let visibleCountries = $derived(
@@ -145,9 +147,7 @@
 
     <!-- Empty search results -->
     {#if filteredCountries.length === 0 && searchQuery.trim()}
-      <p class="text-sm text-gray-400 dark:text-gray-500" data-testid="location-no-results">
-        No matching locations
-      </p>
+      <p class="text-sm text-gray-400 dark:text-gray-500" data-testid="location-no-results">No matching locations</p>
     {/if}
 
     {#each visibleCountries as country (country)}
