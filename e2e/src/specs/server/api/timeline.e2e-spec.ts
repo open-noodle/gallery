@@ -360,12 +360,13 @@ describe('/timeline', () => {
     // fixtures in beforeAll. The fixture lifetime contract is preserved because we don't
     // mutate ctx — we only add new rows attached to ctx.spaceId / ctx.spaceAssetId.
     let spacePerson: { globalPersonId: string; spacePersonId: string; faceId: string };
+    let decoyGlobalPersonId: string;
     let spaceTagId: string;
 
     const total = (body: unknown) => (body as Array<{ count: number }>).reduce((acc, b) => acc + b.count, 0);
 
     beforeAll(async () => {
-      // 1. Add a named person to the space asset via the T02 helper (inserts the
+      // 1. Add a named space person to the space asset via the T02 helper (inserts the
       // shared_space_person_face junction row that the timeline filter joins through).
       spacePerson = await utils.createSpacePerson(
         ctx.spaceId,
@@ -374,7 +375,16 @@ describe('/timeline', () => {
         ctx.spaceAssetId,
       );
 
-      // 2. Create a tag owned by spaceOwner and apply it to spaceAssetId only. The tag is
+      // 2. Decoy: a bare global person attached only to ownerAssetId (which is NOT in
+      // the space). No shared_space_person row, no junction row. This is the asset that
+      // the PR #260 boundary test in test 6 tries to reach by passing the global personId
+      // alongside spaceId — it should NOT come back, because the spaceId scoping should
+      // restrict the result set to assets in the space.
+      const decoy = await utils.createPerson(ctx.spaceOwner.token!, { name: 'Decoy Bob' });
+      decoyGlobalPersonId = decoy.id;
+      await utils.createFace({ assetId: ctx.ownerAssetId, personId: decoyGlobalPersonId });
+
+      // 3. Create a tag owned by spaceOwner and apply it to spaceAssetId only. The tag is
       // owned globally — there's no "space tag" concept — so the timeline join goes
       // through tag_asset.
       const [tag] = await utils.upsertTags(ctx.spaceOwner.token!, ['T06SpaceTag']);
@@ -393,19 +403,31 @@ describe('/timeline', () => {
       expect(total(body)).toBe(1);
     });
 
-    it('passing the GLOBAL personId on a space query does NOT cross-pollute', async () => {
-      // The PR #260 bug shape: a caller forgets the dedicated spacePersonId field and
-      // passes a global personId instead. The two fields route to different code paths
-      // (asset_face vs shared_space_person_face), so this should NOT silently match the
-      // space-asset join. The expected behaviour is "no leakage" — either an empty
-      // result or 400, but not "0 leaked through to 1".
+    it('passing the GLOBAL personId on a space query stays scoped to space assets', async () => {
+      // PR #260 boundary test, part 1. The decoy global person (Bob) is attached only
+      // to ownerAssetId, which is NOT in the space. Querying with the decoy's GLOBAL
+      // personId alongside spaceId should NOT return ownerAssetId, because the spaceId
+      // restriction should fence the result set off to space-scoped assets.
       //
-      // The actual server behaviour: passing personId=<global> with spaceId joins
-      // through asset_face. Since the global person row exists and the space asset has
-      // a face linked to it (createSpacePerson sets up both), this query returns 1 —
-      // NOT because the space scoping is broken, but because the global join legitimately
-      // hits the same asset. Pin this behaviour so a future change that decouples the
-      // two joins (or one that breaks the spaceId restriction) is caught.
+      // If a future regression breaks the spaceId scoping in the timeline query (the
+      // PR #260 bug shape), this test would return 1 instead of 0 — the decoy's asset
+      // would leak through. The other direction (test 1 returns 1) is also necessary
+      // but not sufficient on its own; this test is the actual boundary pin.
+      const { status, body } = await request(app)
+        .get(`/timeline/buckets?spaceId=${ctx.spaceId}&personId=${decoyGlobalPersonId}`)
+        .set(asBearerAuth(ctx.spaceOwner.token!));
+      expect(status).toBe(200);
+      expect(total(body)).toBe(0);
+    });
+
+    it('passing a global personId attached to a space asset still works via the asset_face join', async () => {
+      // PR #260 boundary test, part 2. spacePerson.globalPersonId IS attached to
+      // spaceAssetId (createSpacePerson inserts the asset_face row), so this query is
+      // legitimately allowed to find spaceAssetId via asset_face. Result = 1.
+      //
+      // Together with the decoy test above, the two tests pin both the "in" and "out"
+      // sides of the spaceId boundary on the global personId join: a non-space asset's
+      // global person stays excluded, a space asset's global person is reachable.
       const { status, body } = await request(app)
         .get(`/timeline/buckets?spaceId=${ctx.spaceId}&personId=${spacePerson.globalPersonId}`)
         .set(asBearerAuth(ctx.spaceOwner.token!));
@@ -413,9 +435,15 @@ describe('/timeline', () => {
       expect(total(body)).toBe(1);
     });
 
-    it('spacePersonId without spaceId is allowed and filters to that person globally', async () => {
-      // Without spaceId, the query falls back to the user's own assets. spaceOwner owns
-      // both ownerAssetId AND spaceAssetId; only spaceAssetId has the face. Result = 1.
+    it('spacePersonId without spaceId is allowed and matches via the junction join', async () => {
+      // Without spaceId, timeBucketChecks defaults dto.userId to auth.user.id (spaceOwner).
+      // The spacePersonId join then goes through shared_space_person_face → asset_face,
+      // and matches every space-asset that has the spacePersonId on it — *not* restricted
+      // to any single space, because the join itself doesn't carry a spaceId predicate
+      // here. spaceOwner owns spaceAssetId, which has the face, so the result is 1.
+      //
+      // Note: this means a future test that puts the same spacePersonId on a second
+      // space's asset would observe a count > 1. The current fixture only has one space.
       const { status, body } = await request(app)
         .get(`/timeline/buckets?spacePersonId=${spacePerson.spacePersonId}`)
         .set(asBearerAuth(ctx.spaceOwner.token!));
@@ -432,14 +460,17 @@ describe('/timeline', () => {
       expect(total(body)).toBe(1);
     });
 
-    it('non-owner space member sees tagged space content via spaceId + tagIds', async () => {
-      // spaceEditor is a member of the space; they query with spaceId + the tag that
-      // spaceOwner applied to spaceAssetId. The expectation is that the access path is:
-      //   space member → space-scoped assets → tagged subset
-      // So spaceEditor should see the 1 tagged space asset, even though they don't own
-      // the tag themselves. This pins that the timeline tag filter doesn't enforce
-      // per-user tag ownership for space-scoped queries — a relevant invariant for the
-      // shared-spaces UX where one member labels a photo and others should see the label.
+    it('non-owner space member can filter space content by another user\'s tag', async () => {
+      // The actual invariant being pinned: the timeline tag filter (`hasTags` at
+      // server/src/utils/database.ts:228-241) joins through tag_asset → tag_closure with
+      // **no `tag.userId` predicate at all**. Tag IDs are universally addressable on
+      // the timeline filter — there's no per-user ownership check. spaceEditor passing
+      // spaceOwner's tag ID alongside spaceId returns the tagged space asset.
+      //
+      // The shared-spaces UX consequence: one member labels a photo, all members can
+      // filter by that label. Documented here as the load-bearing invariant — a future
+      // refactor that adds an owner check to hasTags would break this UX silently
+      // unless this test catches it.
       const { status, body } = await request(app)
         .get(`/timeline/buckets?spaceId=${ctx.spaceId}&tagIds=${spaceTagId}`)
         .set(asBearerAuth(ctx.spaceEditor.token!));
