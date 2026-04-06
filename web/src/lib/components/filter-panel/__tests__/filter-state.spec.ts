@@ -79,6 +79,13 @@ describe('FilterState utilities', () => {
     expect(cleared.mediaType).toBe('all');
   });
 
+  it('should preserve relevance sortOrder on clearFilters', () => {
+    const state = createFilterState();
+    state.sortOrder = 'relevance';
+    const cleared = clearFilters(state);
+    expect(cleared.sortOrder).toBe('relevance');
+  });
+
   it('should clear selectedYear and selectedMonth on clearFilters', () => {
     const state = createFilterState();
     state.selectedYear = 2023;
