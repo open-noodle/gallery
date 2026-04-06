@@ -92,7 +92,6 @@
       isFavorite: filters?.isFavorite ?? (spaceId ? undefined : $mapSettings.onlyFavorites || undefined),
       withPartners: spaceId ? undefined : $mapSettings.withPartners || undefined,
       spaceId,
-      timelineSpaceId: spaceId,
       assetFilter: selectedClusterIds,
       ...(filters?.personIds &&
         filters.personIds.length > 0 && {
