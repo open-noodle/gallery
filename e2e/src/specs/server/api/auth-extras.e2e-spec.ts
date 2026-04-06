@@ -83,7 +83,7 @@ describe('/auth — change-password / pin-code / session lock', () => {
       expect(status).toBe(401);
     });
 
-    it('rejects a non-6-digit PIN (Matches /^\\d{6}$/)', async () => {
+    it(String.raw`rejects a non-6-digit PIN (Matches /^\d{6}$/)`, async () => {
       const user = await newUser();
       const { status } = await request(app)
         .post('/auth/pin-code')
@@ -110,10 +110,7 @@ describe('/auth — change-password / pin-code / session lock', () => {
     it('owner can change their PIN code', async () => {
       const user = await newUser();
       // Set up first.
-      await request(app)
-        .post('/auth/pin-code')
-        .set(asBearerAuth(user.login.accessToken))
-        .send({ pinCode: PIN_CODE });
+      await request(app).post('/auth/pin-code').set(asBearerAuth(user.login.accessToken)).send({ pinCode: PIN_CODE });
 
       // Change it.
       const change = await request(app)
@@ -128,10 +125,7 @@ describe('/auth — change-password / pin-code / session lock', () => {
     it('owner can reset their PIN code by providing the password', async () => {
       const user = await newUser();
       // Set up first.
-      await request(app)
-        .post('/auth/pin-code')
-        .set(asBearerAuth(user.login.accessToken))
-        .send({ pinCode: PIN_CODE });
+      await request(app).post('/auth/pin-code').set(asBearerAuth(user.login.accessToken)).send({ pinCode: PIN_CODE });
 
       // Reset using the account password.
       const reset = await request(app)
@@ -150,10 +144,7 @@ describe('/auth — change-password / pin-code / session lock', () => {
     it('owner can unlock + lock the session', async () => {
       const user = await newUser();
       // Need to set up a PIN first (sessions can only unlock if there's a PIN).
-      await request(app)
-        .post('/auth/pin-code')
-        .set(asBearerAuth(user.login.accessToken))
-        .send({ pinCode: PIN_CODE });
+      await request(app).post('/auth/pin-code').set(asBearerAuth(user.login.accessToken)).send({ pinCode: PIN_CODE });
 
       const unlock = await request(app)
         .post('/auth/session/unlock')
@@ -161,19 +152,13 @@ describe('/auth — change-password / pin-code / session lock', () => {
         .send({ pinCode: PIN_CODE });
       expect(unlock.status).toBe(204);
 
-      const lock = await request(app)
-        .post('/auth/session/lock')
-        .set(asBearerAuth(user.login.accessToken))
-        .send({});
+      const lock = await request(app).post('/auth/session/lock').set(asBearerAuth(user.login.accessToken)).send({});
       expect(lock.status).toBe(204);
     });
 
     it('unlock with wrong PIN returns 400', async () => {
       const user = await newUser();
-      await request(app)
-        .post('/auth/pin-code')
-        .set(asBearerAuth(user.login.accessToken))
-        .send({ pinCode: PIN_CODE });
+      await request(app).post('/auth/pin-code').set(asBearerAuth(user.login.accessToken)).send({ pinCode: PIN_CODE });
 
       const { status } = await request(app)
         .post('/auth/session/unlock')
@@ -191,9 +176,7 @@ describe('/auth — change-password / pin-code / session lock', () => {
 
     it('returns the auth status shape for an authenticated user', async () => {
       const user = await newUser();
-      const { status, body } = await request(app)
-        .get('/auth/status')
-        .set(asBearerAuth(user.login.accessToken));
+      const { status, body } = await request(app).get('/auth/status').set(asBearerAuth(user.login.accessToken));
       expect(status).toBe(200);
       expect(body).toEqual(
         expect.objectContaining({

@@ -32,10 +32,7 @@ describe('/view', () => {
     // asset too so the cross-user-isolation tests have a recipient who actually
     // has folders, but we don't need to track userB's asset id specifically —
     // the assertions key off "userB does not see userAAssetId".
-    const [assetA] = await Promise.all([
-      utils.createAsset(userA.accessToken),
-      utils.createAsset(userB.accessToken),
-    ]);
+    const [assetA] = await Promise.all([utils.createAsset(userA.accessToken), utils.createAsset(userB.accessToken)]);
     userAAssetId = assetA.id;
   });
 
@@ -45,25 +42,19 @@ describe('/view', () => {
       expect(status).toBe(401);
     });
 
-    it('returns the user\'s unique folder paths', async () => {
-      const { status, body } = await request(app)
-        .get('/view/folder/unique-paths')
-        .set(asBearerAuth(userA.accessToken));
+    it("returns the user's unique folder paths", async () => {
+      const { status, body } = await request(app).get('/view/folder/unique-paths').set(asBearerAuth(userA.accessToken));
       expect(status).toBe(200);
       expect(Array.isArray(body)).toBe(true);
       expect((body as string[]).length).toBeGreaterThan(0);
     });
 
-    it('cross-user isolation — userB does not see userA\'s paths', async () => {
+    it("cross-user isolation — userB does not see userA's paths", async () => {
       // The service scopes by auth.user.id, so userB's paths are independent of
       // userA's. Both have at least one upload, so we assert userB's response
       // doesn't somehow include userA's path.
-      const a = await request(app)
-        .get('/view/folder/unique-paths')
-        .set(asBearerAuth(userA.accessToken));
-      const b = await request(app)
-        .get('/view/folder/unique-paths')
-        .set(asBearerAuth(userB.accessToken));
+      const a = await request(app).get('/view/folder/unique-paths').set(asBearerAuth(userA.accessToken));
+      const b = await request(app).get('/view/folder/unique-paths').set(asBearerAuth(userB.accessToken));
       expect(a.status).toBe(200);
       expect(b.status).toBe(200);
       // The actual paths include the userId, so they're guaranteed-distinct. This
@@ -85,11 +76,9 @@ describe('/view', () => {
       expect(status).toBe(401);
     });
 
-    it('returns assets when given a known path from the user\'s folder list', async () => {
+    it("returns assets when given a known path from the user's folder list", async () => {
       // Resolve a known path via the unique-paths endpoint, then query getAssetsByOriginalPath.
-      const pathsRes = await request(app)
-        .get('/view/folder/unique-paths')
-        .set(asBearerAuth(userA.accessToken));
+      const pathsRes = await request(app).get('/view/folder/unique-paths').set(asBearerAuth(userA.accessToken));
       const knownPath = (pathsRes.body as string[])[0];
       expect(typeof knownPath).toBe('string');
 
@@ -110,15 +99,13 @@ describe('/view', () => {
       expect(body).toEqual([]);
     });
 
-    it('cross-user isolation — userB cannot fetch userA\'s folder contents', async () => {
+    it("cross-user isolation — userB cannot fetch userA's folder contents", async () => {
       // Use userA's known path, but query as userB. The service scopes by auth.user.id
       // so the result should not include userAAssetId. Ideally the response is empty
       // (because userB has no assets at userA's path), but we just assert the leak
       // doesn't happen — userB MUST NOT see userAAssetId regardless of what else is
       // in the response.
-      const pathsRes = await request(app)
-        .get('/view/folder/unique-paths')
-        .set(asBearerAuth(userA.accessToken));
+      const pathsRes = await request(app).get('/view/folder/unique-paths').set(asBearerAuth(userA.accessToken));
       const userAPath = (pathsRes.body as string[]).find((p) => p.includes(userA.userId));
       expect(userAPath).toBeDefined();
 
@@ -144,5 +131,4 @@ describe('/view', () => {
       expect(status).toBe(500);
     });
   });
-
 });

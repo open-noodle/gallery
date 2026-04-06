@@ -61,23 +61,17 @@ describe('person search + reassign', () => {
 
   describe('GET /search/person', () => {
     it('requires authentication', async () => {
-      const { status } = await request(app)
-        .get('/search/person?name=Alice')
-        .set(authHeaders(anonActor));
+      const { status } = await request(app).get('/search/person?name=Alice').set(authHeaders(anonActor));
       expect(status).toBe(401);
     });
 
     it('rejects an empty name with 400 (IsNotEmpty)', async () => {
-      const { status } = await request(app)
-        .get('/search/person?name=')
-        .set(asBearerAuth(userA.accessToken));
+      const { status } = await request(app).get('/search/person?name=').set(asBearerAuth(userA.accessToken));
       expect(status).toBe(400);
     });
 
     it('owner can find their own person by name', async () => {
-      const { status, body } = await request(app)
-        .get('/search/person?name=Alice')
-        .set(asBearerAuth(userA.accessToken));
+      const { status, body } = await request(app).get('/search/person?name=Alice').set(asBearerAuth(userA.accessToken));
       expect(status).toBe(200);
       const ids = (body as Array<{ id: string }>).map((p) => p.id);
       expect(ids).toContain(alicePersonId);
@@ -87,9 +81,7 @@ describe('person search + reassign', () => {
       // userA has a "Bob T35" (id=bobPersonId). userB has their own "Bob T35"
       // (id=userBobPersonId). When userB searches for "Bob", they should only
       // see their own — the personRepository scopes by ownerId.
-      const { status, body } = await request(app)
-        .get('/search/person?name=Bob')
-        .set(asBearerAuth(userB.accessToken));
+      const { status, body } = await request(app).get('/search/person?name=Bob').set(asBearerAuth(userB.accessToken));
       expect(status).toBe(200);
       const ids = (body as Array<{ id: string }>).map((p) => p.id);
       expect(ids).toContain(userBobPersonId);
@@ -105,9 +97,7 @@ describe('person search + reassign', () => {
       // check load-bearing.
       const hidden = await utils.createPerson(userA.accessToken, { name: 'HiddenAlice', isHidden: true });
 
-      const defaultRes = await request(app)
-        .get('/search/person?name=HiddenAlice')
-        .set(asBearerAuth(userA.accessToken));
+      const defaultRes = await request(app).get('/search/person?name=HiddenAlice').set(asBearerAuth(userA.accessToken));
       const defaultIds = (defaultRes.body as Array<{ id: string }>).map((p) => p.id);
       expect(defaultIds).not.toContain(hidden.id);
 

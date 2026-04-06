@@ -53,9 +53,7 @@ describe('/queues', () => {
     });
 
     it('non-admin returns 403', async () => {
-      const { status } = await request(app)
-        .get('/queues/thumbnailGeneration')
-        .set(asBearerAuth(user.accessToken));
+      const { status } = await request(app).get('/queues/thumbnailGeneration').set(asBearerAuth(user.accessToken));
       expect(status).toBe(403);
     });
 
@@ -116,16 +114,12 @@ describe('/queues', () => {
 
   describe('GET /queues/:name/jobs', () => {
     it('requires authentication', async () => {
-      const { status } = await request(app)
-        .get('/queues/thumbnailGeneration/jobs')
-        .set(authHeaders(anonActor));
+      const { status } = await request(app).get('/queues/thumbnailGeneration/jobs').set(authHeaders(anonActor));
       expect(status).toBe(401);
     });
 
     it('non-admin returns 403', async () => {
-      const { status } = await request(app)
-        .get('/queues/thumbnailGeneration/jobs')
-        .set(asBearerAuth(user.accessToken));
+      const { status } = await request(app).get('/queues/thumbnailGeneration/jobs').set(asBearerAuth(user.accessToken));
       expect(status).toBe(403);
     });
 

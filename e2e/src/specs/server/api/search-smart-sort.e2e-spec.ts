@@ -45,10 +45,7 @@ describe('POST /search/smart — sort + validation surface', () => {
   });
 
   it('requires authentication', async () => {
-    const { status } = await request(app)
-      .post('/search/smart')
-      .set(authHeaders(anonActor))
-      .send({ query: 'test' });
+    const { status } = await request(app).post('/search/smart').set(authHeaders(anonActor)).send({ query: 'test' });
     expect(status).toBe(401);
   });
 
@@ -61,10 +58,7 @@ describe('POST /search/smart — sort + validation surface', () => {
     // the checks (e.g. moves the body check before the ML gate so the missing-
     // body case surfaces a clearer error), this test fails and forces a
     // deliberate update.
-    const { status, body } = await request(app)
-      .post('/search/smart')
-      .set(asBearerAuth(user.accessToken))
-      .send({});
+    const { status, body } = await request(app).post('/search/smart').set(asBearerAuth(user.accessToken)).send({});
     expect(status).toBe(400);
     expect((body as { message: string }).message).toBe('Smart search is not enabled');
   });

@@ -1,5 +1,5 @@
 import { PluginTriggerType, type LoginResponseDto } from '@immich/sdk';
-import { type Actor, authHeaders } from 'src/actors';
+import { authHeaders, type Actor } from 'src/actors';
 import { createUserDto } from 'src/fixtures';
 import { app, asBearerAuth, utils } from 'src/utils';
 import request from 'supertest';
@@ -17,6 +17,17 @@ import { beforeAll, describe, expect, it } from 'vitest';
 // Workflows are per-user — there's no concept of sharing them across spaces
 // or with partners. Cross-user access is uniformly rejected at the access layer.
 
+// Helper: create an empty workflow (no filters/actions). The service supports
+// empty arrays — `validateAndMap*` for-loops are no-ops with zero items. Pure
+// (token + name as args), hoisted to file scope.
+const createEmptyWorkflow = async (token: string, name: string) =>
+  request(app).post('/workflows').set(asBearerAuth(token)).send({
+    triggerType: PluginTriggerType.AssetCreate,
+    name,
+    filters: [],
+    actions: [],
+  });
+
 describe('/workflows', () => {
   let admin: LoginResponseDto;
   let userA: LoginResponseDto;
@@ -31,19 +42,6 @@ describe('/workflows', () => {
       utils.userSetup(admin.accessToken, createUserDto.create('t22-userB')),
     ]);
   });
-
-  // Helper: create an empty workflow (no filters/actions). The service supports
-  // empty arrays — `validateAndMap*` for-loops are no-ops with zero items.
-  const createEmptyWorkflow = async (token: string, name: string) =>
-    request(app)
-      .post('/workflows')
-      .set(asBearerAuth(token))
-      .send({
-        triggerType: PluginTriggerType.AssetCreate,
-        name,
-        filters: [],
-        actions: [],
-      });
 
   describe('POST /workflows', () => {
     it('requires authentication', async () => {
@@ -63,15 +61,12 @@ describe('/workflows', () => {
     });
 
     it('rejects an invalid trigger type with 400', async () => {
-      const { status } = await request(app)
-        .post('/workflows')
-        .set(asBearerAuth(userA.accessToken))
-        .send({
-          triggerType: 'NotAValidTrigger',
-          name: 'bad-trigger',
-          filters: [],
-          actions: [],
-        });
+      const { status } = await request(app).post('/workflows').set(asBearerAuth(userA.accessToken)).send({
+        triggerType: 'NotAValidTrigger',
+        name: 'bad-trigger',
+        filters: [],
+        actions: [],
+      });
       expect(status).toBe(400);
     });
 
@@ -82,9 +77,7 @@ describe('/workflows', () => {
         .send({
           triggerType: PluginTriggerType.AssetCreate,
           name: 'bad-filter',
-          filters: [
-            { pluginFilterId: '00000000-0000-4000-a000-000000000099' },
-          ],
+          filters: [{ pluginFilterId: '00000000-0000-4000-a000-000000000099' }],
           actions: [],
         });
       expect(status).toBe(400);
@@ -93,15 +86,12 @@ describe('/workflows', () => {
     });
 
     it('rejects an empty name with 400 (DTO @IsNotEmpty)', async () => {
-      const { status } = await request(app)
-        .post('/workflows')
-        .set(asBearerAuth(userA.accessToken))
-        .send({
-          triggerType: PluginTriggerType.AssetCreate,
-          name: '',
-          filters: [],
-          actions: [],
-        });
+      const { status } = await request(app).post('/workflows').set(asBearerAuth(userA.accessToken)).send({
+        triggerType: PluginTriggerType.AssetCreate,
+        name: '',
+        filters: [],
+        actions: [],
+      });
       expect(status).toBe(400);
     });
   });
@@ -112,7 +102,7 @@ describe('/workflows', () => {
       expect(status).toBe(401);
     });
 
-    it('returns only the caller\'s workflows (owner-scoped)', async () => {
+    it("returns only the caller's workflows (owner-scoped)", async () => {
       // userA created at least one workflow above; userB has none. Listing as
       // userB returns an empty array even though userA's workflow exists.
       const aRes = await request(app).get('/workflows').set(asBearerAuth(userA.accessToken));
@@ -130,9 +120,7 @@ describe('/workflows', () => {
       const create = await createEmptyWorkflow(userA.accessToken, 'fetch-me');
       const id = (create.body as { id: string }).id;
 
-      const { status, body } = await request(app)
-        .get(`/workflows/${id}`)
-        .set(asBearerAuth(userA.accessToken));
+      const { status, body } = await request(app).get(`/workflows/${id}`).set(asBearerAuth(userA.accessToken));
       expect(status).toBe(200);
       expect((body as { id: string; name: string }).name).toBe('fetch-me');
     });
@@ -170,10 +158,7 @@ describe('/workflows', () => {
       const create = await createEmptyWorkflow(userA.accessToken, 'empty-put');
       const id = (create.body as { id: string }).id;
 
-      const { status, body } = await request(app)
-        .put(`/workflows/${id}`)
-        .set(asBearerAuth(userA.accessToken))
-        .send({});
+      const { status, body } = await request(app).put(`/workflows/${id}`).set(asBearerAuth(userA.accessToken)).send({});
       expect(status).toBe(400);
       expect((body as { message: string }).message).toMatch(/no fields/i);
     });
@@ -191,9 +176,7 @@ describe('/workflows', () => {
       // Verify the workflow's name is still 'cross-update' — a leaking fix
       // could return 400 to the caller while still mutating state. The
       // follow-up GET as the owner pins that the rename did NOT happen.
-      const followup = await request(app)
-        .get(`/workflows/${id}`)
-        .set(asBearerAuth(userA.accessToken));
+      const followup = await request(app).get(`/workflows/${id}`).set(asBearerAuth(userA.accessToken));
       expect(followup.status).toBe(200);
       expect((followup.body as { name: string }).name).toBe('cross-update');
     });
@@ -204,15 +187,11 @@ describe('/workflows', () => {
       const create = await createEmptyWorkflow(userA.accessToken, 'to-delete');
       const id = (create.body as { id: string }).id;
 
-      const { status } = await request(app)
-        .delete(`/workflows/${id}`)
-        .set(asBearerAuth(userA.accessToken));
+      const { status } = await request(app).delete(`/workflows/${id}`).set(asBearerAuth(userA.accessToken));
       expect(status).toBe(204);
 
       // Verify the workflow is gone — subsequent GET returns 400 (bulk-access)
-      const followup = await request(app)
-        .get(`/workflows/${id}`)
-        .set(asBearerAuth(userA.accessToken));
+      const followup = await request(app).get(`/workflows/${id}`).set(asBearerAuth(userA.accessToken));
       expect(followup.status).toBe(400);
     });
 
@@ -220,17 +199,13 @@ describe('/workflows', () => {
       const create = await createEmptyWorkflow(userA.accessToken, 'cross-delete');
       const id = (create.body as { id: string }).id;
 
-      const { status } = await request(app)
-        .delete(`/workflows/${id}`)
-        .set(asBearerAuth(userB.accessToken));
+      const { status } = await request(app).delete(`/workflows/${id}`).set(asBearerAuth(userB.accessToken));
       expect(status).toBe(400);
 
       // Verify the workflow still exists for the owner — same defensive check
       // as the cross-user PUT test above. Confirms 400 to caller AND no
       // mutation behind the scenes.
-      const followup = await request(app)
-        .get(`/workflows/${id}`)
-        .set(asBearerAuth(userA.accessToken));
+      const followup = await request(app).get(`/workflows/${id}`).set(asBearerAuth(userA.accessToken));
       expect(followup.status).toBe(200);
       expect((followup.body as { name: string }).name).toBe('cross-delete');
     });

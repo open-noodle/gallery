@@ -51,9 +51,7 @@ describe('/assets/:id/metadata', () => {
     });
 
     it('non-owner returns 400 (bulk-access pattern)', async () => {
-      const { status } = await request(app)
-        .get(`/assets/${assetId}/metadata`)
-        .set(asBearerAuth(other.accessToken));
+      const { status } = await request(app).get(`/assets/${assetId}/metadata`).set(asBearerAuth(other.accessToken));
       expect(status).toBe(400);
     });
   });
@@ -68,9 +66,7 @@ describe('/assets/:id/metadata', () => {
       expect(Array.isArray(upsert.body)).toBe(true);
 
       // The full listing now includes the key.
-      const list = await request(app)
-        .get(`/assets/${assetId}/metadata`)
-        .set(asBearerAuth(owner.accessToken));
+      const list = await request(app).get(`/assets/${assetId}/metadata`).set(asBearerAuth(owner.accessToken));
       const found = (list.body as Array<{ key: string; value: unknown }>).find((m) => m.key === 't23.alpha');
       expect(found).toBeDefined();
       expect(found?.value).toEqual({ color: 'red', count: 1 });
@@ -138,9 +134,7 @@ describe('/assets/:id/metadata', () => {
         .set(asBearerAuth(owner.accessToken));
       expect(del.status).toBe(204);
 
-      const list = await request(app)
-        .get(`/assets/${assetId}/metadata`)
-        .set(asBearerAuth(owner.accessToken));
+      const list = await request(app).get(`/assets/${assetId}/metadata`).set(asBearerAuth(owner.accessToken));
       const found = (list.body as Array<{ key: string }>).find((m) => m.key === 't23.todelete');
       expect(found).toBeUndefined();
     });
@@ -171,9 +165,7 @@ describe('/assets/:id/metadata', () => {
       expect(Array.isArray(body)).toBe(true);
 
       // Both assets now have the key.
-      const aRes = await request(app)
-        .get(`/assets/${assetId}/metadata/t23.bulk`)
-        .set(asBearerAuth(owner.accessToken));
+      const aRes = await request(app).get(`/assets/${assetId}/metadata/t23.bulk`).set(asBearerAuth(owner.accessToken));
       const bRes = await request(app)
         .get(`/assets/${secondAsset.id}/metadata/t23.bulk`)
         .set(asBearerAuth(owner.accessToken));
@@ -224,12 +216,8 @@ describe('/assets/:id/metadata', () => {
       expect(del.status).toBe(204);
 
       // Both assets should be missing the key.
-      const aList = await request(app)
-        .get(`/assets/${assetId}/metadata`)
-        .set(asBearerAuth(owner.accessToken));
-      const bList = await request(app)
-        .get(`/assets/${secondAsset.id}/metadata`)
-        .set(asBearerAuth(owner.accessToken));
+      const aList = await request(app).get(`/assets/${assetId}/metadata`).set(asBearerAuth(owner.accessToken));
+      const bList = await request(app).get(`/assets/${secondAsset.id}/metadata`).set(asBearerAuth(owner.accessToken));
       expect((aList.body as Array<{ key: string }>).find((m) => m.key === 't23.bulkdelete')).toBeUndefined();
       expect((bList.body as Array<{ key: string }>).find((m) => m.key === 't23.bulkdelete')).toBeUndefined();
     });

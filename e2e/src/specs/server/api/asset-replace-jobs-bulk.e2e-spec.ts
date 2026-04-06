@@ -27,6 +27,22 @@ import { beforeAll, describe, expect, it } from 'vitest';
 //     scopes by auth.user.id when querying checksums. Response is per-item with
 //     ACCEPT or REJECT/DUPLICATE.
 
+// Helper builds a multipart PUT mirroring the shape of utils.replaceAsset.
+// Hoisted to file scope (no closure dependencies — both ids are passed as args).
+const buildReplaceRequest = (assetId: string, accessToken: string | null) => {
+  const builder = request(app)
+    .put(`/assets/${assetId}/original`)
+    .attach('assetData', makeRandomImage(), 'replacement.png');
+  if (accessToken) {
+    builder.set('Authorization', `Bearer ${accessToken}`);
+  }
+  return builder
+    .field('deviceAssetId', 'replace-test')
+    .field('deviceId', 'replace-device')
+    .field('fileCreatedAt', new Date().toISOString())
+    .field('fileModifiedAt', new Date().toISOString());
+};
+
 describe('asset replace + jobs + bulk-upload-check', () => {
   let admin: LoginResponseDto;
   let owner: LoginResponseDto;
@@ -62,19 +78,6 @@ describe('asset replace + jobs + bulk-upload-check', () => {
   });
 
   describe('PUT /assets/:id/original (replaceAsset)', () => {
-    // Helper builds a multipart PUT mirroring the shape of utils.replaceAsset.
-    const buildReplaceRequest = (assetId: string, accessToken: string | null) => {
-      const builder = request(app).put(`/assets/${assetId}/original`).attach('assetData', makeRandomImage(), 'replacement.png');
-      if (accessToken) {
-        builder.set('Authorization', `Bearer ${accessToken}`);
-      }
-      return builder
-        .field('deviceAssetId', 'replace-test')
-        .field('deviceId', 'replace-device')
-        .field('fileCreatedAt', new Date().toISOString())
-        .field('fileModifiedAt', new Date().toISOString());
-    };
-
     it('requires authentication', async () => {
       const freshAsset = await utils.createAsset(owner.accessToken);
       const { status } = await buildReplaceRequest(freshAsset.id, null).set(authHeaders(anonActor));
@@ -212,7 +215,7 @@ describe('asset replace + jobs + bulk-upload-check', () => {
       });
     });
 
-    it('cross-user isolation: another user\'s checksum is treated as new', async () => {
+    it("cross-user isolation: another user's checksum is treated as new", async () => {
       // The repository scopes the lookup by auth.user.id, so a checksum that
       // belongs to a DIFFERENT user's asset is NOT detected as a duplicate
       // when checked by the owner. This protects against checksum-based

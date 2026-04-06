@@ -1,8 +1,8 @@
 import { LoginResponseDto, SharedSpaceRole } from '@immich/sdk';
 import { createUserDto } from 'src/fixtures';
 import { app, asBearerAuth, utils } from 'src/utils';
-import request from 'supertest';
 import type { Response } from 'supertest';
+import request from 'supertest';
 
 // E2E test helpers for actor-matrix-style coverage. See
 // docs/plans/2026-04-06-e2e-T02-helpers-design.md for the rationale.
@@ -85,7 +85,7 @@ export const buildSpaceContext = async (options: BuildSpaceContextOptions = {}):
     utils.userSetup(adminLogin.accessToken, createUserDto.create('editor')),
     utils.userSetup(adminLogin.accessToken, createUserDto.create('viewer')),
     utils.userSetup(adminLogin.accessToken, createUserDto.create('nonmember')),
-    options.withPartner ? utils.userSetup(adminLogin.accessToken, createUserDto.create('partner')) : Promise.resolve(undefined),
+    options.withPartner ? utils.userSetup(adminLogin.accessToken, createUserDto.create('partner')) : Promise.resolve(),
   ]);
 
   const space = await utils.createSpace(ownerLogin.accessToken, { name: 'test space' });
@@ -103,7 +103,7 @@ export const buildSpaceContext = async (options: BuildSpaceContextOptions = {}):
     utils.createAsset(ownerLogin.accessToken),
     utils.createAsset(ownerLogin.accessToken),
     utils.createAsset(editorLogin.accessToken),
-    partnerLogin ? utils.createAsset(partnerLogin.accessToken) : Promise.resolve(undefined),
+    partnerLogin ? utils.createAsset(partnerLogin.accessToken) : Promise.resolve(),
   ]);
 
   await utils.addSpaceAssets(ownerLogin.accessToken, space.id, [spaceAsset.id]);
@@ -194,9 +194,7 @@ export const forEachActor = async (
     }
     const res = await run(actor);
     if (res.status !== exp) {
-      throw new Error(
-        `actor=${actor.id} expected status ${exp}, got ${res.status}. Body: ${JSON.stringify(res.body)}`,
-      );
+      throw new Error(`actor=${actor.id} expected status ${exp}, got ${res.status}. Body: ${JSON.stringify(res.body)}`);
     }
   }
 };

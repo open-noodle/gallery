@@ -76,15 +76,12 @@ describe('/admin/notifications (T37 — content paths)', () => {
     it('accepts level=Warning + type=SystemMessage and the persisted notification reflects them', async () => {
       // Positive case to make sure the enum constraints are not blocking
       // legitimate values.
-      const create = await request(app)
-        .post('/admin/notifications')
-        .set(asBearerAuth(admin.accessToken))
-        .send({
-          userId: user.userId,
-          title: 't37 with level + type',
-          level: 'warning',
-          type: 'SystemMessage',
-        });
+      const create = await request(app).post('/admin/notifications').set(asBearerAuth(admin.accessToken)).send({
+        userId: user.userId,
+        title: 't37 with level + type',
+        level: 'warning',
+        type: 'SystemMessage',
+      });
       expect(create.status).toBe(201);
       expect(create.body).toEqual(
         expect.objectContaining({

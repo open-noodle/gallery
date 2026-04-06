@@ -1,5 +1,5 @@
-import { app, utils } from 'src/utils';
 import { type Actor, type SpaceContext, authHeaders, buildSpaceContext, forEachActor } from 'src/actors';
+import { app, utils } from 'src/utils';
 import request from 'supertest';
 import { beforeAll, describe, expect, it } from 'vitest';
 
@@ -85,10 +85,7 @@ describe('test helpers smoke', () => {
     await forEachActor(
       [ctx.spaceOwner, ctx.spaceEditor, ctx.spaceViewer],
       (actor) =>
-        request(app)
-          .patch(`/shared-spaces/${ctx.spaceId}`)
-          .set(authHeaders(actor))
-          .send({ thumbnailCropY: 0 }),
+        request(app).patch(`/shared-spaces/${ctx.spaceId}`).set(authHeaders(actor)).send({ thumbnailCropY: 0 }),
       { spaceOwner: 200, spaceEditor: 200, spaceViewer: 403 },
     );
   });

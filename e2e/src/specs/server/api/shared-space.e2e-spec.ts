@@ -6,6 +6,15 @@ import { app, utils } from 'src/utils';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+// Helper for T17's bucket queries — multiple tests format the current UTC
+// month as the canonical YYYY-MM-01 string. Pure, hoisted to file scope.
+function currentMonthBucketString(): string {
+  const now = new Date();
+  const yyyy = now.getUTCFullYear();
+  const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
+  return `${yyyy}-${mm}-01`;
+}
+
 describe('/shared-spaces', () => {
   let admin: LoginResponseDto;
   let user1: LoginResponseDto;
@@ -1630,8 +1639,8 @@ describe('/shared-spaces', () => {
         expect(page1.status).toBe(200);
         expect(page2.status).toBe(200);
         const ids1 = (page1.body as Array<{ id: string }>).map((p) => p.id);
-        const ids2 = (page2.body as Array<{ id: string }>).map((p) => p.id);
-        const overlap = ids1.filter((id) => ids2.includes(id));
+        const ids2 = new Set((page2.body as Array<{ id: string }>).map((p) => p.id));
+        const overlap = ids1.filter((id) => ids2.has(id));
         expect(overlap).toHaveLength(0);
       });
 
@@ -1667,10 +1676,7 @@ describe('/shared-spaces', () => {
         it('access matrix', async () => {
           await forEachActor(
             [ownerActor, editorActor, viewerActor, nonMemberActor, anonActor],
-            (actor) =>
-              request(app)
-                .get(`/shared-spaces/${spaceId}/people/${namedPersonId}`)
-                .set(authHeaders(actor)),
+            (actor) => request(app).get(`/shared-spaces/${spaceId}/people/${namedPersonId}`).set(authHeaders(actor)),
             { spaceOwner: 200, spaceEditor: 200, spaceViewer: 200, spaceNonMember: 403, anon: 401 },
           );
         });
@@ -1773,9 +1779,7 @@ describe('/shared-spaces', () => {
             await forEachActor(
               [ownerActor, editorActor, viewerActor, nonMemberActor, anonActor],
               (actor) =>
-                request(app)
-                  .get(`/shared-spaces/${spaceId}/people/${namedPersonId}/thumbnail`)
-                  .set(authHeaders(actor)),
+                request(app).get(`/shared-spaces/${spaceId}/people/${namedPersonId}/thumbnail`).set(authHeaders(actor)),
               { spaceOwner: 404, spaceEditor: 404, spaceViewer: 404, spaceNonMember: 403, anon: 401 },
             );
           } finally {
@@ -1794,9 +1798,7 @@ describe('/shared-spaces', () => {
           await forEachActor(
             [ownerActor, editorActor, viewerActor, nonMemberActor, anonActor],
             (actor) =>
-              request(app)
-                .get(`/shared-spaces/${spaceId}/people/${namedPersonId}/assets`)
-                .set(authHeaders(actor)),
+              request(app).get(`/shared-spaces/${spaceId}/people/${namedPersonId}/assets`).set(authHeaders(actor)),
             { spaceOwner: 200, spaceEditor: 200, spaceViewer: 200, spaceNonMember: 403, anon: 401 },
           );
         });
@@ -1975,7 +1977,7 @@ describe('/shared-spaces', () => {
         );
       });
 
-      it('reassigns the source\'s face and deletes the source row', async () => {
+      it("reassigns the source's face and deletes the source row", async () => {
         // Each scratch person comes with one face attached to spaceAssetId. After merge,
         // the source's face should belong to the target (verified via direct DB), and
         // the source's shared_space_person row should be gone.
@@ -2011,7 +2013,7 @@ describe('/shared-spaces', () => {
         expect(targetJunction.rowCount).toBe(2);
       });
 
-      it('after merge the target\'s denormalised faceCount and assetCount reflect the recount', async () => {
+      it("after merge the target's denormalised faceCount and assetCount reflect the recount", async () => {
         // recountPersons (shared-space.repository.ts:686+) updates faceCount and
         // assetCount on shared_space_person from the junction table. After merging
         // 1 source into the target, the target should have 2 faces and 1 unique asset
@@ -2025,10 +2027,9 @@ describe('/shared-spaces', () => {
           .send({ ids: [source.spacePersonId] });
 
         const dbClient = await utils.connectDatabase();
-        const counts = await dbClient.query(
-          'SELECT "faceCount", "assetCount" FROM shared_space_person WHERE id = $1',
-          [target.spacePersonId],
-        );
+        const counts = await dbClient.query('SELECT "faceCount", "assetCount" FROM shared_space_person WHERE id = $1', [
+          target.spacePersonId,
+        ]);
         expect(counts.rowCount).toBe(1);
         expect(counts.rows[0].faceCount).toBe(2);
         expect(counts.rows[0].assetCount).toBe(1);
@@ -2219,10 +2220,7 @@ describe('/shared-spaces', () => {
         // Owner-only because it can rewrite the space's person graph.
         await forEachActor(
           [ownerActor, editorActor, viewerActor, nonMemberActor, anonActor],
-          (actor) =>
-            request(app)
-              .post(`/shared-spaces/${spaceId}/people/deduplicate`)
-              .set(authHeaders(actor)),
+          (actor) => request(app).post(`/shared-spaces/${spaceId}/people/deduplicate`).set(authHeaders(actor)),
           { spaceOwner: 204, spaceEditor: 403, spaceViewer: 403, spaceNonMember: 403, anon: 401 },
         );
       });
@@ -2287,9 +2285,7 @@ describe('/shared-spaces', () => {
           // assertion below and the test would be flaky for a non-test reason.
           expect(pauseRes.status).toBe(200);
 
-          await request(app)
-            .delete(`/queues/${queueName}/jobs`)
-            .set('Authorization', `Bearer ${admin.accessToken}`);
+          await request(app).delete(`/queues/${queueName}/jobs`).set('Authorization', `Bearer ${admin.accessToken}`);
 
           // First trigger
           const t1 = await request(app)
@@ -2319,9 +2315,7 @@ describe('/shared-spaces', () => {
           expect(ourJobs.length).toBe(1);
         } finally {
           // Drain + unpause so other tests aren't affected.
-          await request(app)
-            .delete(`/queues/${queueName}/jobs`)
-            .set('Authorization', `Bearer ${admin.accessToken}`);
+          await request(app).delete(`/queues/${queueName}/jobs`).set('Authorization', `Bearer ${admin.accessToken}`);
           await request(app)
             .put(`/queues/${queueName}`)
             .set('Authorization', `Bearer ${admin.accessToken}`)
@@ -2494,9 +2488,7 @@ describe('/shared-spaces', () => {
       });
 
       it('anon cannot unlink', async () => {
-        const { status } = await request(app).delete(
-          `/shared-spaces/${spaceId}/libraries/${scratchLibrary.id}`,
-        );
+        const { status } = await request(app).delete(`/shared-spaces/${spaceId}/libraries/${scratchLibrary.id}`);
         expect(status).toBe(401);
       });
 
@@ -2739,14 +2731,6 @@ describe('/shared-spaces', () => {
         expect(after.rowCount).toBe(0);
       });
     });
-
-    // Helper for T17's bucket queries — extracted because multiple tests use it.
-    function currentMonthBucketString(): string {
-      const now = new Date();
-      const yyyy = now.getUTCFullYear();
-      const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
-      return `${yyyy}-${mm}-01`;
-    }
 
     it('empty thumbnailPath on the underlying global person excludes the space person', async () => {
       // The fork's "minFaces gate" mechanism. shared-space.repository.ts:512-513

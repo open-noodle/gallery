@@ -76,9 +76,7 @@ describe('/assets/:id/edits (non-trim)', () => {
 
   describe('GET /assets/:id/edits', () => {
     it('requires authentication', async () => {
-      const { status, body } = await request(app)
-        .get(`/assets/${sharedAssetId}/edits`)
-        .set(authHeaders(anonActor));
+      const { status, body } = await request(app).get(`/assets/${sharedAssetId}/edits`).set(authHeaders(anonActor));
       expect(status).toBe(401);
       expect(body).toEqual(errorDto.unauthorized);
     });
@@ -101,7 +99,7 @@ describe('/assets/:id/edits (non-trim)', () => {
       expect(body).toEqual(errorDto.noPermission);
     });
 
-    it('admin reading another user\'s asset edits returns 400 (no admin override)', async () => {
+    it("admin reading another user's asset edits returns 400 (no admin override)", async () => {
       // The bulk-access pattern for Permission.AssetEditGet is owner-only —
       // admins do NOT get a blanket asset-read escape hatch. Same taxonomy as T24.
       const { status, body } = await request(app)
@@ -121,9 +119,7 @@ describe('/assets/:id/edits (non-trim)', () => {
     });
 
     it('malformed asset id returns 400', async () => {
-      const { status } = await request(app)
-        .get('/assets/not-a-uuid/edits')
-        .set(asBearerAuth(owner.accessToken));
+      const { status } = await request(app).get('/assets/not-a-uuid/edits').set(asBearerAuth(owner.accessToken));
       expect(status).toBe(400);
     });
   });
@@ -147,7 +143,7 @@ describe('/assets/:id/edits (non-trim)', () => {
       expect(body).toEqual(errorDto.noPermission);
     });
 
-    it('admin PUTting another user\'s asset edits returns 400 (no admin override)', async () => {
+    it("admin PUTting another user's asset edits returns 400 (no admin override)", async () => {
       const { status, body } = await request(app)
         .put(`/assets/${sharedAssetId}/edits`)
         .set(asBearerAuth(admin.accessToken))
@@ -321,9 +317,7 @@ describe('/assets/:id/edits (non-trim)', () => {
 
   describe('DELETE /assets/:id/edits', () => {
     it('requires authentication', async () => {
-      const { status, body } = await request(app)
-        .delete(`/assets/${sharedAssetId}/edits`)
-        .set(authHeaders(anonActor));
+      const { status, body } = await request(app).delete(`/assets/${sharedAssetId}/edits`).set(authHeaders(anonActor));
       expect(status).toBe(401);
       expect(body).toEqual(errorDto.unauthorized);
     });
@@ -336,7 +330,7 @@ describe('/assets/:id/edits (non-trim)', () => {
       expect(body).toEqual(errorDto.noPermission);
     });
 
-    it('admin DELETEing another user\'s asset edits returns 400 (no admin override)', async () => {
+    it("admin DELETEing another user's asset edits returns 400 (no admin override)", async () => {
       const { status, body } = await request(app)
         .delete(`/assets/${sharedAssetId}/edits`)
         .set(asBearerAuth(admin.accessToken));
@@ -353,9 +347,7 @@ describe('/assets/:id/edits (non-trim)', () => {
     });
 
     it('malformed asset id returns 400', async () => {
-      const { status } = await request(app)
-        .delete('/assets/not-a-uuid/edits')
-        .set(asBearerAuth(owner.accessToken));
+      const { status } = await request(app).delete('/assets/not-a-uuid/edits').set(asBearerAuth(owner.accessToken));
       expect(status).toBe(400);
     });
 

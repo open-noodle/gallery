@@ -108,20 +108,15 @@ describe('/classification', () => {
   describe('classification config (PUT /system-config)', () => {
     let baseConfig: SystemConfigDto;
 
-    const fetchConfig = () => getConfig({ headers: asBearerAuth(admin.accessToken) });
-
     beforeAll(async () => {
-      baseConfig = await fetchConfig();
+      baseConfig = await getConfig({ headers: asBearerAuth(admin.accessToken) });
     });
 
     afterEach(async () => {
       // Restore the original config so each test starts from a clean slate.
       // Tests that fail at DTO validation never mutate the stored config, but
       // round-trip and smart-rescan tests do.
-      await request(app)
-        .put('/system-config')
-        .set('Authorization', `Bearer ${admin.accessToken}`)
-        .send(baseConfig);
+      await request(app).put('/system-config').set('Authorization', `Bearer ${admin.accessToken}`).send(baseConfig);
     });
 
     describe('validation', () => {
@@ -143,7 +138,9 @@ describe('/classification', () => {
         // class-validator returns a string array for nested DTO errors; the
         // message is wrapped in `classification.<original>` because the error
         // is on a nested field. Use arrayContaining + stringContaining.
-        expect(body.message).toEqual(expect.arrayContaining([expect.stringContaining('Category names must be unique')]));
+        expect(body.message).toEqual(
+          expect.arrayContaining([expect.stringContaining('Category names must be unique')]),
+        );
       });
 
       it('rejects an invalid action with 400 (IsIn validator)', async () => {
@@ -229,7 +226,7 @@ describe('/classification', () => {
         expect(put.body.classification).toEqual({ enabled: true, categories: customCategories });
 
         // GET round-trip — the persisted config matches what was sent.
-        const after = await fetchConfig();
+        const after = await getConfig({ headers: asBearerAuth(admin.accessToken) });
         expect(after.classification).toEqual({ enabled: true, categories: customCategories });
       });
 

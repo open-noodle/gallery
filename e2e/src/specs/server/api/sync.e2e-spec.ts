@@ -66,7 +66,7 @@ describe('/sync', () => {
       expect(ids).toContain(userAAssetId);
     });
 
-    it('cross-user isolation: userB sees their own asset but NOT userA\'s', async () => {
+    it("cross-user isolation: userB sees their own asset but NOT userA's", async () => {
       // Both userA and userB own assets. The sync result for userB must
       // contain userBAssetId AND must NOT contain userAAssetId. Asserting both
       // halves makes the test load-bearing — a fully-broken endpoint that
@@ -103,7 +103,7 @@ describe('/sync', () => {
       expect(body).toEqual({ needsFullSync: true, upserted: [], deleted: [] });
     });
 
-    it('recent cutoff returns the user\'s recent assets', async () => {
+    it("recent cutoff returns the user's recent assets", async () => {
       // Use a cutoff well within the 100-day window. The asset was created
       // moments ago in beforeAll, so it must be in the upserted list.
       const recentCutoff = new Date(Date.now() - 60 * 60 * 1000).toISOString();
@@ -185,7 +185,7 @@ describe('/sync', () => {
       expect(status).toBe(401);
     });
 
-    it('returns the user\'s ack list (initially empty)', async () => {
+    it("returns the user's ack list (initially empty)", async () => {
       // Strong assertion: a fresh user has no acks. Asserting `toEqual([])`
       // pins the empty initial state — `Array.isArray` alone would pass even
       // if the endpoint returned a non-empty leak from another user.

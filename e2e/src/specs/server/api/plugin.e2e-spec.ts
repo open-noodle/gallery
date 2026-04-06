@@ -103,9 +103,7 @@ describe('/plugins', () => {
       const core = (list.body as Array<{ id: string; name: string }>).find((p) => p.name === 'immich-core');
       expect(core).toBeDefined();
 
-      const { status, body } = await request(app)
-        .get(`/plugins/${core!.id}`)
-        .set(asBearerAuth(user.accessToken));
+      const { status, body } = await request(app).get(`/plugins/${core!.id}`).set(asBearerAuth(user.accessToken));
       expect(status).toBe(200);
       expect((body as { id: string; name: string }).name).toBe('immich-core');
     });

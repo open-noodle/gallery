@@ -1,5 +1,5 @@
 import { LoginResponseDto, getConfig, type SystemConfigDto } from '@immich/sdk';
-import { type Actor, authHeaders } from 'src/actors';
+import { authHeaders, type Actor } from 'src/actors';
 import { createUserDto } from 'src/fixtures';
 import { errorDto } from 'src/responses';
 import { app, asBearerAuth, utils } from 'src/utils';
@@ -37,10 +37,7 @@ describe('/system-config', () => {
 
   afterEach(async () => {
     // Restore the default config so each test starts from a clean slate.
-    await request(app)
-      .put('/system-config')
-      .set('Authorization', `Bearer ${admin.accessToken}`)
-      .send(baseConfig);
+    await request(app).put('/system-config').set('Authorization', `Bearer ${admin.accessToken}`).send(baseConfig);
   });
 
   describe('GET /system-config (access matrix)', () => {
@@ -85,16 +82,14 @@ describe('/system-config', () => {
     });
 
     it('admin gets the default config (matches the same shape as GET /system-config)', async () => {
-      const { status, body } = await request(app)
-        .get('/system-config/defaults')
-        .set(asBearerAuth(admin.accessToken));
+      const { status, body } = await request(app).get('/system-config/defaults').set(asBearerAuth(admin.accessToken));
       expect(status).toBe(200);
       // Defaults always have classification.enabled=true and categories=[] —
       // see server/src/config.ts:417-420.
       expect(body.classification).toEqual({ enabled: true, categories: [] });
       // Same top-level shape as the persisted config.
       const live = await getSystemConfig(admin.accessToken);
-      expect(Object.keys(body).sort()).toEqual(Object.keys(live).sort());
+      expect(Object.keys(body).toSorted()).toEqual(Object.keys(live).toSorted());
     });
   });
 
@@ -152,10 +147,7 @@ describe('/system-config', () => {
     });
 
     it('non-admin PUT returns 403', async () => {
-      const { status } = await request(app)
-        .put('/system-config')
-        .set(asBearerAuth(user.accessToken))
-        .send(baseConfig);
+      const { status } = await request(app).put('/system-config').set(asBearerAuth(user.accessToken)).send(baseConfig);
       expect(status).toBe(403);
     });
 

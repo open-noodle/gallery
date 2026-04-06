@@ -16,6 +16,19 @@ import { beforeAll, describe, expect, it } from 'vitest';
 //   The semantics is "reassign the face in the body to the person in the path".
 // - DELETE /faces/:faceId — path is the face id; body has { force: boolean }.
 
+// Helper for POST /faces request body. Pure (both ids passed in), hoisted out
+// of the describe to satisfy unicorn/consistent-function-scoping.
+const newFaceBody = (assetId: string, personId: string) => ({
+  personId,
+  assetId,
+  imageWidth: 100,
+  imageHeight: 100,
+  x: 50,
+  y: 50,
+  width: 20,
+  height: 20,
+});
+
 describe('/faces', () => {
   let ctx: SpaceContext;
   const anonActor: Actor = { id: 'anon' };
@@ -45,17 +58,6 @@ describe('/faces', () => {
   });
 
   describe('POST /faces', () => {
-    const newFaceBody = (assetId: string, personId: string) => ({
-      personId,
-      assetId,
-      imageWidth: 100,
-      imageHeight: 100,
-      x: 50,
-      y: 50,
-      width: 20,
-      height: 20,
-    });
-
     it('access matrix on the asset side', async () => {
       // Posting a face requires READ access to BOTH the asset and the person
       // (person.service.ts:641-642 — Permission.AssetRead + Permission.PersonRead, not
@@ -65,10 +67,7 @@ describe('/faces', () => {
       await forEachActor(
         [ctx.spaceOwner, ctx.spaceNonMember, anonActor],
         (actor) =>
-          request(app)
-            .post('/faces')
-            .set(authHeaders(actor))
-            .send(newFaceBody(ctx.ownerAssetId, ownerPerson.id)),
+          request(app).post('/faces').set(authHeaders(actor)).send(newFaceBody(ctx.ownerAssetId, ownerPerson.id)),
         { spaceOwner: 201, spaceNonMember: 400, anon: 401 },
       );
     });
@@ -100,10 +99,7 @@ describe('/faces', () => {
       // spaceNonMember has no access path to the asset → 400. anon → 401.
       await forEachActor(
         [ctx.spaceOwner, ctx.spaceNonMember, anonActor],
-        (actor) =>
-          request(app)
-            .get(`/faces?id=${ctx.ownerAssetId}`)
-            .set(authHeaders(actor)),
+        (actor) => request(app).get(`/faces?id=${ctx.ownerAssetId}`).set(authHeaders(actor)),
         { spaceOwner: 200, spaceNonMember: 400, anon: 401 },
       );
     });
@@ -119,9 +115,7 @@ describe('/faces', () => {
         .set(asBearerAuth(ctx.spaceOwner.token!));
       expect(status).toBe(200);
       expect(Array.isArray(body)).toBe(true);
-      const ourFace = (body as Array<{ id: string; person?: { id: string } | null }>).find(
-        (f) => f.id === ownerFaceId,
-      );
+      const ourFace = (body as Array<{ id: string; person?: { id: string } | null }>).find((f) => f.id === ownerFaceId);
       expect(ourFace).toBeDefined();
       expect(ourFace?.person?.id).toBe(ownerPerson.id);
     });
@@ -145,10 +139,7 @@ describe('/faces', () => {
       await forEachActor(
         [ctx.spaceOwner, ctx.spaceNonMember, anonActor],
         (actor) =>
-          request(app)
-            .put(`/faces/${secondOwnerPerson.id}`)
-            .set(authHeaders(actor))
-            .send({ id: scratchFaceId }),
+          request(app).put(`/faces/${secondOwnerPerson.id}`).set(authHeaders(actor)).send({ id: scratchFaceId }),
         { spaceOwner: 200, spaceNonMember: 400, anon: 401 },
       );
     });
@@ -191,20 +182,13 @@ describe('/faces', () => {
       const sideFaceId = await utils.createFace({ assetId: ctx.ownerAssetId, personId: sidePerson.id });
 
       // Pre-condition: face is in the listing.
-      const before = await request(app)
-        .get(`/faces?id=${ctx.ownerAssetId}`)
-        .set(asBearerAuth(ctx.spaceOwner.token!));
+      const before = await request(app).get(`/faces?id=${ctx.ownerAssetId}`).set(asBearerAuth(ctx.spaceOwner.token!));
       expect((before.body as Array<{ id: string }>).find((f) => f.id === sideFaceId)).toBeDefined();
 
       // Soft-delete.
-      await request(app)
-        .delete(`/faces/${sideFaceId}`)
-        .set(asBearerAuth(ctx.spaceOwner.token!))
-        .send({ force: false });
+      await request(app).delete(`/faces/${sideFaceId}`).set(asBearerAuth(ctx.spaceOwner.token!)).send({ force: false });
 
-      const after = await request(app)
-        .get(`/faces?id=${ctx.ownerAssetId}`)
-        .set(asBearerAuth(ctx.spaceOwner.token!));
+      const after = await request(app).get(`/faces?id=${ctx.ownerAssetId}`).set(asBearerAuth(ctx.spaceOwner.token!));
       expect((after.body as Array<{ id: string }>).find((f) => f.id === sideFaceId)).toBeUndefined();
     });
 
@@ -214,14 +198,9 @@ describe('/faces', () => {
       const sidePerson = await utils.createPerson(ctx.spaceOwner.token!, { name: 'Dave' });
       const sideFaceId = await utils.createFace({ assetId: ctx.ownerAssetId, personId: sidePerson.id });
 
-      await request(app)
-        .delete(`/faces/${sideFaceId}`)
-        .set(asBearerAuth(ctx.spaceOwner.token!))
-        .send({ force: true });
+      await request(app).delete(`/faces/${sideFaceId}`).set(asBearerAuth(ctx.spaceOwner.token!)).send({ force: true });
 
-      const after = await request(app)
-        .get(`/faces?id=${ctx.ownerAssetId}`)
-        .set(asBearerAuth(ctx.spaceOwner.token!));
+      const after = await request(app).get(`/faces?id=${ctx.ownerAssetId}`).set(asBearerAuth(ctx.spaceOwner.token!));
       expect((after.body as Array<{ id: string }>).find((f) => f.id === sideFaceId)).toBeUndefined();
     });
 
@@ -233,19 +212,14 @@ describe('/faces', () => {
       const sidePerson = await utils.createPerson(ctx.spaceOwner.token!, { name: 'Eve' });
       const sideFaceId = await utils.createFace({ assetId: ctx.ownerAssetId, personId: sidePerson.id });
 
-      await request(app)
-        .delete(`/faces/${sideFaceId}`)
-        .set(asBearerAuth(ctx.spaceOwner.token!))
-        .send({ force: false });
+      await request(app).delete(`/faces/${sideFaceId}`).set(asBearerAuth(ctx.spaceOwner.token!)).send({ force: false });
 
-      const personRes = await request(app)
-        .get(`/people/${sidePerson.id}`)
-        .set(asBearerAuth(ctx.spaceOwner.token!));
+      const personRes = await request(app).get(`/people/${sidePerson.id}`).set(asBearerAuth(ctx.spaceOwner.token!));
       expect(personRes.status).toBe(200);
       expect((personRes.body as { id: string }).id).toBe(sidePerson.id);
     });
 
-    it('soft-deleting a face decreases the person\'s asset statistics', async () => {
+    it("soft-deleting a face decreases the person's asset statistics", async () => {
       // person.repository.ts:335-352 — getStatistics counts asset_face rows joined
       // through asset, with `asset_face.deletedAt IS NULL` AND `asset_face.isVisible IS true`.
       // Soft-delete sets deletedAt → the row drops out of the count.
@@ -258,10 +232,7 @@ describe('/faces', () => {
       expect(before.status).toBe(200);
       expect((before.body as { assets: number }).assets).toBe(1);
 
-      await request(app)
-        .delete(`/faces/${sideFaceId}`)
-        .set(asBearerAuth(ctx.spaceOwner.token!))
-        .send({ force: false });
+      await request(app).delete(`/faces/${sideFaceId}`).set(asBearerAuth(ctx.spaceOwner.token!)).send({ force: false });
 
       const after = await request(app)
         .get(`/people/${sidePerson.id}/statistics`)
@@ -270,15 +241,12 @@ describe('/faces', () => {
       expect((after.body as { assets: number }).assets).toBe(0);
     });
 
-    it('hard-deleting a face decreases the person\'s asset statistics', async () => {
+    it("hard-deleting a face decreases the person's asset statistics", async () => {
       // Same denormalization, hard-delete path.
       const sidePerson = await utils.createPerson(ctx.spaceOwner.token!, { name: 'Grace' });
       const sideFaceId = await utils.createFace({ assetId: ctx.ownerAssetId, personId: sidePerson.id });
 
-      await request(app)
-        .delete(`/faces/${sideFaceId}`)
-        .set(asBearerAuth(ctx.spaceOwner.token!))
-        .send({ force: true });
+      await request(app).delete(`/faces/${sideFaceId}`).set(asBearerAuth(ctx.spaceOwner.token!)).send({ force: true });
 
       const after = await request(app)
         .get(`/people/${sidePerson.id}/statistics`)

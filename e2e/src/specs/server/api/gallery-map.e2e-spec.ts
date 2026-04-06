@@ -2,7 +2,7 @@ import { AssetMediaResponseDto, AssetVisibility, SharedSpaceRole, type LoginResp
 import { readFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import { Socket } from 'socket.io-client';
-import { type Actor, authHeaders } from 'src/actors';
+import { authHeaders, type Actor } from 'src/actors';
 import { createUserDto } from 'src/fixtures';
 import { app, asBearerAuth, testAssetDir, utils } from 'src/utils';
 import request from 'supertest';
@@ -55,10 +55,8 @@ describe('/gallery/map/markers', () => {
     expect(status).toBe(401);
   });
 
-  it('returns the user\'s geotagged assets with no filters', async () => {
-    const { status, body } = await request(app)
-      .get('/gallery/map/markers')
-      .set(asBearerAuth(user.accessToken));
+  it("returns the user's geotagged assets with no filters", async () => {
+    const { status, body } = await request(app).get('/gallery/map/markers').set(asBearerAuth(user.accessToken));
     expect(status).toBe(200);
     expect(Array.isArray(body)).toBe(true);
     const ids = (body as Array<{ id: string }>).map((m) => m.id);
@@ -68,9 +66,7 @@ describe('/gallery/map/markers', () => {
   it('returns an empty array for a user with no geotagged assets', async () => {
     // A fresh user with zero uploads sees an empty marker list.
     const freshUser = await utils.userSetup(admin.accessToken, createUserDto.create('t18-empty'));
-    const { status, body } = await request(app)
-      .get('/gallery/map/markers')
-      .set(asBearerAuth(freshUser.accessToken));
+    const { status, body } = await request(app).get('/gallery/map/markers').set(asBearerAuth(freshUser.accessToken));
     expect(status).toBe(200);
     expect(body).toEqual([]);
   });
@@ -93,9 +89,7 @@ describe('/gallery/map/markers', () => {
   it('city filter narrows the result to matching assets', async () => {
     // The thompson-springs fixture has city = 'Palisade'. Probe both an exact and a
     // non-matching city to confirm the filter actually fires.
-    const matching = await request(app)
-      .get('/gallery/map/markers?city=Palisade')
-      .set(asBearerAuth(user.accessToken));
+    const matching = await request(app).get('/gallery/map/markers?city=Palisade').set(asBearerAuth(user.accessToken));
     expect(matching.status).toBe(200);
     expect((matching.body as Array<{ id: string }>).map((m) => m.id)).toContain(assetWithGps.id);
 
@@ -107,9 +101,7 @@ describe('/gallery/map/markers', () => {
 
   it('isFavorite filter respects the favorite state', async () => {
     // Default state is not favorite — assert exclusion when isFavorite=true.
-    const favOnly = await request(app)
-      .get('/gallery/map/markers?isFavorite=true')
-      .set(asBearerAuth(user.accessToken));
+    const favOnly = await request(app).get('/gallery/map/markers?isFavorite=true').set(asBearerAuth(user.accessToken));
     expect(favOnly.status).toBe(200);
     expect((favOnly.body as Array<{ id: string }>).map((m) => m.id)).not.toContain(assetWithGps.id);
   });
@@ -137,22 +129,16 @@ describe('/gallery/map/markers', () => {
 
   it('rating filter rejects values outside 1-5 with 400', async () => {
     // FilteredMapMarkerDto.rating has @Min(1) @Max(5) — 0 should fail validation.
-    const tooLow = await request(app)
-      .get('/gallery/map/markers?rating=0')
-      .set(asBearerAuth(user.accessToken));
+    const tooLow = await request(app).get('/gallery/map/markers?rating=0').set(asBearerAuth(user.accessToken));
     expect(tooLow.status).toBe(400);
 
-    const tooHigh = await request(app)
-      .get('/gallery/map/markers?rating=6')
-      .set(asBearerAuth(user.accessToken));
+    const tooHigh = await request(app).get('/gallery/map/markers?rating=6').set(asBearerAuth(user.accessToken));
     expect(tooHigh.status).toBe(400);
   });
 
   it('type filter rejects an invalid enum value with 400', async () => {
     // MapMediaType is IMAGE | VIDEO; anything else should fail validation.
-    const { status } = await request(app)
-      .get('/gallery/map/markers?type=NOPE')
-      .set(asBearerAuth(user.accessToken));
+    const { status } = await request(app).get('/gallery/map/markers?type=NOPE').set(asBearerAuth(user.accessToken));
     expect(status).toBe(400);
   });
 
@@ -166,9 +152,7 @@ describe('/gallery/map/markers', () => {
         .set(asBearerAuth(user.accessToken))
         .send({ visibility: AssetVisibility.Archive });
 
-      const { status, body } = await request(app)
-        .get('/gallery/map/markers')
-        .set(asBearerAuth(user.accessToken));
+      const { status, body } = await request(app).get('/gallery/map/markers').set(asBearerAuth(user.accessToken));
       expect(status).toBe(200);
       expect((body as Array<{ id: string }>).map((m) => m.id)).not.toContain(assetWithGps.id);
     } finally {
@@ -179,7 +163,7 @@ describe('/gallery/map/markers', () => {
     }
   });
 
-  it('cross-user isolation — another user does not see this user\'s markers', async () => {
+  it("cross-user isolation — another user does not see this user's markers", async () => {
     // Without spaceId, the service scopes to auth.user.id (line 567). A second
     // user with NO geotagged assets calling the endpoint should see exactly
     // an empty list. The strong assertion (`toEqual([])`) eliminates the
@@ -187,9 +171,7 @@ describe('/gallery/map/markers', () => {
     // empty for unrelated reasons" — both pass `not.toContain` but only the
     // former passes `toEqual([])`.
     const otherUser = await utils.userSetup(admin.accessToken, createUserDto.create('t18-other'));
-    const { status, body } = await request(app)
-      .get('/gallery/map/markers')
-      .set(asBearerAuth(otherUser.accessToken));
+    const { status, body } = await request(app).get('/gallery/map/markers').set(asBearerAuth(otherUser.accessToken));
     expect(status).toBe(200);
     expect(body).toEqual([]);
   });

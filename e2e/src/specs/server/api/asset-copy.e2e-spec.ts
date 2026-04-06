@@ -45,10 +45,7 @@ describe('PUT /assets/copy', () => {
   // Per-test asset creation — each happy-path mutation needs fresh assets so
   // state from one test never leaks into another.
   const createOwnerPair = async () => {
-    const [a, b] = await Promise.all([
-      utils.createAsset(owner.accessToken),
-      utils.createAsset(owner.accessToken),
-    ]);
+    const [a, b] = await Promise.all([utils.createAsset(owner.accessToken), utils.createAsset(owner.accessToken)]);
     return [a.id, b.id] as const;
   };
 
@@ -129,7 +126,7 @@ describe('PUT /assets/copy', () => {
     expect(body).toEqual(errorDto.noPermission);
   });
 
-  it('admin copying between two of another user\'s assets returns 400 (no admin override)', async () => {
+  it("admin copying between two of another user's assets returns 400 (no admin override)", async () => {
     // Permission.AssetCopy goes through the same bulk-access pattern as
     // AssetRead — admins do NOT get a blanket override. Pinned to defend
     // against a future "admin can do anything" refactor.
@@ -157,9 +154,7 @@ describe('PUT /assets/copy', () => {
     expect(fav.status).toBe(200);
 
     // Sanity: target is NOT favorite before the copy.
-    const before = await request(app)
-      .get(`/assets/${targetId}`)
-      .set(asBearerAuth(owner.accessToken));
+    const before = await request(app).get(`/assets/${targetId}`).set(asBearerAuth(owner.accessToken));
     expect((before.body as { isFavorite: boolean }).isFavorite).toBe(false);
 
     const copy = await request(app)
@@ -169,31 +164,22 @@ describe('PUT /assets/copy', () => {
     expect(copy.status).toBe(204);
 
     // Target is now favorite (default favorite flag is true).
-    const after = await request(app)
-      .get(`/assets/${targetId}`)
-      .set(asBearerAuth(owner.accessToken));
+    const after = await request(app).get(`/assets/${targetId}`).set(asBearerAuth(owner.accessToken));
     expect((after.body as { isFavorite: boolean }).isFavorite).toBe(true);
 
     // Source is unchanged — copy is not a move.
-    const sourceAfter = await request(app)
-      .get(`/assets/${sourceId}`)
-      .set(asBearerAuth(owner.accessToken));
+    const sourceAfter = await request(app).get(`/assets/${sourceId}`).set(asBearerAuth(owner.accessToken));
     expect((sourceAfter.body as { isFavorite: boolean }).isFavorite).toBe(true);
   });
 
   it('favorite=false opt-out skips the favorite copy', async () => {
     const [sourceId, targetId] = await createOwnerPair();
 
-    await request(app)
-      .put(`/assets/${sourceId}`)
-      .set(asBearerAuth(owner.accessToken))
-      .send({ isFavorite: true });
+    await request(app).put(`/assets/${sourceId}`).set(asBearerAuth(owner.accessToken)).send({ isFavorite: true });
 
     // Sanity-read: target starts as not-favorite, so a working copy WOULD flip it
     // to true. The opt-out below is the only thing that should prevent that.
-    const before = await request(app)
-      .get(`/assets/${targetId}`)
-      .set(asBearerAuth(owner.accessToken));
+    const before = await request(app).get(`/assets/${targetId}`).set(asBearerAuth(owner.accessToken));
     expect((before.body as { isFavorite: boolean }).isFavorite).toBe(false);
 
     const copy = await request(app)
@@ -202,9 +188,7 @@ describe('PUT /assets/copy', () => {
       .send({ sourceId, targetId, favorite: false });
     expect(copy.status).toBe(204);
 
-    const after = await request(app)
-      .get(`/assets/${targetId}`)
-      .set(asBearerAuth(owner.accessToken));
+    const after = await request(app).get(`/assets/${targetId}`).set(asBearerAuth(owner.accessToken));
     expect((after.body as { isFavorite: boolean }).isFavorite).toBe(false);
   });
 

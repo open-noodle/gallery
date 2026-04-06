@@ -60,29 +60,23 @@ describe('GET /assets/:id/ocr', () => {
     // The asset row exists, the ocr-rows table is empty for it. asset.service.ts:461-477
     // calls ocrRepository.getByAssetId(id) which returns []; the happy-path is [], not 404.
     // (A missing asset row would surface as a 400 from getForOcr(id) — see the next test.)
-    const { status, body } = await request(app)
-      .get(`/assets/${assetId}/ocr`)
-      .set(asBearerAuth(owner.accessToken));
+    const { status, body } = await request(app).get(`/assets/${assetId}/ocr`).set(asBearerAuth(owner.accessToken));
     expect(status).toBe(200);
     expect(Array.isArray(body)).toBe(true);
     expect(body).toEqual([]);
   });
 
   it('non-owner returns 400 (bulk-access pattern)', async () => {
-    const { status } = await request(app)
-      .get(`/assets/${assetId}/ocr`)
-      .set(asBearerAuth(other.accessToken));
+    const { status } = await request(app).get(`/assets/${assetId}/ocr`).set(asBearerAuth(other.accessToken));
     expect(status).toBe(400);
   });
 
-  it('admin reading another user\'s asset OCR returns 400 (no admin override)', async () => {
+  it("admin reading another user's asset OCR returns 400 (no admin override)", async () => {
     // The bulk-access pattern for Permission.AssetRead is owner-only — admins do NOT
     // get blanket asset read via checkOwnerAccess. Pin it explicitly here so a future
     // refactor that adds an admin escape hatch fails this test deliberately. Same
     // taxonomy as T03/T07/T22 — 400, not 403.
-    const { status } = await request(app)
-      .get(`/assets/${assetId}/ocr`)
-      .set(asBearerAuth(admin.accessToken));
+    const { status } = await request(app).get(`/assets/${assetId}/ocr`).set(asBearerAuth(admin.accessToken));
     expect(status).toBe(400);
   });
 
@@ -97,9 +91,7 @@ describe('GET /assets/:id/ocr', () => {
 
   it('malformed asset id returns 400', async () => {
     // UUIDParamDto validation rejects non-UUID at the controller layer.
-    const { status } = await request(app)
-      .get('/assets/not-a-uuid/ocr')
-      .set(asBearerAuth(owner.accessToken));
+    const { status } = await request(app).get('/assets/not-a-uuid/ocr').set(asBearerAuth(owner.accessToken));
     expect(status).toBe(400);
   });
 });

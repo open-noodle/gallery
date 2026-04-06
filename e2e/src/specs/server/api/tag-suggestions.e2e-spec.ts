@@ -1,5 +1,5 @@
 import { SharedSpaceRole, type LoginResponseDto } from '@immich/sdk';
-import { type Actor, authHeaders } from 'src/actors';
+import { authHeaders, type Actor } from 'src/actors';
 import { createUserDto } from 'src/fixtures';
 import { app, asBearerAuth, utils } from 'src/utils';
 import request from 'supertest';
@@ -45,10 +45,7 @@ describe('GET /search/suggestions/tags', () => {
     ]);
 
     // userA's tag → userA's asset
-    const aTagRes = await request(app)
-      .post('/tags')
-      .set(asBearerAuth(userA.accessToken))
-      .send({ name: 't34-tag-A' });
+    const aTagRes = await request(app).post('/tags').set(asBearerAuth(userA.accessToken)).send({ name: 't34-tag-A' });
     userATagId = (aTagRes.body as { id: string }).id;
     await request(app)
       .put(`/tags/${userATagId}/assets`)
@@ -56,10 +53,7 @@ describe('GET /search/suggestions/tags', () => {
       .send({ ids: [userAAssetId] });
 
     // userB's tag → userB's asset
-    const bTagRes = await request(app)
-      .post('/tags')
-      .set(asBearerAuth(userB.accessToken))
-      .send({ name: 't34-tag-B' });
+    const bTagRes = await request(app).post('/tags').set(asBearerAuth(userB.accessToken)).send({ name: 't34-tag-B' });
     userBTagId = (bTagRes.body as { id: string }).id;
     await request(app)
       .put(`/tags/${userBTagId}/assets`)
@@ -83,10 +77,8 @@ describe('GET /search/suggestions/tags', () => {
     expect(status).toBe(401);
   });
 
-  it('default scope returns the caller\'s own tags only', async () => {
-    const { status, body } = await request(app)
-      .get('/search/suggestions/tags')
-      .set(asBearerAuth(userA.accessToken));
+  it("default scope returns the caller's own tags only", async () => {
+    const { status, body } = await request(app).get('/search/suggestions/tags').set(asBearerAuth(userA.accessToken));
     expect(status).toBe(200);
     const ids = (body as Array<{ id: string }>).map((t) => t.id);
     expect(ids).toContain(userATagId);
@@ -94,18 +86,16 @@ describe('GET /search/suggestions/tags', () => {
     expect(ids).not.toContain(userBTagId);
   });
 
-  it('userB does not see userA\'s tag in the default scope', async () => {
+  it("userB does not see userA's tag in the default scope", async () => {
     // Symmetric isolation check.
-    const { status, body } = await request(app)
-      .get('/search/suggestions/tags')
-      .set(asBearerAuth(userB.accessToken));
+    const { status, body } = await request(app).get('/search/suggestions/tags').set(asBearerAuth(userB.accessToken));
     expect(status).toBe(200);
     const ids = (body as Array<{ id: string }>).map((t) => t.id);
     expect(ids).toContain(userBTagId);
     expect(ids).not.toContain(userATagId);
   });
 
-  it('spaceId scope surfaces tags from another user\'s asset added to the space', async () => {
+  it("spaceId scope surfaces tags from another user's asset added to the space", async () => {
     // userB queries with spaceId of the shared space → sees userA's tag because
     // userA's asset is in the space.
     const { status, body } = await request(app)

@@ -83,9 +83,7 @@ describe('asset video playback + device queries', () => {
 
   describe('GET /assets/:id/video/playback', () => {
     it('requires authentication', async () => {
-      const { status } = await request(app)
-        .get(`/assets/${videoAssetId}/video/playback`)
-        .set(authHeaders(anonActor));
+      const { status } = await request(app).get(`/assets/${videoAssetId}/video/playback`).set(authHeaders(anonActor));
       expect(status).toBe(401);
     });
 
@@ -139,9 +137,7 @@ describe('asset video playback + device queries', () => {
 
   describe('GET /assets/device/:deviceId', () => {
     it('requires authentication', async () => {
-      const { status } = await request(app)
-        .get(`/assets/device/${ownerDeviceId}`)
-        .set(authHeaders(anonActor));
+      const { status } = await request(app).get(`/assets/device/${ownerDeviceId}`).set(authHeaders(anonActor));
       expect(status).toBe(401);
     });
 

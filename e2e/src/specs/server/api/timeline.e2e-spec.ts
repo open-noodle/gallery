@@ -14,6 +14,10 @@ import { beforeAll, describe, expect, it } from 'vitest';
 // so non-members get 400 (not 403). Shared-space-family endpoints use
 // `requireMembership` which returns 403. See the backlog "Observed invariants" section.
 
+// Helper for summing bucket counts. Pure, hoisted to file scope so all
+// describe blocks below can reference it (was duplicated 3× before).
+const total = (body: unknown) => (body as Array<{ count: number }>).reduce((acc, b) => acc + b.count, 0);
+
 describe('/timeline', () => {
   let ctx: SpaceContext;
   const anonActor: Actor = { id: 'anon' };
@@ -33,9 +37,7 @@ describe('/timeline', () => {
     });
 
     it('owner sees their own assets when no filter is applied', async () => {
-      const { status, body } = await request(app)
-        .get('/timeline/buckets')
-        .set(asBearerAuth(ctx.spaceOwner.token!));
+      const { status, body } = await request(app).get('/timeline/buckets').set(asBearerAuth(ctx.spaceOwner.token!));
 
       expect(status).toBe(200);
       // spaceOwner has 2 assets total: ownerAssetId (not in space) + spaceAssetId (in space).
@@ -49,10 +51,7 @@ describe('/timeline', () => {
       // uses requireAccess → BadRequestException, NOT requireMembership → 403).
       await forEachActor(
         [ctx.spaceOwner, ctx.spaceEditor, ctx.spaceViewer, ctx.spaceNonMember, anonActor],
-        (actor) =>
-          request(app)
-            .get(`/timeline/buckets?spaceId=${ctx.spaceId}`)
-            .set(authHeaders(actor)),
+        (actor) => request(app).get(`/timeline/buckets?spaceId=${ctx.spaceId}`).set(authHeaders(actor)),
         { spaceOwner: 200, spaceEditor: 200, spaceViewer: 200, spaceNonMember: 400, anon: 401 },
       );
     });
@@ -101,10 +100,7 @@ describe('/timeline', () => {
     it('requires authentication', async () => {
       await forEachActor(
         [anonActor, ctx.spaceOwner],
-        (actor) =>
-          request(app)
-            .get(`/timeline/bucket?timeBucket=${currentMonthBucket}`)
-            .set(authHeaders(actor)),
+        (actor) => request(app).get(`/timeline/bucket?timeBucket=${currentMonthBucket}`).set(authHeaders(actor)),
         { anon: 401, spaceOwner: 200 },
       );
     });
@@ -157,8 +153,6 @@ describe('/timeline', () => {
     // These flags are gated server-side: timeline.service.ts:91-113 throws 400 if
     // visibility is undefined OR set to Archive (because requestedArchived is true in
     // both cases), so all calls in this block must pass `visibility=TIMELINE` explicitly.
-
-    const total = (body: unknown) => (body as Array<{ count: number }>).reduce((acc, b) => acc + b.count, 0);
 
     it('withSharedSpaces=true makes a non-owner member see space content via their own timeline', async () => {
       // spaceEditor owns 1 asset (editorAssetId, NOT in the space). Without withSharedSpaces,
@@ -265,8 +259,6 @@ describe('/timeline', () => {
     // so the asset references are scoped to beforeAll.
     let visibilityUser: LoginResponseDto;
 
-    const total = (body: unknown) => (body as Array<{ count: number }>).reduce((acc, b) => acc + b.count, 0);
-
     beforeAll(async () => {
       visibilityUser = await utils.userSetup(ctx.admin.token!, createUserDto.create('visibility'));
       // Three assets in distinct visibility states; created in parallel because none
@@ -336,9 +328,7 @@ describe('/timeline', () => {
       // Both soft-delete and force-delete set `deletedAt` (asset.service.ts), so this
       // test characterises the deletedAt-based exclusion, which is what the timeline
       // actually depends on. Force-deleted assets are exercised by the trash spec.
-      const defaultResult = await request(app)
-        .get('/timeline/buckets')
-        .set(asBearerAuth(visibilityUser.accessToken));
+      const defaultResult = await request(app).get('/timeline/buckets').set(asBearerAuth(visibilityUser.accessToken));
       expect(defaultResult.status).toBe(200);
       expect(total(defaultResult.body)).toBe(2); // timeline + archive, NOT trashed
 
@@ -363,17 +353,10 @@ describe('/timeline', () => {
     let decoyGlobalPersonId: string;
     let spaceTagId: string;
 
-    const total = (body: unknown) => (body as Array<{ count: number }>).reduce((acc, b) => acc + b.count, 0);
-
     beforeAll(async () => {
       // 1. Add a named space person to the space asset via the T02 helper (inserts the
       // shared_space_person_face junction row that the timeline filter joins through).
-      spacePerson = await utils.createSpacePerson(
-        ctx.spaceId,
-        'Alice',
-        ctx.spaceOwner.userId!,
-        ctx.spaceAssetId,
-      );
+      spacePerson = await utils.createSpacePerson(ctx.spaceId, 'Alice', ctx.spaceOwner.userId!, ctx.spaceAssetId);
 
       // 2. Decoy: a bare global person attached only to ownerAssetId (which is NOT in
       // the space). No shared_space_person row, no junction row. This is the asset that
@@ -460,7 +443,7 @@ describe('/timeline', () => {
       expect(total(body)).toBe(1);
     });
 
-    it('non-owner space member can filter space content by another user\'s tag', async () => {
+    it("non-owner space member can filter space content by another user's tag", async () => {
       // The actual invariant being pinned: the timeline tag filter (`hasTags` at
       // server/src/utils/database.ts:228-241) joins through tag_asset → tag_closure with
       // **no `tag.userId` predicate at all**. Tag IDs are universally addressable on

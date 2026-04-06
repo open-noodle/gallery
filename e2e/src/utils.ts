@@ -515,10 +515,10 @@ export const utils = {
       throw new Error('Database client not connected');
     }
 
-    const result = await client.query(
-      'INSERT INTO asset_face ("assetId", "personId") VALUES ($1, $2) RETURNING id',
-      [assetId, personId],
-    );
+    const result = await client.query('INSERT INTO asset_face ("assetId", "personId") VALUES ($1, $2) RETURNING id', [
+      assetId,
+      personId,
+    ]);
     return result.rows[0].id as string;
   },
 
@@ -589,10 +589,10 @@ export const utils = {
     // the faceCount/assetCount denormalization (lines 693-708), and the
     // takenAfter/takenBefore EXISTS subquery (lines 522-528) all traverse this table.
     // Without it, T07-T14 queries return empty.
-    await client.query(
-      `INSERT INTO "shared_space_person_face" ("personId", "assetFaceId") VALUES ($1, $2)`,
-      [spacePersonId, faceId],
-    );
+    await client.query(`INSERT INTO "shared_space_person_face" ("personId", "assetFaceId") VALUES ($1, $2)`, [
+      spacePersonId,
+      faceId,
+    ]);
 
     return { globalPersonId, spacePersonId, faceId };
   },

@@ -57,7 +57,7 @@ describe('/notifications', () => {
       expect(ids).toContain(id);
     });
 
-    it('cross-user isolation: userB does not see userA\'s notifications', async () => {
+    it("cross-user isolation: userB does not see userA's notifications", async () => {
       // Seed at least one notification for EACH user so the no-overlap loop is
       // load-bearing — if userB had none, the assertion would pass vacuously
       // even if scoping were broken.
@@ -98,9 +98,7 @@ describe('/notifications', () => {
     // a candidate fix; see notification.repository.ts:70.
     it('UPSTREAM BUG: owner GET single returns 400 for an active notification', async () => {
       const id = await seedNotification(userA, 't31 get-single');
-      const { status } = await request(app)
-        .get(`/notifications/${id}`)
-        .set(asBearerAuth(userA.accessToken));
+      const { status } = await request(app).get(`/notifications/${id}`).set(asBearerAuth(userA.accessToken));
       // Bug: should be 200 with the notification body. Currently 400.
       expect(status).toBe(400);
     });
@@ -112,9 +110,7 @@ describe('/notifications', () => {
       // is fine; the underlying mechanism diverges only when the upstream
       // bug is fixed.
       const id = await seedNotification(userA, 't31 cross-user-get');
-      const { status } = await request(app)
-        .get(`/notifications/${id}`)
-        .set(asBearerAuth(userB.accessToken));
+      const { status } = await request(app).get(`/notifications/${id}`).set(asBearerAuth(userB.accessToken));
       expect(status).toBe(400);
     });
   });
@@ -246,7 +242,14 @@ describe('/notifications', () => {
       const { status } = await request(app)
         .post('/admin/notifications/test-email')
         .set(asBearerAuth(userA.accessToken))
-        .send({ host: 'localhost', port: 25, username: '', password: '', from: 'noreply@example.com', ignoreCert: true });
+        .send({
+          host: 'localhost',
+          port: 25,
+          username: '',
+          password: '',
+          from: 'noreply@example.com',
+          ignoreCert: true,
+        });
       expect(status).toBe(403);
     });
   });
