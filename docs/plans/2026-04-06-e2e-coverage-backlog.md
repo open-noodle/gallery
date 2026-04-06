@@ -46,7 +46,7 @@ This is the working backlog for closing the e2e API test coverage gaps. Each row
 | ID  | Task                                                                                                                                                                        | Size      | Blocked by | Status |
 | --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | ---------- | ------ |
 | T07 | **`face.e2e-spec.ts` — CRUD access matrix**. Create / list / reassign / delete with owner + non-owner. Cross-owner reassign rejected. Pinned the non-obvious API shape: PUT `/faces/:personId` with body `{id: faceId}` (path is target person, body is face). Extended `utils.createFace` to return the face id. | 10 tests | T02        | [x]    |
-| T08 | **Face deletion side effects**. Below-`minFaces` faces unaddressable (PR #139), space-person dedup queue triggered with jobId dedup (PR #292), person `assetCount` updates. | ~6 tests  | T02, T07   | [ ]    |
+| T08 | **Face deletion side effects**. Soft-delete excludes from GET via `deletedAt` filter, hard-delete same. Person row preserved when its only face is removed. Person `getStatistics` decreases on both delete paths. Re-attaching the same (assetId, personId) after a soft-delete inserts a new row. _Below-minFaces is a space-person concern (PR #139) — moved to T10/T11. Dedup queue jobId dedup (PR #292) is in T14._ | 6 tests  | T02, T07   | [x]    |
 
 ### Shared space — people sub-tree (`shared-space.e2e-spec.ts` extension)
 

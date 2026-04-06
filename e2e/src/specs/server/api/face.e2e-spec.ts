@@ -57,10 +57,11 @@ describe('/faces', () => {
     });
 
     it('access matrix on the asset side', async () => {
-      // Posting a face requires write access to BOTH the asset and the person. Use
-      // ownerAssetId (owned by spaceOwner) + ownerPerson (also spaceOwner). Owner can;
-      // anon is 401; spaceNonMember is 400 (Immich's bulk-access pattern returns 400 not
-      // 403 — the same taxonomic split T03 pinned for timeline endpoints).
+      // Posting a face requires READ access to BOTH the asset and the person
+      // (person.service.ts:641-642 — Permission.AssetRead + Permission.PersonRead, not
+      // write). Use ownerAssetId (owned by spaceOwner) + ownerPerson (also spaceOwner).
+      // Owner can; anon is 401; spaceNonMember is 400 (Immich's bulk-access pattern
+      // returns 400 not 403 — the same taxonomic split T03 pinned for timeline endpoints).
       await forEachActor(
         [ctx.spaceOwner, ctx.spaceNonMember, anonActor],
         (actor) =>
@@ -165,6 +166,149 @@ describe('/faces', () => {
         .set(asBearerAuth(ctx.spaceOwner.token!))
         .send({ id: scratchFaceId });
       expect(status).toBe(400);
+    });
+  });
+
+  describe('face deletion side effects (T08)', () => {
+    // T08 covers what happens after the face row goes away. The bug shapes being
+    // pinned: soft-delete excludes from GET via deletedAt filter (PR-era patch),
+    // statistics denormalization decreases the asset count, the global person row
+    // is NOT cascaded when its only face goes away, and re-creating the same face
+    // after a soft-delete works.
+    //
+    // What's deliberately NOT covered here:
+    // - Below-minFaces unaddressable: that's a *space-person* concern (PR #139),
+    //   testable in T10/T11 not in the global /faces controller.
+    // - Space-person dedup queue jobId deduplication (PR #292): requires probing
+    //   queue state that's not exposed via the face controller. The space-person
+    //   dedup endpoint is in T14.
+
+    it('soft-deleted face is excluded from GET /faces', async () => {
+      // person.repository.ts:229 — getFaces filters `asset_face.deletedAt IS NULL`.
+      // After softDeleteAssetFaces sets deletedAt, the face vanishes from the listing
+      // even though the row still exists.
+      const sidePerson = await utils.createPerson(ctx.spaceOwner.token!, { name: 'Carol' });
+      const sideFaceId = await utils.createFace({ assetId: ctx.ownerAssetId, personId: sidePerson.id });
+
+      // Pre-condition: face is in the listing.
+      const before = await request(app)
+        .get(`/faces?id=${ctx.ownerAssetId}`)
+        .set(asBearerAuth(ctx.spaceOwner.token!));
+      expect((before.body as Array<{ id: string }>).find((f) => f.id === sideFaceId)).toBeDefined();
+
+      // Soft-delete.
+      await request(app)
+        .delete(`/faces/${sideFaceId}`)
+        .set(asBearerAuth(ctx.spaceOwner.token!))
+        .send({ force: false });
+
+      const after = await request(app)
+        .get(`/faces?id=${ctx.ownerAssetId}`)
+        .set(asBearerAuth(ctx.spaceOwner.token!));
+      expect((after.body as Array<{ id: string }>).find((f) => f.id === sideFaceId)).toBeUndefined();
+    });
+
+    it('hard-deleted face is excluded from GET /faces', async () => {
+      // Same observable result, different mechanism: deleteAssetFace removes the row
+      // entirely instead of setting deletedAt.
+      const sidePerson = await utils.createPerson(ctx.spaceOwner.token!, { name: 'Dave' });
+      const sideFaceId = await utils.createFace({ assetId: ctx.ownerAssetId, personId: sidePerson.id });
+
+      await request(app)
+        .delete(`/faces/${sideFaceId}`)
+        .set(asBearerAuth(ctx.spaceOwner.token!))
+        .send({ force: true });
+
+      const after = await request(app)
+        .get(`/faces?id=${ctx.ownerAssetId}`)
+        .set(asBearerAuth(ctx.spaceOwner.token!));
+      expect((after.body as Array<{ id: string }>).find((f) => f.id === sideFaceId)).toBeUndefined();
+    });
+
+    it('soft-deleting the only face on a person preserves the person row', async () => {
+      // Global persons are NOT cascade-deleted when their only face is removed —
+      // the person row stays addressable via GET /people/:id. This matters for the
+      // shared-spaces UX where a member labels a person and the underlying person
+      // row outlives any individual face attachment.
+      const sidePerson = await utils.createPerson(ctx.spaceOwner.token!, { name: 'Eve' });
+      const sideFaceId = await utils.createFace({ assetId: ctx.ownerAssetId, personId: sidePerson.id });
+
+      await request(app)
+        .delete(`/faces/${sideFaceId}`)
+        .set(asBearerAuth(ctx.spaceOwner.token!))
+        .send({ force: false });
+
+      const personRes = await request(app)
+        .get(`/people/${sidePerson.id}`)
+        .set(asBearerAuth(ctx.spaceOwner.token!));
+      expect(personRes.status).toBe(200);
+      expect((personRes.body as { id: string }).id).toBe(sidePerson.id);
+    });
+
+    it('soft-deleting a face decreases the person\'s asset statistics', async () => {
+      // person.repository.ts:335-352 — getStatistics counts asset_face rows joined
+      // through asset, with `asset_face.deletedAt IS NULL` AND `asset_face.isVisible IS true`.
+      // Soft-delete sets deletedAt → the row drops out of the count.
+      const sidePerson = await utils.createPerson(ctx.spaceOwner.token!, { name: 'Frank' });
+      const sideFaceId = await utils.createFace({ assetId: ctx.ownerAssetId, personId: sidePerson.id });
+
+      const before = await request(app)
+        .get(`/people/${sidePerson.id}/statistics`)
+        .set(asBearerAuth(ctx.spaceOwner.token!));
+      expect(before.status).toBe(200);
+      expect((before.body as { assets: number }).assets).toBe(1);
+
+      await request(app)
+        .delete(`/faces/${sideFaceId}`)
+        .set(asBearerAuth(ctx.spaceOwner.token!))
+        .send({ force: false });
+
+      const after = await request(app)
+        .get(`/people/${sidePerson.id}/statistics`)
+        .set(asBearerAuth(ctx.spaceOwner.token!));
+      expect(after.status).toBe(200);
+      expect((after.body as { assets: number }).assets).toBe(0);
+    });
+
+    it('hard-deleting a face decreases the person\'s asset statistics', async () => {
+      // Same denormalization, hard-delete path.
+      const sidePerson = await utils.createPerson(ctx.spaceOwner.token!, { name: 'Grace' });
+      const sideFaceId = await utils.createFace({ assetId: ctx.ownerAssetId, personId: sidePerson.id });
+
+      await request(app)
+        .delete(`/faces/${sideFaceId}`)
+        .set(asBearerAuth(ctx.spaceOwner.token!))
+        .send({ force: true });
+
+      const after = await request(app)
+        .get(`/people/${sidePerson.id}/statistics`)
+        .set(asBearerAuth(ctx.spaceOwner.token!));
+      expect(after.status).toBe(200);
+      expect((after.body as { assets: number }).assets).toBe(0);
+    });
+
+    it('re-attaching a face on the same asset+person after a soft-delete works', async () => {
+      // Soft-delete leaves the face row in place with deletedAt set; re-attaching
+      // via utils.createFace inserts a NEW row. There's no unique constraint that
+      // would block the second insert — pin that here so a future schema change
+      // (e.g. adding a UNIQUE on (assetId, personId)) is caught.
+      const sidePerson = await utils.createPerson(ctx.spaceOwner.token!, { name: 'Henry' });
+      const firstFaceId = await utils.createFace({ assetId: ctx.ownerAssetId, personId: sidePerson.id });
+
+      await request(app)
+        .delete(`/faces/${firstFaceId}`)
+        .set(asBearerAuth(ctx.spaceOwner.token!))
+        .send({ force: false });
+
+      const secondFaceId = await utils.createFace({ assetId: ctx.ownerAssetId, personId: sidePerson.id });
+      expect(secondFaceId).not.toBe(firstFaceId);
+
+      // Stats reflect the new face — the soft-deleted one is excluded by deletedAt
+      // filter, the new one is counted, total is 1.
+      const stats = await request(app)
+        .get(`/people/${sidePerson.id}/statistics`)
+        .set(asBearerAuth(ctx.spaceOwner.token!));
+      expect((stats.body as { assets: number }).assets).toBe(1);
     });
   });
 
