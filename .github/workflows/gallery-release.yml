@@ -348,6 +348,8 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: true
+          fetch-depth: 0
+          fetch-tags: true
 
       - name: Create tags
         env:
@@ -375,27 +377,32 @@ jobs:
           upstream_version=$(jq -r '.upstream.version' branding/config.json)
           prev_tag=$(git tag --list 'v*.*.*' --sort=-version:refname | sed -n '2p')
 
-          # Generate changelog via API, prepend upstream version
-          changelog=""
-          if [[ -n "$prev_tag" ]]; then
-            changelog=$(gh api "repos/${REPO}/releases/generate-notes" \
-              -f tag_name="$VERSION" \
-              -f previous_tag_name="$prev_tag" \
-              --jq '.body' 2>/dev/null || true)
-          fi
-
-          # Build commit log between tags
-          commits=""
-          if [[ -n "$prev_tag" ]]; then
-            commits=$(git log --pretty=format:'- %s' "${prev_tag}..HEAD" 2>/dev/null || true)
-          fi
-
           notes="Based on [Immich v${upstream_version}](https://github.com/immich-app/immich/releases/tag/v${upstream_version})"
-          if [[ -n "$commits" ]]; then
-            printf -v notes '%s\n\n## Changes\n\n%s' "$notes" "$commits"
-          fi
-          if [[ -n "$changelog" ]]; then
-            printf -v notes '%s\n\n%s' "$notes" "$changelog"
+
+          if [[ -n "$prev_tag" ]]; then
+            # Separate Gallery commits (PR# < 1000 or no PR ref) from upstream (PR# >= 1000)
+            # After a rebase, git log shows rewritten Gallery commits as new — skip them
+            all_commits=$(git log --pretty=format:'%s' "${prev_tag}..HEAD" 2>/dev/null)
+
+            gallery_commits=$(echo "$all_commits" | while IFS= read -r line; do
+              [[ -z "$line" ]] && continue
+              pr_num=$(echo "$line" | grep -oP '\(#\K[0-9]+(?=\))' | head -1)
+              [[ -z "$pr_num" || "$pr_num" -lt 1000 ]] && echo "- $line"
+            done)
+
+            upstream_commits=$(echo "$all_commits" | while IFS= read -r line; do
+              [[ -z "$line" ]] && continue
+              pr_num=$(echo "$line" | grep -oP '\(#\K[0-9]+(?=\))' | head -1)
+              [[ -n "$pr_num" && "$pr_num" -ge 1000 ]] && echo "- $line"
+            done)
+
+            if [[ -n "$upstream_commits" ]]; then
+              # Rebase release — only show upstream commits
+              printf -v notes '%s\n\n<details>\n<summary>Upstream commits</summary>\n\n%s\n\n</details>' "$notes" "$upstream_commits"
+            elif [[ -n "$gallery_commits" ]]; then
+              # Normal release — show Gallery changes
+              printf -v notes '%s\n\n## Changes\n\n%s' "$notes" "$gallery_commits"
+            fi
           fi
 
           gh release create "$VERSION" --title "$VERSION" --latest -n "$notes"
