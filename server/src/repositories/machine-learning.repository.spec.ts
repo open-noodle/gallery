@@ -24,7 +24,7 @@ vi.mock('src/services/storage.service', () => ({
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
 
-const clipConfig = { modelName: 'ViT-B-32__openai', enabled: true };
+const clipConfig = { modelName: 'ViT-B-32__openai', enabled: true, maxDistance: 0 };
 
 describe(MachineLearningRepository.name, () => {
   let sut: MachineLearningRepository;
@@ -36,7 +36,7 @@ describe(MachineLearningRepository.name, () => {
       enabled: true,
       urls: [mlUrl],
       availabilityChecks: { enabled: false, timeout: 2000, interval: 30_000 },
-      clip: { enabled: true, modelName: 'ViT-B-32__openai' },
+      clip: { enabled: true, modelName: 'ViT-B-32__openai', maxDistance: 0 },
       duplicateDetection: { enabled: true, maxDistance: 0.01 },
       facialRecognition: { enabled: true, modelName: 'buffalo_l', minScore: 0.7, maxDistance: 0.5, minFaces: 1 },
       ocr: {
