@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
   import { handleError } from '$lib/utils/handle-error';
   import { Action2, getConfig, scanClassification, updateConfig, type SystemConfigDto } from '@immich/sdk';
   import { Button, IconButton, modalManager, Switch, Text, toastManager } from '@immich/ui';
@@ -6,6 +7,8 @@
   import { onMount } from 'svelte';
 
   type Category = SystemConfigDto['classification']['categories'][number];
+
+  const disabled = $derived(featureFlagsManager.value.configFile);
 
   let config: SystemConfigDto | null = $state(null);
   let categories: Category[] = $state([]);
@@ -187,8 +190,9 @@
             id="category-name"
             type="text"
             bind:value={formName}
+            {disabled}
             placeholder="e.g. Screenshots, Receipts, Memes"
-            class="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:border-immich-primary focus:outline-none"
+            class="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:border-immich-primary focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
           />
         </div>
 
@@ -199,9 +203,10 @@
           <textarea
             id="category-prompts"
             bind:value={formPrompts}
+            {disabled}
             rows="4"
             placeholder="a screenshot of a phone&#10;a screenshot of a computer&#10;a screen capture"
-            class="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:border-immich-primary focus:outline-none resize-y"
+            class="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:border-immich-primary focus:outline-none resize-y disabled:opacity-50 disabled:cursor-not-allowed"
           ></textarea>
         </div>
 
@@ -218,7 +223,8 @@
               max="0.45"
               step="0.01"
               bind:value={formSimilarity}
-              class="flex-1"
+              {disabled}
+              class="flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
             />
             <span class="text-xs text-gray-500 dark:text-gray-400">Strict</span>
           </div>
@@ -231,7 +237,8 @@
           <select
             id="category-action"
             bind:value={formAction}
-            class="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:border-immich-primary focus:outline-none"
+            {disabled}
+            class="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:border-immich-primary focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <option value={Action2.Tag}>{actionLabels.tag}</option>
             <option value={Action2.TagAndArchive}>{actionLabels.tag_and_archive}</option>
@@ -240,7 +247,7 @@
 
         {#if editingIndex !== null}
           <div class="flex items-center gap-2">
-            <Switch bind:checked={formEnabled} />
+            <Switch bind:checked={formEnabled} {disabled} />
             <Text size="small">{formEnabled ? 'Enabled' : 'Disabled'}</Text>
           </div>
         {/if}
@@ -253,7 +260,7 @@
             shape="round"
             size="small"
             onclick={handleSave}
-            disabled={isSaving || !formName.trim() || !formPrompts.trim()}
+            disabled={disabled || isSaving || !formName.trim() || !formPrompts.trim()}
             leadingIcon={mdiContentSave}
           >
             {isSaving ? 'Saving...' : 'Save'}
@@ -293,7 +300,7 @@
           </div>
 
           <div class="flex items-center gap-2">
-            <Switch checked={category.enabled} onCheckedChange={() => handleToggleEnabled(index)} />
+            <Switch checked={category.enabled} onCheckedChange={() => handleToggleEnabled(index)} {disabled} />
             <IconButton
               shape="round"
               color="secondary"
@@ -302,6 +309,7 @@
               size="small"
               onclick={() => startEdit(index)}
               aria-label="Edit"
+              {disabled}
             />
             <IconButton
               shape="round"
@@ -311,6 +319,7 @@
               size="small"
               onclick={() => handleDelete(index)}
               aria-label="Delete"
+              {disabled}
             />
           </div>
         </div>
@@ -321,11 +330,11 @@
   {/if}
 
   <div class="flex justify-end gap-2 mt-5">
-    <Button shape="round" size="small" color="secondary" onclick={handleScan} disabled={isScanning}>
+    <Button shape="round" size="small" color="secondary" onclick={handleScan} disabled={disabled || isScanning}>
       {isScanning ? 'Scanning...' : 'Scan All Libraries'}
     </Button>
     {#if !isCreating && editingIndex === null}
-      <Button shape="round" size="small" onclick={startCreate} leadingIcon={mdiPlus}>Add Category</Button>
+      <Button shape="round" size="small" onclick={startCreate} leadingIcon={mdiPlus} {disabled}>Add Category</Button>
     {/if}
   </div>
 </section>
