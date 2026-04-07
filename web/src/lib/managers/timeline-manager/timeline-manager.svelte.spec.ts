@@ -857,7 +857,7 @@ describe('TimelineManager', () => {
     it('passes spaceId and withStacked to getTimeBucket when loading a month', async () => {
       await timelineManager.updateOptions({ spaceId: 'space-1', withStacked: true });
       await timelineManager.updateViewport({ width: 1588, height: 0 });
-      await timelineManager.loadMonthGroup({ year: 2024, month: 2 });
+      await timelineManager.loadTimelineMonth({ year: 2024, month: 2 });
 
       expect(sdkMock.getTimeBucket).toHaveBeenCalledWith(
         expect.objectContaining({ spaceId: 'space-1', withStacked: true }),
@@ -868,18 +868,18 @@ describe('TimelineManager', () => {
     it('loads stacked assets with stack data preserved', async () => {
       await timelineManager.updateOptions({ spaceId: 'space-1', withStacked: true });
       await timelineManager.updateViewport({ width: 1588, height: 0 });
-      await timelineManager.loadMonthGroup({ year: 2024, month: 2 });
+      await timelineManager.loadTimelineMonth({ year: 2024, month: 2 });
 
-      const month = getMonthGroupByDate(timelineManager, { year: 2024, month: 2 });
+      const month = getTimelineMonthByDate(timelineManager, { year: 2024, month: 2 });
       expect(month).not.toBeUndefined();
       const assets = month!.getAssets();
       expect(assets.length).toEqual(2);
 
-      const stackedAsset = assets.find((a) => a.stack !== null);
+      const stackedAsset = assets.find((a: TimelineAsset) => a.stack !== null);
       expect(stackedAsset).toBeDefined();
       expect(stackedAsset!.stack!.assetCount).toEqual(3);
 
-      const nonStackedAsset = assets.find((a) => a.stack === null);
+      const nonStackedAsset = assets.find((a: TimelineAsset) => a.stack === null);
       expect(nonStackedAsset).toBeDefined();
     });
 
