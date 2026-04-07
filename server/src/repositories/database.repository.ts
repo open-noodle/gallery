@@ -358,6 +358,15 @@ export class DatabaseRepository {
   async runMigrations(): Promise<void> {
     this.logger.log('Running migrations');
 
+    // Upstream renamed 1773846750001-AddPersonNameTrigramIndex to 1775165531374-AddPersonNameTrigramIndex.
+    // Kysely validates all recorded migrations have corresponding files before running anything,
+    // so the old name must be renamed in the DB before the migrator is called.
+    await sql`
+      UPDATE "kysely_migrations"
+      SET "name" = '1775165531374-AddPersonNameTrigramIndex'
+      WHERE "name" = '1773846750001-AddPersonNameTrigramIndex'
+    `.execute(this.db);
+
     const migrator = this.createMigrator();
 
     const { error, results } = await migrator.migrateToLatest();
