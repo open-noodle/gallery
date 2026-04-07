@@ -367,7 +367,22 @@ patch_ios() {
     fi
   done
 
-  echo "  Patched project.pbxproj, Info.plist, entitlements, and Swift sources"
+  # Fastlane — Appfile
+  local appfile="$REPO_ROOT/mobile/ios/fastlane/Appfile"
+  if [[ -f "$appfile" ]]; then
+    sed -i "s/app_identifier \"app\.alextran\.immich\"/app_identifier \"${BUNDLE_ID}\"/g" "$appfile"
+    sed -i "/apple_id/d" "$appfile"
+  fi
+
+  # Fastlane — Fastfile constants
+  local fastfile="$REPO_ROOT/mobile/ios/fastlane/Fastfile"
+  if [[ -f "$fastfile" ]]; then
+    sed -i "s/TEAM_ID = \"2F67MQ8R79\"/TEAM_ID = ENV[\"FASTLANE_TEAM_ID\"] || \"${APPLE_TEAM_ID}\"/g" "$fastfile"
+    sed -i "s/CODE_SIGN_IDENTITY = \"Apple Distribution: Hau Tran (#{TEAM_ID})\"/CODE_SIGN_IDENTITY = \"Apple Distribution: David Pierre Marais (#{TEAM_ID})\"/g" "$fastfile"
+    sed -i "s/BASE_BUNDLE_ID = \"app\.alextran\.immich\"/BASE_BUNDLE_ID = \"${BUNDLE_ID}\"/g" "$fastfile"
+  fi
+
+  echo "  Patched project.pbxproj, Info.plist, entitlements, Swift sources, and Fastlane"
 }
 
 #
