@@ -20364,6 +20364,13 @@
             "description": "Whether the task is enabled",
             "type": "boolean"
           },
+          "maxDistance": {
+            "description": "Maximum cosine distance for smart search results. 0 = disabled.",
+            "format": "double",
+            "maximum": 2,
+            "minimum": 0,
+            "type": "number"
+          },
           "modelName": {
             "description": "Name of the model to use",
             "type": "string"
@@ -20371,6 +20378,7 @@
         },
         "required": [
           "enabled",
+          "maxDistance",
           "modelName"
         ],
         "type": "object"
