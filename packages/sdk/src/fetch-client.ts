@@ -3138,6 +3138,8 @@ export type MachineLearningAvailabilityChecksDto = {
 export type ClipConfig = {
     /** Whether the task is enabled */
     enabled: boolean;
+    /** Maximum cosine distance for smart search results. 0 = disabled. */
+    maxDistance: number;
     /** Name of the model to use */
     modelName: string;
 };

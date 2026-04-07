@@ -14,11 +14,18 @@ class CLIPConfig {
   /// Returns a new [CLIPConfig] instance.
   CLIPConfig({
     required this.enabled,
+    required this.maxDistance,
     required this.modelName,
   });
 
   /// Whether the task is enabled
   bool enabled;
+
+  /// Maximum cosine distance for smart search results. 0 = disabled.
+  ///
+  /// Minimum value: 0
+  /// Maximum value: 2
+  double maxDistance;
 
   /// Name of the model to use
   String modelName;
@@ -26,20 +33,23 @@ class CLIPConfig {
   @override
   bool operator ==(Object other) => identical(this, other) || other is CLIPConfig &&
     other.enabled == enabled &&
+    other.maxDistance == maxDistance &&
     other.modelName == modelName;
 
   @override
   int get hashCode =>
     // ignore: unnecessary_parenthesis
     (enabled.hashCode) +
+    (maxDistance.hashCode) +
     (modelName.hashCode);
 
   @override
-  String toString() => 'CLIPConfig[enabled=$enabled, modelName=$modelName]';
+  String toString() => 'CLIPConfig[enabled=$enabled, maxDistance=$maxDistance, modelName=$modelName]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
       json[r'enabled'] = this.enabled;
+      json[r'maxDistance'] = this.maxDistance;
       json[r'modelName'] = this.modelName;
     return json;
   }
@@ -54,6 +64,7 @@ class CLIPConfig {
 
       return CLIPConfig(
         enabled: mapValueOfType<bool>(json, r'enabled')!,
+        maxDistance: (mapValueOfType<num>(json, r'maxDistance')!).toDouble(),
         modelName: mapValueOfType<String>(json, r'modelName')!,
       );
     }
@@ -103,6 +114,7 @@ class CLIPConfig {
   /// The list of required keys that must be present in a JSON.
   static const requiredKeys = <String>{
     'enabled',
+    'maxDistance',
     'modelName',
   };
 }

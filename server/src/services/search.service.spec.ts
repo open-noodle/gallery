@@ -2,6 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { mapAsset } from 'src/dtos/asset-response.dto';
 import { SearchSuggestionType } from 'src/dtos/search.dto';
 import { AssetOrder, AssetType, AssetVisibility } from 'src/enum';
+import { isActiveDistanceThreshold } from 'src/repositories/search.repository';
 import { SearchService } from 'src/services/search.service';
 import { AssetFactory } from 'test/factories/asset.factory';
 import { AuthFactory } from 'test/factories/auth.factory';
@@ -614,7 +615,7 @@ describe(SearchService.name, () => {
       );
       expect(mocks.search.searchSmart).toHaveBeenCalledWith(
         { page: 1, size: 100 },
-        { query: 'test', embedding: '[1, 2, 3]', userIds: [authStub.user1.user.id] },
+        { query: 'test', embedding: '[1, 2, 3]', userIds: [authStub.user1.user.id], maxDistance: 0 },
       );
     });
 
@@ -801,6 +802,70 @@ describe(SearchService.name, () => {
       expect(mocks.search.searchSmart).toHaveBeenCalledWith(
         { page: 1, size: 100 },
         expect.objectContaining({ orderDirection: undefined }),
+      );
+    });
+
+    it('should pass maxDistance from config to repository', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({
+        machineLearning: { clip: { maxDistance: 0.75 } },
+      });
+
+      await sut.searchSmart(authStub.user1, { query: 'test' });
+
+      expect(mocks.search.searchSmart).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ maxDistance: 0.75 }),
+      );
+    });
+
+    it('should pass maxDistance from config when using queryAssetId', async () => {
+      const assetId = newUuid();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([assetId]));
+      mocks.search.getEmbedding.mockResolvedValue('[4, 5, 6]');
+      mocks.systemMetadata.get.mockResolvedValue({
+        machineLearning: { clip: { maxDistance: 0.75 } },
+      });
+
+      await sut.searchSmart(authStub.user1, { queryAssetId: assetId });
+
+      expect(mocks.search.searchSmart).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ maxDistance: 0.75 }),
+      );
+    });
+
+    it('should pass maxDistance 0 (disabled) by default', async () => {
+      await sut.searchSmart(authStub.user1, { query: 'test' });
+
+      expect(mocks.search.searchSmart).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ maxDistance: 0 }),
+      );
+    });
+
+    it('should pass maxDistance 2 from config to repository', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({
+        machineLearning: { clip: { maxDistance: 2 } },
+      });
+
+      await sut.searchSmart(authStub.user1, { query: 'test' });
+
+      expect(mocks.search.searchSmart).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ maxDistance: 2 }),
+      );
+    });
+
+    it('should pass maxDistance with orderDirection when both are set', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({
+        machineLearning: { clip: { maxDistance: 0.75 } },
+      });
+
+      await sut.searchSmart(authStub.user1, { query: 'test', order: AssetOrder.Desc });
+
+      expect(mocks.search.searchSmart).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ maxDistance: 0.75, orderDirection: AssetOrder.Desc }),
       );
     });
   });
@@ -1263,5 +1328,47 @@ describe(SearchService.name, () => {
         expect.objectContaining({ userIds: [authStub.user1.user.id, partnerId] }),
       );
     });
+  });
+});
+
+describe(isActiveDistanceThreshold.name, () => {
+  it('should return false for undefined', () => {
+    expect(isActiveDistanceThreshold(void 0 as any)).toBe(false);
+  });
+
+  it('should return false for 0 (disabled)', () => {
+    expect(isActiveDistanceThreshold(0)).toBe(false);
+  });
+
+  it('should return false for negative values', () => {
+    expect(isActiveDistanceThreshold(-1)).toBe(false);
+  });
+
+  it('should return false for 2 (max cosine distance, no-op)', () => {
+    expect(isActiveDistanceThreshold(2)).toBe(false);
+  });
+
+  it('should return false for values above 2', () => {
+    expect(isActiveDistanceThreshold(5)).toBe(false);
+  });
+
+  it('should return true for 0.75 (typical threshold)', () => {
+    expect(isActiveDistanceThreshold(0.75)).toBe(true);
+  });
+
+  it('should return true for 0.001 (very small positive)', () => {
+    expect(isActiveDistanceThreshold(0.001)).toBe(true);
+  });
+
+  it('should return true for 1.99 (just under boundary)', () => {
+    expect(isActiveDistanceThreshold(1.99)).toBe(true);
+  });
+
+  it('should return true for 0.5 (strict threshold)', () => {
+    expect(isActiveDistanceThreshold(0.5)).toBe(true);
+  });
+
+  it('should return true for 1 (permissive threshold)', () => {
+    expect(isActiveDistanceThreshold(1)).toBe(true);
   });
 });

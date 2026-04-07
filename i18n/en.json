@@ -154,6 +154,8 @@
     "machine_learning_availability_checks_interval_description": "Interval in milliseconds between availability checks",
     "machine_learning_availability_checks_timeout": "Request timeout",
     "machine_learning_availability_checks_timeout_description": "Timeout in milliseconds for availability checks",
+    "machine_learning_clip_max_distance": "Max search distance",
+    "machine_learning_clip_max_distance_description": "Maximum cosine distance for smart search results. Lower values return fewer but more relevant results. Small changes may have a large effect due to how CLIP embeddings cluster. Values below 0.3 will likely return no results. Set to 0 to disable (default). Recommended: 0.75",
     "machine_learning_clip_model": "CLIP model",
     "machine_learning_clip_model_description": "The name of a CLIP model listed <link>here</link>. Note that you must re-run the 'Smart Search' job for all images upon changing a model.",
     "machine_learning_duplicate_detection": "Duplicate Detection",
