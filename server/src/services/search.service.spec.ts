@@ -1360,7 +1360,7 @@ describe(isActiveDistanceThreshold.name, () => {
     expect(isActiveDistanceThreshold(0.5)).toBe(true);
   });
 
-  it('should return true for 1.0 (permissive threshold)', () => {
-    expect(isActiveDistanceThreshold(1.0)).toBe(true);
+  it('should return true for 1 (permissive threshold)', () => {
+    expect(isActiveDistanceThreshold(1)).toBe(true);
   });
 });
