@@ -511,6 +511,16 @@ where
       "shared_space_person_face"
   )
 
+-- SharedSpaceRepository.deleteAllOrphanedPersons
+delete from "shared_space_person"
+where
+  "id" not in (
+    select
+      "personId"
+    from
+      "shared_space_person_face"
+  )
+
 -- SharedSpaceRepository.recountPersons
 update "shared_space_person"
 set

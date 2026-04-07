@@ -674,6 +674,14 @@ export class SharedSpaceRepository {
       .execute();
   }
 
+  @GenerateSql({ params: [] })
+  async deleteAllOrphanedPersons() {
+    await this.db
+      .deleteFrom('shared_space_person')
+      .where('id', 'not in', this.db.selectFrom('shared_space_person_face').select('personId'))
+      .execute();
+  }
+
   @GenerateSql({ params: [[DummyValue.UUID]] })
   async recountPersons(personIds: string[]) {
     if (personIds.length === 0) {
