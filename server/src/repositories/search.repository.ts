@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Kysely, OrderByDirection, Selectable, ShallowDehydrateObject, sql } from 'kysely';
+import { Kysely, OrderByDirection, Selectable, ShallowDehydrateObject, sql, SqlBool } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { columns } from 'src/database';
 import { DummyValue, GenerateSql } from 'src/decorators';
@@ -95,6 +95,7 @@ export interface SearchExifOptions {
 export interface SearchEmbeddingOptions {
   embedding: string;
   userIds: string[];
+  maxDistance?: number;
 }
 
 export interface SearchOcrOptions {
@@ -249,6 +250,11 @@ export interface FilterSuggestionsResult {
   hasUnnamedPeople: boolean;
 }
 
+/** Skip threshold when disabled (0), undefined, or at max cosine distance (>= 2) since it would filter nothing */
+export function isActiveDistanceThreshold(maxDistance: number | undefined): boolean {
+  return (maxDistance ?? 0) > 0 && (maxDistance ?? 0) < 2;
+}
+
 @Injectable()
 export class SearchRepository {
   constructor(@InjectKysely() private db: Kysely<DB>) {}
@@ -364,6 +370,7 @@ export class SearchRepository {
         userIds: [DummyValue.UUID],
         spacePersonIds: [DummyValue.UUID],
         orderDirection: 'desc',
+        maxDistance: 0.75,
       },
     ],
   })
@@ -372,11 +379,16 @@ export class SearchRepository {
       throw new Error(`Invalid value for 'size': ${pagination.size}`);
     }
 
+    const hasDistanceThreshold = isActiveDistanceThreshold(options.maxDistance);
+
     return this.db.transaction().execute(async (trx) => {
       await sql`set local vchordrq.probes = ${sql.lit(probes[VectorIndex.Clip])}`.execute(trx);
       const baseQuery = searchAssetBuilderLegacy(trx, options)
         .select(columns.searchAsset)
         .innerJoin('smart_search', 'asset.id', 'smart_search.assetId')
+        .$if(hasDistanceThreshold, (qb) =>
+          qb.where(sql<SqlBool>`(smart_search.embedding <=> ${options.embedding}) <= ${options.maxDistance!}`),
+        )
         .orderBy(sql`smart_search.embedding <=> ${options.embedding}`)
         .orderBy('asset.id', 'asc');
 
