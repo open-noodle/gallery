@@ -65,6 +65,7 @@ jobs:
       contents: read
     # Skip when PR from a fork
     if: ${{ !github.event.pull_request.head.repo.fork && github.actor != 'dependabot[bot]' }}
+    environment: mobile-build
     runs-on: mich
 
     steps:
@@ -163,6 +164,7 @@ jobs:
     permissions:
       contents: read
     if: ${{ !github.event.pull_request.head.repo.fork }}
+    environment: mobile-build
     runs-on: macos-15
 
     steps:
