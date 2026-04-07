@@ -171,7 +171,7 @@ Multiple categories can match the same photo. If any matching category has the "
 
 ### Architecture
 
-Classification categories are stored in Gallery's system configuration (the same `system_metadata` table or YAML config file used for all admin settings). This means categories can be managed through the Admin UI, API, or config file — all three are interchangeable.
+Classification categories are stored in Gallery's system configuration (the same `system_metadata` table or YAML config file used for all admin settings). Categories can be managed through the Admin UI, API, or config file. However, if you use a config file (`IMMICH_CONFIG_FILE`), the UI and API are read-only — all changes must be made in the YAML file. This applies to all admin settings, not just classification.
 
 Prompt embeddings (CLIP text vectors) are **not stored in the database**. They are computed lazily by the ML service and cached in memory on the microservices worker. The cache is keyed by `{modelName}::{prompt}` and is cleared automatically when the classification config or CLIP model changes.
 
