@@ -12,6 +12,17 @@ vi.mock('@immich/sdk', () => ({
   Action2: { Tag: 'tag', TagAndArchive: 'tag_and_archive' },
 }));
 
+const mockFeatureFlags = { configFile: false, smartSearch: true, trash: true };
+vi.mock(import('$lib/managers/feature-flags-manager.svelte'), () => ({
+  featureFlagsManager: {
+    init: vi.fn(),
+    loadFeatureFlags: vi.fn(),
+    get value() {
+      return mockFeatureFlags;
+    },
+  } as never,
+}));
+
 vi.mock('@immich/ui', async (original) => {
   const mod = await original<typeof import('@immich/ui')>();
   return {
@@ -42,6 +53,7 @@ const makeCategory = (
 describe('ClassificationSettings', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockFeatureFlags.configFile = false;
     vi.mocked(getConfig).mockResolvedValue(makeConfig());
     vi.mocked(updateConfig).mockResolvedValue(void 0 as unknown as SystemConfigDto);
     // @ts-expect-error mock returns void but SDK type is string
@@ -215,6 +227,19 @@ describe('ClassificationSettings', () => {
     });
 
     expect(scanClassification).not.toHaveBeenCalled();
+  });
+
+  it('should disable controls when config file is active', async () => {
+    mockFeatureFlags.configFile = true;
+    vi.mocked(getConfig).mockResolvedValue(makeConfig([makeCategory()]));
+
+    render(ClassificationSettings);
+    await waitFor(() => {
+      expect(screen.getByText('Screenshots')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText('Add Category').closest('button')).toBeDisabled();
+    expect(screen.getByText('Scan All Libraries').closest('button')).toBeDisabled();
   });
 
   it('should delete category via updateConfig', async () => {
