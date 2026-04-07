@@ -1982,6 +1982,7 @@ describe(PersonService.name, () => {
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
       mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.id]));
       mocks.asset.getById.mockResolvedValue(asset as any);
+      mocks.person.getById.mockResolvedValue(person);
 
       await sut.createFace(auth, {
         assetId: asset.id,
@@ -2012,6 +2013,7 @@ describe(PersonService.name, () => {
       mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.id]));
       // eslint-disable-next-line unicorn/no-useless-undefined
       mocks.asset.getById.mockResolvedValue(undefined);
+      mocks.person.getById.mockResolvedValue(person);
 
       await expect(
         sut.createFace(auth, {
