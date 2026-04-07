@@ -12,6 +12,7 @@
 **/dist/
 **/coverage/
 **/build/
+**/*.tsbuildinfo
 
 design/
 docker/
