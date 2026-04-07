@@ -4583,6 +4583,7 @@ describe(SharedSpaceService.name, () => {
   describe('handleSharedSpacePersonDedup', () => {
     beforeEach(() => {
       mocks.sharedSpace.recountPersons.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.deleteOrphanedPersons.mockResolvedValue(void 0 as any);
     });
 
     it('should skip when space does not exist', async () => {
@@ -4642,6 +4643,7 @@ describe(SharedSpaceService.name, () => {
       expect(mocks.sharedSpace.reassignPersonFacesSafe).toHaveBeenCalledWith(personB, personA);
       expect(mocks.sharedSpace.deletePerson).toHaveBeenCalledWith(personB);
       expect(mocks.sharedSpace.recountPersons).toHaveBeenCalledWith([personA]);
+      expect(mocks.sharedSpace.deleteOrphanedPersons).toHaveBeenCalledWith(spaceId);
     });
 
     it('should succeed with no merges when space has one person (self-exclusion)', async () => {
@@ -4921,6 +4923,16 @@ describe(SharedSpaceService.name, () => {
       expect(result).toBe(JobStatus.Success);
       // Should have been called many times but eventually stopped
       expect(mocks.sharedSpace.deletePerson).toHaveBeenCalled();
+    });
+
+    it('should clean up orphaned persons even with no merges', async () => {
+      const spaceId = newUuid();
+      mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true }));
+      mocks.sharedSpace.getSpacePersonsWithEmbeddings.mockResolvedValue([]);
+
+      const result = await sut.handleSharedSpacePersonDedup({ spaceId });
+      expect(result).toBe(JobStatus.Success);
+      expect(mocks.sharedSpace.deleteOrphanedPersons).toHaveBeenCalledWith(spaceId);
     });
   });
 
