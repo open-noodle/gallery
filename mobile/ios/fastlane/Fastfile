@@ -17,9 +17,9 @@ default_platform(:ios)
 
 platform :ios do
   # Constants
-  TEAM_ID = "2F67MQ8R79"
-  CODE_SIGN_IDENTITY = "Apple Distribution: Hau Tran (#{TEAM_ID})"
-  BASE_BUNDLE_ID = "app.alextran.immich"
+  TEAM_ID = ENV["FASTLANE_TEAM_ID"] || "77MWNP37MV"
+  CODE_SIGN_IDENTITY = "Apple Distribution: David Pierre Marais (#{TEAM_ID})"
+  BASE_BUNDLE_ID = "de.opennoodle.gallery"
   
   # Helper method to get App Store Connect API key
   def get_api_key
