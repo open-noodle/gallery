@@ -1008,6 +1008,9 @@ export class SharedSpaceService extends BaseService {
       this.logger.log(`Dedup pass ${pass} complete: ${passMerges} merges`);
     }
 
+    // Clean up orphaned persons (no faces linked) as safety net
+    await this.sharedSpaceRepository.deleteOrphanedPersons(job.spaceId);
+
     this.logger.log(
       `Dedup finished for space ${job.spaceId}: ${totalMerges} total merges across ${pass} pass${pass === 1 ? '' : 'es'}`,
     );
