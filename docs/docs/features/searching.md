@@ -1206,6 +1206,30 @@ Memory and execution time estimates were obtained without acceleration on a 7800
 Feel free to make a feature request if there's a model you want to use that we don't currently support.
 :::
 
+### Relevance threshold
+
+When combining a text search with metadata filters (e.g., searching "forest" and filtering by a specific country), the results may include photos that match the filter but have little visual similarity to the search term. This happens because the search returns all photos matching the filter, ranked by similarity — even when the best match in that filtered set is poor.
+
+The **max search distance** setting adds a hard cutoff: results with a cosine distance above the threshold are excluded, regardless of how many remain. If no results pass the threshold, the search returns zero results rather than irrelevant ones.
+
+#### Configuration
+
+Set `machineLearning.clip.maxDistance` in **Administration > Machine Learning > Smart Search**, or in your config file. The value is a cosine distance (0 = identical, 2 = opposite).
+
+| Value  | Behavior                                                                |
+| ------ | ----------------------------------------------------------------------- |
+| `0`    | Disabled (default). All results returned regardless of similarity.      |
+| `0.5`  | Very strict. Only strong visual matches. May miss borderline results.   |
+| `0.75` | Recommended starting point. Good balance of relevance and recall.       |
+| `1.0`  | Permissive. Includes weaker matches. Useful for broad/abstract queries. |
+
+#### Tuning tips
+
+- **Start at 0.75** and adjust based on your results. Lower values are stricter.
+- **Small changes can have a large effect.** CLIP embeddings tend to cluster in a narrow distance range rather than being spread evenly. This means a threshold change from, say, 0.75 to 0.80 may dramatically increase the number of results. This is normal — not a bug.
+- **Different CLIP models produce different distance distributions.** If you change your CLIP model, you may need to re-tune the threshold.
+- **Text-to-image vs. image-to-image searches** have different distance characteristics. Text queries typically produce higher distances (looser matches) than searching by a similar photo. If you use both search modes, pick a threshold that works for text queries — it will be permissive enough for image-based searches too.
+
 [huggingface-clip]: https://huggingface.co/collections/immich-app/clip-654eaefb077425890874cd07
 [huggingface-multilingual-clip]: https://huggingface.co/collections/immich-app/multilingual-clip-654eb08c2382f591eeb8c2a7
 [smart-search-settings]: https://my.immich.app/admin/system-settings?isOpen=machine-learning+smart-search
