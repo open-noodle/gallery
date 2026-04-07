@@ -219,18 +219,19 @@ from
       and "asset"."ownerId" = any ($5::uuid[])
       and "asset"."isFavorite" = $6
       and "asset"."deletedAt" is null
+      and (smart_search.embedding <=> $7) <= $8
     order by
-      smart_search.embedding <=> $7
+      smart_search.embedding <=> $9
     limit
-      $8
+      $10
   ) as "candidates"
 order by
   smart_search.embedding <=> $5,
   "asset"."id" asc
 limit
-  $9
+  $11
 offset
-  $10
+  $12
 commit
 
 -- SearchRepository.searchFaces
