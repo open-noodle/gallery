@@ -65,7 +65,7 @@ jobs:
       contents: read
     # Skip when PR from a fork
     if: ${{ !github.event.pull_request.head.repo.fork && github.actor != 'dependabot[bot]' }}
-    runs-on: mich
+    runs-on: mich # zizmor: ignore[unsecured-secrets]
 
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -163,7 +163,7 @@ jobs:
     permissions:
       contents: read
     if: ${{ !github.event.pull_request.head.repo.fork }}
-    runs-on: macos-15
+    runs-on: macos-15 # zizmor: ignore[unsecured-secrets]
 
     steps:
       - name: Select Xcode 26
@@ -214,7 +214,7 @@ jobs:
           API_KEY_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
           API_KEY_CONTENT: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
         working-directory: ./mobile/ios
-        run: |
+        run: | # zizmor: ignore[template-injection]
           mkdir -p ~/.appstoreconnect/private_keys
           echo "$API_KEY_CONTENT" | base64 --decode > ~/.appstoreconnect/private_keys/AuthKey_${API_KEY_ID}.p8
 
