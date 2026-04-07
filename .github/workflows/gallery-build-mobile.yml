@@ -1,6 +1,16 @@
 name: Gallery Build Mobile
 
 on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'development'
+        type: choice
+        options:
+          - development
+          - production
   workflow_call:
     inputs:
       ref:
