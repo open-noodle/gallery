@@ -1,8 +1,8 @@
 import { Kysely, sql } from 'kysely';
 
 export async function up(db: Kysely<any>): Promise<void> {
-  await sql`CREATE INDEX "idx_person_name_trigram" ON "person" USING gin (f_unaccent("name") gin_trgm_ops);`.execute(db);
-  await sql`INSERT INTO "migration_overrides" ("name", "value") VALUES ('index_idx_person_name_trigram', '{"type":"index","name":"idx_person_name_trigram","sql":"CREATE INDEX \\"idx_person_name_trigram\\" ON \\"person\\" USING gin (f_unaccent(\\"name\\") gin_trgm_ops);"}'::jsonb);`.execute(db);
+  await sql`CREATE INDEX IF NOT EXISTS "idx_person_name_trigram" ON "person" USING gin (f_unaccent("name") gin_trgm_ops);`.execute(db);
+  await sql`INSERT INTO "migration_overrides" ("name", "value") VALUES ('index_idx_person_name_trigram', '{"type":"index","name":"idx_person_name_trigram","sql":"CREATE INDEX \\"idx_person_name_trigram\\" ON \\"person\\" USING gin (f_unaccent(\\"name\\") gin_trgm_ops);"}'::jsonb) ON CONFLICT ("name") DO NOTHING;`.execute(db);
 }
 
 export async function down(db: Kysely<any>): Promise<void> {
