@@ -66,7 +66,7 @@ jobs:
     # Skip when PR from a fork
     if: ${{ !github.event.pull_request.head.repo.fork && github.actor != 'dependabot[bot]' }}
     environment: mobile-build
-    runs-on: mich
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -241,6 +241,7 @@ jobs:
           security find-identity -v -p codesigning build.keychain
 
       - name: Build and deploy to TestFlight
+        if: github.ref == 'refs/heads/main'
         env:
           FASTLANE_TEAM_ID: ${{ secrets.FASTLANE_TEAM_ID }}
           IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
@@ -248,21 +249,17 @@ jobs:
           KEYCHAIN_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
           APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
           APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
-          ENVIRONMENT: ${{ inputs.environment || 'development' }}
-          GITHUB_REF: ${{ github.ref }}
+          ENVIRONMENT: ${{ inputs.environment || 'production' }}
           FASTLANE_XCODEBUILD_SETTINGS_TIMEOUT: 120
           FASTLANE_XCODEBUILD_SETTINGS_RETRIES: 6
         working-directory: ./mobile/ios
+        run: bundle exec fastlane gha_release_prod
+
+      - name: Build iOS (no upload)
+        if: github.ref != 'refs/heads/main'
+        working-directory: ./mobile
         run: |
-          if [[ "$GITHUB_REF" == "refs/heads/main" ]]; then
-            if [[ "$ENVIRONMENT" == "development" ]]; then
-              bundle exec fastlane gha_testflight_dev
-            else
-              bundle exec fastlane gha_release_prod
-            fi
-          else
-            bundle exec fastlane gha_build_only
-          fi
+          flutter build ipa --no-codesign
 
       - name: Clean up keychain
         if: always()
