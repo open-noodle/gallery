@@ -308,6 +308,7 @@ export class PersonService extends BaseService {
     if (force) {
       await this.personRepository.deleteFaces({ sourceType: SourceType.MachineLearning });
       await this.handlePersonCleanup();
+      await this.sharedSpaceRepository.deleteAllOrphanedPersons();
       await this.vacuum('asset_face', 'person', 'face_search');
     }
 

@@ -658,12 +658,14 @@ describe(PersonService.name, () => {
       mocks.assetJob.streamForDetectFacesJob.mockReturnValue(makeStream([asset]));
       mocks.person.getAllWithoutFaces.mockResolvedValue([person]);
       mocks.person.delete.mockResolvedValue([person]);
+      mocks.sharedSpace.deleteAllOrphanedPersons.mockResolvedValue(void 0 as any);
 
       await sut.handleQueueDetectFaces({ force: true });
 
       expect(mocks.person.deleteFaces).toHaveBeenCalledWith({ sourceType: SourceType.MachineLearning });
       expect(mocks.person.delete).toHaveBeenCalledWith([person.personGroupId], undefined);
       expect(mocks.person.deleteEmptyGroups).toHaveBeenCalledWith();
+      expect(mocks.sharedSpace.deleteAllOrphanedPersons).toHaveBeenCalled();
       expect(mocks.job.queue).toHaveBeenCalledWith({
         name: JobName.FileDelete,
         data: { files: [person.thumbnailPath] },
@@ -689,6 +691,7 @@ describe(PersonService.name, () => {
       expect(mocks.person.deleteGroups).not.toHaveBeenCalled();
       expect(mocks.person.deleteFaces).not.toHaveBeenCalled();
       expect(mocks.database.vacuum).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.deleteAllOrphanedPersons).not.toHaveBeenCalled();
       expect(mocks.storage.unlink).not.toHaveBeenCalled();
       expect(mocks.assetJob.streamForDetectFacesJob).toHaveBeenCalledWith(undefined);
       expect(mocks.job.queueAll).toHaveBeenCalledWith([
@@ -711,6 +714,7 @@ describe(PersonService.name, () => {
       mocks.person.getAllWithoutFaces.mockResolvedValue([person]);
       mocks.person.delete.mockResolvedValue([person]);
       mocks.person.deleteFaces.mockResolvedValue();
+      mocks.sharedSpace.deleteAllOrphanedPersons.mockResolvedValue(void 0 as any);
 
       await sut.handleQueueDetectFaces({ force: true });
 
@@ -723,6 +727,7 @@ describe(PersonService.name, () => {
       ]);
       expect(mocks.person.delete).toHaveBeenCalledWith([person.personGroupId], undefined);
       expect(mocks.person.deleteEmptyGroups).toHaveBeenCalledWith();
+      expect(mocks.sharedSpace.deleteAllOrphanedPersons).toHaveBeenCalled();
       expect(mocks.job.queue).toHaveBeenCalledWith({
         name: JobName.FileDelete,
         data: { files: [person.thumbnailPath] },
