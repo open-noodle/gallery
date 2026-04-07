@@ -16,7 +16,11 @@ runs:
       shell: bash
       run: |
         if ! command -v jq &>/dev/null; then
-          sudo apt-get update && sudo apt-get install -y jq
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+            brew install jq
+          else
+            sudo apt-get update && sudo apt-get install -y jq
+          fi
         fi
 
     - name: Apply branding overlay
