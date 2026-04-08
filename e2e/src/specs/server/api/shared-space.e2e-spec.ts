@@ -1,9 +1,19 @@
 import { AssetMediaResponseDto, LoginResponseDto, SharedSpaceRole } from '@immich/sdk';
+import { authHeaders, forEachActor, type Actor } from 'src/actors';
 import { createUserDto } from 'src/fixtures';
 import { errorDto } from 'src/responses';
 import { app, utils } from 'src/utils';
 import request from 'supertest';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+
+// Helper for T17's bucket queries — multiple tests format the current UTC
+// month as the canonical YYYY-MM-01 string. Pure, hoisted to file scope.
+function currentMonthBucketString(): string {
+  const now = new Date();
+  const yyyy = now.getUTCFullYear();
+  const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
+  return `${yyyy}-${mm}-01`;
+}
 
 describe('/shared-spaces', () => {
   let admin: LoginResponseDto;
@@ -1399,6 +1409,1354 @@ describe('/shared-spaces', () => {
         .set('Authorization', `Bearer ${user3.accessToken}`);
 
       expect(status).not.toBe(200);
+    });
+  });
+
+  describe('GET /shared-spaces/:id/people (T09)', () => {
+    // T09 covers the space-people listing endpoint. Uses its own dedicated fixtures
+    // (separate from the outer file's user1/user2/user3) so the test counts are
+    // deterministic and don't depend on what other describes did.
+    //
+    // Endpoint: GET /shared-spaces/:id/people
+    // Permission: SharedSpaceRead
+    // Query params (from server/src/dtos/shared-space-person.dto.ts):
+    //   - limit, offset (1-100), withHidden, named, takenAfter, takenBefore
+    // Pet visibility is server-controlled via shared_space.petsEnabled — not a
+    // query param.
+
+    let owner: LoginResponseDto;
+    let editor: LoginResponseDto;
+    let viewer: LoginResponseDto;
+    let nonMember: LoginResponseDto;
+    let spaceId: string;
+    let spaceAssetId: string;
+
+    let namedPersonId: string; // Alice — has a name
+    let unnamedPersonId: string; // empty name
+    let hiddenPersonId: string; // Hannah — set isHidden=true
+    let petPersonId: string; // Rex — type=pet
+    let zeroThumbPersonId: string; // person with empty thumbnailPath — invisible to listing
+    let zeroThumbGlobalId: string; // the underlying global person, for direct mutation in test 11
+    let aliceGlobalId: string; // captured for the "space IDs not global IDs" load-bearing assertion
+
+    // Actor objects for forEachActor — built from the LoginResponseDto bag in beforeAll.
+    let ownerActor: Actor;
+    let editorActor: Actor;
+    let viewerActor: Actor;
+    let nonMemberActor: Actor;
+    const anonActor: Actor = { id: 'anon' };
+
+    beforeAll(async () => {
+      [owner, editor, viewer, nonMember] = await Promise.all([
+        utils.userSetup(admin.accessToken, createUserDto.create('t09-owner')),
+        utils.userSetup(admin.accessToken, createUserDto.create('t09-editor')),
+        utils.userSetup(admin.accessToken, createUserDto.create('t09-viewer')),
+        utils.userSetup(admin.accessToken, createUserDto.create('t09-nonmember')),
+      ]);
+
+      const spaceRes = await utils.createSpace(owner.accessToken, { name: 't09 space' });
+      spaceId = spaceRes.id;
+
+      await utils.addSpaceMember(owner.accessToken, spaceId, {
+        userId: editor.userId,
+        role: SharedSpaceRole.Editor,
+      });
+      await utils.addSpaceMember(owner.accessToken, spaceId, {
+        userId: viewer.userId,
+        role: SharedSpaceRole.Viewer,
+      });
+
+      const asset = await utils.createAsset(owner.accessToken);
+      spaceAssetId = asset.id;
+      await utils.addSpaceAssets(owner.accessToken, spaceId, [spaceAssetId]);
+
+      // Create the four space-people via the extended utils.createSpacePerson helper.
+      // The helper handles the four-table insert (person + asset_face + shared_space_person
+      // + shared_space_person_face junction) and sets person.thumbnailPath so the
+      // listing's hard requirement is satisfied.
+      const aliceRes = await utils.createSpacePerson(spaceId, 'Alice', owner.userId, spaceAssetId);
+      namedPersonId = aliceRes.spacePersonId;
+      aliceGlobalId = aliceRes.globalPersonId;
+
+      const unnamedRes = await utils.createSpacePerson(spaceId, '', owner.userId, spaceAssetId);
+      unnamedPersonId = unnamedRes.spacePersonId;
+
+      const hannahRes = await utils.createSpacePerson(spaceId, 'Hannah', owner.userId, spaceAssetId);
+      hiddenPersonId = hannahRes.spacePersonId;
+      // Set hidden directly via DB to avoid coupling to T11's PUT endpoint coverage.
+      const dbClient = await utils.connectDatabase();
+      await dbClient.query('UPDATE shared_space_person SET "isHidden" = true WHERE id = $1', [hiddenPersonId]);
+
+      const rexRes = await utils.createSpacePerson(spaceId, 'Rex', owner.userId, spaceAssetId, { type: 'pet' });
+      petPersonId = rexRes.spacePersonId;
+
+      // Fifth person whose underlying global thumbnailPath we'll blank — used by test 11
+      // (the "minFaces gate" pin). Created here so test 11 can mutate and restore it
+      // without depending on creation order.
+      const ghostRes = await utils.createSpacePerson(spaceId, 'Ghost', owner.userId, spaceAssetId);
+      zeroThumbPersonId = ghostRes.spacePersonId;
+      zeroThumbGlobalId = ghostRes.globalPersonId;
+
+      // Build actors once so the access matrix test can use forEachActor.
+      ownerActor = { id: 'spaceOwner', token: owner.accessToken, userId: owner.userId };
+      editorActor = { id: 'spaceEditor', token: editor.accessToken, userId: editor.userId };
+      viewerActor = { id: 'spaceViewer', token: viewer.accessToken, userId: viewer.userId };
+      nonMemberActor = { id: 'spaceNonMember', token: nonMember.accessToken, userId: nonMember.userId };
+    });
+
+    it('returns the listing for any space member; 403 for non-member, 401 for anon', async () => {
+      // Standard access matrix. shared-space endpoints use requireMembership which
+      // throws ForbiddenException → 403, distinct from the timeline endpoints which
+      // use requireAccess and return 400.
+      await forEachActor(
+        [ownerActor, editorActor, viewerActor, nonMemberActor, anonActor],
+        (actor) => request(app).get(`/shared-spaces/${spaceId}/people`).set(authHeaders(actor)),
+        { spaceOwner: 200, spaceEditor: 200, spaceViewer: 200, spaceNonMember: 403, anon: 401 },
+      );
+    });
+
+    it('returns space person IDs (not global person IDs)', async () => {
+      // The canonical assertion for the whole sub-tree (T09-T14): the listing response
+      // contains shared_space_person.id values, NOT global person.id values. Every
+      // downstream test takes the IDs from this listing and uses them as path params.
+      //
+      // Both halves are load-bearing:
+      //   - toContain(namedPersonId): the space-person id IS in the list
+      //   - not.toContain(aliceGlobalId): the global person id is NOT
+      // Without the negation, a regression that returned the global person.id
+      // (instead of shared_space_person.id) would still satisfy the contains
+      // checks IF the values happened to be the same — they won't, but the
+      // negation pins the contract explicitly.
+      const { status, body } = await request(app)
+        .get(`/shared-spaces/${spaceId}/people`)
+        .set('Authorization', `Bearer ${owner.accessToken}`);
+      expect(status).toBe(200);
+      const ids = (body as Array<{ id: string }>).map((p) => p.id);
+      expect(ids).toContain(namedPersonId);
+      expect(ids).toContain(unnamedPersonId);
+      expect(ids).toContain(petPersonId);
+      // Sanity check: namedPersonId and aliceGlobalId are different UUIDs.
+      expect(namedPersonId).not.toBe(aliceGlobalId);
+      // The global person id MUST NOT appear in the listing.
+      expect(ids).not.toContain(aliceGlobalId);
+    });
+
+    it('hidden persons are excluded by default (withHidden omitted)', async () => {
+      const { status, body } = await request(app)
+        .get(`/shared-spaces/${spaceId}/people`)
+        .set('Authorization', `Bearer ${owner.accessToken}`);
+      expect(status).toBe(200);
+      const ids = (body as Array<{ id: string }>).map((p) => p.id);
+      expect(ids).not.toContain(hiddenPersonId);
+    });
+
+    it('?withHidden=true includes hidden persons', async () => {
+      const { status, body } = await request(app)
+        .get(`/shared-spaces/${spaceId}/people?withHidden=true`)
+        .set('Authorization', `Bearer ${owner.accessToken}`);
+      expect(status).toBe(200);
+      const ids = (body as Array<{ id: string }>).map((p) => p.id);
+      expect(ids).toContain(hiddenPersonId);
+    });
+
+    it('unnamed persons are included in the default listing', async () => {
+      const { status, body } = await request(app)
+        .get(`/shared-spaces/${spaceId}/people`)
+        .set('Authorization', `Bearer ${owner.accessToken}`);
+      expect(status).toBe(200);
+      const ids = (body as Array<{ id: string }>).map((p) => p.id);
+      expect(ids).toContain(unnamedPersonId);
+    });
+
+    it('?named=true returns only persons with non-empty names', async () => {
+      // The named filter is true if either shared_space_person.name OR the underlying
+      // person.name is non-empty (server/src/repositories/shared-space.repository.ts:514-521).
+      // Alice (named via shared_space_person.name) is in; the truly-unnamed one is out.
+      const { status, body } = await request(app)
+        .get(`/shared-spaces/${spaceId}/people?named=true`)
+        .set('Authorization', `Bearer ${owner.accessToken}`);
+      expect(status).toBe(200);
+      const ids = (body as Array<{ id: string }>).map((p) => p.id);
+      expect(ids).toContain(namedPersonId);
+      expect(ids).not.toContain(unnamedPersonId);
+    });
+
+    it('petsEnabled toggle on the space hides pet persons', async () => {
+      // shared_space_person.type='pet' rows are filtered when shared_space.petsEnabled
+      // is false. Mutate via direct DB and restore in try/finally per the fixture
+      // lifetime contract.
+      const dbClient = await utils.connectDatabase();
+      try {
+        await dbClient.query('UPDATE shared_space SET "petsEnabled" = false WHERE id = $1', [spaceId]);
+        const { status, body } = await request(app)
+          .get(`/shared-spaces/${spaceId}/people`)
+          .set('Authorization', `Bearer ${owner.accessToken}`);
+        expect(status).toBe(200);
+        const ids = (body as Array<{ id: string }>).map((p) => p.id);
+        expect(ids).not.toContain(petPersonId);
+      } finally {
+        await dbClient.query('UPDATE shared_space SET "petsEnabled" = true WHERE id = $1', [spaceId]);
+      }
+    });
+
+    describe('pagination', () => {
+      // Insert 15 extra named persons in this nested describe's beforeAll, deleted in
+      // afterAll. Per the fixture lifetime contract, mutating shared fixtures inside
+      // an `it` block would leak into subsequent tests; the nested describe wrapper
+      // scopes the rows to just the pagination tests.
+      const extraPersonIds: string[] = [];
+
+      beforeAll(async () => {
+        for (let i = 0; i < 15; i++) {
+          const res = await utils.createSpacePerson(spaceId, `Extra ${i}`, owner.userId, spaceAssetId);
+          extraPersonIds.push(res.spacePersonId);
+        }
+      });
+
+      afterAll(async () => {
+        if (extraPersonIds.length === 0) {
+          return;
+        }
+        const dbClient = await utils.connectDatabase();
+        await dbClient.query('DELETE FROM shared_space_person WHERE id = ANY($1::uuid[])', [extraPersonIds]);
+      });
+
+      it('?limit=10 caps the response at 10 entries', async () => {
+        const { status, body } = await request(app)
+          .get(`/shared-spaces/${spaceId}/people?limit=10`)
+          .set('Authorization', `Bearer ${owner.accessToken}`);
+        expect(status).toBe(200);
+        expect((body as unknown[]).length).toBeLessThanOrEqual(10);
+      });
+
+      it('?offset paginates without overlap', async () => {
+        const page1 = await request(app)
+          .get(`/shared-spaces/${spaceId}/people?limit=5&offset=0`)
+          .set('Authorization', `Bearer ${owner.accessToken}`);
+        const page2 = await request(app)
+          .get(`/shared-spaces/${spaceId}/people?limit=5&offset=5`)
+          .set('Authorization', `Bearer ${owner.accessToken}`);
+        expect(page1.status).toBe(200);
+        expect(page2.status).toBe(200);
+        const ids1 = (page1.body as Array<{ id: string }>).map((p) => p.id);
+        const ids2 = new Set((page2.body as Array<{ id: string }>).map((p) => p.id));
+        const overlap = ids1.filter((id) => ids2.has(id));
+        expect(overlap).toHaveLength(0);
+      });
+
+      it('sort order is stable across calls', async () => {
+        const a = await request(app)
+          .get(`/shared-spaces/${spaceId}/people?limit=5`)
+          .set('Authorization', `Bearer ${owner.accessToken}`);
+        const b = await request(app)
+          .get(`/shared-spaces/${spaceId}/people?limit=5`)
+          .set('Authorization', `Bearer ${owner.accessToken}`);
+        const idsA = (a.body as Array<{ id: string }>).map((p) => p.id);
+        const idsB = (b.body as Array<{ id: string }>).map((p) => p.id);
+        expect(idsA).toEqual(idsB);
+      });
+    });
+
+    describe('GET /shared-spaces/:id/people/:personId — single + thumbnail + assets (T10)', () => {
+      // Reuses the T09 fixture setup (parent beforeAll). All read-only sub-endpoints
+      // share the same access path: requireMembership → 403 for non-member, 401 for anon.
+      //
+      // T10 was supposed to resolve the T09 open hypothesis "hidden and pets filters
+      // apply at listing only". The hypothesis turned out to be HALF correct:
+      //   - Hidden person: direct fetch returns 200 (filter is listing-only).
+      //   - Pet person when petsEnabled=false: direct fetch returns 400 (filter
+      //     applies at single-fetch level too).
+      // Both findings pinned in the backlog "Observed invariants" section.
+      //
+      // Also pinned: missing personId returns 400 (not 404) — Immich's bulk-access
+      // pattern via requireAccess uniformly returns BadRequestException for "not found
+      // OR no access" to avoid leaking existence.
+
+      describe('GET /shared-spaces/:id/people/:personId', () => {
+        it('access matrix', async () => {
+          await forEachActor(
+            [ownerActor, editorActor, viewerActor, nonMemberActor, anonActor],
+            (actor) => request(app).get(`/shared-spaces/${spaceId}/people/${namedPersonId}`).set(authHeaders(actor)),
+            { spaceOwner: 200, spaceEditor: 200, spaceViewer: 200, spaceNonMember: 403, anon: 401 },
+          );
+        });
+
+        it('returns the canonical space person ID and name', async () => {
+          const { status, body } = await request(app)
+            .get(`/shared-spaces/${spaceId}/people/${namedPersonId}`)
+            .set('Authorization', `Bearer ${owner.accessToken}`);
+          expect(status).toBe(200);
+          expect((body as { id: string; name: string }).id).toBe(namedPersonId);
+          expect((body as { name: string }).name).toBe('Alice');
+        });
+
+        it('hidden person IS fetchable directly — filter is listing-only', async () => {
+          // Half of the T09 open hypothesis: confirmed for hidden persons. The
+          // listing-level withHidden default excludes them, but a direct fetch by ID
+          // returns 200. Pin so a future security refactor that adds the filter to
+          // the single-fetch path would be caught.
+          const { status, body } = await request(app)
+            .get(`/shared-spaces/${spaceId}/people/${hiddenPersonId}`)
+            .set('Authorization', `Bearer ${owner.accessToken}`);
+          expect(status).toBe(200);
+          expect((body as { id: string }).id).toBe(hiddenPersonId);
+          expect((body as { isHidden: boolean }).isHidden).toBe(true);
+        });
+
+        it('pet person is NOT fetchable directly when petsEnabled=false — filter applies to single-fetch', async () => {
+          // Other half of the T09 open hypothesis: DISPROVED for pets. The pet filter
+          // applies BOTH to the listing AND to the direct fetch — a non-obvious
+          // asymmetry vs the hidden filter (which is listing-only). The server
+          // throws BadRequestException('Person not found') at
+          // shared-space.service.ts:633-636. Pinning the message ensures the test
+          // stays load-bearing — a future regression that returns 400 from a
+          // different validator would not satisfy the message check.
+          //
+          // Practically this means: if the space has petsEnabled=false, no member
+          // can address the pet person at all, even with the ID. This is the
+          // intended UX: when pets are off, the entire pet sub-graph is invisible.
+          const dbClient = await utils.connectDatabase();
+          try {
+            await dbClient.query('UPDATE shared_space SET "petsEnabled" = false WHERE id = $1', [spaceId]);
+            const { status, body } = await request(app)
+              .get(`/shared-spaces/${spaceId}/people/${petPersonId}`)
+              .set('Authorization', `Bearer ${owner.accessToken}`);
+            expect(status).toBe(400);
+            expect((body as { message: string }).message).toMatch(/Person not found/i);
+          } finally {
+            await dbClient.query('UPDATE shared_space SET "petsEnabled" = true WHERE id = $1', [spaceId]);
+          }
+        });
+
+        it('non-existent personId returns 400 (bulk-access pattern, not 404)', async () => {
+          // requireAccess returns BadRequestException uniformly for "not found OR no
+          // access" to avoid leaking existence. Same taxonomic split T03 documented
+          // for timeline. Pin the 400 AND the message so a future change to return
+          // 404 OR a 400 from a different validator would be caught.
+          const { status, body } = await request(app)
+            .get(`/shared-spaces/${spaceId}/people/00000000-0000-4000-a000-000000000099`)
+            .set('Authorization', `Bearer ${owner.accessToken}`);
+          expect(status).toBe(400);
+          expect((body as { message: string }).message).toMatch(/Person not found/i);
+        });
+      });
+
+      describe('GET /shared-spaces/:id/people/:personId/thumbnail', () => {
+        // Test strategy: the thumbnail endpoint at shared-space.service.ts:643-657
+        // has THREE distinct return paths once the access check passes:
+        //   - person not found OR wrong space → throw NotFoundException → 404
+        //   - thumbnailPath is null/empty → throw NotFoundException → 404
+        //   - thumbnailPath set → serveFromBackend → 200 with bytes (or 500 if file
+        //     doesn't exist on disk)
+        //
+        // utils.createSpacePerson sets thumbnailPath to a fictional path ('/my/awesome/
+        // thumbnail.jpg') to satisfy the *listing*'s hard requirement (a non-empty
+        // thumbnailPath) — but that path doesn't exist on disk, so the 200 path would
+        // trip serveFromBackend's 500 case. To keep the test focused on the *access*
+        // path (which is what the controller is responsible for) and away from the
+        // file-resolution side effect, we transiently blank thumbnailPath via DB,
+        // which exercises the graceful 404 path. Restore in try/finally per the
+        // fixture lifetime contract.
+        //
+        // The matrix this test pins:
+        //   - member with empty thumbnailPath → 404 (graceful "no thumbnail" path)
+        //   - non-member → 403 (access check fires before file lookup)
+        //   - anon → 401 (auth middleware denies before service is invoked)
+        // Together this characterises the LAYERED ordering 401 < 403 < 404, which is
+        // exactly what a fully-correct member-success path looks like for a person
+        // that has no thumbnail.
+
+        it('access matrix and 401 < 403 < 404 ordering', async () => {
+          const dbClient = await utils.connectDatabase();
+          try {
+            await dbClient.query(
+              `UPDATE person SET "thumbnailPath" = $1
+               WHERE id = (SELECT "personId" FROM asset_face WHERE id =
+                 (SELECT "representativeFaceId" FROM shared_space_person WHERE id = $2))`,
+              ['', namedPersonId],
+            );
+
+            await forEachActor(
+              [ownerActor, editorActor, viewerActor, nonMemberActor, anonActor],
+              (actor) =>
+                request(app).get(`/shared-spaces/${spaceId}/people/${namedPersonId}/thumbnail`).set(authHeaders(actor)),
+              { spaceOwner: 404, spaceEditor: 404, spaceViewer: 404, spaceNonMember: 403, anon: 401 },
+            );
+          } finally {
+            await dbClient.query(
+              `UPDATE person SET "thumbnailPath" = $1
+               WHERE id = (SELECT "personId" FROM asset_face WHERE id =
+                 (SELECT "representativeFaceId" FROM shared_space_person WHERE id = $2))`,
+              ['/my/awesome/thumbnail.jpg', namedPersonId],
+            );
+          }
+        });
+      });
+
+      describe('GET /shared-spaces/:id/people/:personId/assets', () => {
+        it('access matrix', async () => {
+          await forEachActor(
+            [ownerActor, editorActor, viewerActor, nonMemberActor, anonActor],
+            (actor) =>
+              request(app).get(`/shared-spaces/${spaceId}/people/${namedPersonId}/assets`).set(authHeaders(actor)),
+            { spaceOwner: 200, spaceEditor: 200, spaceViewer: 200, spaceNonMember: 403, anon: 401 },
+          );
+        });
+
+        it('returns the asset IDs containing the person', async () => {
+          // Alice (namedPersonId) is on spaceAssetId. The endpoint returns string[]
+          // of asset IDs.
+          const { status, body } = await request(app)
+            .get(`/shared-spaces/${spaceId}/people/${namedPersonId}/assets`)
+            .set('Authorization', `Bearer ${owner.accessToken}`);
+          expect(status).toBe(200);
+          expect(Array.isArray(body)).toBe(true);
+          expect(body as string[]).toContain(spaceAssetId);
+        });
+      });
+    });
+
+    describe('PUT/DELETE /shared-spaces/:id/people/:personId (T11)', () => {
+      // T11 covers mutation of a single space person: rename, hide, delete.
+      // PUT and DELETE both go through `requireRole(Editor)` (verified at
+      // shared-space.service.ts:665, 704), so Owner and Editor can mutate but
+      // Viewer is rejected (403). Non-member is also 403 (requireMembership inside
+      // requireRole). anon is 401.
+      //
+      // Tests use scratch space persons created via utils.createSpacePerson per `it`
+      // block so the mutations are fully isolated and don't affect T09's listing
+      // assertions or T10's read-only fixtures.
+
+      describe('PUT /shared-spaces/:id/people/:personId', () => {
+        it('access matrix for rename', async () => {
+          const scratch = await utils.createSpacePerson(spaceId, 'ScratchPut1', owner.userId, spaceAssetId);
+          await forEachActor(
+            [ownerActor, editorActor, viewerActor, nonMemberActor, anonActor],
+            (actor) =>
+              request(app)
+                .put(`/shared-spaces/${spaceId}/people/${scratch.spacePersonId}`)
+                .set(authHeaders(actor))
+                .send({ name: 'Renamed' }),
+            { spaceOwner: 200, spaceEditor: 200, spaceViewer: 403, spaceNonMember: 403, anon: 401 },
+          );
+        });
+
+        it('actually renames the person', async () => {
+          const scratch = await utils.createSpacePerson(spaceId, 'BeforeRename', owner.userId, spaceAssetId);
+          const { status, body } = await request(app)
+            .put(`/shared-spaces/${spaceId}/people/${scratch.spacePersonId}`)
+            .set('Authorization', `Bearer ${owner.accessToken}`)
+            .send({ name: 'AfterRename' });
+          expect(status).toBe(200);
+          expect((body as { name: string }).name).toBe('AfterRename');
+        });
+
+        it('marking isHidden=true hides from the default listing but keeps direct fetch', async () => {
+          // Pairs with T10 test 3 (hidden listing-only). After PUT isHidden=true:
+          //   - GET /people (default) excludes the person
+          //   - GET /people?withHidden=true includes it
+          //   - GET /people/:personId still returns 200 with isHidden=true
+          const scratch = await utils.createSpacePerson(spaceId, 'ToHide', owner.userId, spaceAssetId);
+
+          const putRes = await request(app)
+            .put(`/shared-spaces/${spaceId}/people/${scratch.spacePersonId}`)
+            .set('Authorization', `Bearer ${owner.accessToken}`)
+            .send({ isHidden: true });
+          expect(putRes.status).toBe(200);
+          expect((putRes.body as { isHidden: boolean }).isHidden).toBe(true);
+
+          const listing = await request(app)
+            .get(`/shared-spaces/${spaceId}/people`)
+            .set('Authorization', `Bearer ${owner.accessToken}`);
+          const ids = (listing.body as Array<{ id: string }>).map((p) => p.id);
+          expect(ids).not.toContain(scratch.spacePersonId);
+
+          const direct = await request(app)
+            .get(`/shared-spaces/${spaceId}/people/${scratch.spacePersonId}`)
+            .set('Authorization', `Bearer ${owner.accessToken}`);
+          expect(direct.status).toBe(200);
+          expect((direct.body as { isHidden: boolean }).isHidden).toBe(true);
+        });
+
+        it('non-existent personId returns 400', async () => {
+          // Same manual `BadRequestException('Person not found')` mechanism as
+          // GET /:personId (T10). Pinned at the PUT path too — they share the
+          // same error shape per shared-space.service.ts:668-669.
+          const { status } = await request(app)
+            .put(`/shared-spaces/${spaceId}/people/00000000-0000-4000-a000-000000000099`)
+            .set('Authorization', `Bearer ${owner.accessToken}`)
+            .send({ name: 'doesnt-matter' });
+          expect(status).toBe(400);
+        });
+      });
+
+      describe('DELETE /shared-spaces/:id/people/:personId', () => {
+        it('access matrix', async () => {
+          // Recreate a fresh person per actor that needs a real personId. Owner
+          // and editor will delete it (204); viewer/non-member/anon get rejected
+          // before any DB mutation. We use forEachActor with 5 different scratch
+          // persons so each test is isolated.
+          const scratchByActor: Record<string, string> = {};
+          for (const id of ['spaceOwner', 'spaceEditor', 'spaceViewer', 'spaceNonMember', 'anon']) {
+            const res = await utils.createSpacePerson(spaceId, `ScratchDel-${id}`, owner.userId, spaceAssetId);
+            scratchByActor[id] = res.spacePersonId;
+          }
+          await forEachActor(
+            [ownerActor, editorActor, viewerActor, nonMemberActor, anonActor],
+            (actor) =>
+              request(app)
+                .delete(`/shared-spaces/${spaceId}/people/${scratchByActor[actor.id]}`)
+                .set(authHeaders(actor)),
+            { spaceOwner: 204, spaceEditor: 204, spaceViewer: 403, spaceNonMember: 403, anon: 401 },
+          );
+        });
+
+        it('preserves the underlying global person row', async () => {
+          // Deleting a space person should NOT cascade to the global person table.
+          // Probes that the shared_space_person delete is scoped correctly.
+          const scratch = await utils.createSpacePerson(spaceId, 'ScratchPersist', owner.userId, spaceAssetId);
+
+          // Verify the global person exists before
+          const dbClient = await utils.connectDatabase();
+          const beforeRes = await dbClient.query('SELECT id FROM person WHERE id = $1', [scratch.globalPersonId]);
+          expect(beforeRes.rowCount).toBe(1);
+
+          await request(app)
+            .delete(`/shared-spaces/${spaceId}/people/${scratch.spacePersonId}`)
+            .set('Authorization', `Bearer ${owner.accessToken}`);
+
+          // Global person row still exists after the space person is deleted
+          const afterRes = await dbClient.query('SELECT id FROM person WHERE id = $1', [scratch.globalPersonId]);
+          expect(afterRes.rowCount).toBe(1);
+
+          // The space-person side IS gone
+          const spaceRes = await dbClient.query('SELECT id FROM shared_space_person WHERE id = $1', [
+            scratch.spacePersonId,
+          ]);
+          expect(spaceRes.rowCount).toBe(0);
+        });
+
+        it('non-existent personId returns 400', async () => {
+          const { status } = await request(app)
+            .delete(`/shared-spaces/${spaceId}/people/00000000-0000-4000-a000-000000000099`)
+            .set('Authorization', `Bearer ${owner.accessToken}`);
+          expect(status).toBe(400);
+        });
+      });
+    });
+
+    describe('POST /shared-spaces/:id/people/:personId/merge (T12)', () => {
+      // T12 covers merging space persons. Path :personId is the *target*, body
+      // `{ids: string[]}` lists the *sources*. The service (shared-space.service.ts:730-778)
+      // requires Editor role, validates both sides are in the same space and the same
+      // type, reassigns faces from sources to target, deletes the source rows, recounts
+      // the target's denormalised counts, and queues a dedup pass.
+      //
+      // Each test creates fresh scratch persons (target + sources) per `it()` so the
+      // mutations are isolated.
+
+      it('access matrix', async () => {
+        // Create one target + one source per actor (5 fresh source persons; the target
+        // is shared because the merge would consume the source on a successful run, so
+        // we need a fresh source per attempt).
+        const target = await utils.createSpacePerson(spaceId, 'MergeTarget', owner.userId, spaceAssetId);
+        const sourceByActor: Record<string, string> = {};
+        for (const id of ['spaceOwner', 'spaceEditor', 'spaceViewer', 'spaceNonMember', 'anon']) {
+          const res = await utils.createSpacePerson(spaceId, `MergeSource-${id}`, owner.userId, spaceAssetId);
+          sourceByActor[id] = res.spacePersonId;
+        }
+
+        await forEachActor(
+          [ownerActor, editorActor, viewerActor, nonMemberActor, anonActor],
+          (actor) =>
+            request(app)
+              .post(`/shared-spaces/${spaceId}/people/${target.spacePersonId}/merge`)
+              .set(authHeaders(actor))
+              .send({ ids: [sourceByActor[actor.id]] }),
+          { spaceOwner: 204, spaceEditor: 204, spaceViewer: 403, spaceNonMember: 403, anon: 401 },
+        );
+      });
+
+      it("reassigns the source's face and deletes the source row", async () => {
+        // Each scratch person comes with one face attached to spaceAssetId. After merge,
+        // the source's face should belong to the target (verified via direct DB), and
+        // the source's shared_space_person row should be gone.
+        const target = await utils.createSpacePerson(spaceId, 'TgtA', owner.userId, spaceAssetId);
+        const source = await utils.createSpacePerson(spaceId, 'SrcA', owner.userId, spaceAssetId);
+
+        const dbClient = await utils.connectDatabase();
+        // Pre-condition: the source has its junction row pointing at itself.
+        const beforeRes = await dbClient.query(
+          'SELECT "personId" FROM shared_space_person_face WHERE "personId" = $1',
+          [source.spacePersonId],
+        );
+        expect(beforeRes.rowCount).toBe(1);
+
+        const mergeRes = await request(app)
+          .post(`/shared-spaces/${spaceId}/people/${target.spacePersonId}/merge`)
+          .set('Authorization', `Bearer ${owner.accessToken}`)
+          .send({ ids: [source.spacePersonId] });
+        expect(mergeRes.status).toBe(204);
+
+        // The source row is gone
+        const sourceRow = await dbClient.query('SELECT id FROM shared_space_person WHERE id = $1', [
+          source.spacePersonId,
+        ]);
+        expect(sourceRow.rowCount).toBe(0);
+
+        // The junction row that used to belong to the source now belongs to the target
+        const targetJunction = await dbClient.query(
+          'SELECT "personId" FROM shared_space_person_face WHERE "personId" = $1',
+          [target.spacePersonId],
+        );
+        // Target had its own face plus inherited the source's face = 2 junction rows
+        expect(targetJunction.rowCount).toBe(2);
+      });
+
+      it("after merge the target's denormalised faceCount and assetCount reflect the recount", async () => {
+        // recountPersons (shared-space.repository.ts:686+) updates faceCount and
+        // assetCount on shared_space_person from the junction table. After merging
+        // 1 source into the target, the target should have 2 faces and 1 unique asset
+        // (both faces are on spaceAssetId, so assetCount stays at 1).
+        const target = await utils.createSpacePerson(spaceId, 'TgtCount', owner.userId, spaceAssetId);
+        const source = await utils.createSpacePerson(spaceId, 'SrcCount', owner.userId, spaceAssetId);
+
+        await request(app)
+          .post(`/shared-spaces/${spaceId}/people/${target.spacePersonId}/merge`)
+          .set('Authorization', `Bearer ${owner.accessToken}`)
+          .send({ ids: [source.spacePersonId] });
+
+        const dbClient = await utils.connectDatabase();
+        const counts = await dbClient.query('SELECT "faceCount", "assetCount" FROM shared_space_person WHERE id = $1', [
+          target.spacePersonId,
+        ]);
+        expect(counts.rowCount).toBe(1);
+        expect(counts.rows[0].faceCount).toBe(2);
+        expect(counts.rows[0].assetCount).toBe(1);
+      });
+
+      it('cannot merge a person into themselves', async () => {
+        // shared-space.service.ts:743-745 — explicit BadRequestException with the
+        // distinctive "Cannot merge a person into themselves" message.
+        const target = await utils.createSpacePerson(spaceId, 'SelfMerge', owner.userId, spaceAssetId);
+        const { status, body } = await request(app)
+          .post(`/shared-spaces/${spaceId}/people/${target.spacePersonId}/merge`)
+          .set('Authorization', `Bearer ${owner.accessToken}`)
+          .send({ ids: [target.spacePersonId] });
+        expect(status).toBe(400);
+        expect((body as { message: string }).message).toMatch(/themselves/i);
+      });
+
+      it('cannot merge across types (person ↔ pet)', async () => {
+        // shared-space.service.ts:754-756 — service rejects when source.type !==
+        // target.type. UX consequence: pets and persons cannot be merged into each
+        // other, even if they're in the same space.
+        const personTarget = await utils.createSpacePerson(spaceId, 'TypeP', owner.userId, spaceAssetId);
+        const petSource = await utils.createSpacePerson(spaceId, 'TypePet', owner.userId, spaceAssetId, {
+          type: 'pet',
+        });
+
+        const { status, body } = await request(app)
+          .post(`/shared-spaces/${spaceId}/people/${personTarget.spacePersonId}/merge`)
+          .set('Authorization', `Bearer ${owner.accessToken}`)
+          .send({ ids: [petSource.spacePersonId] });
+        expect(status).toBe(400);
+        expect((body as { message: string }).message).toMatch(/different types/i);
+      });
+
+      it('non-existent target or source returns 400', async () => {
+        const target = await utils.createSpacePerson(spaceId, 'TgtMissing', owner.userId, spaceAssetId);
+
+        // Missing target → "Person not found"
+        const missingTarget = await request(app)
+          .post(`/shared-spaces/${spaceId}/people/00000000-0000-4000-a000-000000000099/merge`)
+          .set('Authorization', `Bearer ${owner.accessToken}`)
+          .send({ ids: [target.spacePersonId] });
+        expect(missingTarget.status).toBe(400);
+
+        // Missing source → "Source person not found in this space"
+        const missingSource = await request(app)
+          .post(`/shared-spaces/${spaceId}/people/${target.spacePersonId}/merge`)
+          .set('Authorization', `Bearer ${owner.accessToken}`)
+          .send({ ids: ['00000000-0000-4000-a000-000000000098'] });
+        expect(missingSource.status).toBe(400);
+      });
+    });
+
+    describe('PUT/DELETE /shared-spaces/:id/people/:personId/alias (T13)', () => {
+      // T13 covers per-user alias on a space person.
+      //
+      // CRITICAL invariants this block pins:
+      //
+      // 1. Aliases are PER-USER, not space-wide. The service stores
+      //    `(personId, userId, alias)` and `getAlias(personId, auth.user.id)` retrieves
+      //    only the caller's row (shared-space.service.ts:780-798). Owner setting
+      //    "Mom" as the alias for Alice does NOT show "Mom" to editor or viewer.
+      //
+      // 2. Aliases require `requireMembership` only — NOT `requireRole(Editor)`. So
+      //    Viewer can set their own alias. This is intentional: aliases are personal
+      //    metadata, not space state, and a read-only viewer should still be able to
+      //    label people for themselves.
+      //
+      // 3. Setting an alias does NOT modify the underlying global `person.name`. The
+      //    alias lives in a separate row.
+      //
+      // 4. DELETE alias has NO person existence check (line 800-803) — it just calls
+      //    deleteAlias which is a noop on missing rows. So DELETE returns 204 even
+      //    for non-existent personIds. Asymmetric vs PUT.
+
+      it('access matrix — viewers CAN set their own alias', async () => {
+        const scratch = await utils.createSpacePerson(spaceId, 'AliasMatrix', owner.userId, spaceAssetId);
+        await forEachActor(
+          [ownerActor, editorActor, viewerActor, nonMemberActor, anonActor],
+          (actor) =>
+            request(app)
+              .put(`/shared-spaces/${spaceId}/people/${scratch.spacePersonId}/alias`)
+              .set(authHeaders(actor))
+              .send({ alias: `${actor.id}-alias` }),
+          { spaceOwner: 204, spaceEditor: 204, spaceViewer: 204, spaceNonMember: 403, anon: 401 },
+        );
+      });
+
+      it('alias is per-user — owner sees their alias, editor sees default name', async () => {
+        const scratch = await utils.createSpacePerson(spaceId, 'PerUserAlice', owner.userId, spaceAssetId);
+
+        await request(app)
+          .put(`/shared-spaces/${spaceId}/people/${scratch.spacePersonId}/alias`)
+          .set('Authorization', `Bearer ${owner.accessToken}`)
+          .send({ alias: 'Mom' });
+
+        // Owner sees their alias
+        const ownerView = await request(app)
+          .get(`/shared-spaces/${spaceId}/people/${scratch.spacePersonId}`)
+          .set('Authorization', `Bearer ${owner.accessToken}`);
+        expect(ownerView.status).toBe(200);
+        expect((ownerView.body as { alias?: string | null }).alias).toBe('Mom');
+
+        // Editor sees no alias (their own row doesn't exist).
+        // mapSpacePerson at shared-space.service.ts:~1236 always sets `alias` to
+        // `string | null`, never omits it — assert null specifically so a regression
+        // that drops the field would be caught.
+        const editorView = await request(app)
+          .get(`/shared-spaces/${spaceId}/people/${scratch.spacePersonId}`)
+          .set('Authorization', `Bearer ${editor.accessToken}`);
+        expect(editorView.status).toBe(200);
+        expect((editorView.body as { alias: string | null }).alias).toBeNull();
+        // The original name 'PerUserAlice' is still visible
+        expect((editorView.body as { name: string }).name).toBe('PerUserAlice');
+      });
+
+      it('alias does NOT modify the underlying global person.name', async () => {
+        const scratch = await utils.createSpacePerson(spaceId, 'OriginalName', owner.userId, spaceAssetId);
+
+        await request(app)
+          .put(`/shared-spaces/${spaceId}/people/${scratch.spacePersonId}/alias`)
+          .set('Authorization', `Bearer ${owner.accessToken}`)
+          .send({ alias: 'AliasName' });
+
+        const dbClient = await utils.connectDatabase();
+        const personRow = await dbClient.query('SELECT name FROM person WHERE id = $1', [scratch.globalPersonId]);
+        expect(personRow.rowCount).toBe(1);
+        expect(personRow.rows[0].name).toBe('OriginalName');
+      });
+
+      it('DELETE removes the alias and is idempotent on missing personId', async () => {
+        const scratch = await utils.createSpacePerson(spaceId, 'DeleteMe', owner.userId, spaceAssetId);
+
+        // Set alias
+        await request(app)
+          .put(`/shared-spaces/${spaceId}/people/${scratch.spacePersonId}/alias`)
+          .set('Authorization', `Bearer ${owner.accessToken}`)
+          .send({ alias: 'Temp' });
+
+        // Delete alias
+        const del = await request(app)
+          .delete(`/shared-spaces/${spaceId}/people/${scratch.spacePersonId}/alias`)
+          .set('Authorization', `Bearer ${owner.accessToken}`);
+        expect(del.status).toBe(204);
+
+        // Verify alias is gone via GET. Same DTO contract as test 2 — assert null,
+        // not the disjunction.
+        const get = await request(app)
+          .get(`/shared-spaces/${spaceId}/people/${scratch.spacePersonId}`)
+          .set('Authorization', `Bearer ${owner.accessToken}`);
+        expect((get.body as { alias: string | null }).alias).toBeNull();
+
+        // DELETE on a non-existent personId is also 204 — the service doesn't
+        // check person existence on delete (shared-space.service.ts:800-803),
+        // so the call is a noop. Asymmetric vs PUT (which validates).
+        const idempotent = await request(app)
+          .delete(`/shared-spaces/${spaceId}/people/00000000-0000-4000-a000-000000000099/alias`)
+          .set('Authorization', `Bearer ${owner.accessToken}`);
+        expect(idempotent.status).toBe(204);
+      });
+
+      it('PUT alias on a missing personId returns 400', async () => {
+        const { status } = await request(app)
+          .put(`/shared-spaces/${spaceId}/people/00000000-0000-4000-a000-000000000099/alias`)
+          .set('Authorization', `Bearer ${owner.accessToken}`)
+          .send({ alias: 'Ghost' });
+        expect(status).toBe(400);
+      });
+    });
+
+    describe('POST /shared-spaces/:id/people/deduplicate (T14)', () => {
+      // T14 covers the manual dedup trigger for space people.
+      //
+      // Service shape (shared-space.service.ts:721-728): requires `Owner` role
+      // (NOT just Editor — distinct from PUT/DELETE/merge which only need Editor).
+      // Queues a SharedSpacePersonDedup job on the FacialRecognition queue with
+      // jobId `space-dedup-${spaceId}` (job.repository.ts:239-241). The jobId is
+      // the load-bearing PR #292 invariant: BullMQ's queue() with a duplicate
+      // jobId is a no-op, so calling deduplicate twice in quick succession enqueues
+      // only one job.
+      //
+      // Each `it()` creates a fresh space + makes the relevant user the Owner so
+      // the access matrix is independent and the queue verification has a clean
+      // slate.
+
+      it('Owner-only access matrix', async () => {
+        // Distinct from PUT/DELETE/merge which require Editor — deduplicate is
+        // Owner-only because it can rewrite the space's person graph.
+        await forEachActor(
+          [ownerActor, editorActor, viewerActor, nonMemberActor, anonActor],
+          (actor) => request(app).post(`/shared-spaces/${spaceId}/people/deduplicate`).set(authHeaders(actor)),
+          { spaceOwner: 204, spaceEditor: 403, spaceViewer: 403, spaceNonMember: 403, anon: 401 },
+        );
+      });
+
+      it('owner happy path returns 204 (queues a SharedSpacePersonDedup job)', async () => {
+        // Sanity check on the success path. Doesn't verify queue state — that's
+        // covered by the next test.
+        const { status } = await request(app)
+          .post(`/shared-spaces/${spaceId}/people/deduplicate`)
+          .set('Authorization', `Bearer ${owner.accessToken}`);
+        expect(status).toBe(204);
+      });
+
+      it('two consecutive owner calls both return 204 (HTTP-level idempotency)', async () => {
+        // The HTTP layer is idempotent regardless of whether BullMQ deduplicates.
+        // The actual jobId-based dedup is verified by the next test via queue
+        // inspection; this test pins the HTTP contract independently.
+        const first = await request(app)
+          .post(`/shared-spaces/${spaceId}/people/deduplicate`)
+          .set('Authorization', `Bearer ${owner.accessToken}`);
+        expect(first.status).toBe(204);
+
+        const second = await request(app)
+          .post(`/shared-spaces/${spaceId}/people/deduplicate`)
+          .set('Authorization', `Bearer ${owner.accessToken}`);
+        expect(second.status).toBe(204);
+      });
+
+      it('jobId dedup: two calls in quick succession enqueue only one job (PR #292)', async () => {
+        // The load-bearing PR #292 invariant. BullMQ's queue() with a duplicate
+        // jobId is a no-op (verified by job.repository.ts:252-259's getJob/remove
+        // pattern — duplicate jobId returns the existing job, not an error), so the
+        // same space's dedup job can't be enqueued twice while the first is waiting.
+        //
+        // Strategy: pause the FacialRecognition queue so the worker doesn't drain
+        // the job, empty it, trigger dedup twice, count the resulting jobs that
+        // match our spaceId, restore.
+        //
+        // The pause/restore is bracketed in try/finally so a test failure doesn't
+        // leave the queue paused. The queue endpoints require admin token
+        // (queue.controller.ts:23) — `admin` is set in the outer beforeAll.
+        //
+        // QueueDeleteDto only has `failed?: boolean` (queue.dto.ts:24-31) — there
+        // is no statuses-based filter on emptyQueue, the underlying repository
+        // call drains waiting/active/delayed unconditionally. Sending no body is
+        // sufficient.
+        const queueName = 'facialRecognition';
+        try {
+          // Drain any in-flight dedup jobs from PRIOR tests in this describe
+          // (the previous "owner happy path" and "two consecutive owner calls"
+          // tests both enqueue dedup jobs). Without this wait, those jobs may
+          // still be active/waiting when we pause+empty below, leading to a
+          // flaky baseline where the spaceId match count is off-by-one.
+          await utils.waitForQueueFinish(admin.accessToken, queueName);
+
+          // Pause + empty so the assertions are deterministic.
+          const pauseRes = await request(app)
+            .put(`/queues/${queueName}`)
+            .set('Authorization', `Bearer ${admin.accessToken}`)
+            .send({ isPaused: true });
+          // Assert the pause succeeded — if not, the worker would race the
+          // assertion below and the test would be flaky for a non-test reason.
+          expect(pauseRes.status).toBe(200);
+
+          await request(app).delete(`/queues/${queueName}/jobs`).set('Authorization', `Bearer ${admin.accessToken}`);
+
+          // First trigger
+          const t1 = await request(app)
+            .post(`/shared-spaces/${spaceId}/people/deduplicate`)
+            .set('Authorization', `Bearer ${owner.accessToken}`);
+          expect(t1.status).toBe(204);
+
+          // Second trigger immediately after
+          const t2 = await request(app)
+            .post(`/shared-spaces/${spaceId}/people/deduplicate`)
+            .set('Authorization', `Bearer ${owner.accessToken}`);
+          expect(t2.status).toBe(204);
+
+          // Count jobs whose data matches our space. We don't filter by status
+          // (QueueJobSearchDto.status is the field name, but we want to see all
+          // jobs in any state to be safe), and filter client-side by spaceId.
+          const jobs = await request(app)
+            .get(`/queues/${queueName}/jobs`)
+            .set('Authorization', `Bearer ${admin.accessToken}`);
+          expect(jobs.status).toBe(200);
+          // Match strictly on the data.spaceId — the jobId encodes spaceId so
+          // an `||` would only widen if a future refactor decoupled the two,
+          // which is exactly the kind of regression we want to catch.
+          const ourJobs = (jobs.body as Array<{ id?: string; data?: { spaceId?: string } }>).filter(
+            (j) => j.data?.spaceId === spaceId,
+          );
+          expect(ourJobs.length).toBe(1);
+        } finally {
+          // Drain + unpause so other tests aren't affected.
+          await request(app).delete(`/queues/${queueName}/jobs`).set('Authorization', `Bearer ${admin.accessToken}`);
+          await request(app)
+            .put(`/queues/${queueName}`)
+            .set('Authorization', `Bearer ${admin.accessToken}`)
+            .send({ isPaused: false });
+        }
+      });
+    });
+
+    describe('PUT /shared-spaces/:id/libraries (T15)', () => {
+      // T15 covers the link-library-to-space operation. The service has a TWO-step
+      // gate (shared-space.service.ts:449-477):
+      //
+      //   1. `if (!auth.user.isAdmin) → ForbiddenException('Only admins can link...')`
+      //      — admin gate, fires FIRST. Non-admin members of the space get 403.
+      //   2. `requireRole(Editor)` — must be a member of the space with Editor or Owner.
+      //      Admin non-members and admin viewers also get 403.
+      //
+      // Then library existence is checked (400 if missing). On success the
+      // addLibrary repository call is idempotent — duplicate (spaceId, libraryId)
+      // returns null without error and skips the face-sync queue.
+      //
+      // To exercise the matrix we need:
+      //   - A non-admin owner of a space (can't link → admin gate)
+      //   - An admin who is an Editor in the space (CAN link)
+      //   - An admin library to link
+      //
+      // The outer file's `admin` (top-level beforeAll) is the only admin user.
+      // We add admin as Editor to the test space at the start of the T15 block.
+
+      let library: { id: string };
+      let secondLibrary: { id: string };
+
+      beforeAll(async () => {
+        // Add admin as Editor to the existing T09 space so the success path tests can run.
+        await utils.addSpaceMember(owner.accessToken, spaceId, {
+          userId: admin.userId,
+          role: SharedSpaceRole.Editor,
+        });
+
+        // Create two libraries owned by the global admin (createLibrary requires admin token).
+        library = await utils.createLibrary(admin.accessToken, { ownerId: admin.userId });
+        secondLibrary = await utils.createLibrary(admin.accessToken, { ownerId: admin.userId });
+      });
+
+      it('non-admin owner of the space cannot link a library (admin gate)', async () => {
+        // The "Only admins" branch fires before requireRole. Even the space owner is
+        // rejected if they're not also a global admin.
+        const { status, body } = await request(app)
+          .put(`/shared-spaces/${spaceId}/libraries`)
+          .set('Authorization', `Bearer ${owner.accessToken}`)
+          .send({ libraryId: library.id });
+        expect(status).toBe(403);
+        expect((body as { message: string }).message).toMatch(/admins/i);
+      });
+
+      it('non-admin editor cannot link a library (admin gate fires before role check)', async () => {
+        // Pin the admin-gate message so we know which branch fired. The two-step
+        // gate at shared-space.service.ts:449-477 checks admin BEFORE requireRole,
+        // so a non-admin editor should hit the admin-gate message even though
+        // they would also fail the role check.
+        const { status, body } = await request(app)
+          .put(`/shared-spaces/${spaceId}/libraries`)
+          .set('Authorization', `Bearer ${editor.accessToken}`)
+          .send({ libraryId: library.id });
+        expect(status).toBe(403);
+        expect((body as { message: string }).message).toMatch(/admins/i);
+      });
+
+      it('non-admin viewer cannot link a library (admin gate fires before role check)', async () => {
+        // Same as above — admin gate at line 451 fires before requireRole at
+        // line 454, so the message is the admin-gate one even though the
+        // viewer would also fail role validation.
+        const { status, body } = await request(app)
+          .put(`/shared-spaces/${spaceId}/libraries`)
+          .set('Authorization', `Bearer ${viewer.accessToken}`)
+          .send({ libraryId: library.id });
+        expect(status).toBe(403);
+        expect((body as { message: string }).message).toMatch(/admins/i);
+      });
+
+      it('anon cannot link a library', async () => {
+        const { status } = await request(app)
+          .put(`/shared-spaces/${spaceId}/libraries`)
+          .send({ libraryId: library.id });
+        expect(status).toBe(401);
+      });
+
+      it('admin who is an Editor in the space CAN link a library', async () => {
+        // Admin is added as Editor in this block's beforeAll. This test uses
+        // secondLibrary so the idempotency test below has a clean slate on
+        // `library`.
+        const { status } = await request(app)
+          .put(`/shared-spaces/${spaceId}/libraries`)
+          .set('Authorization', `Bearer ${admin.accessToken}`)
+          .send({ libraryId: secondLibrary.id });
+        expect(status).toBe(204);
+      });
+
+      it('linking the same library twice is idempotent (returns 204 both times)', async () => {
+        // shared-space.service.ts:467-476 — addLibrary returns null on duplicate
+        // (existing row), and the face-sync queue is skipped. The HTTP response is
+        // 204 either way.
+        const first = await request(app)
+          .put(`/shared-spaces/${spaceId}/libraries`)
+          .set('Authorization', `Bearer ${admin.accessToken}`)
+          .send({ libraryId: library.id });
+        expect(first.status).toBe(204);
+
+        const second = await request(app)
+          .put(`/shared-spaces/${spaceId}/libraries`)
+          .set('Authorization', `Bearer ${admin.accessToken}`)
+          .send({ libraryId: library.id });
+        expect(second.status).toBe(204);
+
+        // Verify exactly one row exists in shared_space_library for this pair.
+        const dbClient = await utils.connectDatabase();
+        const rows = await dbClient.query(
+          'SELECT 1 FROM shared_space_library WHERE "spaceId" = $1 AND "libraryId" = $2',
+          [spaceId, library.id],
+        );
+        expect(rows.rowCount).toBe(1);
+      });
+
+      it('linking a non-existent libraryId returns 400', async () => {
+        const { status, body } = await request(app)
+          .put(`/shared-spaces/${spaceId}/libraries`)
+          .set('Authorization', `Bearer ${admin.accessToken}`)
+          .send({ libraryId: '00000000-0000-4000-a000-000000000099' });
+        expect(status).toBe(400);
+        expect((body as { message: string }).message).toMatch(/library.*not found/i);
+      });
+    });
+
+    describe('DELETE /shared-spaces/:id/libraries/:libraryId (T16)', () => {
+      // T16 covers the unlink-library operation. Same TWO-step gate as T15:
+      // admin gate first (`shared-space.service.ts:480-482`), then `requireRole(Editor)`.
+      //
+      // The repository call is a plain DELETE on the (spaceId, libraryId) pair
+      // (`shared-space.repository.ts:220-226`), with no error if no row matches.
+      // So unlinkLibrary is idempotent at the HTTP level: deleting an
+      // already-unlinked library returns 204.
+      //
+      // T16 reuses the global `admin` user that T15's beforeAll added as Editor
+      // to the test space. New libraries are created per-test so the assertions
+      // are isolated from T15's leftover linked libraries.
+
+      let scratchLibrary: { id: string };
+
+      beforeAll(async () => {
+        scratchLibrary = await utils.createLibrary(admin.accessToken, { ownerId: admin.userId });
+        // Pre-link so we have a link row to delete in the success-path test.
+        const linkRes = await request(app)
+          .put(`/shared-spaces/${spaceId}/libraries`)
+          .set('Authorization', `Bearer ${admin.accessToken}`)
+          .send({ libraryId: scratchLibrary.id });
+        if (linkRes.status !== 204) {
+          throw new Error(`T16 setup: linkLibrary failed (${linkRes.status}): ${JSON.stringify(linkRes.body)}`);
+        }
+      });
+
+      it('non-admin owner of the space cannot unlink (admin gate)', async () => {
+        // The "Only admins" branch fires before requireRole. Same shape as T15
+        // test 1, applied to the unlink endpoint to confirm the gate is duplicated
+        // not just inherited from a shared helper.
+        const { status, body } = await request(app)
+          .delete(`/shared-spaces/${spaceId}/libraries/${scratchLibrary.id}`)
+          .set('Authorization', `Bearer ${owner.accessToken}`);
+        expect(status).toBe(403);
+        expect((body as { message: string }).message).toMatch(/admins/i);
+      });
+
+      it('anon cannot unlink', async () => {
+        const { status } = await request(app).delete(`/shared-spaces/${spaceId}/libraries/${scratchLibrary.id}`);
+        expect(status).toBe(401);
+      });
+
+      it('admin who is an Editor in the space CAN unlink', async () => {
+        // Pre-condition: scratchLibrary is currently linked (set up in beforeAll).
+        // Verify via DB that the row exists, then unlink, then verify it's gone.
+        const dbClient = await utils.connectDatabase();
+        const before = await dbClient.query(
+          'SELECT 1 FROM shared_space_library WHERE "spaceId" = $1 AND "libraryId" = $2',
+          [spaceId, scratchLibrary.id],
+        );
+        expect(before.rowCount).toBe(1);
+
+        const { status } = await request(app)
+          .delete(`/shared-spaces/${spaceId}/libraries/${scratchLibrary.id}`)
+          .set('Authorization', `Bearer ${admin.accessToken}`);
+        expect(status).toBe(204);
+
+        const after = await dbClient.query(
+          'SELECT 1 FROM shared_space_library WHERE "spaceId" = $1 AND "libraryId" = $2',
+          [spaceId, scratchLibrary.id],
+        );
+        expect(after.rowCount).toBe(0);
+      });
+
+      it('unlinking an already-unlinked library is idempotent (returns 204)', async () => {
+        // The repository's removeLibrary is a plain DELETE — no row, no error.
+        // The service doesn't pre-validate either. So calling unlink on a
+        // (spaceId, libraryId) pair that has no link row returns 204 without
+        // any state mutation.
+        //
+        // We use scratchLibrary which was just unlinked by the previous test,
+        // so the (spaceId, scratchLibrary.id) pair has 0 rows. The second
+        // unlink should still succeed.
+        const { status } = await request(app)
+          .delete(`/shared-spaces/${spaceId}/libraries/${scratchLibrary.id}`)
+          .set('Authorization', `Bearer ${admin.accessToken}`);
+        expect(status).toBe(204);
+      });
+
+      it('unlinking with a non-existent libraryId returns 204 (no existence check)', async () => {
+        // Same idempotency, different angle. The service doesn't check that
+        // the library actually exists in the `library` table — it just deletes
+        // from `shared_space_library` where (spaceId, libraryId) match. A
+        // bogus libraryId UUID is a no-op DELETE → 204.
+        const { status } = await request(app)
+          .delete(`/shared-spaces/${spaceId}/libraries/00000000-0000-4000-a000-000000000099`)
+          .set('Authorization', `Bearer ${admin.accessToken}`);
+        expect(status).toBe(204);
+      });
+    });
+
+    describe('library link side effects (T17)', () => {
+      // T17 closes the space-library sub-tree by exercising the actual cross-table
+      // query that the link/unlink operations enable: library assets becoming
+      // visible to space members via /timeline/buckets?spaceId=. PR #163 was
+      // specifically about this code path; if a future regression breaks the
+      // shared_space_library JOIN in the timeline query, T17 catches it.
+      //
+      // Setup creates a real external library scanned from a fixture directory
+      // (not direct DB inserts) so the test exercises the same code path the
+      // production system uses. Each test handles its own link/unlink to keep
+      // state changes isolated.
+
+      let t17Library: { id: string };
+      let t17AssetId: string;
+
+      beforeAll(async () => {
+        // Strategy: instead of scanning a real fixture directory (fragile because
+        // of test-stack path/timing concerns), upload an admin asset normally and
+        // then UPDATE its libraryId via direct DB to associate it with the library.
+        // The shared_space_library JOIN treats it the same way regardless of how
+        // the asset was created.
+        t17Library = await utils.createLibrary(admin.accessToken, { ownerId: admin.userId });
+        const asset = await utils.createAsset(admin.accessToken);
+        t17AssetId = asset.id;
+
+        const dbClient = await utils.connectDatabase();
+        await dbClient.query('UPDATE asset SET "libraryId" = $1 WHERE id = $2', [t17Library.id, t17AssetId]);
+      });
+
+      const linkLibrary = async () => {
+        const res = await request(app)
+          .put(`/shared-spaces/${spaceId}/libraries`)
+          .set('Authorization', `Bearer ${admin.accessToken}`)
+          .send({ libraryId: t17Library.id });
+        if (res.status !== 204) {
+          throw new Error(`linkLibrary failed: ${res.status} ${JSON.stringify(res.body)}`);
+        }
+      };
+
+      const unlinkLibrary = async () => {
+        await request(app)
+          .delete(`/shared-spaces/${spaceId}/libraries/${t17Library.id}`)
+          .set('Authorization', `Bearer ${admin.accessToken}`);
+      };
+
+      const memberSeesT17Asset = async (token: string): Promise<boolean> => {
+        const { status, body } = await request(app)
+          .get(`/timeline/bucket?timeBucket=${currentMonthBucketString()}&spaceId=${spaceId}`)
+          .set('Authorization', `Bearer ${token}`);
+        if (status !== 200) {
+          return false;
+        }
+        return ((body as { id: string[] }).id ?? []).includes(t17AssetId);
+      };
+
+      it('after link, a non-owner space member sees the library asset via /timeline/bucket?spaceId=', async () => {
+        // The PR #163 bug class — the timeline query must JOIN through
+        // shared_space_library to surface library assets to space members. If
+        // the JOIN is broken, the editor's bucket query returns the space's
+        // OWN-asset content but NOT the library asset.
+        try {
+          await linkLibrary();
+          expect(await memberSeesT17Asset(editor.accessToken)).toBe(true);
+        } finally {
+          await unlinkLibrary();
+        }
+      });
+
+      it('after link, a space viewer also sees the library asset', async () => {
+        try {
+          await linkLibrary();
+          expect(await memberSeesT17Asset(viewer.accessToken)).toBe(true);
+        } finally {
+          await unlinkLibrary();
+        }
+      });
+
+      it('after unlink, library assets are no longer visible to space members', async () => {
+        // Link, verify visible, unlink, verify hidden — the round-trip pin.
+        await linkLibrary();
+        expect(await memberSeesT17Asset(editor.accessToken)).toBe(true);
+        await unlinkLibrary();
+        expect(await memberSeesT17Asset(editor.accessToken)).toBe(false);
+      });
+
+      it('soft-deleted library asset is hidden from space members', async () => {
+        // While linked, soft-delete the asset (DELETE /assets without force=true).
+        // The shared_space_library JOIN should still match, but the asset.deletedAt
+        // filter in the timeline query excludes the row.
+        try {
+          await linkLibrary();
+          expect(await memberSeesT17Asset(editor.accessToken)).toBe(true);
+
+          // Soft-delete the library asset via direct DB (the assets endpoint
+          // requires the library asset's owner — admin — and the API path is
+          // covered elsewhere; we just need the deletedAt mutation here).
+          const dbClient = await utils.connectDatabase();
+          try {
+            await dbClient.query('UPDATE asset SET "deletedAt" = NOW() WHERE id = $1', [t17AssetId]);
+            expect(await memberSeesT17Asset(editor.accessToken)).toBe(false);
+          } finally {
+            await dbClient.query('UPDATE asset SET "deletedAt" = NULL WHERE id = $1', [t17AssetId]);
+          }
+        } finally {
+          await unlinkLibrary();
+        }
+      });
+
+      it('offline library asset IS still visible to space members (no isOffline filter on timeline)', async () => {
+        // SURPRISING FINDING: the timeline-buckets query at asset.repository.ts:835-849
+        // joins shared_space_library on (libraryId, spaceId) but does NOT filter on
+        // asset.isOffline. The access.repository's checkSpaceAccess (in a different
+        // query path) does filter on isOffline=false, but the timeline takes a
+        // shortcut that skips that filter.
+        //
+        // Practical UX consequence: a library asset whose underlying file went offline
+        // (e.g., the disk was unmounted) is still listed in the space's timeline.
+        // The thumbnail/download endpoints will probably 404 on it, but the asset is
+        // visible in the bucket. Pinning this as the actual behavior — if a future
+        // change adds the missing isOffline filter, the test will fail and force a
+        // deliberate update.
+        try {
+          await linkLibrary();
+          expect(await memberSeesT17Asset(editor.accessToken)).toBe(true);
+
+          const dbClient = await utils.connectDatabase();
+          try {
+            await dbClient.query('UPDATE asset SET "isOffline" = true WHERE id = $1', [t17AssetId]);
+            // Pin the actual behavior: offline library assets are STILL visible.
+            expect(await memberSeesT17Asset(editor.accessToken)).toBe(true);
+          } finally {
+            await dbClient.query('UPDATE asset SET "isOffline" = false WHERE id = $1', [t17AssetId]);
+          }
+        } finally {
+          await unlinkLibrary();
+        }
+      });
+
+      it('deleting the library eventually cascades to shared_space_library (async via job queue)', async () => {
+        // Link the library to a SECOND space (so the cascade test doesn't disturb
+        // the parent describe's spaceId fixture, which T17's other tests reuse).
+        // Then DELETE the library and verify the shared_space_library row is gone.
+        const secondSpace = await utils.createSpace(owner.accessToken, { name: 'T17 Cascade' });
+        // owner needs to add admin so admin can link the library to this new space
+        await utils.addSpaceMember(owner.accessToken, secondSpace.id, {
+          userId: admin.userId,
+          role: SharedSpaceRole.Editor,
+        });
+
+        // Create a fresh library specifically for this test so we can delete it
+        // without affecting t17Library. No assets needed — the cascade test
+        // only checks the shared_space_library FK row.
+        const cascadeLibrary = await utils.createLibrary(admin.accessToken, { ownerId: admin.userId });
+
+        await request(app)
+          .put(`/shared-spaces/${secondSpace.id}/libraries`)
+          .set('Authorization', `Bearer ${admin.accessToken}`)
+          .send({ libraryId: cascadeLibrary.id });
+
+        const dbClient = await utils.connectDatabase();
+        const before = await dbClient.query(
+          'SELECT 1 FROM shared_space_library WHERE "spaceId" = $1 AND "libraryId" = $2',
+          [secondSpace.id, cascadeLibrary.id],
+        );
+        expect(before.rowCount).toBe(1);
+
+        // DELETE /libraries/:id is a TWO-STEP operation:
+        //   1. library.service.ts:370-379 — softDelete() sets `deletedAt` on the
+        //      library row, queues a LibraryDelete job, returns 204 IMMEDIATELY.
+        //   2. The LibraryDelete job (handleDeleteLibrary, line 381+) processes
+        //      asynchronously, eventually hard-deletes the library row, which
+        //      then triggers the FK cascade on shared_space_library.
+        //
+        // So the cascade is real but ASYNC. The test must wait for the library
+        // queue to finish before asserting the FK row is gone.
+        const delRes = await request(app)
+          .delete(`/libraries/${cascadeLibrary.id}`)
+          .set('Authorization', `Bearer ${admin.accessToken}`);
+        expect(delRes.status).toBe(204);
+
+        // Wait for the LibraryDelete job to drain.
+        await utils.waitForQueueFinish(admin.accessToken, 'library');
+
+        const after = await dbClient.query(
+          'SELECT 1 FROM shared_space_library WHERE "spaceId" = $1 AND "libraryId" = $2',
+          [secondSpace.id, cascadeLibrary.id],
+        );
+        expect(after.rowCount).toBe(0);
+      });
+    });
+
+    it('empty thumbnailPath on the underlying global person excludes the space person', async () => {
+      // The fork's "minFaces gate" mechanism. shared-space.repository.ts:512-513
+      // filters with `person.thumbnailPath IS NOT NULL AND != ''`. In production
+      // the dedup job sets this only after a person crosses minFaces faces; in tests
+      // utils.createSpacePerson sets it directly. Blanking it should make the space
+      // person disappear from the listing — pin so a future query refactor that drops
+      // this filter is caught.
+      //
+      // The global personId comes straight from createSpacePerson's returned shape
+      // (T02 extension); no JOIN query needed.
+      const dbClient = await utils.connectDatabase();
+      try {
+        await dbClient.query('UPDATE person SET "thumbnailPath" = $1 WHERE id = $2', ['', zeroThumbGlobalId]);
+        const { status, body } = await request(app)
+          .get(`/shared-spaces/${spaceId}/people`)
+          .set('Authorization', `Bearer ${owner.accessToken}`);
+        expect(status).toBe(200);
+        const ids = (body as Array<{ id: string }>).map((p) => p.id);
+        expect(ids).not.toContain(zeroThumbPersonId);
+      } finally {
+        await dbClient.query('UPDATE person SET "thumbnailPath" = $1 WHERE id = $2', [
+          '/my/awesome/thumbnail.jpg',
+          zeroThumbGlobalId,
+        ]);
+      }
     });
   });
 });
