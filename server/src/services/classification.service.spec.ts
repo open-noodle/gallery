@@ -712,12 +712,8 @@ describe(ClassificationService.name, () => {
     });
 
     it('should write classification snapshot to system metadata after diff', async () => {
-      const oldConfig = makeClassificationConfig([
-        { name: 'Cats', prompts: ['cat'], similarity: 0.3, action: 'tag' },
-      ]);
-      const newConfig = makeClassificationConfig([
-        { name: 'Cats', prompts: ['cat'], similarity: 0.5, action: 'tag' },
-      ]);
+      const oldConfig = makeClassificationConfig([{ name: 'Cats', prompts: ['cat'], similarity: 0.3, action: 'tag' }]);
+      const newConfig = makeClassificationConfig([{ name: 'Cats', prompts: ['cat'], similarity: 0.5, action: 'tag' }]);
 
       await sut.onConfigUpdate({ oldConfig, newConfig } as any);
 
@@ -730,9 +726,7 @@ describe(ClassificationService.name, () => {
 
   describe('onConfigInit', () => {
     it('should store baseline snapshot and skip cleanup when no snapshot exists', async () => {
-      const newConfig = makeClassificationConfig([
-        { name: 'Cats', prompts: ['cat'], similarity: 0.5, action: 'tag' },
-      ]);
+      const newConfig = makeClassificationConfig([{ name: 'Cats', prompts: ['cat'], similarity: 0.5, action: 'tag' }]);
       mocks.systemMetadata.get.mockResolvedValue(null);
 
       await sut.onConfigInit({ newConfig } as any);
@@ -771,15 +765,17 @@ describe(ClassificationService.name, () => {
         { name: 'Screenshots', prompts: ['screenshot'], similarity: 0.3, action: 'tag' },
       ]).classification;
       const callOrder: string[] = [];
-      mocks.systemMetadata.get.mockImplementation(async () => {
+      mocks.systemMetadata.get.mockImplementation(() => {
         callOrder.push('get');
-        return snapshot as any;
+        return Promise.resolve(snapshot as any);
       });
-      mocks.classification.removeAutoTagAssignments.mockImplementation(async () => {
+      mocks.classification.removeAutoTagAssignments.mockImplementation(() => {
         callOrder.push('reconcile');
+        return Promise.resolve();
       });
-      mocks.systemMetadata.set.mockImplementation(async () => {
+      mocks.systemMetadata.set.mockImplementation(() => {
         callOrder.push('set');
+        return Promise.resolve();
       });
 
       await sut.onConfigInit({ newConfig } as any);
@@ -788,9 +784,7 @@ describe(ClassificationService.name, () => {
     });
 
     it('should clean up tags for categories removed from config', async () => {
-      const newConfig = makeClassificationConfig([
-        { name: 'Cats', prompts: ['cat'], similarity: 0.3, action: 'tag' },
-      ]);
+      const newConfig = makeClassificationConfig([{ name: 'Cats', prompts: ['cat'], similarity: 0.3, action: 'tag' }]);
       const snapshot = makeClassificationConfig([
         { name: 'Cats', prompts: ['cat'], similarity: 0.3, action: 'tag' },
         { name: 'Removed', prompts: ['removed'], similarity: 0.3, action: 'tag' },
@@ -804,9 +798,7 @@ describe(ClassificationService.name, () => {
     });
 
     it('should not clean up tags when current similarity matches snapshot', async () => {
-      const newConfig = makeClassificationConfig([
-        { name: 'Cats', prompts: ['cat'], similarity: 0.5, action: 'tag' },
-      ]);
+      const newConfig = makeClassificationConfig([{ name: 'Cats', prompts: ['cat'], similarity: 0.5, action: 'tag' }]);
       const snapshot = makeClassificationConfig([
         { name: 'Cats', prompts: ['cat'], similarity: 0.5, action: 'tag' },
       ]).classification;
@@ -818,9 +810,7 @@ describe(ClassificationService.name, () => {
     });
 
     it('should not clean up tags when current similarity is looser than snapshot', async () => {
-      const newConfig = makeClassificationConfig([
-        { name: 'Cats', prompts: ['cat'], similarity: 0.2, action: 'tag' },
-      ]);
+      const newConfig = makeClassificationConfig([{ name: 'Cats', prompts: ['cat'], similarity: 0.2, action: 'tag' }]);
       const snapshot = makeClassificationConfig([
         { name: 'Cats', prompts: ['cat'], similarity: 0.5, action: 'tag' },
       ]).classification;
