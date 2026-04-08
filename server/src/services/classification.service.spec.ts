@@ -1,4 +1,4 @@
-import { AssetVisibility, JobName, JobStatus } from 'src/enum';
+import { AssetVisibility, JobName, JobStatus, SystemMetadataKey } from 'src/enum';
 import { ClassificationService } from 'src/services/classification.service';
 import { authStub } from 'test/fixtures/auth.stub';
 import { makeStream, newTestService, ServiceMocks } from 'test/utils';
@@ -707,6 +707,116 @@ describe(ClassificationService.name, () => {
       ]);
 
       await sut.onConfigUpdate({ oldConfig, newConfig } as any);
+
+      expect(mocks.classification.removeAutoTagAssignments).not.toHaveBeenCalled();
+    });
+
+    it('should write classification snapshot to system metadata after diff', async () => {
+      const oldConfig = makeClassificationConfig([{ name: 'Cats', prompts: ['cat'], similarity: 0.3, action: 'tag' }]);
+      const newConfig = makeClassificationConfig([{ name: 'Cats', prompts: ['cat'], similarity: 0.5, action: 'tag' }]);
+
+      await sut.onConfigUpdate({ oldConfig, newConfig } as any);
+
+      expect(mocks.systemMetadata.set).toHaveBeenCalledWith(
+        SystemMetadataKey.ClassificationConfigState,
+        newConfig.classification,
+      );
+    });
+  });
+
+  describe('onConfigInit', () => {
+    it('should store baseline snapshot and skip cleanup when no snapshot exists', async () => {
+      const newConfig = makeClassificationConfig([{ name: 'Cats', prompts: ['cat'], similarity: 0.5, action: 'tag' }]);
+      mocks.systemMetadata.get.mockResolvedValue(null);
+
+      await sut.onConfigInit({ newConfig } as any);
+
+      expect(mocks.classification.removeAutoTagAssignments).not.toHaveBeenCalled();
+      expect(mocks.systemMetadata.set).toHaveBeenCalledWith(
+        SystemMetadataKey.ClassificationConfigState,
+        newConfig.classification,
+      );
+    });
+
+    it('should clean up tags when current similarity is stricter than snapshot', async () => {
+      const newConfig = makeClassificationConfig([
+        { name: 'Screenshots', prompts: ['screenshot'], similarity: 0.6, action: 'tag' },
+      ]);
+      const snapshot = makeClassificationConfig([
+        { name: 'Screenshots', prompts: ['screenshot'], similarity: 0.3, action: 'tag' },
+      ]).classification;
+      mocks.systemMetadata.get.mockResolvedValue(snapshot as any);
+
+      await sut.onConfigInit({ newConfig } as any);
+
+      expect(mocks.classification.removeAutoTagAssignments).toHaveBeenCalledWith('Screenshots');
+      expect(mocks.classification.removeAutoTagAssignments).toHaveBeenCalledTimes(1);
+      expect(mocks.systemMetadata.set).toHaveBeenCalledWith(
+        SystemMetadataKey.ClassificationConfigState,
+        newConfig.classification,
+      );
+    });
+
+    it('should read snapshot, reconcile, then write snapshot in that order', async () => {
+      const newConfig = makeClassificationConfig([
+        { name: 'Screenshots', prompts: ['screenshot'], similarity: 0.6, action: 'tag' },
+      ]);
+      const snapshot = makeClassificationConfig([
+        { name: 'Screenshots', prompts: ['screenshot'], similarity: 0.3, action: 'tag' },
+      ]).classification;
+      const callOrder: string[] = [];
+      mocks.systemMetadata.get.mockImplementation(() => {
+        callOrder.push('get');
+        return Promise.resolve(snapshot as any);
+      });
+      mocks.classification.removeAutoTagAssignments.mockImplementation(() => {
+        callOrder.push('reconcile');
+        return Promise.resolve();
+      });
+      mocks.systemMetadata.set.mockImplementation(() => {
+        callOrder.push('set');
+        return Promise.resolve();
+      });
+
+      await sut.onConfigInit({ newConfig } as any);
+
+      expect(callOrder).toEqual(['get', 'reconcile', 'set']);
+    });
+
+    it('should clean up tags for categories removed from config', async () => {
+      const newConfig = makeClassificationConfig([{ name: 'Cats', prompts: ['cat'], similarity: 0.3, action: 'tag' }]);
+      const snapshot = makeClassificationConfig([
+        { name: 'Cats', prompts: ['cat'], similarity: 0.3, action: 'tag' },
+        { name: 'Removed', prompts: ['removed'], similarity: 0.3, action: 'tag' },
+      ]).classification;
+      mocks.systemMetadata.get.mockResolvedValue(snapshot as any);
+
+      await sut.onConfigInit({ newConfig } as any);
+
+      expect(mocks.classification.removeAutoTagAssignments).toHaveBeenCalledWith('Removed');
+      expect(mocks.classification.removeAutoTagAssignments).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not clean up tags when current similarity matches snapshot', async () => {
+      const newConfig = makeClassificationConfig([{ name: 'Cats', prompts: ['cat'], similarity: 0.5, action: 'tag' }]);
+      const snapshot = makeClassificationConfig([
+        { name: 'Cats', prompts: ['cat'], similarity: 0.5, action: 'tag' },
+      ]).classification;
+      mocks.systemMetadata.get.mockResolvedValue(snapshot as any);
+
+      await sut.onConfigInit({ newConfig } as any);
+
+      expect(mocks.classification.removeAutoTagAssignments).not.toHaveBeenCalled();
+    });
+
+    it('should not clean up tags when current similarity is looser than snapshot', async () => {
+      const newConfig = makeClassificationConfig([{ name: 'Cats', prompts: ['cat'], similarity: 0.2, action: 'tag' }]);
+      const snapshot = makeClassificationConfig([
+        { name: 'Cats', prompts: ['cat'], similarity: 0.5, action: 'tag' },
+      ]).classification;
+      mocks.systemMetadata.get.mockResolvedValue(snapshot as any);
+
+      await sut.onConfigInit({ newConfig } as any);
 
       expect(mocks.classification.removeAutoTagAssignments).not.toHaveBeenCalled();
     });
