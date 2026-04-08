@@ -1,11 +1,14 @@
 import { Injectable } from '@nestjs/common';
+import { SystemConfig } from 'src/config';
 import { OnEvent, OnJob } from 'src/decorators';
 import { AuthDto } from 'src/dtos/auth.dto';
-import { AssetVisibility, ImmichWorker, JobName, JobStatus, QueueName } from 'src/enum';
+import { AssetVisibility, ImmichWorker, JobName, JobStatus, QueueName, SystemMetadataKey } from 'src/enum';
 import { ArgOf } from 'src/repositories/event.repository';
 import { BaseService } from 'src/services/base.service';
 import { JobOf } from 'src/types';
 import { upsertTags } from 'src/utils/tag';
+
+type ClassificationConfig = SystemConfig['classification'];
 
 @Injectable()
 export class ClassificationService extends BaseService {
@@ -49,6 +52,17 @@ export class ClassificationService extends BaseService {
     });
   }
 
+  @OnEvent({ name: 'ConfigInit', workers: [ImmichWorker.Microservices] })
+  async onConfigInit({ newConfig }: ArgOf<'ConfigInit'>) {
+    const snapshot = await this.systemMetadataRepository.get(SystemMetadataKey.ClassificationConfigState);
+
+    if (snapshot) {
+      await this.reconcileAutoTags(snapshot, newConfig.classification);
+    }
+
+    await this.systemMetadataRepository.set(SystemMetadataKey.ClassificationConfigState, newConfig.classification);
+  }
+
   @OnEvent({ name: 'ConfigUpdate', workers: [ImmichWorker.Microservices], server: true })
   async onConfigUpdate({ oldConfig, newConfig }: ArgOf<'ConfigUpdate'>) {
     const clipChanged = oldConfig.machineLearning.clip.modelName !== newConfig.machineLearning.clip.modelName;
@@ -62,18 +76,29 @@ export class ClassificationService extends BaseService {
     this.pendingEncodes.clear();
 
     if (classificationChanged) {
-      const oldByName = new Map(oldConfig.classification.categories.map((c) => [c.name, c]));
-      const newNames = new Set(newConfig.classification.categories.map((c) => c.name));
+      await this.reconcileAutoTags(oldConfig.classification, newConfig.classification);
+      await this.systemMetadataRepository.set(SystemMetadataKey.ClassificationConfigState, newConfig.classification);
+    }
+  }
 
-      for (const [name, oldCategory] of oldByName) {
-        if (newNames.has(name)) {
-          const newCategory = newConfig.classification.categories.find((c) => c.name === name);
-          if (newCategory && newCategory.similarity > oldCategory.similarity) {
-            await this.classificationRepository.removeAutoTagAssignments(name);
-          }
-        } else {
-          await this.classificationRepository.removeAutoTagAssignments(name);
-        }
+  private async reconcileAutoTags(previous: ClassificationConfig, current: ClassificationConfig) {
+    const currentByName = new Map(current.categories.map((c) => [c.name, c]));
+
+    for (const previousCategory of previous.categories) {
+      const currentCategory = currentByName.get(previousCategory.name);
+
+      if (!currentCategory) {
+        this.logger.log(`Classification category "${previousCategory.name}" removed; clearing auto-tag assignments`);
+        await this.classificationRepository.removeAutoTagAssignments(previousCategory.name);
+        continue;
+      }
+
+      if (currentCategory.similarity > previousCategory.similarity) {
+        this.logger.log(
+          `Classification category "${previousCategory.name}" similarity increased ` +
+            `(${previousCategory.similarity} → ${currentCategory.similarity}); clearing auto-tag assignments`,
+        );
+        await this.classificationRepository.removeAutoTagAssignments(previousCategory.name);
       }
     }
   }
