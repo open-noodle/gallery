@@ -136,6 +136,16 @@ export class SharedSpaceRepository {
       .execute();
   }
 
+  @GenerateSql({ params: [] })
+  async getSpaceIdsWithFaceRecognitionEnabled(): Promise<string[]> {
+    const rows = await this.db
+      .selectFrom('shared_space')
+      .select('id')
+      .where('faceRecognitionEnabled', '=', true)
+      .execute();
+    return rows.map((r) => r.id);
+  }
+
   @GenerateSql({ params: [DummyValue.UUID] })
   async getAssetCount(spaceId: string): Promise<number> {
     const result = await this.db
@@ -680,6 +690,16 @@ export class SharedSpaceRepository {
       .deleteFrom('shared_space_person')
       .where('id', 'not in', this.db.selectFrom('shared_space_person_face').select('personId'))
       .execute();
+  }
+
+  @GenerateSql({ params: [] })
+  async deleteAllPersonFaces() {
+    await this.db.deleteFrom('shared_space_person_face').execute();
+  }
+
+  @GenerateSql({ params: [] })
+  async deleteAllPersons() {
+    await this.db.deleteFrom('shared_space_person').execute();
   }
 
   @GenerateSql({ params: [[DummyValue.UUID]] })

@@ -97,6 +97,14 @@ where
   "userId" = $1
   and "showInTimeline" = $2
 
+-- SharedSpaceRepository.getSpaceIdsWithFaceRecognitionEnabled
+select
+  "id"
+from
+  "shared_space"
+where
+  "faceRecognitionEnabled" = $1
+
 -- SharedSpaceRepository.getAssetCount
 select
   count(*) as "count"
@@ -520,6 +528,12 @@ where
     from
       "shared_space_person_face"
   )
+
+-- SharedSpaceRepository.deleteAllPersonFaces
+delete from "shared_space_person_face"
+
+-- SharedSpaceRepository.deleteAllPersons
+delete from "shared_space_person"
 
 -- SharedSpaceRepository.recountPersons
 update "shared_space_person"
