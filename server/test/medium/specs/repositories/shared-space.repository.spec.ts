@@ -794,62 +794,6 @@ describe(SharedSpaceRepository.name, () => {
     });
   });
 
-  describe('getPersonsBySpaceId empty-person filter', () => {
-    it('should hide unnamed space-persons with assetCount 0 and keep named ones', async () => {
-      const { ctx, sut } = setup();
-      const { user } = await ctx.newUser();
-      const { space } = await ctx.newSharedSpace({ createdById: user.id });
-
-      // Seed the three space-persons. getPersonsBySpaceId requires each space-person's
-      // representativeFaceId to resolve to a `person` row with a non-null thumbnailPath
-      // (left join + where thumbnailPath is not null / != '') — so every person in
-      // this test needs a backing `person` row with a thumbnail, otherwise all three
-      // get filtered out and the test can't distinguish the empty-filter behaviour.
-
-      const seedRepresentative = async () => {
-        const { asset } = await ctx.newAsset({ ownerId: user.id });
-        const { person } = await ctx.newPerson({ ownerId: user.id, thumbnailPath: '/fake.jpg' });
-        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
-        return { assetFace, asset };
-      };
-
-      // Unnamed, 0 assets → hidden
-      const { assetFace: face1 } = await seedRepresentative();
-      await sut.createPerson({ spaceId: space.id, name: '', representativeFaceId: face1.id, type: 'person' });
-
-      // Named, 0 assets → visible
-      const { assetFace: face2 } = await seedRepresentative();
-      const namedPerson = await sut.createPerson({
-        spaceId: space.id,
-        name: 'Alice',
-        representativeFaceId: face2.id,
-        type: 'person',
-      });
-
-      // Unnamed, > 0 assets → visible
-      const { assetFace: face3 } = await seedRepresentative();
-      const thirdPerson = await sut.createPerson({
-        spaceId: space.id,
-        name: '',
-        representativeFaceId: face3.id,
-        type: 'person',
-      });
-      await sut.addPersonFaces([{ personId: thirdPerson.id, assetFaceId: face3.id }], { skipRecount: false });
-
-      const people = await sut.getPersonsBySpaceId(space.id, {
-        withHidden: true,
-        petsEnabled: true,
-        limit: 50,
-        offset: 0,
-      });
-      const ids = people.map((p) => p.id);
-
-      expect(ids).toHaveLength(2);
-      expect(ids).toContain(namedPerson.id);
-      expect(ids).toContain(thirdPerson.id);
-    });
-  });
-
   describe('removePersonFacesByLibrary', () => {
     it('should delete space-person mappings for all assets in the given library and recount', async () => {
       const { ctx, sut } = setup();

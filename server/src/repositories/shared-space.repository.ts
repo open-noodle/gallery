@@ -517,7 +517,6 @@ export class SharedSpaceRepository {
       .selectAll('shared_space_person')
       .select(['person.name as personalName', 'person.thumbnailPath as personalThumbnailPath'])
       .where('shared_space_person.spaceId', '=', spaceId)
-      .where((eb) => eb.or([eb('shared_space_person.name', '!=', ''), eb('shared_space_person.assetCount', '>', 0)]))
       .$if(!options.withHidden, (qb) => qb.where('shared_space_person.isHidden', '=', false))
       .$if(!options.petsEnabled, (qb) => qb.where('shared_space_person.type', '!=', 'pet'))
       .where('person.thumbnailPath', 'is not', null)
