@@ -1,4 +1,5 @@
 import { Kysely } from 'kysely';
+import { AssetVisibility } from 'src/enum';
 import { LoggingRepository } from 'src/repositories/logging.repository';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
 import { DB } from 'src/schema';
@@ -752,6 +753,44 @@ describe(SharedSpaceRepository.name, () => {
       const result = await sut.getAssetFacesForMatching(asset.id);
 
       expect(result.map((f) => f.id)).toEqual([visibleFace.id]);
+    });
+  });
+
+  describe('recountPersons with filters', () => {
+    it('should exclude trashed, archived, invisible, and deleted-face rows from counts', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: user.id });
+      const spacePerson = await sut.createPerson({
+        spaceId: space.id,
+        name: 'Test',
+        representativeFaceId: null,
+        type: 'person',
+      });
+
+      // Visible, timeline, not trashed — should count
+      const { asset: assetA } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+      const { assetFace: faceA } = await ctx.newAssetFace({ assetId: assetA.id, isVisible: true });
+      // Trashed asset — should NOT count
+      const { asset: assetB } = await ctx.newAsset({ ownerId: user.id, deletedAt: new Date() });
+      const { assetFace: faceB } = await ctx.newAssetFace({ assetId: assetB.id, isVisible: true });
+      // Archived asset — should NOT count
+      const { asset: assetC } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Archive });
+      const { assetFace: faceC } = await ctx.newAssetFace({ assetId: assetC.id, isVisible: true });
+      // Invisible face — should NOT count
+      const { asset: assetD } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+      const { assetFace: faceD } = await ctx.newAssetFace({ assetId: assetD.id, isVisible: false });
+
+      await sut.addPersonFaces(
+        [faceA, faceB, faceC, faceD].map((f) => ({ personId: spacePerson.id, assetFaceId: f.id })),
+        { skipRecount: true },
+      );
+
+      await sut.recountPersons([spacePerson.id]);
+
+      const after = await sut.getPersonById(spacePerson.id);
+      expect(after?.assetCount).toBe(1);
+      expect(after?.faceCount).toBe(1);
     });
   });
 });

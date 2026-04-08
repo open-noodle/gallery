@@ -693,11 +693,22 @@ export class SharedSpaceRepository {
       .set((eb) => ({
         faceCount: eb
           .selectFrom('shared_space_person_face')
+          .innerJoin('asset_face', 'asset_face.id', 'shared_space_person_face.assetFaceId')
+          .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+          .where('asset_face.deletedAt', 'is', null)
+          .where('asset_face.isVisible', 'is', true)
+          .where('asset.deletedAt', 'is', null)
+          .where('asset.visibility', '=', sql.lit(AssetVisibility.Timeline))
           .select((eb2) => eb2.fn.countAll().$castTo<number>().as('count'))
           .whereRef('shared_space_person_face.personId', '=', 'shared_space_person.id'),
         assetCount: eb
           .selectFrom('shared_space_person_face')
           .innerJoin('asset_face', 'asset_face.id', 'shared_space_person_face.assetFaceId')
+          .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+          .where('asset_face.deletedAt', 'is', null)
+          .where('asset_face.isVisible', 'is', true)
+          .where('asset.deletedAt', 'is', null)
+          .where('asset.visibility', '=', sql.lit(AssetVisibility.Timeline))
           .select((eb2) =>
             eb2.fn
               .count(eb2.fn('distinct', ['asset_face.assetId']))

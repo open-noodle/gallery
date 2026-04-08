@@ -529,8 +529,14 @@ set
       count(*) as "count"
     from
       "shared_space_person_face"
+      inner join "asset_face" on "asset_face"."id" = "shared_space_person_face"."assetFaceId"
+      inner join "asset" on "asset"."id" = "asset_face"."assetId"
     where
-      "shared_space_person_face"."personId" = "shared_space_person"."id"
+      "asset_face"."deletedAt" is null
+      and "asset_face"."isVisible" is true
+      and "asset"."deletedAt" is null
+      and "asset"."visibility" = 'timeline'
+      and "shared_space_person_face"."personId" = "shared_space_person"."id"
   ),
   "assetCount" = (
     select
@@ -538,8 +544,13 @@ set
     from
       "shared_space_person_face"
       inner join "asset_face" on "asset_face"."id" = "shared_space_person_face"."assetFaceId"
+      inner join "asset" on "asset"."id" = "asset_face"."assetId"
     where
-      "shared_space_person_face"."personId" = "shared_space_person"."id"
+      "asset_face"."deletedAt" is null
+      and "asset_face"."isVisible" is true
+      and "asset"."deletedAt" is null
+      and "asset"."visibility" = 'timeline'
+      and "shared_space_person_face"."personId" = "shared_space_person"."id"
   )
 where
   "id" in ($1)
