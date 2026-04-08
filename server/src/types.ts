@@ -579,6 +579,7 @@ export type MediaLocation = { location: string };
 
 export interface SystemMetadata extends Record<SystemMetadataKey, Record<string, any>> {
   [SystemMetadataKey.AdminOnboarding]: { isOnboarded: boolean };
+  [SystemMetadataKey.ClassificationConfigState]: SystemConfig['classification'];
   [SystemMetadataKey.FacialRecognitionState]: { lastRun?: string };
   [SystemMetadataKey.License]: { licenseKey: string; activationKey: string; activatedAt: Date };
   [SystemMetadataKey.MaintenanceMode]: MaintenanceModeState;
