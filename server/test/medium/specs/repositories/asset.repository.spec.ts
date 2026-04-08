@@ -2,11 +2,16 @@ import { Kysely } from 'kysely';
 import { AssetOrder, AssetVisibility } from 'src/enum';
 import { AssetRepository } from 'src/repositories/asset.repository';
 import { LoggingRepository } from 'src/repositories/logging.repository';
+import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
 import { DB } from 'src/schema';
 import { BaseService } from 'src/services/base.service';
 import { newMediumService } from 'test/medium.factory';
 import { factory } from 'test/small.factory';
 import { getKyselyDB } from 'test/utils';
+
+interface TimeBucketAssets {
+  id: string[];
+}
 
 let defaultDatabase: Kysely<DB>;
 
@@ -202,6 +207,74 @@ describe(AssetRepository.name, () => {
           .where('assetId', '=', asset.id)
           .executeTakeFirstOrThrow(),
       ).resolves.toEqual({ lockedProperties: null });
+    });
+  });
+
+  describe('getTimeBucket with spacePersonIds', () => {
+    it('should only return assets whose matching face is visible and not deleted when filtering by spacePersonId', async () => {
+      const { ctx, sut } = setup();
+      const sharedSpaceRepo = ctx.get(SharedSpaceRepository);
+
+      const { user } = await ctx.newUser();
+      const auth = factory.auth({ user: { id: user.id } });
+      const { space } = await ctx.newSharedSpace({ createdById: user.id });
+
+      const bucketDate = new Date('2026-03-15T12:00:00.000Z');
+      const assetInput = {
+        ownerId: user.id,
+        visibility: AssetVisibility.Timeline,
+        fileCreatedAt: bucketDate,
+        localDateTime: bucketDate,
+      };
+
+      const { asset: assetVisible } = await ctx.newAsset(assetInput);
+      const { asset: assetInvisibleFace } = await ctx.newAsset(assetInput);
+      const { asset: assetDeletedFace } = await ctx.newAsset(assetInput);
+
+      await Promise.all([
+        ctx.newExif({ assetId: assetVisible.id, timeZone: 'UTC' }),
+        ctx.newExif({ assetId: assetInvisibleFace.id, timeZone: 'UTC' }),
+        ctx.newExif({ assetId: assetDeletedFace.id, timeZone: 'UTC' }),
+      ]);
+
+      const { assetFace: visibleFace } = await ctx.newAssetFace({ assetId: assetVisible.id, isVisible: true });
+      const { assetFace: invisibleFace } = await ctx.newAssetFace({
+        assetId: assetInvisibleFace.id,
+        isVisible: false,
+      });
+      const { assetFace: deletedFace } = await ctx.newAssetFace({
+        assetId: assetDeletedFace.id,
+        isVisible: true,
+        deletedAt: new Date(),
+      });
+
+      const spacePerson = await sharedSpaceRepo.createPerson({
+        spaceId: space.id,
+        name: 'Test',
+        representativeFaceId: visibleFace.id,
+        type: 'person',
+      });
+      await sharedSpaceRepo.addPersonFaces(
+        [
+          { personId: spacePerson.id, assetFaceId: visibleFace.id },
+          { personId: spacePerson.id, assetFaceId: invisibleFace.id },
+          { personId: spacePerson.id, assetFaceId: deletedFace.id },
+        ],
+        { skipRecount: true },
+      );
+
+      const bucket = await sut.getTimeBucket(
+        '2026-03-01',
+        {
+          userIds: [user.id],
+          spacePersonIds: [spacePerson.id],
+          visibility: AssetVisibility.Timeline,
+        },
+        auth,
+      );
+
+      const assets = JSON.parse(bucket.assets) as TimeBucketAssets;
+      expect(assets.id.toSorted()).toEqual([assetVisible.id]);
     });
   });
 });
