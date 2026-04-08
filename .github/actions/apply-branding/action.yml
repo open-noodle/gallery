@@ -12,11 +12,15 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Install jq
+    - name: Install dependencies
       shell: bash
       run: |
-        if ! command -v jq &>/dev/null; then
-          sudo apt-get update && sudo apt-get install -y jq
+        if [[ "$RUNNER_OS" == "macOS" ]]; then
+          brew install jq coreutils gnu-sed 2>/dev/null || true
+        else
+          if ! command -v jq &>/dev/null; then
+            sudo apt-get update && sudo apt-get install -y jq
+          fi
         fi
 
     - name: Apply branding overlay
@@ -24,7 +28,11 @@ runs:
       env:
         FORK_VERSION: ${{ inputs.version }}
         BUILD_NUMBER: ${{ inputs.build_number }}
-      run: ./branding/scripts/apply-branding.sh
+      run: |
+        if [[ "$RUNNER_OS" == "macOS" ]]; then
+          export PATH="/opt/homebrew/opt/gnu-sed/libexec/gnubin:/opt/homebrew/opt/coreutils/libexec/gnubin:$PATH"
+        fi
+        ./branding/scripts/apply-branding.sh
 
     - name: Verify branding applied
       shell: bash
