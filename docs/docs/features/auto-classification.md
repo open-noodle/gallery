@@ -144,21 +144,23 @@ job:
 
 When you modify classification categories, Gallery handles changes automatically:
 
-| Change                              | Behavior                                                                                                                                          |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Add a category**                  | New category takes effect on next classification run. Run "Scan All Libraries" to classify existing assets.                                       |
-| **Remove a category**               | Existing `Auto/{name}` tags are cleaned up and affected archived assets are unarchived.                                                           |
-| **Rename a category**               | Old tags are cleaned up (treated as removal + addition). Run scan to re-tag with the new name.                                                    |
-| **Increase similarity (stricter)**  | Existing auto-tags are removed, archived assets are unarchived. The UI prompts to rescan so only assets matching the new threshold get re-tagged. |
-| **Decrease similarity (looser)**    | Takes effect on next classification run. Run scan to find newly-matching assets.                                                                  |
-| **Change prompts**                  | Prompt embedding cache is cleared. New prompts are encoded on next classification run.                                                            |
-| **Change action**                   | Takes effect on next classification run. Changing to `tag_and_archive` does not retroactively archive already-tagged assets — run scan to apply.  |
-| **Disable/enable a category**       | Immediate. Disabled categories are skipped during classification.                                                                                 |
-| **Disable classification globally** | All classification jobs are skipped. No assets are processed until re-enabled.                                                                    |
-| **CLIP model change**               | Embedding cache is automatically cleared. All prompts are re-encoded with the new model on next use.                                              |
+| Change                              | Behavior                                                                                                                                                                                                                              |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Add a category**                  | New category takes effect on next classification run. Run "Scan All Libraries" to classify existing assets.                                                                                                                           |
+| **Remove a category**               | Existing `Auto/{name}` tags are cleaned up and affected archived assets are unarchived.                                                                                                                                               |
+| **Rename a category**               | Old tags are cleaned up (treated as removal + addition). Run scan to re-tag with the new name.                                                                                                                                        |
+| **Increase similarity (stricter)**  | Existing auto-tags are removed, archived assets are unarchived. The UI prompts to rescan so only assets matching the new threshold get re-tagged. For config-file admins, this cleanup runs automatically on the next server restart. |
+| **Decrease similarity (looser)**    | Takes effect on next classification run. Run scan to find newly-matching assets.                                                                                                                                                      |
+| **Change prompts**                  | Prompt embedding cache is cleared. New prompts are encoded on next classification run.                                                                                                                                                |
+| **Change action**                   | Takes effect on next classification run. Changing to `tag_and_archive` does not retroactively archive already-tagged assets — run scan to apply.                                                                                      |
+| **Disable/enable a category**       | Immediate. Disabled categories are skipped during classification.                                                                                                                                                                     |
+| **Disable classification globally** | All classification jobs are skipped. No assets are processed until re-enabled.                                                                                                                                                        |
+| **CLIP model change**               | Embedding cache is automatically cleared. All prompts are re-encoded with the new model on next use.                                                                                                                                  |
 
-:::note
-Removing a category unarchives assets that were archived by that category's `tag_and_archive` action. If you independently archived a photo that also happened to be auto-tagged, removing the category will unarchive it.
+:::warning Unarchive side effect
+Cleaning up an `Auto/{name}` tag (whether by removing the category, renaming it, or tightening its similarity) unarchives **every** asset that currently holds that tag — including photos you manually archived for unrelated reasons. Gallery cannot tell the difference between an auto-archived asset and one you archived yourself.
+
+For config-file admins, this cleanup runs automatically on the next server restart whenever the YAML changes. Watch your server startup logs (`Classification category "X" similarity increased ... clearing auto-tag assignments`) so you know when it happens.
 :::
 
 ## How It Works
@@ -214,13 +216,24 @@ Upload / Re-encode
        └─ Mark asset as classified (classifiedAt timestamp)
 ```
 
-### Config Change Handling (onConfigUpdate)
+### Config Change Handling
 
-When system configuration changes, the classification service compares old and new config:
+Two paths handle config changes, depending on how classification is managed:
 
-1. If neither classification config nor CLIP model name changed → no action (unrelated config changes like SMTP don't affect classification)
+**UI / API updates (`onConfigUpdate`)** — fired immediately when an admin saves via the UI or API:
+
+1. If neither classification config nor CLIP model name changed → no action
 2. Clear embedding cache (prompts or model may have changed)
-3. For each category name present in old config but absent in new → call `removeAutoTagAssignments` to clean up `Auto/{name}` tags and unarchive affected assets
+3. Diff old vs new categories: for each removed category or category whose similarity increased, call `removeAutoTagAssignments` to clean up `Auto/{name}` tags and unarchive affected assets
+4. Persist the new classification config as a snapshot in `system_metadata`
+
+**Config file (`onConfigInit`)** — fired on every server boot, including after a YAML edit + restart:
+
+1. Read the previous classification snapshot from `system_metadata`
+2. If a snapshot exists, run the same diff logic against the freshly-loaded config (the file is the source of truth)
+3. Persist the current classification config as the new snapshot
+
+The snapshot is the bridge between the two paths. Both paths write it after running cleanup, so the boot-time check never re-runs cleanup that was already handled by the UI path. On the very first boot after upgrading, the snapshot is missing — Gallery just stores a baseline and skips cleanup, so existing tags are preserved.
 
 ### Key Details
 
