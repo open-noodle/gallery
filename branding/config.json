@@ -29,7 +29,8 @@
     "oauth_callback": "de.opennoodle.gallery:///oauth-callback",
     "shared_group": "group.de.opennoodle.gallery.share",
     "download_dir": "DCIM/NoodleGallery",
-    "background_task_prefix": "de.opennoodle.gallery.background"
+    "background_task_prefix": "de.opennoodle.gallery.background",
+    "apple_team_id": "77MWNP37MV"
   },
 
   "docker": {
