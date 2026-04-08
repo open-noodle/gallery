@@ -469,12 +469,16 @@ export const utils = {
     return person;
   },
 
-  createFace: async ({ assetId, personId }: { assetId: string; personId: string }) => {
+  createFace: async ({ assetId, personId }: { assetId: string; personId: string }): Promise<string> => {
     if (!client) {
-      return;
+      throw new Error('Database client not connected');
     }
 
-    await client.query('INSERT INTO asset_face ("assetId", "personId") VALUES ($1, $2)', [assetId, personId]);
+    const result = await client.query('INSERT INTO asset_face ("assetId", "personId") VALUES ($1, $2) RETURNING id', [
+      assetId,
+      personId,
+    ]);
+    return result.rows[0].id as string;
   },
 
   setPersonThumbnail: async (personId: string) => {
@@ -500,33 +504,56 @@ export const utils = {
     return result.rows[0].id as string;
   },
 
-  createSpacePerson: async (spaceId: string, name: string, ownerId: string, assetId: string) => {
+  createSpacePerson: async (
+    spaceId: string,
+    name: string,
+    ownerId: string,
+    assetId: string,
+    options?: { type?: 'person' | 'pet' },
+  ): Promise<{ globalPersonId: string; spacePersonId: string; faceId: string }> => {
     if (!client) {
       throw new Error('Database client not connected');
     }
 
-    // Create a person with a thumbnail (required by getPersonsBySpaceId JOIN)
+    // 1. Create a global person row with a non-empty thumbnailPath. The shared-space
+    // listing query at shared-space.repository.ts:512-513 filters on
+    // `person.thumbnailPath IS NOT NULL AND != ''` (the fork's "minFaces gate"); without
+    // a value here, every getPersonsBySpaceId call would return empty.
     const personResult = await client.query(
       `INSERT INTO "person" ("ownerId", "name", "thumbnailPath")
        VALUES ($1, $2, '/my/awesome/thumbnail.jpg') RETURNING id`,
       [ownerId, name],
     );
-    const personId = personResult.rows[0].id as string;
+    const globalPersonId = personResult.rows[0].id as string;
 
-    // Create a face linking the asset to the person
+    // 2. Create a face row linking the asset to the global person.
     const faceResult = await client.query(
       `INSERT INTO "asset_face" ("assetId", "personId") VALUES ($1, $2) RETURNING id`,
-      [assetId, personId],
+      [assetId, globalPersonId],
     );
     const faceId = faceResult.rows[0].id as string;
 
-    // Create the space person with representativeFaceId
-    const result = await client.query(
-      `INSERT INTO shared_space_person ("spaceId", name, "isHidden", "faceCount", "assetCount", "representativeFaceId")
-       VALUES ($1, $2, false, 1, 1, $3) RETURNING id`,
-      [spaceId, name, faceId],
+    // 3. Create the shared_space_person row pointing at the face as its representative.
+    const spaceType = options?.type ?? 'person';
+    const spacePersonResult = await client.query(
+      `INSERT INTO shared_space_person
+         ("spaceId", name, "isHidden", "faceCount", "assetCount", "representativeFaceId", "type")
+       VALUES ($1, $2, false, 1, 1, $3, $4) RETURNING id`,
+      [spaceId, name, faceId, spaceType],
     );
-    return result.rows[0].id as string;
+    const spacePersonId = spacePersonResult.rows[0].id as string;
+
+    // 4. Insert the load-bearing junction row. shared-space.repository.ts queries
+    // getPersonAssetIds, reassignPersonFaces, isPersonFaceAssigned, getPersonsForDedup,
+    // the faceCount/assetCount denormalization (lines 693-708), and the
+    // takenAfter/takenBefore EXISTS subquery (lines 522-528) all traverse this table.
+    // Without it, T07-T14 queries return empty.
+    await client.query(`INSERT INTO "shared_space_person_face" ("personId", "assetFaceId") VALUES ($1, $2)`, [
+      spacePersonId,
+      faceId,
+    ]);
+
+    return { globalPersonId, spacePersonId, faceId };
   },
 
   createSharedLink: (accessToken: string, dto: SharedLinkCreateDto) =>
