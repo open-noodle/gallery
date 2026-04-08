@@ -386,7 +386,7 @@ Expected: PASS.
 
 **Step 1: Write the failing medium test**
 
-Add inside the `describe(SharedSpaceRepository.name, ...)` block, in a new `describe('getAssetFacesForMatching', ...)` (or add to the existing one if present):
+Add inside the `describe(SharedSpaceRepository.name, ...)` block, in a new `describe('getAssetFacesForMatching', ...)` block:
 
 ```ts
 describe('getAssetFacesForMatching', () => {
@@ -394,8 +394,19 @@ describe('getAssetFacesForMatching', () => {
     const { ctx, sut } = setup();
     const { user } = await ctx.newUser();
     const { asset } = await ctx.newAsset({ ownerId: user.id });
-    const visibleFace = await ctx.newAssetFace({ assetId: asset.id, isVisible: true });
-    await ctx.newAssetFace({ assetId: asset.id, isVisible: false });
+    const { assetFace: visibleFace } = await ctx.newAssetFace({ assetId: asset.id, isVisible: true });
+    const { assetFace: invisibleFace } = await ctx.newAssetFace({ assetId: asset.id, isVisible: false });
+
+    // getAssetFacesForMatching inner-joins face_search, so both faces need
+    // face_search rows or they will be excluded independently of the isVisible
+    // filter. Seed them directly.
+    await ctx.database
+      .insertInto('face_search')
+      .values([
+        { faceId: visibleFace.id, embedding: '[1,2,3]' },
+        { faceId: invisibleFace.id, embedding: '[1,2,3]' },
+      ])
+      .execute();
 
     const result = await sut.getAssetFacesForMatching(asset.id);
 
@@ -404,7 +415,7 @@ describe('getAssetFacesForMatching', () => {
 });
 ```
 
-If `ctx.newAssetFace` does not exist, look at how existing medium tests seed faces and embeddings — there is almost certainly a helper, or `ctx.get(PersonRepository)` can be used directly. Check `server/test/medium.factory.ts` and adapt.
+`ctx.newAssetFace` and `ctx.database` both exist on the medium factory — verified in `server/test/medium.factory.ts`. The pattern `await ctx.database.insertInto('face_search')...` is analogous to the existing soft-delete seeds in the file.
 
 **Step 2: Run the test and confirm it fails**
 
@@ -500,7 +511,7 @@ Refs #272"
 
 **Step 1: Write the failing test**
 
-In a new `describe('recountPersons', ...)` block (or the existing one, if present), add:
+Add a new `describe('recountPersons with filters', ...)` block inside the top-level `describe(SharedSpaceRepository.name, ...)`. Make sure `AssetVisibility` is imported from `src/enum` at the top of the file — add the import if missing.
 
 ```ts
 describe('recountPersons with filters', () => {
@@ -516,17 +527,17 @@ describe('recountPersons with filters', () => {
     });
 
     // Visible, timeline, not trashed — should count
-    const assetA = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
-    const faceA = await ctx.newAssetFace({ assetId: assetA.id, isVisible: true });
+    const { asset: assetA } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+    const { assetFace: faceA } = await ctx.newAssetFace({ assetId: assetA.id, isVisible: true });
     // Trashed asset — should NOT count
-    const assetB = await ctx.newAsset({ ownerId: user.id, deletedAt: new Date() });
-    const faceB = await ctx.newAssetFace({ assetId: assetB.id, isVisible: true });
+    const { asset: assetB } = await ctx.newAsset({ ownerId: user.id, deletedAt: new Date() });
+    const { assetFace: faceB } = await ctx.newAssetFace({ assetId: assetB.id, isVisible: true });
     // Archived asset — should NOT count
-    const assetC = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Archive });
-    const faceC = await ctx.newAssetFace({ assetId: assetC.id, isVisible: true });
+    const { asset: assetC } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Archive });
+    const { assetFace: faceC } = await ctx.newAssetFace({ assetId: assetC.id, isVisible: true });
     // Invisible face — should NOT count
-    const assetD = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
-    const faceD = await ctx.newAssetFace({ assetId: assetD.id, isVisible: false });
+    const { asset: assetD } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+    const { assetFace: faceD } = await ctx.newAssetFace({ assetId: assetD.id, isVisible: false });
 
     await sut.addPersonFaces(
       [faceA, faceB, faceC, faceD].map((f) => ({ personId: spacePerson.id, assetFaceId: f.id })),
@@ -643,29 +654,72 @@ Refs #272"
 
 **Files:**
 
-- Create or modify: an existing medium test file covering timeline / search filtering by space-person. Check `server/test/medium/specs/repositories/search.repository.spec.ts` and `server/test/medium/specs/repositories/asset.repository.spec.ts` for `spacePersonIds` use. Add a new test case next to the existing filter tests.
+- Modify: `server/test/medium/specs/repositories/shared-space.repository.spec.ts` — add a new repo-level test on `SharedSpaceRepository.getPersonAssetIds` which uses neither filter, then verify via a higher-level timeline/search query if needed. But the cleanest place to assert the new filter is via a fresh repo-level spec that exercises `hasAnySpacePerson` indirectly through an asset query.
+
+Rather than hunting for a caller, write the test against the asset repository's search path. Check `server/test/medium/specs/repositories/asset.repository.spec.ts` for a `searchAssets` / `getByFilter` pattern that takes `spacePersonIds` — the grep in task 3.0 (below) will tell you the right file.
+
+**Step 0: Locate the call site**
+
+```bash
+cd server && grep -rn "hasAnySpacePerson\|spacePersonIds" src/repositories src/utils | head
+```
+
+Pick the highest-level entry point that exercises `hasAnySpacePerson` via a filter option. As of the design snapshot, the most natural location is `asset.repository.ts` (`options.spacePersonIds`) in `searchRandom` / the timeline search path.
 
 **Step 1: Write the failing test**
 
-Find the existing `describe` for timeline or search filtering that uses `spacePersonIds`. Add:
+Add to whichever medium spec file owns the repository you picked (likely `server/test/medium/specs/repositories/asset.repository.spec.ts`):
 
 ```ts
 it('should exclude assets whose only matching face is deleted or invisible when filtering by spacePersonId', async () => {
-  // Setup: seed a space, a space-person, and three asset_face rows mapped to
-  // that space-person:
-  //   - assetA: face isVisible=true, deletedAt=null (should match)
-  //   - assetB: face isVisible=false                 (should NOT match)
-  //   - assetC: face deletedAt set                   (should NOT match)
-  // Run the asset search with spacePersonIds=[id] and assert only assetA returns.
+  const { ctx } = setup();
+  const sut = ctx.get(SharedSpaceRepository);
+  const assetRepo = ctx.get(AssetRepository);
+
+  const { user } = await ctx.newUser();
+  const { space } = await ctx.newSharedSpace({ createdById: user.id });
+  const { asset: assetVisible } = await ctx.newAsset({ ownerId: user.id });
+  const { asset: assetInvisibleFace } = await ctx.newAsset({ ownerId: user.id });
+  const { asset: assetDeletedFace } = await ctx.newAsset({ ownerId: user.id });
+
+  const { assetFace: visibleFace } = await ctx.newAssetFace({ assetId: assetVisible.id, isVisible: true });
+  const { assetFace: invisibleFace } = await ctx.newAssetFace({ assetId: assetInvisibleFace.id, isVisible: false });
+  const { assetFace: deletedFace } = await ctx.newAssetFace({
+    assetId: assetDeletedFace.id,
+    isVisible: true,
+    deletedAt: new Date(),
+  });
+
+  const spacePerson = await sut.createPerson({
+    spaceId: space.id,
+    name: 'Test',
+    representativeFaceId: visibleFace.id,
+    type: 'person',
+  });
+  await sut.addPersonFaces(
+    [
+      { personId: spacePerson.id, assetFaceId: visibleFace.id },
+      { personId: spacePerson.id, assetFaceId: invisibleFace.id },
+      { personId: spacePerson.id, assetFaceId: deletedFace.id },
+    ],
+    { skipRecount: true },
+  );
+
+  // Call whichever method on AssetRepository exercises hasAnySpacePerson.
+  // As of this design, it is `searchRandom` / timeline query with
+  // `spacePersonIds: [spacePerson.id]`. Adjust to the exact signature.
+  const result = await assetRepo.getRandom({ userIds: [user.id], spacePersonIds: [spacePerson.id], count: 10 } as any);
+
+  expect(result.map((a: any) => a.id).sort()).toEqual([assetVisible.id]);
 });
 ```
 
-Flesh out with the surrounding file's helpers (`ctx.newUser`, `ctx.newSharedSpace`, `ctx.newAsset`, etc).
+If the chosen entry point's exact signature doesn't match the snippet, adjust accordingly — the behaviour under test is "only `assetVisible` comes back".
 
 **Step 2: Run and confirm failure**
 
 ```bash
-cd server && pnpm test:medium -- --run <path-to-file>
+cd server && pnpm test:medium -- --run <path-to-file> -t "only matching face"
 ```
 
 Expected: FAIL — all three assets return.
@@ -742,83 +796,9 @@ Refs #272"
 
 **Summary:** Add `deleteAllPersonFaces`, `deleteAllPersons`, `getSpaceIdsWithFaceRecognitionEnabled` repo methods; wire Force (`handleQueueRecognizeFaces`) to call them and to queue `SharedSpaceFaceMatchAll` for every face-recognition-enabled space. Corresponds to design section 2.
 
-### Task 4.1: Failing unit test — wipe + requeue
+**Order note:** the repo methods are added first (task 4.1) so the service test in task 4.2 can reference typed mocks — `ServiceMocks` is generated from the repository interface at compile time, so the test won't type-check until the methods exist.
 
-**Files:**
-
-- Modify: `server/src/services/person.service.spec.ts`
-
-**Step 1: Write the failing test**
-
-Find the `handleQueueRecognizeFaces` describe block. Add:
-
-```ts
-describe('handleQueueRecognizeFaces force wipes space state', () => {
-  it('should wipe shared_space_person tables and requeue space match all when force=true', async () => {
-    mocks.systemMetadata.get.mockResolvedValue({ machineLearning: { facialRecognition: { enabled: true } } } as any);
-    mocks.job.waitForQueueCompletion.mockResolvedValue(void 0);
-    mocks.person.unassignFaces.mockResolvedValue(void 0);
-    mocks.person.vacuum.mockResolvedValue(void 0);
-    mocks.person.getAllFaces.mockReturnValue((async function* () {})());
-    mocks.database.prewarm.mockResolvedValue(void 0);
-    mocks.sharedSpace.deleteAllPersonFaces.mockResolvedValue(void 0);
-    mocks.sharedSpace.deleteAllPersons.mockResolvedValue(void 0);
-    mocks.sharedSpace.getSpaceIdsWithFaceRecognitionEnabled.mockResolvedValue(['space-a', 'space-b']);
-
-    await sut.handleQueueRecognizeFaces({ force: true });
-
-    expect(mocks.sharedSpace.deleteAllPersonFaces).toHaveBeenCalledOnce();
-    expect(mocks.sharedSpace.deleteAllPersons).toHaveBeenCalledOnce();
-    expect(mocks.job.queue).toHaveBeenCalledWith({
-      name: JobName.SharedSpaceFaceMatchAll,
-      data: { spaceId: 'space-a' },
-    });
-    expect(mocks.job.queue).toHaveBeenCalledWith({
-      name: JobName.SharedSpaceFaceMatchAll,
-      data: { spaceId: 'space-b' },
-    });
-  });
-
-  it('should not wipe space state when force=false', async () => {
-    mocks.systemMetadata.get.mockResolvedValue({ machineLearning: { facialRecognition: { enabled: true } } } as any);
-    mocks.job.waitForQueueCompletion.mockResolvedValue(void 0);
-    mocks.job.getJobCounts.mockResolvedValue({ waiting: 0 } as any);
-    mocks.person.getAllFaces.mockReturnValue((async function* () {})());
-    mocks.database.prewarm.mockResolvedValue(void 0);
-
-    await sut.handleQueueRecognizeFaces({ force: false });
-
-    expect(mocks.sharedSpace.deleteAllPersonFaces).not.toHaveBeenCalled();
-    expect(mocks.sharedSpace.deleteAllPersons).not.toHaveBeenCalled();
-    expect(mocks.sharedSpace.getSpaceIdsWithFaceRecognitionEnabled).not.toHaveBeenCalled();
-  });
-
-  it('should not add FacialRecognition to waitForQueueCompletion (deadlock guard)', async () => {
-    mocks.systemMetadata.get.mockResolvedValue({ machineLearning: { facialRecognition: { enabled: true } } } as any);
-    mocks.job.waitForQueueCompletion.mockResolvedValue(void 0);
-    mocks.job.getJobCounts.mockResolvedValue({ waiting: 0 } as any);
-    mocks.person.getAllFaces.mockReturnValue((async function* () {})());
-    mocks.database.prewarm.mockResolvedValue(void 0);
-
-    await sut.handleQueueRecognizeFaces({ force: false });
-
-    const drainedQueues = mocks.job.waitForQueueCompletion.mock.calls[0];
-    expect(drainedQueues).not.toContain(QueueName.FacialRecognition);
-  });
-});
-```
-
-Adjust mock setup to match the actual pattern in the existing `handleQueueRecognizeFaces` tests — copy-paste shape from whichever test already mocks `systemMetadata.get`, `waitForQueueCompletion`, `getAllFaces`, `prewarm`, etc.
-
-**Step 2: Run and confirm failure**
-
-```bash
-cd server && pnpm test -- --run src/services/person.service.spec.ts -t "handleQueueRecognizeFaces force wipes"
-```
-
-Expected: FAIL — the new mock methods do not exist yet.
-
-### Task 4.2: Add the three repo methods
+### Task 4.1: Add the three repo methods first
 
 **Files:**
 
@@ -857,6 +837,71 @@ async getSpaceIdsWithFaceRecognitionEnabled(): Promise<string[]> {
 ```
 
 **Step 3: Regenerate the SQL query file** (as in task 1.6 step 5).
+
+### Task 4.2: Failing unit tests — wipe + requeue + deadlock guard
+
+**Files:**
+
+- Modify: `server/src/services/person.service.spec.ts`
+
+**Step 1: Find an existing `handleQueueRecognizeFaces` test** in the file and copy its mock setup verbatim into the new tests below. The existing tests already know the right shape for `mocks.systemMetadata.get`, `mocks.person.getAllFaces`, `mocks.database.prewarm`, etc. — do not guess.
+
+**Step 2: Add these tests** inside the `describe` for `handleQueueRecognizeFaces`, using the mock-setup pattern you copied:
+
+```ts
+describe('force wipes space state', () => {
+  it('should wipe shared_space_person tables and queue SharedSpaceFaceMatchAll per space when force=true', async () => {
+    // ... copied mock setup for the force=true path ...
+    mocks.sharedSpace.deleteAllPersonFaces.mockResolvedValue(void 0);
+    mocks.sharedSpace.deleteAllPersons.mockResolvedValue(void 0);
+    mocks.sharedSpace.getSpaceIdsWithFaceRecognitionEnabled.mockResolvedValue(['space-a', 'space-b']);
+
+    await sut.handleQueueRecognizeFaces({ force: true });
+
+    expect(mocks.sharedSpace.deleteAllPersonFaces).toHaveBeenCalledOnce();
+    expect(mocks.sharedSpace.deleteAllPersons).toHaveBeenCalledOnce();
+    expect(mocks.job.queue).toHaveBeenCalledWith({
+      name: JobName.SharedSpaceFaceMatchAll,
+      data: { spaceId: 'space-a' },
+    });
+    expect(mocks.job.queue).toHaveBeenCalledWith({
+      name: JobName.SharedSpaceFaceMatchAll,
+      data: { spaceId: 'space-b' },
+    });
+  });
+
+  it('should not wipe space state when force=false', async () => {
+    // ... copied mock setup for the force=false path ...
+
+    await sut.handleQueueRecognizeFaces({ force: false });
+
+    expect(mocks.sharedSpace.deleteAllPersonFaces).not.toHaveBeenCalled();
+    expect(mocks.sharedSpace.deleteAllPersons).not.toHaveBeenCalled();
+    expect(mocks.sharedSpace.getSpaceIdsWithFaceRecognitionEnabled).not.toHaveBeenCalled();
+  });
+
+  it('should not drain the FacialRecognition queue (deadlock guard)', async () => {
+    // ... copied mock setup ...
+
+    await sut.handleQueueRecognizeFaces({ force: false });
+
+    // Every call to waitForQueueCompletion must not include FacialRecognition.
+    for (const call of mocks.job.waitForQueueCompletion.mock.calls) {
+      expect(call).not.toContain(QueueName.FacialRecognition);
+    }
+  });
+});
+```
+
+Because the mocks are generated from the repository interface at compile time, `mocks.sharedSpace.deleteAllPersonFaces` etc. only exist after task 4.1 adds the methods. That's why 4.1 runs first.
+
+**Step 3: Run and confirm failure**
+
+```bash
+cd server && pnpm test -- --run src/services/person.service.spec.ts -t "force wipes space state"
+```
+
+Expected: FAIL — the service code doesn't call the new methods yet.
 
 ### Task 4.3: Wire Force to call the new methods
 
@@ -949,14 +994,21 @@ describe('removePersonFacesByLibrary', () => {
     const { user } = await ctx.newUser();
     const { library } = await ctx.newLibrary({ ownerId: user.id });
     const { space } = await ctx.newSharedSpace({ createdById: user.id });
-    // seed 2 assets in the target library and 1 in a different library
-    const libAsset1 = await ctx.newAsset({ ownerId: user.id, libraryId: library.id });
-    const libAsset2 = await ctx.newAsset({ ownerId: user.id, libraryId: library.id });
-    const otherAsset = await ctx.newAsset({ ownerId: user.id });
-    const f1 = await ctx.newAssetFace({ assetId: libAsset1.id });
-    const f2 = await ctx.newAssetFace({ assetId: libAsset2.id });
-    const f3 = await ctx.newAssetFace({ assetId: otherAsset.id });
-    const spacePerson = await sut.createPerson({ spaceId: space.id, name: '', representativeFaceId: null, type: 'person' });
+
+    // 2 assets in the target library and 1 in a different library (no libraryId)
+    const { asset: libAsset1 } = await ctx.newAsset({ ownerId: user.id, libraryId: library.id });
+    const { asset: libAsset2 } = await ctx.newAsset({ ownerId: user.id, libraryId: library.id });
+    const { asset: otherAsset } = await ctx.newAsset({ ownerId: user.id });
+    const { assetFace: f1 } = await ctx.newAssetFace({ assetId: libAsset1.id });
+    const { assetFace: f2 } = await ctx.newAssetFace({ assetId: libAsset2.id });
+    const { assetFace: f3 } = await ctx.newAssetFace({ assetId: otherAsset.id });
+
+    const spacePerson = await sut.createPerson({
+      spaceId: space.id,
+      name: '',
+      representativeFaceId: null,
+      type: 'person',
+    });
     await sut.addPersonFaces(
       [f1, f2, f3].map((f) => ({ personId: spacePerson.id, assetFaceId: f.id })),
       { skipRecount: false },
@@ -971,8 +1023,6 @@ describe('removePersonFacesByLibrary', () => {
   });
 });
 ```
-
-Adapt helper names to match what actually exists in `test/medium.factory.ts`.
 
 **Step 2: Run and confirm failure**
 
@@ -1145,32 +1195,58 @@ describe('getPersonsBySpaceId empty-person filter', () => {
     const { user } = await ctx.newUser();
     const { space } = await ctx.newSharedSpace({ createdById: user.id });
 
+    // Seed the three space-persons. getPersonsBySpaceId requires each space-person's
+    // representativeFaceId to resolve to a `person` row with a non-null thumbnailPath
+    // (left join + where thumbnailPath is not null / != '') — so every person in
+    // this test needs a backing `person` row with a thumbnail, otherwise all three
+    // get filtered out and the test can't distinguish the empty-filter behaviour.
+
+    const seedRepresentative = async () => {
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      const { person } = await ctx.newPerson({ ownerId: user.id, thumbnailPath: '/fake.jpg' });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+      return { assetFace, asset };
+    };
+
     // Unnamed, 0 assets → hidden
-    await sut.createPerson({ spaceId: space.id, name: '', representativeFaceId: null, type: 'person' });
+    const { assetFace: face1 } = await seedRepresentative();
+    await sut.createPerson({ spaceId: space.id, name: '', representativeFaceId: face1.id, type: 'person' });
+
     // Named, 0 assets → visible
-    await sut.createPerson({ spaceId: space.id, name: 'Alice', representativeFaceId: null, type: 'person' });
-    // Unnamed, 1 asset → visible (needs seed with assetCount > 0)
-    const { asset } = await ctx.newAsset({ ownerId: user.id });
-    const face = await ctx.newAssetFace({ assetId: asset.id });
+    const { assetFace: face2 } = await seedRepresentative();
+    const namedPerson = await sut.createPerson({
+      spaceId: space.id,
+      name: 'Alice',
+      representativeFaceId: face2.id,
+      type: 'person',
+    });
+
+    // Unnamed, > 0 assets → visible
+    const { assetFace: face3 } = await seedRepresentative();
     const thirdPerson = await sut.createPerson({
       spaceId: space.id,
       name: '',
-      representativeFaceId: face.id,
+      representativeFaceId: face3.id,
       type: 'person',
     });
-    await sut.addPersonFaces([{ personId: thirdPerson.id, assetFaceId: face.id }], { skipRecount: false });
+    await sut.addPersonFaces([{ personId: thirdPerson.id, assetFaceId: face3.id }], { skipRecount: false });
 
-    const people = await sut.getPersonsBySpaceId(space.id, { withHidden: true, petsEnabled: true, limit: 50, offset: 0 });
-    const names = people.map((p) => ({ id: p.id, name: p.name, assetCount: p.assetCount }));
+    const people = await sut.getPersonsBySpaceId(space.id, {
+      withHidden: true,
+      petsEnabled: true,
+      limit: 50,
+      offset: 0,
+    });
+    const ids = people.map((p) => p.id);
 
-    expect(names).toHaveLength(2);
-    expect(names.find((n) => n.name === 'Alice')).toBeDefined();
-    expect(names.find((n) => n.id === thirdPerson.id)).toBeDefined();
+    expect(ids).toHaveLength(2);
+    expect(ids).toContain(namedPerson.id);
+    expect(ids).toContain(thirdPerson.id);
   });
 });
 ```
 
-Beware: `getPersonsBySpaceId` also does a left join on `person.thumbnailPath` and filters on `thumbnailPath is not null and != ''`. For this test to behave as expected the seeded persons need a non-null thumbnail path — check how existing medium tests seed this, and add whatever setup is needed (or pass `withHidden: true, petsEnabled: true` and also seed a thumbnail path via `ctx.newPerson` or similar).
+`ctx.newPerson` returns `{ person, result }` — verify the destructuring matches the factory definition at `test/medium.factory.ts:257`.
 
 **Step 2: Run and confirm failure**
 
