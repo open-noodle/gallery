@@ -19,6 +19,7 @@ BUNDLE_ID_PROFILE=$(jq -r '.mobile.bundle_id_profile' "$CONFIG")
 DEEP_LINK_SCHEME=$(jq -r '.mobile.deep_link_scheme' "$CONFIG")
 SHARED_GROUP=$(jq -r '.mobile.shared_group' "$CONFIG")
 BG_TASK_PREFIX=$(jq -r '.mobile.background_task_prefix' "$CONFIG")
+APPLE_TEAM_ID=$(jq -r '.mobile.apple_team_id' "$CONFIG")
 
 # Repository
 REPO_NAME=$(jq -r '.repository.name' "$CONFIG")
@@ -41,7 +42,8 @@ DOCS_URL=$(jq -r '.docs.url' "$CONFIG")
 if [[ -n "${FORK_VERSION:-}" ]]; then
   FORK_VERSION="${FORK_VERSION#v}"
 else
-  FORK_VERSION=$(git -C "$REPO_ROOT" describe --tags --abbrev=0 2>/dev/null | sed 's/^v//')
+  FORK_VERSION=$(git -C "$REPO_ROOT" describe --tags --abbrev=0 2>/dev/null || { git -C "$REPO_ROOT" tag -l 'v*.*.*' --sort=-v:refname 2>/dev/null | head -1; })
+  FORK_VERSION="${FORK_VERSION#v}"
 fi
 
 echo "=== Applying branding: $NAME ==="
@@ -328,6 +330,11 @@ patch_ios() {
   sed -i "s/PRODUCT_NAME = \"Immich-Profile\"/PRODUCT_NAME = \"${NAME}-Profile\"/g" "$pbxproj"
   sed -i "s/PRODUCT_NAME = Immich/PRODUCT_NAME = \"${NAME}\"/g" "$pbxproj"
 
+  # project.pbxproj — development team
+  if [[ -n "${APPLE_TEAM_ID:-}" && "$APPLE_TEAM_ID" != "null" ]]; then
+    sed -i "s/DEVELOPMENT_TEAM = [A-Z0-9]*;/DEVELOPMENT_TEAM = ${APPLE_TEAM_ID};/g" "$pbxproj"
+  fi
+
   # Info.plist — bundle name
   sed -i "s|<string>immich_mobile</string>|<string>${NAME_SLUG}</string>|g" "$info_plist"
 
@@ -339,15 +346,44 @@ patch_ios() {
   sed -i "s/app\.alextran\.immich\.backgroundFetch/${BUNDLE_ID}.backgroundFetch/g" "$info_plist"
   sed -i "s/app\.alextran\.immich\.backgroundProcessing/${BUNDLE_ID}.backgroundProcessing/g" "$info_plist"
 
-  # Shared app group
+  # Shared app group — patch entitlements in all targets
   local entitlements
-  for entitlements in "$REPO_ROOT"/mobile/ios/Runner/*.entitlements; do
+  for entitlements in "$REPO_ROOT"/mobile/ios/Runner/*.entitlements \
+                      "$REPO_ROOT"/mobile/ios/ShareExtension/*.entitlements \
+                      "$REPO_ROOT"/mobile/ios/WidgetExtension/*.entitlements; do
     if [[ -f "$entitlements" ]]; then
       sed -i "s/group\.app\.immich\.share/${SHARED_GROUP}/g" "$entitlements"
     fi
   done
 
-  echo "  Patched project.pbxproj, Info.plist, and entitlements"
+  # Shared app group in project.pbxproj (CUSTOM_GROUP_ID)
+  sed -i "s/group\.app\.immich\.share/${SHARED_GROUP}/g" "$pbxproj"
+
+  # Hardcoded app group in Swift source files
+  local swift_file
+  for swift_file in "$REPO_ROOT/mobile/ios/Runner/Core/URLSessionManager.swift" \
+                    "$REPO_ROOT/mobile/ios/WidgetExtension/ImmichAPI.swift"; do
+    if [[ -f "$swift_file" ]]; then
+      sed -i "s/group\.app\.immich\.share/${SHARED_GROUP}/g" "$swift_file"
+    fi
+  done
+
+  # Fastlane — Appfile
+  local appfile="$REPO_ROOT/mobile/ios/fastlane/Appfile"
+  if [[ -f "$appfile" ]]; then
+    sed -i "s/app_identifier \"app\.alextran\.immich\"/app_identifier \"${BUNDLE_ID}\"/g" "$appfile"
+    sed -i "/apple_id/d" "$appfile"
+  fi
+
+  # Fastlane — Fastfile constants
+  local fastfile="$REPO_ROOT/mobile/ios/fastlane/Fastfile"
+  if [[ -f "$fastfile" ]]; then
+    sed -i "s/TEAM_ID = \"2F67MQ8R79\"/TEAM_ID = ENV[\"FASTLANE_TEAM_ID\"] || \"${APPLE_TEAM_ID}\"/g" "$fastfile"
+    sed -i "s/CODE_SIGN_IDENTITY = \"Apple Distribution: Hau Tran (#{TEAM_ID})\"/CODE_SIGN_IDENTITY = \"Apple Distribution: David Pierre Marais (#{TEAM_ID})\"/g" "$fastfile"
+    sed -i "s/BASE_BUNDLE_ID = \"app\.alextran\.immich\"/BASE_BUNDLE_ID = \"${BUNDLE_ID}\"/g" "$fastfile"
+  fi
+
+  echo "  Patched project.pbxproj, Info.plist, entitlements, Swift sources, and Fastlane"
 }
 
 #
