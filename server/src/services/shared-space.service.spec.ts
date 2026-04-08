@@ -2241,9 +2241,12 @@ describe(SharedSpaceService.name, () => {
       expect(result).toBe(JobStatus.Success);
       expect(mocks.sharedSpace.findSpacePersonByLinkedPersonId).toHaveBeenCalledWith(spaceId, personalPersonId);
       expect(mocks.sharedSpace.findClosestSpacePerson).toHaveBeenCalled();
-      expect(mocks.sharedSpace.addPersonFaces).toHaveBeenCalledWith([{ personId: spacePersonId, assetFaceId: faceId }], {
-        skipRecount: true,
-      });
+      expect(mocks.sharedSpace.addPersonFaces).toHaveBeenCalledWith(
+        [{ personId: spacePersonId, assetFaceId: faceId }],
+        {
+          skipRecount: true,
+        },
+      );
     });
 
     it('should create new space-person when no Layer 1 or Layer 2 match', async () => {

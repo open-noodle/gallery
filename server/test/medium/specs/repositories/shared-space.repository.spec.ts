@@ -879,7 +879,7 @@ describe(SharedSpaceRepository.name, () => {
       await sut.removePersonFacesByLibrary(space.id, library.id);
 
       const remaining = await sut.getPersonAssetIds(spacePerson.id);
-      expect(remaining.map((r) => r.assetId).sort()).toEqual([otherAsset.id]);
+      expect(remaining.map((r) => r.assetId).toSorted()).toEqual([otherAsset.id]);
       const after = await sut.getPersonById(spacePerson.id);
       expect(after?.assetCount).toBe(1);
     });

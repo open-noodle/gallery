@@ -7,7 +7,7 @@ Issue [#272](https://github.com/open-noodle/gallery/issues/272) reports that a s
 Investigation confirmed the root cause is a difference in clustering algorithms between the native People pipeline and the shared-space pipeline:
 
 - **Native** (`person.service.ts:handleRecognizeFaces`) uses density-based clustering: a face only joins a cluster if it has at least `minFaces` neighbours within `maxDistance`. Non-core faces are deferred. This prevents chain growth.
-- **Shared space** (`shared-space.service.ts:processSpaceFaceMatch`) uses single-linkage clustering against existing space-person faces: any face within `maxDistance` of *any one* existing cluster face gets attached. Over time this causes clusters to drift and absorb unrelated faces ("chaining").
+- **Shared space** (`shared-space.service.ts:processSpaceFaceMatch`) uses single-linkage clustering against existing space-person faces: any face within `maxDistance` of _any one_ existing cluster face gets attached. Over time this causes clusters to drift and absorb unrelated faces ("chaining").
 
 Two additional contributing bugs make the discrepancy visible and hard to reason about:
 
@@ -67,7 +67,7 @@ Add two repository methods:
 
 Order matters only for FK safety; `shared_space_person_face` has `onDelete: 'CASCADE'` from both FKs, so deleting either table first works, but we delete the face mapping first for clarity.
 
-**Re-populating the space after the wipe.** The ML-face re-clustering path works naturally: `unassignFaces({ sourceType: MachineLearning })` clears native personIds, each face is re-queued through `handleRecognizeFaces`, and line 544-551 queues `SharedSpaceFaceMatch` for every space containing the asset. But this path does **not** cover EXIF or manual-source faces: they keep their personIds across Force (because `unassignFaces` filters by sourceType), and `handleRecognizeFaces` at line 486-489 early-returns on any face that already has a personId — *before* reaching the space-match queueing block. EXIF and manual faces would therefore vanish from every space and never come back. For users with Apple Photos / Lightroom face metadata imports this would be a large regression.
+**Re-populating the space after the wipe.** The ML-face re-clustering path works naturally: `unassignFaces({ sourceType: MachineLearning })` clears native personIds, each face is re-queued through `handleRecognizeFaces`, and line 544-551 queues `SharedSpaceFaceMatch` for every space containing the asset. But this path does **not** cover EXIF or manual-source faces: they keep their personIds across Force (because `unassignFaces` filters by sourceType), and `handleRecognizeFaces` at line 486-489 early-returns on any face that already has a personId — _before_ reaching the space-match queueing block. EXIF and manual faces would therefore vanish from every space and never come back. For users with Apple Photos / Lightroom face metadata imports this would be a large regression.
 
 Fix: after the wipe, explicitly queue `SharedSpaceFaceMatchAll` for every space with `faceRecognitionEnabled = true`. `handleSharedSpaceFaceMatchAll` already iterates `getAssetIdsInSpace` and dispatches per-asset `SharedSpaceFaceMatch` jobs, which run the new strict algorithm against every face in every in-space asset — ML, EXIF, and manual. Add a new repo method:
 
@@ -266,7 +266,7 @@ Named space-persons stay visible even at zero (so users can still find and manag
   - Unnamed space-person with `assetCount > 0` is returned.
 - **Medium test (real DB):**
   - Seed a space with two faces from the same global person → single space-person after match (Layer 1).
-  - Seed a space with two faces from *different* global persons but close embeddings → single space-person after match (Layer 2 bridging).
+  - Seed a space with two faces from _different_ global persons but close embeddings → single space-person after match (Layer 2 bridging).
   - Seed a space with a face that has no personId → no space-person created.
   - Trash one of the assets → `assetCount` decreases on next `recountPersons` call.
   - **Force end-to-end with ML faces.** Seed a space with stale ML-sourced rows, invoke `handleQueueRecognizeFaces({ force: true })`, drain the `FacialRecognition` queue synchronously, then assert `shared_space_person` / `shared_space_person_face` contain only rows produced by the new strict algorithm against the current DB state.
@@ -276,7 +276,7 @@ Named space-persons stay visible even at zero (so users can still find and manag
 
 ## Release notes draft
 
-> **Shared space people accuracy fix.** Fixed an issue where a shared-space person could accumulate unrelated face matches over time, causing wildly inflated photo counts. New face matches now require native facial recognition to have assigned the face to a person first. Existing space clusters and counts are not migrated automatically — if you see incorrect groupings *or* inflated counts, go to **Administration → Jobs → Facial Recognition → Force** to rebuild. Note that this resets all named people in both the global People view *and* shared spaces. Also fixed: shared-space photo counts now exclude trashed, archived, and hidden photos.
+> **Shared space people accuracy fix.** Fixed an issue where a shared-space person could accumulate unrelated face matches over time, causing wildly inflated photo counts. New face matches now require native facial recognition to have assigned the face to a person first. Existing space clusters and counts are not migrated automatically — if you see incorrect groupings _or_ inflated counts, go to **Administration → Jobs → Facial Recognition → Force** to rebuild. Note that this resets all named people in both the global People view _and_ shared spaces. Also fixed: shared-space photo counts now exclude trashed, archived, and hidden photos.
 
 ## PR structure
 

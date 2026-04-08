@@ -68,9 +68,7 @@ it('should skip ML face without a personId (strict gate)', async () => {
   const embedding = '[1,2,3]';
 
   mocks.sharedSpace.getById.mockResolvedValue(space);
-  mocks.sharedSpace.getAssetFacesForMatching.mockResolvedValue([
-    { id: faceId, assetId, personId: null, embedding },
-  ]);
+  mocks.sharedSpace.getAssetFacesForMatching.mockResolvedValue([{ id: faceId, assetId, personId: null, embedding }]);
   mocks.sharedSpace.isPersonFaceAssigned.mockResolvedValue(false);
   mocks.sharedSpace.getPetFacesForAsset.mockResolvedValue([]);
 
@@ -122,10 +120,7 @@ for (const face of faces) {
 
   // Layer 1: same global personId → same space-person. Stable fast path, single
   // indexed lookup, no vector search.
-  const existingSpacePerson = await this.sharedSpaceRepository.findSpacePersonByLinkedPersonId(
-    spaceId,
-    face.personId,
-  );
+  const existingSpacePerson = await this.sharedSpaceRepository.findSpacePersonByLinkedPersonId(spaceId, face.personId);
 
   if (existingSpacePerson) {
     personId = existingSpacePerson.id;
@@ -353,9 +348,7 @@ it('should not touch pre-existing stale rows (isPersonFaceAssigned short-circuit
   const embedding = '[1,2,3]';
 
   mocks.sharedSpace.getById.mockResolvedValue(space);
-  mocks.sharedSpace.getAssetFacesForMatching.mockResolvedValue([
-    { id: faceId, assetId, personId: null, embedding },
-  ]);
+  mocks.sharedSpace.getAssetFacesForMatching.mockResolvedValue([{ id: faceId, assetId, personId: null, embedding }]);
   // Stale row already exists
   mocks.sharedSpace.isPersonFaceAssigned.mockResolvedValue(true);
   mocks.sharedSpace.getPetFacesForAsset.mockResolvedValue([]);
