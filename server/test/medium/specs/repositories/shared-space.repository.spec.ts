@@ -793,4 +793,39 @@ describe(SharedSpaceRepository.name, () => {
       expect(after?.faceCount).toBe(1);
     });
   });
+
+  describe('removePersonFacesByLibrary', () => {
+    it('should delete space-person mappings for all assets in the given library and recount', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { library } = await ctx.newLibrary({ ownerId: user.id });
+      const { space } = await ctx.newSharedSpace({ createdById: user.id });
+
+      // 2 assets in the target library and 1 in a different library (no libraryId)
+      const { asset: libAsset1 } = await ctx.newAsset({ ownerId: user.id, libraryId: library.id });
+      const { asset: libAsset2 } = await ctx.newAsset({ ownerId: user.id, libraryId: library.id });
+      const { asset: otherAsset } = await ctx.newAsset({ ownerId: user.id });
+      const { assetFace: f1 } = await ctx.newAssetFace({ assetId: libAsset1.id });
+      const { assetFace: f2 } = await ctx.newAssetFace({ assetId: libAsset2.id });
+      const { assetFace: f3 } = await ctx.newAssetFace({ assetId: otherAsset.id });
+
+      const spacePerson = await sut.createPerson({
+        spaceId: space.id,
+        name: '',
+        representativeFaceId: null,
+        type: 'person',
+      });
+      await sut.addPersonFaces(
+        [f1, f2, f3].map((f) => ({ personId: spacePerson.id, assetFaceId: f.id })),
+        { skipRecount: false },
+      );
+
+      await sut.removePersonFacesByLibrary(space.id, library.id);
+
+      const remaining = await sut.getPersonAssetIds(spacePerson.id);
+      expect(remaining.map((r) => r.assetId).sort()).toEqual([otherAsset.id]);
+      const after = await sut.getPersonById(spacePerson.id);
+      expect(after?.assetCount).toBe(1);
+    });
+  });
 });

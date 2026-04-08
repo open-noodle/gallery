@@ -508,6 +508,49 @@ where
       "shared_space_person"."spaceId" = $2
   )
 
+-- SharedSpaceRepository.removePersonFacesByLibrary
+select distinct
+  "personId"
+from
+  "shared_space_person_face"
+where
+  "assetFaceId" in (
+    select
+      "asset_face"."id"
+    from
+      "asset_face"
+      inner join "asset" on "asset"."id" = "asset_face"."assetId"
+    where
+      "asset"."libraryId" = $1
+  )
+  and "personId" in (
+    select
+      "shared_space_person"."id"
+    from
+      "shared_space_person"
+    where
+      "shared_space_person"."spaceId" = $2
+  )
+delete from "shared_space_person_face"
+where
+  "assetFaceId" in (
+    select
+      "asset_face"."id"
+    from
+      "asset_face"
+      inner join "asset" on "asset"."id" = "asset_face"."assetId"
+    where
+      "asset"."libraryId" = $1
+  )
+  and "personId" in (
+    select
+      "shared_space_person"."id"
+    from
+      "shared_space_person"
+    where
+      "shared_space_person"."spaceId" = $2
+  )
+
 -- SharedSpaceRepository.deleteOrphanedPersons
 delete from "shared_space_person"
 where

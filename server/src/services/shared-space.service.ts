@@ -484,6 +484,8 @@ export class SharedSpaceService extends BaseService {
     await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
 
     await this.sharedSpaceRepository.removeLibrary(spaceId, libraryId);
+    await this.sharedSpaceRepository.removePersonFacesByLibrary(spaceId, libraryId);
+    await this.sharedSpaceRepository.deleteOrphanedPersons(spaceId);
   }
 
   async markSpaceViewed(auth: AuthDto, spaceId: string): Promise<void> {

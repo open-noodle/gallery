@@ -675,6 +675,38 @@ export class SharedSpaceRepository {
     }
   }
 
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
+  async removePersonFacesByLibrary(spaceId: string, libraryId: string) {
+    const assetFaceSubquery = this.db
+      .selectFrom('asset_face')
+      .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+      .select('asset_face.id')
+      .where('asset.libraryId', '=', libraryId);
+
+    const spacePersonSubquery = this.db
+      .selectFrom('shared_space_person')
+      .select('shared_space_person.id')
+      .where('shared_space_person.spaceId', '=', spaceId);
+
+    const affectedPersonIds = await this.db
+      .selectFrom('shared_space_person_face')
+      .select('personId')
+      .distinct()
+      .where('assetFaceId', 'in', assetFaceSubquery)
+      .where('personId', 'in', spacePersonSubquery)
+      .execute();
+
+    await this.db
+      .deleteFrom('shared_space_person_face')
+      .where('assetFaceId', 'in', assetFaceSubquery)
+      .where('personId', 'in', spacePersonSubquery)
+      .execute();
+
+    if (affectedPersonIds.length > 0) {
+      await this.recountPersons(affectedPersonIds.map((r) => r.personId));
+    }
+  }
+
   @GenerateSql({ params: [DummyValue.UUID] })
   async deleteOrphanedPersons(spaceId: string) {
     await this.db

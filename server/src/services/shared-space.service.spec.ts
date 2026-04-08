@@ -4227,6 +4227,8 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.getById.mockResolvedValue(space);
       mocks.sharedSpace.getMember.mockResolvedValue(member);
       mocks.sharedSpace.removeLibrary.mockResolvedValue([] as any);
+      mocks.sharedSpace.removePersonFacesByLibrary.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.deleteOrphanedPersons.mockResolvedValue(void 0 as any);
 
       await sut.unlinkLibrary(auth, space.id, libraryId);
 
@@ -4246,6 +4248,8 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.getById.mockResolvedValue(space);
       mocks.sharedSpace.getMember.mockResolvedValue(member);
       mocks.sharedSpace.removeLibrary.mockResolvedValue([] as any);
+      mocks.sharedSpace.removePersonFacesByLibrary.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.deleteOrphanedPersons.mockResolvedValue(void 0 as any);
 
       await sut.unlinkLibrary(auth, space.id, libraryId);
 
@@ -4295,6 +4299,8 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.getById.mockResolvedValue(space);
       mocks.sharedSpace.getMember.mockResolvedValue(member);
       mocks.sharedSpace.removeLibrary.mockResolvedValue([] as any);
+      mocks.sharedSpace.removePersonFacesByLibrary.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.deleteOrphanedPersons.mockResolvedValue(void 0 as any);
 
       await expect(sut.unlinkLibrary(auth, space.id, newUuid())).resolves.not.toThrow();
     });
@@ -4311,11 +4317,37 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.getById.mockResolvedValue(space);
       mocks.sharedSpace.getMember.mockResolvedValue(member);
       mocks.sharedSpace.removeLibrary.mockResolvedValue([] as any);
+      mocks.sharedSpace.removePersonFacesByLibrary.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.deleteOrphanedPersons.mockResolvedValue(void 0 as any);
 
       await sut.unlinkLibrary(auth, space.id, newUuid());
 
       expect(mocks.sharedSpace.removeLibrary).toHaveBeenCalled();
       expect(mocks.sharedSpace.removeAssets).not.toHaveBeenCalled();
+    });
+
+    describe('unlinkLibrary cleanup', () => {
+      it('should call removePersonFacesByLibrary and deleteOrphanedPersons after unlink', async () => {
+        const spaceId = newUuid();
+        const libraryId = newUuid();
+        const auth = factory.auth({ user: { isAdmin: true } });
+        const member = makeMemberResult({
+          spaceId,
+          userId: auth.user.id,
+          role: SharedSpaceRole.Owner,
+        });
+
+        mocks.sharedSpace.getMember.mockResolvedValue(member);
+        mocks.sharedSpace.removeLibrary.mockResolvedValue(void 0 as any);
+        mocks.sharedSpace.removePersonFacesByLibrary.mockResolvedValue(void 0 as any);
+        mocks.sharedSpace.deleteOrphanedPersons.mockResolvedValue(void 0 as any);
+
+        await sut.unlinkLibrary(auth, spaceId, libraryId);
+
+        expect(mocks.sharedSpace.removeLibrary).toHaveBeenCalledWith(spaceId, libraryId);
+        expect(mocks.sharedSpace.removePersonFacesByLibrary).toHaveBeenCalledWith(spaceId, libraryId);
+        expect(mocks.sharedSpace.deleteOrphanedPersons).toHaveBeenCalledWith(spaceId);
+      });
     });
   });
 
