@@ -839,6 +839,7 @@ export class SharedSpaceRepository {
       .select(['asset_face.id', 'asset_face.assetId', 'asset_face.personId', 'face_search.embedding'])
       .where('asset_face.assetId', '=', assetId)
       .where('asset_face.deletedAt', 'is', null)
+      .where('asset_face.isVisible', 'is', true)
       .execute();
   }
 

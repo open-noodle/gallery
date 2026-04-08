@@ -4,6 +4,7 @@ import { SharedSpaceRepository } from 'src/repositories/shared-space.repository'
 import { DB } from 'src/schema';
 import { BaseService } from 'src/services/base.service';
 import { newMediumService } from 'test/medium.factory';
+import { newEmbedding } from 'test/small.factory';
 import { getKyselyDB } from 'test/utils';
 
 let defaultDatabase: Kysely<DB>;
@@ -726,6 +727,31 @@ describe(SharedSpaceRepository.name, () => {
       expect(activities[0].userId).toBeNull();
       expect(activities[0].name).toBeNull();
       expect(activities[0].email).toBeNull();
+    });
+  });
+
+  describe('getAssetFacesForMatching', () => {
+    it('should exclude faces with isVisible = false', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      const { assetFace: visibleFace } = await ctx.newAssetFace({ assetId: asset.id, isVisible: true });
+      const { assetFace: invisibleFace } = await ctx.newAssetFace({ assetId: asset.id, isVisible: false });
+
+      // getAssetFacesForMatching inner-joins face_search, so both faces need
+      // face_search rows or they will be excluded independently of the isVisible
+      // filter. Seed them directly.
+      await ctx.database
+        .insertInto('face_search')
+        .values([
+          { faceId: visibleFace.id, embedding: newEmbedding() },
+          { faceId: invisibleFace.id, embedding: newEmbedding() },
+        ])
+        .execute();
+
+      const result = await sut.getAssetFacesForMatching(asset.id);
+
+      expect(result.map((f) => f.id)).toEqual([visibleFace.id]);
     });
   });
 });

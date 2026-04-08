@@ -635,6 +635,7 @@ from
 where
   "asset_face"."assetId" = $1
   and "asset_face"."deletedAt" is null
+  and "asset_face"."isVisible" is true
 
 -- SharedSpaceRepository.isAssetInSpace
 select
