@@ -1,0 +1,272 @@
+name: Gallery Build Mobile
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'development'
+        type: choice
+        options:
+          - development
+          - production
+  workflow_call:
+    inputs:
+      ref:
+        required: false
+        type: string
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'development'
+        type: string
+    secrets:
+      KEY_JKS:
+        required: true
+      ALIAS:
+        required: true
+      ANDROID_KEY_PASSWORD:
+        required: true
+      ANDROID_STORE_PASSWORD:
+        required: true
+      APP_STORE_CONNECT_API_KEY_ID:
+        required: true
+      APP_STORE_CONNECT_API_KEY_ISSUER_ID:
+        required: true
+      APP_STORE_CONNECT_API_KEY:
+        required: true
+      IOS_CERTIFICATE_P12:
+        required: true
+      IOS_CERTIFICATE_PASSWORD:
+        required: true
+      FASTLANE_TEAM_ID:
+        required: true
+  pull_request:
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/gallery-build-mobile.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/gallery-build-mobile.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  build-sign-android:
+    name: Build and sign Android
+    permissions:
+      contents: read
+    # Skip when PR from a fork
+    if: ${{ !github.event.pull_request.head.repo.fork && github.actor != 'dependabot[bot]' }}
+    environment: mobile-build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          persist-credentials: false
+          token: ${{ github.token }}
+          fetch-tags: true
+
+      - uses: ./.github/actions/apply-branding
+
+      - name: Create the Keystore
+        env:
+          KEY_JKS: ${{ secrets.KEY_JKS }}
+        working-directory: ./mobile
+        run: printf "%s" $KEY_JKS | base64 -d > android/key.jks
+
+      - uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Restore Gradle Cache
+        id: cache-gradle-restore
+        uses: actions/cache/restore@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            ~/.android/sdk
+            mobile/android/.gradle
+            mobile/.dart_tool
+          key: build-mobile-gradle-${{ runner.os }}-main
+
+      - name: Setup Flutter SDK
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: 'stable'
+          flutter-version-file: ./mobile/pubspec.yaml
+          cache: true
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3.2.2
+        with:
+          packages: ''
+
+      - name: Get Packages
+        working-directory: ./mobile
+        run: flutter pub get
+
+      - name: Generate translation file
+        run: dart run easy_localization:generate -S ../i18n && dart run bin/generate_keys.dart
+        working-directory: ./mobile
+
+      - name: Generate platform APIs
+        run: make pigeon
+        working-directory: ./mobile
+
+      - name: Build Android App Bundle
+        working-directory: ./mobile
+        env:
+          ALIAS: ${{ secrets.ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          IS_MAIN: ${{ github.ref == 'refs/heads/main' }}
+        run: |
+          if [[ $IS_MAIN == 'true' ]]; then
+            flutter build apk --release
+            flutter build apk --release --split-per-abi --target-platform android-arm,android-arm64,android-x64
+          else
+            flutter build apk --debug --split-per-abi --target-platform android-arm64
+          fi
+
+      - name: Publish Android Artifact
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: release-apk-signed
+          path: mobile/build/app/outputs/flutter-apk/*.apk
+
+      - name: Save Gradle Cache
+        id: cache-gradle-save
+        uses: actions/cache/save@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        if: github.ref == 'refs/heads/main'
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            ~/.android/sdk
+            mobile/android/.gradle
+            mobile/.dart_tool
+          key: ${{ steps.cache-gradle-restore.outputs.cache-primary-key }}
+
+  build-sign-ios:
+    name: Build and sign iOS
+    permissions:
+      contents: read
+    if: ${{ !github.event.pull_request.head.repo.fork }}
+    environment: mobile-build
+    runs-on: macos-15
+
+    steps:
+      - name: Select Xcode 26
+        run: sudo xcode-select -s /Applications/Xcode_26.2.app/Contents/Developer
+
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          persist-credentials: false
+          fetch-tags: true
+
+      - uses: ./.github/actions/apply-branding
+
+      - name: Setup Flutter SDK
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: 'stable'
+          flutter-version-file: ./mobile/pubspec.yaml
+          cache: true
+
+      - name: Install Flutter dependencies
+        working-directory: ./mobile
+        run: flutter pub get
+
+      - name: Generate translation files
+        run: dart run easy_localization:generate -S ../i18n && dart run bin/generate_keys.dart
+        working-directory: ./mobile
+
+      - name: Generate platform APIs
+        run: make pigeon
+        working-directory: ./mobile
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@c515ec17f69368147deb311832da000dd229d338 # v1.297.0
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+          working-directory: ./mobile/ios
+
+      - name: Install CocoaPods dependencies
+        working-directory: ./mobile/ios
+        run: pod install
+
+      - name: Create API Key
+        env:
+          API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          API_KEY_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
+          API_KEY_CONTENT: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+        working-directory: ./mobile/ios
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          echo "$API_KEY_CONTENT" | base64 --decode > ~/.appstoreconnect/private_keys/AuthKey_${API_KEY_ID}.p8
+
+      - name: Import Certificate
+        env:
+          IOS_CERTIFICATE_P12: ${{ secrets.IOS_CERTIFICATE_P12 }}
+        working-directory: ./mobile/ios
+        run: echo "$IOS_CERTIFICATE_P12" | base64 --decode > certificate.p12
+
+      - name: Create keychain and import certificate
+        env:
+          KEYCHAIN_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+          CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+        working-directory: ./mobile/ios
+        run: |
+          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security set-keychain-settings -t 3600 -u build.keychain
+          security import certificate.p12 -k build.keychain -P "$CERTIFICATE_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+          security find-identity -v -p codesigning build.keychain
+
+      - name: Build and deploy to TestFlight
+        if: github.ref == 'refs/heads/main'
+        env:
+          FASTLANE_TEAM_ID: ${{ secrets.FASTLANE_TEAM_ID }}
+          IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_NAME: build.keychain
+          KEYCHAIN_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
+          ENVIRONMENT: ${{ inputs.environment || 'production' }}
+          FASTLANE_XCODEBUILD_SETTINGS_TIMEOUT: 120
+          FASTLANE_XCODEBUILD_SETTINGS_RETRIES: 6
+        working-directory: ./mobile/ios
+        run: bundle exec fastlane gha_release_prod
+
+      - name: Build iOS (no upload)
+        if: github.ref != 'refs/heads/main'
+        working-directory: ./mobile
+        run: |
+          flutter build ipa --no-codesign
+
+      - name: Clean up keychain
+        if: always()
+        run: security delete-keychain build.keychain || true
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: ios-release-ipa
+          path: mobile/ios/Runner.ipa
