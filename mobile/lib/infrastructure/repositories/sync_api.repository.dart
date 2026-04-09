@@ -209,6 +209,17 @@ const _kResponseMap = <SyncEntityType, Function(Object)>{
   SyncEntityType.sharedSpaceToAssetV1: SyncSharedSpaceToAssetV1.fromJson,
   SyncEntityType.sharedSpaceToAssetBackfillV1: SyncSharedSpaceToAssetV1.fromJson,
   SyncEntityType.sharedSpaceToAssetDeleteV1: SyncSharedSpaceToAssetDeleteV1.fromJson,
+  // --- gallery-fork: library sync types ---
+  SyncEntityType.libraryV1: SyncLibraryV1.fromJson,
+  SyncEntityType.libraryDeleteV1: SyncLibraryDeleteV1.fromJson,
+  SyncEntityType.libraryAssetCreateV1: SyncAssetV1.fromJson,
+  SyncEntityType.libraryAssetBackfillV1: SyncAssetV1.fromJson,
+  SyncEntityType.libraryAssetDeleteV1: SyncLibraryAssetDeleteV1.fromJson,
+  SyncEntityType.libraryAssetExifCreateV1: SyncAssetExifV1.fromJson,
+  SyncEntityType.libraryAssetExifBackfillV1: SyncAssetExifV1.fromJson,
+  SyncEntityType.sharedSpaceLibraryV1: SyncSharedSpaceLibraryV1.fromJson,
+  SyncEntityType.sharedSpaceLibraryBackfillV1: SyncSharedSpaceLibraryV1.fromJson,
+  SyncEntityType.sharedSpaceLibraryDeleteV1: SyncSharedSpaceLibraryDeleteV1.fromJson,
 };
 
 class _SyncEmptyDto {

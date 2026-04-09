@@ -13,6 +13,7 @@ import 'package:immich_mobile/infrastructure/entities/asset_edit.entity.drift.da
 import 'package:immich_mobile/infrastructure/entities/asset_face.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/auth_user.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/exif.entity.drift.dart';
+import 'package:immich_mobile/infrastructure/entities/library.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/memory.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/memory_asset.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/partner.entity.drift.dart';
@@ -24,6 +25,7 @@ import 'package:immich_mobile/infrastructure/entities/remote_asset.entity.drift.
 import 'package:immich_mobile/infrastructure/entities/remote_asset_cloud_id.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/shared_space.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/shared_space_asset.entity.drift.dart';
+import 'package:immich_mobile/infrastructure/entities/shared_space_library.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/shared_space_member.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/stack.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/user.entity.drift.dart';
@@ -617,6 +619,139 @@ class SyncStreamRepository extends DriftDatabaseRepository {
       });
     } catch (error, stack) {
       _logger.severe('Error: deleteSharedSpaceToAssetsV1', error, stack);
+      rethrow;
+    }
+  }
+
+  // --- gallery-fork: library sync handlers ---
+
+  Future<void> updateLibrariesV1(Iterable<SyncLibraryV1> data) async {
+    try {
+      await _db.batch((batch) {
+        for (final library in data) {
+          final companion = LibraryEntityCompanion(
+            name: Value(library.name),
+            ownerId: Value(library.ownerId),
+            createdAt: Value(library.createdAt),
+            updatedAt: Value(library.updatedAt),
+          );
+
+          batch.insert(
+            _db.libraryEntity,
+            companion.copyWith(id: Value(library.id)),
+            onConflict: DoUpdate((_) => companion),
+          );
+        }
+      });
+    } catch (error, stack) {
+      _logger.severe('Error: updateLibrariesV1', error, stack);
+      rethrow;
+    }
+  }
+
+  // The currentUserId parameter is passed in from the dispatch site rather
+  // than read from Store inside the repository. This keeps SyncStreamRepository
+  // decoupled from the global Store singleton (matches the rest of the file,
+  // which stays free of auth-context dependencies) and makes the handler
+  // trivially testable with an in-memory Drift database.
+  Future<void> deleteLibrariesV1(Iterable<SyncLibraryDeleteV1> data, {required String currentUserId}) async {
+    final libraryIds = data.map((d) => d.libraryId).toList();
+    if (libraryIds.isEmpty) return;
+
+    try {
+      await _db.transaction(() async {
+        for (final libraryId in libraryIds) {
+          await _db.libraryEntity.deleteWhere((row) => row.id.equals(libraryId));
+        }
+
+        // Sweep orphan library assets — preserves user-owned, partner-shared,
+        // and direct-add (shared_space_asset) paths. Uses snake_case because
+        // Drift generates snake_case table/column names from camelCase Dart
+        // identifiers. See remote_asset.entity.dart for the `libraryId` column
+        // declaration that becomes `library_id`.
+        final placeholders = libraryIds.map((_) => '?').join(',');
+        await _db.customStatement(
+          '''
+          DELETE FROM remote_asset_entity
+          WHERE library_id IS NOT NULL
+            AND library_id IN ($placeholders)
+            AND owner_id != ?
+            AND owner_id NOT IN (
+              SELECT shared_by_id FROM partner_entity WHERE shared_with_id = ?
+            )
+            AND id NOT IN (SELECT asset_id FROM shared_space_asset_entity)
+          ''',
+          [...libraryIds, currentUserId, currentUserId],
+        );
+      });
+    } catch (error, stack) {
+      _logger.severe('Error: deleteLibrariesV1', error, stack);
+      rethrow;
+    }
+  }
+
+  // LibraryAssetCreate/Backfill use the same SyncAssetV1 payload as the regular
+  // asset stream. We delegate to updateAssetsV1 to upsert into remote_asset,
+  // which is the source of truth for asset metadata.
+  Future<void> updateLibraryAssetsV1(Iterable<SyncAssetV1> data) =>
+      updateAssetsV1(data, debugLabel: 'library');
+
+  // Per-asset deletes from the library asset stream. The server has already
+  // scoped these to accessibleLibraries (see commit a6141764a) so we can
+  // authoritatively remove the row without running the whole-library sweep.
+  Future<void> deleteLibraryAssetsV1(Iterable<SyncLibraryAssetDeleteV1> data) async {
+    try {
+      await _db.batch((batch) {
+        for (final asset in data) {
+          batch.deleteWhere(_db.remoteAssetEntity, (row) => row.id.equals(asset.assetId));
+        }
+      });
+    } catch (error, stack) {
+      _logger.severe('Error: deleteLibraryAssetsV1', error, stack);
+      rethrow;
+    }
+  }
+
+  // Same delegation pattern as updateSharedSpaceAssetExifsV1.
+  Future<void> updateLibraryAssetExifsV1(Iterable<SyncAssetExifV1> data) =>
+      updateAssetsExifV1(data, debugLabel: 'library');
+
+  Future<void> updateSharedSpaceLibrariesV1(Iterable<SyncSharedSpaceLibraryV1> data) async {
+    try {
+      await _db.batch((batch) {
+        for (final join in data) {
+          final companion = SharedSpaceLibraryEntityCompanion(
+            spaceId: Value(join.spaceId),
+            libraryId: Value(join.libraryId),
+            addedById: Value(join.addedById),
+            createdAt: Value(join.createdAt),
+          );
+
+          batch.insert(_db.sharedSpaceLibraryEntity, companion, onConflict: DoUpdate((_) => companion));
+        }
+      });
+    } catch (error, stack) {
+      _logger.severe('Error: updateSharedSpaceLibrariesV1', error, stack);
+      rethrow;
+    }
+  }
+
+  // Does NOT sweep assets — that's the job of deleteLibrariesV1's whole-library
+  // cascade when the underlying library itself is deleted. Removing a join row
+  // just means the timeline UNION query in timeline.repository.dart stops
+  // including library-linked assets for this space.
+  Future<void> deleteSharedSpaceLibrariesV1(Iterable<SyncSharedSpaceLibraryDeleteV1> data) async {
+    try {
+      await _db.batch((batch) {
+        for (final join in data) {
+          batch.delete(
+            _db.sharedSpaceLibraryEntity,
+            SharedSpaceLibraryEntityCompanion(spaceId: Value(join.spaceId), libraryId: Value(join.libraryId)),
+          );
+        }
+      });
+    } catch (error, stack) {
+      _logger.severe('Error: deleteSharedSpaceLibrariesV1', error, stack);
       rethrow;
     }
   }

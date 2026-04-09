@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart' as drift;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:immich_mobile/infrastructure/entities/partner.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/sync_stream.repository.dart';
 import 'package:openapi/api.dart';
@@ -351,6 +352,367 @@ void main() {
       final remaining = await db.sharedSpaceAssetEntity.select().get();
       expect(remaining, hasLength(1));
       expect(remaining.first.assetId, 'asset-2');
+    });
+  });
+
+  group('SyncStreamRepository - Libraries', () {
+    SyncLibraryV1 makeLibrary({
+      String id = 'library-1',
+      String name = 'External Library',
+      String ownerId = 'user-1',
+    }) => SyncLibraryV1(
+      id: id,
+      name: name,
+      ownerId: ownerId,
+      createdAt: DateTime(2026, 4, 6),
+      updatedAt: DateTime(2026, 4, 6),
+    );
+
+    SyncAssetV1 makeLibraryAsset({
+      required String id,
+      required String checksum,
+      required String ownerId,
+      required String libraryId,
+    }) => SyncAssetV1(
+      id: id,
+      checksum: checksum,
+      originalFileName: '$id.jpg',
+      type: AssetTypeEnum.IMAGE,
+      ownerId: ownerId,
+      isFavorite: false,
+      fileCreatedAt: DateTime(2024, 1, 1),
+      fileModifiedAt: DateTime(2024, 1, 1),
+      localDateTime: DateTime(2024, 1, 1),
+      visibility: AssetVisibility.timeline,
+      width: 100,
+      height: 100,
+      deletedAt: null,
+      duration: null,
+      libraryId: libraryId,
+      livePhotoVideoId: null,
+      stackId: null,
+      thumbhash: null,
+      isEdited: false,
+    );
+
+    Future<void> insertPartner({required String sharedById, required String sharedWithId}) async {
+      await db.into(db.partnerEntity).insert(
+            PartnerEntityCompanion.insert(
+              sharedById: sharedById,
+              sharedWithId: sharedWithId,
+              inTimeline: const drift.Value(true),
+            ),
+          );
+    }
+
+    test('updateLibrariesV1 inserts a new library row', () async {
+      await sut.updateUsersV1([_createUser()]);
+      await sut.updateLibrariesV1([makeLibrary(name: 'First')]);
+
+      final row = await (db.libraryEntity.select()..where((t) => t.id.equals('library-1'))).getSingle();
+      expect(row.name, 'First');
+      expect(row.ownerId, 'user-1');
+    });
+
+    test('updateLibrariesV1 upserts on conflict', () async {
+      await sut.updateUsersV1([_createUser()]);
+      await sut.updateLibrariesV1([makeLibrary(name: 'Original')]);
+      await sut.updateLibrariesV1([makeLibrary(name: 'Renamed')]);
+
+      final row = await (db.libraryEntity.select()..where((t) => t.id.equals('library-1'))).getSingle();
+      expect(row.name, 'Renamed');
+    });
+
+    test('updateLibraryAssetsV1 delegates to updateAssetsV1 (writes remote_asset with libraryId)', () async {
+      await sut.updateUsersV1([_createUser()]);
+      await sut.updateLibrariesV1([makeLibrary()]);
+      await sut.updateLibraryAssetsV1([
+        makeLibraryAsset(id: 'asset-1', checksum: 'c1', ownerId: 'user-1', libraryId: 'library-1'),
+      ]);
+
+      final row = await (db.remoteAssetEntity.select()..where((t) => t.id.equals('asset-1'))).getSingle();
+      expect(row.libraryId, 'library-1');
+    });
+
+    test('updateLibraryAssetExifsV1 delegates to updateAssetsExifV1', () async {
+      await sut.updateUsersV1([_createUser()]);
+      await sut.updateLibrariesV1([makeLibrary()]);
+      await sut.updateLibraryAssetsV1([
+        makeLibraryAsset(id: 'asset-1', checksum: 'c1', ownerId: 'user-1', libraryId: 'library-1'),
+      ]);
+      await sut.updateLibraryAssetExifsV1([
+        _createExif(assetId: 'asset-1', width: 640, height: 480, orientation: '1'),
+      ]);
+
+      final row = await (db.remoteExifEntity.select()..where((t) => t.assetId.equals('asset-1'))).getSingle();
+      expect(row.width, 640);
+      expect(row.height, 480);
+    });
+
+    test('deleteLibraryAssetsV1 removes individual asset rows', () async {
+      await sut.updateUsersV1([_createUser()]);
+      await sut.updateLibrariesV1([makeLibrary()]);
+      await sut.updateLibraryAssetsV1([
+        makeLibraryAsset(id: 'asset-1', checksum: 'c1', ownerId: 'user-1', libraryId: 'library-1'),
+        makeLibraryAsset(id: 'asset-2', checksum: 'c2', ownerId: 'user-1', libraryId: 'library-1'),
+      ]);
+
+      await sut.deleteLibraryAssetsV1([SyncLibraryAssetDeleteV1(assetId: 'asset-1')]);
+
+      final remaining = await db.remoteAssetEntity.select().get();
+      expect(remaining, hasLength(1));
+      expect(remaining.first.id, 'asset-2');
+    });
+
+    test('updateSharedSpaceLibrariesV1 inserts a join row', () async {
+      await sut.updateUsersV1([_createUser()]);
+      await sut.updateSharedSpacesV1([
+        SyncSharedSpaceV1(
+          id: 'space-1',
+          name: 'Space',
+          description: null,
+          color: null,
+          createdById: 'user-1',
+          thumbnailAssetId: null,
+          thumbnailCropY: null,
+          faceRecognitionEnabled: true,
+          petsEnabled: false,
+          lastActivityAt: null,
+          createdAt: DateTime(2026, 4, 6),
+          updatedAt: DateTime(2026, 4, 6),
+        ),
+      ]);
+
+      await sut.updateSharedSpaceLibrariesV1([
+        SyncSharedSpaceLibraryV1(
+          spaceId: 'space-1',
+          libraryId: 'library-1',
+          addedById: 'user-1',
+          createdAt: DateTime(2026, 4, 6),
+          updatedAt: DateTime(2026, 4, 6),
+        ),
+      ]);
+
+      final rows = await db.sharedSpaceLibraryEntity.select().get();
+      expect(rows, hasLength(1));
+      expect(rows.first.libraryId, 'library-1');
+      expect(rows.first.addedById, 'user-1');
+    });
+
+    test('deleteSharedSpaceLibrariesV1 removes join row but does NOT touch assets', () async {
+      await sut.updateUsersV1([_createUser(), _createUser(id: 'user-2')]);
+      await sut.updateSharedSpacesV1([
+        SyncSharedSpaceV1(
+          id: 'space-1',
+          name: 'Space',
+          description: null,
+          color: null,
+          createdById: 'user-1',
+          thumbnailAssetId: null,
+          thumbnailCropY: null,
+          faceRecognitionEnabled: true,
+          petsEnabled: false,
+          lastActivityAt: null,
+          createdAt: DateTime(2026, 4, 6),
+          updatedAt: DateTime(2026, 4, 6),
+        ),
+      ]);
+      await sut.updateLibrariesV1([makeLibrary()]);
+      await sut.updateLibraryAssetsV1([
+        makeLibraryAsset(id: 'asset-1', checksum: 'c1', ownerId: 'user-2', libraryId: 'library-1'),
+      ]);
+      await sut.updateSharedSpaceLibrariesV1([
+        SyncSharedSpaceLibraryV1(
+          spaceId: 'space-1',
+          libraryId: 'library-1',
+          addedById: 'user-1',
+          createdAt: DateTime(2026, 4, 6),
+          updatedAt: DateTime(2026, 4, 6),
+        ),
+      ]);
+
+      await sut.deleteSharedSpaceLibrariesV1([
+        SyncSharedSpaceLibraryDeleteV1(spaceId: 'space-1', libraryId: 'library-1'),
+      ]);
+
+      final joinRows = await db.sharedSpaceLibraryEntity.select().get();
+      expect(joinRows, isEmpty);
+      // Asset row and library row must still exist — only the join was removed.
+      final assetRows = await db.remoteAssetEntity.select().get();
+      expect(assetRows, hasLength(1));
+      final libraryRows = await db.libraryEntity.select().get();
+      expect(libraryRows, hasLength(1));
+    });
+
+    group('deleteLibrariesV1 orphan sweep', () {
+      setUp(() async {
+        // Current user + a partner user + an unrelated foreign user.
+        await sut.updateUsersV1([
+          _createUser(id: 'user-1'),
+          _createUser(id: 'user-partner'),
+          _createUser(id: 'user-foreign'),
+        ]);
+        await sut.updateLibrariesV1([
+          makeLibrary(id: 'library-1', ownerId: 'user-foreign'),
+        ]);
+      });
+
+      test('preserves an asset owned by the current user', () async {
+        await sut.updateLibraryAssetsV1([
+          makeLibraryAsset(id: 'mine', checksum: 'c1', ownerId: 'user-1', libraryId: 'library-1'),
+        ]);
+
+        await sut.deleteLibrariesV1(
+          [SyncLibraryDeleteV1(libraryId: 'library-1')],
+          currentUserId: 'user-1',
+        );
+
+        final rows = await db.remoteAssetEntity.select().get();
+        expect(rows, hasLength(1));
+        expect(rows.first.id, 'mine');
+      });
+
+      test('preserves an asset owned by an active partner', () async {
+        await insertPartner(sharedById: 'user-partner', sharedWithId: 'user-1');
+        await sut.updateLibraryAssetsV1([
+          makeLibraryAsset(id: 'partner-asset', checksum: 'c2', ownerId: 'user-partner', libraryId: 'library-1'),
+        ]);
+
+        await sut.deleteLibrariesV1(
+          [SyncLibraryDeleteV1(libraryId: 'library-1')],
+          currentUserId: 'user-1',
+        );
+
+        final rows = await db.remoteAssetEntity.select().get();
+        expect(rows, hasLength(1));
+        expect(rows.first.id, 'partner-asset');
+      });
+
+      test('preserves an asset also present in shared_space_asset', () async {
+        await sut.updateSharedSpacesV1([
+          SyncSharedSpaceV1(
+            id: 'space-1',
+            name: 'Space',
+            description: null,
+            color: null,
+            createdById: 'user-1',
+            thumbnailAssetId: null,
+            thumbnailCropY: null,
+            faceRecognitionEnabled: true,
+            petsEnabled: false,
+            lastActivityAt: null,
+            createdAt: DateTime(2026, 4, 6),
+            updatedAt: DateTime(2026, 4, 6),
+          ),
+        ]);
+        await sut.updateLibraryAssetsV1([
+          makeLibraryAsset(
+            id: 'direct-add',
+            checksum: 'c3',
+            ownerId: 'user-foreign',
+            libraryId: 'library-1',
+          ),
+        ]);
+        await sut.updateSharedSpaceToAssetsV1([
+          SyncSharedSpaceToAssetV1(spaceId: 'space-1', assetId: 'direct-add'),
+        ]);
+
+        await sut.deleteLibrariesV1(
+          [SyncLibraryDeleteV1(libraryId: 'library-1')],
+          currentUserId: 'user-1',
+        );
+
+        final rows = await db.remoteAssetEntity.select().get();
+        expect(rows, hasLength(1));
+        expect(rows.first.id, 'direct-add');
+      });
+
+      test('deletes a foreign asset reachable only via the now-deleted library', () async {
+        await sut.updateLibraryAssetsV1([
+          makeLibraryAsset(id: 'orphan', checksum: 'c4', ownerId: 'user-foreign', libraryId: 'library-1'),
+        ]);
+
+        await sut.deleteLibrariesV1(
+          [SyncLibraryDeleteV1(libraryId: 'library-1')],
+          currentUserId: 'user-1',
+        );
+
+        final rows = await db.remoteAssetEntity.select().get();
+        expect(rows, isEmpty);
+        final libraryRows = await db.libraryEntity.select().get();
+        expect(libraryRows, isEmpty);
+      });
+
+      test('runs in a single transaction — library delete and sweep are atomic', () async {
+        // Pre-seed assets that should survive a successful sweep.
+        await sut.updateLibraryAssetsV1([
+          makeLibraryAsset(id: 'mine', checksum: 'c5', ownerId: 'user-1', libraryId: 'library-1'),
+          makeLibraryAsset(id: 'orphan', checksum: 'c6', ownerId: 'user-foreign', libraryId: 'library-1'),
+        ]);
+
+        await sut.deleteLibrariesV1(
+          [SyncLibraryDeleteV1(libraryId: 'library-1')],
+          currentUserId: 'user-1',
+        );
+
+        // Library removed, orphan removed, user-owned preserved.
+        expect(await db.libraryEntity.select().get(), isEmpty);
+        final remaining = await db.remoteAssetEntity.select().get();
+        expect(remaining.map((r) => r.id), ['mine']);
+      });
+
+      test('LibraryDeleteV1 for an unknown library is a no-op', () async {
+        await sut.updateLibraryAssetsV1([
+          makeLibraryAsset(id: 'mine', checksum: 'c7', ownerId: 'user-1', libraryId: 'library-1'),
+        ]);
+
+        await sut.deleteLibrariesV1(
+          [SyncLibraryDeleteV1(libraryId: 'library-does-not-exist')],
+          currentUserId: 'user-1',
+        );
+
+        // library-1 is untouched because the delete targeted a different id.
+        expect(await db.libraryEntity.select().get(), hasLength(1));
+        expect(await db.remoteAssetEntity.select().get(), hasLength(1));
+      });
+    });
+
+    test('SharedSpaceLibraryV1 arriving before LibraryV1 still inserts the join row', () async {
+      // The SharedSpaceLibrary entity intentionally has no FK on libraryId —
+      // this mirrors SharedSpaceAssetEntity's lenient assetId, letting the
+      // sync stream tolerate out-of-order delivery between the library and
+      // shared-space-library streams.
+      await sut.updateUsersV1([_createUser()]);
+      await sut.updateSharedSpacesV1([
+        SyncSharedSpaceV1(
+          id: 'space-1',
+          name: 'Space',
+          description: null,
+          color: null,
+          createdById: 'user-1',
+          thumbnailAssetId: null,
+          thumbnailCropY: null,
+          faceRecognitionEnabled: true,
+          petsEnabled: false,
+          lastActivityAt: null,
+          createdAt: DateTime(2026, 4, 6),
+          updatedAt: DateTime(2026, 4, 6),
+        ),
+      ]);
+
+      await sut.updateSharedSpaceLibrariesV1([
+        SyncSharedSpaceLibraryV1(
+          spaceId: 'space-1',
+          libraryId: 'not-yet-synced-library',
+          addedById: 'user-1',
+          createdAt: DateTime(2026, 4, 6),
+          updatedAt: DateTime(2026, 4, 6),
+        ),
+      ]);
+
+      final rows = await db.sharedSpaceLibraryEntity.select().get();
+      expect(rows, hasLength(1));
+      expect(rows.first.libraryId, 'not-yet-synced-library');
     });
   });
 }
