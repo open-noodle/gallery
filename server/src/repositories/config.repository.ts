@@ -335,7 +335,7 @@ const getEnv = (): EnvData => {
     licensePublicKey: isProd ? productionKeys : stagingKeys,
 
     versionCheck: {
-      url: isProd ? 'https://version.immich.cloud/version' : 'https://version.dev.immich.cloud/version',
+      url: isProd ? 'https://version.opennoodle.de/gallery' : 'https://version.dev.immich.cloud/version',
     },
 
     network: {
