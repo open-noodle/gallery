@@ -13,8 +13,10 @@ import 'package:immich_mobile/infrastructure/entities/remote_album.entity.drift.
 import 'package:immich_mobile/infrastructure/entities/remote_album_asset.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/remote_asset.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/remote_asset_cloud_id.entity.drift.dart';
+import 'package:immich_mobile/infrastructure/entities/library.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/shared_space.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/shared_space_asset.entity.drift.dart';
+import 'package:immich_mobile/infrastructure/entities/shared_space_library.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/shared_space_member.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/user.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
@@ -296,5 +298,44 @@ class MediumRepositoryContext {
     return db
         .into(db.sharedSpaceAssetEntity)
         .insert(SharedSpaceAssetEntityCompanion.insert(spaceId: spaceId, assetId: assetId));
+  }
+
+  Future<LibraryEntityData> newLibrary({
+    String? id,
+    String? name,
+    required String ownerId,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) async {
+    id = id ?? const Uuid().v4();
+    return db
+        .into(db.libraryEntity)
+        .insertReturning(
+          LibraryEntityCompanion(
+            id: Value(id),
+            name: Value(name ?? 'library_$id'),
+            ownerId: Value(ownerId),
+            createdAt: Value(createdAt ?? DateTime.now()),
+            updatedAt: Value(updatedAt ?? DateTime.now()),
+          ),
+        );
+  }
+
+  Future<void> insertSharedSpaceLibrary({
+    required String spaceId,
+    required String libraryId,
+    String? addedById,
+    DateTime? createdAt,
+  }) {
+    return db
+        .into(db.sharedSpaceLibraryEntity)
+        .insert(
+          SharedSpaceLibraryEntityCompanion(
+            spaceId: Value(spaceId),
+            libraryId: Value(libraryId),
+            addedById: Value(addedById),
+            createdAt: Value(createdAt ?? DateTime.now()),
+          ),
+        );
   }
 }

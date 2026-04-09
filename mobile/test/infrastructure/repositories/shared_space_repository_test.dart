@@ -1,3 +1,4 @@
+import 'package:drift/drift.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
 import 'package:immich_mobile/infrastructure/repositories/timeline.repository.dart';
@@ -197,6 +198,188 @@ void main() {
       // none groups everything into a single bucket containing all assets.
       expect(buckets, hasLength(1));
       expect(buckets[0].assetCount, 3);
+    });
+
+    group('library UNION', () {
+      test('returns library-linked assets only (no direct-add)', () async {
+        final library = await ctx.newLibrary(ownerId: userId);
+        await ctx.insertSharedSpaceLibrary(spaceId: spaceId, libraryId: library.id);
+
+        final asset1 = await ctx.newRemoteAsset(
+          ownerId: userId,
+          libraryId: library.id,
+          createdAt: DateTime(2026, 4, 1, 12),
+        );
+        final asset2 = await ctx.newRemoteAsset(
+          ownerId: userId,
+          libraryId: library.id,
+          createdAt: DateTime(2026, 4, 2, 12),
+        );
+
+        final query = sut.sharedSpace(spaceId, GroupAssetsBy.day);
+        final assets = await query.assetSource(0, 10);
+        final buckets = await query.bucketSource().first;
+
+        expect(assets, hasLength(2));
+        final ids = assets.map((a) => a.remoteId).toSet();
+        expect(ids, {asset1.id, asset2.id});
+        expect(buckets, hasLength(2));
+      });
+
+      test('returns direct-add assets only (regression check, no library link)', () async {
+        final asset = await ctx.newRemoteAsset(ownerId: userId, createdAt: DateTime(2026, 4, 1, 12));
+        await ctx.insertSharedSpaceAsset(spaceId: spaceId, assetId: asset.id);
+
+        final query = sut.sharedSpace(spaceId, GroupAssetsBy.day);
+        final assets = await query.assetSource(0, 10);
+
+        expect(assets, hasLength(1));
+        expect(assets[0].remoteId, asset.id);
+      });
+
+      test('unions direct-add and library assets without duplicating when an asset is in both', () async {
+        final library = await ctx.newLibrary(ownerId: userId);
+        await ctx.insertSharedSpaceLibrary(spaceId: spaceId, libraryId: library.id);
+
+        // asset A — library only
+        final assetA = await ctx.newRemoteAsset(
+          ownerId: userId,
+          libraryId: library.id,
+          createdAt: DateTime(2026, 4, 1, 12),
+        );
+        // asset B — direct-add only (random libraryId)
+        final assetB = await ctx.newRemoteAsset(ownerId: userId, createdAt: DateTime(2026, 4, 2, 12));
+        await ctx.insertSharedSpaceAsset(spaceId: spaceId, assetId: assetB.id);
+        // asset C — BOTH library AND direct-add
+        final assetC = await ctx.newRemoteAsset(
+          ownerId: userId,
+          libraryId: library.id,
+          createdAt: DateTime(2026, 4, 3, 12),
+        );
+        await ctx.insertSharedSpaceAsset(spaceId: spaceId, assetId: assetC.id);
+
+        final query = sut.sharedSpace(spaceId, GroupAssetsBy.day);
+        final assets = await query.assetSource(0, 10);
+
+        expect(assets, hasLength(3));
+        final ids = assets.map((a) => a.remoteId).toList();
+        // each asset appears exactly once — no duplication from the OR branches
+        expect(ids.toSet(), {assetA.id, assetB.id, assetC.id});
+        expect(ids.length, ids.toSet().length);
+      });
+
+      test('handles populated shared_space_asset with empty shared_space_library', () async {
+        final asset = await ctx.newRemoteAsset(ownerId: userId, createdAt: DateTime(2026, 4, 1, 12));
+        await ctx.insertSharedSpaceAsset(spaceId: spaceId, assetId: asset.id);
+
+        // No shared_space_library rows; UNION should still return the direct-add asset.
+        final query = sut.sharedSpace(spaceId, GroupAssetsBy.day);
+        final assets = await query.assetSource(0, 10);
+
+        expect(assets, hasLength(1));
+        expect(assets[0].remoteId, asset.id);
+      });
+
+      test('handles populated shared_space_library with empty shared_space_asset', () async {
+        final library = await ctx.newLibrary(ownerId: userId);
+        await ctx.insertSharedSpaceLibrary(spaceId: spaceId, libraryId: library.id);
+        final asset = await ctx.newRemoteAsset(
+          ownerId: userId,
+          libraryId: library.id,
+          createdAt: DateTime(2026, 4, 1, 12),
+        );
+
+        // No shared_space_asset rows; UNION should still return the library asset.
+        final query = sut.sharedSpace(spaceId, GroupAssetsBy.day);
+        final assets = await query.assetSource(0, 10);
+
+        expect(assets, hasLength(1));
+        expect(assets[0].remoteId, asset.id);
+      });
+
+      test('reactive stream: removing a shared_space_library row drops library assets', () async {
+        final library = await ctx.newLibrary(ownerId: userId);
+        await ctx.insertSharedSpaceLibrary(spaceId: spaceId, libraryId: library.id);
+        await ctx.newRemoteAsset(
+          ownerId: userId,
+          libraryId: library.id,
+          createdAt: DateTime(2026, 4, 1, 12),
+        );
+
+        final query = sut.sharedSpace(spaceId, GroupAssetsBy.day);
+        final emissions = <List<Bucket>>[];
+        final sub = query.bucketSource().listen(emissions.add);
+
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        expect(emissions.isNotEmpty, isTrue);
+        expect(emissions.last, hasLength(1));
+
+        // Remove the library link — the asset should drop out of the space timeline.
+        await (ctx.db.delete(ctx.db.sharedSpaceLibraryEntity)
+              ..where((row) => row.spaceId.equals(spaceId) & row.libraryId.equals(library.id)))
+            .go();
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+
+        expect(emissions.last, isEmpty);
+        await sub.cancel();
+      });
+
+      test('reactive stream: inserting a new remote asset with a linked libraryId fires an emission', () async {
+        final library = await ctx.newLibrary(ownerId: userId);
+        await ctx.insertSharedSpaceLibrary(spaceId: spaceId, libraryId: library.id);
+
+        final query = sut.sharedSpace(spaceId, GroupAssetsBy.day);
+        final emissions = <List<Bucket>>[];
+        final sub = query.bucketSource().listen(emissions.add);
+
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        expect(emissions, hasLength(1));
+        expect(emissions[0], isEmpty);
+
+        // Insert an asset directly tagged with the linked libraryId
+        await ctx.newRemoteAsset(
+          ownerId: userId,
+          libraryId: library.id,
+          createdAt: DateTime(2026, 4, 1, 12),
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+
+        expect(emissions.length, greaterThanOrEqualTo(2));
+        expect(emissions.last, hasLength(1));
+        expect(emissions.last[0].assetCount, 1);
+        await sub.cancel();
+      });
+
+      test('reactive stream: inserting a new library link exposes pre-existing library assets', () async {
+        final library = await ctx.newLibrary(ownerId: userId);
+        // Library has assets BEFORE the link exists.
+        await ctx.newRemoteAsset(
+          ownerId: userId,
+          libraryId: library.id,
+          createdAt: DateTime(2026, 4, 1, 12),
+        );
+        await ctx.newRemoteAsset(
+          ownerId: userId,
+          libraryId: library.id,
+          createdAt: DateTime(2026, 4, 2, 12),
+        );
+
+        final query = sut.sharedSpace(spaceId, GroupAssetsBy.day);
+        final emissions = <List<Bucket>>[];
+        final sub = query.bucketSource().listen(emissions.add);
+
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        expect(emissions, hasLength(1));
+        expect(emissions[0], isEmpty);
+
+        // Now link the library — the pre-existing assets should appear.
+        await ctx.insertSharedSpaceLibrary(spaceId: spaceId, libraryId: library.id);
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+
+        expect(emissions.length, greaterThanOrEqualTo(2));
+        expect(emissions.last, hasLength(2));
+        await sub.cancel();
+      });
     });
   });
 }

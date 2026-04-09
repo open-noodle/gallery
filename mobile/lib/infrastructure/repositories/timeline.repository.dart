@@ -279,12 +279,32 @@ class DriftTimelineRepository extends DriftDatabaseRepository {
   );
 
   Stream<List<Bucket>> _watchSharedSpaceBucket(String spaceId, {GroupAssetsBy groupBy = GroupAssetsBy.day}) {
+    // Assets belong to a space if they are either:
+    //   1. directly added via shared_space_asset, OR
+    //   2. owned by a library that is linked via shared_space_library.
+    // We express this as `id IN (...) OR library_id IN (...)`, which natively
+    // deduplicates assets that match both branches (no DISTINCT needed).
+    Expression<bool> spaceMembership() =>
+        _db.remoteAssetEntity.id.isInQuery(
+          _db.sharedSpaceAssetEntity.selectOnly()
+            ..addColumns([_db.sharedSpaceAssetEntity.assetId])
+            ..where(_db.sharedSpaceAssetEntity.spaceId.equals(spaceId)),
+        ) |
+        _db.remoteAssetEntity.libraryId.isInQuery(
+          _db.sharedSpaceLibraryEntity.selectOnly()
+            ..addColumns([_db.sharedSpaceLibraryEntity.libraryId])
+            ..where(_db.sharedSpaceLibraryEntity.spaceId.equals(spaceId)),
+        );
+
     if (groupBy == GroupAssetsBy.none) {
-      return _db.sharedSpaceAssetEntity
-          .count(where: (row) => row.spaceId.equals(spaceId))
+      final countExp = _db.remoteAssetEntity.id.count();
+      final countQuery = _db.remoteAssetEntity.selectOnly()
+        ..addColumns([countExp])
+        ..where(_db.remoteAssetEntity.deletedAt.isNull() & spaceMembership());
+      return countQuery
+          .map((row) => row.read(countExp) ?? 0)
+          .watchSingle()
           .map(_generateBuckets)
-          .watch()
-          .map((results) => results.isNotEmpty ? results.first : const <Bucket>[])
           .handleError((error) => const <Bucket>[]);
     }
 
@@ -293,14 +313,7 @@ class DriftTimelineRepository extends DriftDatabaseRepository {
 
     final query = _db.remoteAssetEntity.selectOnly()
       ..addColumns([assetCountExp, dateExp])
-      ..join([
-        innerJoin(
-          _db.sharedSpaceAssetEntity,
-          _db.sharedSpaceAssetEntity.assetId.equalsExp(_db.remoteAssetEntity.id),
-          useColumns: false,
-        ),
-      ])
-      ..where(_db.remoteAssetEntity.deletedAt.isNull() & _db.sharedSpaceAssetEntity.spaceId.equals(spaceId))
+      ..where(_db.remoteAssetEntity.deletedAt.isNull() & spaceMembership())
       ..groupBy([dateExp])
       ..orderBy([OrderingTerm.desc(dateExp)]);
 
@@ -315,20 +328,27 @@ class DriftTimelineRepository extends DriftDatabaseRepository {
   }
 
   Future<List<BaseAsset>> _getSharedSpaceBucketAssets(String spaceId, {required int offset, required int count}) async {
+    final membership =
+        _db.remoteAssetEntity.id.isInQuery(
+          _db.sharedSpaceAssetEntity.selectOnly()
+            ..addColumns([_db.sharedSpaceAssetEntity.assetId])
+            ..where(_db.sharedSpaceAssetEntity.spaceId.equals(spaceId)),
+        ) |
+        _db.remoteAssetEntity.libraryId.isInQuery(
+          _db.sharedSpaceLibraryEntity.selectOnly()
+            ..addColumns([_db.sharedSpaceLibraryEntity.libraryId])
+            ..where(_db.sharedSpaceLibraryEntity.spaceId.equals(spaceId)),
+        );
+
     final query =
         _db.remoteAssetEntity.select().addColumns([_db.localAssetEntity.id]).join([
-            innerJoin(
-              _db.sharedSpaceAssetEntity,
-              _db.sharedSpaceAssetEntity.assetId.equalsExp(_db.remoteAssetEntity.id),
-              useColumns: false,
-            ),
             leftOuterJoin(
               _db.localAssetEntity,
               _db.remoteAssetEntity.checksum.equalsExp(_db.localAssetEntity.checksum),
               useColumns: false,
             ),
           ])
-          ..where(_db.remoteAssetEntity.deletedAt.isNull() & _db.sharedSpaceAssetEntity.spaceId.equals(spaceId))
+          ..where(_db.remoteAssetEntity.deletedAt.isNull() & membership)
           ..orderBy([OrderingTerm.desc(_db.remoteAssetEntity.createdAt)])
           ..limit(count, offset: offset);
 
