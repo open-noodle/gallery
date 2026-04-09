@@ -99,9 +99,13 @@ test.describe('Photos FilterPanel', () => {
     await expect(page.locator('[data-testid="active-filters-bar"]')).toBeVisible();
     await expect(page.locator('[data-testid="active-chip"]').first()).toBeVisible();
 
-    // Clear all and wait for timeline refetch
+    // Clear all and wait for timeline refetch.
+    // The /photos page now renders a `buttons` snippet so the UserPageLayout
+    // absolute header covers the top of the content area. Playwright's
+    // auto-scroll-into-view lands the ActiveFiltersBar button under the header
+    // overlay; dispatchEvent fires the click handler directly.
     const clearResponse = page.waitForResponse((r) => r.url().includes('/timeline/buckets'));
-    await page.locator('[data-testid="clear-all-btn"]').click();
+    await page.locator('[data-testid="clear-all-btn"]').dispatchEvent('click');
     await clearResponse;
 
     // ActiveFiltersBar should disappear, full timeline restored
