@@ -42,7 +42,7 @@ DOCS_URL=$(jq -r '.docs.url' "$CONFIG")
 if [[ -n "${FORK_VERSION:-}" ]]; then
   FORK_VERSION="${FORK_VERSION#v}"
 else
-  FORK_VERSION=$(git -C "$REPO_ROOT" describe --tags --abbrev=0 2>/dev/null || { git -C "$REPO_ROOT" tag -l 'v*.*.*' --sort=-v:refname 2>/dev/null | head -1; })
+  FORK_VERSION=$(git -C "$REPO_ROOT" describe --tags --abbrev=0 --match 'v[0-9]*.[0-9]*.[0-9]*' 2>/dev/null || { git -C "$REPO_ROOT" tag -l 'v*.*.*' --sort=-v:refname 2>/dev/null | head -1; })
   FORK_VERSION="${FORK_VERSION#v}"
 fi
 
