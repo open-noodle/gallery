@@ -1184,22 +1184,21 @@ export class LibraryAssetSync extends BaseSync {
       .stream();
   }
 
-  // Stream per-asset deletes from library_asset_audit. The audit table stores
-  // only assetId (no libraryId), and the trigger fires AFTER DELETE so the
-  // asset row is gone by the time this stream runs — there is no way to
-  // recover the deleted asset's libraryId post-hoc without a schema change.
+  // Stream per-asset deletes from library_asset_audit, scoped to libraries the
+  // user can still access. The audit table stores both assetId and libraryId
+  // (libraryId is captured by the asset_library_delete_audit trigger from the
+  // OLD asset row). The libraryId scoping prevents leaking per-asset delete
+  // events to clients who never had access to the library.
   //
-  // We therefore emit ALL library_asset_audit rows and rely on client-side
-  // idempotent delete handling (the client removes the asset iff it had it).
-  // The whole-library revocation path is still handled correctly by
-  // LibrarySync.getDeletes (library_audit scoped per-user). The plan's goal of
-  // "does not emit a per-asset delete for a library the user no longer has
-  // access to" is achieved in practice because the client already dropped
-  // those assets when it processed the library_audit delete event.
+  // The whole-library revocation path is handled separately by
+  // LibrarySync.getDeletes (library_audit scoped per-user) — when a user loses
+  // access to a whole library, they receive a LibraryDeleteV1 and the client
+  // drops all assets locally without needing per-asset events.
   @GenerateSql({ params: [dummyQueryOptions], stream: true })
   getDeletes(options: SyncQueryOptions) {
     return this.auditQuery('library_asset_audit', options)
       .select(['library_asset_audit.id as id', 'library_asset_audit.assetId as assetId'])
+      .where('library_asset_audit.libraryId', 'in', (eb) => accessibleLibraries(eb, options.userId))
       .stream();
   }
 

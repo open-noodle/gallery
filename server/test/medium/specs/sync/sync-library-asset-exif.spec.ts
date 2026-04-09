@@ -17,9 +17,7 @@ beforeAll(async () => {
 });
 
 const isExifEvent = (r: { type: string }) =>
-  r.type === SyncEntityType.LibraryAssetExifCreateV1 ||
-  r.type === SyncEntityType.LibraryAssetExifUpdateV1 ||
-  r.type === SyncEntityType.LibraryAssetExifBackfillV1;
+  r.type === SyncEntityType.LibraryAssetExifCreateV1 || r.type === SyncEntityType.LibraryAssetExifBackfillV1;
 
 describe(SyncRequestType.LibraryAssetExifsV1, () => {
   it('emits exif rows for assets in accessible libraries (ownership path)', async () => {

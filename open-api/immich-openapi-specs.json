@@ -27519,10 +27519,9 @@
           "LibraryV1",
           "LibraryDeleteV1",
           "LibraryAssetCreateV1",
-          "LibraryAssetUpdateV1",
+          "LibraryAssetDeleteV1",
           "LibraryAssetBackfillV1",
           "LibraryAssetExifCreateV1",
-          "LibraryAssetExifUpdateV1",
           "LibraryAssetExifBackfillV1",
           "SharedSpaceLibraryV1",
           "SharedSpaceLibraryDeleteV1",
@@ -27532,6 +27531,18 @@
           "SyncCompleteV1"
         ],
         "type": "string"
+      },
+      "SyncLibraryAssetDeleteV1": {
+        "properties": {
+          "assetId": {
+            "description": "Asset ID",
+            "type": "string"
+          }
+        },
+        "required": [
+          "assetId"
+        ],
+        "type": "object"
       },
       "SyncLibraryDeleteV1": {
         "properties": {

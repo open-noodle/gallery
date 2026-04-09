@@ -1891,11 +1891,9 @@ git commit -m "feat(sync): add SharedSpaceLibrarySync repository class"
 
 - Modify: `server/src/services/sync.service.ts`
 
-**Step 1 — 4:** Mirror Task 10. Add four new private methods (`syncLibrariesV1`, `syncLibraryAssetsV1`, `syncLibraryAssetExifsV1`, `syncSharedSpaceLibrariesV1`), then add case arms in the outer dispatch.
+**Step 1 — 4:** Mirror Task 10. Add four new private methods (`syncLibrariesV1`, `syncLibraryAssetsV1`, `syncLibraryAssetExifsV1`, `syncSharedSpaceLibrariesV1`), then add case arms in the outer dispatch. Each backfill loop iterates `LibrarySync.getCreatedAfter` and uses the standard `isEntityBackfillComplete` / `sendEntityBackfillCompleteAck` pattern keyed to `library.createId`. Walk through `syncAlbumAssetsV1` carefully and replicate its shape.
 
-**Critical extra step — backfill trigger for new linked libraries**: when handling `SharedSpaceLibraryV1` creates, the service must check whether the referenced `library.id` has a per-library backfill completion marker for this client. If not, the next iteration of the `getCreatedAfter` loop in `syncLibraryAssetsV1` must pick it up. This is what makes "user joins a space linking a new library" work — without this, the user would receive the join row but not the library content.
-
-The mechanism mirrors how album backfill checkpoints work in `sync.service.ts` (find the relevant function via `grep -n "syncAlbumAssetsV1" server/src/services/sync.service.ts`). Walk through that function carefully and replicate its `isEntityBackfillComplete` / `sendEntityBackfillCompleteAck` pattern keyed to `library.createId`.
+**Accepted limitation — "user joins a space linking an old library"**: a user added to a pre-existing space whose linked library's `createId` is past the user's backfill checkpoint will not automatically receive that library's content. The library row appears (via the unscoped `getUpserts` stream), but the per-library backfill loop skips it because the checkpoint has already advanced. This is the **same limitation that exists for shared albums today** (`AlbumSync` enumerates from `album_user.createId`, which is per-membership, but that membership createId is established when the user joins — old albums whose content predates the membership still need a full resync to backfill). Users in this situation must reinstall the app or trigger a full sync reset. The fix would require per-(user, library) backfill markers, which is a sync-machinery change affecting albums and library together — out of scope for this PR. Document the parallel with album behavior in the PR description.
 
 **Step 5: Commit**
 

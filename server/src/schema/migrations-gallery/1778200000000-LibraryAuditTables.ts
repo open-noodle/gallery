@@ -18,11 +18,13 @@ export async function up(db: Kysely<any>): Promise<void> {
     CREATE TABLE "library_asset_audit" (
       "id" uuid NOT NULL DEFAULT immich_uuid_v7(),
       "assetId" uuid NOT NULL,
+      "libraryId" uuid NOT NULL,
       "deletedAt" timestamp with time zone NOT NULL DEFAULT clock_timestamp(),
       CONSTRAINT "library_asset_audit_pkey" PRIMARY KEY ("id")
     );
   `.execute(db);
   await sql`CREATE INDEX "library_asset_audit_assetId_idx" ON "library_asset_audit" ("assetId")`.execute(db);
+  await sql`CREATE INDEX "library_asset_audit_libraryId_idx" ON "library_asset_audit" ("libraryId")`.execute(db);
   await sql`CREATE INDEX "library_asset_audit_deletedAt_idx" ON "library_asset_audit" ("deletedAt")`.execute(db);
 
   await sql`
@@ -161,8 +163,8 @@ export async function up(db: Kysely<any>): Promise<void> {
   LANGUAGE PLPGSQL
   AS $$
     BEGIN
-      INSERT INTO library_asset_audit ("assetId")
-      SELECT "id" FROM "old" WHERE "libraryId" IS NOT NULL;
+      INSERT INTO library_asset_audit ("assetId", "libraryId")
+      SELECT "id", "libraryId" FROM "old" WHERE "libraryId" IS NOT NULL;
       RETURN NULL;
     END
   $$;`.execute(db);
@@ -203,7 +205,7 @@ export async function up(db: Kysely<any>): Promise<void> {
   await sql`INSERT INTO "migration_overrides" ("name", "value") VALUES ('function_shared_space_member_delete_library_audit', '{"type":"function","name":"shared_space_member_delete_library_audit","sql":"CREATE OR REPLACE FUNCTION shared_space_member_delete_library_audit()\\n  RETURNS TRIGGER\\n  LANGUAGE PLPGSQL\\n  AS $$\\n    BEGIN\\n      -- Skips during shared_space cascade (EXISTS guard fails); the BEFORE-row\\n      -- shared_space_delete_library_audit trigger handles that case.\\n      INSERT INTO library_audit (\\"libraryId\\", \\"userId\\")\\n      SELECT ssl.\\"libraryId\\", o.\\"userId\\"\\n      FROM \\"old\\" o\\n      INNER JOIN shared_space_library ssl ON ssl.\\"spaceId\\" = o.\\"spaceId\\"\\n      WHERE EXISTS (SELECT 1 FROM shared_space ss WHERE ss.id = o.\\"spaceId\\")\\n        AND NOT user_has_library_path(ssl.\\"libraryId\\", o.\\"userId\\", o.\\"spaceId\\");\\n\\n      RETURN NULL;\\n    END\\n  $$;"}'::jsonb);`.execute(
     db,
   );
-  await sql`INSERT INTO "migration_overrides" ("name", "value") VALUES ('function_asset_library_delete_audit', '{"type":"function","name":"asset_library_delete_audit","sql":"CREATE OR REPLACE FUNCTION asset_library_delete_audit()\\n  RETURNS TRIGGER\\n  LANGUAGE PLPGSQL\\n  AS $$\\n    BEGIN\\n      INSERT INTO library_asset_audit (\\"assetId\\")\\n      SELECT \\"id\\" FROM \\"old\\" WHERE \\"libraryId\\" IS NOT NULL;\\n      RETURN NULL;\\n    END\\n  $$;"}'::jsonb);`.execute(
+  await sql`INSERT INTO "migration_overrides" ("name", "value") VALUES ('function_asset_library_delete_audit', '{"type":"function","name":"asset_library_delete_audit","sql":"CREATE OR REPLACE FUNCTION asset_library_delete_audit()\\n  RETURNS TRIGGER\\n  LANGUAGE PLPGSQL\\n  AS $$\\n    BEGIN\\n      INSERT INTO library_asset_audit (\\"assetId\\", \\"libraryId\\")\\n      SELECT \\"id\\", \\"libraryId\\" FROM \\"old\\" WHERE \\"libraryId\\" IS NOT NULL;\\n      RETURN NULL;\\n    END\\n  $$;"}'::jsonb);`.execute(
     db,
   );
   await sql`INSERT INTO "migration_overrides" ("name", "value") VALUES ('trigger_shared_space_delete_library_audit', '{"type":"trigger","name":"shared_space_delete_library_audit","sql":"CREATE OR REPLACE TRIGGER \\"shared_space_delete_library_audit\\"\\n  BEFORE DELETE ON \\"shared_space\\"\\n  FOR EACH ROW\\n  EXECUTE FUNCTION shared_space_delete_library_audit();"}'::jsonb);`.execute(

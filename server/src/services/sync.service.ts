@@ -767,7 +767,7 @@ export class SyncService extends BaseService {
     checkpointMap: CheckpointMap,
     sessionId: string,
   ) {
-    const deleteType = SyncEntityType.AssetDeleteV1;
+    const deleteType = SyncEntityType.LibraryAssetDeleteV1;
     const deletes = this.syncRepository.libraryAsset.getDeletes({ ...options, ack: checkpointMap[deleteType] });
     for await (const { id, assetId } of deletes) {
       send(response, { type: deleteType, ids: [id], data: { assetId } });

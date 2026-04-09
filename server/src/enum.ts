@@ -913,11 +913,10 @@ export enum SyncEntityType {
   LibraryDeleteV1 = 'LibraryDeleteV1',
 
   LibraryAssetCreateV1 = 'LibraryAssetCreateV1',
-  LibraryAssetUpdateV1 = 'LibraryAssetUpdateV1',
+  LibraryAssetDeleteV1 = 'LibraryAssetDeleteV1',
   LibraryAssetBackfillV1 = 'LibraryAssetBackfillV1',
 
   LibraryAssetExifCreateV1 = 'LibraryAssetExifCreateV1',
-  LibraryAssetExifUpdateV1 = 'LibraryAssetExifUpdateV1',
   LibraryAssetExifBackfillV1 = 'LibraryAssetExifBackfillV1',
 
   SharedSpaceLibraryV1 = 'SharedSpaceLibraryV1',

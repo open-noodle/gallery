@@ -17,9 +17,7 @@ beforeAll(async () => {
 });
 
 const isAssetEvent = (r: { type: string }) =>
-  r.type === SyncEntityType.LibraryAssetCreateV1 ||
-  r.type === SyncEntityType.LibraryAssetUpdateV1 ||
-  r.type === SyncEntityType.LibraryAssetBackfillV1;
+  r.type === SyncEntityType.LibraryAssetCreateV1 || r.type === SyncEntityType.LibraryAssetBackfillV1;
 
 describe(SyncRequestType.LibraryAssetsV1, () => {
   it('emits each asset exactly once even when the library is linked to multiple spaces', async () => {
@@ -98,7 +96,7 @@ describe(SyncRequestType.LibraryAssetsV1, () => {
     });
   });
 
-  it('emits an AssetDeleteV1 event when a library asset is deleted', async () => {
+  it('emits a LibraryAssetDeleteV1 event when a library asset is deleted', async () => {
     const { auth, ctx } = await setup();
     const { library } = await ctx.newLibrary({ ownerId: auth.user.id });
     const { asset } = await ctx.newAsset({ ownerId: auth.user.id, libraryId: library.id });
@@ -108,15 +106,37 @@ describe(SyncRequestType.LibraryAssetsV1, () => {
     await ctx.assertSyncIsComplete(auth, [SyncRequestType.LibraryAssetsV1]);
 
     // Hard delete the asset — the asset_library_delete_audit trigger fires and
-    // inserts a library_asset_audit row.
+    // inserts a library_asset_audit row scoped to the asset's libraryId.
     await defaultDatabase.deleteFrom('asset').where('id', '=', asset.id).execute();
 
     const next = await ctx.syncStream(auth, [SyncRequestType.LibraryAssetsV1]);
     const deleteEvents = next.filter(
       (r: { type: string; data: { assetId?: string } }) =>
-        r.type === SyncEntityType.AssetDeleteV1 && r.data.assetId === asset.id,
+        r.type === SyncEntityType.LibraryAssetDeleteV1 && r.data.assetId === asset.id,
     );
-    expect(deleteEvents.length).toBeGreaterThanOrEqual(1);
+    expect(deleteEvents).toHaveLength(1);
+  });
+
+  it('does not emit a LibraryAssetDeleteV1 event for a library the user cannot access', async () => {
+    // Privacy property: per-asset deletes are scoped by libraryId IN
+    // accessibleLibraries. Stranger's library asset deletes must not leak.
+    const { auth, ctx } = await setup();
+    const { user: stranger } = await ctx.newUser();
+    const { library } = await ctx.newLibrary({ ownerId: stranger.id });
+    const { asset } = await ctx.newAsset({ ownerId: stranger.id, libraryId: library.id });
+
+    const initial = await ctx.syncStream(auth, [SyncRequestType.LibraryAssetsV1]);
+    await ctx.syncAckAll(auth, initial);
+    await ctx.assertSyncIsComplete(auth, [SyncRequestType.LibraryAssetsV1]);
+
+    await defaultDatabase.deleteFrom('asset').where('id', '=', asset.id).execute();
+
+    const next = await ctx.syncStream(auth, [SyncRequestType.LibraryAssetsV1]);
+    const deleteEvents = next.filter(
+      (r: { type: string; data: { assetId?: string } }) =>
+        r.type === SyncEntityType.LibraryAssetDeleteV1 && r.data.assetId === asset.id,
+    );
+    expect(deleteEvents).toHaveLength(0);
   });
 
   it('emits LibraryDeleteV1 (not per-asset deletes) as the primary channel for whole-library revocation', async () => {

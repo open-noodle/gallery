@@ -501,8 +501,8 @@ export const asset_library_delete_audit = registerFunction({
   language: 'PLPGSQL',
   body: `
     BEGIN
-      INSERT INTO library_asset_audit ("assetId")
-      SELECT "id" FROM "old" WHERE "libraryId" IS NOT NULL;
+      INSERT INTO library_asset_audit ("assetId", "libraryId")
+      SELECT "id", "libraryId" FROM "old" WHERE "libraryId" IS NOT NULL;
       RETURN NULL;
     END`,
 });

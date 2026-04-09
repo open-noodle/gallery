@@ -586,6 +586,12 @@ export class SyncLibraryDeleteV1 {
 }
 
 @ExtraModel()
+export class SyncLibraryAssetDeleteV1 {
+  @ApiProperty({ description: 'Asset ID' })
+  assetId!: string;
+}
+
+@ExtraModel()
 export class SyncSharedSpaceLibraryV1 {
   @ApiProperty({ description: 'Shared space ID' })
   spaceId!: string;
@@ -677,10 +683,9 @@ export type SyncItem = {
   [SyncEntityType.LibraryV1]: SyncLibraryV1;
   [SyncEntityType.LibraryDeleteV1]: SyncLibraryDeleteV1;
   [SyncEntityType.LibraryAssetCreateV1]: SyncAssetV1;
-  [SyncEntityType.LibraryAssetUpdateV1]: SyncAssetV1;
+  [SyncEntityType.LibraryAssetDeleteV1]: SyncLibraryAssetDeleteV1;
   [SyncEntityType.LibraryAssetBackfillV1]: SyncAssetV1;
   [SyncEntityType.LibraryAssetExifCreateV1]: SyncAssetExifV1;
-  [SyncEntityType.LibraryAssetExifUpdateV1]: SyncAssetExifV1;
   [SyncEntityType.LibraryAssetExifBackfillV1]: SyncAssetExifV1;
   [SyncEntityType.SharedSpaceLibraryV1]: SyncSharedSpaceLibraryV1;
   [SyncEntityType.SharedSpaceLibraryBackfillV1]: SyncSharedSpaceLibraryV1;

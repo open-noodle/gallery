@@ -9,6 +9,9 @@ export class LibraryAssetAuditTable {
   @Column({ type: 'uuid', index: true })
   assetId!: string;
 
+  @Column({ type: 'uuid', index: true })
+  libraryId!: string;
+
   @CreateDateColumn({ default: () => 'clock_timestamp()', index: true })
   deletedAt!: Generated<Timestamp>;
 }
