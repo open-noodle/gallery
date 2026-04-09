@@ -49,6 +49,7 @@ export type Library = {
   ownerId: string;
   createdAt: Date;
   updatedAt: Date;
+  createId: string;
   updateId: string;
   name: string;
   importPaths: string[];
@@ -404,6 +405,9 @@ export type SharedSpaceLibrary = {
   libraryId: string;
   addedById: string | null;
   createdAt: Date;
+  updatedAt: Date;
+  createId: string;
+  updateId: string;
 };
 
 export type UserGroup = {
