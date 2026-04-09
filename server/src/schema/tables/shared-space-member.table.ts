@@ -11,7 +11,11 @@ import {
 } from '@immich/sql-tools';
 import { CreateIdColumn, UpdatedAtTrigger, UpdateIdColumn } from 'src/decorators';
 import { SharedSpaceRole } from 'src/enum';
-import { shared_space_member_after_insert, shared_space_member_delete_audit } from 'src/schema/functions';
+import {
+  shared_space_member_after_insert,
+  shared_space_member_delete_audit,
+  shared_space_member_delete_library_audit,
+} from 'src/schema/functions';
 import { SharedSpaceTable } from 'src/schema/tables/shared-space.table';
 import { UserTable } from 'src/schema/tables/user.table';
 
@@ -30,6 +34,17 @@ import { UserTable } from 'src/schema/tables/user.table';
 @AfterDeleteTrigger({
   scope: 'statement',
   function: shared_space_member_delete_audit,
+  referencingOldTableAs: 'old',
+})
+// Second fan-out trigger: for each library linked to the space the member is
+// leaving, emit a library_audit row iff the user has no other access path.
+// Separate trigger (not merged into shared_space_member_delete_audit) so the
+// two audit streams stay independent and the function bodies can be registered
+// individually in migration_overrides.
+@AfterDeleteTrigger({
+  name: 'shared_space_member_delete_library_audit',
+  scope: 'statement',
+  function: shared_space_member_delete_library_audit,
   referencingOldTableAs: 'old',
 })
 export class SharedSpaceMemberTable {

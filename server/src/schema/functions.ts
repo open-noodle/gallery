@@ -373,3 +373,99 @@ export const shared_space_member_after_insert = registerFunction({
       RETURN NULL;
     END`,
 });
+
+// --- gallery-fork: library audit trigger functions ---
+
+// Helper: does `target_user_id` retain any access path to `target_library_id`
+// ignoring the space identified by `exclude_space_id`? Used by both library
+// audit triggers to avoid emitting audit rows when the user still has another
+// path to the library (direct ownership, membership in another linked space,
+// or creator of another linked space).
+export const user_has_library_path = registerFunction({
+  name: 'user_has_library_path',
+  arguments: ['target_library_id uuid', 'target_user_id uuid', 'exclude_space_id uuid'],
+  returnType: 'boolean',
+  language: 'SQL',
+  behavior: 'stable',
+  body: `
+    SELECT
+      EXISTS (
+        SELECT 1 FROM library l
+        WHERE l."id" = target_library_id
+          AND l."ownerId" = target_user_id
+          AND l."deletedAt" IS NULL
+      )
+      OR EXISTS (
+        SELECT 1
+        FROM shared_space_library ssl2
+        INNER JOIN shared_space_member ssm2 ON ssm2."spaceId" = ssl2."spaceId"
+        WHERE ssl2."libraryId" = target_library_id
+          AND ssm2."userId" = target_user_id
+          AND ssl2."spaceId" <> exclude_space_id
+      )
+      OR EXISTS (
+        SELECT 1
+        FROM shared_space_library ssl3
+        INNER JOIN shared_space ss3 ON ss3."id" = ssl3."spaceId"
+        WHERE ssl3."libraryId" = target_library_id
+          AND ss3."createdById" = target_user_id
+          AND ssl3."spaceId" <> exclude_space_id
+      );
+`,
+});
+
+export const shared_space_library_delete_audit = registerFunction({
+  name: 'shared_space_library_delete_audit',
+  returnType: 'TRIGGER',
+  language: 'PLPGSQL',
+  body: `
+    BEGIN
+      -- 1. Always record the join-row delete so clients drop sharedSpaceLibraryEntity.
+      INSERT INTO shared_space_library_audit ("spaceId", "libraryId")
+      SELECT "spaceId", "libraryId" FROM "old";
+
+      -- 2. Fan out library_audit per affected member only if no other path remains.
+      INSERT INTO library_audit ("libraryId", "userId")
+      SELECT o."libraryId", ssm."userId"
+      FROM "old" o
+      INNER JOIN shared_space_member ssm ON ssm."spaceId" = o."spaceId"
+      WHERE NOT user_has_library_path(o."libraryId", ssm."userId", o."spaceId");
+
+      -- 3. Creator of the unlinked space (not necessarily in shared_space_member).
+      INSERT INTO library_audit ("libraryId", "userId")
+      SELECT o."libraryId", ss."createdById"
+      FROM "old" o
+      INNER JOIN shared_space ss ON ss."id" = o."spaceId"
+      WHERE NOT user_has_library_path(o."libraryId", ss."createdById", o."spaceId");
+
+      RETURN NULL;
+    END`,
+});
+
+export const shared_space_member_delete_library_audit = registerFunction({
+  name: 'shared_space_member_delete_library_audit',
+  returnType: 'TRIGGER',
+  language: 'PLPGSQL',
+  body: `
+    BEGIN
+      INSERT INTO library_audit ("libraryId", "userId")
+      SELECT ssl."libraryId", o."userId"
+      FROM "old" o
+      INNER JOIN shared_space_library ssl ON ssl."spaceId" = o."spaceId"
+      WHERE NOT user_has_library_path(ssl."libraryId", o."userId", o."spaceId");
+
+      RETURN NULL;
+    END`,
+});
+
+export const asset_library_delete_audit = registerFunction({
+  name: 'asset_library_delete_audit',
+  returnType: 'TRIGGER',
+  language: 'PLPGSQL',
+  body: `
+    BEGIN
+      INSERT INTO library_asset_audit ("assetId")
+      SELECT "id" FROM "old" WHERE "libraryId" IS NOT NULL;
+      RETURN NULL;
+    END`,
+});
