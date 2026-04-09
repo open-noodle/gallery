@@ -237,7 +237,7 @@ Total: **11 new values** in PR 2.
 
 Library access is transitive: `library ← shared_space_library ← shared_space_member` (plus the direct `library.ownerId` ownership path and the `shared_space.createdById` creator path). Losing one membership only revokes library access if the user has no other path.
 
-The audit is populated by two triggers. The third case from an earlier draft (trigger on `library` DELETE) is folded into case 2 via cascade: deleting a library cascades to `shared_space_library`, which fires case 2 for each linked space, which fans out per affected user.
+The audit is populated by **three** triggers. The third case from an earlier draft (trigger on `library` DELETE) is folded into case 1 via cascade: deleting a library cascades to `shared_space_library`, which fires case 1 for each linked space, which fans out per affected user. Case 3 (BEFORE-row on `shared_space`) was added during PR 2 implementation after the original two-trigger design failed for `DELETE FROM shared_space`: both AFTER triggers fire only after `shared_space_member` and `shared_space_library` rows have been cascade-cleared, so their joins find nothing. The BEFORE-row trigger captures the (member × library) and (creator × library) cartesian product while everything is still visible, mirroring PR 1's `shared_space_delete_audit` pattern.
 
 **Helper: user-has-other-path subquery.** Used by both triggers, defined once as a SQL function or macro. Given `(targetLibraryId, targetUserId)`, returns true if the user retains any access path to the library. The path check unions `shared_space_member` and `shared_space.createdById` because the creator is not in the member table:
 
@@ -273,7 +273,7 @@ CREATE OR REPLACE FUNCTION user_has_library_path(
 $$;
 ```
 
-**Case 1: trigger on `shared_space_library` DELETE** — for each user affected by losing this link (every member of the space + the space creator), emit an audit row if they have no other path. Also records the join-row delete into `shared_space_library_audit` so the client can drop its local `sharedSpaceLibraryEntity` row. Invoked both on direct unlinking and on cascade from `library` or `shared_space` deletion.
+**Case 1: AFTER STATEMENT trigger on `shared_space_library` DELETE** — for each user affected by losing this link (every member of the space + the space creator), emit an audit row if they have no other path. Also records the join-row delete into `shared_space_library_audit` so the client can drop its local `sharedSpaceLibraryEntity` row. Invoked both on direct unlinking and on cascade from `library` deletion. **Skips during `shared_space` deletion via the `EXISTS shared_space` guard** — case 3 handles that path.
 
 ```sql
 CREATE OR REPLACE FUNCTION shared_space_library_delete_audit()
@@ -281,55 +281,88 @@ RETURNS TRIGGER LANGUAGE PLPGSQL AS $$
 BEGIN
   -- 1. Always record the join-row delete so clients drop sharedSpaceLibraryEntity.
   INSERT INTO shared_space_library_audit ("spaceId", "libraryId")
-  SELECT OLD.spaceId, OLD.libraryId;
+  SELECT "spaceId", "libraryId" FROM "old";
 
-  -- 2. Fan out library_audit per affected user only if no other path remains.
+  -- 2. Fan out library_audit per affected member only if no other path remains.
+  --    EXISTS guard skips during shared_space cascade (case 3 handles that).
   INSERT INTO library_audit ("libraryId", "userId")
-  SELECT OLD.libraryId, ssm.userId
-  FROM shared_space_member ssm
-  WHERE ssm.spaceId = OLD.spaceId
-    AND NOT user_has_library_path(OLD.libraryId, ssm.userId, OLD.spaceId);
+  SELECT o."libraryId", ssm."userId"
+  FROM "old" o
+  INNER JOIN shared_space_member ssm ON ssm."spaceId" = o."spaceId"
+  WHERE EXISTS (SELECT 1 FROM shared_space ss WHERE ss.id = o."spaceId")
+    AND NOT user_has_library_path(o."libraryId", ssm."userId", o."spaceId");
 
-  -- 3. Creator of the unlinked space (not in shared_space_member)
+  -- 3. Creator of the unlinked space. INNER JOIN shared_space naturally skips
+  --    during shared_space cascade because the parent row is gone.
   INSERT INTO library_audit ("libraryId", "userId")
-  SELECT OLD.libraryId, ss.createdById
-  FROM shared_space ss
-  WHERE ss.id = OLD.spaceId
-    AND NOT user_has_library_path(OLD.libraryId, ss.createdById, OLD.spaceId);
+  SELECT o."libraryId", ss."createdById"
+  FROM "old" o
+  INNER JOIN shared_space ss ON ss."id" = o."spaceId"
+  WHERE NOT user_has_library_path(o."libraryId", ss."createdById", o."spaceId");
 
   RETURN NULL;
 END $$;
 
 CREATE TRIGGER shared_space_library_delete_audit
 AFTER DELETE ON shared_space_library
-REFERENCING OLD TABLE AS OLD
+REFERENCING OLD TABLE AS "old"
 FOR EACH STATEMENT
 EXECUTE FUNCTION shared_space_library_delete_audit();
 ```
 
-**Case 2: trigger on `shared_space_member` DELETE** — for the removed user (just one), for each library linked to that space, emit an audit row if they have no other path.
+**Case 2: AFTER STATEMENT trigger on `shared_space_member` DELETE** — for the removed user, for each library linked to that space, emit an audit row if they have no other path. **Skips during `shared_space` deletion via the `EXISTS shared_space` guard** — case 3 handles that path.
 
 ```sql
 CREATE OR REPLACE FUNCTION shared_space_member_delete_library_audit()
 RETURNS TRIGGER LANGUAGE PLPGSQL AS $$
 BEGIN
   INSERT INTO library_audit ("libraryId", "userId")
-  SELECT ssl.libraryId, OLD.userId
-  FROM shared_space_library ssl
-  WHERE ssl.spaceId = OLD.spaceId
-    AND NOT user_has_library_path(ssl.libraryId, OLD.userId, OLD.spaceId);
+  SELECT ssl."libraryId", o."userId"
+  FROM "old" o
+  INNER JOIN shared_space_library ssl ON ssl."spaceId" = o."spaceId"
+  WHERE EXISTS (SELECT 1 FROM shared_space ss WHERE ss.id = o."spaceId")
+    AND NOT user_has_library_path(ssl."libraryId", o."userId", o."spaceId");
 
   RETURN NULL;
 END $$;
 
 CREATE TRIGGER shared_space_member_delete_library_audit
 AFTER DELETE ON shared_space_member
-REFERENCING OLD TABLE AS OLD
+REFERENCING OLD TABLE AS "old"
 FOR EACH STATEMENT
 EXECUTE FUNCTION shared_space_member_delete_library_audit();
 ```
 
-**Cascade ordering.** When a `library` is deleted, cascade fires `shared_space_library` DELETE → case 1 fires → per-user audit rows are emitted. When a `shared_space` is deleted, cascade fires both `shared_space_member` DELETE and `shared_space_library` DELETE — both triggers need to run, and both need to use `pg_trigger_depth` guards to avoid double-counting when the two cascades overlap. The exact guard structure mirrors `album_users_delete_audit` at `migrations/1747664684909:62-67`.
+**Case 3: BEFORE ROW trigger on `shared_space` DELETE** — handles whole-space deletion. Fires before any cascade so `shared_space_library` and `shared_space_member` rows are still visible. The BEFORE-row scope mirrors PR 1's `shared_space_delete_audit` pattern.
+
+```sql
+CREATE OR REPLACE FUNCTION shared_space_delete_library_audit()
+RETURNS TRIGGER LANGUAGE PLPGSQL AS $$
+BEGIN
+  INSERT INTO library_audit ("libraryId", "userId")
+  SELECT DISTINCT "libraryId", "userId" FROM (
+    SELECT ssl."libraryId", ssm."userId"
+    FROM shared_space_library ssl
+    INNER JOIN shared_space_member ssm ON ssm."spaceId" = ssl."spaceId"
+    WHERE ssl."spaceId" = OLD."id"
+      AND NOT user_has_library_path(ssl."libraryId", ssm."userId", OLD."id")
+    UNION
+    SELECT ssl."libraryId", OLD."createdById"
+    FROM shared_space_library ssl
+    WHERE ssl."spaceId" = OLD."id"
+      AND NOT user_has_library_path(ssl."libraryId", OLD."createdById", OLD."id")
+  ) AS targets;
+
+  RETURN OLD;
+END $$;
+
+CREATE TRIGGER shared_space_delete_library_audit
+BEFORE DELETE ON shared_space
+FOR EACH ROW
+EXECUTE FUNCTION shared_space_delete_library_audit();
+```
+
+**Cascade ordering.** When a `library` is deleted, cascade fires `shared_space_library` DELETE → case 1 fires (the EXISTS guard passes because `shared_space` is still alive) → per-user audit rows are emitted. When a `shared_space` is deleted, case 3's BEFORE-row trigger fires first while everything is still visible and emits all (member × library) and (creator × library) audit rows; the subsequent cascade to `shared_space_library` and `shared_space_member` triggers cases 1 and 2, but their `EXISTS shared_space` guards fail (the parent row is gone) so they emit nothing for `library_audit`. Case 1's part-1 join-row audit (`shared_space_library_audit`) still fires unconditionally so the client can drop its local `sharedSpaceLibraryEntity` row.
 
 #### `library_asset_audit(assetId, deletedAt)` — for individual asset deletes within a library
 
