@@ -96,6 +96,13 @@ export const SYNC_TYPES_ORDER = [
   SyncRequestType.SharedSpaceAssetsV1,
   SyncRequestType.SharedSpaceToAssetsV1,
   SyncRequestType.SharedSpaceAssetExifsV1,
+  // Libraries — wired in Task 27. Order: library metadata before its assets, exifs after assets,
+  // shared_space_library link rows last so the client can backfill libraries newly accessible via
+  // a space in the same sync pass.
+  SyncRequestType.LibrariesV1,
+  SyncRequestType.LibraryAssetsV1,
+  SyncRequestType.LibraryAssetExifsV1,
+  SyncRequestType.SharedSpaceLibrariesV1,
 ];
 
 const throwSessionRequired = () => {
@@ -211,6 +218,11 @@ export class SyncService extends BaseService {
         this.syncSharedSpaceAssetExifsV1(options, response, checkpointMap, session.id),
       [SyncRequestType.SharedSpaceToAssetsV1]: () =>
         this.syncSharedSpaceToAssetsV1(options, response, checkpointMap, session.id),
+      // Library sync handlers — wired in Task 27. No-op stubs keep the exhaustive Record happy.
+      [SyncRequestType.LibrariesV1]: () => Promise.resolve(),
+      [SyncRequestType.LibraryAssetsV1]: () => Promise.resolve(),
+      [SyncRequestType.LibraryAssetExifsV1]: () => Promise.resolve(),
+      [SyncRequestType.SharedSpaceLibrariesV1]: () => Promise.resolve(),
     };
 
     for (const type of SYNC_TYPES_ORDER.filter((type) => dto.types.includes(type))) {
