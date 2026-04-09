@@ -73,6 +73,7 @@ export class SyncRepository {
   sharedSpaceAssetExif: SharedSpaceAssetExifSync;
   sharedSpaceToAsset: SharedSpaceToAssetSync;
   library: LibrarySync;
+  libraryAsset: LibraryAssetSync;
 
   constructor(@InjectKysely() private db: Kysely<DB>) {
     this.album = new AlbumSync(this.db);
@@ -102,6 +103,7 @@ export class SyncRepository {
     this.sharedSpaceAssetExif = new SharedSpaceAssetExifSync(this.db);
     this.sharedSpaceToAsset = new SharedSpaceToAssetSync(this.db);
     this.library = new LibrarySync(this.db);
+    this.libraryAsset = new LibraryAssetSync(this.db);
   }
 }
 
@@ -1137,5 +1139,77 @@ export class LibrarySync extends BaseSync {
       .where('library.id', 'in', (eb) => accessibleLibraries(eb, options.userId))
       .select(LIBRARY_SYNC_COLUMNS)
       .stream();
+  }
+}
+
+// Streams library-owned asset rows. The "once-per-asset" correctness property
+// comes from filtering `asset.libraryId IN accessibleLibraries(userId)` directly
+// on the asset table. A library linked to multiple spaces is still counted ONCE
+// in the accessibleLibraries UNION, and each asset has exactly one libraryId,
+// so this class never produces the write-amplification that SharedSpaceAssetSync
+// accepts for (space, asset) pairs.
+//
+// Owns library_asset_audit cleanup because this class is the one that streams
+// the per-asset delete events derived from that table.
+export class LibraryAssetSync extends BaseSync {
+  // Per-library backfill of asset rows for a specific library. Triggered by the
+  // `syncLibraryAssetsV1` service loop when the client has not yet backfilled a
+  // newly-accessible library.
+  @GenerateSql({ params: [dummyBackfillOptions, DummyValue.UUID], stream: true })
+  getBackfill(options: SyncBackfillOptions, libraryId: string) {
+    return this.backfillQuery('asset', options)
+      .select(columns.syncAsset)
+      .select('asset.updateId')
+      .where('asset.libraryId', '=', libraryId)
+      .stream();
+  }
+
+  // Stream new asset rows for any library the user can access. No join through
+  // shared_space_library — scoping is direct on asset.libraryId, guaranteeing
+  // each asset appears at most once.
+  @GenerateSql({ params: [dummyQueryOptions], stream: true })
+  getCreates(options: SyncQueryOptions) {
+    return this.upsertQuery('asset', options)
+      .select(columns.syncAsset)
+      .select('asset.updateId')
+      .where('asset.libraryId', 'is not', null)
+      .where('asset.libraryId', 'in', (eb) => accessibleLibraries(eb, options.userId))
+      .stream();
+  }
+
+  // Stream asset metadata changes for library assets the client has already
+  // received. Unlike SharedSpaceAssetSync.getUpdates — which is gated by the
+  // shared_space_asset join-row ack — library assets are gated directly by the
+  // caller's libraryAssetAck because the library <-> asset relation lives on
+  // the asset row itself.
+  @GenerateSql({ params: [dummyQueryOptions, { updateId: DummyValue.UUID }], stream: true })
+  getUpdates(options: SyncQueryOptions, libraryAssetAck: SyncAck) {
+    return this.upsertQuery('asset', options)
+      .select(columns.syncAsset)
+      .select('asset.updateId')
+      .where('asset.updateId', '<=', libraryAssetAck.updateId)
+      .where('asset.libraryId', 'is not', null)
+      .where('asset.libraryId', 'in', (eb) => accessibleLibraries(eb, options.userId))
+      .stream();
+  }
+
+  // Stream per-asset deletes from library_asset_audit, scoped to libraries the
+  // user currently has access to. Joins back to `asset` (soft-deleted rows are
+  // still present so libraryId is available) to recover the libraryId, which
+  // library_asset_audit itself does not store. Assets whose libraryId no longer
+  // resolves to an accessibleLibraries row are filtered out — the whole-library
+  // revocation is signaled separately via library_audit (LibrarySync.getDeletes).
+  @GenerateSql({ params: [dummyQueryOptions], stream: true })
+  getDeletes(options: SyncQueryOptions) {
+    return this.auditQuery('library_asset_audit', options)
+      .innerJoin('asset', 'asset.id', 'library_asset_audit.assetId')
+      .select(['library_asset_audit.id as id', 'library_asset_audit.assetId as assetId'])
+      .where('asset.libraryId', 'is not', null)
+      .where('asset.libraryId', 'in', (eb) => accessibleLibraries(eb, options.userId))
+      .stream();
+  }
+
+  cleanupAuditTable(daysAgo: number) {
+    return this.auditCleanup('library_asset_audit', daysAgo);
   }
 }
