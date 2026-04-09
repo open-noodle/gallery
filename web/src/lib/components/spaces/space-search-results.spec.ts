@@ -1,7 +1,25 @@
 import { getIntersectionObserverMock } from '$lib/__mocks__/intersection-observer.mock';
 import SpaceSearchResults from '$lib/components/spaces/space-search-results.svelte';
 import type { AssetResponseDto } from '@immich/sdk';
-import { render, screen } from '@testing-library/svelte';
+import { fireEvent, render, screen } from '@testing-library/svelte';
+
+const getAssetInfoMock = vi.fn();
+vi.mock('@immich/sdk', async (importOriginal) => {
+  const actual = (await importOriginal()) as Record<string, unknown>;
+  return { ...actual, getAssetInfo: (...args: unknown[]) => getAssetInfoMock(...args) };
+});
+
+// Spy on the props forwarded to AssetViewer. The component dynamic-imports asset-viewer.svelte,
+// so we mock the module and record each invocation's props on this array. Tests assert against it.
+const assetViewerPropsCalls: Array<Record<string, unknown>> = [];
+vi.mock('$lib/components/asset-viewer/asset-viewer.svelte', () => {
+  return {
+    default: function MockAssetViewer(_node: unknown, props: Record<string, unknown>) {
+      assetViewerPropsCalls.push(props);
+      return { destroy: () => {} };
+    },
+  };
+});
 
 const mockAssets = [
   { id: 'asset-1', originalFileName: 'photo1.jpg' },
@@ -18,6 +36,9 @@ const mockAssetsWithDates = [
 describe('SpaceSearchResults', () => {
   beforeEach(() => {
     vi.stubGlobal('IntersectionObserver', getIntersectionObserverMock());
+    getAssetInfoMock.mockReset();
+    getAssetInfoMock.mockResolvedValue({ id: 'asset-1', originalFileName: 'photo1.jpg' } as AssetResponseDto);
+    assetViewerPropsCalls.length = 0;
   });
 
   it('should render thumbnail grid from search results', () => {
@@ -230,5 +251,105 @@ describe('SpaceSearchResults', () => {
     const text = screen.getByTestId('result-count').textContent;
     expect(text).toContain('35');
     expect(text).not.toContain('of up to');
+  });
+
+  describe('isShared prop and conditional spaceId', () => {
+    it('should pass isShared={true} to AssetViewer when isShared prop is true', async () => {
+      render(SpaceSearchResults, {
+        props: {
+          results: mockAssets,
+          isLoading: false,
+          hasMore: false,
+          totalLoaded: 3,
+          onLoadMore: vi.fn(),
+          sortMode: 'relevance',
+          spaceId: 'space-1',
+          isShared: true,
+        },
+      });
+
+      const firstThumb = screen.getAllByRole('img')[0];
+      await fireEvent.click(firstThumb);
+
+      // Wait for the dynamic-imported AssetViewer mock to be invoked with props.
+      await vi.waitFor(() => expect(assetViewerPropsCalls.length).toBeGreaterThan(0));
+
+      const props = assetViewerPropsCalls.at(-1)!;
+      expect(props.isShared).toBe(true);
+    });
+
+    it('should pass isShared={false} to AssetViewer when isShared prop is false', async () => {
+      render(SpaceSearchResults, {
+        props: {
+          results: mockAssets,
+          isLoading: false,
+          hasMore: false,
+          totalLoaded: 3,
+          onLoadMore: vi.fn(),
+          sortMode: 'relevance',
+          isShared: false,
+        },
+      });
+
+      const firstThumb = screen.getAllByRole('img')[0];
+      await fireEvent.click(firstThumb);
+
+      // This test FAILS today because the component hardcodes isShared={true} in the AssetViewer render.
+      await vi.waitFor(() => expect(assetViewerPropsCalls.length).toBeGreaterThan(0));
+
+      const props = assetViewerPropsCalls.at(-1)!;
+      expect(props.isShared).toBe(false);
+    });
+
+    it('should call getAssetInfo WITH spaceId when spaceId prop is set', async () => {
+      render(SpaceSearchResults, {
+        props: {
+          results: mockAssets,
+          isLoading: false,
+          hasMore: false,
+          totalLoaded: 3,
+          onLoadMore: vi.fn(),
+          sortMode: 'relevance',
+          spaceId: 'space-42',
+          isShared: true,
+        },
+      });
+
+      const firstThumb = screen.getAllByRole('img')[0];
+      await fireEvent.click(firstThumb);
+
+      await vi.waitFor(() => expect(getAssetInfoMock).toHaveBeenCalled());
+
+      expect(getAssetInfoMock).toHaveBeenCalledWith(expect.objectContaining({ spaceId: 'space-42' }));
+    });
+
+    it('should call getAssetInfo WITHOUT spaceId when spaceId prop is undefined', async () => {
+      render(SpaceSearchResults, {
+        props: {
+          results: mockAssets,
+          isLoading: false,
+          hasMore: false,
+          totalLoaded: 3,
+          onLoadMore: vi.fn(),
+          sortMode: 'relevance',
+          isShared: false,
+        },
+      });
+
+      const firstThumb = screen.getAllByRole('img')[0];
+      await fireEvent.click(firstThumb);
+
+      await vi.waitFor(() => expect(getAssetInfoMock).toHaveBeenCalled());
+
+      // Assert the spaceId key is ABSENT (not just undefined) from every call. The current
+      // implementation passes `{ ...authManager.params, id, spaceId }` which results in the
+      // key being present with an undefined value, so this test FAILS today.
+      for (const call of getAssetInfoMock.mock.calls) {
+        const arg = call[0] as Record<string, unknown>;
+        expect(Object.prototype.hasOwnProperty.call(arg, 'spaceId')).toBe(false);
+      }
+      // Also assert via not.objectContaining as a secondary guardrail.
+      expect(getAssetInfoMock).toHaveBeenCalledWith(expect.not.objectContaining({ spaceId: expect.anything() }));
+    });
   });
 });
