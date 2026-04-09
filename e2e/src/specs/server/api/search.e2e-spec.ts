@@ -7,6 +7,7 @@ import {
   SharedLinkType,
   SharedSpaceResponseDto,
   updateAsset,
+  updateConfig,
 } from '@immich/sdk';
 import { DateTime } from 'luxon';
 import { readFile } from 'node:fs/promises';
@@ -16,6 +17,16 @@ import { app, asBearerAuth, TEN_TIMES, testAssetDir, utils } from 'src/utils';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 const today = DateTime.now();
+
+// Shared helper used by multiple withSharedSpaces and pagination describe blocks.
+// Flips the runtime machineLearning config so the e2e stack (which starts with
+// IMMICH_MACHINE_LEARNING_ENABLED=false) lets searchSmart through.
+const enableSmartSearch = async (adminToken: string) => {
+  const config = await utils.getSystemConfig(adminToken);
+  config.machineLearning.enabled = true;
+  config.machineLearning.clip.enabled = true;
+  await updateConfig({ systemConfigDto: config }, { headers: asBearerAuth(adminToken) });
+};
 
 describe('/search', () => {
   let admin: LoginResponseDto;
@@ -1142,6 +1153,335 @@ describe('/search', () => {
       }
     });
   });
+
+  describe('POST /search/smart with withSharedSpaces', () => {
+    // The e2e stack runs with IMMICH_MACHINE_LEARNING_ENABLED=false, so the default
+    // config has ML disabled. We toggle it on at runtime via updateConfig for these
+    // tests and seed fake CLIP embeddings directly into the smart_search table so we
+    // don't need a real ML server. We use `queryAssetId` (not `query`) in the request
+    // so the service reads the embedding from DB instead of calling encodeText().
+
+    let ownerUser: LoginResponseDto;
+    let memberUser: LoginResponseDto;
+    let outsiderUser: LoginResponseDto;
+    let ownerAsset: AssetMediaResponseDto;
+    let ownerAssetNotInSpace: AssetMediaResponseDto;
+    let memberAsset: AssetMediaResponseDto;
+    let outsiderAsset: AssetMediaResponseDto;
+    let memberWebsocket: Socket;
+    let ownerWebsocket: Socket;
+    let outsiderWebsocket: Socket;
+
+    // A 512-dim vector literal in pgvector text format. Zero vector is fine —
+    // we just need *some* embedding so the cosine-distance order-by doesn't error.
+    const zeroEmbedding = '[' + Array.from({ length: 512 }, () => '0').join(',') + ']';
+
+    const seedEmbedding = async (assetId: string) => {
+      const db = await utils.connectDatabase();
+      await db.query(
+        `INSERT INTO "smart_search" ("assetId", "embedding") VALUES ($1, $2)
+         ON CONFLICT ("assetId") DO UPDATE SET "embedding" = EXCLUDED."embedding"`,
+        [assetId, zeroEmbedding],
+      );
+    };
+
+    beforeAll(async () => {
+      ownerUser = await utils.userSetup(admin.accessToken, {
+        email: 'smart-shared-owner@immich.cloud',
+        name: 'Smart Shared Owner',
+        password: 'Password123!',
+      });
+      memberUser = await utils.userSetup(admin.accessToken, {
+        email: 'smart-shared-member@immich.cloud',
+        name: 'Smart Shared Member',
+        password: 'Password123!',
+      });
+      outsiderUser = await utils.userSetup(admin.accessToken, {
+        email: 'smart-shared-outsider@immich.cloud',
+        name: 'Smart Shared Outsider',
+        password: 'Password123!',
+      });
+
+      ownerWebsocket = await utils.connectWebsocket(ownerUser.accessToken);
+      memberWebsocket = await utils.connectWebsocket(memberUser.accessToken);
+      outsiderWebsocket = await utils.connectWebsocket(outsiderUser.accessToken);
+
+      // Upload assets while ML is still disabled (avoids background ML job churn)
+      ownerAsset = await utils.createAsset(ownerUser.accessToken, { deviceAssetId: 'smart-shared-owner-1' });
+      ownerAssetNotInSpace = await utils.createAsset(ownerUser.accessToken, {
+        deviceAssetId: 'smart-shared-owner-2',
+      });
+      memberAsset = await utils.createAsset(memberUser.accessToken, { deviceAssetId: 'smart-shared-member-1' });
+      outsiderAsset = await utils.createAsset(outsiderUser.accessToken, {
+        deviceAssetId: 'smart-shared-outsider-1',
+      });
+
+      await utils.waitForWebsocketEvent({ event: 'assetUpload', id: ownerAsset.id });
+      await utils.waitForWebsocketEvent({ event: 'assetUpload', id: ownerAssetNotInSpace.id });
+      await utils.waitForWebsocketEvent({ event: 'assetUpload', id: memberAsset.id });
+      await utils.waitForWebsocketEvent({ event: 'assetUpload', id: outsiderAsset.id });
+
+      // Seed fake embeddings so searchSmart can find the assets via queryAssetId path
+      await seedEmbedding(ownerAsset.id);
+      await seedEmbedding(ownerAssetNotInSpace.id);
+      await seedEmbedding(memberAsset.id);
+      await seedEmbedding(outsiderAsset.id);
+
+      // Enable smart search via runtime config (overrides IMMICH_MACHINE_LEARNING_ENABLED=false)
+      await enableSmartSearch(admin.accessToken);
+    }, 60_000);
+
+    afterAll(async () => {
+      utils.disconnectWebsocket(ownerWebsocket);
+      utils.disconnectWebsocket(memberWebsocket);
+      utils.disconnectWebsocket(outsiderWebsocket);
+      // Reset admin config so ML is disabled again for downstream tests
+      await utils.resetAdminConfig(admin.accessToken);
+    });
+
+    it('should return timeline-pinned shared space content for a member', async () => {
+      // Owner creates a space with their asset, adds member, member opts in to timeline
+      const space = await utils.createSpace(ownerUser.accessToken, { name: 'Timeline Smart Space' });
+      await utils.addSpaceAssets(ownerUser.accessToken, space.id, [ownerAsset.id]);
+      await utils.addSpaceMember(ownerUser.accessToken, space.id, { userId: memberUser.userId });
+
+      const { status: toggleStatus } = await request(app)
+        .patch(`/shared-spaces/${space.id}/members/me/timeline`)
+        .set('Authorization', `Bearer ${memberUser.accessToken}`)
+        .send({ showInTimeline: true });
+      expect(toggleStatus).toBe(200);
+
+      const { status, body } = await request(app)
+        .post('/search/smart')
+        .set('Authorization', `Bearer ${memberUser.accessToken}`)
+        .send({ queryAssetId: memberAsset.id, withSharedSpaces: true, size: 100 });
+
+      expect(status).toBe(200);
+      const ids = body.assets.items.map((a: AssetResponseDto) => a.id);
+      // Member sees their own asset AND the owner's asset from the pinned space
+      expect(ids).toContain(memberAsset.id);
+      expect(ids).toContain(ownerAsset.id);
+    });
+
+    it('should reject with 400 when both spaceId and withSharedSpaces are set', async () => {
+      const space = await utils.createSpace(ownerUser.accessToken, { name: 'Conflict Space' });
+
+      const { status, body } = await request(app)
+        .post('/search/smart')
+        .set('Authorization', `Bearer ${ownerUser.accessToken}`)
+        .send({ queryAssetId: ownerAsset.id, spaceId: space.id, withSharedSpaces: true });
+
+      expect(status).toBe(400);
+      expect(body.message).toBe('Cannot use both spaceId and withSharedSpaces');
+    });
+
+    it('should fall back to owner-only results when user has no shared spaces', async () => {
+      // outsiderUser is not a member of any space
+      const { status, body } = await request(app)
+        .post('/search/smart')
+        .set('Authorization', `Bearer ${outsiderUser.accessToken}`)
+        .send({ queryAssetId: outsiderAsset.id, withSharedSpaces: true, size: 100 });
+
+      expect(status).toBe(200);
+      const ids = body.assets.items.map((a: AssetResponseDto) => a.id);
+      expect(ids).toContain(outsiderAsset.id);
+      // Never leaks assets from users the outsider isn't partnered/sharing with
+      expect(ids).not.toContain(ownerAsset.id);
+      expect(ids).not.toContain(memberAsset.id);
+    });
+
+    it('should not expose assets from private spaces the user is not a member of', async () => {
+      // Owner creates a private space the outsider is NOT in
+      const privateSpace = await utils.createSpace(ownerUser.accessToken, { name: 'Private Isolation Space' });
+      await utils.addSpaceAssets(ownerUser.accessToken, privateSpace.id, [ownerAssetNotInSpace.id]);
+
+      const { status, body } = await request(app)
+        .post('/search/smart')
+        .set('Authorization', `Bearer ${outsiderUser.accessToken}`)
+        .send({ queryAssetId: outsiderAsset.id, withSharedSpaces: true, size: 100 });
+
+      expect(status).toBe(200);
+      const ids = body.assets.items.map((a: AssetResponseDto) => a.id);
+      expect(ids).toContain(outsiderAsset.id);
+      expect(ids).not.toContain(ownerAssetNotInSpace.id);
+      expect(ids).not.toContain(ownerAsset.id);
+    });
+
+    it('should not return space content after the user has been removed from the space', async () => {
+      // Create a fresh space, add memberUser, pin to timeline, then remove them
+      const kickSpace = await utils.createSpace(ownerUser.accessToken, { name: 'Kick Space' });
+      await utils.addSpaceAssets(ownerUser.accessToken, kickSpace.id, [ownerAssetNotInSpace.id]);
+      await utils.addSpaceMember(ownerUser.accessToken, kickSpace.id, { userId: memberUser.userId });
+
+      await request(app)
+        .patch(`/shared-spaces/${kickSpace.id}/members/me/timeline`)
+        .set('Authorization', `Bearer ${memberUser.accessToken}`)
+        .send({ showInTimeline: true })
+        .expect(200);
+
+      // Sanity: before removal the member can see the kicked-space asset
+      const before = await request(app)
+        .post('/search/smart')
+        .set('Authorization', `Bearer ${memberUser.accessToken}`)
+        .send({ queryAssetId: memberAsset.id, withSharedSpaces: true, size: 100 });
+      expect(before.status).toBe(200);
+      const beforeIds = before.body.assets.items.map((a: AssetResponseDto) => a.id);
+      expect(beforeIds).toContain(ownerAssetNotInSpace.id);
+
+      // Owner removes member
+      const { status: removeStatus } = await request(app)
+        .delete(`/shared-spaces/${kickSpace.id}/members/${memberUser.userId}`)
+        .set('Authorization', `Bearer ${ownerUser.accessToken}`);
+      expect(removeStatus).toBe(204);
+
+      // After removal: kicked member must no longer see content from that space
+      const after = await request(app)
+        .post('/search/smart')
+        .set('Authorization', `Bearer ${memberUser.accessToken}`)
+        .send({ queryAssetId: memberAsset.id, withSharedSpaces: true, size: 100 });
+      expect(after.status).toBe(200);
+      const afterIds = after.body.assets.items.map((a: AssetResponseDto) => a.id);
+      expect(afterIds).toContain(memberAsset.id);
+      expect(afterIds).not.toContain(ownerAssetNotInSpace.id);
+    });
+
+    it('should not include shared-space content when withSharedSpaces is absent or false', async () => {
+      // memberUser still has their pinned space from the first test — verify that
+      // *without* the flag, the owner's asset does NOT leak into their results.
+      const withoutFlag = await request(app)
+        .post('/search/smart')
+        .set('Authorization', `Bearer ${memberUser.accessToken}`)
+        .send({ queryAssetId: memberAsset.id, size: 100 });
+      expect(withoutFlag.status).toBe(200);
+      const withoutIds = withoutFlag.body.assets.items.map((a: AssetResponseDto) => a.id);
+      expect(withoutIds).toContain(memberAsset.id);
+      expect(withoutIds).not.toContain(ownerAsset.id);
+
+      const withFalse = await request(app)
+        .post('/search/smart')
+        .set('Authorization', `Bearer ${memberUser.accessToken}`)
+        .send({ queryAssetId: memberAsset.id, withSharedSpaces: false, size: 100 });
+      expect(withFalse.status).toBe(200);
+      const withFalseIds = withFalse.body.assets.items.map((a: AssetResponseDto) => a.id);
+      expect(withFalseIds).toContain(memberAsset.id);
+      expect(withFalseIds).not.toContain(ownerAsset.id);
+    });
+  });
+
+  describe('POST /search/smart pagination stability', () => {
+    // Regression test for identical-embedding pagination overlap: when multiple
+    // assets have byte-identical CLIP embeddings, the cosine-distance order-by
+    // has no natural tiebreaker, so offset-based pagination can return the same
+    // asset on page 1 and page 2. The fix adds asset.id as a stable tiebreaker
+    // to both the relevance-only ordering and the two-phase CTE's outer
+    // fileCreatedAt ordering. See commit 6a4bffc82.
+
+    let paginationUser: LoginResponseDto;
+    let paginationWebsocket: Socket;
+    let paginationAssets: AssetMediaResponseDto[] = [];
+
+    const zeroEmbedding = '[' + Array.from({ length: 512 }, () => '0').join(',') + ']';
+
+    const seedEmbedding = async (assetId: string) => {
+      const db = await utils.connectDatabase();
+      await db.query(
+        `INSERT INTO "smart_search" ("assetId", "embedding") VALUES ($1, $2)
+         ON CONFLICT ("assetId") DO UPDATE SET "embedding" = EXCLUDED."embedding"`,
+        [assetId, zeroEmbedding],
+      );
+    };
+
+    const ASSET_COUNT = 12;
+    const PAGE_SIZE = 5;
+
+    beforeAll(async () => {
+      paginationUser = await utils.userSetup(admin.accessToken, {
+        email: 'smart-pagination@immich.cloud',
+        name: 'Smart Pagination User',
+        password: 'Password123!',
+      });
+      paginationWebsocket = await utils.connectWebsocket(paginationUser.accessToken);
+
+      // Upload N assets — enough to fill at least two PAGE_SIZE pages.
+      paginationAssets = [];
+      for (let i = 0; i < ASSET_COUNT; i++) {
+        const asset = await utils.createAsset(paginationUser.accessToken, {
+          deviceAssetId: `smart-pagination-${i}`,
+        });
+        paginationAssets.push(asset);
+      }
+
+      for (const asset of paginationAssets) {
+        await utils.waitForWebsocketEvent({ event: 'assetUpload', id: asset.id });
+      }
+
+      // Seed IDENTICAL zero-vector embeddings on every asset so the cosine-
+      // distance order-by has no natural tiebreaker. Without the id tiebreaker
+      // fix, offset-based pagination produces overlap across pages.
+      for (const asset of paginationAssets) {
+        await seedEmbedding(asset.id);
+      }
+
+      await enableSmartSearch(admin.accessToken);
+    }, 60_000);
+
+    afterAll(async () => {
+      utils.disconnectWebsocket(paginationWebsocket);
+      await utils.resetAdminConfig(admin.accessToken);
+    });
+
+    it('should not return duplicate assets across pages when multiple assets have identical embeddings', async () => {
+      const queryAssetId = paginationAssets[0].id;
+
+      const page1Response = await request(app)
+        .post('/search/smart')
+        .set('Authorization', `Bearer ${paginationUser.accessToken}`)
+        .send({ queryAssetId, size: PAGE_SIZE, page: 1 });
+      expect(page1Response.status).toBe(200);
+
+      const page2Response = await request(app)
+        .post('/search/smart')
+        .set('Authorization', `Bearer ${paginationUser.accessToken}`)
+        .send({ queryAssetId, size: PAGE_SIZE, page: 2 });
+      expect(page2Response.status).toBe(200);
+
+      const page1Ids: string[] = page1Response.body.assets.items.map((a: AssetResponseDto) => a.id);
+      const page2Ids: string[] = page2Response.body.assets.items.map((a: AssetResponseDto) => a.id);
+
+      // Regression: no asset should appear on both pages.
+      const overlap = page1Ids.filter((id) => page2Ids.includes(id));
+      expect(overlap).toEqual([]);
+
+      // Each page should be fully populated (we have ASSET_COUNT >= 2 * PAGE_SIZE).
+      expect(page1Ids).toHaveLength(PAGE_SIZE);
+      expect(page2Ids).toHaveLength(PAGE_SIZE);
+
+      // The union of both pages should contain 2 * PAGE_SIZE distinct assets.
+      const uniqueIds = new Set<string>([...page1Ids, ...page2Ids]);
+      expect(uniqueIds.size).toBe(2 * PAGE_SIZE);
+    });
+
+    it('should return a stable ordering when paging with identical embeddings', async () => {
+      const queryAssetId = paginationAssets[0].id;
+
+      const first = await request(app)
+        .post('/search/smart')
+        .set('Authorization', `Bearer ${paginationUser.accessToken}`)
+        .send({ queryAssetId, size: PAGE_SIZE, page: 1 });
+      const second = await request(app)
+        .post('/search/smart')
+        .set('Authorization', `Bearer ${paginationUser.accessToken}`)
+        .send({ queryAssetId, size: PAGE_SIZE, page: 1 });
+
+      expect(first.status).toBe(200);
+      expect(second.status).toBe(200);
+
+      const firstIds: string[] = first.body.assets.items.map((a: AssetResponseDto) => a.id);
+      const secondIds: string[] = second.body.assets.items.map((a: AssetResponseDto) => a.id);
+      expect(firstIds).toEqual(secondIds);
+    });
+  });
+
   describe('GET /search/suggestions (temporal scoping)', () => {
     // Upload assets with specific fileCreatedAt dates and different countries/cameras
     // so we can test that temporal params narrow suggestions correctly.
