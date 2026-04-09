@@ -625,6 +625,7 @@ describe(AssetService.name, () => {
       const asset = AssetFactory.create();
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
       mocks.asset.update.mockResolvedValue(asset as any);
+      mocks.map.reverseGeocode.mockResolvedValue({ country: null, state: null, city: null });
 
       await sut.update(authStub.admin, asset.id, { latitude: 40.7128, longitude: -74.006 });
 
@@ -637,6 +638,38 @@ describe(AssetService.name, () => {
         { lockedPropertiesBehavior: 'append' },
       );
       expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.SidecarWrite, data: { id: asset.id } });
+    });
+
+    it('should reverse-geocode and persist country/state/city when latitude and longitude are updated', async () => {
+      const asset = AssetFactory.create();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.update.mockResolvedValue(asset as any);
+      mocks.map.reverseGeocode.mockResolvedValue({ country: 'Germany', state: 'Berlin', city: 'Berlin' });
+
+      await sut.update(authStub.admin, asset.id, { latitude: 52.52, longitude: 13.405 });
+
+      expect(mocks.map.reverseGeocode).toHaveBeenCalledWith({ latitude: 52.52, longitude: 13.405 });
+      expect(mocks.asset.upsertExif).toHaveBeenCalledWith(
+        expect.objectContaining({
+          assetId: asset.id,
+          latitude: 52.52,
+          longitude: 13.405,
+          country: 'Germany',
+          state: 'Berlin',
+          city: 'Berlin',
+        }),
+        { lockedPropertiesBehavior: 'append' },
+      );
+    });
+
+    it('should not call reverse geocoding when latitude and longitude are not updated', async () => {
+      const asset = AssetFactory.create();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.update.mockResolvedValue(asset as any);
+
+      await sut.update(authStub.admin, asset.id, { description: 'New description' });
+
+      expect(mocks.map.reverseGeocode).not.toHaveBeenCalled();
     });
   });
 
@@ -660,6 +693,7 @@ describe(AssetService.name, () => {
     it('should not update Assets table if no relevant fields are provided', async () => {
       const auth = AuthFactory.create();
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset-1']));
+      mocks.map.reverseGeocode.mockResolvedValue({ country: null, state: null, city: null });
 
       await sut.updateAll(auth, {
         ids: ['asset-1'],
@@ -674,6 +708,7 @@ describe(AssetService.name, () => {
 
     it('should update Assets table if visibility field is provided', async () => {
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset-1']));
+      mocks.map.reverseGeocode.mockResolvedValue({ country: null, state: null, city: null });
 
       await sut.updateAll(authStub.admin, {
         ids: ['asset-1'],
@@ -685,12 +720,19 @@ describe(AssetService.name, () => {
         rating: undefined,
       });
       expect(mocks.asset.updateAll).toHaveBeenCalled();
-      expect(mocks.asset.updateAllExif).toHaveBeenCalledWith(['asset-1'], { latitude: 0, longitude: 0 });
+      expect(mocks.asset.updateAllExif).toHaveBeenCalledWith(['asset-1'], {
+        latitude: 0,
+        longitude: 0,
+        country: null,
+        state: null,
+        city: null,
+      });
       expect(mocks.job.queueAll).toHaveBeenCalledWith([{ name: JobName.SidecarWrite, data: { id: 'asset-1' } }]);
     });
 
     it('should update exif table if latitude field is provided', async () => {
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset-1']));
+      mocks.map.reverseGeocode.mockResolvedValue({ country: null, state: null, city: null });
       const dateTimeOriginal = new Date().toISOString();
       await sut.updateAll(authStub.admin, {
         ids: ['asset-1'],
@@ -706,12 +748,40 @@ describe(AssetService.name, () => {
         dateTimeOriginal,
         latitude: 30,
         longitude: 50,
+        country: null,
+        state: null,
+        city: null,
       });
       expect(mocks.job.queueAll).toHaveBeenCalledWith([{ name: JobName.SidecarWrite, data: { id: 'asset-1' } }]);
     });
 
+    it('should reverse-geocode and persist country/state/city when bulk-updating latitude and longitude', async () => {
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset-1', 'asset-2']));
+      mocks.map.reverseGeocode.mockResolvedValue({ country: 'France', state: 'Île-de-France', city: 'Paris' });
+
+      await sut.updateAll(authStub.admin, {
+        ids: ['asset-1', 'asset-2'],
+        latitude: 48.8566,
+        longitude: 2.3522,
+        isFavorite: undefined,
+        duplicateId: undefined,
+        rating: undefined,
+      });
+
+      expect(mocks.map.reverseGeocode).toHaveBeenCalledTimes(1);
+      expect(mocks.map.reverseGeocode).toHaveBeenCalledWith({ latitude: 48.8566, longitude: 2.3522 });
+      expect(mocks.asset.updateAllExif).toHaveBeenCalledWith(['asset-1', 'asset-2'], {
+        latitude: 48.8566,
+        longitude: 2.3522,
+        country: 'France',
+        state: 'Île-de-France',
+        city: 'Paris',
+      });
+    });
+
     it('should update Assets table if duplicateId is provided as null', async () => {
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset-1']));
+      mocks.map.reverseGeocode.mockResolvedValue({ country: null, state: null, city: null });
 
       await sut.updateAll(authStub.admin, {
         ids: ['asset-1'],
