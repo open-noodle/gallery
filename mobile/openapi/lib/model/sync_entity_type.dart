@@ -84,6 +84,16 @@ class SyncEntityType {
   static const sharedSpaceToAssetV1 = SyncEntityType._(r'SharedSpaceToAssetV1');
   static const sharedSpaceToAssetDeleteV1 = SyncEntityType._(r'SharedSpaceToAssetDeleteV1');
   static const sharedSpaceToAssetBackfillV1 = SyncEntityType._(r'SharedSpaceToAssetBackfillV1');
+  static const libraryV1 = SyncEntityType._(r'LibraryV1');
+  static const libraryDeleteV1 = SyncEntityType._(r'LibraryDeleteV1');
+  static const libraryAssetCreateV1 = SyncEntityType._(r'LibraryAssetCreateV1');
+  static const libraryAssetDeleteV1 = SyncEntityType._(r'LibraryAssetDeleteV1');
+  static const libraryAssetBackfillV1 = SyncEntityType._(r'LibraryAssetBackfillV1');
+  static const libraryAssetExifCreateV1 = SyncEntityType._(r'LibraryAssetExifCreateV1');
+  static const libraryAssetExifBackfillV1 = SyncEntityType._(r'LibraryAssetExifBackfillV1');
+  static const sharedSpaceLibraryV1 = SyncEntityType._(r'SharedSpaceLibraryV1');
+  static const sharedSpaceLibraryDeleteV1 = SyncEntityType._(r'SharedSpaceLibraryDeleteV1');
+  static const sharedSpaceLibraryBackfillV1 = SyncEntityType._(r'SharedSpaceLibraryBackfillV1');
   static const syncAckV1 = SyncEntityType._(r'SyncAckV1');
   static const syncResetV1 = SyncEntityType._(r'SyncResetV1');
   static const syncCompleteV1 = SyncEntityType._(r'SyncCompleteV1');
@@ -151,6 +161,16 @@ class SyncEntityType {
     sharedSpaceToAssetV1,
     sharedSpaceToAssetDeleteV1,
     sharedSpaceToAssetBackfillV1,
+    libraryV1,
+    libraryDeleteV1,
+    libraryAssetCreateV1,
+    libraryAssetDeleteV1,
+    libraryAssetBackfillV1,
+    libraryAssetExifCreateV1,
+    libraryAssetExifBackfillV1,
+    sharedSpaceLibraryV1,
+    sharedSpaceLibraryDeleteV1,
+    sharedSpaceLibraryBackfillV1,
     syncAckV1,
     syncResetV1,
     syncCompleteV1,
@@ -253,6 +273,16 @@ class SyncEntityTypeTypeTransformer {
         case r'SharedSpaceToAssetV1': return SyncEntityType.sharedSpaceToAssetV1;
         case r'SharedSpaceToAssetDeleteV1': return SyncEntityType.sharedSpaceToAssetDeleteV1;
         case r'SharedSpaceToAssetBackfillV1': return SyncEntityType.sharedSpaceToAssetBackfillV1;
+        case r'LibraryV1': return SyncEntityType.libraryV1;
+        case r'LibraryDeleteV1': return SyncEntityType.libraryDeleteV1;
+        case r'LibraryAssetCreateV1': return SyncEntityType.libraryAssetCreateV1;
+        case r'LibraryAssetDeleteV1': return SyncEntityType.libraryAssetDeleteV1;
+        case r'LibraryAssetBackfillV1': return SyncEntityType.libraryAssetBackfillV1;
+        case r'LibraryAssetExifCreateV1': return SyncEntityType.libraryAssetExifCreateV1;
+        case r'LibraryAssetExifBackfillV1': return SyncEntityType.libraryAssetExifBackfillV1;
+        case r'SharedSpaceLibraryV1': return SyncEntityType.sharedSpaceLibraryV1;
+        case r'SharedSpaceLibraryDeleteV1': return SyncEntityType.sharedSpaceLibraryDeleteV1;
+        case r'SharedSpaceLibraryBackfillV1': return SyncEntityType.sharedSpaceLibraryBackfillV1;
         case r'SyncAckV1': return SyncEntityType.syncAckV1;
         case r'SyncResetV1': return SyncEntityType.syncResetV1;
         case r'SyncCompleteV1': return SyncEntityType.syncCompleteV1;
