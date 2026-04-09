@@ -131,6 +131,17 @@ from
       and "asset"."isOffline" = $4
   ) as "combined"
 
+-- SharedSpaceRepository.getEditableByAssetIds
+select distinct
+  "shared_space_asset"."spaceId"
+from
+  "shared_space_asset"
+  inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_asset"."spaceId"
+where
+  "shared_space_asset"."assetId" in ($1)
+  and "shared_space_member"."userId" = $2
+  and "shared_space_member"."role" in ($3, $4)
+
 -- SharedSpaceRepository.removeAssets
 delete from "shared_space_asset"
 where
