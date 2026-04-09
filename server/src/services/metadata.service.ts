@@ -5,6 +5,7 @@ import _ from 'lodash';
 import { DateTime, Duration } from 'luxon';
 import { Stats } from 'node:fs';
 import { constants } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { isAbsolute, join, parse } from 'node:path';
 import { JOBS_ASSET_PAGINATION_SIZE } from 'src/constants';
 import { StorageCore } from 'src/cores/storage.core';
@@ -519,23 +520,33 @@ export class MetadataService extends BaseService {
     if (isAbsolute(sidecarPath)) {
       await this.metadataRepository.writeTags(sidecarPath, exif);
     } else {
-      // S3 mode: download sidecar (if it exists) to temp, write tags locally, upload back
+      // S3 mode: work against a local temp file, then always upload the result to S3.
+      // If an existing sidecar is in S3, download it first so we preserve its contents;
+      // otherwise exiftool will create a fresh XMP at the temp path.
       const backend = StorageService.resolveBackendForKey(sidecarPath);
-      let localSidecar: { localPath: string; cleanup: () => Promise<void> } | undefined;
+      const sidecarExists = await backend.exists(sidecarPath);
+      let localSidecar: { localPath: string; cleanup: () => Promise<void> };
+      if (sidecarExists) {
+        localSidecar = await this.ensureLocalFile(sidecarPath);
+      } else {
+        const tempPath = join(tmpdir(), `immich-sidecar-${this.cryptoRepository.randomUUID()}.xmp`);
+        localSidecar = {
+          localPath: tempPath,
+          cleanup: async () => {
+            try {
+              await this.storageRepository.unlink(tempPath);
+            } catch {
+              // ignore — file may never have been created if writeTags failed
+            }
+          },
+        };
+      }
       try {
-        const sidecarExists = await backend.exists(sidecarPath);
-        if (sidecarExists) {
-          localSidecar = await this.ensureLocalFile(sidecarPath);
-        }
-        const localSidecarPath = localSidecar?.localPath || sidecarPath;
-        await this.metadataRepository.writeTags(localSidecarPath, exif);
-        // Upload the written sidecar back to S3
-        if (localSidecar) {
-          const stream = this.storageRepository.createPlainReadStream(localSidecar.localPath);
-          await backend.put(sidecarPath, stream, { contentType: 'application/xml' });
-        }
+        await this.metadataRepository.writeTags(localSidecar.localPath, exif);
+        const stream = this.storageRepository.createPlainReadStream(localSidecar.localPath);
+        await backend.put(sidecarPath, stream, { contentType: 'application/xml' });
       } finally {
-        await localSidecar?.cleanup();
+        await localSidecar.cleanup();
       }
     }
 

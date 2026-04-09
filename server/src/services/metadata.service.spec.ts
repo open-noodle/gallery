@@ -2,6 +2,7 @@ import { BinaryField, ExifDateTime } from 'exiftool-vendored';
 import { DateTime } from 'luxon';
 import { randomBytes } from 'node:crypto';
 import { Stats } from 'node:fs';
+import { isAbsolute } from 'node:path';
 import { defaults } from 'src/config';
 import {
   AssetFileType,
@@ -2413,6 +2414,65 @@ describe(MetadataService.name, () => {
         expect(mocks.metadata.writeTags).toHaveBeenCalledWith(asset.files[0].path, { Rating: 4 });
         expect(mockBackend.downloadToTemp).not.toHaveBeenCalled();
         expect(mockBackend.put).not.toHaveBeenCalled();
+      });
+
+      it('should create new sidecar in S3 when asset has no existing sidecar row', async () => {
+        // Simulates a fresh immich-go upload to an S3 backend. The asset row exists with a
+        // relative S3 key as originalPath, and asset.files has no Sidecar entry. A user action
+        // (e.g. PATCH /assets/{id} setting dateTimeOriginal) has queued SidecarWrite.
+        const asset = factory.jobAssets.sidecarWrite();
+        asset.originalPath = 'upload/user1/ab/cd/file.jpg';
+        asset.files = [];
+        asset.exifInfo.rating = 3;
+
+        mockBackend.exists.mockResolvedValue(false);
+        mocks.crypto.randomUUID.mockReturnValue('fixed-temp-uuid' as any);
+        mocks.storage.createPlainReadStream.mockReturnValue({} as any);
+
+        mocks.assetJob.getLockedPropertiesForMetadataExtraction.mockResolvedValue(['rating']);
+        mocks.assetJob.getForSidecarWriteJob.mockResolvedValue(asset as any);
+
+        await expect(sut.handleSidecarWrite({ id: asset.id })).resolves.toBe(JobStatus.Success);
+
+        // Must not attempt to download a sidecar that doesn't exist
+        expect(mockBackend.downloadToTemp).not.toHaveBeenCalled();
+        // Must write tags to a local absolute temp path, NOT to the relative S3 key
+        expect(mocks.metadata.writeTags).toHaveBeenCalledOnce();
+        const writeTagsPath = mocks.metadata.writeTags.mock.calls[0][0] as string;
+        expect(isAbsolute(writeTagsPath)).toBe(true);
+        expect(writeTagsPath).not.toBe('upload/user1/ab/cd/file.jpg.xmp');
+        expect(writeTagsPath.endsWith('.xmp')).toBe(true);
+        // Must upload the newly-written sidecar to S3 at the expected key
+        expect(mockBackend.put).toHaveBeenCalledWith('upload/user1/ab/cd/file.jpg.xmp', expect.anything(), {
+          contentType: 'application/xml',
+        });
+        // Must record the sidecar row in the DB so subsequent metadata extraction can find it
+        expect(mocks.asset.upsertFile).toHaveBeenCalledWith({
+          assetId: asset.id,
+          type: AssetFileType.Sidecar,
+          path: 'upload/user1/ab/cd/file.jpg.xmp',
+        });
+      });
+
+      it('should not record a sidecar row if the S3 upload fails', async () => {
+        // Guard against the original bug: if the upload to S3 fails or is skipped, we must NOT
+        // leave a bogus asset_file row pointing at a key that doesn't exist in the bucket.
+        const asset = factory.jobAssets.sidecarWrite();
+        asset.originalPath = 'upload/user1/ab/cd/file.jpg';
+        asset.files = [];
+        asset.exifInfo.rating = 3;
+
+        mockBackend.exists.mockResolvedValue(false);
+        mockBackend.put.mockRejectedValue(new Error('S3 unreachable'));
+        mocks.crypto.randomUUID.mockReturnValue('fixed-temp-uuid' as any);
+        mocks.storage.createPlainReadStream.mockReturnValue({} as any);
+
+        mocks.assetJob.getLockedPropertiesForMetadataExtraction.mockResolvedValue(['rating']);
+        mocks.assetJob.getForSidecarWriteJob.mockResolvedValue(asset as any);
+
+        await expect(sut.handleSidecarWrite({ id: asset.id })).rejects.toThrow('S3 unreachable');
+
+        expect(mocks.asset.upsertFile).not.toHaveBeenCalled();
       });
     });
   });
