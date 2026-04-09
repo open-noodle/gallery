@@ -25,19 +25,13 @@ async function spaceAssetIds(token: string, spaceId: string): Promise<Set<string
   if (status !== 200) {
     throw new Error(`spaceAssetIds failed: ${status} ${JSON.stringify(body)}`);
   }
-  return new Set((body as { id: string[] }).id ?? []);
+  return new Set((body as { id?: string[] }).id);
 }
 
 // Mark two assets as a duplicate group by assigning them the same duplicateId
 // via the fork's setAssetDuplicateId helper.
-async function markAsDuplicate(
-  token: string,
-  duplicateId: string,
-  assetIds: string[],
-): Promise<void> {
-  await Promise.all(
-    assetIds.map((id) => utils.setAssetDuplicateId(token, id, duplicateId)),
-  );
+async function markAsDuplicate(token: string, duplicateId: string, assetIds: string[]): Promise<void> {
+  await Promise.all(assetIds.map((id) => utils.setAssetDuplicateId(token, id, duplicateId)));
 }
 
 describe('/duplicates/resolve — shared space sync (fork)', () => {
@@ -111,10 +105,7 @@ describe('/duplicates/resolve — shared space sync (fork)', () => {
 
   it('does not alter space membership when no duplicate is in a space', async () => {
     const ownerToken = ctx.spaceOwner.token!;
-    const [loose1, loose2] = await Promise.all([
-      utils.createAsset(ownerToken),
-      utils.createAsset(ownerToken),
-    ]);
+    const [loose1, loose2] = await Promise.all([utils.createAsset(ownerToken), utils.createAsset(ownerToken)]);
 
     const before = await spaceAssetIds(ownerToken, ctx.spaceId);
 

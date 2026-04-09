@@ -65,10 +65,7 @@ We reuse the existing `sharedSpaceRepository.addAssets()` method with its `ON CO
 
 ```ts
 if (idsToKeep.length > 0) {
-  const editableSpaceIds = await this.sharedSpaceRepository.getEditableByAssetIds(
-    auth.user.id,
-    new Set(groupAssetIds),
-  );
+  const editableSpaceIds = await this.sharedSpaceRepository.getEditableByAssetIds(auth.user.id, new Set(groupAssetIds));
 
   if (editableSpaceIds.size > 0) {
     await this.sharedSpaceRepository.addAssets(
@@ -182,6 +179,7 @@ Four e2e tests:
    - Validates the `ON CONFLICT DO NOTHING` path.
 
 **What we deliberately don't e2e-test:**
+
 - Face match job side effect: verified by unit tests and by the existing `shared-space.service.ts` face-match job tests. Polling for space person presence in e2e would be slow and flaky.
 - Viewer role: `SpaceContext` doesn't give us a Viewer with their own assets in the space (Viewers can't add assets). Setting one up requires cross-user sharing plumbing that's out of scope.
 - Hard-failure scenarios (`addAssets` throws): unit-test-only; can't reliably induce a repo throw in e2e without infrastructure hacks.
