@@ -66,6 +66,27 @@ class SyncApiRepository {
           SyncRequestType.peopleV1,
           if (serverVersion < const SemVer(major: 2, minor: 6, patch: 0)) SyncRequestType.assetFacesV1,
           if (serverVersion >= const SemVer(major: 2, minor: 6, patch: 0)) SyncRequestType.assetFacesV2,
+          // --- gallery-fork: shared-space + library sync types ---
+          //
+          // PR 1 added the server emitters and the mobile dispatch handlers but
+          // never added these types to the mobile's request list, so the sync
+          // stream silently skipped them. PR 2's SpaceDetailPage UI switchover
+          // surfaced the bug because the new Drift-backed timeline depends on
+          // these tables being populated. Without these entries the
+          // shared_space_*, library_* tables stay empty forever.
+          //
+          // These are gallery-fork-only types — a stock Immich server will
+          // reject the request. The mobile build is intended to talk only to
+          // gallery-fork servers.
+          SyncRequestType.sharedSpacesV1,
+          SyncRequestType.sharedSpaceMembersV1,
+          SyncRequestType.sharedSpaceAssetsV1,
+          SyncRequestType.sharedSpaceAssetExifsV1,
+          SyncRequestType.sharedSpaceToAssetsV1,
+          SyncRequestType.librariesV1,
+          SyncRequestType.libraryAssetsV1,
+          SyncRequestType.libraryAssetExifsV1,
+          SyncRequestType.sharedSpaceLibrariesV1,
         ],
         reset: shouldReset,
       ).toJson(),
