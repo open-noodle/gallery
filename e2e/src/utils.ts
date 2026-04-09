@@ -515,45 +515,60 @@ export const utils = {
       throw new Error('Database client not connected');
     }
 
-    // 1. Create a global person row with a non-empty thumbnailPath. The shared-space
-    // listing query at shared-space.repository.ts:512-513 filters on
-    // `person.thumbnailPath IS NOT NULL AND != ''` (the fork's "minFaces gate"); without
-    // a value here, every getPersonsBySpaceId call would return empty.
-    const personResult = await client.query(
-      `INSERT INTO "person" ("ownerId", "name", "thumbnailPath")
-       VALUES ($1, $2, '/my/awesome/thumbnail.jpg') RETURNING id`,
-      [ownerId, name],
-    );
-    const globalPersonId = personResult.rows[0].id as string;
-
-    // 2. Create a face row linking the asset to the global person.
-    const faceResult = await client.query(
-      `INSERT INTO "asset_face" ("assetId", "personId") VALUES ($1, $2) RETURNING id`,
-      [assetId, globalPersonId],
-    );
-    const faceId = faceResult.rows[0].id as string;
-
-    // 3. Create the shared_space_person row pointing at the face as its representative.
+    // All 4 inserts are wrapped in a single transaction to avoid a race with the
+    // background SharedSpacePersonDedup job. That job runs after every asset-add
+    // on the FacialRecognition queue and calls deleteOrphanedPersons, which
+    // deletes any shared_space_person with no shared_space_person_face rows.
+    // Without a transaction, on slow runners (arm) the dedup job can fire between
+    // steps 3 and 4 and hard-delete the just-created shared_space_person, causing
+    // step 4's FK insert to fail with shared_space_person_face_personId_fkey.
     const spaceType = options?.type ?? 'person';
-    const spacePersonResult = await client.query(
-      `INSERT INTO shared_space_person
-         ("spaceId", name, "isHidden", "faceCount", "assetCount", "representativeFaceId", "type")
-       VALUES ($1, $2, false, 1, 1, $3, $4) RETURNING id`,
-      [spaceId, name, faceId, spaceType],
-    );
-    const spacePersonId = spacePersonResult.rows[0].id as string;
+    try {
+      await client.query('BEGIN');
 
-    // 4. Insert the load-bearing junction row. shared-space.repository.ts queries
-    // getPersonAssetIds, reassignPersonFaces, isPersonFaceAssigned, getPersonsForDedup,
-    // the faceCount/assetCount denormalization (lines 693-708), and the
-    // takenAfter/takenBefore EXISTS subquery (lines 522-528) all traverse this table.
-    // Without it, T07-T14 queries return empty.
-    await client.query(`INSERT INTO "shared_space_person_face" ("personId", "assetFaceId") VALUES ($1, $2)`, [
-      spacePersonId,
-      faceId,
-    ]);
+      // 1. Create a global person row with a non-empty thumbnailPath. The shared-space
+      // listing query at shared-space.repository.ts:512-513 filters on
+      // `person.thumbnailPath IS NOT NULL AND != ''` (the fork's "minFaces gate"); without
+      // a value here, every getPersonsBySpaceId call would return empty.
+      const personResult = await client.query(
+        `INSERT INTO "person" ("ownerId", "name", "thumbnailPath")
+         VALUES ($1, $2, '/my/awesome/thumbnail.jpg') RETURNING id`,
+        [ownerId, name],
+      );
+      const globalPersonId = personResult.rows[0].id as string;
 
-    return { globalPersonId, spacePersonId, faceId };
+      // 2. Create a face row linking the asset to the global person.
+      const faceResult = await client.query(
+        `INSERT INTO "asset_face" ("assetId", "personId") VALUES ($1, $2) RETURNING id`,
+        [assetId, globalPersonId],
+      );
+      const faceId = faceResult.rows[0].id as string;
+
+      // 3. Create the shared_space_person row pointing at the face as its representative.
+      const spacePersonResult = await client.query(
+        `INSERT INTO shared_space_person
+           ("spaceId", name, "isHidden", "faceCount", "assetCount", "representativeFaceId", "type")
+         VALUES ($1, $2, false, 1, 1, $3, $4) RETURNING id`,
+        [spaceId, name, faceId, spaceType],
+      );
+      const spacePersonId = spacePersonResult.rows[0].id as string;
+
+      // 4. Insert the load-bearing junction row. shared-space.repository.ts queries
+      // getPersonAssetIds, reassignPersonFaces, isPersonFaceAssigned, getPersonsForDedup,
+      // the faceCount/assetCount denormalization (lines 693-708), and the
+      // takenAfter/takenBefore EXISTS subquery (lines 522-528) all traverse this table.
+      // Without it, T07-T14 queries return empty.
+      await client.query(`INSERT INTO "shared_space_person_face" ("personId", "assetFaceId") VALUES ($1, $2)`, [
+        spacePersonId,
+        faceId,
+      ]);
+
+      await client.query('COMMIT');
+      return { globalPersonId, spacePersonId, faceId };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw error;
+    }
   },
 
   createSharedLink: (accessToken: string, dto: SharedLinkCreateDto) =>
