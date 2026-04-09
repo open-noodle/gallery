@@ -14,10 +14,10 @@
   } from '$lib/components/filter-panel/filter-panel';
   import OnEvents from '$lib/components/OnEvents.svelte';
   import UserPageLayout from '$lib/components/layouts/user-page-layout.svelte';
+  import SmartSearchResults from '$lib/components/search/smart-search-results.svelte';
   import ControlAppBar from '$lib/components/shared-components/control-app-bar.svelte';
   import ButtonContextMenu from '$lib/components/shared-components/context-menu/button-context-menu.svelte';
   import SpaceHero from '$lib/components/spaces/space-hero.svelte';
-  import SpaceSearchResults from '$lib/components/spaces/space-search-results.svelte';
   import SpaceMap from '$lib/components/spaces/space-map.svelte';
   import SpaceNewAssetsDivider from '$lib/components/spaces/space-new-assets-divider.svelte';
   import SpaceOnboardingBanner from '$lib/components/spaces/space-onboarding-banner.svelte';
@@ -48,7 +48,6 @@
   import { createUrl } from '$lib/utils';
   import { handleError } from '$lib/utils/handle-error';
   import { loadHeroCollapsed, persistHeroCollapsed } from '$lib/utils/space-hero-storage';
-  import { buildSmartSearchParams, SEARCH_FILTER_DEBOUNCE_MS } from '$lib/utils/space-search';
   import {
     addAssets,
     bulkAddAssets,
@@ -65,11 +64,9 @@
     removeSpace,
     Role,
     SearchSuggestionType,
-    searchSmart,
     updateMemberTimeline,
     updateSpace,
     UserAvatarColor,
-    type AssetResponseDto,
     type SharedSpaceActivityResponseDto,
     type SharedSpaceMemberResponseDto,
     type SharedSpacePersonResponseDto,
@@ -118,13 +115,9 @@
       spacePeople = [];
       personNames.clear();
       tagNames.clear();
-      searchAbortController?.abort();
       searchQuery = '';
-      searchResults = [];
-      isSearching = false;
+      isLoading = false;
       showSearchResults = false;
-      searchPage = 1;
-      hasMoreResults = false;
       heroCollapsed = loadHeroCollapsed(data.space.id);
       panelOpen = false;
       viewMode = 'view';
@@ -576,101 +569,20 @@
   };
 
   let searchQuery = $state('');
-  let searchResults = $state<AssetResponseDto[]>([]);
-  let isSearching = $state(false);
+  let isLoading = $state(false);
   let showSearchResults = $state(false);
-  let searchPage = $state(1);
-  let hasMoreResults = $state(false);
-  let searchAbortController: AbortController | undefined;
-
-  const executeSearch = async (page: number, append: boolean) => {
-    const query = searchQuery.trim();
-    if (!query) {
-      return;
-    }
-
-    searchAbortController?.abort();
-    const controller = new AbortController();
-    searchAbortController = controller;
-
-    isSearching = true;
-    try {
-      const { assets } = await searchSmart({
-        smartSearchDto: { ...buildSmartSearchParams(searchQuery.trim(), space.id, filters), page, size: 100 },
-      });
-
-      if (controller.signal.aborted) {
-        return;
-      }
-
-      searchResults = append ? [...searchResults, ...assets.items] : assets.items;
-      searchPage = page;
-      hasMoreResults = assets.nextPage !== null;
-      showSearchResults = true;
-    } catch {
-      if (controller.signal.aborted) {
-        return;
-      }
-      searchResults = append ? searchResults : [];
-      hasMoreResults = false;
-    } finally {
-      if (!controller.signal.aborted) {
-        isSearching = false;
-      }
-    }
-  };
 
   const handleSearchSubmit = () => {
     filters = { ...filters, sortOrder: 'relevance' };
-    searchPage = 1;
-    void executeSearch(1, false);
-  };
-
-  const handleLoadMore = () => {
-    void executeSearch(searchPage + 1, true);
+    showSearchResults = true;
   };
 
   const clearSearch = () => {
-    searchAbortController?.abort();
     searchQuery = '';
-    searchResults = [];
+    isLoading = false;
     showSearchResults = false;
-    searchPage = 1;
-    hasMoreResults = false;
-    isSearching = false;
     filters = { ...filters, sortOrder: 'desc' };
   };
-
-  $effect(() => {
-    const _ = [
-      filters.personIds,
-      filters.city,
-      filters.country,
-      filters.make,
-      filters.model,
-      filters.tagIds,
-      filters.rating,
-      filters.mediaType,
-      filters.selectedYear,
-      filters.selectedMonth,
-      filters.sortOrder,
-      filters.isFavorite,
-    ];
-
-    if (!showSearchResults || !searchQuery.trim()) {
-      return;
-    }
-
-    const timeout = setTimeout(() => {
-      searchPage = 1;
-      void executeSearch(1, false);
-    }, SEARCH_FILTER_DEBOUNCE_MS);
-
-    return () => {
-      clearTimeout(timeout);
-      searchAbortController?.abort();
-    };
-  });
 
   const gradientClasses: Record<string, string> = {
     [UserAvatarColor.Primary]: 'from-immich-primary/60 to-immich-primary',
@@ -725,7 +637,7 @@
             <SearchBar
               placeholder={$t('search')}
               bind:name={searchQuery}
-              showLoadingSpinner={isSearching}
+              showLoadingSpinner={isLoading}
               onSearch={({ force }) => {
                 if (force) {
                   void handleSearchSubmit();
@@ -848,7 +760,7 @@
       {#if viewMode === 'view' && (getActiveFilterCount(filters) > 0 || searchQuery.trim().length > 0)}
         <ActiveFiltersBar
           {filters}
-          resultCount={showSearchResults ? searchResults.length : totalAssetCount}
+          resultCount={showSearchResults ? undefined : totalAssetCount}
           {personNames}
           {tagNames}
           onRemoveFilter={handleRemoveFilter}
@@ -861,15 +773,7 @@
       {/if}
 
       {#if showSearchResults}
-        <SpaceSearchResults
-          results={searchResults}
-          isLoading={isSearching}
-          hasMore={hasMoreResults}
-          totalLoaded={searchResults.length}
-          onLoadMore={handleLoadMore}
-          spaceId={space.id}
-          sortMode={filters.sortOrder}
-        />
+        <SmartSearchResults bind:isLoading {searchQuery} {filters} spaceId={space.id} isShared={true} />
       {/if}
 
       {#if !showSearchResults}

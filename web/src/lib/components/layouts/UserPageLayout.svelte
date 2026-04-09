@@ -45,7 +45,8 @@
   );
 
   let scrollbarClass = $derived(scrollbar ? 'immich-scrollbar' : 'scrollbar-hidden');
-  let hasTitleClass = $derived(title ? 'top-16 h-[calc(100%-(--spacing(16)))]' : 'top-0 h-full');
+  let hasHeaderRow = $derived(!!(title || buttons));
+  let hasTitleClass = $derived(hasHeaderRow ? 'top-16 h-[calc(100%-(--spacing(16)))]' : 'top-0 h-full');
 </script>
 
 <header>
