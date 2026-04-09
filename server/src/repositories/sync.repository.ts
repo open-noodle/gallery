@@ -75,6 +75,7 @@ export class SyncRepository {
   library: LibrarySync;
   libraryAsset: LibraryAssetSync;
   libraryAssetExif: LibraryAssetExifSync;
+  sharedSpaceLibrary: SharedSpaceLibrarySync;
 
   constructor(@InjectKysely() private db: Kysely<DB>) {
     this.album = new AlbumSync(this.db);
@@ -106,6 +107,7 @@ export class SyncRepository {
     this.library = new LibrarySync(this.db);
     this.libraryAsset = new LibraryAssetSync(this.db);
     this.libraryAssetExif = new LibraryAssetExifSync(this.db);
+    this.sharedSpaceLibrary = new SharedSpaceLibrarySync(this.db);
   }
 }
 
@@ -1252,6 +1254,51 @@ export class LibraryAssetExifSync extends BaseSync {
       .where('asset.updateId', '<=', libraryAssetAck.updateId)
       .where('asset.libraryId', 'is not', null)
       .where('asset.libraryId', 'in', (eb) => accessibleLibraries(eb, options.userId))
+      .stream();
+  }
+}
+
+const SHARED_SPACE_LIBRARY_SYNC_COLUMNS = [
+  'shared_space_library.spaceId',
+  'shared_space_library.libraryId',
+  'shared_space_library.addedById',
+  'shared_space_library.createdAt',
+  'shared_space_library.updatedAt',
+  'shared_space_library.updateId',
+] as const;
+
+// Streams the shared_space_library join rows — the per-space "which libraries
+// are linked" mapping. Scoped by accessibleSpaces (NOT accessibleLibraries):
+// this is the join row belonging to the space, and the user must have access
+// to the space itself to see its link set.
+//
+// Owns shared_space_library_audit cleanup.
+export class SharedSpaceLibrarySync extends BaseSync {
+  @GenerateSql({ params: [dummyBackfillOptions, DummyValue.UUID], stream: true })
+  getBackfill(options: SyncBackfillOptions, spaceId: string) {
+    return this.backfillQuery('shared_space_library', options)
+      .select(SHARED_SPACE_LIBRARY_SYNC_COLUMNS)
+      .where('shared_space_library.spaceId', '=', spaceId)
+      .stream();
+  }
+
+  @GenerateSql({ params: [dummyQueryOptions], stream: true })
+  getDeletes(options: SyncQueryOptions) {
+    return this.auditQuery('shared_space_library_audit', options)
+      .select(['id', 'spaceId', 'libraryId'])
+      .where('spaceId', 'in', (eb) => accessibleSpaces(eb, options.userId))
+      .stream();
+  }
+
+  cleanupAuditTable(daysAgo: number) {
+    return this.auditCleanup('shared_space_library_audit', daysAgo);
+  }
+
+  @GenerateSql({ params: [dummyQueryOptions], stream: true })
+  getUpserts(options: SyncQueryOptions) {
+    return this.upsertQuery('shared_space_library', options)
+      .select(SHARED_SPACE_LIBRARY_SYNC_COLUMNS)
+      .where('shared_space_library.spaceId', 'in', (eb) => accessibleSpaces(eb, options.userId))
       .stream();
   }
 }
