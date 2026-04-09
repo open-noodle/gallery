@@ -72,6 +72,12 @@ jobs:
         with:
           persist-credentials: false
           ref: ${{ inputs.ref }}
+          # Full history + tags so apply-branding's git-describe fallback can find
+          # the latest v*.*.* tag and stamp a valid semver into package.json /
+          # pyproject.toml. Required because the RC tag (e.g. fix-foo-rc1) is not
+          # a valid semver and would crash server startup at `new SemVer(version)`.
+          fetch-depth: 0
+          fetch-tags: true
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
@@ -84,9 +90,12 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Apply branding
+        # Intentionally no `version` input — let the branding script fall through
+        # to its git-describe fallback (constrained to v<N>.<N>.<N> by the --match
+        # in branding/scripts/apply-branding.sh) so the package version stamped into
+        # the image is always a real semver. The RC docker tag is applied later in
+        # merge-server and is independent of the stamped package version.
         uses: ./.github/actions/apply-branding
-        with:
-          version: ${{ inputs.rc_tag }}
 
       - name: Prepare platform pair
         id: prepare
