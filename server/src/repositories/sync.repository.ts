@@ -72,6 +72,7 @@ export class SyncRepository {
   sharedSpaceAsset: SharedSpaceAssetSync;
   sharedSpaceAssetExif: SharedSpaceAssetExifSync;
   sharedSpaceToAsset: SharedSpaceToAssetSync;
+  library: LibrarySync;
 
   constructor(@InjectKysely() private db: Kysely<DB>) {
     this.album = new AlbumSync(this.db);
@@ -100,6 +101,7 @@ export class SyncRepository {
     this.sharedSpaceAsset = new SharedSpaceAssetSync(this.db);
     this.sharedSpaceAssetExif = new SharedSpaceAssetExifSync(this.db);
     this.sharedSpaceToAsset = new SharedSpaceToAssetSync(this.db);
+    this.library = new LibrarySync(this.db);
   }
 }
 
@@ -1056,6 +1058,84 @@ export class SharedSpaceToAssetSync extends BaseSync {
         'shared_space_asset.updateId',
       ])
       .where('shared_space_asset.spaceId', 'in', (eb) => accessibleSpaces(eb, options.userId))
+      .stream();
+  }
+}
+
+// `accessibleLibraries` is the source-of-truth scoping subquery used by every
+// library sync class. A user can access a library via direct ownership OR via
+// any space they can access (membership or creator). The UNION naturally
+// deduplicates so a user who both owns L and is a member of a space linking L
+// gets a single row.
+//
+// Usage:
+//   .where('library.id', 'in', (eb) => accessibleLibraries(eb, userId))
+//
+// NOTE: soft-deleted libraries (deletedAt IS NOT NULL) are excluded from the
+// ownership branch but NOT from the space-link branch — a soft-deleted library
+// is still reachable via a linked space and the client should still see it
+// until the library is hard-deleted.
+export function accessibleLibraries(eb: ExpressionBuilder<DB, keyof DB>, userId: string) {
+  return eb
+    .selectFrom('library')
+    .select('library.id')
+    .where('library.ownerId', '=', userId)
+    .where('library.deletedAt', 'is', null)
+    .union(
+      eb
+        .selectFrom('shared_space_library')
+        .select('shared_space_library.libraryId as id')
+        .where('shared_space_library.spaceId', 'in', (eb2) => accessibleSpaces(eb2, userId)),
+    );
+}
+
+const LIBRARY_SYNC_COLUMNS = [
+  'library.id',
+  'library.name',
+  'library.ownerId',
+  'library.createdAt',
+  'library.updatedAt',
+  'library.updateId',
+] as const;
+
+export class LibrarySync extends BaseSync {
+  // Returns libraries accessible to the user, ordered by library.createId. Unlike
+  // SharedSpaceSync.getCreatedAfter — which enumerates membership rows because
+  // each user gets a fresh per-membership createId — libraries do not have a
+  // per-user join table. The createId is a property of the library row itself,
+  // shared across all users with access. A user added to a pre-existing space
+  // that links an old library will not pick up that library here (the createId
+  // is past their backfill checkpoint); SharedSpaceLibrarySync's per-link
+  // backfill loop in sync.service.ts handles that case.
+  @GenerateSql({ params: [dummyCreateAfterOptions] })
+  getCreatedAfter({ nowId, userId, afterCreateId }: SyncCreatedAfterOptions) {
+    return this.db
+      .selectFrom('library')
+      .select(['library.id', 'library.createId'])
+      .where('library.id', 'in', (eb) => accessibleLibraries(eb, userId))
+      .$if(!!afterCreateId, (qb) => qb.where('library.createId', '>=', afterCreateId!))
+      .where('library.createId', '<', nowId)
+      .orderBy('library.createId', 'asc')
+      .execute();
+  }
+
+  @GenerateSql({ params: [dummyQueryOptions], stream: true })
+  getDeletes(options: SyncQueryOptions) {
+    return this.auditQuery('library_audit', options)
+      .select(['id', 'libraryId'])
+      .where('userId', '=', options.userId)
+      .stream();
+  }
+
+  cleanupAuditTable(daysAgo: number) {
+    return this.auditCleanup('library_audit', daysAgo);
+  }
+
+  @GenerateSql({ params: [dummyQueryOptions], stream: true })
+  getUpserts(options: SyncQueryOptions) {
+    return this.upsertQuery('library', options)
+      .where('library.id', 'in', (eb) => accessibleLibraries(eb, options.userId))
+      .select(LIBRARY_SYNC_COLUMNS)
       .stream();
   }
 }
