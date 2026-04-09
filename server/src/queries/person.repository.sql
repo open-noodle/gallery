@@ -120,6 +120,7 @@ where
 -- PersonRepository.getFaceForFacialRecognitionJob
 select
   "asset_face"."id",
+  "asset_face"."assetId",
   "asset_face"."personId",
   "asset_face"."sourceType",
   (
