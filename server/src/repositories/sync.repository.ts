@@ -74,6 +74,7 @@ export class SyncRepository {
   sharedSpaceToAsset: SharedSpaceToAssetSync;
   library: LibrarySync;
   libraryAsset: LibraryAssetSync;
+  libraryAssetExif: LibraryAssetExifSync;
 
   constructor(@InjectKysely() private db: Kysely<DB>) {
     this.album = new AlbumSync(this.db);
@@ -104,6 +105,7 @@ export class SyncRepository {
     this.sharedSpaceToAsset = new SharedSpaceToAssetSync(this.db);
     this.library = new LibrarySync(this.db);
     this.libraryAsset = new LibraryAssetSync(this.db);
+    this.libraryAssetExif = new LibraryAssetExifSync(this.db);
   }
 }
 
@@ -1211,5 +1213,45 @@ export class LibraryAssetSync extends BaseSync {
 
   cleanupAuditTable(daysAgo: number) {
     return this.auditCleanup('library_asset_audit', daysAgo);
+  }
+}
+
+// Streams asset_exif rows for library-owned assets. Scoped by
+// asset.libraryId IN accessibleLibraries, joined through asset → asset_exif.
+// Mirrors AlbumAssetExifSync but uses the library-access boundary instead of
+// the album-user boundary. No cleanupAuditTable — there is no dedicated
+// exif audit table (consistent with AlbumAssetExifSync).
+export class LibraryAssetExifSync extends BaseSync {
+  @GenerateSql({ params: [dummyBackfillOptions, DummyValue.UUID], stream: true })
+  getBackfill(options: SyncBackfillOptions, libraryId: string) {
+    return this.backfillQuery('asset', options)
+      .innerJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
+      .select(columns.syncAssetExif)
+      .select('asset.updateId')
+      .where('asset.libraryId', '=', libraryId)
+      .stream();
+  }
+
+  @GenerateSql({ params: [dummyQueryOptions], stream: true })
+  getCreates(options: SyncQueryOptions) {
+    return this.upsertQuery('asset', options)
+      .innerJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
+      .select(columns.syncAssetExif)
+      .select('asset.updateId')
+      .where('asset.libraryId', 'is not', null)
+      .where('asset.libraryId', 'in', (eb) => accessibleLibraries(eb, options.userId))
+      .stream();
+  }
+
+  @GenerateSql({ params: [dummyQueryOptions, { updateId: DummyValue.UUID }], stream: true })
+  getUpdates(options: SyncQueryOptions, libraryAssetAck: SyncAck) {
+    return this.upsertQuery('asset_exif', options)
+      .innerJoin('asset', 'asset.id', 'asset_exif.assetId')
+      .select(columns.syncAssetExif)
+      .select('asset_exif.updateId')
+      .where('asset.updateId', '<=', libraryAssetAck.updateId)
+      .where('asset.libraryId', 'is not', null)
+      .where('asset.libraryId', 'in', (eb) => accessibleLibraries(eb, options.userId))
+      .stream();
   }
 }
