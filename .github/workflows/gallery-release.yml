@@ -381,19 +381,27 @@ jobs:
 
           if [[ -n "$prev_tag" ]]; then
             # Separate Gallery commits (PR# < 1000 or no PR ref) from upstream (PR# >= 1000)
-            # After a rebase, git log shows rewritten Gallery commits as new — skip them
+            # After a rebase, git log shows rewritten Gallery commits as new — skip them.
+            # Note: each loop body uses an explicit if/then so the last command on every
+            # iteration exits 0. Otherwise `[[ ... ]] && echo` returns 1 when the filter
+            # rejects a line, the while loop inherits that exit code, and the command
+            # substitution fails — which on the runner's strict bash kills the whole step.
             all_commits=$(git log --pretty=format:'%s' "${prev_tag}..HEAD" 2>/dev/null)
 
             gallery_commits=$(echo "$all_commits" | while IFS= read -r line; do
               [[ -z "$line" ]] && continue
               pr_num=$(echo "$line" | grep -oP '\(#\K[0-9]+(?=\))' | head -1)
-              [[ -z "$pr_num" || "$pr_num" -lt 1000 ]] && echo "- $line"
+              if [[ -z "$pr_num" || "$pr_num" -lt 1000 ]]; then
+                echo "- $line"
+              fi
             done)
 
             upstream_commits=$(echo "$all_commits" | while IFS= read -r line; do
               [[ -z "$line" ]] && continue
               pr_num=$(echo "$line" | grep -oP '\(#\K[0-9]+(?=\))' | head -1)
-              [[ -n "$pr_num" && "$pr_num" -ge 1000 ]] && echo "- $line"
+              if [[ -n "$pr_num" && "$pr_num" -ge 1000 ]]; then
+                echo "- $line"
+              fi
             done)
 
             if [[ -n "$upstream_commits" ]]; then
