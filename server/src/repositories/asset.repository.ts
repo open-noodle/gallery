@@ -14,7 +14,7 @@ import {
 import { jsonArrayFrom } from 'kysely/helpers/postgres';
 import { isEmpty, isUndefined, omitBy } from 'lodash';
 import { InjectKysely } from 'nestjs-kysely';
-import { LockableProperty, Stack } from 'src/database';
+import { lockableProperties, LockableProperty, Stack } from 'src/database';
 import { Chunked, ChunkedArray, DummyValue, GenerateSql } from 'src/decorators';
 import { AuthDto } from 'src/dtos/auth.dto';
 import {
@@ -329,11 +329,12 @@ export class AssetRepository {
       return;
     }
 
+    const lockedColumns = lockableProperties.filter((property) => property in options);
     await this.db
       .updateTable('asset_exif')
       .set((eb) => ({
         ...options,
-        lockedProperties: distinctLocked(eb, Object.keys(options) as LockableProperty[]),
+        lockedProperties: distinctLocked(eb, lockedColumns),
       }))
       .where('assetId', 'in', ids)
       .execute();
