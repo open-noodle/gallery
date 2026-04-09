@@ -9,6 +9,7 @@ import { AssetRepository } from 'src/repositories/asset.repository';
 import { EventRepository } from 'src/repositories/event.repository';
 import { JobRepository } from 'src/repositories/job.repository';
 import { LoggingRepository } from 'src/repositories/logging.repository';
+import { MapRepository } from 'src/repositories/map.repository';
 import { OcrRepository } from 'src/repositories/ocr.repository';
 import { SharedLinkAssetRepository } from 'src/repositories/shared-link-asset.repository';
 import { SharedLinkRepository } from 'src/repositories/shared-link.repository';
@@ -36,7 +37,7 @@ const setup = (db?: Kysely<DB>) => {
       StackRepository,
       UserRepository,
     ],
-    mock: [EventRepository, LoggingRepository, JobRepository, StorageRepository, OcrRepository],
+    mock: [EventRepository, LoggingRepository, JobRepository, StorageRepository, OcrRepository, MapRepository],
   });
 };
 
@@ -337,6 +338,7 @@ describe(AssetService.name, () => {
     it('should automatically lock lockable columns', async () => {
       const { sut, ctx } = setup();
       ctx.getMock(JobRepository).queue.mockResolvedValue();
+      ctx.getMock(MapRepository).reverseGeocode.mockResolvedValue({ country: null, state: null, city: null });
       const { user } = await ctx.newUser();
       const auth = factory.auth({ user });
       const { asset } = await ctx.newAsset({ ownerId: user.id });
@@ -425,6 +427,7 @@ describe(AssetService.name, () => {
     it('should automatically lock lockable columns', async () => {
       const { sut, ctx } = setup();
       ctx.getMock(JobRepository).queueAll.mockResolvedValue();
+      ctx.getMock(MapRepository).reverseGeocode.mockResolvedValue({ country: null, state: null, city: null });
       const { user } = await ctx.newUser();
       const auth = factory.auth({ user });
       const { asset } = await ctx.newAsset({ ownerId: user.id });

@@ -252,4 +252,60 @@ describe(SearchService.name, () => {
       expect(suggestions).toEqual(['Canon', null]);
     });
   });
+
+  describe('getFilterSuggestions', () => {
+    it('should return countries from the user assets', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newExif({ assetId: asset.id, country: 'Germany' });
+
+      const auth = factory.auth({ user: { id: user.id } });
+      const result = await sut.getFilterSuggestions(auth, {});
+
+      expect(result.countries).toContain('Germany');
+    });
+
+    it('should return countries when withSharedSpaces is true and the user has no shared spaces', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newExif({ assetId: asset.id, country: 'Germany' });
+
+      const auth = factory.auth({ user: { id: user.id } });
+      const result = await sut.getFilterSuggestions(auth, { withSharedSpaces: true });
+
+      expect(result.countries).toContain('Germany');
+    });
+
+    it('should return tagged people for the user', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Alice' });
+      await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+
+      const auth = factory.auth({ user: { id: user.id } });
+      const result = await sut.getFilterSuggestions(auth, {});
+
+      expect(result.people.map((p) => p.name)).toContain('Alice');
+    });
+
+    it('should return people whose thumbnail has not been generated yet', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Bob', thumbnailPath: '' });
+      await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+
+      const auth = factory.auth({ user: { id: user.id } });
+      const result = await sut.getFilterSuggestions(auth, {});
+
+      expect(result.people.map((p) => p.name)).toContain('Bob');
+    });
+  });
 });
