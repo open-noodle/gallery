@@ -828,4 +828,109 @@ describe(SharedSpaceRepository.name, () => {
       expect(after?.assetCount).toBe(1);
     });
   });
+
+  describe('getEditableByAssetIds', () => {
+    it('returns spaces containing the asset where the user is Editor', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: user.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: 'editor' });
+
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      await sut.addAssets([{ spaceId: space.id, assetId: asset.id, addedById: user.id }]);
+
+      const result = await sut.getEditableByAssetIds(user.id, new Set([asset.id]));
+
+      expect(result).toEqual(new Set([space.id]));
+    });
+
+    it('returns spaces containing the asset where the user is Owner', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: user.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: 'owner' });
+
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      await sut.addAssets([{ spaceId: space.id, assetId: asset.id, addedById: user.id }]);
+
+      const result = await sut.getEditableByAssetIds(user.id, new Set([asset.id]));
+
+      expect(result).toEqual(new Set([space.id]));
+    });
+
+    it('excludes spaces where the user is only a Viewer', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: viewer } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: 'owner' });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: viewer.id, role: 'viewer' });
+
+      const { asset } = await ctx.newAsset({ ownerId: owner.id });
+      await sut.addAssets([{ spaceId: space.id, assetId: asset.id, addedById: owner.id }]);
+
+      const result = await sut.getEditableByAssetIds(viewer.id, new Set([asset.id]));
+
+      expect(result).toEqual(new Set());
+    });
+
+    it('excludes spaces where the user is not a member', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: stranger } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: 'owner' });
+
+      const { asset } = await ctx.newAsset({ ownerId: owner.id });
+      await sut.addAssets([{ spaceId: space.id, assetId: asset.id, addedById: owner.id }]);
+
+      const result = await sut.getEditableByAssetIds(stranger.id, new Set([asset.id]));
+
+      expect(result).toEqual(new Set());
+    });
+
+    it('returns multiple spaces when the asset is in several editable ones', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { space: spaceA } = await ctx.newSharedSpace({ createdById: user.id });
+      const { space: spaceB } = await ctx.newSharedSpace({ createdById: user.id });
+      await ctx.newSharedSpaceMember({ spaceId: spaceA.id, userId: user.id, role: 'editor' });
+      await ctx.newSharedSpaceMember({ spaceId: spaceB.id, userId: user.id, role: 'owner' });
+
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      await sut.addAssets([
+        { spaceId: spaceA.id, assetId: asset.id, addedById: user.id },
+        { spaceId: spaceB.id, assetId: asset.id, addedById: user.id },
+      ]);
+
+      const result = await sut.getEditableByAssetIds(user.id, new Set([asset.id]));
+
+      expect(result).toEqual(new Set([spaceA.id, spaceB.id]));
+    });
+
+    it('returns spaces containing ANY of the given asset ids', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: user.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: 'editor' });
+
+      const { asset: asset1 } = await ctx.newAsset({ ownerId: user.id });
+      const { asset: asset2 } = await ctx.newAsset({ ownerId: user.id });
+      // Only asset1 is in the space; asset2 is loose.
+      await sut.addAssets([{ spaceId: space.id, assetId: asset1.id, addedById: user.id }]);
+
+      const result = await sut.getEditableByAssetIds(user.id, new Set([asset1.id, asset2.id]));
+
+      expect(result).toEqual(new Set([space.id]));
+    });
+
+    it('returns empty set when input is empty', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+
+      const result = await sut.getEditableByAssetIds(user.id, new Set());
+
+      expect(result).toEqual(new Set());
+    });
+  });
 });
