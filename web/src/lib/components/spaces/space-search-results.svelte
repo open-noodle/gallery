@@ -17,10 +17,11 @@
     totalLoaded: number;
     onLoadMore: () => void;
     spaceId?: string;
+    isShared: boolean;
     sortMode: 'relevance' | 'asc' | 'desc';
   }
 
-  let { results, isLoading, hasMore, totalLoaded, onLoadMore, spaceId, sortMode }: Props = $props();
+  let { results, isLoading, hasMore, totalLoaded, onLoadMore, spaceId, isShared, sortMode }: Props = $props();
 
   let isViewerOpen = $state(false);
   let sentinelElement: HTMLElement | undefined = $state();
@@ -44,7 +45,7 @@
   });
 
   const getFullAsset = async (id: string): Promise<AssetResponseDto> => {
-    return getAssetInfo({ ...authManager.params, id, spaceId });
+    return getAssetInfo({ ...authManager.params, id, ...(spaceId ? { spaceId } : {}) });
   };
 
   let cursor = $state<AssetCursor | undefined>();
@@ -183,7 +184,7 @@
 <Portal target="body">
   {#if isViewerOpen && cursor}
     {#await import('$lib/components/asset-viewer/asset-viewer.svelte') then { default: AssetViewer }}
-      <AssetViewer {cursor} isShared={true} {spaceId} onClose={() => handlePromiseError(handleClose())} />
+      <AssetViewer {cursor} {isShared} {spaceId} onClose={() => handlePromiseError(handleClose())} />
     {/await}
   {/if}
 </Portal>
