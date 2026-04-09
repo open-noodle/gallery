@@ -484,6 +484,8 @@ export class SharedSpaceService extends BaseService {
     await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
 
     await this.sharedSpaceRepository.removeLibrary(spaceId, libraryId);
+    await this.sharedSpaceRepository.removePersonFacesByLibrary(spaceId, libraryId);
+    await this.sharedSpaceRepository.deleteOrphanedPersons(spaceId);
   }
 
   async markSpaceViewed(auth: AuthDto, spaceId: string): Promise<void> {
@@ -1085,30 +1087,38 @@ export class SharedSpaceService extends BaseService {
         continue;
       }
 
-      const matches = await this.sharedSpaceRepository.findClosestSpacePerson(spaceId, face.embedding, {
-        maxDistance,
-        numResults: 1,
-      });
+      // Strict gate: only faces native recognition has already assigned to a global
+      // person are eligible to join a space-person. This guarantees every face in a
+      // space-person belongs to a density-validated native cluster and eliminates the
+      // single-face chaining bug reported in #272.
+      if (!face.personId) {
+        continue;
+      }
 
       let personId: string;
-      if (matches.length > 0) {
-        personId = matches[0].personId;
+
+      // Layer 1: same global personId → same space-person. Stable fast path, single
+      // indexed lookup, no vector search.
+      const existingSpacePerson = await this.sharedSpaceRepository.findSpacePersonByLinkedPersonId(
+        spaceId,
+        face.personId,
+      );
+
+      if (existingSpacePerson) {
+        personId = existingSpacePerson.id;
       } else {
-        // Only create a new space person if the face has a linked personal person
-        // (faces without one haven't passed the minFaces threshold yet)
-        if (!face.personId) {
-          continue;
-        }
+        // Layer 2: cross-owner bridging via embedding similarity. Alice's "Dad" and
+        // Bob's "Dad" are two separate native persons but should merge into one
+        // space-person.
+        const matches = await this.sharedSpaceRepository.findClosestSpacePerson(spaceId, face.embedding, {
+          maxDistance,
+          numResults: 1,
+        });
 
-        // Layer 1 dedup: check if a space person already exists for this personal person
-        const existingSpacePerson = await this.sharedSpaceRepository.findSpacePersonByLinkedPersonId(
-          spaceId,
-          face.personId,
-        );
-
-        if (existingSpacePerson) {
-          personId = existingSpacePerson.id;
+        if (matches.length > 0) {
+          personId = matches[0].personId;
         } else {
+          // Layer 3: nothing close → create new space-person.
           const newPerson = await this.sharedSpaceRepository.createPerson({
             spaceId,
             name: '',
