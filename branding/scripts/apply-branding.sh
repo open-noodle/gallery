@@ -109,6 +109,29 @@ patch_web() {
     echo "  Patched server-status.svelte"
   fi
 
+  # Version announcement modal — hardcoded "latest releases" link in major/minor update popup
+  local version_modal="$REPO_ROOT/web/src/lib/modals/VersionAnnouncementModal.svelte"
+  if [[ -f "$version_modal" ]]; then
+    sed -i "s|https://github\.com/immich-app/immich/releases/latest|${REPO_URL}/releases/latest|g" "$version_modal"
+    echo "  Patched VersionAnnouncementModal.svelte"
+  fi
+
+  # Error layout — hardcoded "releases" link on the error page
+  local error_layout="$REPO_ROOT/web/src/lib/components/layouts/ErrorLayout.svelte"
+  if [[ -f "$error_layout" ]]; then
+    sed -i "s|https://github\.com/immich-app/immich/releases|${REPO_URL}/releases|g" "$error_layout"
+    echo "  Patched ErrorLayout.svelte"
+  fi
+
+  # security.txt — hardcoded SECURITY.md policy URL and "Immich instance" comments
+  local security_txt="$REPO_ROOT/web/static/.well-known/security.txt"
+  if [[ -f "$security_txt" ]]; then
+    sed -i "s|https://github\.com/immich-app/immich/blob/main/SECURITY\.md|${REPO_URL}/blob/main/SECURITY.md|g" "$security_txt"
+    sed -i "s|running an Immich instance|running a ${NAME} instance|g" "$security_txt"
+    sed -i "s|Immich-related security problems should be reported to the Immich security team|${NAME}-related security problems should be reported to the ${NAME} security team|g" "$security_txt"
+    echo "  Patched security.txt"
+  fi
+
   # OpenAPI spec
   local openapi="$REPO_ROOT/open-api/immich-openapi-specs.json"
   if [[ -f "$openapi" ]]; then
