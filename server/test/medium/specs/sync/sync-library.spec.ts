@@ -157,4 +157,66 @@ describe(SyncRequestType.LibrariesV1, () => {
     expect(deleteEvents).toHaveLength(1);
     expect((deleteEvents[0] as { data: { libraryId: string } }).data.libraryId).toBe(library.id);
   });
+
+  it("emits a partner's library via the creator path through the dispatch loop", async () => {
+    // accessibleLibraries' ownership branch only matches libraries owned by the
+    // current user. This test verifies that auth.user can ALSO see a library
+    // owned by a partner (B) when auth.user is the creator of a space S that
+    // links B's library — even though auth.user is not in shared_space_member
+    // for S (the creator-only branch of accessibleSpaces), and even though
+    // auth.user does not own the library. The library reaches auth.user via
+    // shared_space_library → shared_space (createdById = auth.user).
+    const { auth, ctx } = await setup();
+    const { user: partner } = await ctx.newUser();
+    const { library } = await ctx.newLibrary({ ownerId: partner.id, name: "Partner's library" });
+    const { space } = await ctx.newSharedSpace({ createdById: auth.user.id });
+    // Deliberately do NOT call newSharedSpaceMember for auth.user — exercise
+    // the pure creator branch.
+    await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id, addedById: auth.user.id });
+
+    const response = await ctx.syncStream(auth, [SyncRequestType.LibrariesV1]);
+    const libraryEvents = response.filter((r: { type: string }) => r.type === SyncEntityType.LibraryV1);
+    expect(libraryEvents).toHaveLength(1);
+    expect((libraryEvents[0] as { data: { id: string; ownerId: string } }).data).toMatchObject({
+      id: library.id,
+      ownerId: partner.id,
+    });
+  });
+
+  it('emits incremental update events when an accessible library is renamed after initial sync', async () => {
+    // Plan Task 24's unit tests for LibrarySync.getUpserts cover the query-level
+    // delta behavior. This test verifies the dispatch-loop integration: after a
+    // user has acked the initial sync, renaming the library on the server must
+    // produce a LibraryV1 event on the next sync (not just a stale-state miss).
+    const { auth, ctx } = await setup();
+    const { user: owner } = await ctx.newUser();
+    const { library } = await ctx.newLibrary({ ownerId: owner.id, name: 'Original name' });
+    const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: SharedSpaceRole.Owner });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: auth.user.id, role: SharedSpaceRole.Editor });
+    await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id, addedById: owner.id });
+
+    const initial = await ctx.syncStream(auth, [SyncRequestType.LibrariesV1]);
+    expect(initial.filter((r: { type: string }) => r.type === SyncEntityType.LibraryV1)).toHaveLength(1);
+    await ctx.syncAckAll(auth, initial);
+    await ctx.assertSyncIsComplete(auth, [SyncRequestType.LibrariesV1]);
+
+    // Rename the library — the updated_at trigger advances library.updateId.
+    await defaultDatabase
+      .updateTable('library')
+      .set({ name: 'Renamed library' })
+      .where('id', '=', library.id)
+      .execute();
+
+    const next = await ctx.syncStream(auth, [SyncRequestType.LibrariesV1]);
+    const libraryEvents = next.filter((r: { type: string }) => r.type === SyncEntityType.LibraryV1);
+    expect(libraryEvents).toHaveLength(1);
+    expect((libraryEvents[0] as { data: { id: string; name: string } }).data).toMatchObject({
+      id: library.id,
+      name: 'Renamed library',
+    });
+
+    await ctx.syncAckAll(auth, next);
+    await ctx.assertSyncIsComplete(auth, [SyncRequestType.LibrariesV1]);
+  });
 });

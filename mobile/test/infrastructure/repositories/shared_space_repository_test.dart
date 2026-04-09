@@ -380,6 +380,69 @@ void main() {
         expect(emissions.last, hasLength(2));
         await sub.cancel();
       });
+
+      test('multi-library single-space: dedupes assets present in two linked libraries (none direct)', () async {
+        // A space links two libraries, libA and libB. The same asset cannot belong
+        // to both (asset.libraryId is single-valued), so the dedup property here
+        // is about ensuring the UNION returns the union of both libraries' assets
+        // exactly once each — not about an asset appearing twice. Combined with
+        // a third asset that IS direct-add only (not in either library), the
+        // total expected count is the sum of all distinct assets, with no
+        // duplication from the OR branches even though all three rows match the
+        // membership predicate via different paths.
+        final libA = await ctx.newLibrary(ownerId: userId);
+        final libB = await ctx.newLibrary(ownerId: userId);
+        await ctx.insertSharedSpaceLibrary(spaceId: spaceId, libraryId: libA.id);
+        await ctx.insertSharedSpaceLibrary(spaceId: spaceId, libraryId: libB.id);
+
+        // 2 assets in libA
+        final a1 = await ctx.newRemoteAsset(
+          ownerId: userId,
+          libraryId: libA.id,
+          createdAt: DateTime(2026, 4, 1, 12),
+        );
+        final a2 = await ctx.newRemoteAsset(
+          ownerId: userId,
+          libraryId: libA.id,
+          createdAt: DateTime(2026, 4, 2, 12),
+        );
+        // 2 assets in libB
+        final b1 = await ctx.newRemoteAsset(
+          ownerId: userId,
+          libraryId: libB.id,
+          createdAt: DateTime(2026, 4, 3, 12),
+        );
+        final b2 = await ctx.newRemoteAsset(
+          ownerId: userId,
+          libraryId: libB.id,
+          createdAt: DateTime(2026, 4, 4, 12),
+        );
+        // 1 asset that is BOTH in libA AND directly added — exercises the OR-dedup
+        // path (the row matches the libraryId branch AND the id branch).
+        final c1 = await ctx.newRemoteAsset(
+          ownerId: userId,
+          libraryId: libA.id,
+          createdAt: DateTime(2026, 4, 5, 12),
+        );
+        await ctx.insertSharedSpaceAsset(spaceId: spaceId, assetId: c1.id);
+        // 1 asset that is in an unrelated library (NOT linked to this space) —
+        // must NOT appear in the timeline.
+        final unrelatedLib = await ctx.newLibrary(ownerId: userId);
+        await ctx.newRemoteAsset(
+          ownerId: userId,
+          libraryId: unrelatedLib.id,
+          createdAt: DateTime(2026, 4, 6, 12),
+        );
+
+        final query = sut.sharedSpace(spaceId, GroupAssetsBy.day);
+        final assets = await query.assetSource(0, 20);
+
+        final ids = assets.map((a) => a.remoteId).toList();
+        expect(ids, hasLength(5));
+        expect(ids.toSet(), {a1.id, a2.id, b1.id, b2.id, c1.id});
+        // No duplication from the OR branches even when an asset matches both.
+        expect(ids.length, ids.toSet().length);
+      });
     });
   });
 }
