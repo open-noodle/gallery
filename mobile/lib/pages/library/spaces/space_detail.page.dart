@@ -6,6 +6,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/presentation/widgets/bottom_sheet/space_bottom_sheet.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.widget.dart';
+import 'package:immich_mobile/providers/background_sync.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
 import 'package:immich_mobile/providers/shared_space.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
@@ -129,13 +130,30 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
         );
       }
       // Drift's sharedSpace() stream auto-refreshes the timeline as new
-      // shared_space_asset rows land via the sync stream — we only need to
-      // re-fetch metadata so fields like lastActivityAt update immediately.
+      // shared_space_asset rows land in local Drift. Trigger an incremental
+      // sync now so the rows arrive without waiting for the next app start.
+      // The websocket has no per-space asset event subscription on the gallery
+      // fork, so without this nudge the user wouldn't see the photos until
+      // the app is restarted (closed-from-recents and reopened).
+      await _triggerSpaceSync();
       await _refreshSpaceMetadata();
     } catch (e) {
       if (context.mounted) {
         ImmichToast.show(context: context, msg: 'Failed to add photos', toastType: ToastType.error);
       }
+    }
+  }
+
+  // Pull new shared_space_* events from the server immediately. The Drift
+  // sync stream is incremental — each call only fetches rows newer than the
+  // last ack — so this is a cheap nudge to bring the local DB in line after
+  // a mutation that the websocket doesn't push (add/remove/rename/etc).
+  Future<void> _triggerSpaceSync() async {
+    try {
+      await ref.read(backgroundSyncProvider).syncRemote();
+    } catch (error) {
+      // Failure here is non-fatal — the sync will eventually catch up on
+      // the next app resume. The mutation already succeeded server-side.
     }
   }
 
@@ -286,7 +304,12 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
         bottomSheet: SpaceBottomSheet(
           spaceId: widget.spaceId,
           currentUserRole: _currentRole,
-          onAssetsRemoved: _refreshSpaceMetadata,
+          onAssetsRemoved: () async {
+            // Same nudge as _addPhotos — pull new shared_space_asset_audit rows
+            // so the deletes propagate to local Drift before the next sync.
+            await _triggerSpaceSync();
+            await _refreshSpaceMetadata();
+          },
         ),
       ),
     );
