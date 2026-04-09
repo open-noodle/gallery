@@ -96,6 +96,25 @@ from
       inner join "smart_search" on "asset"."id" = "smart_search"."assetId"
     where
       "asset"."visibility" = $1
+      and (
+        "asset"."ownerId" = any ($2::uuid[])
+        or exists (
+          select
+          from
+            "shared_space_asset"
+          where
+            "shared_space_asset"."assetId" = "asset"."id"
+            and "shared_space_asset"."spaceId" = any ($3::uuid[])
+        )
+        or exists (
+          select
+          from
+            "shared_space_library"
+          where
+            "shared_space_library"."libraryId" = "asset"."libraryId"
+            and "shared_space_library"."spaceId" = any ($4::uuid[])
+        )
+      )
       and exists (
         select
         from
@@ -105,25 +124,26 @@ from
           "asset_face"."assetId" = "asset"."id"
           and "asset_face"."deletedAt" is null
           and "asset_face"."isVisible" is true
-          and "shared_space_person_face"."personId" = any ($2::uuid[])
+          and "shared_space_person_face"."personId" = any ($5::uuid[])
       )
-      and "asset"."fileCreatedAt" >= $3
-      and "asset_exif"."lensModel" = $4
-      and "asset"."ownerId" = any ($5::uuid[])
-      and "asset"."isFavorite" = $6
+      and "asset"."fileCreatedAt" >= $6
+      and "asset_exif"."lensModel" = $7
+      and "asset"."isFavorite" = $8
       and "asset"."deletedAt" is null
-      and (smart_search.embedding <=> $7) <= $8
+      and (smart_search.embedding <=> $9) <= $10
     order by
-      smart_search.embedding <=> $9
+      smart_search.embedding <=> $11,
+      "asset"."id"
     limit
-      $10
+      $12
   ) as "candidates"
 order by
-  "candidates"."fileCreatedAt" desc nulls last
+  "candidates"."fileCreatedAt" desc nulls last,
+  "candidates"."id"
 limit
-  $11
+  $13
 offset
-  $12
+  $14
 commit
 
 -- SearchRepository.searchFaces

@@ -239,9 +239,17 @@
     hasNavigatedToOrFromAssetViewer = isNavigatingToAssetViewer !== isNavigatingFromAssetViewer;
   });
 
+  // Tracks whether afterNavigate has fired for this Timeline instance. If the
+  // component is re-mounted after the triggering navigation has already completed
+  // (e.g., a parent conditionally swaps Timeline back in after a goto()),
+  // afterNavigate won't fire for the new instance, so onMount has to handle
+  // the visibility transition itself as a fallback.
+  let afterNavigateFired = false;
+
   // afterNavigate is only called after navigation to a new URL, {complete} will resolve
   // after successful navigation.
   afterNavigate(({ complete }) => {
+    afterNavigateFired = true;
     void complete.finally(() => {
       const isAssetViewerPage = isAssetViewerRoute(page);
 
@@ -262,7 +270,18 @@
   onMount(() => {
     if (!enableRouting) {
       invisible = false;
+      return;
     }
+    // Fallback: when Timeline re-mounts after its triggering navigation has
+    // already completed (conditional parent render + goto), afterNavigate
+    // doesn't fire for this instance. Run scrollAfterNavigate manually on the
+    // next microtask so visibility is restored and scroll-to-asset still
+    // happens for direct /photos/<id> navigations.
+    void tick().then(() => {
+      if (!afterNavigateFired && invisible) {
+        void scrollAfterNavigate();
+      }
+    });
   });
 
   const scrollToSegmentPercentage = (segmentTop: number, segmentHeight: number, timelineMonthScrollPercent: number) => {

@@ -171,6 +171,9 @@ const SearchSuggestionRequestSchema = z
   @Type(() => Number)
   @Optional()
   page?: number;
+
+  @ValidateBoolean({ optional: true, description: 'Include shared spaces the user is a member of' })
+  withSharedSpaces?: boolean;
 }
 
 export class SearchPlacesDto {

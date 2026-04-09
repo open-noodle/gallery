@@ -2278,6 +2278,8 @@ export type SmartSearchDto = {
     withDeleted?: boolean;
     /** Include EXIF data in response */
     withExif?: boolean;
+    /** Include shared spaces the user is a member of */
+    withSharedSpaces?: boolean;
 };
 export type StatisticsSearchDto = {
     /** Filter by album IDs */
