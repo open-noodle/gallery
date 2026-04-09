@@ -152,6 +152,18 @@ void main() {
     when(() => mockSyncStreamRepo.deletePeopleV1(any())).thenAnswer(successHandler);
     when(() => mockSyncStreamRepo.updateAssetFacesV1(any())).thenAnswer(successHandler);
     when(() => mockSyncStreamRepo.deleteAssetFacesV1(any())).thenAnswer(successHandler);
+    // Library sync handlers — wired in PR 2 Task 33/34. Stubbed here so the
+    // dispatch tests can route a libraryV1/libraryDeleteV1 event without
+    // falling through to the default case (which would log a warning).
+    when(() => mockSyncStreamRepo.updateLibrariesV1(any())).thenAnswer(successHandler);
+    when(
+      () => mockSyncStreamRepo.deleteLibrariesV1(any(), currentUserId: any(named: 'currentUserId')),
+    ).thenAnswer(successHandler);
+    when(() => mockSyncStreamRepo.updateLibraryAssetsV1(any())).thenAnswer(successHandler);
+    when(() => mockSyncStreamRepo.deleteLibraryAssetsV1(any())).thenAnswer(successHandler);
+    when(() => mockSyncStreamRepo.updateLibraryAssetExifsV1(any())).thenAnswer(successHandler);
+    when(() => mockSyncStreamRepo.updateSharedSpaceLibrariesV1(any())).thenAnswer(successHandler);
+    when(() => mockSyncStreamRepo.deleteSharedSpaceLibrariesV1(any())).thenAnswer(successHandler);
     when(() => mockSyncMigrationRepo.v20260128CopyExifWidthHeightToAsset()).thenAnswer(successHandler);
 
     sut = SyncStreamService(
@@ -393,6 +405,20 @@ void main() {
 
       verify(() => mockSyncStreamRepo.updateMemoriesV1(any())).called(1);
       verify(() => mockSyncApiRepo.ack(["5"])).called(1);
+    });
+
+    test("dispatches a libraryV1 event to updateLibrariesV1 — smoke test for the library dispatch arm", () async {
+      // Smoke test for the library case arm in sync_stream.service.dart added
+      // by Task 34. The repository handlers are exhaustively covered by
+      // sync_stream_repository_test.dart; this test verifies the dispatch
+      // routing one level up so a future typo in the case arm fails fast.
+      final events = [SyncStreamStub.libraryV1];
+
+      await simulateEvents(events);
+
+      verify(() => mockSyncStreamRepo.updateLibrariesV1(any())).called(1);
+      verify(() => mockSyncApiRepo.ack(['library-v1-ack'])).called(1);
+      verifyNever(() => mockAbortCallbackWrapper());
     });
   });
 

@@ -133,4 +133,24 @@ abstract final class SyncStreamStub {
       ack: ack,
     );
   }
+
+  // --- gallery-fork: library sync stubs ---
+
+  static final libraryV1 = SyncEvent(
+    type: SyncEntityType.libraryV1,
+    data: SyncLibraryV1(
+      id: 'library-1',
+      name: 'Test Library',
+      ownerId: 'owner',
+      createdAt: DateTime(2026, 4, 1),
+      updatedAt: DateTime(2026, 4, 1),
+    ),
+    ack: 'library-v1-ack',
+  );
+
+  static final libraryDeleteV1 = SyncEvent(
+    type: SyncEntityType.libraryDeleteV1,
+    data: SyncLibraryDeleteV1(libraryId: 'library-2'),
+    ack: 'library-delete-ack',
+  );
 }

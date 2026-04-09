@@ -464,6 +464,50 @@ void main() {
       expect(remaining.first.id, 'asset-2');
     });
 
+    test('deleteLibraryAssetsV1 is idempotent — calling twice with the same id is safe', () async {
+      await sut.updateUsersV1([_createUser()]);
+      await sut.updateLibrariesV1([makeLibrary()]);
+      await sut.updateLibraryAssetsV1([
+        makeLibraryAsset(id: 'asset-1', checksum: 'cIdem', ownerId: 'user-1', libraryId: 'library-1'),
+      ]);
+
+      await sut.deleteLibraryAssetsV1([SyncLibraryAssetDeleteV1(assetId: 'asset-1')]);
+      // Second call must not throw and must leave the table unchanged.
+      await sut.deleteLibraryAssetsV1([SyncLibraryAssetDeleteV1(assetId: 'asset-1')]);
+
+      expect(await db.remoteAssetEntity.select().get(), isEmpty);
+    });
+
+    test('deleteLibraryAssetsV1 handles a mixed batch (some present, some missing)', () async {
+      await sut.updateUsersV1([_createUser()]);
+      await sut.updateLibrariesV1([makeLibrary()]);
+      await sut.updateLibraryAssetsV1([
+        makeLibraryAsset(id: 'asset-present', checksum: 'cMix', ownerId: 'user-1', libraryId: 'library-1'),
+      ]);
+
+      await sut.deleteLibraryAssetsV1([
+        SyncLibraryAssetDeleteV1(assetId: 'asset-present'),
+        SyncLibraryAssetDeleteV1(assetId: 'asset-missing-1'),
+        SyncLibraryAssetDeleteV1(assetId: 'asset-missing-2'),
+      ]);
+
+      // Present asset removed, missing asset deletes are silent no-ops.
+      expect(await db.remoteAssetEntity.select().get(), isEmpty);
+    });
+
+    test('deleteLibraryAssetsV1 with empty input is a no-op (does not throw)', () async {
+      await sut.updateUsersV1([_createUser()]);
+      await sut.updateLibrariesV1([makeLibrary()]);
+      await sut.updateLibraryAssetsV1([
+        makeLibraryAsset(id: 'asset-1', checksum: 'cEmpty', ownerId: 'user-1', libraryId: 'library-1'),
+      ]);
+
+      await sut.deleteLibraryAssetsV1(const <SyncLibraryAssetDeleteV1>[]);
+
+      // Asset untouched.
+      expect(await db.remoteAssetEntity.select().get(), hasLength(1));
+    });
+
     test('updateSharedSpaceLibrariesV1 inserts a join row', () async {
       await sut.updateUsersV1([_createUser()]);
       await sut.updateSharedSpacesV1([
@@ -643,7 +687,7 @@ void main() {
         expect(libraryRows, isEmpty);
       });
 
-      test('runs in a single transaction — library delete and sweep are atomic', () async {
+      test('happy path: library delete and orphan sweep both succeed in a single call', () async {
         // Pre-seed assets that should survive a successful sweep.
         await sut.updateLibraryAssetsV1([
           makeLibraryAsset(id: 'mine', checksum: 'c5', ownerId: 'user-1', libraryId: 'library-1'),
@@ -659,6 +703,118 @@ void main() {
         expect(await db.libraryEntity.select().get(), isEmpty);
         final remaining = await db.remoteAssetEntity.select().get();
         expect(remaining.map((r) => r.id), ['mine']);
+      });
+
+      test('atomicity: a failure inside the transaction rolls back the libraryEntity delete', () async {
+        // Verifies that Drift's _db.transaction() rollback semantics hold for
+        // the shape used by deleteLibrariesV1. We can't easily inject a failure
+        // INTO the production handler (the customStatement is hard-coded), so
+        // this test exercises the same transaction shape directly via the
+        // db handle and confirms rollback behaviour. If Drift's transaction
+        // primitive ever loses rollback semantics, this test catches it before
+        // the production sweep silently splits into separate operations.
+        await sut.updateLibraryAssetsV1([
+          makeLibraryAsset(id: 'mine', checksum: 'cAtom', ownerId: 'user-1', libraryId: 'library-1'),
+        ]);
+        expect(await db.libraryEntity.select().get(), hasLength(1));
+        expect(await db.remoteAssetEntity.select().get(), hasLength(1));
+
+        Object? thrownError;
+        try {
+          await db.transaction(() async {
+            // Delete the library row — same statement deleteLibrariesV1 runs.
+            await db.libraryEntity.deleteWhere((row) => row.id.equals('library-1'));
+            // Force a failure mid-transaction. Drift must roll back the prior
+            // deleteWhere along with this customStatement.
+            await db.customStatement('SELECT * FROM definitely_not_a_real_table');
+          });
+        } catch (e) {
+          thrownError = e;
+        }
+
+        expect(thrownError, isNotNull, reason: 'transaction body should have thrown');
+        // Both the library row and the asset must still exist — the
+        // deleteWhere was rolled back along with the failing customStatement.
+        expect(await db.libraryEntity.select().get(), hasLength(1));
+        expect(await db.remoteAssetEntity.select().get(), hasLength(1));
+      });
+
+      test('large-batch: chunks the sweep across the SQLite parameter limit (>500 libraries)', () async {
+        // SQLite's SQLITE_MAX_VARIABLE_NUMBER is typically 999. The sweep
+        // customStatement binds libraryIds.length + 2 parameters per call.
+        // The repository chunks at 500 so a 600-library batch hits the chunk
+        // boundary and runs as multiple statements inside the same transaction.
+        // This test verifies the chunking works AND that all 600 libraries +
+        // their orphan assets are still removed atomically (a failure mid-loop
+        // would roll back ALL preceding chunks).
+        //
+        // The setUp() block already inserted library-1; we delete that one
+        // along with our 600 batch entries to land on a clean zero-row state.
+        const int batchSize = 600;
+        final libraryIds = List.generate(batchSize, (i) => 'lib-$i');
+
+        await sut.updateLibrariesV1(
+          libraryIds.map((id) => makeLibrary(id: id, ownerId: 'user-foreign')),
+        );
+        // Insert 600 orphan assets, one per library.
+        await sut.updateLibraryAssetsV1(
+          List.generate(
+            batchSize,
+            (i) => makeLibraryAsset(
+              id: 'orphan-$i',
+              checksum: 'cBig$i',
+              ownerId: 'user-foreign',
+              libraryId: libraryIds[i],
+            ),
+          ),
+        );
+        // setUp inserted library-1 (601 total) but no asset for it.
+        expect(await db.libraryEntity.select().get(), hasLength(batchSize + 1));
+        expect(await db.remoteAssetEntity.select().get(), hasLength(batchSize));
+
+        await sut.deleteLibrariesV1(
+          [
+            SyncLibraryDeleteV1(libraryId: 'library-1'),
+            ...libraryIds.map((id) => SyncLibraryDeleteV1(libraryId: id)),
+          ],
+          currentUserId: 'user-1',
+        );
+
+        // All 601 library rows and all 600 orphan assets gone.
+        expect(await db.libraryEntity.select().get(), isEmpty);
+        expect(await db.remoteAssetEntity.select().get(), isEmpty);
+      });
+
+      test('multi-library: deletes all 3 library rows and sweeps their orphan assets in one call', () async {
+        // Verifies the placeholder expansion in the customStatement works for
+        // N > 1 libraryIds. Single-library is the common case but
+        // syncLibrariesV1 may dispatch multiple deletes per batch.
+        await sut.updateLibrariesV1([
+          makeLibrary(id: 'library-1', ownerId: 'user-foreign'),
+          makeLibrary(id: 'library-2', ownerId: 'user-foreign'),
+          makeLibrary(id: 'library-3', ownerId: 'user-foreign'),
+        ]);
+        await sut.updateLibraryAssetsV1([
+          makeLibraryAsset(id: 'mine', checksum: 'cM1', ownerId: 'user-1', libraryId: 'library-1'),
+          makeLibraryAsset(id: 'orphan-1', checksum: 'cO1', ownerId: 'user-foreign', libraryId: 'library-1'),
+          makeLibraryAsset(id: 'orphan-2', checksum: 'cO2', ownerId: 'user-foreign', libraryId: 'library-2'),
+          makeLibraryAsset(id: 'orphan-3', checksum: 'cO3', ownerId: 'user-foreign', libraryId: 'library-3'),
+        ]);
+
+        await sut.deleteLibrariesV1(
+          [
+            SyncLibraryDeleteV1(libraryId: 'library-1'),
+            SyncLibraryDeleteV1(libraryId: 'library-2'),
+            SyncLibraryDeleteV1(libraryId: 'library-3'),
+          ],
+          currentUserId: 'user-1',
+        );
+
+        // All 3 library rows removed in the same transaction.
+        expect(await db.libraryEntity.select().get(), isEmpty);
+        // The 3 foreign-owned orphans are swept; user-owned 'mine' is preserved.
+        final remaining = await db.remoteAssetEntity.select().get();
+        expect(remaining.map((r) => r.id).toList(), ['mine']);
       });
 
       test('LibraryDeleteV1 for an unknown library is a no-op', () async {

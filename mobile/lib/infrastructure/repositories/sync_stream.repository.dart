@@ -654,6 +654,12 @@ class SyncStreamRepository extends DriftDatabaseRepository {
   // decoupled from the global Store singleton (matches the rest of the file,
   // which stays free of auth-context dependencies) and makes the handler
   // trivially testable with an in-memory Drift database.
+  // SQLite's default SQLITE_MAX_VARIABLE_NUMBER is 999. The sweep customStatement
+  // uses libraryIds.length + 2 parameters (currentUserId is bound twice). At
+  // 500 we leave generous headroom: 500 + 2 = 502 parameters per chunk, well
+  // under the limit even on builds with a lower compile-time cap.
+  static const int _kSweepChunkSize = 500;
+
   Future<void> deleteLibrariesV1(Iterable<SyncLibraryDeleteV1> data, {required String currentUserId}) async {
     final libraryIds = data.map((d) => d.libraryId).toList();
     if (libraryIds.isEmpty) return;
@@ -664,25 +670,33 @@ class SyncStreamRepository extends DriftDatabaseRepository {
           await _db.libraryEntity.deleteWhere((row) => row.id.equals(libraryId));
         }
 
-        // Sweep orphan library assets — preserves user-owned, partner-shared,
-        // and direct-add (shared_space_asset) paths. Uses snake_case because
-        // Drift generates snake_case table/column names from camelCase Dart
-        // identifiers. See remote_asset.entity.dart for the `libraryId` column
-        // declaration that becomes `library_id`.
-        final placeholders = libraryIds.map((_) => '?').join(',');
-        await _db.customStatement(
-          '''
-          DELETE FROM remote_asset_entity
-          WHERE library_id IS NOT NULL
-            AND library_id IN ($placeholders)
-            AND owner_id != ?
-            AND owner_id NOT IN (
-              SELECT shared_by_id FROM partner_entity WHERE shared_with_id = ?
-            )
-            AND id NOT IN (SELECT asset_id FROM shared_space_asset_entity)
-          ''',
-          [...libraryIds, currentUserId, currentUserId],
-        );
+        // Sweep orphan library assets in chunks to stay under the SQLite
+        // parameter limit. Preserves user-owned, partner-shared, and direct-add
+        // (shared_space_asset) paths. Uses snake_case because Drift generates
+        // snake_case table/column names from camelCase Dart identifiers — see
+        // remote_asset.entity.dart for the `libraryId` column declaration that
+        // becomes `library_id`. The chunks all run inside the same transaction
+        // so the entire sweep is still atomic with the libraryEntity deletes.
+        for (var offset = 0; offset < libraryIds.length; offset += _kSweepChunkSize) {
+          final chunk = libraryIds.sublist(
+            offset,
+            (offset + _kSweepChunkSize).clamp(0, libraryIds.length),
+          );
+          final placeholders = chunk.map((_) => '?').join(',');
+          await _db.customStatement(
+            '''
+            DELETE FROM remote_asset_entity
+            WHERE library_id IS NOT NULL
+              AND library_id IN ($placeholders)
+              AND owner_id != ?
+              AND owner_id NOT IN (
+                SELECT shared_by_id FROM partner_entity WHERE shared_with_id = ?
+              )
+              AND id NOT IN (SELECT asset_id FROM shared_space_asset_entity)
+            ''',
+            [...chunk, currentUserId, currentUserId],
+          );
+        }
       });
     } catch (error, stack) {
       _logger.severe('Error: deleteLibrariesV1', error, stack);
