@@ -4,8 +4,6 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
-import 'package:immich_mobile/domain/services/timeline.service.dart';
-import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/presentation/widgets/bottom_sheet/space_bottom_sheet.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.widget.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
@@ -15,6 +13,11 @@ import 'package:immich_mobile/repositories/shared_space_api.repository.dart';
 import 'package:immich_mobile/routing/router.dart';
 import 'package:immich_mobile/widgets/common/immich_toast.dart';
 import 'package:openapi/api.dart';
+
+// PR 2 — Task 35: the space timeline is now served directly by the Drift
+// sharedSpace() query (see DriftTimelineRepository.sharedSpace), so this page
+// no longer fetches assets over the network. Metadata + member list still
+// load from the API because they are not yet mirrored in Drift.
 
 @RoutePage()
 class SpaceDetailPage extends ConsumerStatefulWidget {
@@ -29,7 +32,6 @@ class SpaceDetailPage extends ConsumerStatefulWidget {
 class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
   SharedSpaceResponseDto? _space;
   List<SharedSpaceMemberResponseDto>? _members;
-  List<RemoteAsset>? _assets;
   String? _error;
   bool _loading = true;
   bool _isRefreshing = false;
@@ -49,14 +51,12 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
       final results = await Future.wait([
         repo.get(widget.spaceId),
         repo.getMembers(widget.spaceId),
-        repo.getSpaceAssets(widget.spaceId),
       ]);
 
       if (mounted) {
         setState(() {
           _space = results[0] as SharedSpaceResponseDto;
           _members = results[1] as List<SharedSpaceMemberResponseDto>;
-          _assets = results[2] as List<RemoteAsset>;
           _loading = false;
         });
       }
@@ -72,22 +72,18 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
     }
   }
 
-  Future<void> _refreshAssets() async {
-    if (_isRefreshing) return;
-    _isRefreshing = true;
+  // Drift reactivity now propagates asset additions/removals automatically,
+  // so we only need to refresh metadata (e.g. lastActivityAt) after an
+  // add/remove action. Members and assets take care of themselves.
+  Future<void> _refreshSpaceMetadata() async {
     try {
-      final repo = ref.read(sharedSpaceApiRepositoryProvider);
-      final assets = await repo.getSpaceAssets(widget.spaceId);
-      final space = await repo.get(widget.spaceId);
+      final space = await ref.read(sharedSpaceApiRepositoryProvider).get(widget.spaceId);
       if (mounted) {
-        setState(() {
-          _assets = assets;
-          _space = space;
-        });
+        setState(() => _space = space);
       }
     } catch (_) {
-    } finally {
-      _isRefreshing = false;
+      // Best-effort refresh — failures are non-fatal; the Drift stream still
+      // drives the asset grid.
     }
   }
 
@@ -132,7 +128,10 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
           toastType: ToastType.success,
         );
       }
-      await _refreshAssets();
+      // Drift's sharedSpace() stream auto-refreshes the timeline as new
+      // shared_space_asset rows land via the sync stream — we only need to
+      // re-fetch metadata so fields like lastActivityAt update immediately.
+      await _refreshSpaceMetadata();
     } catch (e) {
       if (context.mounted) {
         ImmichToast.show(context: context, msg: 'Failed to add photos', toastType: ToastType.error);
@@ -245,18 +244,12 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
       );
     }
 
-    final assets = _assets ?? [];
-
-    if (assets.isEmpty) {
-      return _buildEmptyState();
-    }
-
     return ProviderScope(
       overrides: [
         timelineServiceProvider.overrideWith((ref) {
           final timelineService = ref
               .watch(timelineFactoryProvider)
-              .fromAssetsWithBuckets(assets, TimelineOrigin.remoteSpace);
+              .sharedSpace(spaceId: widget.spaceId);
           ref.onDispose(timelineService.dispose);
           return timelineService;
         }),
@@ -293,54 +286,10 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
         bottomSheet: SpaceBottomSheet(
           spaceId: widget.spaceId,
           currentUserRole: _currentRole,
-          onAssetsRemoved: _refreshAssets,
+          onAssetsRemoved: _refreshSpaceMetadata,
         ),
       ),
     );
   }
 
-  Widget _buildEmptyState() {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(_space!.name),
-        centerTitle: false,
-        actions: [
-          IconButton(
-            icon: Icon(_showInTimeline ? Icons.visibility : Icons.visibility_off),
-            onPressed: _togglingTimeline ? null : _toggleTimeline,
-            tooltip: _showInTimeline ? 'Hide from timeline' : 'Show in timeline',
-          ),
-          IconButton(icon: const Icon(Icons.people_outline), onPressed: _navigateToMembers),
-          if (_isOwner)
-            PopupMenuButton<String>(
-              onSelected: (value) {
-                if (value == 'delete') _deleteSpace();
-              },
-              itemBuilder: (context) => [const PopupMenuItem(value: 'delete', child: Text('Delete Space'))],
-            ),
-        ],
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.photo_library_outlined, size: 64, color: context.colorScheme.onSurface.withAlpha(100)),
-            const SizedBox(height: 16),
-            Text(
-              'No photos yet',
-              style: context.textTheme.titleMedium?.copyWith(color: context.colorScheme.onSurface.withAlpha(150)),
-            ),
-            if (_canEdit) ...[
-              const SizedBox(height: 24),
-              ElevatedButton.icon(
-                onPressed: _addPhotos,
-                icon: const Icon(Icons.add_photo_alternate_outlined),
-                label: const Text('Add Photos'),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
 }
