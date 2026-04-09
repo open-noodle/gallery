@@ -65,17 +65,27 @@ jobs:
       - name: Summarize results
         if: always()
         working-directory: ./mobile
+        env:
+          # Pass via env to avoid zizmor's template-injection rule —
+          # ${{ github.* }} expressions interpolated directly into shell
+          # scripts are flagged as code injection vectors even when the
+          # source is trusted GitHub-managed metadata.
+          RUN_NUMBER: ${{ github.run_number }}
+          BRANCH_NAME: ${{ github.ref_name }}
+          COMMIT_SHA: ${{ github.sha }}
         run: |
-          echo "## Scale test run ${{ github.run_number }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Branch: \`${{ github.ref_name }}\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Commit: \`${{ github.sha }}\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "Measurements are in the 'Run 100k scale test' step log. Look for \`[scale-test]\`." >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "Performance targets:" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Insert 100k rows: single-digit minutes" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Bucket query: 200 ms" >> "$GITHUB_STEP_SUMMARY"
-          echo "- First page (100 assets): 100 ms" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "See \`docs/plans/2026-04-08-mobile-shared-space-drift-sync-scale-notes.md\` for context." >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "## Scale test run ${RUN_NUMBER}"
+            echo ""
+            echo "- Branch: \`${BRANCH_NAME}\`"
+            echo "- Commit: \`${COMMIT_SHA}\`"
+            echo ""
+            echo "Measurements are in the 'Run 100k scale test' step log. Look for \`[scale-test]\`."
+            echo ""
+            echo "Performance targets:"
+            echo "- Insert 100k rows: single-digit minutes"
+            echo "- Bucket query: 200 ms"
+            echo "- First page (100 assets): 100 ms"
+            echo ""
+            echo "See \`docs/plans/2026-04-08-mobile-shared-space-drift-sync-scale-notes.md\` for context."
+          } >> "$GITHUB_STEP_SUMMARY"

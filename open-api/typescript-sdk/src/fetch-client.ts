@@ -3534,6 +3534,26 @@ export type SyncAuthUserV1 = {
     storageLabel: string | null;
 };
 export type SyncCompleteV1 = {};
+export type SyncLibraryAssetDeleteV1 = {
+    /** Asset ID */
+    assetId: string;
+};
+export type SyncLibraryDeleteV1 = {
+    /** Library ID */
+    libraryId: string;
+};
+export type SyncLibraryV1 = {
+    /** Created at */
+    createdAt: string;
+    /** Library ID */
+    id: string;
+    /** Library name */
+    name: string;
+    /** Owner user ID */
+    ownerId: string;
+    /** Updated at */
+    updatedAt: string;
+};
 export type SyncMemoryAssetDeleteV1 = {
     /** Asset ID */
     assetId: string;
@@ -3620,6 +3640,24 @@ export type SyncResetV1 = {};
 export type SyncSharedSpaceDeleteV1 = {
     /** Shared space ID */
     spaceId: string;
+};
+export type SyncSharedSpaceLibraryDeleteV1 = {
+    /** Library ID */
+    libraryId: string;
+    /** Shared space ID */
+    spaceId: string;
+};
+export type SyncSharedSpaceLibraryV1 = {
+    /** User who added the library to the space */
+    addedById: string | null;
+    /** Created at */
+    createdAt: string;
+    /** Library ID */
+    libraryId: string;
+    /** Shared space ID */
+    spaceId: string;
+    /** Updated at */
+    updatedAt: string;
 };
 export type SyncSharedSpaceMemberDeleteV1 = {
     /** Shared space ID */
@@ -8505,6 +8543,16 @@ export enum SyncEntityType {
     SharedSpaceToAssetV1 = "SharedSpaceToAssetV1",
     SharedSpaceToAssetDeleteV1 = "SharedSpaceToAssetDeleteV1",
     SharedSpaceToAssetBackfillV1 = "SharedSpaceToAssetBackfillV1",
+    LibraryV1 = "LibraryV1",
+    LibraryDeleteV1 = "LibraryDeleteV1",
+    LibraryAssetCreateV1 = "LibraryAssetCreateV1",
+    LibraryAssetDeleteV1 = "LibraryAssetDeleteV1",
+    LibraryAssetBackfillV1 = "LibraryAssetBackfillV1",
+    LibraryAssetExifCreateV1 = "LibraryAssetExifCreateV1",
+    LibraryAssetExifBackfillV1 = "LibraryAssetExifBackfillV1",
+    SharedSpaceLibraryV1 = "SharedSpaceLibraryV1",
+    SharedSpaceLibraryDeleteV1 = "SharedSpaceLibraryDeleteV1",
+    SharedSpaceLibraryBackfillV1 = "SharedSpaceLibraryBackfillV1",
     SyncAckV1 = "SyncAckV1",
     SyncResetV1 = "SyncResetV1",
     SyncCompleteV1 = "SyncCompleteV1"
@@ -8536,7 +8584,11 @@ export enum SyncRequestType {
     SharedSpaceMembersV1 = "SharedSpaceMembersV1",
     SharedSpaceAssetsV1 = "SharedSpaceAssetsV1",
     SharedSpaceAssetExifsV1 = "SharedSpaceAssetExifsV1",
-    SharedSpaceToAssetsV1 = "SharedSpaceToAssetsV1"
+    SharedSpaceToAssetsV1 = "SharedSpaceToAssetsV1",
+    LibrariesV1 = "LibrariesV1",
+    LibraryAssetsV1 = "LibraryAssetsV1",
+    LibraryAssetExifsV1 = "LibraryAssetExifsV1",
+    SharedSpaceLibrariesV1 = "SharedSpaceLibrariesV1"
 }
 export enum Action2 {
     Tag = "tag",
