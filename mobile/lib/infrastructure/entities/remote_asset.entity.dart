@@ -26,6 +26,9 @@ WHERE (library_id IS NOT NULL);
 @TableIndex.sql(
   "CREATE INDEX IF NOT EXISTS idx_remote_asset_local_date_time_month ON remote_asset_entity (STRFTIME('%Y-%m', local_date_time))",
 )
+@TableIndex.sql(
+  'CREATE INDEX IF NOT EXISTS idx_remote_asset_library_created ON remote_asset_entity (library_id, created_at DESC)',
+)
 class RemoteAssetEntity extends Table with DriftDefaultsMixin, AssetEntityMixin {
   const RemoteAssetEntity();
 

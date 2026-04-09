@@ -35,23 +35,27 @@ import 'package:immich_mobile/infrastructure/entities/shared_space_member.entity
     as i16;
 import 'package:immich_mobile/infrastructure/entities/shared_space_asset.entity.drift.dart'
     as i17;
-import 'package:immich_mobile/infrastructure/entities/memory.entity.drift.dart'
+import 'package:immich_mobile/infrastructure/entities/library.entity.drift.dart'
     as i18;
-import 'package:immich_mobile/infrastructure/entities/memory_asset.entity.drift.dart'
+import 'package:immich_mobile/infrastructure/entities/shared_space_library.entity.drift.dart'
     as i19;
-import 'package:immich_mobile/infrastructure/entities/person.entity.drift.dart'
+import 'package:immich_mobile/infrastructure/entities/memory.entity.drift.dart'
     as i20;
-import 'package:immich_mobile/infrastructure/entities/asset_face.entity.drift.dart'
+import 'package:immich_mobile/infrastructure/entities/memory_asset.entity.drift.dart'
     as i21;
-import 'package:immich_mobile/infrastructure/entities/store.entity.drift.dart'
+import 'package:immich_mobile/infrastructure/entities/person.entity.drift.dart'
     as i22;
-import 'package:immich_mobile/infrastructure/entities/trashed_local_asset.entity.drift.dart'
+import 'package:immich_mobile/infrastructure/entities/asset_face.entity.drift.dart'
     as i23;
-import 'package:immich_mobile/infrastructure/entities/asset_edit.entity.drift.dart'
+import 'package:immich_mobile/infrastructure/entities/store.entity.drift.dart'
     as i24;
-import 'package:immich_mobile/infrastructure/entities/merged_asset.drift.dart'
+import 'package:immich_mobile/infrastructure/entities/trashed_local_asset.entity.drift.dart'
     as i25;
-import 'package:drift/internal/modular.dart' as i26;
+import 'package:immich_mobile/infrastructure/entities/asset_edit.entity.drift.dart'
+    as i26;
+import 'package:immich_mobile/infrastructure/entities/merged_asset.drift.dart'
+    as i27;
+import 'package:drift/internal/modular.dart' as i28;
 
 abstract class $Drift extends i0.GeneratedDatabase {
   $Drift(i0.QueryExecutor e) : super(e);
@@ -90,20 +94,25 @@ abstract class $Drift extends i0.GeneratedDatabase {
       .$SharedSpaceMemberEntityTable(this);
   late final i17.$SharedSpaceAssetEntityTable sharedSpaceAssetEntity = i17
       .$SharedSpaceAssetEntityTable(this);
-  late final i18.$MemoryEntityTable memoryEntity = i18.$MemoryEntityTable(this);
-  late final i19.$MemoryAssetEntityTable memoryAssetEntity = i19
-      .$MemoryAssetEntityTable(this);
-  late final i20.$PersonEntityTable personEntity = i20.$PersonEntityTable(this);
-  late final i21.$AssetFaceEntityTable assetFaceEntity = i21
-      .$AssetFaceEntityTable(this);
-  late final i22.$StoreEntityTable storeEntity = i22.$StoreEntityTable(this);
-  late final i23.$TrashedLocalAssetEntityTable trashedLocalAssetEntity = i23
-      .$TrashedLocalAssetEntityTable(this);
-  late final i24.$AssetEditEntityTable assetEditEntity = i24
-      .$AssetEditEntityTable(this);
-  i25.MergedAssetDrift get mergedAssetDrift => i26.ReadDatabaseContainer(
+  late final i18.$LibraryEntityTable libraryEntity = i18.$LibraryEntityTable(
     this,
-  ).accessor<i25.MergedAssetDrift>(i25.MergedAssetDrift.new);
+  );
+  late final i19.$SharedSpaceLibraryEntityTable sharedSpaceLibraryEntity = i19
+      .$SharedSpaceLibraryEntityTable(this);
+  late final i20.$MemoryEntityTable memoryEntity = i20.$MemoryEntityTable(this);
+  late final i21.$MemoryAssetEntityTable memoryAssetEntity = i21
+      .$MemoryAssetEntityTable(this);
+  late final i22.$PersonEntityTable personEntity = i22.$PersonEntityTable(this);
+  late final i23.$AssetFaceEntityTable assetFaceEntity = i23
+      .$AssetFaceEntityTable(this);
+  late final i24.$StoreEntityTable storeEntity = i24.$StoreEntityTable(this);
+  late final i25.$TrashedLocalAssetEntityTable trashedLocalAssetEntity = i25
+      .$TrashedLocalAssetEntityTable(this);
+  late final i26.$AssetEditEntityTable assetEditEntity = i26
+      .$AssetEditEntityTable(this);
+  i27.MergedAssetDrift get mergedAssetDrift => i28.ReadDatabaseContainer(
+    this,
+  ).accessor<i27.MergedAssetDrift>(i27.MergedAssetDrift.new);
   @override
   Iterable<i0.TableInfo<i0.Table, Object?>> get allTables =>
       allSchemaEntities.whereType<i0.TableInfo<i0.Table, Object?>>();
@@ -128,6 +137,7 @@ abstract class $Drift extends i0.GeneratedDatabase {
     i2.idxRemoteAssetStackId,
     i2.idxRemoteAssetLocalDateTimeDay,
     i2.idxRemoteAssetLocalDateTimeMonth,
+    i2.idxRemoteAssetLibraryCreated,
     authUserEntity,
     userMetadataEntity,
     partnerEntity,
@@ -138,6 +148,8 @@ abstract class $Drift extends i0.GeneratedDatabase {
     sharedSpaceEntity,
     sharedSpaceMemberEntity,
     sharedSpaceAssetEntity,
+    libraryEntity,
+    sharedSpaceLibraryEntity,
     memoryEntity,
     memoryAssetEntity,
     personEntity,
@@ -151,12 +163,13 @@ abstract class $Drift extends i0.GeneratedDatabase {
     i14.idxRemoteAssetCloudId,
     i15.idxSharedSpaceCreatedById,
     i17.idxSharedSpaceAssetSpaceAsset,
-    i20.idxPersonOwnerId,
-    i21.idxAssetFacePersonId,
-    i21.idxAssetFaceAssetId,
-    i23.idxTrashedLocalAssetChecksum,
-    i23.idxTrashedLocalAssetAlbum,
-    i24.idxAssetEditAssetId,
+    i19.idxSharedSpaceLibrarySpaceId,
+    i22.idxPersonOwnerId,
+    i23.idxAssetFacePersonId,
+    i23.idxAssetFaceAssetId,
+    i25.idxTrashedLocalAssetChecksum,
+    i25.idxTrashedLocalAssetAlbum,
+    i26.idxAssetEditAssetId,
   ];
   @override
   i0.StreamQueryUpdateRules
@@ -349,6 +362,25 @@ abstract class $Drift extends i0.GeneratedDatabase {
         'user_entity',
         limitUpdateKind: i0.UpdateKind.delete,
       ),
+      result: [i0.TableUpdate('library_entity', kind: i0.UpdateKind.delete)],
+    ),
+    i0.WritePropagation(
+      on: i0.TableUpdateQuery.onTableName(
+        'shared_space_entity',
+        limitUpdateKind: i0.UpdateKind.delete,
+      ),
+      result: [
+        i0.TableUpdate(
+          'shared_space_library_entity',
+          kind: i0.UpdateKind.delete,
+        ),
+      ],
+    ),
+    i0.WritePropagation(
+      on: i0.TableUpdateQuery.onTableName(
+        'user_entity',
+        limitUpdateKind: i0.UpdateKind.delete,
+      ),
       result: [i0.TableUpdate('memory_entity', kind: i0.UpdateKind.delete)],
     ),
     i0.WritePropagation(
@@ -453,21 +485,29 @@ class $DriftManager {
         _db,
         _db.sharedSpaceAssetEntity,
       );
-  i18.$$MemoryEntityTableTableManager get memoryEntity =>
-      i18.$$MemoryEntityTableTableManager(_db, _db.memoryEntity);
-  i19.$$MemoryAssetEntityTableTableManager get memoryAssetEntity =>
-      i19.$$MemoryAssetEntityTableTableManager(_db, _db.memoryAssetEntity);
-  i20.$$PersonEntityTableTableManager get personEntity =>
-      i20.$$PersonEntityTableTableManager(_db, _db.personEntity);
-  i21.$$AssetFaceEntityTableTableManager get assetFaceEntity =>
-      i21.$$AssetFaceEntityTableTableManager(_db, _db.assetFaceEntity);
-  i22.$$StoreEntityTableTableManager get storeEntity =>
-      i22.$$StoreEntityTableTableManager(_db, _db.storeEntity);
-  i23.$$TrashedLocalAssetEntityTableTableManager get trashedLocalAssetEntity =>
-      i23.$$TrashedLocalAssetEntityTableTableManager(
+  i18.$$LibraryEntityTableTableManager get libraryEntity =>
+      i18.$$LibraryEntityTableTableManager(_db, _db.libraryEntity);
+  i19.$$SharedSpaceLibraryEntityTableTableManager
+  get sharedSpaceLibraryEntity =>
+      i19.$$SharedSpaceLibraryEntityTableTableManager(
+        _db,
+        _db.sharedSpaceLibraryEntity,
+      );
+  i20.$$MemoryEntityTableTableManager get memoryEntity =>
+      i20.$$MemoryEntityTableTableManager(_db, _db.memoryEntity);
+  i21.$$MemoryAssetEntityTableTableManager get memoryAssetEntity =>
+      i21.$$MemoryAssetEntityTableTableManager(_db, _db.memoryAssetEntity);
+  i22.$$PersonEntityTableTableManager get personEntity =>
+      i22.$$PersonEntityTableTableManager(_db, _db.personEntity);
+  i23.$$AssetFaceEntityTableTableManager get assetFaceEntity =>
+      i23.$$AssetFaceEntityTableTableManager(_db, _db.assetFaceEntity);
+  i24.$$StoreEntityTableTableManager get storeEntity =>
+      i24.$$StoreEntityTableTableManager(_db, _db.storeEntity);
+  i25.$$TrashedLocalAssetEntityTableTableManager get trashedLocalAssetEntity =>
+      i25.$$TrashedLocalAssetEntityTableTableManager(
         _db,
         _db.trashedLocalAssetEntity,
       );
-  i24.$$AssetEditEntityTableTableManager get assetEditEntity =>
-      i24.$$AssetEditEntityTableTableManager(_db, _db.assetEditEntity);
+  i26.$$AssetEditEntityTableTableManager get assetEditEntity =>
+      i26.$$AssetEditEntityTableTableManager(_db, _db.assetEditEntity);
 }

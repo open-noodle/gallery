@@ -8,6 +8,7 @@ import 'package:immich_mobile/infrastructure/entities/asset_edit.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/asset_face.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/auth_user.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/exif.entity.dart';
+import 'package:immich_mobile/infrastructure/entities/library.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/local_album.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/local_album_asset.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/local_asset.entity.dart';
@@ -22,6 +23,7 @@ import 'package:immich_mobile/infrastructure/entities/remote_asset.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/remote_asset_cloud_id.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/shared_space.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/shared_space_asset.entity.dart';
+import 'package:immich_mobile/infrastructure/entities/shared_space_library.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/shared_space_member.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/stack.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/store.entity.dart';
@@ -65,6 +67,8 @@ class IsarDatabaseRepository implements IDatabaseRepository {
     SharedSpaceEntity,
     SharedSpaceMemberEntity,
     SharedSpaceAssetEntity,
+    LibraryEntity,
+    SharedSpaceLibraryEntity,
     MemoryEntity,
     MemoryAssetEntity,
     StackEntity,
@@ -104,7 +108,7 @@ class Drift extends $Drift implements IDatabaseRepository {
   }
 
   @override
-  int get schemaVersion => 23;
+  int get schemaVersion => 24;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -251,6 +255,12 @@ class Drift extends $Drift implements IDatabaseRepository {
             await m.createTable(v23.sharedSpaceAssetEntity);
             await m.createIndex(v23.idxSharedSpaceCreatedById);
             await m.createIndex(v23.idxSharedSpaceAssetSpaceAsset);
+          },
+          from23To24: (m, v24) async {
+            await m.createTable(v24.libraryEntity);
+            await m.createTable(v24.sharedSpaceLibraryEntity);
+            await m.createIndex(v24.idxSharedSpaceLibrarySpaceId);
+            await m.createIndex(v24.idxRemoteAssetLibraryCreated);
           },
         ),
       );

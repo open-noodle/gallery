@@ -1722,3 +1722,7 @@ i0.Index get idxRemoteAssetLocalDateTimeMonth => i0.Index(
   'idx_remote_asset_local_date_time_month',
   'CREATE INDEX IF NOT EXISTS idx_remote_asset_local_date_time_month ON remote_asset_entity (STRFTIME(\'%Y-%m\', local_date_time))',
 );
+i0.Index get idxRemoteAssetLibraryCreated => i0.Index(
+  'idx_remote_asset_library_created',
+  'CREATE INDEX IF NOT EXISTS idx_remote_asset_library_created ON remote_asset_entity (library_id, created_at DESC)',
+);
