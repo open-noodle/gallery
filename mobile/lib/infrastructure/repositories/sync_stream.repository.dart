@@ -678,10 +678,7 @@ class SyncStreamRepository extends DriftDatabaseRepository {
         // becomes `library_id`. The chunks all run inside the same transaction
         // so the entire sweep is still atomic with the libraryEntity deletes.
         for (var offset = 0; offset < libraryIds.length; offset += _kSweepChunkSize) {
-          final chunk = libraryIds.sublist(
-            offset,
-            (offset + _kSweepChunkSize).clamp(0, libraryIds.length),
-          );
+          final chunk = libraryIds.sublist(offset, (offset + _kSweepChunkSize).clamp(0, libraryIds.length));
           final placeholders = chunk.map((_) => '?').join(',');
           await _db.customStatement(
             '''
@@ -707,8 +704,7 @@ class SyncStreamRepository extends DriftDatabaseRepository {
   // LibraryAssetCreate/Backfill use the same SyncAssetV1 payload as the regular
   // asset stream. We delegate to updateAssetsV1 to upsert into remote_asset,
   // which is the source of truth for asset metadata.
-  Future<void> updateLibraryAssetsV1(Iterable<SyncAssetV1> data) =>
-      updateAssetsV1(data, debugLabel: 'library');
+  Future<void> updateLibraryAssetsV1(Iterable<SyncAssetV1> data) => updateAssetsV1(data, debugLabel: 'library');
 
   // Per-asset deletes from the library asset stream. The server has already
   // scoped these to accessibleLibraries (see commit a6141764a) so we can

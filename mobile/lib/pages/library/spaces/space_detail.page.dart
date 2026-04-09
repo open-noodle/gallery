@@ -49,10 +49,7 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
     _isRefreshing = true;
     try {
       final repo = ref.read(sharedSpaceApiRepositoryProvider);
-      final results = await Future.wait([
-        repo.get(widget.spaceId),
-        repo.getMembers(widget.spaceId),
-      ]);
+      final results = await Future.wait([repo.get(widget.spaceId), repo.getMembers(widget.spaceId)]);
 
       if (mounted) {
         setState(() {
@@ -265,9 +262,7 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
     return ProviderScope(
       overrides: [
         timelineServiceProvider.overrideWith((ref) {
-          final timelineService = ref
-              .watch(timelineFactoryProvider)
-              .sharedSpace(spaceId: widget.spaceId);
+          final timelineService = ref.watch(timelineFactoryProvider).sharedSpace(spaceId: widget.spaceId);
           ref.onDispose(timelineService.dispose);
           return timelineService;
         }),
@@ -314,5 +309,4 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
       ),
     );
   }
-
 }

@@ -27,7 +27,7 @@ describe(SyncRequestType.LibraryAssetExifsV1, () => {
     await ctx.newExif({ assetId: asset.id, make: 'TestMake', model: 'TestModel' });
 
     const response = await ctx.syncStream(auth, [SyncRequestType.LibraryAssetExifsV1]);
-    const exifEvents = response.filter(isExifEvent);
+    const exifEvents = response.filter((r) => isExifEvent(r));
     expect(exifEvents).toHaveLength(1);
     expect((exifEvents[0] as { data: { assetId: string; make: string } }).data).toMatchObject({
       assetId: asset.id,
@@ -47,7 +47,7 @@ describe(SyncRequestType.LibraryAssetExifsV1, () => {
     await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id, addedById: owner.id });
 
     const response = await ctx.syncStream(auth, [SyncRequestType.LibraryAssetExifsV1]);
-    const exifEvents = response.filter(isExifEvent);
+    const exifEvents = response.filter((r) => isExifEvent(r));
     expect(exifEvents).toHaveLength(1);
     expect((exifEvents[0] as { data: { assetId: string } }).data.assetId).toBe(asset.id);
   });
@@ -60,7 +60,7 @@ describe(SyncRequestType.LibraryAssetExifsV1, () => {
     await ctx.newExif({ assetId: asset.id, make: 'StrangerMake' });
 
     const response = await ctx.syncStream(auth, [SyncRequestType.LibraryAssetExifsV1]);
-    const exifEvents = response.filter(isExifEvent);
+    const exifEvents = response.filter((r) => isExifEvent(r));
     expect(exifEvents).toHaveLength(0);
   });
 
@@ -80,7 +80,7 @@ describe(SyncRequestType.LibraryAssetExifsV1, () => {
     await ctx.newExif({ assetId: asset.id, make: 'NewMake' });
 
     const next = await ctx.syncStream(auth, [SyncRequestType.LibraryAssetExifsV1]);
-    const exifEvents = next.filter(isExifEvent);
+    const exifEvents = next.filter((r) => isExifEvent(r));
     expect(exifEvents).toHaveLength(1);
     expect((exifEvents[0] as { data: { assetId: string; make: string } }).data).toMatchObject({
       assetId: asset.id,

@@ -43,10 +43,10 @@ describe(SyncRequestType.LibraryAssetsV1, () => {
     await ctx.newSharedSpaceLibrary({ spaceId: spaceB.id, libraryId: library.id, addedById: owner.id });
 
     const response = await ctx.syncStream(auth, [SyncRequestType.LibraryAssetsV1]);
-    const assetEvents = response.filter(isAssetEvent);
+    const assetEvents = response.filter((r) => isAssetEvent(r));
     expect(assetEvents).toHaveLength(3);
-    const ids = assetEvents.map((e: { data: { id: string } }) => e.data.id).sort();
-    expect(ids).toEqual([a1.id, a2.id, a3.id].sort());
+    const ids = assetEvents.map((e: { data: { id: string } }) => e.data.id).toSorted();
+    expect(ids).toEqual([a1.id, a2.id, a3.id].toSorted());
   });
 
   it('emits library assets the user can access via ownership', async () => {
@@ -55,7 +55,7 @@ describe(SyncRequestType.LibraryAssetsV1, () => {
     const { asset } = await ctx.newAsset({ ownerId: auth.user.id, libraryId: library.id });
 
     const response = await ctx.syncStream(auth, [SyncRequestType.LibraryAssetsV1]);
-    const assetEvents = response.filter(isAssetEvent);
+    const assetEvents = response.filter((r) => isAssetEvent(r));
     expect(assetEvents).toHaveLength(1);
     expect((assetEvents[0] as { data: { id: string } }).data.id).toBe(asset.id);
   });
@@ -67,7 +67,7 @@ describe(SyncRequestType.LibraryAssetsV1, () => {
     await ctx.newAsset({ ownerId: stranger.id, libraryId: library.id });
 
     const response = await ctx.syncStream(auth, [SyncRequestType.LibraryAssetsV1]);
-    const assetEvents = response.filter(isAssetEvent);
+    const assetEvents = response.filter((r) => isAssetEvent(r));
     expect(assetEvents).toHaveLength(0);
   });
 
@@ -88,7 +88,7 @@ describe(SyncRequestType.LibraryAssetsV1, () => {
     await defaultDatabase.updateTable('asset').set({ isFavorite: true }).where('id', '=', asset.id).execute();
 
     const next = await ctx.syncStream(auth, [SyncRequestType.LibraryAssetsV1]);
-    const assetEvents = next.filter(isAssetEvent);
+    const assetEvents = next.filter((r) => isAssetEvent(r));
     expect(assetEvents).toHaveLength(1);
     expect((assetEvents[0] as { data: { id: string; isFavorite: boolean } }).data).toMatchObject({
       id: asset.id,

@@ -68,8 +68,8 @@ describe('library sync end-to-end access control', () => {
       (r: { type: string }) =>
         r.type === SyncEntityType.LibraryAssetCreateV1 || r.type === SyncEntityType.LibraryAssetBackfillV1,
     );
-    const assetIds = assetEvents.map((e: { data: { id: string } }) => e.data.id).sort();
-    expect(assetIds).toEqual([a1.id, a2.id, a3.id].sort());
+    const assetIds = assetEvents.map((e: { data: { id: string } }) => e.data.id).toSorted();
+    expect(assetIds).toEqual([a1.id, a2.id, a3.id].toSorted());
 
     // Assertion 3: B does not receive library assets from libraries outside S.
     expect(assetIds).not.toContain(outsideAsset.id);
@@ -79,16 +79,16 @@ describe('library sync end-to-end access control', () => {
       (r: { type: string }) =>
         r.type === SyncEntityType.SharedSpaceLibraryV1 || r.type === SyncEntityType.SharedSpaceLibraryBackfillV1,
     );
-    const linkLibraryIds = linkEvents.map((e: { data: { libraryId: string } }) => e.data.libraryId).sort();
-    expect(linkLibraryIds).toEqual([l1.id, l2.id].sort());
+    const linkLibraryIds = linkEvents.map((e: { data: { libraryId: string } }) => e.data.libraryId).toSorted();
+    expect(linkLibraryIds).toEqual([l1.id, l2.id].toSorted());
 
     // Assertion 5: B receives exif rows for all 3 library assets.
     const exifEvents = initial.filter(
       (r: { type: string }) =>
         r.type === SyncEntityType.LibraryAssetExifCreateV1 || r.type === SyncEntityType.LibraryAssetExifBackfillV1,
     );
-    const exifAssetIds = exifEvents.map((e: { data: { assetId: string } }) => e.data.assetId).sort();
-    expect(exifAssetIds).toEqual([a1.id, a2.id, a3.id].sort());
+    const exifAssetIds = exifEvents.map((e: { data: { assetId: string } }) => e.data.assetId).toSorted();
+    expect(exifAssetIds).toEqual([a1.id, a2.id, a3.id].toSorted());
 
     await ctx.syncAckAll(authB, initial);
     await ctx.assertSyncIsComplete(authB, ALL_LIBRARY_TYPES);
@@ -104,8 +104,8 @@ describe('library sync end-to-end access control', () => {
     const libraryDeletes = afterRemoval.filter(
       (r: { type: string; data: { libraryId?: string } }) => r.type === SyncEntityType.LibraryDeleteV1,
     );
-    const deletedLibraryIds = libraryDeletes.map((e: { data: { libraryId: string } }) => e.data.libraryId).sort();
-    expect(deletedLibraryIds).toEqual([l1.id, l2.id].sort());
+    const deletedLibraryIds = libraryDeletes.map((e: { data: { libraryId: string } }) => e.data.libraryId).toSorted();
+    expect(deletedLibraryIds).toEqual([l1.id, l2.id].toSorted());
 
     await ctx.syncAckAll(authB, afterRemoval);
 
@@ -156,8 +156,8 @@ describe('library sync end-to-end access control', () => {
     );
     const reAddedLinkLibraryIds = reAddedLinkEvents
       .map((e: { data: { libraryId: string } }) => e.data.libraryId)
-      .sort();
-    expect(reAddedLinkLibraryIds).toEqual([l1.id, l2.id].sort());
+      .toSorted();
+    expect(reAddedLinkLibraryIds).toEqual([l1.id, l2.id].toSorted());
 
     // Asset content does NOT reappear — this is the Known Limitation in action.
     const reAddedAssetEvents = afterReadd.filter(

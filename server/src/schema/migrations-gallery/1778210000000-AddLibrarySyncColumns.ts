@@ -16,7 +16,9 @@ export async function up(db: Kysely<any>): Promise<void> {
   // table definition); add createId, updateId, updatedAt + the standard updated_at
   // trigger. There is no after_insert trigger because parent updateId bumping is
   // not required — clients pull the new join row directly via SharedSpaceLibrarySync.
-  await sql`ALTER TABLE "shared_space_library" ADD COLUMN "createId" uuid NOT NULL DEFAULT immich_uuid_v7();`.execute(db);
+  await sql`ALTER TABLE "shared_space_library" ADD COLUMN "createId" uuid NOT NULL DEFAULT immich_uuid_v7();`.execute(
+    db,
+  );
   await sql`ALTER TABLE "shared_space_library" ADD COLUMN "updateId" uuid NOT NULL DEFAULT immich_uuid_v7();`.execute(
     db,
   );

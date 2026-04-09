@@ -10,12 +10,7 @@ const setup = () => {
   return { ctx, db: defaultDatabase };
 };
 
-const callFn = async (
-  db: Kysely<DB>,
-  libraryId: string,
-  userId: string,
-  excludeSpaceId: string,
-): Promise<boolean> => {
+const callFn = async (db: Kysely<DB>, libraryId: string, userId: string, excludeSpaceId: string): Promise<boolean> => {
   const result = await db.executeQuery(
     sql<{
       r: boolean;
@@ -96,11 +91,7 @@ describe('user_has_library_path', () => {
     const { ctx, db } = setup();
     const owner = await ctx.newUser();
     const { library } = await ctx.newLibrary({ ownerId: owner.user.id });
-    await db
-      .updateTable('library')
-      .set({ deletedAt: new Date() })
-      .where('id', '=', library.id)
-      .execute();
+    await db.updateTable('library').set({ deletedAt: new Date() }).where('id', '=', library.id).execute();
 
     const { space: anySpace } = await ctx.newSharedSpace({ createdById: owner.user.id });
 
@@ -116,11 +107,7 @@ describe('user_has_library_path', () => {
     // still resolve to true.
     const owner = await ctx.newUser();
     const { library } = await ctx.newLibrary({ ownerId: owner.user.id });
-    await db
-      .updateTable('library')
-      .set({ deletedAt: new Date() })
-      .where('id', '=', library.id)
-      .execute();
+    await db.updateTable('library').set({ deletedAt: new Date() }).where('id', '=', library.id).execute();
 
     const { space: spaceA } = await ctx.newSharedSpace({ createdById: owner.user.id });
     const { space: spaceB } = await ctx.newSharedSpace({ createdById: owner.user.id });

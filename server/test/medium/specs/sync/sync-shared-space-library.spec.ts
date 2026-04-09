@@ -30,7 +30,7 @@ describe(SyncRequestType.SharedSpaceLibrariesV1, () => {
     await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id, addedById: owner.id });
 
     const response = await ctx.syncStream(auth, [SyncRequestType.SharedSpaceLibrariesV1]);
-    const joinEvents = response.filter(isJoinEvent);
+    const joinEvents = response.filter((r) => isJoinEvent(r));
     expect(joinEvents).toHaveLength(1);
     expect((joinEvents[0] as { data: { spaceId: string; libraryId: string } }).data).toMatchObject({
       spaceId: space.id,
@@ -46,7 +46,7 @@ describe(SyncRequestType.SharedSpaceLibrariesV1, () => {
     await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id, addedById: auth.user.id });
 
     const response = await ctx.syncStream(auth, [SyncRequestType.SharedSpaceLibrariesV1]);
-    const joinEvents = response.filter(isJoinEvent);
+    const joinEvents = response.filter((r) => isJoinEvent(r));
     expect(joinEvents).toHaveLength(1);
     expect((joinEvents[0] as { data: { libraryId: string } }).data.libraryId).toBe(library.id);
   });
@@ -60,7 +60,7 @@ describe(SyncRequestType.SharedSpaceLibrariesV1, () => {
     await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id, addedById: stranger.id });
 
     const response = await ctx.syncStream(auth, [SyncRequestType.SharedSpaceLibrariesV1]);
-    const joinEvents = response.filter(isJoinEvent);
+    const joinEvents = response.filter((r) => isJoinEvent(r));
     expect(joinEvents).toHaveLength(0);
   });
 
