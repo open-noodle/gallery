@@ -210,6 +210,14 @@ export class AssetService extends BaseService {
     await this.requireAccess({ auth, permission: Permission.AssetUpdate, ids });
 
     const assetDto = omitBy({ isFavorite, visibility, duplicateId }, isUndefined);
+
+    // When latitude/longitude are updated in bulk, reverse-geocode once so country/state/city
+    // stay in sync across all selected assets. See updateExif() for the rationale.
+    let geo: { country: string | null; state: string | null; city: string | null } | undefined;
+    if (latitude !== undefined && longitude !== undefined) {
+      geo = await this.mapRepository.reverseGeocode({ latitude, longitude });
+    }
+
     const exifDto = omitBy(
       {
         latitude,
@@ -217,6 +225,7 @@ export class AssetService extends BaseService {
         rating,
         description,
         dateTimeOriginal,
+        ...geo,
       },
       isUndefined,
     );
@@ -574,6 +583,15 @@ export class AssetService extends BaseService {
     rating?: number | null;
   }) {
     const { id, description, dateTimeOriginal, latitude, longitude, rating } = dto;
+
+    // When latitude/longitude are updated manually, reverse-geocode them so country/state/city
+    // stay in sync. Otherwise the asset shows on the map (which only needs lat/lon) but is
+    // missing from location-based filters and search (which scope by country/city).
+    let geo: { country: string | null; state: string | null; city: string | null } | undefined;
+    if (latitude !== undefined && longitude !== undefined) {
+      geo = await this.mapRepository.reverseGeocode({ latitude, longitude });
+    }
+
     const writes = omitBy(
       {
         description,
@@ -582,6 +600,7 @@ export class AssetService extends BaseService {
         latitude,
         longitude,
         rating,
+        ...geo,
       },
       isUndefined,
     );
