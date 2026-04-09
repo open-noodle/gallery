@@ -269,6 +269,8 @@ export function hasSpacePerson<O>(qb: SelectQueryBuilder<DB, 'asset', O>, spaceP
         .selectFrom('shared_space_person_face')
         .innerJoin('asset_face', 'asset_face.id', 'shared_space_person_face.assetFaceId')
         .whereRef('asset_face.assetId', '=', 'asset.id')
+        .where('asset_face.deletedAt', 'is', null)
+        .where('asset_face.isVisible', 'is', true)
         .where('shared_space_person_face.personId', '=', asUuid(spacePersonId)),
     ),
   );
@@ -281,6 +283,8 @@ export function hasAnySpacePerson<O>(qb: SelectQueryBuilder<DB, 'asset', O>, spa
         .selectFrom('shared_space_person_face')
         .innerJoin('asset_face', 'asset_face.id', 'shared_space_person_face.assetFaceId')
         .whereRef('asset_face.assetId', '=', 'asset.id')
+        .where('asset_face.deletedAt', 'is', null)
+        .where('asset_face.isVisible', 'is', true)
         .where('shared_space_person_face.personId', '=', anyUuid(spacePersonIds)),
     ),
   );

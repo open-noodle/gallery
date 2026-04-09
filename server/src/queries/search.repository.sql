@@ -103,6 +103,8 @@ from
           inner join "asset_face" on "asset_face"."id" = "shared_space_person_face"."assetFaceId"
         where
           "asset_face"."assetId" = "asset"."id"
+          and "asset_face"."deletedAt" is null
+          and "asset_face"."isVisible" is true
           and "shared_space_person_face"."personId" = any ($2::uuid[])
       )
       and "asset"."fileCreatedAt" >= $3

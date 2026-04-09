@@ -429,6 +429,25 @@ export class PersonService extends BaseService {
       await this.personRepository.unassignFaces({ sourceType: SourceType.MachineLearning });
       await this.handlePersonCleanup();
       await this.personRepository.vacuum({ reindexVectors: false });
+
+      // Wipe shared-space person state so the new strict clustering algorithm can
+      // rebuild from scratch. Aliases cascade via the FK on personId; named
+      // space-persons are lost by design (Force already clears named native persons).
+      await this.sharedSpaceRepository.deleteAllPersonFaces();
+      await this.sharedSpaceRepository.deleteAllPersons();
+
+      // Queue one SharedSpaceFaceMatchAll per face-recognition-enabled space.
+      // handleRecognizeFaces returns early for faces whose personId is already set
+      // (EXIF/manual-sourced), so the normal per-face SharedSpaceFaceMatch path is
+      // skipped for them. Without this explicit re-queue, those faces would vanish
+      // from every space after Force and never come back.
+      const spaceIds = await this.sharedSpaceRepository.getSpaceIdsWithFaceRecognitionEnabled();
+      await this.jobRepository.queueAll(
+        spaceIds.map((spaceId) => ({
+          name: JobName.SharedSpaceFaceMatchAll as const,
+          data: { spaceId },
+        })),
+      );
     } else if (waiting) {
       this.logger.debug(
         `Skipping facial recognition queueing because ${waiting} job${waiting > 1 ? 's are' : ' is'} already queued`,

@@ -8,6 +8,7 @@ import {
   CacheControl,
   JobName,
   JobStatus,
+  QueueName,
   SourceType,
   SystemMetadataKey,
 } from 'src/enum';
@@ -743,6 +744,9 @@ describe(PersonService.name, () => {
       mocks.person.getAll.mockReturnValue(makeStream());
       mocks.person.getAllFaces.mockReturnValue(makeStream([face]));
       mocks.person.getAllWithoutFaces.mockResolvedValue([]);
+      mocks.sharedSpace.deleteAllPersonFaces.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.deleteAllPersons.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.getSpaceIdsWithFaceRecognitionEnabled.mockResolvedValue([]);
 
       await sut.handleQueueRecognizeFaces({ force: true });
 
@@ -830,6 +834,9 @@ describe(PersonService.name, () => {
       mocks.person.getAllFaces.mockReturnValue(makeStream([face]));
       mocks.person.getAllWithoutFaces.mockResolvedValue([person]);
       mocks.person.unassignFaces.mockResolvedValue();
+      mocks.sharedSpace.deleteAllPersonFaces.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.deleteAllPersons.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.getSpaceIdsWithFaceRecognitionEnabled.mockResolvedValue([]);
 
       await sut.handleQueueRecognizeFaces({ force: true });
 
@@ -847,6 +854,77 @@ describe(PersonService.name, () => {
         data: { files: [person.thumbnailPath] },
       });
       expect(mocks.person.vacuum).toHaveBeenCalledWith({ reindexVectors: false });
+    });
+
+    describe('force wipes space state', () => {
+      it('should wipe shared_space_person tables and queue SharedSpaceFaceMatchAll per space when force=true', async () => {
+        const face = AssetFaceFactory.from().person().build();
+        mocks.job.getJobCounts.mockResolvedValue({
+          active: 1,
+          waiting: 0,
+          paused: 0,
+          completed: 0,
+          failed: 0,
+          delayed: 0,
+        });
+        mocks.person.getAll.mockReturnValue(makeStream([face.person!]));
+        mocks.person.getAllFaces.mockReturnValue(makeStream([face]));
+        mocks.person.getAllWithoutFaces.mockResolvedValue([]);
+        mocks.person.unassignFaces.mockResolvedValue();
+        mocks.sharedSpace.deleteAllPersonFaces.mockResolvedValue(void 0 as any);
+        mocks.sharedSpace.deleteAllPersons.mockResolvedValue(void 0 as any);
+        mocks.sharedSpace.getSpaceIdsWithFaceRecognitionEnabled.mockResolvedValue(['space-a', 'space-b']);
+
+        await sut.handleQueueRecognizeFaces({ force: true });
+
+        expect(mocks.sharedSpace.deleteAllPersonFaces).toHaveBeenCalledOnce();
+        expect(mocks.sharedSpace.deleteAllPersons).toHaveBeenCalledOnce();
+        expect(mocks.sharedSpace.getSpaceIdsWithFaceRecognitionEnabled).toHaveBeenCalledOnce();
+        expect(mocks.job.queueAll).toHaveBeenCalledWith([
+          { name: JobName.SharedSpaceFaceMatchAll, data: { spaceId: 'space-a' } },
+          { name: JobName.SharedSpaceFaceMatchAll, data: { spaceId: 'space-b' } },
+        ]);
+      });
+
+      it('should not wipe space state when force=false', async () => {
+        const face = AssetFaceFactory.create();
+        mocks.job.getJobCounts.mockResolvedValue({
+          active: 1,
+          waiting: 0,
+          paused: 0,
+          completed: 0,
+          failed: 0,
+          delayed: 0,
+        });
+        mocks.person.getAllFaces.mockReturnValue(makeStream([face]));
+        mocks.person.getAllWithoutFaces.mockResolvedValue([]);
+
+        await sut.handleQueueRecognizeFaces({ force: false });
+
+        expect(mocks.sharedSpace.deleteAllPersonFaces).not.toHaveBeenCalled();
+        expect(mocks.sharedSpace.deleteAllPersons).not.toHaveBeenCalled();
+        expect(mocks.sharedSpace.getSpaceIdsWithFaceRecognitionEnabled).not.toHaveBeenCalled();
+      });
+
+      it('should not drain the FacialRecognition queue (deadlock guard)', async () => {
+        const face = AssetFaceFactory.create();
+        mocks.job.getJobCounts.mockResolvedValue({
+          active: 1,
+          waiting: 0,
+          paused: 0,
+          completed: 0,
+          failed: 0,
+          delayed: 0,
+        });
+        mocks.person.getAllFaces.mockReturnValue(makeStream([face]));
+        mocks.person.getAllWithoutFaces.mockResolvedValue([]);
+
+        await sut.handleQueueRecognizeFaces({ force: false });
+
+        for (const call of mocks.job.waitForQueueCompletion.mock.calls) {
+          expect(call).not.toContain(QueueName.FacialRecognition);
+        }
+      });
     });
   });
 
