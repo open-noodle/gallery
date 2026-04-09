@@ -156,6 +156,38 @@ export class DuplicateService extends BaseService {
       }
     }
 
+    // Sync shared space membership: add the keeper(s) to any space the group's
+    // assets were in, provided the auth user has Editor+ role there. Placed
+    // before any other mutation so partial-failure blast radius is minimal —
+    // if addAssets throws, nothing else has been written yet.
+    //
+    // Caveat: if addAssets succeeds but queueAll throws, the keeper is in the
+    // space but no SharedSpaceFaceMatch jobs were queued. The outer try/catch
+    // reports the group as failed, so the user retries — addAssets is
+    // idempotent and queueAll runs again. Self-healing on retry.
+    if (idsToKeep.length > 0) {
+      const editableSpaceIds = await this.sharedSpaceRepository.getEditableByAssetIds(auth.user.id, groupAssetIds);
+
+      if (editableSpaceIds.size > 0) {
+        const spaceIds = [...editableSpaceIds];
+        await this.sharedSpaceRepository.addAssets(
+          spaceIds.flatMap((spaceId) => idsToKeep.map((assetId) => ({ spaceId, assetId, addedById: auth.user.id }))),
+        );
+
+        // Queue face match jobs unconditionally — handleSharedSpaceFaceMatch
+        // short-circuits when space.faceRecognitionEnabled is false, so a
+        // wasted queue entry is cheaper than a pre-filter query.
+        await this.jobRepository.queueAll(
+          spaceIds.flatMap((spaceId) =>
+            idsToKeep.map((assetId) => ({
+              name: JobName.SharedSpaceFaceMatch,
+              data: { spaceId, assetId },
+            })),
+          ),
+        );
+      }
+    }
+
     const assetAlbumMap = await this.albumRepository.getByAssetIds(auth.user.id, [...groupAssetIds]);
 
     const { assetUpdate, exifUpdate, mergedAlbumIds, mergedTagIds, mergedTagValues } = this.getSyncMergeResult(
