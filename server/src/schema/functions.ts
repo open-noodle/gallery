@@ -414,6 +414,36 @@ export const user_has_library_path = registerFunction({
 `,
 });
 
+export const shared_space_delete_library_audit = registerFunction({
+  name: 'shared_space_delete_library_audit',
+  returnType: 'TRIGGER',
+  language: 'PLPGSQL',
+  body: `
+    BEGIN
+      -- BEFORE DELETE row-level trigger so shared_space_library and
+      -- shared_space_member rows for this space are still visible. The companion
+      -- shared_space_library_delete_audit and shared_space_member_delete_library_audit
+      -- AFTER triggers skip on cascade (their EXISTS shared_space guards fail), so
+      -- this BEFORE-row trigger is the single source of truth for library_audit
+      -- emission on whole-space deletion.
+      INSERT INTO library_audit ("libraryId", "userId")
+      SELECT DISTINCT "libraryId", "userId" FROM (
+        SELECT ssl."libraryId", ssm."userId"
+        FROM shared_space_library ssl
+        INNER JOIN shared_space_member ssm ON ssm."spaceId" = ssl."spaceId"
+        WHERE ssl."spaceId" = OLD."id"
+          AND NOT user_has_library_path(ssl."libraryId", ssm."userId", OLD."id")
+        UNION
+        SELECT ssl."libraryId", OLD."createdById"
+        FROM shared_space_library ssl
+        WHERE ssl."spaceId" = OLD."id"
+          AND NOT user_has_library_path(ssl."libraryId", OLD."createdById", OLD."id")
+      ) AS targets;
+
+      RETURN OLD;
+    END`,
+});
+
 export const shared_space_library_delete_audit = registerFunction({
   name: 'shared_space_library_delete_audit',
   returnType: 'TRIGGER',
@@ -425,13 +455,17 @@ export const shared_space_library_delete_audit = registerFunction({
       SELECT "spaceId", "libraryId" FROM "old";
 
       -- 2. Fan out library_audit per affected member only if no other path remains.
+      --    Skips during shared_space cascade (EXISTS guard fails); the BEFORE-row
+      --    shared_space_delete_library_audit trigger handles that case.
       INSERT INTO library_audit ("libraryId", "userId")
       SELECT o."libraryId", ssm."userId"
       FROM "old" o
       INNER JOIN shared_space_member ssm ON ssm."spaceId" = o."spaceId"
-      WHERE NOT user_has_library_path(o."libraryId", ssm."userId", o."spaceId");
+      WHERE EXISTS (SELECT 1 FROM shared_space ss WHERE ss.id = o."spaceId")
+        AND NOT user_has_library_path(o."libraryId", ssm."userId", o."spaceId");
 
-      -- 3. Creator of the unlinked space (not necessarily in shared_space_member).
+      -- 3. Creator of the unlinked space. INNER JOIN shared_space naturally skips
+      --    during shared_space cascade because the parent row is gone.
       INSERT INTO library_audit ("libraryId", "userId")
       SELECT o."libraryId", ss."createdById"
       FROM "old" o
@@ -448,11 +482,14 @@ export const shared_space_member_delete_library_audit = registerFunction({
   language: 'PLPGSQL',
   body: `
     BEGIN
+      -- Skips during shared_space cascade (EXISTS guard fails); the BEFORE-row
+      -- shared_space_delete_library_audit trigger handles that case.
       INSERT INTO library_audit ("libraryId", "userId")
       SELECT ssl."libraryId", o."userId"
       FROM "old" o
       INNER JOIN shared_space_library ssl ON ssl."spaceId" = o."spaceId"
-      WHERE NOT user_has_library_path(ssl."libraryId", o."userId", o."spaceId");
+      WHERE EXISTS (SELECT 1 FROM shared_space ss WHERE ss.id = o."spaceId")
+        AND NOT user_has_library_path(ssl."libraryId", o."userId", o."spaceId");
 
       RETURN NULL;
     END`,
