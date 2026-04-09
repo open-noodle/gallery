@@ -157,9 +157,9 @@ The default configuration looks like this:
     "urls": ["http://immich-machine-learning:3003"]
   },
   "map": {
-    "darkStyle": "https://tiles.immich.cloud/v1/style/dark.json",
+    "darkStyle": "https://tiles.openfreemap.org/styles/dark",
     "enabled": true,
-    "lightStyle": "https://tiles.immich.cloud/v1/style/light.json"
+    "lightStyle": "https://tiles.openfreemap.org/styles/positron"
   },
   "metadata": {
     "faces": {

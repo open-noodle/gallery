@@ -17,8 +17,8 @@ dynamic upgradeDto(dynamic value, String targetType) {
       break;
     case 'ServerConfigDto':
       if (value is Map) {
-        addDefault(value, 'mapLightStyleUrl', 'https://tiles.immich.cloud/v1/style/light.json');
-        addDefault(value, 'mapDarkStyleUrl', 'https://tiles.immich.cloud/v1/style/dark.json');
+        addDefault(value, 'mapLightStyleUrl', 'https://tiles.openfreemap.org/styles/positron');
+        addDefault(value, 'mapDarkStyleUrl', 'https://tiles.openfreemap.org/styles/dark');
       }
     case 'UserResponseDto':
       if (value is Map) {

@@ -168,8 +168,8 @@ describe(ServerService.name, () => {
         isOnboarded: false,
         externalDomain: '',
         publicUsers: true,
-        mapDarkStyleUrl: 'https://tiles.immich.cloud/v1/style/dark.json',
-        mapLightStyleUrl: 'https://tiles.immich.cloud/v1/style/light.json',
+        mapDarkStyleUrl: 'https://tiles.openfreemap.org/styles/dark',
+        mapLightStyleUrl: 'https://tiles.openfreemap.org/styles/positron',
         maintenanceMode: false,
       });
       expect(mocks.systemMetadata.get).toHaveBeenCalled();
