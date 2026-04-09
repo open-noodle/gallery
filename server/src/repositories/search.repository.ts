@@ -996,7 +996,6 @@ export class SearchRepository {
       .select(['person.id', 'person.name'])
       .where('person.name', '!=', '')
       .where('person.isHidden', '=', false)
-      .where('person.thumbnailPath', '!=', '')
       .where((eb) =>
         eb.exists(
           eb
