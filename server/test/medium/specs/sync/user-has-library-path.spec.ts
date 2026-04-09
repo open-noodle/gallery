@@ -108,4 +108,28 @@ describe('user_has_library_path', () => {
 
     expect(result).toBe(false);
   });
+
+  it('returns true when soft-deleted owner falls back to a member path', async () => {
+    const { ctx, db } = setup();
+    // The owner branch returns false (deletedAt set), but the member branch picks
+    // up another linked space the user is in. The function's three-branch OR must
+    // still resolve to true.
+    const owner = await ctx.newUser();
+    const { library } = await ctx.newLibrary({ ownerId: owner.user.id });
+    await db
+      .updateTable('library')
+      .set({ deletedAt: new Date() })
+      .where('id', '=', library.id)
+      .execute();
+
+    const { space: spaceA } = await ctx.newSharedSpace({ createdById: owner.user.id });
+    const { space: spaceB } = await ctx.newSharedSpace({ createdById: owner.user.id });
+    await ctx.newSharedSpaceLibrary({ spaceId: spaceA.id, libraryId: library.id });
+    await ctx.newSharedSpaceLibrary({ spaceId: spaceB.id, libraryId: library.id });
+    await ctx.newSharedSpaceMember({ spaceId: spaceB.id, userId: owner.user.id });
+
+    const result = await callFn(db, library.id, owner.user.id, spaceA.id);
+
+    expect(result).toBe(true);
+  });
 });
