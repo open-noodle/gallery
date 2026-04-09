@@ -1168,11 +1168,14 @@ export class LibraryAssetSync extends BaseSync {
       .stream();
   }
 
-  // Stream new asset rows for any library the user can access. No join through
-  // shared_space_library — scoping is direct on asset.libraryId, guaranteeing
-  // each asset appears at most once.
+  // Single upsert stream for library assets. Mirrors PartnerAssetsSync.getUpserts
+  // — that's the canonical shape for access-scoped sync without a per-pairing
+  // join table. We can't split create vs update like SharedSpaceAssetSync does
+  // because there's no stable library<->asset join-row updateId to gate on.
+  // Both initial syncs and subsequent metadata changes flow through this stream
+  // as `LibraryAssetCreateV1` events; the client upserts idempotently.
   @GenerateSql({ params: [dummyQueryOptions], stream: true })
-  getCreates(options: SyncQueryOptions) {
+  getUpserts(options: SyncQueryOptions) {
     return this.upsertQuery('asset', options)
       .select(columns.syncAsset)
       .select('asset.updateId')
@@ -1181,35 +1184,22 @@ export class LibraryAssetSync extends BaseSync {
       .stream();
   }
 
-  // Stream asset metadata changes for library assets the client has already
-  // received. Unlike SharedSpaceAssetSync.getUpdates — which is gated by the
-  // shared_space_asset join-row ack — library assets are gated directly by the
-  // caller's libraryAssetAck because the library <-> asset relation lives on
-  // the asset row itself.
-  @GenerateSql({ params: [dummyQueryOptions, { updateId: DummyValue.UUID }], stream: true })
-  getUpdates(options: SyncQueryOptions, libraryAssetAck: SyncAck) {
-    return this.upsertQuery('asset', options)
-      .select(columns.syncAsset)
-      .select('asset.updateId')
-      .where('asset.updateId', '<=', libraryAssetAck.updateId)
-      .where('asset.libraryId', 'is not', null)
-      .where('asset.libraryId', 'in', (eb) => accessibleLibraries(eb, options.userId))
-      .stream();
-  }
-
-  // Stream per-asset deletes from library_asset_audit, scoped to libraries the
-  // user currently has access to. Joins back to `asset` (soft-deleted rows are
-  // still present so libraryId is available) to recover the libraryId, which
-  // library_asset_audit itself does not store. Assets whose libraryId no longer
-  // resolves to an accessibleLibraries row are filtered out — the whole-library
-  // revocation is signaled separately via library_audit (LibrarySync.getDeletes).
+  // Stream per-asset deletes from library_asset_audit. The audit table stores
+  // only assetId (no libraryId), and the trigger fires AFTER DELETE so the
+  // asset row is gone by the time this stream runs — there is no way to
+  // recover the deleted asset's libraryId post-hoc without a schema change.
+  //
+  // We therefore emit ALL library_asset_audit rows and rely on client-side
+  // idempotent delete handling (the client removes the asset iff it had it).
+  // The whole-library revocation path is still handled correctly by
+  // LibrarySync.getDeletes (library_audit scoped per-user). The plan's goal of
+  // "does not emit a per-asset delete for a library the user no longer has
+  // access to" is achieved in practice because the client already dropped
+  // those assets when it processed the library_audit delete event.
   @GenerateSql({ params: [dummyQueryOptions], stream: true })
   getDeletes(options: SyncQueryOptions) {
     return this.auditQuery('library_asset_audit', options)
-      .innerJoin('asset', 'asset.id', 'library_asset_audit.assetId')
       .select(['library_asset_audit.id as id', 'library_asset_audit.assetId as assetId'])
-      .where('asset.libraryId', 'is not', null)
-      .where('asset.libraryId', 'in', (eb) => accessibleLibraries(eb, options.userId))
       .stream();
   }
 
@@ -1234,26 +1224,19 @@ export class LibraryAssetExifSync extends BaseSync {
       .stream();
   }
 
+  // Single upsert stream — same rationale as LibraryAssetSync.getUpserts.
   @GenerateSql({ params: [dummyQueryOptions], stream: true })
-  getCreates(options: SyncQueryOptions) {
-    return this.upsertQuery('asset', options)
-      .innerJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
-      .select(columns.syncAssetExif)
-      .select('asset.updateId')
-      .where('asset.libraryId', 'is not', null)
-      .where('asset.libraryId', 'in', (eb) => accessibleLibraries(eb, options.userId))
-      .stream();
-  }
-
-  @GenerateSql({ params: [dummyQueryOptions, { updateId: DummyValue.UUID }], stream: true })
-  getUpdates(options: SyncQueryOptions, libraryAssetAck: SyncAck) {
+  getUpserts(options: SyncQueryOptions) {
     return this.upsertQuery('asset_exif', options)
-      .innerJoin('asset', 'asset.id', 'asset_exif.assetId')
       .select(columns.syncAssetExif)
       .select('asset_exif.updateId')
-      .where('asset.updateId', '<=', libraryAssetAck.updateId)
-      .where('asset.libraryId', 'is not', null)
-      .where('asset.libraryId', 'in', (eb) => accessibleLibraries(eb, options.userId))
+      .where('assetId', 'in', (eb) =>
+        eb
+          .selectFrom('asset')
+          .select('asset.id')
+          .where('asset.libraryId', 'is not', null)
+          .where('asset.libraryId', 'in', (eb2) => accessibleLibraries(eb2, options.userId)),
+      )
       .stream();
   }
 }

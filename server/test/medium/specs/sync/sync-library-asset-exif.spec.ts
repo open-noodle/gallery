@@ -66,7 +66,10 @@ describe(SyncRequestType.LibraryAssetExifsV1, () => {
     expect(exifEvents).toHaveLength(0);
   });
 
-  it('emits an updated exif row on the update path when properties change', async () => {
+  it('re-emits an exif row when properties change', async () => {
+    // LibraryAssetExifSync uses a single getUpserts stream (same pattern as
+    // PartnerAssetExifsSync) — updates flow through as LibraryAssetExifCreateV1
+    // and the client upserts idempotently.
     const { auth, ctx } = await setup();
     const { library } = await ctx.newLibrary({ ownerId: auth.user.id });
     const { asset } = await ctx.newAsset({ ownerId: auth.user.id, libraryId: library.id });
@@ -79,9 +82,9 @@ describe(SyncRequestType.LibraryAssetExifsV1, () => {
     await ctx.newExif({ assetId: asset.id, make: 'NewMake' });
 
     const next = await ctx.syncStream(auth, [SyncRequestType.LibraryAssetExifsV1]);
-    const updateEvents = next.filter((r: { type: string }) => r.type === SyncEntityType.LibraryAssetExifUpdateV1);
-    expect(updateEvents).toHaveLength(1);
-    expect((updateEvents[0] as { data: { assetId: string; make: string } }).data).toMatchObject({
+    const exifEvents = next.filter(isExifEvent);
+    expect(exifEvents).toHaveLength(1);
+    expect((exifEvents[0] as { data: { assetId: string; make: string } }).data).toMatchObject({
       assetId: asset.id,
       make: 'NewMake',
     });

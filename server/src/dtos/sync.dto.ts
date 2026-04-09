@@ -562,6 +562,51 @@ export class SyncSharedSpaceMemberV1 {
   showInTimeline!: boolean;
 }
 
+// Library sync DTOs — minimal shape to support typed `send()` calls in
+// sync.service.ts. Task 29 will polish ApiProperty metadata + regenerate
+// OpenAPI; the runtime types below are what Task 27 needs to compile.
+@ExtraModel()
+export class SyncLibraryV1 {
+  @ApiProperty({ description: 'Library ID' })
+  id!: string;
+  @ApiProperty({ description: 'Library name' })
+  name!: string;
+  @ApiProperty({ description: 'Owner user ID' })
+  ownerId!: string;
+  @ApiProperty({ description: 'Created at' })
+  createdAt!: Date;
+  @ApiProperty({ description: 'Updated at' })
+  updatedAt!: Date;
+}
+
+@ExtraModel()
+export class SyncLibraryDeleteV1 {
+  @ApiProperty({ description: 'Library ID' })
+  libraryId!: string;
+}
+
+@ExtraModel()
+export class SyncSharedSpaceLibraryV1 {
+  @ApiProperty({ description: 'Shared space ID' })
+  spaceId!: string;
+  @ApiProperty({ description: 'Library ID' })
+  libraryId!: string;
+  @ApiProperty({ description: 'User who added the library to the space', nullable: true })
+  addedById!: string | null;
+  @ApiProperty({ description: 'Created at' })
+  createdAt!: Date;
+  @ApiProperty({ description: 'Updated at' })
+  updatedAt!: Date;
+}
+
+@ExtraModel()
+export class SyncSharedSpaceLibraryDeleteV1 {
+  @ApiProperty({ description: 'Shared space ID' })
+  spaceId!: string;
+  @ApiProperty({ description: 'Library ID' })
+  libraryId!: string;
+}
+
 export type SyncItem = {
   [SyncEntityType.AuthUserV1]: SyncAuthUserV1;
   [SyncEntityType.UserV1]: SyncUserV1;
@@ -628,6 +673,18 @@ export type SyncItem = {
   [SyncEntityType.SharedSpaceToAssetV1]: SyncSharedSpaceToAssetV1;
   [SyncEntityType.SharedSpaceToAssetBackfillV1]: SyncSharedSpaceToAssetV1;
   [SyncEntityType.SharedSpaceToAssetDeleteV1]: SyncSharedSpaceToAssetDeleteV1;
+  // Library sync — wired in Task 27 (DTOs added alongside the dispatch change).
+  [SyncEntityType.LibraryV1]: SyncLibraryV1;
+  [SyncEntityType.LibraryDeleteV1]: SyncLibraryDeleteV1;
+  [SyncEntityType.LibraryAssetCreateV1]: SyncAssetV1;
+  [SyncEntityType.LibraryAssetUpdateV1]: SyncAssetV1;
+  [SyncEntityType.LibraryAssetBackfillV1]: SyncAssetV1;
+  [SyncEntityType.LibraryAssetExifCreateV1]: SyncAssetExifV1;
+  [SyncEntityType.LibraryAssetExifUpdateV1]: SyncAssetExifV1;
+  [SyncEntityType.LibraryAssetExifBackfillV1]: SyncAssetExifV1;
+  [SyncEntityType.SharedSpaceLibraryV1]: SyncSharedSpaceLibraryV1;
+  [SyncEntityType.SharedSpaceLibraryBackfillV1]: SyncSharedSpaceLibraryV1;
+  [SyncEntityType.SharedSpaceLibraryDeleteV1]: SyncSharedSpaceLibraryDeleteV1;
 };
 
 export class SyncStreamDto {

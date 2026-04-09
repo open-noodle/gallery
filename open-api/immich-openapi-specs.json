@@ -27533,6 +27533,52 @@
         ],
         "type": "string"
       },
+      "SyncLibraryDeleteV1": {
+        "properties": {
+          "libraryId": {
+            "description": "Library ID",
+            "type": "string"
+          }
+        },
+        "required": [
+          "libraryId"
+        ],
+        "type": "object"
+      },
+      "SyncLibraryV1": {
+        "properties": {
+          "createdAt": {
+            "description": "Created at",
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "description": "Library ID",
+            "type": "string"
+          },
+          "name": {
+            "description": "Library name",
+            "type": "string"
+          },
+          "ownerId": {
+            "description": "Owner user ID",
+            "type": "string"
+          },
+          "updatedAt": {
+            "description": "Updated at",
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "createdAt",
+          "id",
+          "name",
+          "ownerId",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
       "SyncMemoryAssetDeleteV1": {
         "properties": {
           "assetId": {
@@ -27825,6 +27871,58 @@
         },
         "required": [
           "spaceId"
+        ],
+        "type": "object"
+      },
+      "SyncSharedSpaceLibraryDeleteV1": {
+        "properties": {
+          "libraryId": {
+            "description": "Library ID",
+            "type": "string"
+          },
+          "spaceId": {
+            "description": "Shared space ID",
+            "type": "string"
+          }
+        },
+        "required": [
+          "libraryId",
+          "spaceId"
+        ],
+        "type": "object"
+      },
+      "SyncSharedSpaceLibraryV1": {
+        "properties": {
+          "addedById": {
+            "description": "User who added the library to the space",
+            "nullable": true,
+            "type": "string"
+          },
+          "createdAt": {
+            "description": "Created at",
+            "format": "date-time",
+            "type": "string"
+          },
+          "libraryId": {
+            "description": "Library ID",
+            "type": "string"
+          },
+          "spaceId": {
+            "description": "Shared space ID",
+            "type": "string"
+          },
+          "updatedAt": {
+            "description": "Updated at",
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "addedById",
+          "createdAt",
+          "libraryId",
+          "spaceId",
+          "updatedAt"
         ],
         "type": "object"
       },
