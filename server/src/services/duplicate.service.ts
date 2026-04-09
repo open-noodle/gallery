@@ -169,9 +169,7 @@ export class DuplicateService extends BaseService {
       if (editableSpaceIds.size > 0) {
         const spaceIds = [...editableSpaceIds];
         await this.sharedSpaceRepository.addAssets(
-          spaceIds.flatMap((spaceId) =>
-            idsToKeep.map((assetId) => ({ spaceId, assetId, addedById: auth.user.id })),
-          ),
+          spaceIds.flatMap((spaceId) => idsToKeep.map((assetId) => ({ spaceId, assetId, addedById: auth.user.id }))),
         );
 
         // Queue face match jobs unconditionally — handleSharedSpaceFaceMatch
