@@ -318,6 +318,31 @@ class SyncStreamService {
         return _syncStreamRepository.updateSharedSpaceToAssetsV1(data.cast());
       case SyncEntityType.sharedSpaceToAssetDeleteV1:
         return _syncStreamRepository.deleteSharedSpaceToAssetsV1(data.cast());
+      // --- gallery-fork: library sync dispatch ---
+      case SyncEntityType.libraryV1:
+        return _syncStreamRepository.updateLibrariesV1(data.cast());
+      case SyncEntityType.libraryDeleteV1:
+        // Read the current user id at dispatch time so the repository stays
+        // free of a Store dependency — see comment on deleteLibrariesV1.
+        final currentUserId = Store.tryGet(StoreKey.currentUser)?.id;
+        if (currentUserId == null) {
+          _logger.warning('LibraryDeleteV1 received without a current user id — skipping sweep');
+          return;
+        }
+        return _syncStreamRepository.deleteLibrariesV1(data.cast(), currentUserId: currentUserId);
+      case SyncEntityType.libraryAssetCreateV1:
+      case SyncEntityType.libraryAssetBackfillV1:
+        return _syncStreamRepository.updateLibraryAssetsV1(data.cast());
+      case SyncEntityType.libraryAssetDeleteV1:
+        return _syncStreamRepository.deleteLibraryAssetsV1(data.cast());
+      case SyncEntityType.libraryAssetExifCreateV1:
+      case SyncEntityType.libraryAssetExifBackfillV1:
+        return _syncStreamRepository.updateLibraryAssetExifsV1(data.cast());
+      case SyncEntityType.sharedSpaceLibraryV1:
+      case SyncEntityType.sharedSpaceLibraryBackfillV1:
+        return _syncStreamRepository.updateSharedSpaceLibrariesV1(data.cast());
+      case SyncEntityType.sharedSpaceLibraryDeleteV1:
+        return _syncStreamRepository.deleteSharedSpaceLibrariesV1(data.cast());
       // Forward-compat: any new SyncEntityType added on the server but not yet
       // wired here lands in this default arm. Must NOT throw — the sync stream
       // should continue processing subsequent events of known types. The plan's
