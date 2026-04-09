@@ -1,7 +1,11 @@
 <script lang="ts">
+  import { goto } from '$app/navigation';
+  import { page } from '$app/state';
   import ActionMenuItem from '$lib/components/ActionMenuItem.svelte';
   import ActiveFiltersBar from '$lib/components/filter-panel/active-filters-bar.svelte';
   import FilterPanel from '$lib/components/filter-panel/filter-panel.svelte';
+  import SearchSortDropdown from '$lib/components/filter-panel/search-sort-dropdown.svelte';
+  import SmartSearchResults from '$lib/components/search/smart-search-results.svelte';
   import {
     buildFilterContext,
     clearFilters,
@@ -11,6 +15,7 @@
     type FilterState,
   } from '$lib/components/filter-panel/filter-panel';
   import UserPageLayout from '$lib/components/layouts/UserPageLayout.svelte';
+  import SearchBar from '$lib/elements/SearchBar.svelte';
   import ButtonContextMenu from '$lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
   import EmptyPlaceholder from '$lib/components/shared-components/EmptyPlaceholder.svelte';
   import ArchiveAction from '$lib/components/timeline/actions/ArchiveAction.svelte';
@@ -37,7 +42,6 @@
   import { TimelineManager } from '$lib/managers/timeline-manager/timeline-manager.svelte';
   import { Route } from '$lib/route';
   import { getAssetBulkActions } from '$lib/services/asset.service';
-  import { preferences } from '$lib/stores/user.store';
   import { createUrl, getAssetMediaUrl, memoryLaneTitle } from '$lib/utils';
   import {
     updateStackedAssetInTimeline,
@@ -53,6 +57,7 @@
   import { ActionButton, CommandPaletteDefaultProvider, ImageCarousel } from '@immich/ui';
   import { mdiDotsVertical } from '@mdi/js';
   import { DateTime } from 'luxon';
+  import { untrack } from 'svelte';
   import { t } from 'svelte-i18n';
   import { SvelteMap } from 'svelte/reactivity';
 
@@ -60,6 +65,15 @@
 
   // Filter state
   let filters = $state(createFilterState());
+  // searchQuery is the live SearchBar input value — it updates on every keystroke so the
+  // input reflects what the user is typing. committedQuery is the "applied" query and only
+  // updates on explicit submit (Enter), on clearSearch, or from URL state changes. We key
+  // showSearchResults off committedQuery so typing characters doesn't unmount the Timeline
+  // until the user explicitly submits. This mirrors the spaces page UX.
+  let searchQuery = $state(page.url.searchParams.get('q') ?? '');
+  let committedQuery = $state(searchQuery);
+  let isLoading = $state(false);
+  const showSearchResults = $derived(committedQuery.trim().length > 0);
   const options = $derived(buildPhotosTimelineOptions(filters));
   let personNames = new SvelteMap<string, string>();
   let tagNames = new SvelteMap<string, string>();
@@ -126,7 +140,7 @@
     },
   };
 
-  const hasActiveFilters = $derived(getActiveFilterCount(filters) > 0);
+  const hasActiveFilters = $derived(getActiveFilterCount(filters) > 0 || showSearchResults);
   const totalAssetCount = $derived(timelineManager?.assetCount ?? 0);
   const isTimelineEmpty = $derived(timelineManager?.isInitialized && totalAssetCount === 0 && !hasActiveFilters);
 
@@ -167,6 +181,36 @@
     assetMultiSelectManager.clear();
   };
 
+  function handleSearchSubmit() {
+    const trimmed = searchQuery.trim();
+    if (!trimmed) {
+      return;
+    }
+    filters = { ...filters, sortOrder: 'relevance' };
+    committedQuery = trimmed;
+    const url = new URL('/photos', globalThis.location.origin);
+    url.searchParams.set('q', trimmed);
+    void goto(url.pathname + url.search, { keepFocus: true, noScroll: true });
+  }
+
+  function clearSearch() {
+    searchQuery = '';
+    committedQuery = '';
+    isLoading = false;
+    filters = { ...filters, sortOrder: 'desc' };
+    void goto('/photos', { replaceState: true, keepFocus: true, noScroll: true });
+  }
+
+  $effect(() => {
+    const q = page.url.searchParams.get('q') ?? '';
+    untrack(() => {
+      if (q !== committedQuery) {
+        committedQuery = q;
+        searchQuery = q;
+      }
+    });
+  });
+
   const items = $derived(
     memoryManager.memories.map((memory) => ({
       id: memory.id,
@@ -181,6 +225,32 @@
 </script>
 
 <UserPageLayout hideNavbar={assetMultiSelectManager.selectionActive} scrollbar={false}>
+  {#snippet buttons()}
+    <div class="flex items-center gap-1">
+      <div class="hidden h-10 sm:block sm:w-40 xl:w-60">
+        <SearchBar
+          placeholder={$t('search')}
+          bind:name={searchQuery}
+          showLoadingSpinner={isLoading}
+          onSearch={({ force }) => {
+            if (force) {
+              handleSearchSubmit();
+            }
+          }}
+          onReset={clearSearch}
+        />
+      </div>
+      {#if showSearchResults}
+        <SearchSortDropdown
+          sortOrder={filters.sortOrder}
+          onSelect={(mode) => {
+            filters = { ...filters, sortOrder: mode };
+          }}
+        />
+      {/if}
+    </div>
+  {/snippet}
+
   <div class="ml-4 flex h-full">
     <FilterPanel
       bind:filters
@@ -192,11 +262,13 @@
       storageKey="gallery-filter-visible-sections-photos"
       hidden={isTimelineEmpty}
     />
-    <div class="flex-1 overflow-hidden pl-4">
+    <div class="flex flex-1 flex-col overflow-hidden pl-4">
       {#if hasActiveFilters}
         <ActiveFiltersBar
           {filters}
-          resultCount={totalAssetCount}
+          searchQuery={committedQuery}
+          onClearSearch={clearSearch}
+          resultCount={showSearchResults ? undefined : totalAssetCount}
           {personNames}
           {tagNames}
           onRemoveFilter={(type, id) => {
@@ -207,26 +279,36 @@
           }}
         />
       {/if}
-      <Timeline
-        enableRouting={true}
-        bind:timelineManager
-        {options}
-        assetInteraction={assetMultiSelectManager}
-        removeAction={AssetAction.ARCHIVE}
-        onEscape={handleEscape}
-        withStacked
-      >
-        {#if authManager.preferences.memories.enabled && !hasActiveFilters}
-          <ImageCarousel {items} />
-        {/if}
-        {#snippet empty()}
-          <EmptyPlaceholder
-            text={$t('no_assets_message')}
-            onClick={() => openFileUploadDialog()}
-            class="mx-auto mt-10"
-          />
-        {/snippet}
-      </Timeline>
+      {#if showSearchResults}
+        <SmartSearchResults
+          bind:isLoading
+          searchQuery={committedQuery}
+          {filters}
+          isShared={false}
+          withSharedSpaces={true}
+        />
+      {:else}
+        <Timeline
+          enableRouting={true}
+          bind:timelineManager
+          {options}
+          assetInteraction={assetMultiSelectManager}
+          removeAction={AssetAction.ARCHIVE}
+          onEscape={handleEscape}
+          withStacked
+        >
+          {#if authManager.preferences.memories.enabled && !hasActiveFilters}
+            <ImageCarousel {items} />
+          {/if}
+          {#snippet empty()}
+            <EmptyPlaceholder
+              text={$t('no_assets_message')}
+              onClick={() => openFileUploadDialog()}
+              class="mx-auto mt-10"
+            />
+          {/snippet}
+        </Timeline>
+      {/if}
     </div>
   </div>
 </UserPageLayout>
