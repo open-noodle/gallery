@@ -10,7 +10,7 @@
         "blob:",
         "https://pay.futo.org",
         "https://static.immich.cloud",
-        "https://tiles.immich.cloud"
+        "https://tiles.openfreemap.org"
       ],
       "worker-src": ["'self'", "blob:"],
       "frame-src": ["'none'"],
