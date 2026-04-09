@@ -188,7 +188,7 @@ const updatedConfig = Object.freeze<SystemConfig>({
     extractEmbedded: false,
   },
   newVersionCheck: {
-    enabled: true,
+    enabled: false,
   },
   trash: {
     enabled: true,
