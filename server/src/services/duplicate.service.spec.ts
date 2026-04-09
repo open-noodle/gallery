@@ -377,6 +377,7 @@ describe(DuplicateService.name, () => {
       const spaceX = 'space-x-id';
       const spaceY = 'space-y-id';
 
+      // eslint-disable-next-line unicorn/consistent-function-scoping -- test helper, kept local to this describe
       const setupBaseDuplicate = (asset1: any, asset2: any) => {
         mocks.access.duplicate.checkOwnerAccess.mockResolvedValue(new Set(['group-1']));
         mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset2.id]));
@@ -425,7 +426,8 @@ describe(DuplicateService.name, () => {
         expect(result[0].success).toBe(true);
         expect(mocks.sharedSpace.addAssets).not.toHaveBeenCalled();
         const faceMatchCalls = mocks.job.queueAll.mock.calls
-          .flat(2)
+          .flat()
+          .flat()
           .filter((j: any) => j?.name === JobName.SharedSpaceFaceMatch);
         expect(faceMatchCalls).toHaveLength(0);
       });
@@ -456,7 +458,8 @@ describe(DuplicateService.name, () => {
         );
 
         const queuedFaceJobs = mocks.job.queueAll.mock.calls
-          .flat(2)
+          .flat()
+          .flat()
           .filter((j: any) => j?.name === JobName.SharedSpaceFaceMatch);
         expect(queuedFaceJobs).toHaveLength(2);
       });
