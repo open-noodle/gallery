@@ -71,6 +71,27 @@ fi
 
 # Check that hardcoded upstream URLs are patched in user-facing frontend
 echo "--- Checking URL replacements ---"
+
+# Files where ALL `github.com/immich-app/immich` references must be patched away
+url_check_files=(
+  "web/src/lib/components/shared-components/side-bar/server-status.svelte"
+  "web/src/lib/modals/VersionAnnouncementModal.svelte"
+  "web/src/lib/components/layouts/ErrorLayout.svelte"
+  "web/static/.well-known/security.txt"
+)
+
+for file in "${url_check_files[@]}"; do
+  filepath="$REPO_ROOT/$file"
+  if [[ -f "$filepath" ]]; then
+    if grep -q "github\.com/immich-app/immich" "$filepath"; then
+      echo "  WARN: Upstream GitHub URL still present in $file"
+      EXIT_CODE=1
+    else
+      echo "  OK: $file"
+    fi
+  fi
+done
+
 help_modal="$REPO_ROOT/web/src/lib/modals/HelpAndFeedbackModal.svelte"
 if [[ -f "$help_modal" ]]; then
   # Extract content outside BRANDING:UPSTREAM markers
