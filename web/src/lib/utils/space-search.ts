@@ -3,12 +3,29 @@ import { AssetOrder, AssetTypeEnum, type SmartSearchDto } from '@immich/sdk';
 
 export const SEARCH_FILTER_DEBOUNCE_MS = 250;
 
-export function buildSmartSearchParams(query: string, spaceId: string, filters: FilterState): SmartSearchDto {
-  const params: SmartSearchDto = { query, spaceId };
+export function buildSmartSearchParams(args: {
+  query: string;
+  filters: FilterState;
+  spaceId?: string;
+  withSharedSpaces?: boolean;
+}): SmartSearchDto {
+  const { query, filters, spaceId, withSharedSpaces } = args;
+  const params: SmartSearchDto = { query };
 
-  if (filters.personIds.length > 0) {
-    params.spacePersonIds = filters.personIds;
+  if (spaceId) {
+    params.spaceId = spaceId;
+    if (filters.personIds.length > 0) {
+      params.spacePersonIds = filters.personIds;
+    }
+  } else {
+    if (filters.personIds.length > 0) {
+      params.personIds = filters.personIds;
+    }
+    if (withSharedSpaces) {
+      params.withSharedSpaces = true;
+    }
   }
+
   if (filters.city) {
     params.city = filters.city;
   }
