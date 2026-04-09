@@ -414,3 +414,52 @@ jobs:
           fi
 
           gh release create "$VERSION" --title "$VERSION" --latest -n "$notes"
+
+  publish-version-endpoint:
+    name: Publish Version Endpoint
+    if: needs.version.outputs.skip != 'true'
+    needs: [version, tag]
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          role-to-assume: arn:aws:iam::660432264815:role/noodle-prod-gallery-release-version-upload
+          aws-region: eu-west-1
+
+      - name: Build and upload version.json
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          # Validate version format (keep v prefix for wire-format parity with upstream Immich)
+          if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Invalid version tag: $VERSION"
+            exit 1
+          fi
+
+          # Fetch published_at from the GitHub Release created by the tag job.
+          # Retry briefly in case of transient GH API issues immediately after release create.
+          published_at=""
+          for attempt in 1 2 3; do
+            published_at=$(gh release view "$VERSION" --repo "$REPO" --json publishedAt --jq .publishedAt 2>/dev/null || true)
+            if [[ -n "$published_at" && "$published_at" != "null" ]]; then
+              break
+            fi
+            echo "Attempt ${attempt}: could not read publishedAt, retrying in 5s..."
+            sleep 5
+          done
+          if [[ -z "$published_at" || "$published_at" == "null" ]]; then
+            echo "::error::Could not read publishedAt for release $VERSION after 3 attempts"
+            exit 1
+          fi
+
+          printf '{"version":"%s","published_at":"%s"}' "$VERSION" "$published_at" > /tmp/gallery
+
+          aws s3 cp /tmp/gallery s3://noodle-prod-version/gallery \
+            --content-type "application/json; charset=utf-8" \
+            --cache-control "public, max-age=300"
