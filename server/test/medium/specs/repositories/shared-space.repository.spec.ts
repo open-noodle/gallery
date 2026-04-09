@@ -1,9 +1,11 @@
 import { Kysely } from 'kysely';
+import { AssetVisibility } from 'src/enum';
 import { LoggingRepository } from 'src/repositories/logging.repository';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
 import { DB } from 'src/schema';
 import { BaseService } from 'src/services/base.service';
 import { newMediumService } from 'test/medium.factory';
+import { newEmbedding } from 'test/small.factory';
 import { getKyselyDB } from 'test/utils';
 
 let defaultDatabase: Kysely<DB>;
@@ -726,6 +728,104 @@ describe(SharedSpaceRepository.name, () => {
       expect(activities[0].userId).toBeNull();
       expect(activities[0].name).toBeNull();
       expect(activities[0].email).toBeNull();
+    });
+  });
+
+  describe('getAssetFacesForMatching', () => {
+    it('should exclude faces with isVisible = false', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      const { assetFace: visibleFace } = await ctx.newAssetFace({ assetId: asset.id, isVisible: true });
+      const { assetFace: invisibleFace } = await ctx.newAssetFace({ assetId: asset.id, isVisible: false });
+
+      // getAssetFacesForMatching inner-joins face_search, so both faces need
+      // face_search rows or they will be excluded independently of the isVisible
+      // filter. Seed them directly.
+      await ctx.database
+        .insertInto('face_search')
+        .values([
+          { faceId: visibleFace.id, embedding: newEmbedding() },
+          { faceId: invisibleFace.id, embedding: newEmbedding() },
+        ])
+        .execute();
+
+      const result = await sut.getAssetFacesForMatching(asset.id);
+
+      expect(result.map((f) => f.id)).toEqual([visibleFace.id]);
+    });
+  });
+
+  describe('recountPersons with filters', () => {
+    it('should exclude trashed, archived, invisible, and deleted-face rows from counts', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: user.id });
+      const spacePerson = await sut.createPerson({
+        spaceId: space.id,
+        name: 'Test',
+        representativeFaceId: null,
+        type: 'person',
+      });
+
+      // Visible, timeline, not trashed — should count
+      const { asset: assetA } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+      const { assetFace: faceA } = await ctx.newAssetFace({ assetId: assetA.id, isVisible: true });
+      // Trashed asset — should NOT count
+      const { asset: assetB } = await ctx.newAsset({ ownerId: user.id, deletedAt: new Date() });
+      const { assetFace: faceB } = await ctx.newAssetFace({ assetId: assetB.id, isVisible: true });
+      // Archived asset — should NOT count
+      const { asset: assetC } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Archive });
+      const { assetFace: faceC } = await ctx.newAssetFace({ assetId: assetC.id, isVisible: true });
+      // Invisible face — should NOT count
+      const { asset: assetD } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+      const { assetFace: faceD } = await ctx.newAssetFace({ assetId: assetD.id, isVisible: false });
+
+      await sut.addPersonFaces(
+        [faceA, faceB, faceC, faceD].map((f) => ({ personId: spacePerson.id, assetFaceId: f.id })),
+        { skipRecount: true },
+      );
+
+      await sut.recountPersons([spacePerson.id]);
+
+      const after = await sut.getPersonById(spacePerson.id);
+      expect(after?.assetCount).toBe(1);
+      expect(after?.faceCount).toBe(1);
+    });
+  });
+
+  describe('removePersonFacesByLibrary', () => {
+    it('should delete space-person mappings for all assets in the given library and recount', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { library } = await ctx.newLibrary({ ownerId: user.id });
+      const { space } = await ctx.newSharedSpace({ createdById: user.id });
+
+      // 2 assets in the target library and 1 in a different library (no libraryId)
+      const { asset: libAsset1 } = await ctx.newAsset({ ownerId: user.id, libraryId: library.id });
+      const { asset: libAsset2 } = await ctx.newAsset({ ownerId: user.id, libraryId: library.id });
+      const { asset: otherAsset } = await ctx.newAsset({ ownerId: user.id });
+      const { assetFace: f1 } = await ctx.newAssetFace({ assetId: libAsset1.id });
+      const { assetFace: f2 } = await ctx.newAssetFace({ assetId: libAsset2.id });
+      const { assetFace: f3 } = await ctx.newAssetFace({ assetId: otherAsset.id });
+
+      const spacePerson = await sut.createPerson({
+        spaceId: space.id,
+        name: '',
+        representativeFaceId: null,
+        type: 'person',
+      });
+      await sut.addPersonFaces(
+        [f1, f2, f3].map((f) => ({ personId: spacePerson.id, assetFaceId: f.id })),
+        { skipRecount: false },
+      );
+
+      await sut.removePersonFacesByLibrary(space.id, library.id);
+
+      const remaining = await sut.getPersonAssetIds(spacePerson.id);
+      expect(remaining.map((r) => r.assetId).toSorted()).toEqual([otherAsset.id]);
+      const after = await sut.getPersonById(spacePerson.id);
+      expect(after?.assetCount).toBe(1);
     });
   });
 });
