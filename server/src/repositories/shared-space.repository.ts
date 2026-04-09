@@ -136,6 +136,16 @@ export class SharedSpaceRepository {
       .execute();
   }
 
+  @GenerateSql({ params: [] })
+  async getSpaceIdsWithFaceRecognitionEnabled(): Promise<string[]> {
+    const rows = await this.db
+      .selectFrom('shared_space')
+      .select('id')
+      .where('faceRecognitionEnabled', '=', true)
+      .execute();
+    return rows.map((r) => r.id);
+  }
+
   @GenerateSql({ params: [DummyValue.UUID] })
   async getAssetCount(spaceId: string): Promise<number> {
     const result = await this.db
@@ -665,6 +675,38 @@ export class SharedSpaceRepository {
     }
   }
 
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
+  async removePersonFacesByLibrary(spaceId: string, libraryId: string) {
+    const assetFaceSubquery = this.db
+      .selectFrom('asset_face')
+      .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+      .select('asset_face.id')
+      .where('asset.libraryId', '=', libraryId);
+
+    const spacePersonSubquery = this.db
+      .selectFrom('shared_space_person')
+      .select('shared_space_person.id')
+      .where('shared_space_person.spaceId', '=', spaceId);
+
+    const affectedPersonIds = await this.db
+      .selectFrom('shared_space_person_face')
+      .select('personId')
+      .distinct()
+      .where('assetFaceId', 'in', assetFaceSubquery)
+      .where('personId', 'in', spacePersonSubquery)
+      .execute();
+
+    await this.db
+      .deleteFrom('shared_space_person_face')
+      .where('assetFaceId', 'in', assetFaceSubquery)
+      .where('personId', 'in', spacePersonSubquery)
+      .execute();
+
+    if (affectedPersonIds.length > 0) {
+      await this.recountPersons(affectedPersonIds.map((r) => r.personId));
+    }
+  }
+
   @GenerateSql({ params: [DummyValue.UUID] })
   async deleteOrphanedPersons(spaceId: string) {
     await this.db
@@ -682,6 +724,16 @@ export class SharedSpaceRepository {
       .execute();
   }
 
+  @GenerateSql({ params: [] })
+  async deleteAllPersonFaces() {
+    await this.db.deleteFrom('shared_space_person_face').execute();
+  }
+
+  @GenerateSql({ params: [] })
+  async deleteAllPersons() {
+    await this.db.deleteFrom('shared_space_person').execute();
+  }
+
   @GenerateSql({ params: [[DummyValue.UUID]] })
   async recountPersons(personIds: string[]) {
     if (personIds.length === 0) {
@@ -693,11 +745,22 @@ export class SharedSpaceRepository {
       .set((eb) => ({
         faceCount: eb
           .selectFrom('shared_space_person_face')
+          .innerJoin('asset_face', 'asset_face.id', 'shared_space_person_face.assetFaceId')
+          .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+          .where('asset_face.deletedAt', 'is', null)
+          .where('asset_face.isVisible', 'is', true)
+          .where('asset.deletedAt', 'is', null)
+          .where('asset.visibility', '=', sql.lit(AssetVisibility.Timeline))
           .select((eb2) => eb2.fn.countAll().$castTo<number>().as('count'))
           .whereRef('shared_space_person_face.personId', '=', 'shared_space_person.id'),
         assetCount: eb
           .selectFrom('shared_space_person_face')
           .innerJoin('asset_face', 'asset_face.id', 'shared_space_person_face.assetFaceId')
+          .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+          .where('asset_face.deletedAt', 'is', null)
+          .where('asset_face.isVisible', 'is', true)
+          .where('asset.deletedAt', 'is', null)
+          .where('asset.visibility', '=', sql.lit(AssetVisibility.Timeline))
           .select((eb2) =>
             eb2.fn
               .count(eb2.fn('distinct', ['asset_face.assetId']))
@@ -839,6 +902,7 @@ export class SharedSpaceRepository {
       .select(['asset_face.id', 'asset_face.assetId', 'asset_face.personId', 'face_search.embedding'])
       .where('asset_face.assetId', '=', assetId)
       .where('asset_face.deletedAt', 'is', null)
+      .where('asset_face.isVisible', 'is', true)
       .execute();
   }
 

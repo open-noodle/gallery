@@ -97,6 +97,14 @@ where
   "userId" = $1
   and "showInTimeline" = $2
 
+-- SharedSpaceRepository.getSpaceIdsWithFaceRecognitionEnabled
+select
+  "id"
+from
+  "shared_space"
+where
+  "faceRecognitionEnabled" = $1
+
 -- SharedSpaceRepository.getAssetCount
 select
   count(*) as "count"
@@ -500,6 +508,49 @@ where
       "shared_space_person"."spaceId" = $2
   )
 
+-- SharedSpaceRepository.removePersonFacesByLibrary
+select distinct
+  "personId"
+from
+  "shared_space_person_face"
+where
+  "assetFaceId" in (
+    select
+      "asset_face"."id"
+    from
+      "asset_face"
+      inner join "asset" on "asset"."id" = "asset_face"."assetId"
+    where
+      "asset"."libraryId" = $1
+  )
+  and "personId" in (
+    select
+      "shared_space_person"."id"
+    from
+      "shared_space_person"
+    where
+      "shared_space_person"."spaceId" = $2
+  )
+delete from "shared_space_person_face"
+where
+  "assetFaceId" in (
+    select
+      "asset_face"."id"
+    from
+      "asset_face"
+      inner join "asset" on "asset"."id" = "asset_face"."assetId"
+    where
+      "asset"."libraryId" = $1
+  )
+  and "personId" in (
+    select
+      "shared_space_person"."id"
+    from
+      "shared_space_person"
+    where
+      "shared_space_person"."spaceId" = $2
+  )
+
 -- SharedSpaceRepository.deleteOrphanedPersons
 delete from "shared_space_person"
 where
@@ -521,6 +572,12 @@ where
       "shared_space_person_face"
   )
 
+-- SharedSpaceRepository.deleteAllPersonFaces
+delete from "shared_space_person_face"
+
+-- SharedSpaceRepository.deleteAllPersons
+delete from "shared_space_person"
+
 -- SharedSpaceRepository.recountPersons
 update "shared_space_person"
 set
@@ -529,8 +586,14 @@ set
       count(*) as "count"
     from
       "shared_space_person_face"
+      inner join "asset_face" on "asset_face"."id" = "shared_space_person_face"."assetFaceId"
+      inner join "asset" on "asset"."id" = "asset_face"."assetId"
     where
-      "shared_space_person_face"."personId" = "shared_space_person"."id"
+      "asset_face"."deletedAt" is null
+      and "asset_face"."isVisible" is true
+      and "asset"."deletedAt" is null
+      and "asset"."visibility" = 'timeline'
+      and "shared_space_person_face"."personId" = "shared_space_person"."id"
   ),
   "assetCount" = (
     select
@@ -538,8 +601,13 @@ set
     from
       "shared_space_person_face"
       inner join "asset_face" on "asset_face"."id" = "shared_space_person_face"."assetFaceId"
+      inner join "asset" on "asset"."id" = "asset_face"."assetId"
     where
-      "shared_space_person_face"."personId" = "shared_space_person"."id"
+      "asset_face"."deletedAt" is null
+      and "asset_face"."isVisible" is true
+      and "asset"."deletedAt" is null
+      and "asset"."visibility" = 'timeline'
+      and "shared_space_person_face"."personId" = "shared_space_person"."id"
   )
 where
   "id" in ($1)
@@ -635,6 +703,7 @@ from
 where
   "asset_face"."assetId" = $1
   and "asset_face"."deletedAt" is null
+  and "asset_face"."isVisible" is true
 
 -- SharedSpaceRepository.isAssetInSpace
 select
