@@ -231,7 +231,7 @@ export class AssetService extends BaseService {
         rating,
         description,
         dateTimeOriginal,
-        ...(geo ?? {}),
+        ...geo,
       },
       _.isUndefined,
     );
@@ -602,7 +602,7 @@ export class AssetService extends BaseService {
         latitude,
         longitude,
         rating,
-        ...(geo ?? {}),
+        ...geo,
       },
       _.isUndefined,
     );
