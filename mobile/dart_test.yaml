@@ -1,3 +1,4 @@
 # Used to filter out tags from test runs
 tags:
   widget:
+  scale:
