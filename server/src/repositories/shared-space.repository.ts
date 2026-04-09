@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { Insertable, Kysely, NotNull, sql, Updateable } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
-import { ChunkedArray, DummyValue, GenerateSql } from 'src/decorators';
-import { AssetType, AssetVisibility, VectorIndex } from 'src/enum';
+import { ChunkedArray, ChunkedSet, DummyValue, GenerateSql } from 'src/decorators';
+import { AssetType, AssetVisibility, SharedSpaceRole, VectorIndex } from 'src/enum';
 import { probes } from 'src/repositories/database.repository';
 import type { AssetSearchBuilderOptions } from 'src/repositories/search.repository';
 import { DB } from 'src/schema';
@@ -202,6 +202,40 @@ export class SharedSpaceRepository {
       .onConflict((oc) => oc.doNothing())
       .returningAll()
       .execute();
+  }
+
+  /**
+   * Returns the set of space IDs that contain ANY of the given asset IDs
+   * via direct membership (`shared_space_asset`) AND in which the user has
+   * Owner or Editor role.
+   *
+   * Library-linked content (`shared_space_library`) is deliberately excluded
+   * — only direct per-asset membership counts. See dedup-space-sync design
+   * doc for rationale.
+   *
+   * Returns `Set<string>` (not `Map<assetId, spaceIds[]>` as
+   * `albumRepository.getByAssetIds` does) because the dedup sync caller
+   * applies every matched space to every keeper, so the per-asset grouping
+   * is unused.
+   */
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID_SET] })
+  @ChunkedSet({ paramIndex: 1 })
+  async getEditableByAssetIds(userId: string, assetIds: Set<string>): Promise<Set<string>> {
+    if (assetIds.size === 0) {
+      return new Set();
+    }
+
+    const rows = await this.db
+      .selectFrom('shared_space_asset')
+      .innerJoin('shared_space_member', 'shared_space_member.spaceId', 'shared_space_asset.spaceId')
+      .select('shared_space_asset.spaceId')
+      .where('shared_space_asset.assetId', 'in', [...assetIds])
+      .where('shared_space_member.userId', '=', userId)
+      .where('shared_space_member.role', 'in', [SharedSpaceRole.Owner, SharedSpaceRole.Editor])
+      .distinct()
+      .execute();
+
+    return new Set(rows.map((row) => row.spaceId));
   }
 
   @GenerateSql({ params: [DummyValue.UUID, [DummyValue.UUID]] })
