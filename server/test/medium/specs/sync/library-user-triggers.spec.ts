@@ -149,5 +149,58 @@ describe('library_user triggers', () => {
         expect(after.updateId).not.toBe(beforeById.get(after.id));
       }
     });
+
+    it('is a no-op when the space has zero linked libraries', async () => {
+      const { ctx, db } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: newMember } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: newMember.id });
+
+      const rows = await db.selectFrom('library_user').selectAll().where('userId', '=', newMember.id).execute();
+      expect(rows).toHaveLength(0);
+    });
+
+    it('ON CONFLICT DO NOTHING preserves an existing owner library_user row', async () => {
+      const { ctx, db } = setup();
+      const { user } = await ctx.newUser();
+      const { library } = await ctx.newLibrary({ ownerId: user.id });
+
+      // Owner already has a row from library_after_insert with library.createId.
+      const ownerRowBefore = await db
+        .selectFrom('library_user')
+        .select(['createId'])
+        .where('userId', '=', user.id)
+        .where('libraryId', '=', library.id)
+        .executeTakeFirstOrThrow();
+      expect(ownerRowBefore.createId).toBe(library.createId);
+
+      // Link the library to a space and add a new member. The trigger's
+      // INSERT...ON CONFLICT won't touch the owner's existing row, but it
+      // will grant access to peer.
+      const { space } = await ctx.newSharedSpace({ createdById: user.id });
+      await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id });
+      const { user: peer } = await ctx.newUser();
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: peer.id });
+
+      // Owner's row is unchanged.
+      const ownerRowAfter = await db
+        .selectFrom('library_user')
+        .select(['createId'])
+        .where('userId', '=', user.id)
+        .where('libraryId', '=', library.id)
+        .executeTakeFirstOrThrow();
+      expect(ownerRowAfter.createId).toBe(library.createId);
+
+      // Peer got a row with a fresh createId.
+      const peerRow = await db
+        .selectFrom('library_user')
+        .select(['createId'])
+        .where('userId', '=', peer.id)
+        .where('libraryId', '=', library.id)
+        .executeTakeFirstOrThrow();
+      expect(peerRow.createId).not.toBe(library.createId);
+    });
   });
 });
