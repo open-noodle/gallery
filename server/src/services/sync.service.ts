@@ -96,13 +96,19 @@ export const SYNC_TYPES_ORDER = [
   SyncRequestType.SharedSpaceAssetsV1,
   SyncRequestType.SharedSpaceToAssetsV1,
   SyncRequestType.SharedSpaceAssetExifsV1,
-  // Libraries — wired in Task 27. Order: library metadata before its assets, exifs after assets,
-  // shared_space_library link rows last so the client can backfill libraries newly accessible via
-  // a space in the same sync pass.
+  // Libraries — wired in Task 27. Order: library metadata first, then the
+  // shared_space_library link rows (small, tens of rows at most), THEN the
+  // bulky library asset rows. The link rows must precede the asset rows so
+  // that mobile's space-detail Drift query — which joins shared_space_library
+  // with remote_asset on library_id — can emit incremental buckets as the
+  // 5000-row library asset batches arrive. Putting the link rows last makes
+  // the JOIN return zero buckets until the very end of the sync pass, so on
+  // a 40k-asset library the space view looks empty for ~60 s. See mobile
+  // space-slowness investigation.
   SyncRequestType.LibrariesV1,
+  SyncRequestType.SharedSpaceLibrariesV1,
   SyncRequestType.LibraryAssetsV1,
   SyncRequestType.LibraryAssetExifsV1,
-  SyncRequestType.SharedSpaceLibrariesV1,
 ];
 
 const throwSessionRequired = () => {
