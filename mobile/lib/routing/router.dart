@@ -330,6 +330,7 @@ class AppRouter extends RootStackRouter {
     AutoRoute(page: DriftPartnerDetailRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: DriftRecentlyTakenRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: DriftLocalAlbumsRoute.page, guards: [_authGuard, _duplicateGuard]),
+    AutoRoute(page: DriftAlbumsRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: DriftCreateAlbumRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: DriftPlaceRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: DriftPlaceDetailRoute.page, guards: [_authGuard, _duplicateGuard]),
