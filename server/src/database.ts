@@ -45,6 +45,7 @@ export type Library = {
   ownerId: string;
   createdAt: Date;
   updatedAt: Date;
+  createId: string;
   updateId: string;
   name: string;
   importPaths: string[];
@@ -301,6 +302,10 @@ export type SharedSpaceMember = {
   joinedAt: Date;
   showInTimeline: boolean;
   lastViewedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+  createId: string;
+  updateId: string;
 };
 
 export type SharedSpaceAsset = {
@@ -308,6 +313,10 @@ export type SharedSpaceAsset = {
   assetId: string;
   addedById: string | null;
   addedAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
+  createId: string;
+  updateId: string;
 };
 
 export type SharedSpaceActivity = {
@@ -353,6 +362,9 @@ export type SharedSpaceLibrary = {
   libraryId: string;
   addedById: string | null;
   createdAt: Date;
+  updatedAt: Date;
+  createId: string;
+  updateId: string;
 };
 
 export type UserGroup = {
