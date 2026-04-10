@@ -24,9 +24,51 @@ export async function up(db: Kysely<any>): Promise<void> {
   // user's slice and walk sorted. PK (userId, libraryId) doesn't serve this
   // query because it's ordered on the wrong column.
   await sql`CREATE INDEX "library_user_userId_createId_idx" ON "library_user" ("userId", "createId");`.execute(db);
+
+  // --- Create-side triggers ---
+
+  // library_after_insert: populate library_user for the library owner at
+  // library creation. Explicitly propagates library.createId/createdAt rather
+  // than letting the defaults mint fresh values, so existing clients' sync
+  // checkpoints (already past library.createId) don't retrigger a completed
+  // backfill for freshly-created owned libraries.
+  await sql`CREATE OR REPLACE FUNCTION library_after_insert()
+  RETURNS TRIGGER
+  LANGUAGE PLPGSQL
+  AS $$
+    BEGIN
+      INSERT INTO library_user ("userId", "libraryId", "createId", "createdAt")
+      SELECT "ownerId", "id", "createId", "createdAt"
+      FROM inserted_rows
+      WHERE "ownerId" IS NOT NULL AND "deletedAt" IS NULL
+      ON CONFLICT DO NOTHING;
+      RETURN NULL;
+    END
+  $$;`.execute(db);
+
+  await sql`CREATE OR REPLACE TRIGGER "library_after_insert"
+  AFTER INSERT ON "library"
+  REFERENCING NEW TABLE AS "inserted_rows"
+  FOR EACH STATEMENT
+  EXECUTE FUNCTION library_after_insert();`.execute(db);
+
+  // migration_overrides entries so sql-tools' schema diff recognizes these
+  // objects. Pattern lifted from 1778200000000-LibraryAuditTables.ts.
+  await sql`INSERT INTO "migration_overrides" ("name", "value") VALUES ('function_library_after_insert', '{"type":"function","name":"library_after_insert","sql":"CREATE OR REPLACE FUNCTION library_after_insert()\\n  RETURNS TRIGGER\\n  LANGUAGE PLPGSQL\\n  AS $$\\n    BEGIN\\n      INSERT INTO library_user (\\"userId\\", \\"libraryId\\", \\"createId\\", \\"createdAt\\")\\n      SELECT \\"ownerId\\", \\"id\\", \\"createId\\", \\"createdAt\\"\\n      FROM inserted_rows\\n      WHERE \\"ownerId\\" IS NOT NULL AND \\"deletedAt\\" IS NULL\\n      ON CONFLICT DO NOTHING;\\n      RETURN NULL;\\n    END\\n  $$;"}'::jsonb);`.execute(
+    db,
+  );
+  await sql`INSERT INTO "migration_overrides" ("name", "value") VALUES ('trigger_library_after_insert', '{"type":"trigger","name":"library_after_insert","sql":"CREATE OR REPLACE TRIGGER \\"library_after_insert\\"\\n  AFTER INSERT ON \\"library\\"\\n  REFERENCING NEW TABLE AS \\"inserted_rows\\"\\n  FOR EACH STATEMENT\\n  EXECUTE FUNCTION library_after_insert();"}'::jsonb);`.execute(
+    db,
+  );
 }
 
 export async function down(db: Kysely<any>): Promise<void> {
+  await sql`DELETE FROM "migration_overrides" WHERE "name" IN (
+    'function_library_after_insert',
+    'trigger_library_after_insert'
+  )`.execute(db);
+  await sql`DROP TRIGGER IF EXISTS "library_after_insert" ON "library";`.execute(db);
+  await sql`DROP FUNCTION IF EXISTS library_after_insert();`.execute(db);
   await sql`DROP INDEX IF EXISTS "library_user_userId_createId_idx";`.execute(db);
   await sql`DROP TABLE IF EXISTS "library_user";`.execute(db);
 }
