@@ -295,25 +295,41 @@ class DriftTimelineRepository extends DriftDatabaseRepository {
     // Assets belong to a space if they are either:
     //   1. directly added via shared_space_asset, OR
     //   2. owned by a library that is linked via shared_space_library.
-    // We express this as `id IN (...) OR library_id IN (...)`, which natively
-    // deduplicates assets that match both branches (no DISTINCT needed).
-    Expression<bool> spaceMembership() =>
-        _db.remoteAssetEntity.id.isInQuery(
-          _db.sharedSpaceAssetEntity.selectOnly()
-            ..addColumns([_db.sharedSpaceAssetEntity.assetId])
-            ..where(_db.sharedSpaceAssetEntity.spaceId.equals(spaceId)),
-        ) |
-        _db.remoteAssetEntity.libraryId.isInQuery(
-          _db.sharedSpaceLibraryEntity.selectOnly()
-            ..addColumns([_db.sharedSpaceLibraryEntity.libraryId])
-            ..where(_db.sharedSpaceLibraryEntity.spaceId.equals(spaceId)),
-        );
+    //
+    // We LEFT JOIN both association tables and require at least one match in
+    // the WHERE clause. The join structure matters for reactivity: Drift's
+    // `.watch()` only subscribes to tables referenced via a real FROM/JOIN in
+    // the query builder — tables reached via `.isInQuery()` subqueries are
+    // invisible to the reactive layer, so a previous `IN (...) OR IN (...)`
+    // formulation produced a stale stream that never re-emitted when photos
+    // were added/removed or a library link changed. See
+    // timeline_repository_test.dart for the regression covering both cases.
+    //
+    // An asset matching both branches is counted once because we COUNT
+    // DISTINCT remote_asset.id.
 
     if (groupBy == GroupAssetsBy.none) {
-      final countExp = _db.remoteAssetEntity.id.count();
+      final countExp = _db.remoteAssetEntity.id.count(distinct: true);
       final countQuery = _db.remoteAssetEntity.selectOnly()
         ..addColumns([countExp])
-        ..where(_db.remoteAssetEntity.deletedAt.isNull() & spaceMembership());
+        ..join([
+          leftOuterJoin(
+            _db.sharedSpaceAssetEntity,
+            _db.sharedSpaceAssetEntity.assetId.equalsExp(_db.remoteAssetEntity.id) &
+                _db.sharedSpaceAssetEntity.spaceId.equals(spaceId),
+            useColumns: false,
+          ),
+          leftOuterJoin(
+            _db.sharedSpaceLibraryEntity,
+            _db.sharedSpaceLibraryEntity.libraryId.equalsExp(_db.remoteAssetEntity.libraryId) &
+                _db.sharedSpaceLibraryEntity.spaceId.equals(spaceId),
+            useColumns: false,
+          ),
+        ])
+        ..where(
+          _db.remoteAssetEntity.deletedAt.isNull() &
+              (_db.sharedSpaceAssetEntity.assetId.isNotNull() | _db.sharedSpaceLibraryEntity.libraryId.isNotNull()),
+        );
       return countQuery
           .map((row) => row.read(countExp) ?? 0)
           .watchSingle()
@@ -321,12 +337,29 @@ class DriftTimelineRepository extends DriftDatabaseRepository {
           .handleError((error) => const <Bucket>[]);
     }
 
-    final assetCountExp = _db.remoteAssetEntity.id.count();
+    final assetCountExp = _db.remoteAssetEntity.id.count(distinct: true);
     final dateExp = _db.remoteAssetEntity.effectiveCreatedAt(groupBy);
 
     final query = _db.remoteAssetEntity.selectOnly()
       ..addColumns([assetCountExp, dateExp])
-      ..where(_db.remoteAssetEntity.deletedAt.isNull() & spaceMembership())
+      ..join([
+        leftOuterJoin(
+          _db.sharedSpaceAssetEntity,
+          _db.sharedSpaceAssetEntity.assetId.equalsExp(_db.remoteAssetEntity.id) &
+              _db.sharedSpaceAssetEntity.spaceId.equals(spaceId),
+          useColumns: false,
+        ),
+        leftOuterJoin(
+          _db.sharedSpaceLibraryEntity,
+          _db.sharedSpaceLibraryEntity.libraryId.equalsExp(_db.remoteAssetEntity.libraryId) &
+              _db.sharedSpaceLibraryEntity.spaceId.equals(spaceId),
+          useColumns: false,
+        ),
+      ])
+      ..where(
+        _db.remoteAssetEntity.deletedAt.isNull() &
+            (_db.sharedSpaceAssetEntity.assetId.isNotNull() | _db.sharedSpaceLibraryEntity.libraryId.isNotNull()),
+      )
       ..groupBy([dateExp])
       ..orderBy([OrderingTerm.desc(dateExp)]);
 

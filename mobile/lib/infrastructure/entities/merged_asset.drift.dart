@@ -9,10 +9,16 @@ import 'package:immich_mobile/infrastructure/entities/remote_asset.entity.drift.
     as i4;
 import 'package:immich_mobile/infrastructure/entities/stack.entity.drift.dart'
     as i5;
-import 'package:immich_mobile/infrastructure/entities/local_album_asset.entity.drift.dart'
+import 'package:immich_mobile/infrastructure/entities/shared_space_asset.entity.drift.dart'
     as i6;
-import 'package:immich_mobile/infrastructure/entities/local_album.entity.drift.dart'
+import 'package:immich_mobile/infrastructure/entities/shared_space_member.entity.drift.dart'
     as i7;
+import 'package:immich_mobile/infrastructure/entities/shared_space_library.entity.drift.dart'
+    as i8;
+import 'package:immich_mobile/infrastructure/entities/local_album_asset.entity.drift.dart'
+    as i9;
+import 'package:immich_mobile/infrastructure/entities/local_album.entity.drift.dart'
+    as i10;
 
 class MergedAssetDrift extends i1.ModularAccessor {
   MergedAssetDrift(i0.GeneratedDatabase db) : super(db);
@@ -40,6 +46,9 @@ class MergedAssetDrift extends i1.ModularAccessor {
         remoteAssetEntity,
         localAssetEntity,
         stackEntity,
+        sharedSpaceAssetEntity,
+        sharedSpaceMemberEntity,
+        sharedSpaceLibraryEntity,
         localAlbumAssetEntity,
         localAlbumEntity,
         ...generatedlimit.watchedTables,
@@ -92,6 +101,9 @@ class MergedAssetDrift extends i1.ModularAccessor {
       readsFrom: {
         remoteAssetEntity,
         stackEntity,
+        sharedSpaceAssetEntity,
+        sharedSpaceMemberEntity,
+        sharedSpaceLibraryEntity,
         localAssetEntity,
         localAlbumAssetEntity,
         localAlbumEntity,
@@ -113,13 +125,29 @@ class MergedAssetDrift extends i1.ModularAccessor {
   i3.$LocalAssetEntityTable get localAssetEntity => i1.ReadDatabaseContainer(
     attachedDatabase,
   ).resultSet<i3.$LocalAssetEntityTable>('local_asset_entity');
-  i6.$LocalAlbumAssetEntityTable get localAlbumAssetEntity =>
+  i6.$SharedSpaceAssetEntityTable get sharedSpaceAssetEntity =>
       i1.ReadDatabaseContainer(
         attachedDatabase,
-      ).resultSet<i6.$LocalAlbumAssetEntityTable>('local_album_asset_entity');
-  i7.$LocalAlbumEntityTable get localAlbumEntity => i1.ReadDatabaseContainer(
+      ).resultSet<i6.$SharedSpaceAssetEntityTable>('shared_space_asset_entity');
+  i7.$SharedSpaceMemberEntityTable get sharedSpaceMemberEntity =>
+      i1.ReadDatabaseContainer(
+        attachedDatabase,
+      ).resultSet<i7.$SharedSpaceMemberEntityTable>(
+        'shared_space_member_entity',
+      );
+  i8.$SharedSpaceLibraryEntityTable get sharedSpaceLibraryEntity =>
+      i1.ReadDatabaseContainer(
+        attachedDatabase,
+      ).resultSet<i8.$SharedSpaceLibraryEntityTable>(
+        'shared_space_library_entity',
+      );
+  i9.$LocalAlbumAssetEntityTable get localAlbumAssetEntity =>
+      i1.ReadDatabaseContainer(
+        attachedDatabase,
+      ).resultSet<i9.$LocalAlbumAssetEntityTable>('local_album_asset_entity');
+  i10.$LocalAlbumEntityTable get localAlbumEntity => i1.ReadDatabaseContainer(
     attachedDatabase,
-  ).resultSet<i7.$LocalAlbumEntityTable>('local_album_entity');
+  ).resultSet<i10.$LocalAlbumEntityTable>('local_album_entity');
 }
 
 class MergedAssetResult {

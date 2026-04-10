@@ -212,6 +212,13 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
           toastType: ToastType.success,
         );
       }
+      // Same nudge as _addPhotos: pull the sharedSpaceMemberUpdateV1 event so
+      // the new showInTimeline value lands in local Drift immediately.
+      // Without this, the main timeline's mergedBucket query keeps returning
+      // the pre-toggle result until the next background sync cycle fires, so
+      // toggling appears not to take effect until the user closes and reopens
+      // the app.
+      await _triggerSpaceSync();
     } catch (e) {
       if (mounted) {
         setState(() => _togglingTimeline = false);

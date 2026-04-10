@@ -3,6 +3,14 @@ import 'stack.entity.dart';
 import 'local_asset.entity.dart';
 import 'local_album.entity.dart';
 import 'local_album_asset.entity.dart';
+-- Imported so Drift's analyzer adds shared_space_* tables to the generated
+-- `readsFrom` set. Without these imports the EXISTS subqueries below still
+-- work, but the .watch() stream won't re-emit when a space membership or
+-- link row changes — so toggling showInTimeline has no visible effect until
+-- the user re-enters the page.
+import 'shared_space_asset.entity.dart';
+import 'shared_space_library.entity.dart';
+import 'shared_space_member.entity.dart';
 
 -- A viewer's main timeline is a UNION over three sources:
 --   1. Remote assets owned by the timeline users (self + partners)
