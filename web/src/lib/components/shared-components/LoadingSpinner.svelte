@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { Theme, theme } from '@immich/ui';
+
   interface Props {
     size?: 'tiny' | 'small' | 'medium' | 'large' | 'giant';
     class?: string;
@@ -13,13 +15,15 @@
   };
 
   let { size = 'medium', class: className }: Props = $props();
+
+  const src = $derived(theme.value === Theme.Light ? '/gallery-loader.svg' : '/gallery-loader-dark.svg');
 </script>
 
 <div>
   <img
     role="status"
     class={[sizeClasses[size], className].filter(Boolean).join(' ')}
-    src="/gallery-loader.svg"
+    {src}
     alt="Loading"
     data-testid="loading-spinner"
   />
