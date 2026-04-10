@@ -56,11 +56,9 @@ CREATE TABLE "library_user" (
 -- directly to the user's slice and walk sorted. PK (userId, libraryId)
 -- doesn't serve this query because it's ordered on the wrong column.
 CREATE INDEX "library_user_userId_createId_idx" ON "library_user" ("userId", "createId");
-
--- Supports the library_audit consumer trigger's join on libraryId and
--- any future `which users have access to library X` queries.
-CREATE INDEX "library_user_libraryId_idx" ON "library_user" ("libraryId");
 ```
+
+The `library_user_delete_after_audit` consumer trigger joins on `(userId, libraryId)` which is served by the primary key — no extra index needed for that path. A standalone `libraryId` index was considered for "which users have access to library X" admin queries but has no concrete caller, so it's dropped per YAGNI. Easy to add later if such a query shows up.
 
 - `(userId, libraryId)` primary key prevents duplicates when the same user gains access via multiple paths.
 - `createId` (uuid_v7) is the per-user access-grant timestamp. Unique per row, monotonic, drives the backfill loop.
@@ -74,14 +72,14 @@ Migration file: `server/src/schema/migrations-gallery/<ts>-AddLibraryUserTable.t
 
 ### Create-side (three new triggers)
 
-**1. `library_after_insert`** — when a library is created, insert the owner's library_user row.
+**1. `library_after_insert`** — when a library is created, insert the owner's library_user row. The insert explicitly propagates `library.createId` and `library.createdAt` instead of letting the column defaults generate fresh values. This preserves the invariant (established in the migration's Pass 1) that **owner-path rows always share the library's own createId**, which matters because existing clients' sync checkpoints are already past `library.createId` and we don't want a new-library insert to appear "fresh" enough to retrigger an already-completed backfill on reconnection. Post-migration and post-insert the rule is the same: owner rows copy from the library row.
 
 ```sql
 CREATE OR REPLACE FUNCTION library_after_insert()
 RETURNS TRIGGER LANGUAGE PLPGSQL AS $$
 BEGIN
-  INSERT INTO library_user ("userId", "libraryId")
-  SELECT "ownerId", "id"
+  INSERT INTO library_user ("userId", "libraryId", "createId", "createdAt")
+  SELECT "ownerId", "id", "createId", "createdAt"
   FROM inserted_rows
   WHERE "ownerId" IS NOT NULL AND "deletedAt" IS NULL
   ON CONFLICT DO NOTHING;
@@ -315,6 +313,40 @@ The owner soft-deletes their library (sets `deletedAt`). Current behavior: `acce
 
 Both passes use `ON CONFLICT DO NOTHING` so the migration is idempotent. Running it twice is a no-op on the second run. Useful for local dev workflows and CI test fixtures that may reset and re-seed the DB.
 
+### Dependence on the "creator is always a member" invariant
+
+The create-side triggers handle the space-creator case indirectly: `SharedSpaceService.create` invariantly inserts a `shared_space_member` row for the creator when a space is created, and our `shared_space_member_after_insert_library` trigger then grants library_user rows from whatever libraries are linked to that space. The `user_has_library_path()` helper that drives the delete-side also defensively includes a "creator of the space that links the library" branch, so a creator-but-not-member case won't spuriously lose access if it ever arises.
+
+If a future change to `SharedSpaceService.create` breaks the "creator is always a member" invariant, our design's create-side silently fails to insert `library_user` for the creator while the delete-side still defends them. That asymmetry would manifest as a creator seeing a space's libraries go missing after a cache-reset sync (the delete path preserves them, but the create path never populated the row). Pre-existing implicit invariant, but worth noting so whoever touches space creation later knows to check.
+
+### Bulk cascade performance with `user_has_library_path`
+
+The `library_user_delete_after_audit` consumer trigger calls `user_has_library_path(libraryId, userId, NULL)` once per row in `inserted_rows`. For a bulk cascade — e.g., hard-deleting a `shared_space` that contains M members × N libraries — the existing delete-side triggers can fan out hundreds or thousands of `library_audit` rows, and our consumer trigger then evaluates the path-check function once per row. Each call does its own subqueries against `library`, `shared_space_library`, and `shared_space_member`. For small instances this is fine; for a hypothetical deployment with 1000-member spaces linking 50 libraries, the per-delete cost becomes noticeable.
+
+**Not fixed in v1.** The fix if it ever matters is to rewrite the consumer trigger's DELETE to inline the path check as a `NOT EXISTS` subquery, skipping the function call entirely:
+
+```sql
+DELETE FROM library_user lu
+USING inserted_rows ir
+WHERE lu."userId" = ir."userId"
+  AND lu."libraryId" = ir."libraryId"
+  AND NOT EXISTS (
+    SELECT 1 FROM library l WHERE l.id = lu."libraryId" AND l."ownerId" = lu."userId" AND l."deletedAt" IS NULL
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM shared_space_library ssl
+    INNER JOIN shared_space_member ssm ON ssm."spaceId" = ssl."spaceId"
+    WHERE ssl."libraryId" = lu."libraryId" AND ssm."userId" = lu."userId"
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM shared_space_library ssl
+    INNER JOIN shared_space ss ON ss."id" = ssl."spaceId"
+    WHERE ssl."libraryId" = lu."libraryId" AND ss."createdById" = lu."userId"
+  );
+```
+
+Trades readability for throughput. Keep the function-call version until it actually hurts.
+
 ## Testing strategy
 
 ### Unit / small tests (`server/src/repositories/sync.repository.spec.ts` additions or new `library-user.repository.spec.ts`)
@@ -325,6 +357,7 @@ Both passes use `ON CONFLICT DO NOTHING` so the migration is idempotent. Running
 - Returns owned + transitive without duplicates
 - **Excludes a soft-deleted owned library when the user has no space-linked path to it** (regression guard for the `accessibleLibraries` filter)
 - **Includes a soft-deleted library when the user is a member of a space that links it** (matches existing `accessibleLibraries` behavior for the space-link branch)
+- **Set equality with `accessibleLibraries`**: seed a user with a mix of owned, owned-and-soft-deleted, and space-linked libraries, then assert that the set of `libraryId`s returned by `getCreatedAfter(userId, afterCreateId=null)` is exactly the same as the set returned by querying `accessibleLibraries(userId)` directly. Regression guard against any future drift between the two sources of truth — if someone changes one without the other, this test fails loudly.
 
 ### Medium tests (new file `server/test/medium/specs/sync/library-user.spec.ts`)
 
@@ -332,9 +365,10 @@ Trigger and consumer behavior against a real DB.
 
 **Create-side triggers**:
 
-- Insert library as owner → library_user row created for owner with `createId = library.createId`
+- Insert library as owner → library_user row created for owner with `createId = library.createId` (and `createdAt = library.createdAt`) — pins the I4 invariant
 - Insert library with `ownerId IS NULL` → no library_user row
 - Insert library with `deletedAt IS NOT NULL` → no library_user row (trigger WHERE excludes)
+- **Bulk library insert** — insert 10 libraries in one statement, all with distinct owners → 10 library_user rows created with 10 distinct createIds that each match the corresponding library's own createId (pins the statement-level trigger semantics and VOLATILE uuid_v7 generation)
 - Insert shared_space_member for a space with N linked libraries → N library_user rows for the new member with fresh createIds; `library.updateId` bumped for each of the N libraries
 - Insert shared_space_member for a space with zero linked libraries → no library_user rows, no library UPDATEs
 - Insert shared_space_library for a space with M members → M library_user rows; `library.updateId` bumped on the newly-linked library
@@ -345,7 +379,7 @@ Trigger and consumer behavior against a real DB.
 - Delete shared_space_member (user leaves space) → library_user rows removed IF no other path; owned-library rows preserved
 - Delete shared_space_library (link removed) → library_user rows removed for members who have no other path; owner's row preserved
 - Delete shared_space (whole space) → all affected (member, library) pairs with no other path get library_user removed; owner of a still-linked-elsewhere library retains access
-- Delete library (hard delete) → FK cascade removes library_user rows without involving library_audit
+- **Delete library (hard delete) via FK cascade**: directly `DELETE FROM library WHERE id = ?` → all matching `library_user` rows disappear via the `ON DELETE CASCADE` FK; assert that no `library_audit` rows are emitted (the audit chain only fires on `shared_space_*` delete paths, not on a direct `DELETE library`) and that no dangling `library_user` rows remain
 - Owner leaves a space that also links their own library → library_user row stays (owner path still valid per `user_has_library_path`)
 - **Defensive consumer re-check**: manually insert a row into `library_audit` for a (user, library) pair where the user still has access via an owned path, then assert that `library_user` is NOT deleted. This documents and locks in the `NOT user_has_library_path(...)` defensive clause.
 - **Bulk cascade**: delete a shared_space containing many members × libraries → audit rows fan-out correctly, consumer trigger deletes only the pairs with no surviving path
