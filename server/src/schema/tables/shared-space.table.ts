@@ -6,14 +6,34 @@ import {
   PrimaryGeneratedColumn,
   Table,
   Timestamp,
+  TriggerFunction,
   UpdateDateColumn,
 } from '@immich/sql-tools';
 import { CreateIdColumn, UpdatedAtTrigger, UpdateIdColumn } from 'src/decorators';
+import { shared_space_delete_audit, shared_space_delete_library_audit } from 'src/schema/functions';
 import { AssetTable } from 'src/schema/tables/asset.table';
 import { UserTable } from 'src/schema/tables/user.table';
 
 @Table('shared_space')
 @UpdatedAtTrigger('shared_space_updatedAt')
+// BEFORE DELETE row-level so the trigger sees shared_space_member rows that the
+// cascade is about to remove. See shared_space_delete_audit body for the dedup logic.
+@TriggerFunction({
+  timing: 'before',
+  actions: ['delete'],
+  scope: 'row',
+  function: shared_space_delete_audit,
+})
+// Gallery-fork PR 2: BEFORE-row trigger so shared_space_library and
+// shared_space_member rows are still visible when fanning out library_audit on
+// space deletion. The companion AFTER triggers on shared_space_library and
+// shared_space_member skip during this cascade via EXISTS shared_space guards.
+@TriggerFunction({
+  timing: 'before',
+  actions: ['delete'],
+  scope: 'row',
+  function: shared_space_delete_library_audit,
+})
 export class SharedSpaceTable {
   @PrimaryGeneratedColumn()
   id!: Generated<string>;
