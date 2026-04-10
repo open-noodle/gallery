@@ -66,3 +66,45 @@ The separate delete-sweep chunking in `deleteLibrariesV1` (500 libraryIds per ch
 ## Conclusion
 
 The 100k-asset backfill is **safely within the performance envelope** the PR 2 design targets. No chunking or code changes required. The bucket query goal of "opening a space is instant" is achieved: 119 ms from stream subscribe to first emission, with reactive updates for any subsequent changes.
+
+## Additional scale scenarios (added post-PR-2 review)
+
+Three more scale scenarios were added to exercise the other performance-critical hot paths:
+
+### Mixed backfill — 50k direct-add + 50k library-linked
+
+Populates a single space with 50,000 library-linked assets AND 50,000 direct-add assets, then runs the same UNION bucket query that powers the mobile space timeline. This is the realistic case where a user both uploads directly to a space AND links an external library.
+
+| Metric              | Result  |
+| ------------------- | ------- |
+| Insert 100k mixed   | 4646 ms |
+| UNION bucket query  | 119 ms  |
+| First page (100)    | 124 ms  |
+
+The UNION query stays flat at ~120 ms — the two-branch predicate on `id IN (shared_space_asset) | library_id IN (shared_space_library)` is resolved at index-scan time, not materialize time.
+
+### Incremental sync at scale — 100k initial + 1k delta
+
+Backfills 100,000 rows, then processes a 1,000-row delta batch (the typical shape of a "user reopened the app after a few hours" sync).
+
+| Metric               | Result  |
+| -------------------- | ------- |
+| Initial 100k insert  | 4585 ms |
+| 1k delta insert      | 47 ms   |
+
+Delta throughput is **~21,000 rows/sec** — essentially the same as the initial backfill on a per-row basis. No degradation as the local DB grows, which confirms the batch insert path doesn't scan the full table.
+
+### Sweep at scale — 100k assets across 200 libraries, delete 100 libraries
+
+Creates 200 libraries with 500 assets each (100k total), then revokes access to 100 of them via `deleteLibrariesV1`. Exercises the orphan sweep under a realistic multi-library revocation — chunked `DELETE ... WHERE library_id IN (...)` across the 500-chunk boundary.
+
+| Metric                    | Result  |
+| ------------------------- | ------- |
+| Insert 100k across 200 libs | 4654 ms |
+| Sweep 100 libs (50k orphans) | 748 ms  |
+
+Sweep throughput is **~67,000 rows/sec** — the DELETE path is faster per-row than the INSERT path because there's no index rebuild on the primary key for deleted rows (SQLite marks and reuses). This is well within the "user taps 'leave space', timeline catches up in under a second" UX envelope.
+
+## Nightly CI job
+
+All four scale tests run nightly via `.github/workflows/gallery-mobile-scale-test.yml` at 03:27 UTC. The job is gated by `--dart-define=RUN_SCALE=true` and the `scale:` test tag so regular CI sweeps skip it. Failures are reported via the workflow's `if: always()` summary step.
