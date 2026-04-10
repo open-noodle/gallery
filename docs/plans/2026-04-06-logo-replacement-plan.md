@@ -11,6 +11,7 @@
 **Reference design:** `docs/plans/2026-04-06-logo-replacement-design.md` (committed at `02a4ee0fe`).
 
 **Source artwork:**
+
 - 4:3 lockups: `/home/pierre/Downloads/noodle_gallery_camera_lockups_no_glare_4x3/`
 - 1:1 mark: `/home/pierre/Downloads/noodle_gallery_camera_only_1x1/`
 
@@ -38,6 +39,7 @@
 The previous session staged 9 files in `branding/assets/`. Replace the 4:3 mark with the 1:1 variant, add a dark mark, and tick the README checklist.
 
 **Files:**
+
 - Replace: `branding/assets/logo-mark.svg` (currently 4:3 light camera-only → switch to 1:1 light)
 - Create: `branding/assets/logo-mark-dark.svg` (1:1 dark, new)
 - Modify: `branding/assets/README.md` (tick checklist rows)
@@ -79,6 +81,7 @@ Expected: both show `viewBox="0 0 1024 1024"`.
 **Step 1.5: Tick the lockup + logo-mark rows in `branding/assets/README.md`**
 
 Use Edit to change `- [ ]` to `- [x]` for these rows:
+
 - `logo-inline-light.svg + .png`
 - `logo-inline-dark.svg + .png`
 - `logo-stacked-light.svg + .png`
@@ -100,6 +103,7 @@ Expected: only `[ ]` → `[x]` changes on the 5 listed rows.
 ## Task 2: Write user-visible lockup destinations
 
 **Files:**
+
 - Modify: `web/static/gallery-logo-inline-light.svg`
 - Modify: `web/static/gallery-logo-inline-dark.svg`
 - Modify: `web/static/gallery-logo-stacked.svg` (note: existing name has no `-light` suffix)
@@ -180,6 +184,7 @@ git status --short
 ```
 
 Expected (order may vary):
+
 ```
  M branding/assets/README.md
 ?? branding/assets/logo-inline-dark.png
@@ -293,6 +298,7 @@ Expected: empty output.
 ## Task 4: Generate favicon master raster
 
 **Files:**
+
 - Create: `/tmp/logo-mark-master.png` (1024×1024, working file, not committed)
 
 **Step 4.1: Rasterize the 1:1 SVG to a 1024×1024 PNG**
@@ -317,6 +323,7 @@ Expected: `/tmp/logo-mark-master.png: PNG image data, 1024 x 1024, 8-bit/color R
 ## Task 5: Generate sized PNG favicons
 
 **Files:**
+
 - Create (working): `/tmp/icon-{16,32,48,96,144,180,192,256,512}.png`
 
 **Step 5.1: Generate every required size**
@@ -345,6 +352,7 @@ Expected: each line ends in `${size} x ${size}`.
 ## Task 6: Generate ICO favicon
 
 **Files:**
+
 - Create (working): `/tmp/favicon.ico`
 
 **Step 6.1: Build a multi-frame ICO containing 16/32/48 variants**
@@ -365,6 +373,7 @@ identify /tmp/favicon.ico
 ```
 
 Expected:
+
 - `file` reports `MS Windows icon resource - 3 icons, ...` (or similar)
 - `identify` lists three lines, one per frame, sized 16, 32, 48.
 
@@ -373,6 +382,7 @@ Expected:
 ## Task 7: Stage favicon master files in `branding/assets/`
 
 **Files:**
+
 - Create: `branding/assets/app-icon.png` (1024×1024 master)
 - Create: `branding/assets/favicon.png` (256×256, matches existing destination size)
 - Create: `branding/assets/favicon.ico` (multi-frame)
@@ -402,6 +412,7 @@ file branding/assets/app-icon.png branding/assets/favicon.png branding/assets/fa
 ```
 
 Expected:
+
 - `app-icon.png: PNG image data, 1024 x 1024, ...`
 - `favicon.png: PNG image data, 256 x 256, ...`
 - `favicon.ico: MS Windows icon resource - 3 icons, ...`
@@ -411,10 +422,12 @@ Expected:
 ## Task 8: Write favicon destinations
 
 **Files (web/static/):**
+
 - Modify: `favicon.ico`, `favicon.png`, `favicon-{16,32,48,96,144,256}.png`,
   `apple-icon-180.png`, `manifest-icon-192.maskable.png`, `manifest-icon-512.maskable.png`
 
 **Files (docs/static/img/):**
+
 - Modify: `favicon.ico`, `favicon.png`
 
 **Step 8.1: Write web/static/ favicons**
@@ -484,6 +497,7 @@ git status --short
 ```
 
 Expected:
+
 ```
 ?? branding/assets/app-icon.png
 ?? branding/assets/favicon.ico
@@ -588,6 +602,7 @@ git log --oneline main..HEAD
 ```
 
 Expected: 3 commits (oldest to newest):
+
 1. `02a4ee0fe docs(plans): logo replacement design`
 2. `<hash> chore(branding): replace gallery lockup logos and mark with new camera artwork`
 3. `<hash> chore(branding): regenerate favicons from new 1:1 camera mark`
@@ -617,6 +632,7 @@ rm -f /tmp/logo-mark-master.png /tmp/icon-{16,32,48,96,144,180,192,256,512}.png 
 **Step 10.5: Report back to the user**
 
 Summarize:
+
 - 3 commits on `feature/logo-replacement`, all dated 2026-04-06
 - File counts changed in each commit
 - What was deferred (mobile, Lottie, etc.)

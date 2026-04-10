@@ -30,10 +30,10 @@ This design only touches system (2). System (1) gets a partial source update
 
 ## Source artwork
 
-| Folder | Files |
-|---|---|
-| `~/Downloads/noodle_gallery_camera_lockups_no_glare_4x3/` | 6 SVGs (3 variants × 2 themes) at 1200×900 (4:3), plus PNG previews |
-| `~/Downloads/noodle_gallery_camera_only_1x1/` | 2 SVGs (camera-only mark, light + dark) at 1024×1024, plus PNG previews |
+| Folder                                                    | Files                                                                   |
+| --------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `~/Downloads/noodle_gallery_camera_lockups_no_glare_4x3/` | 6 SVGs (3 variants × 2 themes) at 1200×900 (4:3), plus PNG previews     |
+| `~/Downloads/noodle_gallery_camera_only_1x1/`             | 2 SVGs (camera-only mark, light + dark) at 1024×1024, plus PNG previews |
 
 All SVGs have a hardcoded background `<rect>`: `#FFFFFF` for light variants,
 `#000000` for dark variants. The existing `gallery-logo-*.svg` files have
@@ -54,13 +54,13 @@ is unchanged.
 
 ### File operations
 
-| Source | Destination(s) |
-|---|---|
-| `noodle_gallery_camera_inline_light_4x3.svg` | `web/static/gallery-logo-inline-light.svg`, `docs/static/img/gallery-logo-inline-light.svg` |
-| `noodle_gallery_camera_inline_dark_4x3.svg` | `web/static/gallery-logo-inline-dark.svg`, `docs/static/img/gallery-logo-inline-dark.svg` |
-| `noodle_gallery_camera_stacked_light_4x3.svg` | `web/static/gallery-logo-stacked.svg` (note: existing name has no `-light` suffix) |
-| `noodle_gallery_camera_stacked_dark_4x3.svg` | `web/static/gallery-logo-stacked-dark.svg` |
-| `noodle_gallery_camera_only_light_1x1.svg` | `web/static/gallery-logo-mark.svg` |
+| Source                                        | Destination(s)                                                                              |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `noodle_gallery_camera_inline_light_4x3.svg`  | `web/static/gallery-logo-inline-light.svg`, `docs/static/img/gallery-logo-inline-light.svg` |
+| `noodle_gallery_camera_inline_dark_4x3.svg`   | `web/static/gallery-logo-inline-dark.svg`, `docs/static/img/gallery-logo-inline-dark.svg`   |
+| `noodle_gallery_camera_stacked_light_4x3.svg` | `web/static/gallery-logo-stacked.svg` (note: existing name has no `-light` suffix)          |
+| `noodle_gallery_camera_stacked_dark_4x3.svg`  | `web/static/gallery-logo-stacked-dark.svg`                                                  |
+| `noodle_gallery_camera_only_light_1x1.svg`    | `web/static/gallery-logo-mark.svg`                                                          |
 
 5 sources → 7 destinations.
 
@@ -86,7 +86,7 @@ is unchanged.
 A future refactor could either:
 
 - Update `apply-branding.sh` to also write to the `gallery-logo-*` paths, or
-- Migrate the gallery-logo-* paths to use the immich-logo-* set (rename)
+- Migrate the gallery-logo-_ paths to use the immich-logo-_ set (rename)
   and unify around `apply-branding.sh`.
 
 That refactor is not in scope here.
@@ -114,29 +114,29 @@ Source: `noodle_gallery_camera_only_light_1x1.svg`.
 **Stage in `branding/assets/`** (canonical sources for future
 `apply-branding.sh` integration):
 
-| File | Size | How |
-|---|---|---|
-| `branding/assets/app-icon.png` | 1024×1024 | `rsvg-convert -w 1024 -h 1024` |
-| `branding/assets/favicon.png` | 256×256 | `rsvg-convert -w 256 -h 256` (matches existing destination size) |
-| `branding/assets/favicon.ico` | 16+32+48 multi-size ICO | `magick` from 1024 master |
+| File                           | Size                    | How                                                              |
+| ------------------------------ | ----------------------- | ---------------------------------------------------------------- |
+| `branding/assets/app-icon.png` | 1024×1024               | `rsvg-convert -w 1024 -h 1024`                                   |
+| `branding/assets/favicon.png`  | 256×256                 | `rsvg-convert -w 256 -h 256` (matches existing destination size) |
+| `branding/assets/favicon.ico`  | 16+32+48 multi-size ICO | `magick` from 1024 master                                        |
 
 **Write destinations** (manual, no `apply-branding.sh`):
 
-| Destination | Size | Currently |
-|---|---|---|
-| `web/static/favicon.ico` | ICO | old Immich |
-| `web/static/favicon.png` | 256×256 | old Immich |
-| `web/static/favicon-16.png` | 16×16 | old Immich |
-| `web/static/favicon-32.png` | 32×32 | old Immich |
-| `web/static/favicon-48.png` | 48×48 | old Immich |
-| `web/static/favicon-96.png` | 96×96 | old Immich |
-| `web/static/favicon-144.png` | 144×144 | old Immich |
-| `web/static/favicon-256.png` | 256×256 | old Immich |
-| `web/static/apple-icon-180.png` | 180×180 | old Immich |
+| Destination                                 | Size    | Currently  |
+| ------------------------------------------- | ------- | ---------- |
+| `web/static/favicon.ico`                    | ICO     | old Immich |
+| `web/static/favicon.png`                    | 256×256 | old Immich |
+| `web/static/favicon-16.png`                 | 16×16   | old Immich |
+| `web/static/favicon-32.png`                 | 32×32   | old Immich |
+| `web/static/favicon-48.png`                 | 48×48   | old Immich |
+| `web/static/favicon-96.png`                 | 96×96   | old Immich |
+| `web/static/favicon-144.png`                | 144×144 | old Immich |
+| `web/static/favicon-256.png`                | 256×256 | old Immich |
+| `web/static/apple-icon-180.png`             | 180×180 | old Immich |
 | `web/static/manifest-icon-192.maskable.png` | 192×192 | old Immich |
 | `web/static/manifest-icon-512.maskable.png` | 512×512 | old Immich |
-| `docs/static/img/favicon.ico` | ICO | old Immich |
-| `docs/static/img/favicon.png` | 256×256 | old Immich |
+| `docs/static/img/favicon.ico`               | ICO     | old Immich |
+| `docs/static/img/favicon.png`               | 256×256 | old Immich |
 
 13 destination writes from 1 source SVG.
 
@@ -195,6 +195,7 @@ The design doc commit itself uses the same backdating.
 ### Verification (no full build)
 
 For each commit:
+
 1. `git status` shows only expected files modified.
 2. Spot-check at least one rendered destination by opening the SVG/PNG.
 3. For commit 2, `file` each generated PNG to confirm dimensions and
@@ -214,7 +215,7 @@ Captured here so they don't get lost; not part of this work:
 - Replace mobile Lottie animation (`immich-logo.json`) — needs designer rework,
   not auto-regeneratable.
 - Refactor `apply-branding.sh` to write to `gallery-logo-*` paths, OR rename
-  the gallery-logo-* set to immich-logo-* and let `apply-branding.sh` handle it.
+  the gallery-logo-_ set to immich-logo-_ and let `apply-branding.sh` handle it.
 - Theme-aware mark in `Logo.svelte` (use `gallery-logo-mark-dark.svg` on dark
   theme).
 - Re-rasterize `branding/assets/logo-{inline,stacked}-{light,dark}.png` with
