@@ -2610,7 +2610,7 @@
   "validation_error": "Validation error",
   "variables": "Variables",
   "version": "Version",
-  "version_announcement_closing": "Your friend, Alex",
+  "version_announcement_closing": "Your friend, Pierre",
   "version_announcement_message": "Hi there! A new version of Immich is available. Please take some time to read the <link>release notes</link> to ensure your setup is up-to-date to prevent any misconfigurations, especially if you use WatchTower or any mechanism that handles updating your Immich instance automatically.",
   "version_history": "Version History",
   "version_history_item": "Installed {version} on {date}",
