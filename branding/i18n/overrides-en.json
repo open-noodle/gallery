@@ -54,5 +54,6 @@
   "trash_page_empty_trash_dialog_content": "Do you want to empty your trashed assets? These items will be permanently removed from Noodle Gallery",
   "upload_to_immich": "Upload to Noodle Gallery ({count})",
   "version_announcement_message": "Hi there! A new version of Noodle Gallery is available. Please take some time to read the <link>release notes</link> to ensure your setup is up-to-date to prevent any misconfigurations, especially if you use WatchTower or any mechanism that handles updating your Noodle Gallery instance automatically.",
-  "welcome_to_immich": "Welcome to Noodle Gallery"
+  "welcome_to_immich": "Welcome to Noodle Gallery",
+  "version_announcement_closing": "Your friend, Pierre"
 }
