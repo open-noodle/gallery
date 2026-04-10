@@ -580,3 +580,32 @@ export const shared_space_library_after_insert_user = registerFunction({
       RETURN NULL;
     END`,
 });
+
+// Consume library_audit inserts by deleting the corresponding library_user
+// rows UNCONDITIONALLY. Trusts the gating at insertion time — every path
+// that inserts into library_audit already checks
+// `NOT user_has_library_path(..., excludeSpaceId)`, so audit rows represent
+// "this (user, library) pair has definitively lost access".
+//
+// IMPORTANT: any future path inserting into library_audit MUST gate
+// beforehand. See design doc "Trust boundary" and the
+// library_user_delete_after_audit test in library-user-triggers.spec.ts.
+//
+// Why we don't re-check here: `user_has_library_path(lib, user, NULL)`
+// during a shared_space hard-delete returns TRUE because the BEFORE DELETE
+// trigger fires BEFORE FK cascades remove shared_space_library /
+// shared_space_member — the still-alive path would spuriously preserve
+// rows that should have been cleaned up.
+export const library_user_delete_after_audit = registerFunction({
+  name: 'library_user_delete_after_audit',
+  returnType: 'TRIGGER',
+  language: 'PLPGSQL',
+  body: `
+    BEGIN
+      DELETE FROM library_user lu
+      USING inserted_rows ir
+      WHERE lu."userId" = ir."userId"
+        AND lu."libraryId" = ir."libraryId";
+      RETURN NULL;
+    END`,
+});

@@ -131,6 +131,40 @@ export async function up(db: Kysely<any>): Promise<void> {
   await sql`INSERT INTO "migration_overrides" ("name", "value") VALUES ('trigger_shared_space_library_after_insert_user', '{"type":"trigger","name":"shared_space_library_after_insert_user","sql":"CREATE OR REPLACE TRIGGER \\"shared_space_library_after_insert_user\\"\\n  AFTER INSERT ON \\"shared_space_library\\"\\n  REFERENCING NEW TABLE AS \\"inserted_rows\\"\\n  FOR EACH STATEMENT\\n  EXECUTE FUNCTION shared_space_library_after_insert_user();"}'::jsonb);`.execute(
     db,
   );
+
+  // --- Delete-side consumer ---
+  //
+  // library_user_delete_after_audit: when library_audit rows land, delete the
+  // corresponding library_user rows UNCONDITIONALLY. Trusts the gating at
+  // insertion time (every inserter gates on NOT user_has_library_path(...,
+  // excludeSpaceId)). Re-checking here with NULL would be BROKEN during
+  // shared_space hard-delete because the BEFORE DELETE trigger fires before
+  // FK cascades run. See design doc.
+  await sql`CREATE OR REPLACE FUNCTION library_user_delete_after_audit()
+  RETURNS TRIGGER
+  LANGUAGE PLPGSQL
+  AS $$
+    BEGIN
+      DELETE FROM library_user lu
+      USING inserted_rows ir
+      WHERE lu."userId" = ir."userId"
+        AND lu."libraryId" = ir."libraryId";
+      RETURN NULL;
+    END
+  $$;`.execute(db);
+
+  await sql`CREATE OR REPLACE TRIGGER "library_user_delete_after_audit"
+  AFTER INSERT ON "library_audit"
+  REFERENCING NEW TABLE AS "inserted_rows"
+  FOR EACH STATEMENT
+  EXECUTE FUNCTION library_user_delete_after_audit();`.execute(db);
+
+  await sql`INSERT INTO "migration_overrides" ("name", "value") VALUES ('function_library_user_delete_after_audit', '{"type":"function","name":"library_user_delete_after_audit","sql":"CREATE OR REPLACE FUNCTION library_user_delete_after_audit()\\n  RETURNS TRIGGER\\n  LANGUAGE PLPGSQL\\n  AS $$\\n    BEGIN\\n      DELETE FROM library_user lu\\n      USING inserted_rows ir\\n      WHERE lu.\\"userId\\" = ir.\\"userId\\"\\n        AND lu.\\"libraryId\\" = ir.\\"libraryId\\";\\n      RETURN NULL;\\n    END\\n  $$;"}'::jsonb);`.execute(
+    db,
+  );
+  await sql`INSERT INTO "migration_overrides" ("name", "value") VALUES ('trigger_library_user_delete_after_audit', '{"type":"trigger","name":"library_user_delete_after_audit","sql":"CREATE OR REPLACE TRIGGER \\"library_user_delete_after_audit\\"\\n  AFTER INSERT ON \\"library_audit\\"\\n  REFERENCING NEW TABLE AS \\"inserted_rows\\"\\n  FOR EACH STATEMENT\\n  EXECUTE FUNCTION library_user_delete_after_audit();"}'::jsonb);`.execute(
+    db,
+  );
 }
 
 export async function down(db: Kysely<any>): Promise<void> {
@@ -140,8 +174,12 @@ export async function down(db: Kysely<any>): Promise<void> {
     'function_shared_space_member_after_insert_library',
     'trigger_shared_space_member_after_insert_library',
     'function_shared_space_library_after_insert_user',
-    'trigger_shared_space_library_after_insert_user'
+    'trigger_shared_space_library_after_insert_user',
+    'function_library_user_delete_after_audit',
+    'trigger_library_user_delete_after_audit'
   )`.execute(db);
+  await sql`DROP TRIGGER IF EXISTS "library_user_delete_after_audit" ON "library_audit";`.execute(db);
+  await sql`DROP FUNCTION IF EXISTS library_user_delete_after_audit();`.execute(db);
   await sql`DROP TRIGGER IF EXISTS "shared_space_library_after_insert_user" ON "shared_space_library";`.execute(db);
   await sql`DROP FUNCTION IF EXISTS shared_space_library_after_insert_user();`.execute(db);
   await sql`DROP TRIGGER IF EXISTS "shared_space_member_after_insert_library" ON "shared_space_member";`.execute(db);

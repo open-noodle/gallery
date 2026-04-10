@@ -319,4 +319,196 @@ describe('library_user triggers', () => {
       expect(rows).toHaveLength(0);
     });
   });
+
+  describe('library_user_delete_after_audit', () => {
+    it('removes library_user when a member leaves a space and has no other path', async () => {
+      const { ctx, db } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: viewer } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      const { library } = await ctx.newLibrary({ ownerId: owner.id });
+      await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: viewer.id });
+
+      // Sanity: viewer has the library_user row.
+      const before = await db
+        .selectFrom('library_user')
+        .selectAll()
+        .where('userId', '=', viewer.id)
+        .where('libraryId', '=', library.id)
+        .execute();
+      expect(before).toHaveLength(1);
+
+      // Viewer leaves (delete the shared_space_member row).
+      await db
+        .deleteFrom('shared_space_member')
+        .where('spaceId', '=', space.id)
+        .where('userId', '=', viewer.id)
+        .execute();
+
+      const after = await db
+        .selectFrom('library_user')
+        .selectAll()
+        .where('userId', '=', viewer.id)
+        .where('libraryId', '=', library.id)
+        .execute();
+      expect(after).toHaveLength(0);
+    });
+
+    it('preserves library_user for the owner when another member leaves a space linking their library', async () => {
+      // Pins two properties together:
+      //   1. The audit chain's gate skips the owner when peer leaves. The
+      //      consumer trigger's DELETE ... USING inserted_rows only touches
+      //      userIds present in the `new` NEW TABLE — owner is not there.
+      //   2. The DELETE scope is strict — no side-effect on other rows.
+      const { ctx, db } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: peer } = await ctx.newUser();
+      const { library } = await ctx.newLibrary({ ownerId: owner.id });
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: peer.id });
+
+      // Sanity: both have rows.
+      expect(
+        await db.selectFrom('library_user').selectAll().where('libraryId', '=', library.id).execute(),
+      ).toHaveLength(2);
+
+      // Peer leaves.
+      await db
+        .deleteFrom('shared_space_member')
+        .where('spaceId', '=', space.id)
+        .where('userId', '=', peer.id)
+        .execute();
+
+      // Owner's row survives.
+      const ownerRows = await db
+        .selectFrom('library_user')
+        .selectAll()
+        .where('userId', '=', owner.id)
+        .where('libraryId', '=', library.id)
+        .execute();
+      expect(ownerRows).toHaveLength(1);
+      // Peer's row is gone.
+      const peerRows = await db
+        .selectFrom('library_user')
+        .selectAll()
+        .where('userId', '=', peer.id)
+        .where('libraryId', '=', library.id)
+        .execute();
+      expect(peerRows).toHaveLength(0);
+    });
+
+    it('removes library_user for all affected members when a shared_space is hard-deleted (cascade path)', async () => {
+      // REGRESSION GUARD for the dropped defensive clause. Under the original
+      // design, the `NOT user_has_library_path(..., NULL)` filter would run
+      // inside the BEFORE DELETE trigger of shared_space, BEFORE the FK
+      // cascade removed shared_space_library / shared_space_member rows — so
+      // it would see the still-alive path and incorrectly preserve library_user
+      // rows for members who should have lost access.
+      const { ctx, db } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: viewerA } = await ctx.newUser();
+      const { user: viewerB } = await ctx.newUser();
+      const { user: spaceCreator } = await ctx.newUser();
+      const { library: lib1 } = await ctx.newLibrary({ ownerId: owner.id });
+      const { library: lib2 } = await ctx.newLibrary({ ownerId: owner.id });
+      const { space } = await ctx.newSharedSpace({ createdById: spaceCreator.id });
+      await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: lib1.id });
+      await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: lib2.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: viewerA.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: viewerB.id });
+      // spaceCreator is NOT auto-added as member by newSharedSpace, so the
+      // user_has_library_path "creator-of-a-linked-space" branch covers them.
+
+      // Sanity snapshot: owner's 2 rows + viewerA's 2 + viewerB's 2 = 6.
+      // spaceCreator has no library_user row because the trigger only runs
+      // for member-insert, not creator-insert.
+      const beforeRows = await db
+        .selectFrom('library_user')
+        .selectAll()
+        .where('libraryId', 'in', [lib1.id, lib2.id])
+        .execute();
+      expect(beforeRows).toHaveLength(6);
+
+      // Hard-delete the whole space. BEFORE-trigger fan-out inserts into
+      // library_audit for every (viewerA|B, library) pair that loses its
+      // only path, and for spaceCreator (via the creator branch) — though
+      // spaceCreator has no library_user row, so nothing changes for them.
+      // Owner's rows are NOT touched (owned path remains).
+      await db.deleteFrom('shared_space').where('id', '=', space.id).execute();
+
+      // Only owner's two rows remain.
+      const remaining = await db
+        .selectFrom('library_user')
+        .selectAll()
+        .where('libraryId', 'in', [lib1.id, lib2.id])
+        .execute();
+      expect(remaining).toHaveLength(2);
+      expect(remaining.every((r) => r.userId === owner.id)).toBe(true);
+    });
+
+    it('trusts the inserter gate: a manual library_audit insert deletes library_user unconditionally', async () => {
+      // The consumer does NOT re-check user_has_library_path. Any code path
+      // inserting into library_audit MUST gate beforehand — the consumer
+      // deletes whatever it's told to.
+      const { ctx, db } = setup();
+      const { user } = await ctx.newUser();
+      const { library } = await ctx.newLibrary({ ownerId: user.id });
+
+      const before = await db
+        .selectFrom('library_user')
+        .selectAll()
+        .where('userId', '=', user.id)
+        .where('libraryId', '=', library.id)
+        .execute();
+      expect(before).toHaveLength(1);
+
+      // Manually insert into library_audit, bypassing the gating path.
+      await db.insertInto('library_audit').values({ libraryId: library.id, userId: user.id }).execute();
+
+      const after = await db
+        .selectFrom('library_user')
+        .selectAll()
+        .where('userId', '=', user.id)
+        .where('libraryId', '=', library.id)
+        .execute();
+      expect(after).toHaveLength(0);
+    });
+
+    it('hard-deleting a library removes library_user rows via FK cascade (no library_audit involvement)', async () => {
+      const { ctx, db } = setup();
+      const { user } = await ctx.newUser();
+      const { library } = await ctx.newLibrary({ ownerId: user.id });
+
+      const before = await db
+        .selectFrom('library_user')
+        .selectAll()
+        .where('libraryId', '=', library.id)
+        .execute();
+      expect(before).toHaveLength(1);
+
+      const auditBefore = await db
+        .selectFrom('library_audit')
+        .selectAll()
+        .where('libraryId', '=', library.id)
+        .execute();
+
+      await db.deleteFrom('library').where('id', '=', library.id).execute();
+
+      const after = await db
+        .selectFrom('library_user')
+        .selectAll()
+        .where('libraryId', '=', library.id)
+        .execute();
+      expect(after).toHaveLength(0);
+
+      const auditAfter = await db
+        .selectFrom('library_audit')
+        .selectAll()
+        .where('libraryId', '=', library.id)
+        .execute();
+      expect(auditAfter).toHaveLength(auditBefore.length);
+    });
+  });
 });
