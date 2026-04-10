@@ -461,6 +461,131 @@ class SyncResetV1 extends createZodDto(SyncResetV1Schema) {}
 @ExtraModel()
 class SyncCompleteV1 extends createZodDto(SyncCompleteV1Schema) {}
 
+// --- gallery-fork: shared-space sync DTOs ---
+
+@ExtraModel()
+export class SyncSharedSpaceDeleteV1 {
+  @ApiProperty({ description: 'Shared space ID' })
+  spaceId!: string;
+}
+
+@ExtraModel()
+export class SyncSharedSpaceToAssetV1 {
+  @ApiProperty({ description: 'Shared space ID' })
+  spaceId!: string;
+  @ApiProperty({ description: 'Asset ID' })
+  assetId!: string;
+}
+
+@ExtraModel()
+export class SyncSharedSpaceToAssetDeleteV1 {
+  @ApiProperty({ description: 'Shared space ID' })
+  spaceId!: string;
+  @ApiProperty({ description: 'Asset ID' })
+  assetId!: string;
+}
+
+@ExtraModel()
+export class SyncSharedSpaceV1 {
+  @ApiProperty({ description: 'Shared space ID' })
+  id!: string;
+  @ApiProperty({ description: 'Space name' })
+  name!: string;
+  @ApiProperty({ description: 'Space description' })
+  description!: string | null;
+  @ApiProperty({ description: 'Color' })
+  color!: string | null;
+  @ApiProperty({ description: 'Created by user ID' })
+  createdById!: string;
+  @ApiProperty({ description: 'Thumbnail asset ID' })
+  thumbnailAssetId!: string | null;
+  @ApiProperty({ description: 'Thumbnail crop Y offset' })
+  thumbnailCropY!: number | null;
+  @ApiProperty({ description: 'Face recognition enabled' })
+  faceRecognitionEnabled!: boolean;
+  @ApiProperty({ description: 'Pets enabled' })
+  petsEnabled!: boolean;
+  @ApiProperty({ description: 'Last activity timestamp' })
+  lastActivityAt!: Date | null;
+  @ApiProperty({ description: 'Created at' })
+  createdAt!: Date;
+  @ApiProperty({ description: 'Updated at' })
+  updatedAt!: Date;
+}
+
+@ExtraModel()
+export class SyncSharedSpaceMemberDeleteV1 {
+  @ApiProperty({ description: 'Shared space ID' })
+  spaceId!: string;
+  @ApiProperty({ description: 'User ID' })
+  userId!: string;
+}
+
+@ExtraModel()
+export class SyncSharedSpaceMemberV1 {
+  @ApiProperty({ description: 'Shared space ID' })
+  spaceId!: string;
+  @ApiProperty({ description: 'User ID' })
+  userId!: string;
+  @ApiProperty({ description: 'Member role' })
+  role!: string;
+  @ApiProperty({ description: 'When the user joined the space' })
+  joinedAt!: Date;
+  @ApiProperty({ description: 'Whether the space contributes to the user timeline' })
+  showInTimeline!: boolean;
+}
+
+// Library sync DTOs — minimal shape to support typed `send()` calls in
+// sync.service.ts. Task 29 will polish ApiProperty metadata + regenerate
+// OpenAPI; the runtime types below are what Task 27 needs to compile.
+@ExtraModel()
+export class SyncLibraryV1 {
+  @ApiProperty({ description: 'Library ID' })
+  id!: string;
+  @ApiProperty({ description: 'Library name' })
+  name!: string;
+  @ApiProperty({ description: 'Owner user ID' })
+  ownerId!: string;
+  @ApiProperty({ description: 'Created at' })
+  createdAt!: Date;
+  @ApiProperty({ description: 'Updated at' })
+  updatedAt!: Date;
+}
+
+@ExtraModel()
+export class SyncLibraryDeleteV1 {
+  @ApiProperty({ description: 'Library ID' })
+  libraryId!: string;
+}
+
+@ExtraModel()
+export class SyncLibraryAssetDeleteV1 {
+  @ApiProperty({ description: 'Asset ID' })
+  assetId!: string;
+}
+
+@ExtraModel()
+export class SyncSharedSpaceLibraryV1 {
+  @ApiProperty({ description: 'Shared space ID' })
+  spaceId!: string;
+  @ApiProperty({ description: 'Library ID' })
+  libraryId!: string;
+  @ApiProperty({ description: 'User who added the library to the space', nullable: true })
+  addedById!: string | null;
+  @ApiProperty({ description: 'Created at' })
+  createdAt!: Date;
+  @ApiProperty({ description: 'Updated at' })
+  updatedAt!: Date;
+}
+
+@ExtraModel()
+export class SyncSharedSpaceLibraryDeleteV1 {
+  @ApiProperty({ description: 'Shared space ID' })
+  spaceId!: string;
+  @ApiProperty({ description: 'Library ID' })
+  libraryId!: string;
+}
+
 export type SyncItem = {
   [SyncEntityType.AuthUserV1]: SyncAuthUserV1;
   [SyncEntityType.UserV1]: SyncUserV1;
@@ -515,6 +640,32 @@ export type SyncItem = {
   [SyncEntityType.SyncAckV1]: SyncAckV1;
   [SyncEntityType.SyncCompleteV1]: SyncCompleteV1;
   [SyncEntityType.SyncResetV1]: SyncResetV1;
+  // gallery-fork shared-space sync types
+  [SyncEntityType.SharedSpaceV1]: SyncSharedSpaceV1;
+  [SyncEntityType.SharedSpaceDeleteV1]: SyncSharedSpaceDeleteV1;
+  [SyncEntityType.SharedSpaceMemberV1]: SyncSharedSpaceMemberV1;
+  [SyncEntityType.SharedSpaceMemberBackfillV1]: SyncSharedSpaceMemberV1;
+  [SyncEntityType.SharedSpaceMemberDeleteV1]: SyncSharedSpaceMemberDeleteV1;
+  [SyncEntityType.SharedSpaceAssetCreateV1]: SyncAssetV1;
+  [SyncEntityType.SharedSpaceAssetUpdateV1]: SyncAssetV1;
+  [SyncEntityType.SharedSpaceAssetBackfillV1]: SyncAssetV1;
+  [SyncEntityType.SharedSpaceAssetExifCreateV1]: SyncAssetExifV1;
+  [SyncEntityType.SharedSpaceAssetExifUpdateV1]: SyncAssetExifV1;
+  [SyncEntityType.SharedSpaceAssetExifBackfillV1]: SyncAssetExifV1;
+  [SyncEntityType.SharedSpaceToAssetV1]: SyncSharedSpaceToAssetV1;
+  [SyncEntityType.SharedSpaceToAssetBackfillV1]: SyncSharedSpaceToAssetV1;
+  [SyncEntityType.SharedSpaceToAssetDeleteV1]: SyncSharedSpaceToAssetDeleteV1;
+  // Library sync — wired in Task 27 (DTOs added alongside the dispatch change).
+  [SyncEntityType.LibraryV1]: SyncLibraryV1;
+  [SyncEntityType.LibraryDeleteV1]: SyncLibraryDeleteV1;
+  [SyncEntityType.LibraryAssetCreateV1]: SyncAssetV1;
+  [SyncEntityType.LibraryAssetDeleteV1]: SyncLibraryAssetDeleteV1;
+  [SyncEntityType.LibraryAssetBackfillV1]: SyncAssetV1;
+  [SyncEntityType.LibraryAssetExifCreateV1]: SyncAssetExifV1;
+  [SyncEntityType.LibraryAssetExifBackfillV1]: SyncAssetExifV1;
+  [SyncEntityType.SharedSpaceLibraryV1]: SyncSharedSpaceLibraryV1;
+  [SyncEntityType.SharedSpaceLibraryBackfillV1]: SyncSharedSpaceLibraryV1;
+  [SyncEntityType.SharedSpaceLibraryDeleteV1]: SyncSharedSpaceLibraryDeleteV1;
 };
 
 const SyncStreamSchema = z
