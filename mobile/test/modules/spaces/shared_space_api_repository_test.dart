@@ -1,16 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/repositories/shared_space_api.repository.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:openapi/api.dart' as api;
 
 class MockSharedSpacesApi extends Mock implements api.SharedSpacesApi {}
 
-class MockTimelineApi extends Mock implements api.TimelineApi {}
-
 void main() {
   late MockSharedSpacesApi mockApi;
-  late MockTimelineApi mockTimelineApi;
   late SharedSpaceApiRepository repository;
 
   setUpAll(() {
@@ -24,8 +20,7 @@ void main() {
 
   setUp(() {
     mockApi = MockSharedSpacesApi();
-    mockTimelineApi = MockTimelineApi();
-    repository = SharedSpaceApiRepository(mockApi, mockTimelineApi);
+    repository = SharedSpaceApiRepository(mockApi);
   });
 
   group('getAll', () {
@@ -309,152 +304,4 @@ void main() {
     });
   });
 
-  group('getSpaceAssets', () {
-    test('returns empty list when no buckets', () async {
-      when(() => mockTimelineApi.getTimeBuckets(spaceId: 'space-1')).thenAnswer((_) async => []);
-
-      final result = await repository.getSpaceAssets('space-1');
-
-      expect(result, isEmpty);
-    });
-
-    test('returns empty list when buckets are null', () async {
-      when(() => mockTimelineApi.getTimeBuckets(spaceId: 'space-1')).thenAnswer((_) async => null);
-
-      final result = await repository.getSpaceAssets('space-1');
-
-      expect(result, isEmpty);
-    });
-
-    test('converts time buckets to RemoteAsset list', () async {
-      final buckets = [api.TimeBucketsResponseDto(timeBucket: '2024-01-01', count: 2)];
-      final bucketData = api.TimeBucketAssetResponseDto(
-        id: ['asset-1', 'asset-2'],
-        ownerId: ['user-1', 'user-1'],
-        isImage: [true, false],
-        isFavorite: [false, true],
-        fileCreatedAt: ['2024-01-01T10:00:00Z', '2024-01-01T14:00:00Z'],
-        thumbhash: ['hash1', 'hash2'],
-        duration: ['0:00:00.00000', '0:01:30.00000'],
-        livePhotoVideoId: [null, null],
-        isTrashed: [false, false],
-        projectionType: [null, null],
-      );
-
-      when(() => mockTimelineApi.getTimeBuckets(spaceId: 'space-1')).thenAnswer((_) async => buckets);
-      when(() => mockTimelineApi.getTimeBucket('2024-01-01', spaceId: 'space-1')).thenAnswer((_) async => bucketData);
-
-      final result = await repository.getSpaceAssets('space-1');
-
-      expect(result.length, equals(2));
-      expect(result[0].id, equals('asset-1'));
-      expect(result[0].type, equals(AssetType.image));
-      expect(result[0].isFavorite, isFalse);
-      expect(result[1].id, equals('asset-2'));
-      expect(result[1].type, equals(AssetType.video));
-      expect(result[1].isFavorite, isTrue);
-      expect(result[1].durationInSeconds, equals(90));
-    });
-
-    test('skips null bucket data', () async {
-      final buckets = [
-        api.TimeBucketsResponseDto(timeBucket: '2024-01-01', count: 1),
-        api.TimeBucketsResponseDto(timeBucket: '2024-01-02', count: 1),
-      ];
-
-      when(() => mockTimelineApi.getTimeBuckets(spaceId: 'space-1')).thenAnswer((_) async => buckets);
-      when(() => mockTimelineApi.getTimeBucket('2024-01-01', spaceId: 'space-1')).thenAnswer((_) async => null);
-      when(() => mockTimelineApi.getTimeBucket('2024-01-02', spaceId: 'space-1')).thenAnswer(
-        (_) async => api.TimeBucketAssetResponseDto(
-          id: ['asset-2'],
-          ownerId: ['user-1'],
-          isImage: [true],
-          isFavorite: [false],
-          fileCreatedAt: ['2024-01-02T10:00:00Z'],
-          thumbhash: ['hash'],
-          duration: ['0:00:00.00000'],
-          livePhotoVideoId: [null],
-          isTrashed: [false],
-          projectionType: [null],
-        ),
-      );
-
-      final result = await repository.getSpaceAssets('space-1');
-
-      expect(result.length, equals(1));
-      expect(result[0].id, equals('asset-2'));
-    });
-  });
-
-  group('_parseDuration', () {
-    test('returns null for null duration', () async {
-      final buckets = [api.TimeBucketsResponseDto(timeBucket: '2024-01-01', count: 1)];
-      final bucketData = api.TimeBucketAssetResponseDto(
-        id: ['asset-1'],
-        ownerId: ['user-1'],
-        isImage: [true],
-        isFavorite: [false],
-        fileCreatedAt: ['2024-01-01T10:00:00Z'],
-        thumbhash: ['hash'],
-        duration: [null],
-        livePhotoVideoId: [null],
-        isTrashed: [false],
-        projectionType: [null],
-      );
-
-      when(() => mockTimelineApi.getTimeBuckets(spaceId: 'space-1')).thenAnswer((_) async => buckets);
-      when(() => mockTimelineApi.getTimeBucket('2024-01-01', spaceId: 'space-1')).thenAnswer((_) async => bucketData);
-
-      final result = await repository.getSpaceAssets('space-1');
-
-      expect(result[0].durationInSeconds, isNull);
-    });
-
-    test('returns null for zero duration string', () async {
-      final buckets = [api.TimeBucketsResponseDto(timeBucket: '2024-01-01', count: 1)];
-      final bucketData = api.TimeBucketAssetResponseDto(
-        id: ['asset-1'],
-        ownerId: ['user-1'],
-        isImage: [false],
-        isFavorite: [false],
-        fileCreatedAt: ['2024-01-01T10:00:00Z'],
-        thumbhash: ['hash'],
-        duration: ['0:00:00.00000'],
-        livePhotoVideoId: [null],
-        isTrashed: [false],
-        projectionType: [null],
-      );
-
-      when(() => mockTimelineApi.getTimeBuckets(spaceId: 'space-1')).thenAnswer((_) async => buckets);
-      when(() => mockTimelineApi.getTimeBucket('2024-01-01', spaceId: 'space-1')).thenAnswer((_) async => bucketData);
-
-      final result = await repository.getSpaceAssets('space-1');
-
-      expect(result[0].durationInSeconds, isNull);
-    });
-
-    test('parses hours:minutes:seconds correctly', () async {
-      final buckets = [api.TimeBucketsResponseDto(timeBucket: '2024-01-01', count: 1)];
-      final bucketData = api.TimeBucketAssetResponseDto(
-        id: ['asset-1'],
-        ownerId: ['user-1'],
-        isImage: [false],
-        isFavorite: [false],
-        fileCreatedAt: ['2024-01-01T10:00:00Z'],
-        thumbhash: ['hash'],
-        duration: ['1:23:45.00000'],
-        livePhotoVideoId: [null],
-        isTrashed: [false],
-        projectionType: [null],
-      );
-
-      when(() => mockTimelineApi.getTimeBuckets(spaceId: 'space-1')).thenAnswer((_) async => buckets);
-      when(() => mockTimelineApi.getTimeBucket('2024-01-01', spaceId: 'space-1')).thenAnswer((_) async => bucketData);
-
-      final result = await repository.getSpaceAssets('space-1');
-
-      // 1*3600 + 23*60 + 45 = 3600 + 1380 + 45 = 5025
-      expect(result[0].durationInSeconds, equals(5025));
-    });
-  });
 }
