@@ -29924,11 +29924,93 @@
           "AssetFaceDeleteV1",
           "UserMetadataV1",
           "UserMetadataDeleteV1",
+          "SharedSpaceV1",
+          "SharedSpaceDeleteV1",
+          "SharedSpaceMemberV1",
+          "SharedSpaceMemberDeleteV1",
+          "SharedSpaceMemberBackfillV1",
+          "SharedSpaceAssetCreateV1",
+          "SharedSpaceAssetUpdateV1",
+          "SharedSpaceAssetBackfillV1",
+          "SharedSpaceAssetExifCreateV1",
+          "SharedSpaceAssetExifUpdateV1",
+          "SharedSpaceAssetExifBackfillV1",
+          "SharedSpaceToAssetV1",
+          "SharedSpaceToAssetDeleteV1",
+          "SharedSpaceToAssetBackfillV1",
+          "LibraryV1",
+          "LibraryDeleteV1",
+          "LibraryAssetCreateV1",
+          "LibraryAssetDeleteV1",
+          "LibraryAssetBackfillV1",
+          "LibraryAssetExifCreateV1",
+          "LibraryAssetExifBackfillV1",
+          "SharedSpaceLibraryV1",
+          "SharedSpaceLibraryDeleteV1",
+          "SharedSpaceLibraryBackfillV1",
           "SyncAckV1",
           "SyncResetV1",
           "SyncCompleteV1"
         ],
         "type": "string"
+      },
+      "SyncLibraryAssetDeleteV1": {
+        "properties": {
+          "assetId": {
+            "description": "Asset ID",
+            "type": "string"
+          }
+        },
+        "required": [
+          "assetId"
+        ],
+        "type": "object"
+      },
+      "SyncLibraryDeleteV1": {
+        "properties": {
+          "libraryId": {
+            "description": "Library ID",
+            "type": "string"
+          }
+        },
+        "required": [
+          "libraryId"
+        ],
+        "type": "object"
+      },
+      "SyncLibraryV1": {
+        "properties": {
+          "createdAt": {
+            "description": "Created at",
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "description": "Library ID",
+            "type": "string"
+          },
+          "name": {
+            "description": "Library name",
+            "type": "string"
+          },
+          "ownerId": {
+            "description": "Owner user ID",
+            "type": "string"
+          },
+          "updatedAt": {
+            "description": "Updated at",
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "createdAt",
+          "id",
+          "name",
+          "ownerId",
+          "updatedAt"
+        ],
+        "type": "object"
       },
       "SyncMemoryAssetDeleteV1": {
         "properties": {
@@ -30245,12 +30327,244 @@
           "PeopleV1",
           "AssetFacesV1",
           "AssetFacesV2",
-          "UserMetadataV1"
+          "UserMetadataV1",
+          "SharedSpacesV1",
+          "SharedSpaceMembersV1",
+          "SharedSpaceAssetsV1",
+          "SharedSpaceAssetExifsV1",
+          "SharedSpaceToAssetsV1",
+          "LibrariesV1",
+          "LibraryAssetsV1",
+          "LibraryAssetExifsV1",
+          "SharedSpaceLibrariesV1"
         ],
         "type": "string"
       },
       "SyncResetV1": {
         "properties": {},
+        "type": "object"
+      },
+      "SyncSharedSpaceDeleteV1": {
+        "properties": {
+          "spaceId": {
+            "description": "Shared space ID",
+            "type": "string"
+          }
+        },
+        "required": [
+          "spaceId"
+        ],
+        "type": "object"
+      },
+      "SyncSharedSpaceLibraryDeleteV1": {
+        "properties": {
+          "libraryId": {
+            "description": "Library ID",
+            "type": "string"
+          },
+          "spaceId": {
+            "description": "Shared space ID",
+            "type": "string"
+          }
+        },
+        "required": [
+          "libraryId",
+          "spaceId"
+        ],
+        "type": "object"
+      },
+      "SyncSharedSpaceLibraryV1": {
+        "properties": {
+          "addedById": {
+            "description": "User who added the library to the space",
+            "nullable": true,
+            "type": "string"
+          },
+          "createdAt": {
+            "description": "Created at",
+            "format": "date-time",
+            "type": "string"
+          },
+          "libraryId": {
+            "description": "Library ID",
+            "type": "string"
+          },
+          "spaceId": {
+            "description": "Shared space ID",
+            "type": "string"
+          },
+          "updatedAt": {
+            "description": "Updated at",
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "addedById",
+          "createdAt",
+          "libraryId",
+          "spaceId",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "SyncSharedSpaceMemberDeleteV1": {
+        "properties": {
+          "spaceId": {
+            "description": "Shared space ID",
+            "type": "string"
+          },
+          "userId": {
+            "description": "User ID",
+            "type": "string"
+          }
+        },
+        "required": [
+          "spaceId",
+          "userId"
+        ],
+        "type": "object"
+      },
+      "SyncSharedSpaceMemberV1": {
+        "properties": {
+          "joinedAt": {
+            "description": "When the user joined the space",
+            "format": "date-time",
+            "type": "string"
+          },
+          "role": {
+            "description": "Member role",
+            "type": "string"
+          },
+          "showInTimeline": {
+            "description": "Whether the space contributes to the user timeline",
+            "type": "boolean"
+          },
+          "spaceId": {
+            "description": "Shared space ID",
+            "type": "string"
+          },
+          "userId": {
+            "description": "User ID",
+            "type": "string"
+          }
+        },
+        "required": [
+          "joinedAt",
+          "role",
+          "showInTimeline",
+          "spaceId",
+          "userId"
+        ],
+        "type": "object"
+      },
+      "SyncSharedSpaceToAssetDeleteV1": {
+        "properties": {
+          "assetId": {
+            "description": "Asset ID",
+            "type": "string"
+          },
+          "spaceId": {
+            "description": "Shared space ID",
+            "type": "string"
+          }
+        },
+        "required": [
+          "assetId",
+          "spaceId"
+        ],
+        "type": "object"
+      },
+      "SyncSharedSpaceToAssetV1": {
+        "properties": {
+          "assetId": {
+            "description": "Asset ID",
+            "type": "string"
+          },
+          "spaceId": {
+            "description": "Shared space ID",
+            "type": "string"
+          }
+        },
+        "required": [
+          "assetId",
+          "spaceId"
+        ],
+        "type": "object"
+      },
+      "SyncSharedSpaceV1": {
+        "properties": {
+          "color": {
+            "description": "Color",
+            "nullable": true,
+            "type": "string"
+          },
+          "createdAt": {
+            "description": "Created at",
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdById": {
+            "description": "Created by user ID",
+            "type": "string"
+          },
+          "description": {
+            "description": "Space description",
+            "nullable": true,
+            "type": "string"
+          },
+          "faceRecognitionEnabled": {
+            "description": "Face recognition enabled",
+            "type": "boolean"
+          },
+          "id": {
+            "description": "Shared space ID",
+            "type": "string"
+          },
+          "lastActivityAt": {
+            "description": "Last activity timestamp",
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "name": {
+            "description": "Space name",
+            "type": "string"
+          },
+          "petsEnabled": {
+            "description": "Pets enabled",
+            "type": "boolean"
+          },
+          "thumbnailAssetId": {
+            "description": "Thumbnail asset ID",
+            "nullable": true,
+            "type": "string"
+          },
+          "thumbnailCropY": {
+            "description": "Thumbnail crop Y offset",
+            "nullable": true,
+            "type": "number"
+          },
+          "updatedAt": {
+            "description": "Updated at",
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "color",
+          "createdAt",
+          "createdById",
+          "description",
+          "faceRecognitionEnabled",
+          "id",
+          "lastActivityAt",
+          "name",
+          "petsEnabled",
+          "thumbnailAssetId",
+          "thumbnailCropY",
+          "updatedAt"
+        ],
         "type": "object"
       },
       "SyncStackDeleteV1": {
