@@ -548,7 +548,7 @@
   <!-- FilterPanel hidden: no assets to filter -->
 {:else if collapsed}
   <div
-    class="flex h-full w-8 flex-shrink-0 flex-col items-center gap-3 border-r border-gray-200 bg-light py-2 shadow-sm dark:border-gray-700 dark:shadow-none"
+    class="flex h-full w-8 flex-shrink-0 flex-col items-center gap-3 border-r border-gray-200 bg-light py-2 dark:border-gray-700"
     data-testid="collapsed-icon-strip"
   >
     <button
@@ -576,7 +576,7 @@
   </div>
 {:else}
   <div
-    class="immich-scrollbar flex w-64 flex-col overflow-y-auto border-r border-gray-200 bg-light shadow-sm dark:border-gray-700 dark:shadow-none"
+    class="immich-scrollbar flex w-64 flex-col overflow-y-auto border-r border-gray-200 bg-light dark:border-gray-700"
     data-testid="discovery-panel"
   >
     <div
