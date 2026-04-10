@@ -1618,18 +1618,19 @@ order by
 
 -- SyncRepository.library.getCreatedAfter
 select
-  "library"."id",
-  "library"."createId"
+  "library_user"."libraryId" as "id",
+  "library_user"."createId"
 from
-  "library"
+  "library_user"
 where
-  "library"."id" in (
+  "library_user"."userId" = $1
+  and "library_user"."libraryId" in (
     select
       "library"."id"
     from
       "library"
     where
-      "library"."ownerId" = $1
+      "library"."ownerId" = $2
       and "library"."deletedAt" is null
     union
     select
@@ -1643,20 +1644,20 @@ where
         from
           "shared_space"
         where
-          "shared_space"."createdById" = $2
+          "shared_space"."createdById" = $3
         union
         select
           "shared_space_member"."spaceId" as "id"
         from
           "shared_space_member"
         where
-          "shared_space_member"."userId" = $3
+          "shared_space_member"."userId" = $4
       )
   )
-  and "library"."createId" >= $4
-  and "library"."createId" < $5
+  and "library_user"."createId" >= $5
+  and "library_user"."createId" < $6
 order by
-  "library"."createId" asc
+  "library_user"."createId" asc
 
 -- SyncRepository.library.getDeletes
 select

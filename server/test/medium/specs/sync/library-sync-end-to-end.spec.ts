@@ -110,31 +110,24 @@ describe('library sync end-to-end access control', () => {
     await ctx.syncAckAll(authB, afterRemoval);
 
     // Step 3: Re-add B to S. After the library_user fix, re-membership
-    // triggers the create-side library_user trigger which:
-    //   1. INSERTs a (B, L) row for each linked library with a fresh createId,
-    //      so the per-library asset backfill loop will re-iterate (landing
-    //      after the LibrarySync.getCreatedAfter rewrite — see plan Task 13).
-    //   2. Bumps library.updateId so LibrarySync.getUpserts re-emits the
+    // fires the create-side triggers which:
+    //   1. INSERT (B, L) rows for each linked library with fresh createIds,
+    //      so LibrarySync.getCreatedAfter returns them and the per-library
+    //      asset backfill loop re-iterates.
+    //   2. Bump library.updateId so LibrarySync.getUpserts re-emits the
     //      library metadata row on B's next sync.
-    //
-    // This test asserts the Library metadata re-emit half of the fix. The
-    // asset + exif re-emit half lands with the getCreatedAfter rewrite;
-    // assertions below currently expect 0 for asset/exif and will be flipped
-    // to `>= 1` in the same commit that rewrites getCreatedAfter.
     await ctx.newSharedSpaceMember({ spaceId: space.id, userId: authB.user.id, role: SharedSpaceRole.Editor });
 
     const afterReadd = await ctx.syncStream(authB, ALL_LIBRARY_TYPES);
 
-    // Library rows DO reappear now — the shared_space_member_after_insert_library
-    // trigger bumped library.updateId for every linked library, and
-    // LibrarySync.getUpserts picks that up.
+    // Library metadata rows re-emit via the updateId bump.
     const reAddedLibraryEvents = afterReadd.filter((r: { type: string }) => r.type === SyncEntityType.LibraryV1);
     const reAddedLibraryIds = reAddedLibraryEvents
       .map((e: { data: { id: string } }) => e.data.id)
       .toSorted();
     expect(reAddedLibraryIds).toEqual([l1.id, l2.id].toSorted());
 
-    // Join rows DO reappear via SharedSpaceLibraryBackfillV1 — the membership
+    // Join rows re-emit via SharedSpaceLibraryBackfillV1 — the membership
     // createId is fresh, so the backfill loop re-iterates the space.
     const reAddedLinkEvents = afterReadd.filter(
       (r: { type: string }) =>
@@ -145,19 +138,19 @@ describe('library sync end-to-end access control', () => {
       .toSorted();
     expect(reAddedLinkLibraryIds).toEqual([l1.id, l2.id].toSorted());
 
-    // Asset content does NOT reappear YET — LibrarySync.getCreatedAfter still
-    // keys off library.createId. This flips in plan Task 13.
+    // Asset content re-emits via the per-library backfill loop driven by
+    // fresh library_user.createIds.
     const reAddedAssetEvents = afterReadd.filter(
       (r: { type: string }) =>
         r.type === SyncEntityType.LibraryAssetCreateV1 || r.type === SyncEntityType.LibraryAssetBackfillV1,
     );
-    expect(reAddedAssetEvents).toHaveLength(0);
+    expect(reAddedAssetEvents.length).toBeGreaterThan(0);
 
-    // Exif content does NOT reappear YET — same reason.
+    // Exif content re-emits too.
     const reAddedExifEvents = afterReadd.filter(
       (r: { type: string }) =>
         r.type === SyncEntityType.LibraryAssetExifCreateV1 || r.type === SyncEntityType.LibraryAssetExifBackfillV1,
     );
-    expect(reAddedExifEvents).toHaveLength(0);
+    expect(reAddedExifEvents.length).toBeGreaterThan(0);
   });
 });

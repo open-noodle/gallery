@@ -1105,23 +1105,34 @@ const LIBRARY_SYNC_COLUMNS = [
 ] as const;
 
 export class LibrarySync extends BaseSync {
-  // Returns libraries accessible to the user, ordered by library.createId. Unlike
-  // SharedSpaceSync.getCreatedAfter — which enumerates membership rows because
-  // each user gets a fresh per-membership createId — libraries do not have a
-  // per-user join table. The createId is a property of the library row itself,
-  // shared across all users with access. A user added to a pre-existing space
-  // that links an old library will not pick up that library here (the createId
-  // is past their backfill checkpoint); SharedSpaceLibrarySync's per-link
-  // backfill loop in sync.service.ts handles that case.
+  // Queries library_user (a (userId, libraryId) denormalization populated by
+  // the library_after_insert / shared_space_member_after_insert_library /
+  // shared_space_library_after_insert_user triggers) keyed by the per-user
+  // access-grant createId. This mirrors SharedSpaceSync.getCreatedAfter and
+  // AlbumSync.getCreatedAfter — each row represents "user U gained access to
+  // library L at time createId", so a user rejoining a space or being added
+  // to a pre-existing space gets fresh createIds > their checkpoint and the
+  // per-library asset backfill loop correctly re-iterates the library.
+  //
+  // The `library_user.libraryId IN accessibleLibraries(userId)` filter is
+  // preserved so that soft-deleted owned libraries are excluded — matching
+  // the existing behavior where `accessibleLibraries` drops the ownership
+  // branch when `deletedAt IS NOT NULL`, while keeping soft-deleted libraries
+  // visible via the space-link branch. Without this filter, an owner who
+  // soft-deletes a library would still see its assets re-streamed on every
+  // sync.
+  //
+  // See docs/plans/2026-04-11-library-user-access-backfill-design.md.
   @GenerateSql({ params: [dummyCreateAfterOptions] })
   getCreatedAfter({ nowId, userId, afterCreateId }: SyncCreatedAfterOptions) {
     return this.db
-      .selectFrom('library')
-      .select(['library.id', 'library.createId'])
-      .where('library.id', 'in', (eb) => accessibleLibraries(eb, userId))
-      .$if(!!afterCreateId, (qb) => qb.where('library.createId', '>=', afterCreateId!))
-      .where('library.createId', '<', nowId)
-      .orderBy('library.createId', 'asc')
+      .selectFrom('library_user')
+      .select(['library_user.libraryId as id', 'library_user.createId'])
+      .where('library_user.userId', '=', userId)
+      .where('library_user.libraryId', 'in', (eb) => accessibleLibraries(eb, userId))
+      .$if(!!afterCreateId, (qb) => qb.where('library_user.createId', '>=', afterCreateId!))
+      .where('library_user.createId', '<', nowId)
+      .orderBy('library_user.createId', 'asc')
       .execute();
   }
 
