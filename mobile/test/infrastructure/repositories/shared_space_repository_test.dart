@@ -381,6 +381,127 @@ void main() {
         await sub.cancel();
       });
 
+      test('interleaved ordering: library and direct-add assets sorted DESC across both sources', () async {
+        // The UNION must sort the merged result by createdAt DESC, not by
+        // source. Mix 6 assets where library and direct-add alternate —
+        // the output order must be strictly DESC regardless of which
+        // branch each row came from.
+        final library = await ctx.newLibrary(ownerId: userId);
+        await ctx.insertSharedSpaceLibrary(spaceId: spaceId, libraryId: library.id);
+
+        // Interleave: lib(day1) → direct(day2) → lib(day3) → direct(day4) → lib(day5) → direct(day6)
+        final lib1 = await ctx.newRemoteAsset(ownerId: userId, libraryId: library.id, createdAt: DateTime(2026, 4, 1, 12));
+        final direct2 = await ctx.newRemoteAsset(ownerId: userId, createdAt: DateTime(2026, 4, 2, 12));
+        await ctx.insertSharedSpaceAsset(spaceId: spaceId, assetId: direct2.id);
+        final lib3 = await ctx.newRemoteAsset(ownerId: userId, libraryId: library.id, createdAt: DateTime(2026, 4, 3, 12));
+        final direct4 = await ctx.newRemoteAsset(ownerId: userId, createdAt: DateTime(2026, 4, 4, 12));
+        await ctx.insertSharedSpaceAsset(spaceId: spaceId, assetId: direct4.id);
+        final lib5 = await ctx.newRemoteAsset(ownerId: userId, libraryId: library.id, createdAt: DateTime(2026, 4, 5, 12));
+        final direct6 = await ctx.newRemoteAsset(ownerId: userId, createdAt: DateTime(2026, 4, 6, 12));
+        await ctx.insertSharedSpaceAsset(spaceId: spaceId, assetId: direct6.id);
+
+        final query = sut.sharedSpace(spaceId, GroupAssetsBy.day);
+        final assets = await query.assetSource(0, 20);
+
+        final ids = assets.map((a) => a.remoteId).toList();
+        // DESC order: direct6, lib5, direct4, lib3, direct2, lib1
+        expect(ids, [direct6.id, lib5.id, direct4.id, lib3.id, direct2.id, lib1.id]);
+      });
+
+      test('bucket grouping: GroupAssetsBy.day emits one bucket per day across both sources', () async {
+        // 2 library assets on day A, 2 direct-add assets on day B, 1 of
+        // each on day C. Expected: 3 buckets, counts [2, 2, 2].
+        final library = await ctx.newLibrary(ownerId: userId);
+        await ctx.insertSharedSpaceLibrary(spaceId: spaceId, libraryId: library.id);
+
+        // Day A (lib only, 2 assets)
+        await ctx.newRemoteAsset(ownerId: userId, libraryId: library.id, createdAt: DateTime(2026, 4, 3, 10));
+        await ctx.newRemoteAsset(ownerId: userId, libraryId: library.id, createdAt: DateTime(2026, 4, 3, 14));
+        // Day B (direct only, 2 assets)
+        final d1 = await ctx.newRemoteAsset(ownerId: userId, createdAt: DateTime(2026, 4, 2, 10));
+        final d2 = await ctx.newRemoteAsset(ownerId: userId, createdAt: DateTime(2026, 4, 2, 14));
+        await ctx.insertSharedSpaceAsset(spaceId: spaceId, assetId: d1.id);
+        await ctx.insertSharedSpaceAsset(spaceId: spaceId, assetId: d2.id);
+        // Day C (mix, 1 of each)
+        await ctx.newRemoteAsset(ownerId: userId, libraryId: library.id, createdAt: DateTime(2026, 4, 1, 10));
+        final d3 = await ctx.newRemoteAsset(ownerId: userId, createdAt: DateTime(2026, 4, 1, 14));
+        await ctx.insertSharedSpaceAsset(spaceId: spaceId, assetId: d3.id);
+
+        final query = sut.sharedSpace(spaceId, GroupAssetsBy.day);
+        final buckets = await query.bucketSource().first;
+
+        expect(buckets, hasLength(3));
+        // DESC order by day: Day A (04-03) first with 2, Day B (04-02) with 2, Day C (04-01) with 2.
+        expect(buckets.map((b) => b.assetCount).toList(), [2, 2, 2]);
+      });
+
+      test('space links a library that has zero assets: empty timeline without crash', () async {
+        // Linking an empty library to a space is a legitimate state (e.g.
+        // import paths not yet crawled). The timeline query must not
+        // crash and must return an empty bucket list.
+        final library = await ctx.newLibrary(ownerId: userId);
+        await ctx.insertSharedSpaceLibrary(spaceId: spaceId, libraryId: library.id);
+
+        final query = sut.sharedSpace(spaceId, GroupAssetsBy.day);
+        final buckets = await query.bucketSource().first;
+        final assets = await query.assetSource(0, 10);
+        expect(buckets, isEmpty);
+        expect(assets, isEmpty);
+      });
+
+      test('asset with a dangling libraryId (not linked to this space) is NOT returned', () async {
+        // An asset carries library_id = X but X is not in the
+        // shared_space_library join table for this space. The asset must
+        // NOT appear in the timeline. This catches a bug where the UNION
+        // predicate would incorrectly match on libraryId alone.
+        final linkedLib = await ctx.newLibrary(ownerId: userId);
+        final danglingLib = await ctx.newLibrary(ownerId: userId);
+        await ctx.insertSharedSpaceLibrary(spaceId: spaceId, libraryId: linkedLib.id);
+
+        // Asset in the linked library — should appear.
+        final visible = await ctx.newRemoteAsset(
+          ownerId: userId,
+          libraryId: linkedLib.id,
+          createdAt: DateTime(2026, 4, 1, 12),
+        );
+        // Asset in the dangling library — should NOT appear.
+        await ctx.newRemoteAsset(
+          ownerId: userId,
+          libraryId: danglingLib.id,
+          createdAt: DateTime(2026, 4, 2, 12),
+        );
+
+        final query = sut.sharedSpace(spaceId, GroupAssetsBy.day);
+        final assets = await query.assetSource(0, 10);
+        expect(assets, hasLength(1));
+        expect(assets.first.remoteId, visible.id);
+      });
+
+      test('soft-deleted library asset is excluded from the timeline', () async {
+        // remote_asset_entity.deleted_at IS NULL is a baseline filter on
+        // every timeline query. A library asset with deleted_at set must
+        // not appear, even though the library link is intact.
+        final library = await ctx.newLibrary(ownerId: userId);
+        await ctx.insertSharedSpaceLibrary(spaceId: spaceId, libraryId: library.id);
+
+        final live = await ctx.newRemoteAsset(
+          ownerId: userId,
+          libraryId: library.id,
+          createdAt: DateTime(2026, 4, 1, 12),
+        );
+        await ctx.newRemoteAsset(
+          ownerId: userId,
+          libraryId: library.id,
+          createdAt: DateTime(2026, 4, 2, 12),
+          deletedAt: DateTime(2026, 4, 3, 12),
+        );
+
+        final query = sut.sharedSpace(spaceId, GroupAssetsBy.day);
+        final assets = await query.assetSource(0, 10);
+        expect(assets, hasLength(1));
+        expect(assets.first.remoteId, live.id);
+      });
+
       test('multi-library single-space: dedupes assets present in two linked libraries (none direct)', () async {
         // A space links two libraries, libA and libB. The same asset cannot belong
         // to both (asset.libraryId is single-valued), so the dedup property here

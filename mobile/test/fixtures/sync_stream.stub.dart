@@ -153,4 +153,213 @@ abstract final class SyncStreamStub {
     data: SyncLibraryDeleteV1(libraryId: 'library-2'),
     ack: 'library-delete-ack',
   );
+
+  static final libraryAssetCreateV1 = SyncEvent(
+    type: SyncEntityType.libraryAssetCreateV1,
+    data: SyncAssetV1(
+      id: 'lib-asset-1',
+      checksum: 'cLib1',
+      originalFileName: 'lib-asset-1.jpg',
+      type: AssetTypeEnum.IMAGE,
+      ownerId: 'owner',
+      isFavorite: false,
+      fileCreatedAt: DateTime(2026, 4, 1),
+      fileModifiedAt: DateTime(2026, 4, 1),
+      localDateTime: DateTime(2026, 4, 1),
+      visibility: AssetVisibility.timeline,
+      width: 100,
+      height: 100,
+      deletedAt: null,
+      duration: null,
+      libraryId: 'library-1',
+      livePhotoVideoId: null,
+      stackId: null,
+      thumbhash: null,
+      isEdited: false,
+    ),
+    ack: 'lib-asset-create-ack',
+  );
+
+  static final libraryAssetBackfillV1 = SyncEvent(
+    type: SyncEntityType.libraryAssetBackfillV1,
+    data: SyncAssetV1(
+      id: 'lib-asset-2',
+      checksum: 'cLib2',
+      originalFileName: 'lib-asset-2.jpg',
+      type: AssetTypeEnum.IMAGE,
+      ownerId: 'owner',
+      isFavorite: false,
+      fileCreatedAt: DateTime(2026, 4, 1),
+      fileModifiedAt: DateTime(2026, 4, 1),
+      localDateTime: DateTime(2026, 4, 1),
+      visibility: AssetVisibility.timeline,
+      width: 100,
+      height: 100,
+      deletedAt: null,
+      duration: null,
+      libraryId: 'library-1',
+      livePhotoVideoId: null,
+      stackId: null,
+      thumbhash: null,
+      isEdited: false,
+    ),
+    ack: 'lib-asset-backfill-ack',
+  );
+
+  static final libraryAssetDeleteV1 = SyncEvent(
+    type: SyncEntityType.libraryAssetDeleteV1,
+    data: SyncLibraryAssetDeleteV1(assetId: 'lib-asset-3'),
+    ack: 'lib-asset-delete-ack',
+  );
+
+  static final libraryAssetExifCreateV1 = SyncEvent(
+    type: SyncEntityType.libraryAssetExifCreateV1,
+    data: SyncAssetExifV1(
+      assetId: 'lib-asset-1',
+      exifImageWidth: null,
+      exifImageHeight: null,
+      orientation: null,
+      city: null,
+      country: null,
+      dateTimeOriginal: null,
+      description: null,
+      exposureTime: null,
+      fNumber: null,
+      fileSizeInByte: null,
+      focalLength: null,
+      fps: null,
+      iso: null,
+      latitude: null,
+      lensModel: null,
+      longitude: null,
+      make: null,
+      model: null,
+      modifyDate: null,
+      profileDescription: null,
+      projectionType: null,
+      rating: null,
+      state: null,
+      timeZone: null,
+    ),
+    ack: 'lib-asset-exif-create-ack',
+  );
+
+  static final libraryAssetExifBackfillV1 = SyncEvent(
+    type: SyncEntityType.libraryAssetExifBackfillV1,
+    data: SyncAssetExifV1(
+      assetId: 'lib-asset-2',
+      exifImageWidth: null,
+      exifImageHeight: null,
+      orientation: null,
+      city: null,
+      country: null,
+      dateTimeOriginal: null,
+      description: null,
+      exposureTime: null,
+      fNumber: null,
+      fileSizeInByte: null,
+      focalLength: null,
+      fps: null,
+      iso: null,
+      latitude: null,
+      lensModel: null,
+      longitude: null,
+      make: null,
+      model: null,
+      modifyDate: null,
+      profileDescription: null,
+      projectionType: null,
+      rating: null,
+      state: null,
+      timeZone: null,
+    ),
+    ack: 'lib-asset-exif-backfill-ack',
+  );
+
+  static final sharedSpaceLibraryV1 = SyncEvent(
+    type: SyncEntityType.sharedSpaceLibraryV1,
+    data: SyncSharedSpaceLibraryV1(
+      spaceId: 'space-1',
+      libraryId: 'library-1',
+      addedById: 'owner',
+      createdAt: DateTime(2026, 4, 1),
+      updatedAt: DateTime(2026, 4, 1),
+    ),
+    ack: 'shared-space-library-v1-ack',
+  );
+
+  static final sharedSpaceLibraryBackfillV1 = SyncEvent(
+    type: SyncEntityType.sharedSpaceLibraryBackfillV1,
+    data: SyncSharedSpaceLibraryV1(
+      spaceId: 'space-2',
+      libraryId: 'library-2',
+      addedById: 'owner',
+      createdAt: DateTime(2026, 4, 1),
+      updatedAt: DateTime(2026, 4, 1),
+    ),
+    ack: 'shared-space-library-backfill-ack',
+  );
+
+  static final sharedSpaceLibraryDeleteV1 = SyncEvent(
+    type: SyncEntityType.sharedSpaceLibraryDeleteV1,
+    data: SyncSharedSpaceLibraryDeleteV1(spaceId: 'space-3', libraryId: 'library-3'),
+    ack: 'shared-space-library-delete-ack',
+  );
+
+  // --- gallery-fork: shared space sync stubs (PR 1) ---
+
+  static final sharedSpaceV1 = SyncEvent(
+    type: SyncEntityType.sharedSpaceV1,
+    data: SyncSharedSpaceV1(
+      id: 'space-1',
+      name: 'Test Space',
+      description: null,
+      color: null,
+      createdById: 'owner',
+      thumbnailAssetId: null,
+      thumbnailCropY: null,
+      faceRecognitionEnabled: true,
+      petsEnabled: false,
+      lastActivityAt: null,
+      createdAt: DateTime(2026, 4, 1),
+      updatedAt: DateTime(2026, 4, 1),
+    ),
+    ack: 'shared-space-v1-ack',
+  );
+
+  static final sharedSpaceDeleteV1 = SyncEvent(
+    type: SyncEntityType.sharedSpaceDeleteV1,
+    data: SyncSharedSpaceDeleteV1(spaceId: 'space-2'),
+    ack: 'shared-space-delete-ack',
+  );
+
+  static final sharedSpaceMemberV1 = SyncEvent(
+    type: SyncEntityType.sharedSpaceMemberV1,
+    data: SyncSharedSpaceMemberV1(
+      spaceId: 'space-1',
+      userId: 'user-1',
+      role: 'editor',
+      showInTimeline: true,
+      joinedAt: DateTime(2026, 4, 1),
+    ),
+    ack: 'shared-space-member-v1-ack',
+  );
+
+  static final sharedSpaceMemberBackfillV1 = SyncEvent(
+    type: SyncEntityType.sharedSpaceMemberBackfillV1,
+    data: SyncSharedSpaceMemberV1(
+      spaceId: 'space-2',
+      userId: 'user-2',
+      role: 'editor',
+      showInTimeline: true,
+      joinedAt: DateTime(2026, 4, 1),
+    ),
+    ack: 'shared-space-member-backfill-ack',
+  );
+
+  static final sharedSpaceMemberDeleteV1 = SyncEvent(
+    type: SyncEntityType.sharedSpaceMemberDeleteV1,
+    data: SyncSharedSpaceMemberDeleteV1(spaceId: 'space-3', userId: 'user-3'),
+    ack: 'shared-space-member-delete-ack',
+  );
 }

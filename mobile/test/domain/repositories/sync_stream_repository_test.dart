@@ -870,5 +870,163 @@ void main() {
       expect(rows, hasLength(1));
       expect(rows.first.libraryId, 'not-yet-synced-library');
     });
+
+    test('SharedSpaceLibraryV1 arriving before SharedSpaceV1 is rejected by the hard FK on spaceId', () async {
+      // Asymmetry lock-in: libraryId on sharedSpaceLibraryEntity is loose
+      // (no FK — see the test above), but spaceId has a HARD cascade FK.
+      // The sync ordering contract is: SharedSpaceV1 must land BEFORE any
+      // join rows for that space. This test asserts the contract is
+      // enforced — if you relax the FK, the top-level sync dispatcher must
+      // be able to guarantee strict ordering, or this test will catch it.
+      await sut.updateUsersV1([_createUser()]);
+
+      await expectLater(
+        sut.updateSharedSpaceLibrariesV1([
+          SyncSharedSpaceLibraryV1(
+            spaceId: 'not-yet-synced-space',
+            libraryId: 'also-not-yet-synced',
+            addedById: 'user-1',
+            createdAt: DateTime(2026, 4, 6),
+            updatedAt: DateTime(2026, 4, 6),
+          ),
+        ]),
+        throwsA(anything),
+      );
+      expect(await db.sharedSpaceLibraryEntity.select().get(), isEmpty);
+    });
+
+    test('LibraryV1 with an unknown ownerId throws a foreign key violation', () async {
+      // library_entity has a HARD FK on owner_id (no tolerance for missing
+      // parent rows). This test locks in that design — if you ever relax
+      // the FK, update this assertion. The contract is: the server is
+      // expected to stream the owner user row BEFORE the library row.
+      await sut.updateUsersV1([_createUser()]);
+
+      await expectLater(
+        sut.updateLibrariesV1([makeLibrary(ownerId: 'user-does-not-exist')]),
+        throwsA(anything),
+      );
+      // Library table untouched.
+      expect(await db.libraryEntity.select().get(), isEmpty);
+    });
+
+    group('deleteLibrariesV1 chunk boundary tests', () {
+      // _kSweepChunkSize = 500 in the production handler. Off-by-one bugs in
+      // the slicing loop would slip past the single 600-library test above,
+      // so we stress the exact boundaries (N-1, N, N+1) at both 500 and 1000.
+      setUp(() async {
+        // Both users must exist before any library/asset inserts.
+        // user-1 = current user (preserved), user-foreign = orphan owner (swept).
+        await sut.updateUsersV1([_createUser(id: 'user-1'), _createUser(id: 'user-foreign')]);
+      });
+
+      Future<void> seedAndDelete(int count) async {
+        final libraryIds = List.generate(count, (i) => 'boundary-lib-$i');
+        await sut.updateLibrariesV1(
+          libraryIds.map((id) => makeLibrary(id: id, ownerId: 'user-foreign')),
+        );
+        // Each library has exactly one foreign-owned orphan asset.
+        await sut.updateLibraryAssetsV1(
+          List.generate(
+            count,
+            (i) => makeLibraryAsset(
+              id: 'orphan-$i',
+              checksum: 'cBound$i',
+              ownerId: 'user-foreign',
+              libraryId: libraryIds[i],
+            ),
+          ),
+        );
+
+        await sut.deleteLibrariesV1(
+          libraryIds.map((id) => SyncLibraryDeleteV1(libraryId: id)),
+          currentUserId: 'user-1',
+        );
+
+        // Full cleanup: libraries gone, orphan assets swept.
+        expect(await db.libraryEntity.select().get(), isEmpty);
+        expect(await db.remoteAssetEntity.select().get(), isEmpty);
+      }
+
+      test('N=499 libraries (1 under chunk boundary) deletes all in single chunk', () async {
+        await seedAndDelete(499);
+      });
+
+      test('N=500 libraries (exact chunk boundary) deletes all', () async {
+        await seedAndDelete(500);
+      });
+
+      test('N=501 libraries (1 over chunk boundary, needs 2 chunks) deletes all', () async {
+        await seedAndDelete(501);
+      });
+
+      test('N=999 libraries (1 under 2x boundary) deletes all', () async {
+        await seedAndDelete(999);
+      });
+
+      test('N=1000 libraries (exact 2x boundary) deletes all', () async {
+        await seedAndDelete(1000);
+      });
+
+      test('N=1001 libraries (1 over 2x boundary, needs 3 chunks) deletes all', () async {
+        await seedAndDelete(1001);
+      });
+    });
+
+    test('deleteLibrariesV1 with empty list is a no-op (does not open a transaction)', () async {
+      // An empty LibraryDeleteV1 batch should not crash, not open a
+      // transaction, and not touch any rows. The handler can receive empty
+      // batches when the server has nothing to delete but still sends an
+      // end-of-stream frame.
+      await sut.updateUsersV1([_createUser()]);
+      await sut.updateLibrariesV1([makeLibrary(id: 'library-1', ownerId: 'user-1')]);
+      await sut.updateLibraryAssetsV1([
+        makeLibraryAsset(id: 'keep-me', checksum: 'cEmpty', ownerId: 'user-1', libraryId: 'library-1'),
+      ]);
+
+      await sut.deleteLibrariesV1(const <SyncLibraryDeleteV1>[], currentUserId: 'user-1');
+
+      expect(await db.libraryEntity.select().get(), hasLength(1));
+      expect(await db.remoteAssetEntity.select().get(), hasLength(1));
+    });
+
+    test('deleteLibrariesV1 on a library with zero assets still removes the library row', () async {
+      // Library has no asset rows at all. The delete must succeed (not
+      // throw on the "no orphans to sweep" case) and the library_entity
+      // row must be gone.
+      await sut.updateUsersV1([_createUser()]);
+      await sut.updateLibrariesV1([makeLibrary(id: 'empty-lib', ownerId: 'user-1')]);
+      expect(await db.libraryEntity.select().get(), hasLength(1));
+
+      await sut.deleteLibrariesV1(
+        [SyncLibraryDeleteV1(libraryId: 'empty-lib')],
+        currentUserId: 'user-1',
+      );
+
+      expect(await db.libraryEntity.select().get(), isEmpty);
+      expect(await db.remoteAssetEntity.select().get(), isEmpty);
+    });
+
+    test('updateLibraryAssetsV1 with asset.libraryId change moves the asset between libraries', () async {
+      // Asset lives in libA, then the server streams an UPSERT with the
+      // same id but libraryId = libB. The remote_asset_entity row should
+      // reflect libB — not duplicate, not revert.
+      await sut.updateUsersV1([_createUser()]);
+      await sut.updateLibrariesV1([
+        makeLibrary(id: 'libA', ownerId: 'user-1'),
+        makeLibrary(id: 'libB', ownerId: 'user-1'),
+      ]);
+      await sut.updateLibraryAssetsV1([
+        makeLibraryAsset(id: 'mover', checksum: 'cMove', ownerId: 'user-1', libraryId: 'libA'),
+      ]);
+
+      await sut.updateLibraryAssetsV1([
+        makeLibraryAsset(id: 'mover', checksum: 'cMove', ownerId: 'user-1', libraryId: 'libB'),
+      ]);
+
+      final rows = await db.remoteAssetEntity.select().get();
+      expect(rows, hasLength(1));
+      expect(rows.first.libraryId, 'libB');
+    });
   });
 }
