@@ -109,44 +109,30 @@ describe('library sync end-to-end access control', () => {
 
     await ctx.syncAckAll(authB, afterRemoval);
 
-    // Step 3: Re-add B to S — document the Known Limitation behavior.
+    // Step 3: Re-add B to S. After the library_user fix, re-membership
+    // triggers the create-side library_user trigger which:
+    //   1. INSERTs a (B, L) row for each linked library with a fresh createId,
+    //      so the per-library asset backfill loop will re-iterate (landing
+    //      after the LibrarySync.getCreatedAfter rewrite — see plan Task 13).
+    //   2. Bumps library.updateId so LibrarySync.getUpserts re-emits the
+    //      library metadata row on B's next sync.
     //
-    // After re-membership, the four library streams behave asymmetrically:
-    //
-    // 1. SharedSpaceLibrary join rows DO re-emit. The dispatch enumerates
-    //    spaces via SharedSpaceSync.getCreatedAfter, which reads from
-    //    shared_space_member.createId. Re-adding B inserts a new
-    //    shared_space_member row with a fresh createId past B's backfill
-    //    checkpoint, so the per-space backfill loop fires and streams the
-    //    shared_space_library rows for the space again. B's mobile client
-    //    re-receives the join rows.
-    //
-    // 2. Library, LibraryAsset, and LibraryAssetExif rows do NOT re-emit.
-    //    These streams are gated by `library.createId` (per-library backfill
-    //    marker) or by `entity.updateId > ack`. The library row's createId
-    //    and updateId are unchanged since B's first sync, so:
-    //      - LibrarySync.getUpserts: WHERE updateId > ack → 0 events
-    //      - LibraryAssetSync per-library backfill: skips (createId past marker)
-    //      - LibraryAssetSync.getUpserts: WHERE updateId > ack → 0 events
-    //      - LibraryAssetExifSync: same as above
-    //
-    // The result for B's mobile client: the join rows reappear, but the
-    // library content does NOT. The mobile UI shows "library exists" with no
-    // photos. The user must trigger a sync reset or reinstall to recover the
-    // library content.
-    //
-    // This mirrors the existing AlbumSync limitation: a user added to a
-    // pre-existing album does not get a backfill of historical assets either.
-    // Solving it requires per-(user, library) backfill markers — out of scope
-    // for this PR. See design doc lines 376-378 and plan Task 27 "Accepted
-    // limitation".
+    // This test asserts the Library metadata re-emit half of the fix. The
+    // asset + exif re-emit half lands with the getCreatedAfter rewrite;
+    // assertions below currently expect 0 for asset/exif and will be flipped
+    // to `>= 1` in the same commit that rewrites getCreatedAfter.
     await ctx.newSharedSpaceMember({ spaceId: space.id, userId: authB.user.id, role: SharedSpaceRole.Editor });
 
     const afterReadd = await ctx.syncStream(authB, ALL_LIBRARY_TYPES);
 
-    // Library rows do NOT reappear — updateId is past B's ack.
+    // Library rows DO reappear now — the shared_space_member_after_insert_library
+    // trigger bumped library.updateId for every linked library, and
+    // LibrarySync.getUpserts picks that up.
     const reAddedLibraryEvents = afterReadd.filter((r: { type: string }) => r.type === SyncEntityType.LibraryV1);
-    expect(reAddedLibraryEvents).toHaveLength(0);
+    const reAddedLibraryIds = reAddedLibraryEvents
+      .map((e: { data: { id: string } }) => e.data.id)
+      .toSorted();
+    expect(reAddedLibraryIds).toEqual([l1.id, l2.id].toSorted());
 
     // Join rows DO reappear via SharedSpaceLibraryBackfillV1 — the membership
     // createId is fresh, so the backfill loop re-iterates the space.
@@ -159,14 +145,15 @@ describe('library sync end-to-end access control', () => {
       .toSorted();
     expect(reAddedLinkLibraryIds).toEqual([l1.id, l2.id].toSorted());
 
-    // Asset content does NOT reappear — this is the Known Limitation in action.
+    // Asset content does NOT reappear YET — LibrarySync.getCreatedAfter still
+    // keys off library.createId. This flips in plan Task 13.
     const reAddedAssetEvents = afterReadd.filter(
       (r: { type: string }) =>
         r.type === SyncEntityType.LibraryAssetCreateV1 || r.type === SyncEntityType.LibraryAssetBackfillV1,
     );
     expect(reAddedAssetEvents).toHaveLength(0);
 
-    // Exif content does NOT reappear either.
+    // Exif content does NOT reappear YET — same reason.
     const reAddedExifEvents = afterReadd.filter(
       (r: { type: string }) =>
         r.type === SyncEntityType.LibraryAssetExifCreateV1 || r.type === SyncEntityType.LibraryAssetExifBackfillV1,

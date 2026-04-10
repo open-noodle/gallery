@@ -533,3 +533,29 @@ export const library_after_insert = registerFunction({
       RETURN NULL;
     END`,
 });
+
+// When a user joins a space, grant access to every library currently linked
+// to that space. Also bump library.updateId so LibrarySync.getUpserts
+// re-delivers the library metadata row on the new member's next sync.
+export const shared_space_member_after_insert_library = registerFunction({
+  name: 'shared_space_member_after_insert_library',
+  returnType: 'TRIGGER',
+  language: 'PLPGSQL',
+  body: `
+    BEGIN
+      INSERT INTO library_user ("userId", "libraryId")
+      SELECT DISTINCT ir."userId", ssl."libraryId"
+      FROM inserted_rows ir
+      INNER JOIN shared_space_library ssl ON ssl."spaceId" = ir."spaceId"
+      ON CONFLICT DO NOTHING;
+
+      UPDATE library
+      SET "updatedAt" = clock_timestamp(), "updateId" = immich_uuid_v7(clock_timestamp())
+      WHERE "id" IN (
+        SELECT DISTINCT ssl."libraryId"
+        FROM inserted_rows ir
+        INNER JOIN shared_space_library ssl ON ssl."spaceId" = ir."spaceId"
+      );
+      RETURN NULL;
+    END`,
+});
