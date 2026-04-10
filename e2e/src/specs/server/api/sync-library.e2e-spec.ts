@@ -77,7 +77,9 @@ const syncStream = async (accessToken: string, types: SyncRequestType[], reset =
  */
 const ackAll = async (accessToken: string, lines: SyncLine[]): Promise<void> => {
   const acks = lines.filter((line) => line.type !== 'SyncCompleteV1' && line.ack).map((line) => line.ack);
-  if (acks.length === 0) return;
+  if (acks.length === 0) {
+    return;
+  }
   await request(app).post('/sync/ack').set(asBearerAuth(accessToken)).send({ acks }).expect(204);
 };
 
@@ -335,7 +337,9 @@ describe('/sync — library streams', () => {
         SyncRequestType.SharedSpaceLibrariesV1,
       ]);
       const deleteEvents = next.filter((l) => {
-        if (l.type !== 'SharedSpaceLibraryDeleteV1') return false;
+        if (l.type !== 'SharedSpaceLibraryDeleteV1') {
+          return false;
+        }
         const data = l.data as { spaceId: string; libraryId: string };
         return data.spaceId === space.id && data.libraryId === library.id;
       });
@@ -376,7 +380,9 @@ describe('/sync — library streams', () => {
       // Re-sync — victim must see a LibraryDeleteV1 for this library.
       const afterRemoval = await syncStream(victim.accessToken, ALL_LIBRARY_TYPES);
       const deletes = afterRemoval.filter((l) => {
-        if (l.type !== 'LibraryDeleteV1') return false;
+        if (l.type !== 'LibraryDeleteV1') {
+          return false;
+        }
         const data = l.data as { libraryId: string };
         return data.libraryId === library.id;
       });

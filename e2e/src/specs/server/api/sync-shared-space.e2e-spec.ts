@@ -58,7 +58,9 @@ const syncStream = async (accessToken: string, types: SyncRequestType[], reset =
 
 const ackAll = async (accessToken: string, lines: SyncLine[]): Promise<void> => {
   const acks = lines.filter((l) => l.type !== 'SyncCompleteV1' && l.ack).map((l) => l.ack);
-  if (acks.length === 0) return;
+  if (acks.length === 0) {
+    return;
+  }
   await request(app).post('/sync/ack').set(asBearerAuth(accessToken)).send({ acks }).expect(204);
 };
 
@@ -306,7 +308,9 @@ describe('/sync — shared-space streams', () => {
         SyncRequestType.SharedSpaceToAssetsV1,
       ]);
       const deletes = next.filter((l) => {
-        if (l.type !== 'SharedSpaceToAssetDeleteV1') return false;
+        if (l.type !== 'SharedSpaceToAssetDeleteV1') {
+          return false;
+        }
         const data = l.data as { spaceId: string; assetId: string };
         return data.spaceId === space.id && data.assetId === asset.id;
       });
