@@ -165,6 +165,30 @@ export async function up(db: Kysely<any>): Promise<void> {
   await sql`INSERT INTO "migration_overrides" ("name", "value") VALUES ('trigger_library_user_delete_after_audit', '{"type":"trigger","name":"library_user_delete_after_audit","sql":"CREATE OR REPLACE TRIGGER \\"library_user_delete_after_audit\\"\\n  AFTER INSERT ON \\"library_audit\\"\\n  REFERENCING NEW TABLE AS \\"inserted_rows\\"\\n  FOR EACH STATEMENT\\n  EXECUTE FUNCTION library_user_delete_after_audit();"}'::jsonb);`.execute(
     db,
   );
+
+  // --- Backfill from current state ---
+  //
+  // Pass 1: owned libraries inherit library.createId/createdAt so existing
+  // synced clients don't re-backfill libraries they already have.
+  await sql`
+    INSERT INTO library_user ("userId", "libraryId", "createId", "createdAt")
+    SELECT "ownerId", "id", "createId", "createdAt"
+    FROM library
+    WHERE "ownerId" IS NOT NULL AND "deletedAt" IS NULL
+    ON CONFLICT ("userId", "libraryId") DO NOTHING;
+  `.execute(db);
+
+  // Pass 2: transitive access via shared_space_library with fresh createIds
+  // so users in the broken state get their missing libraries re-delivered on
+  // next sync. Soft-deleted libraries are deliberately INCLUDED here —
+  // matches accessibleLibraries' space-link branch behavior.
+  await sql`
+    INSERT INTO library_user ("userId", "libraryId")
+    SELECT DISTINCT ssm."userId", ssl."libraryId"
+    FROM shared_space_library ssl
+    INNER JOIN shared_space_member ssm ON ssl."spaceId" = ssm."spaceId"
+    ON CONFLICT ("userId", "libraryId") DO NOTHING;
+  `.execute(db);
 }
 
 export async function down(db: Kysely<any>): Promise<void> {
