@@ -220,39 +220,39 @@ patch_assets() {
 
   # Logo variants for web, docs, design, mobile
   copy_if_exists "$assets/logo-inline-light.svg" \
-    "$REPO_ROOT/design/immich-logo-inline-light.svg" \
+    "$REPO_ROOT/design/gallery-logo-inline-light.svg" \
     "$REPO_ROOT/docs/static/img/immich-logo-inline-light.svg" \
     "$REPO_ROOT/mobile/assets/immich-logo-inline-light.svg"
 
   copy_if_exists "$assets/logo-inline-light.png" \
-    "$REPO_ROOT/design/immich-logo-inline-light.png" \
+    "$REPO_ROOT/design/gallery-logo-inline-light.png" \
     "$REPO_ROOT/docs/static/img/immich-logo-inline-light.png" \
     "$REPO_ROOT/mobile/assets/immich-logo-inline-light.png"
 
   copy_if_exists "$assets/logo-inline-dark.svg" \
-    "$REPO_ROOT/design/immich-logo-inline-dark.svg" \
+    "$REPO_ROOT/design/gallery-logo-inline-dark.svg" \
     "$REPO_ROOT/docs/static/img/immich-logo-inline-dark.svg" \
     "$REPO_ROOT/mobile/assets/immich-logo-inline-dark.svg"
 
   copy_if_exists "$assets/logo-inline-dark.png" \
-    "$REPO_ROOT/design/immich-logo-inline-dark.png" \
+    "$REPO_ROOT/design/gallery-logo-inline-dark.png" \
     "$REPO_ROOT/docs/static/img/immich-logo-inline-dark.png" \
     "$REPO_ROOT/mobile/assets/immich-logo-inline-dark.png"
 
   copy_if_exists "$assets/logo-stacked-light.svg" \
-    "$REPO_ROOT/design/immich-logo-stacked-light.svg" \
+    "$REPO_ROOT/design/gallery-logo-stacked-light.svg" \
     "$REPO_ROOT/docs/static/img/immich-logo-stacked-light.svg"
 
   copy_if_exists "$assets/logo-stacked-light.png" \
-    "$REPO_ROOT/design/immich-logo-stacked-light.png" \
+    "$REPO_ROOT/design/gallery-logo-stacked-light.png" \
     "$REPO_ROOT/docs/static/img/immich-logo-stacked-light.png"
 
   copy_if_exists "$assets/logo-stacked-dark.svg" \
-    "$REPO_ROOT/design/immich-logo-stacked-dark.svg" \
+    "$REPO_ROOT/design/gallery-logo-stacked-dark.svg" \
     "$REPO_ROOT/docs/static/img/immich-logo-stacked-dark.svg"
 
   copy_if_exists "$assets/logo-stacked-dark.png" \
-    "$REPO_ROOT/design/immich-logo-stacked-dark.png" \
+    "$REPO_ROOT/design/gallery-logo-stacked-dark.png" \
     "$REPO_ROOT/docs/static/img/immich-logo-stacked-dark.png"
 
   # Mobile logo assets

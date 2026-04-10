@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-<img src="../design/immich-logo-stacked-light.svg" width="300" title="Accedi con url personalizzato">
+<img src="../design/gallery-logo-stacked-light.svg" width="300" title="Accedi con url personalizzato">
 </p>
 <h3 align="center">Soluzione ad alte prestazioni per la gestione self-hosted di foto e video</h3>
 <br/>
