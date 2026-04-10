@@ -158,24 +158,30 @@ EXECUTE FUNCTION shared_space_library_after_insert_user();
 
 ### Delete-side (one new trigger)
 
-**4. `library_user_delete_after_audit`** — when a row is inserted into `library_audit`, delete the corresponding `library_user` row. The existing delete trigger chain (`shared_space_delete_library_audit`, `shared_space_library_delete_audit`, `shared_space_member_delete_library_audit`) already encodes the "user has lost all paths" policy via `user_has_library_path()` — we just consume its output.
+**4. `library_user_delete_after_audit`** — when a row is inserted into `library_audit`, delete the corresponding `library_user` row. The existing delete trigger chain (`shared_space_delete_library_audit`, `shared_space_library_delete_audit`, `shared_space_member_delete_library_audit`) already encodes the "user has lost all paths" policy via `user_has_library_path()` — we consume its output unconditionally.
 
 ```sql
 CREATE OR REPLACE FUNCTION library_user_delete_after_audit()
 RETURNS TRIGGER LANGUAGE PLPGSQL AS $$
 BEGIN
-  -- Defensive re-check: every existing path that inserts into library_audit
-  -- has already gated on `NOT user_has_library_path(...)`, so in normal
-  -- operation this filter is a no-op. We keep it so that any future code
-  -- path that inserts into library_audit without gating correctly cannot
-  -- accidentally strip a user's access — the consumer trigger will only
-  -- delete library_user rows for (user, library) pairs that genuinely have
-  -- no valid path anymore.
+  -- Trusts the gating at library_audit insertion time: every existing path
+  -- that inserts into library_audit already gates on
+  -- `NOT user_has_library_path(..., excludeSpaceId)`, so an audit row means
+  -- "this (user, library) pair has definitively lost access". We do NOT
+  -- re-check here.
+  --
+  -- Why not defensive re-check: an earlier design attempted a defensive
+  -- `NOT user_has_library_path(..., NULL)` filter here, but it is BROKEN
+  -- during `shared_space` hard-delete. `shared_space_delete_library_audit`
+  -- is a BEFORE DELETE ROW trigger, so when it inserts into library_audit
+  -- the FK-cascade deletes of shared_space_library / shared_space_member
+  -- have NOT yet run — `user_has_library_path(lib, user, NULL)` still finds
+  -- the about-to-be-cascaded rows and returns TRUE, which would incorrectly
+  -- skip the delete and leave stale library_user rows. Trust the gate.
   DELETE FROM library_user lu
   USING inserted_rows ir
   WHERE lu."userId" = ir."userId"
-    AND lu."libraryId" = ir."libraryId"
-    AND NOT user_has_library_path(lu."libraryId", lu."userId", NULL);
+    AND lu."libraryId" = ir."libraryId";
   RETURN NULL;
 END
 $$;
@@ -187,7 +193,7 @@ FOR EACH STATEMENT
 EXECUTE FUNCTION library_user_delete_after_audit();
 ```
 
-`user_has_library_path(libraryId, userId, excludeSpaceId=NULL)` with a null exclude returns true if the user has access via ANY path (ownership, space membership, space creator). Calling it with NULL here asks "does the user have access right now?" — and if they still do, we preserve the row.
+**Trust boundary:** any future code path that inserts into `library_audit` MUST gate on `NOT user_has_library_path(libraryId, userId, excludeSpaceId)` with the correct `excludeSpaceId` for the operation being performed — otherwise it will strip access it shouldn't. This is now a documented invariant of the `library_audit` table and is exercised by the test suite (see "defensive gate is owned by the inserter" in Testing strategy below).
 
 ## Migration: backfill `library_user` from current state
 
@@ -319,33 +325,9 @@ The create-side triggers handle the space-creator case indirectly: `SharedSpaceS
 
 If a future change to `SharedSpaceService.create` breaks the "creator is always a member" invariant, our design's create-side silently fails to insert `library_user` for the creator while the delete-side still defends them. That asymmetry would manifest as a creator seeing a space's libraries go missing after a cache-reset sync (the delete path preserves them, but the create path never populated the row). Pre-existing implicit invariant, but worth noting so whoever touches space creation later knows to check.
 
-### Bulk cascade performance with `user_has_library_path`
+### Bulk cascade performance
 
-The `library_user_delete_after_audit` consumer trigger calls `user_has_library_path(libraryId, userId, NULL)` once per row in `inserted_rows`. For a bulk cascade — e.g., hard-deleting a `shared_space` that contains M members × N libraries — the existing delete-side triggers can fan out hundreds or thousands of `library_audit` rows, and our consumer trigger then evaluates the path-check function once per row. Each call does its own subqueries against `library`, `shared_space_library`, and `shared_space_member`. For small instances this is fine; for a hypothetical deployment with 1000-member spaces linking 50 libraries, the per-delete cost becomes noticeable.
-
-**Not fixed in v1.** The fix if it ever matters is to rewrite the consumer trigger's DELETE to inline the path check as a `NOT EXISTS` subquery, skipping the function call entirely:
-
-```sql
-DELETE FROM library_user lu
-USING inserted_rows ir
-WHERE lu."userId" = ir."userId"
-  AND lu."libraryId" = ir."libraryId"
-  AND NOT EXISTS (
-    SELECT 1 FROM library l WHERE l.id = lu."libraryId" AND l."ownerId" = lu."userId" AND l."deletedAt" IS NULL
-  )
-  AND NOT EXISTS (
-    SELECT 1 FROM shared_space_library ssl
-    INNER JOIN shared_space_member ssm ON ssm."spaceId" = ssl."spaceId"
-    WHERE ssl."libraryId" = lu."libraryId" AND ssm."userId" = lu."userId"
-  )
-  AND NOT EXISTS (
-    SELECT 1 FROM shared_space_library ssl
-    INNER JOIN shared_space ss ON ss."id" = ssl."spaceId"
-    WHERE ssl."libraryId" = lu."libraryId" AND ss."createdById" = lu."userId"
-  );
-```
-
-Trades readability for throughput. Keep the function-call version until it actually hurts.
+The `library_user_delete_after_audit` consumer trigger does a single unconditional `DELETE ... USING inserted_rows`, so its cost is linear in the number of audit rows delivered by the BEFORE-trigger fan-out. Each deletion is a PK lookup on `library_user (userId, libraryId)`. For a hypothetical deployment hard-deleting a 1000-member space linking 50 libraries, that's ~50k PK lookups — fast. No `user_has_library_path` calls from the consumer; all path evaluation happens once, at insertion time, inside the existing audit triggers.
 
 ## Testing strategy
 
@@ -373,16 +355,18 @@ Trigger and consumer behavior against a real DB.
 - Insert shared_space_member for a space with zero linked libraries → no library_user rows, no library UPDATEs
 - Insert shared_space_library for a space with M members → M library_user rows; `library.updateId` bumped on the newly-linked library
 - Insert shared_space_library into a space with zero members → no library_user rows, but the library.updateId is still bumped (consistent with the trigger body)
+- **`LibrarySync.getUpserts` re-delivery**: after a `shared_space_member_after_insert_library` trigger fires, assert that `LibrarySync.getUpserts({ userId: newMember, ack: { updateId: <pre-bump>, ... } })` returns the affected library. Pins the integration path that depends on the `updateId` bump — if the bump breaks (or if `getUpserts` grows a filter that excludes newly-accessible libraries), the integration tests in Task 14 might still pass by accidentally riding the `getCreatedAfter` stream, masking the regression. This test asserts the upsert stream independently.
+- **Creator-not-member asymmetry (documentation test)**: manually insert a `shared_space` row via direct SQL without creating the matching `shared_space_member` row for the creator, link a library, then attempt a sync as the creator. Assert that `library_user` does NOT contain a row for the creator, documenting the known limitation where the create-side silently fails if the "creator is always a member" invariant is ever broken. Marked with a comment referencing the Known Limitations section.
 
 **Delete-side consumer**:
 
 - Delete shared_space_member (user leaves space) → library_user rows removed IF no other path; owned-library rows preserved
 - Delete shared_space_library (link removed) → library_user rows removed for members who have no other path; owner's row preserved
-- Delete shared_space (whole space) → all affected (member, library) pairs with no other path get library_user removed; owner of a still-linked-elsewhere library retains access
+- **Delete shared_space (whole space)** → all affected (member, library) pairs with no other path get library_user removed; owner of a still-linked-elsewhere library retains access. **This test is the regression guard for the dropped "defensive re-check" clause** — under the original design that clause would incorrectly re-detect the still-alive (pre-cascade) shared_space_library/shared_space_member rows and leave stale library_user entries behind.
 - **Delete library (hard delete) via FK cascade**: directly `DELETE FROM library WHERE id = ?` → all matching `library_user` rows disappear via the `ON DELETE CASCADE` FK; assert that no `library_audit` rows are emitted (the audit chain only fires on `shared_space_*` delete paths, not on a direct `DELETE library`) and that no dangling `library_user` rows remain
-- Owner leaves a space that also links their own library → library_user row stays (owner path still valid per `user_has_library_path`)
-- **Defensive consumer re-check**: manually insert a row into `library_audit` for a (user, library) pair where the user still has access via an owned path, then assert that `library_user` is NOT deleted. This documents and locks in the `NOT user_has_library_path(...)` defensive clause.
-- **Bulk cascade**: delete a shared_space containing many members × libraries → audit rows fan-out correctly, consumer trigger deletes only the pairs with no surviving path
+- Owner leaves a space that also links their own library → library_user row stays (owner path still valid; delete audit never gets emitted because the leave-trigger's `NOT user_has_library_path(..., o.spaceId)` gate already excludes the owner)
+- **Trust-the-gate contract**: manually insert a row into `library_audit` for a (user, library) pair where the user still has access via an owned path, then assert that `library_user` IS deleted. This pins the fact that the consumer trusts the inserter's gating and does NOT re-check — and is the regression guard that future code touching `library_audit` must continue to gate on `NOT user_has_library_path(libraryId, userId, excludeSpaceId)` before inserting.
+- **Bulk cascade**: delete a shared_space containing many members × libraries → audit rows fan-out correctly, consumer trigger deletes exactly the pairs flagged by the BEFORE-trigger gate.
 
 **Multi-path deduplication**:
 
@@ -433,6 +417,7 @@ The migration is purely additive:
 - **Application code rollback only**: the new table and triggers stay in place harmlessly. The old `LibrarySync.getCreatedAfter` (keyed off `library.createId`) would work against the existing `library` table as before. The new trigger-maintained `library_user` would keep growing but be unread. `library.updateId` bumps would continue, which is mildly wasteful but consistent with how `album` and `shared_space` already behave.
 - **Migration rollback**: `down()` drops the table, triggers, and functions. The `library.updateId` bumps from the running version stay — that's a minor inflation of updateIds but sync correctness is unaffected.
 - **Concurrent old+new code**: triggers fire regardless of whether the reading code path is the old or new `LibrarySync.getCreatedAfter`. Safe to roll forward or back without coordinated restarts.
+- **Checkpoint value-space shift for in-flight clients**: the `afterCreateId` checkpoint that clients send with `getCreatedAfter` changes meaning under this migration — pre-fix it was a `library.createId` watermark, post-fix it is a `library_user.createId` watermark. A client whose checkpoint was captured mid-sync just before the deploy will carry a value into the post-fix system that does not correspond to a row in `library_user`. Because the new query uses `library_user.createId >= afterCreateId`, this is fine: the client will either match (no re-delivery needed) or exceed (re-delivers from a point already past) without producing incorrect results. The worst case is a one-time harmless re-delivery of rows the client already has — upserts are idempotent in the mobile sync handler. The implementation plan adds a dedicated regression test in `sync.repository.spec.ts` that seeds a checkpoint from the pre-fix value-space and asserts the post-fix query returns a consistent superset of the user's accessible libraries.
 
 ## YAGNI rejections
 

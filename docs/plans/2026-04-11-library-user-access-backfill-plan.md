@@ -747,6 +747,118 @@ git commit -m "test(server): pin shared_space_member trigger edge cases"
 
 ---
 
+## Task 8.5: Pin the library metadata re-delivery path via `LibrarySync.getUpserts`
+
+The new member-insert trigger bumps `library.updateId` so that `LibrarySync.getUpserts` re-emits the library metadata (`LibraryV1`) to the newly-accessing member on their next sync. This is the wire-level path that delivers the library row itself — the `getCreatedAfter` change only drives the per-library asset backfill loop, not the library metadata upsert.
+
+Without a dedicated test for this path, the integration tests in Task 14 could pass accidentally by riding the `createAfter` stream even if the upsert flow were broken or accidentally filtered. This task pins the upsert path independently.
+
+**Files:**
+
+- Modify: `server/test/medium/specs/sync/library-user-triggers.spec.ts`
+
+**Step 1: Add the test inside the `shared_space_member_after_insert_library` describe block**
+
+```ts
+it('LibrarySync.getUpserts re-delivers the library to the new member after the updateId bump', async () => {
+  const { ctx, sut } = await newMediumService({
+    repos: [LibraryRepository, UserRepository, SharedSpaceRepository],
+    sut: SyncRepository, // or however the sync repo is exposed in the harness
+  });
+  const { user: owner } = await ctx.newUser();
+  const { user: newMember } = await ctx.newUser();
+  const { library } = await ctx.newLibrary({ ownerId: owner.id });
+  const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+  await ctx.linkLibraryToSpace(space.id, library.id);
+
+  // Capture the library.updateId before the trigger fires.
+  const preBump = await defaultDatabase
+    .selectFrom('library')
+    .select(['updateId'])
+    .where('id', '=', library.id)
+    .executeTakeFirstOrThrow();
+
+  // newMember joins → trigger bumps library.updateId.
+  await ctx.addSharedSpaceMember(space.id, newMember.id);
+
+  // `getUpserts` with an ack at the PRE-bump updateId must return the library.
+  const dummyNowId = '99999999-9999-9999-9999-999999999999';
+  const upserts = await sut.library.getUpserts({
+    nowId: dummyNowId,
+    userId: newMember.id,
+    ack: { updateId: preBump.updateId, updatedAt: new Date(0) },
+  });
+  expect(upserts.map((r) => r.id)).toContain(library.id);
+});
+```
+
+**Before writing this test, grep for an existing `LibrarySync.getUpserts` call** in `server/src/repositories/sync.repository.spec.ts` or any `test/medium/specs/sync/sync-library*.spec.ts` file, and copy the exact call shape (instantiation, `ack` object structure, return type). The sync repo's upserts API uses `SyncAckOptions` / `SyncUpsertOptions` internally; match those types rather than guessing. The skeleton above is approximate — the imports, the `sut` shape, and the `ack` fields MUST be aligned with an existing working test before this one can run.
+
+**Step 2: Run the test**
+
+Run: `cd server && pnpm test:medium -- --run test/medium/specs/sync/library-user-triggers.spec.ts -t "getUpserts re-delivers" 2>&1 | tail -15`
+
+Expected: PASS. If it fails, either the `updateId` bump isn't landing (check the trigger body) or `getUpserts` has a filter the design didn't account for (diagnose before proceeding — this is the whole reason the test exists).
+
+**Step 3: Add a creator-not-member documentation test (known limitation guard)**
+
+Inside the same describe block:
+
+```ts
+// Documentation test: pins the known asymmetry flagged in the design's
+// "Dependence on the creator-is-always-a-member invariant" section. If the
+// invariant ever breaks, the create-side triggers won't populate library_user
+// for a space creator who is not a member. The delete-side defensively
+// includes a creator-path branch in user_has_library_path, so they'd still
+// be protected from wrongful removal — the asymmetry manifests as "creator
+// silently missing from library_user after a cache-reset sync".
+it('(known limitation) does not populate library_user for a space creator who is not a member', async () => {
+  const { ctx } = await newMediumService({
+    repos: [LibraryRepository, UserRepository, SharedSpaceRepository],
+  });
+  const { user: creator } = await ctx.newUser();
+  const { user: member } = await ctx.newUser();
+  const { library } = await ctx.newLibrary({ ownerId: member.id });
+
+  // Bypass the service layer to create a shared_space WITHOUT the matching
+  // shared_space_member row for the creator.
+  const space = await defaultDatabase
+    .insertInto('shared_space')
+    .values({ name: 'orphan-creator', createdById: creator.id })
+    .returning(['id'])
+    .executeTakeFirstOrThrow();
+
+  await ctx.linkLibraryToSpace(space.id, library.id);
+
+  // The library-link insert trigger's SELECT is:
+  //   FROM inserted_rows ir INNER JOIN shared_space_member ssm ON ssm.spaceId = ir.spaceId
+  // which produces ZERO rows because no shared_space_member exists for the
+  // creator. No library_user for `creator` gets inserted.
+  const rows = await defaultDatabase
+    .selectFrom('library_user')
+    .selectAll()
+    .where('userId', '=', creator.id)
+    .where('libraryId', '=', library.id)
+    .execute();
+  expect(rows).toHaveLength(0);
+});
+```
+
+**Step 4: Run the full trigger spec**
+
+Run: `cd server && pnpm test:medium -- --run test/medium/specs/sync/library-user-triggers.spec.ts 2>&1 | tail -20`
+
+Expected: all tests pass.
+
+**Step 5: Commit**
+
+```bash
+git add server/test/medium/specs/sync/library-user-triggers.spec.ts
+git commit -m "test(server): pin library metadata re-delivery + creator-not-member asymmetry"
+```
+
+---
+
 ## Task 9: Failing test + implementation — `shared_space_library_after_insert_user` trigger
 
 Bundled task because the pattern mirrors Task 6+7.
@@ -905,7 +1017,7 @@ This trigger is the delete-side counterpart. Bundled: failing tests, implementat
 describe('library_user_delete_after_audit', () => {
   it('removes library_user when a member leaves a space and has no other path', async () => {
     const { ctx } = await newMediumService({
-      /* relevant repos */
+      repos: [LibraryRepository, UserRepository, SharedSpaceRepository],
     });
     const { user: owner } = await ctx.newUser();
     const { user: viewer } = await ctx.newUser();
@@ -935,31 +1047,113 @@ describe('library_user_delete_after_audit', () => {
     expect(after).toHaveLength(0);
   });
 
-  it('preserves library_user for the owner even when they leave a space that linked the library', async () => {
+  it('preserves library_user for the owner when another member leaves a space linking their library', async () => {
+    // This test pins TWO properties together:
+    //   1. The audit chain's gate correctly skips the owner. When peer leaves,
+    //      `shared_space_member_delete_library_audit` only emits audit rows for
+    //      userIds present in the `old` NEW TABLE (i.e., peer). The owner's
+    //      owned-path is never even evaluated — they are not in `inserted_rows`
+    //      for the consumer trigger, so the PK join `lu.userId = ir.userId`
+    //      skips them structurally. This is the "inserter-side gating" half.
+    //   2. The consumer's DELETE doesn't accidentally touch rows outside of
+    //      inserted_rows — pins that the join is a strict scoping, not a
+    //      side-effect on the full library.
+    // Together these guarantee the consumer only deletes rows the audit chain
+    // explicitly told it to delete.
     const { ctx } = await newMediumService({
-      /* ... */
+      repos: [LibraryRepository, UserRepository, SharedSpaceRepository],
     });
     const { user: owner } = await ctx.newUser();
+    const { user: peer } = await ctx.newUser();
     const { library } = await ctx.newLibrary({ ownerId: owner.id });
     const { space } = await ctx.newSharedSpace({ createdById: owner.id });
     await ctx.linkLibraryToSpace(space.id, library.id);
-    // Owner is auto-added as a member on space creation; leaving...
-    // Actually the space creator can't leave their own space via the normal
-    // service call — the creator is the owner of the space. Use a slightly
-    // different setup: peer owner creates space and links a library they
-    // also own, a different user (our "owner") is a space member AND owns
-    // another library that's ALSO linked to the same space. Then the "owner"
-    // leaves.
-    // (exact setup depends on factory; adapt as needed)
+    await ctx.addSharedSpaceMember(space.id, peer.id);
+
+    // Sanity: both have library_user rows.
+    expect(
+      await defaultDatabase.selectFrom('library_user').selectAll().where('libraryId', '=', library.id).execute(),
+    ).toHaveLength(2);
+
+    // Peer leaves
+    await ctx.removeSharedSpaceMember(space.id, peer.id);
+
+    // Owner's row survives
+    const ownerRow = await defaultDatabase
+      .selectFrom('library_user')
+      .selectAll()
+      .where('userId', '=', owner.id)
+      .where('libraryId', '=', library.id)
+      .execute();
+    expect(ownerRow).toHaveLength(1);
+    // Peer's row gone
+    const peerRow = await defaultDatabase
+      .selectFrom('library_user')
+      .selectAll()
+      .where('userId', '=', peer.id)
+      .where('libraryId', '=', library.id)
+      .execute();
+    expect(peerRow).toHaveLength(0);
   });
 
-  it('defensive re-check: does NOT delete library_user when user_has_library_path is still true', async () => {
-    // Setup: user owns library, and separately has library_audit row inserted
-    // manually (bypassing the normal delete trigger chain). Since owner path
-    // is still valid, user_has_library_path returns true → consumer trigger
-    // must NOT delete library_user.
+  it('removes library_user for all affected members when a shared_space is hard-deleted (cascade path)', async () => {
+    // REGRESSION GUARD for the dropped defensive clause. Under the original
+    // design, the `NOT user_has_library_path(..., NULL)` filter would run
+    // during the BEFORE DELETE trigger of shared_space, BEFORE the FK cascade
+    // removed shared_space_library / shared_space_member — so it would see
+    // the still-alive path and incorrectly preserve library_user rows.
     const { ctx } = await newMediumService({
-      /* ... */
+      repos: [LibraryRepository, UserRepository, SharedSpaceRepository],
+    });
+    const { user: owner } = await ctx.newUser();
+    const { user: viewerA } = await ctx.newUser();
+    const { user: viewerB } = await ctx.newUser();
+    // Non-owner creates the space so we can freely delete it without cascading
+    // through the owner's user row. The library is owned by `owner` (separate
+    // user) so owner's library_user row is NOT tied to the space.
+    const { user: spaceCreator } = await ctx.newUser();
+    const { library: lib1 } = await ctx.newLibrary({ ownerId: owner.id });
+    const { library: lib2 } = await ctx.newLibrary({ ownerId: owner.id });
+    const { space } = await ctx.newSharedSpace({ createdById: spaceCreator.id });
+    await ctx.linkLibraryToSpace(space.id, lib1.id);
+    await ctx.linkLibraryToSpace(space.id, lib2.id);
+    await ctx.addSharedSpaceMember(space.id, viewerA.id);
+    await ctx.addSharedSpaceMember(space.id, viewerB.id);
+
+    // Sanity: each viewer has rows for both libraries (2 libs × 2 viewers = 4
+    // rows plus spaceCreator's 2 = 6 non-owner rows plus owner's 2 owned
+    // rows = 8 total).
+    expect(
+      await defaultDatabase
+        .selectFrom('library_user')
+        .selectAll()
+        .where('libraryId', 'in', [lib1.id, lib2.id])
+        .execute(),
+    ).toHaveLength(8);
+
+    // Hard-delete the whole space. BEFORE-trigger fan-out inserts into
+    // library_audit for every (viewer|spaceCreator, library) pair that loses
+    // its only path. Owner's two rows are NOT touched (owned path remains).
+    await defaultDatabase.deleteFrom('shared_space').where('id', '=', space.id).execute();
+
+    // Only owner's two rows remain.
+    const remaining = await defaultDatabase
+      .selectFrom('library_user')
+      .selectAll()
+      .where('libraryId', 'in', [lib1.id, lib2.id])
+      .execute();
+    expect(remaining).toHaveLength(2);
+    expect(remaining.every((r) => r.userId === owner.id)).toBe(true);
+  });
+
+  it('trusts the inserter gate: a manual library_audit insert deletes library_user unconditionally', async () => {
+    // The consumer trigger does NOT re-check user_has_library_path. This test
+    // pins that contract: any code path inserting into library_audit MUST
+    // gate beforehand, because the consumer will delete whatever it's told.
+    // Regression guard in the opposite direction from the cascade test —
+    // together they ensure the consumer is neither over- nor under-deleting.
+    const { ctx } = await newMediumService({
+      repos: [LibraryRepository, UserRepository],
     });
     const { user } = await ctx.newUser();
     const { library } = await ctx.newLibrary({ ownerId: user.id });
@@ -973,22 +1167,22 @@ describe('library_user_delete_after_audit', () => {
       .execute();
     expect(before).toHaveLength(1);
 
-    // Manually insert into library_audit (bypassing gated triggers)
+    // Manually insert into library_audit (bypassing the normal gating path)
     await defaultDatabase.insertInto('library_audit').values({ libraryId: library.id, userId: user.id }).execute();
 
-    // Defensive clause must have protected the row
+    // Row IS deleted — consumer trusts the inserter's gate.
     const after = await defaultDatabase
       .selectFrom('library_user')
       .selectAll()
       .where('userId', '=', user.id)
       .where('libraryId', '=', library.id)
       .execute();
-    expect(after).toHaveLength(1);
+    expect(after).toHaveLength(0);
   });
 
   it('hard-deleting a library removes library_user rows via FK cascade (no library_audit involvement)', async () => {
     const { ctx } = await newMediumService({
-      /* ... */
+      repos: [LibraryRepository, UserRepository],
     });
     const { user } = await ctx.newUser();
     const { library } = await ctx.newLibrary({ ownerId: user.id });
@@ -1033,9 +1227,11 @@ describe('library_user_delete_after_audit', () => {
 
 Run: `cd server && pnpm test:medium -- --run test/medium/specs/sync/library-user-triggers.spec.ts -t "library_user_delete_after_audit" 2>&1 | tail -20`
 
-Expected: the first three tests fail (the fourth — FK cascade — would actually pass right now because FK cascade is already declared on the table). The first test might fail because the existing delete chain inserts into library_audit but nothing deletes from library_user.
+Expected: the `member leaves`, `owner preserved`, `shared_space cascade`, and `trusts the inserter gate` tests fail. The FK cascade test passes (FK cascade is already declared in Task 1). If `shared_space cascade` happens to pass against a defensive-clause design, that indicates the test setup isn't exercising the BEFORE-trigger window correctly — diagnose before proceeding.
 
 **Step 3: Add function + trigger + overrides in migration**
+
+The function body does NOT re-check `user_has_library_path`. It trusts the gating that every inserter into `library_audit` is required to perform (see design doc "Trust boundary"). Re-checking would be broken during `shared_space` hard-delete because the BEFORE-trigger window runs before FK cascades, and the function would find the still-alive (ssl, ssm) rows and incorrectly preserve library_user.
 
 ```ts
 await sql`
@@ -1047,8 +1243,7 @@ await sql`
       DELETE FROM library_user lu
       USING inserted_rows ir
       WHERE lu."userId" = ir."userId"
-        AND lu."libraryId" = ir."libraryId"
-        AND NOT user_has_library_path(lu."libraryId", lu."userId", NULL);
+        AND lu."libraryId" = ir."libraryId";
       RETURN NULL;
     END
   $$;
@@ -1077,8 +1272,7 @@ export const library_user_delete_after_audit = registerFunction({
       DELETE FROM library_user lu
       USING inserted_rows ir
       WHERE lu."userId" = ir."userId"
-        AND lu."libraryId" = ir."libraryId"
-        AND NOT user_has_library_path(lu."libraryId", lu."userId", NULL);
+        AND lu."libraryId" = ir."libraryId";
       RETURN NULL;
     END`,
 });
@@ -1143,38 +1337,48 @@ Migration tests are tricky because by the time the test suite runs, the migratio
 import { sql } from 'kysely';
 import { defaultDatabase } from 'test/test-utils';
 
+// Helper: run the migration's Pass 1 + Pass 2 backfill SQL as a single block.
+// Centralizing this keeps the tests focused on the expected state, not on
+// the exact SQL, and makes it easy to re-run the backfill mid-test.
+const runBackfill = async () => {
+  await sql`
+    INSERT INTO library_user ("userId", "libraryId", "createId", "createdAt")
+    SELECT "ownerId", "id", "createId", "createdAt"
+    FROM library
+    WHERE "ownerId" IS NOT NULL AND "deletedAt" IS NULL
+    ON CONFLICT ("userId", "libraryId") DO NOTHING;
+  `.execute(defaultDatabase);
+
+  await sql`
+    INSERT INTO library_user ("userId", "libraryId")
+    SELECT DISTINCT ssm."userId", ssl."libraryId"
+    FROM shared_space_library ssl
+    INNER JOIN shared_space_member ssm ON ssl."spaceId" = ssm."spaceId"
+    ON CONFLICT ("userId", "libraryId") DO NOTHING;
+  `.execute(defaultDatabase);
+};
+
 describe('library_user migration backfill', () => {
-  // These tests manipulate library_user directly, so clean up after each.
+  // NOTE: the migration runs triggers + backfill in a single transaction. On
+  // a fresh DB (CI testcontainer) the library table is empty when Pass 1
+  // runs. On upgrade from a prior version, the triggers are created first,
+  // then Pass 1/2 scoop up every pre-existing row. These tests simulate the
+  // upgrade path by clearing library_user (which the triggers just populated)
+  // before running the backfill, so the state at the start of runBackfill()
+  // mirrors the post-create-tables-but-pre-backfill moment of a real upgrade.
+
   afterEach(async () => {
     await defaultDatabase.deleteFrom('library_user').execute();
   });
 
   it('owner rows use library.createId (Pass 1)', async () => {
-    // Seed: create user + library via direct SQL, leave the library_after_insert
-    // trigger to populate library_user at insert time. Delete the triggered row
-    // and re-run the backfill INSERT manually — verify the Pass 1 SQL produces
-    // the same row.
-    //
-    // Simpler alternative: disable the trigger temporarily for this test, insert
-    // the library, then run the backfill. Or: just assert that the row created
-    // by the trigger has createId = library.createId (which the trigger test
-    // already covers). This test is more about the migration SQL as a string.
-    //
-    // Actual test: run Pass 1 SQL in isolation against a small seeded state.
     const { user } = await ctx.newUser();
     const { library } = await ctx.newLibrary({ ownerId: user.id });
 
-    // Clear what the trigger inserted
+    // Simulate upgrade state: library exists, library_user empty.
     await defaultDatabase.deleteFrom('library_user').execute();
 
-    // Run Pass 1 SQL
-    await sql`
-      INSERT INTO library_user ("userId", "libraryId", "createId", "createdAt")
-      SELECT "ownerId", "id", "createId", "createdAt"
-      FROM library
-      WHERE "ownerId" IS NOT NULL AND "deletedAt" IS NULL
-      ON CONFLICT ("userId", "libraryId") DO NOTHING;
-    `.execute(defaultDatabase);
+    await runBackfill();
 
     const row = await defaultDatabase
       .selectFrom('library_user')
@@ -1185,28 +1389,146 @@ describe('library_user migration backfill', () => {
     expect(row.createdAt).toEqual(library.createdAt);
   });
 
-  it('transitive rows use fresh createId (Pass 2)', async () => {
-    // Setup a user who has transitive access, simulate a stale state by
-    // clearing library_user, then run Pass 2 and verify createId is fresh.
-    // (details elided — same pattern)
+  it('transitive rows use a fresh createId (Pass 2)', async () => {
+    const { user: owner } = await ctx.newUser();
+    const { user: peer } = await ctx.newUser();
+    const { library } = await ctx.newLibrary({ ownerId: owner.id });
+    const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+    await ctx.linkLibraryToSpace(space.id, library.id);
+    await ctx.addSharedSpaceMember(space.id, peer.id);
+
+    // Clear what the triggers populated → simulate upgrade state.
+    await defaultDatabase.deleteFrom('library_user').execute();
+
+    // Capture a pre-backfill uuid_v7 marker. Use raw SQL to avoid any
+    // Kysely-version dependency on selectNoFrom / eb.fn shape.
+    const markerResult = await sql<{
+      id: string;
+    }>`SELECT immich_uuid_v7() AS id`.execute(defaultDatabase);
+    const backfillStart = markerResult.rows[0].id;
+
+    await runBackfill();
+
+    // Peer gets a row with a createId MINTED AFTER backfillStart — i.e.,
+    // strictly greater than the pre-backfill marker AND strictly greater
+    // than library.createId. Pass 2 does not propagate library.createId.
+    const peerRow = await defaultDatabase
+      .selectFrom('library_user')
+      .selectAll()
+      .where('userId', '=', peer.id)
+      .where('libraryId', '=', library.id)
+      .executeTakeFirstOrThrow();
+    expect(peerRow.createId > backfillStart).toBe(true);
+    expect(peerRow.createId > library.createId).toBe(true);
   });
 
   it('Pass 2 preserves owner rows via ON CONFLICT DO NOTHING', async () => {
-    // User owns library AND is in a space that links it. Run Pass 1 then
-    // Pass 2. Assert only ONE row and its createId equals library.createId.
+    // User owns the library AND is a member of a space that also links it.
+    // Pass 1 inserts with old createId, Pass 2 would insert with fresh, but
+    // ON CONFLICT preserves Pass 1's row.
+    const { user } = await ctx.newUser();
+    const { library } = await ctx.newLibrary({ ownerId: user.id });
+    const { space } = await ctx.newSharedSpace({ createdById: user.id });
+    await ctx.linkLibraryToSpace(space.id, library.id);
+    // Owner is auto-added as member when they create the space.
+
+    await defaultDatabase.deleteFrom('library_user').execute();
+
+    await runBackfill();
+
+    const rows = await defaultDatabase
+      .selectFrom('library_user')
+      .selectAll()
+      .where('userId', '=', user.id)
+      .where('libraryId', '=', library.id)
+      .execute();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].createId).toBe(library.createId);
+    expect(rows[0].createdAt).toEqual(library.createdAt);
   });
 
   it('is idempotent: re-running both passes is a no-op', async () => {
-    // Run Pass 1 + Pass 2. Capture state. Run them again. Assert state
-    // unchanged.
+    const { user: owner } = await ctx.newUser();
+    const { user: peer } = await ctx.newUser();
+    const { library } = await ctx.newLibrary({ ownerId: owner.id });
+    const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+    await ctx.linkLibraryToSpace(space.id, library.id);
+    await ctx.addSharedSpaceMember(space.id, peer.id);
+
+    await defaultDatabase.deleteFrom('library_user').execute();
+
+    await runBackfill();
+    const firstSnapshot = await defaultDatabase
+      .selectFrom('library_user')
+      .select(['userId', 'libraryId', 'createId', 'createdAt'])
+      .orderBy('userId')
+      .orderBy('libraryId')
+      .execute();
+
+    // Re-run the backfill. ON CONFLICT DO NOTHING should make this a no-op.
+    await runBackfill();
+    const secondSnapshot = await defaultDatabase
+      .selectFrom('library_user')
+      .select(['userId', 'libraryId', 'createId', 'createdAt'])
+      .orderBy('userId')
+      .orderBy('libraryId')
+      .execute();
+
+    expect(secondSnapshot).toEqual(firstSnapshot);
   });
 
-  it('includes soft-deleted libraries in Pass 2 when linked to a space (mirrors accessibleLibraries)', async () => {
-    // ...
+  it('includes soft-deleted libraries in Pass 2 when linked to a space', async () => {
+    // Matches accessibleLibraries behavior for the space-link branch: a
+    // soft-deleted library is still reachable for members via the
+    // shared_space_library path until it is hard-deleted.
+    const { user: owner } = await ctx.newUser();
+    const { user: peer } = await ctx.newUser();
+    const { library } = await ctx.newLibrary({ ownerId: owner.id });
+    const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+    await ctx.linkLibraryToSpace(space.id, library.id);
+    await ctx.addSharedSpaceMember(space.id, peer.id);
+
+    // Soft-delete the library
+    await defaultDatabase.updateTable('library').set({ deletedAt: new Date() }).where('id', '=', library.id).execute();
+
+    await defaultDatabase.deleteFrom('library_user').execute();
+
+    await runBackfill();
+
+    // peer still gets a row (Pass 2, no deletedAt filter)
+    const peerRow = await defaultDatabase
+      .selectFrom('library_user')
+      .selectAll()
+      .where('userId', '=', peer.id)
+      .where('libraryId', '=', library.id)
+      .execute();
+    expect(peerRow).toHaveLength(1);
+    // owner does NOT (Pass 1 filters out deletedAt IS NOT NULL)
+    const ownerRow = await defaultDatabase
+      .selectFrom('library_user')
+      .selectAll()
+      .where('userId', '=', owner.id)
+      .where('libraryId', '=', library.id)
+      .execute();
+    expect(ownerRow).toHaveLength(0);
   });
 
-  it('skips soft-deleted libraries in Pass 1 (owned path)', async () => {
-    // ...
+  it('skips soft-deleted owned libraries in Pass 1 when there is no space path', async () => {
+    const { user } = await ctx.newUser();
+    const { library } = await ctx.newLibrary({ ownerId: user.id });
+
+    await defaultDatabase.updateTable('library').set({ deletedAt: new Date() }).where('id', '=', library.id).execute();
+    await defaultDatabase.deleteFrom('library_user').execute();
+
+    await runBackfill();
+
+    const rows = await defaultDatabase
+      .selectFrom('library_user')
+      .selectAll()
+      .where('userId', '=', user.id)
+      .where('libraryId', '=', library.id)
+      .execute();
+    expect(rows).toHaveLength(0);
   });
 });
 ```
@@ -1272,30 +1594,67 @@ Before rewriting the query, write the new expected behavior as unit tests. This 
 
 ```ts
 describe('LibrarySync.getCreatedAfter', () => {
+  const dummyNowId = '99999999-9999-9999-9999-999999999999';
+
   it('returns libraries the user owns', async () => {
-    // Setup via repo
     const { user } = await ctx.newUser();
     const { library } = await ctx.newLibrary({ ownerId: user.id });
-    // (trigger populates library_user automatically)
 
     const rows = await sut.getCreatedAfter({ nowId: dummyNowId, userId: user.id, afterCreateId: undefined });
     expect(rows.map((r) => r.id)).toContain(library.id);
   });
 
   it('returns libraries the user accesses via shared_space_library', async () => {
-    /* similar */
+    const { user: owner } = await ctx.newUser();
+    const { user: peer } = await ctx.newUser();
+    const { library } = await ctx.newLibrary({ ownerId: owner.id });
+    const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+    await ctx.linkLibraryToSpace(space.id, library.id);
+    await ctx.addSharedSpaceMember(space.id, peer.id);
+
+    const rows = await sut.getCreatedAfter({ nowId: dummyNowId, userId: peer.id, afterCreateId: undefined });
+    expect(rows.map((r) => r.id)).toContain(library.id);
   });
 
   it('returns empty for a user with no library access', async () => {
-    /* similar */
+    const { user } = await ctx.newUser();
+    const rows = await sut.getCreatedAfter({ nowId: dummyNowId, userId: user.id, afterCreateId: undefined });
+    expect(rows).toHaveLength(0);
   });
 
   it('filters by afterCreateId', async () => {
-    /* two libraries, check that only the one >= afterCreateId is returned */
+    const { user } = await ctx.newUser();
+    const { library: first } = await ctx.newLibrary({ ownerId: user.id });
+    const { library: second } = await ctx.newLibrary({ ownerId: user.id });
+
+    // Checkpoint strictly between the two createIds: use `second.createId`
+    // as the lower bound, so only `second` (which has createId >= itself)
+    // comes back.
+    const rows = await sut.getCreatedAfter({
+      nowId: dummyNowId,
+      userId: user.id,
+      afterCreateId: second.createId,
+    });
+    const ids = rows.map((r) => r.id);
+    expect(ids).toContain(second.id);
+    expect(ids).not.toContain(first.id);
   });
 
   it('orders by createId ascending', async () => {
-    /* seed 3 libraries with known createIds, assert order */
+    const { user } = await ctx.newUser();
+    const { library: a } = await ctx.newLibrary({ ownerId: user.id });
+    const { library: b } = await ctx.newLibrary({ ownerId: user.id });
+    const { library: c } = await ctx.newLibrary({ ownerId: user.id });
+
+    const rows = await sut.getCreatedAfter({ nowId: dummyNowId, userId: user.id, afterCreateId: undefined });
+    const libIds = rows.map((r) => r.id);
+    // Natural insertion order matches uuid_v7 monotonicity.
+    expect(libIds.indexOf(a.id)).toBeLessThan(libIds.indexOf(b.id));
+    expect(libIds.indexOf(b.id)).toBeLessThan(libIds.indexOf(c.id));
+    // And the createIds returned should be non-decreasing.
+    for (let i = 1; i < rows.length; i++) {
+      expect(rows[i].createId >= rows[i - 1].createId).toBe(true);
+    }
   });
 
   it('excludes a soft-deleted owned library when the user has no space-linked path', async () => {
@@ -1309,8 +1668,63 @@ describe('LibrarySync.getCreatedAfter', () => {
   });
 
   it('includes a soft-deleted library when the user has a space-linked path to it', async () => {
-    /* owner, stranger, space, linked library, soft-delete via owner,
-       assert stranger still sees it */
+    const { user: owner } = await ctx.newUser();
+    const { user: peer } = await ctx.newUser();
+    const { library } = await ctx.newLibrary({ ownerId: owner.id });
+    const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+    await ctx.linkLibraryToSpace(space.id, library.id);
+    await ctx.addSharedSpaceMember(space.id, peer.id);
+
+    // Soft-delete from the owner side; the space link stays valid.
+    await defaultDatabase.updateTable('library').set({ deletedAt: new Date() }).where('id', '=', library.id).execute();
+
+    const rows = await sut.getCreatedAfter({ nowId: dummyNowId, userId: peer.id, afterCreateId: undefined });
+    expect(rows.map((r) => r.id)).toContain(library.id);
+  });
+
+  // Regression guard for the deploy-time checkpoint value-space shift. Before
+  // this fix, `afterCreateId` was a `library.createId` watermark; after, it's
+  // a `library_user.createId` watermark. Carry a pre-fix-value-space checkpoint
+  // over the boundary and assert the query still returns a consistent
+  // superset of the user's accessible libraries (idempotent re-delivery is OK,
+  // wrong-answers are not).
+  it('handles a pre-fix-value-space afterCreateId checkpoint without returning a wrong set', async () => {
+    const { user: owner } = await ctx.newUser();
+    const { user: peer } = await ctx.newUser();
+    const { library } = await ctx.newLibrary({ ownerId: owner.id });
+    const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+    await ctx.linkLibraryToSpace(space.id, library.id);
+    await ctx.addSharedSpaceMember(space.id, peer.id);
+
+    // Pre-fix clients stored `library.createId` as their checkpoint.
+    const preFixCheckpoint = library.createId;
+
+    // Post-fix query using that same value — peer's library_user.createId was
+    // minted AFTER library.createId, so the peer row satisfies >= the
+    // checkpoint and is (correctly) re-delivered.
+    const rows = await sut.getCreatedAfter({
+      nowId: dummyNowId,
+      userId: peer.id,
+      afterCreateId: preFixCheckpoint,
+    });
+    const ids = new Set(rows.map((r) => r.id));
+    // Every accessible library for peer is present.
+    const accessible = new Set(
+      (
+        await defaultDatabase
+          .selectFrom('library')
+          .select('id')
+          .where('library.id', 'in', (eb) => accessibleLibraries(eb, peer.id))
+          .execute()
+      ).map((r) => r.id),
+    );
+    for (const id of accessible) {
+      expect(ids.has(id)).toBe(true);
+    }
+    // No libraries the user shouldn't have access to.
+    for (const id of ids) {
+      expect(accessible.has(id)).toBe(true);
+    }
   });
 
   it('set equality with accessibleLibraries', async () => {
