@@ -51,13 +51,17 @@ class TimelineFactory {
     return group == GroupAssetsBy.auto ? GroupAssetsBy.day : group;
   }
 
-  TimelineService main(List<String> timelineUsers) => TimelineService(_timelineRepository.main(timelineUsers, groupBy));
+  TimelineService main(List<String> timelineUsers, String currentUserId) =>
+      TimelineService(_timelineRepository.main(timelineUsers, currentUserId, groupBy));
 
   TimelineService localAlbum({required String albumId}) =>
       TimelineService(_timelineRepository.localAlbum(albumId, groupBy));
 
   TimelineService remoteAlbum({required String albumId}) =>
       TimelineService(_timelineRepository.remoteAlbum(albumId, groupBy));
+
+  TimelineService sharedSpace({required String spaceId}) =>
+      TimelineService(_timelineRepository.sharedSpace(spaceId, groupBy));
 
   TimelineService remoteAssets(String userId) => TimelineService(_timelineRepository.remote(userId, groupBy));
 
