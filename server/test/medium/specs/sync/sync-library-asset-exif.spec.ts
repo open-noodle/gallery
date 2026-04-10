@@ -113,11 +113,7 @@ describe(SyncRequestType.LibraryAssetExifsV1, () => {
     await ctx.syncAckAll(auth, before);
     await ctx.assertSyncIsComplete(auth, [SyncRequestType.LibraryAssetExifsV1]);
 
-    await defaultDatabase
-      .updateTable('library')
-      .set({ deletedAt: new Date() })
-      .where('id', '=', library.id)
-      .execute();
+    await defaultDatabase.updateTable('library').set({ deletedAt: new Date() }).where('id', '=', library.id).execute();
     // Mutate exif — would stream if the gate was broken.
     await ctx.newExif({ assetId: asset.id, make: 'PostSoft' });
 
@@ -139,11 +135,7 @@ describe(SyncRequestType.LibraryAssetExifsV1, () => {
     await ctx.newSharedSpaceMember({ spaceId: space.id, userId: auth.user.id, role: SharedSpaceRole.Editor });
     await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id, addedById: owner.id });
 
-    await defaultDatabase
-      .updateTable('library')
-      .set({ deletedAt: new Date() })
-      .where('id', '=', library.id)
-      .execute();
+    await defaultDatabase.updateTable('library').set({ deletedAt: new Date() }).where('id', '=', library.id).execute();
 
     const response = await ctx.syncStream(auth, [SyncRequestType.LibraryAssetExifsV1]);
     const events = response.filter((r) => isExifEvent(r));
@@ -185,11 +177,7 @@ describe(SyncRequestType.LibraryAssetExifsV1, () => {
     await ctx.syncAckAll(auth, initial);
     await ctx.assertSyncIsComplete(auth, [SyncRequestType.LibraryAssetExifsV1]);
 
-    await defaultDatabase
-      .updateTable('asset')
-      .set({ libraryId: libB.id })
-      .where('id', '=', asset.id)
-      .execute();
+    await defaultDatabase.updateTable('asset').set({ libraryId: libB.id }).where('id', '=', asset.id).execute();
     // Also touch the exif row so getUpserts has something to emit.
     await ctx.newExif({ assetId: asset.id, make: 'LibB' });
 

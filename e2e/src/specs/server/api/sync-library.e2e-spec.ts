@@ -1,5 +1,5 @@
 import { SharedSpaceRole, SyncRequestType, type LoginResponseDto } from '@immich/sdk';
-import { type Actor, authHeaders } from 'src/actors';
+import { authHeaders, type Actor } from 'src/actors';
 import { createUserDto } from 'src/fixtures';
 import { app, asBearerAuth, utils } from 'src/utils';
 import request from 'supertest';
@@ -76,9 +76,7 @@ const syncStream = async (accessToken: string, types: SyncRequestType[], reset =
  * as-is.
  */
 const ackAll = async (accessToken: string, lines: SyncLine[]): Promise<void> => {
-  const acks = lines
-    .filter((line) => line.type !== 'SyncCompleteV1' && line.ack)
-    .map((line) => line.ack);
+  const acks = lines.filter((line) => line.type !== 'SyncCompleteV1' && line.ack).map((line) => line.ack);
   if (acks.length === 0) return;
   await request(app).post('/sync/ack').set(asBearerAuth(accessToken)).send({ acks }).expect(204);
 };
@@ -189,16 +187,11 @@ describe('/sync — library streams', () => {
       });
 
       // Set up a partner relationship: ownerOfLib shares with partner.
-      await request(app)
-        .post(`/partners/${ownerOfLib.userId}`)
-        .set(asBearerAuth(partner.accessToken))
-        .expect(201);
+      await request(app).post(`/partners/${ownerOfLib.userId}`).set(asBearerAuth(partner.accessToken)).expect(201);
 
       const lines = await syncStream(partner.accessToken, [SyncRequestType.LibrariesV1], true);
       const libraryLines = lines.filter((l) => l.type === 'LibraryV1');
-      const matchingIds = libraryLines
-        .map((l) => l.data as { id: string })
-        .filter((d) => d.id === partnerLib.id);
+      const matchingIds = libraryLines.map((l) => l.data as { id: string }).filter((d) => d.id === partnerLib.id);
       expect(matchingIds).toHaveLength(0);
       await ackAll(partner.accessToken, lines);
     });
@@ -250,9 +243,7 @@ describe('/sync — library streams', () => {
 
     it('stranger receives no library assets', async () => {
       const lines = await syncStream(stranger.accessToken, [SyncRequestType.LibraryAssetsV1], true);
-      const assetEvents = lines.filter(
-        (l) => l.type === 'LibraryAssetCreateV1' || l.type === 'LibraryAssetBackfillV1',
-      );
+      const assetEvents = lines.filter((l) => l.type === 'LibraryAssetCreateV1' || l.type === 'LibraryAssetBackfillV1');
       expect(assetEvents).toHaveLength(0);
       await ackAll(stranger.accessToken, lines);
     });
@@ -372,9 +363,7 @@ describe('/sync — library streams', () => {
 
       // Initial sync — victim sees the library.
       const initial = await syncStream(victim.accessToken, ALL_LIBRARY_TYPES, true);
-      const initialLibs = initial
-        .filter((l) => l.type === 'LibraryV1')
-        .map((l) => (l.data as { id: string }).id);
+      const initialLibs = initial.filter((l) => l.type === 'LibraryV1').map((l) => (l.data as { id: string }).id);
       expect(initialLibs).toContain(library.id);
       await ackAll(victim.accessToken, initial);
 

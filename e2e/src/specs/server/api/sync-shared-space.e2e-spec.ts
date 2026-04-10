@@ -1,5 +1,5 @@
 import { SharedSpaceRole, SyncRequestType, type LoginResponseDto } from '@immich/sdk';
-import { type Actor, authHeaders } from 'src/actors';
+import { authHeaders, type Actor } from 'src/actors';
 import { createUserDto } from 'src/fixtures';
 import { app, asBearerAuth, utils } from 'src/utils';
 import request from 'supertest';
@@ -122,7 +122,7 @@ describe('/sync — shared-space streams', () => {
       await ackAll(stranger.accessToken, lines);
     });
 
-    it('partner does NOT see the partnered user\'s spaces', async () => {
+    it("partner does NOT see the partnered user's spaces", async () => {
       // Partnership does NOT grant access to spaces. A partner of the
       // space creator must not see the space in sync.
       const partnerSpace = await utils.createSpace(admin.accessToken, { name: 'Partner Not Visible' });
@@ -326,11 +326,7 @@ describe('/sync — shared-space streams', () => {
 
       const lines = await syncStream(
         member.accessToken,
-        [
-          SyncRequestType.SharedSpacesV1,
-          SyncRequestType.SharedSpaceMembersV1,
-          SyncRequestType.SharedSpaceAssetExifsV1,
-        ],
+        [SyncRequestType.SharedSpacesV1, SyncRequestType.SharedSpaceMembersV1, SyncRequestType.SharedSpaceAssetExifsV1],
         true,
       );
       const exifEvents = lines.filter(

@@ -532,9 +532,7 @@ describe('library audit triggers', () => {
     const member = await ctx.newUser();
     const { library } = await ctx.newLibrary({ ownerId: owner.user.id });
 
-    const spaces = await Promise.all(
-      [0, 1, 2, 3].map(() => ctx.newSharedSpace({ createdById: owner.user.id })),
-    );
+    const spaces = await Promise.all([0, 1, 2, 3].map(() => ctx.newSharedSpace({ createdById: owner.user.id })));
     for (const { space } of spaces) {
       await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id });
       await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.user.id });

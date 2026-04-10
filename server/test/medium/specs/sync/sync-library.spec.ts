@@ -273,11 +273,7 @@ describe(SyncRequestType.LibrariesV1, () => {
     await ctx.syncAckAll(auth, first);
     await ctx.assertSyncIsComplete(auth, [SyncRequestType.LibrariesV1]);
 
-    await defaultDatabase
-      .updateTable('library')
-      .set({ name: 'Rename B' })
-      .where('id', '=', library.id)
-      .execute();
+    await defaultDatabase.updateTable('library').set({ name: 'Rename B' }).where('id', '=', library.id).execute();
 
     const second = await ctx.syncStream(auth, [SyncRequestType.LibrariesV1]);
     const secondEvents = second.filter((r: { type: string }) => r.type === SyncEntityType.LibraryV1);
@@ -287,11 +283,7 @@ describe(SyncRequestType.LibrariesV1, () => {
     await ctx.syncAckAll(auth, second);
     await ctx.assertSyncIsComplete(auth, [SyncRequestType.LibrariesV1]);
 
-    await defaultDatabase
-      .updateTable('library')
-      .set({ name: 'Rename C' })
-      .where('id', '=', library.id)
-      .execute();
+    await defaultDatabase.updateTable('library').set({ name: 'Rename C' }).where('id', '=', library.id).execute();
 
     const third = await ctx.syncStream(auth, [SyncRequestType.LibrariesV1]);
     const thirdEvents = third.filter((r: { type: string }) => r.type === SyncEntityType.LibraryV1);

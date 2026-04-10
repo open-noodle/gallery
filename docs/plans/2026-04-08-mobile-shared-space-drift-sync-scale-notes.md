@@ -75,11 +75,11 @@ Three more scale scenarios were added to exercise the other performance-critical
 
 Populates a single space with 50,000 library-linked assets AND 50,000 direct-add assets, then runs the same UNION bucket query that powers the mobile space timeline. This is the realistic case where a user both uploads directly to a space AND links an external library.
 
-| Metric              | Result  |
-| ------------------- | ------- |
-| Insert 100k mixed   | 4646 ms |
-| UNION bucket query  | 119 ms  |
-| First page (100)    | 124 ms  |
+| Metric             | Result  |
+| ------------------ | ------- |
+| Insert 100k mixed  | 4646 ms |
+| UNION bucket query | 119 ms  |
+| First page (100)   | 124 ms  |
 
 The UNION query stays flat at ~120 ms — the two-branch predicate on `id IN (shared_space_asset) | library_id IN (shared_space_library)` is resolved at index-scan time, not materialize time.
 
@@ -87,10 +87,10 @@ The UNION query stays flat at ~120 ms — the two-branch predicate on `id IN (sh
 
 Backfills 100,000 rows, then processes a 1,000-row delta batch (the typical shape of a "user reopened the app after a few hours" sync).
 
-| Metric               | Result  |
-| -------------------- | ------- |
-| Initial 100k insert  | 4585 ms |
-| 1k delta insert      | 47 ms   |
+| Metric              | Result  |
+| ------------------- | ------- |
+| Initial 100k insert | 4585 ms |
+| 1k delta insert     | 47 ms   |
 
 Delta throughput is **~21,000 rows/sec** — essentially the same as the initial backfill on a per-row basis. No degradation as the local DB grows, which confirms the batch insert path doesn't scan the full table.
 
@@ -98,9 +98,9 @@ Delta throughput is **~21,000 rows/sec** — essentially the same as the initial
 
 Creates 200 libraries with 500 assets each (100k total), then revokes access to 100 of them via `deleteLibrariesV1`. Exercises the orphan sweep under a realistic multi-library revocation — chunked `DELETE ... WHERE library_id IN (...)` across the 500-chunk boundary.
 
-| Metric                    | Result  |
-| ------------------------- | ------- |
-| Insert 100k across 200 libs | 4654 ms |
+| Metric                       | Result  |
+| ---------------------------- | ------- |
+| Insert 100k across 200 libs  | 4654 ms |
 | Sweep 100 libs (50k orphans) | 748 ms  |
 
 Sweep throughput is **~67,000 rows/sec** — the DELETE path is faster per-row than the INSERT path because there's no index rebuild on the primary key for deleted rows (SQLite marks and reuses). This is well within the "user taps 'leave space', timeline catches up in under a second" UX envelope.

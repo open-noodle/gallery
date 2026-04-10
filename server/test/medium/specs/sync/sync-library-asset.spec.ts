@@ -204,11 +204,7 @@ describe(SyncRequestType.LibraryAssetsV1, () => {
     await ctx.syncAckAll(auth, before);
     await ctx.assertSyncIsComplete(auth, [SyncRequestType.LibraryAssetsV1]);
 
-    await defaultDatabase
-      .updateTable('library')
-      .set({ deletedAt: new Date() })
-      .where('id', '=', library.id)
-      .execute();
+    await defaultDatabase.updateTable('library').set({ deletedAt: new Date() }).where('id', '=', library.id).execute();
 
     // Mutate the asset so it would be streamed if the library gate was broken.
     await defaultDatabase.updateTable('asset').set({ isFavorite: true }).where('id', '=', asset.id).execute();
@@ -245,11 +241,7 @@ describe(SyncRequestType.LibraryAssetsV1, () => {
     await ctx.syncAckAll(auth, before);
     await ctx.assertSyncIsComplete(auth, [SyncRequestType.LibraryAssetsV1]);
 
-    await defaultDatabase
-      .updateTable('library')
-      .set({ deletedAt: new Date() })
-      .where('id', '=', library.id)
-      .execute();
+    await defaultDatabase.updateTable('library').set({ deletedAt: new Date() }).where('id', '=', library.id).execute();
     await defaultDatabase.updateTable('asset').set({ isFavorite: true }).where('id', '=', asset.id).execute();
 
     const after = await ctx.syncStream(auth, [SyncRequestType.LibraryAssetsV1]);
@@ -302,11 +294,7 @@ describe(SyncRequestType.LibraryAssetsV1, () => {
     await ctx.syncAckAll(auth, initial);
     await ctx.assertSyncIsComplete(auth, [SyncRequestType.LibraryAssetsV1]);
 
-    await defaultDatabase
-      .updateTable('asset')
-      .set({ libraryId: libB.id })
-      .where('id', '=', asset.id)
-      .execute();
+    await defaultDatabase.updateTable('asset').set({ libraryId: libB.id }).where('id', '=', asset.id).execute();
 
     const next = await ctx.syncStream(auth, [SyncRequestType.LibraryAssetsV1]);
     const events = next.filter((r) => isAssetEvent(r));

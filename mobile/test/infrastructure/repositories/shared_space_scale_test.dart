@@ -399,8 +399,8 @@ void main() {
 
       // ignore: avoid_print
       print(
-        '\n[scale-test] incremental · Initial ${initialCount} in ${initialMs}ms · '
-        'Delta ${deltaCount} in ${deltaMs}ms',
+        '\n[scale-test] incremental · Initial $initialCount in ${initialMs}ms · '
+        'Delta $deltaCount in ${deltaMs}ms',
       );
 
       // Delta insert should be much faster than initial — the test is
@@ -511,7 +511,7 @@ void main() {
       // ignore: avoid_print
       print(
         '\n[scale-test] sweep · Insert ${libraryCount * assetsPerLibrary} in ${insertMs}ms · '
-        'Sweep ${librariesToDelete} libraries (~${librariesToDelete * assetsPerLibrary} orphans) in ${sweepMs}ms',
+        'Sweep $librariesToDelete libraries (~${librariesToDelete * assetsPerLibrary} orphans) in ${sweepMs}ms',
       );
 
       // Sweep of 50k orphans across chunked DELETE ... IN (...) statements
