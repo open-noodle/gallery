@@ -33,26 +33,38 @@ class TimelineRepository extends DatabaseAccessor<Drift> with $TimelineRepositor
         .map((users) => users..add(userId));
   }
 
-  TimelineQuery main(List<String> userIds, GroupAssetsBy groupBy) => (
-    bucketSource: () => _watchMainBucket(userIds, groupBy: groupBy),
-    assetSource: (offset, count) => _getMainBucketAssets(userIds, offset: offset, count: count),
+  TimelineQuery main(List<String> userIds, String currentUserId, GroupAssetsBy groupBy) => (
+    bucketSource: () => _watchMainBucket(userIds, currentUserId, groupBy: groupBy),
+    assetSource: (offset, count) => _getMainBucketAssets(userIds, currentUserId, offset: offset, count: count),
     origin: TimelineOrigin.main,
   );
 
-  Stream<List<Bucket>> _watchMainBucket(List<String> userIds, {GroupAssetsBy groupBy = GroupAssetsBy.day}) {
+  Stream<List<Bucket>> _watchMainBucket(
+    List<String> userIds,
+    String currentUserId, {
+    GroupAssetsBy groupBy = GroupAssetsBy.day,
+  }) {
     if (groupBy == GroupAssetsBy.none) {
       throw UnsupportedError("GroupAssetsBy.none is not supported for watchMainBucket");
     }
 
-    return _db.mergedAssetDrift.mergedBucket(userIds: userIds, groupBy: groupBy.index).map((row) {
-      final date = row.bucketDate.truncateDate(groupBy);
-      return TimeBucket(date: date, assetCount: row.assetCount);
-    }).watch();
+    return _db.mergedAssetDrift
+        .mergedBucket(userIds: userIds, currentUserId: currentUserId, groupBy: groupBy.index)
+        .map((row) {
+          final date = row.bucketDate.truncateDate(groupBy);
+          return TimeBucket(date: date, assetCount: row.assetCount);
+        })
+        .watch();
   }
 
-  Future<List<BaseAsset>> _getMainBucketAssets(List<String> userIds, {required int offset, required int count}) {
+  Future<List<BaseAsset>> _getMainBucketAssets(
+    List<String> userIds,
+    String currentUserId, {
+    required int offset,
+    required int count,
+  }) {
     return _db.mergedAssetDrift
-        .mergedAsset(userIds: userIds, limit: (_) => Limit(count, offset))
+        .mergedAsset(userIds: userIds, currentUserId: currentUserId, limit: (_) => Limit(count, offset))
         .map(
           (row) => row.remoteId != null && row.ownerId != null
               ? RemoteAsset(
@@ -260,6 +272,126 @@ class TimelineRepository extends DatabaseAccessor<Drift> with $TimelineRepositor
     query.limit(count, offset: offset);
 
     return query.map((row) => row.readTable(_db.remoteAssetEntity).toDto(localId: row.read(localId))).get();
+  }
+
+  // Mirrors remoteAlbum() but scopes via shared_space_asset. Always orders DESC
+  // (shared spaces have no per-space order setting in PR1).
+  TimelineQuery sharedSpace(String spaceId, GroupAssetsBy groupBy) => (
+    bucketSource: () => _watchSharedSpaceBucket(spaceId, groupBy: groupBy),
+    assetSource: (offset, count) => _getSharedSpaceBucketAssets(spaceId, offset: offset, count: count),
+    origin: TimelineOrigin.remoteSpace,
+  );
+
+  Stream<List<Bucket>> _watchSharedSpaceBucket(String spaceId, {GroupAssetsBy groupBy = GroupAssetsBy.day}) {
+    // Assets belong to a space if they are either:
+    //   1. directly added via shared_space_asset, OR
+    //   2. owned by a library that is linked via shared_space_library.
+    //
+    // We LEFT JOIN both association tables and require at least one match in
+    // the WHERE clause. The join structure matters for reactivity: Drift's
+    // `.watch()` only subscribes to tables referenced via a real FROM/JOIN in
+    // the query builder — tables reached via `.isInQuery()` subqueries are
+    // invisible to the reactive layer, so a previous `IN (...) OR IN (...)`
+    // formulation produced a stale stream that never re-emitted when photos
+    // were added/removed or a library link changed. See
+    // timeline_repository_test.dart for the regression covering both cases.
+    //
+    // An asset matching both branches is counted once because we COUNT
+    // DISTINCT remote_asset.id.
+
+    if (groupBy == GroupAssetsBy.none) {
+      final countExp = _db.remoteAssetEntity.id.count(distinct: true);
+      final countQuery = _db.remoteAssetEntity.selectOnly()
+        ..addColumns([countExp])
+        ..join([
+          leftOuterJoin(
+            _db.sharedSpaceAssetEntity,
+            _db.sharedSpaceAssetEntity.assetId.equalsExp(_db.remoteAssetEntity.id) &
+                _db.sharedSpaceAssetEntity.spaceId.equals(spaceId),
+            useColumns: false,
+          ),
+          leftOuterJoin(
+            _db.sharedSpaceLibraryEntity,
+            _db.sharedSpaceLibraryEntity.libraryId.equalsExp(_db.remoteAssetEntity.libraryId) &
+                _db.sharedSpaceLibraryEntity.spaceId.equals(spaceId),
+            useColumns: false,
+          ),
+        ])
+        ..where(
+          _db.remoteAssetEntity.deletedAt.isNull() &
+              (_db.sharedSpaceAssetEntity.assetId.isNotNull() | _db.sharedSpaceLibraryEntity.libraryId.isNotNull()),
+        );
+      return countQuery
+          .map((row) => row.read(countExp) ?? 0)
+          .watchSingle()
+          .map(_generateBuckets)
+          .handleError((error) => const <Bucket>[]);
+    }
+
+    final assetCountExp = _db.remoteAssetEntity.id.count(distinct: true);
+    final dateExp = _db.remoteAssetEntity.effectiveCreatedAt(groupBy);
+
+    final query = _db.remoteAssetEntity.selectOnly()
+      ..addColumns([assetCountExp, dateExp])
+      ..join([
+        leftOuterJoin(
+          _db.sharedSpaceAssetEntity,
+          _db.sharedSpaceAssetEntity.assetId.equalsExp(_db.remoteAssetEntity.id) &
+              _db.sharedSpaceAssetEntity.spaceId.equals(spaceId),
+          useColumns: false,
+        ),
+        leftOuterJoin(
+          _db.sharedSpaceLibraryEntity,
+          _db.sharedSpaceLibraryEntity.libraryId.equalsExp(_db.remoteAssetEntity.libraryId) &
+              _db.sharedSpaceLibraryEntity.spaceId.equals(spaceId),
+          useColumns: false,
+        ),
+      ])
+      ..where(
+        _db.remoteAssetEntity.deletedAt.isNull() &
+            (_db.sharedSpaceAssetEntity.assetId.isNotNull() | _db.sharedSpaceLibraryEntity.libraryId.isNotNull()),
+      )
+      ..groupBy([dateExp])
+      ..orderBy([OrderingTerm.desc(dateExp)]);
+
+    return query
+        .map((row) {
+          final timeline = row.read(dateExp)!.truncateDate(groupBy);
+          final assetCount = row.read(assetCountExp)!;
+          return TimeBucket(date: timeline, assetCount: assetCount);
+        })
+        .watch()
+        .handleError((error) => const <Bucket>[]);
+  }
+
+  Future<List<BaseAsset>> _getSharedSpaceBucketAssets(String spaceId, {required int offset, required int count}) async {
+    final membership =
+        _db.remoteAssetEntity.id.isInQuery(
+          _db.sharedSpaceAssetEntity.selectOnly()
+            ..addColumns([_db.sharedSpaceAssetEntity.assetId])
+            ..where(_db.sharedSpaceAssetEntity.spaceId.equals(spaceId)),
+        ) |
+        _db.remoteAssetEntity.libraryId.isInQuery(
+          _db.sharedSpaceLibraryEntity.selectOnly()
+            ..addColumns([_db.sharedSpaceLibraryEntity.libraryId])
+            ..where(_db.sharedSpaceLibraryEntity.spaceId.equals(spaceId)),
+        );
+
+    final query =
+        _db.remoteAssetEntity.select().addColumns([_db.localAssetEntity.id]).join([
+            leftOuterJoin(
+              _db.localAssetEntity,
+              _db.remoteAssetEntity.checksum.equalsExp(_db.localAssetEntity.checksum),
+              useColumns: false,
+            ),
+          ])
+          ..where(_db.remoteAssetEntity.deletedAt.isNull() & membership)
+          ..orderBy([OrderingTerm.desc(_db.remoteAssetEntity.createdAt)])
+          ..limit(count, offset: offset);
+
+    return query
+        .map((row) => row.readTable(_db.remoteAssetEntity).toDto(localId: row.read(_db.localAssetEntity.id)))
+        .get();
   }
 
   TimelineQuery fromAssets(List<BaseAsset> assets, TimelineOrigin origin) => (
