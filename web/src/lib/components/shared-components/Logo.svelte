@@ -4,10 +4,11 @@
   type Props = {
     variant?: 'icon' | 'inline' | 'stacked';
     size?: 'tiny' | 'small' | 'medium' | 'large' | 'giant';
+    transparent?: boolean;
     class?: string;
   };
 
-  const { variant = 'icon', size = 'medium', class: className }: Props = $props();
+  const { variant = 'icon', size = 'medium', transparent = false, class: className }: Props = $props();
 
   const sizeClasses: Record<string, string> = {
     tiny: 'h-8',
@@ -32,7 +33,10 @@
         return theme.value === Theme.Light ? '/gallery-logo-inline-light.svg' : '/gallery-logo-inline-dark.svg';
       }
       default: {
-        return '/gallery-logo-mark.svg';
+        if (transparent) {
+          return theme.value === Theme.Light ? '/gallery-loader.svg' : '/gallery-loader-dark.svg';
+        }
+        return theme.value === Theme.Light ? '/gallery-logo-mark.svg' : '/gallery-logo-mark-dark.svg';
       }
     }
   });
