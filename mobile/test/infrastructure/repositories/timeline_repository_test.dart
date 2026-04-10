@@ -10,8 +10,6 @@
 // but we want a test that proves it, so a future refactor can't silently
 // break reactivity.
 
-import 'dart:async';
-
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
