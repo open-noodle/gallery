@@ -341,6 +341,16 @@ describe('/search/suggestions/filters', () => {
     ]);
     const faceId = faceResult.rows[0].id as string;
 
+    // addSpaceAssets (above) queues SharedSpaceFaceMatch jobs for each asset
+    // on the FacialRecognition worker. After each face match completes, the
+    // worker also queues a SharedSpacePersonDedup job. Dedup calls
+    // `deletePerson` on merged sources. If dedup runs concurrently with the
+    // manual INSERTs below, it can delete our freshly-inserted
+    // shared_space_person row before the shared_space_person_face INSERT,
+    // causing an FK violation. Drain the queue before we touch
+    // shared_space_person directly.
+    await utils.waitForQueueFinish(admin.accessToken, 'facialRecognition');
+
     const spacePersonResult = await db.query(
       `INSERT INTO "shared_space_person" ("spaceId", "name", "isHidden", "faceCount", "assetCount", "representativeFaceId")
        VALUES ($1, $2, false, 1, 1, $3) RETURNING id`,

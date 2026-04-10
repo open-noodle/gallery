@@ -56,6 +56,8 @@ import { ClusterGroupTable } from 'src/schema/tables/cluster-group.table.js';
 import { FaceSearchTable } from 'src/schema/tables/face-search.table.js';
 import { GeodataPlacesTable } from 'src/schema/tables/geodata-places.table.js';
 import { IntegrityReportTable } from 'src/schema/tables/integrity-report.table.js';
+import { LibraryAssetAuditTable } from 'src/schema/tables/library-asset-audit.table.js';
+import { LibraryAuditTable } from 'src/schema/tables/library-audit.table.js';
 import { LibraryTable } from 'src/schema/tables/library.table.js';
 import { MemoryAssetAuditTable } from 'src/schema/tables/memory-asset-audit.table.js';
 import { MemoryAssetTable } from 'src/schema/tables/memory-asset.table.js';
@@ -77,8 +79,12 @@ import { SessionTable } from 'src/schema/tables/session.table.js';
 import { SharedLinkAssetTable } from 'src/schema/tables/shared-link-asset.table.js';
 import { SharedLinkTable } from 'src/schema/tables/shared-link.table.js';
 import { SharedSpaceActivityTable } from 'src/schema/tables/shared-space-activity.table.js';
+import { SharedSpaceAssetAuditTable } from 'src/schema/tables/shared-space-asset-audit.table.js';
 import { SharedSpaceAssetTable } from 'src/schema/tables/shared-space-asset.table.js';
+import { SharedSpaceAuditTable } from 'src/schema/tables/shared-space-audit.table.js';
+import { SharedSpaceLibraryAuditTable } from 'src/schema/tables/shared-space-library-audit.table.js';
 import { SharedSpaceLibraryTable } from 'src/schema/tables/shared-space-library.table.js';
+import { SharedSpaceMemberAuditTable } from 'src/schema/tables/shared-space-member-audit.table.js';
 import { SharedSpaceMemberTable } from 'src/schema/tables/shared-space-member.table.js';
 import { SharedSpacePersonAliasTable } from 'src/schema/tables/shared-space-person-alias.table.js';
 import { SharedSpacePersonFaceTable } from 'src/schema/tables/shared-space-person-face.table.js';
@@ -141,6 +147,8 @@ export class ImmichDatabase {
     GeodataPlacesTable,
     IntegrityReportTable,
     LibraryTable,
+    LibraryAuditTable,
+    LibraryAssetAuditTable,
     MemoryTable,
     MemoryAuditTable,
     MemoryAssetTable,
@@ -159,9 +167,13 @@ export class ImmichDatabase {
     SharedLinkAssetTable,
     SharedLinkTable,
     SharedSpaceTable,
+    SharedSpaceAuditTable,
     SharedSpaceMemberTable,
+    SharedSpaceMemberAuditTable,
     SharedSpaceAssetTable,
+    SharedSpaceAssetAuditTable,
     SharedSpaceLibraryTable,
+    SharedSpaceLibraryAuditTable,
     SharedSpaceActivityTable,
     SharedSpacePersonTable,
     SharedSpacePersonFaceTable,
@@ -265,6 +277,8 @@ export interface DB {
   integrity_report: IntegrityReportTable;
 
   library: LibraryTable;
+  library_audit: LibraryAuditTable;
+  library_asset_audit: LibraryAssetAuditTable;
 
   memory: MemoryTable;
   memory_audit: MemoryAuditTable;
@@ -297,9 +311,13 @@ export interface DB {
   shared_link_asset: SharedLinkAssetTable;
 
   shared_space: SharedSpaceTable;
+  shared_space_audit: SharedSpaceAuditTable;
   shared_space_member: SharedSpaceMemberTable;
+  shared_space_member_audit: SharedSpaceMemberAuditTable;
   shared_space_asset: SharedSpaceAssetTable;
+  shared_space_asset_audit: SharedSpaceAssetAuditTable;
   shared_space_library: SharedSpaceLibraryTable;
+  shared_space_library_audit: SharedSpaceLibraryAuditTable;
   shared_space_activity: SharedSpaceActivityTable;
   shared_space_person: SharedSpacePersonTable;
   shared_space_person_face: SharedSpacePersonFaceTable;

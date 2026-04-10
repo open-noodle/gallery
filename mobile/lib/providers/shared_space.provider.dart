@@ -1,5 +1,4 @@
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:immich_mobile/repositories/shared_space_api.repository.dart';
 import 'package:openapi/api.dart';
@@ -29,9 +28,4 @@ final currentSpaceMemberProvider = FutureProvider.family<SharedSpaceMemberRespon
   final currentUser = ref.watch(currentUserProvider);
   if (currentUser == null) return null;
   return members.where((m) => m.userId == currentUser.id).firstOrNull;
-});
-
-final spaceAssetsProvider = FutureProvider.family<List<RemoteAsset>, String>((ref, spaceId) async {
-  final repository = ref.watch(sharedSpaceApiRepositoryProvider);
-  return repository.getSpaceAssets(spaceId);
 });
