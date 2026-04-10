@@ -4,17 +4,22 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
-import 'package:immich_mobile/domain/services/timeline.service.dart';
-import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/presentation/widgets/bottom_sheet/space_bottom_sheet.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.widget.dart';
+import 'package:immich_mobile/providers/background_sync.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
 import 'package:immich_mobile/providers/shared_space.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:immich_mobile/repositories/shared_space_api.repository.dart';
 import 'package:immich_mobile/routing/router.dart';
 import 'package:immich_mobile/widgets/common/immich_toast.dart';
+import 'package:immich_mobile/widgets/spaces/sync_status_banner.dart';
 import 'package:openapi/api.dart';
+
+// PR 2 — Task 35: the space timeline is now served directly by the Drift
+// sharedSpace() query (see DriftTimelineRepository.sharedSpace), so this page
+// no longer fetches assets over the network. Metadata + member list still
+// load from the API because they are not yet mirrored in Drift.
 
 @RoutePage()
 class SpaceDetailPage extends ConsumerStatefulWidget {
@@ -29,7 +34,6 @@ class SpaceDetailPage extends ConsumerStatefulWidget {
 class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
   SharedSpaceResponseDto? _space;
   List<SharedSpaceMemberResponseDto>? _members;
-  List<RemoteAsset>? _assets;
   String? _error;
   bool _loading = true;
   bool _isRefreshing = false;
@@ -46,17 +50,12 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
     _isRefreshing = true;
     try {
       final repo = ref.read(sharedSpaceApiRepositoryProvider);
-      final results = await Future.wait([
-        repo.get(widget.spaceId),
-        repo.getMembers(widget.spaceId),
-        repo.getSpaceAssets(widget.spaceId),
-      ]);
+      final results = await Future.wait([repo.get(widget.spaceId), repo.getMembers(widget.spaceId)]);
 
       if (mounted) {
         setState(() {
           _space = results[0] as SharedSpaceResponseDto;
           _members = results[1] as List<SharedSpaceMemberResponseDto>;
-          _assets = results[2] as List<RemoteAsset>;
           _loading = false;
         });
       }
@@ -72,22 +71,18 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
     }
   }
 
-  Future<void> _refreshAssets() async {
-    if (_isRefreshing) return;
-    _isRefreshing = true;
+  // Drift reactivity now propagates asset additions/removals automatically,
+  // so we only need to refresh metadata (e.g. lastActivityAt) after an
+  // add/remove action. Members and assets take care of themselves.
+  Future<void> _refreshSpaceMetadata() async {
     try {
-      final repo = ref.read(sharedSpaceApiRepositoryProvider);
-      final assets = await repo.getSpaceAssets(widget.spaceId);
-      final space = await repo.get(widget.spaceId);
+      final space = await ref.read(sharedSpaceApiRepositoryProvider).get(widget.spaceId);
       if (mounted) {
-        setState(() {
-          _assets = assets;
-          _space = space;
-        });
+        setState(() => _space = space);
       }
     } catch (_) {
-    } finally {
-      _isRefreshing = false;
+      // Best-effort refresh — failures are non-fatal; the Drift stream still
+      // drives the asset grid.
     }
   }
 
@@ -132,11 +127,31 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
           toastType: ToastType.success,
         );
       }
-      await _refreshAssets();
+      // Drift's sharedSpace() stream auto-refreshes the timeline as new
+      // shared_space_asset rows land in local Drift. Trigger an incremental
+      // sync now so the rows arrive without waiting for the next app start.
+      // The websocket has no per-space asset event subscription on the gallery
+      // fork, so without this nudge the user wouldn't see the photos until
+      // the app is restarted (closed-from-recents and reopened).
+      await _triggerSpaceSync();
+      await _refreshSpaceMetadata();
     } catch (e) {
       if (context.mounted) {
         ImmichToast.show(context: context, msg: 'Failed to add photos', toastType: ToastType.error);
       }
+    }
+  }
+
+  // Pull new shared_space_* events from the server immediately. The Drift
+  // sync stream is incremental — each call only fetches rows newer than the
+  // last ack — so this is a cheap nudge to bring the local DB in line after
+  // a mutation that the websocket doesn't push (add/remove/rename/etc).
+  Future<void> _triggerSpaceSync() async {
+    try {
+      await ref.read(backgroundSyncProvider).syncRemote();
+    } catch (error) {
+      // Failure here is non-fatal — the sync will eventually catch up on
+      // the next app resume. The mutation already succeeded server-side.
     }
   }
 
@@ -197,6 +212,13 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
           toastType: ToastType.success,
         );
       }
+      // Same nudge as _addPhotos: pull the sharedSpaceMemberUpdateV1 event so
+      // the new showInTimeline value lands in local Drift immediately.
+      // Without this, the main timeline's mergedBucket query keeps returning
+      // the pre-toggle result until the next background sync cycle fires, so
+      // toggling appears not to take effect until the user closes and reopens
+      // the app.
+      await _triggerSpaceSync();
     } catch (e) {
       if (mounted) {
         setState(() => _togglingTimeline = false);
@@ -245,23 +267,16 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
       );
     }
 
-    final assets = _assets ?? [];
-
-    if (assets.isEmpty) {
-      return _buildEmptyState();
-    }
-
     return ProviderScope(
       overrides: [
         timelineServiceProvider.overrideWith((ref) {
-          final timelineService = ref
-              .watch(timelineFactoryProvider)
-              .fromAssetsWithBuckets(assets, TimelineOrigin.remoteSpace);
+          final timelineService = ref.watch(timelineFactoryProvider).sharedSpace(spaceId: widget.spaceId);
           ref.onDispose(timelineService.dispose);
           return timelineService;
         }),
       ],
       child: Timeline(
+        topSliverWidget: const SyncStatusBannerSliver(),
         appBar: SliverAppBar(
           title: Text(_space!.name),
           centerTitle: false,
@@ -293,52 +308,12 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
         bottomSheet: SpaceBottomSheet(
           spaceId: widget.spaceId,
           currentUserRole: _currentRole,
-          onAssetsRemoved: _refreshAssets,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(_space!.name),
-        centerTitle: false,
-        actions: [
-          IconButton(
-            icon: Icon(_showInTimeline ? Icons.visibility : Icons.visibility_off),
-            onPressed: _togglingTimeline ? null : _toggleTimeline,
-            tooltip: _showInTimeline ? 'Hide from timeline' : 'Show in timeline',
-          ),
-          IconButton(icon: const Icon(Icons.people_outline), onPressed: _navigateToMembers),
-          if (_isOwner)
-            PopupMenuButton<String>(
-              onSelected: (value) {
-                if (value == 'delete') _deleteSpace();
-              },
-              itemBuilder: (context) => [const PopupMenuItem(value: 'delete', child: Text('Delete Space'))],
-            ),
-        ],
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.photo_library_outlined, size: 64, color: context.colorScheme.onSurface.withAlpha(100)),
-            const SizedBox(height: 16),
-            Text(
-              'No photos yet',
-              style: context.textTheme.titleMedium?.copyWith(color: context.colorScheme.onSurface.withAlpha(150)),
-            ),
-            if (_canEdit) ...[
-              const SizedBox(height: 24),
-              ElevatedButton.icon(
-                onPressed: _addPhotos,
-                icon: const Icon(Icons.add_photo_alternate_outlined),
-                label: const Text('Add Photos'),
-              ),
-            ],
-          ],
+          onAssetsRemoved: () async {
+            // Same nudge as _addPhotos — pull new shared_space_asset_audit rows
+            // so the deletes propagate to local Drift before the next sync.
+            await _triggerSpaceSync();
+            await _refreshSpaceMetadata();
+          },
         ),
       ),
     );
