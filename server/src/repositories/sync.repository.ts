@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Kysely, sql } from 'kysely';
+import { ExpressionBuilder, Kysely, sql } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { columns } from 'src/database';
 import { DummyValue, GenerateSql } from 'src/decorators';
@@ -69,6 +69,15 @@ export class SyncRepository {
   stack: StackSync;
   user: UserSync;
   userMetadata: UserMetadataSync;
+  sharedSpace: SharedSpaceSync;
+  sharedSpaceMember: SharedSpaceMemberSync;
+  sharedSpaceAsset: SharedSpaceAssetSync;
+  sharedSpaceAssetExif: SharedSpaceAssetExifSync;
+  sharedSpaceToAsset: SharedSpaceToAssetSync;
+  library: LibrarySync;
+  libraryAsset: LibraryAssetSync;
+  libraryAssetExif: LibraryAssetExifSync;
+  sharedSpaceLibrary: SharedSpaceLibrarySync;
 
   constructor(@InjectKysely() private db: Kysely<DB>) {
     this.album = new AlbumSync(this.db);
@@ -94,6 +103,15 @@ export class SyncRepository {
     this.stack = new StackSync(this.db);
     this.user = new UserSync(this.db);
     this.userMetadata = new UserMetadataSync(this.db);
+    this.sharedSpace = new SharedSpaceSync(this.db);
+    this.sharedSpaceMember = new SharedSpaceMemberSync(this.db);
+    this.sharedSpaceAsset = new SharedSpaceAssetSync(this.db);
+    this.sharedSpaceAssetExif = new SharedSpaceAssetExifSync(this.db);
+    this.sharedSpaceToAsset = new SharedSpaceToAssetSync(this.db);
+    this.library = new LibrarySync(this.db);
+    this.libraryAsset = new LibraryAssetSync(this.db);
+    this.libraryAssetExif = new LibraryAssetExifSync(this.db);
+    this.sharedSpaceLibrary = new SharedSpaceLibrarySync(this.db);
   }
 }
 
@@ -827,6 +845,475 @@ class AssetOcrSync extends BaseSync {
       .select(columns.syncAssetOcr)
       .innerJoin('asset', 'asset.id', 'asset_ocr.assetId')
       .where('asset.ownerId', '=', userId)
+      .stream();
+  }
+}
+
+// --- gallery-fork: shared-space sync ---
+// `accessibleSpaces` is the source-of-truth scoping subquery used by every
+// shared-space sync class to test "does this user have access to this space?".
+// A user can access a space via creator path OR membership path. Defining it
+// once here prevents the divergence the design doc flags as a risk.
+//
+// Usage:
+//   .where('shared_space.id', 'in', (eb) => accessibleSpaces(eb, userId))
+//
+// NOTE: owners are also added as `shared_space_member` rows by
+// `SharedSpaceService.create`, so iterating via `shared_space_member` for backfill
+// enumeration is sufficient — the OR'd creator path here is for query filtering
+// only and protects against direct DB inserts that bypass the service.
+export function accessibleSpaces(eb: ExpressionBuilder<DB, keyof DB>, userId: string) {
+  return eb
+    .selectFrom('shared_space')
+    .select('shared_space.id')
+    .where('shared_space.createdById', '=', userId)
+    .union(
+      eb
+        .selectFrom('shared_space_member')
+        .select('shared_space_member.spaceId as id')
+        .where('shared_space_member.userId', '=', userId),
+    );
+}
+
+const SHARED_SPACE_SYNC_COLUMNS = [
+  'shared_space.id',
+  'shared_space.name',
+  'shared_space.description',
+  'shared_space.color',
+  'shared_space.createdById',
+  'shared_space.thumbnailAssetId',
+  'shared_space.thumbnailCropY',
+  'shared_space.faceRecognitionEnabled',
+  'shared_space.petsEnabled',
+  'shared_space.lastActivityAt',
+  'shared_space.createdAt',
+  'shared_space.updatedAt',
+  'shared_space.updateId',
+] as const;
+
+export class SharedSpaceSync extends BaseSync {
+  // Returns spaces accessible to the user, ordered by the user's MEMBERSHIP
+  // createId (not the space's createId). This matches the album pattern in
+  // AlbumSync.getCreatedAfter — using the membership createId means a user
+  // added to a pre-existing space gets a fresh createId past their backfill
+  // checkpoint, which triggers the per-space backfill loop in
+  // syncSharedSpaceMembersV1 / AssetsV1 / etc. and drains the historical rows.
+  //
+  // Relies on the SharedSpaceService.create invariant that the creator is
+  // always added as a member.
+  @GenerateSql({ params: [dummyCreateAfterOptions] })
+  getCreatedAfter({ nowId, userId, afterCreateId }: SyncCreatedAfterOptions) {
+    return this.db
+      .selectFrom('shared_space_member')
+      .select(['shared_space_member.spaceId as id', 'shared_space_member.createId'])
+      .where('shared_space_member.userId', '=', userId)
+      .$if(!!afterCreateId, (qb) => qb.where('shared_space_member.createId', '>=', afterCreateId!))
+      .where('shared_space_member.createId', '<', nowId)
+      .orderBy('shared_space_member.createId', 'asc')
+      .execute();
+  }
+
+  @GenerateSql({ params: [dummyQueryOptions], stream: true })
+  getDeletes(options: SyncQueryOptions) {
+    return this.auditQuery('shared_space_audit', options)
+      .select(['id', 'spaceId'])
+      .where('userId', '=', options.userId)
+      .stream();
+  }
+
+  cleanupAuditTable(daysAgo: number) {
+    return this.auditCleanup('shared_space_audit', daysAgo);
+  }
+
+  @GenerateSql({ params: [dummyQueryOptions], stream: true })
+  getUpserts(options: SyncQueryOptions) {
+    return this.upsertQuery('shared_space', options)
+      .where('shared_space.id', 'in', (eb) => accessibleSpaces(eb, options.userId))
+      .select(SHARED_SPACE_SYNC_COLUMNS)
+      .stream();
+  }
+}
+
+// Columns emitted to mobile clients. Explicitly excludes lastViewedAt — that's a
+// per-user UI hint that mobile clients track locally and we don't want to round-trip.
+const SHARED_SPACE_MEMBER_SYNC_COLUMNS = [
+  'shared_space_member.spaceId',
+  'shared_space_member.userId',
+  'shared_space_member.role',
+  'shared_space_member.joinedAt',
+  'shared_space_member.showInTimeline',
+  'shared_space_member.updateId',
+] as const;
+
+export class SharedSpaceMemberSync extends BaseSync {
+  @GenerateSql({ params: [dummyBackfillOptions, DummyValue.UUID], stream: true })
+  getBackfill(options: SyncBackfillOptions, spaceId: string) {
+    return this.backfillQuery('shared_space_member', options)
+      .select(SHARED_SPACE_MEMBER_SYNC_COLUMNS)
+      .where('shared_space_member.spaceId', '=', spaceId)
+      .stream();
+  }
+
+  // Stream peer-removal events to OTHER members of an accessible space. The
+  // current user being removed from a space is signaled separately via
+  // SharedSpaceSync.getDeletes (reading shared_space_audit), not this method —
+  // by the time this query runs the removed user no longer satisfies
+  // accessibleSpaces, so audit rows for them are filtered out. That's the
+  // intentional channel split: shared_space_audit handles "you lost access",
+  // shared_space_member_audit handles "this peer left".
+  @GenerateSql({ params: [dummyQueryOptions], stream: true })
+  getDeletes(options: SyncQueryOptions) {
+    return this.auditQuery('shared_space_member_audit', options)
+      .select(['id', 'spaceId', 'userId'])
+      .where('spaceId', 'in', (eb) => accessibleSpaces(eb, options.userId))
+      .stream();
+  }
+
+  cleanupAuditTable(daysAgo: number) {
+    return this.auditCleanup('shared_space_member_audit', daysAgo);
+  }
+
+  @GenerateSql({ params: [dummyQueryOptions], stream: true })
+  getUpserts(options: SyncQueryOptions) {
+    return this.upsertQuery('shared_space_member', options)
+      .select(SHARED_SPACE_MEMBER_SYNC_COLUMNS)
+      .where('shared_space_member.spaceId', 'in', (eb) => accessibleSpaces(eb, options.userId))
+      .stream();
+  }
+}
+
+export class SharedSpaceAssetSync extends BaseSync {
+  // Per-space backfill of asset rows joined through shared_space_asset.
+  @GenerateSql({ params: [dummyBackfillOptions, DummyValue.UUID], stream: true })
+  getBackfill(options: SyncBackfillOptions, spaceId: string) {
+    return this.backfillQuery('shared_space_asset', options)
+      .innerJoin('asset', 'asset.id', 'shared_space_asset.assetId')
+      .select(columns.syncAsset)
+      .select('shared_space_asset.updateId')
+      .where('shared_space_asset.spaceId', '=', spaceId)
+      .stream();
+  }
+
+  // Create-side: stream new (space, asset) pairings the user can access. Each
+  // shared_space_asset row produces one event (write amplification accepted —
+  // mobile dedups by asset id at insert time).
+  @GenerateSql({ params: [dummyQueryOptions], stream: true })
+  getCreates(options: SyncQueryOptions) {
+    return this.upsertQuery('shared_space_asset', options)
+      .innerJoin('asset', 'asset.id', 'shared_space_asset.assetId')
+      .select(columns.syncAsset)
+      .select('shared_space_asset.updateId')
+      .where('shared_space_asset.spaceId', 'in', (eb) => accessibleSpaces(eb, options.userId))
+      .stream();
+  }
+
+  // Update-side: stream asset metadata changes for assets the client has already
+  // received. Gated by `shared_space_asset.updateId <= sharedSpaceToAssetAck` to
+  // ensure we only emit updates for join rows the client has acked.
+  @GenerateSql({ params: [dummyQueryOptions, { updateId: DummyValue.UUID }], stream: true })
+  getUpdates(options: SyncQueryOptions, sharedSpaceToAssetAck: SyncAck) {
+    return this.upsertQuery('asset', options)
+      .innerJoin('shared_space_asset', 'shared_space_asset.assetId', 'asset.id')
+      .select(columns.syncAsset)
+      .select('asset.updateId')
+      .where('shared_space_asset.updateId', '<=', sharedSpaceToAssetAck.updateId)
+      .where('shared_space_asset.spaceId', 'in', (eb) => accessibleSpaces(eb, options.userId))
+      .stream();
+  }
+  // Note: shared_space_asset_audit cleanup is owned by SharedSpaceToAssetSync below,
+  // mirroring how AlbumToAssetSync owns album_asset_audit cleanup.
+}
+
+export class SharedSpaceAssetExifSync extends BaseSync {
+  @GenerateSql({ params: [dummyBackfillOptions, DummyValue.UUID], stream: true })
+  getBackfill(options: SyncBackfillOptions, spaceId: string) {
+    return this.backfillQuery('shared_space_asset', options)
+      .innerJoin('asset_exif', 'asset_exif.assetId', 'shared_space_asset.assetId')
+      .select(columns.syncAssetExif)
+      .select('shared_space_asset.updateId')
+      .where('shared_space_asset.spaceId', '=', spaceId)
+      .stream();
+  }
+
+  @GenerateSql({ params: [dummyQueryOptions], stream: true })
+  getCreates(options: SyncQueryOptions) {
+    return this.upsertQuery('shared_space_asset', options)
+      .innerJoin('asset_exif', 'asset_exif.assetId', 'shared_space_asset.assetId')
+      .select(columns.syncAssetExif)
+      .select('shared_space_asset.updateId')
+      .where('shared_space_asset.spaceId', 'in', (eb) => accessibleSpaces(eb, options.userId))
+      .stream();
+  }
+
+  @GenerateSql({ params: [dummyQueryOptions, { updateId: DummyValue.UUID }], stream: true })
+  getUpdates(options: SyncQueryOptions, sharedSpaceToAssetAck: SyncAck) {
+    return this.upsertQuery('asset_exif', options)
+      .innerJoin('shared_space_asset', 'shared_space_asset.assetId', 'asset_exif.assetId')
+      .select(columns.syncAssetExif)
+      .select('asset_exif.updateId')
+      .where('shared_space_asset.updateId', '<=', sharedSpaceToAssetAck.updateId)
+      .where('shared_space_asset.spaceId', 'in', (eb) => accessibleSpaces(eb, options.userId))
+      .stream();
+  }
+}
+
+// Owns shared_space_asset_audit cleanup. The audit table is shared with
+// SharedSpaceAssetSync (which streams full asset rows) and SharedSpaceAssetExifSync
+// (which streams exif rows), but only one class should call auditCleanup per table
+// — otherwise the schema-driven `should cleanup every table` test counts duplicate
+// invocations and fails. The convention (mirrored from AlbumToAssetSync) is that
+// the join-row sync class owns cleanup of the join-row audit table.
+export class SharedSpaceToAssetSync extends BaseSync {
+  @GenerateSql({ params: [dummyBackfillOptions, DummyValue.UUID], stream: true })
+  getBackfill(options: SyncBackfillOptions, spaceId: string) {
+    return this.backfillQuery('shared_space_asset', options)
+      .select([
+        'shared_space_asset.assetId as assetId',
+        'shared_space_asset.spaceId as spaceId',
+        'shared_space_asset.updateId',
+      ])
+      .where('shared_space_asset.spaceId', '=', spaceId)
+      .stream();
+  }
+
+  @GenerateSql({ params: [dummyQueryOptions], stream: true })
+  getDeletes(options: SyncQueryOptions) {
+    return this.auditQuery('shared_space_asset_audit', options)
+      .select(['id', 'assetId', 'spaceId'])
+      .where('spaceId', 'in', (eb) => accessibleSpaces(eb, options.userId))
+      .stream();
+  }
+
+  cleanupAuditTable(daysAgo: number) {
+    return this.auditCleanup('shared_space_asset_audit', daysAgo);
+  }
+
+  @GenerateSql({ params: [dummyQueryOptions], stream: true })
+  getUpserts(options: SyncQueryOptions) {
+    return this.upsertQuery('shared_space_asset', options)
+      .select([
+        'shared_space_asset.assetId as assetId',
+        'shared_space_asset.spaceId as spaceId',
+        'shared_space_asset.updateId',
+      ])
+      .where('shared_space_asset.spaceId', 'in', (eb) => accessibleSpaces(eb, options.userId))
+      .stream();
+  }
+}
+
+// `accessibleLibraries` is the source-of-truth scoping subquery used by every
+// library sync class. A user can access a library via direct ownership OR via
+// any space they can access (membership or creator). The UNION naturally
+// deduplicates so a user who both owns L and is a member of a space linking L
+// gets a single row.
+//
+// Usage:
+//   .where('library.id', 'in', (eb) => accessibleLibraries(eb, userId))
+//
+// NOTE: soft-deleted libraries (deletedAt IS NOT NULL) are excluded from the
+// ownership branch but NOT from the space-link branch — a soft-deleted library
+// is still reachable via a linked space and the client should still see it
+// until the library is hard-deleted.
+export function accessibleLibraries(eb: ExpressionBuilder<DB, keyof DB>, userId: string) {
+  return eb
+    .selectFrom('library')
+    .select('library.id')
+    .where('library.ownerId', '=', userId)
+    .where('library.deletedAt', 'is', null)
+    .union(
+      eb
+        .selectFrom('shared_space_library')
+        .select('shared_space_library.libraryId as id')
+        .where('shared_space_library.spaceId', 'in', (eb2) => accessibleSpaces(eb2, userId)),
+    );
+}
+
+const LIBRARY_SYNC_COLUMNS = [
+  'library.id',
+  'library.name',
+  'library.ownerId',
+  'library.createdAt',
+  'library.updatedAt',
+  'library.updateId',
+] as const;
+
+export class LibrarySync extends BaseSync {
+  // Returns libraries accessible to the user, ordered by library.createId. Unlike
+  // SharedSpaceSync.getCreatedAfter — which enumerates membership rows because
+  // each user gets a fresh per-membership createId — libraries do not have a
+  // per-user join table. The createId is a property of the library row itself,
+  // shared across all users with access. A user added to a pre-existing space
+  // that links an old library will not pick up that library here (the createId
+  // is past their backfill checkpoint); SharedSpaceLibrarySync's per-link
+  // backfill loop in sync.service.ts handles that case.
+  @GenerateSql({ params: [dummyCreateAfterOptions] })
+  getCreatedAfter({ nowId, userId, afterCreateId }: SyncCreatedAfterOptions) {
+    return this.db
+      .selectFrom('library')
+      .select(['library.id', 'library.createId'])
+      .where('library.id', 'in', (eb) => accessibleLibraries(eb, userId))
+      .$if(!!afterCreateId, (qb) => qb.where('library.createId', '>=', afterCreateId!))
+      .where('library.createId', '<', nowId)
+      .orderBy('library.createId', 'asc')
+      .execute();
+  }
+
+  @GenerateSql({ params: [dummyQueryOptions], stream: true })
+  getDeletes(options: SyncQueryOptions) {
+    return this.auditQuery('library_audit', options)
+      .select(['id', 'libraryId'])
+      .where('userId', '=', options.userId)
+      .stream();
+  }
+
+  cleanupAuditTable(daysAgo: number) {
+    return this.auditCleanup('library_audit', daysAgo);
+  }
+
+  @GenerateSql({ params: [dummyQueryOptions], stream: true })
+  getUpserts(options: SyncQueryOptions) {
+    return this.upsertQuery('library', options)
+      .where('library.id', 'in', (eb) => accessibleLibraries(eb, options.userId))
+      .select(LIBRARY_SYNC_COLUMNS)
+      .stream();
+  }
+}
+
+// Streams library-owned asset rows. The "once-per-asset" correctness property
+// comes from filtering `asset.libraryId IN accessibleLibraries(userId)` directly
+// on the asset table. A library linked to multiple spaces is still counted ONCE
+// in the accessibleLibraries UNION, and each asset has exactly one libraryId,
+// so this class never produces the write-amplification that SharedSpaceAssetSync
+// accepts for (space, asset) pairs.
+//
+// Owns library_asset_audit cleanup because this class is the one that streams
+// the per-asset delete events derived from that table.
+export class LibraryAssetSync extends BaseSync {
+  // Per-library backfill of asset rows for a specific library. Triggered by the
+  // `syncLibraryAssetsV1` service loop when the client has not yet backfilled a
+  // newly-accessible library.
+  @GenerateSql({ params: [dummyBackfillOptions, DummyValue.UUID], stream: true })
+  getBackfill(options: SyncBackfillOptions, libraryId: string) {
+    return this.backfillQuery('asset', options)
+      .select(columns.syncAsset)
+      .select('asset.updateId')
+      .where('asset.libraryId', '=', libraryId)
+      .stream();
+  }
+
+  // Single upsert stream for library assets. Mirrors PartnerAssetsSync.getUpserts
+  // — that's the canonical shape for access-scoped sync without a per-pairing
+  // join table. We can't split create vs update like SharedSpaceAssetSync does
+  // because there's no stable library<->asset join-row updateId to gate on.
+  // Both initial syncs and subsequent metadata changes flow through this stream
+  // as `LibraryAssetCreateV1` events; the client upserts idempotently.
+  @GenerateSql({ params: [dummyQueryOptions], stream: true })
+  getUpserts(options: SyncQueryOptions) {
+    return this.upsertQuery('asset', options)
+      .select(columns.syncAsset)
+      .select('asset.updateId')
+      .where('asset.libraryId', 'is not', null)
+      .where('asset.libraryId', 'in', (eb) => accessibleLibraries(eb, options.userId))
+      .stream();
+  }
+
+  // Stream per-asset deletes from library_asset_audit, scoped to libraries the
+  // user can still access. The audit table stores both assetId and libraryId
+  // (libraryId is captured by the asset_library_delete_audit trigger from the
+  // OLD asset row). The libraryId scoping prevents leaking per-asset delete
+  // events to clients who never had access to the library.
+  //
+  // The whole-library revocation path is handled separately by
+  // LibrarySync.getDeletes (library_audit scoped per-user) — when a user loses
+  // access to a whole library, they receive a LibraryDeleteV1 and the client
+  // drops all assets locally without needing per-asset events.
+  @GenerateSql({ params: [dummyQueryOptions], stream: true })
+  getDeletes(options: SyncQueryOptions) {
+    return this.auditQuery('library_asset_audit', options)
+      .select(['library_asset_audit.id as id', 'library_asset_audit.assetId as assetId'])
+      .where('library_asset_audit.libraryId', 'in', (eb) => accessibleLibraries(eb, options.userId))
+      .stream();
+  }
+
+  cleanupAuditTable(daysAgo: number) {
+    return this.auditCleanup('library_asset_audit', daysAgo);
+  }
+}
+
+// Streams asset_exif rows for library-owned assets. Scoped by
+// asset.libraryId IN accessibleLibraries, joined through asset → asset_exif.
+// Mirrors AlbumAssetExifSync but uses the library-access boundary instead of
+// the album-user boundary. No cleanupAuditTable — there is no dedicated
+// exif audit table (consistent with AlbumAssetExifSync).
+export class LibraryAssetExifSync extends BaseSync {
+  @GenerateSql({ params: [dummyBackfillOptions, DummyValue.UUID], stream: true })
+  getBackfill(options: SyncBackfillOptions, libraryId: string) {
+    return this.backfillQuery('asset', options)
+      .innerJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
+      .select(columns.syncAssetExif)
+      .select('asset.updateId')
+      .where('asset.libraryId', '=', libraryId)
+      .stream();
+  }
+
+  // Single upsert stream — same rationale as LibraryAssetSync.getUpserts.
+  @GenerateSql({ params: [dummyQueryOptions], stream: true })
+  getUpserts(options: SyncQueryOptions) {
+    return this.upsertQuery('asset_exif', options)
+      .select(columns.syncAssetExif)
+      .select('asset_exif.updateId')
+      .where('assetId', 'in', (eb) =>
+        eb
+          .selectFrom('asset')
+          .select('asset.id')
+          .where('asset.libraryId', 'is not', null)
+          .where('asset.libraryId', 'in', (eb2) => accessibleLibraries(eb2, options.userId)),
+      )
+      .stream();
+  }
+}
+
+const SHARED_SPACE_LIBRARY_SYNC_COLUMNS = [
+  'shared_space_library.spaceId',
+  'shared_space_library.libraryId',
+  'shared_space_library.addedById',
+  'shared_space_library.createdAt',
+  'shared_space_library.updatedAt',
+  'shared_space_library.updateId',
+] as const;
+
+// Streams the shared_space_library join rows — the per-space "which libraries
+// are linked" mapping. Scoped by accessibleSpaces (NOT accessibleLibraries):
+// this is the join row belonging to the space, and the user must have access
+// to the space itself to see its link set.
+//
+// Owns shared_space_library_audit cleanup.
+export class SharedSpaceLibrarySync extends BaseSync {
+  @GenerateSql({ params: [dummyBackfillOptions, DummyValue.UUID], stream: true })
+  getBackfill(options: SyncBackfillOptions, spaceId: string) {
+    return this.backfillQuery('shared_space_library', options)
+      .select(SHARED_SPACE_LIBRARY_SYNC_COLUMNS)
+      .where('shared_space_library.spaceId', '=', spaceId)
+      .stream();
+  }
+
+  @GenerateSql({ params: [dummyQueryOptions], stream: true })
+  getDeletes(options: SyncQueryOptions) {
+    return this.auditQuery('shared_space_library_audit', options)
+      .select(['id', 'spaceId', 'libraryId'])
+      .where('spaceId', 'in', (eb) => accessibleSpaces(eb, options.userId))
+      .stream();
+  }
+
+  cleanupAuditTable(daysAgo: number) {
+    return this.auditCleanup('shared_space_library_audit', daysAgo);
+  }
+
+  @GenerateSql({ params: [dummyQueryOptions], stream: true })
+  getUpserts(options: SyncQueryOptions) {
+    return this.upsertQuery('shared_space_library', options)
+      .select(SHARED_SPACE_LIBRARY_SYNC_COLUMNS)
+      .where('shared_space_library.spaceId', 'in', (eb) => accessibleSpaces(eb, options.userId))
       .stream();
   }
 }

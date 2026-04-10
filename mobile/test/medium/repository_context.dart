@@ -15,6 +15,11 @@ import 'package:immich_mobile/data/db/main/table/remote/album_asset.drift.dart';
 import 'package:immich_mobile/data/db/main/table/remote/album_user.drift.dart';
 import 'package:immich_mobile/data/db/main/table/remote/asset.drift.dart';
 import 'package:immich_mobile/data/db/main/table/remote/cloud_id.drift.dart';
+import 'package:immich_mobile/data/db/main/table/remote/library.entity.drift.dart';
+import 'package:immich_mobile/data/db/main/table/remote/shared_space.entity.drift.dart';
+import 'package:immich_mobile/data/db/main/table/remote/shared_space_asset.entity.drift.dart';
+import 'package:immich_mobile/data/db/main/table/remote/shared_space_library.entity.drift.dart';
+import 'package:immich_mobile/data/db/main/table/remote/shared_space_member.entity.drift.dart';
 import 'package:immich_mobile/data/db/main/table/user/auth_user.drift.dart';
 import 'package:immich_mobile/data/db/main/table/user/partner.drift.dart';
 import 'package:immich_mobile/data/db/main/table/user/user.drift.dart';
@@ -392,4 +397,94 @@ class MediumRepositoryContext {
   Future<void> newMemoryAsset({required String memoryId, required String assetId}) => db
       .into(db.memoryAssetEntity)
       .insert(MemoryAssetEntityCompanion(memoryId: .new(memoryId), assetId: .new(assetId)));
+
+  Future<SharedSpaceEntityData> newSharedSpace({
+    String? id,
+    String? name,
+    String? description,
+    String? color,
+    required String createdById,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) async {
+    id ??= TestUtils.uuid();
+    return db
+        .into(db.sharedSpaceEntity)
+        .insertReturning(
+          SharedSpaceEntityCompanion(
+            id: .new(id),
+            name: .new(name ?? 'shared_space_$id'),
+            description: .new(description),
+            color: .new(color),
+            createdById: .new(createdById),
+            createdAt: .new(TestUtils.date(createdAt)),
+            updatedAt: .new(TestUtils.date(updatedAt)),
+          ),
+        );
+  }
+
+  Future<void> newSharedSpaceMember({
+    required String spaceId,
+    required String userId,
+    String? role,
+    DateTime? joinedAt,
+    bool? showInTimeline,
+  }) {
+    return db
+        .into(db.sharedSpaceMemberEntity)
+        .insert(
+          SharedSpaceMemberEntityCompanion(
+            spaceId: .new(spaceId),
+            userId: .new(userId),
+            role: .new(role ?? 'editor'),
+            joinedAt: .new(TestUtils.date(joinedAt)),
+            showInTimeline: .new(showInTimeline ?? true),
+          ),
+        );
+  }
+
+  Future<void> insertSharedSpaceAsset({required String spaceId, required String assetId}) {
+    return db
+        .into(db.sharedSpaceAssetEntity)
+        .insert(SharedSpaceAssetEntityCompanion.insert(spaceId: spaceId, assetId: assetId));
+  }
+
+  Future<LibraryEntityData> newLibrary({
+    String? id,
+    String? name,
+    required String ownerId,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) async {
+    id ??= TestUtils.uuid();
+    return db
+        .into(db.libraryEntity)
+        .insertReturning(
+          LibraryEntityCompanion(
+            id: .new(id),
+            name: .new(name ?? 'library_$id'),
+            ownerId: .new(ownerId),
+            createdAt: .new(TestUtils.date(createdAt)),
+            updatedAt: .new(TestUtils.date(updatedAt)),
+          ),
+        );
+  }
+
+  Future<void> insertSharedSpaceLibrary({
+    required String spaceId,
+    required String libraryId,
+    String? addedById,
+    DateTime? createdAt,
+  }) {
+    return db
+        .into(db.sharedSpaceLibraryEntity)
+        .insert(
+          SharedSpaceLibraryEntityCompanion(
+            spaceId: .new(spaceId),
+            libraryId: .new(libraryId),
+            addedById: .new(addedById),
+            createdAt: .new(TestUtils.date(createdAt)),
+          ),
+        );
+  }
 }
