@@ -93,7 +93,7 @@ class _ImmichLogoWithText extends StatelessWidget {
     duration: kThemeChangeDuration,
     child: SvgPicture.asset(
       context.isDarkTheme ? 'assets/immich-logo-inline-dark.svg' : 'assets/immich-logo-inline-light.svg',
-      height: 40,
+      height: 60,
     ),
   );
 }
