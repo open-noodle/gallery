@@ -559,3 +559,24 @@ export const shared_space_member_after_insert_library = registerFunction({
       RETURN NULL;
     END`,
 });
+
+// When a library is linked to a space, grant library_user for every current
+// member of that space and bump library.updateId so the metadata re-emits.
+export const shared_space_library_after_insert_user = registerFunction({
+  name: 'shared_space_library_after_insert_user',
+  returnType: 'TRIGGER',
+  language: 'PLPGSQL',
+  body: `
+    BEGIN
+      INSERT INTO library_user ("userId", "libraryId")
+      SELECT DISTINCT ssm."userId", ir."libraryId"
+      FROM inserted_rows ir
+      INNER JOIN shared_space_member ssm ON ssm."spaceId" = ir."spaceId"
+      ON CONFLICT DO NOTHING;
+
+      UPDATE library
+      SET "updatedAt" = clock_timestamp(), "updateId" = immich_uuid_v7(clock_timestamp())
+      WHERE "id" IN (SELECT DISTINCT "libraryId" FROM inserted_rows);
+      RETURN NULL;
+    END`,
+});

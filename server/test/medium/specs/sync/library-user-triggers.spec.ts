@@ -240,6 +240,49 @@ describe('library_user triggers', () => {
       expect(rows.map((r) => r.id)).toContain(library.id);
     });
 
+  });
+
+  describe('shared_space_library_after_insert_user', () => {
+    it('grants library_user for every member of the space when a library is linked', async () => {
+      const { ctx, db } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: memberA } = await ctx.newUser();
+      const { user: memberB } = await ctx.newUser();
+
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: memberA.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: memberB.id });
+
+      const { library } = await ctx.newLibrary({ ownerId: owner.id });
+
+      const before = await db
+        .selectFrom('library')
+        .select(['updateId'])
+        .where('id', '=', library.id)
+        .executeTakeFirstOrThrow();
+
+      await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id });
+
+      // memberA and memberB should both get library_user rows.
+      const rows = await db
+        .selectFrom('library_user')
+        .select(['userId'])
+        .where('libraryId', '=', library.id)
+        .execute();
+      const userIds = rows.map((r) => r.userId);
+      expect(userIds).toContain(owner.id); // from library_after_insert
+      expect(userIds).toContain(memberA.id);
+      expect(userIds).toContain(memberB.id);
+
+      // library.updateId was bumped.
+      const after = await db
+        .selectFrom('library')
+        .select(['updateId'])
+        .where('id', '=', library.id)
+        .executeTakeFirstOrThrow();
+      expect(after.updateId).not.toBe(before.updateId);
+    });
+
     // Documentation test: pins the "creator is always a member" asymmetry
     // flagged in the design's Known Limitations section. If the invariant
     // breaks (e.g., a future refactor of SharedSpaceService.create), the

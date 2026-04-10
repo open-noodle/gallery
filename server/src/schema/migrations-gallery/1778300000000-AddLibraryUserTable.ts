@@ -98,6 +98,39 @@ export async function up(db: Kysely<any>): Promise<void> {
   await sql`INSERT INTO "migration_overrides" ("name", "value") VALUES ('trigger_shared_space_member_after_insert_library', '{"type":"trigger","name":"shared_space_member_after_insert_library","sql":"CREATE OR REPLACE TRIGGER \\"shared_space_member_after_insert_library\\"\\n  AFTER INSERT ON \\"shared_space_member\\"\\n  REFERENCING NEW TABLE AS \\"inserted_rows\\"\\n  FOR EACH STATEMENT\\n  EXECUTE FUNCTION shared_space_member_after_insert_library();"}'::jsonb);`.execute(
     db,
   );
+
+  // shared_space_library_after_insert_user: on library link, grant library_user
+  // for every current member and bump library.updateId.
+  await sql`CREATE OR REPLACE FUNCTION shared_space_library_after_insert_user()
+  RETURNS TRIGGER
+  LANGUAGE PLPGSQL
+  AS $$
+    BEGIN
+      INSERT INTO library_user ("userId", "libraryId")
+      SELECT DISTINCT ssm."userId", ir."libraryId"
+      FROM inserted_rows ir
+      INNER JOIN shared_space_member ssm ON ssm."spaceId" = ir."spaceId"
+      ON CONFLICT DO NOTHING;
+
+      UPDATE library
+      SET "updatedAt" = clock_timestamp(), "updateId" = immich_uuid_v7(clock_timestamp())
+      WHERE "id" IN (SELECT DISTINCT "libraryId" FROM inserted_rows);
+      RETURN NULL;
+    END
+  $$;`.execute(db);
+
+  await sql`CREATE OR REPLACE TRIGGER "shared_space_library_after_insert_user"
+  AFTER INSERT ON "shared_space_library"
+  REFERENCING NEW TABLE AS "inserted_rows"
+  FOR EACH STATEMENT
+  EXECUTE FUNCTION shared_space_library_after_insert_user();`.execute(db);
+
+  await sql`INSERT INTO "migration_overrides" ("name", "value") VALUES ('function_shared_space_library_after_insert_user', '{"type":"function","name":"shared_space_library_after_insert_user","sql":"CREATE OR REPLACE FUNCTION shared_space_library_after_insert_user()\\n  RETURNS TRIGGER\\n  LANGUAGE PLPGSQL\\n  AS $$\\n    BEGIN\\n      INSERT INTO library_user (\\"userId\\", \\"libraryId\\")\\n      SELECT DISTINCT ssm.\\"userId\\", ir.\\"libraryId\\"\\n      FROM inserted_rows ir\\n      INNER JOIN shared_space_member ssm ON ssm.\\"spaceId\\" = ir.\\"spaceId\\"\\n      ON CONFLICT DO NOTHING;\\n\\n      UPDATE library\\n      SET \\"updatedAt\\" = clock_timestamp(), \\"updateId\\" = immich_uuid_v7(clock_timestamp())\\n      WHERE \\"id\\" IN (SELECT DISTINCT \\"libraryId\\" FROM inserted_rows);\\n      RETURN NULL;\\n    END\\n  $$;"}'::jsonb);`.execute(
+    db,
+  );
+  await sql`INSERT INTO "migration_overrides" ("name", "value") VALUES ('trigger_shared_space_library_after_insert_user', '{"type":"trigger","name":"shared_space_library_after_insert_user","sql":"CREATE OR REPLACE TRIGGER \\"shared_space_library_after_insert_user\\"\\n  AFTER INSERT ON \\"shared_space_library\\"\\n  REFERENCING NEW TABLE AS \\"inserted_rows\\"\\n  FOR EACH STATEMENT\\n  EXECUTE FUNCTION shared_space_library_after_insert_user();"}'::jsonb);`.execute(
+    db,
+  );
 }
 
 export async function down(db: Kysely<any>): Promise<void> {
@@ -105,8 +138,12 @@ export async function down(db: Kysely<any>): Promise<void> {
     'function_library_after_insert',
     'trigger_library_after_insert',
     'function_shared_space_member_after_insert_library',
-    'trigger_shared_space_member_after_insert_library'
+    'trigger_shared_space_member_after_insert_library',
+    'function_shared_space_library_after_insert_user',
+    'trigger_shared_space_library_after_insert_user'
   )`.execute(db);
+  await sql`DROP TRIGGER IF EXISTS "shared_space_library_after_insert_user" ON "shared_space_library";`.execute(db);
+  await sql`DROP FUNCTION IF EXISTS shared_space_library_after_insert_user();`.execute(db);
   await sql`DROP TRIGGER IF EXISTS "shared_space_member_after_insert_library" ON "shared_space_member";`.execute(db);
   await sql`DROP FUNCTION IF EXISTS shared_space_member_after_insert_library();`.execute(db);
   await sql`DROP TRIGGER IF EXISTS "library_after_insert" ON "library";`.execute(db);
