@@ -1,5 +1,7 @@
 import { Kysely } from 'kysely';
+import { SyncRepository } from 'src/repositories/sync.repository';
 import { DB } from 'src/schema';
+import { SyncEntityType } from 'src/enum';
 import { SyncTestContext } from 'test/medium.factory';
 import { getKyselyDB } from 'test/utils';
 
@@ -201,6 +203,77 @@ describe('library_user triggers', () => {
         .where('libraryId', '=', library.id)
         .executeTakeFirstOrThrow();
       expect(peerRow.createId).not.toBe(library.createId);
+    });
+
+    it('LibrarySync.getUpserts re-delivers the library to the new member after the updateId bump', async () => {
+      const { ctx, db } = setup();
+      const syncRepo = ctx.get(SyncRepository);
+      const { user: owner } = await ctx.newUser();
+      const { user: newMember } = await ctx.newUser();
+      const { library } = await ctx.newLibrary({ ownerId: owner.id });
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id });
+
+      // Snapshot library.updateId before the trigger bumps it.
+      const preBump = await db
+        .selectFrom('library')
+        .select(['updateId'])
+        .where('id', '=', library.id)
+        .executeTakeFirstOrThrow();
+
+      // newMember joins → shared_space_member_after_insert_library fires
+      // and bumps library.updateId.
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: newMember.id });
+
+      // A dummyNowId past any possible uuid_v7, and ack at the pre-bump
+      // updateId. The new updateId is > ack, so the upsert stream should
+      // include this library.
+      const upsertStream = syncRepo.library.getUpserts({
+        nowId: 'ffffffff-ffff-7fff-bfff-ffffffffffff',
+        userId: newMember.id,
+        ack: { type: SyncEntityType.LibraryV1, updateId: preBump.updateId },
+      });
+      const rows: { id: string }[] = [];
+      for await (const row of upsertStream) {
+        rows.push(row);
+      }
+      expect(rows.map((r) => r.id)).toContain(library.id);
+    });
+
+    // Documentation test: pins the "creator is always a member" asymmetry
+    // flagged in the design's Known Limitations section. If the invariant
+    // breaks (e.g., a future refactor of SharedSpaceService.create), the
+    // create-side trigger will silently fail to populate library_user for
+    // a creator-but-not-member, while the delete-side defensively preserves
+    // them. This test documents that state so whoever touches space creation
+    // knows the consequence.
+    it('(known limitation) does not populate library_user for a space creator who is not a member', async () => {
+      const { ctx, db } = setup();
+      const { user: creator } = await ctx.newUser();
+      const { user: libOwner } = await ctx.newUser();
+      const { library } = await ctx.newLibrary({ ownerId: libOwner.id });
+
+      // Direct insert of a shared_space WITHOUT a shared_space_member row
+      // for the creator.
+      const space = await db
+        .insertInto('shared_space')
+        .values({ name: 'orphan-creator', createdById: creator.id })
+        .returning(['id'])
+        .executeTakeFirstOrThrow();
+
+      await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id });
+
+      // shared_space_library_after_insert_user (Task 9) joins on
+      // shared_space_member; there's no row for creator, so no library_user
+      // is created for them. library_after_insert already populated libOwner,
+      // but NOT the creator.
+      const rows = await db
+        .selectFrom('library_user')
+        .selectAll()
+        .where('userId', '=', creator.id)
+        .where('libraryId', '=', library.id)
+        .execute();
+      expect(rows).toHaveLength(0);
     });
   });
 });
