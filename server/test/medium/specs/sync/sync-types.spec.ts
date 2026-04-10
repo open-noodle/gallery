@@ -16,4 +16,17 @@ describe('types', () => {
 
     expect(albumIndex).toBeGreaterThan(albumAssetsIndex);
   });
+
+  // Regression guard: mobile's space-detail Drift query joins
+  // shared_space_library with remote_asset on library_id, so the link rows
+  // MUST arrive before the bulky library asset rows. Otherwise the JOIN is
+  // empty until the end of the sync pass and a 40k-asset library-backed space
+  // looks blank for the ~60 s the backfill takes. See the mobile space
+  // slowness investigation.
+  it('should stream shared_space_library links before library assets', () => {
+    const linkIndex = SYNC_TYPES_ORDER.indexOf(SyncRequestType.SharedSpaceLibrariesV1);
+    const assetsIndex = SYNC_TYPES_ORDER.indexOf(SyncRequestType.LibraryAssetsV1);
+
+    expect(linkIndex).toBeLessThan(assetsIndex);
+  });
 });

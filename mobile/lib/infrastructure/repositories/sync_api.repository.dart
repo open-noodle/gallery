@@ -65,6 +65,27 @@ class SyncApiRepository {
           SyncRequestType.peopleV1,
           serverVersion.supports(.assetFacesV2) ? SyncRequestType.assetFacesV2 : SyncRequestType.assetFacesV1,
           if (serverVersion.supports(.assetOcr)) SyncRequestType.assetOcrV1,
+          // --- gallery-fork: shared-space + library sync types ---
+          //
+          // PR 1 added the server emitters and the mobile dispatch handlers but
+          // never added these types to the mobile's request list, so the sync
+          // stream silently skipped them. PR 2's SpaceDetailPage UI switchover
+          // surfaced the bug because the new Drift-backed timeline depends on
+          // these tables being populated. Without these entries the
+          // shared_space_*, library_* tables stay empty forever.
+          //
+          // These are gallery-fork-only types — a stock Immich server will
+          // reject the request. The mobile build is intended to talk only to
+          // gallery-fork servers.
+          SyncRequestType.sharedSpacesV1,
+          SyncRequestType.sharedSpaceMembersV1,
+          SyncRequestType.sharedSpaceAssetsV1,
+          SyncRequestType.sharedSpaceAssetExifsV1,
+          SyncRequestType.sharedSpaceToAssetsV1,
+          SyncRequestType.librariesV1,
+          SyncRequestType.libraryAssetsV1,
+          SyncRequestType.libraryAssetExifsV1,
+          SyncRequestType.sharedSpaceLibrariesV1,
         ],
       ).toJson(),
     );
@@ -198,6 +219,32 @@ const _kResponseMap = <SyncEntityType, Function(Object)>{
   SyncEntityType.assetOcrV1: SyncAssetOcrV1.fromJson,
   SyncEntityType.assetOcrDeleteV1: SyncAssetOcrDeleteV1.fromJson,
   SyncEntityType.syncCompleteV1: _SyncEmptyDto.fromJson,
+  // --- gallery-fork: shared-space sync types ---
+  SyncEntityType.sharedSpaceV1: SyncSharedSpaceV1.fromJson,
+  SyncEntityType.sharedSpaceDeleteV1: SyncSharedSpaceDeleteV1.fromJson,
+  SyncEntityType.sharedSpaceMemberV1: SyncSharedSpaceMemberV1.fromJson,
+  SyncEntityType.sharedSpaceMemberBackfillV1: SyncSharedSpaceMemberV1.fromJson,
+  SyncEntityType.sharedSpaceMemberDeleteV1: SyncSharedSpaceMemberDeleteV1.fromJson,
+  SyncEntityType.sharedSpaceAssetCreateV1: SyncAssetV1.fromJson,
+  SyncEntityType.sharedSpaceAssetUpdateV1: SyncAssetV1.fromJson,
+  SyncEntityType.sharedSpaceAssetBackfillV1: SyncAssetV1.fromJson,
+  SyncEntityType.sharedSpaceAssetExifCreateV1: SyncAssetExifV1.fromJson,
+  SyncEntityType.sharedSpaceAssetExifUpdateV1: SyncAssetExifV1.fromJson,
+  SyncEntityType.sharedSpaceAssetExifBackfillV1: SyncAssetExifV1.fromJson,
+  SyncEntityType.sharedSpaceToAssetV1: SyncSharedSpaceToAssetV1.fromJson,
+  SyncEntityType.sharedSpaceToAssetBackfillV1: SyncSharedSpaceToAssetV1.fromJson,
+  SyncEntityType.sharedSpaceToAssetDeleteV1: SyncSharedSpaceToAssetDeleteV1.fromJson,
+  // --- gallery-fork: library sync types ---
+  SyncEntityType.libraryV1: SyncLibraryV1.fromJson,
+  SyncEntityType.libraryDeleteV1: SyncLibraryDeleteV1.fromJson,
+  SyncEntityType.libraryAssetCreateV1: SyncAssetV1.fromJson,
+  SyncEntityType.libraryAssetBackfillV1: SyncAssetV1.fromJson,
+  SyncEntityType.libraryAssetDeleteV1: SyncLibraryAssetDeleteV1.fromJson,
+  SyncEntityType.libraryAssetExifCreateV1: SyncAssetExifV1.fromJson,
+  SyncEntityType.libraryAssetExifBackfillV1: SyncAssetExifV1.fromJson,
+  SyncEntityType.sharedSpaceLibraryV1: SyncSharedSpaceLibraryV1.fromJson,
+  SyncEntityType.sharedSpaceLibraryBackfillV1: SyncSharedSpaceLibraryV1.fromJson,
+  SyncEntityType.sharedSpaceLibraryDeleteV1: SyncSharedSpaceLibraryDeleteV1.fromJson,
 };
 
 class _SyncEmptyDto {
