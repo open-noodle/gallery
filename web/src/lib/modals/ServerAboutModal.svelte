@@ -3,6 +3,7 @@
   import { locale } from '$lib/stores/preferences.store';
   import { type ServerAboutResponseDto, type ServerVersionHistoryResponseDto } from '@immich/sdk';
   import { Alert, Label, Modal, ModalBody } from '@immich/ui';
+  import { mdiInformationOutline } from '@mdi/js';
   import { DateTime } from 'luxon';
   import { t } from 'svelte-i18n';
 
@@ -15,7 +16,7 @@
   let { onClose, info, versions }: Props = $props();
 </script>
 
-<Modal title={$t('about')} {onClose}>
+<Modal title={$t('about')} icon={mdiInformationOutline} {onClose}>
   <ModalBody>
     <div class="flex flex-col sm:grid sm:grid-cols-2 gap-4">
       {#if info.sourceRef === 'main' && (info.repository === 'immich-app/immich' || info.repository === 'open-noodle/gallery')}
