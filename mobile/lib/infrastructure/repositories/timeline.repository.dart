@@ -50,8 +50,7 @@ class DriftTimelineRepository extends DriftDatabaseRepository {
 
   TimelineQuery main(List<String> userIds, String currentUserId, GroupAssetsBy groupBy) => (
     bucketSource: () => _watchMainBucket(userIds, currentUserId, groupBy: groupBy),
-    assetSource: (offset, count) =>
-        _getMainBucketAssets(userIds, currentUserId, offset: offset, count: count),
+    assetSource: (offset, count) => _getMainBucketAssets(userIds, currentUserId, offset: offset, count: count),
     origin: TimelineOrigin.main,
   );
 

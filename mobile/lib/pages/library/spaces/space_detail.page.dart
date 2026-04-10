@@ -319,4 +319,3 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
     );
   }
 }
-
