@@ -37,6 +37,8 @@ describe('LoadingSpinner Component', () => {
   it('should load gallery loader SVG', () => {
     const { container } = render(LoadingSpinner);
     const img = container.querySelector('[data-testid="loading-spinner"]');
-    expect(img?.getAttribute('src')).toContain('gallery-loader.svg');
+    // LoadingSpinner is theme-aware and swaps between gallery-loader.svg and
+    // gallery-loader-dark.svg based on @immich/ui theme. Assert the shared prefix.
+    expect(img?.getAttribute('src')).toMatch(/gallery-loader(-dark)?\.svg/);
   });
 });
