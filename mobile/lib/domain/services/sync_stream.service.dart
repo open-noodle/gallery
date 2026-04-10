@@ -329,6 +329,62 @@ class SyncStreamService {
         return _syncStreamRepository.updateAssetOcrV1(data.cast());
       case SyncEntityType.assetOcrDeleteV1:
         return _syncStreamRepository.deleteAssetOcrV1(data.cast());
+      // --- gallery-fork: shared-space sync dispatch ---
+      case SyncEntityType.sharedSpaceV1:
+        return _syncStreamRepository.updateSharedSpacesV1(data.cast());
+      case SyncEntityType.sharedSpaceDeleteV1:
+        return _syncStreamRepository.deleteSharedSpacesV1(data.cast());
+      case SyncEntityType.sharedSpaceMemberV1:
+        return _syncStreamRepository.updateSharedSpaceMembersV1(data.cast());
+      case SyncEntityType.sharedSpaceMemberBackfillV1:
+        return _syncStreamRepository.updateSharedSpaceMembersV1(data.cast());
+      case SyncEntityType.sharedSpaceMemberDeleteV1:
+        return _syncStreamRepository.deleteSharedSpaceMembersV1(data.cast());
+      case SyncEntityType.sharedSpaceAssetCreateV1:
+      case SyncEntityType.sharedSpaceAssetUpdateV1:
+      case SyncEntityType.sharedSpaceAssetBackfillV1:
+        return _syncStreamRepository.updateSharedSpaceAssetsV1(data.cast());
+      case SyncEntityType.sharedSpaceAssetExifCreateV1:
+      case SyncEntityType.sharedSpaceAssetExifUpdateV1:
+      case SyncEntityType.sharedSpaceAssetExifBackfillV1:
+        return _syncStreamRepository.updateSharedSpaceAssetExifsV1(data.cast());
+      case SyncEntityType.sharedSpaceToAssetV1:
+      case SyncEntityType.sharedSpaceToAssetBackfillV1:
+        return _syncStreamRepository.updateSharedSpaceToAssetsV1(data.cast());
+      case SyncEntityType.sharedSpaceToAssetDeleteV1:
+        return _syncStreamRepository.deleteSharedSpaceToAssetsV1(data.cast());
+      // --- gallery-fork: library sync dispatch ---
+      case SyncEntityType.libraryV1:
+        return _syncStreamRepository.updateLibrariesV1(data.cast());
+      case SyncEntityType.libraryDeleteV1:
+        // Read the current user id at dispatch time so the repository stays
+        // free of a Store dependency — see comment on deleteLibrariesV1.
+        final currentUserId = Store.tryGet(StoreKey.currentUser)?.id;
+        if (currentUserId == null) {
+          _logger.warning('LibraryDeleteV1 received without a current user id — skipping sweep');
+          return;
+        }
+        return _syncStreamRepository.deleteLibrariesV1(data.cast(), currentUserId: currentUserId);
+      case SyncEntityType.libraryAssetCreateV1:
+      case SyncEntityType.libraryAssetBackfillV1:
+        return _syncStreamRepository.updateLibraryAssetsV1(data.cast());
+      case SyncEntityType.libraryAssetDeleteV1:
+        return _syncStreamRepository.deleteLibraryAssetsV1(data.cast());
+      case SyncEntityType.libraryAssetExifCreateV1:
+      case SyncEntityType.libraryAssetExifBackfillV1:
+        return _syncStreamRepository.updateLibraryAssetExifsV1(data.cast());
+      case SyncEntityType.sharedSpaceLibraryV1:
+      case SyncEntityType.sharedSpaceLibraryBackfillV1:
+        return _syncStreamRepository.updateSharedSpaceLibrariesV1(data.cast());
+      case SyncEntityType.sharedSpaceLibraryDeleteV1:
+        return _syncStreamRepository.deleteSharedSpaceLibrariesV1(data.cast());
+      // Forward-compat: openapi-generator v7.24 emits SyncEntityType as a real
+      // exhaustive Dart enum, so upstream dropped the `default:` arm here (it is
+      // now unreachable and trips `unreachable_switch_default`). The plan's
+      // Task 18 regression contract — a new server-side SyncEntityType must NOT
+      // throw and must not stall the stream — is still enforced one layer up by
+      // the null-check in sync_api.repository.dart's _kResponseMap lookup, which
+      // logs and skips unknown types at the parsing layer.
     }
   }
 
