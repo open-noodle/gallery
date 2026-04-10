@@ -1,0 +1,91 @@
+name: Gallery Mobile Scale Test
+
+# Runs the mobile scale test (100k-asset library backfill via the production
+# sync handler path) nightly to catch performance regressions in the Drift
+# shared-space sync pipeline. The test is gated at runtime by
+# --dart-define=RUN_SCALE=true so regular CI sweeps skip it.
+#
+# Results are recorded in the job log; a failure means either insert latency
+# or bucket query latency regressed past the loose 500ms assertion in the test.
+# Performance targets are documented in
+# docs/plans/2026-04-08-mobile-shared-space-drift-sync-scale-notes.md.
+
+on:
+  schedule:
+    # 03:27 UTC every day. Offset from the hour so it doesn't pile on with
+    # other nightly jobs.
+    - cron: '27 3 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scale-test:
+    name: 100k-asset library backfill (scale)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Setup Flutter SDK
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: 'stable'
+          flutter-version-file: ./mobile/pubspec.yaml
+          cache: true
+
+      - name: Get Packages
+        working-directory: ./mobile
+        run: flutter pub get
+
+      - name: Generate translation file
+        working-directory: ./mobile
+        run: dart run easy_localization:generate -S ../i18n && dart run bin/generate_keys.dart
+
+      - name: Generate platform APIs
+        working-directory: ./mobile
+        run: make pigeon
+
+      - name: Run 100k scale test
+        working-directory: ./mobile
+        run: |
+          flutter test test/infrastructure/repositories/shared_space_scale_test.dart \
+            --dart-define=RUN_SCALE=true \
+            --reporter expanded \
+            --timeout 15m
+
+      - name: Summarize results
+        if: always()
+        working-directory: ./mobile
+        env:
+          # Pass via env to avoid zizmor's template-injection rule —
+          # ${{ github.* }} expressions interpolated directly into shell
+          # scripts are flagged as code injection vectors even when the
+          # source is trusted GitHub-managed metadata.
+          RUN_NUMBER: ${{ github.run_number }}
+          BRANCH_NAME: ${{ github.ref_name }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          {
+            echo "## Scale test run ${RUN_NUMBER}"
+            echo ""
+            echo "- Branch: \`${BRANCH_NAME}\`"
+            echo "- Commit: \`${COMMIT_SHA}\`"
+            echo ""
+            echo "Measurements are in the 'Run 100k scale test' step log. Look for \`[scale-test]\`."
+            echo ""
+            echo "Performance targets:"
+            echo "- Insert 100k rows: single-digit minutes"
+            echo "- Bucket query: 200 ms"
+            echo "- First page (100 assets): 100 ms"
+            echo ""
+            echo "See \`docs/plans/2026-04-08-mobile-shared-space-drift-sync-scale-notes.md\` for context."
+          } >> "$GITHUB_STEP_SUMMARY"
