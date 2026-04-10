@@ -28,6 +28,7 @@ import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
 import 'package:immich_mobile/providers/timeline/multiselect.provider.dart';
 import 'package:immich_mobile/routing/app_navigation_observer.dart';
 import 'package:immich_mobile/utils/debounce.dart';
+import 'package:immich_mobile/widgets/common/immich_loading_indicator.dart';
 import 'package:immich_mobile/widgets/common/immich_sliver_app_bar.dart';
 import 'package:immich_mobile/widgets/common/mesmerizing_sliver_app_bar.dart';
 import 'package:immich_mobile/widgets/common/selection_sliver_app_bar.dart';
@@ -438,7 +439,17 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
             resizeToAvoidBottomInset: false,
             floatingActionButton: const DownloadStatusFloatingButton(),
             body: asyncSegments.widgetWhen(
-              onLoading: widget.loadingWidget != null ? () => widget.loadingWidget! : null,
+              onLoading: () =>
+                  widget.loadingWidget ??
+                  CustomScrollView(
+                    slivers: [
+                      if (widget.appBar != null) widget.appBar!,
+                      const SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: Center(child: ImmichLoadingIndicator()),
+                      ),
+                    ],
+                  ),
               onData: (segments) {
                 final childCount = (segments.lastOrNull?.lastIndex ?? -1) + 1;
                 final double appBarExpandedHeight = widget.appBar != null && widget.appBar is MesmerizingSliverAppBar
