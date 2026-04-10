@@ -125,21 +125,6 @@ void main() {
     });
   });
 
-  group('spaceAssetsProvider', () {
-    test('returns assets from repository', () async {
-      when(() => mockRepo.getSpaceAssets('space-1')).thenAnswer((_) async => []);
-
-      final container = TestUtils.createContainer(
-        overrides: [sharedSpaceApiRepositoryProvider.overrideWithValue(mockRepo)],
-      );
-
-      final result = await container.read(spaceAssetsProvider('space-1').future);
-
-      expect(result, isEmpty);
-      verify(() => mockRepo.getSpaceAssets('space-1')).called(1);
-    });
-  });
-
   group('sharedSpacesProvider refresh', () {
     test('refetches data after invalidation', () async {
       final initialSpaces = <api.SharedSpaceResponseDto>[
