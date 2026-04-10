@@ -12,12 +12,12 @@ correct locations at build time.
 - [ ] `favicon.ico` — 32x32
 - [ ] `favicon.png` — 180x180
 - [ ] `splash.png` — 1152x1152 centered logo on solid bg
-- [ ] `logo-inline-light.svg` + `.png` — horizontal wordmark, light bg
-- [ ] `logo-inline-dark.svg` + `.png` — horizontal wordmark, dark bg
-- [ ] `logo-stacked-light.svg` + `.png` — stacked logo, light bg
-- [ ] `logo-stacked-dark.svg` + `.png` — stacked logo, dark bg
+- [x] `logo-inline-light.svg` + `.png` — horizontal wordmark, light bg
+- [x] `logo-inline-dark.svg` + `.png` — horizontal wordmark, dark bg
+- [x] `logo-stacked-light.svg` + `.png` — stacked logo, light bg
+- [x] `logo-stacked-dark.svg` + `.png` — stacked logo, dark bg
 
 ## Optional Assets
 
-- [ ] `logo-mark.svg` — icon without text
+- [x] `logo-mark.svg` — icon without text
 - [ ] `og-image.png` — 1200x630 social preview
