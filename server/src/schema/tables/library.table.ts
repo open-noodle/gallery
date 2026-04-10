@@ -9,7 +9,7 @@ import {
   Timestamp,
   UpdateDateColumn,
 } from '@immich/sql-tools';
-import { UpdatedAtTrigger, UpdateIdColumn } from 'src/decorators';
+import { CreateIdColumn, UpdatedAtTrigger, UpdateIdColumn } from 'src/decorators';
 import { UserTable } from 'src/schema/tables/user.table';
 
 @Table('library')
@@ -41,6 +41,9 @@ export class LibraryTable {
 
   @Column({ type: 'timestamp with time zone', nullable: true })
   refreshedAt!: Timestamp | null;
+
+  @CreateIdColumn({ index: true })
+  createId!: Generated<string>;
 
   @UpdateIdColumn({ index: true })
   updateId!: Generated<string>;
