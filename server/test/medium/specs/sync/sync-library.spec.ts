@@ -219,4 +219,127 @@ describe(SyncRequestType.LibrariesV1, () => {
     await ctx.syncAckAll(auth, next);
     await ctx.assertSyncIsComplete(auth, [SyncRequestType.LibrariesV1]);
   });
+
+  it('does not emit libraries to a partner (partner relationship has no library path)', async () => {
+    // Lock in the design: accessibleLibraries has three branches
+    // (ownership, member-of-linked-space, creator-of-linked-space) and
+    // explicitly does NOT include the partner relationship. Adding a
+    // partner must not stream the partner's libraries.
+    const { auth, ctx } = await setup();
+    const { user: partner } = await ctx.newUser();
+    await ctx.newPartner({ sharedById: partner.id, sharedWithId: auth.user.id });
+    await ctx.newLibrary({ ownerId: partner.id, name: "Partner's private library" });
+
+    const response = await ctx.syncStream(auth, [SyncRequestType.LibrariesV1]);
+    const libraryEvents = response.filter((r: { type: string }) => r.type === SyncEntityType.LibraryV1);
+    expect(libraryEvents).toHaveLength(0);
+  });
+
+  it('does not emit libraries to a partner via a space the partner did not join', async () => {
+    // Harder case: partner A owns a library and links it to a space. User B
+    // is A's partner but NOT a member of the space and NOT the creator.
+    // Partnership alone must not grant library access.
+    const { auth, ctx } = await setup();
+    const { user: partner } = await ctx.newUser();
+    await ctx.newPartner({ sharedById: partner.id, sharedWithId: auth.user.id });
+    const { library } = await ctx.newLibrary({ ownerId: partner.id });
+    const { space } = await ctx.newSharedSpace({ createdById: partner.id });
+    await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id });
+
+    const response = await ctx.syncStream(auth, [SyncRequestType.LibrariesV1]);
+    const libraryEvents = response.filter((r: { type: string }) => r.type === SyncEntityType.LibraryV1);
+    expect(libraryEvents).toHaveLength(0);
+  });
+
+  it('emits a library with zero assets (empty library still appears in the stream)', async () => {
+    // A library with no assets should still show up in LibrariesV1 so the
+    // client can create its local library_entity row before assets arrive.
+    const { auth, ctx } = await setup();
+    const { library } = await ctx.newLibrary({ ownerId: auth.user.id, name: 'Empty library' });
+
+    const response = await ctx.syncStream(auth, [SyncRequestType.LibrariesV1]);
+    const libraryEvents = response.filter((r: { type: string }) => r.type === SyncEntityType.LibraryV1);
+    expect(libraryEvents).toHaveLength(1);
+    expect((libraryEvents[0] as { data: { id: string } }).data.id).toBe(library.id);
+  });
+
+  it('advances the checkpoint across two consecutive renames with an intermediate ack', async () => {
+    // Rename A → ack → rename B → resync. The second sync must see name B
+    // (delta correctness) and NOT re-emit any earlier state.
+    const { auth, ctx } = await setup();
+    const { library } = await ctx.newLibrary({ ownerId: auth.user.id, name: 'Rename A' });
+
+    const first = await ctx.syncStream(auth, [SyncRequestType.LibrariesV1]);
+    await ctx.syncAckAll(auth, first);
+    await ctx.assertSyncIsComplete(auth, [SyncRequestType.LibrariesV1]);
+
+    await defaultDatabase
+      .updateTable('library')
+      .set({ name: 'Rename B' })
+      .where('id', '=', library.id)
+      .execute();
+
+    const second = await ctx.syncStream(auth, [SyncRequestType.LibrariesV1]);
+    const secondEvents = second.filter((r: { type: string }) => r.type === SyncEntityType.LibraryV1);
+    expect(secondEvents).toHaveLength(1);
+    expect((secondEvents[0] as { data: { name: string } }).data.name).toBe('Rename B');
+
+    await ctx.syncAckAll(auth, second);
+    await ctx.assertSyncIsComplete(auth, [SyncRequestType.LibrariesV1]);
+
+    await defaultDatabase
+      .updateTable('library')
+      .set({ name: 'Rename C' })
+      .where('id', '=', library.id)
+      .execute();
+
+    const third = await ctx.syncStream(auth, [SyncRequestType.LibrariesV1]);
+    const thirdEvents = third.filter((r: { type: string }) => r.type === SyncEntityType.LibraryV1);
+    expect(thirdEvents).toHaveLength(1);
+    expect((thirdEvents[0] as { data: { name: string } }).data.name).toBe('Rename C');
+  });
+
+  it('emits delete events to multiple users when they simultaneously lose access', async () => {
+    // Unlinking a library from its only linking space should emit
+    // library_audit rows for every member who loses their last path. Both
+    // users call sync independently; each must see a LibraryDeleteV1 event
+    // for the same library.
+    const { auth: authA, ctx: ctxA } = await setup();
+    const ctxB = new SyncTestContext(defaultDatabase);
+    const { auth: authB } = await ctxB.newSyncAuthUser();
+
+    const { user: owner } = await ctxA.newUser();
+    const { library } = await ctxA.newLibrary({ ownerId: owner.id });
+    const { space } = await ctxA.newSharedSpace({ createdById: owner.id });
+    await ctxA.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: SharedSpaceRole.Owner });
+    await ctxA.newSharedSpaceMember({ spaceId: space.id, userId: authA.user.id, role: SharedSpaceRole.Editor });
+    await ctxA.newSharedSpaceMember({ spaceId: space.id, userId: authB.user.id, role: SharedSpaceRole.Editor });
+    await ctxA.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id, addedById: owner.id });
+
+    const initialA = await ctxA.syncStream(authA, [SyncRequestType.LibrariesV1]);
+    const initialB = await ctxB.syncStream(authB, [SyncRequestType.LibrariesV1]);
+    await ctxA.syncAckAll(authA, initialA);
+    await ctxB.syncAckAll(authB, initialB);
+
+    // Unlink library → both users fan out audit rows.
+    await defaultDatabase
+      .deleteFrom('shared_space_library')
+      .where('spaceId', '=', space.id)
+      .where('libraryId', '=', library.id)
+      .execute();
+
+    const nextA = await ctxA.syncStream(authA, [SyncRequestType.LibrariesV1]);
+    const nextB = await ctxB.syncStream(authB, [SyncRequestType.LibrariesV1]);
+
+    const deletesA = nextA.filter(
+      (r: { type: string; data: { libraryId?: string } }) =>
+        r.type === SyncEntityType.LibraryDeleteV1 && r.data.libraryId === library.id,
+    );
+    const deletesB = nextB.filter(
+      (r: { type: string; data: { libraryId?: string } }) =>
+        r.type === SyncEntityType.LibraryDeleteV1 && r.data.libraryId === library.id,
+    );
+    expect(deletesA).toHaveLength(1);
+    expect(deletesB).toHaveLength(1);
+  });
 });

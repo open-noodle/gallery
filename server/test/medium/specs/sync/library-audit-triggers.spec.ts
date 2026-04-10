@@ -1,4 +1,4 @@
-import { Kysely } from 'kysely';
+import { Kysely, sql } from 'kysely';
 import { DB } from 'src/schema';
 import { SyncTestContext } from 'test/medium.factory';
 import { getKyselyDB } from 'test/utils';
@@ -438,5 +438,241 @@ describe('library audit triggers', () => {
       .where('userId', '=', member.user.id)
       .execute();
     expect(rows).toHaveLength(1);
+  });
+
+  it('trigger_user_delete_cascade_fires_asset_library_audit_once_per_asset', async () => {
+    const { ctx, db } = setup();
+    // Deepest cascade: DELETE user → library cascade → asset cascade.
+    // asset_library_delete_audit has `WHEN (pg_trigger_depth() <= 1)` — we
+    // assert it still fires exactly once per asset (not zero, not twice)
+    // even though the statement originates on the user table.
+    const owner = await ctx.newUser();
+    const { library } = await ctx.newLibrary({ ownerId: owner.user.id });
+    const { asset: a1 } = await ctx.newAsset({ ownerId: owner.user.id, libraryId: library.id });
+    const { asset: a2 } = await ctx.newAsset({ ownerId: owner.user.id, libraryId: library.id });
+
+    await db.deleteFrom('user').where('id', '=', owner.user.id).execute();
+
+    const rows = await db
+      .selectFrom('library_asset_audit')
+      .select(['assetId'])
+      .where('assetId', 'in', [a1.id, a2.id])
+      .execute();
+    const counts = new Map<string, number>();
+    for (const row of rows) {
+      counts.set(row.assetId, (counts.get(row.assetId) ?? 0) + 1);
+    }
+    expect(counts.get(a1.id)).toBe(1);
+    expect(counts.get(a2.id)).toBe(1);
+  });
+
+  it('trigger_insert_shared_space_library_does_not_populate_library_audit', async () => {
+    const { ctx, db } = setup();
+    // Negative: audit triggers only fire on DELETE. Adding a space-library
+    // link is a GAINING-access event, not a losing-access event, so
+    // library_audit must stay empty.
+    const owner = await ctx.newUser();
+    const member = await ctx.newUser();
+    const { library } = await ctx.newLibrary({ ownerId: owner.user.id });
+    const { space } = await ctx.newSharedSpace({ createdById: owner.user.id });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.user.id });
+    // INSERT the link — the AFTER DELETE trigger should NOT fire.
+    await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id });
+
+    const rows = await db
+      .selectFrom('library_audit')
+      .select(['libraryId', 'userId'])
+      .where('libraryId', '=', library.id)
+      .execute();
+    expect(rows).toHaveLength(0);
+
+    const linkRows = await db
+      .selectFrom('shared_space_library_audit')
+      .selectAll()
+      .where('spaceId', '=', space.id)
+      .execute();
+    expect(linkRows).toHaveLength(0);
+  });
+
+  it('trigger_update_shared_space_library_does_not_populate_library_audit', async () => {
+    const { ctx, db } = setup();
+    // The UPDATE on shared_space_library (e.g. the updated_at trigger firing
+    // when addedById is rewritten) must NOT write audit rows — the triggers
+    // are AFTER DELETE only.
+    const owner = await ctx.newUser();
+    const member = await ctx.newUser();
+    const secondAdder = await ctx.newUser();
+    const { library } = await ctx.newLibrary({ ownerId: owner.user.id });
+    const { space } = await ctx.newSharedSpace({ createdById: owner.user.id });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.user.id });
+    await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id, addedById: owner.user.id });
+
+    await db
+      .updateTable('shared_space_library')
+      .set({ addedById: secondAdder.user.id })
+      .where('spaceId', '=', space.id)
+      .where('libraryId', '=', library.id)
+      .execute();
+
+    const rows = await db
+      .selectFrom('library_audit')
+      .select(['libraryId', 'userId'])
+      .where('libraryId', '=', library.id)
+      .execute();
+    expect(rows).toHaveLength(0);
+  });
+
+  it('trigger_member_removed_with_three_other_library_paths', async () => {
+    const { ctx, db } = setup();
+    // Dedup stress: member has 4 spaces linking the same library. Removing
+    // from 1 must not emit. Removing from 3 in sequence must not emit
+    // (they still have space D). Only after removing from the 4th do they
+    // get exactly one audit row.
+    const owner = await ctx.newUser();
+    const member = await ctx.newUser();
+    const { library } = await ctx.newLibrary({ ownerId: owner.user.id });
+
+    const spaces = await Promise.all(
+      [0, 1, 2, 3].map(() => ctx.newSharedSpace({ createdById: owner.user.id })),
+    );
+    for (const { space } of spaces) {
+      await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.user.id });
+    }
+
+    // Remove from 3 — no audit, still has one path.
+    for (const { space } of spaces.slice(0, 3)) {
+      await db
+        .deleteFrom('shared_space_member')
+        .where('spaceId', '=', space.id)
+        .where('userId', '=', member.user.id)
+        .execute();
+    }
+
+    let rows = await db
+      .selectFrom('library_audit')
+      .select(['libraryId', 'userId'])
+      .where('libraryId', '=', library.id)
+      .where('userId', '=', member.user.id)
+      .execute();
+    expect(rows).toHaveLength(0);
+
+    // Remove from the last — exactly one audit row.
+    await db
+      .deleteFrom('shared_space_member')
+      .where('spaceId', '=', spaces[3].space.id)
+      .where('userId', '=', member.user.id)
+      .execute();
+
+    rows = await db
+      .selectFrom('library_audit')
+      .select(['libraryId', 'userId'])
+      .where('libraryId', '=', library.id)
+      .where('userId', '=', member.user.id)
+      .execute();
+    expect(rows).toHaveLength(1);
+  });
+
+  it('trigger_space_deleted_subset_of_members_retain_path_via_other_space', async () => {
+    const { ctx, db } = setup();
+    // Whole-space delete where memberA has another path (spaceB) but memberB
+    // does not. Expect memberB gets one audit row, memberA gets zero.
+    const owner = await ctx.newUser();
+    const memberA = await ctx.newUser();
+    const memberB = await ctx.newUser();
+    const { library } = await ctx.newLibrary({ ownerId: owner.user.id });
+
+    const { space: spaceA } = await ctx.newSharedSpace({ createdById: owner.user.id });
+    const { space: spaceB } = await ctx.newSharedSpace({ createdById: owner.user.id });
+    await ctx.newSharedSpaceLibrary({ spaceId: spaceA.id, libraryId: library.id });
+    await ctx.newSharedSpaceLibrary({ spaceId: spaceB.id, libraryId: library.id });
+    await ctx.newSharedSpaceMember({ spaceId: spaceA.id, userId: memberA.user.id });
+    await ctx.newSharedSpaceMember({ spaceId: spaceB.id, userId: memberA.user.id });
+    await ctx.newSharedSpaceMember({ spaceId: spaceA.id, userId: memberB.user.id });
+    // memberB is ONLY in spaceA.
+
+    await db.deleteFrom('shared_space').where('id', '=', spaceA.id).execute();
+
+    const rows = await db
+      .selectFrom('library_audit')
+      .select(['libraryId', 'userId'])
+      .where('libraryId', '=', library.id)
+      .execute();
+    const userIds = new Set(rows.map((r) => r.userId));
+    expect(userIds.has(memberB.user.id)).toBe(true);
+    expect(userIds.has(memberA.user.id)).toBe(false);
+    expect(userIds.has(owner.user.id)).toBe(false);
+  });
+
+  it('trigger_space_deleted_all_members_have_other_paths', async () => {
+    const { ctx, db } = setup();
+    // Whole-space delete where EVERY member has a path via another space.
+    // library_audit must stay empty (BEFORE-row trigger + user_has_library_path
+    // returns true for each row → nothing to insert).
+    const owner = await ctx.newUser();
+    const memberA = await ctx.newUser();
+    const memberB = await ctx.newUser();
+    const { library } = await ctx.newLibrary({ ownerId: owner.user.id });
+
+    const { space: spaceA } = await ctx.newSharedSpace({ createdById: owner.user.id });
+    const { space: spaceB } = await ctx.newSharedSpace({ createdById: owner.user.id });
+    await ctx.newSharedSpaceLibrary({ spaceId: spaceA.id, libraryId: library.id });
+    await ctx.newSharedSpaceLibrary({ spaceId: spaceB.id, libraryId: library.id });
+    await ctx.newSharedSpaceMember({ spaceId: spaceA.id, userId: memberA.user.id });
+    await ctx.newSharedSpaceMember({ spaceId: spaceB.id, userId: memberA.user.id });
+    await ctx.newSharedSpaceMember({ spaceId: spaceA.id, userId: memberB.user.id });
+    await ctx.newSharedSpaceMember({ spaceId: spaceB.id, userId: memberB.user.id });
+
+    await db.deleteFrom('shared_space').where('id', '=', spaceA.id).execute();
+
+    const rows = await db
+      .selectFrom('library_audit')
+      .select(['libraryId', 'userId'])
+      .where('libraryId', '=', library.id)
+      .execute();
+    expect(rows).toHaveLength(0);
+  });
+
+  it('trigger_partner_has_no_library_path', async () => {
+    const { ctx, db } = setup();
+    // Lock in the design: library access does not flow through the partner
+    // relationship. user A and user B are partners; A owns a library; B's
+    // user_has_library_path for A's library returns false, AND deleting a
+    // space B isn't a member of (but that links A's library) does NOT emit
+    // an audit row for B (the trigger only fans out to actual members or
+    // creators, not partners).
+    const userA = await ctx.newUser();
+    const userB = await ctx.newUser();
+    await ctx.newPartner({ sharedById: userA.user.id, sharedWithId: userB.user.id });
+    const { library } = await ctx.newLibrary({ ownerId: userA.user.id });
+
+    // A space A creates linking the library. B is NOT a member.
+    const { space } = await ctx.newSharedSpace({ createdById: userA.user.id });
+    await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id });
+
+    // user_has_library_path for partner B returns false.
+    const result = await db.executeQuery(
+      sql<{
+        r: boolean;
+      }>`SELECT user_has_library_path(${library.id}::uuid, ${userB.user.id}::uuid, '00000000-0000-0000-0000-000000000000'::uuid) AS r`.compile(
+        db,
+      ),
+    );
+    expect(result.rows[0].r).toBe(false);
+
+    // Unlink the library; B must not get any audit row.
+    await db
+      .deleteFrom('shared_space_library')
+      .where('spaceId', '=', space.id)
+      .where('libraryId', '=', library.id)
+      .execute();
+
+    const rows = await db
+      .selectFrom('library_audit')
+      .select(['libraryId', 'userId'])
+      .where('libraryId', '=', library.id)
+      .where('userId', '=', userB.user.id)
+      .execute();
+    expect(rows).toHaveLength(0);
   });
 });
