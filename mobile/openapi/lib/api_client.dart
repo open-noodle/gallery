@@ -182,14 +182,14 @@ class ApiClient {
           return valueString == 'true' || valueString == '1';
         case 'DateTime':
           return value is DateTime ? value : DateTime.tryParse(value);
-        case 'APIKeyCreateDto':
-          return APIKeyCreateDto.fromJson(value);
-        case 'APIKeyCreateResponseDto':
-          return APIKeyCreateResponseDto.fromJson(value);
-        case 'APIKeyResponseDto':
-          return APIKeyResponseDto.fromJson(value);
-        case 'APIKeyUpdateDto':
-          return APIKeyUpdateDto.fromJson(value);
+        case 'ApiKeyCreateDto':
+          return ApiKeyCreateDto.fromJson(value);
+        case 'ApiKeyCreateResponseDto':
+          return ApiKeyCreateResponseDto.fromJson(value);
+        case 'ApiKeyResponseDto':
+          return ApiKeyResponseDto.fromJson(value);
+        case 'ApiKeyUpdateDto':
+          return ApiKeyUpdateDto.fromJson(value);
         case 'ActivityCreateDto':
           return ActivityCreateDto.fromJson(value);
         case 'ActivityResponseDto':
@@ -234,10 +234,6 @@ class ApiClient {
           return AssetBulkUploadCheckResult.fromJson(value);
         case 'AssetCopyDto':
           return AssetCopyDto.fromJson(value);
-        case 'AssetDeltaSyncDto':
-          return AssetDeltaSyncDto.fromJson(value);
-        case 'AssetDeltaSyncResponseDto':
-          return AssetDeltaSyncResponseDto.fromJson(value);
         case 'AssetEditAction':
           return AssetEditActionTypeTransformer().decode(value);
         case 'AssetEditActionItemDto':
@@ -262,8 +258,8 @@ class ApiClient {
           return AssetFaceUpdateItem.fromJson(value);
         case 'AssetFaceWithoutPersonResponseDto':
           return AssetFaceWithoutPersonResponseDto.fromJson(value);
-        case 'AssetFullSyncDto':
-          return AssetFullSyncDto.fromJson(value);
+        case 'AssetIdErrorReason':
+          return AssetIdErrorReasonTypeTransformer().decode(value);
         case 'AssetIdsDto':
           return AssetIdsDto.fromJson(value);
         case 'AssetIdsResponseDto':
@@ -298,6 +294,8 @@ class ApiClient {
           return AssetOcrResponseDto.fromJson(value);
         case 'AssetOrder':
           return AssetOrderTypeTransformer().decode(value);
+        case 'AssetRejectReason':
+          return AssetRejectReasonTypeTransformer().decode(value);
         case 'AssetResponseDto':
           return AssetResponseDto.fromJson(value);
         case 'AssetStackResponseDto':
@@ -306,6 +304,8 @@ class ApiClient {
           return AssetStatsResponseDto.fromJson(value);
         case 'AssetTypeEnum':
           return AssetTypeEnumTypeTransformer().decode(value);
+        case 'AssetUploadAction':
+          return AssetUploadActionTypeTransformer().decode(value);
         case 'AssetVisibility':
           return AssetVisibilityTypeTransformer().decode(value);
         case 'AudioCodec':
@@ -330,10 +330,6 @@ class ApiClient {
           return CastUpdate.fromJson(value);
         case 'ChangePasswordDto':
           return ChangePasswordDto.fromJson(value);
-        case 'CheckExistingAssetsDto':
-          return CheckExistingAssetsDto.fromJson(value);
-        case 'CheckExistingAssetsResponseDto':
-          return CheckExistingAssetsResponseDto.fromJson(value);
         case 'Colorspace':
           return ColorspaceTypeTransformer().decode(value);
         case 'ContributorCountResponseDto':
@@ -408,8 +404,6 @@ class ApiClient {
           return LibraryStatsResponseDto.fromJson(value);
         case 'LicenseKeyDto':
           return LicenseKeyDto.fromJson(value);
-        case 'LicenseResponseDto':
-          return LicenseResponseDto.fromJson(value);
         case 'LogLevel':
           return LogLevelTypeTransformer().decode(value);
         case 'LoginCredentialDto':
@@ -538,6 +532,14 @@ class ApiClient {
           return PluginContextTypeTypeTransformer().decode(value);
         case 'PluginFilterResponseDto':
           return PluginFilterResponseDto.fromJson(value);
+        case 'PluginJsonSchema':
+          return PluginJsonSchema.fromJson(value);
+        case 'PluginJsonSchemaProperty':
+          return PluginJsonSchemaProperty.fromJson(value);
+        case 'PluginJsonSchemaPropertyAdditionalProperties':
+          return PluginJsonSchemaPropertyAdditionalProperties.fromJson(value);
+        case 'PluginJsonSchemaType':
+          return PluginJsonSchemaTypeTypeTransformer().decode(value);
         case 'PluginResponseDto':
           return PluginResponseDto.fromJson(value);
         case 'PluginTriggerResponseDto':
@@ -620,8 +622,6 @@ class ApiClient {
           return ServerStatsResponseDto.fromJson(value);
         case 'ServerStorageResponseDto':
           return ServerStorageResponseDto.fromJson(value);
-        case 'ServerThemeDto':
-          return ServerThemeDto.fromJson(value);
         case 'ServerVersionHistoryResponseDto':
           return ServerVersionHistoryResponseDto.fromJson(value);
         case 'ServerVersionResponseDto':
@@ -726,6 +726,8 @@ class ApiClient {
           return SyncAlbumUserV1.fromJson(value);
         case 'SyncAlbumV1':
           return SyncAlbumV1.fromJson(value);
+        case 'SyncAlbumV2':
+          return SyncAlbumV2.fromJson(value);
         case 'SyncAssetDeleteV1':
           return SyncAssetDeleteV1.fromJson(value);
         case 'SyncAssetEditDeleteV1':
@@ -750,6 +752,12 @@ class ApiClient {
           return SyncAuthUserV1.fromJson(value);
         case 'SyncEntityType':
           return SyncEntityTypeTypeTransformer().decode(value);
+        case 'SyncLibraryAssetDeleteV1':
+          return SyncLibraryAssetDeleteV1.fromJson(value);
+        case 'SyncLibraryDeleteV1':
+          return SyncLibraryDeleteV1.fromJson(value);
+        case 'SyncLibraryV1':
+          return SyncLibraryV1.fromJson(value);
         case 'SyncMemoryAssetDeleteV1':
           return SyncMemoryAssetDeleteV1.fromJson(value);
         case 'SyncMemoryAssetV1':
@@ -768,6 +776,22 @@ class ApiClient {
           return SyncPersonV1.fromJson(value);
         case 'SyncRequestType':
           return SyncRequestTypeTypeTransformer().decode(value);
+        case 'SyncSharedSpaceDeleteV1':
+          return SyncSharedSpaceDeleteV1.fromJson(value);
+        case 'SyncSharedSpaceLibraryDeleteV1':
+          return SyncSharedSpaceLibraryDeleteV1.fromJson(value);
+        case 'SyncSharedSpaceLibraryV1':
+          return SyncSharedSpaceLibraryV1.fromJson(value);
+        case 'SyncSharedSpaceMemberDeleteV1':
+          return SyncSharedSpaceMemberDeleteV1.fromJson(value);
+        case 'SyncSharedSpaceMemberV1':
+          return SyncSharedSpaceMemberV1.fromJson(value);
+        case 'SyncSharedSpaceToAssetDeleteV1':
+          return SyncSharedSpaceToAssetDeleteV1.fromJson(value);
+        case 'SyncSharedSpaceToAssetV1':
+          return SyncSharedSpaceToAssetV1.fromJson(value);
+        case 'SyncSharedSpaceV1':
+          return SyncSharedSpaceV1.fromJson(value);
         case 'SyncStackDeleteV1':
           return SyncStackDeleteV1.fromJson(value);
         case 'SyncStackV1':

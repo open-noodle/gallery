@@ -152,6 +152,29 @@ void main() {
     when(() => mockSyncStreamRepo.deletePeopleV1(any())).thenAnswer(successHandler);
     when(() => mockSyncStreamRepo.updateAssetFacesV1(any())).thenAnswer(successHandler);
     when(() => mockSyncStreamRepo.deleteAssetFacesV1(any())).thenAnswer(successHandler);
+    // Shared-space sync handlers — wired in PR 1. Stubbed here so the
+    // parameterized dispatch tests can route sharedSpace* events through
+    // all 14 case arms without falling into the default arm.
+    when(() => mockSyncStreamRepo.updateSharedSpacesV1(any())).thenAnswer(successHandler);
+    when(() => mockSyncStreamRepo.deleteSharedSpacesV1(any())).thenAnswer(successHandler);
+    when(() => mockSyncStreamRepo.updateSharedSpaceMembersV1(any())).thenAnswer(successHandler);
+    when(() => mockSyncStreamRepo.deleteSharedSpaceMembersV1(any())).thenAnswer(successHandler);
+    when(() => mockSyncStreamRepo.updateSharedSpaceAssetsV1(any())).thenAnswer(successHandler);
+    when(() => mockSyncStreamRepo.updateSharedSpaceAssetExifsV1(any())).thenAnswer(successHandler);
+    when(() => mockSyncStreamRepo.updateSharedSpaceToAssetsV1(any())).thenAnswer(successHandler);
+    when(() => mockSyncStreamRepo.deleteSharedSpaceToAssetsV1(any())).thenAnswer(successHandler);
+    // Library sync handlers — wired in PR 2 Task 33/34. Stubbed here so the
+    // dispatch tests can route a libraryV1/libraryDeleteV1 event without
+    // falling through to the default case (which would log a warning).
+    when(() => mockSyncStreamRepo.updateLibrariesV1(any())).thenAnswer(successHandler);
+    when(
+      () => mockSyncStreamRepo.deleteLibrariesV1(any(), currentUserId: any(named: 'currentUserId')),
+    ).thenAnswer(successHandler);
+    when(() => mockSyncStreamRepo.updateLibraryAssetsV1(any())).thenAnswer(successHandler);
+    when(() => mockSyncStreamRepo.deleteLibraryAssetsV1(any())).thenAnswer(successHandler);
+    when(() => mockSyncStreamRepo.updateLibraryAssetExifsV1(any())).thenAnswer(successHandler);
+    when(() => mockSyncStreamRepo.updateSharedSpaceLibrariesV1(any())).thenAnswer(successHandler);
+    when(() => mockSyncStreamRepo.deleteSharedSpaceLibrariesV1(any())).thenAnswer(successHandler);
     when(() => mockSyncMigrationRepo.v20260128CopyExifWidthHeightToAsset()).thenAnswer(successHandler);
 
     sut = SyncStreamService(
@@ -393,6 +416,121 @@ void main() {
 
       verify(() => mockSyncStreamRepo.updateMemoriesV1(any())).called(1);
       verify(() => mockSyncApiRepo.ack(["5"])).called(1);
+    });
+
+    // --- gallery-fork: parameterized dispatch arm tests ---
+    //
+    // sync_stream.service.dart has 24 case arms for shared-space and library
+    // sync entity types. A typo in any one of them would send events to the
+    // wrong repository method (or the default arm, which silently logs and
+    // skips). The repository handlers are exhaustively covered by
+    // sync_stream_repository_test.dart; these tests verify the dispatch
+    // routing one level up. They are structured as individual test cases so
+    // a single-arm failure is easy to identify in CI output.
+
+    group('SyncStreamService - library dispatch arms', () {
+      test('libraryV1 → updateLibrariesV1', () async {
+        await simulateEvents([SyncStreamStub.libraryV1]);
+        verify(() => mockSyncStreamRepo.updateLibrariesV1(any())).called(1);
+        verify(() => mockSyncApiRepo.ack(['library-v1-ack'])).called(1);
+      });
+
+      test('libraryDeleteV1 → deleteLibrariesV1 (no-op when no currentUser in Store)', () async {
+        // The dispatch reads Store.tryGet(currentUser) to pass into the
+        // sweep handler. In this isolated test the store has no user row,
+        // so the dispatch logs a warning and does NOT call the handler.
+        // We verify the SKIP path: event is still acked (forward progress
+        // is essential — we cannot wedge on a missing store) and the
+        // repository method is NOT called.
+        await simulateEvents([SyncStreamStub.libraryDeleteV1]);
+        verifyNever(
+          () => mockSyncStreamRepo.deleteLibrariesV1(any(), currentUserId: any(named: 'currentUserId')),
+        );
+        // The event is still acked — the dispatch must not wedge when
+        // there's no current user. (If you change the contract to wedge,
+        // update this assertion.)
+        verify(() => mockSyncApiRepo.ack(['library-delete-ack'])).called(1);
+      });
+
+      test('libraryAssetCreateV1 → updateLibraryAssetsV1', () async {
+        await simulateEvents([SyncStreamStub.libraryAssetCreateV1]);
+        verify(() => mockSyncStreamRepo.updateLibraryAssetsV1(any())).called(1);
+        verify(() => mockSyncApiRepo.ack(['lib-asset-create-ack'])).called(1);
+      });
+
+      test('libraryAssetBackfillV1 → updateLibraryAssetsV1 (same handler as create)', () async {
+        await simulateEvents([SyncStreamStub.libraryAssetBackfillV1]);
+        verify(() => mockSyncStreamRepo.updateLibraryAssetsV1(any())).called(1);
+        verify(() => mockSyncApiRepo.ack(['lib-asset-backfill-ack'])).called(1);
+      });
+
+      test('libraryAssetDeleteV1 → deleteLibraryAssetsV1', () async {
+        await simulateEvents([SyncStreamStub.libraryAssetDeleteV1]);
+        verify(() => mockSyncStreamRepo.deleteLibraryAssetsV1(any())).called(1);
+        verify(() => mockSyncApiRepo.ack(['lib-asset-delete-ack'])).called(1);
+      });
+
+      test('libraryAssetExifCreateV1 → updateLibraryAssetExifsV1', () async {
+        await simulateEvents([SyncStreamStub.libraryAssetExifCreateV1]);
+        verify(() => mockSyncStreamRepo.updateLibraryAssetExifsV1(any())).called(1);
+        verify(() => mockSyncApiRepo.ack(['lib-asset-exif-create-ack'])).called(1);
+      });
+
+      test('libraryAssetExifBackfillV1 → updateLibraryAssetExifsV1 (same handler)', () async {
+        await simulateEvents([SyncStreamStub.libraryAssetExifBackfillV1]);
+        verify(() => mockSyncStreamRepo.updateLibraryAssetExifsV1(any())).called(1);
+        verify(() => mockSyncApiRepo.ack(['lib-asset-exif-backfill-ack'])).called(1);
+      });
+
+      test('sharedSpaceLibraryV1 → updateSharedSpaceLibrariesV1', () async {
+        await simulateEvents([SyncStreamStub.sharedSpaceLibraryV1]);
+        verify(() => mockSyncStreamRepo.updateSharedSpaceLibrariesV1(any())).called(1);
+        verify(() => mockSyncApiRepo.ack(['shared-space-library-v1-ack'])).called(1);
+      });
+
+      test('sharedSpaceLibraryBackfillV1 → updateSharedSpaceLibrariesV1 (same handler)', () async {
+        await simulateEvents([SyncStreamStub.sharedSpaceLibraryBackfillV1]);
+        verify(() => mockSyncStreamRepo.updateSharedSpaceLibrariesV1(any())).called(1);
+        verify(() => mockSyncApiRepo.ack(['shared-space-library-backfill-ack'])).called(1);
+      });
+
+      test('sharedSpaceLibraryDeleteV1 → deleteSharedSpaceLibrariesV1', () async {
+        await simulateEvents([SyncStreamStub.sharedSpaceLibraryDeleteV1]);
+        verify(() => mockSyncStreamRepo.deleteSharedSpaceLibrariesV1(any())).called(1);
+        verify(() => mockSyncApiRepo.ack(['shared-space-library-delete-ack'])).called(1);
+      });
+    });
+
+    group('SyncStreamService - shared space dispatch arms (PR 1 gap fill)', () {
+      test('sharedSpaceV1 → updateSharedSpacesV1', () async {
+        await simulateEvents([SyncStreamStub.sharedSpaceV1]);
+        verify(() => mockSyncStreamRepo.updateSharedSpacesV1(any())).called(1);
+        verify(() => mockSyncApiRepo.ack(['shared-space-v1-ack'])).called(1);
+      });
+
+      test('sharedSpaceDeleteV1 → deleteSharedSpacesV1', () async {
+        await simulateEvents([SyncStreamStub.sharedSpaceDeleteV1]);
+        verify(() => mockSyncStreamRepo.deleteSharedSpacesV1(any())).called(1);
+        verify(() => mockSyncApiRepo.ack(['shared-space-delete-ack'])).called(1);
+      });
+
+      test('sharedSpaceMemberV1 → updateSharedSpaceMembersV1', () async {
+        await simulateEvents([SyncStreamStub.sharedSpaceMemberV1]);
+        verify(() => mockSyncStreamRepo.updateSharedSpaceMembersV1(any())).called(1);
+        verify(() => mockSyncApiRepo.ack(['shared-space-member-v1-ack'])).called(1);
+      });
+
+      test('sharedSpaceMemberBackfillV1 → updateSharedSpaceMembersV1 (same handler)', () async {
+        await simulateEvents([SyncStreamStub.sharedSpaceMemberBackfillV1]);
+        verify(() => mockSyncStreamRepo.updateSharedSpaceMembersV1(any())).called(1);
+        verify(() => mockSyncApiRepo.ack(['shared-space-member-backfill-ack'])).called(1);
+      });
+
+      test('sharedSpaceMemberDeleteV1 → deleteSharedSpaceMembersV1', () async {
+        await simulateEvents([SyncStreamStub.sharedSpaceMemberDeleteV1]);
+        verify(() => mockSyncStreamRepo.deleteSharedSpaceMembersV1(any())).called(1);
+        verify(() => mockSyncApiRepo.ack(['shared-space-member-delete-ack'])).called(1);
+      });
     });
   });
 

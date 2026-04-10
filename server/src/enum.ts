@@ -1031,6 +1031,19 @@ export enum SyncRequestType {
   AssetFacesV1 = 'AssetFacesV1',
   AssetFacesV2 = 'AssetFacesV2',
   UserMetadataV1 = 'UserMetadataV1',
+
+  // --- gallery-fork additions ---
+
+  SharedSpacesV1 = 'SharedSpacesV1',
+  SharedSpaceMembersV1 = 'SharedSpaceMembersV1',
+  SharedSpaceAssetsV1 = 'SharedSpaceAssetsV1',
+  SharedSpaceAssetExifsV1 = 'SharedSpaceAssetExifsV1',
+  SharedSpaceToAssetsV1 = 'SharedSpaceToAssetsV1',
+
+  LibrariesV1 = 'LibrariesV1',
+  LibraryAssetsV1 = 'LibraryAssetsV1',
+  LibraryAssetExifsV1 = 'LibraryAssetExifsV1',
+  SharedSpaceLibrariesV1 = 'SharedSpaceLibrariesV1',
 }
 
 export const SyncRequestTypeSchema = z
@@ -1113,6 +1126,41 @@ export enum SyncEntityType {
 
   UserMetadataV1 = 'UserMetadataV1',
   UserMetadataDeleteV1 = 'UserMetadataDeleteV1',
+
+  // --- gallery-fork additions ---
+
+  SharedSpaceV1 = 'SharedSpaceV1',
+  SharedSpaceDeleteV1 = 'SharedSpaceDeleteV1',
+
+  SharedSpaceMemberV1 = 'SharedSpaceMemberV1',
+  SharedSpaceMemberDeleteV1 = 'SharedSpaceMemberDeleteV1',
+  SharedSpaceMemberBackfillV1 = 'SharedSpaceMemberBackfillV1',
+
+  SharedSpaceAssetCreateV1 = 'SharedSpaceAssetCreateV1',
+  SharedSpaceAssetUpdateV1 = 'SharedSpaceAssetUpdateV1',
+  SharedSpaceAssetBackfillV1 = 'SharedSpaceAssetBackfillV1',
+
+  SharedSpaceAssetExifCreateV1 = 'SharedSpaceAssetExifCreateV1',
+  SharedSpaceAssetExifUpdateV1 = 'SharedSpaceAssetExifUpdateV1',
+  SharedSpaceAssetExifBackfillV1 = 'SharedSpaceAssetExifBackfillV1',
+
+  SharedSpaceToAssetV1 = 'SharedSpaceToAssetV1',
+  SharedSpaceToAssetDeleteV1 = 'SharedSpaceToAssetDeleteV1',
+  SharedSpaceToAssetBackfillV1 = 'SharedSpaceToAssetBackfillV1',
+
+  LibraryV1 = 'LibraryV1',
+  LibraryDeleteV1 = 'LibraryDeleteV1',
+
+  LibraryAssetCreateV1 = 'LibraryAssetCreateV1',
+  LibraryAssetDeleteV1 = 'LibraryAssetDeleteV1',
+  LibraryAssetBackfillV1 = 'LibraryAssetBackfillV1',
+
+  LibraryAssetExifCreateV1 = 'LibraryAssetExifCreateV1',
+  LibraryAssetExifBackfillV1 = 'LibraryAssetExifBackfillV1',
+
+  SharedSpaceLibraryV1 = 'SharedSpaceLibraryV1',
+  SharedSpaceLibraryDeleteV1 = 'SharedSpaceLibraryDeleteV1',
+  SharedSpaceLibraryBackfillV1 = 'SharedSpaceLibraryBackfillV1',
 
   SyncAckV1 = 'SyncAckV1',
   SyncResetV1 = 'SyncResetV1',

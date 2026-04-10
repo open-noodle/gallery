@@ -266,6 +266,7 @@ const libraryFactory = (library: Partial<Library> = {}) => ({
   id: newUuid(),
   createdAt: newDate(),
   updatedAt: newDate(),
+  createId: newUuidV7(),
   updateId: newUuidV7(),
   deletedAt: null,
   refreshedAt: null,
@@ -413,6 +414,10 @@ const sharedSpaceMemberFactory = (data: Partial<SharedSpaceMember> = {}): Shared
   joinedAt: newDate(),
   showInTimeline: true,
   lastViewedAt: null,
+  createdAt: newDate(),
+  updatedAt: newDate(),
+  createId: newUuid(),
+  updateId: newUuid(),
   ...data,
 });
 
@@ -462,6 +467,9 @@ const sharedSpaceLibraryFactory = (data: Partial<SharedSpaceLibrary> = {}): Shar
   libraryId: newUuid(),
   addedById: newUuid(),
   createdAt: newDate(),
+  updatedAt: newDate(),
+  createId: newUuid(),
+  updateId: newUuid(),
   ...data,
 });
 

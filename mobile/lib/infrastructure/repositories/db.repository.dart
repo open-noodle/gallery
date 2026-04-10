@@ -7,13 +7,13 @@ import 'package:immich_mobile/infrastructure/entities/asset_edit.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/asset_face.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/auth_user.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/exif.entity.dart';
+import 'package:immich_mobile/infrastructure/entities/library.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/local_album.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/local_album_asset.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/local_asset.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/local_asset.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/memory.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/memory_asset.entity.dart';
-import 'package:immich_mobile/infrastructure/entities/metadata.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/partner.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/person.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/remote_album.entity.dart';
@@ -22,6 +22,10 @@ import 'package:immich_mobile/infrastructure/entities/remote_album_user.entity.d
 import 'package:immich_mobile/infrastructure/entities/remote_asset.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/remote_asset.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/remote_asset_cloud_id.entity.dart';
+import 'package:immich_mobile/infrastructure/entities/shared_space.entity.dart';
+import 'package:immich_mobile/infrastructure/entities/shared_space_asset.entity.dart';
+import 'package:immich_mobile/infrastructure/entities/shared_space_library.entity.dart';
+import 'package:immich_mobile/infrastructure/entities/shared_space_member.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/stack.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/store.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/trashed_local_asset.entity.dart';
@@ -47,6 +51,11 @@ import 'package:logging/logging.dart';
     RemoteAlbumAssetEntity,
     RemoteAlbumUserEntity,
     RemoteAssetCloudIdEntity,
+    SharedSpaceEntity,
+    SharedSpaceMemberEntity,
+    SharedSpaceAssetEntity,
+    LibraryEntity,
+    SharedSpaceLibraryEntity,
     MemoryEntity,
     MemoryAssetEntity,
     StackEntity,
@@ -55,7 +64,6 @@ import 'package:logging/logging.dart';
     StoreEntity,
     TrashedLocalAssetEntity,
     AssetEditEntity,
-    MetadataEntity,
   ],
   include: {'package:immich_mobile/infrastructure/entities/merged_asset.drift'},
 )
@@ -240,41 +248,42 @@ class Drift extends $Drift {
             await m.createIndex(v22.idxAssetEditAssetId);
           },
           from22To23: (m, v23) async {
-            await m.renameColumn(v23.localAssetEntity, 'duration_in_seconds', v23.localAssetEntity.durationMs);
-            await m.renameColumn(v23.remoteAssetEntity, 'duration_in_seconds', v23.remoteAssetEntity.durationMs);
+            await m.createTable(v23.sharedSpaceEntity);
+            await m.createTable(v23.sharedSpaceMemberEntity);
+            await m.createTable(v23.sharedSpaceAssetEntity);
+            await m.createIndex(v23.idxSharedSpaceCreatedById);
+            await m.createIndex(v23.idxSharedSpaceAssetSpaceAsset);
+          },
+          from23To24: (m, v24) async {
+            await m.createTable(v24.libraryEntity);
+            await m.createTable(v24.sharedSpaceLibraryEntity);
+            await m.createIndex(v24.idxSharedSpaceLibrarySpaceId);
+            await m.createIndex(v24.idxRemoteAssetLibraryCreated);
+          },
+          from24To25: (m, v25) async {
+            await m.renameColumn(v25.localAssetEntity, 'duration_in_seconds', v25.localAssetEntity.durationMs);
+            await m.renameColumn(v25.remoteAssetEntity, 'duration_in_seconds', v25.remoteAssetEntity.durationMs);
             await m.renameColumn(
-              v23.trashedLocalAssetEntity,
+              v25.trashedLocalAssetEntity,
               'duration_in_seconds',
-              v23.trashedLocalAssetEntity.durationMs,
+              v25.trashedLocalAssetEntity.durationMs,
             );
 
             await localAssetEntity.update().write(
-              LocalAssetEntityCompanion.custom(durationMs: v23.localAssetEntity.durationMs * const Constant(1000)),
+              LocalAssetEntityCompanion.custom(durationMs: v25.localAssetEntity.durationMs * const Constant(1000)),
             );
             await remoteAssetEntity.update().write(
-              RemoteAssetEntityCompanion.custom(durationMs: v23.remoteAssetEntity.durationMs * const Constant(1000)),
+              RemoteAssetEntityCompanion.custom(durationMs: v25.remoteAssetEntity.durationMs * const Constant(1000)),
             );
             await trashedLocalAssetEntity.update().write(
               TrashedLocalAssetEntityCompanion.custom(
-                durationMs: v23.trashedLocalAssetEntity.durationMs * const Constant(1000),
+                durationMs: v25.trashedLocalAssetEntity.durationMs * const Constant(1000),
               ),
             );
           },
-          from23To24: (m, v24) async {
-            await customStatement('DROP INDEX IF EXISTS idx_remote_album_owner_id');
-            await m.alterTable(TableMigration(v24.remoteAlbumEntity));
-          },
-          from24To25: (m, v25) async {
-            await m.createTable(v25.metadata);
-            await customStatement('DROP INDEX IF EXISTS idx_remote_asset_owner_checksum');
-            await customStatement('DROP INDEX IF EXISTS idx_remote_asset_local_date_time_day');
-            await customStatement('DROP INDEX IF EXISTS idx_remote_asset_local_date_time_month');
-            await m.createIndex(v25.idxRemoteAssetOwnerVisibilityDeletedCreated);
-            await m.createIndex(v25.idxRemoteExifCity);
-            await m.createIndex(v25.idxAssetFaceVisiblePerson);
-          },
           from25To26: (m, v26) async {
-            await m.addColumn(v26.remoteAssetEntity, v26.remoteAssetEntity.uploadedAt);
+            await customStatement('DROP INDEX IF EXISTS idx_remote_album_owner_id');
+            await m.alterTable(TableMigration(v26.remoteAlbumEntity));
           },
         ),
       );

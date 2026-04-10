@@ -3,8 +3,26 @@ import 'stack.entity.dart';
 import 'local_asset.entity.dart';
 import 'local_album.entity.dart';
 import 'local_album_asset.entity.dart';
+-- Imported so Drift's analyzer adds shared_space_* tables to the generated
+-- `readsFrom` set. Without these imports the EXISTS subqueries below still
+-- work, but the .watch() stream won't re-emit when a space membership or
+-- link row changes — so toggling showInTimeline has no visible effect until
+-- the user re-enters the page.
+import 'shared_space_asset.entity.dart';
+import 'shared_space_library.entity.dart';
+import 'shared_space_member.entity.dart';
 
-mergedAsset:
+-- A viewer's main timeline is a UNION over three sources:
+--   1. Remote assets owned by the timeline users (self + partners)
+--   2. Remote assets shared with the viewer via a space where the viewer
+--      has showInTimeline=true — either directly via shared_space_asset OR
+--      transitively via a library linked to the space (shared_space_library).
+--      This mirrors the server's TimeBucket query which OR-joins ownerId with
+--      timelineSpaceIds (see `asset.repository.ts` timelineSpaceIds branch).
+--      Only the viewer's own member row is honored — partner memberships do
+--      NOT leak into the viewer's timeline.
+--   3. Local assets not yet backed up.
+mergedAsset(:current_user_id AS TEXT):
 SELECT
 	rae.id as remote_id,
 	(SELECT lae.id FROM local_asset_entity lae WHERE lae.checksum = rae.checksum LIMIT 1) as local_id,
@@ -36,7 +54,23 @@ LEFT JOIN
 WHERE
 	rae.deleted_at IS NULL
 	AND rae.visibility = 0 -- timeline visibility
-	AND rae.owner_id IN :user_ids
+	AND (
+		rae.owner_id IN :user_ids
+		OR EXISTS (
+			SELECT 1 FROM shared_space_asset_entity ssa
+			INNER JOIN shared_space_member_entity ssm ON ssm.space_id = ssa.space_id
+			WHERE ssa.asset_id = rae.id
+				AND ssm.user_id = :current_user_id
+				AND ssm.show_in_timeline = 1
+		)
+		OR EXISTS (
+			SELECT 1 FROM shared_space_library_entity ssl
+			INNER JOIN shared_space_member_entity ssm ON ssm.space_id = ssl.space_id
+			WHERE ssl.library_id = rae.library_id
+				AND ssm.user_id = :current_user_id
+				AND ssm.show_in_timeline = 1
+		)
+	)
 	AND (
 		rae.stack_id IS NULL
 		OR rae.id = se.primary_asset_id
@@ -86,7 +120,7 @@ AND NOT EXISTS (
 ORDER BY created_at DESC
 LIMIT $limit;
 
-mergedBucket(:group_by AS INTEGER):
+mergedBucket(:group_by AS INTEGER, :current_user_id AS TEXT):
 SELECT
 	COUNT(*) as asset_count,
 	bucket_date
@@ -110,7 +144,23 @@ FROM
 	WHERE
 		rae.deleted_at IS NULL
 		AND rae.visibility = 0 -- timeline visibility
-		AND rae.owner_id in :user_ids
+		AND (
+			rae.owner_id IN :user_ids
+			OR EXISTS (
+				SELECT 1 FROM shared_space_asset_entity ssa
+				INNER JOIN shared_space_member_entity ssm ON ssm.space_id = ssa.space_id
+				WHERE ssa.asset_id = rae.id
+					AND ssm.user_id = :current_user_id
+					AND ssm.show_in_timeline = 1
+			)
+			OR EXISTS (
+				SELECT 1 FROM shared_space_library_entity ssl
+				INNER JOIN shared_space_member_entity ssm ON ssm.space_id = ssl.space_id
+				WHERE ssl.library_id = rae.library_id
+					AND ssm.user_id = :current_user_id
+					AND ssm.show_in_timeline = 1
+			)
+		)
 		AND (
 			rae.stack_id IS NULL
 			OR rae.id = se.primary_asset_id
