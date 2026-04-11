@@ -1,4 +1,4 @@
-name: Release
+name: Release Gallery
 
 on:
   workflow_dispatch:
@@ -7,8 +7,6 @@ on:
         description: 'Version tag (e.g. v3.0.5) — overrides auto-version'
         required: false
         type: string
-  push:
-    branches: [main]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
