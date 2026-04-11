@@ -228,7 +228,17 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
   }
 
   void _navigateToMembers() {
-    context.pushRoute(SpaceMembersRoute(spaceId: widget.spaceId)).then((_) => _loadData());
+    context.pushRoute<String>(SpaceMembersRoute(spaceId: widget.spaceId)).then((result) async {
+      if (!mounted) return;
+      if (result == 'left') {
+        // The user just left this space from the members page. Re-fetching
+        // the space metadata would 403, so just pop ourselves back to the
+        // spaces list.
+        await context.maybePop();
+        return;
+      }
+      await _loadData();
+    });
   }
 
   @override
