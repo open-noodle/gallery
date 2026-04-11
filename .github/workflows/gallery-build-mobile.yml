@@ -162,25 +162,23 @@ jobs:
         with:
           ruby-version: '3.3'
           bundler-cache: true
-          working-directory: ./mobile/android
+          working-directory: ./mobile/android/gallery-release
 
       - name: Write Play Store service account key
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        working-directory: ./mobile/android
+        working-directory: ./mobile/android/gallery-release
         env:
           PLAY_STORE_JSON_KEY: ${{ secrets.PLAY_STORE_JSON_KEY }}
-        run: |
-          mkdir -p fastlane
-          printf '%s' "$PLAY_STORE_JSON_KEY" > fastlane/play-store-key.json
+        run: printf '%s' "$PLAY_STORE_JSON_KEY" > fastlane/play-store-key.json
 
       - name: Upload to Play Store internal track
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        working-directory: ./mobile/android
+        working-directory: ./mobile/android/gallery-release
         run: bundle exec fastlane android internal
 
       - name: Remove Play Store service account key
         if: always()
-        working-directory: ./mobile/android
+        working-directory: ./mobile/android/gallery-release
         run: rm -f fastlane/play-store-key.json
 
       - name: Save Gradle Cache
