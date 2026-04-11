@@ -1,7 +1,7 @@
 import { Kysely } from 'kysely';
+import { SyncEntityType } from 'src/enum';
 import { SyncRepository } from 'src/repositories/sync.repository';
 import { DB } from 'src/schema';
-import { SyncEntityType } from 'src/enum';
 import { SyncTestContext } from 'test/medium.factory';
 import { getKyselyDB } from 'test/utils';
 
@@ -51,11 +51,7 @@ describe('library_user triggers', () => {
         .returning(['id'])
         .executeTakeFirstOrThrow();
 
-      const rows = await db
-        .selectFrom('library_user')
-        .selectAll()
-        .where('libraryId', '=', library.id)
-        .execute();
+      const rows = await db.selectFrom('library_user').selectAll().where('libraryId', '=', library.id).execute();
       expect(rows).toHaveLength(0);
     });
 
@@ -239,7 +235,6 @@ describe('library_user triggers', () => {
       }
       expect(rows.map((r) => r.id)).toContain(library.id);
     });
-
   });
 
   describe('shared_space_library_after_insert_user', () => {
@@ -264,11 +259,7 @@ describe('library_user triggers', () => {
       await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id });
 
       // memberA and memberB should both get library_user rows.
-      const rows = await db
-        .selectFrom('library_user')
-        .select(['userId'])
-        .where('libraryId', '=', library.id)
-        .execute();
+      const rows = await db.selectFrom('library_user').select(['userId']).where('libraryId', '=', library.id).execute();
       const userIds = rows.map((r) => r.userId);
       expect(userIds).toContain(owner.id); // from library_after_insert
       expect(userIds).toContain(memberA.id);
@@ -481,11 +472,7 @@ describe('library_user triggers', () => {
       const { user } = await ctx.newUser();
       const { library } = await ctx.newLibrary({ ownerId: user.id });
 
-      const before = await db
-        .selectFrom('library_user')
-        .selectAll()
-        .where('libraryId', '=', library.id)
-        .execute();
+      const before = await db.selectFrom('library_user').selectAll().where('libraryId', '=', library.id).execute();
       expect(before).toHaveLength(1);
 
       const auditBefore = await db
@@ -496,18 +483,10 @@ describe('library_user triggers', () => {
 
       await db.deleteFrom('library').where('id', '=', library.id).execute();
 
-      const after = await db
-        .selectFrom('library_user')
-        .selectAll()
-        .where('libraryId', '=', library.id)
-        .execute();
+      const after = await db.selectFrom('library_user').selectAll().where('libraryId', '=', library.id).execute();
       expect(after).toHaveLength(0);
 
-      const auditAfter = await db
-        .selectFrom('library_audit')
-        .selectAll()
-        .where('libraryId', '=', library.id)
-        .execute();
+      const auditAfter = await db.selectFrom('library_audit').selectAll().where('libraryId', '=', library.id).execute();
       expect(auditAfter).toHaveLength(auditBefore.length);
     });
   });

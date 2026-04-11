@@ -50,11 +50,7 @@ describe('library_user migration backfill', () => {
 
     // Simulate upgrade state: library exists, library_user empty for this
     // (user, library) pair.
-    await db
-      .deleteFrom('library_user')
-      .where('userId', '=', user.id)
-      .where('libraryId', '=', library.id)
-      .execute();
+    await db.deleteFrom('library_user').where('userId', '=', user.id).where('libraryId', '=', library.id).execute();
 
     await runBackfill(db);
 

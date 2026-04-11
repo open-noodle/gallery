@@ -22,6 +22,9 @@ export class LibraryUserTable {
     onUpdate: 'CASCADE',
     nullable: false,
     primary: true,
+    // The composite (userId, createId) index above already serves the
+    // userId-leading hot-path query — no need for a standalone index.
+    index: false,
   })
   userId!: string;
 
@@ -30,6 +33,9 @@ export class LibraryUserTable {
     onUpdate: 'CASCADE',
     nullable: false,
     primary: true,
+    // No query uses libraryId as the leading column on this table; the
+    // consumer trigger and migration backfill all join through PK.
+    index: false,
   })
   libraryId!: string;
 

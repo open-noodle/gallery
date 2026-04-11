@@ -237,7 +237,7 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
         await context.maybePop();
         return;
       }
-      _loadData();
+      await _loadData();
     });
   }
 

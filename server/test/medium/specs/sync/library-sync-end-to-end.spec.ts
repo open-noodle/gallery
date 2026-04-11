@@ -122,9 +122,7 @@ describe('library sync end-to-end access control', () => {
 
     // Library metadata rows re-emit via the updateId bump.
     const reAddedLibraryEvents = afterReadd.filter((r: { type: string }) => r.type === SyncEntityType.LibraryV1);
-    const reAddedLibraryIds = reAddedLibraryEvents
-      .map((e: { data: { id: string } }) => e.data.id)
-      .toSorted();
+    const reAddedLibraryIds = reAddedLibraryEvents.map((e: { data: { id: string } }) => e.data.id).toSorted();
     expect(reAddedLibraryIds).toEqual([l1.id, l2.id].toSorted());
 
     // Join rows re-emit via SharedSpaceLibraryBackfillV1 — the membership

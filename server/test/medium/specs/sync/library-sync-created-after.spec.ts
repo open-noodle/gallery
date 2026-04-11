@@ -1,6 +1,5 @@
 import { Kysely } from 'kysely';
-import { accessibleLibraries } from 'src/repositories/sync.repository';
-import { SyncRepository } from 'src/repositories/sync.repository';
+import { accessibleLibraries, SyncRepository } from 'src/repositories/sync.repository';
 import { DB } from 'src/schema';
 import { SyncTestContext } from 'test/medium.factory';
 import { getKyselyDB } from 'test/utils';
@@ -100,18 +99,18 @@ describe('LibrarySync.getCreatedAfter', () => {
     await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: transitive.id });
     await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id });
 
-    const getCreatedAfterIds = new Set(
-      (await sut.getCreatedAfter({ nowId: NOW_ID, userId: user.id, afterCreateId: undefined })).map((r) => r.id),
-    );
-    const accessibleIds = new Set(
-      (
-        await db
-          .selectFrom('library')
-          .select('id')
-          .where('library.id', 'in', (eb) => accessibleLibraries(eb, user.id))
-          .execute()
-      ).map((r) => r.id),
-    );
+    const getCreatedAfterRows = await sut.getCreatedAfter({
+      nowId: NOW_ID,
+      userId: user.id,
+      afterCreateId: undefined,
+    });
+    const getCreatedAfterIds = new Set(getCreatedAfterRows.map((r) => r.id));
+    const accessibleRows = await db
+      .selectFrom('library')
+      .select('id')
+      .where('library.id', 'in', (eb) => accessibleLibraries(eb, user.id))
+      .execute();
+    const accessibleIds = new Set(accessibleRows.map((r) => r.id));
 
     expect(getCreatedAfterIds).toEqual(accessibleIds);
     expect(getCreatedAfterIds.has(owned.id)).toBe(true);
@@ -144,15 +143,12 @@ describe('LibrarySync.getCreatedAfter', () => {
     const returnedIds = new Set(rows.map((r) => r.id));
 
     // Every accessible library for peer appears in the result.
-    const accessible = new Set(
-      (
-        await db
-          .selectFrom('library')
-          .select('id')
-          .where('library.id', 'in', (eb) => accessibleLibraries(eb, peer.id))
-          .execute()
-      ).map((r) => r.id),
-    );
+    const accessibleRows = await db
+      .selectFrom('library')
+      .select('id')
+      .where('library.id', 'in', (eb) => accessibleLibraries(eb, peer.id))
+      .execute();
+    const accessible = new Set(accessibleRows.map((r) => r.id));
     for (const id of accessible) {
       expect(returnedIds.has(id)).toBe(true);
     }

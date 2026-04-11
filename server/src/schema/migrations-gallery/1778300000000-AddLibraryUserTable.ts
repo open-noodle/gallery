@@ -11,8 +11,8 @@ import { Kysely, sql } from 'kysely';
 export async function up(db: Kysely<any>): Promise<void> {
   await sql`
     CREATE TABLE "library_user" (
-      "userId"    uuid NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
-      "libraryId" uuid NOT NULL REFERENCES "library"(id) ON DELETE CASCADE,
+      "userId"    uuid NOT NULL REFERENCES "user"(id) ON UPDATE CASCADE ON DELETE CASCADE,
+      "libraryId" uuid NOT NULL REFERENCES "library"(id) ON UPDATE CASCADE ON DELETE CASCADE,
       "createId"  uuid NOT NULL DEFAULT immich_uuid_v7(),
       "createdAt" timestamp with time zone NOT NULL DEFAULT now(),
       CONSTRAINT "library_user_pkey" PRIMARY KEY ("userId", "libraryId")
