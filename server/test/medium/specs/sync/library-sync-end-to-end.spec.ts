@@ -109,46 +109,23 @@ describe('library sync end-to-end access control', () => {
 
     await ctx.syncAckAll(authB, afterRemoval);
 
-    // Step 3: Re-add B to S — document the Known Limitation behavior.
-    //
-    // After re-membership, the four library streams behave asymmetrically:
-    //
-    // 1. SharedSpaceLibrary join rows DO re-emit. The dispatch enumerates
-    //    spaces via SharedSpaceSync.getCreatedAfter, which reads from
-    //    shared_space_member.createId. Re-adding B inserts a new
-    //    shared_space_member row with a fresh createId past B's backfill
-    //    checkpoint, so the per-space backfill loop fires and streams the
-    //    shared_space_library rows for the space again. B's mobile client
-    //    re-receives the join rows.
-    //
-    // 2. Library, LibraryAsset, and LibraryAssetExif rows do NOT re-emit.
-    //    These streams are gated by `library.createId` (per-library backfill
-    //    marker) or by `entity.updateId > ack`. The library row's createId
-    //    and updateId are unchanged since B's first sync, so:
-    //      - LibrarySync.getUpserts: WHERE updateId > ack → 0 events
-    //      - LibraryAssetSync per-library backfill: skips (createId past marker)
-    //      - LibraryAssetSync.getUpserts: WHERE updateId > ack → 0 events
-    //      - LibraryAssetExifSync: same as above
-    //
-    // The result for B's mobile client: the join rows reappear, but the
-    // library content does NOT. The mobile UI shows "library exists" with no
-    // photos. The user must trigger a sync reset or reinstall to recover the
-    // library content.
-    //
-    // This mirrors the existing AlbumSync limitation: a user added to a
-    // pre-existing album does not get a backfill of historical assets either.
-    // Solving it requires per-(user, library) backfill markers — out of scope
-    // for this PR. See design doc lines 376-378 and plan Task 27 "Accepted
-    // limitation".
+    // Step 3: Re-add B to S. After the library_user fix, re-membership
+    // fires the create-side triggers which:
+    //   1. INSERT (B, L) rows for each linked library with fresh createIds,
+    //      so LibrarySync.getCreatedAfter returns them and the per-library
+    //      asset backfill loop re-iterates.
+    //   2. Bump library.updateId so LibrarySync.getUpserts re-emits the
+    //      library metadata row on B's next sync.
     await ctx.newSharedSpaceMember({ spaceId: space.id, userId: authB.user.id, role: SharedSpaceRole.Editor });
 
     const afterReadd = await ctx.syncStream(authB, ALL_LIBRARY_TYPES);
 
-    // Library rows do NOT reappear — updateId is past B's ack.
+    // Library metadata rows re-emit via the updateId bump.
     const reAddedLibraryEvents = afterReadd.filter((r: { type: string }) => r.type === SyncEntityType.LibraryV1);
-    expect(reAddedLibraryEvents).toHaveLength(0);
+    const reAddedLibraryIds = reAddedLibraryEvents.map((e: { data: { id: string } }) => e.data.id).toSorted();
+    expect(reAddedLibraryIds).toEqual([l1.id, l2.id].toSorted());
 
-    // Join rows DO reappear via SharedSpaceLibraryBackfillV1 — the membership
+    // Join rows re-emit via SharedSpaceLibraryBackfillV1 — the membership
     // createId is fresh, so the backfill loop re-iterates the space.
     const reAddedLinkEvents = afterReadd.filter(
       (r: { type: string }) =>
@@ -159,18 +136,19 @@ describe('library sync end-to-end access control', () => {
       .toSorted();
     expect(reAddedLinkLibraryIds).toEqual([l1.id, l2.id].toSorted());
 
-    // Asset content does NOT reappear — this is the Known Limitation in action.
+    // Asset content re-emits via the per-library backfill loop driven by
+    // fresh library_user.createIds.
     const reAddedAssetEvents = afterReadd.filter(
       (r: { type: string }) =>
         r.type === SyncEntityType.LibraryAssetCreateV1 || r.type === SyncEntityType.LibraryAssetBackfillV1,
     );
-    expect(reAddedAssetEvents).toHaveLength(0);
+    expect(reAddedAssetEvents.length).toBeGreaterThan(0);
 
-    // Exif content does NOT reappear either.
+    // Exif content re-emits too.
     const reAddedExifEvents = afterReadd.filter(
       (r: { type: string }) =>
         r.type === SyncEntityType.LibraryAssetExifCreateV1 || r.type === SyncEntityType.LibraryAssetExifBackfillV1,
     );
-    expect(reAddedExifEvents).toHaveLength(0);
+    expect(reAddedExifEvents.length).toBeGreaterThan(0);
   });
 });
