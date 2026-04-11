@@ -14,3 +14,4 @@ key.properties
 
 # Fastlane
 fastlane/report.xml
+fastlane/play-store-key.json
