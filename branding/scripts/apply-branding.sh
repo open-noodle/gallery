@@ -256,8 +256,22 @@ patch_assets() {
     "$REPO_ROOT/docs/static/img/immich-logo-stacked-dark.png"
 
   # Mobile logo assets
+  #
+  # immich-logo.png is the IN-APP rotating logo (login form, splash screen,
+  # profile avatar fallback, album fallback thumbnail) and must be transparent
+  # so it composites onto the surrounding card/scaffold background. The
+  # immich-logo-w-bg variants are the launcher icon sources — those need an
+  # opaque background because Apple forbids transparent iOS app icons
+  # (pubspec.yaml passes them through flutter_launcher_icons with
+  # remove_alpha_ios: true).
+  #
+  # Two source files in branding/assets/ keep these requirements separate:
+  #   app-icon-transparent.png → in-app logo (transparent camera mark)
+  #   app-icon.png             → launcher icons (opaque white background)
+  copy_if_exists "$assets/app-icon-transparent.png" \
+    "$REPO_ROOT/mobile/assets/immich-logo.png"
+
   copy_if_exists "$assets/app-icon.png" \
-    "$REPO_ROOT/mobile/assets/immich-logo.png" \
     "$REPO_ROOT/mobile/assets/immich-logo-w-bg.png" \
     "$REPO_ROOT/mobile/assets/immich-logo-w-bg-android.png" \
     "$REPO_ROOT/docs/static/img/color-logo.png"
@@ -290,6 +304,47 @@ patch_assets() {
   # Android adaptive icon foreground
   copy_if_exists "$assets/app-icon-adaptive-fg.png" \
     "$REPO_ROOT/mobile/assets/immich-logo-android-adaptive-icon.png"
+
+  # Android adaptive icon drawables (referenced by mipmap-anydpi-v26/ic_launcher.xml)
+  copy_if_exists "$assets/mobile/android/ic_launcher_foreground.png" \
+    "$REPO_ROOT/mobile/android/app/src/main/res/drawable/ic_launcher_foreground.png"
+  copy_if_exists "$assets/mobile/android/ic_launcher_monochrome.png" \
+    "$REPO_ROOT/mobile/android/app/src/main/res/drawable/ic_launcher_monochrome.png"
+
+  # Mobile in-app wordmark (camera + "gallery" text shown in app bar dialog)
+  copy_if_exists "$assets/mobile/wordmark-light.png" \
+    "$REPO_ROOT/mobile/assets/immich-text-light.png"
+  copy_if_exists "$assets/mobile/wordmark-dark.png" \
+    "$REPO_ROOT/mobile/assets/immich-text-dark.png"
+
+  # iOS launcher icons (AppIcon.appiconset) — Apple-required size matrix.
+  # Each PNG is shipped pre-rendered at the correct size in branding/assets/
+  # because the original app-icon.png renders are not bit-identical via simple
+  # ImageMagick resize, and Apple is strict about icon quality.
+  local ios_appicon_src="$assets/mobile/ios/AppIcon"
+  local ios_appicon_dest="$REPO_ROOT/mobile/ios/Runner/Assets.xcassets/AppIcon.appiconset"
+  if [[ -d "$ios_appicon_src" && -d "$ios_appicon_dest" ]]; then
+    for size in 16 20 29 32 40 48 50 55 57 58 60 64 66 72 76 80 87 88 92 100 102 114 120 128 144 152 167 172 180 196 216 256 512 1024; do
+      copy_if_exists "$ios_appicon_src/${size}.png" "$ios_appicon_dest/${size}.png"
+    done
+  fi
+
+  # iOS launch screen image (rotated camera mark on launch storyboard)
+  local ios_launchimg_src="$assets/mobile/ios/LaunchImage"
+  local ios_launchimg_dest="$REPO_ROOT/mobile/ios/Runner/Assets.xcassets/LaunchImage.imageset"
+  if [[ -d "$ios_launchimg_src" && -d "$ios_launchimg_dest" ]]; then
+    for variant in LaunchImage LaunchImage@2x LaunchImage@3x; do
+      copy_if_exists "$ios_launchimg_src/${variant}.png" "$ios_launchimg_dest/${variant}.png"
+    done
+  fi
+
+  # iOS launch screen background (1×1 PNGs stretched to fill the storyboard)
+  local ios_launchbg_src="$assets/mobile/ios/LaunchBackground"
+  local ios_launchbg_dest="$REPO_ROOT/mobile/ios/Runner/Assets.xcassets/LaunchBackground.imageset"
+  if [[ -d "$ios_launchbg_src" && -d "$ios_launchbg_dest" ]]; then
+    copy_if_exists "$ios_launchbg_src/background.png" "$ios_launchbg_dest/background.png"
+    copy_if_exists "$ios_launchbg_src/darkbackground.png" "$ios_launchbg_dest/darkbackground.png"
+  fi
 
   # Docs assets
   copy_if_exists "$assets/logo-mark.svg" \
