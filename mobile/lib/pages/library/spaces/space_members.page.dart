@@ -47,10 +47,19 @@ class SpaceMembersPage extends HookConsumerWidget {
       if (confirmed == true) {
         try {
           await ref.read(sharedSpaceApiRepositoryProvider).removeMember(spaceId, member.userId);
-          ref.invalidate(sharedSpaceMembersProvider(spaceId));
+          // Only refetch the member list if we removed SOMEONE ELSE. When the
+          // current user just left, hitting GET /shared-spaces/{id}/members
+          // triggers a 403 "Not a member of this space" because the backend
+          // permission check correctly rejects us. The spaces list is always
+          // safe to refresh.
+          if (!isLeaving) {
+            ref.invalidate(sharedSpaceMembersProvider(spaceId));
+          }
           ref.invalidate(sharedSpacesProvider);
           if (isLeaving && context.mounted) {
-            await context.maybePop();
+            // Signal to SpaceDetailPage that we just left, so it can pop
+            // itself without trying to re-fetch this (now inaccessible) space.
+            await context.maybePop<String>('left');
           } else if (context.mounted) {
             ImmichToast.show(context: context, msg: '${member.name} removed', toastType: ToastType.success);
           }
