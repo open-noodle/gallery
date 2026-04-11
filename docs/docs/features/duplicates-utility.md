@@ -17,15 +17,16 @@ When using "Deduplicate All" or viewing suggestions, Immich automatically presel
 
 When resolving duplicates, metadata from trashed assets is automatically synchronized to the kept asset. This synchronization only happens when **exactly one** asset is kept and at least one asset is trashed. When more than one asset is kept, metadata is not merged — the assets keep their own metadata and are simply removed from the duplicate group. The following metadata is synchronized:
 
-| Name        | Description                                                                                                                    |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| Album       | The kept asset will be added to _every_ album that the other assets in the group belong to.                                    |
-| Favorite    | If any of the assets in the group have been added to favorites, the kept asset will also be added to favorites.                |
-| Rating      | If one or more assets in the duplicate group have a rating, the highest rating is selected and synchronized to the kept asset. |
-| Description | Descriptions from each asset are combined together and synchronized to the kept asset.                                         |
-| Visibility  | The most restrictive visibility is applied to the kept asset.                                                                  |
-| Location    | Latitude and longitude are copied if all assets with geolocation data in the group share the same coordinates.                 |
-| Tag         | Tags from all assets in the group are merged and applied to the kept asset.                                                    |
+| Name         | Description                                                                                                                                                                                                                                                                   |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Album        | The kept asset will be added to _every_ album that the other assets in the group belong to.                                                                                                                                                                                   |
+| Shared Space | The kept asset will be added to every [Shared Space](./shared-spaces.md) the trashed duplicates belonged to, provided you have Owner or Editor role. Face recognition re-runs on the keeper inside each space so any people it captures flow into the space's people sidebar. |
+| Favorite     | If any of the assets in the group have been added to favorites, the kept asset will also be added to favorites.                                                                                                                                                               |
+| Rating       | If one or more assets in the duplicate group have a rating, the highest rating is selected and synchronized to the kept asset.                                                                                                                                                |
+| Description  | Descriptions from each asset are combined together and synchronized to the kept asset.                                                                                                                                                                                        |
+| Visibility   | The most restrictive visibility is applied to the kept asset.                                                                                                                                                                                                                 |
+| Location     | Latitude and longitude are copied if all assets with geolocation data in the group share the same coordinates.                                                                                                                                                                |
+| Tag          | Tags from all assets in the group are merged and applied to the kept asset.                                                                                                                                                                                                   |
 
 ### Re-upload prevention
 
