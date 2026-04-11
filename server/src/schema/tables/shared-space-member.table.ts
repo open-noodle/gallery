@@ -13,6 +13,7 @@ import { CreateIdColumn, UpdatedAtTrigger, UpdateIdColumn } from 'src/decorators
 import { SharedSpaceRole } from 'src/enum';
 import {
   shared_space_member_after_insert,
+  shared_space_member_after_insert_library,
   shared_space_member_delete_audit,
   shared_space_member_delete_library_audit,
 } from 'src/schema/functions';
@@ -28,6 +29,16 @@ import { UserTable } from 'src/schema/tables/user.table';
   scope: 'statement',
   referencingNewTableAs: 'inserted_rows',
   function: shared_space_member_after_insert,
+})
+// Populates library_user + bumps library.updateId for every library linked
+// to the space the new member joined. Name-suffixed with `_library` so it
+// sorts after shared_space_member_after_insert in alphabetical trigger order.
+// See docs/plans/2026-04-11-library-user-access-backfill-design.md.
+@AfterInsertTrigger({
+  name: 'shared_space_member_after_insert_library',
+  scope: 'statement',
+  referencingNewTableAs: 'inserted_rows',
+  function: shared_space_member_after_insert_library,
 })
 // Always fires (no `when` clause). The function body distinguishes direct removal
 // from cascade by checking whether the parent shared_space row still exists.
