@@ -1,4 +1,5 @@
 import {
+  AfterInsertTrigger,
   Column,
   CreateDateColumn,
   DeleteDateColumn,
@@ -11,9 +12,18 @@ import {
 } from '@immich/sql-tools';
 import { CreateIdColumn, UpdateIdColumn, UpdatedAtTrigger } from 'src/decorators.js';
 import { UserTable } from 'src/schema/tables/user.table.js';
+import { library_after_insert } from 'src/schema/functions.js';
 
 @Table('library')
 @UpdatedAtTrigger('library_updatedAt')
+// Populate library_user for the owner on library creation. See
+// docs/plans/2026-04-11-library-user-access-backfill-design.md.
+@AfterInsertTrigger({
+  name: 'library_after_insert',
+  scope: 'statement',
+  referencingNewTableAs: 'inserted_rows',
+  function: library_after_insert,
+})
 export class LibraryTable {
   @PrimaryGeneratedColumn()
   id!: Generated<string>;
