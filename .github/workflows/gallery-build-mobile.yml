@@ -30,6 +30,8 @@ on:
         required: true
       ANDROID_STORE_PASSWORD:
         required: true
+      PLAY_STORE_JSON_KEY:
+        required: true
       APP_STORE_CONNECT_API_KEY_ID:
         required: true
       APP_STORE_CONNECT_API_KEY_ISSUER_ID:
@@ -125,26 +127,59 @@ jobs:
         run: make pigeon
         working-directory: ./mobile
 
-      - name: Build Android App Bundle
+      - name: Compute build metadata
+        id: build-meta
+        working-directory: ./mobile
+        run: |
+          version_name=$(awk -F'[ +]' '/^version:/ {print $2}' pubspec.yaml)
+          version_code=$(( 1000 + GITHUB_RUN_NUMBER ))
+          echo "version_name=$version_name" >> "$GITHUB_OUTPUT"
+          echo "version_code=$version_code" >> "$GITHUB_OUTPUT"
+          echo "Building $version_name ($version_code)"
+
+      - name: Build signed Android App Bundle
         working-directory: ./mobile
         env:
           ALIAS: ${{ secrets.ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
           ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
-          IS_MAIN: ${{ github.ref == 'refs/heads/main' }}
+          VERSION_NAME: ${{ steps.build-meta.outputs.version_name }}
+          VERSION_CODE: ${{ steps.build-meta.outputs.version_code }}
         run: |
-          if [[ $IS_MAIN == 'true' ]]; then
-            flutter build apk --release
-            flutter build apk --release --split-per-abi --target-platform android-arm,android-arm64,android-x64
-          else
-            flutter build apk --debug --split-per-abi --target-platform android-arm64
-          fi
+          flutter build appbundle --release \
+            --build-name="$VERSION_NAME" \
+            --build-number="$VERSION_CODE"
 
-      - name: Publish Android Artifact
+      - name: Publish Android App Bundle artifact
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
-          name: release-apk-signed
-          path: mobile/build/app/outputs/flutter-apk/*.apk
+          name: app-release-aab
+          path: mobile/build/app/outputs/bundle/release/app-release.aab
+
+      - name: Setup Ruby
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: ruby/setup-ruby@c515ec17f69368147deb311832da000dd229d338 # v1.297.0
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+          working-directory: ./mobile/android/gallery-release
+
+      - name: Write Play Store service account key
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        working-directory: ./mobile/android/gallery-release
+        env:
+          PLAY_STORE_JSON_KEY: ${{ secrets.PLAY_STORE_JSON_KEY }}
+        run: printf '%s' "$PLAY_STORE_JSON_KEY" > fastlane/play-store-key.json
+
+      - name: Upload to Play Store internal track
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        working-directory: ./mobile/android/gallery-release
+        run: bundle exec fastlane android internal
+
+      - name: Remove Play Store service account key
+        if: always()
+        working-directory: ./mobile/android/gallery-release
+        run: rm -f fastlane/play-store-key.json
 
       - name: Save Gradle Cache
         id: cache-gradle-save
