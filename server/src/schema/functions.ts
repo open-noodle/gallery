@@ -534,3 +534,106 @@ export const asset_library_delete_audit = registerFunction({
       RETURN NULL;
     END`,
 });
+
+// --- gallery-fork: library_user create-side trigger functions ---
+//
+// See docs/plans/2026-04-11-library-user-access-backfill-design.md for the
+// full design. Summary: library_user is a (userId, libraryId) access-grant
+// denormalization; three insert triggers populate it, and one consumer
+// trigger (below) drains it when library_audit rows are emitted.
+
+// Populate library_user for the library owner when a library is created.
+// Explicitly propagates library.createId and library.createdAt rather than
+// letting the defaults generate fresh values — owner rows must share the
+// library's own createId so existing clients' sync checkpoints (which are
+// already past library.createId) don't retrigger a completed backfill.
+export const library_after_insert = registerFunction({
+  name: 'library_after_insert',
+  returnType: 'TRIGGER',
+  language: 'PLPGSQL',
+  body: `
+    BEGIN
+      INSERT INTO library_user ("userId", "libraryId", "createId", "createdAt")
+      SELECT "ownerId", "id", "createId", "createdAt"
+      FROM inserted_rows
+      WHERE "ownerId" IS NOT NULL AND "deletedAt" IS NULL
+      ON CONFLICT DO NOTHING;
+      RETURN NULL;
+    END`,
+});
+
+// When a user joins a space, grant access to every library currently linked
+// to that space. Also bump library.updateId so LibrarySync.getUpserts
+// re-delivers the library metadata row on the new member's next sync.
+export const shared_space_member_after_insert_library = registerFunction({
+  name: 'shared_space_member_after_insert_library',
+  returnType: 'TRIGGER',
+  language: 'PLPGSQL',
+  body: `
+    BEGIN
+      INSERT INTO library_user ("userId", "libraryId")
+      SELECT DISTINCT ir."userId", ssl."libraryId"
+      FROM inserted_rows ir
+      INNER JOIN shared_space_library ssl ON ssl."spaceId" = ir."spaceId"
+      ON CONFLICT DO NOTHING;
+
+      UPDATE library
+      SET "updatedAt" = clock_timestamp(), "updateId" = immich_uuid_v7(clock_timestamp())
+      WHERE "id" IN (
+        SELECT DISTINCT ssl."libraryId"
+        FROM inserted_rows ir
+        INNER JOIN shared_space_library ssl ON ssl."spaceId" = ir."spaceId"
+      );
+      RETURN NULL;
+    END`,
+});
+
+// When a library is linked to a space, grant library_user for every current
+// member of that space and bump library.updateId so the metadata re-emits.
+export const shared_space_library_after_insert_user = registerFunction({
+  name: 'shared_space_library_after_insert_user',
+  returnType: 'TRIGGER',
+  language: 'PLPGSQL',
+  body: `
+    BEGIN
+      INSERT INTO library_user ("userId", "libraryId")
+      SELECT DISTINCT ssm."userId", ir."libraryId"
+      FROM inserted_rows ir
+      INNER JOIN shared_space_member ssm ON ssm."spaceId" = ir."spaceId"
+      ON CONFLICT DO NOTHING;
+
+      UPDATE library
+      SET "updatedAt" = clock_timestamp(), "updateId" = immich_uuid_v7(clock_timestamp())
+      WHERE "id" IN (SELECT DISTINCT "libraryId" FROM inserted_rows);
+      RETURN NULL;
+    END`,
+});
+
+// Consume library_audit inserts by deleting the corresponding library_user
+// rows UNCONDITIONALLY. Trusts the gating at insertion time — every path
+// that inserts into library_audit already checks
+// `NOT user_has_library_path(..., excludeSpaceId)`, so audit rows represent
+// "this (user, library) pair has definitively lost access".
+//
+// IMPORTANT: any future path inserting into library_audit MUST gate
+// beforehand. See design doc "Trust boundary" and the
+// library_user_delete_after_audit test in library-user-triggers.spec.ts.
+//
+// Why we don't re-check here: `user_has_library_path(lib, user, NULL)`
+// during a shared_space hard-delete returns TRUE because the BEFORE DELETE
+// trigger fires BEFORE FK cascades remove shared_space_library /
+// shared_space_member — the still-alive path would spuriously preserve
+// rows that should have been cleaned up.
+export const library_user_delete_after_audit = registerFunction({
+  name: 'library_user_delete_after_audit',
+  returnType: 'TRIGGER',
+  language: 'PLPGSQL',
+  body: `
+    BEGIN
+      DELETE FROM library_user lu
+      USING inserted_rows ir
+      WHERE lu."userId" = ir."userId"
+        AND lu."libraryId" = ir."libraryId";
+      RETURN NULL;
+    END`,
+});
