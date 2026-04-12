@@ -13,11 +13,11 @@ class DriftMapRepository extends DriftDatabaseRepository {
 
   const DriftMapRepository(super._db) : _db = _db;
 
-  MapQuery remote(List<String> ownerIds, TimelineMapOptions options) => _mapQueryBuilder(
+  MapQuery remote(List<String> userIds, String currentUserId, TimelineMapOptions options) => _mapQueryBuilder(
     assetFilter: (row) {
       Expression<bool> condition =
           row.deletedAt.isNull() &
-          row.ownerId.isIn(ownerIds) &
+          row.ownerId.isIn(userIds) &
           _db.remoteAssetEntity.visibility.isIn([
             AssetVisibility.timeline.index,
             if (options.includeArchived) AssetVisibility.archive.index,

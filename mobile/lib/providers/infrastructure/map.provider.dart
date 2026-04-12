@@ -19,7 +19,7 @@ final mapServiceProvider = Provider<MapService>(
         ? ref.watch(timelineUsersProvider).valueOrNull ?? [user.id]
         : [user.id];
 
-    final mapService = ref.watch(mapFactoryProvider).remote(users, ref.watch(mapStateProvider).toOptions());
+    final mapService = ref.watch(mapFactoryProvider).remote(users, user.id, ref.watch(mapStateProvider).toOptions());
     return mapService;
   },
   // Empty dependencies to inform the framework that this provider
