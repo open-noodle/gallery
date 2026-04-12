@@ -933,4 +933,108 @@ describe(SharedSpaceRepository.name, () => {
       expect(result).toEqual(new Set());
     });
   });
+
+  // ==========================================
+  // getPersonsBySpaceId
+  // ==========================================
+
+  describe('getPersonsBySpaceId', () => {
+    it('should return space persons whose global person has no thumbnail', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: user.id });
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+
+      // Create a global person with empty thumbnailPath
+      const { result: person } = await ctx.newPerson({ ownerId: user.id, thumbnailPath: '' });
+      const { assetFace: face } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+
+      const spacePerson = await sut.createPerson({
+        spaceId: space.id,
+        name: 'No Thumbnail Person',
+        representativeFaceId: face.id,
+        type: 'person',
+      });
+
+      const result = await sut.getPersonsBySpaceId(space.id, {});
+
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe(spacePerson.id);
+      expect(result[0].name).toBe('No Thumbnail Person');
+    });
+
+    it('should return space persons whose representativeFace has no global personId', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: user.id });
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+
+      // Create a face with no personId (default is null)
+      const { assetFace: face } = await ctx.newAssetFace({ assetId: asset.id });
+
+      const spacePerson = await sut.createPerson({
+        spaceId: space.id,
+        name: 'Orphan Face Person',
+        representativeFaceId: face.id,
+        type: 'person',
+      });
+
+      const result = await sut.getPersonsBySpaceId(space.id, {});
+
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe(spacePerson.id);
+    });
+
+    it('should return space persons whose representative face was deleted', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: user.id });
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+
+      const { result: person } = await ctx.newPerson({ ownerId: user.id, thumbnailPath: '/thumb.jpg' });
+      const { assetFace: face } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+
+      const spacePerson = await sut.createPerson({
+        spaceId: space.id,
+        name: 'Deleted Face Person',
+        representativeFaceId: face.id,
+        type: 'person',
+      });
+
+      // Soft-delete the representative face
+      await ctx.database.updateTable('asset_face').set({ deletedAt: new Date() }).where('id', '=', face.id).execute();
+
+      const result = await sut.getPersonsBySpaceId(space.id, {});
+
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe(spacePerson.id);
+    });
+
+    it('should fall back to global person name when space person has no name', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: user.id });
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+
+      const { result: person } = await ctx.newPerson({
+        ownerId: user.id,
+        name: 'Global Name',
+        thumbnailPath: '/path/to/thumbnail.jpg',
+      });
+      const { assetFace: face } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+
+      await sut.createPerson({
+        spaceId: space.id,
+        name: '',
+        representativeFaceId: face.id,
+        type: 'person',
+      });
+
+      const result = await sut.getPersonsBySpaceId(space.id, {});
+
+      expect(result).toHaveLength(1);
+      expect(result[0].personalName).toBe('Global Name');
+      expect(result[0].personalThumbnailPath).toBe('/path/to/thumbnail.jpg');
+    });
+  });
 });

@@ -25,6 +25,12 @@ describe('/timeline', () => {
   beforeAll(async () => {
     await utils.resetDatabase();
     ctx = await buildSpaceContext({ withPartner: true });
+    // Drain metadata extraction before inner describes mutate tags/ratings on
+    // ctx assets. Late metadata extraction calls applyTagList → replaceAssetTags
+    // which DELETEs all tag_asset rows and re-inserts from EXIF (empty for test
+    // PNGs), wiping any tags a nested beforeAll applied. Same root cause as the
+    // filter-suggestions and tag-suggestions ARM flakes.
+    await utils.waitForQueueFinish(ctx.admin.token!, 'metadataExtraction');
   });
 
   describe('GET /timeline/buckets', () => {
