@@ -160,7 +160,7 @@ e2e/src/specs/web/global-search.e2e-spec.ts
 - **`web/src/lib/components/shared-components/search-bar/search-bar.svelte`** — **delete the document-level `Ctrl+K` binding at line 246** (`{ ctrl: true, key: 'k' } → input?.select()`). The rest of the file is unchanged — it still backs the `/search` depth-view page's own input. Without this deletion, the file's `<svelte:document>` handler would fight the global palette binding whenever the `/search` route is mounted.
 - **`web/src/lib/stores/search.svelte.ts`** — `savedSearchTerms` is left as-is. The palette does not depend on it.
 - **`server/src/repositories/machine-learning.repository.ts`** — **targeted** AbortSignal fix in `predict()`. Called by five ML tasks (`detectFaces` :223, `encodeImage` :233, `encodeText` :239, `ocr` :250, `detectPets` :260). Thread `{ timeoutMs?: number }` through `predict(payload, config, { timeoutMs })`, default to no timeout (existing behavior), set `timeoutMs: 15_000` only at `encodeText`. Unit tests verify `encodeText` aborts on timeout, the other four callers don't, **and that a second caller (e.g. test-only) can pass a different `timeoutMs` to prove the option is truly per-call, not an `encodeText`-only hardcode**.
-- **`server/src/controllers/server-info.controller.ts`** (+ service + `dtos/server-info.dto.ts`) — add `GET /api/server-info/ml-health` returning `{ smartSearchHealthy: boolean }`. See [ML health](#ml-health-and-banner) for auth and caching details. OpenAPI + Dart + TypeScript SDK regen per `feedback_openapi_dart_and_sql`.
+- **`server/src/controllers/server.controller.ts`** (+ `server/src/services/server.service.ts` + `server/src/dtos/server.dto.ts`) — add `GET /api/server/ml-health` returning `{ smartSearchHealthy: boolean }`. See [ML health](#ml-health-and-banner) for auth and caching details. OpenAPI + Dart + TypeScript SDK regen per `feedback_openapi_dart_and_sql`. (Note: controller prefix is `'server'`, not `'server-info'` — the plan corrected this after codebase verification.)
 
 ### Libraries
 
@@ -263,7 +263,7 @@ on close():
 
 Because `MachineLearningRepository.isHealthy()` returns `true` unconditionally when `availabilityChecks.enabled` is `false` (`machine-learning.repository.ts:178–184`), reading the server's `healthyMap` is not a reliable signal. The browser also can't probe the ML container directly — it lives on the internal Docker network. So we add one small server endpoint:
 
-- **`GET /api/server-info/ml-health`** — new authenticated route on `server-info` controller. Handler performs an on-demand `fetch('/ping', { signal: AbortSignal.timeout(2000) })` against the first configured ML URL. Success criterion: HTTP 2xx **and** response content-type is `application/json` (protects against a reverse proxy returning an HTML error page with 200). Returns `{ smartSearchHealthy: boolean }`.
+- **`GET /api/server/ml-health`** — new authenticated route on `server-info` controller. Handler performs an on-demand `fetch('/ping', { signal: AbortSignal.timeout(2000) })` against the first configured ML URL. Success criterion: HTTP 2xx **and** response content-type is `application/json` (protects against a reverse proxy returning an HTML error page with 200). Returns `{ smartSearchHealthy: boolean }`.
 - **Auth + rate limiting.** The endpoint requires a valid session (standard `AuthGuard`) — unauthenticated callers would otherwise have a free way to probe the internal ML URL on every request. Server-side caches the probe result for **30 seconds** in-process, with a single-flight guard so concurrent callers share one in-flight probe. This bounds the amplification factor of an authenticated attacker to 1 request per 30 s regardless of client hits.
 - **Client.** On first palette open per session, call `getServerMlHealth()` once, cache for the palette session.
 - **Retroactive promotion.** The banner is also shown when the Photos provider (mode = Smart) returns `timeout` or `error` during the session, regardless of the initial probe. This covers mid-session degradation. Once set, the banner persists across mode switches within the session — switching back to Smart still shows the banner.
@@ -471,7 +471,7 @@ Tiny nod to the entity set; still short enough to fit on one line.
 ### Server
 
 - **`machine-learning.repository.spec.ts`** — `encodeText` aborts with `AbortError` after 15 s when mock ML never responds; `detectFaces` / `encodeImage` / `ocr` / `detectPets` do **not** abort (blast-radius); **a second caller passing `{ timeoutMs: 30_000 }` gets a 30 s timeout** (proves the option is per-call, not hardcoded).
-- **`server-info.controller.spec.ts`** — new test file (or add to existing) — `GET /api/server-info/ml-health`:
+- **`server.controller.spec.ts`** — new test file (or add to existing) — `GET /api/server/ml-health`:
   - Returns `{ smartSearchHealthy: true }` when the mocked `/ping` responds 200 with JSON.
   - Returns `{ smartSearchHealthy: false }` when `/ping` times out at 2 s.
   - Returns `{ smartSearchHealthy: false }` when `/ping` responds 200 but with HTML content-type (reverse-proxy error page).
@@ -540,7 +540,7 @@ Responsive breakpoints are where motion and layout details break. Eyeball at **1
 Not a plan doc — rough order for when we move to `writing-plans`:
 
 1. **Server: `predict()` gains `{ timeoutMs }` option;** `encodeText` sets 15 s; unit tests cover abort + per-call usability + blast radius. Lands standalone or bundled.
-2. **Server: `GET /api/server-info/ml-health` endpoint** with auth guard, 30 s cache, single-flight probe, content-type validation. Unit tests cover all cases.
+2. **Server: `GET /api/server/ml-health` endpoint** with auth guard, 30 s cache, single-flight probe, content-type validation. Unit tests cover all cases.
 3. **Regen OpenAPI + Dart + TypeScript SDKs** for the new endpoint.
 4. **`bits-ui` added to `web/package.json`** at the pinned version.
 5. **`GlobalSearchService`** — four providers, rune store, debounce, abort, timeout, min-query-length, cursor identity, mode/debounce interaction, `searchQueryType` sanity. Unit tests cover the state machine.

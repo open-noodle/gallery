@@ -662,6 +662,16 @@ describe('GlobalSearchManager (skeleton)', () => {
         expect(manager.mode).toBe(m);
       }
     });
+
+    it('falls back to smart and does not throw when localStorage access throws (SSR / privacy mode)', () => {
+      // Simulates the SSR path via $app/environment `browser=false`, or a privacy-mode browser that throws on access.
+      const spy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+        throw new Error('SecurityError');
+      });
+      expect(() => new GlobalSearchManager()).not.toThrow();
+      expect(new GlobalSearchManager().mode).toBe('smart');
+      spy.mockRestore();
+    });
   });
 });
 ```
@@ -696,13 +706,23 @@ export interface Provider<T = unknown> {
   run(query: string, mode: SearchMode, signal: AbortSignal): Promise<ProviderStatus<T>>;
 }
 
+import { browser } from '$app/environment';
+
 const VALID_MODES: ReadonlySet<SearchMode> = new Set(['smart', 'metadata', 'description', 'ocr']);
 const idle: ProviderStatus = { status: 'idle' };
 
 function loadSearchQueryType(): SearchMode {
-  const stored = localStorage.getItem('searchQueryType');
-  if (stored && VALID_MODES.has(stored as SearchMode)) return stored as SearchMode;
-  if (stored !== null) localStorage.setItem('searchQueryType', 'smart');
+  // SSR gate — localStorage does not exist in Node during SSR render.
+  // Gallery's manager convention uses `browser` from $app/environment
+  // (see theme-manager.svelte.ts:1,13 for the precedent).
+  if (!browser) return 'smart';
+  try {
+    const stored = localStorage.getItem('searchQueryType');
+    if (stored && VALID_MODES.has(stored as SearchMode)) return stored as SearchMode;
+    if (stored !== null) localStorage.setItem('searchQueryType', 'smart');
+  } catch {
+    // localStorage unavailable (privacy mode) — fall through
+  }
   return 'smart';
 }
 
@@ -1285,7 +1305,8 @@ private storageListener?: (e: StorageEvent) => void;
 
 constructor() {
   this.providers = this.buildProviders();
-  if (typeof window !== 'undefined') {
+  // Use the same `browser` gate as loadSearchQueryType — skip any DOM wiring during SSR.
+  if (browser) {
     this.storageListener = (e) => {
       if (e.key === 'cmdk.tags.version') this.tagsCache = null;
     };
@@ -1535,7 +1556,15 @@ describe('ML health retroactive promotion', () => {
 
 **Step 3: Implement**
 
-Add to the manager:
+Add imports to the top of `global-search-manager.svelte.ts`:
+
+```ts
+import { goto } from '$app/navigation';
+import { addEntry, makePlaceId, type RecentEntry } from '$lib/stores/cmdk-recent';
+import { Route } from '$lib/route';
+```
+
+Then add to the manager class body:
 
 ```ts
 export type ActiveItem =
@@ -1574,6 +1603,60 @@ private sectionForKind(kind: string): ProviderStatus | null {
     case 'tag': return this.sections.tags;
     default: return null;
   }
+}
+
+// Called from Command.Item onSelect (Task 14) on Enter or click.
+// Dispatches navigation by kind and writes a RecentEntry to cmdk.recent.
+activate(kind: 'photo' | 'person' | 'place' | 'tag', item: any) {
+  const now = Date.now();
+  switch (kind) {
+    case 'photo':
+      addEntry({ kind: 'photo', id: `photo:${item.id}`, assetId: item.id, label: item.originalFileName ?? '', lastUsed: now });
+      goto(`/photos/${item.id}`);
+      break;
+    case 'person':
+      addEntry({ kind: 'person', id: `person:${item.id}`, personId: item.id, label: item.name ?? '', thumbnailAssetId: item.faceAssetId, lastUsed: now });
+      goto(`/people/${item.id}`);
+      break;
+    case 'place':
+      addEntry({
+        kind: 'place',
+        id: makePlaceId(item.latitude, item.longitude),
+        latitude: item.latitude,
+        longitude: item.longitude,
+        label: item.name ?? '',
+        lastUsed: now,
+      });
+      goto(`/map?lat=${item.latitude}&lng=${item.longitude}`);
+      break;
+    case 'tag':
+      addEntry({ kind: 'tag', id: `tag:${item.id}`, tagId: item.id, label: item.name ?? '', lastUsed: now });
+      // Route.search builds the right search payload for a tag filter.
+      goto(Route.search({ tagIds: [item.id] }));
+      break;
+  }
+  this.close();
+}
+
+// Called when the user presses Enter on a RECENT row. Re-runs text queries in place;
+// re-activates entity entries via navigation.
+activateRecent(entry: RecentEntry) {
+  const now = Date.now();
+  addEntry({ ...entry, lastUsed: now });
+  if (entry.kind === 'query') {
+    this.setMode(entry.mode);
+    this.setQuery(entry.text);
+    // Do NOT close — let the user see the fresh results in-place.
+    return;
+  }
+  // Entity entries: rebuild a synthetic item matching the stored fields and dispatch.
+  switch (entry.kind) {
+    case 'photo': goto(`/photos/${entry.assetId}`); break;
+    case 'person': goto(`/people/${entry.personId}`); break;
+    case 'place': goto(`/map?lat=${entry.latitude}&lng=${entry.longitude}`); break;
+    case 'tag': goto(Route.search({ tagIds: [entry.tagId] })); break;
+  }
+  this.close();
 }
 
 reconcileCursor() {
@@ -1649,7 +1732,64 @@ setMode(newMode: SearchMode) {
 }
 ```
 
-**Update `runBatch`** so the photos provider's resolve/reject handlers also call `onPhotosSettled()` and `reconcileCursor()`, and the other three providers' resolve handlers also call `reconcileCursor()`. This is a minor edit — add the two method calls at the end of each `.then` / `.catch` path for the photos key, and at the end of `.then` for the other keys.
+**Update `runBatch`** so the photos provider's resolve/reject paths call `onPhotosSettled()` and `reconcileCursor()`, and every provider's resolve path calls `reconcileCursor()`. Replace Task 8's `runBatch` body with:
+
+```ts
+protected runBatch(text: string, mode: SearchMode) {
+  this.debounceTimer = null;
+  const batch = new AbortController();
+  const photosLocal = new AbortController();
+  this.batchController = batch;
+  this.photosController = photosLocal;
+
+  for (const key of ['photos', 'people', 'places', 'tags'] as const) {
+    const provider = this.providers[key];
+    if (text.length < provider.minQueryLength) {
+      this.sections[key] = idle;
+      continue;
+    }
+    const controllers = key === 'photos' ? [batch.signal, photosLocal.signal] : [batch.signal];
+    const signal = AbortSignal.any([...controllers, AbortSignal.timeout(5000)]);
+
+    // Wrap in Promise.resolve so a provider that synchronously throws still lands in .catch
+    Promise.resolve()
+      .then(() => provider.run(text, mode, signal))
+      .then((result) => {
+        if (batch !== this.batchController) return;
+        this.sections[key] = result;
+        if (key === 'photos') this.onPhotosSettled();
+        this.reconcileCursor();
+      })
+      .catch((err: unknown) => {
+        if (batch !== this.batchController) return;
+        if (err instanceof Error && err.name === 'AbortError') {
+          if (signal.aborted && signal.reason instanceof DOMException && signal.reason.name === 'TimeoutError') {
+            this.sections[key] = { status: 'timeout' };
+            if (key === 'photos') this.onPhotosSettled();
+          }
+          return;
+        }
+        const message = err instanceof Error ? err.message : 'unknown error';
+        this.sections[key] = { status: 'error', message };
+        if (key === 'photos') this.onPhotosSettled();
+      });
+  }
+}
+```
+
+Note the `Promise.resolve().then(() => provider.run(...))` wrapper: it guarantees that a provider which **synchronously throws** (rather than returning a rejected promise) still lands in the `.catch` handler instead of escaping `runBatch` entirely. Add a regression test:
+
+```ts
+it('synchronous throw from a provider does not crash runBatch', async () => {
+  const m = new GlobalSearchManager();
+  (m as any).providers.photos.run = () => {
+    throw new Error('sync boom');
+  };
+  m.setQuery('beach');
+  await vi.advanceTimersByTimeAsync(200);
+  expect(m.sections.photos).toEqual({ status: 'error', message: 'sync boom' });
+});
+```
 
 **Step 4: Run — expect pass**
 
@@ -1848,7 +1988,7 @@ git commit -m "feat(web): cmdk.recent localStorage store with quota-preserving w
 - Create: `web/src/lib/components/global-search/rows/{photo,person,place,tag}-row.svelte`
 - Create: `web/src/lib/components/global-search/__tests__/{photo,person,place,tag}-row.spec.ts`
 
-**Context:** Presentation components taking `{ item, isActive }` props. Use `getAssetMediaUrl` directly (no `createUrl` wrap). Tag rows read `tag.name` (not `.value`).
+**Context:** Presentation components taking a single `{ item }` prop — they render visual content only. `role="option"`, `aria-selected`, and the active-row tint are provided by the parent `Command.Item` wrapper in Task 14 (bits-ui handles those automatically). Use `getAssetMediaUrl` directly (no `createUrl` wrap). Tag rows read `tag.name` (not `.value`).
 
 **Step 1: Write failing tests** (example — `photo-row`):
 
@@ -1865,27 +2005,26 @@ describe('photo-row', () => {
           originalFileName: 'sunset.jpg',
           exifInfo: { dateTimeOriginal: '2024-03-01T00:00:00Z', city: 'Santa Cruz' },
         },
-        isActive: false,
       },
     });
     expect(screen.getByText('sunset.jpg')).toBeInTheDocument();
     expect(screen.getByText(/Santa Cruz/)).toBeInTheDocument();
   });
 
-  it('applies bg-primary/10 tint when active', () => {
+  it('uses getAssetMediaUrl for the thumbnail', () => {
     const { container } = render(PhotoRow, {
-      props: { item: { id: 'a1', originalFileName: 'x.jpg' }, isActive: true },
+      props: { item: { id: 'a1', originalFileName: 'x.jpg' } },
     });
-    expect(container.querySelector('[data-cmdk-row]')?.className).toContain('bg-primary/10');
+    const img = container.querySelector('img');
+    expect(img).not.toBeNull();
+    expect(img?.src).toContain('/api/');
   });
 
-  it('sets role="option" and aria-selected matching isActive', () => {
-    const { rerender } = render(PhotoRow, {
-      props: { item: { id: 'a1', originalFileName: 'x.jpg' }, isActive: false },
+  it('does NOT set role="option" (Command.Item wraps it and provides the role)', () => {
+    const { container } = render(PhotoRow, {
+      props: { item: { id: 'a1', originalFileName: 'x.jpg' } },
     });
-    expect(screen.getByRole('option').getAttribute('aria-selected')).toBe('false');
-    rerender({ item: { id: 'a1', originalFileName: 'x.jpg' }, isActive: true });
-    expect(screen.getByRole('option').getAttribute('aria-selected')).toBe('true');
+    expect(container.querySelector('[role="option"]')).toBeNull();
   });
 });
 ```
@@ -1901,11 +2040,8 @@ Write analogous specs for person/place/tag rows. The tag row test uses `item.nam
   import { getAssetMediaUrl } from '$lib/utils';
   import { AssetMediaSize, type AssetResponseDto } from '@immich/sdk';
 
-  interface Props {
-    item: AssetResponseDto;
-    isActive: boolean;
-  }
-  let { item, isActive }: Props = $props();
+  interface Props { item: AssetResponseDto; }
+  let { item }: Props = $props();
 
   const subtitle = $derived(
     [item.exifInfo?.dateTimeOriginal?.slice(0, 10), item.exifInfo?.city].filter(Boolean).join(' · '),
@@ -1915,12 +2051,7 @@ Write analogous specs for person/place/tag rows. The tag row test uses `item.nam
   );
 </script>
 
-<div
-  data-cmdk-row
-  role="option"
-  aria-selected={isActive}
-  class="flex h-[52px] items-center gap-3 rounded-lg px-3 py-2 {isActive ? 'bg-primary/10' : ''}"
->
+<div class="flex h-[52px] items-center gap-3 rounded-lg px-3 py-2 data-[selected=true]:bg-primary/10">
   <img src={thumbUrl} alt="" class="h-10 w-10 rounded-md object-cover" loading="lazy" />
   <div class="min-w-0 flex-1">
     <div class="truncate text-sm font-medium">{item.originalFileName}</div>
@@ -1931,11 +2062,44 @@ Write analogous specs for person/place/tag rows. The tag row test uses `item.nam
 </div>
 ```
 
+The `data-[selected=true]:bg-primary/10` Tailwind selector applies the active tint when bits-ui's `Command.Item` sets `data-selected="true"` on its rendered element, which cascades to the child row. This replaces the prior `isActive` prop-based styling — bits-ui drives selection, we just style on its data attributes.
+
 Similar for:
 
 - `person-row.svelte` — face thumbnail via `getAssetMediaUrl({ id: person.faceAssetId ?? person.id, ... })`, rounded-full, name, face count
 - `place-row.svelte` — pin icon (no thumbnail), place name + country subtitle
 - `tag-row.svelte` — optional color dot prefix, `tag.name` as title
+- `recent-row.svelte` — thin dispatcher that takes `{ entry: RecentEntry }` and renders the matching row component based on `entry.kind`:
+
+```svelte
+<script lang="ts">
+  import type { RecentEntry } from '$lib/stores/cmdk-recent';
+  import PhotoRow from './photo-row.svelte';
+  import PersonRow from './person-row.svelte';
+  import PlaceRow from './place-row.svelte';
+  import TagRow from './tag-row.svelte';
+
+  interface Props { entry: RecentEntry; }
+  let { entry }: Props = $props();
+</script>
+
+{#if entry.kind === 'query'}
+  <div class="flex h-[52px] items-center gap-3 rounded-lg px-3 py-2 data-[selected=true]:bg-primary/10">
+    <span class="text-sm text-gray-500 dark:text-gray-400">🔍</span>
+    <div class="truncate text-sm">{entry.text}</div>
+  </div>
+{:else if entry.kind === 'photo'}
+  <PhotoRow item={{ id: entry.assetId, originalFileName: entry.label }} />
+{:else if entry.kind === 'person'}
+  <PersonRow item={{ id: entry.personId, name: entry.label, faceAssetId: entry.thumbnailAssetId }} />
+{:else if entry.kind === 'place'}
+  <PlaceRow item={{ name: entry.label, latitude: entry.latitude, longitude: entry.longitude }} />
+{:else if entry.kind === 'tag'}
+  <TagRow item={{ id: entry.tagId, name: entry.label, color: null }} />
+{/if}
+```
+
+Add a `recent-row.spec.ts` test that verifies each `kind` dispatches to the right component.
 
 **Step 4: Run — expect pass**
 
@@ -1961,7 +2125,8 @@ git commit -m "feat(web): row components for global search palette"
 
 ```ts
 import { render, screen } from '@testing-library/svelte';
-import { userEvent } from '@testing-library/user-event';
+import userEvent from '@testing-library/user-event'; // default import — Gallery convention
+import { vi } from 'vitest';
 import GlobalSearch from '../global-search.svelte';
 import { GlobalSearchManager } from '$lib/managers/global-search-manager.svelte';
 
@@ -1972,11 +2137,23 @@ describe('global-search root', () => {
     user = userEvent.setup();
   });
 
-  it('renders dialog when open', () => {
+  it('renders dialog when open (accessible name via sr-only label)', () => {
     const m = new GlobalSearchManager();
     m.open();
     render(GlobalSearch, { props: { manager: m } });
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: /global search/i })).toBeInTheDocument();
+  });
+
+  it('does NOT render a visible Modal title header', () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    const { container } = render(GlobalSearch, { props: { manager: m } });
+    // Modal's title prop is not set, so no CardTitle header should render.
+    // The only "global search" text should be inside an sr-only element.
+    const visibleHeaders = container.querySelectorAll('h1, h2, h3, [role="heading"]');
+    for (const h of visibleHeaders) {
+      expect(h.textContent).not.toMatch(/global search/i);
+    }
   });
 
   it('Esc once clears input, twice closes (APG two-stage)', async () => {
@@ -1990,6 +2167,31 @@ describe('global-search root', () => {
     expect(m.isOpen).toBe(true);
     await user.keyboard('{Escape}');
     expect(m.isOpen).toBe(false);
+  });
+
+  it('Ctrl+K inside the palette closes (not captured by vimBindings)', async () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    render(GlobalSearch, { props: { manager: m } });
+    await user.keyboard('{Control>}k{/Control}');
+    expect(m.isOpen).toBe(false);
+  });
+
+  it('backdrop click closes the palette', async () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    const { container } = render(GlobalSearch, { props: { manager: m } });
+    // Modal's backdrop is an overlay element; click it directly.
+    // The exact selector depends on @immich/ui Modal internals; grep for the real class during implementation.
+    const overlay = container.querySelector('[data-dialog-overlay], [role="presentation"]') as HTMLElement | null;
+    if (overlay) {
+      await user.click(overlay);
+      expect(m.isOpen).toBe(false);
+    } else {
+      // Fallback: fire a pointerdown on document outside the dialog content
+      await user.click(document.body);
+      expect(m.isOpen).toBe(false);
+    }
   });
 
   it('helper row appears on cold open, disappears after first keystroke', async () => {
@@ -2007,11 +2209,52 @@ describe('global-search root', () => {
     m.open();
     render(GlobalSearch, { props: { manager: m } });
     await user.type(screen.getByRole('combobox'), 'beach');
-    await new Promise((r) => setTimeout(r, 250));
-    expect(m.activeItemId).toBe('photo:a1');
+    await vi.waitFor(() => expect(m.activeItemId).toBe('photo:a1'), { timeout: 1000 });
   });
 
-  it('respects prefers-reduced-motion', () => {
+  it('ArrowDown moves cursor to next row (bits-ui Command.Item keyboard nav)', async () => {
+    const m = new GlobalSearchManager();
+    (m as any).providers.photos.run = async () => ({ status: 'ok', items: [{ id: 'a1' }, { id: 'a2' }], total: 2 });
+    m.open();
+    render(GlobalSearch, { props: { manager: m } });
+    await user.type(screen.getByRole('combobox'), 'beach');
+    await vi.waitFor(() => expect(m.activeItemId).toBe('photo:a1'), { timeout: 1000 });
+    await user.keyboard('{ArrowDown}');
+    await vi.waitFor(() => expect(m.activeItemId).toBe('photo:a2'), { timeout: 500 });
+  });
+
+  it('Enter on a highlighted photo row calls manager.activate("photo", item)', async () => {
+    const m = new GlobalSearchManager();
+    (m as any).providers.photos.run = async () => ({
+      status: 'ok',
+      items: [{ id: 'a1', originalFileName: 'x.jpg' }],
+      total: 1,
+    });
+    const activateSpy = vi.spyOn(m, 'activate').mockImplementation(() => {});
+    m.open();
+    render(GlobalSearch, { props: { manager: m } });
+    await user.type(screen.getByRole('combobox'), 'beach');
+    await vi.waitFor(() => expect(m.activeItemId).toBe('photo:a1'));
+    await user.keyboard('{Enter}');
+    expect(activateSpy).toHaveBeenCalledWith('photo', expect.objectContaining({ id: 'a1' }));
+  });
+
+  it('ML banner hides when switching to metadata, re-shows when switching back to smart (while mlHealthy=false)', async () => {
+    const m = new GlobalSearchManager();
+    m.mlHealthy = false;
+    m.open();
+    render(GlobalSearch, { props: { manager: m } });
+    // In smart mode the banner is visible
+    expect(screen.getByText(/smart search is unavailable/i)).toBeInTheDocument();
+    // Switch to metadata — banner hides
+    m.setMode('metadata');
+    await vi.waitFor(() => expect(screen.queryByText(/smart search is unavailable/i)).toBeNull());
+    // Switch back to smart — banner reappears
+    m.setMode('smart');
+    await vi.waitFor(() => expect(screen.getByText(/smart search is unavailable/i)).toBeInTheDocument());
+  });
+
+  it('respects prefers-reduced-motion (class lands on palette shell)', () => {
     window.matchMedia = vi.fn().mockImplementation((query: string) => ({
       matches: query === '(prefers-reduced-motion: reduce)',
       media: query,
@@ -2025,10 +2268,17 @@ describe('global-search root', () => {
     const m = new GlobalSearchManager();
     m.open();
     const { container } = render(GlobalSearch, { props: { manager: m } });
-    expect(container.querySelector('[role="dialog"]')?.className).toMatch(/motion-reduce:/);
+    // `motion-reduce:` utility classes live on the Modal root. Grep the rendered DOM for any
+    // element whose className contains 'motion-reduce:' — avoids asserting on a specific
+    // element position that may shift when Modal internals change.
+    const allElements = container.querySelectorAll('*');
+    const hasReducedMotion = Array.from(allElements).some((el) => el.className?.toString().includes('motion-reduce:'));
+    expect(hasReducedMotion).toBe(true);
   });
 });
 ```
+
+**Note:** Ctrl+Enter (open in new tab) is intentionally NOT unit-tested — `Command.Item.onSelect` does not expose modifier state, so "open in new tab" lives in the E2E layer (Task 19) where a real browser handles `Cmd/Ctrl+Click`. Flagged as a documented limitation rather than a coverage gap.
 
 **Step 2: Run — expect failure**
 
@@ -2045,12 +2295,12 @@ describe('global-search root', () => {
   interface Props {
     heading: string;
     status: ProviderStatus<T>;
-    renderRow: Snippet<[T, boolean]>;
+    renderRow: Snippet<[T]>;
     idPrefix: 'photo' | 'person' | 'place' | 'tag';
-    activeItemId: string | null;
+    onActivate: (item: T) => void;
     onSeeAll?: () => void;
   }
-  let { heading, status, renderRow, idPrefix, activeItemId, onSeeAll }: Props = $props();
+  let { heading, status, renderRow, idPrefix, onActivate, onSeeAll }: Props = $props();
 
   function itemKey(item: T): string {
     const id = (item as { id?: string }).id;
@@ -2064,34 +2314,40 @@ describe('global-search root', () => {
 </script>
 
 {#if status.status !== 'idle'}
-  <div role="group" aria-labelledby="{idPrefix}-heading" class="mb-4">
-    <div id="{idPrefix}-heading" class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+  <Command.Group class="mb-4">
+    <Command.GroupHeading class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
       {heading}
-    </div>
-    {#if status.status === 'loading'}
-      {#each Array(3) as _}
-        <div class="mx-3 mb-1 h-[52px] animate-pulse rounded-lg bg-subtle/50" aria-hidden="true" />
-      {/each}
-    {:else if status.status === 'ok'}
-      {#each status.items as item (itemKey(item))}
-        {@render renderRow(item, itemKey(item) === activeItemId)}
-      {/each}
-      {#if onSeeAll && status.total > status.items.length}
-        <button type="button" onclick={onSeeAll} class="mt-1 flex w-full items-center justify-between px-3 py-2 text-xs text-primary">
-          <span>{$t('cmdk_see_all', { values: { count: status.total } })}</span>
-          <span>→</span>
-        </button>
+    </Command.GroupHeading>
+    <Command.GroupItems>
+      {#if status.status === 'loading'}
+        {#each Array(3) as _}
+          <div class="mx-3 mb-1 h-[52px] animate-pulse rounded-lg bg-subtle/50" aria-hidden="true" />
+        {/each}
+      {:else if status.status === 'ok'}
+        {#each status.items as item (itemKey(item))}
+          <Command.Item value={itemKey(item)} onSelect={() => onActivate(item)}>
+            {@render renderRow(item)}
+          </Command.Item>
+        {/each}
+        {#if onSeeAll && status.total > status.items.length}
+          <button type="button" onclick={onSeeAll} class="mt-1 flex w-full items-center justify-between px-3 py-2 text-xs text-primary">
+            <span>{$t('cmdk_see_all', { values: { count: status.total } })}</span>
+            <span>→</span>
+          </button>
+        {/if}
+      {:else if status.status === 'timeout'}
+        <div class="px-3 py-2 text-xs text-gray-500 dark:text-gray-400">{$t('cmdk_slow_results')}</div>
+      {:else if status.status === 'error'}
+        <div class="px-3 py-2 text-xs text-gray-500 dark:text-gray-400">
+          {$t('cmdk_couldnt_load', { values: { entity: heading } })}
+        </div>
       {/if}
-    {:else if status.status === 'timeout'}
-      <div class="px-3 py-2 text-xs text-gray-500 dark:text-gray-400">{$t('cmdk_slow_results')}</div>
-    {:else if status.status === 'error'}
-      <div class="px-3 py-2 text-xs text-gray-500 dark:text-gray-400">
-        {$t('cmdk_couldnt_load', { values: { entity: heading } })}
-      </div>
-    {/if}
-  </div>
+    </Command.GroupItems>
+  </Command.Group>
 {/if}
 ```
+
+`Command.Group` / `GroupHeading` / `GroupItems` already emit `role="group"` + `aria-labelledby` — no manual ARIA wiring needed. `Command.Item` emits `role="option"` + `aria-selected` + handles keyboard nav / scroll-into-view / click-to-select for free.
 
 `global-search.svelte`:
 
@@ -2136,15 +2392,39 @@ describe('global-search root', () => {
   const showHelper = $derived(inputValue.trim() === '' && getEntries().length === 0);
 </script>
 
+<!--
+  Modal notes:
+  - No `title` prop: passing title renders a visible CardTitle header (Modal.svelte:132-142).
+    A cmdk palette should have no visible title bar; the input IS the title.
+  - `closeOnBackdropClick={true}`: default is FALSE (Modal.svelte:43), so we must opt in
+    for design § "Closing: click outside the modal closes" to work.
+  - `closeOnEsc={false}`: we handle Esc ourselves via onKeyDown for APG two-stage behavior.
+  - A visually-hidden span inside provides the dialog's accessible name.
+
+  Command.Root notes:
+  - `vimBindings={false}`: default is TRUE (command.svelte:22). Leaving it enabled captures
+    Ctrl+K / Ctrl+J / Ctrl+N / Ctrl+P inside the palette and collides with "Ctrl+K closes".
+    Disabling it means ArrowDown/ArrowUp are the only nav keys — which is what we want.
+  - `bind:value={selectedValue}`: Command.Root drives selection among its Command.Item
+    children. We mirror selectedValue → manager.activeItemId via $effect.
+  - `shouldFilter={false}`: results come from the server, not from Command's built-in filter.
+-->
 <Modal
-  title={$t('global_search')}
   size="large"
   closeOnEsc={false}
+  closeOnBackdropClick={true}
   onClose={() => manager.close()}
   class="motion-reduce:transition-none motion-reduce:transform-none"
 >
   {#snippet children()}
-    <Command.Root shouldFilter={false} class="flex flex-col gap-2">
+    <span class="sr-only" id="global-search-label">{$t('global_search')}</span>
+    <Command.Root
+      shouldFilter={false}
+      vimBindings={false}
+      bind:value={selectedValue}
+      aria-labelledby="global-search-label"
+      class="flex flex-col gap-2"
+    >
       <Command.Input
         bind:value={inputValue}
         placeholder={$t('cmdk_placeholder')}
@@ -2152,50 +2432,77 @@ describe('global-search root', () => {
         onkeydown={onKeyDown}
         class="w-full rounded-md bg-subtle/40 px-3 py-2 text-sm"
       />
+
+      {#if manager.mode === 'smart' && !manager.mlHealthy}
+        <div class="mx-3 rounded-md bg-subtle/60 px-3 py-2 text-xs">
+          {$t('cmdk_smart_unavailable')}
+          <button type="button" onclick={() => manager.setMode('metadata')} class="ml-2 text-primary">
+            {$t('cmdk_try_filename')}
+          </button>
+        </div>
+      {/if}
+
       <Command.List class="max-h-[60vh] overflow-y-auto">
-        {#if showHelper}
-          <div class="p-6 text-center text-sm text-gray-500 dark:text-gray-400">
-            {$t('cmdk_helper')}
-          </div>
+        {#if inputValue.trim() === ''}
+          <!-- Empty-state: RECENT section if entries exist, else helper row. SUGGESTED is deferred to v1.1. -->
+          {#if recentEntries.length > 0}
+            <Command.Group>
+              <Command.GroupHeading class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                {$t('cmdk_recent_heading')}
+              </Command.GroupHeading>
+              <Command.GroupItems>
+                {#each recentEntries as entry (entry.id)}
+                  <Command.Item value={entry.id} onSelect={() => manager.activateRecent(entry)}>
+                    <!-- Render a type-appropriate row. Reuses the same row components. -->
+                    <RecentRow {entry} />
+                  </Command.Item>
+                {/each}
+              </Command.GroupItems>
+            </Command.Group>
+          {:else}
+            <div class="p-6 text-center text-sm text-gray-500 dark:text-gray-400">
+              {$t('cmdk_helper')}
+            </div>
+          {/if}
         {:else}
           <GlobalSearchSection
             heading={$t('cmdk_photos_heading')}
             status={manager.sections.photos}
             idPrefix="photo"
-            activeItemId={manager.activeItemId}
+            onActivate={(item) => manager.activate('photo', item)}
           >
-            {#snippet renderRow(item, isActive)}
-              <PhotoRow {item} {isActive} />
+            {#snippet renderRow(item)}
+              <PhotoRow {item} />
             {/snippet}
           </GlobalSearchSection>
           <GlobalSearchSection
             heading={$t('cmdk_people_heading')}
             status={manager.sections.people}
             idPrefix="person"
-            activeItemId={manager.activeItemId}
+            onActivate={(item) => manager.activate('person', item)}
           >
-            {#snippet renderRow(item, isActive)}
-              <PersonRow {item} {isActive} />
+            {#snippet renderRow(item)}
+              <PersonRow {item} />
             {/snippet}
           </GlobalSearchSection>
           <GlobalSearchSection
             heading={$t('cmdk_places_heading')}
             status={manager.sections.places}
             idPrefix="place"
-            activeItemId={manager.activeItemId}
+            onActivate={(item) => manager.activate('place', item)}
           >
-            {#snippet renderRow(item, isActive)}
-              <PlaceRow {item} {isActive} />
+            {#snippet renderRow(item)}
+              <PlaceRow {item} />
             {/snippet}
           </GlobalSearchSection>
           <GlobalSearchSection
             heading={$t('cmdk_tags_heading')}
             status={manager.sections.tags}
             idPrefix="tag"
-            activeItemId={manager.activeItemId}
+            onActivate={(item) => manager.activate('tag', item)}
           >
-            {#snippet renderRow(item, isActive)}
-              <TagRow {item} {isActive} />
+            {#snippet renderRow(item)}
+              <TagRow {item} />
             {/snippet}
           </GlobalSearchSection>
         {/if}
@@ -2204,6 +2511,43 @@ describe('global-search root', () => {
   {/snippet}
 </Modal>
 ```
+
+**Selection state bridge.** Add to the `<script>` block:
+
+```ts
+import { getEntries, type RecentEntry } from '$lib/stores/cmdk-recent';
+import RecentRow from './rows/recent-row.svelte'; // thin dispatcher that renders a photo-row/person-row/etc. based on entry.kind
+
+let selectedValue = $state<string>('');
+const recentEntries = $derived<RecentEntry[]>(inputValue.trim() === '' ? getEntries() : []);
+
+// Bridge Command.Root selection state into manager.activeItemId so
+// the manager-side cursor stays in sync with bits-ui's internal selection.
+$effect(() => {
+  if (selectedValue) manager.setActiveItem(selectedValue);
+});
+
+// When reconcileCursor updates activeItemId (e.g. auto-highlight on first results),
+// push it back into Command.Root so bits-ui highlights the same row.
+$effect(() => {
+  if (manager.activeItemId && manager.activeItemId !== selectedValue) {
+    selectedValue = manager.activeItemId;
+  }
+});
+```
+
+The section component (`global-search-section.svelte`) must wrap each row in `<Command.Item value={itemKey(item)} onSelect={() => onActivate(item)}>` and take `onActivate: (item: T) => void` instead of `activeItemId`. Update Task 14's section-component snippet accordingly:
+
+```svelte
+<!-- inside the ok branch -->
+{#each status.items as item (itemKey(item))}
+  <Command.Item value={itemKey(item)} onSelect={() => onActivate(item)}>
+    {@render renderRow(item)}
+  </Command.Item>
+{/each}
+```
+
+Bits UI's `Command.Item` handles `role="option"` + `aria-selected` + scroll-into-view automatically. That means **row components do NOT set `role="option"` or `aria-selected`** — they just render visual content. Update Task 13 accordingly (see below).
 
 **Step 4: Run — expect pass**
 
@@ -2240,14 +2584,25 @@ export const globalSearchManager = new GlobalSearchManager();
 
 Tests:
 
+`featureFlagsManager.value` is a getter that throws when `#value` is undefined and returns a snapshot when set (verified in `feature-flags-manager.svelte.ts`). Assigning `.search` to the returned object won't update the private rune field. Mock the whole module to control the flag cleanly:
+
 ```ts
-import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
+import { render, screen } from '@testing-library/svelte';
+import userEvent from '@testing-library/user-event'; // default import
+import { vi } from 'vitest';
+
+// Hoisted mock of feature-flags-manager — use a mutable object so tests can flip `.search`.
+const mockFlags = { value: { search: true } };
+vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({
+  featureFlagsManager: mockFlags,
+}));
+
 import { globalSearchManager } from '$lib/managers/global-search-manager.svelte';
 import GlobalSearchTrigger from '../global-search-trigger.svelte';
 
 describe('trigger + feature flag', () => {
   beforeEach(() => {
-    featureFlagsManager.value.search = true;
+    mockFlags.value.search = true;
     globalSearchManager.close();
   });
 
@@ -2257,7 +2612,7 @@ describe('trigger + feature flag', () => {
   });
 
   it('trigger hides when flag is off', () => {
-    featureFlagsManager.value.search = false;
+    mockFlags.value.search = false;
     render(GlobalSearchTrigger);
     expect(screen.queryByRole('button')).toBeNull();
   });
@@ -2528,6 +2883,28 @@ Dispatcher:
 
 Mount `<GlobalSearchPreview>` in `global-search.svelte` only when the viewport ≥ 1024 px. Grep `web/src/lib/managers/media-query-manager.svelte.ts` (or similar) for the existing Gallery breakpoint helper — don't invent one.
 
+**Additional test to add to `global-search.spec.ts`:**
+
+```ts
+it('preview pane does not mount below 1024 px', () => {
+  window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+    matches: query === '(min-width: 1024px)' ? false : true,
+    media: query,
+    addListener: () => {},
+    removeListener: () => {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => false,
+    onchange: null,
+  }));
+  const m = new GlobalSearchManager();
+  m.open();
+  const { container } = render(GlobalSearch, { props: { manager: m } });
+  // Preview pane carries a known data attribute or test-id
+  expect(container.querySelector('[data-cmdk-preview]')).toBeNull();
+});
+```
+
 **Step 4: Run — expect pass**
 
 **Step 5: Commit**
@@ -2723,11 +3100,18 @@ import { test, expect } from '@playwright/test';
 import { utils } from 'src/utils';
 
 test.describe('global search palette', () => {
+  let adminAccessToken: string;
+
   test.beforeAll(async () => {
     await utils.resetDatabase();
-    await utils.adminSetup();
-    // Upload a few test assets; grep existing web specs for the helper pattern (e.g. utils.uploadAsset)
-    // Drain metadata extraction
+    const admin = await utils.adminSetup();
+    adminAccessToken = admin.accessToken;
+    // Upload a seeded test asset using the existing helper (utils.ts:375).
+    // Find a test fixture under e2e/test-assets/ (grep existing specs for a known file name).
+    await utils.createAsset(admin.accessToken);
+    // Drain metadata extraction before asserting on tag/filename-based results
+    // (per feedback_e2e_metadata_extraction_wait, utils.ts:805).
+    await utils.waitForQueueFinish(admin.accessToken, 'metadataExtraction');
   });
 
   test('Ctrl+K opens, type query, Enter on photo opens viewer', async ({ page }) => {
