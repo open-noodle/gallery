@@ -2732,16 +2732,10 @@ describe('/shared-spaces', () => {
       });
     });
 
-    it('empty thumbnailPath on the underlying global person excludes the space person', async () => {
-      // The fork's "minFaces gate" mechanism. shared-space.repository.ts:512-513
-      // filters with `person.thumbnailPath IS NOT NULL AND != ''`. In production
-      // the dedup job sets this only after a person crosses minFaces faces; in tests
-      // utils.createSpacePerson sets it directly. Blanking it should make the space
-      // person disappear from the listing — pin so a future query refactor that drops
-      // this filter is caught.
-      //
-      // The global personId comes straight from createSpacePerson's returned shape
-      // (T02 extension); no JOIN query needed.
+    it('empty thumbnailPath on the underlying global person does NOT exclude the space person', async () => {
+      // Fixed in #336: the thumbnailPath filter was removed from getPersonsBySpaceId.
+      // Space person visibility should not depend on the global person's thumbnail
+      // state — the space person has its own representativeFaceId for display.
       const dbClient = await utils.connectDatabase();
       try {
         await dbClient.query('UPDATE person SET "thumbnailPath" = $1 WHERE id = $2', ['', zeroThumbGlobalId]);
@@ -2750,7 +2744,7 @@ describe('/shared-spaces', () => {
           .set('Authorization', `Bearer ${owner.accessToken}`);
         expect(status).toBe(200);
         const ids = (body as Array<{ id: string }>).map((p) => p.id);
-        expect(ids).not.toContain(zeroThumbPersonId);
+        expect(ids).toContain(zeroThumbPersonId);
       } finally {
         await dbClient.query('UPDATE person SET "thumbnailPath" = $1 WHERE id = $2', [
           '/my/awesome/thumbnail.jpg',
