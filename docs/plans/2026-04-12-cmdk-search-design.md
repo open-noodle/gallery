@@ -35,7 +35,7 @@ Replace Gallery's inline header search bar with a keyboard-first **global palett
 Two sections, in order, each rendered only if non-empty:
 
 1. **RECENT** — up to 8 entries from a new `localStorage`-backed store `cmdk.recent`. Each entry is either a text query (written when the user hits `Enter` on plain text that matched nothing, or re-ran a prior query) or an entity activation (photo / person / place / tag). Entries are mixed, sorted by `lastUsed` desc, displayed top 8 out of a max 20.
-2. **SUGGESTED** — fallback when RECENT is empty (first-run or cleared). Seeded from `getExploreData()` cached on first palette open. Verified: `getExploreData` returns city-name groupings only (see `search.service.ts:45–51` — no people data), so SUGGESTED shows up to 6 place rows pulled from the largest city buckets. If the user has fewer than 6 places, we show what's available. If the result is still empty (tiny library), we fall back to a single "Start typing to search" helper row.
+2. **SUGGESTED** — fallback when RECENT is empty (first-run or cleared). Seeded from `getExploreData()` cached on first palette open. Verified: `getExploreData` returns city-name groupings only (see `search.service.ts:45–51` — no people data), so SUGGESTED shows up to 6 place rows pulled from the largest city buckets. If the user has fewer than 6 places, we show what's available. If the result is still empty (tiny library), we fall back to a single "Start typing — photos, people, places, tags." helper row.
 
 This collapses what I originally drafted as two separate recent sections. The reason: Gallery's existing `savedSearchTerms` store (`web/src/lib/stores/search.svelte.ts`) is in-memory Svelte `$state`, **not persisted** — it clears on reload and on logout. Seeding from it would give users a section that's usually empty. Writing text queries into `cmdk.recent` alongside entity activations solves both problems with one store.
 
@@ -254,10 +254,10 @@ Committing to this endpoint now (rather than deferring) avoids scope creep durin
 
 The preview pane is a pure function of the highlighted row. For each entity type:
 
-- **Photo** — full thumbnail via `createUrl()` (per `feedback_filter_thumbnail_createUrl` memory — bare paths get intercepted by SvelteKit), EXIF strip (date · camera · location), quick "Open" / "Add to album" actions.
-- **Person** — face crop via `createUrl()` on the person's `faceAssetId` thumbnail, name, face count, a 4-wide strip of recent photos from `searchAssets({ personIds: [person.id], size: 4 })`.
-- **Place** — a static map tile centered on the coordinate (reusing whatever static-tile source the existing map view uses), place name, country, a 4-wide strip of recent photos from `searchAssets({ latitude: p.lat, longitude: p.lng, size: 4 })`.
-- **Tag** — a 2×3 grid via `searchAssets({ tagIds: [tag.id], size: 6 })`.
+- **Photo** — thumbnail via `createUrl()` (per `feedback_filter_thumbnail_createUrl` memory — bare paths get intercepted by SvelteKit) at full pane width (~240×180 `object-cover`). Below: filename in GoogleSans 14/500, then a 2-row metadata block in GoogleSans 12/410 / `text-gray-500 dark:text-gray-400`: "March 2024 · Santa Cruz, CA" and "Canon R5 · f/2.8 · 1/500". Below that: two ghost-style pill buttons ("Open" / "Add to album"), not filled.
+- **Person** — face crop via `createUrl()` on `faceAssetId` at 120×120 rounded-full, centered. Name in GoogleSans 18/600, face count in 12/410 subtle. Below: 4-wide 48×48 strip of recent photos from `searchAssets({ personIds: [person.id], size: 4 })`.
+- **Place** — static map tile at 240×160 with a 1 px `border-gray-200 dark:border-gray-700` border (reuses existing Gallery map tile source). Place name in GoogleSans 16/600, country in 12/410 subtle, "412 photos" metadata. Below: 4-wide 48×48 recent-photos strip from `searchAssets({ latitude, longitude, size: 4 })`.
+- **Tag** — a 2×3 grid of 72×72 thumbnails with 8 px gaps from `searchAssets({ tagIds: [tag.id], size: 6 })`. Tag name in GoogleSans 16/600 with a 8×8 rounded color dot prefix (tag's stored color), "98 photos" metadata below the grid.
 
 **Preview staleness handling.** Each preview has its own `AbortController`, separate from the batch controller. When the active item changes or the query changes, the current preview's controller is aborted and a new one is created. A late-arriving response for a stale item is discarded via a generation counter check (`if (thisGeneration !== currentGeneration) return`). The preview render is also deferred for **300 ms** after cursor stop — quickly cursoring past a tag row does not fire a tag-content fetch. Below 720 px viewport the preview pane is hidden entirely and no preview fetches happen.
 
@@ -308,6 +308,94 @@ Read/write is wrapped in try-catch. On JSON parse error or `QuotaExceededError`,
 
 ---
 
+## Visual identity and motion
+
+**Aesthetic direction: "library archive," editorial-leaning.** Gallery is a personal archive, not an enterprise dashboard. The palette should feel closer to a museum catalog interface than a sysadmin console — quietly confident, editorial, typographically refined without being loud. The concept guides every decision below.
+
+### Typography
+
+Uses Gallery's existing loaded fonts — **GoogleSans** (variable, weight range 410–900) for all UI and **GoogleSansCode** for monospace accents. Both are already available via `--font-sans` (`app.css:87–101`). No new font files.
+
+GoogleSans's minimum weight is 410, not 400 — that's the "regular" baseline in Gallery. Numbers below refer to real variable-font weights.
+
+| Element                       | Font           | Size  | Weight | Color / treatment                        |
+| ----------------------------- | -------------- | ----- | ------ | ---------------------------------------- |
+| Section heading ("PHOTOS —")  | GoogleSans     | 11 px | 600    | uppercase, letter-spacing 0.08em, subtle |
+| Row title                     | GoogleSans     | 14 px | 500    | tracking -0.01em                         |
+| Row subtitle                  | GoogleSans     | 12 px | 410    | `text-gray-500 dark:text-gray-400`       |
+| "See all N photos →"          | GoogleSans     | 12 px | 500    | accent color for chevron                 |
+| Preview title                 | GoogleSans     | 16 px | 600    | Person preview promotes to 18/600        |
+| Preview metadata              | GoogleSans     | 12 px | 410    | `text-gray-500 dark:text-gray-400`       |
+| Mode label ("Smart · …")      | GoogleSansCode | 11 px | 500    | uppercase, tabular                       |
+| Keybind chip (`⌘K`, `Ctrl+/`) | GoogleSansCode | 11 px | 500    | `bg-subtle/60` pill, 1 px border         |
+| Empty state / helper rows     | GoogleSans     | 13 px | 410    | subtle                                   |
+
+Section headings get a small em-dash after the label — "PHOTOS —" — as a deliberate editorial accent. Cheap to render, tells the user the palette cares about detail.
+
+### Dimensions
+
+| Viewport    | Palette width | Preview pane | Notes                 |
+| ----------- | ------------- | ------------ | --------------------- |
+| ≥ 1024 px   | 720 px        | 280 px right | Two-pane layout       |
+| 640–1023 px | 560 px        | hidden       | List only             |
+| < 640 px    | full − 16 px  | hidden       | Mobile / small laptop |
+
+Inside the palette:
+
+- Row height **52 px** (thumbnails breathe, 5 rows per section fit on a 14″ screen without scroll)
+- Row padding **12 px horizontal, 8 px vertical**
+- Section gap **16 px**
+- Preview pane padding **20 px**
+- Thumbnail sizes: photos 40×40 `rounded-md` (6 px), people 40×40 `rounded-full`, places and tags icon-only 32×32
+- Divider between list and preview: single 1 px hairline `border-gray-200 dark:border-gray-700`, no shadow — they're one surface, not two floating cards
+
+### Color philosophy
+
+**95 % neutral, 5 % accent.** Dominant neutrals with a single sharp accent tell the eye where to look. No accent gradients, no tinted backdrop, no secondary accents.
+
+- Palette chrome: `bg-light dark:bg-dark` with an off-warm tint (not cold white; cold white reads "SaaS")
+- Hairline border: `border-gray-200 dark:border-gray-700`
+- Elevation: a single elevated shadow layer (`shadow-2xl` or equivalent Gallery token) with a slightly warm cast
+- Backdrop: `bg-black/30 backdrop-blur-md` — the blur signals the palette is _floating_, not opaque-dimmed
+- **Accent** (Gallery's existing `accent-primary` token) appears in only two places: the active-row 3 px left border + faint tint, and the "See all" chevron. Nowhere else.
+
+Every color goes through Gallery's `@immich/ui` tokens with `dark:` prefixes per `feedback_match_gallery_design` — no hardcoded hex, no bespoke palette.
+
+### Motion
+
+All motion drops to instant when `prefers-reduced-motion: reduce` matches. No exceptions.
+
+| Moment                              | Duration | Easing                                               | Detail                                                                                                               |
+| ----------------------------------- | -------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Palette enter                       | 180 ms   | `cubic-bezier(0.22, 1, 0.36, 1)` (ease-out-quint)    | Backdrop fades in; palette scales 0.98 → 1.0 + fades in + 4 px translate-from-top — reads as "descending into place" |
+| Palette exit                        | 120 ms   | same, reversed                                       | Faster out than in — dismissal feels snappy                                                                          |
+| Section heading + rows on resolve   | 100 ms   | linear                                               | Stagger: 20 ms per row index; heading leads by 40 ms                                                                 |
+| Skeleton → real row                 | 120 ms   | ease-out                                             | Cross-fade in place; no layout jump                                                                                  |
+| Active row highlight                | 80 ms    | ease-out                                             | Left border grows 0 → 3 px; background tint fades in                                                                 |
+| Preview swap (type change)          | 120 ms   | ease-out                                             | Full content cross-fade                                                                                              |
+| Preview swap (same type, diff item) | 60 ms    | ease-out                                             | Opacity blink 0.85 → 1.0 — "blink of recognition" without lag                                                        |
+| Mode selector pill                  | 180 ms   | `cubic-bezier(0.34, 1.56, 0.64, 1)` (mild overshoot) | The one place mild playfulness is allowed; footer is otherwise dead space                                            |
+| Skeleton pulse                      | 1600 ms  | ease-in-out infinite                                 | Opacity 0.4 → 0.7 → 0.4. **Pulse, not shimmer** — shimmer reads "AI loading"                                         |
+
+### Atmosphere and detail
+
+Small touches that signal "designed," not "generated":
+
+- **Grain texture** on the palette surface — a 1 px SVG noise pattern at 2 % opacity. Costs ~50 bytes, reads expensive. "Archive, not SaaS."
+- **Single hairline divider** between list and preview — not a shadow, not a gap. The two panes read as one surface split internally.
+- **Em-dash on section headings** ("PHOTOS —") — tiny editorial signal.
+- **`⌘K` trigger chip** (in the header trigger button): GoogleSansCode, `bg-subtle/60`, 1 px `border-gray-200 dark:border-gray-700`, `rounded-sm`. Clickable-but-not-screaming.
+- **Right-aligned chevron** on "See all N photos →" with `tabular-nums` so counts align vertically across sections.
+- **Active row highlight** is a 3 px accent-colored left border + very subtle `bg-accent-primary/5` tint. No scale, no shadow, no glow. Restraint is the whole point — this row is seen constantly.
+
+### Empty-state voice
+
+Replace the generic placeholder with something with a bit of character:
+
+> **"Start typing — photos, people, places, tags."**
+
+Same byte count, less corporate. The em-dash matches the section-heading treatment.
+
 ## Error handling
 
 | Failure                                                 | Behavior                                                                                           |
@@ -319,7 +407,7 @@ Read/write is wrapped in try-catch. On JSON parse error or `QuotaExceededError`,
 | ML becomes unhealthy mid-session                        | First timeout/error from Photos promotes the same banner retroactively                             |
 | Photos timeout during non-Smart mode                    | Section shows generic timeout message; banner does not appear (it's Smart-specific)                |
 | User has empty `cmdk.recent`                            | Skip RECENT section; fall through to SUGGESTED                                                     |
-| `getExploreData()` returns zero cities (tiny library)   | Skip SUGGESTED; show a single "Start typing to search" helper row                                  |
+| `getExploreData()` returns zero cities (tiny library)   | Skip SUGGESTED; show a single "Start typing — photos, people, places, tags." helper row            |
 | `localStorage` unavailable / quota exceeded / corrupted | Try-catch on read/write; treat as empty; log once to console                                       |
 | `getAllTags()` call fails (tag cache miss)              | Tags section renders error row; retry on next keystroke                                            |
 | User types query of length 1                            | Only Photos fires; People/Places/Tags sections render `idle` (no skeleton, no error)               |
@@ -361,6 +449,18 @@ Per `feedback_e2e_mock_filterpanel`, real server not mocks. Per `feedback_e2e_me
 - Cold-open (no `cmdk.recent`) shows SUGGESTED if explore data exists, or the helper row if not.
 - Hover-based preview tests are avoided per `feedback_playwright_hover_menus` (flaky in headless) — preview assertions use keyboard navigation only.
 
+### Visual QA (manual)
+
+Responsive breakpoints are where the motion and layout details break. Before the PR, eyeball the palette at **1024 px, 720 px, and 480 px** widths in **both light and dark modes**:
+
+- Two-pane layout at ≥ 1024 px renders the 280 px preview without overflow; divider is a single hairline, no shadow.
+- Mid-viewport (640–1023 px) hides the preview pane cleanly — no layout jump, no empty right column.
+- Mobile (< 640 px) renders edge-to-edge minus 16 px margin; trigger button collapses to an icon if navbar real estate is tight.
+- Active row highlight is visible in both modes (neither theme drops the 3 px accent border into invisibility).
+- Skeleton pulse visible in both modes (opacity range tuned against `bg-subtle`, not hardcoded).
+- Grain texture reads at 2 % opacity without banding on either theme.
+- Motion feels right at the specified durations — not jerky, not sluggish. Verify `prefers-reduced-motion` drops everything to instant.
+
 ---
 
 ## Migration and rollout
@@ -387,7 +487,7 @@ These aren't new problems, but the design surfaces them and the review should fl
 3. **Tag cache size.** Mitigation: the service measures tag count on first `getAllTags()` call and logs a warning at > 5k; a follow-up plan adds a server-side `name` param if we see deployments over that threshold.
 4. **`AbortSignal.any` support** — Chrome 116 / Firefox 124 / Safari 17.4. Gallery doesn't formally declare a browser baseline, but these all shipped ~2024 and are safe. If we want older-browser support, the service can fall back to a manual controller wrapper (trivial).
 5. **ML health probe endpoint** — small server surface addition committed to above. The retroactive-promotion path still covers mid-session degradation, so even if the probe itself fails the banner still appears after a real failure.
-6. **The SUGGESTED section on a tiny library** — if `getExploreData` returns nothing, we fall through to the "Start typing to search" helper row. Documented.
+6. **The SUGGESTED section on a tiny library** — if `getExploreData` returns nothing, we fall through to the "Start typing — photos, people, places, tags." helper row. Documented.
 
 ## Implementation sequence (rough order for the follow-up plan)
 
