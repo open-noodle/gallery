@@ -10,7 +10,6 @@
   import { createUrl } from '$lib/utils';
   import { handleError } from '$lib/utils/handle-error';
   import {
-    deduplicateSpacePeople,
     getSpacePeople,
     Role,
     updateSpacePerson,
@@ -18,7 +17,7 @@
     type SharedSpacePersonResponseDto,
     type SharedSpaceResponseDto,
   } from '@immich/sdk';
-  import { Button, Icon, IconButton, modalManager, toastManager } from '@immich/ui';
+  import { Button, Icon, IconButton, toastManager } from '@immich/ui';
   import {
     mdiAccountGroupOutline,
     mdiAccountMultipleCheckOutline,
@@ -173,26 +172,6 @@
     void goto(`/spaces/${space.id}/people/${personId}?action=merge`);
   }
 
-  async function handleDeduplicate() {
-    const confirmed = await modalManager.showDialog({
-      title: $t('deduplicate_people'),
-      prompt: $t('dedup_people_confirm'),
-      confirmText: $t('start'),
-      confirmColor: 'primary',
-    });
-
-    if (!confirmed) {
-      return;
-    }
-
-    try {
-      await deduplicateSpacePeople({ id: space.id });
-      toastManager.info($t('dedup_people_started'));
-    } catch (error) {
-      handleError(error, $t('dedup_people_error'));
-    }
-  }
-
   async function handleHide(person: SharedSpacePersonResponseDto) {
     try {
       await updateSpacePerson({
@@ -243,17 +222,6 @@
     />
   {/snippet}
   {#snippet buttons()}
-    {#if isOwner}
-      <Button
-        leadingIcon={mdiAccountMultipleCheckOutline}
-        onclick={handleDeduplicate}
-        size="small"
-        variant="ghost"
-        color="secondary"
-      >
-        {$t('deduplicate_people')}
-      </Button>
-    {/if}
     {#if isEditor}
       <Button leadingIcon={mdiEyeOutline} onclick={openVisibilityModal} size="small" variant="ghost" color="secondary"
         >{$t('show_and_hide_people')}</Button
