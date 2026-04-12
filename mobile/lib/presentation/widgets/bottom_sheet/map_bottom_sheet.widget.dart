@@ -44,7 +44,7 @@ class _ScopedMapTimeline extends StatelessWidget {
 
           final timelineService = ref
               .watch(timelineFactoryProvider)
-              .map(users, ref.watch(mapStateProvider).toOptions());
+              .map(users, user.id, ref.watch(mapStateProvider).toOptions());
           ref.onDispose(timelineService.dispose);
           return timelineService;
         }),

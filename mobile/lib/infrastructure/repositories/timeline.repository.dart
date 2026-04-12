@@ -711,7 +711,7 @@ class DriftTimelineRepository extends DriftDatabaseRepository {
     return query.map((row) => row.readTable(_db.remoteAssetEntity).toDto()).get();
   }
 
-  TimelineQuery map(List<String> userIds, TimelineMapOptions options, GroupAssetsBy groupBy) => (
+  TimelineQuery map(List<String> userIds, String currentUserId, TimelineMapOptions options, GroupAssetsBy groupBy) => (
     bucketSource: () => _watchMapBucket(userIds, options, groupBy: groupBy),
     assetSource: (offset, count) => _getMapBucketAssets(userIds, options, offset: offset, count: count),
     origin: TimelineOrigin.map,
