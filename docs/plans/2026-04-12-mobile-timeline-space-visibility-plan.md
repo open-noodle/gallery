@@ -344,8 +344,8 @@ ViewerVisibilityJoinSpec buildViewerVisibilityJoins(
   $RemoteAssetEntityTable assetTable,
   String currentUserId,
 ) {
-  final assetMember = alias(db.sharedSpaceMemberEntity, 'ssm_asset');
-  final libraryMember = alias(db.sharedSpaceMemberEntity, 'ssm_lib');
+  final assetMember = db.alias(db.sharedSpaceMemberEntity, 'ssm_asset');
+  final libraryMember = db.alias(db.sharedSpaceMemberEntity, 'ssm_lib');
 
   final joins = <Join>[
     leftOuterJoin(
