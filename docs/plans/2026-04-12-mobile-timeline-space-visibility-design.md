@@ -177,7 +177,7 @@ Three methods in `mobile/lib/domain/services/timeline.service.dart` get extended
 
 Extend `mobile/test/infrastructure/repositories/timeline_repository_test.dart` (already uses `NativeDatabase.memory()` with real tables).
 
-### Full helper matrix via `video()` — 10 tests
+### Full helper matrix via `video()` — 13 tests
 
 1. Owner asset → visible
 2. Partner asset (owner in `userIds`) → visible
@@ -187,8 +187,11 @@ Extend `mobile/test/infrastructure/repositories/timeline_repository_test.dart` (
 6. Space asset, viewer NOT a member → hidden
 7. Library-in-space, `showInTimeline=true` → visible
 8. Library-in-space, `showInTimeline=false` → hidden
-9. Asset in 2 spaces → counted once in bucket, returned once in asset list
-10. Image asset reachable via space → hidden (type filter still applies)
+9. Asset in 2 directly-linked spaces → counted once in bucket, returned once in asset list
+10. Asset reachable via BOTH `shared_space_asset` AND `shared_space_library` on the same space → counted once (exercises the crossproduct of both LEFT JOIN branches)
+11. Asset with `library_id IS NULL` reachable via direct `shared_space_asset` → visible (NULL library must not break the direct branch)
+12. Asset with `library_id IS NULL` NOT in any direct space, library-space branch evaluated → hidden (NULL ≠ any library_id, library branch cannot match)
+13. Image asset reachable via space → hidden (type filter still applies)
 
 ### Method-specific tests
 
@@ -198,9 +201,12 @@ Extend `mobile/test/infrastructure/repositories/timeline_repository_test.dart` (
 
 **`DriftMapRepository.remote()` (2):** owner marker; space-visible marker. No reactivity test — `Future`, not `Stream`.
 
-**`video()` reactivity (1):** bucket stream re-emits on `shared_space_asset` delete.
+**`video()` reactivity (2):**
 
-**Total: ~20 tests.**
+- Bucket stream re-emits on `shared_space_asset` delete
+- **`showInTimeline` toggle** — subscribe with a visible space asset, flip the viewer's `shared_space_member.show_in_timeline` from `true` to `false`, assert the bucket stream re-emits with zero buckets. This is the load-bearing test for the aliased-member-join reactivity claim. **Write this test FIRST during implementation** — if it fails, the LEFT-JOIN helper approach is invalid and the design must switch to `.drift` SQL files with explicit table imports (like `merged_asset.drift`).
+
+**Total: ~24 tests.**
 
 ## Out of scope
 
@@ -217,8 +223,8 @@ Extend `mobile/test/infrastructure/repositories/timeline_repository_test.dart` (
 
 ## Risks
 
-| Risk                                                                                                      | Mitigation                                                                                                     |
-| --------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| Drift aliased-join reactivity doesn't propagate to the base `shared_space_member` table's `readsFrom` set | Reactivity tests (one per `.watch()` method) delete a row and assert the stream re-emits                       |
-| `isInQuery` in `.get()` paths silently introduces a reactivity bug                                        | `.get()` paths don't use `.watch()` — reactivity doesn't apply. Bucket paths use real LEFT JOINs where it does |
-| `place()` visibility narrowing surprises users who relied on the leak                                     | Commit message calls out the visibility tightening explicitly                                                  |
+| Risk                                                                                                      | Mitigation                                                                                                                                                                                                                                          |
+| --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Drift aliased-join reactivity doesn't propagate to the base `shared_space_member` table's `readsFrom` set | `video()` reactivity test #2 toggles `show_in_timeline` on a live stream and asserts re-emission — directly exercises the aliased-member path. Written first so failure pivots the design to `.drift` SQL before any implementation work is wasted. |
+| `isInQuery` in `.get()` paths silently introduces a reactivity bug                                        | `.get()` paths don't use `.watch()` — reactivity doesn't apply. Bucket paths use real LEFT JOINs where it does                                                                                                                                      |
+| `place()` visibility narrowing surprises users who relied on the leak                                     | Commit message calls out the visibility tightening explicitly                                                                                                                                                                                       |
