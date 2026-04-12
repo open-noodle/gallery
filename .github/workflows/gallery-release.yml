@@ -1,4 +1,4 @@
-name: Release
+name: Release Gallery
 
 on:
   workflow_dispatch:
@@ -7,8 +7,6 @@ on:
         description: 'Version tag (e.g. v3.0.5) — overrides auto-version'
         required: false
         type: string
-  push:
-    branches: [main]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -40,66 +38,109 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           INPUT_VERSION: ${{ inputs.version }}
         run: |
-          # Check for changelog:skip label on the merged PR (skip for manual dispatch)
-          if [[ -z "$INPUT_VERSION" ]]; then
-            commit_msg_check=$(git log -1 --pretty=%B)
-            pr_num=$(echo "$commit_msg_check" | grep -oP '#\K[0-9]+' | head -1)
-            if [[ -n "$pr_num" ]]; then
-              pr_labels=$(gh pr view "$pr_num" --json labels --jq '.labels[].name' 2>/dev/null || true)
-              if echo "$pr_labels" | grep -q 'changelog:skip'; then
-                echo "skip=true" >> "$GITHUB_OUTPUT"
-                echo "Skipping release — changelog:skip label found on PR #${pr_num}"
-                exit 0
-              fi
-            fi
+          set -euo pipefail
+
+          # Manual override always wins — trust the caller and build.
+          if [[ -n "$INPUT_VERSION" ]]; then
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "version=$INPUT_VERSION" >> "$GITHUB_OUTPUT"
+            major=$(echo "$INPUT_VERSION" | sed 's/^v//' | cut -d. -f1)
+            echo "major=v${major}" >> "$GITHUB_OUTPUT"
+            echo "Version: $INPUT_VERSION (major: v${major}) — manual override"
+            exit 0
           fi
+
+          prev_tag=$(git tag --list 'v*.*.*' --sort=-version:refname | head -n1)
+          if [[ -z "$prev_tag" ]]; then
+            echo "::error::No existing version tags found. Run a manual release first."
+            exit 1
+          fi
+
+          # Walk every commit since prev_tag. Aggregate the max bump level
+          # across all release-worthy commits. Treat changelog:skip as a no-op
+          # — it neither bumps nor blocks by itself. If ALL commits since the
+          # last tag are changelog:skip, there's nothing to release.
+          rank_of() {
+            case "$1" in
+              major) echo 3 ;;
+              minor) echo 2 ;;
+              patch) echo 1 ;;
+              *) echo 0 ;;
+            esac
+          }
+
+          bump=""
+          has_non_skip_commit=false
+          skipped_count=0
+          total_count=0
+
+          # %H is commit hash, %s is subject only (single line). PR number
+          # lives in the subject since we squash-merge with "...(#NNN)".
+          while IFS=$'\t' read -r sha subject; do
+            [[ -z "$sha" ]] && continue
+            total_count=$((total_count + 1))
+
+            pr_num=$(echo "$subject" | grep -oP '#\K[0-9]+' | tail -1 || true)
+            labels=""
+            if [[ -n "$pr_num" ]]; then
+              labels=$(gh pr view "$pr_num" --json labels --jq '.labels[].name' 2>/dev/null || true)
+            fi
+
+            if echo "$labels" | grep -q '^changelog:skip$'; then
+              skipped_count=$((skipped_count + 1))
+              echo "  · ${sha:0:7} ${subject}  [skip]"
+              continue
+            fi
+
+            has_non_skip_commit=true
+            commit_bump="patch"
+
+            if echo "$labels" | grep -q '^changelog:feat$'; then
+              commit_bump="minor"
+            fi
+
+            # Conventional Commits: `feat:` → minor, `feat!:` / `fix!:` → major
+            if echo "$subject" | grep -qP '^[a-z]+(\([^)]+\))?!:'; then
+              commit_bump="major"
+            elif echo "$subject" | grep -qP '^feat(\([^)]+\))?:'; then
+              [[ "$commit_bump" == "patch" ]] && commit_bump="minor"
+            fi
+
+            if [[ -z "$bump" ]] || (( $(rank_of "$commit_bump") > $(rank_of "$bump") )); then
+              bump="$commit_bump"
+            fi
+            echo "  · ${sha:0:7} ${subject}  [${commit_bump}]"
+          done < <(git log --format='%H%x09%s' "${prev_tag}..HEAD")
+
+          echo "Scanned $total_count commits since $prev_tag ($skipped_count skipped)."
+
+          if [[ "$has_non_skip_commit" == "false" ]]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            if (( total_count == 0 )); then
+              echo "Skipping release — no commits since $prev_tag"
+            else
+              echo "Skipping release — all $total_count commits since $prev_tag are changelog:skip"
+            fi
+            exit 0
+          fi
+
+          bump="${bump:-patch}"
           echo "skip=false" >> "$GITHUB_OUTPUT"
 
-          if [[ -n "$INPUT_VERSION" ]]; then
-            echo "version=$INPUT_VERSION" >> "$GITHUB_OUTPUT"
-          else
-            # Find the latest vX.Y.Z tag by semver sort
-            latest=$(git tag --list 'v*.*.*' --sort=-version:refname | head -n1)
-            if [[ -z "$latest" ]]; then
-              echo "::error::No existing version tags found. Run a manual release first."
-              exit 1
-            fi
+          major=$(echo "$prev_tag" | sed 's/^v//' | cut -d. -f1)
+          minor=$(echo "$prev_tag" | sed 's/^v//' | cut -d. -f2)
+          patch=$(echo "$prev_tag" | sed 's/^v//' | cut -d. -f3)
 
-            major=$(echo "$latest" | sed 's/^v//' | cut -d. -f1)
-            minor=$(echo "$latest" | sed 's/^v//' | cut -d. -f2)
-            patch=$(echo "$latest" | sed 's/^v//' | cut -d. -f3)
+          case "$bump" in
+            major) version="v$((major + 1)).0.0" ;;
+            minor) version="v${major}.$((minor + 1)).0" ;;
+            patch) version="v${major}.${minor}.$((patch + 1))" ;;
+          esac
 
-            # Determine bump type from merge commit message or PR labels
-            commit_msg=$(git log -1 --pretty=%B)
-            bump="patch"
-
-            # Check for PR labels (changelog:feat, changelog:fix, etc.)
-            pr_number=$(echo "$commit_msg" | grep -oP '#\K[0-9]+' | head -1)
-            if [[ -n "$pr_number" ]]; then
-              labels=$(gh pr view "$pr_number" --json labels --jq '.labels[].name' 2>/dev/null || true)
-              if echo "$labels" | grep -q 'changelog:feat'; then
-                bump="minor"
-              fi
-            fi
-
-            # Also check conventional commit prefix as fallback
-            if echo "$commit_msg" | head -1 | grep -qP '^feat(\(.+\))?!?:'; then
-              bump="minor"
-            fi
-            if echo "$commit_msg" | grep -q 'BREAKING CHANGE'; then
-              bump="major"
-            fi
-
-            case "$bump" in
-              major) echo "version=v$((major + 1)).0.0" >> "$GITHUB_OUTPUT" ;;
-              minor) echo "version=v${major}.$((minor + 1)).0" >> "$GITHUB_OUTPUT" ;;
-              patch) echo "version=v${major}.${minor}.$((patch + 1))" >> "$GITHUB_OUTPUT" ;;
-            esac
-          fi
-          version=$(grep version "$GITHUB_OUTPUT" | cut -d= -f2)
-          major=$(echo "$version" | sed 's/^v//' | cut -d. -f1)
-          echo "major=v${major}" >> "$GITHUB_OUTPUT"
-          echo "Version: $version (major: v${major})"
+          new_major=$(echo "$version" | sed 's/^v//' | cut -d. -f1)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "major=v${new_major}" >> "$GITHUB_OUTPUT"
+          echo "Version: $version (major: v${new_major}) — ${bump} bump from $prev_tag"
 
   build-server:
     name: Build Server (${{ matrix.platform }})
