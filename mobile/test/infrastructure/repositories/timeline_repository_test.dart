@@ -277,6 +277,87 @@ void main() {
 
       await sub.cancel();
     });
+
+    test('video() bucket stream re-emits when shared_space_member.showInTimeline toggles', () async {
+      await insertUser('viewer');
+      await insertUser('owner');
+      await insertVideo('a1', 'owner');
+      await insertSpace('space1', 'owner');
+      await insertMember('space1', 'viewer', showInTimeline: true);
+      await linkAssetToSpace('space1', 'a1');
+
+      final emissions = <List<Bucket>>[];
+      final sub = sut
+          .video(['viewer'], 'viewer', GroupAssetsBy.day)
+          .bucketSource()
+          .listen(emissions.add);
+
+      await _waitFor(() => emissions.isNotEmpty);
+      expect((emissions.last.single as TimeBucket).assetCount, 1);
+
+      // Flip showInTimeline=false — asset should drop out.
+      await (db.update(db.sharedSpaceMemberEntity)
+            ..where((t) => t.spaceId.equals('space1') & t.userId.equals('viewer')))
+          .write(const SharedSpaceMemberEntityCompanion(showInTimeline: Value(false)));
+
+      await _waitFor(() => emissions.length >= 2);
+      expect(
+        emissions.last,
+        isEmpty,
+        reason:
+            'Toggling showInTimeline=false on the viewer\'s member row must drop the space asset '
+            'from the video bucket stream immediately',
+      );
+
+      // Flip it back on — verify symmetric reactivity.
+      await (db.update(db.sharedSpaceMemberEntity)
+            ..where((t) => t.spaceId.equals('space1') & t.userId.equals('viewer')))
+          .write(const SharedSpaceMemberEntityCompanion(showInTimeline: Value(true)));
+
+      await _waitFor(() => emissions.length >= 3);
+      expect(
+        (emissions.last.single as TimeBucket).assetCount,
+        1,
+        reason: 'Toggling showInTimeline=true must bring the space asset back into the bucket',
+      );
+
+      await sub.cancel();
+    });
+
+    test('video() bucket stream re-emits when shared_space_member row is deleted', () async {
+      // Complementary to the toggle test — covers the case where the viewer is
+      // removed from the space entirely (member row deleted, not updated).
+      await insertUser('viewer');
+      await insertUser('owner');
+      await insertVideo('a1', 'owner');
+      await insertSpace('space1', 'owner');
+      await insertMember('space1', 'viewer', showInTimeline: true);
+      await linkAssetToSpace('space1', 'a1');
+
+      final emissions = <List<Bucket>>[];
+      final sub = sut
+          .video(['viewer'], 'viewer', GroupAssetsBy.day)
+          .bucketSource()
+          .listen(emissions.add);
+
+      await _waitFor(() => emissions.isNotEmpty);
+      expect((emissions.last.single as TimeBucket).assetCount, 1);
+
+      await (db.delete(db.sharedSpaceMemberEntity)
+            ..where((t) => t.spaceId.equals('space1') & t.userId.equals('viewer')))
+          .go();
+
+      await _waitFor(() => emissions.length >= 2);
+      expect(
+        emissions.last,
+        isEmpty,
+        reason:
+            'Deleting the viewer\'s shared_space_member row must drop the space asset '
+            'from the video bucket stream',
+      );
+
+      await sub.cancel();
+    });
   });
 
   // PRE-FLIGHT: verifies Drift's reactive layer tracks tables reached via
