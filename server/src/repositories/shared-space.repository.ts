@@ -553,8 +553,6 @@ export class SharedSpaceRepository {
       .where('shared_space_person.spaceId', '=', spaceId)
       .$if(!options.withHidden, (qb) => qb.where('shared_space_person.isHidden', '=', false))
       .$if(!options.petsEnabled, (qb) => qb.where('shared_space_person.type', '!=', 'pet'))
-      .where('person.thumbnailPath', 'is not', null)
-      .where('person.thumbnailPath', '!=', '')
       .$if(!!options.named, (qb) =>
         qb.where((eb) =>
           eb.or([
@@ -675,6 +673,42 @@ export class SharedSpaceRepository {
       .updateTable('shared_space_person_face')
       .set({ personId: toPersonId })
       .where('personId', '=', fromPersonId)
+      .execute();
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID] })
+  async getFirstFaceIdForPerson(personId: string): Promise<string | null> {
+    const result = await this.db
+      .selectFrom('shared_space_person_face')
+      .innerJoin('face_search', 'face_search.faceId', 'shared_space_person_face.assetFaceId')
+      .select('shared_space_person_face.assetFaceId')
+      .where('shared_space_person_face.personId', '=', personId)
+      .limit(1)
+      .executeTakeFirst();
+    return result?.assetFaceId ?? null;
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID] })
+  async repairOrphanedRepresentativeFaces(spaceId: string) {
+    await this.db
+      .updateTable('shared_space_person')
+      .set((eb) => ({
+        representativeFaceId: eb
+          .selectFrom('shared_space_person_face')
+          .innerJoin('face_search', 'face_search.faceId', 'shared_space_person_face.assetFaceId')
+          .select('shared_space_person_face.assetFaceId')
+          .whereRef('shared_space_person_face.personId', '=', 'shared_space_person.id')
+          .limit(1),
+      }))
+      .where('shared_space_person.spaceId', '=', spaceId)
+      .where('shared_space_person.representativeFaceId', 'is', null)
+      .where((eb) =>
+        eb.exists(
+          eb
+            .selectFrom('shared_space_person_face')
+            .whereRef('shared_space_person_face.personId', '=', 'shared_space_person.id'),
+        ),
+      )
       .execute();
   }
 
@@ -922,6 +956,7 @@ export class SharedSpaceRepository {
         'shared_space_person.type',
         'shared_space_person.isHidden',
         'shared_space_person.faceCount',
+        'shared_space_person.representativeFaceId',
         'face_search.embedding',
       ])
       .where('shared_space_person.spaceId', '=', spaceId)
