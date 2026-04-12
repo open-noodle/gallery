@@ -2064,11 +2064,90 @@ Write analogous specs for person/place/tag rows. The tag row test uses `item.nam
 
 The `data-[selected=true]:bg-primary/10` Tailwind selector applies the active tint when bits-ui's `Command.Item` sets `data-selected="true"` on its rendered element, which cascades to the child row. This replaces the prior `isActive` prop-based styling — bits-ui drives selection, we just style on its data attributes.
 
-Similar for:
+`person-row.svelte`:
 
-- `person-row.svelte` — face thumbnail via `getAssetMediaUrl({ id: person.faceAssetId ?? person.id, ... })`, rounded-full, name, face count
-- `place-row.svelte` — pin icon (no thumbnail), place name + country subtitle
-- `tag-row.svelte` — optional color dot prefix, `tag.name` as title
+```svelte
+<script lang="ts">
+  import { getAssetMediaUrl } from '$lib/utils';
+  import { AssetMediaSize, type PersonResponseDto } from '@immich/sdk';
+  import { t } from 'svelte-i18n';
+
+  interface Props { item: PersonResponseDto & { numberOfAssets?: number }; }
+  let { item }: Props = $props();
+
+  const thumbUrl = $derived(
+    item.faceAssetId ? getAssetMediaUrl({ id: item.faceAssetId, size: AssetMediaSize.Thumbnail }) : '',
+  );
+</script>
+
+<div class="flex h-[52px] items-center gap-3 rounded-lg px-3 py-2 data-[selected=true]:bg-primary/10">
+  {#if thumbUrl}
+    <img src={thumbUrl} alt="" class="h-10 w-10 rounded-full object-cover" loading="lazy" />
+  {:else}
+    <div class="h-10 w-10 rounded-full bg-subtle/40" aria-hidden="true"></div>
+  {/if}
+  <div class="min-w-0 flex-1">
+    <div class="truncate text-sm font-medium">{item.name || $t('cmdk_unnamed_person')}</div>
+    {#if item.numberOfAssets !== undefined}
+      <div class="text-xs text-gray-500 dark:text-gray-400">{item.numberOfAssets} photos</div>
+    {/if}
+  </div>
+</div>
+```
+
+`place-row.svelte`:
+
+```svelte
+<script lang="ts">
+  import Icon from '$lib/elements/Icon.svelte';
+  import { mdiMapMarker } from '@mdi/js';
+  import type { PlacesResponseDto } from '@immich/sdk';
+
+  interface Props { item: PlacesResponseDto; }
+  let { item }: Props = $props();
+
+  const subtitle = $derived([item.admin1name, item.countryName].filter(Boolean).join(' · '));
+</script>
+
+<div class="flex h-[52px] items-center gap-3 rounded-lg px-3 py-2 data-[selected=true]:bg-primary/10">
+  <div class="flex h-8 w-8 items-center justify-center rounded-md bg-subtle/40">
+    <Icon path={mdiMapMarker} size="18" class="text-gray-500 dark:text-gray-400" />
+  </div>
+  <div class="min-w-0 flex-1">
+    <div class="truncate text-sm font-medium">{item.name}</div>
+    {#if subtitle}
+      <div class="truncate text-xs text-gray-500 dark:text-gray-400">{subtitle}</div>
+    {/if}
+  </div>
+</div>
+```
+
+`tag-row.svelte`:
+
+```svelte
+<script lang="ts">
+  import Icon from '$lib/elements/Icon.svelte';
+  import { mdiTag } from '@mdi/js';
+  import type { TagResponseDto } from '@immich/sdk';
+
+  interface Props { item: TagResponseDto; }
+  let { item }: Props = $props();
+</script>
+
+<div class="flex h-[52px] items-center gap-3 rounded-lg px-3 py-2 data-[selected=true]:bg-primary/10">
+  <div class="flex h-8 w-8 items-center justify-center rounded-md bg-subtle/40">
+    {#if item.color}
+      <span class="h-2 w-2 rounded-full" style:background-color={item.color}></span>
+    {:else}
+      <Icon path={mdiTag} size="18" class="text-gray-500 dark:text-gray-400" />
+    {/if}
+  </div>
+  <div class="min-w-0 flex-1">
+    <div class="truncate text-sm font-medium">{item.name}</div>
+  </div>
+</div>
+```
+
 - `recent-row.svelte` — thin dispatcher that takes `{ entry: RecentEntry }` and renders the matching row component based on `entry.kind`:
 
 ```svelte
@@ -2320,8 +2399,13 @@ describe('global-search root', () => {
     </Command.GroupHeading>
     <Command.GroupItems>
       {#if status.status === 'loading'}
+        <!-- Uses Gallery's global Skeleton component (web/src/lib/elements/Skeleton.svelte) which
+             renders the same textured background-image tile the rest of the app uses, not a solid-color
+             Tailwind animate-pulse. Matches Skeleton.svelte:45's 2s cubic-bezier cadence. -->
         {#each Array(3) as _}
-          <div class="mx-3 mb-1 h-[52px] animate-pulse rounded-lg bg-subtle/50" aria-hidden="true" />
+          <div class="mx-3 mb-1">
+            <Skeleton height={52} />
+          </div>
         {/each}
       {:else if status.status === 'ok'}
         {#each status.items as item (itemKey(item))}
@@ -2330,9 +2414,13 @@ describe('global-search root', () => {
           </Command.Item>
         {/each}
         {#if onSeeAll && status.total > status.items.length}
-          <button type="button" onclick={onSeeAll} class="mt-1 flex w-full items-center justify-between px-3 py-2 text-xs text-primary">
+          <button
+            type="button"
+            onclick={onSeeAll}
+            class="mt-1 flex w-full items-center justify-between px-3 py-2 text-xs font-medium text-primary tabular-nums"
+          >
             <span>{$t('cmdk_see_all', { values: { count: status.total } })}</span>
-            <span>→</span>
+            <span aria-hidden="true">→</span>
           </button>
         {/if}
       {:else if status.status === 'timeout'}
@@ -2345,6 +2433,12 @@ describe('global-search root', () => {
     </Command.GroupItems>
   </Command.Group>
 {/if}
+```
+
+Section component imports:
+
+```ts
+import Skeleton from '$lib/elements/Skeleton.svelte';
 ```
 
 `Command.Group` / `GroupHeading` / `GroupItems` already emit `role="group"` + `aria-labelledby` — no manual ARIA wiring needed. `Command.Item` emits `role="option"` + `aria-selected` + handles keyboard nav / scroll-into-view / click-to-select for free.
@@ -2414,7 +2508,7 @@ describe('global-search root', () => {
   closeOnEsc={false}
   closeOnBackdropClick={true}
   onClose={() => manager.close()}
-  class="motion-reduce:transition-none motion-reduce:transform-none"
+  class="motion-reduce:transition-none motion-reduce:transform-none !p-0"
 >
   {#snippet children()}
     <span class="sr-only" id="global-search-label">{$t('global_search')}</span>
@@ -2423,103 +2517,102 @@ describe('global-search root', () => {
       vimBindings={false}
       bind:value={selectedValue}
       aria-labelledby="global-search-label"
-      class="flex flex-col gap-2"
+      class="flex flex-col"
     >
+      <!-- Input row (always full-width of the palette) -->
       <Command.Input
         bind:value={inputValue}
         placeholder={$t('cmdk_placeholder')}
         maxlength={256}
         onkeydown={onKeyDown}
-        class="w-full rounded-md bg-subtle/40 px-3 py-2 text-sm"
+        class="w-full border-b border-gray-200 bg-transparent px-4 py-3 text-sm focus:outline-none dark:border-gray-700"
       />
 
-      {#if manager.mode === 'smart' && !manager.mlHealthy}
-        <div class="mx-3 rounded-md bg-subtle/60 px-3 py-2 text-xs">
-          {$t('cmdk_smart_unavailable')}
-          <button type="button" onclick={() => manager.setMode('metadata')} class="ml-2 text-primary">
-            {$t('cmdk_try_filename')}
-          </button>
-        </div>
-      {/if}
-
-      <Command.List class="max-h-[60vh] overflow-y-auto">
-        {#if inputValue.trim() === ''}
-          <!-- Empty-state: RECENT section if entries exist, else helper row. SUGGESTED is deferred to v1.1. -->
-          {#if recentEntries.length > 0}
-            <Command.Group>
-              <Command.GroupHeading class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                {$t('cmdk_recent_heading')}
-              </Command.GroupHeading>
-              <Command.GroupItems>
-                {#each recentEntries as entry (entry.id)}
-                  <Command.Item value={entry.id} onSelect={() => manager.activateRecent(entry)}>
-                    <!-- Render a type-appropriate row. Reuses the same row components. -->
-                    <RecentRow {entry} />
-                  </Command.Item>
-                {/each}
-              </Command.GroupItems>
-            </Command.Group>
-          {:else}
-            <div class="p-6 text-center text-sm text-gray-500 dark:text-gray-400">
-              {$t('cmdk_helper')}
+      <!-- Two-pane body: list (left) + preview pane (right, ≥ 1024 px only) -->
+      <div class="flex flex-1 min-h-[420px]">
+        <!-- LIST PANE -->
+        <div class="flex flex-1 flex-col {showPreview ? 'border-r border-gray-200 dark:border-gray-700' : ''}">
+          <!-- ML banner lives inside the list pane, visually nested under the photos section (design § ML health). -->
+          {#if manager.mode === 'smart' && !manager.mlHealthy && inputValue.trim() !== ''}
+            <div class="mx-3 mt-3 rounded-md bg-subtle/60 px-3 py-2 text-xs">
+              {$t('cmdk_smart_unavailable')}
+              <button type="button" onclick={() => manager.setMode('metadata')} class="ml-2 text-primary transition-colors duration-[80ms] ease-out">
+                {$t('cmdk_try_filename')}
+              </button>
             </div>
           {/if}
-        {:else}
-          <GlobalSearchSection
-            heading={$t('cmdk_photos_heading')}
-            status={manager.sections.photos}
-            idPrefix="photo"
-            onActivate={(item) => manager.activate('photo', item)}
-          >
-            {#snippet renderRow(item)}
-              <PhotoRow {item} />
-            {/snippet}
-          </GlobalSearchSection>
-          <GlobalSearchSection
-            heading={$t('cmdk_people_heading')}
-            status={manager.sections.people}
-            idPrefix="person"
-            onActivate={(item) => manager.activate('person', item)}
-          >
-            {#snippet renderRow(item)}
-              <PersonRow {item} />
-            {/snippet}
-          </GlobalSearchSection>
-          <GlobalSearchSection
-            heading={$t('cmdk_places_heading')}
-            status={manager.sections.places}
-            idPrefix="place"
-            onActivate={(item) => manager.activate('place', item)}
-          >
-            {#snippet renderRow(item)}
-              <PlaceRow {item} />
-            {/snippet}
-          </GlobalSearchSection>
-          <GlobalSearchSection
-            heading={$t('cmdk_tags_heading')}
-            status={manager.sections.tags}
-            idPrefix="tag"
-            onActivate={(item) => manager.activate('tag', item)}
-          >
-            {#snippet renderRow(item)}
-              <TagRow {item} />
-            {/snippet}
-          </GlobalSearchSection>
+
+          <Command.List class="flex-1 overflow-y-auto py-2">
+            {#if inputValue.trim() === ''}
+              <!-- Empty state: RECENT section if entries exist, else helper row. SUGGESTED deferred to v1.1. -->
+              {#if recentEntries.length > 0}
+                <Command.Group>
+                  <Command.GroupHeading class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                    {$t('cmdk_recent_heading')}
+                  </Command.GroupHeading>
+                  <Command.GroupItems>
+                    {#each recentEntries as entry (entry.id)}
+                      <Command.Item value={entry.id} onSelect={() => manager.activateRecent(entry)}>
+                        <RecentRow {entry} />
+                      </Command.Item>
+                    {/each}
+                  </Command.GroupItems>
+                </Command.Group>
+              {:else}
+                <div class="p-6 text-center text-[13px] font-normal text-gray-500 dark:text-gray-400">
+                  {$t('cmdk_helper')}
+                </div>
+              {/if}
+            {:else}
+              <GlobalSearchSection heading={$t('cmdk_photos_heading')} status={manager.sections.photos} idPrefix="photo" onActivate={(item) => manager.activate('photo', item)}>
+                {#snippet renderRow(item)}<PhotoRow {item} />{/snippet}
+              </GlobalSearchSection>
+              <GlobalSearchSection heading={$t('cmdk_people_heading')} status={manager.sections.people} idPrefix="person" onActivate={(item) => manager.activate('person', item)}>
+                {#snippet renderRow(item)}<PersonRow {item} />{/snippet}
+              </GlobalSearchSection>
+              <GlobalSearchSection heading={$t('cmdk_places_heading')} status={manager.sections.places} idPrefix="place" onActivate={(item) => manager.activate('place', item)}>
+                {#snippet renderRow(item)}<PlaceRow {item} />{/snippet}
+              </GlobalSearchSection>
+              <GlobalSearchSection heading={$t('cmdk_tags_heading')} status={manager.sections.tags} idPrefix="tag" onActivate={(item) => manager.activate('tag', item)}>
+                {#snippet renderRow(item)}<TagRow {item} />{/snippet}
+              </GlobalSearchSection>
+            {/if}
+          </Command.List>
+        </div>
+
+        <!-- PREVIEW PANE — mounted only at ≥ 1024 px -->
+        {#if showPreview}
+          <div data-cmdk-preview class="w-[280px] shrink-0 overflow-y-auto">
+            <GlobalSearchPreview activeItem={manager.getActiveItem()} />
+          </div>
         {/if}
-      </Command.List>
+      </div>
+
+      <!-- Footer: mode selector (see Task 14b) -->
+      <GlobalSearchFooter {manager} />
     </Command.Root>
   {/snippet}
 </Modal>
 ```
 
-**Selection state bridge.** Add to the `<script>` block:
+**Note on Modal width:** `@immich/ui` Modal's `size="large"` maps to `md:max-w-(--breakpoint-md)` = 767 px at ≥ 768 px, full-width minus padding below. This gives a 2-tier width (767 px / full-width) rather than the design's 3-tier (767/639/full). The design dimensions table lists 639 px at 640–1023 px but that would require overriding Modal's internal `max-width` class, which fights the design system. Accept Modal's 2-tier behavior for v1 and update the design dimensions table to match (see design-doc fixes at the end of this plan). The preview pane remains gated at ≥ 1024 px so the behavioral contract still matches.
+
+**Selection state bridge and imports.** Add to the `<script>` block:
 
 ```ts
 import { getEntries, type RecentEntry } from '$lib/stores/cmdk-recent';
-import RecentRow from './rows/recent-row.svelte'; // thin dispatcher that renders a photo-row/person-row/etc. based on entry.kind
+import RecentRow from './rows/recent-row.svelte';
+import GlobalSearchPreview from './global-search-preview.svelte';
+import GlobalSearchFooter from './global-search-footer.svelte'; // Task 14b
+import { mediaQueryManager } from '$lib/managers/media-query-manager.svelte'; // existing — grep for real import
 
 let selectedValue = $state<string>('');
 const recentEntries = $derived<RecentEntry[]>(inputValue.trim() === '' ? getEntries() : []);
+
+// Two-pane layout is only at ≥ 1024 px. Grep Gallery for the established breakpoint helper
+// (media-query-manager.svelte.ts or $lib/utils/media-query.ts) and use it rather than
+// inventing a new matchMedia listener.
+const showPreview = $derived(mediaQueryManager.isLg ?? false);
 
 // Bridge Command.Root selection state into manager.activeItemId so
 // the manager-side cursor stays in sync with bits-ui's internal selection.
@@ -2560,6 +2653,129 @@ git add web/src/lib/components/global-search/global-search.svelte \
   web/src/lib/components/global-search/__tests__/global-search.spec.ts
 git commit -m "feat(web): GlobalSearch root + section via @immich/ui Modal"
 ```
+
+---
+
+## Task 14b — Mode selector footer
+
+**Files:**
+
+- Create: `web/src/lib/components/global-search/global-search-footer.svelte`
+- Create: `web/src/lib/components/global-search/__tests__/global-search-footer.spec.ts`
+
+**Context:** The palette footer is a segmented control letting the user switch between Smart / Filename / Description / OCR without leaving the palette. Per the design, the mode label uses GoogleSansCode (11 px / 500 / uppercase / tabular). The selected pill slides 180 ms on change. Mode persists to `searchQueryType` localStorage (handled by `manager.setMode()` in Task 11). `Ctrl+/` keyboard shortcut is registered in Task 15's `+layout.svelte`.
+
+**Step 1: Write failing tests**
+
+```ts
+import { render, screen } from '@testing-library/svelte';
+import userEvent from '@testing-library/user-event';
+import GlobalSearchFooter from '../global-search-footer.svelte';
+import { GlobalSearchManager } from '$lib/managers/global-search-manager.svelte';
+
+describe('global-search-footer', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('renders four segmented-control options', () => {
+    const manager = new GlobalSearchManager();
+    render(GlobalSearchFooter, { props: { manager } });
+    for (const label of [/smart/i, /filename/i, /description/i, /ocr/i]) {
+      expect(screen.getByRole('radio', { name: label })).toBeInTheDocument();
+    }
+  });
+
+  it('reflects manager.mode as the checked radio', () => {
+    const manager = new GlobalSearchManager();
+    manager.setMode('metadata');
+    render(GlobalSearchFooter, { props: { manager } });
+    expect((screen.getByRole('radio', { name: /filename/i }) as HTMLInputElement).checked).toBe(true);
+  });
+
+  it('clicking a segment calls manager.setMode with the right value', async () => {
+    const user = userEvent.setup();
+    const manager = new GlobalSearchManager();
+    const spy = vi.spyOn(manager, 'setMode');
+    render(GlobalSearchFooter, { props: { manager } });
+    await user.click(screen.getByRole('radio', { name: /description/i }));
+    expect(spy).toHaveBeenCalledWith('description');
+  });
+
+  it('displays the Ctrl+/ keybind hint', () => {
+    const manager = new GlobalSearchManager();
+    render(GlobalSearchFooter, { props: { manager } });
+    expect(screen.getByText(/ctrl\+\//i)).toBeInTheDocument();
+  });
+});
+```
+
+**Step 2: Run — expect failure**
+
+**Step 3: Implement**
+
+```svelte
+<!-- global-search-footer.svelte -->
+<script lang="ts">
+  import type { GlobalSearchManager, SearchMode } from '$lib/managers/global-search-manager.svelte';
+  import { t } from 'svelte-i18n';
+
+  interface Props { manager: GlobalSearchManager; }
+  let { manager }: Props = $props();
+
+  // "Filename" label maps to stored value 'metadata' — preserve the existing Gallery key.
+  const options: Array<{ value: SearchMode; labelKey: string }> = [
+    { value: 'smart', labelKey: 'cmdk_mode_smart' },
+    { value: 'metadata', labelKey: 'cmdk_mode_filename' },
+    { value: 'description', labelKey: 'cmdk_mode_description' },
+    { value: 'ocr', labelKey: 'cmdk_mode_ocr' },
+  ];
+</script>
+
+<div class="flex items-center justify-between border-t border-gray-200 px-4 py-2 dark:border-gray-700">
+  <!-- Segmented control as a radiogroup so keyboard and AT users can tab to it and the selection is announced. -->
+  <div role="radiogroup" aria-label={$t('cmdk_search_mode')} class="flex gap-0 rounded-md bg-subtle/40 p-0.5 font-mono text-[11px] font-medium uppercase">
+    {#each options as opt (opt.value)}
+      <label class="relative">
+        <input
+          type="radio"
+          name="cmdk-mode"
+          value={opt.value}
+          checked={manager.mode === opt.value}
+          onchange={() => manager.setMode(opt.value)}
+          class="sr-only"
+        />
+        <span
+          class="block cursor-pointer rounded-sm px-2.5 py-1 tabular-nums transition-colors duration-[180ms] ease-out {manager.mode === opt.value ? 'bg-primary/10 text-primary' : 'text-gray-500 dark:text-gray-400'}"
+        >
+          {$t(opt.labelKey)}
+        </span>
+      </label>
+    {/each}
+  </div>
+
+  <!-- Keybind hint: Ctrl+/ cycles modes (design § Search mode selector). -->
+  <span class="font-mono text-[11px] text-gray-500 dark:text-gray-400">
+    <kbd class="rounded-sm border border-gray-200 bg-subtle/60 px-1.5 py-0.5 dark:border-gray-700">Ctrl+/</kbd>
+    <span class="ml-1">{$t('cmdk_cycle_mode_hint')}</span>
+  </span>
+</div>
+```
+
+**Why radiogroup instead of a button segmented control.** The semantic accessibility is much cleaner: screen readers announce the selected value, keyboard users can use arrow keys natively (`role="radiogroup"` gives you this for free), and `manager.mode` binds symmetrically. The visible styling is the pill slider; the inputs are `sr-only`.
+
+**Step 4: Run — expect pass**
+
+**Step 5: Commit**
+
+```bash
+cd web && pnpm check && pnpm lint
+git add web/src/lib/components/global-search/global-search-footer.svelte \
+  web/src/lib/components/global-search/__tests__/global-search-footer.spec.ts
+git commit -m "feat(web): mode selector footer with segmented radiogroup"
+```
+
+**Note:** i18n keys `cmdk_mode_smart`, `cmdk_mode_filename`, `cmdk_mode_description`, `cmdk_mode_ocr`, `cmdk_search_mode`, `cmdk_cycle_mode_hint` are added in Task 18.
 
 ---
 
@@ -2650,7 +2866,8 @@ Trigger component:
   >
     <Icon path={mdiMagnify} size="16" />
     <span class="flex-1 text-left">{$t('cmdk_search')}</span>
-    <span class="font-mono text-[11px]">⌘K</span>
+    <!-- Keybind chip: pill styling per design § Atmosphere line 413 -->
+    <kbd class="rounded-sm border border-gray-200 bg-subtle/60 px-1.5 py-0.5 font-mono text-[11px] font-medium text-gray-500 dark:border-gray-700 dark:text-gray-400">⌘K</kbd>
   </button>
 {/if}
 ```
@@ -2696,6 +2913,16 @@ Edit `+layout.svelte` — register the global bindings and mount:
     {
       shortcut: { ctrl: true, shift: true, key: 'k' },
       onShortcut: () => modalManager.show(SearchFilterModal, {}),
+    },
+    {
+      // Ctrl+/ cycles the palette's search mode — only while the palette is open.
+      shortcut: { ctrl: true, key: '/' },
+      onShortcut: () => {
+        if (!globalSearchManager.isOpen) return;
+        const order: SearchMode[] = ['smart', 'metadata', 'description', 'ocr'];
+        const next = order[(order.indexOf(globalSearchManager.mode) + 1) % order.length];
+        globalSearchManager.setMode(next);
+      },
     },
     // ... existing Ctrl+Shift+M etc ...
   ]}
@@ -2848,7 +3075,194 @@ describe('tag-preview', () => {
 </div>
 ```
 
-Similar pattern for `photo-preview`, `person-preview`, `place-preview` (place preview should render "No photos here yet" when its strip comes back empty).
+`photo-preview.svelte`:
+
+```svelte
+<script lang="ts">
+  import { getAssetMediaUrl } from '$lib/utils';
+  import { AssetMediaSize, type AssetResponseDto } from '@immich/sdk';
+  import { Button } from '@immich/ui';
+  import { t } from 'svelte-i18n';
+  import { goto } from '$app/navigation';
+
+  interface Props { photo: AssetResponseDto; }
+  let { photo }: Props = $props();
+
+  const thumbUrl = $derived(
+    getAssetMediaUrl({ id: photo.id, size: AssetMediaSize.Preview, cacheKey: (photo as { thumbhash?: string }).thumbhash }),
+  );
+  const dateLine = $derived(
+    [photo.exifInfo?.dateTimeOriginal?.slice(0, 10), photo.exifInfo?.city].filter(Boolean).join(' · '),
+  );
+  const cameraLine = $derived(
+    [photo.exifInfo?.make, photo.exifInfo?.fNumber, photo.exifInfo?.exposureTime].filter(Boolean).join(' · '),
+  );
+</script>
+
+<div class="flex h-full flex-col gap-3 p-5">
+  <img
+    src={thumbUrl}
+    alt={photo.originalFileName ?? ''}
+    class="aspect-[4/3] w-full rounded-md object-cover"
+    loading="lazy"
+  />
+  <div class="min-w-0">
+    <div class="truncate text-base font-semibold">{photo.originalFileName}</div>
+    {#if dateLine}
+      <div class="truncate text-xs font-normal text-gray-500 dark:text-gray-400">{dateLine}</div>
+    {/if}
+    {#if cameraLine}
+      <div class="truncate text-xs font-normal text-gray-500 dark:text-gray-400">{cameraLine}</div>
+    {/if}
+  </div>
+  <div class="mt-auto flex gap-2">
+    <Button variant="ghost" size="small" onclick={() => goto(`/photos/${photo.id}`)}>
+      {$t('cmdk_open')}
+    </Button>
+    <!-- "Add to album" deferred to v1.1 — it needs the album picker modal which is out of scope for this PR. -->
+  </div>
+</div>
+```
+
+`person-preview.svelte`:
+
+```svelte
+<script lang="ts">
+  import { getAssetMediaUrl } from '$lib/utils';
+  import { AssetMediaSize, searchAssets, type PersonResponseDto, type AssetResponseDto } from '@immich/sdk';
+  import { t } from 'svelte-i18n';
+
+  interface Props { person: PersonResponseDto & { numberOfAssets?: number }; }
+  let { person }: Props = $props();
+
+  let photos = $state<AssetResponseDto[]>([]);
+  let loaded = $state(false);
+  let generation = 0;
+
+  const thumbUrl = $derived(
+    person.faceAssetId ? getAssetMediaUrl({ id: person.faceAssetId, size: AssetMediaSize.Preview }) : '',
+  );
+
+  $effect(() => {
+    const gen = ++generation;
+    const id = person.id;
+    photos = [];
+    loaded = false;
+    const dwell = setTimeout(async () => {
+      const ctrl = new AbortController();
+      try {
+        const response = await searchAssets({ metadataSearchDto: { personIds: [id], size: 4 } }, { signal: ctrl.signal });
+        if (gen !== generation) return;
+        photos = response.assets.items;
+      } catch {
+        // ignored
+      } finally {
+        if (gen === generation) loaded = true;
+      }
+    }, 300);
+    return () => clearTimeout(dwell);
+  });
+</script>
+
+<div class="flex h-full flex-col items-center gap-3 p-5">
+  {#if thumbUrl}
+    <img src={thumbUrl} alt={person.name ?? ''} class="h-[120px] w-[120px] rounded-full object-cover" />
+  {:else}
+    <div class="h-[120px] w-[120px] rounded-full bg-subtle/40"></div>
+  {/if}
+  <div class="text-center">
+    <div class="text-lg font-semibold">{person.name || $t('cmdk_unnamed_person')}</div>
+    {#if person.numberOfAssets !== undefined}
+      <div class="text-xs font-normal text-gray-500 dark:text-gray-400">{person.numberOfAssets} photos</div>
+    {/if}
+  </div>
+  {#if loaded && photos.length > 0}
+    <div class="mt-2 flex gap-2">
+      {#each photos as photo (photo.id)}
+        <img
+          src={getAssetMediaUrl({ id: photo.id, size: AssetMediaSize.Thumbnail })}
+          alt=""
+          class="h-12 w-12 rounded-md object-cover"
+        />
+      {/each}
+    </div>
+  {/if}
+</div>
+```
+
+`place-preview.svelte`:
+
+The design calls for a static map tile, but **Gallery does not ship a static-map-tile helper** (no OSM static API caller, no Leaflet-to-image helper). Mounting a full Leaflet instance per cursor move would cost real performance. **v1 drops the map tile and renders the recent-photos strip + place name only.** v1.1 can add a static map when we decide on a tile source (OpenStreetMap's static tile API or a Mapbox static image endpoint).
+
+```svelte
+<script lang="ts">
+  import { getAssetMediaUrl } from '$lib/utils';
+  import { AssetMediaSize, searchAssets, type PlacesResponseDto, type AssetResponseDto } from '@immich/sdk';
+  import Icon from '$lib/elements/Icon.svelte';
+  import { mdiMapMarker } from '@mdi/js';
+  import { t } from 'svelte-i18n';
+
+  interface Props { place: PlacesResponseDto; }
+  let { place }: Props = $props();
+
+  let photos = $state<AssetResponseDto[]>([]);
+  let loaded = $state(false);
+  let generation = 0;
+
+  $effect(() => {
+    const gen = ++generation;
+    const { latitude, longitude } = place;
+    photos = [];
+    loaded = false;
+    const dwell = setTimeout(async () => {
+      const ctrl = new AbortController();
+      try {
+        // searchAssets with lat/long filters (existing DTO fields)
+        const response = await searchAssets(
+          { metadataSearchDto: { latitude, longitude, size: 4 } },
+          { signal: ctrl.signal },
+        );
+        if (gen !== generation) return;
+        photos = response.assets.items;
+      } catch {
+        // ignored
+      } finally {
+        if (gen === generation) loaded = true;
+      }
+    }, 300);
+    return () => clearTimeout(dwell);
+  });
+
+  const subtitle = $derived([place.admin1name, place.countryName].filter(Boolean).join(' · '));
+</script>
+
+<div class="flex h-full flex-col gap-3 p-5">
+  <div class="flex items-center gap-2">
+    <Icon path={mdiMapMarker} size="24" class="text-gray-500 dark:text-gray-400" />
+    <div class="min-w-0 flex-1">
+      <div class="truncate text-base font-semibold">{place.name}</div>
+      {#if subtitle}
+        <div class="truncate text-xs font-normal text-gray-500 dark:text-gray-400">{subtitle}</div>
+      {/if}
+    </div>
+  </div>
+  {#if loaded}
+    {#if photos.length > 0}
+      <div class="flex gap-2">
+        {#each photos as photo (photo.id)}
+          <img
+            src={getAssetMediaUrl({ id: photo.id, size: AssetMediaSize.Thumbnail })}
+            alt=""
+            class="h-12 w-12 rounded-md object-cover"
+          />
+        {/each}
+      </div>
+    {:else}
+      <div class="text-xs text-gray-500 dark:text-gray-400">{$t('cmdk_no_photos_here')}</div>
+    {/if}
+  {/if}
+</div>
+```
 
 Dispatcher:
 
@@ -3059,6 +3473,13 @@ cmdk_open: "Open"
 cmdk_add_to_album: "Add to album"
 cmdk_tag_cache_too_large: "Too many tags to search in-browser — use the Tags page"
 cmdk_nothing_to_preview: "Select a result to preview"
+cmdk_unnamed_person: "Unnamed person"
+cmdk_search_mode: "Search mode"
+cmdk_mode_smart: "Smart"
+cmdk_mode_filename: "Filename"
+cmdk_mode_description: "Description"
+cmdk_mode_ocr: "OCR"
+cmdk_cycle_mode_hint: "cycle mode"
 global_search: "Global search"
 shortcut_open_global_search: "Open global search"
 shortcut_cycle_search_mode: "Cycle search mode"
@@ -3268,9 +3689,10 @@ All green before opening the PR.
 11. feat(web): setMode, cursor identity, Enter capture, ML health promotion
 12. feat(web): cmdk.recent localStorage store with quota-preserving writes
 13. feat(web): row components for global search palette
-14. feat(web): GlobalSearch root + section via @immich/ui Modal
-15. feat(web): wire trigger, global Ctrl+K, and layout mount
-16. feat(web): preview pane with dwell, staleness, empty states
+14. feat(web): GlobalSearch root + section via @immich/ui Modal (two-pane layout, preview mount)
+14b. feat(web): mode selector footer with segmented radiogroup
+15. feat(web): wire trigger, global Ctrl+K, Ctrl+/, and layout mount
+16. feat(web): preview pane with dwell, staleness, empty states (photo/person/place/tag)
 17. feat(web): ML health probe on open + banner
 18. i18n(web): keys for global search palette
 19. test(e2e): global search palette basic flows

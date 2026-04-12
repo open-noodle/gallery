@@ -279,7 +279,7 @@ The preview pane is a pure function of the highlighted row. For each entity type
 - **Place** — static map tile at 240×160 with a 1 px `border-gray-200 dark:border-gray-700` border (reuses existing Gallery map tile source). Place name in GoogleSans 16/600, country in 12/410 subtle. Below: a 4-wide 48×48 recent-photos strip from `searchAssets({ latitude, longitude, size: 4 })`. **When the strip comes back empty** (the global geocoder returned a place the user has zero photos in — see [inherited quirks](#known-quirks-inherited-from-v0)), the preview shows "No photos here yet" in place of the strip and hides the photo count, rather than rendering an empty row of gray boxes.
 - **Tag** — a 2×3 grid of 72×72 thumbnails with 8 px gaps from `searchAssets({ tagIds: [tag.id], size: 6 })`. Tag name in GoogleSans 16/600 with a 8×8 rounded color dot prefix (tag's stored color). Empty state same as Place — "No photos tagged yet" in place of the grid.
 
-**Preview staleness handling.** Each preview has its own `AbortController`, separate from the batch controller. When the active item changes or the query changes or the palette closes, the current preview's controller is aborted and a new one is created (if still relevant). A late-arriving response for a stale item is discarded via a generation counter check. The preview render is deferred **300 ms after cursor stop** — quickly cursoring past a row doesn't fire content fetches. Below 640 px viewport the preview pane is hidden entirely and no preview fetches happen.
+**Preview staleness handling.** Each preview has its own `AbortController`, separate from the batch controller. When the active item changes or the query changes or the palette closes, the current preview's controller is aborted and a new one is created (if still relevant). A late-arriving response for a stale item is discarded via a generation counter check. The preview render is deferred **300 ms after cursor stop** — quickly cursoring past a row doesn't fire content fetches. **Below 1024 px viewport the preview pane is hidden entirely** and no preview fetches happen (matches the dimensions table below).
 
 **No-highlight on open.** When the palette opens with nothing highlighted (empty RECENT + empty SUGGESTED + helper-row state), the preview pane renders a neutral "nothing to preview" state: a faded Gallery logo centered in the pane, no metadata, no actions. Auto-highlight (described under [Empty state](#empty-state-no-query-typed)) avoids this state in most real sessions.
 
@@ -356,11 +356,11 @@ The `tracking-wider` uppercase heading pattern matches existing Gallery eyebrows
 
 ### Dimensions
 
-| Viewport    | Palette width                          | Preview pane | Notes                                   |
-| ----------- | -------------------------------------- | ------------ | --------------------------------------- |
-| ≥ 1024 px   | **767 px** (`max-w-(--breakpoint-md)`) | 280 px right | Matches @immich/ui Modal `large` width  |
-| 640–1023 px | **639 px** (`max-w-(--breakpoint-sm)`) | hidden       | Matches @immich/ui Modal `medium` width |
-| < 640 px    | full − 16 px                           | hidden       | Mobile / small laptop                   |
+| Viewport    | Palette width                                                    | Preview pane | Notes                 |
+| ----------- | ---------------------------------------------------------------- | ------------ | --------------------- |
+| ≥ 1024 px   | **767 px** (Modal `size="large"` → `md:max-w-(--breakpoint-md)`) | 280 px right | Two-pane layout       |
+| 768–1023 px | **767 px** (same Modal constraint, preview hidden)               | hidden       | List-only             |
+| < 768 px    | full − 16 px margin (Modal's native responsive width)            | hidden       | Mobile / small tablet |
 
 Snapping to the @immich/ui Modal size tokens avoids introducing a bespoke width convention — the palette is one size up from `SearchFilterModal` and looks like a family member.
 
@@ -381,7 +381,7 @@ Inside the palette:
 
 - **Palette chrome:** `bg-light dark:bg-subtle`. This matches @immich/ui's Modal surface (`Modal.svelte:50`) — not `dark:bg-dark`, which resolves to a near-white color in dark mode (Gallery's dark token is text-colored, not surface-colored).
 - **Hairline border:** `border-gray-200 dark:border-gray-700`.
-- **Elevation:** `shadow-2xl` — matches `SearchHistoryBox.svelte:97`, the nearest floating-surface precedent in Gallery.
+- **Elevation:** inherits from `@immich/ui` Modal (`shadow-sm shadow-primary/20` per `Modal.svelte:50`). Earlier draft proposed `shadow-2xl`; verification showed Modal ships its own lighter shadow, and we accept the inherited value rather than override to keep the palette consistent with every other modal in Gallery.
 - **Backdrop:** `bg-black/30` — **no `backdrop-blur`**. This matches `@immich/ui` Modal's default overlay (`bg-black/30`, zero blur) at `Modal.svelte:118`. Every other Gallery modal uses this treatment; a blurred backdrop here would read as foreign.
 - **Primary accent token:** `primary` (the `@immich/ui` token, not the fork-legacy `immich-primary`). Grep confirms 163 hits for `bg-primary`/`text-primary`/`border-primary` in Gallery code. The "faint tint + accent text" pattern is established at `active-filters-bar.svelte:102`, which uses `bg-primary/10 text-primary` for selected chips — the active row adopts the same mechanic.
 
@@ -390,6 +390,8 @@ Every color goes through Gallery's `@immich/ui` tokens with `dark:` prefixes per
 ### Motion
 
 **All motion drops to instant when `prefers-reduced-motion: reduce` matches.** No exceptions. (Screen-reader `aria-live` announcements still fire — they're not motion.)
+
+**What's inherited vs. what's specified.** Palette enter/exit animation is inherited from `@immich/ui` Modal (which wraps bits-ui Dialog) — we do not override these. The values in the table below for Palette enter/exit are aspirational targets; if Modal's defaults match reasonably they stand, otherwise the palette uses whatever Modal ships and we annotate any divergence during the visual QA pass (Task 21). Specific durations we **do** actively set: active-row tint (`transition-colors duration-[80ms] ease-out`), mode selector pill slide (`transition-colors duration-[180ms] ease-out`), and preview swap cross-fade. Skeleton pulse is inherited from Gallery's `Skeleton.svelte` element directly (2 s cubic-bezier(0.4, 0, 0.6, 1) per `Skeleton.svelte:45`).
 
 | Moment                              | Duration | Easing                                  | Detail                                                                                  |
 | ----------------------------------- | -------- | --------------------------------------- | --------------------------------------------------------------------------------------- |
