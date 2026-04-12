@@ -436,18 +436,6 @@ export class PersonService extends BaseService {
       await this.sharedSpaceRepository.deleteAllPersonFaces();
       await this.sharedSpaceRepository.deleteAllPersons();
 
-      // Queue one SharedSpaceFaceMatchAll per face-recognition-enabled space.
-      // handleRecognizeFaces returns early for faces whose personId is already set
-      // (EXIF/manual-sourced), so the normal per-face SharedSpaceFaceMatch path is
-      // skipped for them. Without this explicit re-queue, those faces would vanish
-      // from every space after Force and never come back.
-      const spaceIds = await this.sharedSpaceRepository.getSpaceIdsWithFaceRecognitionEnabled();
-      await this.jobRepository.queueAll(
-        spaceIds.map((spaceId) => ({
-          name: JobName.SharedSpaceFaceMatchAll as const,
-          data: { spaceId },
-        })),
-      );
     } else if (waiting) {
       this.logger.debug(
         `Skipping facial recognition queueing because ${waiting} job${waiting > 1 ? 's are' : ' is'} already queued`,
@@ -473,6 +461,20 @@ export class PersonService extends BaseService {
     }
 
     await this.jobRepository.queueAll(jobs);
+
+    // Queue SharedSpaceFaceMatchAll AFTER recognition jobs so it runs last.
+    // This catches EXIF/manual-sourced faces whose personIds survive
+    // unassignFaces (non-ML source). Queued after recognition jobs so
+    // ML faces have been processed by the per-face space matching path first.
+    if (force) {
+      const spaceIds = await this.sharedSpaceRepository.getSpaceIdsWithFaceRecognitionEnabled();
+      await this.jobRepository.queueAll(
+        spaceIds.map((spaceId) => ({
+          name: JobName.SharedSpaceFaceMatchAll as const,
+          data: { spaceId },
+        })),
+      );
+    }
 
     await this.systemMetadataRepository.set(SystemMetadataKey.FacialRecognitionState, { lastRun });
 
