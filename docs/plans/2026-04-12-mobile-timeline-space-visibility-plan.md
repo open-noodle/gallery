@@ -1954,6 +1954,386 @@ git commit -m "feat(mobile): DriftMapRepository.remote() markers respect shared-
 
 ---
 
+## Task 14.5: Cross-method full permission matrix
+
+**Goal:** The earlier tasks test the full 14-case visibility matrix against `video()` only; `place()`, `map()`, and `DriftMapRepository.remote()` got a smaller method-specific test set. This task adds a parameterized matrix helper and runs the full permission matrix against all four methods, so a regression in the helper cannot silently pass for one method while failing for another.
+
+Also covers three edge cases that didn't fit the video-only matrix:
+
+- Asset in one space with `showInTimeline=true` AND another space with `showInTimeline=false` — visible (OR-branch with showInTimeline=true wins).
+- Member `role='admin'` vs `role='viewer'` — both see with the same rules (role is modification-gated, not visibility-gated).
+- Symmetric `withPartners`: both viewer and partner are members of the same space where a third user's asset lives — visible (viewer's own member row does the work).
+
+**Files:**
+
+- Modify: `mobile/test/infrastructure/repositories/timeline_repository_test.dart`
+- Modify: `mobile/test/infrastructure/repositories/map_repository_test.dart`
+
+**Step 1: Define the parameterized matrix helper**
+
+Inside `main()` at top-level scope (alongside the fixture helpers from Task 6), add:
+
+```dart
+typedef _MatrixCase = ({
+  String name,
+  Future<String> Function() setup, // returns the asset id under test
+  int expectedCount,
+  List<String> userIds,
+  String currentUserId,
+});
+
+/// Returns a list of permission matrix cases. Each case sets up one asset
+/// via [insertAsset] (which must stash method-specific prereqs like exif
+/// city or lat/lng) and returns the asset id. The caller's query runner
+/// then asserts the expected count.
+List<_MatrixCase> _permissionMatrixCases({
+  required Future<void> Function(String assetId, String ownerId) insertAsset,
+}) {
+  Future<String> single(String ownerId, Future<void> Function(String assetId) extra) async {
+    await _insertUser(ownerId);
+    await insertAsset('asset-1', ownerId);
+    await extra('asset-1');
+    return 'asset-1';
+  }
+
+  return <_MatrixCase>[
+    (
+      name: 'M1: owner asset visible',
+      setup: () async {
+        await _insertUser('viewer');
+        await insertAsset('asset-1', 'viewer');
+        return 'asset-1';
+      },
+      expectedCount: 1,
+      userIds: const ['viewer'],
+      currentUserId: 'viewer',
+    ),
+    (
+      name: 'M2: partner asset visible',
+      setup: () async {
+        await _insertUser('viewer');
+        await single('partner', (_) async {});
+      },
+      expectedCount: 1,
+      userIds: const ['viewer', 'partner'],
+      currentUserId: 'viewer',
+    ),
+    (
+      name: 'M3: unrelated user hidden',
+      setup: () async {
+        await _insertUser('viewer');
+        await single('stranger', (_) async {});
+      },
+      expectedCount: 0,
+      userIds: const ['viewer'],
+      currentUserId: 'viewer',
+    ),
+    (
+      name: 'M4: space member showInTimeline=true visible',
+      setup: () async {
+        await _insertUser('viewer');
+        final id = await single('owner', (a) async {
+          await _insertSpace('sp1', 'owner');
+          await _insertMember('sp1', 'viewer', showInTimeline: true);
+          await _linkAssetToSpace('sp1', a);
+        });
+        return id;
+      },
+      expectedCount: 1,
+      userIds: const ['viewer'],
+      currentUserId: 'viewer',
+    ),
+    (
+      name: 'M5: space member showInTimeline=false hidden',
+      setup: () async {
+        await _insertUser('viewer');
+        await single('owner', (a) async {
+          await _insertSpace('sp1', 'owner');
+          await _insertMember('sp1', 'viewer', showInTimeline: false);
+          await _linkAssetToSpace('sp1', a);
+        });
+      },
+      expectedCount: 0,
+      userIds: const ['viewer'],
+      currentUserId: 'viewer',
+    ),
+    (
+      name: 'M6: partner is member, viewer is NOT → hidden',
+      setup: () async {
+        await _insertUser('viewer');
+        await _insertUser('partner');
+        await single('owner', (a) async {
+          await _insertSpace('sp1', 'owner');
+          await _insertMember('sp1', 'partner', showInTimeline: true);
+          await _linkAssetToSpace('sp1', a);
+        });
+      },
+      expectedCount: 0,
+      userIds: const ['viewer', 'partner'],
+      currentUserId: 'viewer',
+    ),
+    (
+      name: 'M7: library-in-space showInTimeline=true visible',
+      setup: () async {
+        await _insertUser('viewer');
+        await _insertUser('owner');
+        await insertAsset('asset-1', 'owner');
+        // Patch libraryId onto the asset after insertAsset (insertAsset is
+        // method-specific and doesn't know about libraryId, so update).
+        await (db.update(db.remoteAssetEntity)..where((t) => t.id.equals('asset-1')))
+            .write(const RemoteAssetEntityCompanion(libraryId: Value('lib-1')));
+        await _insertSpace('sp1', 'owner');
+        await _insertMember('sp1', 'viewer', showInTimeline: true);
+        await _linkLibraryToSpace('sp1', 'lib-1');
+        return 'asset-1';
+      },
+      expectedCount: 1,
+      userIds: const ['viewer'],
+      currentUserId: 'viewer',
+    ),
+    (
+      name: 'M8: library-in-space showInTimeline=false hidden',
+      setup: () async {
+        await _insertUser('viewer');
+        await _insertUser('owner');
+        await insertAsset('asset-1', 'owner');
+        await (db.update(db.remoteAssetEntity)..where((t) => t.id.equals('asset-1')))
+            .write(const RemoteAssetEntityCompanion(libraryId: Value('lib-1')));
+        await _insertSpace('sp1', 'owner');
+        await _insertMember('sp1', 'viewer', showInTimeline: false);
+        await _linkLibraryToSpace('sp1', 'lib-1');
+        return 'asset-1';
+      },
+      expectedCount: 0,
+      userIds: const ['viewer'],
+      currentUserId: 'viewer',
+    ),
+    (
+      name: 'M9: asset in 2 direct spaces counted once',
+      setup: () async {
+        await _insertUser('viewer');
+        await single('owner', (a) async {
+          await _insertSpace('sp1', 'owner');
+          await _insertSpace('sp2', 'owner');
+          await _insertMember('sp1', 'viewer');
+          await _insertMember('sp2', 'viewer');
+          await _linkAssetToSpace('sp1', a);
+          await _linkAssetToSpace('sp2', a);
+        });
+      },
+      expectedCount: 1,
+      userIds: const ['viewer'],
+      currentUserId: 'viewer',
+    ),
+    (
+      name: 'M10: direct + library link on same space counted once',
+      setup: () async {
+        await _insertUser('viewer');
+        await _insertUser('owner');
+        await insertAsset('asset-1', 'owner');
+        await (db.update(db.remoteAssetEntity)..where((t) => t.id.equals('asset-1')))
+            .write(const RemoteAssetEntityCompanion(libraryId: Value('lib-1')));
+        await _insertSpace('sp1', 'owner');
+        await _insertMember('sp1', 'viewer');
+        await _linkAssetToSpace('sp1', 'asset-1');
+        await _linkLibraryToSpace('sp1', 'lib-1');
+        return 'asset-1';
+      },
+      expectedCount: 1,
+      userIds: const ['viewer'],
+      currentUserId: 'viewer',
+    ),
+    (
+      name: 'M11: opposite showInTimeline across two spaces → visible via true branch',
+      setup: () async {
+        await _insertUser('viewer');
+        await _insertUser('owner');
+        await insertAsset('asset-1', 'owner');
+        await (db.update(db.remoteAssetEntity)..where((t) => t.id.equals('asset-1')))
+            .write(const RemoteAssetEntityCompanion(libraryId: Value('lib-1')));
+        await _insertSpace('sp_a', 'owner');
+        await _insertSpace('sp_b', 'owner');
+        await _insertMember('sp_a', 'viewer', showInTimeline: true);
+        await _insertMember('sp_b', 'viewer', showInTimeline: false);
+        await _linkAssetToSpace('sp_a', 'asset-1');
+        await _linkLibraryToSpace('sp_b', 'lib-1');
+        return 'asset-1';
+      },
+      expectedCount: 1,
+      userIds: const ['viewer'],
+      currentUserId: 'viewer',
+    ),
+    (
+      name: 'M12: role=admin sees same as role=viewer',
+      setup: () async {
+        await _insertUser('viewer');
+        await single('owner', (a) async {
+          await _insertSpace('sp1', 'owner');
+          await db.into(db.sharedSpaceMemberEntity).insert(
+                SharedSpaceMemberEntityCompanion.insert(
+                  spaceId: 'sp1',
+                  userId: 'viewer',
+                  role: 'admin',
+                  showInTimeline: const Value(true),
+                ),
+              );
+          await _linkAssetToSpace('sp1', a);
+        });
+      },
+      expectedCount: 1,
+      userIds: const ['viewer'],
+      currentUserId: 'viewer',
+    ),
+    (
+      name: 'M13: viewer + partner both members of same space → visible once',
+      setup: () async {
+        await _insertUser('viewer');
+        await _insertUser('partner');
+        await single('owner', (a) async {
+          await _insertSpace('sp1', 'owner');
+          await _insertMember('sp1', 'viewer', showInTimeline: true);
+          await _insertMember('sp1', 'partner', showInTimeline: true);
+          await _linkAssetToSpace('sp1', a);
+        });
+      },
+      expectedCount: 1,
+      userIds: const ['viewer', 'partner'],
+      currentUserId: 'viewer',
+    ),
+  ];
+}
+
+void _runPermissionMatrix({
+  required String methodName,
+  required Future<void> Function(String assetId, String ownerId) insertAsset,
+  required Future<int> Function(List<String> userIds, String currentUserId) count,
+}) {
+  for (final tc in _permissionMatrixCases(insertAsset: insertAsset)) {
+    test('$methodName — ${tc.name}', () async {
+      await tc.setup();
+      final got = await count(tc.userIds, tc.currentUserId);
+      expect(got, tc.expectedCount, reason: 'matrix case: ${tc.name}');
+    });
+  }
+}
+```
+
+**Step 2: Add the 4 matrix invocations**
+
+Inside `main()`, after the existing per-method groups:
+
+```dart
+group('Cross-method permission matrix — video()', () {
+  _runPermissionMatrix(
+    methodName: 'video',
+    insertAsset: (assetId, ownerId) =>
+        _insertVideo(assetId, ownerId, type: AssetType.video),
+    count: (userIds, currentUserId) async {
+      final buckets = await sut.video(userIds, currentUserId, GroupAssetsBy.day).bucketSource().first;
+      return buckets.fold<int>(0, (sum, b) => sum + (b as TimeBucket).assetCount);
+    },
+  );
+});
+
+group('Cross-method permission matrix — place()', () {
+  _runPermissionMatrix(
+    methodName: 'place',
+    insertAsset: (assetId, ownerId) async {
+      await _insertVideo(assetId, ownerId, type: AssetType.image);
+      await db
+          .into(db.remoteExifEntity)
+          .insert(RemoteExifEntityCompanion.insert(assetId: assetId, city: const Value('Paris')));
+    },
+    count: (userIds, currentUserId) async {
+      final buckets = await sut.place('Paris', userIds, currentUserId, GroupAssetsBy.day).bucketSource().first;
+      return buckets.fold<int>(0, (sum, b) => sum + (b as TimeBucket).assetCount);
+    },
+  );
+});
+
+group('Cross-method permission matrix — map()', () {
+  final bounds = LatLngBounds(
+    southwest: const LatLng(-89, -179),
+    northeast: const LatLng(89, 179),
+  );
+  _runPermissionMatrix(
+    methodName: 'map',
+    insertAsset: (assetId, ownerId) async {
+      await _insertVideo(assetId, ownerId, type: AssetType.image);
+      await db.into(db.remoteExifEntity).insert(
+            RemoteExifEntityCompanion.insert(
+              assetId: assetId,
+              latitude: const Value(48.85),
+              longitude: const Value(2.35),
+            ),
+          );
+    },
+    count: (userIds, currentUserId) async {
+      final buckets = await sut
+          .map(userIds, currentUserId, TimelineMapOptions(bounds: bounds), GroupAssetsBy.day)
+          .bucketSource()
+          .first;
+      return buckets.fold<int>(0, (sum, b) => sum + (b as TimeBucket).assetCount);
+    },
+  );
+});
+```
+
+For the marker matrix, put it in `map_repository_test.dart` (since `DriftMapRepository` lives there):
+
+```dart
+group('Cross-method permission matrix — DriftMapRepository.remote() markers', () {
+  final bounds = LatLngBounds(
+    southwest: const LatLng(-89, -179),
+    northeast: const LatLng(89, 179),
+  );
+  _runPermissionMatrix(
+    methodName: 'marker',
+    insertAsset: (assetId, ownerId) async {
+      await _insertVideo(assetId, ownerId, type: AssetType.image);
+      await db.into(db.remoteExifEntity).insert(
+            RemoteExifEntityCompanion.insert(
+              assetId: assetId,
+              latitude: const Value(48.85),
+              longitude: const Value(2.35),
+            ),
+          );
+    },
+    count: (userIds, currentUserId) async {
+      final markers = await mapSut
+          .remote(userIds, currentUserId, TimelineMapOptions(bounds: bounds))
+          .markerSource(bounds);
+      return markers.length;
+    },
+  );
+});
+```
+
+Note: `_permissionMatrixCases` and `_runPermissionMatrix` need to be accessible from BOTH test files. Either duplicate them (cheap, each file has its own `db` + helpers) or extract them to a shared `_test_matrix.dart` file. For simplicity during subagent-driven execution, **duplicate** them — each file is already independent.
+
+**Step 3: Run the matrix tests**
+
+```bash
+cd mobile && flutter test test/infrastructure/repositories/timeline_repository_test.dart --plain-name "Cross-method permission matrix"
+cd mobile && flutter test test/infrastructure/repositories/map_repository_test.dart --plain-name "Cross-method permission matrix"
+```
+
+Expected: all 52 cases (13 × 4 methods) PASS. If any fails, identify the method and branch that regressed — the failure message includes `matrix case: <case name>`.
+
+**Step 4: Commit**
+
+```bash
+git add mobile/test/infrastructure/repositories/timeline_repository_test.dart mobile/test/infrastructure/repositories/map_repository_test.dart
+git commit -m "test(mobile): cross-method permission matrix for shared-space visibility
+
+Runs 13 permission cases (owner, partner, stranger, space member
+variants, library-in-space variants, dedup, cross-branch opposites,
+role-admin, symmetric-partner-member) against all four affected
+methods: video(), place(), map(), and DriftMapRepository.remote()."
+```
+
+---
+
 ## Task 15: Full test suite sweep
 
 **Goal:** Run all mobile tests to catch any regressions in adjacent code paths.
@@ -1988,6 +2368,8 @@ git commit -m "chore(mobile): clean up lint warnings from timeline space fix"
 ## Task 16: Manual smoke test
 
 **Goal:** Exercise the four query paths in a running dev build to confirm end-to-end behavior.
+
+> **Autonomous execution note:** If running this plan in a subagent-driven / unattended workflow, **SKIP this task**. The ~70 unit tests (matrix + method-specific + reactivity) plus `flutter analyze` are enough to ship. Add a line to the PR description stating _"Manual smoke test pending — run `flutter run` locally before merging"_ and move on to Task 17.
 
 **Step 1: Start the dev stack**
 
