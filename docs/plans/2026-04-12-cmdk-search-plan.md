@@ -1616,7 +1616,7 @@ activate(kind: 'photo' | 'person' | 'place' | 'tag', item: any) {
       break;
     case 'person':
       addEntry({ kind: 'person', id: `person:${item.id}`, personId: item.id, label: item.name ?? '', thumbnailAssetId: item.faceAssetId, lastUsed: now });
-      goto(`/people/${item.id}`);
+      goto(Route.viewPerson({ id: item.id }));
       break;
     case 'place':
       addEntry({
@@ -1627,7 +1627,8 @@ activate(kind: 'photo' | 'person' | 'place' | 'tag', item: any) {
         label: item.name ?? '',
         lastUsed: now,
       });
-      goto(`/map?lat=${item.latitude}&lng=${item.longitude}`);
+      // Route.map uses a hash fragment (#zoom/lat/lng), not query params — verified at web/src/lib/route.ts:89.
+      goto(Route.map({ zoom: 12, lat: item.latitude, lng: item.longitude }));
       break;
     case 'tag':
       addEntry({ kind: 'tag', id: `tag:${item.id}`, tagId: item.id, label: item.name ?? '', lastUsed: now });
@@ -1652,8 +1653,8 @@ activateRecent(entry: RecentEntry) {
   // Entity entries: rebuild a synthetic item matching the stored fields and dispatch.
   switch (entry.kind) {
     case 'photo': goto(`/photos/${entry.assetId}`); break;
-    case 'person': goto(`/people/${entry.personId}`); break;
-    case 'place': goto(`/map?lat=${entry.latitude}&lng=${entry.longitude}`); break;
+    case 'person': goto(Route.viewPerson({ id: entry.personId })); break;
+    case 'place': goto(Route.map({ zoom: 12, lat: entry.latitude, lng: entry.longitude })); break;
     case 'tag': goto(Route.search({ tagIds: [entry.tagId] })); break;
   }
   this.close();
@@ -1687,6 +1688,26 @@ private onPhotosSettled() {
   const s = this.sections.photos.status;
   if (s === 'timeout' || s === 'error') this.mlHealthy = false;
 }
+
+/**
+ * Aggregate announcement for the aria-live region in global-search.svelte.
+ * Only produces a string once every enabled provider has settled to avoid
+ * mid-stream torrents (design § Accessibility). Empty string otherwise.
+ */
+announcementText = $derived.by(() => {
+  const s = this.sections;
+  const allSettled =
+    s.photos.status !== 'loading' && s.people.status !== 'loading' &&
+    s.places.status !== 'loading' && s.tags.status !== 'loading';
+  if (!allSettled) return '';
+  const parts: string[] = [];
+  const count = (st: ProviderStatus) => (st.status === 'ok' ? st.total : 0);
+  if (count(s.photos) > 0) parts.push(`${count(s.photos)} photos`);
+  if (count(s.people) > 0) parts.push(`${count(s.people)} people`);
+  if (count(s.places) > 0) parts.push(`${count(s.places)} places`);
+  if (count(s.tags) > 0) parts.push(`${count(s.tags)} tags`);
+  return parts.join(', ');
+});
 
 setMode(newMode: SearchMode) {
   if (newMode === this.mode) return;
@@ -2302,6 +2323,56 @@ describe('global-search root', () => {
     await vi.waitFor(() => expect(m.activeItemId).toBe('photo:a2'), { timeout: 500 });
   });
 
+  it('Home jumps to first row, End jumps to last row', async () => {
+    const m = new GlobalSearchManager();
+    (m as any).providers.photos.run = async () => ({
+      status: 'ok',
+      items: [{ id: 'a1' }, { id: 'a2' }, { id: 'a3' }],
+      total: 3,
+    });
+    m.open();
+    render(GlobalSearch, { props: { manager: m } });
+    await user.type(screen.getByRole('combobox'), 'beach');
+    await vi.waitFor(() => expect(m.activeItemId).toBe('photo:a1'));
+    await user.keyboard('{End}');
+    await vi.waitFor(() => expect(m.activeItemId).toBe('photo:a3'));
+    await user.keyboard('{Home}');
+    await vi.waitFor(() => expect(m.activeItemId).toBe('photo:a1'));
+  });
+
+  it('aria-live region renders final aggregate once all providers settle', async () => {
+    const m = new GlobalSearchManager();
+    (m as any).providers.photos.run = async () => ({ status: 'ok', items: [{ id: 'a1' }], total: 42 });
+    (m as any).providers.people.run = async () => ({ status: 'ok', items: [{ id: 'p1' }], total: 5 });
+    (m as any).providers.places.run = async () => ({ status: 'empty' });
+    (m as any).providers.tags.run = async () => ({ status: 'empty' });
+    m.open();
+    const { container } = render(GlobalSearch, { props: { manager: m } });
+    await user.type(screen.getByRole('combobox'), 'beach');
+    await vi.waitFor(() => {
+      const live = container.querySelector('[aria-live="polite"]');
+      expect(live?.textContent ?? '').toMatch(/42 photos.*5 people/);
+    });
+  });
+
+  it('aria-live is empty while any provider is still loading', async () => {
+    const m = new GlobalSearchManager();
+    (m as any).providers.photos.run = () => new Promise(() => {}); // never resolves
+    m.open();
+    const { container } = render(GlobalSearch, { props: { manager: m } });
+    await user.type(screen.getByRole('combobox'), 'beach');
+    const live = container.querySelector('[aria-live="polite"]');
+    expect(live?.textContent).toBe('');
+  });
+
+  it('combobox has maxlength="256"', () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    render(GlobalSearch, { props: { manager: m } });
+    const input = screen.getByRole('combobox') as HTMLInputElement;
+    expect(input.maxLength).toBe(256);
+  });
+
   it('Enter on a highlighted photo row calls manager.activate("photo", item)', async () => {
     const m = new GlobalSearchManager();
     (m as any).providers.photos.run = async () => ({
@@ -2427,7 +2498,11 @@ describe('global-search root', () => {
         <div class="px-3 py-2 text-xs text-gray-500 dark:text-gray-400">{$t('cmdk_slow_results')}</div>
       {:else if status.status === 'error'}
         <div class="px-3 py-2 text-xs text-gray-500 dark:text-gray-400">
-          {$t('cmdk_couldnt_load', { values: { entity: heading } })}
+          {#if status.message === 'tag_cache_too_large'}
+            {$t('cmdk_tag_cache_too_large')}
+          {:else}
+            {$t('cmdk_couldnt_load', { values: { entity: heading } })}
+          {/if}
         </div>
       {/if}
     </Command.GroupItems>
@@ -2476,10 +2551,25 @@ import Skeleton from '$lib/elements/Skeleton.svelte';
       }
       manager.close();
       e.preventDefault();
+      return;
     }
     if (e.ctrlKey && e.key === 'k') {
       manager.close();
       e.preventDefault();
+      return;
+    }
+    // Home / End: jump cursor to first / last item. Bits-UI Command.Item does not
+    // handle these natively; we query the rendered Command.Item elements and set
+    // the manager's active id to the first/last one so the selection bridge fires.
+    if (e.key === 'Home' || e.key === 'End') {
+      const items = document.querySelectorAll<HTMLElement>('[cmdk-item]');
+      if (items.length === 0) return;
+      const target = e.key === 'Home' ? items[0] : items[items.length - 1];
+      const value = target.getAttribute('data-value');
+      if (value) {
+        manager.setActiveItem(value);
+        e.preventDefault();
+      }
     }
   }
 
@@ -2503,6 +2593,8 @@ import Skeleton from '$lib/elements/Skeleton.svelte';
     children. We mirror selectedValue → manager.activeItemId via $effect.
   - `shouldFilter={false}`: results come from the server, not from Command's built-in filter.
 -->
+<!-- Task 14 ships the single-pane version. Task 14b amends this template to add
+     the footer. Task 16 amends it again to add the two-pane preview layout. -->
 <Modal
   size="large"
   closeOnEsc={false}
@@ -2519,7 +2611,6 @@ import Skeleton from '$lib/elements/Skeleton.svelte';
       aria-labelledby="global-search-label"
       class="flex flex-col"
     >
-      <!-- Input row (always full-width of the palette) -->
       <Command.Input
         bind:value={inputValue}
         placeholder={$t('cmdk_placeholder')}
@@ -2528,68 +2619,55 @@ import Skeleton from '$lib/elements/Skeleton.svelte';
         class="w-full border-b border-gray-200 bg-transparent px-4 py-3 text-sm focus:outline-none dark:border-gray-700"
       />
 
-      <!-- Two-pane body: list (left) + preview pane (right, ≥ 1024 px only) -->
-      <div class="flex flex-1 min-h-[420px]">
-        <!-- LIST PANE -->
-        <div class="flex flex-1 flex-col {showPreview ? 'border-r border-gray-200 dark:border-gray-700' : ''}">
-          <!-- ML banner lives inside the list pane, visually nested under the photos section (design § ML health). -->
-          {#if manager.mode === 'smart' && !manager.mlHealthy && inputValue.trim() !== ''}
-            <div class="mx-3 mt-3 rounded-md bg-subtle/60 px-3 py-2 text-xs">
-              {$t('cmdk_smart_unavailable')}
-              <button type="button" onclick={() => manager.setMode('metadata')} class="ml-2 text-primary transition-colors duration-[80ms] ease-out">
-                {$t('cmdk_try_filename')}
-              </button>
+      <!-- ML banner sits inside the list area, above the result list (design § ML health rendering). -->
+      {#if manager.mode === 'smart' && !manager.mlHealthy && inputValue.trim() !== ''}
+        <div class="mx-3 mt-3 rounded-md bg-subtle/60 px-3 py-2 text-xs">
+          {$t('cmdk_smart_unavailable')}
+          <button type="button" onclick={() => manager.setMode('metadata')} class="ml-2 text-primary transition-colors duration-[80ms] ease-out">
+            {$t('cmdk_try_filename')}
+          </button>
+        </div>
+      {/if}
+
+      <Command.List class="min-h-[420px] max-h-[60vh] flex-1 overflow-y-auto py-2">
+        {#if inputValue.trim() === ''}
+          <!-- Empty state: RECENT if entries exist, else helper row. SUGGESTED is in design § Non-goals. -->
+          {#if recentEntries.length > 0}
+            <Command.Group>
+              <Command.GroupHeading class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                {$t('cmdk_recent_heading')}
+              </Command.GroupHeading>
+              <Command.GroupItems>
+                {#each recentEntries as entry (entry.id)}
+                  <Command.Item value={entry.id} onSelect={() => manager.activateRecent(entry)}>
+                    <RecentRow {entry} />
+                  </Command.Item>
+                {/each}
+              </Command.GroupItems>
+            </Command.Group>
+          {:else}
+            <div class="p-6 text-center text-[13px] font-normal text-gray-500 dark:text-gray-400">
+              {$t('cmdk_helper')}
             </div>
           {/if}
-
-          <Command.List class="flex-1 overflow-y-auto py-2">
-            {#if inputValue.trim() === ''}
-              <!-- Empty state: RECENT section if entries exist, else helper row. SUGGESTED deferred to v1.1. -->
-              {#if recentEntries.length > 0}
-                <Command.Group>
-                  <Command.GroupHeading class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                    {$t('cmdk_recent_heading')}
-                  </Command.GroupHeading>
-                  <Command.GroupItems>
-                    {#each recentEntries as entry (entry.id)}
-                      <Command.Item value={entry.id} onSelect={() => manager.activateRecent(entry)}>
-                        <RecentRow {entry} />
-                      </Command.Item>
-                    {/each}
-                  </Command.GroupItems>
-                </Command.Group>
-              {:else}
-                <div class="p-6 text-center text-[13px] font-normal text-gray-500 dark:text-gray-400">
-                  {$t('cmdk_helper')}
-                </div>
-              {/if}
-            {:else}
-              <GlobalSearchSection heading={$t('cmdk_photos_heading')} status={manager.sections.photos} idPrefix="photo" onActivate={(item) => manager.activate('photo', item)}>
-                {#snippet renderRow(item)}<PhotoRow {item} />{/snippet}
-              </GlobalSearchSection>
-              <GlobalSearchSection heading={$t('cmdk_people_heading')} status={manager.sections.people} idPrefix="person" onActivate={(item) => manager.activate('person', item)}>
-                {#snippet renderRow(item)}<PersonRow {item} />{/snippet}
-              </GlobalSearchSection>
-              <GlobalSearchSection heading={$t('cmdk_places_heading')} status={manager.sections.places} idPrefix="place" onActivate={(item) => manager.activate('place', item)}>
-                {#snippet renderRow(item)}<PlaceRow {item} />{/snippet}
-              </GlobalSearchSection>
-              <GlobalSearchSection heading={$t('cmdk_tags_heading')} status={manager.sections.tags} idPrefix="tag" onActivate={(item) => manager.activate('tag', item)}>
-                {#snippet renderRow(item)}<TagRow {item} />{/snippet}
-              </GlobalSearchSection>
-            {/if}
-          </Command.List>
-        </div>
-
-        <!-- PREVIEW PANE — mounted only at ≥ 1024 px -->
-        {#if showPreview}
-          <div data-cmdk-preview class="w-[280px] shrink-0 overflow-y-auto">
-            <GlobalSearchPreview activeItem={manager.getActiveItem()} />
-          </div>
+        {:else}
+          <GlobalSearchSection heading={$t('cmdk_photos_heading')} status={manager.sections.photos} idPrefix="photo" onActivate={(item) => manager.activate('photo', item)}>
+            {#snippet renderRow(item)}<PhotoRow {item} />{/snippet}
+          </GlobalSearchSection>
+          <GlobalSearchSection heading={$t('cmdk_people_heading')} status={manager.sections.people} idPrefix="person" onActivate={(item) => manager.activate('person', item)}>
+            {#snippet renderRow(item)}<PersonRow {item} />{/snippet}
+          </GlobalSearchSection>
+          <GlobalSearchSection heading={$t('cmdk_places_heading')} status={manager.sections.places} idPrefix="place" onActivate={(item) => manager.activate('place', item)}>
+            {#snippet renderRow(item)}<PlaceRow {item} />{/snippet}
+          </GlobalSearchSection>
+          <GlobalSearchSection heading={$t('cmdk_tags_heading')} status={manager.sections.tags} idPrefix="tag" onActivate={(item) => manager.activate('tag', item)}>
+            {#snippet renderRow(item)}<TagRow {item} />{/snippet}
+          </GlobalSearchSection>
         {/if}
-      </div>
+      </Command.List>
 
-      <!-- Footer: mode selector (see Task 14b) -->
-      <GlobalSearchFooter {manager} />
+      <!-- aria-live region announces final aggregate once all enabled providers settle (design § Accessibility). -->
+      <div aria-live="polite" aria-atomic="true" class="sr-only">{manager.announcementText}</div>
     </Command.Root>
   {/snippet}
 </Modal>
@@ -2602,17 +2680,15 @@ import Skeleton from '$lib/elements/Skeleton.svelte';
 ```ts
 import { getEntries, type RecentEntry } from '$lib/stores/cmdk-recent';
 import RecentRow from './rows/recent-row.svelte';
-import GlobalSearchPreview from './global-search-preview.svelte';
-import GlobalSearchFooter from './global-search-footer.svelte'; // Task 14b
-import { mediaQueryManager } from '$lib/managers/media-query-manager.svelte'; // existing — grep for real import
+// NOTE: GlobalSearchFooter (Task 14b) and GlobalSearchPreview (Task 16) are
+// NOT imported here in Task 14's initial commit. Task 14 ships a single-pane
+// palette with no footer. Task 14b amends global-search.svelte to import and
+// mount the footer. Task 16 amends it again to import GlobalSearchPreview,
+// add the two-pane layout, and render the preview pane at ≥ 1024 px. Each
+// task's diff is additive and each intermediate commit typechecks cleanly.
 
 let selectedValue = $state<string>('');
 const recentEntries = $derived<RecentEntry[]>(inputValue.trim() === '' ? getEntries() : []);
-
-// Two-pane layout is only at ≥ 1024 px. Grep Gallery for the established breakpoint helper
-// (media-query-manager.svelte.ts or $lib/utils/media-query.ts) and use it rather than
-// inventing a new matchMedia listener.
-const showPreview = $derived(mediaQueryManager.isLg ?? false);
 
 // Bridge Command.Root selection state into manager.activeItemId so
 // the manager-side cursor stays in sync with bits-ui's internal selection.
@@ -2662,6 +2738,7 @@ git commit -m "feat(web): GlobalSearch root + section via @immich/ui Modal"
 
 - Create: `web/src/lib/components/global-search/global-search-footer.svelte`
 - Create: `web/src/lib/components/global-search/__tests__/global-search-footer.spec.ts`
+- Modify: `web/src/lib/components/global-search/global-search.svelte` — add the import and mount the footer at the bottom of `<Command.Root>`
 
 **Context:** The palette footer is a segmented control letting the user switch between Smart / Filename / Description / OCR without leaving the palette. Per the design, the mode label uses GoogleSansCode (11 px / 500 / uppercase / tabular). The selected pill slides 180 ms on change. Mode persists to `searchQueryType` localStorage (handled by `manager.setMode()` in Task 11). `Ctrl+/` keyboard shortcut is registered in Task 15's `+layout.svelte`.
 
@@ -2764,6 +2841,21 @@ describe('global-search-footer', () => {
 
 **Why radiogroup instead of a button segmented control.** The semantic accessibility is much cleaner: screen readers announce the selected value, keyboard users can use arrow keys natively (`role="radiogroup"` gives you this for free), and `manager.mode` binds symmetrically. The visible styling is the pill slider; the inputs are `sr-only`.
 
+**Mount the footer in `global-search.svelte`.** Add the import and the mount point at the end of `<Command.Root>` (right after the `aria-live` region):
+
+```svelte
+<script lang="ts">
+  // ... existing imports ...
+  import GlobalSearchFooter from './global-search-footer.svelte';
+</script>
+
+<!-- ... existing Command.Root children ... -->
+  <Command.List>...</Command.List>
+  <div aria-live="polite" aria-atomic="true" class="sr-only">{manager.announcementText}</div>
+  <GlobalSearchFooter {manager} />
+</Command.Root>
+```
+
 **Step 4: Run — expect pass**
 
 **Step 5: Commit**
@@ -2771,7 +2863,8 @@ describe('global-search-footer', () => {
 ```bash
 cd web && pnpm check && pnpm lint
 git add web/src/lib/components/global-search/global-search-footer.svelte \
-  web/src/lib/components/global-search/__tests__/global-search-footer.spec.ts
+  web/src/lib/components/global-search/__tests__/global-search-footer.spec.ts \
+  web/src/lib/components/global-search/global-search.svelte
 git commit -m "feat(web): mode selector footer with segmented radiogroup"
 ```
 
@@ -2960,8 +3053,41 @@ git commit -m "feat(web): wire trigger, global Ctrl+K, and layout mount"
 - Create: `web/src/lib/components/global-search/global-search-preview.svelte`
 - Create: `web/src/lib/components/global-search/previews/{photo,person,place,tag}-preview.svelte`
 - Create: `web/src/lib/components/global-search/__tests__/{photo,person,place,tag}-preview.spec.ts`
+- Modify: `web/src/lib/stores/media-query-manager.svelte.ts` — add a `minLg` getter
+- Modify: `web/src/lib/components/global-search/global-search.svelte` — wrap `Command.List` in a two-pane flex layout and mount `<GlobalSearchPreview>` when `minLg` is true
 
 **Context:** Type-dispatched preview. Each preview has its own dwell timer + AbortController. Empty-state strings for place and tag cover the "user has no photos at this scope" case. Mount only on viewports ≥ 1024 px.
+
+**Breakpoint helper.** Gallery's `media-query-manager.svelte.ts` at `web/src/lib/stores/` (verified) exposes `pointerCoarse`, `maxMd`, `isFullSidebar`, `reducedMotion` — none gives "≥ 1024 px." Add a `minLg` getter to the same file so the palette doesn't invent a bespoke listener:
+
+```ts
+// web/src/lib/stores/media-query-manager.svelte.ts
+import { MediaQuery } from 'svelte/reactivity';
+
+const pointerCoarse = new MediaQuery('pointer:coarse');
+const maxMd = new MediaQuery('max-width: 767px');
+const sidebar = new MediaQuery('min-width: 850px');
+const reducedMotion = new MediaQuery('prefers-reduced-motion: reduce');
+const minLg = new MediaQuery('min-width: 1024px'); // NEW
+
+export const mediaQueryManager = {
+  get pointerCoarse() {
+    return pointerCoarse.current;
+  },
+  get maxMd() {
+    return maxMd.current;
+  },
+  get isFullSidebar() {
+    return sidebar.current;
+  },
+  get reducedMotion() {
+    return reducedMotion.current;
+  },
+  get minLg() {
+    return minLg.current;
+  }, // NEW
+};
+```
 
 **Step 1: Write failing tests** (sample — `tag-preview`):
 
@@ -3217,9 +3343,18 @@ The design calls for a static map tile, but **Gallery does not ship a static-map
     const dwell = setTimeout(async () => {
       const ctrl = new AbortController();
       try {
-        // searchAssets with lat/long filters (existing DTO fields)
+        // MetadataSearchDto has no latitude/longitude — only city/state/country.
+        // Use the geocoder's place name to filter. Pass state and country as
+        // disambiguation for cities with repeated names (Springfield, Paris, etc.).
         const response = await searchAssets(
-          { metadataSearchDto: { latitude, longitude, size: 4 } },
+          {
+            metadataSearchDto: {
+              city: place.name,
+              state: place.admin1name ?? undefined,
+              country: place.countryName ?? undefined,
+              size: 4,
+            },
+          },
           { signal: ctrl.signal },
         );
         if (gen !== generation) return;
@@ -3295,7 +3430,39 @@ Dispatcher:
 {/if}
 ```
 
-Mount `<GlobalSearchPreview>` in `global-search.svelte` only when the viewport ≥ 1024 px. Grep `web/src/lib/managers/media-query-manager.svelte.ts` (or similar) for the existing Gallery breakpoint helper — don't invent one.
+**Amend `global-search.svelte` to mount the preview pane at ≥ 1024 px** (using the `minLg` getter added above in step 1). This is the second modification of `global-search.svelte` in the task sequence — Task 14b already added the footer import and mount.
+
+Import additions:
+
+```ts
+import GlobalSearchPreview from './global-search-preview.svelte';
+import { mediaQueryManager } from '$lib/stores/media-query-manager.svelte';
+
+const showPreview = $derived(mediaQueryManager.minLg);
+```
+
+Wrap `Command.List` (and the ML banner above it) in a flex container so the preview pane lives as a sibling to the list:
+
+```svelte
+<!-- Replace Task 14's single-column body with a two-pane flex -->
+<div class="flex flex-1 min-h-[420px]">
+  <div class="flex flex-1 flex-col {showPreview ? 'border-r border-gray-200 dark:border-gray-700' : ''}">
+    {#if manager.mode === 'smart' && !manager.mlHealthy && inputValue.trim() !== ''}
+      <!-- ML banner (unchanged from Task 14) -->
+    {/if}
+    <Command.List class="flex-1 overflow-y-auto py-2">
+      <!-- ... unchanged sections ... -->
+    </Command.List>
+  </div>
+  {#if showPreview}
+    <div data-cmdk-preview class="w-[280px] shrink-0 overflow-y-auto">
+      <GlobalSearchPreview activeItem={manager.getActiveItem()} />
+    </div>
+  {/if}
+</div>
+```
+
+The `aria-live` region and `<GlobalSearchFooter {manager} />` stay siblings of the flex container inside `Command.Root`.
 
 **Additional test to add to `global-search.spec.ts`:**
 
@@ -3327,7 +3494,9 @@ it('preview pane does not mount below 1024 px', () => {
 cd web && pnpm check && pnpm lint
 git add web/src/lib/components/global-search/previews/ \
   web/src/lib/components/global-search/global-search-preview.svelte \
-  web/src/lib/components/global-search/__tests__/
+  web/src/lib/components/global-search/global-search.svelte \
+  web/src/lib/components/global-search/__tests__/ \
+  web/src/lib/stores/media-query-manager.svelte.ts
 git commit -m "feat(web): preview pane with dwell, staleness, empty states"
 ```
 
@@ -3461,7 +3630,6 @@ cmdk_people_heading: "People"
 cmdk_places_heading: "Places"
 cmdk_tags_heading: "Tags"
 cmdk_recent_heading: "Recent"
-cmdk_suggested_heading: "Suggested"
 cmdk_see_all: "See all {count}"
 cmdk_smart_unavailable: "Smart search is unavailable"
 cmdk_try_filename: "Try Filename mode"
@@ -3470,7 +3638,6 @@ cmdk_couldnt_load: "Couldn't load {entity} — retry"
 cmdk_no_photos_here: "No photos here yet"
 cmdk_no_tagged_photos: "No photos tagged yet"
 cmdk_open: "Open"
-cmdk_add_to_album: "Add to album"
 cmdk_tag_cache_too_large: "Too many tags to search in-browser — use the Tags page"
 cmdk_nothing_to_preview: "Select a result to preview"
 cmdk_unnamed_person: "Unnamed person"

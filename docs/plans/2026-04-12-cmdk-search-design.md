@@ -14,11 +14,15 @@ Replace Gallery's inline header search bar (desktop) with a keyboard-first **glo
 ## Non-goals (v1)
 
 - Albums and Spaces sections — deferred to v1.1
+- **SUGGESTED empty-state section** seeded from `getExploreData()` — deferred to v1.1. v1 ships only RECENT as the empty-state content; when RECENT is empty the palette shows the helper row directly.
+- **Static map tile in place preview** — deferred to v1.1 pending a decision on tile source. v1's place preview shows place name + country + recent-photos strip filtered by city.
+- **Add to album quick action in photo preview** — deferred to v1.1. Needs the album picker modal which is out of scope.
+- **Ctrl+Enter / Cmd+Enter "open in new tab"** — unit-testable coverage isn't possible through `Command.Item.onSelect` (no modifier state exposed). Plan defers assertion to E2E — acceptable but noted.
 - Prefix scoping (`@person`, `#tag`, `/album`, `>command`) — deferred to v1.2
 - Frecency ranking across sections — deferred
 - Bridging `@immich/ui`'s `CommandPaletteDefaultProvider` action registry — deferred to v1.5
 - Context-aware page suggestions (Linear-style) — deferred to v1.5
-- Mobile preview pane — palette opens on mobile tap but no preview below ~640 px
+- Mobile preview pane — palette opens on mobile tap but no preview below ~1024 px
 
 ---
 
@@ -37,7 +41,7 @@ Replace Gallery's inline header search bar (desktop) with a keyboard-first **glo
 Two sections, rendered in this priority:
 
 1. **RECENT** — up to 8 entries from the `localStorage`-backed store `cmdk.recent`. Each entry is either a text query (written when a query is submitted or re-run) or an entity activation (photo / person / place / tag). Entries are mixed, sorted by `lastUsed` desc, displayed top 8 of a max 20. RECENT rows **reuse the same row components** as query-time results — a photo entry in RECENT looks identical to a photo entry in a result section.
-2. **SUGGESTED** — only shown when RECENT is empty. Seeded from `getExploreData()` cached on first palette open. Verified: `getExploreData` returns city-name groupings only (see `search.service.ts:45–51` — no people data), so SUGGESTED shows up to 6 place rows pulled from the largest city buckets.
+2. **SUGGESTED** — _deferred to v1.1_ (see § Non-goals). Would have been seeded from `getExploreData()` showing place rows from the largest city buckets. v1 shows the helper row directly when RECENT is empty.
 
 **Helper-row fall-through.** When RECENT is empty **and** SUGGESTED is also empty (tiny library, no explore data), show a single helper row: **"Start typing — photos, people, places, tags."** When RECENT has entries but SUGGESTED would be empty, show RECENT alone — no helper row.
 
@@ -213,7 +217,7 @@ on setQuery(text):
   abort current batch (if any)
   if text.trim() === '':
     sections[*] = { status: 'idle' }
-    render empty state (RECENT + SUGGESTED fallback)
+    render empty state (RECENT if non-empty, else helper row)
     return
   sections[*] = { status: 'loading' }
   start debounce timer (150 ms)
@@ -550,7 +554,7 @@ Not a plan doc — rough order for when we move to `writing-plans`:
 7. **Row components + section component + palette root** (`Command.Dialog`). Per-component unit tests including `prefers-reduced-motion` and feature-flag gating.
 8. **`GlobalSearchTrigger`** replaces the desktop `<SearchBar />` mount only. `+layout.svelte` registers `Ctrl+K` and re-registers `Ctrl+Shift+K`. **Delete the `Ctrl+K` binding from `search-bar.svelte:246`.** `ShortcutsModal` updated.
 9. **Preview pane components** with generation-counter staleness check, 300 ms dwell, empty-state fallbacks.
-10. **Empty-state sections** — RECENT from `cmdk.recent`, SUGGESTED from cached `getExploreData`, helper row fallback, auto-highlight on open, no-highlight preview state.
+10. **Empty-state wire-up** — RECENT from `cmdk.recent`, helper row fallback when RECENT is empty, auto-highlight on open, no-highlight preview state. (SUGGESTED deferred to v1.1 per Non-goals.)
 11. **ML health client wire-up** — probe on open, retroactive promotion on Photos failure, banner rendering and mode-switch button.
 12. **i18n keys** added and sorted via `pnpm --filter=immich-i18n format:fix`.
 13. **E2E tests** — full flow plus the ML-unhealthy banner case plus feature-flag gating.
