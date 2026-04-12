@@ -89,5 +89,33 @@ Expression<bool> viewerVisibilityPredicate(
   List<String> userIds,
   String currentUserId,
 ) {
-  throw UnimplementedError();
+  final inSpaceAsset = assetTable.id.isInQuery(
+    db.sharedSpaceAssetEntity.selectOnly()
+      ..addColumns([db.sharedSpaceAssetEntity.assetId])
+      ..join([
+        innerJoin(
+          db.sharedSpaceMemberEntity,
+          db.sharedSpaceMemberEntity.spaceId.equalsExp(db.sharedSpaceAssetEntity.spaceId) &
+              db.sharedSpaceMemberEntity.userId.equals(currentUserId) &
+              db.sharedSpaceMemberEntity.showInTimeline.equals(true),
+          useColumns: false,
+        ),
+      ]),
+  );
+
+  final inSpaceLibrary = assetTable.libraryId.isInQuery(
+    db.sharedSpaceLibraryEntity.selectOnly()
+      ..addColumns([db.sharedSpaceLibraryEntity.libraryId])
+      ..join([
+        innerJoin(
+          db.sharedSpaceMemberEntity,
+          db.sharedSpaceMemberEntity.spaceId.equalsExp(db.sharedSpaceLibraryEntity.spaceId) &
+              db.sharedSpaceMemberEntity.userId.equals(currentUserId) &
+              db.sharedSpaceMemberEntity.showInTimeline.equals(true),
+          useColumns: false,
+        ),
+      ]),
+  );
+
+  return assetTable.ownerId.isIn(userIds) | inSpaceAsset | inSpaceLibrary;
 }
