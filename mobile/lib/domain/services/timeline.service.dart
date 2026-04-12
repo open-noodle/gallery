@@ -76,7 +76,8 @@ class TimelineFactory {
   TimelineService video(List<String> userIds, String currentUserId) =>
       TimelineService(_timelineRepository.video(userIds, currentUserId, groupBy));
 
-  TimelineService place(String place) => TimelineService(_timelineRepository.place(place, groupBy));
+  TimelineService place(String place, List<String> userIds, String currentUserId) =>
+      TimelineService(_timelineRepository.place(place, userIds, currentUserId, groupBy));
 
   TimelineService person(String userId, String personId) =>
       TimelineService(_timelineRepository.person(userId, personId, groupBy));

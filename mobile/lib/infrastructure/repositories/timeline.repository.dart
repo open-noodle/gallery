@@ -543,7 +543,7 @@ class DriftTimelineRepository extends DriftDatabaseRepository {
     return query.map((row) => row.toDto()).get();
   }
 
-  TimelineQuery place(String place, GroupAssetsBy groupBy) => (
+  TimelineQuery place(String place, List<String> userIds, String currentUserId, GroupAssetsBy groupBy) => (
     bucketSource: () => _watchPlaceBucket(place, groupBy: groupBy),
     assetSource: (offset, count) => _getPlaceBucketAssets(place, offset: offset, count: count),
     origin: TimelineOrigin.place,
