@@ -299,6 +299,36 @@ Hidden people are excluded from the people strip on the space cover, the filter 
 
 When face recognition is enabled and new photos are added, a background job automatically matches detected faces against existing people in the space. If no match is found, a new person entry is created. When face recognition is first enabled on a space that already has photos, all existing photos are processed.
 
+### Why space people counts may differ from Explore
+
+You may notice that the number of people in a shared space is smaller than the number of people shown in your personal **Explore** page, even though every photo in the space contributes its faces. This is expected — space people clustering is more aggressive than personal clustering, by design.
+
+**How personal face recognition works (Explore):**
+
+Face clustering runs per user. For each new face, Gallery finds the nearest existing face in the same user's library and, if they're similar enough, assigns both to the same person. Two people with strong resemblance but no connecting face will stay separate. The algorithm only ever adds — once two personal people exist, Gallery will not automatically merge them.
+
+**How shared space face recognition works:**
+
+Shared spaces have to handle two things the personal pipeline doesn't:
+
+1. **Multiple contributors.** If Alice and Bob are both members of a space, Alice's personal "Dad" and Bob's personal "Dad" are two different people in the personal system (they belong to two different user libraries). In the space, they should appear as one person.
+2. **Per-space naming.** Naming, hiding, and merging in a space must not affect anyone's personal library.
+
+To make that work, the space runs an extra **space-person deduplication pass** after face matching. It compares every pair of space people and merges any two whose representative faces are within the similarity threshold. This pass runs repeatedly until no more merges happen.
+
+The pass is what lets cross-contributor bridging work (one "Dad" instead of two). As a side effect, it also merges look-alikes from a single contributor that the personal clustering had kept separate — so a space with one member's photos will usually show slightly fewer people than that member's Explore page.
+
+**Summary:**
+
+|                         | Personal (Explore)                          | Shared Space                                        |
+| ----------------------- | ------------------------------------------- | --------------------------------------------------- |
+| Clustering threshold    | Same                                        | Same                                                |
+| Scope                   | Per user                                    | Per space                                           |
+| Post-pass consolidation | No                                          | Yes (merges similar people across all contributors) |
+| Result                  | More separate entries, even for look-alikes | Fewer, more consolidated entries                    |
+
+In short: **personal clustering is cautious and keeps things separate; space clustering is opinionated and consolidates to keep the member-facing people list tidy.** Neither is wrong — they optimize for different goals.
+
 ## Space Colors
 
 Each space can have an assigned color, chosen during creation or changed later by the Owner. Colors are used for:

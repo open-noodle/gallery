@@ -215,15 +215,40 @@ export class SharedSpaceService extends BaseService {
     const thumbnailCropY = dto.thumbnailAssetId === undefined ? dto.thumbnailCropY : null;
 
     const existing = await this.sharedSpaceRepository.getById(id);
-    const space = await this.sharedSpaceRepository.update(id, {
-      name: dto.name,
-      description: dto.description,
-      thumbnailAssetId: dto.thumbnailAssetId,
-      thumbnailCropY,
-      color: dto.color,
-      faceRecognitionEnabled: dto.faceRecognitionEnabled,
-      petsEnabled: dto.petsEnabled,
-    });
+
+    // Build update payload with only defined fields — Kysely's .set() with all-undefined
+    // values produces an empty SET clause and a SQL syntax error.
+    const updatePayload: Parameters<typeof this.sharedSpaceRepository.update>[1] = {};
+    if (dto.name !== undefined) {
+      updatePayload.name = dto.name;
+    }
+    if (dto.description !== undefined) {
+      updatePayload.description = dto.description;
+    }
+    if (dto.thumbnailAssetId !== undefined) {
+      updatePayload.thumbnailAssetId = dto.thumbnailAssetId;
+    }
+    if (thumbnailCropY !== undefined) {
+      updatePayload.thumbnailCropY = thumbnailCropY;
+    }
+    if (dto.color !== undefined) {
+      updatePayload.color = dto.color;
+    }
+    if (dto.faceRecognitionEnabled !== undefined) {
+      updatePayload.faceRecognitionEnabled = dto.faceRecognitionEnabled;
+    }
+    if (dto.petsEnabled !== undefined) {
+      updatePayload.petsEnabled = dto.petsEnabled;
+    }
+
+    const space =
+      Object.keys(updatePayload).length > 0 && existing
+        ? await this.sharedSpaceRepository.update(id, updatePayload)
+        : existing;
+
+    if (!space) {
+      throw new BadRequestException('Space not found');
+    }
 
     if (existing) {
       if (dto.name !== undefined && dto.name !== existing.name) {
@@ -850,6 +875,13 @@ export class SharedSpaceService extends BaseService {
     let offset = 0;
 
     while (true) {
+      // Re-check link each batch to handle concurrent unlink
+      const stillLinked = await this.sharedSpaceRepository.hasLibraryLink(job.spaceId, job.libraryId);
+      if (!stillLinked) {
+        this.logger.log(`Library ${job.libraryId} was unlinked from space ${job.spaceId} during sync, stopping`);
+        break;
+      }
+
       const assets = await this.assetRepository.getByLibraryIdWithFaces(job.libraryId, batchSize, offset);
       if (assets.length === 0) {
         break;
@@ -905,6 +937,11 @@ export class SharedSpaceService extends BaseService {
 
     const { machineLearning } = await this.getConfig({ withCache: true });
     const maxDistance = machineLearning.facialRecognition.maxDistance;
+
+    // Repair persons that have faces but lost their representativeFaceId
+    // (e.g., after force-detection reset). Without this, they are invisible
+    // to getSpacePersonsWithEmbeddings due to the INNER JOIN on face_search.
+    await this.sharedSpaceRepository.repairOrphanedRepresentativeFaces(job.spaceId);
 
     const MAX_PASSES = 100;
     let totalMerges = 0;
@@ -969,6 +1006,16 @@ export class SharedSpaceService extends BaseService {
         // Reassign faces and migrate aliases
         await this.sharedSpaceRepository.reassignPersonFacesSafe(source.id, target.id);
         await this.sharedSpaceRepository.migrateAliases(source.id, target.id);
+
+        // Refresh representativeFaceId to a face with a valid embedding from the merged pool
+        const newRepFace = await this.sharedSpaceRepository.getFirstFaceIdForPerson(target.id);
+        if (newRepFace && newRepFace !== target.representativeFaceId) {
+          try {
+            await this.sharedSpaceRepository.updatePerson(target.id, { representativeFaceId: newRepFace });
+          } catch (error) {
+            this.logger.warn(`Dedup: failed to update representativeFaceId for target ${target.id}: ${error}`);
+          }
+        }
 
         // Determine merged properties
         const updates: Partial<{ name: string; isHidden: boolean }> = {};
