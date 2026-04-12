@@ -17,7 +17,7 @@
     type SharedSpacePersonResponseDto,
     type SharedSpaceResponseDto,
   } from '@immich/sdk';
-  import { Button, Icon, IconButton, modalManager, toastManager } from '@immich/ui';
+  import { Button, Icon, IconButton, toastManager } from '@immich/ui';
   import {
     mdiAccountGroupOutline,
     mdiAccountMultipleCheckOutline,
