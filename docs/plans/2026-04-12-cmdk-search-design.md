@@ -1,15 +1,15 @@
 # Design: Cmd/Ctrl+K Multi-Entity Search Palette
 
 **Date:** 2026-04-12
-**Status:** Draft — reviewed by `superpowers:code-reviewer`, blockers fixed
+**Status:** Draft — two review rounds applied (code-reviewer + review-skill audit + Gallery design-language audit)
 **Research:** [`docs/plans/research/2026-04-12-cmdk-search.md`](./research/2026-04-12-cmdk-search.md)
-**Scope:** Web v1 only. Mobile gets a functional palette but no preview pane.
+**Scope:** Web v1. Desktop palette with preview pane; mobile gets the palette without preview.
 
 ---
 
 ## Goal
 
-Replace Gallery's inline header search bar with a keyboard-first **global palette** opened via `Ctrl+K` / `Cmd+K`. The palette returns **mixed entity results** — photos, people, places, tags — in a single view with a right-hand preview pane, streaming results per-section as each backend responds. `/search` remains the depth view for overflow on the Photos section.
+Replace Gallery's inline header search bar (desktop) with a keyboard-first **global palette** opened via `Ctrl+K` / `Cmd+K`. The palette returns **mixed entity results** — photos, people, places, tags — in a single view with a right-hand preview pane on wide viewports, streaming results per-section as each backend responds. `/search` remains the depth view for overflow on the Photos section.
 
 ## Non-goals (v1)
 
@@ -18,7 +18,7 @@ Replace Gallery's inline header search bar with a keyboard-first **global palett
 - Frecency ranking across sections — deferred
 - Bridging `@immich/ui`'s `CommandPaletteDefaultProvider` action registry — deferred to v1.5
 - Context-aware page suggestions (Linear-style) — deferred to v1.5
-- Mobile-native UX — palette opens on mobile tap but no preview pane below ~720 px
+- Mobile preview pane — palette opens on mobile tap but no preview below ~640 px
 
 ---
 
@@ -26,40 +26,48 @@ Replace Gallery's inline header search bar with a keyboard-first **global palett
 
 ### Opening
 
-- `Ctrl+K` / `Cmd+K` toggles the palette globally. When focus is inside a text input, textarea, or contenteditable, the shortcut **still opens the palette** — power users expect `Ctrl+K` to be universally available. If that conflicts with any existing in-editor hotkey we discover during implementation, we'll revisit.
-- The header's inline `<SearchBar />` and its mobile magnify `<IconButton>` counterpart are both replaced by a compact trigger labelled **"Search… ⌘K"** that opens the palette on click/tap. Both replacements live in `navigation-bar.svelte:86–105` and are gated on the existing `featureFlagsManager.value.search` flag — when search is disabled server-side, the trigger hides and the global `Ctrl+K` binding no-ops.
-- On first open after login, a lightweight `GET /ping` probe to the ML server runs in the background (cached for the palette session) to seed the health banner; see [ML health](#ml-health-and-banner) below.
+- **`Ctrl+K` / `Cmd+K`** toggles the palette globally. When focus is inside a text input, textarea, or contenteditable, the shortcut still opens the palette — power users expect `Ctrl+K` to be universally available.
+- **Desktop trigger (≥ 640 px).** The header's inline `<SearchBar grayTheme />` (`navigation-bar.svelte:86–89`) is replaced by a compact **"Search… ⌘K"** button. The existing SearchBar slot spans `hidden w-full max-w-5xl flex-1 tall:ps-0 sm:block` — the new trigger is narrower, which **will visibly reflow the navbar layout**; we keep the trigger left-anchored in the same slot and let the right-side icons float closer, rather than introducing a spacer. Worth showing in PR review.
+- **Mobile entry (< 640 px).** The mobile magnify `<IconButton>` at `navigation-bar.svelte:93–105` currently navigates directly to `Route.search()` via an `href`. We **keep the href-based mobile button unchanged** and mount `<GlobalSearchTrigger />` only in the `sm:block` desktop slot. Mobile users keep their direct link to the full `/search` page; the palette is reachable on mobile by following that link and using the existing inline search there. Rationale: the palette without a preview pane offers mobile users no value over the existing full-page search, and stealing the direct link would be a regression.
+- Both paths are gated on the existing `featureFlagsManager.value.search` flag — when search is disabled server-side, the trigger hides and the global `Ctrl+K` binding is a no-op.
+- **ML health probe.** On first palette open after login, the client fires one `getServerMlHealth()` call (new endpoint — see [ML health](#ml-health-and-banner)) to seed the banner state. Cached for the palette session.
 
 ### Empty state (no query typed)
 
-Two sections, in order, each rendered only if non-empty:
+Two sections, rendered in this priority:
 
-1. **RECENT** — up to 8 entries from a new `localStorage`-backed store `cmdk.recent`. Each entry is either a text query (written when the user hits `Enter` on plain text that matched nothing, or re-ran a prior query) or an entity activation (photo / person / place / tag). Entries are mixed, sorted by `lastUsed` desc, displayed top 8 out of a max 20.
-2. **SUGGESTED** — fallback when RECENT is empty (first-run or cleared). Seeded from `getExploreData()` cached on first palette open. Verified: `getExploreData` returns city-name groupings only (see `search.service.ts:45–51` — no people data), so SUGGESTED shows up to 6 place rows pulled from the largest city buckets. If the user has fewer than 6 places, we show what's available. If the result is still empty (tiny library), we fall back to a single "Start typing — photos, people, places, tags." helper row.
+1. **RECENT** — up to 8 entries from the `localStorage`-backed store `cmdk.recent`. Each entry is either a text query (written when a query is submitted or re-run) or an entity activation (photo / person / place / tag). Entries are mixed, sorted by `lastUsed` desc, displayed top 8 of a max 20. RECENT rows **reuse the same row components** as query-time results — a photo entry in RECENT looks identical to a photo entry in a result section.
+2. **SUGGESTED** — only shown when RECENT is empty. Seeded from `getExploreData()` cached on first palette open. Verified: `getExploreData` returns city-name groupings only (see `search.service.ts:45–51` — no people data), so SUGGESTED shows up to 6 place rows pulled from the largest city buckets.
 
-This collapses what I originally drafted as two separate recent sections. The reason: Gallery's existing `savedSearchTerms` store (`web/src/lib/stores/search.svelte.ts`) is in-memory Svelte `$state`, **not persisted** — it clears on reload and on logout. Seeding from it would give users a section that's usually empty. Writing text queries into `cmdk.recent` alongside entity activations solves both problems with one store.
+**Helper-row fall-through.** When RECENT is empty **and** SUGGESTED is also empty (tiny library, no explore data), show a single helper row: **"Start typing — photos, people, places, tags."** When RECENT has entries but SUGGESTED would be empty, show RECENT alone — no helper row.
+
+**Why one RECENT section, not two.** Gallery's existing `savedSearchTerms` store (`web/src/lib/stores/search.svelte.ts`) is in-memory Svelte `$state`, **not persisted** — it clears on reload and on logout. Writing text queries into `cmdk.recent` alongside entity activations replaces it with something durable.
+
+**Auto-highlight on open.** When the palette opens, the cursor is placed on the **first visible row** so the preview pane has content to render. On a cold open with no RECENT and no SUGGESTED, the helper row is highlighted but the preview pane shows a neutral "nothing to preview yet" state (a faded Gallery logo is fine).
 
 ### Querying
 
-On every input change:
-
-1. **Debounce 150 ms.** The previous pending timer is cancelled.
-2. **Query length < 2** — only the Photos provider fires (CLIP can handle 1-char queries, mostly). People/Places/Tags providers require ≥ 2 chars (pg_trgm trigram similarity below 2 chars almost never clears the 0.5 threshold in `person.repository.ts:getByName`, and place/tag name matches are similarly noisy).
-3. **On debounce fire**, abort the previous batch's `AbortController`, create a new one, and fan out to the enabled providers in parallel. Each provider gets its own signal composed of `AbortSignal.any([batch.signal, AbortSignal.timeout(5000)])`. (`AbortSignal.any` ships in Chrome 116+/Firefox 124+/Safari 17.4+ — adequate for Gallery's target.)
-4. **Skeleton rows** (3 per enabled section) render immediately.
-5. **Results replace skeletons** as each provider resolves.
-6. **Cancellation source matters.** An abort that originates from "new batch" is silent (the stale result is discarded). An abort from the 5 s timeout sets the section to `{ status: 'timeout' }` and shows a "Search is slow — results may be incomplete" row instead of a skeleton.
-7. **"No results" empty state** renders only when _every_ enabled provider has resolved (or timed out / errored) with zero items — never mid-stream.
+1. **Debounce 150 ms.** The previous pending timer is cancelled on new input.
+2. **Input max length 256 characters.** Enforced via `<input maxlength="256">` — prevents pathological pastes, protects the tag-filter hot path.
+3. **`searchQueryType` sanity check.** On load, if the stored mode value isn't one of `'smart' | 'metadata' | 'description' | 'ocr'`, fall back to `'smart'` and overwrite.
+4. **Query length < 2** — only the Photos provider fires. People/Places/Tags providers require ≥ 2 chars (pg_trgm trigram similarity below 2 chars almost never clears the 0.5 threshold in `person.repository.ts:getByName`, and place/tag name matches are similarly noisy).
+5. **On debounce fire**, abort the previous batch's `AbortController`, create a new one, and fan out to the enabled providers in parallel. Each provider gets its own signal composed of `AbortSignal.any([batch.signal, AbortSignal.timeout(5000)])`. (`AbortSignal.any` ships in Chrome 116+/Firefox 124+/Safari 17.4+ — adequate for Gallery's target.)
+6. **Skeleton rows** (3 per enabled section) render immediately.
+7. **Results replace skeletons** as each provider resolves.
+8. **Cancellation source matters.** Silent abort (new batch) → stale result discarded. Timeout abort (5 s) → `{ status: 'timeout' }` with a "Search is slow — results may be incomplete" row.
+9. **"No results" empty state** renders only when _every_ enabled provider has resolved (or timed out / errored) with zero items — never mid-stream.
 
 ### Navigating
 
 - `ArrowDown` / `ArrowUp` move a single cursor across all sections, wrapping at the ends.
-- `Ctrl+N` / `Ctrl+P` — same as arrow keys (Bits UI defaults, free).
+- `Ctrl+N` / `Ctrl+P` — same as arrow keys (Bits UI default, free).
 - `Ctrl+J` and the VIM `Ctrl+K` aliases are **disabled** so `Ctrl+K` only ever means "toggle palette."
 - `Home` / `End` jump to first / last item.
 - Cursor is tracked via `aria-activedescendant` on the combobox input; DOM focus never leaves the input.
 - Per-row hover moves the cursor but does not steal focus.
-- After an in-place re-run (clicking a RECENT text entry), the cursor moves to the first result row so the next arrow press is predictable.
+- After an in-place re-run (clicking a RECENT text entry), the cursor moves to the first result row.
+
+**Cursor identity on out-of-order section resolution.** Typical timing: People/Places/Tags resolve in < 100 ms; Photos (smart search) resolves in 200–600 ms. If the user's cursor has moved to "People row 2" before Photos resolves and Photos then renders 5 rows _above_ People, the cursor **stays on the same item** — identity-tracked by `item.id`, not by positional index. If the tracked id disappears from results (e.g., after a new keystroke), the cursor falls back to the first row of the current top section.
 
 ### Activating
 
@@ -77,16 +85,18 @@ On every input change:
 
 `Ctrl+Enter` / `Cmd+Enter` opens the target in a new tab, skipped for re-runs.
 
-**Only Photos has a "See all" overflow row.** People/Places/Tags cap at top N and don't offer overflow — `/people` is a full face browser with no query-scoped view, `/map` doesn't support place-name search, and `/tags` doesn't support substring filtering in the URL. v1 accepts this; if a user needs deeper browse, they use the relevant dedicated page directly.
+**Enter-vs-late-result race.** The activated item is captured by reference at `Enter` time. If a later provider result has already replaced the item in `sections[*]` before the navigation runs, the capture is still valid and the navigation still happens against the captured item. Only if the cursor-tracked id has been lost entirely (e.g., `Enter` fires after a new keystroke and a fresh batch is mid-flight) does `Enter` no-op and the cursor falls back to the first row of the new results.
 
-Activating any row writes a `RecentEntry` into `cmdk.recent` (trimmed to 20; see [localStorage shape](#localstorage-shape)).
+**Only Photos has a "See all" overflow row.** People/Places/Tags cap at top N and don't offer overflow — `/people` is a full face browser with no query-scoped view, `/map` doesn't support place-name search, and `/tags` doesn't support substring filtering in the URL. If a user needs deeper browse, they use those dedicated pages directly.
+
+Activating any row writes a `RecentEntry` into `cmdk.recent` (trimmed to 20).
 
 ### Closing
 
-- `Esc` first press: clears the input if non-empty; second press: closes the palette (APG two-stage behavior).
+- **`Esc` first press:** clears the input if non-empty; **second press:** closes the palette (APG two-stage behavior).
 - `Ctrl+K` while open: closes.
 - Click outside the modal: closes.
-- **Closing aborts the current batch's `AbortController`** so slow in-flight requests stop consuming server resources.
+- **`close()` aborts the batch controller AND any in-flight preview controller**, clears the debounce timer, **resets `sections[*]` to `{ status: 'idle' }`**, clears the active item, sets `open = false`. On re-open the palette starts from a clean slate — no residual skeletons or stale data from the previous session.
 - After close, DOM focus returns to the element that was focused before the palette opened (standard modal focus restore, provided by Bits UI).
 
 ### Search mode selector
@@ -94,12 +104,10 @@ Activating any row writes a `RecentEntry` into `cmdk.recent` (trimmed to 20; see
 The palette footer shows a segmented control: **Smart · Filename · Description · OCR**.
 
 - Default: **Smart**.
-- Persisted in `localStorage` under the existing key **`searchQueryType`** (used today by `search-bar.svelte:184/196` and `SearchFilterModal.svelte:40/44`). The valid values are `'smart' | 'metadata' | 'description' | 'ocr'` — note that the UI label "Filename" maps to the stored value `'metadata'`. We preserve this mapping so the setting carries across from the old header bar without a migration.
+- Persisted in `localStorage` under the existing key **`searchQueryType`** (used today by `search-bar.svelte:184/196` and `SearchFilterModal.svelte:40/44`). Valid values are `'smart' | 'metadata' | 'description' | 'ocr'` — note that the UI label "Filename" maps to the stored value `'metadata'`. We preserve this mapping so the setting carries across from the old header bar without a migration.
 - `Ctrl+/` cycles forward through modes.
-- Switching mode **aborts the in-flight Photos provider call** and re-runs the Photos provider against the current query with the new mode. People/Places/Tags are untouched. If a debounce is pending when the mode changes, the debounce timer resets and fires with the new mode.
-- Mode affects the **Photos section only**. Smart → `searchSmart`; Filename / Description / OCR → `searchAssets` with the appropriate DTO flags (reuses whatever payload builder the current bar uses in `search-bar.svelte`).
-
-The footer placement risks being missed (users ignore chrome), but `Ctrl+/` + the same muscle-memory location the current bar's dropdown occupies mitigate that.
+- **Switching mode** aborts the in-flight Photos provider call (silent abort) and re-runs Photos against the current query with the new mode. People/Places/Tags keep their current results. **If a debounce is pending** when mode changes, the debounce timer restarts with the new mode — the pending batch will use the new mode consistently across all providers when it fires.
+- Mode affects the **Photos section only**. Smart → `searchSmart`; Filename / Description / OCR → `searchAssets` with appropriate DTO flags (reuses the payload builder from `search-bar.svelte`).
 
 ---
 
@@ -111,7 +119,7 @@ The footer placement risks being missed (users ignore chrome), but `Ctrl+/` + th
 web/src/lib/components/global-search/
   global-search.svelte                 — root palette (Bits UI Command.Dialog wrapper)
   global-search-trigger.svelte         — header button that opens the palette
-  global-search-section.svelte         — one section (heading + items + skeletons + optional "See all")
+  global-search-section.svelte         — one section (heading + items + skeletons + "See all")
   global-search-preview.svelte         — right-hand preview pane (type-dispatched)
   global-search-footer.svelte          — mode selector + keyboard hints
   rows/
@@ -124,40 +132,39 @@ web/src/lib/components/global-search/
     person-preview.svelte
     place-preview.svelte
     tag-preview.svelte
+  __tests__/
+    global-search.spec.ts
+    photo-row.spec.ts + one spec per row component
+    photo-preview.spec.ts + one spec per preview component
 
-web/src/lib/services/global-search.svelte.ts
-  class GlobalSearchService (singleton)
-    — rune-based $state: open, query, mode, sections, activeItemId, mlHealthy, tagsCache
-    — public: open(), close(), toggle(), setQuery(text), setMode(mode), activate(item)
-    — private: runProviders(), abortCurrentBatch(), probeMlHealth()
+web/src/lib/services/
+  global-search.service.svelte.ts      — GlobalSearchService singleton
+  global-search.service.spec.ts        — service unit tests (next to service, per Gallery convention)
+  global-search-provider-tags.spec.ts  — tag provider + client-filter + cache behavior
 
-web/src/lib/stores/cmdk-recent.ts
-  — localStorage-backed store for RecentEntry[]
-  — addEntry, getEntries, clearEntries, migrate
-
-web/src/lib/components/global-search/__tests__/
-  global-search.spec.ts
-  global-search-service.spec.ts
+web/src/lib/stores/
+  cmdk-recent.ts
   cmdk-recent.spec.ts
-  photo-row.spec.ts + one spec per row/preview component
 
 e2e/src/specs/web/global-search.e2e-spec.ts
 ```
 
+`GlobalSearchService` exposes `open()`, `close()`, `toggle()`, `setQuery(text)`, `setMode(mode)`, `activate(item)`. Private: `runProviders()`, `abortCurrentBatch()`, `probeMlHealth()`, `onStorageEvent()`. Rune-based `$state`: `open`, `query`, `mode`, `sections`, `activeItemId`, `mlHealthy`, `tagsCache`, `tagsCacheLoadedAt`.
+
 ### Modified files
 
-- `web/package.json` — add `bits-ui` as a **direct dependency** (pin to the same minor that `@immich/ui` uses; currently `^2.15.7`). It exists in the lockfile as a transitive dep via `@immich/ui`, but it is not hoisted to `web/node_modules` under pnpm's strict hoisting, so `import { Command } from 'bits-ui'` from `web/src` does not resolve without an explicit entry.
-- `web/src/routes/+layout.svelte` — register the global `Ctrl+K` shortcut on `<svelte:document>` (matches the existing `Ctrl+Shift+M` pattern at lines 234–238), mount `<GlobalSearch />` once at the root, and — **important** — re-register `Ctrl+Shift+K` (currently owned by `search-bar.svelte:247`) to open the `SearchFilterModal`. Without this, removing the header `<SearchBar />` would silently delete the `Ctrl+Shift+K` binding.
-- `web/src/lib/components/shared-components/navigation-bar/navigation-bar.svelte` — replace both the desktop `<SearchBar grayTheme />` (line 88) and the mobile magnify `<IconButton>` (lines 93–105) with `<GlobalSearchTrigger />`. The trigger respects the existing `featureFlagsManager.value.search` feature flag and renders nothing when the flag is off.
-- `web/src/lib/modals/ShortcutsModal.svelte` — update the `Ctrl+K` row to describe "Open global search" and add a `Ctrl+/` row for "Cycle search mode." `Ctrl+Shift+K` stays as "Open search filters."
-- `web/src/lib/components/shared-components/search-bar/search-bar.svelte` — **not modified, not deleted.** It continues to back the `/search` depth-view page's own input. Only the header mount is removed.
-- `web/src/lib/stores/search.svelte.ts` — the in-memory `savedSearchTerms` store is left as-is. The palette does not depend on it.
-- `server/src/repositories/machine-learning.repository.ts` — **targeted** AbortSignal fix in `predict()`. The method is called by five different ML tasks (`detectFaces` :223, `encodeImage` :233, `encodeText` :239, `ocr` :250, `detectPets` :260) — a blanket timeout on the shared `predict()` path would add aborts to long-running background jobs. Instead, thread a `{ timeoutMs?: number }` option through `predict(payload, config, { timeoutMs })`, default to no timeout (existing behavior), and set `timeoutMs: 15_000` only at the `encodeText` call site. A small unit test verifies `encodeText` aborts on timeout and the other callers still see no timeout.
-- `server/src/controllers/server-info.controller.ts` (and corresponding service) — add `GET /api/server-info/ml-health` returning `{ smartSearchHealthy: boolean }`, implemented by firing a 2 s `/ping` probe to the configured ML URL. DTO added in `server/src/dtos/server-info.dto.ts`; OpenAPI spec regen + Dart + TypeScript SDK regen per `feedback_openapi_dart_and_sql`.
+- **`web/package.json`** — add `bits-ui` as a direct dependency (pin to the version `@immich/ui` uses, currently `^2.15.7`). It exists in the lockfile transitively but is not hoisted to `web/node_modules` under pnpm's strict hoisting, so `import { Command } from 'bits-ui'` does not resolve without an explicit entry.
+- **`web/src/routes/+layout.svelte`** — register the global `Ctrl+K` shortcut on `<svelte:document>` (matches the `Ctrl+Shift+M` pattern at lines 234–238), mount `<GlobalSearch />` once at the root, and **re-register `Ctrl+Shift+K`** (currently owned by `search-bar.svelte:247`) to open `SearchFilterModal`. Without that re-register, removing the header `<SearchBar />` would silently delete the `Ctrl+Shift+K` binding.
+- **`web/src/lib/components/shared-components/navigation-bar/navigation-bar.svelte`** — replace the desktop `<SearchBar grayTheme />` at line 88 with `<GlobalSearchTrigger />`. **Leave the mobile `<IconButton>` at lines 93–105 unchanged** — mobile users keep their direct `href={Route.search()}` link. Document the navbar-reflow expectation.
+- **`web/src/lib/modals/ShortcutsModal.svelte`** — update the `Ctrl+K` row to "Open global search," add a `Ctrl+/` row for "Cycle search mode." `Ctrl+Shift+K` stays as "Open search filters."
+- **`web/src/lib/components/shared-components/search-bar/search-bar.svelte`** — **delete the document-level `Ctrl+K` binding at line 246** (`{ ctrl: true, key: 'k' } → input?.select()`). The rest of the file is unchanged — it still backs the `/search` depth-view page's own input. Without this deletion, the file's `<svelte:document>` handler would fight the global palette binding whenever the `/search` route is mounted.
+- **`web/src/lib/stores/search.svelte.ts`** — `savedSearchTerms` is left as-is. The palette does not depend on it.
+- **`server/src/repositories/machine-learning.repository.ts`** — **targeted** AbortSignal fix in `predict()`. Called by five ML tasks (`detectFaces` :223, `encodeImage` :233, `encodeText` :239, `ocr` :250, `detectPets` :260). Thread `{ timeoutMs?: number }` through `predict(payload, config, { timeoutMs })`, default to no timeout (existing behavior), set `timeoutMs: 15_000` only at `encodeText`. Unit tests verify `encodeText` aborts on timeout, the other four callers don't, **and that a second caller (e.g. test-only) can pass a different `timeoutMs` to prove the option is truly per-call, not an `encodeText`-only hardcode**.
+- **`server/src/controllers/server-info.controller.ts`** (+ service + `dtos/server-info.dto.ts`) — add `GET /api/server-info/ml-health` returning `{ smartSearchHealthy: boolean }`. See [ML health](#ml-health-and-banner) for auth and caching details. OpenAPI + Dart + TypeScript SDK regen per `feedback_openapi_dart_and_sql`.
 
 ### Libraries
 
-- **Bits UI `Command`** — added directly to `web/package.json` per the note above. Provides `Command.Root`, `Input`, `List`, `Viewport`, `Group`, `GroupHeading`, `GroupItems`, `Item`, `Empty`, `Loading`, `Dialog`, with ARIA combobox wiring. Svelte 5 native.
+- **Bits UI `Command`** — already available transitively via `@immich/ui`. Provides `Command.Root`, `Input`, `List`, `Viewport`, `Group`, `GroupHeading`, `GroupItems`, `Item`, `Empty`, `Loading`, `Dialog`, with ARIA combobox wiring. Svelte 5 native.
 - No new server-side libraries.
 
 ---
@@ -179,18 +186,22 @@ interface Provider<T> {
   key: 'photos' | 'people' | 'places' | 'tags';
   run(query: string, mode: SearchMode, signal: AbortSignal): Promise<ProviderStatus<T>>;
   topN: number;
-  minQueryLength: number; // 1 for photos, 2 for the rest
+  minQueryLength: number;
 }
 ```
 
 ### The four v1 providers
 
-| Provider | SDK call(s)                                           | `topN` | `minQueryLength` | Notes                                                                                                                                                                                                                                                                                              |
-| -------- | ----------------------------------------------------- | ------ | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| photos   | `searchSmart` (mode=smart) or `searchAssets` (others) | 5      | 1                | DTO shape mirrors what `search-bar.svelte` currently builds per mode                                                                                                                                                                                                                               |
-| people   | `searchPerson({ name, withHidden: false })`           | 5      | 2                | Returns matches owned by the current user; the global-faces quirk is inherited from the existing header bar                                                                                                                                                                                        |
-| places   | `searchPlaces({ name })`                              | 3      | 2                | Global geocoder lookup, not user-scoped — inherited quirk. Activating a place can land on an empty map spot; see [open quirks](#known-quirks-inherited-from-v0)                                                                                                                                    |
-| tags     | _client-side filter_ over a cached `getAllTags()`     | 5      | 2                | `getTagSuggestions` has no `name` parameter. On first keystroke we call `getAllTags()` once, cache in the service for the palette session, filter client-side by substring. Assumes < ~10k tags per user. If we exceed that, we add a `name` parameter to the suggestions endpoint as a follow-up. |
+| Provider | SDK call(s)                                         | topN | minLen | Notes                                                                      |
+| -------- | --------------------------------------------------- | ---- | ------ | -------------------------------------------------------------------------- |
+| photos   | `searchSmart` (smart) or `searchAssets` (non-smart) | 5    | 1      | DTO shape mirrors what `search-bar.svelte` currently builds per mode       |
+| people   | `searchPerson({ name, withHidden: false })`         | 5    | 2      | Returns user-owned faces only (inherited quirk)                            |
+| places   | `searchPlaces({ name })`                            | 3    | 2      | Global geocoder lookup, not user-scoped (inherited quirk)                  |
+| tags     | Client-side filter over cached `getAllTags()`       | 5    | 2      | See "Tag provider" below for scope, cache semantics, and the 20 k hard cap |
+
+**Tag provider.** `getTagSuggestions` has no `name` parameter, so on the first keystroke the service calls `getAllTags()` once, caches the result for the palette session, and filters client-side by case-insensitive substring. Scope: `getAllTags()` returns tags the caller owns (does **not** include shared-space-only tags); this mirrors how Gallery's filter-panel tag UI behaves today. **Hard cap:** if `getAllTags()` returns > 20 000 entries, the tag provider disables itself for the session and logs a console warning — the tag section renders an "Too many tags to search in-browser — use the Tags page" helper row. Warning threshold: 5 000 (log only). Above 20 000 the UX degrades to uselessness anyway; a follow-up would add a server-side `name` parameter.
+
+**Cross-tab tag cache invalidation.** The service listens for `window` `storage` events on a known key (`cmdk.tags.version`, bumped by the tag management pages when a tag is created, edited, or deleted). On invalidation, the cache is cleared; the next keystroke re-fetches. This is best-effort — Gallery's current tag pages don't write that key yet, so v1 ships with cache invalidation on palette close/reopen as the baseline, and the follow-up for tag pages bumps the version key.
 
 ### `GlobalSearchService.setQuery(text)` algorithm
 
@@ -228,46 +239,57 @@ on setMode(newMode):
   if newMode === mode: return
   mode = newMode
   persist to localStorage['searchQueryType']
-  if debounce timer pending: clear and restart with current query
-  else: abort photos provider only, re-run photos provider with new mode
-        (people/places/tags keep their current results)
+  if debounce timer pending:
+    // restart the debounce; on fire the new batch uses the new mode
+    clear debounce; start new 150 ms timer
+  else if sections.photos.status in { loading, ok, empty, error, timeout }:
+    abort only the in-flight photos call (if any)
+    signal = new composed signal for photos only
+    photosProvider.run(query, mode, signal).then(...).catch(...)
+    // people/places/tags keep their current results
 
 on close():
   clear pending debounce
-  abort current batch
+  abort current batch controller
+  abort current preview controller (if any)
+  sections[*] = { status: 'idle' }
   clear active item
   open = false
 ```
 
+**Socket.IO isolation.** The service does not subscribe to Socket.IO events. Real-time timeline updates, notifications, and background job events have no effect on palette state. Other subsystems may still react to Socket.IO events; this is intentional isolation.
+
 ### ML health and banner
 
-Because `MachineLearningRepository.isHealthy()` returns `true` unconditionally when `availabilityChecks.enabled` is `false` (see `machine-learning.repository.ts:178–184`), reading the server's `healthyMap` is not a reliable signal. The browser also can't probe the ML container directly — it lives on the internal Docker network. So **we add one small server endpoint**:
+Because `MachineLearningRepository.isHealthy()` returns `true` unconditionally when `availabilityChecks.enabled` is `false` (`machine-learning.repository.ts:178–184`), reading the server's `healthyMap` is not a reliable signal. The browser also can't probe the ML container directly — it lives on the internal Docker network. So we add one small server endpoint:
 
-- **`GET /api/server-info/ml-health`** — new route on the existing `server-info` controller. Handler performs an on-demand `fetch('/ping', { signal: AbortSignal.timeout(2000) })` against the first configured ML URL, returns `{ smartSearchHealthy: boolean }`. No caching on the server side (the palette caches client-side). OpenAPI regen + Dart client regen required per `feedback_openapi_dart_and_sql`.
-- **Palette client:** on first palette open per session, call `getServerMlHealth()` (the new SDK method) once, cache the result for the palette session. If unhealthy, set `mlHealthy = false`.
-- **Retroactive promotion:** the banner is also shown when the Photos provider (mode = Smart) returns `{ status: 'timeout' }` or `{ status: 'error' }` during the session, regardless of the initial probe result. This covers mid-session ML degradation.
-- **Rendering:** when `mlHealthy === false` and `mode === smart`, the Photos section renders a persistent banner: **"Smart search is unavailable — try Filename mode"** with a button that calls `setMode('metadata')`. Switching to any non-Smart mode hides the banner.
-
-Committing to this endpoint now (rather than deferring) avoids scope creep during implementation and ensures first-time Smart searchers get the proactive banner on a broken ML container instead of silently hitting a timeout.
+- **`GET /api/server-info/ml-health`** — new authenticated route on `server-info` controller. Handler performs an on-demand `fetch('/ping', { signal: AbortSignal.timeout(2000) })` against the first configured ML URL. Success criterion: HTTP 2xx **and** response content-type is `application/json` (protects against a reverse proxy returning an HTML error page with 200). Returns `{ smartSearchHealthy: boolean }`.
+- **Auth + rate limiting.** The endpoint requires a valid session (standard `AuthGuard`) — unauthenticated callers would otherwise have a free way to probe the internal ML URL on every request. Server-side caches the probe result for **30 seconds** in-process, with a single-flight guard so concurrent callers share one in-flight probe. This bounds the amplification factor of an authenticated attacker to 1 request per 30 s regardless of client hits.
+- **Client.** On first palette open per session, call `getServerMlHealth()` once, cache for the palette session.
+- **Retroactive promotion.** The banner is also shown when the Photos provider (mode = Smart) returns `timeout` or `error` during the session, regardless of the initial probe. This covers mid-session degradation. Once set, the banner persists across mode switches within the session — switching back to Smart still shows the banner.
+- **Non-Smart failures don't affect the banner.** A Photos `timeout` or `error` in mode = Filename/Description/OCR renders a generic section-level error and does not promote the banner (the banner is Smart-specific messaging).
+- **Rendering.** When `mlHealthy === false` and `mode === smart`, the Photos section renders a persistent banner: **"Smart search is unavailable — try Filename mode"** with a button that calls `setMode('metadata')`. Switching to any non-Smart mode hides the banner visually; the `mlHealthy` flag stays false so switching back to Smart re-shows it.
 
 ### Preview pane
 
 The preview pane is a pure function of the highlighted row. For each entity type:
 
-- **Photo** — thumbnail via `createUrl()` (per `feedback_filter_thumbnail_createUrl` memory — bare paths get intercepted by SvelteKit) at full pane width (~240×180 `object-cover`). Below: filename in GoogleSans 14/500, then a 2-row metadata block in GoogleSans 12/410 / `text-gray-500 dark:text-gray-400`: "March 2024 · Santa Cruz, CA" and "Canon R5 · f/2.8 · 1/500". Below that: two ghost-style pill buttons ("Open" / "Add to album"), not filled.
+- **Photo** — thumbnail via `createUrl()` (per `feedback_filter_thumbnail_createUrl` — bare paths get intercepted by SvelteKit) at full pane width (~240×180 `object-cover`). Below: filename in GoogleSans 14/500, then a 2-row metadata block in GoogleSans 12/410 / `text-gray-500 dark:text-gray-400`: "March 2024 · Santa Cruz, CA" and "Canon R5 · f/2.8 · 1/500". Below: two ghost-style pill buttons ("Open" / "Add to album").
 - **Person** — face crop via `createUrl()` on `faceAssetId` at 120×120 rounded-full, centered. Name in GoogleSans 18/600, face count in 12/410 subtle. Below: 4-wide 48×48 strip of recent photos from `searchAssets({ personIds: [person.id], size: 4 })`.
-- **Place** — static map tile at 240×160 with a 1 px `border-gray-200 dark:border-gray-700` border (reuses existing Gallery map tile source). Place name in GoogleSans 16/600, country in 12/410 subtle, "412 photos" metadata. Below: 4-wide 48×48 recent-photos strip from `searchAssets({ latitude, longitude, size: 4 })`.
-- **Tag** — a 2×3 grid of 72×72 thumbnails with 8 px gaps from `searchAssets({ tagIds: [tag.id], size: 6 })`. Tag name in GoogleSans 16/600 with a 8×8 rounded color dot prefix (tag's stored color), "98 photos" metadata below the grid.
+- **Place** — static map tile at 240×160 with a 1 px `border-gray-200 dark:border-gray-700` border (reuses existing Gallery map tile source). Place name in GoogleSans 16/600, country in 12/410 subtle. Below: a 4-wide 48×48 recent-photos strip from `searchAssets({ latitude, longitude, size: 4 })`. **When the strip comes back empty** (the global geocoder returned a place the user has zero photos in — see [inherited quirks](#known-quirks-inherited-from-v0)), the preview shows "No photos here yet" in place of the strip and hides the photo count, rather than rendering an empty row of gray boxes.
+- **Tag** — a 2×3 grid of 72×72 thumbnails with 8 px gaps from `searchAssets({ tagIds: [tag.id], size: 6 })`. Tag name in GoogleSans 16/600 with a 8×8 rounded color dot prefix (tag's stored color). Empty state same as Place — "No photos tagged yet" in place of the grid.
 
-**Preview staleness handling.** Each preview has its own `AbortController`, separate from the batch controller. When the active item changes or the query changes, the current preview's controller is aborted and a new one is created. A late-arriving response for a stale item is discarded via a generation counter check (`if (thisGeneration !== currentGeneration) return`). The preview render is also deferred for **300 ms** after cursor stop — quickly cursoring past a tag row does not fire a tag-content fetch. Below 720 px viewport the preview pane is hidden entirely and no preview fetches happen.
+**Preview staleness handling.** Each preview has its own `AbortController`, separate from the batch controller. When the active item changes or the query changes or the palette closes, the current preview's controller is aborted and a new one is created (if still relevant). A late-arriving response for a stale item is discarded via a generation counter check. The preview render is deferred **300 ms after cursor stop** — quickly cursoring past a row doesn't fire content fetches. Below 640 px viewport the preview pane is hidden entirely and no preview fetches happen.
 
-### localStorage shape
+**No-highlight on open.** When the palette opens with nothing highlighted (empty RECENT + empty SUGGESTED + helper-row state), the preview pane renders a neutral "nothing to preview" state: a faded Gallery logo centered in the pane, no metadata, no actions. Auto-highlight (described under [Empty state](#empty-state-no-query-typed)) avoids this state in most real sessions.
+
+### `cmdk.recent` localStorage shape
 
 ```ts
 // key: 'cmdk.recent'
 type RecentEntry =
   | { kind: 'query'; id: string; text: string; mode: SearchMode; lastUsed: number }
-  | { kind: 'photo'; id: `photo:${string}`; assetId: string; label: string; thumbnailAssetId: string; lastUsed: number }
+  | { kind: 'photo'; id: `photo:${string}`; assetId: string; label: string; lastUsed: number }
   | {
       kind: 'person';
       id: `person:${string}`;
@@ -276,22 +298,21 @@ type RecentEntry =
       thumbnailAssetId?: string;
       lastUsed: number;
     }
-  | {
-      kind: 'place';
-      id: `place:${number}:${number}`;
-      latitude: number;
-      longitude: number;
-      label: string;
-      lastUsed: number;
-    }
+  | { kind: 'place'; id: string; latitude: number; longitude: number; label: string; lastUsed: number }
   | { kind: 'tag'; id: `tag:${string}`; tagId: string; label: string; lastUsed: number };
-
-// Max 20 entries stored, top 8 displayed in RECENT.
-// id is the stable dedup key; activating the same thing twice updates lastUsed in place.
-// Place ids are composite because PlacesResponseDto has no server-side id.
 ```
 
-Read/write is wrapped in try-catch. On JSON parse error or `QuotaExceededError`, the store treats itself as empty and logs once to the console — it does not crash the palette.
+- **Photo `id` is `photo:${assetId}`** — photo rows render their thumbnail from `assetId` directly; the previously-listed separate `thumbnailAssetId` field was redundant and is removed.
+- **Place `id`** is computed as `` `place:${lat.toFixed(4)}:${lng.toFixed(4)}` `` — fixed 4-decimal precision (~11 m resolution) to avoid floating-point drift creating duplicate keys for the same user-perceived place across queries.
+- **Max 20 entries stored, top 8 displayed.** `id` is the stable dedup key; activating the same item twice updates `lastUsed` in place.
+
+**Quota and corruption handling.**
+
+- Read: try-catch around `JSON.parse(localStorage.getItem(…))`. On `SyntaxError` or `null`, treat as empty `[]`, log once.
+- Write: try-catch around `setItem`. On `QuotaExceededError`, **keep the previous in-memory copy** (do not zero it out) and log once. The store silently fails to persist the new entry but the session's existing RECENT stays intact.
+- localStorage unavailable entirely (e.g., privacy-mode browser that throws on any access): the store returns `[]` and every write is a no-op. Logged once per session.
+
+**Two-tab concurrent writes.** `cmdk.recent` uses read-modify-write with no locking. If two tabs activate entries simultaneously, the second write wins and the first may be lost. We accept this as a trivial data-loss case — the entries are hints, not state.
 
 ---
 
@@ -304,89 +325,96 @@ Read/write is wrapped in try-catch. On JSON parse error or `QuotaExceededError`,
 - The outer modal is a `Command.Dialog` — `role="dialog"`, `aria-modal="true"`, `aria-label={t('global_search')}` — without replacing the combobox role on the input.
 - Focus trap is provided by Bits UI; focus returns to the opener on close.
 - Skeleton rows are `aria-hidden="true"` with no `option` role.
-- An `aria-live="polite"` region announces **only the final aggregate** once all four providers have settled per query — "342 photos, 5 people, 3 places, 2 tags." We deliberately do **not** announce each section as it streams in; rapid typers would trigger an unlistenable torrent of announcements.
+- **Live region.** An `aria-live="polite"` region announces **only the final aggregate** once all enabled providers have settled per query — "342 photos, 5 people, 3 places, 2 tags." We deliberately do not announce per-section as results stream in; rapid typers would produce an unlistenable torrent. The live-region announcement **still fires under `prefers-reduced-motion`** — motion and screen-reader announcements are independent concerns.
+- **New accessibility primitive.** This feature introduces `prefers-reduced-motion` handling to Gallery for the first time — there is no existing precedent elsewhere in the codebase. Implementation uses Tailwind's `motion-reduce:` utility classes or a CSS-level media query wrapper. Worth calling out in PR review so reviewers know it's a deliberate new convention.
 
 ---
 
 ## Visual identity and motion
 
-**Aesthetic direction: "library archive," editorial-leaning.** Gallery is a personal archive, not an enterprise dashboard. The palette should feel closer to a museum catalog interface than a sysadmin console — quietly confident, editorial, typographically refined without being loud. The concept guides every decision below.
+**Aesthetic direction: cool, restrained, editorial.** Gallery's actual palette is neutral and cool in both light and dark modes (hue 0 or 271 in OKLCH — see `@immich/ui/dist/theme/default.css`). The palette should _lean into_ that cool restraint rather than invent a warm editorial tone that doesn't exist anywhere else in the app. Quiet, keyboard-first, typographically precise.
 
 ### Typography
 
-Uses Gallery's existing loaded fonts — **GoogleSans** (variable, weight range 410–900) for all UI and **GoogleSansCode** for monospace accents. Both are already available via `--font-sans` (`app.css:87–101`). No new font files.
+Uses Gallery's already-loaded fonts — **GoogleSans** (variable, weight range 410–900) for all UI and **GoogleSansCode** for monospace accents. Both are defined in `app.css:87–101` and exposed as `--font-sans`. GoogleSansCode has real precedent in Gallery UI already (e.g. `breadcrumbs.svelte:54`, `tree.svelte:45`, `ApiKeySecretModal.svelte:18`, `geolocation/+page.svelte:141–146`), so using it for the `⌘K` chip and mode labels is consistent with existing patterns.
 
-GoogleSans's minimum weight is 410, not 400 — that's the "regular" baseline in Gallery. Numbers below refer to real variable-font weights.
+GoogleSans's minimum weight is **410**, not 400 — that's the "regular" baseline in Gallery. Numbers below are real variable-font weights.
 
-| Element                       | Font           | Size  | Weight | Color / treatment                        |
-| ----------------------------- | -------------- | ----- | ------ | ---------------------------------------- |
-| Section heading ("PHOTOS —")  | GoogleSans     | 11 px | 600    | uppercase, letter-spacing 0.08em, subtle |
-| Row title                     | GoogleSans     | 14 px | 500    | tracking -0.01em                         |
-| Row subtitle                  | GoogleSans     | 12 px | 410    | `text-gray-500 dark:text-gray-400`       |
-| "See all N photos →"          | GoogleSans     | 12 px | 500    | accent color for chevron                 |
-| Preview title                 | GoogleSans     | 16 px | 600    | Person preview promotes to 18/600        |
-| Preview metadata              | GoogleSans     | 12 px | 410    | `text-gray-500 dark:text-gray-400`       |
-| Mode label ("Smart · …")      | GoogleSansCode | 11 px | 500    | uppercase, tabular                       |
-| Keybind chip (`⌘K`, `Ctrl+/`) | GoogleSansCode | 11 px | 500    | `bg-subtle/60` pill, 1 px border         |
-| Empty state / helper rows     | GoogleSans     | 13 px | 410    | subtle                                   |
+| Element                       | Font           | Size  | Weight | Color / treatment                   |
+| ----------------------------- | -------------- | ----- | ------ | ----------------------------------- |
+| Section heading ("PHOTOS")    | GoogleSans     | 11 px | 600    | uppercase, `tracking-wider`, subtle |
+| Row title                     | GoogleSans     | 14 px | 500    | default foreground                  |
+| Row subtitle                  | GoogleSans     | 12 px | 410    | `text-gray-500 dark:text-gray-400`  |
+| "See all N photos →"          | GoogleSans     | 12 px | 500    | primary accent for chevron          |
+| Preview title                 | GoogleSans     | 16 px | 600    | Person preview promotes to 18/600   |
+| Preview metadata              | GoogleSans     | 12 px | 410    | `text-gray-500 dark:text-gray-400`  |
+| Mode label ("Smart · …")      | GoogleSansCode | 11 px | 500    | uppercase, tabular                  |
+| Keybind chip (`⌘K`, `Ctrl+/`) | GoogleSansCode | 11 px | 500    | `bg-subtle/60` pill, 1 px border    |
+| Helper / empty rows           | GoogleSans     | 13 px | 410    | subtle                              |
 
-Section headings get a small em-dash after the label — "PHOTOS —" — as a deliberate editorial accent. Cheap to render, tells the user the palette cares about detail.
+The `tracking-wider` uppercase heading pattern matches existing Gallery eyebrows at `space-activity-feed.svelte:157`, `spaces-table.svelte:90`, and `trim-tool.svelte:65` — the palette's section headings will feel native. **No em-dash on section headings** — Gallery headings are plain labels, and a novel em-dash ornament in this one surface would feel foreign. Plain "PHOTOS", "PEOPLE", "PLACES", "TAGS".
 
 ### Dimensions
 
-| Viewport    | Palette width | Preview pane | Notes                 |
-| ----------- | ------------- | ------------ | --------------------- |
-| ≥ 1024 px   | 720 px        | 280 px right | Two-pane layout       |
-| 640–1023 px | 560 px        | hidden       | List only             |
-| < 640 px    | full − 16 px  | hidden       | Mobile / small laptop |
+| Viewport    | Palette width                          | Preview pane | Notes                                   |
+| ----------- | -------------------------------------- | ------------ | --------------------------------------- |
+| ≥ 1024 px   | **767 px** (`max-w-(--breakpoint-md)`) | 280 px right | Matches @immich/ui Modal `large` width  |
+| 640–1023 px | **639 px** (`max-w-(--breakpoint-sm)`) | hidden       | Matches @immich/ui Modal `medium` width |
+| < 640 px    | full − 16 px                           | hidden       | Mobile / small laptop                   |
+
+Snapping to the @immich/ui Modal size tokens avoids introducing a bespoke width convention — the palette is one size up from `SearchFilterModal` and looks like a family member.
 
 Inside the palette:
 
-- Row height **52 px** (thumbnails breathe, 5 rows per section fit on a 14″ screen without scroll)
-- Row padding **12 px horizontal, 8 px vertical**
+- Row height **52 px** — thumbnails breathe, 5 rows per section fit on a 14″ screen without scroll
+- Row padding **`px-3 py-2`** (matches Gallery filter-panel row padding at `people-filter.svelte:92`)
+- Row radius **`rounded-lg`** (matches filter-panel rows)
 - Section gap **16 px**
 - Preview pane padding **20 px**
-- Thumbnail sizes: photos 40×40 `rounded-md` (6 px), people 40×40 `rounded-full`, places and tags icon-only 32×32
-- Divider between list and preview: single 1 px hairline `border-gray-200 dark:border-gray-700`, no shadow — they're one surface, not two floating cards
+- **Palette shell radius: `rounded-2xl`** — matches @immich/ui Modal's `sm:rounded-2xl` at `Modal.svelte:50`. Not `rounded-md`.
+- Thumbnails: photos 40×40 `rounded-md` (6 px), people 40×40 `rounded-full`, places and tags icon-only 32×32
+- Divider between list and preview: single 1 px hairline `border-gray-200 dark:border-gray-700`, no shadow
 
-### Color philosophy
+### Color
 
-**95 % neutral, 5 % accent.** Dominant neutrals with a single sharp accent tell the eye where to look. No accent gradients, no tinted backdrop, no secondary accents.
+**95 % neutral, 5 % accent.** Dominant neutrals with a single sharp accent.
 
-- Palette chrome: `bg-light dark:bg-dark` with an off-warm tint (not cold white; cold white reads "SaaS")
-- Hairline border: `border-gray-200 dark:border-gray-700`
-- Elevation: a single elevated shadow layer (`shadow-2xl` or equivalent Gallery token) with a slightly warm cast
-- Backdrop: `bg-black/30 backdrop-blur-md` — the blur signals the palette is _floating_, not opaque-dimmed
-- **Accent** (Gallery's existing `accent-primary` token) appears in only two places: the active-row 3 px left border + faint tint, and the "See all" chevron. Nowhere else.
+- **Palette chrome:** `bg-light dark:bg-subtle`. This matches @immich/ui's Modal surface (`Modal.svelte:50`) — not `dark:bg-dark`, which resolves to a near-white color in dark mode (Gallery's dark token is text-colored, not surface-colored).
+- **Hairline border:** `border-gray-200 dark:border-gray-700`.
+- **Elevation:** `shadow-2xl` — matches `SearchHistoryBox.svelte:97`, the nearest floating-surface precedent in Gallery.
+- **Backdrop:** `bg-black/30` — **no `backdrop-blur`**. This matches `@immich/ui` Modal's default overlay (`bg-black/30`, zero blur) at `Modal.svelte:118`. Every other Gallery modal uses this treatment; a blurred backdrop here would read as foreign.
+- **Primary accent token:** `primary` (the `@immich/ui` token, not the fork-legacy `immich-primary`). Grep confirms 163 hits for `bg-primary`/`text-primary`/`border-primary` in Gallery code. The "faint tint + accent text" pattern is established at `active-filters-bar.svelte:102`, which uses `bg-primary/10 text-primary` for selected chips — the active row adopts the same mechanic.
 
-Every color goes through Gallery's `@immich/ui` tokens with `dark:` prefixes per `feedback_match_gallery_design` — no hardcoded hex, no bespoke palette.
+Every color goes through Gallery's `@immich/ui` tokens with `dark:` prefixes per `feedback_match_gallery_design`. No hardcoded hex.
 
 ### Motion
 
-All motion drops to instant when `prefers-reduced-motion: reduce` matches. No exceptions.
+**All motion drops to instant when `prefers-reduced-motion: reduce` matches.** No exceptions. (Screen-reader `aria-live` announcements still fire — they're not motion.)
 
-| Moment                              | Duration | Easing                                               | Detail                                                                                                               |
-| ----------------------------------- | -------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| Palette enter                       | 180 ms   | `cubic-bezier(0.22, 1, 0.36, 1)` (ease-out-quint)    | Backdrop fades in; palette scales 0.98 → 1.0 + fades in + 4 px translate-from-top — reads as "descending into place" |
-| Palette exit                        | 120 ms   | same, reversed                                       | Faster out than in — dismissal feels snappy                                                                          |
-| Section heading + rows on resolve   | 100 ms   | linear                                               | Stagger: 20 ms per row index; heading leads by 40 ms                                                                 |
-| Skeleton → real row                 | 120 ms   | ease-out                                             | Cross-fade in place; no layout jump                                                                                  |
-| Active row highlight                | 80 ms    | ease-out                                             | Left border grows 0 → 3 px; background tint fades in                                                                 |
-| Preview swap (type change)          | 120 ms   | ease-out                                             | Full content cross-fade                                                                                              |
-| Preview swap (same type, diff item) | 60 ms    | ease-out                                             | Opacity blink 0.85 → 1.0 — "blink of recognition" without lag                                                        |
-| Mode selector pill                  | 180 ms   | `cubic-bezier(0.34, 1.56, 0.64, 1)` (mild overshoot) | The one place mild playfulness is allowed; footer is otherwise dead space                                            |
-| Skeleton pulse                      | 1600 ms  | ease-in-out infinite                                 | Opacity 0.4 → 0.7 → 0.4. **Pulse, not shimmer** — shimmer reads "AI loading"                                         |
+| Moment                              | Duration | Easing                                  | Detail                                                                                  |
+| ----------------------------------- | -------- | --------------------------------------- | --------------------------------------------------------------------------------------- |
+| Palette enter                       | 180 ms   | `ease-out` (Tailwind default)           | Backdrop fades in; palette scales 0.98 → 1.0 + fades in + 4 px translate-from-top       |
+| Palette exit                        | 120 ms   | `ease-out`                              | Faster out than in — dismissal feels snappy                                             |
+| Section heading + rows on resolve   | 100 ms   | linear                                  | Stagger: 20 ms per row index; heading leads by 40 ms                                    |
+| Skeleton → real row                 | 120 ms   | `ease-out`                              | Cross-fade in place; no layout jump                                                     |
+| Active row highlight                | 80 ms    | `ease-out`                              | Background tint (`bg-primary/10`) fades in                                              |
+| Preview swap (type change)          | 120 ms   | `ease-out`                              | Full content cross-fade                                                                 |
+| Preview swap (same type, diff item) | 60 ms    | `ease-out`                              | Opacity blink 0.85 → 1.0                                                                |
+| Mode selector pill                  | 180 ms   | `ease-out`                              | Selected pill slides between positions                                                  |
+| Skeleton pulse                      | 2000 ms  | `cubic-bezier(0.4, 0, 0.6, 1)` infinite | **Matches Gallery's existing `Skeleton.svelte:45` exactly** — opacity pulse, no shimmer |
+
+Durations stick to Gallery's existing 100/120/150/180/200 ms vocab (confirmed by grep). No custom `cubic-bezier` in Tailwind classes — the `ease-out` default is what Gallery uses everywhere.
 
 ### Atmosphere and detail
 
-Small touches that signal "designed," not "generated":
+Small touches that signal the palette cares about detail without diverging from Gallery's design language:
 
-- **Grain texture** on the palette surface — a 1 px SVG noise pattern at 2 % opacity. Costs ~50 bytes, reads expensive. "Archive, not SaaS."
-- **Single hairline divider** between list and preview — not a shadow, not a gap. The two panes read as one surface split internally.
-- **Em-dash on section headings** ("PHOTOS —") — tiny editorial signal.
+- **Single hairline divider** between list and preview — not a shadow, not a gap. One surface, split.
 - **`⌘K` trigger chip** (in the header trigger button): GoogleSansCode, `bg-subtle/60`, 1 px `border-gray-200 dark:border-gray-700`, `rounded-sm`. Clickable-but-not-screaming.
 - **Right-aligned chevron** on "See all N photos →" with `tabular-nums` so counts align vertically across sections.
-- **Active row highlight** is a 3 px accent-colored left border + very subtle `bg-accent-primary/5` tint. No scale, no shadow, no glow. Restraint is the whole point — this row is seen constantly.
+- **Active row highlight.** `bg-primary/10` tint on the active row, full width, `rounded-lg`. **No left border, no scale, no shadow, no glow.** This matches how `active-filters-bar.svelte` renders its selected chip and will feel native. A 3 px accent left border (as proposed in an earlier draft) is not used — it would be a novel visual mechanic with no precedent elsewhere in Gallery.
+
+**Not included in v1:** grain/noise texture (no existing Gallery surface uses one; at 2 % opacity over pure neutrals it would either be invisible or read as a render bug), em-dashes on headings (novel ornament), bespoke warm-tint chrome (Gallery is cool-neutral). These were in an earlier draft but removed after the design-language audit.
 
 ### Empty-state voice
 
@@ -394,25 +422,38 @@ Replace the generic placeholder with something with a bit of character:
 
 > **"Start typing — photos, people, places, tags."**
 
-Same byte count, less corporate. The em-dash matches the section-heading treatment.
+Tiny nod to the entity set; still short enough to fit on one line.
+
+---
 
 ## Error handling
 
-| Failure                                                 | Behavior                                                                                           |
-| ------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| One provider 5xx / network error                        | Section shows "Couldn't load [entity] — retry" row; other sections unaffected                      |
-| One provider times out (5 s client cap)                 | Section shows "Search is slow — results may be incomplete" and hides the skeleton                  |
-| All four providers error                                | Palette shows "Something went wrong" with a retry button                                           |
-| ML unhealthy at palette open (Smart mode)               | Banner: "Smart search is unavailable — try Filename mode" with quick-switch button                 |
-| ML becomes unhealthy mid-session                        | First timeout/error from Photos promotes the same banner retroactively                             |
-| Photos timeout during non-Smart mode                    | Section shows generic timeout message; banner does not appear (it's Smart-specific)                |
-| User has empty `cmdk.recent`                            | Skip RECENT section; fall through to SUGGESTED                                                     |
-| `getExploreData()` returns zero cities (tiny library)   | Skip SUGGESTED; show a single "Start typing — photos, people, places, tags." helper row            |
-| `localStorage` unavailable / quota exceeded / corrupted | Try-catch on read/write; treat as empty; log once to console                                       |
-| `getAllTags()` call fails (tag cache miss)              | Tags section renders error row; retry on next keystroke                                            |
-| User types query of length 1                            | Only Photos fires; People/Places/Tags sections render `idle` (no skeleton, no error)               |
-| Mode switch while Photos is in flight                   | Abort the in-flight Photos call (silent abort, no timeout message), re-run with new mode           |
-| Palette closed while providers in flight                | `close()` aborts the batch; sections are reset to `idle`; pending responses are discarded silently |
+| Failure                                                 | Behavior                                                                                          |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| One provider 5xx / network error                        | Section shows "Couldn't load [entity] — retry" row; other sections unaffected                     |
+| One provider times out (5 s client cap)                 | Section shows "Search is slow — results may be incomplete"; skeleton hides                        |
+| All enabled providers error                             | Palette shows "Something went wrong" with a retry button                                          |
+| ML unhealthy at palette open (Smart mode)               | Banner: "Smart search is unavailable — try Filename mode" with quick-switch button                |
+| ML becomes unhealthy mid-session (Smart, any failure)   | First timeout/error from Photos promotes the banner; persists across mode switches within session |
+| Photos timeout in non-Smart mode                        | Generic timeout row; banner stays hidden (Smart-specific messaging)                               |
+| `ml-health` endpoint returns non-JSON content-type      | Treated as unhealthy; banner shown; logged                                                        |
+| User has empty `cmdk.recent`                            | Skip RECENT; fall through to SUGGESTED                                                            |
+| `getExploreData()` returns zero cities                  | Skip SUGGESTED; if RECENT is also empty, show a single "Start typing — …" helper row              |
+| RECENT non-empty, SUGGESTED empty                       | Show RECENT alone; no helper row                                                                  |
+| `localStorage` unavailable (privacy mode)               | Treat as empty; writes are no-ops; logged once                                                    |
+| `localStorage` QuotaExceededError on write              | **Keep in-memory copy intact**; fail to persist; logged once                                      |
+| `localStorage` JSON parse failure                       | Treat as empty; logged once                                                                       |
+| `getAllTags()` call fails                               | Tags section renders error row; retry on next keystroke                                           |
+| `getAllTags()` returns > 20 000 entries                 | Disable tag provider for the session; tags section shows "Too many tags to search in-browser" row |
+| `searchQueryType` localStorage value corrupted          | Fall back to `'smart'`, overwrite the stored value                                                |
+| Query length 1                                          | Only Photos fires; People/Places/Tags render `idle` (no skeleton, no error)                       |
+| Query > 256 chars                                       | Blocked at input via `maxlength="256"`                                                            |
+| Mode switch while Photos in flight                      | Abort Photos (silent), re-run with new mode; People/Places/Tags untouched                         |
+| Mode switch during 150 ms debounce                      | Debounce timer restarts; fresh batch uses the new mode                                            |
+| Palette closed while providers in flight                | `close()` aborts batch AND preview controllers; sections reset to `idle`                          |
+| Enter on a stale / lost cursor item                     | No-op; cursor falls back to first row of current top section                                      |
+| Place preview strip empty (geocoder hit with no photos) | Shows "No photos here yet" instead of empty thumbnail row                                         |
+| Tag preview grid empty                                  | Shows "No photos tagged yet" instead of empty grid                                                |
 
 ---
 
@@ -420,89 +461,96 @@ Same byte count, less corporate. The em-dash matches the section-heading treatme
 
 ### Unit (vitest + happy-dom)
 
-- **`global-search-service.spec.ts`** — fan-out fires enabled providers; short queries skip pg_trgm providers; debounce coalesces rapid keystrokes; new keystroke aborts prior batch silently; timeout sets section to `timeout`; provider error sets section to `error`; mode switch aborts photos only and re-runs with new mode; `close()` aborts in-flight batch.
-- **`cmdk-recent.spec.ts`** — read/write, trim to 20, top 8 display, corrupt JSON tolerance, QuotaExceeded tolerance, entity dedup by stable id (same photo activated twice → one entry with updated `lastUsed`).
-- **`global-search.spec.ts`** — component mounts, keyboard navigation moves cursor across sections (wrap), Enter activates correct row type, Esc two-stage clear/close, mode selector persists to `searchQueryType`, feature-flag gate hides trigger.
-- **`photo-row.spec.ts` / `person-row.spec.ts` / `place-row.spec.ts` / `tag-row.spec.ts`** — each row renders its entity shape, thumbnails use `createUrl()`, ARIA attributes set correctly.
-- **`photo-preview.spec.ts` / etc.** — type dispatch renders correct preview; late response after cursor change is discarded via generation counter; below 720 px preview component does not mount.
-- **`global-search-provider-tags.spec.ts`** — client-side tag name filter correctness with various query shapes; cache is used on second keystroke; bust on palette close/reopen.
+- **`global-search.service.spec.ts`** — fan-out fires enabled providers; short queries skip pg_trgm providers; debounce coalesces rapid keystrokes; new keystroke aborts prior batch silently; timeout → `timeout` status; provider error → `error` status; mode switch aborts Photos only and re-runs with new mode; **mode switch during debounce restarts the timer with the new mode**; `close()` aborts batch AND preview controllers, resets `sections[*]` to `idle`; cursor-identity fallback when a tracked id disappears; `searchQueryType` corruption falls back to `'smart'`.
+- **`global-search-provider-tags.spec.ts`** — client-side filter correctness with various query shapes; cache hit on second keystroke; cache bust on palette close/reopen; **cache invalidated by `storage` event on `cmdk.tags.version`**; **tag provider disables itself at > 20 000 tags**; graceful retry on `getAllTags()` failure.
+- **`cmdk-recent.spec.ts`** — read/write, trim to 20, top 8 display, corrupt JSON tolerance, **`QuotaExceededError` preserves in-memory copy** (regression test — do NOT zero out), **localStorage entirely unavailable path** (mock `localStorage.getItem` throwing), entity dedup by stable id, **place id precision** (`48.85664567` and `48.85669999` produce the same key `place:48.8566:2.3522`).
+- **`global-search.spec.ts`** — component mounts, keyboard nav across sections (wrap), Enter dispatch per type, **Enter on stale cursor is a no-op**, Esc two-stage, mode selector persists to `searchQueryType`, feature-flag gate hides trigger, **`prefers-reduced-motion` media query removes animation classes** (JSDOM `matchMedia` mock), **auto-highlight on open places cursor on first visible row**, **no-highlight preview state renders the neutral fallback**.
+- **`global-search-trigger.spec.ts`** — **global `Ctrl+K` binding is no-op when `featureFlagsManager.value.search === false`**; trigger hides when flag is off.
+- **Row and preview components** — each row renders its entity shape, thumbnails use `createUrl()`, ARIA attributes correct; **place preview shows "No photos here yet" on empty strip**; **tag preview shows "No photos tagged yet" on empty grid**; below 640 px preview components don't mount.
 
 ### Server
 
-- **`machine-learning.repository.spec.ts`** — add cases:
-  - `encodeText` aborts with `AbortError` after 15 s when the mock ML server never responds.
-  - `detectFaces` / `encodeImage` / `ocr` / `detectPets` do **not** abort after 15 s (blast-radius verification that the `{ timeoutMs }` option is per-caller).
-- No changes to `search.service.spec.ts` — server logic is unchanged.
+- **`machine-learning.repository.spec.ts`** — `encodeText` aborts with `AbortError` after 15 s when mock ML never responds; `detectFaces` / `encodeImage` / `ocr` / `detectPets` do **not** abort (blast-radius); **a second caller passing `{ timeoutMs: 30_000 }` gets a 30 s timeout** (proves the option is per-call, not hardcoded).
+- **`server-info.controller.spec.ts`** — new test file (or add to existing) — `GET /api/server-info/ml-health`:
+  - Returns `{ smartSearchHealthy: true }` when the mocked `/ping` responds 200 with JSON.
+  - Returns `{ smartSearchHealthy: false }` when `/ping` times out at 2 s.
+  - Returns `{ smartSearchHealthy: false }` when `/ping` responds 200 but with HTML content-type (reverse-proxy error page).
+  - **Requires authentication** — unauth call returns 401.
+  - **30 s server-side cache** — two consecutive calls in < 30 s hit the cache (one actual `/ping` fetch); after 30 s a fresh probe fires.
+  - Single-flight — concurrent callers share one in-flight probe.
+
+No changes to `search.service.spec.ts` — server search logic is unchanged.
 
 ### E2E (Playwright + real server, `e2e/src/specs/web/global-search.e2e-spec.ts`)
 
-Per `feedback_e2e_mock_filterpanel`, real server not mocks. Per `feedback_e2e_metadata_extraction_wait`, drain metadata extraction before asserting on tag/rating results.
+Per `feedback_e2e_mock_filterpanel`, real server not mocks. Per `feedback_e2e_metadata_extraction_wait`, drain metadata extraction before asserting on tag/rating results. Per `feedback_playwright_hover_menus`, keyboard nav only (no hover-based preview assertions).
 
-- Open with `Ctrl+K`, verify dialog role and focus in the input.
-- Type `"beach"` (or whatever seeds the test DB), verify skeletons then real results in each section.
-- Arrow-nav across section boundaries, verify cursor moves through Photos → People → Places → Tags.
-- `Enter` on a photo opens the asset viewer.
-- `Enter` on a person navigates to `/people/:id`.
-- `Enter` on the "See all N photos" row navigates to `/search?query=...`.
-- Switch mode via `Ctrl+/`, verify Photos section re-renders and People stays unchanged.
-- `Esc` clears input, second `Esc` closes palette.
-- Cold-open (no `cmdk.recent`) shows SUGGESTED if explore data exists, or the helper row if not.
-- Hover-based preview tests are avoided per `feedback_playwright_hover_menus` (flaky in headless) — preview assertions use keyboard navigation only.
+- Open with `Ctrl+K`; verify dialog role and input focus.
+- Type a seeded query; verify skeletons then per-section results.
+- Arrow-nav across section boundaries.
+- `Enter` on photo → asset viewer; on person → `/people/:id`; on "See all N photos" → `/search?…`.
+- `Ctrl+/` switches mode; Photos re-renders; People unchanged.
+- Esc clears input, second Esc closes palette.
+- Cold-open (no `cmdk.recent`) shows SUGGESTED if explore data exists, else the helper row.
+- **ML-health banner E2E.** Gallery's CI runs with ML disabled (per `feedback_ci_preexisting_failures`, `project_unified_space_search`) — which is exactly the environment where the banner should fire. Test: open palette, assert the "Smart search is unavailable" banner appears in the Photos section, click the "try Filename mode" button, assert the mode switches and the banner hides.
+- **Feature-flag off.** With `features.search = false` in server config, the trigger does not render and `Ctrl+K` does nothing.
 
 ### Visual QA (manual)
 
-Responsive breakpoints are where the motion and layout details break. Before the PR, eyeball the palette at **1024 px, 720 px, and 480 px** widths in **both light and dark modes**:
+Responsive breakpoints are where motion and layout details break. Eyeball at **1024 px, 720 px, and 480 px** in **both light and dark modes** before PR:
 
-- Two-pane layout at ≥ 1024 px renders the 280 px preview without overflow; divider is a single hairline, no shadow.
-- Mid-viewport (640–1023 px) hides the preview pane cleanly — no layout jump, no empty right column.
-- Mobile (< 640 px) renders edge-to-edge minus 16 px margin; trigger button collapses to an icon if navbar real estate is tight.
-- Active row highlight is visible in both modes (neither theme drops the 3 px accent border into invisibility).
-- Skeleton pulse visible in both modes (opacity range tuned against `bg-subtle`, not hardcoded).
-- Grain texture reads at 2 % opacity without banding on either theme.
-- Motion feels right at the specified durations — not jerky, not sluggish. Verify `prefers-reduced-motion` drops everything to instant.
+- Two-pane layout at ≥ 1024 px renders the 280 px preview without overflow; divider is a single hairline.
+- Mid-viewport (640–1023 px) hides the preview cleanly — no layout jump.
+- Mobile (< 640 px) renders edge-to-edge minus 16 px margin. Navbar still shows the existing magnify `IconButton` link (unchanged).
+- Active row tint (`bg-primary/10`) is visible in both modes.
+- Skeleton pulse visible in both modes; matches global `Skeleton.svelte` cadence.
+- Motion feels right at the specified durations; `prefers-reduced-motion` drops everything to instant.
+- **Navbar reflow.** Confirm the trigger button sitting where the old wide SearchBar used to live doesn't push other navbar elements around awkwardly on medium viewports.
 
 ---
 
 ## Migration and rollout
 
-1. **No feature flag for the palette itself** — this is a fork-only change iterating on `main`. The `featureFlagsManager.search` flag already exists and gates the whole feature end-to-end.
-2. **`/search` route untouched** — deep links and bookmarks continue to work. "See all" rows navigate there.
-3. **`searchQueryType` localStorage key reused verbatim** — mode preference migrates seamlessly.
-4. **`predict()` AbortSignal fix** can ship standalone as a precursor PR or bundled with the palette PR. If bundled, it reviews in the same commit as a small server-side change. If standalone, the palette PR's implementation step 1 becomes "depend on [link to the merged fix PR]."
-5. **`ShortcutsModal.svelte` updated in the same PR** so the `?` help dialog reflects the new bindings.
-6. **i18n keys** — every user-visible string (section headings, "See all N", "Smart search is unavailable," mode labels, error rows, helper rows, ARIA labels) goes through `i18n`. Per `feedback_i18n_key_sorting`, run `pnpm --filter=immich-i18n format:fix` before committing the translation file.
+1. **No palette-specific feature flag** — `featureFlagsManager.value.search` already gates the whole surface.
+2. **`/search` route untouched** — deep links, bookmarks, and the mobile href all keep working.
+3. **`searchQueryType` localStorage key reused verbatim.**
+4. **`predict()` AbortSignal fix** can ship standalone or with the palette PR.
+5. **`ShortcutsModal.svelte`** updated in the same PR.
+6. **i18n keys** — every user-visible string (headings, "See all N", banner text, helper rows, ARIA labels) goes through i18n. Run `pnpm --filter=immich-i18n format:fix` before committing.
 
 ## Known quirks inherited from v0
 
-These aren't new problems, but the design surfaces them and the review should flag them for the user:
-
-- **`searchPlaces` is global, not user-scoped.** Matches return a geocoder hit for any known place name, not just places the user has photos in. Activating can land on an empty `/map` spot. The current header bar has this same behavior, so it's not a regression — but worth noting.
-- **`searchPerson` returns only faces owned by the calling user.** Shared-space faces are not surfaced in the People section. Future work can intersect with `withSharedSpaces` when the server endpoint gains that option.
-- **Tag name match is case-insensitive substring on a cached list.** A user with > ~10k tags will hit a cache growth issue; we add a server-side `name` parameter as a follow-up if that comes up.
+- **`searchPlaces` is a global geocoder**, not user-scoped. Matches can be places the user has zero photos in. The palette's place preview handles this explicitly with an empty-state message.
+- **`searchPerson` returns only user-owned faces.** Shared-space-only faces aren't surfaced. Follow-up can intersect with `withSharedSpaces`.
+- **Tag name match is case-insensitive substring on a cached list.** Hard cap at 20 000 tags; follow-up adds a server-side `name` parameter if deployments exceed that.
 
 ## Risks
 
-1. **`bits-ui` direct-dep addition** may cause `@immich/ui` to see a different bits-ui version in hoisting. Mitigation: pin to exactly the version `@immich/ui` depends on. If the internal `@immich/ui` build breaks, the PR reverts and we ship the palette with a different primitive.
-2. **`predict()` per-caller timeout plumbing** touches a hot path. Mitigation: default is `undefined` (no change), only `encodeText` opts in; tests verify the other four callers behave identically to today.
-3. **Tag cache size.** Mitigation: the service measures tag count on first `getAllTags()` call and logs a warning at > 5k; a follow-up plan adds a server-side `name` param if we see deployments over that threshold.
-4. **`AbortSignal.any` support** — Chrome 116 / Firefox 124 / Safari 17.4. Gallery doesn't formally declare a browser baseline, but these all shipped ~2024 and are safe. If we want older-browser support, the service can fall back to a manual controller wrapper (trivial).
-5. **ML health probe endpoint** — small server surface addition committed to above. The retroactive-promotion path still covers mid-session degradation, so even if the probe itself fails the banner still appears after a real failure.
-6. **The SUGGESTED section on a tiny library** — if `getExploreData` returns nothing, we fall through to the "Start typing — photos, people, places, tags." helper row. Documented.
+1. **`bits-ui` direct-dep version may drift from `@immich/ui`'s transitive version.** Pin to the exact version `@immich/ui` depends on.
+2. **`predict()` per-caller timeout plumbing** touches a hot path. Default is `undefined`; tests verify the four other callers behave identically to today and that a second caller can pass a different `timeoutMs`.
+3. **Tag cache size at scale.** Hard cap at 20 000 (degrade), warning at 5 000 (log).
+4. **`AbortSignal.any`** — Chrome 116 / Firefox 124 / Safari 17.4. Safe for Gallery's target; manual controller fallback is trivial.
+5. **ML health endpoint** — small new surface with auth and 30 s cache; retroactive-promotion path covers the failure mode anyway.
+6. **Navbar layout reflow.** Replacing the wide `<SearchBar />` with a compact trigger will visibly re-flow the desktop navbar. Confirm in PR visual review.
+7. **`cmdk.tags.version` cross-tab invalidation** — v1 ships with palette-close/reopen invalidation as the baseline; the follow-up for tag management pages writes the version key. In the meantime a tag created in one tab won't appear in another tab's palette until the palette is reopened.
+8. **Two-tab `cmdk.recent` writes** — acknowledged data-loss case. Entries are hints, not state.
 
-## Implementation sequence (rough order for the follow-up plan)
+## Implementation sequence (skeleton for the follow-up plan)
 
-Not a plan doc — this is the skeleton for when we move to `writing-plans`:
+Not a plan doc — rough order for when we move to `writing-plans`:
 
-1. **Server, standalone.** `predict()` gains `{ timeoutMs }` option; `encodeText` sets `15_000`; unit tests cover encodeText abort + other-callers unchanged. Lands as its own commit/PR.
-2. **`bits-ui` added to `web/package.json`.** Pinned to `@immich/ui`'s dep version. Verify web build still passes.
-3. **`GlobalSearchService` skeleton.** Four providers, rune store, debounce, abort, timeout, min-query-length gating. Unit tests cover the state machine.
-4. **`cmdk.recent` store.** With quota + corrupt-JSON handling and dedup.
-5. **Row components + section component + palette root** (`Command.Dialog`). Per-component unit tests.
-6. **`GlobalSearchTrigger`** replaces both header mounts (desktop + mobile). `+layout.svelte` registers `Ctrl+K` and re-registers `Ctrl+Shift+K` at layout level. `ShortcutsModal` updated.
-7. **Preview pane components** with generation-counter staleness check and 300 ms dwell.
-8. **Empty-state sections** wire-up: RECENT from `cmdk.recent`, SUGGESTED from cached `getExploreData`, helper row fallback.
-9. **ML health endpoint + banner.** Add `GET /api/server-info/ml-health` on the server, regenerate OpenAPI + Dart + TypeScript SDKs, wire up the client probe and the Photos-section banner (both proactive-on-open and retroactive-on-timeout paths).
-10. **i18n keys** added and sorted.
-11. **E2E tests.**
-12. **Manual QA** with `make dev` against every section, mode, keyboard path, and the ML-down error path.
-13. `make lint-web`, `make check-web`, full `pnpm test` suite pass before PR.
+1. **Server: `predict()` gains `{ timeoutMs }` option;** `encodeText` sets 15 s; unit tests cover abort + per-call usability + blast radius. Lands standalone or bundled.
+2. **Server: `GET /api/server-info/ml-health` endpoint** with auth guard, 30 s cache, single-flight probe, content-type validation. Unit tests cover all cases.
+3. **Regen OpenAPI + Dart + TypeScript SDKs** for the new endpoint.
+4. **`bits-ui` added to `web/package.json`** at the pinned version.
+5. **`GlobalSearchService`** — four providers, rune store, debounce, abort, timeout, min-query-length, cursor identity, mode/debounce interaction, `searchQueryType` sanity. Unit tests cover the state machine.
+6. **`cmdk.recent` store** — quota, corruption, place-id precision, dedup, localStorage unavailable path.
+7. **Row components + section component + palette root** (`Command.Dialog`). Per-component unit tests including `prefers-reduced-motion` and feature-flag gating.
+8. **`GlobalSearchTrigger`** replaces the desktop `<SearchBar />` mount only. `+layout.svelte` registers `Ctrl+K` and re-registers `Ctrl+Shift+K`. **Delete the `Ctrl+K` binding from `search-bar.svelte:246`.** `ShortcutsModal` updated.
+9. **Preview pane components** with generation-counter staleness check, 300 ms dwell, empty-state fallbacks.
+10. **Empty-state sections** — RECENT from `cmdk.recent`, SUGGESTED from cached `getExploreData`, helper row fallback, auto-highlight on open, no-highlight preview state.
+11. **ML health client wire-up** — probe on open, retroactive promotion on Photos failure, banner rendering and mode-switch button.
+12. **i18n keys** added and sorted via `pnpm --filter=immich-i18n format:fix`.
+13. **E2E tests** — full flow plus the ML-unhealthy banner case plus feature-flag gating.
+14. **Manual visual QA** at 1024/720/480 px in light and dark, with and without `prefers-reduced-motion`.
+15. `make lint-web`, `make check-web`, full `pnpm test` suite green before PR.
