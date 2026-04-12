@@ -504,6 +504,17 @@ export class PersonService extends BaseService {
 
     if (face.personId) {
       this.logger.debug(`Face ${id} already has a person assigned`);
+
+      // Still queue space face matching — this face may belong to a space
+      // that was created/linked after the face was originally recognized.
+      const spaceIds = await this.sharedSpaceRepository.getSpaceIdsForAsset(face.assetId);
+      for (const { spaceId } of spaceIds) {
+        await this.jobRepository.queue({
+          name: JobName.SharedSpaceFaceMatch,
+          data: { spaceId, assetId: face.assetId },
+        });
+      }
+
       return JobStatus.Skipped;
     }
 
