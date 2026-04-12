@@ -38,6 +38,27 @@ The test uses a **hand-written inline query** — no helper, no method rewrite. 
 
 - Modify: `mobile/test/infrastructure/repositories/timeline_repository_test.dart`
 
+**Step 0: Verify the Drift aliasing API**
+
+Before writing the pre-flight test, check which aliasing form this Drift version exposes:
+
+```bash
+cd mobile && grep -rn "alias(" lib/infrastructure/repositories/ lib/infrastructure/entities/ | grep -v ".g.dart" | head -10
+```
+
+Drift exposes aliasing two ways: the top-level `alias(table, 'name')` function imported from `package:drift/drift.dart`, and (in some versions) a method `db.alias(table, 'name')` on the generated database class. This repo has no existing aliasing call, so you must verify.
+
+Write a 3-line throwaway sanity check at the top of the test file (inside `main()`):
+
+```dart
+test('sanity: alias() top-level function is available', () {
+  final aliased = alias(db.sharedSpaceMemberEntity, 'x');
+  expect(aliased, isNotNull);
+});
+```
+
+Run it: `cd mobile && flutter test test/infrastructure/repositories/timeline_repository_test.dart --plain-name "sanity: alias"`. If it compiles and passes, use `alias(...)` throughout the plan. If it fails to compile with "The function 'alias' isn't defined", try `db.alias(db.sharedSpaceMemberEntity, 'x')` instead. Delete the sanity test after confirming the form works.
+
 **Step 1: Add the pre-flight test inside `main()`**
 
 Add this test as the FIRST test in the file (just after the existing `tearDown`), before any existing `sharedSpace` tests:
@@ -89,7 +110,7 @@ test('PRE-FLIGHT: aliased shared_space_member join re-emits on showInTimeline to
         ),
       );
 
-  final ssmAsset = db.alias(db.sharedSpaceMemberEntity, 'ssm_asset');
+  final ssmAsset = alias(db.sharedSpaceMemberEntity, 'ssm_asset');
   final countExp = db.remoteAssetEntity.id.count(distinct: true);
   final query = db.remoteAssetEntity.selectOnly()
     ..addColumns([countExp])
@@ -144,7 +165,17 @@ test('PRE-FLIGHT: aliased shared_space_member join re-emits on showInTimeline to
 cd mobile && flutter test test/infrastructure/repositories/timeline_repository_test.dart --plain-name "PRE-FLIGHT"
 ```
 
-Expected: **PASS**. If it fails with "Timed out waiting for condition" on the second emission, **STOP ALL WORK** and notify the user — the architecture is invalid and we need to redesign around `.drift` SQL files.
+Expected: **PASS**. If it fails with "Timed out waiting for condition" on the second emission, **STOP ALL WORK**:
+
+1. Unstage and discard the pre-flight test so we don't leave a broken test on the branch:
+
+   ```bash
+   git restore mobile/test/infrastructure/repositories/timeline_repository_test.dart
+   ```
+
+2. Document the failure by appending to the design doc's Risks section a note: _"PRE-FLIGHT FAILED on $(date). Drift's aliased LEFT OUTER JOIN does not propagate to `readsFrom` — architecture must pivot to `.drift` SQL files with explicit table imports (like `merged_asset.drift`). See plan Task 1 for repro."_
+
+3. Notify the user and propose the `.drift` SQL file redesign before any further work.
 
 **Step 3: Commit**
 
@@ -313,8 +344,8 @@ ViewerVisibilityJoinSpec buildViewerVisibilityJoins(
   $RemoteAssetEntityTable assetTable,
   String currentUserId,
 ) {
-  final assetMember = db.alias(db.sharedSpaceMemberEntity, 'ssm_asset');
-  final libraryMember = db.alias(db.sharedSpaceMemberEntity, 'ssm_lib');
+  final assetMember = alias(db.sharedSpaceMemberEntity, 'ssm_asset');
+  final libraryMember = alias(db.sharedSpaceMemberEntity, 'ssm_lib');
 
   final joins = <Join>[
     leftOuterJoin(
@@ -440,9 +471,22 @@ This isolates "signature plumbing" from "new behavior" — next task writes the 
 
 **Files:**
 
-- Modify: `mobile/lib/infrastructure/repositories/timeline.repository.dart:482-490` (video method)
-- Modify: `mobile/lib/domain/services/timeline.service.dart:76` (TimelineFactory.video)
-- Modify: `mobile/lib/presentation/pages/drift_video.page.dart:18-27` (caller)
+- Modify: `mobile/lib/infrastructure/repositories/timeline.repository.dart` (video method — around line 482, verify first)
+- Modify: `mobile/lib/domain/services/timeline.service.dart` (TimelineFactory.video — around line 76, verify first)
+- Modify: `mobile/lib/presentation/pages/drift_video.page.dart` (caller — around line 18, verify first)
+
+**Step 0: Verify current line numbers**
+
+Line numbers in this plan come from a conversation-time snapshot. Confirm they're still accurate before editing:
+
+```bash
+cd mobile && grep -n 'TimelineQuery video\|^  TimelineService video\|timelineFactoryProvider).video' \
+  lib/infrastructure/repositories/timeline.repository.dart \
+  lib/domain/services/timeline.service.dart \
+  lib/presentation/pages/drift_video.page.dart
+```
+
+Expected output: one hit per file showing the method or call. If any file is missing a hit, the line has moved — use the grep output to find the new location.
 
 **Step 1: Update `DriftTimelineRepository.video()`**
 
@@ -529,9 +573,19 @@ git commit -m "refactor(mobile): thread userIds+currentUserId through video() si
 - Modify: `mobile/test/infrastructure/repositories/timeline_repository_test.dart`
 - Modify: `mobile/lib/infrastructure/repositories/timeline.repository.dart` (rewrite `video`, add `_watchVideoBucket`, `_getVideoBucketAssets`)
 
-**Step 1: Add a test helper for setting up video assets**
+**Step 0: Verify `libraryId` exists on `remote_asset_entity`**
 
-Inside `main()`, just after the existing reactivity test setup, add a shared helper function:
+The fixture below inserts rows with a nullable `libraryId` column, which tests 7, 8, 10, 11 depend on. Confirm the column exists and is nullable before proceeding:
+
+```bash
+cd mobile && grep -n 'libraryId' lib/infrastructure/entities/remote_asset.entity.dart
+```
+
+Expected: one or more matches including a `TextColumn get libraryId => text().nullable()` (or similar). If missing, the design's library-linked space visibility assumption is wrong — STOP and reconsider scope.
+
+**Step 1: Add shared fixture helpers at `main()` scope**
+
+These helpers must be declared **at `main()`'s top-level scope** (after `tearDown` but outside any `group` block) so every test group — `video()`, `place()`, `map()`, markers — can reuse them. Do NOT nest them inside the video group.
 
 ```dart
 Future<void> _insertUser(String id) => db
@@ -834,6 +888,8 @@ Future<List<BaseAsset>> _getVideoBucketAssets(
 }
 ```
 
+> **Row-to-DTO pattern:** before writing `_getVideoBucketAssets`, read `_getRemoteAssets` in `timeline.repository.dart` and mirror its `joinLocal: false` branch. The snippet above uses `row.toDto()` assuming the `RemoteAssetEntityData` extension is a bare `.toDto()`. If `_getRemoteAssets` uses a different shape (e.g., `row.toDto(localId: null)`, or a `.select().join([])` pattern with `readTable`), use that form instead. Do NOT invent a new shape — mirror the existing non-join code path exactly, minus the `filter` lambda indirection.
+
 **Step 5: Re-run the matrix**
 
 ```bash
@@ -953,23 +1009,71 @@ test('video() bucket stream re-emits when shared_space_member.showInTimeline tog
         'from the video bucket stream immediately',
   );
 
+  // Flip it back on — verify symmetric reactivity.
+  await (db.update(db.sharedSpaceMemberEntity)
+        ..where((t) => t.spaceId.equals('space1') & t.userId.equals('viewer')))
+      .write(const SharedSpaceMemberEntityCompanion(showInTimeline: Value(true)));
+
+  await _waitFor(() => emissions.length >= 3);
+  expect(
+    (emissions.last.single as TimeBucket).assetCount,
+    1,
+    reason: 'Toggling showInTimeline=true must bring the space asset back into the bucket',
+  );
+
+  await sub.cancel();
+});
+
+test('video() bucket stream re-emits when shared_space_member row is deleted', () async {
+  // Complementary to the toggle test — covers the case where the viewer is
+  // removed from the space entirely (member row deleted, not updated).
+  await _insertUser('viewer');
+  await _insertUser('owner');
+  await _insertVideo('a1', 'owner');
+  await _insertSpace('space1', 'owner');
+  await _insertMember('space1', 'viewer', showInTimeline: true);
+  await _linkAssetToSpace('space1', 'a1');
+
+  final emissions = <List<Bucket>>[];
+  final sub = sut
+      .video(['viewer'], 'viewer', GroupAssetsBy.day)
+      .bucketSource()
+      .listen(emissions.add);
+
+  await _waitFor(() => emissions.isNotEmpty);
+  expect((emissions.last.single as TimeBucket).assetCount, 1);
+
+  await (db.delete(db.sharedSpaceMemberEntity)
+        ..where((t) => t.spaceId.equals('space1') & t.userId.equals('viewer')))
+      .go();
+
+  await _waitFor(() => emissions.length >= 2);
+  expect(
+    emissions.last,
+    isEmpty,
+    reason:
+        'Deleting the viewer\'s shared_space_member row must drop the space asset '
+        'from the video bucket stream',
+  );
+
   await sub.cancel();
 });
 ```
 
-**Step 2: Run it**
+**Step 2: Run the tests**
 
 ```bash
 cd mobile && flutter test test/infrastructure/repositories/timeline_repository_test.dart --plain-name "showInTimeline toggles"
+cd mobile && flutter test test/infrastructure/repositories/timeline_repository_test.dart --plain-name "shared_space_member row is deleted"
 ```
 
-Expected: PASS. If it FAILS, the helper architecture is broken — stop and redesign.
+Expected: BOTH PASS. If EITHER fails, the helper architecture is broken — stop and redesign around `.drift` SQL files (same rollback procedure as Task 1).
 
 **Step 3: Commit**
 
 ```bash
 git add mobile/test/infrastructure/repositories/timeline_repository_test.dart
-git commit -m "test(mobile): video() reactivity on showInTimeline toggle (load-bearing)"
+git commit -m "test(mobile): video() reactivity on showInTimeline toggle and member delete (load-bearing)"
 ```
 
 ---
@@ -981,8 +1085,17 @@ git commit -m "test(mobile): video() reactivity on showInTimeline toggle (load-b
 **Files:**
 
 - Modify: `mobile/lib/infrastructure/repositories/timeline.repository.dart` (place method)
-- Modify: `mobile/lib/domain/services/timeline.service.dart:78` (TimelineFactory.place)
-- Modify: `mobile/lib/presentation/pages/drift_place_detail.page.dart:11-30`
+- Modify: `mobile/lib/domain/services/timeline.service.dart` (TimelineFactory.place)
+- Modify: `mobile/lib/presentation/pages/drift_place_detail.page.dart`
+
+**Step 0: Verify current line numbers**
+
+```bash
+cd mobile && grep -n 'TimelineQuery place\|^  TimelineService place\|timelineFactoryProvider).place' \
+  lib/infrastructure/repositories/timeline.repository.dart \
+  lib/domain/services/timeline.service.dart \
+  lib/presentation/pages/drift_place_detail.page.dart
+```
 
 **Step 1: Update repository method (placeholder body)**
 
@@ -1128,17 +1241,19 @@ group('DriftTimelineRepository.place()', () {
 
 Note the new imports required: `package:immich_mobile/infrastructure/entities/exif.entity.drift.dart` for `RemoteExifEntityCompanion`.
 
-**Step 2: Run the tests — expect 2nd and 3rd to fail**
+**Step 2: Run the tests — expect reactivity test to fail, others incidental pass**
 
 ```bash
 cd mobile && flutter test test/infrastructure/repositories/timeline_repository_test.dart --plain-name "DriftTimelineRepository.place"
 ```
 
-Expected: test 1 passes (placeholder still filters by city but the test asserts empty, which is true regardless); tests 2 and 3 fail because the placeholder still uses the old no-user-filter code, OR `city.equals(place)` matches but there's no visibility scoping on top.
+Expected against the Task 9 placeholder (which calls the OLD `_watchPlaceBucket(place, groupBy)` with no viewer filter):
 
-Actually: re-read task 9 carefully. The placeholder returns `_watchPlaceBucket(place, groupBy: ...)` — the OLD helper, which has no viewer filter. So test 2 will pass incidentally (asset is in DB, city matches, no filter blocks it). Test 3 will pass incidentally too (reactivity via isInQuery-less JOIN isn't in the old query at all). So the "red" state here is mostly just the write-failing-tests-first discipline; they may all pass against the old code. That's fine — the rewrite is still required by the design.
+- **Test 1** (wrong city hidden) → PASS. City filter still works on the old query.
+- **Test 2** (space asset right-city visible) → PASS **incidentally**. The old query has NO viewer filter at all, so any asset matching the city appears. This test is correct-for-the-wrong-reason — the rewrite in Step 3 makes it correct-for-the-right-reason.
+- **Test 3** (reactivity on shared_space_asset delete) → **FAIL**. The old query doesn't reference `shared_space_asset`, so Drift's `readsFrom` set never includes that table. Deleting a row from it does not re-emit the stream; the test times out at "Timed out after 2s waiting for condition" on `emissions.length >= 2`.
 
-Rephrase Step 2 expected result: tests run, all 3 likely PASS incidentally. Move on to Step 3.
+Tests 1 and 2 are passing-for-the-wrong-reason; test 3 is the real red. Proceed to Step 3 to rewrite.
 
 **Step 3: Rewrite `_watchPlaceBucket` and `_getPlaceBucketAssets`**
 
@@ -1272,8 +1387,17 @@ detail pages even if they happen to be cached locally."
 **Files:**
 
 - Modify: `mobile/lib/infrastructure/repositories/timeline.repository.dart` (map method)
-- Modify: `mobile/lib/domain/services/timeline.service.dart:92` (TimelineFactory.map)
-- Modify: `mobile/lib/presentation/widgets/bottom_sheet/map_bottom_sheet.widget.dart:47`
+- Modify: `mobile/lib/domain/services/timeline.service.dart` (TimelineFactory.map)
+- Modify: `mobile/lib/presentation/widgets/bottom_sheet/map_bottom_sheet.widget.dart`
+
+**Step 0: Verify current line numbers**
+
+```bash
+cd mobile && grep -n 'TimelineQuery map\|^  TimelineService map\|timelineFactoryProvider).map' \
+  lib/infrastructure/repositories/timeline.repository.dart \
+  lib/domain/services/timeline.service.dart \
+  lib/presentation/widgets/bottom_sheet/map_bottom_sheet.widget.dart
+```
 
 **Step 1: Update `DriftTimelineRepository.map()` (placeholder)**
 
@@ -1620,9 +1744,20 @@ restriction."
 
 **Files:**
 
-- Modify: `mobile/lib/infrastructure/repositories/map.repository.dart:16-37`
+- Modify: `mobile/lib/infrastructure/repositories/map.repository.dart` (DriftMapRepository.remote)
 - Modify: `mobile/lib/domain/services/map.service.dart` (MapFactory.remote)
-- Modify: `mobile/lib/providers/infrastructure/map.provider.dart:22`
+- Modify: `mobile/lib/providers/infrastructure/map.provider.dart`
+
+**Step 0: Verify `MapFactory.remote` exists and grab line numbers**
+
+```bash
+cd mobile && grep -n 'MapQuery remote\|^  MapQuery remote\|mapFactoryProvider).remote' \
+  lib/infrastructure/repositories/map.repository.dart \
+  lib/domain/services/map.service.dart \
+  lib/providers/infrastructure/map.provider.dart
+```
+
+Confirm all three hits exist. If `MapFactory.remote()` is missing from `map.service.dart`, the `MapFactory` class may have a different method name — fix the plan before continuing.
 
 **Step 1: Update `DriftMapRepository.remote()` (placeholder)**
 
@@ -1755,7 +1890,11 @@ group('DriftMapRepository.remote()', () {
 });
 ```
 
-Note: `markerSource` may take `bounds` as an argument; verify its signature in `map.repository.dart` and adjust the test calls accordingly. The existing `MapQuery` type exposes `markerSource: (bounds) => ...`.
+Note on the double `bounds` argument: the test passes globe bounds twice — once inside `TimelineMapOptions(bounds: _globeBounds())` and once as the argument to `markerSource(_globeBounds())`. This is a pre-existing API oddity: `DriftMapRepository.remote()` reads non-bounds options (`onlyFavorites`, `relativeDays`, `includeArchived`) from `TimelineMapOptions`, but bounds is separately passed to `markerSource(bounds)` at call time by the map UI. The test mirrors that shape.
+
+Verify `markerSource`'s actual signature in `map.repository.dart` before running — the existing `MapQuery` type is `(markerSource: (bounds) => ...)` per the original code. If the signature changed (e.g., now takes `LatLngBounds?` nullable), adjust the test calls accordingly.
+
+**Note on reactivity:** No reactivity test here. `DriftMapRepository.remote()` returns a `MapQuery` whose `markerSource` is a `Future<List<Marker>>`-returning function (one-shot `.get()`, NOT a `Stream`). Toggling membership or deleting space-asset rows has no "re-emit" to observe — reactivity tests belong only to `.watch()`-based bucket queries.
 
 **Step 3: Run — expect 2nd test to fail**
 
@@ -1897,13 +2036,21 @@ If anything doesn't work, file the observations inline in the commit message for
 
 **Goal:** Push the branch and open a PR with a clear description that flags the `place()` visibility narrowing.
 
-**Step 1: Push the branch**
+**Step 1: Rename the branch before push**
+
+The branch was created as `docs/mobile-timeline-space-visibility-design` for the design phase, but by now it contains implementation commits too. Rename it so the branch name reflects the net change:
 
 ```bash
-git push -u origin docs/mobile-timeline-space-visibility-design
+git branch -m fix/mobile-timeline-space-visibility
 ```
 
-**Step 2: Open the PR via `gh`**
+**Step 2: Push the branch**
+
+```bash
+git push -u origin fix/mobile-timeline-space-visibility
+```
+
+**Step 3: Open the PR via `gh`**
 
 ```bash
 gh pr create --title "fix(mobile): shared-space visibility for video, place, map, and marker queries" --body "$(cat <<'EOF'
@@ -1923,7 +2070,7 @@ Four mobile Drift queries did not honor shared-space visibility, diverging from 
 
 ## Tests
 
-~25 unit tests added to `mobile/test/infrastructure/repositories/timeline_repository_test.dart` (and a new `map_repository_test.dart`), covering the full visibility matrix on `video()` plus method-specific filter interaction and reactivity for each method. The load-bearing architectural verification — that Drift reactivity tracks aliased `shared_space_member` joins — is tested both as a pre-flight smoke test and via the `video()` showInTimeline toggle test.
+~27 unit tests added to `mobile/test/infrastructure/repositories/timeline_repository_test.dart` (and a new `map_repository_test.dart`), covering the full visibility matrix on `video()` plus method-specific filter interaction and reactivity for each method. The load-bearing architectural verification — that Drift reactivity tracks aliased `shared_space_member` joins — is tested three ways: a pre-flight smoke test, a `showInTimeline` toggle (true→false→true) test, and a member-row deletion test.
 
 ## Test Plan
 
@@ -1934,7 +2081,7 @@ EOF
 )"
 ```
 
-**Step 3: Note the PR URL**
+**Step 4: Note the PR URL**
 
 Print the returned URL and paste it into the user-facing summary.
 
