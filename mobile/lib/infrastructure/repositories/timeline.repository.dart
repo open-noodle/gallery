@@ -482,8 +482,7 @@ class DriftTimelineRepository extends DriftDatabaseRepository {
 
   TimelineQuery video(List<String> userIds, String currentUserId, GroupAssetsBy groupBy) => (
     bucketSource: () => _watchVideoBucket(userIds, currentUserId, groupBy: groupBy),
-    assetSource: (offset, count) =>
-        _getVideoBucketAssets(userIds, currentUserId, offset: offset, count: count),
+    assetSource: (offset, count) => _getVideoBucketAssets(userIds, currentUserId, offset: offset, count: count),
     origin: TimelineOrigin.video,
   );
 
@@ -545,8 +544,7 @@ class DriftTimelineRepository extends DriftDatabaseRepository {
 
   TimelineQuery place(String place, List<String> userIds, String currentUserId, GroupAssetsBy groupBy) => (
     bucketSource: () => _watchPlaceBucket(place, userIds, currentUserId, groupBy: groupBy),
-    assetSource: (offset, count) =>
-        _getPlaceBucketAssets(place, userIds, currentUserId, offset: offset, count: count),
+    assetSource: (offset, count) => _getPlaceBucketAssets(place, userIds, currentUserId, offset: offset, count: count),
     origin: TimelineOrigin.place,
   );
 
@@ -713,8 +711,7 @@ class DriftTimelineRepository extends DriftDatabaseRepository {
 
   TimelineQuery map(List<String> userIds, String currentUserId, TimelineMapOptions options, GroupAssetsBy groupBy) => (
     bucketSource: () => _watchMapBucket(userIds, currentUserId, options, groupBy: groupBy),
-    assetSource: (offset, count) =>
-        _getMapBucketAssets(userIds, currentUserId, options, offset: offset, count: count),
+    assetSource: (offset, count) => _getMapBucketAssets(userIds, currentUserId, options, offset: offset, count: count),
     origin: TimelineOrigin.map,
   );
 
