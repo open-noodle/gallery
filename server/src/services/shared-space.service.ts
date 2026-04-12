@@ -850,6 +850,13 @@ export class SharedSpaceService extends BaseService {
     let offset = 0;
 
     while (true) {
+      // Re-check link each batch to handle concurrent unlink
+      const stillLinked = await this.sharedSpaceRepository.hasLibraryLink(job.spaceId, job.libraryId);
+      if (!stillLinked) {
+        this.logger.log(`Library ${job.libraryId} was unlinked from space ${job.spaceId} during sync, stopping`);
+        break;
+      }
+
       const assets = await this.assetRepository.getByLibraryIdWithFaces(job.libraryId, batchSize, offset);
       if (assets.length === 0) {
         break;
@@ -905,6 +912,11 @@ export class SharedSpaceService extends BaseService {
 
     const { machineLearning } = await this.getConfig({ withCache: true });
     const maxDistance = machineLearning.facialRecognition.maxDistance;
+
+    // Repair persons that have faces but lost their representativeFaceId
+    // (e.g., after force-detection reset). Without this, they are invisible
+    // to getSpacePersonsWithEmbeddings due to the INNER JOIN on face_search.
+    await this.sharedSpaceRepository.repairOrphanedRepresentativeFaces(job.spaceId);
 
     const MAX_PASSES = 100;
     let totalMerges = 0;
@@ -969,6 +981,16 @@ export class SharedSpaceService extends BaseService {
         // Reassign faces and migrate aliases
         await this.sharedSpaceRepository.reassignPersonFacesSafe(source.id, target.id);
         await this.sharedSpaceRepository.migrateAliases(source.id, target.id);
+
+        // Refresh representativeFaceId to a face with a valid embedding from the merged pool
+        const newRepFace = await this.sharedSpaceRepository.getFirstFaceIdForPerson(target.id);
+        if (newRepFace && newRepFace !== target.representativeFaceId) {
+          try {
+            await this.sharedSpaceRepository.updatePerson(target.id, { representativeFaceId: newRepFace });
+          } catch (error) {
+            this.logger.warn(`Dedup: failed to update representativeFaceId for target ${target.id}: ${error}`);
+          }
+        }
 
         // Determine merged properties
         const updates: Partial<{ name: string; isHidden: boolean }> = {};

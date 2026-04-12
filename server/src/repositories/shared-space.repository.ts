@@ -676,6 +676,42 @@ export class SharedSpaceRepository {
       .execute();
   }
 
+  @GenerateSql({ params: [DummyValue.UUID] })
+  async getFirstFaceIdForPerson(personId: string): Promise<string | null> {
+    const result = await this.db
+      .selectFrom('shared_space_person_face')
+      .innerJoin('face_search', 'face_search.faceId', 'shared_space_person_face.assetFaceId')
+      .select('shared_space_person_face.assetFaceId')
+      .where('shared_space_person_face.personId', '=', personId)
+      .limit(1)
+      .executeTakeFirst();
+    return result?.assetFaceId ?? null;
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID] })
+  async repairOrphanedRepresentativeFaces(spaceId: string) {
+    await this.db
+      .updateTable('shared_space_person')
+      .set((eb) => ({
+        representativeFaceId: eb
+          .selectFrom('shared_space_person_face')
+          .innerJoin('face_search', 'face_search.faceId', 'shared_space_person_face.assetFaceId')
+          .select('shared_space_person_face.assetFaceId')
+          .whereRef('shared_space_person_face.personId', '=', 'shared_space_person.id')
+          .limit(1),
+      }))
+      .where('shared_space_person.spaceId', '=', spaceId)
+      .where('shared_space_person.representativeFaceId', 'is', null)
+      .where((eb) =>
+        eb.exists(
+          eb
+            .selectFrom('shared_space_person_face')
+            .whereRef('shared_space_person_face.personId', '=', 'shared_space_person.id'),
+        ),
+      )
+      .execute();
+  }
+
   @GenerateSql({ params: [DummyValue.UUID, [DummyValue.UUID]] })
   async removePersonFacesByAssetIds(spaceId: string, assetIds: string[]) {
     const assetFaceSubquery = this.db
@@ -920,6 +956,7 @@ export class SharedSpaceRepository {
         'shared_space_person.type',
         'shared_space_person.isHidden',
         'shared_space_person.faceCount',
+        'shared_space_person.representativeFaceId',
         'face_search.embedding',
       ])
       .where('shared_space_person.spaceId', '=', spaceId)
