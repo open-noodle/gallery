@@ -44,7 +44,37 @@ ViewerVisibilityJoinSpec buildViewerVisibilityJoins(
   $RemoteAssetEntityTable assetTable,
   String currentUserId,
 ) {
-  throw UnimplementedError();
+  final assetMember = db.alias(db.sharedSpaceMemberEntity, 'ssm_asset');
+  final libraryMember = db.alias(db.sharedSpaceMemberEntity, 'ssm_lib');
+
+  final joins = <Join>[
+    leftOuterJoin(
+      db.sharedSpaceAssetEntity,
+      db.sharedSpaceAssetEntity.assetId.equalsExp(assetTable.id),
+      useColumns: false,
+    ),
+    leftOuterJoin(
+      assetMember,
+      assetMember.spaceId.equalsExp(db.sharedSpaceAssetEntity.spaceId) &
+          assetMember.userId.equals(currentUserId) &
+          assetMember.showInTimeline.equals(true),
+      useColumns: false,
+    ),
+    leftOuterJoin(
+      db.sharedSpaceLibraryEntity,
+      db.sharedSpaceLibraryEntity.libraryId.equalsExp(assetTable.libraryId),
+      useColumns: false,
+    ),
+    leftOuterJoin(
+      libraryMember,
+      libraryMember.spaceId.equalsExp(db.sharedSpaceLibraryEntity.spaceId) &
+          libraryMember.userId.equals(currentUserId) &
+          libraryMember.showInTimeline.equals(true),
+      useColumns: false,
+    ),
+  ];
+
+  return (joins: joins, assetMember: assetMember, libraryMember: libraryMember);
 }
 
 /// Returns an `Expression<bool>` matching assets visible to the viewer:
