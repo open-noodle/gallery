@@ -6,6 +6,7 @@ import 'package:immich_mobile/infrastructure/entities/exif.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/remote_asset.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/timeline.repository.dart';
+import 'package:immich_mobile/infrastructure/repositories/viewer_visibility.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 
 class DriftMapRepository extends DriftDatabaseRepository {
@@ -17,7 +18,7 @@ class DriftMapRepository extends DriftDatabaseRepository {
     assetFilter: (row) {
       Expression<bool> condition =
           row.deletedAt.isNull() &
-          row.ownerId.isIn(userIds) &
+          viewerVisibilityPredicate(_db, row, userIds, currentUserId) &
           _db.remoteAssetEntity.visibility.isIn([
             AssetVisibility.timeline.index,
             if (options.includeArchived) AssetVisibility.archive.index,
