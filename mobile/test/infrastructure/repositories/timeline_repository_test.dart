@@ -25,6 +25,7 @@ import 'package:immich_mobile/infrastructure/entities/shared_space_member.entity
 import 'package:immich_mobile/infrastructure/entities/user.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/timeline.repository.dart';
+import 'package:maplibre_gl/maplibre_gl.dart';
 
 Future<void> _waitFor(bool Function() predicate, {Duration timeout = const Duration(seconds: 2)}) async {
   final deadline = DateTime.now().add(timeout);
@@ -434,6 +435,135 @@ void main() {
           .bucketSource()
           .first;
       expect(buckets, isEmpty, reason: 'Unowned, unshared asset must not appear on place detail');
+    });
+  });
+
+  group('DriftTimelineRepository.map() bucket sheet', () {
+    LatLngBounds globeBounds() => LatLngBounds(
+          southwest: const LatLng(-89, -179),
+          northeast: const LatLng(89, 179),
+        );
+
+    LatLngBounds europeBounds() => LatLngBounds(
+          southwest: const LatLng(35, -10),
+          northeast: const LatLng(70, 40),
+        );
+
+    Future<void> insertExifAt(String assetId, double lat, double lng) => db
+        .into(db.remoteExifEntity)
+        .insert(
+          RemoteExifEntityCompanion.insert(
+            assetId: assetId,
+            latitude: Value(lat),
+            longitude: Value(lng),
+          ),
+        );
+
+    test('map() hides out-of-bounds asset even when viewer-visible', () async {
+      await insertUser('viewer');
+      await insertUser('owner');
+      await insertVideo('a1', 'owner', type: AssetType.image);
+      await insertExifAt('a1', 48.85, 2.35); // Paris
+      await insertSpace('space1', 'owner');
+      await insertMember('space1', 'viewer');
+      await linkAssetToSpace('space1', 'a1');
+
+      final naBounds = LatLngBounds(
+        southwest: const LatLng(20, -130),
+        northeast: const LatLng(60, -60),
+      );
+
+      final buckets = await sut
+          .map(['viewer'], 'viewer', TimelineMapOptions(bounds: naBounds), GroupAssetsBy.day)
+          .bucketSource()
+          .first;
+      expect(buckets, isEmpty);
+    });
+
+    test('map() shows in-bounds asset reachable via shared space', () async {
+      await insertUser('viewer');
+      await insertUser('owner');
+      await insertVideo('a1', 'owner', type: AssetType.image);
+      await insertExifAt('a1', 48.85, 2.35);
+      await insertSpace('space1', 'owner');
+      await insertMember('space1', 'viewer');
+      await linkAssetToSpace('space1', 'a1');
+
+      final buckets = await sut
+          .map(['viewer'], 'viewer', TimelineMapOptions(bounds: europeBounds()), GroupAssetsBy.day)
+          .bucketSource()
+          .first;
+      expect(buckets, hasLength(1));
+      expect((buckets.single as TimeBucket).assetCount, 1);
+    });
+
+    test('map() relativeDays cutoff excludes older space asset', () async {
+      await insertUser('viewer');
+      await insertUser('owner');
+      final oldDate = DateTime.now().subtract(const Duration(days: 365));
+      await db
+          .into(db.remoteAssetEntity)
+          .insert(
+            RemoteAssetEntityCompanion.insert(
+              id: 'a1',
+              name: 'a1.jpg',
+              type: AssetType.image,
+              checksum: 'c-a1',
+              ownerId: 'owner',
+              visibility: AssetVisibility.timeline,
+              createdAt: Value(oldDate),
+              updatedAt: Value(oldDate),
+              localDateTime: Value(oldDate),
+            ),
+          );
+      await insertExifAt('a1', 48.85, 2.35);
+      await insertSpace('space1', 'owner');
+      await insertMember('space1', 'viewer');
+      await linkAssetToSpace('space1', 'a1');
+
+      final buckets = await sut
+          .map(
+            ['viewer'],
+            'viewer',
+            TimelineMapOptions(bounds: globeBounds(), relativeDays: 7),
+            GroupAssetsBy.day,
+          )
+          .bucketSource()
+          .first;
+      expect(buckets, isEmpty);
+    });
+
+    test('map() bucket stream re-emits when shared_space_asset row is deleted', () async {
+      await insertUser('viewer');
+      await insertUser('owner');
+      await insertVideo('a1', 'owner', type: AssetType.image);
+      await insertExifAt('a1', 48.85, 2.35);
+      await insertSpace('space1', 'owner');
+      await insertMember('space1', 'viewer');
+      await linkAssetToSpace('space1', 'a1');
+
+      final emissions = <List<Bucket>>[];
+      final sub = sut
+          .map(
+            ['viewer'],
+            'viewer',
+            TimelineMapOptions(bounds: europeBounds()),
+            GroupAssetsBy.day,
+          )
+          .bucketSource()
+          .listen(emissions.add);
+
+      await _waitFor(() => emissions.isNotEmpty);
+      expect(emissions.last, hasLength(1));
+
+      await (db.delete(db.sharedSpaceAssetEntity)
+            ..where((t) => t.spaceId.equals('space1') & t.assetId.equals('a1')))
+          .go();
+
+      await _waitFor(() => emissions.length >= 2);
+      expect(emissions.last, isEmpty);
+
+      await sub.cancel();
     });
   });
 
