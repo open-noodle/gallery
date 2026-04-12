@@ -411,8 +411,6 @@ from
 where
   "shared_space_person"."spaceId" = $1
   and "shared_space_person"."isHidden" = $2
-  and "person"."thumbnailPath" is not null
-  and "person"."thumbnailPath" != $3
 order by
   CASE
     WHEN shared_space_person.name != '' THEN 0
@@ -423,7 +421,7 @@ order by
   "shared_space_person"."assetCount" desc,
   "shared_space_person"."id"
 limit
-  $4
+  $3
 
 -- SharedSpaceRepository.getPersonById
 select
@@ -477,6 +475,42 @@ set
   "personId" = $1
 where
   "personId" = $2
+
+-- SharedSpaceRepository.getFirstFaceIdForPerson
+select
+  "shared_space_person_face"."assetFaceId"
+from
+  "shared_space_person_face"
+  inner join "face_search" on "face_search"."faceId" = "shared_space_person_face"."assetFaceId"
+where
+  "shared_space_person_face"."personId" = $1
+limit
+  $2
+
+-- SharedSpaceRepository.repairOrphanedRepresentativeFaces
+update "shared_space_person"
+set
+  "representativeFaceId" = (
+    select
+      "shared_space_person_face"."assetFaceId"
+    from
+      "shared_space_person_face"
+      inner join "face_search" on "face_search"."faceId" = "shared_space_person_face"."assetFaceId"
+    where
+      "shared_space_person_face"."personId" = "shared_space_person"."id"
+    limit
+      $1
+  )
+where
+  "shared_space_person"."spaceId" = $2
+  and "shared_space_person"."representativeFaceId" is null
+  and exists (
+    select
+    from
+      "shared_space_person_face"
+    where
+      "shared_space_person_face"."personId" = "shared_space_person"."id"
+  )
 
 -- SharedSpaceRepository.removePersonFacesByAssetIds
 select distinct
@@ -695,6 +729,7 @@ select
   "shared_space_person"."type",
   "shared_space_person"."isHidden",
   "shared_space_person"."faceCount",
+  "shared_space_person"."representativeFaceId",
   "face_search"."embedding"
 from
   "shared_space_person"
