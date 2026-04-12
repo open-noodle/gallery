@@ -435,7 +435,6 @@ export class PersonService extends BaseService {
       // space-persons are lost by design (Force already clears named native persons).
       await this.sharedSpaceRepository.deleteAllPersonFaces();
       await this.sharedSpaceRepository.deleteAllPersons();
-
     } else if (waiting) {
       this.logger.debug(
         `Skipping facial recognition queueing because ${waiting} job${waiting > 1 ? 's are' : ' is'} already queued`,

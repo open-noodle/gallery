@@ -1002,11 +1002,7 @@ describe(SharedSpaceRepository.name, () => {
       });
 
       // Soft-delete the representative face
-      await ctx.database
-        .updateTable('asset_face')
-        .set({ deletedAt: new Date() })
-        .where('id', '=', face.id)
-        .execute();
+      await ctx.database.updateTable('asset_face').set({ deletedAt: new Date() }).where('id', '=', face.id).execute();
 
       const result = await sut.getPersonsBySpaceId(space.id, {});
 

@@ -30,7 +30,7 @@ async function createFaceWithEmbedding(
   const { result: faceId } = await ctx.newAssetFace({
     assetId: opts.assetId,
     personId: opts.personId ?? null,
-    ...(opts.isVisible !== undefined ? { isVisible: opts.isVisible } : {}),
+    ...(opts.isVisible === undefined ? {} : { isVisible: opts.isVisible }),
   });
   await ctx.database.insertInto('face_search').values({ faceId, embedding: newEmbedding() }).execute();
   return faceId;
@@ -184,19 +184,12 @@ describe('SharedSpaceRepository - face matching pipeline', () => {
       await sut.recountPersons([spacePersonP1.id]);
 
       // Simulate force reset: delete all space person faces and space persons
-      await ctx.database
-        .deleteFrom('shared_space_person_face')
-        .where('personId', '=', spacePersonP1.id)
-        .execute();
+      await ctx.database.deleteFrom('shared_space_person_face').where('personId', '=', spacePersonP1.id).execute();
       await sut.deletePerson(spacePersonP1.id);
 
       // Reassign faces to P2 (simulating re-recognition)
       for (const faceId of faceIds) {
-        await ctx.database
-          .updateTable('asset_face')
-          .set({ personId: personP2.id })
-          .where('id', '=', faceId)
-          .execute();
+        await ctx.database.updateTable('asset_face').set({ personId: personP2.id }).where('id', '=', faceId).execute();
       }
 
       // Re-run processSpaceFaceMatch for P2
@@ -447,7 +440,12 @@ describe('SharedSpaceRepository - face matching pipeline', () => {
           await sut.addPersonFaces([{ personId: existing.id, assetFaceId: faceId }], { skipRecount: true });
           spacePersonId = existing.id;
         } else {
-          const sp = await sut.createPerson({ spaceId: space.id, name: '', representativeFaceId: faceId, type: 'person' });
+          const sp = await sut.createPerson({
+            spaceId: space.id,
+            name: '',
+            representativeFaceId: faceId,
+            type: 'person',
+          });
           await sut.addPersonFaces([{ personId: sp.id, assetFaceId: faceId }], { skipRecount: true });
           spacePersonId = sp.id;
         }
@@ -503,11 +501,7 @@ describe('SharedSpaceRepository - face matching pipeline', () => {
       const face4 = await createFaceWithEmbedding(ctx, { assetId: asset4.id });
       const sp4 = await sut.createPerson({ spaceId: space.id, name: '', representativeFaceId: face4, type: 'person' });
       await sut.addPersonFaces([{ personId: sp4.id, assetFaceId: face4 }]);
-      await ctx.database
-        .updateTable('asset_face')
-        .set({ deletedAt: new Date() })
-        .where('id', '=', face4)
-        .execute();
+      await ctx.database.updateTable('asset_face').set({ deletedAt: new Date() }).where('id', '=', face4).execute();
 
       // SP5: has global person but person was deleted (simulate by referencing non-existent person)
       const { result: person5 } = await ctx.newPerson({ ownerId: user.id, name: 'Person5' });
@@ -578,7 +572,12 @@ describe('SharedSpaceRepository - face matching pipeline', () => {
       const { result: person } = await ctx.newPerson({ ownerId: user.id, thumbnailPath: '' });
       const faceId = await createFaceWithEmbedding(ctx, { assetId: asset.id, personId: person.id });
 
-      const sp = await sut.createPerson({ spaceId: space.id, name: 'Empty Thumb', representativeFaceId: faceId, type: 'person' });
+      const sp = await sut.createPerson({
+        spaceId: space.id,
+        name: 'Empty Thumb',
+        representativeFaceId: faceId,
+        type: 'person',
+      });
       await sut.addPersonFaces([{ personId: sp.id, assetFaceId: faceId }], { skipRecount: false });
 
       const result = await sut.getPersonsBySpaceId(space.id, {});
@@ -593,7 +592,12 @@ describe('SharedSpaceRepository - face matching pipeline', () => {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
       const faceId = await createFaceWithEmbedding(ctx, { assetId: asset.id, personId: null });
 
-      const sp = await sut.createPerson({ spaceId: space.id, name: 'No Global Person', representativeFaceId: faceId, type: 'person' });
+      const sp = await sut.createPerson({
+        spaceId: space.id,
+        name: 'No Global Person',
+        representativeFaceId: faceId,
+        type: 'person',
+      });
       await sut.addPersonFaces([{ personId: sp.id, assetFaceId: faceId }], { skipRecount: false });
 
       const result = await sut.getPersonsBySpaceId(space.id, {});
@@ -606,10 +610,19 @@ describe('SharedSpaceRepository - face matching pipeline', () => {
       const { user } = await ctx.newUser();
       const { space } = await ctx.newSharedSpace({ createdById: user.id });
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { result: person } = await ctx.newPerson({ ownerId: user.id, name: 'Soon Deleted', thumbnailPath: '/thumb.jpg' });
+      const { result: person } = await ctx.newPerson({
+        ownerId: user.id,
+        name: 'Soon Deleted',
+        thumbnailPath: '/thumb.jpg',
+      });
       const faceId = await createFaceWithEmbedding(ctx, { assetId: asset.id, personId: person.id });
 
-      const sp = await sut.createPerson({ spaceId: space.id, name: 'Survives Delete', representativeFaceId: faceId, type: 'person' });
+      const sp = await sut.createPerson({
+        spaceId: space.id,
+        name: 'Survives Delete',
+        representativeFaceId: faceId,
+        type: 'person',
+      });
       await sut.addPersonFaces([{ personId: sp.id, assetFaceId: faceId }], { skipRecount: false });
 
       // Delete the global person — face's personId becomes dangling
@@ -982,11 +995,7 @@ describe('SharedSpaceRepository - face matching pipeline', () => {
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: assetB.id });
       const faceB = await createFaceWithEmbedding(ctx, { assetId: assetB.id });
       // Trash asset B
-      await ctx.database
-        .updateTable('asset')
-        .set({ deletedAt: new Date() })
-        .where('id', '=', assetB.id)
-        .execute();
+      await ctx.database.updateTable('asset').set({ deletedAt: new Date() }).where('id', '=', assetB.id).execute();
 
       const sp = await sut.createPerson({
         spaceId: space.id,
@@ -1222,11 +1231,7 @@ describe('SharedSpaceRepository - face matching pipeline', () => {
 
       // F3: soft-deleted (deletedAt set), has face_search -> excluded
       const f3 = await createFaceWithEmbedding(ctx, { assetId: asset.id, isVisible: true });
-      await ctx.database
-        .updateTable('asset_face')
-        .set({ deletedAt: new Date() })
-        .where('id', '=', f3)
-        .execute();
+      await ctx.database.updateTable('asset_face').set({ deletedAt: new Date() }).where('id', '=', f3).execute();
 
       const faces = await sut.getAssetFacesForMatching(asset.id);
       expect(faces).toHaveLength(1);
@@ -1315,11 +1320,7 @@ describe('SharedSpaceRepository - face matching pipeline', () => {
       await sut.addPersonFaces([{ personId: sp1.id, assetFaceId: face1 }]);
 
       // Change F1's personId to P2 (simulate re-recognition)
-      await ctx.database
-        .updateTable('asset_face')
-        .set({ personId: personP2.id })
-        .where('id', '=', face1)
-        .execute();
+      await ctx.database.updateTable('asset_face').set({ personId: personP2.id }).where('id', '=', face1).execute();
 
       // Space assignment is unchanged
       expect(await sut.isPersonFaceAssigned(face1, space.id)).toBe(true);
