@@ -27,6 +27,14 @@ import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/timeline.repository.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 
+typedef MatrixCase = ({
+  String name,
+  Future<void> Function() setup,
+  int expectedCount,
+  List<String> userIds,
+  String currentUserId,
+});
+
 Future<void> _waitFor(bool Function() predicate, {Duration timeout = const Duration(seconds: 2)}) async {
   final deadline = DateTime.now().add(timeout);
   while (!predicate()) {
@@ -106,6 +114,242 @@ void main() {
   Future<void> linkLibraryToSpace(String spaceId, String libraryId) => db
       .into(db.sharedSpaceLibraryEntity)
       .insert(SharedSpaceLibraryEntityCompanion.insert(spaceId: spaceId, libraryId: libraryId));
+
+  // ---------------------------------------------------------------------------
+  // Permission matrix helper — Task 14.5
+  // ---------------------------------------------------------------------------
+  // Defines 13 cross-cutting permission cases that every visibility-aware
+  // method (video, place, map, marker) must satisfy. The helper is invoked
+  // once per method via a method-specific `insertAsset` closure that handles
+  // any per-method prereqs (e.g. exif city for place, lat/lng for map/marker).
+  //
+  // The underscore prefix on the type/function names is stylistic — they're
+  // nested inside main() so the underscore is not actually a privacy marker.
+
+  List<MatrixCase> permissionMatrixCases({
+    required Future<void> Function(String assetId, String ownerId) insertAsset,
+  }) {
+    Future<void> single(
+      String ownerId,
+      Future<void> Function(String assetId) extra,
+    ) async {
+      await insertUser(ownerId);
+      await insertAsset('asset-1', ownerId);
+      await extra('asset-1');
+    }
+
+    return <MatrixCase>[
+      (
+        name: 'M1: owner asset visible',
+        setup: () async {
+          await insertUser('viewer');
+          await insertAsset('asset-1', 'viewer');
+        },
+        expectedCount: 1,
+        userIds: const ['viewer'],
+        currentUserId: 'viewer',
+      ),
+      (
+        name: 'M2: partner asset visible',
+        setup: () async {
+          await insertUser('viewer');
+          await single('partner', (_) async {});
+        },
+        expectedCount: 1,
+        userIds: const ['viewer', 'partner'],
+        currentUserId: 'viewer',
+      ),
+      (
+        name: 'M3: unrelated user hidden',
+        setup: () async {
+          await insertUser('viewer');
+          await single('stranger', (_) async {});
+        },
+        expectedCount: 0,
+        userIds: const ['viewer'],
+        currentUserId: 'viewer',
+      ),
+      (
+        name: 'M4: space member showInTimeline=true visible',
+        setup: () async {
+          await insertUser('viewer');
+          await single('owner', (a) async {
+            await insertSpace('sp1', 'owner');
+            await insertMember('sp1', 'viewer', showInTimeline: true);
+            await linkAssetToSpace('sp1', a);
+          });
+        },
+        expectedCount: 1,
+        userIds: const ['viewer'],
+        currentUserId: 'viewer',
+      ),
+      (
+        name: 'M5: space member showInTimeline=false hidden',
+        setup: () async {
+          await insertUser('viewer');
+          await single('owner', (a) async {
+            await insertSpace('sp1', 'owner');
+            await insertMember('sp1', 'viewer', showInTimeline: false);
+            await linkAssetToSpace('sp1', a);
+          });
+        },
+        expectedCount: 0,
+        userIds: const ['viewer'],
+        currentUserId: 'viewer',
+      ),
+      (
+        name: 'M6: partner is member, viewer is NOT -> hidden',
+        setup: () async {
+          await insertUser('viewer');
+          await insertUser('partner');
+          await single('owner', (a) async {
+            await insertSpace('sp1', 'owner');
+            await insertMember('sp1', 'partner', showInTimeline: true);
+            await linkAssetToSpace('sp1', a);
+          });
+        },
+        expectedCount: 0,
+        userIds: const ['viewer', 'partner'],
+        currentUserId: 'viewer',
+      ),
+      (
+        name: 'M7: library-in-space showInTimeline=true visible',
+        setup: () async {
+          await insertUser('viewer');
+          await insertUser('owner');
+          await insertAsset('asset-1', 'owner');
+          await (db.update(db.remoteAssetEntity)..where((t) => t.id.equals('asset-1')))
+              .write(const RemoteAssetEntityCompanion(libraryId: Value('lib-1')));
+          await insertSpace('sp1', 'owner');
+          await insertMember('sp1', 'viewer', showInTimeline: true);
+          await linkLibraryToSpace('sp1', 'lib-1');
+        },
+        expectedCount: 1,
+        userIds: const ['viewer'],
+        currentUserId: 'viewer',
+      ),
+      (
+        name: 'M8: library-in-space showInTimeline=false hidden',
+        setup: () async {
+          await insertUser('viewer');
+          await insertUser('owner');
+          await insertAsset('asset-1', 'owner');
+          await (db.update(db.remoteAssetEntity)..where((t) => t.id.equals('asset-1')))
+              .write(const RemoteAssetEntityCompanion(libraryId: Value('lib-1')));
+          await insertSpace('sp1', 'owner');
+          await insertMember('sp1', 'viewer', showInTimeline: false);
+          await linkLibraryToSpace('sp1', 'lib-1');
+        },
+        expectedCount: 0,
+        userIds: const ['viewer'],
+        currentUserId: 'viewer',
+      ),
+      (
+        name: 'M9: asset in 2 direct spaces counted once',
+        setup: () async {
+          await insertUser('viewer');
+          await single('owner', (a) async {
+            await insertSpace('sp1', 'owner');
+            await insertSpace('sp2', 'owner');
+            await insertMember('sp1', 'viewer');
+            await insertMember('sp2', 'viewer');
+            await linkAssetToSpace('sp1', a);
+            await linkAssetToSpace('sp2', a);
+          });
+        },
+        expectedCount: 1,
+        userIds: const ['viewer'],
+        currentUserId: 'viewer',
+      ),
+      (
+        name: 'M10: direct + library link on same space counted once',
+        setup: () async {
+          await insertUser('viewer');
+          await insertUser('owner');
+          await insertAsset('asset-1', 'owner');
+          await (db.update(db.remoteAssetEntity)..where((t) => t.id.equals('asset-1')))
+              .write(const RemoteAssetEntityCompanion(libraryId: Value('lib-1')));
+          await insertSpace('sp1', 'owner');
+          await insertMember('sp1', 'viewer');
+          await linkAssetToSpace('sp1', 'asset-1');
+          await linkLibraryToSpace('sp1', 'lib-1');
+        },
+        expectedCount: 1,
+        userIds: const ['viewer'],
+        currentUserId: 'viewer',
+      ),
+      (
+        name: 'M11: opposite showInTimeline across two spaces -> visible via true branch',
+        setup: () async {
+          await insertUser('viewer');
+          await insertUser('owner');
+          await insertAsset('asset-1', 'owner');
+          await (db.update(db.remoteAssetEntity)..where((t) => t.id.equals('asset-1')))
+              .write(const RemoteAssetEntityCompanion(libraryId: Value('lib-1')));
+          await insertSpace('sp_a', 'owner');
+          await insertSpace('sp_b', 'owner');
+          await insertMember('sp_a', 'viewer', showInTimeline: true);
+          await insertMember('sp_b', 'viewer', showInTimeline: false);
+          await linkAssetToSpace('sp_a', 'asset-1');
+          await linkLibraryToSpace('sp_b', 'lib-1');
+        },
+        expectedCount: 1,
+        userIds: const ['viewer'],
+        currentUserId: 'viewer',
+      ),
+      (
+        name: 'M12: role=admin sees same as role=viewer',
+        setup: () async {
+          await insertUser('viewer');
+          await single('owner', (a) async {
+            await insertSpace('sp1', 'owner');
+            await db.into(db.sharedSpaceMemberEntity).insert(
+                  SharedSpaceMemberEntityCompanion.insert(
+                    spaceId: 'sp1',
+                    userId: 'viewer',
+                    role: 'admin',
+                    showInTimeline: const Value(true),
+                  ),
+                );
+            await linkAssetToSpace('sp1', a);
+          });
+        },
+        expectedCount: 1,
+        userIds: const ['viewer'],
+        currentUserId: 'viewer',
+      ),
+      (
+        name: 'M13: viewer + partner both members of same space -> visible once',
+        setup: () async {
+          await insertUser('viewer');
+          await insertUser('partner');
+          await single('owner', (a) async {
+            await insertSpace('sp1', 'owner');
+            await insertMember('sp1', 'viewer', showInTimeline: true);
+            await insertMember('sp1', 'partner', showInTimeline: true);
+            await linkAssetToSpace('sp1', a);
+          });
+        },
+        expectedCount: 1,
+        userIds: const ['viewer', 'partner'],
+        currentUserId: 'viewer',
+      ),
+    ];
+  }
+
+  void runPermissionMatrix({
+    required String methodName,
+    required Future<void> Function(String assetId, String ownerId) insertAsset,
+    required Future<int> Function(List<String> userIds, String currentUserId) count,
+  }) {
+    for (final tc in permissionMatrixCases(insertAsset: insertAsset)) {
+      test('$methodName — ${tc.name}', () async {
+        await tc.setup();
+        final got = await count(tc.userIds, tc.currentUserId);
+        expect(got, tc.expectedCount, reason: 'matrix case: ${tc.name}');
+      });
+    }
+  }
 
   Future<int> videoBucketCount(List<String> userIds, String currentUserId) async {
     final first = await sut.video(userIds, currentUserId, GroupAssetsBy.day).bucketSource().first;
@@ -565,6 +809,67 @@ void main() {
 
       await sub.cancel();
     });
+  });
+
+  group('Cross-method permission matrix — video()', () {
+    runPermissionMatrix(
+      methodName: 'video',
+      insertAsset: (assetId, ownerId) =>
+          insertVideo(assetId, ownerId, type: AssetType.video),
+      count: (userIds, currentUserId) async {
+        final buckets = await sut
+            .video(userIds, currentUserId, GroupAssetsBy.day)
+            .bucketSource()
+            .first;
+        return buckets.fold<int>(0, (sum, b) => sum + (b as TimeBucket).assetCount);
+      },
+    );
+  });
+
+  group('Cross-method permission matrix — place()', () {
+    runPermissionMatrix(
+      methodName: 'place',
+      insertAsset: (assetId, ownerId) async {
+        await insertVideo(assetId, ownerId, type: AssetType.image);
+        await db
+            .into(db.remoteExifEntity)
+            .insert(RemoteExifEntityCompanion.insert(assetId: assetId, city: const Value('Paris')));
+      },
+      count: (userIds, currentUserId) async {
+        final buckets = await sut
+            .place('Paris', userIds, currentUserId, GroupAssetsBy.day)
+            .bucketSource()
+            .first;
+        return buckets.fold<int>(0, (sum, b) => sum + (b as TimeBucket).assetCount);
+      },
+    );
+  });
+
+  group('Cross-method permission matrix — map()', () {
+    final bounds = LatLngBounds(
+      southwest: const LatLng(-89, -179),
+      northeast: const LatLng(89, 179),
+    );
+    runPermissionMatrix(
+      methodName: 'map',
+      insertAsset: (assetId, ownerId) async {
+        await insertVideo(assetId, ownerId, type: AssetType.image);
+        await db.into(db.remoteExifEntity).insert(
+              RemoteExifEntityCompanion.insert(
+                assetId: assetId,
+                latitude: const Value(48.85),
+                longitude: const Value(2.35),
+              ),
+            );
+      },
+      count: (userIds, currentUserId) async {
+        final buckets = await sut
+            .map(userIds, currentUserId, TimelineMapOptions(bounds: bounds), GroupAssetsBy.day)
+            .bucketSource()
+            .first;
+        return buckets.fold<int>(0, (sum, b) => sum + (b as TimeBucket).assetCount);
+      },
+    );
   });
 
   // PRE-FLIGHT: verifies Drift's reactive layer tracks tables reached via
