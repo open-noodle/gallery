@@ -20,6 +20,7 @@
   import { Button, Icon, IconButton, modalManager, toastManager } from '@immich/ui';
   import {
     mdiAccountGroupOutline,
+    mdiAccountMultipleCheckOutline,
     mdiArrowLeft,
     mdiDotsVertical,
     mdiEyeOffOutline,
