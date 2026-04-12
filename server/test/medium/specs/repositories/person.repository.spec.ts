@@ -23,6 +23,35 @@ beforeAll(async () => {
 });
 
 describe(PersonRepository.name, () => {
+  describe('getAllWithoutFaces', () => {
+    it('should return persons with no asset_face rows, including named ones', async () => {
+      // Regression: the previous query used LEFT JOIN + WHERE on the joined table,
+      // which silently converts to INNER JOIN and hides persons with zero asset_face
+      // rows entirely. Named zombies (e.g. after force-recognition reset unassigned
+      // their faces) accumulated in production. This test pins the correct behavior.
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+
+      // Person A: has a visible face → should NOT be returned.
+      const { asset: assetA } = await ctx.newAsset({ ownerId: user.id });
+      const { person: personA } = await ctx.newPerson({ ownerId: user.id, name: 'Alice' });
+      await ctx.newAssetFace({ assetId: assetA.id, personId: personA.id });
+
+      // Person B: named, zero asset_face rows → SHOULD be returned.
+      const { person: personB } = await ctx.newPerson({ ownerId: user.id, name: 'Bob' });
+
+      // Person C: unnamed, zero asset_face rows → SHOULD be returned.
+      const { person: personC } = await ctx.newPerson({ ownerId: user.id });
+
+      const result = await sut.getAllWithoutFaces();
+      const ids = result.map((p) => p.id);
+
+      expect(ids).not.toContain(personA.id);
+      expect(ids).toContain(personB.id);
+      expect(ids).toContain(personC.id);
+    });
+  });
+
   describe('getDataForThumbnailGenerationJob', () => {
     it('should not return the edited preview path', async () => {
       const { ctx, sut } = setup();

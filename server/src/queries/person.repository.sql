@@ -62,8 +62,7 @@ select
 from
   "person"
   left join "asset_face" on "asset_face"."personId" = "person"."id"
-where
-  "asset_face"."deletedAt" is null
+  and "asset_face"."deletedAt" is null
   and "asset_face"."isVisible" is true
 group by
   "person"."id"
