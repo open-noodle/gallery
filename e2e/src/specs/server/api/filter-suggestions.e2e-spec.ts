@@ -47,6 +47,12 @@ describe('/search/suggestions/filters', () => {
       await utils.waitForWebsocketEvent({ event: 'assetUpload', id: asset.id });
     }
 
+    // Drain metadata extraction before mutating ratings/tags. Otherwise a late
+    // metadata extraction can race with the test's tagAssets() call — applyTagList
+    // in metadata.service.ts calls replaceAssetTags, which wipes tags set by the
+    // test if the extraction hasn't finished yet. See #331-adjacent flake.
+    await utils.waitForQueueFinish(admin.accessToken, 'metadataExtraction');
+
     // Set distinct coordinates for different countries
     const coordinates = [
       { latitude: 48.853_41, longitude: 2.3488 }, // Paris, France

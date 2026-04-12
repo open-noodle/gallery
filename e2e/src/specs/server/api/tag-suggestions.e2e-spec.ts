@@ -44,6 +44,14 @@ describe('GET /search/suggestions/tags', () => {
       utils.createAsset(userB.accessToken).then((a) => a.id),
     ]);
 
+    // Drain metadata extraction before associating tags. Otherwise a late
+    // metadata extraction calls applyTagList → replaceAssetTags which DELETEs
+    // all tag_asset rows for the asset and re-inserts from EXIF. The test's
+    // PNGs have no EXIF tags, so tag associations set below get wiped. On
+    // slower ARM runners this race is reliable. Same root cause as the
+    // filter-suggestions flake fix.
+    await utils.waitForQueueFinish(admin.accessToken, 'metadataExtraction');
+
     // userA's tag → userA's asset
     const aTagRes = await request(app).post('/tags').set(asBearerAuth(userA.accessToken)).send({ name: 't34-tag-A' });
     userATagId = (aTagRes.body as { id: string }).id;
