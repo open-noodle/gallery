@@ -215,15 +215,40 @@ export class SharedSpaceService extends BaseService {
     const thumbnailCropY = dto.thumbnailAssetId === undefined ? dto.thumbnailCropY : null;
 
     const existing = await this.sharedSpaceRepository.getById(id);
-    const space = await this.sharedSpaceRepository.update(id, {
-      name: dto.name,
-      description: dto.description,
-      thumbnailAssetId: dto.thumbnailAssetId,
-      thumbnailCropY,
-      color: dto.color,
-      faceRecognitionEnabled: dto.faceRecognitionEnabled,
-      petsEnabled: dto.petsEnabled,
-    });
+
+    // Build update payload with only defined fields — Kysely's .set() with all-undefined
+    // values produces an empty SET clause and a SQL syntax error.
+    const updatePayload: Parameters<typeof this.sharedSpaceRepository.update>[1] = {};
+    if (dto.name !== undefined) {
+      updatePayload.name = dto.name;
+    }
+    if (dto.description !== undefined) {
+      updatePayload.description = dto.description;
+    }
+    if (dto.thumbnailAssetId !== undefined) {
+      updatePayload.thumbnailAssetId = dto.thumbnailAssetId;
+    }
+    if (thumbnailCropY !== undefined) {
+      updatePayload.thumbnailCropY = thumbnailCropY;
+    }
+    if (dto.color !== undefined) {
+      updatePayload.color = dto.color;
+    }
+    if (dto.faceRecognitionEnabled !== undefined) {
+      updatePayload.faceRecognitionEnabled = dto.faceRecognitionEnabled;
+    }
+    if (dto.petsEnabled !== undefined) {
+      updatePayload.petsEnabled = dto.petsEnabled;
+    }
+
+    const space =
+      Object.keys(updatePayload).length > 0 && existing
+        ? await this.sharedSpaceRepository.update(id, updatePayload)
+        : existing;
+
+    if (!space) {
+      throw new BadRequestException('Space not found');
+    }
 
     if (existing) {
       if (dto.name !== undefined && dto.name !== existing.name) {

@@ -688,6 +688,21 @@ describe(SharedSpaceService.name, () => {
   });
 
   describe('update', () => {
+    it('should no-op and return existing space when dto is empty', async () => {
+      const auth = factory.auth();
+      const space = factory.sharedSpace();
+      const member = makeMemberResult({ spaceId: space.id, userId: auth.user.id, role: SharedSpaceRole.Editor });
+
+      mocks.sharedSpace.getMember.mockResolvedValue(member);
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+
+      const result = await sut.update(auth, space.id, {});
+
+      expect(result.id).toBe(space.id);
+      expect(mocks.sharedSpace.update).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.logActivity).not.toHaveBeenCalled();
+    });
+
     it('should update when user is owner', async () => {
       const auth = factory.auth();
       const space = factory.sharedSpace();
