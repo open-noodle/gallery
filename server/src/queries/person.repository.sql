@@ -7,36 +7,10 @@ set
 where
   "asset_face"."personId" = $2
 
--- PersonRepository.unassignFaces
-update "asset_face"
-set
-  "personGroupId" = $1
-from
-  "asset"
-  inner join "user" on "user"."id" = "asset"."ownerId"
-where
-  "asset_face"."assetId" = "asset"."id"
-  and "asset_face"."sourceType" = $2
-  and "user"."clusterGroupId" = $3
-
 -- PersonRepository.delete
 delete from "person"
 where
   "person"."id" in ($1)
-
--- PersonRepository.getAllFaces
-select
-  "asset_face".*
-from
-  "asset_face"
-  inner join "asset" on "asset"."id" = "asset_face"."assetId"
-  inner join "user" on "user"."id" = "asset"."ownerId"
-where
-  "asset_face"."personGroupId" is null
-  and "asset_face"."sourceType" = $1
-  and "user"."clusterGroupId" = $2
-  and "asset_face"."deletedAt" is null
-  and "asset_face"."isVisible" is true
 
 -- PersonRepository.getFileSamples
 select
@@ -99,16 +73,12 @@ select
 from
   "person"
   left join "asset_face" on "asset_face"."personId" = "person"."id"
-where
-  "asset_face"."deletedAt" is null
-  and (
-    "asset_face"."isVisible" is null
-    or "asset_face"."isVisible" = $1
-  )
+  and "asset_face"."deletedAt" is null
+  and "asset_face"."isVisible" is true
 group by
   "person"."id"
 having
-  count("asset_face"."assetId") = $2
+  count("asset_face"."assetId") = $1
 
 -- PersonRepository.getFaces
 select
