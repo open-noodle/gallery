@@ -206,14 +206,21 @@ export class PersonRepository {
 
   @GenerateSql()
   getAllWithoutFaces() {
+    // The deletedAt / isVisible predicates must live inside the JOIN ON clause,
+    // not in WHERE. A WHERE filter on a LEFT JOIN'd table silently converts it
+    // to an INNER JOIN, which excludes persons with zero asset_face rows entirely
+    // and leaves named zombies uncleaned after a force-recognition reset.
     return this.db
       .selectFrom('person')
       .selectAll('person')
-      .leftJoin('asset_face', 'asset_face.personId', 'person.id')
-      .where('asset_face.deletedAt', 'is', null)
-      .where('asset_face.isVisible', 'is', true)
-      .having((eb) => eb.fn.count('asset_face.assetId'), '=', 0)
+      .leftJoin('asset_face', (join) =>
+        join
+          .onRef('asset_face.personId', '=', 'person.id')
+          .on('asset_face.deletedAt', 'is', null)
+          .on('asset_face.isVisible', 'is', true),
+      )
       .groupBy('person.id')
+      .having((eb) => eb.fn.count('asset_face.assetId'), '=', 0)
       .execute();
   }
 
