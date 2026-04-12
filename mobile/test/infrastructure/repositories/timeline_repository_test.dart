@@ -16,6 +16,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:immich_mobile/infrastructure/entities/exif.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/remote_asset.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/shared_space.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/shared_space_asset.entity.drift.dart';
@@ -357,6 +358,82 @@ void main() {
       );
 
       await sub.cancel();
+    });
+  });
+
+  group('DriftTimelineRepository.place()', () {
+    Future<void> insertExif(String assetId, String? city) => db
+        .into(db.remoteExifEntity)
+        .insert(RemoteExifEntityCompanion.insert(assetId: assetId, city: Value(city)));
+
+    test('place() hides assets with wrong city even when viewer-visible', () async {
+      await insertUser('viewer');
+      await insertVideo('a1', 'viewer', type: AssetType.image);
+      await insertExif('a1', 'Berlin');
+
+      final buckets = await sut
+          .place('Paris', ['viewer'], 'viewer', GroupAssetsBy.day)
+          .bucketSource()
+          .first;
+      expect(buckets, isEmpty);
+    });
+
+    test('place() shows right-city asset reachable via shared space', () async {
+      await insertUser('viewer');
+      await insertUser('owner');
+      await insertVideo('a1', 'owner', type: AssetType.image);
+      await insertExif('a1', 'Paris');
+      await insertSpace('space1', 'owner');
+      await insertMember('space1', 'viewer');
+      await linkAssetToSpace('space1', 'a1');
+
+      final buckets = await sut
+          .place('Paris', ['viewer'], 'viewer', GroupAssetsBy.day)
+          .bucketSource()
+          .first;
+      expect(buckets, hasLength(1));
+      expect((buckets.single as TimeBucket).assetCount, 1);
+    });
+
+    test('place() bucket stream re-emits when a shared_space_asset row is deleted', () async {
+      await insertUser('viewer');
+      await insertUser('owner');
+      await insertVideo('a1', 'owner', type: AssetType.image);
+      await insertExif('a1', 'Paris');
+      await insertSpace('space1', 'owner');
+      await insertMember('space1', 'viewer');
+      await linkAssetToSpace('space1', 'a1');
+
+      final emissions = <List<Bucket>>[];
+      final sub = sut
+          .place('Paris', ['viewer'], 'viewer', GroupAssetsBy.day)
+          .bucketSource()
+          .listen(emissions.add);
+
+      await _waitFor(() => emissions.isNotEmpty);
+      expect(emissions.last, hasLength(1));
+
+      await (db.delete(db.sharedSpaceAssetEntity)
+            ..where((t) => t.spaceId.equals('space1') & t.assetId.equals('a1')))
+          .go();
+
+      await _waitFor(() => emissions.length >= 2);
+      expect(emissions.last, isEmpty);
+
+      await sub.cancel();
+    });
+
+    test('place() hides stranger asset with matching city (place narrowing)', () async {
+      await insertUser('viewer');
+      await insertUser('stranger');
+      await insertVideo('a1', 'stranger', type: AssetType.image);
+      await insertExif('a1', 'Paris');
+
+      final buckets = await sut
+          .place('Paris', ['viewer'], 'viewer', GroupAssetsBy.day)
+          .bucketSource()
+          .first;
+      expect(buckets, isEmpty, reason: 'Unowned, unshared asset must not appear on place detail');
     });
   });
 
