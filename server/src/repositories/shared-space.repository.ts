@@ -553,8 +553,6 @@ export class SharedSpaceRepository {
       .where('shared_space_person.spaceId', '=', spaceId)
       .$if(!options.withHidden, (qb) => qb.where('shared_space_person.isHidden', '=', false))
       .$if(!options.petsEnabled, (qb) => qb.where('shared_space_person.type', '!=', 'pet'))
-      .where('person.thumbnailPath', 'is not', null)
-      .where('person.thumbnailPath', '!=', '')
       .$if(!!options.named, (qb) =>
         qb.where((eb) =>
           eb.or([

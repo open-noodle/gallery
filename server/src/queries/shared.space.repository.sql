@@ -411,8 +411,6 @@ from
 where
   "shared_space_person"."spaceId" = $1
   and "shared_space_person"."isHidden" = $2
-  and "person"."thumbnailPath" is not null
-  and "person"."thumbnailPath" != $3
 order by
   CASE
     WHEN shared_space_person.name != '' THEN 0
@@ -423,7 +421,7 @@ order by
   "shared_space_person"."assetCount" desc,
   "shared_space_person"."id"
 limit
-  $4
+  $3
 
 -- SharedSpaceRepository.getPersonById
 select
