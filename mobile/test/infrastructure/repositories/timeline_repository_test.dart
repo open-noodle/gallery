@@ -53,6 +53,205 @@ void main() {
     await db.close();
   });
 
+  Future<void> insertUser(String id) =>
+      db.into(db.userEntity).insert(UserEntityCompanion.insert(id: id, email: '$id@test', name: id));
+
+  Future<void> insertVideo(
+    String id,
+    String ownerId, {
+    String? libraryId,
+    AssetType type = AssetType.video,
+    AssetVisibility visibility = AssetVisibility.timeline,
+  }) {
+    final createdAt = DateTime(2024, 1, 1, 12);
+    return db
+        .into(db.remoteAssetEntity)
+        .insert(
+          RemoteAssetEntityCompanion.insert(
+            id: id,
+            name: '$id.mp4',
+            type: type,
+            checksum: 'c-$id',
+            ownerId: ownerId,
+            visibility: visibility,
+            createdAt: Value(createdAt),
+            updatedAt: Value(createdAt),
+            localDateTime: Value(createdAt),
+            libraryId: Value(libraryId),
+          ),
+        );
+  }
+
+  Future<void> insertSpace(String id, String ownerId) => db
+      .into(db.sharedSpaceEntity)
+      .insert(SharedSpaceEntityCompanion.insert(id: id, name: id, createdById: ownerId));
+
+  Future<void> insertMember(String spaceId, String userId, {bool showInTimeline = true}) => db
+      .into(db.sharedSpaceMemberEntity)
+      .insert(
+        SharedSpaceMemberEntityCompanion.insert(
+          spaceId: spaceId,
+          userId: userId,
+          role: 'viewer',
+          showInTimeline: Value(showInTimeline),
+        ),
+      );
+
+  Future<void> linkAssetToSpace(String spaceId, String assetId) => db
+      .into(db.sharedSpaceAssetEntity)
+      .insert(SharedSpaceAssetEntityCompanion.insert(spaceId: spaceId, assetId: assetId));
+
+  Future<void> linkLibraryToSpace(String spaceId, String libraryId) => db
+      .into(db.sharedSpaceLibraryEntity)
+      .insert(SharedSpaceLibraryEntityCompanion.insert(spaceId: spaceId, libraryId: libraryId));
+
+  Future<int> videoBucketCount(List<String> userIds, String currentUserId) async {
+    final first = await sut.video(userIds, currentUserId, GroupAssetsBy.day).bucketSource().first;
+    return first.fold<int>(0, (sum, b) => sum + (b as TimeBucket).assetCount);
+  }
+
+  Future<List<BaseAsset>> videoBucketAssets(List<String> userIds, String currentUserId) {
+    return sut.video(userIds, currentUserId, GroupAssetsBy.day).assetSource(0, 100);
+  }
+
+  group('DriftTimelineRepository.video() visibility matrix', () {
+    test('1. owner asset visible', () async {
+      await insertUser('viewer');
+      await insertVideo('a1', 'viewer');
+      expect(await videoBucketCount(['viewer'], 'viewer'), 1);
+      expect(await videoBucketAssets(['viewer'], 'viewer'), hasLength(1));
+    });
+
+    test('2. partner asset (owner in userIds) visible', () async {
+      await insertUser('viewer');
+      await insertUser('partner');
+      await insertVideo('a1', 'partner');
+      expect(await videoBucketCount(['viewer', 'partner'], 'viewer'), 1);
+    });
+
+    test('3. unrelated user asset hidden', () async {
+      await insertUser('viewer');
+      await insertUser('stranger');
+      await insertVideo('a1', 'stranger');
+      expect(await videoBucketCount(['viewer'], 'viewer'), 0);
+    });
+
+    test('4. space asset, viewer member, showInTimeline=true → visible', () async {
+      await insertUser('viewer');
+      await insertUser('owner');
+      await insertVideo('a1', 'owner');
+      await insertSpace('space1', 'owner');
+      await insertMember('space1', 'viewer', showInTimeline: true);
+      await linkAssetToSpace('space1', 'a1');
+      expect(await videoBucketCount(['viewer'], 'viewer'), 1);
+    });
+
+    test('5. space asset, viewer member, showInTimeline=false → hidden', () async {
+      await insertUser('viewer');
+      await insertUser('owner');
+      await insertVideo('a1', 'owner');
+      await insertSpace('space1', 'owner');
+      await insertMember('space1', 'viewer', showInTimeline: false);
+      await linkAssetToSpace('space1', 'a1');
+      expect(await videoBucketCount(['viewer'], 'viewer'), 0);
+    });
+
+    test('6. space asset where partner is member but viewer is NOT → hidden', () async {
+      await insertUser('viewer');
+      await insertUser('partner');
+      await insertUser('owner');
+      await insertVideo('a1', 'owner');
+      await insertSpace('space1', 'owner');
+      await insertMember('space1', 'partner', showInTimeline: true);
+      await linkAssetToSpace('space1', 'a1');
+      expect(await videoBucketCount(['viewer', 'partner'], 'viewer'), 0);
+    });
+
+    test('7. library-in-space, showInTimeline=true → visible', () async {
+      await insertUser('viewer');
+      await insertUser('owner');
+      await insertVideo('a1', 'owner', libraryId: 'lib1');
+      await insertSpace('space1', 'owner');
+      await insertMember('space1', 'viewer', showInTimeline: true);
+      await linkLibraryToSpace('space1', 'lib1');
+      expect(await videoBucketCount(['viewer'], 'viewer'), 1);
+    });
+
+    test('8. library-in-space, showInTimeline=false → hidden', () async {
+      await insertUser('viewer');
+      await insertUser('owner');
+      await insertVideo('a1', 'owner', libraryId: 'lib1');
+      await insertSpace('space1', 'owner');
+      await insertMember('space1', 'viewer', showInTimeline: false);
+      await linkLibraryToSpace('space1', 'lib1');
+      expect(await videoBucketCount(['viewer'], 'viewer'), 0);
+    });
+
+    test('9. asset in 2 directly-linked spaces → counted once', () async {
+      await insertUser('viewer');
+      await insertUser('owner');
+      await insertVideo('a1', 'owner');
+      await insertSpace('space1', 'owner');
+      await insertSpace('space2', 'owner');
+      await insertMember('space1', 'viewer');
+      await insertMember('space2', 'viewer');
+      await linkAssetToSpace('space1', 'a1');
+      await linkAssetToSpace('space2', 'a1');
+      expect(await videoBucketCount(['viewer'], 'viewer'), 1);
+      expect(await videoBucketAssets(['viewer'], 'viewer'), hasLength(1));
+    });
+
+    test('10. asset reachable via BOTH direct and library links on same space → counted once', () async {
+      await insertUser('viewer');
+      await insertUser('owner');
+      await insertVideo('a1', 'owner', libraryId: 'lib1');
+      await insertSpace('space1', 'owner');
+      await insertMember('space1', 'viewer');
+      await linkAssetToSpace('space1', 'a1');
+      await linkLibraryToSpace('space1', 'lib1');
+      expect(await videoBucketCount(['viewer'], 'viewer'), 1);
+      expect(await videoBucketAssets(['viewer'], 'viewer'), hasLength(1));
+    });
+
+    test('11. asset with library_id NULL reachable via shared_space_asset → visible', () async {
+      await insertUser('viewer');
+      await insertUser('owner');
+      await insertVideo('a1', 'owner');
+      await insertSpace('space1', 'owner');
+      await insertMember('space1', 'viewer');
+      await linkAssetToSpace('space1', 'a1');
+      expect(await videoBucketCount(['viewer'], 'viewer'), 1);
+    });
+
+    test('12. asset with library_id NULL NOT in any space → hidden', () async {
+      await insertUser('viewer');
+      await insertUser('owner');
+      await insertVideo('a1', 'owner');
+      expect(await videoBucketCount(['viewer'], 'viewer'), 0);
+    });
+
+    test('13. image asset reachable via space → hidden (type filter still applies)', () async {
+      await insertUser('viewer');
+      await insertUser('owner');
+      await insertVideo('a1', 'owner', type: AssetType.image);
+      await insertSpace('space1', 'owner');
+      await insertMember('space1', 'viewer');
+      await linkAssetToSpace('space1', 'a1');
+      expect(await videoBucketCount(['viewer'], 'viewer'), 0);
+    });
+
+    test('14. userIds = [user.id] only (loading fallback) → owner visible, space branches still work', () async {
+      await insertUser('viewer');
+      await insertUser('owner');
+      await insertVideo('owned', 'viewer');
+      await insertVideo('space', 'owner');
+      await insertSpace('space1', 'owner');
+      await insertMember('space1', 'viewer');
+      await linkAssetToSpace('space1', 'space');
+      expect(await videoBucketCount(['viewer'], 'viewer'), 2);
+    });
+  });
+
   // PRE-FLIGHT: verifies Drift's reactive layer tracks tables reached via
   // aliased LEFT OUTER JOINs. The full timeline space visibility design
   // (docs/plans/2026-04-12-mobile-timeline-space-visibility-design.md) is
