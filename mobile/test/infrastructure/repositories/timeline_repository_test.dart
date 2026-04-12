@@ -680,6 +680,31 @@ void main() {
           .first;
       expect(buckets, isEmpty, reason: 'Unowned, unshared asset must not appear on place detail');
     });
+
+    test('place() assetSource returns space-visible asset and hides stranger asset', () async {
+      // Direct regression test for the assetSource() / .get() path on place().
+      // bucketSource() runs against a separate query — this proves the asset
+      // list query also composes the visibility predicate with the exif join
+      // correctly.
+      await insertUser('viewer');
+      await insertUser('owner');
+      await insertUser('stranger');
+      await insertVideo('a1', 'owner', type: AssetType.image);
+      await insertExif('a1', 'Paris');
+      await insertSpace('space1', 'owner');
+      await insertMember('space1', 'viewer');
+      await linkAssetToSpace('space1', 'a1');
+
+      // Stranger asset with matching city must not appear.
+      await insertVideo('stranger1', 'stranger', type: AssetType.image);
+      await insertExif('stranger1', 'Paris');
+
+      final assets = await sut
+          .place('Paris', ['viewer'], 'viewer', GroupAssetsBy.day)
+          .assetSource(0, 100);
+      expect(assets, hasLength(1));
+      expect((assets.single as RemoteAsset).id, 'a1');
+    });
   });
 
   group('DriftTimelineRepository.map() bucket sheet', () {
@@ -775,6 +800,31 @@ void main() {
           .bucketSource()
           .first;
       expect(buckets, isEmpty);
+    });
+
+    test('map() assetSource returns in-bounds space-visible asset', () async {
+      // Direct regression test for the assetSource() / .get() path on map().
+      // Mirrors the place() assetSource test — proves the visibility predicate
+      // composes correctly with the exif inner join in the asset list query
+      // (not just the bucketSource() count query).
+      await insertUser('viewer');
+      await insertUser('owner');
+      await insertVideo('a1', 'owner', type: AssetType.image);
+      await insertExifAt('a1', 48.85, 2.35); // Paris, inside europeBounds
+      await insertSpace('space1', 'owner');
+      await insertMember('space1', 'viewer');
+      await linkAssetToSpace('space1', 'a1');
+
+      final assets = await sut
+          .map(
+            ['viewer'],
+            'viewer',
+            TimelineMapOptions(bounds: europeBounds()),
+            GroupAssetsBy.day,
+          )
+          .assetSource(0, 100);
+      expect(assets, hasLength(1));
+      expect((assets.single as RemoteAsset).id, 'a1');
     });
 
     test('map() bucket stream re-emits when shared_space_asset row is deleted', () async {
