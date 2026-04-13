@@ -1466,3 +1466,59 @@ describe('runNavigationProvider', () => {
     }
   });
 });
+
+describe('setQuery synchronous navigation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    vi.useFakeTimers();
+    installFakeAbortTimeout();
+    mockUser.current = { isAdmin: true };
+    mockFlags.valueOrUndefined = { search: true, map: true, trash: true };
+    mockI18nLocale.current = 'en';
+    vi.mocked(searchSmart).mockResolvedValue({ assets: { items: [], nextPage: null } } as never);
+    vi.mocked(searchAssets).mockResolvedValue({ assets: { items: [], nextPage: null } } as never);
+    vi.mocked(searchPerson).mockResolvedValue([] as never);
+    vi.mocked(searchPlaces).mockResolvedValue([] as never);
+    vi.mocked(getAllTags).mockResolvedValue([] as never);
+  });
+
+  afterEach(() => {
+    restoreAbortTimeout();
+    vi.useRealTimers();
+  });
+
+  it('navigation section updates synchronously BEFORE the debounce fires', () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    m.setQuery('classific');
+    // No timer advancement. Entity sections are loading, navigation is already ok.
+    expect(m.sections.navigation.status).toBe('ok');
+    expect(m.sections.photos.status).toBe('loading');
+    expect(m.sections.people.status).toBe('loading');
+    expect(m.sections.places.status).toBe('loading');
+    expect(m.sections.tags.status).toBe('loading');
+  });
+
+  it('runBatch does NOT re-invoke runNavigationProvider after the debounce', () => {
+    const m = new GlobalSearchManager();
+    const spy = vi.spyOn(
+      m as unknown as { runNavigationProvider: (q: string) => unknown },
+      'runNavigationProvider',
+    );
+    m.open();
+    m.setQuery('classific');
+    expect(spy).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(200);
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it('empty query resets navigation back to idle', () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    m.setQuery('classific');
+    expect(m.sections.navigation.status).toBe('ok');
+    m.setQuery('');
+    expect(m.sections.navigation.status).toBe('idle');
+  });
+});

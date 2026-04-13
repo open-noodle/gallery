@@ -591,12 +591,15 @@ export class GlobalSearchManager {
       return;
     }
 
+    // Navigation runs synchronously on every keystroke, bypassing the 150ms debounce.
+    // It's a pure in-memory scan, so there is no rate-limit or network concern. runBatch
+    // does NOT iterate over navigation — its hardcoded tuple is `photos/people/places/tags`.
     this.sections = {
       photos: { status: 'loading' },
       people: { status: 'loading' },
       places: { status: 'loading' },
       tags: { status: 'loading' },
-      navigation: idle, // Stub until Task 10 wires the synchronous runNavigationProvider call here
+      navigation: this.runNavigationProvider(text),
     };
     this.debounceTimer = setTimeout(() => this.runBatch(text, this.mode), 150);
   }
