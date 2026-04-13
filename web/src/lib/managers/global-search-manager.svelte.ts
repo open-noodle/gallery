@@ -5,7 +5,6 @@ import {
   searchPlaces,
   searchSmart,
   type MetadataSearchDto,
-  type SmartSearchDto,
 } from '@immich/sdk';
 
 export type SearchMode = 'smart' | 'metadata' | 'description' | 'ocr';
@@ -86,6 +85,9 @@ export class GlobalSearchManager {
     this.photosController = null;
     this.sections = { photos: idle, people: idle, places: idle, tags: idle };
     this.activeItemId = null;
+    // Reset query so reopening and re-typing the same string is not a no-op
+    // (setQuery short-circuits when `this.query === text`).
+    this.query = '';
   }
 
   toggle() {
@@ -178,7 +180,7 @@ export class GlobalSearchManager {
       run: async (query, mode, signal) => {
         try {
           if (mode === 'smart') {
-            const response = await searchSmart({ smartSearchDto: { query, size: 5 } as SmartSearchDto }, { signal });
+            const response = await searchSmart({ smartSearchDto: { query, size: 5 } }, { signal });
             const items = response.assets.items;
             return items.length === 0 ? { status: 'empty' } : { status: 'ok', items, total: items.length };
           }

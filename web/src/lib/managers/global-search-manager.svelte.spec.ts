@@ -45,6 +45,13 @@ describe('GlobalSearchManager (skeleton)', () => {
     expect(manager.activeItemId).toBe(null);
   });
 
+  it('close() resets query so reopening and re-typing the same string runs a new batch', () => {
+    manager.open();
+    manager.query = 'beach';
+    manager.close();
+    expect(manager.query).toBe('');
+  });
+
   it('toggle() flips state', () => {
     manager.toggle();
     expect(manager.isOpen).toBe(true);
@@ -295,5 +302,48 @@ describe('real providers', () => {
       { name: 'santa' },
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
+  });
+
+  it('photos provider returns { status: error } when SDK throws non-abort error', async () => {
+    vi.mocked(searchSmart).mockRejectedValueOnce(new Error('network down'));
+    const m = new GlobalSearchManager();
+    m.setQuery('beach');
+    await vi.advanceTimersByTimeAsync(200);
+    await Promise.resolve();
+    expect(m.sections.photos).toEqual({ status: 'error', message: 'network down' });
+  });
+
+  it('people provider caps results at top 5', async () => {
+    vi.mocked(searchPerson).mockResolvedValue(
+      Array.from({ length: 8 }, (_, i) => ({ id: `p${i}`, name: `P${i}` })) as unknown as Awaited<
+        ReturnType<typeof searchPerson>
+      >,
+    );
+    const m = new GlobalSearchManager();
+    m.setQuery('al');
+    await vi.advanceTimersByTimeAsync(200);
+    const section = m.sections.people;
+    expect(section.status).toBe('ok');
+    if (section.status === 'ok') {
+      expect(section.items.length).toBe(5);
+      expect(section.total).toBe(8);
+    }
+  });
+
+  it('places provider caps results at top 3', async () => {
+    vi.mocked(searchPlaces).mockResolvedValue(
+      Array.from({ length: 6 }, (_, i) => ({ name: `P${i}`, latitude: i, longitude: i })) as unknown as Awaited<
+        ReturnType<typeof searchPlaces>
+      >,
+    );
+    const m = new GlobalSearchManager();
+    m.setQuery('sa');
+    await vi.advanceTimersByTimeAsync(200);
+    const section = m.sections.places;
+    expect(section.status).toBe('ok');
+    if (section.status === 'ok') {
+      expect(section.items.length).toBe(3);
+      expect(section.total).toBe(6);
+    }
   });
 });
