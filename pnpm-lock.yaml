@@ -791,6 +791,9 @@ importers:
       '@zoom-image/svelte':
         specifier: ^0.3.0
         version: 0.3.9(svelte@5.54.1)
+      bits-ui:
+        specifier: ^2.15.7
+        version: 2.16.3(@internationalized/date@3.12.0)(@sveltejs/kit@2.55.0(@opentelemetry/api@1.9.0)(@sveltejs/vite-plugin-svelte@7.0.0(svelte@5.54.1)(vite@8.0.5(@emnapi/core@1.9.1)(@emnapi/runtime@1.9.1)(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(sass@1.97.1)(terser@5.44.1)(tsx@4.21.0)(yaml@2.8.3)))(svelte@5.54.1)(typescript@6.0.2)(vite@8.0.5(@emnapi/core@1.9.1)(@emnapi/runtime@1.9.1)(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(sass@1.97.1)(terser@5.44.1)(tsx@4.21.0)(yaml@2.8.3)))(svelte@5.54.1)
       dom-to-image:
         specifier: ^2.6.0
         version: 2.6.0

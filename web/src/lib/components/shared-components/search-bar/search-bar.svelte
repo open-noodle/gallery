@@ -242,10 +242,7 @@
 </script>
 
 <svelte:document
-  use:shortcuts={[
-    { shortcut: { ctrl: true, key: 'k' }, onShortcut: () => input?.select() },
-    { shortcut: { ctrl: true, shift: true, key: 'k' }, onShortcut: onFilterClick },
-  ]}
+  use:shortcuts={[{ shortcut: { ctrl: true, shift: true, key: 'k' }, onShortcut: onFilterClick }]}
 />
 
 <div class="w-full relative z-auto" use:focusOutside={{ onFocusOut }} tabindex="-1">

@@ -8,6 +8,7 @@ import {
   ServerConfigDto,
   ServerFeaturesDto,
   ServerMediaTypesResponseDto,
+  ServerMlHealthResponseDto,
   ServerPingResponse,
   ServerStatsResponseDto,
   ServerStorageResponseDto,
@@ -40,6 +41,17 @@ export class ServerController {
   })
   getAboutInfo(): Promise<ServerAboutResponseDto> {
     return this.service.getAboutInfo();
+  }
+
+  @Get('ml-health')
+  @Authenticated({ permission: Permission.ServerAbout })
+  @Endpoint({
+    summary: 'Smart search health',
+    description: 'Reports whether the ML server is currently reachable and healthy for smart search.',
+    history: new HistoryBuilder().added('v2'),
+  })
+  getMlHealth(): Promise<ServerMlHealthResponseDto> {
+    return this.service.getMlHealth();
   }
 
   @Get('apk-links')

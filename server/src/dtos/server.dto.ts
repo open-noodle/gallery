@@ -58,6 +58,11 @@ export class ServerAboutResponseDto {
   thirdPartySupportUrl?: string;
 }
 
+export class ServerMlHealthResponseDto {
+  @ApiProperty({ description: 'Whether the ML server is currently reachable and healthy for smart search' })
+  smartSearchHealthy!: boolean;
+}
+
 export class ServerApkLinksDto {
   @ApiProperty({ description: 'APK download link for ARM64 v8a architecture' })
   arm64v8a!: string;

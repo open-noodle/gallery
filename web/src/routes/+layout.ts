@@ -2,7 +2,6 @@ import { goto } from '$app/navigation';
 import { serverConfigManager } from '$lib/managers/server-config-manager.svelte';
 import { maintenanceCreateUrl, maintenanceReturnUrl, maintenanceShouldRedirect } from '$lib/utils/maintenance';
 import { init } from '$lib/utils/server';
-import { commandPaletteManager } from '@immich/ui';
 import type { LayoutLoad } from './$types';
 
 export const ssr = false;
@@ -22,7 +21,10 @@ export const load = (async ({ fetch, url }) => {
     error = initError;
   }
 
-  commandPaletteManager.enable();
+  // commandPaletteManager.enable() is intentionally NOT called — we reclaim Ctrl+K /
+  // Cmd+K / `/` for the Gallery cmdk palette (GlobalSearchManager). Per-page
+  // <CommandPaletteDefaultProvider> mounts still compile but their shortcut is dead.
+  // Re-enable if per-page @immich/ui action palettes are needed in the future.
 
   return {
     error,
