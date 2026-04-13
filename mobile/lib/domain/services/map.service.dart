@@ -11,8 +11,8 @@ class MapFactory {
 
   const MapFactory({required this._mapRepository});
 
-  MapService remote(List<String> ownerIds, TimelineMapOptions options) =>
-      MapService(_mapRepository.remote(ownerIds, options));
+  MapService remote(List<String> userIds, String currentUserId, TimelineMapOptions options) =>
+      MapService(_mapRepository.remote(userIds, currentUserId, options));
 }
 
 class MapService {
