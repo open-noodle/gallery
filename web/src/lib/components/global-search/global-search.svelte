@@ -228,8 +228,14 @@
                `max-h-[80vh]` as a clamp for small viewports makes both columns
                definite-sized so Command.List's `overflow-y-auto` actually scrolls
                internally, and the preview pane is bounded by its column's height. -->
+          <!-- `min-w-0` on the left column is critical: flex children default to
+               `min-width: auto` (= content size), so without it the column refuses
+               to shrink below the widest row (long filenames) and the whole row
+               grows wider than the modal/viewport — pushing the fixed-width preview
+               pane off-screen. With min-w-0, flex-1 can shrink below content width
+               and the rows' `truncate` class ellipsizes long text. -->
           <div class="flex h-[520px] max-h-[80vh] min-h-0">
-            <div class="flex min-h-0 flex-1 flex-col {showPreview ? 'border-e border-gray-200 dark:border-gray-700' : ''}">
+            <div class="flex min-h-0 min-w-0 flex-1 flex-col {showPreview ? 'border-e border-gray-200 dark:border-gray-700' : ''}">
               {#if manager.mode === 'smart' && !manager.mlHealthy && inputValue.trim() !== ''}
                 <div class="mx-3 mt-3 rounded-md bg-subtle/60 px-3 py-2 text-xs">
                   {$t('cmdk_smart_unavailable')}
