@@ -2119,3 +2119,101 @@ describe('setMode stale photos race (review fix U3)', () => {
     expect((m as unknown as { inFlightCounter: number }).inFlightCounter).toBe(0);
   });
 });
+
+describe('Batch 4 post-review: route consistency, SWR cursor, debounce-window close (NF1/CG2/UE1/UE2)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    resetRecentStore();
+    vi.useFakeTimers();
+    installFakeAbortTimeout();
+    mockUser.current = { isAdmin: true };
+    mockFlags.valueOrUndefined = { search: true, map: true, trash: true };
+    mockI18nLocale.current = 'en';
+    vi.mocked(searchSmart).mockResolvedValue({ assets: { items: [], nextPage: null } } as never);
+    vi.mocked(searchAssets).mockResolvedValue({ assets: { items: [], nextPage: null } } as never);
+    vi.mocked(searchPerson).mockResolvedValue([] as never);
+    vi.mocked(searchPlaces).mockResolvedValue([] as never);
+    vi.mocked(getAllTags).mockResolvedValue([] as never);
+  });
+  afterEach(() => {
+    restoreAbortTimeout();
+    vi.useRealTimers();
+  });
+
+  // NF1 / CG1: the fix uses LIVE NavigationItem.route, not the stored entry.route.
+  // An upstream rename (route change) would otherwise leak 404s via recents.
+  it('activateRecent navigates to the LIVE NavigationItem.route even when the saved entry.route is stale', () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    // Saved entry has a fake old path; the live catalog has '/memory' for memories.
+    const staleEntry = {
+      kind: 'navigate' as const,
+      id: 'nav:userPages:memories',
+      route: '/old-memories-path',
+      labelKey: 'memories',
+      icon: 'x',
+      adminOnly: false,
+      lastUsed: 1,
+    };
+    addEntry(staleEntry);
+    m.activateRecent(staleEntry);
+    // NAVIGATION_ITEMS defines memories.route as '/memory'. The live value must win.
+    expect(goto).toHaveBeenCalledWith('/memory');
+    expect(goto).not.toHaveBeenCalledWith('/old-memories-path');
+  });
+
+  // CG2: reconcileCursor inside setQuery must NOT jump the highlight off a valid
+  // SWR-preserved photo cursor when the user types another keystroke.
+  it('setQuery reconcileCursor preserves a valid cursor on an SWR-preserved photo', async () => {
+    vi.mocked(searchSmart).mockResolvedValueOnce({
+      assets: { items: [{ id: 'a1' } as never, { id: 'a2' } as never], nextPage: null },
+    } as never);
+    const m = new GlobalSearchManager();
+    m.open();
+    m.setQuery('beach');
+    await vi.advanceTimersByTimeAsync(200);
+    expect(m.sections.photos.status).toBe('ok');
+    m.activeItemId = 'photo:a2'; // valid, not the first item
+    m.setQuery('sunset'); // photos stay SWR-preserved as ok with [a1, a2]
+    expect(m.activeItemId).toBe('photo:a2');
+  });
+
+  // UE1: close() fired during the 150ms debounce window (before runBatch ever ran).
+  // Prior tests close AFTER runBatch has fired; this one verifies the earlier state.
+  it('close() during the debounce window clears pending runBatch and resets all state', () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    m.setQuery('beach');
+    expect(m.batchInFlight).toBe(true);
+    expect(m.batchInFlightStartedAt).toBe(Number.POSITIVE_INFINITY);
+    m.close();
+    expect(m.batchInFlight).toBe(false);
+    expect(m.batchInFlightStartedAt).toBe(0);
+    expect((m as unknown as { inFlightCounter: number }).inFlightCounter).toBe(0);
+    // Advancing time should NOT fire the pending runBatch — it was cleared.
+    vi.advanceTimersByTime(500);
+    expect(m.batchInFlight).toBe(false);
+    expect(m.sections.photos.status).toBe('idle');
+  });
+
+  // UE2: feature-flag ENABLED positive path — mirrors the disabled-→-purge test.
+  it("activateRecent navigates normally when the navigate entry's feature flag is enabled", () => {
+    mockFlags.valueOrUndefined = { search: true, map: true, trash: true };
+    const m = new GlobalSearchManager();
+    m.open();
+    const mapEntry = {
+      kind: 'navigate' as const,
+      id: 'nav:userPages:map',
+      route: '/map',
+      labelKey: 'map',
+      icon: 'x',
+      adminOnly: false,
+      lastUsed: 1,
+    };
+    addEntry(mapEntry);
+    m.activateRecent(mapEntry);
+    expect(goto).toHaveBeenCalledWith('/map');
+    expect(getEntries().some((e) => e.id === 'nav:userPages:map')).toBe(true);
+  });
+});

@@ -504,26 +504,27 @@ export class GlobalSearchManager {
     //   2. It's adminOnly and the user has been demoted since the recent was saved.
     //   3. It's feature-flag gated and the flag was disabled since the recent was saved.
     // Using the LIVE NavigationItem (not the saved entry fields) ensures we pick up
-    // adminOnly / featureFlag changes made upstream.
+    // adminOnly / featureFlag / route changes made upstream.
+    let liveNavItem: NavigationItem | undefined;
     if (entry.kind === 'navigate') {
-      const navItem = NAVIGATION_ITEMS.find((n) => n.id === entry.id);
+      liveNavItem = NAVIGATION_ITEMS.find((n) => n.id === entry.id);
       const isAdmin = get(user)?.isAdmin ?? false;
       const flags = featureFlagsManager.valueOrUndefined;
-      if (!navItem) {
+      if (!liveNavItem) {
         // eslint-disable-next-line no-console
         console.warn('[cmdk] purging stale recent — unknown nav item', entry.id);
         removeEntry(entry.id);
         this.close();
         return;
       }
-      if (navItem.adminOnly && !isAdmin) {
+      if (liveNavItem.adminOnly && !isAdmin) {
         // eslint-disable-next-line no-console
         console.warn('[cmdk] purging stale admin recent', entry.id);
         removeEntry(entry.id);
         this.close();
         return;
       }
-      if (navItem.featureFlag && !flags?.[navItem.featureFlag]) {
+      if (liveNavItem.featureFlag && !flags?.[liveNavItem.featureFlag]) {
         // eslint-disable-next-line no-console
         console.warn('[cmdk] purging stale recent — feature flag disabled', entry.id);
         removeEntry(entry.id);
@@ -556,7 +557,11 @@ export class GlobalSearchManager {
         break;
       }
       case 'navigate': {
-        void goto(entry.route);
+        // Use the LIVE NavigationItem route — an upstream rename would otherwise
+        // leave the user stranded on a 404 even though we just validated the entry.
+        // liveNavItem is guaranteed set here (unknown-item branch returned early),
+        // but fall back to entry.route for defensive robustness.
+        void goto(liveNavItem?.route ?? entry.route);
         break;
       }
     }
