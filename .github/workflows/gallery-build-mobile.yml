@@ -11,6 +11,11 @@ on:
         options:
           - development
           - production
+      version:
+        description: 'Fork version to stamp and deploy (e.g. v4.48.5). Leave empty for a smoke build with no store upload.'
+        required: false
+        type: string
+        default: ''
   workflow_call:
     inputs:
       ref:
