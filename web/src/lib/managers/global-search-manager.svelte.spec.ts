@@ -67,9 +67,9 @@ describe('GlobalSearchManager (skeleton)', () => {
     expect(manager.isOpen).toBe(false);
   });
 
-  it('providers is an instance-bound record with four keys', () => {
+  it('providers is an instance-bound record with five keys', () => {
     const providers = (manager as unknown as { providers: Record<string, unknown> }).providers;
-    expect(Object.keys(providers).sort()).toEqual(['people', 'photos', 'places', 'tags']);
+    expect(Object.keys(providers).sort()).toEqual(['navigation', 'people', 'photos', 'places', 'tags']);
   });
 
   describe('searchQueryType sanity check', () => {
@@ -139,6 +139,7 @@ describe('setQuery', () => {
       people: makeStub('people', 2),
       places: makeStub('places', 2),
       tags: makeStub('tags', 2),
+      navigation: makeStub('navigation', 2),
     };
   });
 
@@ -816,6 +817,7 @@ describe('announcementText', () => {
       people: { status: 'ok', items: [{ id: 'p1' }], total: 1 },
       places: { status: 'empty' },
       tags: { status: 'empty' },
+      navigation: { status: 'empty' },
     };
     expect(m.announcementText).toBe('');
   });
@@ -827,6 +829,7 @@ describe('announcementText', () => {
       people: { status: 'ok', items: [{ id: 'p1' }], total: 5 },
       places: { status: 'empty' },
       tags: { status: 'ok', items: [{ id: 't1' }], total: 3 },
+      navigation: { status: 'empty' },
     };
     expect(m.announcementText).toBe('42 photos, 5 people, 3 tags');
   });
@@ -838,6 +841,7 @@ describe('announcementText', () => {
       people: { status: 'empty' },
       places: { status: 'empty' },
       tags: { status: 'empty' },
+      navigation: { status: 'empty' },
     };
     expect(m.announcementText).toBe('');
   });
@@ -857,6 +861,7 @@ describe('reconcileCursor fallback + getActiveItem edge cases', () => {
       people: { status: 'empty' },
       places: { status: 'empty' },
       tags: { status: 'empty' },
+      navigation: { status: 'empty' },
     };
     m.reconcileCursor();
     expect(m.activeItemId).toBe(null);
@@ -870,6 +875,7 @@ describe('reconcileCursor fallback + getActiveItem edge cases', () => {
       people: { status: 'idle' },
       places: { status: 'idle' },
       tags: { status: 'idle' },
+      navigation: { status: 'idle' },
     };
     expect(m.getActiveItem()).toBe(null);
   });
@@ -1080,5 +1086,55 @@ describe('tagsDisabled persists across close/reopen', () => {
     // getAllTags should NOT have been re-invoked because tagsDisabled short-circuits.
     expect(vi.mocked(getAllTags).mock.calls.length).toBe(callsAfterFirst);
     warnSpy.mockRestore();
+  });
+});
+
+describe('navigation section scaffolding', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
+
+  it('sections.navigation starts as idle', () => {
+    const m = new GlobalSearchManager();
+    expect(m.sections.navigation).toEqual({ status: 'idle' });
+  });
+
+  it('sectionForKind("nav") returns sections.navigation', () => {
+    const m = new GlobalSearchManager();
+    m.sections.navigation = {
+      status: 'ok',
+      items: [{ id: 'nav:theme' }] as never[],
+      total: 1,
+    };
+    m.activeItemId = 'nav:theme';
+    const active = m.getActiveItem();
+    expect(active?.kind).toBe('nav');
+  });
+
+  it('announcementText includes navigation count as "N pages" when ok', () => {
+    const m = new GlobalSearchManager();
+    m.sections = {
+      photos: { status: 'empty' },
+      people: { status: 'empty' },
+      places: { status: 'empty' },
+      tags: { status: 'empty' },
+      navigation: { status: 'ok', items: [{ id: 'nav:theme' }] as never[], total: 5 },
+    };
+    expect(m.announcementText).toBe('5 pages');
+  });
+
+  it('reconcileCursor falls through to navigation when entity sections are empty', () => {
+    const m = new GlobalSearchManager();
+    m.sections = {
+      photos: { status: 'empty' },
+      people: { status: 'empty' },
+      places: { status: 'empty' },
+      tags: { status: 'empty' },
+      navigation: { status: 'ok', items: [{ id: 'nav:theme' }] as never[], total: 1 },
+    };
+    m.activeItemId = null;
+    m.reconcileCursor();
+    expect(m.activeItemId).toBe('nav:theme');
   });
 });

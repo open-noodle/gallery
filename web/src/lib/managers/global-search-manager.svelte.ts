@@ -12,6 +12,7 @@ import {
   type MetadataSearchDto,
   type TagResponseDto,
 } from '@immich/sdk';
+import type { NavigationItem } from './navigation-items';
 
 export type SearchMode = 'smart' | 'metadata' | 'description' | 'ocr';
 
@@ -28,6 +29,7 @@ export type Sections = {
   people: ProviderStatus;
   places: ProviderStatus;
   tags: ProviderStatus;
+  navigation: ProviderStatus<NavigationItem>;
 };
 
 export interface Provider<T = unknown> {
@@ -41,10 +43,13 @@ export type ActiveItem =
   | { kind: 'photo'; data: unknown }
   | { kind: 'person'; data: unknown }
   | { kind: 'place'; data: unknown }
-  | { kind: 'tag'; data: unknown };
+  | { kind: 'tag'; data: unknown }
+  | { kind: 'nav'; data: NavigationItem };
 
 const VALID_MODES: ReadonlySet<SearchMode> = new Set(['smart', 'metadata', 'description', 'ocr']);
-const idle: ProviderStatus = { status: 'idle' };
+// Narrow literal type so it can be assigned to both `ProviderStatus<unknown>` and
+// `ProviderStatus<NavigationItem>` without the generic T widening fighting the assignment.
+const idle = { status: 'idle' as const };
 
 function isValidRecentEntry(e: RecentEntry): boolean {
   switch (e.kind) {
@@ -101,7 +106,7 @@ export class GlobalSearchManager {
   isOpen = $state(false);
   query = $state('');
   mode = $state<SearchMode>(loadSearchQueryType());
-  sections = $state<Sections>({ photos: idle, people: idle, places: idle, tags: idle });
+  sections = $state<Sections>({ photos: idle, people: idle, places: idle, tags: idle, navigation: idle });
   activeItemId = $state<string | null>(null);
   mlHealthy = $state(true);
 
@@ -166,7 +171,7 @@ export class GlobalSearchManager {
     this.batchController = null;
     this.photosController?.abort();
     this.photosController = null;
-    this.sections = { photos: idle, people: idle, places: idle, tags: idle };
+    this.sections = { photos: idle, people: idle, places: idle, tags: idle, navigation: idle };
     this.activeItemId = null;
     this.tagsCache = null;
     // Reset query so reopening and re-typing the same string is not a no-op
@@ -191,6 +196,9 @@ export class GlobalSearchManager {
     if (!id) {
       return null;
     }
+    // Navigation item IDs are themselves prefixed `nav:...` so the split-on-first-colon
+    // trick is inverted: the whole id is the cursor value, and the kind prefix is the
+    // string BEFORE the first colon. For nav items, the "kind prefix" is literally `nav`.
     const colon = id.indexOf(':');
     if (colon === -1) {
       return null;
@@ -201,6 +209,15 @@ export class GlobalSearchManager {
     if (!section || section.status !== 'ok') {
       return null;
     }
+
+    if (kind === 'nav') {
+      // For navigation items, the activeItemId IS the full NavigationItem.id (e.g.
+      // `nav:theme`, `nav:systemSettings:classification`). Match on the full id.
+      const navItems = section.items as NavigationItem[];
+      const navMatch = navItems.find((n) => n.id === id);
+      return navMatch ? { kind: 'nav', data: navMatch } : null;
+    }
+
     const items = section.items as Array<{ id?: string; latitude?: number; longitude?: number }>;
     const match = items.find((it) => {
       if (it.id !== undefined) {
@@ -214,7 +231,7 @@ export class GlobalSearchManager {
     if (!match) {
       return null;
     }
-    return { kind: kind as ActiveItem['kind'], data: match };
+    return { kind: kind as 'photo' | 'person' | 'place' | 'tag', data: match };
   }
 
   private sectionForKind(kind: string): ProviderStatus | null {
@@ -231,6 +248,9 @@ export class GlobalSearchManager {
       case 'tag': {
         return this.sections.tags;
       }
+      case 'nav': {
+        return this.sections.navigation as ProviderStatus;
+      }
       default: {
         return null;
       }
@@ -241,19 +261,22 @@ export class GlobalSearchManager {
     if (this.getActiveItem() !== null) {
       return;
     }
-    const order = ['photos', 'people', 'places', 'tags'] as const;
+    const order = ['photos', 'people', 'places', 'tags', 'navigation'] as const;
     const kindOf: Record<keyof Sections, string> = {
       photos: 'photo',
       people: 'person',
       places: 'place',
       tags: 'tag',
+      navigation: 'nav',
     };
     for (const key of order) {
       const s = this.sections[key];
       if (s.status === 'ok' && s.items.length > 0) {
         const first = s.items[0] as { id?: string; latitude?: number; longitude?: number };
         if (first.id !== undefined) {
-          this.activeItemId = `${kindOf[key]}:${first.id}`;
+          // Navigation item IDs are already fully-qualified (`nav:<category>:<slug>`).
+          // Other entity IDs are just the raw entity id and need the kind prefix.
+          this.activeItemId = key === 'navigation' ? first.id : `${kindOf[key]}:${first.id}`;
           return;
         }
         if (key === 'places' && first.latitude !== undefined && first.longitude !== undefined) {
@@ -433,7 +456,8 @@ export class GlobalSearchManager {
       s.photos.status !== 'loading' &&
       s.people.status !== 'loading' &&
       s.places.status !== 'loading' &&
-      s.tags.status !== 'loading';
+      s.tags.status !== 'loading' &&
+      s.navigation.status !== 'loading';
     if (!allSettled) {
       return '';
     }
@@ -450,6 +474,9 @@ export class GlobalSearchManager {
     }
     if (count(s.tags) > 0) {
       parts.push(`${count(s.tags)} tags`);
+    }
+    if (count(s.navigation) > 0) {
+      parts.push(`${count(s.navigation)} pages`);
     }
     return parts.join(', ');
   });
@@ -470,7 +497,7 @@ export class GlobalSearchManager {
     this.photosController = null;
 
     if (text.trim() === '') {
-      this.sections = { photos: idle, people: idle, places: idle, tags: idle };
+      this.sections = { photos: idle, people: idle, places: idle, tags: idle, navigation: idle };
       return;
     }
 
@@ -479,6 +506,7 @@ export class GlobalSearchManager {
       people: { status: 'loading' },
       places: { status: 'loading' },
       tags: { status: 'loading' },
+      navigation: idle, // Stub until Task 10 wires the synchronous runNavigationProvider call here
     };
     this.debounceTimer = setTimeout(() => this.runBatch(text, this.mode), 150);
   }
@@ -655,7 +683,18 @@ export class GlobalSearchManager {
       run: (query, _mode, signal) => this.runTagsProvider(query, signal),
     };
 
-    return { photos, people, places, tags };
+    // Navigation provider is a stub. Task 10 wires runNavigationProvider into setQuery
+    // directly (synchronous, bypassing the 150ms debounce). runBatch iterates only over
+    // entity keys, so this stub is never invoked at runtime — it exists to satisfy the
+    // Record<keyof Sections, Provider> contract. Regression test in Task 10 pins this.
+    const navigationStub: Provider<NavigationItem> = {
+      key: 'navigation',
+      topN: 5,
+      minQueryLength: 2,
+      run: async () => ({ status: 'empty' }),
+    };
+
+    return { photos, people, places, tags, navigation: navigationStub };
   }
 }
 
