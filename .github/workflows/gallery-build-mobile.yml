@@ -173,6 +173,31 @@ jobs:
           name: app-release-aab
           path: mobile/build/app/outputs/bundle/release/app-release.aab
 
+      - name: Build signed Android APK
+        if: inputs.version != ''
+        working-directory: ./mobile
+        env:
+          ALIAS: ${{ secrets.ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          VERSION_NAME: ${{ steps.build-meta.outputs.version_name }}
+          VERSION_CODE: ${{ steps.build-meta.outputs.version_code }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          flutter build apk --release \
+            --build-name="$VERSION_NAME" \
+            --build-number="$VERSION_CODE"
+          mv build/app/outputs/flutter-apk/app-release.apk \
+             "build/app/outputs/flutter-apk/gallery-${VERSION}.apk"
+
+      - name: Publish Android APK artifact
+        if: inputs.version != ''
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: gallery-apk
+          path: mobile/build/app/outputs/flutter-apk/gallery-${{ inputs.version }}.apk
+          if-no-files-found: error
+
       - name: Setup Ruby
         if: inputs.version != ''
         uses: ruby/setup-ruby@c515ec17f69368147deb311832da000dd229d338 # v1.297.0
