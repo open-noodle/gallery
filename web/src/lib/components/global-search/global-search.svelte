@@ -9,6 +9,7 @@
   import PlaceRow from './rows/place-row.svelte';
   import TagRow from './rows/tag-row.svelte';
   import RecentRow from './rows/recent-row.svelte';
+  import GlobalSearchFooter from './global-search-footer.svelte';
   import { getEntries, type RecentEntry } from '$lib/stores/cmdk-recent';
 
   interface Props {
@@ -179,6 +180,7 @@
       </Command.List>
 
       <div aria-live="polite" aria-atomic="true" class="sr-only">{manager.announcementText}</div>
+      <GlobalSearchFooter {manager} />
         </Command.Root>
       {/snippet}
     </ModalBody>
