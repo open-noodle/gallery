@@ -1,10 +1,12 @@
 import { browser } from '$app/environment';
 import {
+  getAllTags,
   searchAssets,
   searchPerson,
   searchPlaces,
   searchSmart,
   type MetadataSearchDto,
+  type TagResponseDto,
 } from '@immich/sdk';
 
 export type SearchMode = 'smart' | 'metadata' | 'description' | 'ocr';
@@ -65,8 +67,26 @@ export class GlobalSearchManager {
   protected batchController: AbortController | null = null;
   protected photosController: AbortController | null = null;
 
+  private tagsCache: TagResponseDto[] | null = null;
+  private tagsDisabled = false;
+  private storageListener?: (e: StorageEvent) => void;
+
   constructor() {
     this.providers = this.buildProviders();
+    if (browser) {
+      this.storageListener = (e) => {
+        if (e.key === 'cmdk.tags.version') {
+          this.tagsCache = null;
+        }
+      };
+      window.addEventListener('storage', this.storageListener);
+    }
+  }
+
+  destroy() {
+    if (this.storageListener) {
+      window.removeEventListener('storage', this.storageListener);
+    }
   }
 
   open() {
@@ -85,6 +105,7 @@ export class GlobalSearchManager {
     this.photosController = null;
     this.sections = { photos: idle, people: idle, places: idle, tags: idle };
     this.activeItemId = null;
+    this.tagsCache = null;
     // Reset query so reopening and re-typing the same string is not a no-op
     // (setQuery short-circuits when `this.query === text`).
     this.query = '';
@@ -172,6 +193,36 @@ export class GlobalSearchManager {
     }
   }
 
+  private async runTagsProvider(query: string, signal: AbortSignal): Promise<ProviderStatus<TagResponseDto>> {
+    if (this.tagsDisabled) {
+      return { status: 'error', message: 'tag_cache_too_large' };
+    }
+    if (this.tagsCache === null) {
+      try {
+        const all = await getAllTags({ signal });
+        if (all.length > 20_000) {
+          this.tagsDisabled = true;
+          // eslint-disable-next-line no-console
+          console.warn('[cmdk] tag cache > 20k, disabling tag provider for session');
+          return { status: 'error', message: 'tag_cache_too_large' };
+        }
+        if (all.length > 5_000) {
+          // eslint-disable-next-line no-console
+          console.warn(`[cmdk] tag cache is large (${all.length} entries)`);
+        }
+        this.tagsCache = all;
+      } catch (err: unknown) {
+        if (err instanceof Error && err.name === 'AbortError') {
+          throw err;
+        }
+        return { status: 'error', message: err instanceof Error ? err.message : 'getAllTags failed' };
+      }
+    }
+    const q = query.toLowerCase();
+    const matches = this.tagsCache.filter((t) => t.name.toLowerCase().includes(q)).slice(0, 5);
+    return matches.length === 0 ? { status: 'empty' } : { status: 'ok', items: matches, total: matches.length };
+  }
+
   protected buildProviders(): Record<keyof Sections, Provider> {
     const photos: Provider = {
       key: 'photos',
@@ -240,13 +291,13 @@ export class GlobalSearchManager {
       },
     };
 
-    const tagsStub: Provider = {
+    const tags: Provider = {
       key: 'tags',
       topN: 5,
       minQueryLength: 2,
-      run: async () => ({ status: 'empty' }),
+      run: (query, _mode, signal) => this.runTagsProvider(query, signal),
     };
 
-    return { photos, people, places, tags: tagsStub };
+    return { photos, people, places, tags };
   }
 }

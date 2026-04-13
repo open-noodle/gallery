@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { searchSmart, searchAssets, searchPerson, searchPlaces } from '@immich/sdk';
+import { searchSmart, searchAssets, searchPerson, searchPlaces, getAllTags } from '@immich/sdk';
 import { GlobalSearchManager, type Provider, type ProviderStatus, type SearchMode, type Sections } from './global-search-manager.svelte';
 import { installFakeAbortTimeout, restoreAbortTimeout } from './__tests__/fake-abort-timeout';
 
@@ -9,6 +9,7 @@ vi.mock('@immich/sdk', async () => ({
   searchAssets: vi.fn(),
   searchPerson: vi.fn(),
   searchPlaces: vi.fn(),
+  getAllTags: vi.fn(),
 }));
 
 describe('GlobalSearchManager (skeleton)', () => {
@@ -106,6 +107,7 @@ describe('setQuery', () => {
   let calls: Array<{ key: string; query: string; mode: SearchMode }>;
 
   beforeEach(() => {
+    vi.clearAllMocks();
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
@@ -215,6 +217,7 @@ describe('setQuery', () => {
 
 describe('real providers', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
@@ -345,5 +348,102 @@ describe('real providers', () => {
       expect(section.items.length).toBe(3);
       expect(section.total).toBe(6);
     }
+  });
+});
+
+describe('tag provider', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    vi.useFakeTimers();
+    installFakeAbortTimeout();
+    vi.mocked(searchSmart).mockResolvedValue({
+      assets: { items: [], nextPage: null },
+    } as unknown as Awaited<ReturnType<typeof searchSmart>>);
+    vi.mocked(searchAssets).mockResolvedValue({
+      assets: { items: [], nextPage: null },
+    } as unknown as Awaited<ReturnType<typeof searchAssets>>);
+    vi.mocked(searchPerson).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof searchPerson>>);
+    vi.mocked(searchPlaces).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof searchPlaces>>);
+    vi.mocked(getAllTags).mockResolvedValue([
+      { id: 't1', name: 'beach', color: null },
+      { id: 't2', name: 'beer', color: null },
+      { id: 't3', name: 'mountain', color: null },
+    ] as unknown as Awaited<ReturnType<typeof getAllTags>>);
+  });
+
+  afterEach(() => {
+    restoreAbortTimeout();
+    vi.useRealTimers();
+  });
+
+  it('filters tags by case-insensitive substring on name', async () => {
+    const m = new GlobalSearchManager();
+    m.setQuery('BE');
+    await vi.advanceTimersByTimeAsync(200);
+    const section = m.sections.tags;
+    expect(section.status).toBe('ok');
+    if (section.status === 'ok') {
+      expect((section.items as Array<{ name: string }>).map((t) => t.name).sort()).toEqual(['beach', 'beer']);
+    }
+  });
+
+  it('caches getAllTags across keystrokes', async () => {
+    const m = new GlobalSearchManager();
+    m.setQuery('be');
+    await vi.advanceTimersByTimeAsync(200);
+    m.setQuery('mou');
+    await vi.advanceTimersByTimeAsync(200);
+    expect(getAllTags).toHaveBeenCalledTimes(1);
+  });
+
+  it('close() clears cache; reopen refetches', async () => {
+    const m = new GlobalSearchManager();
+    m.setQuery('be');
+    await vi.advanceTimersByTimeAsync(200);
+    m.close();
+    m.open();
+    m.setQuery('be');
+    await vi.advanceTimersByTimeAsync(200);
+    expect(getAllTags).toHaveBeenCalledTimes(2);
+  });
+
+  it('disables tag provider at > 20 000 tags', async () => {
+    vi.mocked(getAllTags).mockResolvedValue(
+      Array.from({ length: 20_001 }, (_, i) => ({ id: `t${i}`, name: `tag${i}`, color: null })) as unknown as Awaited<
+        ReturnType<typeof getAllTags>
+      >,
+    );
+    // Silence the console.warn from the 20k-cap branch
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const m = new GlobalSearchManager();
+    m.setQuery('tag');
+    await vi.advanceTimersByTimeAsync(200);
+    expect(m.sections.tags).toEqual({ status: 'error', message: 'tag_cache_too_large' });
+    warnSpy.mockRestore();
+  });
+
+  it('invalidates cache on storage event for cmdk.tags.version', async () => {
+    const m = new GlobalSearchManager();
+    m.setQuery('be');
+    await vi.advanceTimersByTimeAsync(200);
+    window.dispatchEvent(new StorageEvent('storage', { key: 'cmdk.tags.version', newValue: '2' }));
+    m.setQuery('mou');
+    await vi.advanceTimersByTimeAsync(200);
+    expect(getAllTags).toHaveBeenCalledTimes(2);
+  });
+
+  it('getAllTags failure renders error row, retries on next keystroke', async () => {
+    vi.mocked(getAllTags).mockRejectedValueOnce(new Error('boom'));
+    const m = new GlobalSearchManager();
+    m.setQuery('be');
+    await vi.advanceTimersByTimeAsync(200);
+    expect(m.sections.tags.status).toBe('error');
+    vi.mocked(getAllTags).mockResolvedValueOnce([
+      { id: 't1', name: 'beach', color: null },
+    ] as unknown as Awaited<ReturnType<typeof getAllTags>>);
+    m.setQuery('bea');
+    await vi.advanceTimersByTimeAsync(200);
+    expect(m.sections.tags.status).toBe('ok');
   });
 });
