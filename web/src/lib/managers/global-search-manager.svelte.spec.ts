@@ -1522,3 +1522,175 @@ describe('setQuery synchronous navigation', () => {
     expect(m.sections.navigation.status).toBe('idle');
   });
 });
+
+describe('SWR loading rules', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    vi.useFakeTimers();
+    installFakeAbortTimeout();
+    mockUser.current = { isAdmin: true };
+    mockFlags.valueOrUndefined = { search: true, map: true, trash: true };
+    mockI18nLocale.current = 'en';
+    vi.mocked(searchSmart).mockResolvedValue({ assets: { items: [], nextPage: null } } as never);
+    vi.mocked(searchAssets).mockResolvedValue({ assets: { items: [], nextPage: null } } as never);
+    vi.mocked(searchPerson).mockResolvedValue([] as never);
+    vi.mocked(searchPlaces).mockResolvedValue([] as never);
+    vi.mocked(getAllTags).mockResolvedValue([] as never);
+  });
+  afterEach(() => {
+    restoreAbortTimeout();
+    vi.useRealTimers();
+  });
+
+  it('preserves ok photos across a new keystroke (does NOT flip to loading)', async () => {
+    vi.mocked(searchSmart).mockResolvedValueOnce({
+      assets: { items: [{ id: 'a1' } as never], nextPage: null },
+    } as never);
+    const m = new GlobalSearchManager();
+    m.open();
+    m.setQuery('beach');
+    await vi.advanceTimersByTimeAsync(200);
+    expect(m.sections.photos.status).toBe('ok');
+    m.setQuery('sunset');
+    // Synchronously — photos should still be ok (old items), not loading.
+    expect(m.sections.photos.status).toBe('ok');
+  });
+
+  it('flips empty → loading on new keystroke', async () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    m.setQuery('xxxx');
+    await vi.advanceTimersByTimeAsync(200);
+    expect(m.sections.photos.status).toBe('empty');
+    m.setQuery('yyyy');
+    expect(m.sections.photos.status).toBe('loading');
+  });
+
+  it('flips error → loading on new keystroke', async () => {
+    vi.mocked(searchSmart).mockRejectedValueOnce(new Error('boom'));
+    const m = new GlobalSearchManager();
+    m.open();
+    m.setQuery('xxxx');
+    await vi.advanceTimersByTimeAsync(200);
+    expect(m.sections.photos.status).toBe('error');
+    m.setQuery('yyyy');
+    expect(m.sections.photos.status).toBe('loading');
+  });
+
+  it('flips idle → loading on FIRST keystroke (cold open)', () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    m.setQuery('a');
+    expect(m.sections.photos.status).toBe('loading');
+  });
+
+  it('batchInFlight is true during setQuery and false after all providers settle', async () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    m.setQuery('beach');
+    expect(m.batchInFlight).toBe(true);
+    await vi.advanceTimersByTimeAsync(200);
+    expect(m.batchInFlight).toBe(false);
+  });
+
+  it('cold-open first keystroke: navigation is ok instantly, entity sections flip to loading', () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    m.setQuery('classific');
+    expect(m.sections.navigation.status).toBe('ok');
+    expect(m.sections.photos.status).toBe('loading');
+    expect(m.sections.people.status).toBe('loading');
+  });
+
+  it('setMode preserves ok photos until re-run completes (SWR)', async () => {
+    vi.mocked(searchSmart).mockResolvedValueOnce({
+      assets: { items: [{ id: 'a1' } as never], nextPage: null },
+    } as never);
+    const m = new GlobalSearchManager();
+    m.open();
+    m.setQuery('beach');
+    await vi.advanceTimersByTimeAsync(200);
+    expect(m.sections.photos.status).toBe('ok');
+    m.setMode('metadata');
+    expect(m.sections.photos.status).toBe('ok');
+  });
+
+  it('setMode joins the batch counter — mode switch during live batch does NOT drop stripe early', async () => {
+    // Slow photos provider so the main batch stays in flight.
+    let resolvePhotos!: () => void;
+    vi.mocked(searchSmart).mockImplementationOnce(
+      () => new Promise((r) => (resolvePhotos = () => r({ assets: { items: [], nextPage: null } } as never))),
+    );
+    const m = new GlobalSearchManager();
+    m.open();
+    m.setQuery('beach');
+    await vi.advanceTimersByTimeAsync(200);
+    expect(m.batchInFlight).toBe(true);
+    // Mode switch while photos is still in flight — counter should increment, not reset.
+    m.setMode('metadata');
+    expect(m.batchInFlight).toBe(true);
+    // setMode's re-run (searchAssets) resolves first from the default mockResolvedValue.
+    await vi.advanceTimersByTimeAsync(10);
+    // Original photos still in flight — batchInFlight MUST remain true.
+    expect(m.batchInFlight).toBe(true);
+    // Finally, let the original photos resolve.
+    resolvePhotos();
+    await vi.advanceTimersByTimeAsync(10);
+    expect(m.batchInFlight).toBe(false);
+  });
+
+  it('stale-batch providers do not deadlock batchInFlight after a new batch supersedes', async () => {
+    let resolveStalePhotos!: () => void;
+    vi.mocked(searchSmart).mockImplementationOnce(
+      () =>
+        new Promise((r) => (resolveStalePhotos = () => r({ assets: { items: [], nextPage: null } } as never))),
+    );
+    const m = new GlobalSearchManager();
+    m.open();
+    m.setQuery('first');
+    await vi.advanceTimersByTimeAsync(200);
+    expect(m.batchInFlight).toBe(true);
+    // Second query — runBatch2 resets counter and uses the default empty mock so it settles fast.
+    m.setQuery('second');
+    await vi.advanceTimersByTimeAsync(200);
+    expect(m.batchInFlight).toBe(false);
+    // Release stale photos — check-before-decrement guard must prevent corruption.
+    resolveStalePhotos();
+    await vi.advanceTimersByTimeAsync(10);
+    expect((m as unknown as { inFlightCounter: number }).inFlightCounter).toBe(0);
+    expect(m.batchInFlight).toBe(false);
+  });
+
+  it('runBatch entry resets inFlightCounter to zero before incrementing per-provider', async () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    (m as unknown as { inFlightCounter: number }).inFlightCounter = 99;
+    m.setQuery('beach');
+    await vi.advanceTimersByTimeAsync(200);
+    expect((m as unknown as { inFlightCounter: number }).inFlightCounter).toBe(0);
+  });
+
+  it('setMode with empty query is a no-op (cold open)', () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    m.setMode('metadata');
+    expect(m.batchInFlight).toBe(false);
+    expect(m.sections.photos.status).toBe('idle');
+    expect((m as unknown as { inFlightCounter: number }).inFlightCounter).toBe(0);
+  });
+
+  it('rapid mode switching does not decrement counter below zero', async () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    m.setQuery('beach');
+    await vi.advanceTimersByTimeAsync(200);
+    m.setMode('metadata');
+    m.setMode('description');
+    m.setMode('ocr');
+    m.setMode('smart');
+    await vi.advanceTimersByTimeAsync(100);
+    expect(m.batchInFlight).toBe(false);
+    expect((m as unknown as { inFlightCounter: number }).inFlightCounter).toBe(0);
+  });
+});

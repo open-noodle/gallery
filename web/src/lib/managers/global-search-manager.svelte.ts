@@ -116,11 +116,31 @@ export class GlobalSearchManager {
   sections = $state<Sections>({ photos: idle, people: idle, places: idle, tags: idle, navigation: idle });
   activeItemId = $state<string | null>(null);
   mlHealthy = $state(true);
+  /**
+   * True while any provider in the current batch (or a mode-switch re-run) is in flight.
+   * Drives the progress stripe on the palette header.
+   */
+  batchInFlight = $state(false);
 
   protected providers: Record<keyof Sections, Provider>;
   protected debounceTimer: ReturnType<typeof setTimeout> | null = null;
   protected batchController: AbortController | null = null;
   protected photosController: AbortController | null = null;
+  /**
+   * Count of providers currently in flight. runBatch resets this at entry so a stale
+   * batch's decrements cannot corrupt the new batch's bookkeeping (onSettle checks
+   * `batch !== this.batchController` before decrementing — see the stale-batch guard).
+   */
+  private inFlightCounter = 0;
+  /**
+   * When the current batchInFlight window started (performance.now()). Set by runBatch
+   * at debounce-fire time, not setQuery time — the debounce would eat most of the
+   * component-side 200ms grace window otherwise.
+   */
+  private _batchInFlightStartedAt = 0;
+  get batchInFlightStartedAt() {
+    return this._batchInFlightStartedAt;
+  }
 
   private tagsCache: TagResponseDto[] | null = null;
   private tagsDisabled = false;
@@ -495,31 +515,67 @@ export class GlobalSearchManager {
       return;
     }
 
+    // SWR: only flip to loading if the previous photos are not ok.
+    if (this.sections.photos.status !== 'ok') {
+      this.sections.photos = { status: 'loading' };
+    }
+
+    // Capture the batchController at setMode-call time. A stale setMode straggler
+    // that resolves AFTER a new runBatch has taken over must not decrement the new
+    // batch's counter — same stale-batch-guard pattern as runBatch.onSettle.
+    const setModeBatch = this.batchController;
+
+    // Join the in-flight counter so mode switches share bookkeeping with any active
+    // main batch. Without this, a mode switch during an active batch would drop the
+    // stripe the moment its own photos settle, even though the main batch is still
+    // pending.
+    this.inFlightCounter++;
+    if (!this.batchInFlight) {
+      this.batchInFlight = true;
+      this._batchInFlightStartedAt = performance.now();
+    }
+
     this.photosController?.abort();
     const photos = new AbortController();
     this.photosController = photos;
-    const batch = this.batchController;
     const signal = AbortSignal.any([
-      ...(batch ? [batch.signal] : []),
+      ...(setModeBatch ? [setModeBatch.signal] : []),
       photos.signal,
       AbortSignal.timeout(5000),
     ]);
+
+    const onSetModeSettle = () => {
+      // Same stale-batch guard as runBatch.onSettle.
+      if (this.batchController !== setModeBatch) {
+        return;
+      }
+      this.inFlightCounter--;
+      if (this.inFlightCounter === 0) {
+        this.batchInFlight = false;
+      }
+    };
+
     this.providers.photos
       .run(this.query, this.mode, signal)
       .then((result) => {
-        if (batch !== this.batchController) {
+        if (setModeBatch !== this.batchController) {
           return;
         }
         this.sections.photos = result;
         this.onPhotosSettled();
         this.reconcileCursor();
+        onSetModeSettle();
       })
       .catch((err: unknown) => {
+        if (setModeBatch !== this.batchController) {
+          return;
+        }
         if (err instanceof Error && err.name === 'AbortError') {
           if (signal.aborted && signal.reason instanceof DOMException && signal.reason.name === 'TimeoutError') {
             this.sections.photos = { status: 'timeout' };
             this.onPhotosSettled();
           }
+          onSetModeSettle();
           return;
         }
         this.sections.photos = {
@@ -527,6 +583,7 @@ export class GlobalSearchManager {
           message: err instanceof Error ? err.message : 'unknown error',
         };
         this.onPhotosSettled();
+        onSetModeSettle();
       });
   }
 
@@ -588,28 +645,40 @@ export class GlobalSearchManager {
 
     if (text.trim() === '') {
       this.sections = { photos: idle, people: idle, places: idle, tags: idle, navigation: idle };
+      this.batchInFlight = false;
       return;
     }
 
+    // SWR (stale-while-revalidate): only flip sections that are NOT already 'ok' to
+    // loading. Preserving ok content across keystrokes fixes the jitter bug where the
+    // palette flashed skeletons between every character.
+    for (const key of ['photos', 'people', 'places', 'tags'] as const) {
+      if (this.sections[key].status !== 'ok') {
+        this.sections[key] = { status: 'loading' };
+      }
+    }
     // Navigation runs synchronously on every keystroke, bypassing the 150ms debounce.
-    // It's a pure in-memory scan, so there is no rate-limit or network concern. runBatch
-    // does NOT iterate over navigation — its hardcoded tuple is `photos/people/places/tags`.
-    this.sections = {
-      photos: { status: 'loading' },
-      people: { status: 'loading' },
-      places: { status: 'loading' },
-      tags: { status: 'loading' },
-      navigation: this.runNavigationProvider(text),
-    };
+    // It's a pure in-memory scan — no rate-limit or network concern. runBatch does NOT
+    // iterate over navigation; its hardcoded tuple is `photos/people/places/tags`.
+    this.sections.navigation = this.runNavigationProvider(text);
+
+    this.batchInFlight = true;
     this.debounceTimer = setTimeout(() => this.runBatch(text, this.mode), 150);
   }
 
   protected runBatch(text: string, mode: SearchMode) {
     this.debounceTimer = null;
+    this._batchInFlightStartedAt = performance.now();
     const batch = new AbortController();
     const photosLocal = new AbortController();
     this.batchController = batch;
     this.photosController = photosLocal;
+
+    // Reset the counter — this batch owns the bookkeeping from here on. Stale onSettle
+    // calls from prior batches no-op via the check-before-decrement guard below,
+    // preventing them from corrupting this batch's counter (which would deadlock
+    // batchInFlight at true).
+    this.inFlightCounter = 0;
 
     for (const key of ['photos', 'people', 'places', 'tags'] as const) {
       const provider = this.providers[key];
@@ -617,8 +686,22 @@ export class GlobalSearchManager {
         this.sections[key] = idle;
         continue;
       }
+      this.inFlightCounter++;
       const controllers = key === 'photos' ? [batch.signal, photosLocal.signal] : [batch.signal];
       const signal = AbortSignal.any([...controllers, AbortSignal.timeout(5000)]);
+
+      const onSettle = () => {
+        // Stale-batch guard: if a new batch has taken over the batchController, this
+        // settle belongs to a superseded batch and must NOT decrement the new batch's
+        // counter.
+        if (batch !== this.batchController) {
+          return;
+        }
+        this.inFlightCounter--;
+        if (this.inFlightCounter === 0) {
+          this.batchInFlight = false;
+        }
+      };
 
       // Promise.resolve().then(...) guarantees that a provider which synchronously
       // throws (not just returns a rejected promise) still lands in the .catch handler.
@@ -633,6 +716,7 @@ export class GlobalSearchManager {
             this.onPhotosSettled();
           }
           this.reconcileCursor();
+          onSettle();
         })
         .catch((err: unknown) => {
           if (batch !== this.batchController) {
@@ -645,6 +729,7 @@ export class GlobalSearchManager {
                 this.onPhotosSettled();
               }
             }
+            onSettle();
             return;
           }
           const message = err instanceof Error ? err.message : 'unknown error';
@@ -652,7 +737,13 @@ export class GlobalSearchManager {
           if (key === 'photos') {
             this.onPhotosSettled();
           }
+          onSettle();
         });
+    }
+
+    if (this.inFlightCounter === 0) {
+      // All providers were below minQueryLength — nothing scheduled, flip off.
+      this.batchInFlight = false;
     }
   }
 
