@@ -79,6 +79,17 @@ export function clearEntries() {
   rawWrite([]);
 }
 
+export function removeEntry(id: string) {
+  if (memory === null) {
+    memory = rawRead();
+  }
+  const before = memory.length;
+  memory = memory.filter((e) => e.id !== id);
+  if (memory.length !== before) {
+    rawWrite(memory);
+  }
+}
+
 export function makePlaceId(lat: number, lng: number): string {
   return `place:${lat.toFixed(4)}:${lng.toFixed(4)}`;
 }

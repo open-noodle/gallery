@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { addEntry, getEntries, clearEntries, makePlaceId, __resetForTests } from './cmdk-recent';
+import { addEntry, getEntries, clearEntries, makePlaceId, removeEntry, __resetForTests } from './cmdk-recent';
 
 describe('cmdk-recent', () => {
   beforeEach(() => {
@@ -98,6 +98,34 @@ describe('cmdk-recent', () => {
     window.dispatchEvent(new StorageEvent('storage', { key: 'some.other.key' }));
     const entries = getEntries();
     expect(entries.map((e) => e.id)).toEqual(['q:a']);
+  });
+});
+
+describe('removeEntry', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    __resetForTests();
+  });
+
+  it('removes the matching entry and preserves order', () => {
+    addEntry({ kind: 'query', id: 'q:a', text: 'a', mode: 'smart', lastUsed: 1 });
+    addEntry({ kind: 'query', id: 'q:b', text: 'b', mode: 'smart', lastUsed: 2 });
+    addEntry({ kind: 'query', id: 'q:c', text: 'c', mode: 'smart', lastUsed: 3 });
+    removeEntry('q:b');
+    expect(getEntries().map((e) => e.id)).toEqual(['q:c', 'q:a']);
+  });
+
+  it('no-op on missing id', () => {
+    addEntry({ kind: 'query', id: 'q:a', text: 'a', mode: 'smart', lastUsed: 1 });
+    removeEntry('does-not-exist');
+    expect(getEntries().map((e) => e.id)).toEqual(['q:a']);
+  });
+
+  it('persists the removal to localStorage', () => {
+    addEntry({ kind: 'query', id: 'q:a', text: 'a', mode: 'smart', lastUsed: 1 });
+    removeEntry('q:a');
+    const raw = localStorage.getItem('cmdk.recent');
+    expect(JSON.parse(raw ?? '[]')).toEqual([]);
   });
 });
 
