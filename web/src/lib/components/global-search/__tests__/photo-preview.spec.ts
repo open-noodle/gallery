@@ -37,12 +37,15 @@ describe('photo-preview', () => {
     expect(screen.getByText('plain.jpg')).toBeInTheDocument();
   });
 
-  it('letterboxes the image with object-contain (not cropped via object-cover)', () => {
-    // Regression guard: images inside the preview must NOT be cropped to fit 4:3 —
-    // portrait photos would lose their top/bottom and the user sees a "cut off"
-    // preview. Instead, wrap in an aspect-[4/3] container with bg-subtle and use
-    // object-contain so the full image shows, letterboxed when the source aspect
-    // doesn't match.
+  it('constrains the image via max-h + object-contain without aspect-ratio wrapping', () => {
+    // Regression guard for two related bugs:
+    //   1. `object-cover` cropped portraits and landscapes — replaced with object-contain.
+    //   2. `aspect-[4/3]` + `h-full` caused overflow because percent heights don't
+    //      resolve reliably inside aspect-ratio containers, so h-full fell back to the
+    //      image's natural height and spilled out of the overflow-hidden frame.
+    // The current pattern: a direct `max-h-[200px] max-w-full object-contain` on the
+    // <img> with `mx-auto` for horizontal centering. No wrapper frame, no percent
+    // heights — just natural sizing capped by max-h.
     const { container } = render(PhotoPreview, {
       props: { photo: { id: 'a1', originalFileName: 'plain.jpg' } as never },
     });
@@ -50,8 +53,11 @@ describe('photo-preview', () => {
     expect(img).not.toBeNull();
     expect(img?.className).toContain('object-contain');
     expect(img?.className).not.toContain('object-cover');
-    // The aspect-ratio frame is on the parent wrapper, not the image itself.
-    const frame = img?.parentElement as HTMLElement | null;
-    expect(frame?.className).toContain('aspect-[4/3]');
+    expect(img?.className).toContain('max-h-[200px]');
+    expect(img?.className).toContain('max-w-full');
+    // Explicitly assert the image is NOT wrapped in an aspect-ratio frame — this
+    // prevents anyone from reintroducing the h-full-inside-aspect-ratio pattern.
+    const parent = img?.parentElement as HTMLElement | null;
+    expect(parent?.className).not.toContain('aspect-[4/3]');
   });
 });

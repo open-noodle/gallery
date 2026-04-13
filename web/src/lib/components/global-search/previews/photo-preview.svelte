@@ -26,18 +26,19 @@
 </script>
 
 <div class="flex h-full flex-col gap-3 p-5">
-  <!-- Letterbox the image inside a fixed-aspect frame: `object-contain` shows the full
-       image without cropping, `bg-subtle/40` fills the non-image area when the source
-       aspect doesn't match 4:3. Previously we used `object-cover` which cropped both
-       landscape (sides) and portrait (top/bottom) sources. -->
-  <div class="aspect-[4/3] w-full overflow-hidden rounded-md bg-subtle/40">
-    <img
-      src={thumbUrl}
-      alt={photo.originalFileName ?? ''}
-      class="h-full w-full object-contain"
-      loading="lazy"
-    />
-  </div>
+  <!-- Cap the image via `max-h` directly on the <img>. We intentionally avoid the
+       `aspect-ratio` + `h-full` pattern: percent heights require a definite parent
+       height, and `aspect-ratio` isn't always considered definite for that resolution,
+       so `h-full` would collapse to the image's natural height and overflow an
+       `overflow-hidden` container. `max-h-[200px] max-w-full object-contain` keeps
+       the natural aspect intact, caps the image at 200px tall within the pane width,
+       and centers it horizontally via `mx-auto`. -->
+  <img
+    src={thumbUrl}
+    alt={photo.originalFileName ?? ''}
+    class="mx-auto max-h-[200px] max-w-full rounded-md object-contain"
+    loading="lazy"
+  />
   <div class="min-w-0">
     <div class="truncate text-base font-semibold">{photo.originalFileName}</div>
     {#if dateLine}
