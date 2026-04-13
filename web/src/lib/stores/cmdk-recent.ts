@@ -3,6 +3,18 @@ import type { SearchMode } from '$lib/managers/global-search-manager.svelte';
 const STORAGE_KEY = 'cmdk.recent';
 const MAX_ENTRIES = 20;
 
+// Register a 'storage' listener once at module load (browser only) so that another
+// tab's updates to cmdk.recent drop our in-memory cache and the next read re-fetches
+// from localStorage. Without this, two tabs silently diverge until one of them clears
+// or mutates its own entries.
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key === STORAGE_KEY || e.key === null) {
+      memory = null;
+    }
+  });
+}
+
 export type RecentEntry =
   | { kind: 'query'; id: string; text: string; mode: SearchMode; lastUsed: number }
   | { kind: 'photo'; id: string; assetId: string; label: string; lastUsed: number }

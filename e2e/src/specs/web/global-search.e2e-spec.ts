@@ -54,6 +54,20 @@ test.describe('global search palette', () => {
     await expect(combobox).toHaveAttribute('maxlength', '256');
   });
 
+  test('focus returns to the trigger after the palette closes', async ({ page }) => {
+    const trigger = page.getByRole('button', { name: /search/i }).first();
+    await trigger.focus();
+    await expect(trigger).toBeFocused();
+    await page.keyboard.press('Control+k');
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(page.getByRole('combobox')).toBeFocused();
+    await page.keyboard.press('Escape'); // empty already → closes
+    await expect(page.getByRole('dialog')).toBeHidden();
+    // @immich/ui Modal / bits-ui Dialog restores focus to the element that had it
+    // before the dialog opened. If this regresses, it's a keyboard-a11y issue.
+    await expect(trigger).toBeFocused();
+  });
+
   test('Ctrl+/ cycles search mode via footer', async ({ page }) => {
     await page.keyboard.press('Control+k');
     await expect(page.getByRole('dialog')).toBeVisible();

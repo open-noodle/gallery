@@ -247,11 +247,17 @@ describe('real providers', () => {
     vi.useRealTimers();
   });
 
-  it('photos uses searchSmart in smart mode', async () => {
+  it('photos uses searchSmart in smart mode with withSharedSpaces=true', async () => {
     const m = new GlobalSearchManager();
     m.setQuery('beach');
     await vi.advanceTimersByTimeAsync(200);
     expect(searchSmart).toHaveBeenCalledOnce();
+    expect(searchSmart).toHaveBeenCalledWith(
+      expect.objectContaining({
+        smartSearchDto: expect.objectContaining({ query: 'beach', withSharedSpaces: true }),
+      }),
+      expect.anything(),
+    );
     expect(m.sections.photos.status).toBe('ok');
   });
 
@@ -872,6 +878,121 @@ describe('reconcileCursor fallback + getActiveItem edge cases', () => {
     const m = new GlobalSearchManager();
     m.activeItemId = 'malformed';
     expect(m.getActiveItem()).toBe(null);
+  });
+});
+
+describe('edge-case guards', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    vi.useFakeTimers();
+    installFakeAbortTimeout();
+    vi.mocked(searchSmart).mockResolvedValue({
+      assets: { items: [], nextPage: null },
+    } as unknown as Awaited<ReturnType<typeof searchSmart>>);
+    vi.mocked(searchAssets).mockResolvedValue({
+      assets: { items: [], nextPage: null },
+    } as unknown as Awaited<ReturnType<typeof searchAssets>>);
+    vi.mocked(searchPerson).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof searchPerson>>);
+    vi.mocked(searchPlaces).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof searchPlaces>>);
+    vi.mocked(getAllTags).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof getAllTags>>);
+    vi.mocked(getMlHealth).mockResolvedValue({ smartSearchHealthy: true } as never);
+  });
+  afterEach(() => {
+    restoreAbortTimeout();
+    vi.useRealTimers();
+  });
+
+  it('setQuery while closed: leaves no visible state after next open/type cycle', async () => {
+    const m = new GlobalSearchManager();
+    // Never opened. setQuery mutates internal query but no UI is bound so it's harmless.
+    m.setQuery('phantom');
+    await vi.advanceTimersByTimeAsync(200);
+    // Sections get loaded states because we run providers. Ensure close() cleans up.
+    m.close();
+    expect(m.query).toBe('');
+    expect(m.sections.photos).toEqual({ status: 'idle' });
+    // Now open and type — the fresh cycle should work normally.
+    m.open();
+    m.setQuery('real');
+    await vi.advanceTimersByTimeAsync(200);
+    expect(searchSmart).toHaveBeenCalled();
+  });
+
+  it('ML probe resolving after close() does not mutate mlHealthy', async () => {
+    let resolveProbe!: (v: { smartSearchHealthy: boolean }) => void;
+    vi.mocked(getMlHealth).mockImplementationOnce(() => new Promise((r) => (resolveProbe = r)));
+    const m = new GlobalSearchManager();
+    m.open();
+    expect(m.mlHealthy).toBe(true);
+    m.close();
+    // Late probe resolution with a false value — should be discarded.
+    resolveProbe({ smartSearchHealthy: false });
+    await vi.advanceTimersByTimeAsync(0);
+    await Promise.resolve();
+    expect(m.mlHealthy).toBe(true);
+  });
+
+  it('activateRecent with corrupt photo entry (missing assetId) no-ops and closes', () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    m.activateRecent({
+      kind: 'photo',
+      id: 'photo:ghost',
+      assetId: '' as unknown as string,
+      label: '',
+      lastUsed: 1,
+    });
+    expect(warnSpy).toHaveBeenCalled();
+    expect(m.isOpen).toBe(false);
+    warnSpy.mockRestore();
+  });
+
+  it('activateRecent with corrupt place entry (non-finite lat) no-ops and closes', () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    m.activateRecent({
+      kind: 'place',
+      id: 'place:bad',
+      latitude: Number.NaN,
+      longitude: 0,
+      label: 'Broken',
+      lastUsed: 1,
+    });
+    expect(warnSpy).toHaveBeenCalled();
+    expect(m.isOpen).toBe(false);
+    warnSpy.mockRestore();
+  });
+
+  it('activateRecent with corrupt query entry (invalid mode) no-ops and closes', () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    m.activateRecent({
+      kind: 'query',
+      id: 'q:bad',
+      text: 'x',
+      mode: 'evil' as unknown as 'smart',
+      lastUsed: 1,
+    });
+    expect(warnSpy).toHaveBeenCalled();
+    expect(m.isOpen).toBe(false);
+    warnSpy.mockRestore();
+  });
+
+  it('unicode / emoji query is passed through to providers untouched', async () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    m.setQuery('🍕 café München');
+    await vi.advanceTimersByTimeAsync(200);
+    expect(searchSmart).toHaveBeenCalledWith(
+      expect.objectContaining({
+        smartSearchDto: expect.objectContaining({ query: '🍕 café München' }),
+      }),
+      expect.anything(),
+    );
   });
 });
 

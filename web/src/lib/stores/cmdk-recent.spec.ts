@@ -71,6 +71,34 @@ describe('cmdk-recent', () => {
     clearEntries();
     expect(getEntries()).toEqual([]);
   });
+
+  it('invalidates in-memory cache on storage event for cmdk.recent', () => {
+    addEntry({ kind: 'query', id: 'q:a', text: 'a', mode: 'smart', lastUsed: 1 });
+    // Simulate another tab writing directly to localStorage and dispatching the
+    // 'storage' event that cross-tab updates emit.
+    localStorage.setItem(
+      'cmdk.recent',
+      JSON.stringify([{ kind: 'query', id: 'q:b', text: 'b', mode: 'smart', lastUsed: 2 }]),
+    );
+    window.dispatchEvent(new StorageEvent('storage', { key: 'cmdk.recent' }));
+    const entries = getEntries();
+    expect(entries.map((e) => e.id)).toEqual(['q:b']);
+  });
+
+  it('invalidates cache on storage event with null key (full clear)', () => {
+    addEntry({ kind: 'query', id: 'q:a', text: 'a', mode: 'smart', lastUsed: 1 });
+    localStorage.clear();
+    window.dispatchEvent(new StorageEvent('storage', { key: null }));
+    expect(getEntries()).toEqual([]);
+  });
+
+  it('ignores storage events for unrelated keys', () => {
+    addEntry({ kind: 'query', id: 'q:a', text: 'a', mode: 'smart', lastUsed: 1 });
+    // Fire an unrelated key event — in-memory copy should survive.
+    window.dispatchEvent(new StorageEvent('storage', { key: 'some.other.key' }));
+    const entries = getEntries();
+    expect(entries.map((e) => e.id)).toEqual(['q:a']);
+  });
 });
 
 describe('makePlaceId precision', () => {

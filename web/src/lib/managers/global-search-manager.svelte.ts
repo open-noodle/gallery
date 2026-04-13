@@ -46,6 +46,29 @@ export type ActiveItem =
 const VALID_MODES: ReadonlySet<SearchMode> = new Set(['smart', 'metadata', 'description', 'ocr']);
 const idle: ProviderStatus = { status: 'idle' };
 
+function isValidRecentEntry(e: RecentEntry): boolean {
+  switch (e.kind) {
+    case 'query': {
+      return typeof e.text === 'string' && e.text.length > 0 && VALID_MODES.has(e.mode);
+    }
+    case 'photo': {
+      return typeof e.assetId === 'string' && e.assetId.length > 0;
+    }
+    case 'person': {
+      return typeof e.personId === 'string' && e.personId.length > 0;
+    }
+    case 'place': {
+      return Number.isFinite(e.latitude) && Number.isFinite(e.longitude);
+    }
+    case 'tag': {
+      return typeof e.tagId === 'string' && e.tagId.length > 0;
+    }
+    default: {
+      return false;
+    }
+  }
+}
+
 function loadSearchQueryType(): SearchMode {
   if (!browser) {
     return 'smart';
@@ -111,6 +134,12 @@ export class GlobalSearchManager {
   private async probeMlHealth() {
     try {
       const result = await getMlHealth();
+      // If the palette was closed while the probe was in flight, discard the result.
+      // Otherwise a slow probe could flip mlHealthy on a hidden manager and corrupt
+      // the next-open state.
+      if (!this.isOpen) {
+        return;
+      }
       this.mlHealthy = result.smartSearchHealthy;
     } catch {
       // Retroactive promotion (onPhotosSettled) handles mid-session failure.
@@ -284,6 +313,15 @@ export class GlobalSearchManager {
   }
 
   activateRecent(entry: RecentEntry) {
+    // Guard against corrupt or truncated entries (user-tampered localStorage, legacy
+    // schema from an older version). Missing the kind-specific id fields would cause
+    // goto('/photos/undefined') or similar bad URLs, so bail out silently.
+    if (!isValidRecentEntry(entry)) {
+      // eslint-disable-next-line no-console
+      console.warn('[cmdk] ignoring corrupt recent entry', entry);
+      this.close();
+      return;
+    }
     const now = Date.now();
     addEntry({ ...entry, lastUsed: now });
     if (entry.kind === 'query') {
@@ -407,6 +445,10 @@ export class GlobalSearchManager {
   });
 
   setQuery(text: string) {
+    // In production setQuery only fires through global-search.svelte's $effect, which
+    // is only mounted while the palette is open. Calling this method on a closed
+    // manager is safe — sections mutate but no side effects escape — but should be
+    // considered an implementation detail of the component, not a public entry point.
     if (this.query === text) {
       return;
     }
@@ -528,10 +570,18 @@ export class GlobalSearchManager {
       run: async (query, mode, signal) => {
         try {
           if (mode === 'smart') {
-            const response = await searchSmart({ smartSearchDto: { query, size: 5 } }, { signal });
+            // withSharedSpaces:true mirrors Gallery's main search page so palette
+            // results include shared-space content the user can access.
+            const response = await searchSmart(
+              { smartSearchDto: { query, size: 5, withSharedSpaces: true } },
+              { signal },
+            );
             const items = response.assets.items;
             return items.length === 0 ? { status: 'empty' } : { status: 'ok', items, total: items.length };
           }
+          // MetadataSearchDto does not have a withSharedSpaces field — shared-space
+          // scoping for metadata search would require passing spaceId, which we do not
+          // have in the palette. Only smart search includes shared-space content in v1.
           const metadataSearchDto: MetadataSearchDto = {
             size: 5,
             ...(mode === 'metadata' ? { originalFileName: query } : {}),

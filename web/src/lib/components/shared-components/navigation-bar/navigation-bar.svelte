@@ -88,7 +88,7 @@
       </div>
 
       <section class="flex place-items-center justify-end gap-1 md:gap-2 w-full sm:w-auto">
-        {#if featureFlagsManager.value.search}
+        {#if featureFlagsManager.valueOrUndefined?.search}
           <IconButton
             color="secondary"
             shape="round"
