@@ -239,6 +239,10 @@
     shortcut: { ctrl: true, shift: true, key: 'm' },
     onShortcut: () => copyToClipboard(getMyImmichLink().toString()),
   }}
+  use:shortcut={{
+    shortcut: { shift: true, key: 't' },
+    onShortcut: () => themeManager.toggleTheme(),
+  }}
   use:shortcuts={[
     {
       shortcut: { ctrl: true, key: 'k' },
