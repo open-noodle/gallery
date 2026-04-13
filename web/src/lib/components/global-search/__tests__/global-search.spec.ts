@@ -279,14 +279,18 @@ describe('global-search root', () => {
     }
   });
 
-  it('progress stripe is hidden for fast-settling queries (< 200ms grace)', async () => {
+  it('progress stripe is hidden for fast-settling queries (batch actually settles before grace)', async () => {
     const m = new GlobalSearchManager();
     m.open();
     render(GlobalSearch, { props: { manager: m } });
-    // All providers mock-resolve instantly → settles before the 200ms timer fires.
+    // All providers mock-resolve instantly → debounce (150ms) + microtasks → batch settles.
     await user.type(screen.getByRole('combobox'), 'beach');
-    // Small wait to let the batch settle under real timers.
-    await new Promise((r) => setTimeout(r, 50));
+    // Wait for batchInFlight to actually flip false — proves the batch settled, not that
+    // we polled too early. Must happen before the 200ms grace would have armed the stripe.
+    await vi.waitFor(() => expect(m.batchInFlight).toBe(false), { timeout: 500 });
+    // Now wait past when the stripe COULD have fired (grace window = 200ms). The effect
+    // cleanup should have cancelled the timer when batchInFlight flipped false.
+    await new Promise((r) => setTimeout(r, 250));
     expect(document.querySelector('[data-cmdk-progress]')).toBeNull();
   });
 
@@ -329,6 +333,106 @@ describe('global-search root', () => {
     // Non-admin should see photos but NOT users in the recents list.
     expect(screen.getByText('photos')).toBeInTheDocument();
     expect(screen.queryByText('users')).toBeNull();
+  });
+
+  // NF2: the filter uses the LIVE NavigationItem.adminOnly, not the stored entry.adminOnly,
+  // so a stale `adminOnly: false` entry pointing at a currently-admin-only item is dropped.
+  it('render-time filter uses live NavigationItem.adminOnly, not the stale saved entry field', () => {
+    mockUser.current = { isAdmin: false };
+    // classification_settings is live adminOnly=true, but the saved entry has stale adminOnly=false.
+    addEntry({
+      kind: 'navigate',
+      id: 'nav:systemSettings:classification',
+      route: '/admin/system-settings?isOpen=classification',
+      labelKey: 'admin.classification_settings',
+      icon: 'x',
+      adminOnly: false, // stale
+      lastUsed: 1,
+    });
+    const m = new GlobalSearchManager();
+    m.open();
+    render(GlobalSearch, { props: { manager: m } });
+    // Live catalog says adminOnly=true, user is non-admin → entry must not render.
+    expect(screen.queryByText('admin.classification_settings')).toBeNull();
+  });
+
+  // CG6: feature-flag-disabled navigate recents must also be hidden pre-click.
+  it('render-time filter hides navigate recents whose feature flag is now disabled', () => {
+    mockUser.current = { isAdmin: true };
+    mockFlags.valueOrUndefined = { search: true, map: false, trash: true };
+    addEntry({
+      kind: 'navigate',
+      id: 'nav:userPages:map',
+      route: '/map',
+      labelKey: 'map',
+      icon: 'x',
+      adminOnly: false,
+      lastUsed: 1,
+    });
+    addEntry({
+      kind: 'navigate',
+      id: 'nav:userPages:photos',
+      route: '/photos',
+      labelKey: 'photos',
+      icon: 'x',
+      adminOnly: false,
+      lastUsed: 2,
+    });
+    const m = new GlobalSearchManager();
+    m.open();
+    render(GlobalSearch, { props: { manager: m } });
+    expect(screen.getByText('photos')).toBeInTheDocument();
+    expect(screen.queryByText('map')).toBeNull();
+  });
+
+  // NF2: the filter also drops ghost entries whose NavigationItem was removed upstream.
+  it('render-time filter hides navigate recents for unknown (ghost) NavigationItems', () => {
+    mockUser.current = { isAdmin: true };
+    addEntry({
+      kind: 'navigate',
+      id: 'nav:removed:feature',
+      route: '/removed',
+      labelKey: 'removed_feature_label',
+      icon: 'x',
+      adminOnly: false,
+      lastUsed: 1,
+    });
+    const m = new GlobalSearchManager();
+    m.open();
+    render(GlobalSearch, { props: { manager: m } });
+    expect(screen.queryByText('removed_feature_label')).toBeNull();
+  });
+
+  // CG8: cold open (empty query) must not render any navigation sub-section headings.
+  it('cold open (empty query) does NOT render navigation sub-sections', () => {
+    mockUser.current = { isAdmin: true };
+    const m = new GlobalSearchManager();
+    m.open();
+    render(GlobalSearch, { props: { manager: m } });
+    expect(screen.queryByText('cmdk_section_system_settings')).toBeNull();
+    expect(screen.queryByText('cmdk_section_admin')).toBeNull();
+    expect(screen.queryByText('cmdk_section_user_pages')).toBeNull();
+    expect(screen.queryByText('cmdk_section_actions')).toBeNull();
+  });
+
+  // CG7: closing the palette mid-batch must unmount and clean up the stripe effect.
+  // Re-mounting a fresh instance should start with the stripe hidden.
+  it('close() during in-flight batch cleans up the stripe effect', async () => {
+    const m = new GlobalSearchManager();
+    (m as unknown as { providers: Record<keyof Sections, Provider> }).providers.photos.run = () =>
+      new Promise(() => {});
+    m.open();
+    const firstRender = render(GlobalSearch, { props: { manager: m } });
+    await user.type(screen.getByRole('combobox'), 'beach');
+    await new Promise((r) => setTimeout(r, 500));
+    expect(document.querySelector('[data-cmdk-progress]')).not.toBeNull();
+    // Unmount simulates palette close — $effect cleanup should run.
+    firstRender.unmount();
+    // Re-mount a fresh instance. Stripe must NOT be leaking across mounts.
+    const fresh = new GlobalSearchManager();
+    fresh.open();
+    const secondRender = render(GlobalSearch, { props: { manager: fresh } });
+    expect(secondRender.container.querySelector('[data-cmdk-progress]')).toBeNull();
   });
 
   it('respects prefers-reduced-motion class on palette shell', () => {

@@ -2,7 +2,6 @@
   import { Modal, ModalBody } from '@immich/ui';
   import { Command } from 'bits-ui';
   import { t } from 'svelte-i18n';
-  import { get } from 'svelte/store';
   import type { GlobalSearchManager } from '$lib/managers/global-search-manager.svelte';
   import GlobalSearchSection from './global-search-section.svelte';
   import GlobalSearchNavigationSections from './global-search-navigation-sections.svelte';
@@ -16,6 +15,8 @@
   import { mediaQueryManager } from '$lib/stores/media-query-manager.svelte';
   import { getEntries, type RecentEntry } from '$lib/stores/cmdk-recent';
   import { user } from '$lib/stores/user.store';
+  import { NAVIGATION_ITEMS } from '$lib/managers/navigation-items';
+  import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
 
   interface Props {
     manager: GlobalSearchManager;
@@ -46,17 +47,35 @@
     }
   });
 
-  // Render-time filter: drop stale admin navigate recents for non-admin users. This
-  // catches the window between a demotion and the next activation of the entry —
-  // activateRecent already handles the activation path, but the recents list itself
-  // must not display unreachable items.
+  // Render-time filter: drop unreachable navigate recents before they hit the DOM.
+  // Mirrors the live-catalog logic in activateRecent — an admin demotion, a disabled
+  // feature flag, or an upstream upgrade that removed a page would otherwise leave
+  // stale recents visible until clicked. Using `$user` (reactive auto-subscription)
+  // instead of `get(user)` so the derived re-runs when the user store updates
+  // mid-session (logout/login, role change).
   const recentEntries = $derived<RecentEntry[]>(
     (() => {
       if (inputValue.trim() !== '') {
         return [];
       }
-      const isAdmin = get(user)?.isAdmin ?? false;
-      return getEntries().filter((e) => !(e.kind === 'navigate' && e.adminOnly && !isAdmin));
+      const isAdmin = $user?.isAdmin ?? false;
+      const flags = featureFlagsManager.valueOrUndefined;
+      return getEntries().filter((e) => {
+        if (e.kind !== 'navigate') {
+          return true;
+        }
+        const live = NAVIGATION_ITEMS.find((n) => n.id === e.id);
+        if (!live) {
+          return false;
+        }
+        if (live.adminOnly && !isAdmin) {
+          return false;
+        }
+        if (live.featureFlag && !flags?.[live.featureFlag]) {
+          return false;
+        }
+        return true;
+      });
     })(),
   );
   const showPreview = $derived(mediaQueryManager.minLg);
