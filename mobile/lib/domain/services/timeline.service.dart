@@ -75,9 +75,11 @@ class TimelineFactory {
 
   TimelineService lockedFolder(String userId) => TimelineService(_timelineRepository.locked(userId, groupBy));
 
-  TimelineService video(String userId) => TimelineService(_timelineRepository.video(userId, groupBy));
+  TimelineService video(List<String> userIds, String currentUserId) =>
+      TimelineService(_timelineRepository.video(userIds, currentUserId, groupBy));
 
-  TimelineService place(String place) => TimelineService(_timelineRepository.place(place, groupBy));
+  TimelineService place(String place, List<String> userIds, String currentUserId) =>
+      TimelineService(_timelineRepository.place(place, userIds, currentUserId, groupBy));
 
   TimelineService person(String userId, String personId) =>
       TimelineService(_timelineRepository.person(userId, personId, groupBy));
@@ -94,9 +96,12 @@ class TimelineFactory {
   /// Creates a TimelineService for serving geographical map queries, such assets within bounded locations
   TimelineService geographicMap(
     List<String> userIds,
+    String currentUserId,
     TimelineMapOptions Function() currentOptions,
     Stream<TimelineMapOptions> optionsStream,
-  ) => TimelineService(_timelineRepository.geographicMap(userIds, currentOptions, optionsStream, groupBy));
+  ) => TimelineService(
+    _timelineRepository.geographicMap(userIds, currentUserId, currentOptions, optionsStream, groupBy),
+  );
 }
 
 class TimelineService {
