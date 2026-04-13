@@ -102,6 +102,49 @@ describe('global-search root', () => {
     expect(document.getElementById('global-search-label')).not.toBeNull();
   });
 
+  it('left column has min-w-0 so flex-1 shrinks below long-filename content', () => {
+    // Regression guard: flex children default to min-width: auto (= content size),
+    // so without explicit min-w-0 on the `flex-1` left column, rows with long
+    // filenames (e.g. pexels-kirsten-buhne-682055-1521306.jpg) force the whole
+    // row wider than the modal and push the fixed-width preview pane off-screen.
+    // Assert the column carries the `min-w-0` class so `truncate` on inner rows
+    // actually kicks in.
+    const m = new GlobalSearchManager();
+    m.open();
+    const { container } = render(GlobalSearch, { props: { manager: m } });
+    // Locate the left column: the first child of the palette's row div that is
+    // NOT the preview pane (which has data-cmdk-preview).
+    // Modal portals into document.body, not the render container — search the whole document.
+    const row = document.querySelector<HTMLElement>('div.flex[class*="h-[520px]"]');
+    expect(row).not.toBeNull();
+    const leftColumn = row?.firstElementChild as HTMLElement | null;
+    expect(leftColumn).not.toBeNull();
+    expect(leftColumn?.className).toContain('flex-1');
+    expect(leftColumn?.className).toContain('min-w-0');
+    // Sanity: the preview pane exists as a sibling with data-cmdk-preview (or is
+    // absent when preview is disabled via media query) — doesn't matter for this
+    // regression, only the left column's constraint matters.
+  });
+
+  it('row uses explicit h-[520px] / max-h-[80vh] / min-h-0 (not flex-1)', () => {
+    // Regression guard: the row previously used `flex min-h-[420px] max-h-[60vh]
+    // flex-1`, which grew to content because `flex-1` in a column without a
+    // definite parent height doesn't respect max-height. Explicit fixed height
+    // with min-h-0 makes both columns definite-sized so Command.List scrolls
+    // internally instead of stretching the preview pane.
+    const m = new GlobalSearchManager();
+    m.open();
+    render(GlobalSearch, { props: { manager: m } });
+    // Modal portals into document.body, not the render container — search the whole document.
+    const row = document.querySelector<HTMLElement>('div.flex[class*="h-[520px]"]');
+    expect(row).not.toBeNull();
+    expect(row?.className).toContain('h-[520px]');
+    expect(row?.className).toContain('max-h-[80vh]');
+    expect(row?.className).toContain('min-h-0');
+    // Explicitly guard against the broken `flex-1` pattern returning.
+    expect(row?.className).not.toMatch(/\bflex-1\b/);
+  });
+
   it('does NOT render a visible Modal title header', () => {
     const m = new GlobalSearchManager();
     m.open();
