@@ -331,11 +331,12 @@ export class GlobalSearchManager {
     this.providers.photos
       .run(this.query, this.mode, signal)
       .then((result) => {
-        if (batch === this.batchController || batch === null) {
-          this.sections.photos = result;
-          this.onPhotosSettled();
-          this.reconcileCursor();
+        if (batch !== this.batchController) {
+          return;
         }
+        this.sections.photos = result;
+        this.onPhotosSettled();
+        this.reconcileCursor();
       })
       .catch((err: unknown) => {
         if (err instanceof Error && err.name === 'AbortError') {

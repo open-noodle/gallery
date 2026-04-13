@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import { goto } from '$app/navigation';
 import { searchSmart, searchAssets, searchPerson, searchPlaces, getAllTags } from '@immich/sdk';
 import { GlobalSearchManager, type Provider, type ProviderStatus, type SearchMode, type Sections } from './global-search-manager.svelte';
 import { installFakeAbortTimeout, restoreAbortTimeout } from './__tests__/fake-abort-timeout';
+import { __resetForTests as resetRecentStore, getEntries } from '$lib/stores/cmdk-recent';
 
 vi.mock('@immich/sdk', async () => ({
   ...(await vi.importActual<typeof import('@immich/sdk')>('@immich/sdk')),
@@ -10,6 +12,10 @@ vi.mock('@immich/sdk', async () => ({
   searchPerson: vi.fn(),
   searchPlaces: vi.fn(),
   getAllTags: vi.fn(),
+}));
+
+vi.mock('$app/navigation', () => ({
+  goto: vi.fn(),
 }));
 
 describe('GlobalSearchManager (skeleton)', () => {
@@ -657,5 +663,260 @@ describe('ML health retroactive promotion', () => {
     await vi.advanceTimersByTimeAsync(200);
     await vi.advanceTimersByTimeAsync(5_100);
     expect(m.mlHealthy).toBe(true);
+  });
+});
+
+describe('activate()', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    resetRecentStore();
+  });
+
+  it('activate("photo", item) calls goto with /photos/:id and records recent entry', () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    m.activate('photo', { id: 'a1', originalFileName: 'sunset.jpg' });
+    expect(goto).toHaveBeenCalledWith('/photos/a1');
+    const entries = getEntries();
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ kind: 'photo', id: 'photo:a1', assetId: 'a1', label: 'sunset.jpg' });
+    expect(m.isOpen).toBe(false);
+  });
+
+  it('activate("person", item) navigates to /people/:id and records recent entry', () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    m.activate('person', { id: 'p1', name: 'Alice', faceAssetId: 'face1' });
+    expect(goto).toHaveBeenCalledWith('/people/p1');
+    const entries = getEntries();
+    expect(entries[0]).toMatchObject({ kind: 'person', personId: 'p1', label: 'Alice', thumbnailAssetId: 'face1' });
+  });
+
+  it('activate("place", item) navigates to /map with hash and records recent entry', () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    m.activate('place', { name: 'Paris', latitude: 48.8566, longitude: 2.3522 });
+    expect(goto).toHaveBeenCalledWith('/map#12/48.8566/2.3522');
+    const entries = getEntries();
+    expect(entries[0]).toMatchObject({ kind: 'place', id: 'place:48.8566:2.3522', label: 'Paris' });
+  });
+
+  it('activate("tag", item) navigates to /search with tagIds and records recent entry', () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    m.activate('tag', { id: 't1', name: 'beach' });
+    const firstCall = vi.mocked(goto).mock.calls[0]?.[0] as string;
+    expect(firstCall).toContain('/search');
+    expect(decodeURIComponent(firstCall)).toContain('"tagIds":["t1"]');
+    const entries = getEntries();
+    expect(entries[0]).toMatchObject({ kind: 'tag', id: 'tag:t1', tagId: 't1', label: 'beach' });
+  });
+});
+
+describe('activateRecent()', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    resetRecentStore();
+    vi.useFakeTimers();
+    installFakeAbortTimeout();
+    vi.mocked(searchSmart).mockResolvedValue({
+      assets: { items: [], nextPage: null },
+    } as unknown as Awaited<ReturnType<typeof searchSmart>>);
+    vi.mocked(searchAssets).mockResolvedValue({
+      assets: { items: [], nextPage: null },
+    } as unknown as Awaited<ReturnType<typeof searchAssets>>);
+    vi.mocked(searchPerson).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof searchPerson>>);
+    vi.mocked(searchPlaces).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof searchPlaces>>);
+    vi.mocked(getAllTags).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof getAllTags>>);
+  });
+  afterEach(() => {
+    restoreAbortTimeout();
+    vi.useRealTimers();
+  });
+
+  it('query entry re-runs the search in place without closing', async () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    m.activateRecent({ kind: 'query', id: 'q:beach', text: 'beach', mode: 'metadata', lastUsed: 1 });
+    expect(m.mode).toBe('metadata');
+    expect(m.query).toBe('beach');
+    expect(m.isOpen).toBe(true);
+    expect(goto).not.toHaveBeenCalled();
+  });
+
+  it('photo entry navigates and closes', () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    m.activateRecent({ kind: 'photo', id: 'photo:a1', assetId: 'a1', label: 'x.jpg', lastUsed: 1 });
+    expect(goto).toHaveBeenCalledWith('/photos/a1');
+    expect(m.isOpen).toBe(false);
+  });
+
+  it('person entry navigates and closes', () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    m.activateRecent({ kind: 'person', id: 'person:p1', personId: 'p1', label: 'Alice', lastUsed: 1 });
+    expect(goto).toHaveBeenCalledWith('/people/p1');
+    expect(m.isOpen).toBe(false);
+  });
+
+  it('place entry navigates and closes', () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    m.activateRecent({
+      kind: 'place',
+      id: 'place:48.8566:2.3522',
+      latitude: 48.8566,
+      longitude: 2.3522,
+      label: 'Paris',
+      lastUsed: 1,
+    });
+    expect(goto).toHaveBeenCalledWith('/map#12/48.8566/2.3522');
+    expect(m.isOpen).toBe(false);
+  });
+
+  it('tag entry navigates and closes', () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    m.activateRecent({ kind: 'tag', id: 'tag:t1', tagId: 't1', label: 'beach', lastUsed: 1 });
+    const firstCall = vi.mocked(goto).mock.calls[0]?.[0] as string;
+    expect(firstCall).toContain('/search');
+    expect(m.isOpen).toBe(false);
+  });
+
+  it('updates lastUsed on re-activation', () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    const now = Date.now();
+    m.activateRecent({ kind: 'photo', id: 'photo:a1', assetId: 'a1', label: 'x.jpg', lastUsed: 1 });
+    const entries = getEntries();
+    expect(entries[0].lastUsed).toBeGreaterThanOrEqual(now);
+  });
+});
+
+describe('announcementText', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
+
+  it('returns empty string while any provider is still loading', () => {
+    const m = new GlobalSearchManager();
+    m.sections = {
+      photos: { status: 'loading' },
+      people: { status: 'ok', items: [{ id: 'p1' }], total: 1 },
+      places: { status: 'empty' },
+      tags: { status: 'empty' },
+    };
+    expect(m.announcementText).toBe('');
+  });
+
+  it('aggregates non-zero counts once all providers have settled', () => {
+    const m = new GlobalSearchManager();
+    m.sections = {
+      photos: { status: 'ok', items: [{ id: 'a1' }], total: 42 },
+      people: { status: 'ok', items: [{ id: 'p1' }], total: 5 },
+      places: { status: 'empty' },
+      tags: { status: 'ok', items: [{ id: 't1' }], total: 3 },
+    };
+    expect(m.announcementText).toBe('42 photos, 5 people, 3 tags');
+  });
+
+  it('returns "" if all settled sections are empty', () => {
+    const m = new GlobalSearchManager();
+    m.sections = {
+      photos: { status: 'empty' },
+      people: { status: 'empty' },
+      places: { status: 'empty' },
+      tags: { status: 'empty' },
+    };
+    expect(m.announcementText).toBe('');
+  });
+});
+
+describe('reconcileCursor fallback + getActiveItem edge cases', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
+
+  it('reconcileCursor sets activeItemId to null when all sections are empty', () => {
+    const m = new GlobalSearchManager();
+    m.activeItemId = 'photo:ghost';
+    m.sections = {
+      photos: { status: 'empty' },
+      people: { status: 'empty' },
+      places: { status: 'empty' },
+      tags: { status: 'empty' },
+    };
+    m.reconcileCursor();
+    expect(m.activeItemId).toBe(null);
+  });
+
+  it('getActiveItem returns null when the target section is still loading', () => {
+    const m = new GlobalSearchManager();
+    m.activeItemId = 'photo:a1';
+    m.sections = {
+      photos: { status: 'loading' },
+      people: { status: 'idle' },
+      places: { status: 'idle' },
+      tags: { status: 'idle' },
+    };
+    expect(m.getActiveItem()).toBe(null);
+  });
+
+  it('getActiveItem returns null for an activeItemId with no prefix separator', () => {
+    const m = new GlobalSearchManager();
+    m.activeItemId = 'malformed';
+    expect(m.getActiveItem()).toBe(null);
+  });
+});
+
+describe('tagsDisabled persists across close/reopen', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    vi.useFakeTimers();
+    installFakeAbortTimeout();
+    vi.mocked(searchSmart).mockResolvedValue({
+      assets: { items: [], nextPage: null },
+    } as unknown as Awaited<ReturnType<typeof searchSmart>>);
+    vi.mocked(searchAssets).mockResolvedValue({
+      assets: { items: [], nextPage: null },
+    } as unknown as Awaited<ReturnType<typeof searchAssets>>);
+    vi.mocked(searchPerson).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof searchPerson>>);
+    vi.mocked(searchPlaces).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof searchPlaces>>);
+  });
+  afterEach(() => {
+    restoreAbortTimeout();
+    vi.useRealTimers();
+  });
+
+  it('once disabled for one session, stays disabled after close + reopen', async () => {
+    vi.mocked(getAllTags).mockResolvedValue(
+      Array.from({ length: 20_001 }, (_, i) => ({ id: `t${i}`, name: `tag${i}`, color: null })) as unknown as Awaited<
+        ReturnType<typeof getAllTags>
+      >,
+    );
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const m = new GlobalSearchManager();
+    m.setQuery('tag');
+    await vi.advanceTimersByTimeAsync(200);
+    expect(m.sections.tags).toEqual({ status: 'error', message: 'tag_cache_too_large' });
+    const callsAfterFirst = vi.mocked(getAllTags).mock.calls.length;
+    m.close();
+    m.open();
+    // Swap mock to a tiny list — if tagsDisabled reset, this would succeed and repopulate.
+    vi.mocked(getAllTags).mockResolvedValue([
+      { id: 't1', name: 'beach', color: null },
+    ] as unknown as Awaited<ReturnType<typeof getAllTags>>);
+    m.setQuery('tag');
+    await vi.advanceTimersByTimeAsync(200);
+    expect(m.sections.tags).toEqual({ status: 'error', message: 'tag_cache_too_large' });
+    // getAllTags should NOT have been re-invoked because tagsDisabled short-circuits.
+    expect(vi.mocked(getAllTags).mock.calls.length).toBe(callsAfterFirst);
+    warnSpy.mockRestore();
   });
 });
