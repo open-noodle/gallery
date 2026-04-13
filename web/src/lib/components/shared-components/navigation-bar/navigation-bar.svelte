@@ -6,6 +6,7 @@
   import { page } from '$app/state';
   import { clickOutside } from '$lib/actions/click-outside';
   import NotificationPanel from '$lib/components/shared-components/navigation-bar/notification-panel.svelte';
+  import SearchBar from '$lib/components/shared-components/search-bar/search-bar.svelte';
   import GlobalSearchTrigger from '$lib/components/global-search/global-search-trigger.svelte';
   import SkipLink from '$lib/elements/SkipLink.svelte';
   import { authManager } from '$lib/managers/auth-manager.svelte';
@@ -84,10 +85,19 @@
     </div>
     <div class="flex justify-between gap-4 lg:gap-8 pe-6">
       <div class="hidden w-full max-w-5xl flex-1 tall:ps-0 sm:block">
-        <GlobalSearchTrigger />
+        {#if featureFlagsManager.value.search}
+          <SearchBar grayTheme={true} />
+        {/if}
       </div>
 
       <section class="flex place-items-center justify-end gap-1 md:gap-2 w-full sm:w-auto">
+        <!-- Quick-search launcher for the new cmdk palette. Hidden below sm where the
+             mobile search icon takes over; on sm+ it sits alongside the classic SearchBar
+             (which handles full filter search) and offers a visually distinct entry point
+             into the fuzzy command palette. -->
+        <div class="hidden sm:flex">
+          <GlobalSearchTrigger />
+        </div>
         {#if featureFlagsManager.valueOrUndefined?.search}
           <IconButton
             color="secondary"

@@ -63,8 +63,23 @@ describe('global-search-trigger + feature flag', () => {
     expect(globalSearchManager.isOpen).toBe(true);
   });
 
-  it('shows the ⌘K keybind chip', () => {
+  it('shows a platform-aware keybind chip (⌘K on Mac, Ctrl+K elsewhere)', () => {
     render(GlobalSearchTrigger);
-    expect(screen.getByText('⌘K')).toBeInTheDocument();
+    // happy-dom's navigator.platform is typically empty or "" → isMac=false → "Ctrl+K".
+    // On a Mac-emulating environment either label is valid, so match both.
+    const kbd = screen.getByText(/^(⌘K|Ctrl\+K)$/);
+    expect(kbd).toBeInTheDocument();
+    expect(kbd.tagName).toBe('KBD');
+  });
+
+  it('renders the "Quick search" label (visually hidden on small breakpoints)', () => {
+    render(GlobalSearchTrigger);
+    // i18n fallbackLocale 'dev' → the literal key renders.
+    expect(screen.getByText('cmdk_quick_search')).toBeInTheDocument();
+  });
+
+  it('has a stable data-testid for navbar regression tests', () => {
+    render(GlobalSearchTrigger);
+    expect(screen.getByTestId('cmdk-trigger')).toBeInTheDocument();
   });
 });
