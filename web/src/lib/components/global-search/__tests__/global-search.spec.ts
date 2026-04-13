@@ -178,6 +178,23 @@ describe('global-search root', () => {
     await vi.waitFor(() => expect(input.value).toBe('sunset'));
   });
 
+  it('preview pane is not mounted below 1024 px', () => {
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: query === '(min-width: 1024px)' ? false : true,
+      media: query,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+      onchange: null,
+    }));
+    const m = new GlobalSearchManager();
+    m.open();
+    render(GlobalSearch, { props: { manager: m } });
+    expect(document.querySelector('[data-cmdk-preview]')).toBeNull();
+  });
+
   it('respects prefers-reduced-motion class on palette shell', () => {
     window.matchMedia = vi.fn().mockImplementation((query: string) => ({
       matches: query === '(prefers-reduced-motion: reduce)',

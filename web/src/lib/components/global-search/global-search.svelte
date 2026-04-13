@@ -10,6 +10,8 @@
   import TagRow from './rows/tag-row.svelte';
   import RecentRow from './rows/recent-row.svelte';
   import GlobalSearchFooter from './global-search-footer.svelte';
+  import GlobalSearchPreview from './global-search-preview.svelte';
+  import { mediaQueryManager } from '$lib/stores/media-query-manager.svelte';
   import { getEntries, type RecentEntry } from '$lib/stores/cmdk-recent';
 
   interface Props {
@@ -42,6 +44,7 @@
   });
 
   const recentEntries = $derived<RecentEntry[]>(inputValue.trim() === '' ? getEntries() : []);
+  const showPreview = $derived(mediaQueryManager.minLg);
 
   function onKeyDown(e: KeyboardEvent) {
     if (e.key === 'Escape') {
@@ -103,20 +106,21 @@
             class="w-full border-b border-gray-200 bg-transparent px-4 py-3 text-sm focus:outline-none dark:border-gray-700"
           />
 
-          {#if manager.mode === 'smart' && !manager.mlHealthy && inputValue.trim() !== ''}
-            <div class="mx-3 mt-3 rounded-md bg-subtle/60 px-3 py-2 text-xs">
-              {$t('cmdk_smart_unavailable')}
-              <button
-                type="button"
-                onclick={() => manager.setMode('metadata')}
-                class="ml-2 text-primary transition-colors duration-[80ms] ease-out"
-              >
-                {$t('cmdk_try_filename')}
-              </button>
-            </div>
-          {/if}
-
-          <Command.List class="min-h-[420px] max-h-[60vh] flex-1 overflow-y-auto py-2">
+          <div class="flex min-h-[420px] max-h-[60vh] flex-1">
+            <div class="flex flex-1 flex-col {showPreview ? 'border-e border-gray-200 dark:border-gray-700' : ''}">
+              {#if manager.mode === 'smart' && !manager.mlHealthy && inputValue.trim() !== ''}
+                <div class="mx-3 mt-3 rounded-md bg-subtle/60 px-3 py-2 text-xs">
+                  {$t('cmdk_smart_unavailable')}
+                  <button
+                    type="button"
+                    onclick={() => manager.setMode('metadata')}
+                    class="ml-2 text-primary transition-colors duration-[80ms] ease-out"
+                  >
+                    {$t('cmdk_try_filename')}
+                  </button>
+                </div>
+              {/if}
+              <Command.List class="flex-1 overflow-y-auto py-2">
             {#if inputValue.trim() === ''}
               {#if recentEntries.length > 0}
                 <Command.Group>
@@ -180,7 +184,14 @@
                 {/snippet}
               </GlobalSearchSection>
             {/if}
-          </Command.List>
+              </Command.List>
+            </div>
+            {#if showPreview}
+              <div data-cmdk-preview class="w-[280px] shrink-0 overflow-y-auto">
+                <GlobalSearchPreview activeItem={manager.getActiveItem()} />
+              </div>
+            {/if}
+          </div>
 
           <div aria-live="polite" aria-atomic="true" class="sr-only">{manager.announcementText}</div>
           <GlobalSearchFooter {manager} />
