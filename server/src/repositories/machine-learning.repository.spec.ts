@@ -31,27 +31,29 @@ describe(MachineLearningRepository.name, () => {
 
   const mlUrl = 'http://ml-server:3003';
 
+  const baseConfig = {
+    enabled: true,
+    urls: [mlUrl],
+    availabilityChecks: { enabled: false, timeout: 2000, interval: 30_000 },
+    clip: { enabled: true, modelName: 'ViT-B-32__openai', maxDistance: 0 },
+    duplicateDetection: { enabled: true, maxDistance: 0.01 },
+    facialRecognition: { enabled: true, modelName: 'buffalo_l', minScore: 0.7, maxDistance: 0.5, minFaces: 1 },
+    ocr: {
+      enabled: false,
+      modelName: 'default-ocr',
+      minDetectionScore: 0.5,
+      minRecognitionScore: 0.5,
+      maxResolution: 0,
+    },
+    petDetection: {
+      enabled: false,
+      modelName: 'yolo11s',
+      minScore: 0.6,
+    },
+  };
+
   const setupConfig = () => {
-    sut.setup({
-      enabled: true,
-      urls: [mlUrl],
-      availabilityChecks: { enabled: false, timeout: 2000, interval: 30_000 },
-      clip: { enabled: true, modelName: 'ViT-B-32__openai', maxDistance: 0 },
-      duplicateDetection: { enabled: true, maxDistance: 0.01 },
-      facialRecognition: { enabled: true, modelName: 'buffalo_l', minScore: 0.7, maxDistance: 0.5, minFaces: 1 },
-      ocr: {
-        enabled: false,
-        modelName: 'default-ocr',
-        minDetectionScore: 0.5,
-        minRecognitionScore: 0.5,
-        maxResolution: 0,
-      },
-      petDetection: {
-        enabled: false,
-        modelName: 'yolo11s',
-        minScore: 0.6,
-      },
-    });
+    sut.setup(baseConfig);
   };
 
   beforeEach(() => {
@@ -329,6 +331,41 @@ describe(MachineLearningRepository.name, () => {
       await expect(sut.encodeImage('thumbs/user1/preview.webp', clipConfig)).rejects.toThrow('failed for all URLs');
 
       expect(mockBackend.get).toHaveBeenCalledWith('thumbs/user1/preview.webp');
+    });
+  });
+
+  describe('ping()', () => {
+    it('returns { ok: true, contentType } when /ping responds with JSON', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        headers: new Headers({ 'content-type': 'application/json' }),
+      });
+      await expect(sut.ping()).resolves.toEqual({ ok: true, contentType: 'application/json' });
+    });
+
+    it('returns { ok: false, contentType: null } on timeout/abort', async () => {
+      mockFetch.mockImplementation(
+        (_url: URL, init: RequestInit) =>
+          new Promise((_resolve, reject) => {
+            init.signal?.addEventListener('abort', () =>
+              reject(Object.assign(new Error('t'), { name: 'AbortError' })),
+            );
+          }),
+      );
+      await expect(sut.ping()).resolves.toEqual({ ok: false, contentType: null });
+    });
+
+    it('returns { ok: true, contentType: "text/html" } when ML returns HTML', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        headers: new Headers({ 'content-type': 'text/html' }),
+      });
+      await expect(sut.ping()).resolves.toEqual({ ok: true, contentType: 'text/html' });
+    });
+
+    it('returns { ok: false, contentType: null } when no URLs configured', async () => {
+      sut.setup({ ...baseConfig, urls: [] });
+      await expect(sut.ping()).resolves.toEqual({ ok: false, contentType: null });
     });
   });
 

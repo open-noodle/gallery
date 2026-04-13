@@ -259,6 +259,19 @@ export class MachineLearningRepository {
     return response[ModelTask.OCR];
   }
 
+  async ping(): Promise<{ ok: boolean; contentType: string | null }> {
+    const url = this.config.urls[0];
+    if (!url) {
+      return { ok: false, contentType: null };
+    }
+    try {
+      const response = await fetch(new URL('/ping', url), { signal: AbortSignal.timeout(2000) });
+      return { ok: response.ok, contentType: response.headers.get('content-type') };
+    } catch {
+      return { ok: false, contentType: null };
+    }
+  }
+
   async detectPets(imagePath: string, { modelName, minScore }: { modelName: string; minScore: number }) {
     const request = {
       [ModelTask.PET_DETECTION]: {
