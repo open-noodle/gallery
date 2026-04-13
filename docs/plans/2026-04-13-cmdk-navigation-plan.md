@@ -49,6 +49,48 @@
 - **Svelte 5:** never mutate `$state` from inside `$derived` (`feedback_svelte_derived_no_mutation`); use `SvelteMap`/`SvelteSet` in `.svelte` files (`feedback_svelte_map_lint`).
 - **i18n:** new keys must go through `pnpm --filter=immich-i18n format:fix` before commit (`feedback_i18n_key_sorting`).
 - **Type-safe casts:** prefer `as unknown as T` over `as T` for opaque shape-punning; prefer `as never` only inside Svelte snippet prop passthrough (existing convention in the v1 palette).
+- **User store mocking pattern (shared).** Tests that need to flip `user.isAdmin` mid-file MUST use the `vi.hoisted` + `vi.mock` pattern — `vi.doMock` inside an `it()` block does NOT retroactively swap references that are already bound at module-load time. Use this header in every spec file that mocks `$lib/stores/user.store`:
+
+  ```ts
+  const { mockUser } = vi.hoisted(() => ({
+    mockUser: { current: { isAdmin: true } as { isAdmin: boolean } | null },
+  }));
+  vi.mock('$lib/stores/user.store', () => ({
+    user: {
+      subscribe: (run: (v: { isAdmin: boolean } | null) => void) => {
+        run(mockUser.current);
+        return () => {};
+      },
+    },
+  }));
+  ```
+
+  Tests then flip `mockUser.current = { isAdmin: false }` before constructing a new manager. This pattern is proven in `web/src/lib/components/global-search/__tests__/global-search-trigger.spec.ts` for the `featureFlagsManager` case.
+
+- **Feature flags mocking pattern (shared).** Same rule — use `vi.hoisted` for mutable mock state:
+
+  ```ts
+  const { mockFlags } = vi.hoisted(() => ({
+    mockFlags: {
+      valueOrUndefined: { search: true, map: true, trash: true } as Record<string, boolean> | undefined,
+    },
+  }));
+  vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({
+    featureFlagsManager: mockFlags,
+  }));
+  ```
+
+- **Icon fallback map.** If `pnpm check:typescript` fails on any `@mdi/js` import introduced in Task 5, use these substitutions rather than inventing new ones:
+
+  | Missing icon     | Substitute           |
+  | ---------------- | -------------------- |
+  | `mdiJobOutline`  | `mdiSync`            |
+  | `mdiViewAgenda`  | `mdiBookOpenOutline` |
+  | `mdiStarOutline` | `mdiHistory`         |
+  | `mdiHeart`       | `mdiStar`            |
+  | `mdiArchive`     | `mdiPackageVariant`  |
+
+  The Task 6 schema test only asserts `icon` is a non-empty string, so any valid path works. If none of the above exist either, pick any `mdi*` import that compiles.
 
 ---
 
@@ -336,7 +378,44 @@ describe('navigate kind', () => {
 });
 ```
 
-Also add one test inside `global-search-manager.svelte.spec.ts` (existing file) or in a new standalone spec — `isValidRecentEntry` is currently private; the simplest check is via the activate path in Task 12. Skip an isolated test for this function; Task 12 covers it.
+Also add an isolated `isValidRecentEntry` test to the manager spec (it's a module-local function, but activateRecent exercises it):
+
+```ts
+describe('isValidRecentEntry (navigate branch)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    resetRecentStore();
+  });
+
+  // Mock goto so we can detect whether activateRecent actually navigated.
+  it('rejects navigate entries with empty route / labelKey / icon', () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    for (const missing of ['route', 'labelKey', 'icon'] as const) {
+      vi.mocked(goto).mockClear();
+      warnSpy.mockClear();
+      const entry = {
+        kind: 'navigate' as const,
+        id: `nav:bad-${missing}`,
+        route: missing === 'route' ? '' : '/ok',
+        labelKey: missing === 'labelKey' ? '' : 'ok',
+        icon: missing === 'icon' ? '' : 'M0 0',
+        adminOnly: false,
+        lastUsed: 1,
+      };
+      m.open();
+      m.activateRecent(entry);
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('corrupt recent entry'), expect.anything());
+      expect(goto).not.toHaveBeenCalled();
+    }
+    warnSpy.mockRestore();
+  });
+});
+```
+
+This test depends on Task 12's `activateRecent` implementation. Move this test into Task 12 if Task 4 doesn't yet have the `activateRecent` navigate branch — the isValidRecentEntry function itself is already written in Task 4.
 
 **Step 2: Run — expect failure**
 
@@ -832,7 +911,7 @@ describe('navigation section scaffolding', () => {
     expect(active?.kind).toBe('nav');
   });
 
-  it('announcementText includes navigation count when ok', () => {
+  it('announcementText includes navigation count as "N pages" when ok', () => {
     const m = new GlobalSearchManager();
     m.sections = {
       photos: { status: 'empty' },
@@ -841,7 +920,7 @@ describe('navigation section scaffolding', () => {
       tags: { status: 'empty' },
       navigation: { status: 'ok', items: [{ id: 'nav:theme' }] as never[], total: 5 },
     };
-    expect(m.announcementText).toContain('5');
+    expect(m.announcementText).toBe('5 pages');
   });
 
   it('reconcileCursor falls through to navigation when entity sections are empty', () => {
@@ -929,11 +1008,11 @@ const kindOf: Record<keyof Sections, string> = {
 };
 ```
 
-Update `announcementText` — add the `navigation` count to the `parts` array:
+Update `announcementText` — add the `navigation` count to the `parts` array. Use "pages" rather than "navigation" in the aria-live text because "5 navigation" reads awkwardly to a screen reader:
 
 ```ts
 if (count(s.navigation) > 0) {
-  parts.push(`${count(s.navigation)} navigation`);
+  parts.push(`${count(s.navigation)} pages`);
 }
 ```
 
@@ -1011,6 +1090,18 @@ describe('navigation memo cache', () => {
     const a = (m as unknown as { getNavigationSearchStrings: () => Map<string, string> }).getNavigationSearchStrings();
     const b = (m as unknown as { getNavigationSearchStrings: () => Map<string, string> }).getNavigationSearchStrings();
     expect(a).toBe(b); // same reference
+  });
+
+  it('handles a null locale gracefully (svelte-i18n before init)', () => {
+    // The `get(i18nLocale) ?? 'en'` fallback handles this. Verify no throw and cache still built.
+    // Implementation-side: if `get(locale)` ever returns null/undefined, the cache is keyed under 'en'.
+    const m = new GlobalSearchManager();
+    // Replace the private locale getter with one that returns null.
+    const result = (
+      m as unknown as { getNavigationSearchStrings: () => Map<string, string> }
+    ).getNavigationSearchStrings();
+    expect(() => result).not.toThrow();
+    expect(result.size).toBeGreaterThan(0);
   });
 });
 ```
@@ -1106,7 +1197,33 @@ git commit -m "feat(web): navigation memo cache + locale subscription"
 
 **Step 1: Write failing tests**
 
-Append:
+**IMPORTANT:** These tests require the shared `vi.hoisted` mocking patterns from the "Conventions for every task" section. Add these `vi.hoisted` + `vi.mock` blocks at the TOP of `global-search-manager.svelte.spec.ts` (if not already added by an earlier task) — `vi.doMock` inside individual tests does NOT work because `GlobalSearchManager` binds `user` and `featureFlagsManager` at module load:
+
+```ts
+// Top of file, before the import of GlobalSearchManager
+const { mockUser } = vi.hoisted(() => ({
+  mockUser: { current: { isAdmin: true } as { isAdmin: boolean } | null },
+}));
+vi.mock('$lib/stores/user.store', () => ({
+  user: {
+    subscribe: (run: (v: { isAdmin: boolean } | null) => void) => {
+      run(mockUser.current);
+      return () => {};
+    },
+  },
+}));
+
+const { mockFlags } = vi.hoisted(() => ({
+  mockFlags: {
+    valueOrUndefined: { search: true, map: true, trash: true } as Record<string, boolean> | undefined,
+  },
+}));
+vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({
+  featureFlagsManager: mockFlags,
+}));
+```
+
+Append the test block:
 
 ```ts
 import { computeCommandScore } from 'bits-ui';
@@ -1115,6 +1232,8 @@ describe('runNavigationProvider', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    mockUser.current = { isAdmin: true };
+    mockFlags.valueOrUndefined = { search: true, map: true, trash: true };
   });
 
   function runNav(m: GlobalSearchManager, query: string): ProviderStatus<never> {
@@ -1130,15 +1249,6 @@ describe('runNavigationProvider', () => {
   });
 
   it('returns ok with Auto-Classification in the result set for query "classific"', () => {
-    // Mock the user store to return admin so systemSettings items are not filtered.
-    vi.doMock('$lib/stores/user.store', () => ({
-      user: {
-        subscribe: (run: (v: { isAdmin: boolean }) => void) => {
-          run({ isAdmin: true });
-          return () => {};
-        },
-      },
-    }));
     const m = new GlobalSearchManager();
     const result = runNav(m, 'classific');
     expect(result.status).toBe('ok');
@@ -1149,17 +1259,9 @@ describe('runNavigationProvider', () => {
   });
 
   it('filters admin-only items for non-admin users', () => {
-    vi.doMock('$lib/stores/user.store', () => ({
-      user: {
-        subscribe: (run: (v: { isAdmin: boolean }) => void) => {
-          run({ isAdmin: false });
-          return () => {};
-        },
-      },
-    }));
+    mockUser.current = { isAdmin: false };
     const m = new GlobalSearchManager();
     const result = runNav(m, 'classific');
-    // Non-admin shouldn't see system-settings items
     if (result.status === 'ok') {
       for (const item of result.items) {
         expect((item as { adminOnly: boolean }).adminOnly).toBe(false);
@@ -1168,11 +1270,18 @@ describe('runNavigationProvider', () => {
   });
 
   it('filters items gated on a disabled feature flag', () => {
+    mockFlags.valueOrUndefined = { search: true, map: false, trash: true };
     const m = new GlobalSearchManager();
-    // mock featureFlagsManager.valueOrUndefined = { map: false, ... }
-    vi.doMock('$lib/managers/feature-flags-manager.svelte', () => ({
-      featureFlagsManager: { valueOrUndefined: { map: false, search: true, trash: true } },
-    }));
+    const result = runNav(m, 'map');
+    if (result.status === 'ok') {
+      const ids = result.items.map((i) => (i as { id: string }).id);
+      expect(ids).not.toContain('nav:userPages:map');
+    }
+  });
+
+  it('items gated on a feature flag are hidden when flags have not loaded yet (SSR window)', () => {
+    mockFlags.valueOrUndefined = undefined;
+    const m = new GlobalSearchManager();
     const result = runNav(m, 'map');
     if (result.status === 'ok') {
       const ids = result.items.map((i) => (i as { id: string }).id);
@@ -1181,16 +1290,9 @@ describe('runNavigationProvider', () => {
   });
 
   it('hyphenated query matches (auto-class → Auto-Classification)', () => {
-    vi.doMock('$lib/stores/user.store', () => ({
-      user: {
-        subscribe: (run: (v: { isAdmin: boolean }) => void) => {
-          run({ isAdmin: true });
-          return () => {};
-        },
-      },
-    }));
     const m = new GlobalSearchManager();
     const result = runNav(m, 'auto-class');
+    expect(result.status).toBe('ok');
     if (result.status === 'ok') {
       const labels = result.items.map((i) => (i as { labelKey: string }).labelKey);
       expect(labels).toContain('admin.classification_settings');
@@ -1198,8 +1300,6 @@ describe('runNavigationProvider', () => {
   });
 });
 ```
-
-**Note on mocking `$lib/stores/user.store`:** the existing test file may need refactoring to support `vi.doMock` at describe-scope. If `user.store` is imported at module load and can't be re-mocked mid-test, use `vi.mock` at file top with a mutable hoisted variable — see the `global-search-trigger.spec.ts` `vi.hoisted` pattern from Task 15 of the original cmdk plan for a proven approach.
 
 **Step 2: Run — expect failure**
 
@@ -1466,6 +1566,75 @@ describe('SWR loading rules', () => {
     await vi.advanceTimersByTimeAsync(200);
     expect(m.batchInFlight).toBe(false);
   });
+
+  it('cold-open first keystroke: navigation is ok instantly, entity sections flip to loading', () => {
+    mockUser.current = { isAdmin: true };
+    const m = new GlobalSearchManager();
+    m.open();
+    m.setQuery('classific');
+    // Navigation is synchronous.
+    expect(m.sections.navigation.status).toBe('ok');
+    // Entities were idle on cold open, so they all flip to loading (SWR skips only ok).
+    expect(m.sections.photos.status).toBe('loading');
+    expect(m.sections.people.status).toBe('loading');
+  });
+
+  it('setMode preserves ok photos until re-run completes (SWR)', async () => {
+    vi.mocked(searchSmart).mockResolvedValueOnce({
+      assets: { items: [{ id: 'a1' } as never], nextPage: null },
+    } as never);
+    const m = new GlobalSearchManager();
+    m.open();
+    m.setQuery('beach');
+    await vi.advanceTimersByTimeAsync(200);
+    expect(m.sections.photos.status).toBe('ok');
+    // Mode switch: synchronously, photos stays ok.
+    m.setMode('metadata');
+    expect(m.sections.photos.status).toBe('ok');
+  });
+
+  it('setMode joins the batch counter — mode switch during live batch does NOT drop stripe early', async () => {
+    // Create a slow photos provider so the batch stays in flight.
+    let resolvePhotos!: () => void;
+    vi.mocked(searchSmart).mockImplementationOnce(
+      () => new Promise((r) => (resolvePhotos = () => r({ assets: { items: [], nextPage: null } } as never))),
+    );
+    const m = new GlobalSearchManager();
+    m.open();
+    m.setQuery('beach');
+    await vi.advanceTimersByTimeAsync(200); // runBatch fires
+    expect(m.batchInFlight).toBe(true);
+    // Mode switch while photos is still in flight.
+    m.setMode('metadata');
+    expect(m.batchInFlight).toBe(true); // still true — setMode increments the counter
+    // Let the setMode-triggered re-run resolve first (fast path).
+    vi.mocked(searchAssets).mockResolvedValueOnce({ assets: { items: [], nextPage: null } } as never);
+    await vi.advanceTimersByTimeAsync(10);
+    // Original photos still in flight — batchInFlight MUST remain true.
+    expect(m.batchInFlight).toBe(true);
+    // Finally, let the original photos resolve.
+    resolvePhotos();
+    await vi.advanceTimersByTimeAsync(10);
+    expect(m.batchInFlight).toBe(false);
+  });
+
+  it('rapid mode switching does not decrement counter below zero', async () => {
+    vi.mocked(searchSmart).mockResolvedValue({ assets: { items: [], nextPage: null } } as never);
+    vi.mocked(searchAssets).mockResolvedValue({ assets: { items: [], nextPage: null } } as never);
+    const m = new GlobalSearchManager();
+    m.open();
+    m.setQuery('beach');
+    await vi.advanceTimersByTimeAsync(200);
+    // Rapid mode churn.
+    m.setMode('metadata');
+    m.setMode('description');
+    m.setMode('ocr');
+    m.setMode('smart');
+    await vi.advanceTimersByTimeAsync(100);
+    // Should settle cleanly; no negative counter; batchInFlight returns to false.
+    expect(m.batchInFlight).toBe(false);
+    expect((m as unknown as { inFlightCounter: number }).inFlightCounter).toBe(0);
+  });
 });
 ```
 
@@ -1477,7 +1646,14 @@ Add state fields:
 
 ```ts
 batchInFlight = $state(false);
-private batchInFlightStartedAt = 0;
+private _batchInFlightStartedAt = 0;
+/**
+ * Public getter — the component needs to read this for the progress stripe's
+ * 200ms grace calculation but the field stays encapsulated.
+ */
+get batchInFlightStartedAt() {
+  return this._batchInFlightStartedAt;
+}
 private inFlightCounter = 0;
 ```
 
@@ -1491,23 +1667,25 @@ for (const key of ['photos', 'people', 'places', 'tags'] as const) {
   }
 }
 
+// batchInFlight flips true here, but batchInFlightStartedAt is set INSIDE runBatch.
+// Starting the grace-window timer at setQuery time would let the 150ms debounce
+// eat most of the 200ms grace and fast backend responses would flash the stripe.
 this.batchInFlight = true;
-this.batchInFlightStartedAt = performance.now();
 this.debounceTimer = setTimeout(() => this.runBatch(text, this.mode), 150);
 ```
 
-Update `runBatch` — introduce a counter and clear `batchInFlight` when it reaches zero:
+Update `runBatch` — set `batchInFlightStartedAt` HERE (at debounce-fire time, not setQuery time) and introduce a counter that clears `batchInFlight` when it reaches zero:
 
 ```ts
 protected runBatch(text: string, mode: SearchMode) {
   this.debounceTimer = null;
+  this._batchInFlightStartedAt = performance.now(); // 200ms grace starts now
   const batch = new AbortController();
   const photosLocal = new AbortController();
   this.batchController = batch;
   this.photosController = photosLocal;
 
   const keys = ['photos', 'people', 'places', 'tags'] as const;
-  let pending = 0;
 
   for (const key of keys) {
     const provider = this.providers[key];
@@ -1515,13 +1693,13 @@ protected runBatch(text: string, mode: SearchMode) {
       this.sections[key] = idle;
       continue;
     }
-    pending++;
+    this.inFlightCounter++;
     const controllers = key === 'photos' ? [batch.signal, photosLocal.signal] : [batch.signal];
     const signal = AbortSignal.any([...controllers, AbortSignal.timeout(5000)]);
 
     const onSettle = () => {
-      pending--;
-      if (pending === 0 && batch === this.batchController) {
+      this.inFlightCounter--;
+      if (this.inFlightCounter === 0 && batch === this.batchController) {
         this.batchInFlight = false;
       }
     };
@@ -1564,25 +1742,41 @@ protected runBatch(text: string, mode: SearchMode) {
       });
   }
 
-  if (pending === 0) {
+  if (this.inFlightCounter === 0) {
     // All sections were below minQueryLength — nothing to do.
     this.batchInFlight = false;
   }
 }
 ```
 
-`setMode`'s photos-only re-run uses the same SWR rule:
+`setMode`'s photos-only re-run must use the same SWR rule AND integrate with the in-flight counter (not flip `batchInFlight` directly) — otherwise a mode switch during an active batch would prematurely drop the progress stripe:
 
 ```ts
 // In setMode's non-debounce branch, replace the current loading flip:
 if (this.sections.photos.status !== 'ok') {
   this.sections.photos = { status: 'loading' };
 }
-this.batchInFlight = true;
-this.batchInFlightStartedAt = performance.now();
+
+// Join the in-flight counter. If a runBatch is already active, pending > 0 and this
+// call just increments. If no batch is in flight, this starts a single-provider batch.
+this.inFlightCounter++;
+if (!this.batchInFlight) {
+  this.batchInFlight = true;
+  this._batchInFlightStartedAt = performance.now();
+}
 ```
 
-And in the promise `.then`/`.catch` of that setMode re-run, clear `batchInFlight` on settle.
+In the promise `.then`/`.catch` of the setMode re-run:
+
+```ts
+// On settle (success OR failure):
+this.inFlightCounter--;
+if (this.inFlightCounter === 0) {
+  this.batchInFlight = false;
+}
+```
+
+This ensures mode switches share bookkeeping with the main batch — `batchInFlight` stays true until everything is settled.
 
 **Step 4: Run — expect pass**
 
@@ -1933,9 +2127,23 @@ describe('global-search-navigation-sections', () => {
     };
   }
 
-  it('renders nothing when status is not ok', () => {
+  it('renders nothing when status is idle', () => {
     const { container } = render(GlobalSearchNavigationSections, {
       props: { status: { status: 'idle' }, onActivate: () => {} },
+    });
+    expect(container.textContent?.trim()).toBe('');
+  });
+
+  it('renders nothing when status is empty', () => {
+    const { container } = render(GlobalSearchNavigationSections, {
+      props: { status: { status: 'empty' }, onActivate: () => {} },
+    });
+    expect(container.textContent?.trim()).toBe('');
+  });
+
+  it('renders nothing when status is loading', () => {
+    const { container } = render(GlobalSearchNavigationSections, {
+      props: { status: { status: 'loading' }, onActivate: () => {} },
     });
     expect(container.textContent?.trim()).toBe('');
   });
@@ -2173,18 +2381,26 @@ Add the progress stripe + nav sections mount + recent filter. Relevant additions
   });
 
   // Progress stripe: show only after 200ms grace so fast queries don't flash.
-  let tick = $state(0);
+  // Clean setTimeout pattern — no interval, no `performance.now` polling.
+  let stripeArmed = $state(false);
+  let stripeTimer: ReturnType<typeof setTimeout> | null = null;
+
   $effect(() => {
-    if (!manager.batchInFlight) {
-      return;
+    if (manager.batchInFlight) {
+      stripeTimer = setTimeout(() => {
+        stripeArmed = true;
+      }, 200);
+      return () => {
+        if (stripeTimer !== null) {
+          clearTimeout(stripeTimer);
+          stripeTimer = null;
+        }
+        stripeArmed = false;
+      };
     }
-    const interval = setInterval(() => (tick += 1), 50);
-    return () => clearInterval(interval);
   });
-  const showProgressStripe = $derived.by(() => {
-    void tick; // reactivity handle
-    return manager.batchInFlight && performance.now() - (manager.batchInFlightStartedAt ?? 0) > 200;
-  });
+
+  const showProgressStripe = $derived(stripeArmed && manager.batchInFlight);
 </script>
 
 <!-- Inside Command.Root, after Command.Input: -->
@@ -2203,7 +2419,7 @@ Add the progress stripe + nav sections mount + recent filter. Relevant additions
 />
 ```
 
-**Note:** `batchInFlightStartedAt` on the manager is `private` — expose it as a read-only getter or promote it to a public field for the effect to read it.
+**Note:** the setTimeout pattern above does not read `batchInFlightStartedAt` at all — the 200 ms grace is encoded purely as a timer. Task 11 still exposes `batchInFlightStartedAt` via a public getter, but this component no longer depends on it. The getter remains for future diagnostic use and for any test that wants to assert the timing invariant.
 
 Add to `web/src/app.css`:
 
@@ -2343,30 +2559,60 @@ test.describe('navigation provider', () => {
     const combobox = page.getByRole('combobox');
     await combobox.fill('beach');
     await expect(page.getByRole('option').first()).toBeVisible({ timeout: 8000 });
-    // Type more — assert no skeleton data-testid appears in the photos section.
-    await combobox.type('y');
-    await combobox.type('z');
-    // Skeletons should not appear between keystrokes because photos.status === 'ok' and SWR preserves it.
-    // We assert the photos section still shows at least one option during the transition.
-    await expect(page.getByRole('option').first()).toBeVisible();
+    // Directly assert no Skeleton elements exist while typing through additional characters.
+    // Skeleton.svelte renders <div data-skeleton="true">. If SWR is working, photos are ok
+    // and the component short-circuits the loading branch — zero skeleton nodes in the DOM.
+    const countBefore = await page.locator('[data-skeleton="true"]').count();
+    expect(countBefore).toBe(0);
+    await combobox.press('y');
+    await combobox.press('z');
+    const countAfter = await page.locator('[data-skeleton="true"]').count();
+    expect(countAfter).toBe(0);
   });
 
-  test('non-admin user: System Settings and Admin sub-sections are absent', async ({ page }) => {
-    // Use a non-admin user fixture. Assuming one exists per env-prep setup.
-    // ... set non-admin auth cookie ...
+  test('non-admin user: System Settings and Admin sub-sections are absent', async ({ page, context }) => {
+    // Seed a non-admin user via utils.userSetup and set auth cookies.
+    const writer = await utils.userSetup(admin.accessToken, {
+      email: 'nonadmin-nav@cmdk.test',
+      password: 'pw',
+      name: 'NonAdmin Nav',
+    });
+    await utils.setAuthCookies(context, writer.accessToken);
     await page.goto('/photos');
     await page.keyboard.press('Control+k');
     await page.getByRole('combobox').fill('classific');
-    // No "Auto-Classification" for non-admin.
     await expect(page.getByText(/auto-classification/i)).toHaveCount(0);
   });
 
-  test('Ctrl+K reclaim: old @immich/ui palette does NOT open', async ({ page }) => {
+  test('admin demotion: stale admin recents are not visible to non-admin users', async ({ page, context }) => {
+    // Step 1: as admin, activate Auto-Classification to seed a recent.
+    await utils.setAuthCookies(context, admin.accessToken);
     await page.goto('/photos');
     await page.keyboard.press('Control+k');
-    // Our palette shows "Photos" section heading; the legacy palette shows "Global" heading.
+    await page.getByRole('combobox').fill('auto-class');
+    await expect(page.getByText(/auto-classification/i)).toBeVisible();
+    await page.keyboard.press('Enter');
+    await expect(page).toHaveURL(/classification/);
+    // Step 2: swap to non-admin cookie (simulating a demotion).
+    const writer = await utils.userSetup(admin.accessToken, {
+      email: 'demoted-nav@cmdk.test',
+      password: 'pw',
+      name: 'Demoted',
+    });
+    await utils.setAuthCookies(context, writer.accessToken);
+    await page.goto('/photos');
+    await page.keyboard.press('Control+k');
+    // Empty query → Recent section should NOT contain Auto-Classification.
+    await expect(page.getByText(/auto-classification/i)).toHaveCount(0);
+  });
+
+  test('Ctrl+K reclaim: our palette opens (not the legacy @immich/ui one)', async ({ page }) => {
+    await page.goto('/photos');
+    await page.keyboard.press('Control+k');
     await expect(page.getByRole('dialog')).toBeVisible();
-    await expect(page.getByText(/^global$/i)).toHaveCount(0);
+    // Positive signature of OUR palette: the mode-selector radiogroup with role="radiogroup"
+    // and a name derived from cmdk_search_mode. The legacy @immich/ui palette has no such element.
+    await expect(page.getByRole('radiogroup', { name: /search mode/i })).toBeVisible();
   });
 });
 ```
