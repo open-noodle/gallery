@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import GlobalSearch from '../global-search.svelte';
 import { GlobalSearchManager, type Provider, type Sections } from '$lib/managers/global-search-manager.svelte';
+import { __resetForTests as resetRecentStore, addEntry } from '$lib/stores/cmdk-recent';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
 vi.mock('@immich/sdk', async () => {
@@ -28,7 +29,8 @@ describe('global-search root', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
-    user = userEvent.setup();
+    resetRecentStore();
+    user = userEvent.setup({ pointerEventsCheck: 0 });
   });
 
   it('renders dialog containing the palette', () => {
@@ -127,6 +129,53 @@ describe('global-search root', () => {
     await vi.waitFor(() =>
       expect(screen.queryByText(/cmdk_smart_unavailable|smart search is unavailable/i)).not.toBeNull(),
     );
+  });
+
+  it('Home key moves selection to the first Command.Item, End to the last', async () => {
+    const m = new GlobalSearchManager();
+    installPhotoStub(m, [{ id: 'a1' }, { id: 'a2' }, { id: 'a3' }]);
+    m.open();
+    render(GlobalSearch, { props: { manager: m } });
+    await user.type(screen.getByRole('combobox'), 'beach');
+    await vi.waitFor(() => expect(m.activeItemId).toBe('photo:a1'), { timeout: 2000 });
+    await user.keyboard('{End}');
+    await vi.waitFor(() => expect(m.activeItemId).toBe('photo:a3'));
+    await user.keyboard('{Home}');
+    await vi.waitFor(() => expect(m.activeItemId).toBe('photo:a1'));
+  });
+
+  it('renders recent entries when store is non-empty and query is blank', () => {
+    addEntry({ kind: 'query', id: 'q:beach', text: 'beach', mode: 'smart', lastUsed: 1 });
+    addEntry({ kind: 'photo', id: 'photo:a1', assetId: 'a1', label: 'sunset.jpg', lastUsed: 2 });
+    const m = new GlobalSearchManager();
+    m.open();
+    render(GlobalSearch, { props: { manager: m } });
+    expect(screen.getByText('beach')).toBeInTheDocument();
+    expect(screen.getByText('sunset.jpg')).toBeInTheDocument();
+  });
+
+  it('Enter on a highlighted photo row calls manager.activate("photo", item)', async () => {
+    const m = new GlobalSearchManager();
+    installPhotoStub(m, [{ id: 'a1', originalFileName: 'x.jpg' }]);
+    const activateSpy = vi.spyOn(m, 'activate').mockImplementation(() => {});
+    m.open();
+    render(GlobalSearch, { props: { manager: m } });
+    await user.type(screen.getByRole('combobox'), 'beach');
+    await vi.waitFor(() => expect(m.activeItemId).toBe('photo:a1'), { timeout: 2000 });
+    await user.keyboard('{Enter}');
+    expect(activateSpy).toHaveBeenCalledWith('photo', expect.objectContaining({ id: 'a1' }));
+  });
+
+  it('activateRecent("query", ...) updates the input value via manager.query sync', async () => {
+    addEntry({ kind: 'query', id: 'q:sunset', text: 'sunset', mode: 'smart', lastUsed: 1 });
+    const m = new GlobalSearchManager();
+    m.open();
+    render(GlobalSearch, { props: { manager: m } });
+    const input = screen.getByRole('combobox') as HTMLInputElement;
+    expect(input.value).toBe('');
+    // Directly invoke activateRecent on the manager — the effect should sync inputValue.
+    m.activateRecent({ kind: 'query', id: 'q:sunset', text: 'sunset', mode: 'smart', lastUsed: 1 });
+    await vi.waitFor(() => expect(input.value).toBe('sunset'));
   });
 
   it('respects prefers-reduced-motion class on palette shell', () => {

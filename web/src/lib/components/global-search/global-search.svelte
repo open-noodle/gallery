@@ -60,7 +60,10 @@
       return;
     }
     if (e.key === 'Home' || e.key === 'End') {
-      const items = document.querySelectorAll<HTMLElement>('[cmdk-item]');
+      // bits-ui tags each Command.Item with a data-command-item attribute (see
+      // bits-ui command.svelte.js:1204 — `createBitsAttrs({ component: 'command' ... })`
+      // yields `data-command-${part}`). Using the wrong attribute name silently breaks nav.
+      const items = document.querySelectorAll<HTMLElement>('[data-command-item]');
       if (items.length === 0) {
         return;
       }
@@ -86,101 +89,101 @@
       {#snippet children()}
         <span class="sr-only" id="global-search-label">{$t('global_search')}</span>
         <Command.Root
-      shouldFilter={false}
-      vimBindings={false}
-      bind:value={selectedValue}
-      aria-labelledby="global-search-label"
-      class="flex flex-col"
-    >
-      <Command.Input
-        bind:value={inputValue}
-        placeholder={$t('cmdk_placeholder')}
-        maxlength={256}
-        onkeydown={onKeyDown}
-        class="w-full border-b border-gray-200 bg-transparent px-4 py-3 text-sm focus:outline-none dark:border-gray-700"
-      />
+          shouldFilter={false}
+          vimBindings={false}
+          bind:value={selectedValue}
+          aria-labelledby="global-search-label"
+          class="flex flex-col"
+        >
+          <Command.Input
+            bind:value={inputValue}
+            placeholder={$t('cmdk_placeholder')}
+            maxlength={256}
+            onkeydown={onKeyDown}
+            class="w-full border-b border-gray-200 bg-transparent px-4 py-3 text-sm focus:outline-none dark:border-gray-700"
+          />
 
-      {#if manager.mode === 'smart' && !manager.mlHealthy && inputValue.trim() !== ''}
-        <div class="mx-3 mt-3 rounded-md bg-subtle/60 px-3 py-2 text-xs">
-          {$t('cmdk_smart_unavailable')}
-          <button
-            type="button"
-            onclick={() => manager.setMode('metadata')}
-            class="ml-2 text-primary transition-colors duration-[80ms] ease-out"
-          >
-            {$t('cmdk_try_filename')}
-          </button>
-        </div>
-      {/if}
-
-      <Command.List class="min-h-[420px] max-h-[60vh] flex-1 overflow-y-auto py-2">
-        {#if inputValue.trim() === ''}
-          {#if recentEntries.length > 0}
-            <Command.Group>
-              <Command.GroupHeading
-                class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400"
+          {#if manager.mode === 'smart' && !manager.mlHealthy && inputValue.trim() !== ''}
+            <div class="mx-3 mt-3 rounded-md bg-subtle/60 px-3 py-2 text-xs">
+              {$t('cmdk_smart_unavailable')}
+              <button
+                type="button"
+                onclick={() => manager.setMode('metadata')}
+                class="ml-2 text-primary transition-colors duration-[80ms] ease-out"
               >
-                {$t('cmdk_recent_heading')}
-              </Command.GroupHeading>
-              <Command.GroupItems>
-                {#each recentEntries as entry (entry.id)}
-                  <Command.Item value={entry.id} onSelect={() => manager.activateRecent(entry)}>
-                    <RecentRow {entry} />
-                  </Command.Item>
-                {/each}
-              </Command.GroupItems>
-            </Command.Group>
-          {:else}
-            <div class="p-6 text-center text-[13px] font-normal text-gray-500 dark:text-gray-400">
-              {$t('cmdk_helper')}
+                {$t('cmdk_try_filename')}
+              </button>
             </div>
           {/if}
-        {:else}
-          <GlobalSearchSection
-            heading={$t('cmdk_photos_heading')}
-            status={manager.sections.photos}
-            idPrefix="photo"
-            onActivate={(item) => manager.activate('photo', item)}
-          >
-            {#snippet renderRow(item)}
-              <PhotoRow item={item as never} />
-            {/snippet}
-          </GlobalSearchSection>
-          <GlobalSearchSection
-            heading={$t('cmdk_people_heading')}
-            status={manager.sections.people}
-            idPrefix="person"
-            onActivate={(item) => manager.activate('person', item)}
-          >
-            {#snippet renderRow(item)}
-              <PersonRow item={item as never} />
-            {/snippet}
-          </GlobalSearchSection>
-          <GlobalSearchSection
-            heading={$t('cmdk_places_heading')}
-            status={manager.sections.places}
-            idPrefix="place"
-            onActivate={(item) => manager.activate('place', item)}
-          >
-            {#snippet renderRow(item)}
-              <PlaceRow item={item as never} />
-            {/snippet}
-          </GlobalSearchSection>
-          <GlobalSearchSection
-            heading={$t('cmdk_tags_heading')}
-            status={manager.sections.tags}
-            idPrefix="tag"
-            onActivate={(item) => manager.activate('tag', item)}
-          >
-            {#snippet renderRow(item)}
-              <TagRow item={item as never} />
-            {/snippet}
-          </GlobalSearchSection>
-        {/if}
-      </Command.List>
 
-      <div aria-live="polite" aria-atomic="true" class="sr-only">{manager.announcementText}</div>
-      <GlobalSearchFooter {manager} />
+          <Command.List class="min-h-[420px] max-h-[60vh] flex-1 overflow-y-auto py-2">
+            {#if inputValue.trim() === ''}
+              {#if recentEntries.length > 0}
+                <Command.Group>
+                  <Command.GroupHeading
+                    class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400"
+                  >
+                    {$t('cmdk_recent_heading')}
+                  </Command.GroupHeading>
+                  <Command.GroupItems>
+                    {#each recentEntries as entry (entry.id)}
+                      <Command.Item value={entry.id} onSelect={() => manager.activateRecent(entry)}>
+                        <RecentRow {entry} />
+                      </Command.Item>
+                    {/each}
+                  </Command.GroupItems>
+                </Command.Group>
+              {:else}
+                <div class="p-6 text-center text-[13px] font-normal text-gray-500 dark:text-gray-400">
+                  {$t('cmdk_helper')}
+                </div>
+              {/if}
+            {:else}
+              <GlobalSearchSection
+                heading={$t('cmdk_photos_heading')}
+                status={manager.sections.photos}
+                idPrefix="photo"
+                onActivate={(item) => manager.activate('photo', item)}
+              >
+                {#snippet renderRow(item)}
+                  <PhotoRow item={item as never} />
+                {/snippet}
+              </GlobalSearchSection>
+              <GlobalSearchSection
+                heading={$t('cmdk_people_heading')}
+                status={manager.sections.people}
+                idPrefix="person"
+                onActivate={(item) => manager.activate('person', item)}
+              >
+                {#snippet renderRow(item)}
+                  <PersonRow item={item as never} />
+                {/snippet}
+              </GlobalSearchSection>
+              <GlobalSearchSection
+                heading={$t('cmdk_places_heading')}
+                status={manager.sections.places}
+                idPrefix="place"
+                onActivate={(item) => manager.activate('place', item)}
+              >
+                {#snippet renderRow(item)}
+                  <PlaceRow item={item as never} />
+                {/snippet}
+              </GlobalSearchSection>
+              <GlobalSearchSection
+                heading={$t('cmdk_tags_heading')}
+                status={manager.sections.tags}
+                idPrefix="tag"
+                onActivate={(item) => manager.activate('tag', item)}
+              >
+                {#snippet renderRow(item)}
+                  <TagRow item={item as never} />
+                {/snippet}
+              </GlobalSearchSection>
+            {/if}
+          </Command.List>
+
+          <div aria-live="polite" aria-atomic="true" class="sr-only">{manager.announcementText}</div>
+          <GlobalSearchFooter {manager} />
         </Command.Root>
       {/snippet}
     </ModalBody>
