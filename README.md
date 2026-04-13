@@ -21,6 +21,9 @@
 > [!NOTE]
 > This is a **community fork** of [Immich](https://github.com/immich-app/immich) with additional features and improvements. Currently based on **Immich v2.7.5**. We regularly sync with upstream to stay up to date. See [What's Different](#whats-different-from-upstream-immich) below.
 
+> [!TIP]
+> **Noodle Gallery for iPhone is now on the App Store!** Back up your photos and browse your library on the go. [Download on the App Store](https://apps.apple.com/il/app/noodle-gallery/id6761776289)
+
 ## What's Different from Upstream Immich
 
 This fork builds on top of Immich with the following improvements:
