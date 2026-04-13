@@ -289,6 +289,7 @@ part 'model/server_apk_links_dto.dart';
 part 'model/server_config_dto.dart';
 part 'model/server_features_dto.dart';
 part 'model/server_media_types_response_dto.dart';
+part 'model/server_ml_health_response_dto.dart';
 part 'model/server_ping_response.dart';
 part 'model/server_stats_response_dto.dart';
 part 'model/server_storage_response_dto.dart';

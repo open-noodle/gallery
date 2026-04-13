@@ -236,6 +236,7 @@ Class | Method | HTTP request | Description
 *ServerApi* | [**deleteServerLicense**](doc//ServerApi.md#deleteserverlicense) | **DELETE** /server/license | Delete server product key
 *ServerApi* | [**getAboutInfo**](doc//ServerApi.md#getaboutinfo) | **GET** /server/about | Get server information
 *ServerApi* | [**getApkLinks**](doc//ServerApi.md#getapklinks) | **GET** /server/apk-links | Get APK links
+*ServerApi* | [**getMlHealth**](doc//ServerApi.md#getmlhealth) | **GET** /server/ml-health | Smart search health
 *ServerApi* | [**getServerConfig**](doc//ServerApi.md#getserverconfig) | **GET** /server/config | Get config
 *ServerApi* | [**getServerFeatures**](doc//ServerApi.md#getserverfeatures) | **GET** /server/features | Get features
 *ServerApi* | [**getServerLicense**](doc//ServerApi.md#getserverlicense) | **GET** /server/license | Get product key
@@ -588,6 +589,7 @@ Class | Method | HTTP request | Description
  - [ServerConfigDto](doc//ServerConfigDto.md)
  - [ServerFeaturesDto](doc//ServerFeaturesDto.md)
  - [ServerMediaTypesResponseDto](doc//ServerMediaTypesResponseDto.md)
+ - [ServerMlHealthResponseDto](doc//ServerMlHealthResponseDto.md)
  - [ServerPingResponse](doc//ServerPingResponse.md)
  - [ServerStatsResponseDto](doc//ServerStatsResponseDto.md)
  - [ServerStorageResponseDto](doc//ServerStorageResponseDto.md)
