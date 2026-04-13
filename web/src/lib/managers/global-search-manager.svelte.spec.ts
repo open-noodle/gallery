@@ -26,9 +26,19 @@ vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({
 
 import { goto } from '$app/navigation';
 import { searchSmart, searchAssets, searchPerson, searchPlaces, getAllTags, getMlHealth } from '@immich/sdk';
+import { computeCommandScore } from 'bits-ui';
 import { GlobalSearchManager, type Provider, type ProviderStatus, type SearchMode, type Sections } from './global-search-manager.svelte';
 import { installFakeAbortTimeout, restoreAbortTimeout } from './__tests__/fake-abort-timeout';
 import { __resetForTests as resetRecentStore, getEntries } from '$lib/stores/cmdk-recent';
+
+// File-level reset so mock state cannot leak between describe blocks. Tests that
+// mutate these should still set what they want in their own beforeEach, but this
+// guarantees that forgetting to reset cannot poison later tests.
+afterEach(() => {
+  mockUser.current = { isAdmin: true };
+  mockFlags.valueOrUndefined = { search: true, map: true, trash: true };
+  mockI18nLocale.current = 'en';
+});
 
 vi.mock('@immich/sdk', async () => ({
   ...(await vi.importActual<typeof import('@immich/sdk')>('@immich/sdk')),
@@ -46,9 +56,22 @@ vi.mock('$app/navigation', () => ({
 
 // Mock ONLY svelte-i18n's `locale` store so tests can control it. The `t` store
 // keeps its real implementation so translation calls resolve via fallbackLocale='dev'.
-const { mockI18nLocale } = vi.hoisted(() => ({
-  mockI18nLocale: { current: 'en' as string | null },
-}));
+// `setLocale(v)` drives all live subscribers — required by the cache-invalidation test
+// which asserts that a locale change clears the navigation memo cache.
+const { mockI18nLocale } = vi.hoisted(() => {
+  const subscribers = new Set<(v: string | null) => void>();
+  const state = {
+    current: 'en' as string | null,
+    subscribers,
+    setLocale(v: string | null) {
+      state.current = v;
+      for (const sub of subscribers) {
+        sub(v);
+      }
+    },
+  };
+  return { mockI18nLocale: state };
+});
 vi.mock('svelte-i18n', async (orig) => {
   const actual = await orig<typeof import('svelte-i18n')>();
   return {
@@ -56,7 +79,10 @@ vi.mock('svelte-i18n', async (orig) => {
     locale: {
       subscribe: (run: (v: string | null) => void) => {
         run(mockI18nLocale.current);
-        return () => {};
+        mockI18nLocale.subscribers.add(run);
+        return () => {
+          mockI18nLocale.subscribers.delete(run);
+        };
       },
     },
   };
@@ -1219,7 +1245,78 @@ describe('navigation memo cache', () => {
       m as unknown as { getNavigationSearchStrings: () => Map<string, string> }
     ).getNavigationSearchStrings();
     expect(cache.size).toBe(36);
-    mockI18nLocale.current = 'en';
+  });
+
+  it('clears the cached table when the locale subscription fires with a new value', () => {
+    const m = new GlobalSearchManager();
+    const first = (
+      m as unknown as { getNavigationSearchStrings: () => Map<string, string> }
+    ).getNavigationSearchStrings();
+    // Drive the subscribers: this mirrors svelte-i18n emitting a new locale after
+    // the user switches language. The manager's locale subscription should fire
+    // and clear `navigationSearchCache`, forcing the next call to rebuild.
+    mockI18nLocale.setLocale('de');
+    const second = (
+      m as unknown as { getNavigationSearchStrings: () => Map<string, string> }
+    ).getNavigationSearchStrings();
+    expect(second).not.toBe(first);
+    expect(second.size).toBe(36);
+  });
+});
+
+describe('getActiveItem nav branch', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
+
+  it('returns a nav ActiveItem when activeItemId is a nav id matching navigation.items', () => {
+    const m = new GlobalSearchManager();
+    m.sections = {
+      photos: { status: 'empty' },
+      people: { status: 'empty' },
+      places: { status: 'empty' },
+      tags: { status: 'empty' },
+      navigation: {
+        status: 'ok',
+        items: [
+          {
+            id: 'nav:theme',
+            category: 'actions',
+            labelKey: 'theme',
+            descriptionKey: 'toggle_theme_description',
+            icon: 'x',
+            route: '',
+            adminOnly: false,
+          },
+        ] as never[],
+        total: 1,
+      },
+    };
+    m.activeItemId = 'nav:theme';
+    const active = m.getActiveItem();
+    expect(active).not.toBeNull();
+    expect(active?.kind).toBe('nav');
+    if (active?.kind === 'nav') {
+      expect(active.data.id).toBe('nav:theme');
+    }
+  });
+
+  it('returns null when activeItemId is a nav id not present in the navigation section', () => {
+    const m = new GlobalSearchManager();
+    m.sections = {
+      photos: { status: 'empty' },
+      people: { status: 'empty' },
+      places: { status: 'empty' },
+      tags: { status: 'empty' },
+      navigation: {
+        status: 'ok',
+        items: [{ id: 'nav:theme' } as never],
+        total: 1,
+      },
+    };
+    m.activeItemId = 'nav:userPages:map'; // not in the section
+    expect(m.getActiveItem()).toBeNull();
   });
 });
 
@@ -1255,33 +1352,102 @@ describe('runNavigationProvider', () => {
   });
 
   it('filters admin-only items for non-admin users', () => {
+    // Query 'theme' DEFINITELY matches:
+    //   - nav:theme                     (adminOnly:false, labelKey='theme')
+    //   - nav:systemSettings:theme      (adminOnly:true,  labelKey='admin.theme_settings')
+    // Under non-admin this yields status='ok' with exactly nav:theme, so the
+    // assertion is forced to run (no vacuous-loop path).
     mockUser.current = { isAdmin: false };
     const m = new GlobalSearchManager();
-    const result = runNav(m, 'classific');
+    const result = runNav(m, 'theme');
+    expect(result.status).toBe('ok');
     if (result.status === 'ok') {
-      for (const item of result.items) {
-        expect((item as { adminOnly: boolean }).adminOnly).toBe(false);
-      }
+      const ids = result.items.map((i) => (i as { id: string }).id);
+      expect(ids).toContain('nav:theme');
+      expect(ids).not.toContain('nav:systemSettings:theme');
+      expect(result.items.every((i) => (i as { adminOnly: boolean }).adminOnly === false)).toBe(true);
+    }
+  });
+
+  it('admin users see both admin and non-admin matches (baseline for the admin filter test)', () => {
+    mockUser.current = { isAdmin: true };
+    const m = new GlobalSearchManager();
+    const result = runNav(m, 'theme');
+    expect(result.status).toBe('ok');
+    if (result.status === 'ok') {
+      const ids = result.items.map((i) => (i as { id: string }).id);
+      expect(ids).toContain('nav:theme');
+      expect(ids).toContain('nav:systemSettings:theme');
     }
   });
 
   it('filters items gated on a disabled feature flag', () => {
+    // Query 'map' (admin=true) DEFINITELY matches:
+    //   - nav:userPages:map            (featureFlag:'map')
+    //   - nav:systemSettings:location  (labelKey='admin.map_gps_settings', no flag)
+    // With map flag disabled, status='ok' is guaranteed because the system-settings
+    // item is still present, so the negative assertion is non-vacuous.
+    mockUser.current = { isAdmin: true };
     mockFlags.valueOrUndefined = { search: true, map: false, trash: true };
     const m = new GlobalSearchManager();
     const result = runNav(m, 'map');
+    expect(result.status).toBe('ok');
     if (result.status === 'ok') {
       const ids = result.items.map((i) => (i as { id: string }).id);
       expect(ids).not.toContain('nav:userPages:map');
+      expect(ids).toContain('nav:systemSettings:location');
     }
   });
 
   it('items gated on a feature flag are hidden when flags have not loaded yet (SSR window)', () => {
+    mockUser.current = { isAdmin: true };
     mockFlags.valueOrUndefined = undefined;
     const m = new GlobalSearchManager();
     const result = runNav(m, 'map');
+    expect(result.status).toBe('ok');
     if (result.status === 'ok') {
       const ids = result.items.map((i) => (i as { id: string }).id);
       expect(ids).not.toContain('nav:userPages:map');
+      expect(ids).toContain('nav:systemSettings:location');
+    }
+  });
+
+  it('includes a featureFlag-gated item when the flag is enabled (positive path)', () => {
+    mockUser.current = { isAdmin: false };
+    mockFlags.valueOrUndefined = { search: true, map: true, trash: true };
+    const m = new GlobalSearchManager();
+    const result = runNav(m, 'map');
+    expect(result.status).toBe('ok');
+    if (result.status === 'ok') {
+      const ids = result.items.map((i) => (i as { id: string }).id);
+      expect(ids).toContain('nav:userPages:map');
+    }
+  });
+
+  it('sorts results by descending computeCommandScore', () => {
+    mockUser.current = { isAdmin: true };
+    const m = new GlobalSearchManager();
+    // Reproduce the corpus lookups via the same cache the implementation uses, so
+    // we can re-score each item and assert the returned order is monotonically
+    // non-increasing. This pins the sort direction; if anyone flips the comparator
+    // to ascending or removes the sort, this test fails on a query that has
+    // multiple matches with distinct scores.
+    const cache = (
+      m as unknown as { getNavigationSearchStrings: () => Map<string, string> }
+    ).getNavigationSearchStrings();
+    const result = runNav(m, 'set');
+    expect(result.status).toBe('ok');
+    if (result.status === 'ok') {
+      expect(result.items.length).toBeGreaterThan(1);
+      let prev = Infinity;
+      for (const item of result.items) {
+        const corpus = cache.get((item as { id: string }).id);
+        expect(corpus).toBeDefined();
+        const score = computeCommandScore(corpus!, 'set');
+        expect(score).toBeLessThanOrEqual(prev);
+        expect(score).toBeGreaterThan(0);
+        prev = score;
+      }
     }
   });
 

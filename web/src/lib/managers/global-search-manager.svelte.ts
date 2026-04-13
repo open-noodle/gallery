@@ -54,7 +54,9 @@ export type ActiveItem =
 const VALID_MODES: ReadonlySet<SearchMode> = new Set(['smart', 'metadata', 'description', 'ocr']);
 // Narrow literal type so it can be assigned to both `ProviderStatus<unknown>` and
 // `ProviderStatus<NavigationItem>` without the generic T widening fighting the assignment.
-const idle = { status: 'idle' as const };
+// Frozen so a future engineer cannot accidentally mutate the shared reference and
+// cross-contaminate all five sections.
+const idle = Object.freeze({ status: 'idle' as const });
 
 function isValidRecentEntry(e: RecentEntry): boolean {
   switch (e.kind) {
@@ -322,7 +324,7 @@ export class GlobalSearchManager {
     return { kind: kind as 'photo' | 'person' | 'place' | 'tag', data: match };
   }
 
-  private sectionForKind(kind: string): ProviderStatus | null {
+  private sectionForKind(kind: string): ProviderStatus<unknown> | null {
     switch (kind) {
       case 'photo': {
         return this.sections.photos;
@@ -337,7 +339,7 @@ export class GlobalSearchManager {
         return this.sections.tags;
       }
       case 'nav': {
-        return this.sections.navigation as ProviderStatus;
+        return this.sections.navigation;
       }
       default: {
         return null;
