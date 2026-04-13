@@ -64,7 +64,7 @@ class _ScopedMapTimeline extends StatelessWidget {
 
           final timelineService = ref
               .watch(timelineFactoryProvider)
-              .geographicMap(users, () => currentOptions, optionsController.stream);
+              .geographicMap(users, user.id, () => currentOptions, optionsController.stream);
           ref.onDispose(timelineService.dispose);
 
           return timelineService;
