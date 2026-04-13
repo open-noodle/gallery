@@ -244,7 +244,7 @@ export class MachineLearningRepository {
 
   async encodeText(text: string, { language, modelName }: TextEncodingOptions) {
     const request = { [ModelTask.SEARCH]: { [ModelType.TEXTUAL]: { modelName, options: { language } } } };
-    const response = await this.predict<ClipTextualResponse>({ text }, request);
+    const response = await this.predict<ClipTextualResponse>({ text }, request, { timeoutMs: 15_000 });
     return response[ModelTask.SEARCH];
   }
 

@@ -332,6 +332,56 @@ describe(MachineLearningRepository.name, () => {
     });
   });
 
+  describe('encodeText()', () => {
+    it('15s timeout aborts when ML never responds', async () => {
+      vi.useFakeTimers();
+      const originalTimeout = AbortSignal.timeout;
+      AbortSignal.timeout = (ms: number) => {
+        const c = new AbortController();
+        setTimeout(() => c.abort(new DOMException('timeout', 'TimeoutError')), ms);
+        return c.signal;
+      };
+      try {
+        mockFetch.mockImplementation(
+          (_url: URL, init: RequestInit) =>
+            new Promise((_resolve, reject) => {
+              init.signal?.addEventListener('abort', () =>
+                reject(Object.assign(new Error('t'), { name: 'AbortError' })),
+              );
+            }),
+        );
+        const promise = sut.encodeText('hello', { language: 'en', modelName: 'clip' });
+        promise.catch(() => void 0);
+        await vi.advanceTimersByTimeAsync(15_000);
+        await expect(promise).rejects.toMatchObject({ name: 'AbortError' });
+      } finally {
+        AbortSignal.timeout = originalTimeout;
+        vi.useRealTimers();
+      }
+    });
+
+    it('non-abort errors still surface as the multi-URL failure', async () => {
+      mockFetch.mockRejectedValue(new Error('ECONNREFUSED'));
+      await expect(sut.encodeText('hello', { language: 'en', modelName: 'clip' })).rejects.toThrow(
+        /failed for all URLs/,
+      );
+    });
+
+    it('other ML callers do NOT get the 15s timeout (blast radius)', async () => {
+      const signalsUsed: (AbortSignal | undefined)[] = [];
+      mockFetch.mockImplementation((_url: URL, init: RequestInit) => {
+        signalsUsed.push(init.signal ?? undefined);
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ [ModelTask.SEARCH]: 'x', imageHeight: 1, imageWidth: 1 }),
+        });
+      });
+      mockReadFile.mockResolvedValue(Buffer.from('img'));
+      await sut.encodeImage('/data/upload/thumbs/a/b/c.webp', clipConfig);
+      expect(signalsUsed[0]).toBeUndefined();
+    });
+  });
+
   describe('predict()', () => {
     it('propagates AbortError when caller-supplied timeoutMs elapses', async () => {
       mockFetch.mockImplementation(
