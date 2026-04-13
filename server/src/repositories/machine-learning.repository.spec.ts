@@ -367,6 +367,19 @@ describe(MachineLearningRepository.name, () => {
       sut.setup({ ...baseConfig, urls: [] });
       await expect(sut.ping()).resolves.toEqual({ ok: false, contentType: null });
     });
+
+    it('returns { ok: false, contentType } when /ping returns HTTP 500 with a valid content-type', async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        headers: new Headers({ 'content-type': 'application/json' }),
+      });
+      await expect(sut.ping()).resolves.toEqual({ ok: false, contentType: 'application/json' });
+    });
+
+    it('returns { ok: true, contentType: null } when /ping 200s with no content-type header', async () => {
+      mockFetch.mockResolvedValue({ ok: true, headers: new Headers() });
+      await expect(sut.ping()).resolves.toEqual({ ok: true, contentType: null });
+    });
   });
 
   describe('encodeText()', () => {
@@ -387,10 +400,14 @@ describe(MachineLearningRepository.name, () => {
               );
             }),
         );
-        const promise = sut.encodeText('hello', { language: 'en', modelName: 'clip' });
-        promise.catch(() => void 0);
+        // Attach the .rejects assertion synchronously before advancing timers so
+        // the handler is in place when the fetch promise rejects. Without this,
+        // the rejection becomes "unhandled" during vi.advanceTimersByTimeAsync.
+        const assertion = expect(
+          sut.encodeText('hello', { language: 'en', modelName: 'clip' }),
+        ).rejects.toMatchObject({ name: 'AbortError' });
         await vi.advanceTimersByTimeAsync(15_000);
-        await expect(promise).rejects.toMatchObject({ name: 'AbortError' });
+        await assertion;
       } finally {
         AbortSignal.timeout = originalTimeout;
         vi.useRealTimers();
