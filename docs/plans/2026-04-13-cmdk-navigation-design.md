@@ -59,26 +59,34 @@ export type NavigationItem = {
   icon: string;
   route: string;
   adminOnly: boolean;
+  featureFlag?: keyof ServerFeaturesDto; // optional gate; item hidden when flag is false
 };
 export const NAVIGATION_ITEMS: readonly NavigationItem[];
 ```
+
+Items that depend on a feature flag declare it at build time (e.g. Spaces, Memories — verify which flags exist in `ServerFeaturesDto` at implementation time). `runNavigationProvider` filters these out whenever `featureFlagsManager.valueOrUndefined?.[item.featureFlag]` is falsy, in addition to the `adminOnly` gate.
 
 ### Filtering & scoring
 
 `runNavigationProvider(query)` runs synchronously inside the manager (async signature only to match the `Provider` interface):
 
-1. Read `get(user)?.isAdmin` once. Filter out `adminOnly` items for non-admins.
-2. Look up a locale-keyed memoized cache of translated searchable strings: `Map<locale, Map<itemId, string>>` where the string is `` `${$t(labelKey)} ${$t(descriptionKey)}` `` — single concatenated string, because `bits-ui`'s `computeCommandScore(string, abbreviation, aliases?)` scores one string at a time (the review caught an earlier draft that misused the `aliases` parameter as a weighted-context array). If a locale is not yet cached, build the full table on first use.
-3. For each surviving item, `score = computeCommandScore(searchString, query)`. Drop `score === 0`.
-4. Sort the surviving items descending by score.
-5. Return `{ status: 'ok', items, total: items.length }` — a flat `ProviderStatus<NavigationItem>`, no custom extended type. The items carry their `category` field; grouping into sub-sections happens at render time.
-6. Empty result: `{ status: 'empty' }`.
+1. Read `get(user)?.isAdmin` once and `featureFlagsManager.valueOrUndefined` once.
+2. Filter `NAVIGATION_ITEMS`:
+   - Drop `adminOnly: true` items for non-admins.
+   - Drop items with `featureFlag` set when `featureFlagsManager.valueOrUndefined?.[item.featureFlag]` is falsy. If `featureFlagsManager` hasn't been initialised yet (SSR-hydration window), `valueOrUndefined` is `undefined` and flagged items are dropped — they reappear once flags load and the next keystroke re-runs the filter.
+3. Look up a locale-keyed memoized cache of translated searchable strings: `Map<locale, Map<itemId, string>>` where the string is `` `${$t(labelKey)} ${$t(descriptionKey)}` `` — single concatenated string, matching `bits-ui`'s real `computeCommandScore(command, search, aliases?)` signature (the reviewer caught an earlier draft that misused the `aliases` parameter as a weighted-context array). If a locale is not yet cached, build the full table on first use.
+4. For each surviving item, `score = computeCommandScore(searchString, query)`. Drop `score === 0`.
+5. Sort the surviving items descending by score.
+6. Return `{ status: 'ok', items, total: items.length }` — a flat `ProviderStatus<NavigationItem>`, no custom extended type. The items carry their `category` field; grouping into sub-sections happens at render time.
+7. Empty result: `{ status: 'empty' }`.
 
 `computeCommandScore` is imported from `bits-ui` top-level. It's the same fuzzy scorer the @immich/ui palette was using under the hood — characters can be non-contiguous, transpositions are penalised less than misses, case-insensitive.
 
 ### Locale change handling
 
 The memo cache is invalidated when `svelte-i18n`'s `locale` store changes. The manager subscribes to `locale` in its constructor (inside the `if (browser)` guard already used for the storage listener) and clears `this.navigationSearchCache` on each change. Tests pin this behaviour with a mocked locale store.
+
+**Singleton lifetime note.** The locale subscription's unsubscribe handler is intentionally never called. `GlobalSearchManager` is a module-level singleton exported from `$lib/managers/global-search-manager.svelte`; it lives for the tab's lifetime and is never torn down during normal navigation. The existing `destroy()` method (which removes the storage listener) is effectively dead code in production — it exists only for test isolation via `resetForTests()` helpers. The locale subscription follows the same pattern: the handle is stored on `this.localeUnsubscribe` so tests can invoke it, but production never does. Memory impact is one subscription for tab-life.
 
 ### Rendering
 
@@ -141,17 +149,34 @@ Theme-toggle is intentionally not persistable — a stateless command in the Rec
 
 ### Admin gating on stale recents
 
-`activateRecent` re-checks admin status before acting on a `navigate` entry with `adminOnly: true`:
+Two defences, both necessary:
+
+**Render-time filter.** `global-search.svelte:44` currently reads `recentEntries = getEntries()` unconditionally. After this change it filters the returned entries to hide `navigate` entries with `adminOnly: true` for non-admin users:
+
+```ts
+const recentEntries = $derived<RecentEntry[]>(() => {
+  if (inputValue.trim() !== '') return [];
+  const isAdmin = $user?.isAdmin ?? false;
+  return getEntries().filter((e) => !(e.kind === 'navigate' && e.adminOnly && !isAdmin));
+});
+```
+
+A demoted admin never sees their old admin-only entries in the Recent section.
+
+**Activate-time guard + purge.** `activateRecent` re-checks admin status as defence in depth. If a navigate entry with `adminOnly: true` is activated by a non-admin (e.g. via a direct manager call, or if the render-time filter misses an edge case), the entry is **purged from the store** so it doesn't accumulate and palette closes silently with a warn:
 
 ```ts
 if (entry.kind === 'navigate' && entry.adminOnly && !get(user)?.isAdmin) {
-  console.warn('[cmdk] dropping stale admin recent', entry);
+  console.warn('[cmdk] purging stale admin recent', entry);
+  removeEntry(entry.id);
   this.close();
   return;
 }
 ```
 
-This prevents a demoted admin from hitting a 403 by re-activating a stored admin route.
+This requires a new `removeEntry(id: string)` export on `cmdk-recent.ts` that filters the in-memory + persisted list by id.
+
+This prevents a demoted admin from hitting a 403 by re-activating a stored admin route AND prevents stale admin entries from lingering in localStorage forever.
 
 ## Stale-while-revalidate loading
 
@@ -177,7 +202,9 @@ private inFlightCounter = 0;         // providers still running for the current 
 
 ### `runBatch`
 
-Structure unchanged except for the in-flight counter: each provider's settle path (success or failure) decrements `inFlightCounter`, and when it hits zero, `batchInFlight = false`. Individual sections still update incrementally as providers return (keeps the streaming UX we already have).
+**`runBatch` continues to iterate only over the four entity provider keys: `['photos', 'people', 'places', 'tags']`. The `navigation` key is never passed through the debounce pipeline — it is handled synchronously in `setQuery` (step 3 below) and the navigation provider's `run` is never called from `runBatch`.** A regression test pins this: after `setQuery('x')`, the navigation provider has been invoked exactly once via the synchronous path, not again after the 150 ms debounce.
+
+Structure otherwise unchanged, except for the in-flight counter: each entity provider's settle path (success or failure) decrements `inFlightCounter`, and when it hits zero, `batchInFlight = false`. Individual sections still update incrementally as providers return (keeps the streaming UX we already have).
 
 `setMode`'s photos-only re-run path applies the same SWR rule and increments/decrements the counter.
 
@@ -199,6 +226,15 @@ The stripe is plain HTML — bits-ui's `Command.Loading` is a semantic `role="pr
 
 Cold open — all four entity sections are `idle`. The first keystroke flips them to `loading` (step 4 above) because the `idle` branch is not SWR-eligible. Skeletons appear for ~150 ms while the debounce ticks. This is intentional: there's nothing to preserve on cold open, and the skeletons provide the "something is happening" affordance. SWR kicks in from the second keystroke onward.
 
+### Side-fix: `empty` branch missing in `GlobalSearchSection`
+
+The existing `global-search-section.svelte` (shipped in v1) has no `empty` branch in its `#if` chain. On `empty` status it renders a bare `<Command.GroupHeading>` followed by an empty `<Command.GroupItems>` — a visible heading with no content. This is a pre-existing bug the SWR change exposes more often (because `empty` persists one more render cycle in some transitions). Fix as a side-quest in this same PR:
+
+- Update the outer guard from `{#if status.status !== 'idle'}` to `{#if status.status !== 'idle' && status.status !== 'empty'}` so an empty section renders nothing at all.
+- Add a unit test asserting that an `{ status: 'empty' }` provider state produces no `Command.GroupHeading` or `Command.Group` in the DOM.
+
+One-line production change, one test.
+
 ## File changes
 
 ### New
@@ -212,13 +248,15 @@ Cold open — all four entity sections are `idle`. The first keystroke flips the
 
 ### Modified
 
-- `web/src/lib/managers/global-search-manager.svelte.ts` — navigation provider, `runNavigationProvider`, memo cache, locale subscription, SWR rule in `setQuery`, `batchInFlight` + `inFlightCounter`, `activate` navigation branch, six section-consistency touchpoints.
-- `web/src/lib/managers/global-search-manager.svelte.spec.ts` — new describe blocks for navigation provider, SWR, cursor integration, activate/activateRecent navigation cases, admin gating on recents.
-- `web/src/lib/components/global-search/global-search.svelte` — mount `<GlobalSearchNavigationSections>` below the four entity sections, render progress stripe, widen `ActiveItem` handling for `nav` kind.
-- `web/src/lib/components/global-search/__tests__/global-search.spec.ts` — progress stripe visibility test, navigation section order test, admin vs non-admin render test.
+- `web/src/lib/managers/global-search-manager.svelte.ts` — navigation provider, `runNavigationProvider`, memo cache, locale subscription (with `localeUnsubscribe` stored for test teardown), SWR rule in `setQuery`, `batchInFlight` + `inFlightCounter`, `activate` navigation branch, six section-consistency touchpoints. Feature-flag filter reads `featureFlagsManager.valueOrUndefined?.<flag>` for gated user pages.
+- `web/src/lib/managers/global-search-manager.svelte.spec.ts` — new describe blocks for navigation provider, SWR, cursor integration, activate/activateRecent navigation cases, admin gating on recents, runBatch-excludes-navigation regression test, feature-flag gating test.
+- `web/src/lib/components/global-search/global-search.svelte` — mount `<GlobalSearchNavigationSections>` below the four entity sections, render progress stripe, widen `ActiveItem` handling for `nav` kind, **render-time filter on `recentEntries` to drop stale admin-only `navigate` entries**.
+- `web/src/lib/components/global-search/__tests__/global-search.spec.ts` — progress stripe visibility test, navigation section order test, admin vs non-admin render test, stale-admin-recent render-time filter test.
+- **`web/src/lib/components/global-search/global-search-section.svelte` — side-fix: add `empty` to the outer render guard so empty sections produce no DOM.**
+- **`web/src/lib/components/global-search/__tests__/global-search-section.spec.ts` (new) — pins the empty-state render-nothing behaviour.**
 - `web/src/lib/components/global-search/rows/recent-row.svelte` — `navigate` kind branch.
-- `web/src/lib/stores/cmdk-recent.ts` — `navigate` kind in `RecentEntry` union, `isValidRecentEntry` branch.
-- `web/src/lib/stores/cmdk-recent.spec.ts` — `navigate` roundtrip + validation tests.
+- `web/src/lib/stores/cmdk-recent.ts` — `navigate` kind in `RecentEntry` union, `isValidRecentEntry` branch, **new `removeEntry(id)` export for admin demotion purge**.
+- `web/src/lib/stores/cmdk-recent.spec.ts` — `navigate` roundtrip + validation tests + `removeEntry` tests.
 - `web/src/routes/+layout.ts` — delete `commandPaletteManager.enable()` (one-line).
 - `web/src/routes/+layout.svelte` — add `Shift+T` shortcut binding for theme toggle.
 - `web/src/app.css` — `@keyframes cmdk-shimmer`.
@@ -243,11 +281,13 @@ _Navigation provider:_
 
 - Admin user sees system-settings and admin items for matching queries.
 - Non-admin user never sees admin-only items.
-- `computeCommandScore` ranking: typing `class` surfaces `Auto-Classification` in the top position.
+- **Fuzzy match inclusion, not ranking.** Typing `class` returns a result set that includes `Auto-Classification`. Typing `classific` (a strong prefix match unique to Auto-Classification) places it in the top position. Typing `storage templ` uniquely identifies Storage Template Settings as the top result. Avoid assertions on the relative ordering of two items that both match the query with similar quality — the exact scoring is an implementation detail of `bits-ui`'s `computeCommandScore` and changes between library versions.
 - `minQueryLength: 2` respected: single-char query → navigation stays idle.
 - Empty query → navigation stays idle, no provider call.
 - Hyphenated query (`auto-class`) matches `Auto-Classification`.
-- Locale change invalidates the memo cache — re-run after locale swap produces re-translated strings (mocked `svelte-i18n`).
+- Locale change invalidates the memo cache — re-run after locale swap produces re-translated strings (mocked `svelte-i18n`). The mocked `locale` store is a `writable('en')` that tests can `set('de')` to trigger invalidation.
+- **runBatch does NOT double-run navigation:** after `setQuery('x')`, the spied `runNavigationProvider` has been called exactly once (via the synchronous path in `setQuery`), not again after the 150 ms debounce tick.
+- **Feature-flag gating for user pages:** items gated on `featureFlagsManager.valueOrUndefined?.<flag>` are filtered out when the flag is false. Cover at least Spaces and Memories if they are flag-gated at current Gallery — verify at implementation time. Test shape: mock `featureFlagsManager.valueOrUndefined = { search: true, spaces: false, ... }`, run provider, assert Spaces item absent.
 
 _SWR:_
 
@@ -267,13 +307,19 @@ _Activate / ActivateRecent:_
 
 - `activate('navigation', themeItem)` calls `themeManager.toggleTheme()` and does NOT add a recent entry.
 - `activate('navigation', settingsItem)` calls `goto(route)` and adds a `navigate` recent entry with `adminOnly: true`.
-- `activateRecent` on a `navigate` entry with `adminOnly: true` and non-admin user: warns and does NOT navigate.
 - `activateRecent` on a valid `navigate` entry: calls `goto(route)`, closes palette.
+- `activateRecent` on a `navigate` entry with `adminOnly: true` and non-admin user: warns, calls `removeEntry` to purge the stale entry, does NOT navigate, closes palette. Pin both the warn and the purge.
 
 **`cmdk-recent.spec.ts` additions:**
 
 - `navigate` kind roundtrip (add, dedup, 20-cap, ordering).
 - `isValidRecentEntry` rejects `navigate` with empty `route`, `labelKey`, or `icon`.
+- **New** `removeEntry(id)` export: removes the matching entry in memory and persists the new list. Missing id is a no-op. Preserves order of remaining entries.
+
+**`global-search-section.spec.ts` (new):**
+
+- On `{ status: 'empty' }` the component renders nothing — no `<Command.GroupHeading>` node, no `<Command.Group>` wrapper. Pins C3 side-fix as a regression test.
+- On `{ status: 'ok', items: [] }` (degenerate but possible) the component ALSO renders nothing. (Defensive.)
 
 **`navigation-row.spec.ts`:**
 
@@ -294,6 +340,8 @@ _Activate / ActivateRecent:_
 - Progress stripe renders when `batchInFlight === true` AND elapsed > 200 ms.
 - Progress stripe hidden for fast queries that settle in < 200 ms.
 - Cold open → first keystroke → skeletons appear (SWR does not activate on first search).
+- **Stale admin recent render-time filter:** mock a non-admin user, seed `cmdk-recent` with a `navigate` entry that has `adminOnly: true`, open the palette, confirm the Recent section does NOT include that entry's label.
+- **`× N more` affordance is currently absent:** when a category returns > 5 items, the render shows exactly 5 items and no "see all" link or "+N more" indicator. Pins the current "not implemented" behaviour so a future deliberate addition is a deliberate test change.
 
 ### E2E (`global-search.e2e-spec.ts` additions)
 
@@ -315,5 +363,5 @@ _Activate / ActivateRecent:_
 ## Open at implementation time
 
 - Exact labels and icons for the four section headings in `i18n/en.json`. Draft: `System Settings`, `Admin`, `User Pages`, `Actions`.
-- Whether `GlobalSearchNavigationSections` renders a "× N more" affordance per category when results exceed `topN = 5`. Deferred — there is no "See all" target for navigation (unlike entity sections which can link to the search page).
-- Final `NAVIGATION_ITEMS` list, especially the user pages — Gallery has ~11 user-facing pages but some may be hidden behind feature flags (e.g. Spaces, Memories). Items should gate on the relevant `featureFlagsManager.valueOrUndefined?.*` at filter time for those, similar to how admin gating works.
+- Whether `GlobalSearchNavigationSections` renders a "× N more" affordance per category when results exceed `topN = 5`. **Deferred to v1.1** — there is no "See all" target for navigation (unlike entity sections which can link to the search page). v1 pins "no affordance" as the current behaviour via a test so the future addition is deliberate.
+- **Final `NAVIGATION_ITEMS` list** — the shape is locked (category / labelKey / descriptionKey / icon / route / adminOnly / featureFlag?). What is NOT locked: which Gallery user pages declare a `featureFlag` gate. Concrete task at implementation time: inspect `ServerFeaturesDto` for the flags that gate Spaces, Memories, Sharing, Partner, etc., and set `featureFlag` on those items accordingly. The total count may dip below 36 if any user pages are collapsed (e.g. Archive / Favorites / Trash live under a single "Library" sidebar entry).
