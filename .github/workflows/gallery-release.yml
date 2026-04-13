@@ -472,7 +472,8 @@ jobs:
             fi
           fi
 
-          gh release create "$VERSION" --title "$VERSION" --latest -n "$notes"
+          gh release create "$VERSION" "$RUNNER_TEMP/apk/gallery-${VERSION}.apk" \
+            --title "$VERSION" --latest -n "$notes"
 
   publish-version-endpoint:
     name: Publish Version Endpoint
