@@ -20,7 +20,13 @@
 
 **Step 1: Locate the insertion point**
 
-Open `.github/workflows/gallery-build-mobile.yml`. Find the "Publish Android App Bundle artifact" step (currently around lines 170–174). The next step is "Setup Ruby" (around line 176). You will insert two new steps between these.
+Open `.github/workflows/gallery-build-mobile.yml`. The two new steps go between "Publish Android App Bundle artifact" and "Setup Ruby" in the `build-sign-android` job. Don't trust line numbers — the file drifts. Use grep to confirm the neighbors exist:
+
+```bash
+grep -n "Publish Android App Bundle artifact\|Setup Ruby" .github/workflows/gallery-build-mobile.yml
+```
+
+Expected: two matches, with "Setup Ruby" appearing after "Publish Android App Bundle artifact" and before "Build and sign iOS". Insert the new steps between them.
 
 **Step 2: Add the APK build step**
 
@@ -110,7 +116,13 @@ git commit -m "feat(ci): build signed APK alongside AAB on release builds"
 
 **Step 1: Locate the insertion point**
 
-Open `.github/workflows/gallery-release.yml`. Find the `tag` job (around line 392). Inside that job, find the "Create GitHub Release" step. You will insert a new "Download APK artifact" step **before** "Create GitHub Release" and **after** "Create tags".
+Open `.github/workflows/gallery-release.yml`. The new download step goes in the `tag` job, between "Create tags" and "Create GitHub Release". Don't trust line numbers — use grep:
+
+```bash
+grep -n "name: Create tags\|name: Create GitHub Release" .github/workflows/gallery-release.yml
+```
+
+Expected: two matches, "Create tags" before "Create GitHub Release". Insert between them.
 
 **Step 2: Add the download step**
 
@@ -151,13 +163,13 @@ git commit -m "ci: download APK artifact in release tag job"
 
 **Step 1: Find the existing `gh release create` line**
 
-In `.github/workflows/gallery-release.yml`, inside the `tag` job's "Create GitHub Release" step, find:
+In `.github/workflows/gallery-release.yml`, inside the `tag` job's "Create GitHub Release" step, find the existing call:
 
 ```bash
-gh release create "$VERSION" --title "$VERSION" --latest -n "$notes"
+grep -n 'gh release create' .github/workflows/gallery-release.yml
 ```
 
-(Currently around line 469.)
+Expected: one match — `gh release create "$VERSION" --title "$VERSION" --latest -n "$notes"`. If there's more than one, you're editing the wrong workflow.
 
 **Step 2: Add the APK as a positional arg**
 
@@ -219,21 +231,17 @@ git commit -m "feat(ci): attach Android APK to GitHub Release"
 
 - None modified. Read-only check.
 
-**Step 1: Run zizmor on both files**
+**Step 1: Verify static lint expectations mentally, skip local run**
 
-Gallery uses zizmor via `org-zizmor.yml` — run it locally if available, otherwise trust CI.
+Gallery runs zizmor in CI via `org-zizmor.yml` — do NOT install it locally. The CI run on PR is the source of truth. This task is a reading-only sanity pass to catch obvious issues before push.
 
-```bash
-zizmor .github/workflows/gallery-build-mobile.yml .github/workflows/gallery-release.yml 2>&1 | tail -20
-```
-
-Expected: either "no findings" or only findings that match existing `# zizmor: ignore[...]` suppressions in the surrounding code.
-
-If zizmor isn't installed locally:
+Check the new steps against existing patterns in the same file:
 
 ```bash
-command -v zizmor || echo "zizmor not installed — skipping local check, CI org-zizmor workflow will verify"
+grep -n "inputs.version\|secrets\.\|steps.build-meta" .github/workflows/gallery-build-mobile.yml | head -30
 ```
+
+Expected: the new APK build step uses `${{ inputs.version }}` in `env:` and `with:`, `${{ secrets.* }}` in `env:`, and `${{ steps.build-meta.outputs.* }}` in `env:` — all identical patterns to the existing AAB step above it. Zizmor flags template-injection in `run:` blocks, not `env:`/`with:` blocks, so these are safe.
 
 **Step 2: Look for unintended template-injection warnings**
 
@@ -312,13 +320,15 @@ If you find yourself wanting to add any of these, stop and re-read `docs/plans/2
 
 After all tasks are complete, the following must be true:
 
-1. `git log --oneline feat/release-apk-upload` shows: design doc commit + 3 feature commits (APK build, artifact download, release attachment).
+1. `git log --oneline feat/release-apk-upload` shows: design doc commit, plan doc commit, and 3 feature commits (APK build, artifact download, release attachment) — 5 commits total on top of `main`.
 2. `python3 -c "import yaml; yaml.safe_load(open('.github/workflows/gallery-build-mobile.yml'))"` parses cleanly.
 3. `python3 -c "import yaml; yaml.safe_load(open('.github/workflows/gallery-release.yml'))"` parses cleanly.
-4. `grep -c "gallery-apk" .github/workflows/gallery-build-mobile.yml` returns `2` (one in upload name, one in path).
-5. `grep -c "gallery-apk" .github/workflows/gallery-release.yml` returns `1` (download name).
-6. `grep "RUNNER_TEMP/apk/gallery" .github/workflows/gallery-release.yml` returns exactly one line (the `gh release create` positional arg).
-7. PR is open, all CI checks green.
+4. `grep -c "gallery-apk" .github/workflows/gallery-build-mobile.yml` returns `2` (one in upload `name:`, one in `path:`).
+5. `grep -c "gallery-apk" .github/workflows/gallery-release.yml` returns `1` (download `name:`).
+6. **AAB regression guard:** `grep -c "app-release-aab" .github/workflows/gallery-build-mobile.yml` returns `1` — the existing AAB artifact upload must still be present.
+7. **AAB build regression guard:** `grep -c "flutter build appbundle" .github/workflows/gallery-build-mobile.yml` returns `1` — the existing AAB build step must still be present.
+8. `grep "RUNNER_TEMP/apk/gallery" .github/workflows/gallery-release.yml` returns exactly one line (the `gh release create` positional arg).
+9. PR is open, all CI checks green.
 
 End-to-end verification (requires an actual release cut — post-merge):
 
