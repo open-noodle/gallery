@@ -447,3 +447,215 @@ describe('tag provider', () => {
     expect(m.sections.tags.status).toBe('ok');
   });
 });
+
+describe('setMode', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    vi.useFakeTimers();
+    installFakeAbortTimeout();
+    vi.mocked(searchSmart).mockResolvedValue({
+      assets: { items: [], nextPage: null },
+    } as unknown as Awaited<ReturnType<typeof searchSmart>>);
+    vi.mocked(searchAssets).mockResolvedValue({
+      assets: { items: [], nextPage: null },
+    } as unknown as Awaited<ReturnType<typeof searchAssets>>);
+    vi.mocked(searchPerson).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof searchPerson>>);
+    vi.mocked(searchPlaces).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof searchPlaces>>);
+    vi.mocked(getAllTags).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof getAllTags>>);
+  });
+  afterEach(() => {
+    restoreAbortTimeout();
+    vi.useRealTimers();
+  });
+
+  it('aborts in-flight photos only, re-runs with new mode; people untouched', async () => {
+    let photosCalls = 0;
+    let peopleCalls = 0;
+    const m = new GlobalSearchManager();
+    const providers = (m as unknown as { providers: Record<keyof Sections, Provider> }).providers;
+    providers.photos.run = async () => {
+      photosCalls++;
+      return { status: 'ok', items: [], total: 0 };
+    };
+    providers.people.run = async () => {
+      peopleCalls++;
+      return { status: 'ok', items: [], total: 0 };
+    };
+    m.setQuery('beach');
+    await vi.advanceTimersByTimeAsync(200);
+    expect(photosCalls).toBe(1);
+    expect(peopleCalls).toBe(1);
+    m.setMode('metadata');
+    await vi.advanceTimersByTimeAsync(10);
+    expect(photosCalls).toBe(2);
+    expect(peopleCalls).toBe(1);
+  });
+
+  it('setMode during pending debounce restarts timer with new mode', async () => {
+    const m = new GlobalSearchManager();
+    const providers = (m as unknown as { providers: Record<keyof Sections, Provider> }).providers;
+    const photosRun = vi.fn().mockResolvedValue({ status: 'ok', items: [], total: 0 } as ProviderStatus);
+    providers.photos.run = photosRun;
+    m.setQuery('beach');
+    await vi.advanceTimersByTimeAsync(50);
+    m.setMode('metadata');
+    await vi.advanceTimersByTimeAsync(200);
+    expect(photosRun).toHaveBeenCalledOnce();
+    expect(photosRun).toHaveBeenCalledWith('beach', 'metadata', expect.any(AbortSignal));
+  });
+
+  it('persists mode to localStorage', () => {
+    const m = new GlobalSearchManager();
+    m.setMode('ocr');
+    expect(localStorage.getItem('searchQueryType')).toBe('ocr');
+  });
+
+  it('setMode with empty query is a no-op for providers', async () => {
+    const m = new GlobalSearchManager();
+    const providers = (m as unknown as { providers: Record<keyof Sections, Provider> }).providers;
+    const photosRun = vi.fn();
+    providers.photos.run = photosRun;
+    m.setMode('metadata');
+    await vi.advanceTimersByTimeAsync(200);
+    expect(photosRun).not.toHaveBeenCalled();
+  });
+});
+
+describe('cursor identity', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    vi.useFakeTimers();
+    installFakeAbortTimeout();
+    vi.mocked(searchSmart).mockResolvedValue({
+      assets: { items: [], nextPage: null },
+    } as unknown as Awaited<ReturnType<typeof searchSmart>>);
+    vi.mocked(searchAssets).mockResolvedValue({
+      assets: { items: [], nextPage: null },
+    } as unknown as Awaited<ReturnType<typeof searchAssets>>);
+    vi.mocked(searchPerson).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof searchPerson>>);
+    vi.mocked(searchPlaces).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof searchPlaces>>);
+    vi.mocked(getAllTags).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof getAllTags>>);
+  });
+  afterEach(() => {
+    restoreAbortTimeout();
+    vi.useRealTimers();
+  });
+
+  it('preserves activeItemId when a later section populates above it', async () => {
+    const m = new GlobalSearchManager();
+    const providers = (m as unknown as { providers: Record<keyof Sections, Provider> }).providers;
+    providers.people.run = async () => ({ status: 'ok', items: [{ id: 'p1', name: 'Alice' }], total: 1 });
+    providers.photos.run = async () => ({ status: 'ok', items: [{ id: 'a1' }, { id: 'a2' }], total: 2 });
+    m.setQuery('alice');
+    await vi.advanceTimersByTimeAsync(200);
+    m.setActiveItem('person:p1');
+    expect(m.activeItemId).toBe('person:p1');
+    m.sections.photos = { status: 'ok', items: [{ id: 'a3' }] as unknown[], total: 1 };
+    m.reconcileCursor();
+    expect(m.activeItemId).toBe('person:p1');
+  });
+
+  it('falls back to first top-section row when tracked id disappears', async () => {
+    const m = new GlobalSearchManager();
+    const providers = (m as unknown as { providers: Record<keyof Sections, Provider> }).providers;
+    providers.photos.run = async () => ({ status: 'ok', items: [{ id: 'a1' }, { id: 'a2' }], total: 2 });
+    m.setQuery('beach');
+    await vi.advanceTimersByTimeAsync(200);
+    m.setActiveItem('photo:a1');
+    providers.photos.run = async () => ({ status: 'ok', items: [{ id: 'a9' }], total: 1 });
+    m.setQuery('sunset');
+    await vi.advanceTimersByTimeAsync(200);
+    expect(m.activeItemId).toBe('photo:a9');
+  });
+});
+
+describe('Enter race', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    vi.useFakeTimers();
+    installFakeAbortTimeout();
+    vi.mocked(searchSmart).mockResolvedValue({
+      assets: { items: [], nextPage: null },
+    } as unknown as Awaited<ReturnType<typeof searchSmart>>);
+    vi.mocked(searchAssets).mockResolvedValue({
+      assets: { items: [], nextPage: null },
+    } as unknown as Awaited<ReturnType<typeof searchAssets>>);
+    vi.mocked(searchPerson).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof searchPerson>>);
+    vi.mocked(searchPlaces).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof searchPlaces>>);
+    vi.mocked(getAllTags).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof getAllTags>>);
+  });
+  afterEach(() => {
+    restoreAbortTimeout();
+    vi.useRealTimers();
+  });
+
+  it('getActiveItem captures the currently-highlighted item by reference', async () => {
+    const m = new GlobalSearchManager();
+    const providers = (m as unknown as { providers: Record<keyof Sections, Provider> }).providers;
+    providers.photos.run = async () => ({ status: 'ok', items: [{ id: 'a1' }], total: 1 });
+    m.setQuery('beach');
+    await vi.advanceTimersByTimeAsync(200);
+    m.setActiveItem('photo:a1');
+    const active = m.getActiveItem();
+    expect(active?.kind).toBe('photo');
+    expect((active?.data as { id: string }).id).toBe('a1');
+  });
+
+  it('Enter on stale cursor returns null (no-op at call site)', () => {
+    const m = new GlobalSearchManager();
+    m.activeItemId = 'photo:nonexistent';
+    expect(m.getActiveItem()).toBe(null);
+  });
+});
+
+describe('ML health retroactive promotion', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    vi.useFakeTimers();
+    installFakeAbortTimeout();
+    vi.mocked(searchSmart).mockResolvedValue({
+      assets: { items: [], nextPage: null },
+    } as unknown as Awaited<ReturnType<typeof searchSmart>>);
+    vi.mocked(searchAssets).mockResolvedValue({
+      assets: { items: [], nextPage: null },
+    } as unknown as Awaited<ReturnType<typeof searchAssets>>);
+    vi.mocked(searchPerson).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof searchPerson>>);
+    vi.mocked(searchPlaces).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof searchPlaces>>);
+    vi.mocked(getAllTags).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof getAllTags>>);
+  });
+  afterEach(() => {
+    restoreAbortTimeout();
+    vi.useRealTimers();
+  });
+
+  it('sets mlHealthy=false when photos times out in smart mode', async () => {
+    const m = new GlobalSearchManager();
+    const providers = (m as unknown as { providers: Record<keyof Sections, Provider> }).providers;
+    providers.photos.run = (_q: string, _mode: SearchMode, signal: AbortSignal) =>
+      new Promise<ProviderStatus>((_resolve, reject) => {
+        signal.addEventListener('abort', () => reject(Object.assign(new Error('x'), { name: 'AbortError' })));
+      });
+    m.setQuery('beach');
+    await vi.advanceTimersByTimeAsync(200);
+    await vi.advanceTimersByTimeAsync(5_100);
+    expect(m.mlHealthy).toBe(false);
+  });
+
+  it('does NOT promote banner in non-smart mode', async () => {
+    localStorage.setItem('searchQueryType', 'metadata');
+    const m = new GlobalSearchManager();
+    const providers = (m as unknown as { providers: Record<keyof Sections, Provider> }).providers;
+    providers.photos.run = (_q: string, _mode: SearchMode, signal: AbortSignal) =>
+      new Promise<ProviderStatus>((_resolve, reject) => {
+        signal.addEventListener('abort', () => reject(Object.assign(new Error('x'), { name: 'AbortError' })));
+      });
+    m.setQuery('beach');
+    await vi.advanceTimersByTimeAsync(200);
+    await vi.advanceTimersByTimeAsync(5_100);
+    expect(m.mlHealthy).toBe(true);
+  });
+});
