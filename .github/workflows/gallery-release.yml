@@ -421,6 +421,12 @@ jobs:
 
           git push origin "$VERSION" "v${major}" "release" --force
 
+      - name: Download APK artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: gallery-apk
+          path: ${{ runner.temp }}/apk
+
       - name: Create GitHub Release
         env:
           VERSION: ${{ needs.version.outputs.version }}
@@ -466,7 +472,8 @@ jobs:
             fi
           fi
 
-          gh release create "$VERSION" --title "$VERSION" --latest -n "$notes"
+          gh release create "$VERSION" "$RUNNER_TEMP/apk/gallery-${VERSION}.apk" \
+            --title "$VERSION" --latest -n "$notes"
 
   publish-version-endpoint:
     name: Publish Version Endpoint
