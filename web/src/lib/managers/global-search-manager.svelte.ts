@@ -63,6 +63,16 @@ function isValidRecentEntry(e: RecentEntry): boolean {
     case 'tag': {
       return typeof e.tagId === 'string' && e.tagId.length > 0;
     }
+    case 'navigate': {
+      return (
+        typeof e.route === 'string' &&
+        e.route.length > 0 &&
+        typeof e.labelKey === 'string' &&
+        e.labelKey.length > 0 &&
+        typeof e.icon === 'string' &&
+        e.icon.length > 0
+      );
+    }
     default: {
       return false;
     }

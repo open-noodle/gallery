@@ -101,6 +101,57 @@ describe('cmdk-recent', () => {
   });
 });
 
+describe('navigate kind', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    __resetForTests();
+  });
+
+  it('persists a navigate entry with all required fields', () => {
+    addEntry({
+      kind: 'navigate',
+      id: 'nav:users',
+      route: '/admin/users',
+      labelKey: 'users',
+      icon: 'M12...mock',
+      adminOnly: true,
+      lastUsed: 1,
+    });
+    const entries = getEntries();
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      kind: 'navigate',
+      id: 'nav:users',
+      route: '/admin/users',
+      adminOnly: true,
+    });
+  });
+
+  it('dedupes navigate entries by id', () => {
+    addEntry({
+      kind: 'navigate',
+      id: 'nav:users',
+      route: '/admin/users',
+      labelKey: 'users',
+      icon: 'x',
+      adminOnly: true,
+      lastUsed: 1,
+    });
+    addEntry({
+      kind: 'navigate',
+      id: 'nav:users',
+      route: '/admin/users',
+      labelKey: 'users',
+      icon: 'x',
+      adminOnly: true,
+      lastUsed: 5,
+    });
+    const entries = getEntries();
+    expect(entries).toHaveLength(1);
+    expect(entries[0].lastUsed).toBe(5);
+  });
+});
+
 describe('removeEntry', () => {
   beforeEach(() => {
     localStorage.clear();

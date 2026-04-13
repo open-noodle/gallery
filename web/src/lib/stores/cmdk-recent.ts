@@ -20,7 +20,16 @@ export type RecentEntry =
   | { kind: 'photo'; id: string; assetId: string; label: string; lastUsed: number }
   | { kind: 'person'; id: string; personId: string; label: string; thumbnailAssetId?: string; lastUsed: number }
   | { kind: 'place'; id: string; latitude: number; longitude: number; label: string; lastUsed: number }
-  | { kind: 'tag'; id: string; tagId: string; label: string; lastUsed: number };
+  | { kind: 'tag'; id: string; tagId: string; label: string; lastUsed: number }
+  | {
+      kind: 'navigate';
+      id: string;
+      route: string;
+      labelKey: string;
+      icon: string;
+      adminOnly: boolean;
+      lastUsed: number;
+    };
 
 let memory: RecentEntry[] | null = null;
 let warnedOnce = false;
