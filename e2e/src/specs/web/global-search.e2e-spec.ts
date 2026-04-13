@@ -64,4 +64,28 @@ test.describe('global search palette', () => {
     await page.keyboard.press('Control+/');
     await expect(page.getByRole('radio', { name: /description/i })).toBeChecked();
   });
+
+  test.describe('ML unhealthy banner', () => {
+    // CI runs with ML disabled, so /server/ml-health reports { smartSearchHealthy: false }.
+    test('shows the smart-search-unavailable banner in smart mode after typing', async ({ page }) => {
+      await page.keyboard.press('Control+k');
+      await page.getByRole('combobox').fill('beach');
+      await expect(page.getByText(/smart search is unavailable/i)).toBeVisible();
+    });
+
+    test('"Try Filename mode" button hides the banner', async ({ page }) => {
+      await page.keyboard.press('Control+k');
+      await page.getByRole('combobox').fill('beach');
+      await expect(page.getByText(/smart search is unavailable/i)).toBeVisible();
+      await page.getByRole('button', { name: /try filename mode/i }).click();
+      await expect(page.getByText(/smart search is unavailable/i)).toBeHidden();
+      await expect(page.getByRole('radio', { name: /filename/i })).toBeChecked();
+    });
+  });
+
+  // NOTE: Feature-flag-off coverage (trigger hidden, Ctrl+K no-op) is intentionally
+  // not an E2E test because `search` is hardcoded to `true` in
+  // `server.service.ts:getFeatures()` — there is no SystemConfig path to flip it.
+  // The unit-level trigger + manager tests (in web/src/lib/components/global-search/)
+  // cover the flag-off branch via a mocked featureFlagsManager.
 });
