@@ -211,6 +211,42 @@ describe('global-search root', () => {
     await vi.waitFor(() => expect(m.activeItemId).toBe('photo:a1'));
   });
 
+  it('scrolls the newly selected item into view, even when it is the first of a group', async () => {
+    // bits-ui's built-in scroll-into-view treats "first item of a group" as a special
+    // case — it scrolls the group heading instead of the item and returns early. If the
+    // heading was already partially visible, the item stays off-screen. We add an override
+    // effect in global-search.svelte that re-calls scrollIntoView on the item. This test
+    // pins that override by spying on Element.prototype.scrollIntoView and asserting the
+    // item's data-value matches the spy's invocation target.
+    const scrollSpy = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {});
+    const m = new GlobalSearchManager();
+    installPhotoStub(m, [{ id: 'a1' }, { id: 'a2' }]);
+    (m as unknown as { runNavigationProvider: (q: string) => { status: 'empty' } }).runNavigationProvider =
+      () => ({ status: 'empty' });
+    m.open();
+    render(GlobalSearch, { props: { manager: m } });
+    await user.type(screen.getByRole('combobox'), 'beach');
+    await vi.waitFor(() => expect(m.activeItemId).toBe('photo:a1'), { timeout: 2000 });
+    // Force a selection change so the override effect re-runs.
+    await user.keyboard('{End}');
+    await vi.waitFor(() => expect(m.activeItemId).toBe('photo:a2'));
+    // The override uses requestAnimationFrame — wait one frame.
+    await new Promise((r) => requestAnimationFrame(() => r(undefined)));
+    // The override must have called scrollIntoView on a [data-command-item] element
+    // whose data-value matches the selected id. bits-ui's own scroll may also have
+    // fired earlier in the same microtask — filter to our target.
+    const matchingCalls = scrollSpy.mock.calls.filter((_, i) => {
+      const target = scrollSpy.mock.instances[i] as Element | undefined;
+      return (
+        target instanceof Element &&
+        target.getAttribute('data-command-item') !== null &&
+        target.getAttribute('data-value') === 'photo:a2'
+      );
+    });
+    expect(matchingCalls.length).toBeGreaterThan(0);
+    scrollSpy.mockRestore();
+  });
+
   it('arrow keys wrap around at both ends (Command.Root loop=true)', async () => {
     // ARIA APG's listbox pattern explicitly permits wrapping as an optional behavior,
     // and wrap is the dominant convention for command palettes (VS Code, Raycast,

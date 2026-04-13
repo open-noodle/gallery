@@ -41,6 +41,26 @@
     }
   });
 
+  // bits-ui's built-in scroll-into-view logic has a quirk: when the selected item is
+  // the FIRST item of its group, it scrolls the group HEADING into view instead of the
+  // item and returns early (see command.svelte.js `#scrollSelectedIntoView`). If the
+  // heading was already partially visible, that's a no-op — leaving the newly focused
+  // item off-screen. We override with our own scroll AFTER bits-ui's afterTick handler
+  // runs. requestAnimationFrame ensures we run post-paint, so bits-ui's scroll (if any)
+  // has already been applied and we layer our adjustment on top.
+  $effect(() => {
+    if (!selectedValue) {
+      return;
+    }
+    const raf = requestAnimationFrame(() => {
+      const item = document.querySelector<HTMLElement>(
+        `[data-command-item][data-value="${CSS.escape(selectedValue)}"]`,
+      );
+      item?.scrollIntoView({ block: 'nearest' });
+    });
+    return () => cancelAnimationFrame(raf);
+  });
+
   $effect(() => {
     if (manager.activeItemId && manager.activeItemId !== selectedValue) {
       selectedValue = manager.activeItemId;
