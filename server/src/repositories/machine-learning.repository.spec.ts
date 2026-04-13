@@ -331,4 +331,59 @@ describe(MachineLearningRepository.name, () => {
       expect(mockBackend.get).toHaveBeenCalledWith('thumbs/user1/preview.webp');
     });
   });
+
+  describe('predict()', () => {
+    it('propagates AbortError when caller-supplied timeoutMs elapses', async () => {
+      mockFetch.mockImplementation(
+        (_url: URL, init: RequestInit) =>
+          new Promise((_resolve, reject) => {
+            init.signal?.addEventListener('abort', () =>
+              reject(Object.assign(new Error('timeout'), { name: 'AbortError' })),
+            );
+          }),
+      );
+      const predictFn = (sut as unknown as { predict: (...args: unknown[]) => Promise<unknown> }).predict.bind(sut);
+      await expect(
+        predictFn(
+          { text: 'hello' },
+          { [ModelTask.SEARCH]: { [ModelType.TEXTUAL]: { modelName: 'clip' } } },
+          { timeoutMs: 50 },
+        ),
+      ).rejects.toMatchObject({ name: 'AbortError' });
+    });
+
+    it('does not apply any timeout when caller omits timeoutMs (backward compat)', async () => {
+      mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ [ModelTask.SEARCH]: 'embedding' }) });
+      const predictFn = (sut as unknown as { predict: (...args: unknown[]) => Promise<unknown> }).predict.bind(sut);
+      await expect(
+        predictFn({ text: 'hello' }, { [ModelTask.SEARCH]: { [ModelType.TEXTUAL]: { modelName: 'clip' } } }),
+      ).resolves.toBeDefined();
+      const [, init] = mockFetch.mock.calls[0] as [URL, RequestInit];
+      expect(init.signal).toBeUndefined();
+    });
+
+    it('different callers can pass different timeoutMs values (option is per-call)', async () => {
+      const signalsUsed: (AbortSignal | undefined)[] = [];
+      mockFetch.mockImplementation((_url: URL, init: RequestInit) => {
+        signalsUsed.push(init.signal ?? undefined);
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ [ModelTask.SEARCH]: 'x' }) });
+      });
+      const predictFn = (sut as unknown as { predict: (...args: unknown[]) => Promise<unknown> }).predict.bind(sut);
+      await predictFn(
+        { text: 'a' },
+        { [ModelTask.SEARCH]: { [ModelType.TEXTUAL]: { modelName: 'clip' } } },
+        { timeoutMs: 100 },
+      );
+      await predictFn(
+        { text: 'b' },
+        { [ModelTask.SEARCH]: { [ModelType.TEXTUAL]: { modelName: 'clip' } } },
+        { timeoutMs: 5000 },
+      );
+      await predictFn({ text: 'c' }, { [ModelTask.SEARCH]: { [ModelType.TEXTUAL]: { modelName: 'clip' } } });
+      expect(signalsUsed[0]).toBeInstanceOf(AbortSignal);
+      expect(signalsUsed[1]).toBeInstanceOf(AbortSignal);
+      expect(signalsUsed[2]).toBeUndefined();
+      expect(signalsUsed[0]).not.toBe(signalsUsed[1]);
+    });
+  });
 });
