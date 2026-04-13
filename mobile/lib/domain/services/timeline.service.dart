@@ -78,9 +78,11 @@ class TimelineFactory {
 
   TimelineService lockedFolder(String userId) => TimelineService(_timelineRepository.locked(userId, groupBy));
 
-  TimelineService video(String userId) => TimelineService(_timelineRepository.video(userId, groupBy));
+  TimelineService video(List<String> userIds, String currentUserId) =>
+      TimelineService(_timelineRepository.video(userIds, currentUserId, groupBy));
 
-  TimelineService place(String place) => TimelineService(_timelineRepository.place(place, groupBy));
+  TimelineService place(String place, List<String> userIds, String currentUserId) =>
+      TimelineService(_timelineRepository.place(place, userIds, currentUserId, groupBy));
 
   TimelineService person(String userId, String personId) =>
       TimelineService(_timelineRepository.person(userId, personId, groupBy));
@@ -94,8 +96,8 @@ class TimelineFactory {
   TimelineService fromAssetsWithBuckets(List<BaseAsset> assets, TimelineOrigin type) =>
       TimelineService(_timelineRepository.fromAssetsWithBuckets(assets, type));
 
-  TimelineService map(List<String> userIds, TimelineMapOptions options) =>
-      TimelineService(_timelineRepository.map(userIds, options, groupBy));
+  TimelineService map(List<String> userIds, String currentUserId, TimelineMapOptions options) =>
+      TimelineService(_timelineRepository.map(userIds, currentUserId, options, groupBy));
 }
 
 class TimelineService {

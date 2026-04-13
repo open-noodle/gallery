@@ -12,6 +12,7 @@ import 'package:immich_mobile/infrastructure/entities/remote_asset.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/remote_asset.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/map.repository.dart';
+import 'package:immich_mobile/infrastructure/repositories/viewer_visibility.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 import 'package:stream_transform/stream_transform.dart';
 
@@ -493,50 +494,35 @@ class DriftTimelineRepository extends DriftDatabaseRepository {
     groupBy: groupBy,
   );
 
-  TimelineQuery video(String userId, GroupAssetsBy groupBy) => _remoteQueryBuilder(
-    filter: (row) =>
-        row.deletedAt.isNull() &
-        row.type.equalsValue(AssetType.video) &
-        row.visibility.equalsValue(AssetVisibility.timeline) &
-        row.ownerId.equals(userId),
+  TimelineQuery video(List<String> userIds, String currentUserId, GroupAssetsBy groupBy) => (
+    bucketSource: () => _watchVideoBucket(userIds, currentUserId, groupBy: groupBy),
+    assetSource: (offset, count) => _getVideoBucketAssets(userIds, currentUserId, offset: offset, count: count),
     origin: TimelineOrigin.video,
-    groupBy: groupBy,
   );
 
-  TimelineQuery place(String place, GroupAssetsBy groupBy) => (
-    bucketSource: () => _watchPlaceBucket(place, groupBy: groupBy),
-    assetSource: (offset, count) => _getPlaceBucketAssets(place, offset: offset, count: count),
-    origin: TimelineOrigin.place,
-  );
-
-  TimelineQuery person(String userId, String personId, GroupAssetsBy groupBy) => (
-    bucketSource: () => _watchPersonBucket(userId, personId, groupBy: groupBy),
-    assetSource: (offset, count) => _getPersonBucketAssets(userId, personId, offset: offset, count: count),
-    origin: TimelineOrigin.person,
-  );
-
-  Stream<List<Bucket>> _watchPlaceBucket(String place, {GroupAssetsBy groupBy = GroupAssetsBy.day}) {
+  Stream<List<Bucket>> _watchVideoBucket(
+    List<String> userIds,
+    String currentUserId, {
+    GroupAssetsBy groupBy = GroupAssetsBy.day,
+  }) {
     if (groupBy == GroupAssetsBy.none) {
-      // TODO: implement GroupAssetBy for place
-      throw UnsupportedError("GroupAssetsBy.none is not supported for watchPlaceBucket");
+      throw UnsupportedError('GroupAssetsBy.none is not supported for _watchVideoBucket');
     }
 
-    final assetCountExp = _db.remoteAssetEntity.id.count();
+    final viz = buildViewerVisibilityJoins(_db, _db.remoteAssetEntity, currentUserId);
+    final assetCountExp = _db.remoteAssetEntity.id.count(distinct: true);
     final dateExp = _db.remoteAssetEntity.effectiveCreatedAt(groupBy);
 
     final query = _db.remoteAssetEntity.selectOnly()
       ..addColumns([assetCountExp, dateExp])
-      ..join([
-        innerJoin(
-          _db.remoteExifEntity,
-          _db.remoteExifEntity.assetId.equalsExp(_db.remoteAssetEntity.id),
-          useColumns: false,
-        ),
-      ])
+      ..join(viz.joins)
       ..where(
-        _db.remoteExifEntity.city.equals(place) &
-            _db.remoteAssetEntity.deletedAt.isNull() &
-            _db.remoteAssetEntity.visibility.equalsValue(AssetVisibility.timeline),
+        _db.remoteAssetEntity.deletedAt.isNull() &
+            _db.remoteAssetEntity.type.equalsValue(AssetType.video) &
+            _db.remoteAssetEntity.visibility.equalsValue(AssetVisibility.timeline) &
+            (_db.remoteAssetEntity.ownerId.isIn(userIds) |
+                viz.assetMember.userId.isNotNull() |
+                viz.libraryMember.userId.isNotNull()),
       )
       ..groupBy([dateExp])
       ..orderBy([OrderingTerm.desc(dateExp)]);
@@ -548,7 +534,91 @@ class DriftTimelineRepository extends DriftDatabaseRepository {
     }).watch();
   }
 
-  Future<List<BaseAsset>> _getPlaceBucketAssets(String place, {required int offset, required int count}) {
+  Future<List<BaseAsset>> _getVideoBucketAssets(
+    List<String> userIds,
+    String currentUserId, {
+    required int offset,
+    required int count,
+  }) {
+    final visibilityPredicate = viewerVisibilityPredicate(_db, _db.remoteAssetEntity, userIds, currentUserId);
+
+    final query = _db.remoteAssetEntity.select()
+      ..where(
+        (row) =>
+            row.deletedAt.isNull() &
+            row.type.equalsValue(AssetType.video) &
+            row.visibility.equalsValue(AssetVisibility.timeline) &
+            visibilityPredicate,
+      )
+      ..orderBy([(row) => OrderingTerm.desc(row.createdAt)])
+      ..limit(count, offset: offset);
+
+    return query.map((row) => row.toDto()).get();
+  }
+
+  TimelineQuery place(String place, List<String> userIds, String currentUserId, GroupAssetsBy groupBy) => (
+    bucketSource: () => _watchPlaceBucket(place, userIds, currentUserId, groupBy: groupBy),
+    assetSource: (offset, count) => _getPlaceBucketAssets(place, userIds, currentUserId, offset: offset, count: count),
+    origin: TimelineOrigin.place,
+  );
+
+  TimelineQuery person(String userId, String personId, GroupAssetsBy groupBy) => (
+    bucketSource: () => _watchPersonBucket(userId, personId, groupBy: groupBy),
+    assetSource: (offset, count) => _getPersonBucketAssets(userId, personId, offset: offset, count: count),
+    origin: TimelineOrigin.person,
+  );
+
+  Stream<List<Bucket>> _watchPlaceBucket(
+    String place,
+    List<String> userIds,
+    String currentUserId, {
+    GroupAssetsBy groupBy = GroupAssetsBy.day,
+  }) {
+    if (groupBy == GroupAssetsBy.none) {
+      throw UnsupportedError('GroupAssetsBy.none is not supported for _watchPlaceBucket');
+    }
+
+    final viz = buildViewerVisibilityJoins(_db, _db.remoteAssetEntity, currentUserId);
+    final assetCountExp = _db.remoteAssetEntity.id.count(distinct: true);
+    final dateExp = _db.remoteAssetEntity.effectiveCreatedAt(groupBy);
+
+    final query = _db.remoteAssetEntity.selectOnly()
+      ..addColumns([assetCountExp, dateExp])
+      ..join([
+        innerJoin(
+          _db.remoteExifEntity,
+          _db.remoteExifEntity.assetId.equalsExp(_db.remoteAssetEntity.id),
+          useColumns: false,
+        ),
+        ...viz.joins,
+      ])
+      ..where(
+        _db.remoteExifEntity.city.equals(place) &
+            _db.remoteAssetEntity.deletedAt.isNull() &
+            _db.remoteAssetEntity.visibility.equalsValue(AssetVisibility.timeline) &
+            (_db.remoteAssetEntity.ownerId.isIn(userIds) |
+                viz.assetMember.userId.isNotNull() |
+                viz.libraryMember.userId.isNotNull()),
+      )
+      ..groupBy([dateExp])
+      ..orderBy([OrderingTerm.desc(dateExp)]);
+
+    return query.map((row) {
+      final timeline = row.read(dateExp)!.truncateDate(groupBy);
+      final assetCount = row.read(assetCountExp)!;
+      return TimeBucket(date: timeline, assetCount: assetCount);
+    }).watch();
+  }
+
+  Future<List<BaseAsset>> _getPlaceBucketAssets(
+    String place,
+    List<String> userIds,
+    String currentUserId, {
+    required int offset,
+    required int count,
+  }) {
+    final visibilityPredicate = viewerVisibilityPredicate(_db, _db.remoteAssetEntity, userIds, currentUserId);
+
     final query =
         _db.remoteAssetEntity.select().join([
             innerJoin(
@@ -560,10 +630,12 @@ class DriftTimelineRepository extends DriftDatabaseRepository {
           ..where(
             _db.remoteAssetEntity.deletedAt.isNull() &
                 _db.remoteAssetEntity.visibility.equalsValue(AssetVisibility.timeline) &
-                _db.remoteExifEntity.city.equals(place),
+                _db.remoteExifEntity.city.equals(place) &
+                visibilityPredicate,
           )
           ..orderBy([OrderingTerm.desc(_db.remoteAssetEntity.createdAt)])
           ..limit(count, offset: offset);
+
     return query.map((row) => row.readTable(_db.remoteAssetEntity).toDto()).get();
   }
 
@@ -641,23 +713,29 @@ class DriftTimelineRepository extends DriftDatabaseRepository {
     return query.map((row) => row.toDto()).get();
   }
 
-  TimelineQuery map(List<String> userIds, TimelineMapOptions options, GroupAssetsBy groupBy) => (
-    bucketSource: () => _watchMapBucket(userIds, options, groupBy: groupBy),
-    assetSource: (offset, count) => _getMapBucketAssets(userIds, options, offset: offset, count: count),
+  TimelineQuery map(List<String> userIds, String currentUserId, TimelineMapOptions options, GroupAssetsBy groupBy) => (
+    bucketSource: () => _watchMapBucket(userIds, currentUserId, options, groupBy: groupBy),
+    assetSource: (offset, count) => _getMapBucketAssets(userIds, currentUserId, options, offset: offset, count: count),
     origin: TimelineOrigin.map,
   );
 
   Stream<List<Bucket>> _watchMapBucket(
-    List<String> userId,
+    List<String> userIds,
+    String currentUserId,
     TimelineMapOptions options, {
     GroupAssetsBy groupBy = GroupAssetsBy.day,
   }) {
     if (groupBy == GroupAssetsBy.none) {
-      // TODO: Support GroupAssetsBy.none
-      throw UnsupportedError("GroupAssetsBy.none is not supported for _watchMapBucket");
+      throw UnsupportedError('GroupAssetsBy.none is not supported for _watchMapBucket');
     }
 
-    final assetCountExp = _db.remoteAssetEntity.id.count();
+    // NOTE: Mobile map() currently allows withPartners+shared-space branches
+    // when onlyFavorites or includeArchived is true, which diverges from the
+    // server's restriction (timeline.service.ts rejects that combination). We
+    // preserve the mobile-specific behavior here intentionally.
+
+    final viz = buildViewerVisibilityJoins(_db, _db.remoteAssetEntity, currentUserId);
+    final assetCountExp = _db.remoteAssetEntity.id.count(distinct: true);
     final dateExp = _db.remoteAssetEntity.effectiveCreatedAt(groupBy);
 
     final query = _db.remoteAssetEntity.selectOnly()
@@ -668,15 +746,18 @@ class DriftTimelineRepository extends DriftDatabaseRepository {
           _db.remoteExifEntity.assetId.equalsExp(_db.remoteAssetEntity.id),
           useColumns: false,
         ),
+        ...viz.joins,
       ])
       ..where(
-        _db.remoteAssetEntity.ownerId.isIn(userId) &
-            _db.remoteExifEntity.inBounds(options.bounds) &
+        _db.remoteExifEntity.inBounds(options.bounds) &
             _db.remoteAssetEntity.visibility.isIn([
               AssetVisibility.timeline.index,
               if (options.includeArchived) AssetVisibility.archive.index,
             ]) &
-            _db.remoteAssetEntity.deletedAt.isNull(),
+            _db.remoteAssetEntity.deletedAt.isNull() &
+            (_db.remoteAssetEntity.ownerId.isIn(userIds) |
+                viz.assetMember.userId.isNotNull() |
+                viz.libraryMember.userId.isNotNull()),
       )
       ..groupBy([dateExp])
       ..orderBy([OrderingTerm.desc(dateExp)]);
@@ -698,11 +779,14 @@ class DriftTimelineRepository extends DriftDatabaseRepository {
   }
 
   Future<List<BaseAsset>> _getMapBucketAssets(
-    List<String> userId,
+    List<String> userIds,
+    String currentUserId,
     TimelineMapOptions options, {
     required int offset,
     required int count,
   }) {
+    final visibilityPredicate = viewerVisibilityPredicate(_db, _db.remoteAssetEntity, userIds, currentUserId);
+
     final query =
         _db.remoteAssetEntity.select().join([
             innerJoin(
@@ -712,13 +796,13 @@ class DriftTimelineRepository extends DriftDatabaseRepository {
             ),
           ])
           ..where(
-            _db.remoteAssetEntity.ownerId.isIn(userId) &
-                _db.remoteExifEntity.inBounds(options.bounds) &
+            _db.remoteExifEntity.inBounds(options.bounds) &
                 _db.remoteAssetEntity.visibility.isIn([
                   AssetVisibility.timeline.index,
                   if (options.includeArchived) AssetVisibility.archive.index,
                 ]) &
-                _db.remoteAssetEntity.deletedAt.isNull(),
+                _db.remoteAssetEntity.deletedAt.isNull() &
+                visibilityPredicate,
           )
           ..orderBy([OrderingTerm.desc(_db.remoteAssetEntity.createdAt)])
           ..limit(count, offset: offset);
