@@ -57,7 +57,7 @@
         </Command.GroupHeading>
         <Command.GroupItems>
           {#each bucket.items as item (item.id)}
-            <Command.Item value={item.id} onSelect={() => onActivate(item)}>
+            <Command.Item value={item.id} onSelect={() => onActivate(item)} class="group">
               <NavigationRow {item} />
             </Command.Item>
           {/each}

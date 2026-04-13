@@ -46,7 +46,7 @@
       {:else if status.status === 'ok'}
         <div in:fade={{ duration: 120 }} out:fade={{ duration: 80 }}>
           {#each status.items as item (itemKey(item))}
-            <Command.Item value={itemKey(item)} onSelect={() => onActivate(item)}>
+            <Command.Item value={itemKey(item)} onSelect={() => onActivate(item)} class="group">
               {@render renderRow(item)}
             </Command.Item>
           {/each}

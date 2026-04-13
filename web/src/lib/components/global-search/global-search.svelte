@@ -2,7 +2,7 @@
   import { Modal, ModalBody } from '@immich/ui';
   import { Command } from 'bits-ui';
   import { t } from 'svelte-i18n';
-  import type { GlobalSearchManager } from '$lib/managers/global-search-manager.svelte';
+  import type { GlobalSearchManager, SearchMode } from '$lib/managers/global-search-manager.svelte';
   import GlobalSearchSection from './global-search-section.svelte';
   import GlobalSearchNavigationSections from './global-search-navigation-sections.svelte';
   import PhotoRow from './rows/photo-row.svelte';
@@ -120,6 +120,17 @@
       e.preventDefault();
       return;
     }
+    if (e.ctrlKey && e.key === '/') {
+      // The layout-level use:shortcuts binding for Ctrl+/ has ignoreInputFields=true
+      // by default (the @immich/ui shortcut action skips events whose target is an
+      // input), so it won't fire while the palette's Command.Input is focused. Handle
+      // the cycle here instead — same behavior, different listener.
+      const order: SearchMode[] = ['smart', 'metadata', 'description', 'ocr'];
+      const next = order[(order.indexOf(manager.mode) + 1) % order.length];
+      manager.setMode(next);
+      e.preventDefault();
+      return;
+    }
     if (e.key === 'Home' || e.key === 'End') {
       // bits-ui tags each Command.Item with a data-command-item attribute (see
       // bits-ui command.svelte.js:1204 — `createBitsAttrs({ component: 'command' ... })`
@@ -158,6 +169,7 @@
         >
           <Command.Input
             bind:value={inputValue}
+            autofocus
             placeholder={$t('cmdk_placeholder')}
             maxlength={256}
             onkeydown={onKeyDown}
@@ -196,7 +208,11 @@
                       </Command.GroupHeading>
                       <Command.GroupItems>
                         {#each recentEntries as entry (entry.id)}
-                          <Command.Item value={entry.id} onSelect={() => manager.activateRecent(entry)}>
+                          <Command.Item
+                            value={entry.id}
+                            onSelect={() => manager.activateRecent(entry)}
+                            class="group"
+                          >
                             <RecentRow {entry} />
                           </Command.Item>
                         {/each}
