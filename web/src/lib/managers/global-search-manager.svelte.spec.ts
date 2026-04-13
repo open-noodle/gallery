@@ -1842,3 +1842,280 @@ describe('activateRecent stale admin purge', () => {
     expect(getEntries().some((e) => e.id === 'nav:userPages:photos')).toBe(true);
   });
 });
+
+describe('batch lifecycle: close, empty-query, grace window (review fixes)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    vi.useFakeTimers();
+    installFakeAbortTimeout();
+    mockUser.current = { isAdmin: true };
+    mockFlags.valueOrUndefined = { search: true, map: true, trash: true };
+    mockI18nLocale.current = 'en';
+    vi.mocked(searchSmart).mockResolvedValue({ assets: { items: [], nextPage: null } } as never);
+    vi.mocked(searchAssets).mockResolvedValue({ assets: { items: [], nextPage: null } } as never);
+    vi.mocked(searchPerson).mockResolvedValue([] as never);
+    vi.mocked(searchPlaces).mockResolvedValue([] as never);
+    vi.mocked(getAllTags).mockResolvedValue([] as never);
+  });
+  afterEach(() => {
+    restoreAbortTimeout();
+    vi.useRealTimers();
+  });
+
+  it('close() resets batchInFlight and inFlightCounter even when a batch is in flight', async () => {
+    let resolveStale!: () => void;
+    vi.mocked(searchSmart).mockImplementationOnce(
+      () =>
+        new Promise((r) => (resolveStale = () => r({ assets: { items: [], nextPage: null } } as never))),
+    );
+    const m = new GlobalSearchManager();
+    m.open();
+    m.setQuery('beach');
+    await vi.advanceTimersByTimeAsync(200);
+    expect(m.batchInFlight).toBe(true);
+    m.close();
+    expect(m.batchInFlight).toBe(false);
+    expect((m as unknown as { inFlightCounter: number }).inFlightCounter).toBe(0);
+    expect(m.batchInFlightStartedAt).toBe(0);
+    // Release the stale promise — must NOT re-animate batchInFlight or the counter.
+    resolveStale();
+    await vi.advanceTimersByTimeAsync(10);
+    expect(m.batchInFlight).toBe(false);
+    expect((m as unknown as { inFlightCounter: number }).inFlightCounter).toBe(0);
+  });
+
+  it('setQuery(empty) resets batchInFlight, inFlightCounter, and _batchInFlightStartedAt', () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    m.setQuery('beach');
+    expect(m.batchInFlight).toBe(true);
+    m.setQuery('');
+    expect(m.batchInFlight).toBe(false);
+    expect((m as unknown as { inFlightCounter: number }).inFlightCounter).toBe(0);
+    expect(m.batchInFlightStartedAt).toBe(0);
+  });
+
+  it('_batchInFlightStartedAt is +Infinity during the 150ms debounce window (grace hidden)', () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    m.setQuery('beach');
+    // Sync check — no timer advancement yet, runBatch has not fired.
+    expect(m.batchInFlightStartedAt).toBe(Number.POSITIVE_INFINITY);
+    // Grace-window contract: `now - startedAt > 200` must be false, so the stripe stays hidden.
+    expect(performance.now() - m.batchInFlightStartedAt > 200).toBe(false);
+  });
+
+  it('_batchInFlightStartedAt becomes a real performance.now() timestamp after runBatch fires', async () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    m.setQuery('beach');
+    await vi.advanceTimersByTimeAsync(200);
+    expect(Number.isFinite(m.batchInFlightStartedAt)).toBe(true);
+    expect(m.batchInFlightStartedAt).toBeGreaterThanOrEqual(0);
+  });
+
+  it('setMode decrements counter when photos provider rejects (catch path)', async () => {
+    vi.mocked(searchSmart).mockResolvedValueOnce({
+      assets: { items: [{ id: 'initial' } as never], nextPage: null },
+    } as never);
+    const m = new GlobalSearchManager();
+    m.open();
+    m.setQuery('beach');
+    await vi.advanceTimersByTimeAsync(200);
+    expect(m.sections.photos.status).toBe('ok');
+    vi.mocked(searchAssets).mockRejectedValueOnce(new Error('boom'));
+    m.setMode('metadata');
+    expect(m.batchInFlight).toBe(true);
+    await vi.advanceTimersByTimeAsync(10);
+    expect(m.batchInFlight).toBe(false);
+    expect((m as unknown as { inFlightCounter: number }).inFlightCounter).toBe(0);
+    expect(m.sections.photos.status).toBe('error');
+  });
+
+  it('setQuery reconciles cursor synchronously so stale nav highlight is not left behind', () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    m.setQuery('theme');
+    // At this point reconcileCursor has placed activeItemId on the first nav item
+    // (because photos/people/places/tags are all loading). Manually poison the cursor.
+    m.activeItemId = 'nav:nonexistent-item';
+    m.setQuery('themes');
+    // After setQuery, reconcileCursor must have replaced the stale id with something
+    // that exists in the current navigation section (or null).
+    expect(m.activeItemId).not.toBe('nav:nonexistent-item');
+  });
+});
+
+describe('activate non-theme action (review fix U1)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    resetRecentStore();
+    mockUser.current = { isAdmin: true };
+  });
+
+  it('warns and does NOT navigate when activate("nav") receives a non-theme actions item', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const m = new GlobalSearchManager();
+    m.open();
+    m.activate('nav', {
+      id: 'nav:futureAction',
+      category: 'actions' as const,
+      labelKey: 'x',
+      descriptionKey: 'x',
+      icon: 'x',
+      route: '',
+      adminOnly: false,
+    });
+    expect(warnSpy).toHaveBeenCalled();
+    expect(goto).not.toHaveBeenCalled();
+    expect(getEntries().find((e) => e.id === 'nav:futureAction')).toBeUndefined();
+    expect(m.isOpen).toBe(false);
+    warnSpy.mockRestore();
+  });
+});
+
+describe('activateRecent stale-state purge (review fix U2)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    resetRecentStore();
+    mockUser.current = { isAdmin: true };
+    mockFlags.valueOrUndefined = { search: true, map: true, trash: true };
+  });
+
+  it('purges a navigate recent whose feature flag is now disabled', () => {
+    mockFlags.valueOrUndefined = { search: true, map: false, trash: true };
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const m = new GlobalSearchManager();
+    m.open();
+    const mapEntry = {
+      kind: 'navigate' as const,
+      id: 'nav:userPages:map',
+      route: '/map',
+      labelKey: 'map',
+      icon: 'x',
+      adminOnly: false,
+      lastUsed: 1,
+    };
+    addEntry(mapEntry);
+    m.activateRecent(mapEntry);
+    expect(warnSpy).toHaveBeenCalled();
+    expect(goto).not.toHaveBeenCalled();
+    expect(getEntries().some((e) => e.id === 'nav:userPages:map')).toBe(false);
+    warnSpy.mockRestore();
+  });
+
+  it('purges a navigate recent whose NavigationItem no longer exists in the catalog', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const m = new GlobalSearchManager();
+    m.open();
+    const ghostEntry = {
+      kind: 'navigate' as const,
+      id: 'nav:removed:feature',
+      route: '/removed',
+      labelKey: 'removed',
+      icon: 'x',
+      adminOnly: false,
+      lastUsed: 1,
+    };
+    addEntry(ghostEntry);
+    m.activateRecent(ghostEntry);
+    expect(warnSpy).toHaveBeenCalled();
+    expect(goto).not.toHaveBeenCalled();
+    expect(getEntries().some((e) => e.id === 'nav:removed:feature')).toBe(false);
+    warnSpy.mockRestore();
+  });
+
+  it('admin status re-check uses the live NavigationItem.adminOnly, not the stored entry', () => {
+    // Saved entry has adminOnly=false (stale), but nav:systemSettings:classification is
+    // actually adminOnly=true in the live catalog. A non-admin user should still be purged.
+    mockUser.current = { isAdmin: false };
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const m = new GlobalSearchManager();
+    m.open();
+    const entry = {
+      kind: 'navigate' as const,
+      id: 'nav:systemSettings:classification',
+      route: '/admin/system-settings?isOpen=classification',
+      labelKey: 'admin.classification_settings',
+      icon: 'x',
+      adminOnly: false, // stale — live catalog says true
+      lastUsed: 1,
+    };
+    addEntry(entry);
+    m.activateRecent(entry);
+    expect(warnSpy).toHaveBeenCalled();
+    expect(goto).not.toHaveBeenCalled();
+    expect(getEntries().some((e) => e.id === entry.id)).toBe(false);
+    warnSpy.mockRestore();
+  });
+});
+
+describe('setMode stale photos race (review fix U3)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    vi.useFakeTimers();
+    installFakeAbortTimeout();
+    mockUser.current = { isAdmin: true };
+    mockFlags.valueOrUndefined = { search: true, map: true, trash: true };
+    mockI18nLocale.current = 'en';
+    vi.mocked(searchPerson).mockResolvedValue([] as never);
+    vi.mocked(searchPlaces).mockResolvedValue([] as never);
+    vi.mocked(getAllTags).mockResolvedValue([] as never);
+  });
+  afterEach(() => {
+    restoreAbortTimeout();
+    vi.useRealTimers();
+  });
+
+  it('stale first-setMode photos does not overwrite fresh second-setMode photos', async () => {
+    // Initial batch: photos = [initial]
+    vi.mocked(searchSmart).mockResolvedValueOnce({
+      assets: { items: [{ id: 'initial' } as never], nextPage: null },
+    } as never);
+    // First setMode (metadata): slow — stays pending until resolvePhotos1().
+    let resolvePhotos1!: () => void;
+    vi.mocked(searchAssets).mockImplementationOnce(
+      () =>
+        new Promise(
+          (r) =>
+            (resolvePhotos1 = () =>
+              r({ assets: { items: [{ id: 'stale' } as never], nextPage: null } } as never)),
+        ),
+    );
+    // Second setMode (description): fast — resolves to {fresh}.
+    vi.mocked(searchAssets).mockResolvedValueOnce({
+      assets: { items: [{ id: 'fresh' } as never], nextPage: null },
+    } as never);
+
+    const m = new GlobalSearchManager();
+    m.open();
+    m.setQuery('beach');
+    await vi.advanceTimersByTimeAsync(200);
+    expect(m.sections.photos.status).toBe('ok');
+
+    m.setMode('metadata'); // starts photos1 (stuck)
+    m.setMode('description'); // aborts photos1's photosController, starts photos2 (fast)
+    await vi.advanceTimersByTimeAsync(10); // photos2 resolves → photos should be {fresh}
+    if (m.sections.photos.status === 'ok') {
+      const ids = m.sections.photos.items.map((p) => (p as { id: string }).id);
+      expect(ids).toContain('fresh');
+    }
+
+    // Now release photos1 — its .then runs. Without the U3 fix it would overwrite
+    // sections.photos with [stale]. With the fix, signal.aborted check prevents the write.
+    resolvePhotos1();
+    await vi.advanceTimersByTimeAsync(10);
+    expect(m.sections.photos.status).toBe('ok');
+    if (m.sections.photos.status === 'ok') {
+      const ids = m.sections.photos.items.map((p) => (p as { id: string }).id);
+      expect(ids).toContain('fresh');
+      expect(ids).not.toContain('stale');
+    }
+    expect(m.batchInFlight).toBe(false);
+    expect((m as unknown as { inFlightCounter: number }).inFlightCounter).toBe(0);
+  });
+});

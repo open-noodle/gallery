@@ -285,6 +285,12 @@ export class GlobalSearchManager {
     this.sections = { photos: idle, people: idle, places: idle, tags: idle, navigation: idle };
     this.activeItemId = null;
     this.tagsCache = null;
+    // Clear batch bookkeeping. Without this, closing mid-batch leaves batchInFlight=true
+    // (the stale-batch guard in onSettle prevents stale decrements, so counter never
+    // returns to zero naturally) which would flash the progress stripe on reopen.
+    this.batchInFlight = false;
+    this.inFlightCounter = 0;
+    this._batchInFlightStartedAt = 0;
     // Reset query so reopening and re-typing the same string is not a no-op
     // (setQuery short-circuits when `this.query === text`).
     this.query = '';
@@ -454,9 +460,16 @@ export class GlobalSearchManager {
       }
       case 'nav': {
         const n = item as NavigationItem;
-        if (n.category === 'actions' && n.id === 'nav:theme') {
-          // Theme toggle is stateless — not persisted to recents.
-          themeManager.toggleTheme();
+        if (n.category === 'actions') {
+          // Actions are stateless side-effect handlers. Dispatch by id so future
+          // actions can be added without falling through to the goto path (which
+          // would navigate to `route: ''` and persist a broken recent).
+          if (n.id === 'nav:theme') {
+            themeManager.toggleTheme();
+          } else {
+            // eslint-disable-next-line no-console
+            console.warn('[cmdk] unknown action navigation item', n.id);
+          }
         } else {
           addEntry({
             kind: 'navigate',
@@ -485,14 +498,38 @@ export class GlobalSearchManager {
       this.close();
       return;
     }
-    // Admin re-check for stale navigate entries: an admin user may have been
-    // demoted since the recent was saved. Purge the stale entry and close.
-    if (entry.kind === 'navigate' && entry.adminOnly && !(get(user)?.isAdmin ?? false)) {
-      // eslint-disable-next-line no-console
-      console.warn('[cmdk] purging stale admin recent', entry);
-      removeEntry(entry.id);
-      this.close();
-      return;
+    // Stale-state re-check for navigate entries. Three failure modes, all treated
+    // the same way (warn + purge + close):
+    //   1. The navigation item was removed from NAVIGATION_ITEMS (upgrade dropped it).
+    //   2. It's adminOnly and the user has been demoted since the recent was saved.
+    //   3. It's feature-flag gated and the flag was disabled since the recent was saved.
+    // Using the LIVE NavigationItem (not the saved entry fields) ensures we pick up
+    // adminOnly / featureFlag changes made upstream.
+    if (entry.kind === 'navigate') {
+      const navItem = NAVIGATION_ITEMS.find((n) => n.id === entry.id);
+      const isAdmin = get(user)?.isAdmin ?? false;
+      const flags = featureFlagsManager.valueOrUndefined;
+      if (!navItem) {
+        // eslint-disable-next-line no-console
+        console.warn('[cmdk] purging stale recent — unknown nav item', entry.id);
+        removeEntry(entry.id);
+        this.close();
+        return;
+      }
+      if (navItem.adminOnly && !isAdmin) {
+        // eslint-disable-next-line no-console
+        console.warn('[cmdk] purging stale admin recent', entry.id);
+        removeEntry(entry.id);
+        this.close();
+        return;
+      }
+      if (navItem.featureFlag && !flags?.[navItem.featureFlag]) {
+        // eslint-disable-next-line no-console
+        console.warn('[cmdk] purging stale recent — feature flag disabled', entry.id);
+        removeEntry(entry.id);
+        this.close();
+        return;
+      }
     }
     const now = Date.now();
     addEntry({ ...entry, lastUsed: now });
@@ -588,10 +625,21 @@ export class GlobalSearchManager {
       }
     };
 
-    this.providers.photos
-      .run(this.query, this.mode, signal)
+    // Promise.resolve().then(...) guarantees that a provider which synchronously
+    // throws (not just returns a rejected promise) still lands in the .catch handler.
+    // Symmetric with runBatch's defensive wrapper.
+    Promise.resolve()
+      .then(() => this.providers.photos.run(this.query, this.mode, signal))
       .then((result) => {
         if (setModeBatch !== this.batchController) {
+          return;
+        }
+        // Stale setMode race: if a later setMode aborted OUR photosController before
+        // we resolved, a newer photos run is already in flight (or has already written
+        // fresh results). Skip the write to avoid clobbering the newer data, but still
+        // decrement the counter we incremented above.
+        if (signal.aborted) {
+          onSetModeSettle();
           return;
         }
         this.sections.photos = result;
@@ -679,6 +727,8 @@ export class GlobalSearchManager {
     if (text.trim() === '') {
       this.sections = { photos: idle, people: idle, places: idle, tags: idle, navigation: idle };
       this.batchInFlight = false;
+      this.inFlightCounter = 0;
+      this._batchInFlightStartedAt = 0;
       return;
     }
 
@@ -694,8 +744,17 @@ export class GlobalSearchManager {
     // It's a pure in-memory scan — no rate-limit or network concern. runBatch does NOT
     // iterate over navigation; its hardcoded tuple is `photos/people/places/tags`.
     this.sections.navigation = this.runNavigationProvider(text);
+    // The prior cursor may point at a nav/entity item that no longer exists in the new
+    // results. Reconcile synchronously so the highlight doesn't lag the displayed list.
+    this.reconcileCursor();
 
     this.batchInFlight = true;
+    // During the 150ms debounce window, `batchInFlight` is true but no request has
+    // actually fired. We want the component-side 200ms grace check
+    // `now - batchInFlightStartedAt > 200` to be FALSE so the stripe stays hidden.
+    // Setting startedAt to +Infinity makes `now - Infinity = -Infinity`, which is not
+    // greater than 200. runBatch overwrites this with `performance.now()` at fire-time.
+    this._batchInFlightStartedAt = Number.POSITIVE_INFINITY;
     this.debounceTimer = setTimeout(() => this.runBatch(text, this.mode), 150);
   }
 
