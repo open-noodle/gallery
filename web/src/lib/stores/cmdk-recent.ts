@@ -1,0 +1,79 @@
+import type { SearchMode } from '$lib/managers/global-search-manager.svelte';
+
+const STORAGE_KEY = 'cmdk.recent';
+const MAX_ENTRIES = 20;
+
+export type RecentEntry =
+  | { kind: 'query'; id: string; text: string; mode: SearchMode; lastUsed: number }
+  | { kind: 'photo'; id: string; assetId: string; label: string; lastUsed: number }
+  | { kind: 'person'; id: string; personId: string; label: string; thumbnailAssetId?: string; lastUsed: number }
+  | { kind: 'place'; id: string; latitude: number; longitude: number; label: string; lastUsed: number }
+  | { kind: 'tag'; id: string; tagId: string; label: string; lastUsed: number };
+
+let memory: RecentEntry[] | null = null;
+let warnedOnce = false;
+
+function warn(err: unknown) {
+  if (warnedOnce) {
+    return;
+  }
+  warnedOnce = true;
+  // eslint-disable-next-line no-console
+  console.warn('[cmdk.recent]', err);
+}
+
+function rawRead(): RecentEntry[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw === null) {
+      return [];
+    }
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as RecentEntry[]) : [];
+  } catch (err) {
+    warn(err);
+    return [];
+  }
+}
+
+function rawWrite(entries: RecentEntry[]) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+  } catch (err) {
+    warn(err);
+  }
+}
+
+export function getEntries(): RecentEntry[] {
+  if (memory === null) {
+    memory = rawRead();
+  }
+  return [...memory].sort((a, b) => b.lastUsed - a.lastUsed);
+}
+
+export function addEntry(entry: RecentEntry) {
+  if (memory === null) {
+    memory = rawRead();
+  }
+  const deduped = memory.filter((e) => e.id !== entry.id);
+  deduped.push(entry);
+  deduped.sort((a, b) => b.lastUsed - a.lastUsed);
+  memory = deduped.slice(0, MAX_ENTRIES);
+  rawWrite(memory);
+}
+
+export function clearEntries() {
+  memory = [];
+  rawWrite([]);
+}
+
+export function makePlaceId(lat: number, lng: number): string {
+  return `place:${lat.toFixed(4)}:${lng.toFixed(4)}`;
+}
+
+// Test-only escape hatch: reset the in-memory cache so tests get a clean slate
+// without leaking state across `localStorage.clear()`.
+export function __resetForTests() {
+  memory = null;
+  warnedOnce = false;
+}
