@@ -25,19 +25,19 @@
   );
 </script>
 
-<!-- Content-sized preview. We intentionally avoid `h-full` and `flex-col` stretching
-     here: the pane is a flex child of a row with `flex-1` + `max-h-[60vh]`, and
-     without a definite parent height the row grows to fit its content — so an
-     `h-full` chain inside the preview would force the whole palette taller. Letting
-     the preview be content-sized keeps the row within its max-height and the pane's
-     `overflow-y-auto` handles any edge-case overflow. -->
+<!-- Content-sized preview. Avoids `h-full` / `flex-1` chains that would fight the
+     palette row for height. The image is placed inside a fixed-height flex-centered
+     frame so its size is fully definite (no percent-height quirks) and the content
+     below is anchored predictably. -->
 <div class="flex flex-col gap-3 p-5">
-  <img
-    src={thumbUrl}
-    alt={photo.originalFileName ?? ''}
-    class="mx-auto max-h-[200px] max-w-full rounded-md object-contain"
-    loading="lazy"
-  />
+  <div class="flex h-[200px] w-full items-center justify-center overflow-hidden rounded-md bg-subtle/40">
+    <img
+      src={thumbUrl}
+      alt={photo.originalFileName ?? ''}
+      class="max-h-full max-w-full object-contain"
+      loading="lazy"
+    />
+  </div>
   <div class="min-w-0">
     <div class="truncate text-base font-semibold">{photo.originalFileName}</div>
     {#if dateLine}

@@ -37,15 +37,17 @@ describe('photo-preview', () => {
     expect(screen.getByText('plain.jpg')).toBeInTheDocument();
   });
 
-  it('constrains the image via max-h + object-contain without aspect-ratio wrapping', () => {
-    // Regression guard for two related bugs:
-    //   1. `object-cover` cropped portraits and landscapes — replaced with object-contain.
-    //   2. `aspect-[4/3]` + `h-full` caused overflow because percent heights don't
-    //      resolve reliably inside aspect-ratio containers, so h-full fell back to the
-    //      image's natural height and spilled out of the overflow-hidden frame.
-    // The current pattern: a direct `max-h-[200px] max-w-full object-contain` on the
-    // <img> with `mx-auto` for horizontal centering. No wrapper frame, no percent
-    // heights — just natural sizing capped by max-h.
+  it('wraps the image in an explicit-height flex-centered frame (not aspect-ratio)', () => {
+    // Regression guard for the long chain of preview-clipping bugs:
+    //   1. object-cover cropped portraits/landscapes.
+    //   2. aspect-[4/3] + h-full overflowed because percent heights don't resolve
+    //      reliably inside aspect-ratio containers.
+    //   3. A bare img with max-h worked in isolation but the parent flex context
+    //      (h-full cascade + content-sized row) still produced clipping.
+    // The current pattern: a fixed h-[200px] flex-center wrapper with overflow-hidden,
+    // and the img capped at max-h-full / max-w-full with object-contain. Every
+    // dimension is definite (pixels, not percents or aspect ratios) so the image can
+    // never overflow or clip its container regardless of source aspect ratio.
     const { container } = render(PhotoPreview, {
       props: { photo: { id: 'a1', originalFileName: 'plain.jpg' } as never },
     });
@@ -53,11 +55,15 @@ describe('photo-preview', () => {
     expect(img).not.toBeNull();
     expect(img?.className).toContain('object-contain');
     expect(img?.className).not.toContain('object-cover');
-    expect(img?.className).toContain('max-h-[200px]');
+    expect(img?.className).toContain('max-h-full');
     expect(img?.className).toContain('max-w-full');
-    // Explicitly assert the image is NOT wrapped in an aspect-ratio frame — this
-    // prevents anyone from reintroducing the h-full-inside-aspect-ratio pattern.
-    const parent = img?.parentElement as HTMLElement | null;
-    expect(parent?.className).not.toContain('aspect-[4/3]');
+    // Parent frame assertions — fixed 200px height, flex-centered, overflow-hidden.
+    const frame = img?.parentElement as HTMLElement | null;
+    expect(frame?.className).toContain('h-[200px]');
+    expect(frame?.className).toContain('items-center');
+    expect(frame?.className).toContain('justify-center');
+    expect(frame?.className).toContain('overflow-hidden');
+    // Explicitly guard against the earlier aspect-ratio approach.
+    expect(frame?.className).not.toContain('aspect-[4/3]');
   });
 });
