@@ -25,14 +25,13 @@
   );
 </script>
 
-<div class="flex h-full flex-col gap-3 p-5">
-  <!-- Cap the image via `max-h` directly on the <img>. We intentionally avoid the
-       `aspect-ratio` + `h-full` pattern: percent heights require a definite parent
-       height, and `aspect-ratio` isn't always considered definite for that resolution,
-       so `h-full` would collapse to the image's natural height and overflow an
-       `overflow-hidden` container. `max-h-[200px] max-w-full object-contain` keeps
-       the natural aspect intact, caps the image at 200px tall within the pane width,
-       and centers it horizontally via `mx-auto`. -->
+<!-- Content-sized preview. We intentionally avoid `h-full` and `flex-col` stretching
+     here: the pane is a flex child of a row with `flex-1` + `max-h-[60vh]`, and
+     without a definite parent height the row grows to fit its content — so an
+     `h-full` chain inside the preview would force the whole palette taller. Letting
+     the preview be content-sized keeps the row within its max-height and the pane's
+     `overflow-y-auto` handles any edge-case overflow. -->
+<div class="flex flex-col gap-3 p-5">
   <img
     src={thumbUrl}
     alt={photo.originalFileName ?? ''}
@@ -48,7 +47,7 @@
       <div class="truncate text-xs font-normal text-gray-500 dark:text-gray-400">{cameraLine}</div>
     {/if}
   </div>
-  <div class="mt-auto flex gap-2">
+  <div class="flex gap-2">
     <Button variant="ghost" size="small" onclick={() => goto(`/photos/${photo.id}`)}>
       {$t('cmdk_open')}
     </Button>

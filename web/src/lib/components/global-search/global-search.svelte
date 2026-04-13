@@ -220,8 +220,16 @@
             ></div>
           {/if}
 
-          <div class="flex min-h-[420px] max-h-[60vh] flex-1">
-            <div class="flex flex-1 flex-col {showPreview ? 'border-e border-gray-200 dark:border-gray-700' : ''}">
+          <!-- Explicit fixed height instead of flex-1 + max-h. The flex-1 approach
+               relied on the parent (Command.Root / ModalBody) having a definite
+               height, which it doesn't — so the row grew to its content (the full
+               results list), the preview pane stretched to match, and the whole
+               palette ballooned well past 60vh. A fixed height (`h-[520px]`) with
+               `max-h-[80vh]` as a clamp for small viewports makes both columns
+               definite-sized so Command.List's `overflow-y-auto` actually scrolls
+               internally, and the preview pane is bounded by its column's height. -->
+          <div class="flex h-[520px] max-h-[80vh] min-h-0">
+            <div class="flex min-h-0 flex-1 flex-col {showPreview ? 'border-e border-gray-200 dark:border-gray-700' : ''}">
               {#if manager.mode === 'smart' && !manager.mlHealthy && inputValue.trim() !== ''}
                 <div class="mx-3 mt-3 rounded-md bg-subtle/60 px-3 py-2 text-xs">
                   {$t('cmdk_smart_unavailable')}
@@ -309,7 +317,7 @@
               </Command.List>
             </div>
             {#if showPreview}
-              <div data-cmdk-preview class="w-[280px] shrink-0 overflow-y-auto">
+              <div data-cmdk-preview class="w-[280px] shrink-0 overflow-y-auto min-h-0">
                 <GlobalSearchPreview activeItem={manager.getActiveItem()} />
               </div>
             {/if}

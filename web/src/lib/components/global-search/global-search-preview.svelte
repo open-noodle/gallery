@@ -20,9 +20,12 @@
 </script>
 
 {#key previewKey}
-  <div in:fade={{ duration: 120 }} class="h-full">
+  <div in:fade={{ duration: 120 }}>
     {#if activeItem === null}
-      <div class="flex h-full flex-col items-center justify-center gap-3 px-8 text-center">
+      <!-- Empty state still needs to fill the pane so the logo is centered vertically.
+           Using `h-full` here is safe because there's no tall content fighting for
+           height — the pane's flex-stretched size is the logo's target. -->
+      <div class="flex h-full min-h-[360px] flex-col items-center justify-center gap-3 px-8 text-center">
         <Logo variant="icon" size="giant" class="opacity-10" />
         <span class="text-sm text-gray-500 opacity-50 dark:text-gray-400">
           {$t('cmdk_nothing_to_preview')}

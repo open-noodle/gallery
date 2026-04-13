@@ -51,7 +51,7 @@
   const subtitle = $derived([place.admin1name, place.admin2name].filter(Boolean).join(' · '));
 </script>
 
-<div class="flex h-full flex-col gap-3 p-5">
+<div class="flex flex-col gap-3 p-5">
   <div class="flex items-center gap-2">
     <Icon icon={mdiMapMarker} size="1.5em" class="text-gray-500 dark:text-gray-400" />
     <div class="min-w-0 flex-1">
