@@ -27,7 +27,7 @@
   }
 </script>
 
-{#if status.status !== 'idle'}
+{#if status.status !== 'idle' && status.status !== 'empty'}
   <Command.Group class="mb-4">
     <Command.GroupHeading
       class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400"
