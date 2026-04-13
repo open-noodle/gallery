@@ -377,10 +377,22 @@ jobs:
           sources=$(printf "${IMAGE}@sha256:%s " *)
           docker buildx imagetools create ${tags} ${sources}
 
+  build-mobile:
+    name: Build Mobile
+    if: needs.version.outputs.skip != 'true'
+    needs: version
+    permissions:
+      contents: read
+    uses: ./.github/workflows/gallery-build-mobile.yml
+    with:
+      environment: production
+      version: ${{ needs.version.outputs.version }}
+    secrets: inherit
+
   tag:
     name: Create Git Tag
     if: needs.version.outputs.skip != 'true'
-    needs: [version, merge-server, merge-ml]
+    needs: [version, merge-server, merge-ml, build-mobile]
     runs-on: ubuntu-latest
     permissions:
       contents: write
