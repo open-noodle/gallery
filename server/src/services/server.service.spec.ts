@@ -628,7 +628,7 @@ describe(ServerService.name, () => {
       expect(results.every((r: { smartSearchHealthy: boolean }) => r.smartSearchHealthy === true)).toBe(true);
     });
 
-    it('stale probe result does not overwrite a fresher cached value', async () => {
+    it('second call within TTL returns the cached value without re-probing', async () => {
       mocks.machineLearning.ping.mockResolvedValueOnce({ ok: true, contentType: 'application/json' });
       await sut.getMlHealth();
       mocks.machineLearning.ping.mockResolvedValueOnce({ ok: false, contentType: null });
