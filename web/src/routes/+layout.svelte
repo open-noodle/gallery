@@ -1,7 +1,10 @@
 <script lang="ts">
   import { afterNavigate, beforeNavigate, goto } from '$app/navigation';
   import { page } from '$app/state';
-  import { shortcut } from '$lib/actions/shortcut';
+  import { shortcut, shortcuts } from '$lib/actions/shortcut';
+  import GlobalSearch from '$lib/components/global-search/global-search.svelte';
+  import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
+  import { globalSearchManager, type SearchMode } from '$lib/managers/global-search-manager.svelte';
   import DownloadPanel from '$lib/components/asset-viewer/download-panel.svelte';
   import ErrorLayout from '$lib/components/layouts/ErrorLayout.svelte';
   import OnEvents from '$lib/components/OnEvents.svelte';
@@ -236,6 +239,27 @@
     shortcut: { ctrl: true, shift: true, key: 'm' },
     onShortcut: () => copyToClipboard(getMyImmichLink().toString()),
   }}
+  use:shortcuts={[
+    {
+      shortcut: { ctrl: true, key: 'k' },
+      onShortcut: () => {
+        if (featureFlagsManager.value.search) {
+          globalSearchManager.toggle();
+        }
+      },
+    },
+    {
+      shortcut: { ctrl: true, key: '/' },
+      onShortcut: () => {
+        if (!globalSearchManager.isOpen) {
+          return;
+        }
+        const order: SearchMode[] = ['smart', 'metadata', 'description', 'ocr'];
+        const next = order[(order.indexOf(globalSearchManager.mode) + 1) % order.length];
+        globalSearchManager.setMode(next);
+      },
+    },
+  ]}
 />
 
 <TooltipProvider>
@@ -251,4 +275,7 @@
 
   <DownloadPanel />
   <UploadPanel />
+  {#if globalSearchManager.isOpen}
+    <GlobalSearch manager={globalSearchManager} />
+  {/if}
 </TooltipProvider>

@@ -583,3 +583,5 @@ export class GlobalSearchManager {
     return { photos, people, places, tags };
   }
 }
+
+export const globalSearchManager = new GlobalSearchManager();

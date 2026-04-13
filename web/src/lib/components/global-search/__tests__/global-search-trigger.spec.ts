@@ -1,0 +1,57 @@
+import { render, screen } from '@testing-library/svelte';
+import userEvent from '@testing-library/user-event';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+// Hoisted mutable feature-flag object so tests can flip `.search` between runs.
+// Must use vi.hoisted so the reference inside vi.mock's factory is resolvable —
+// vi.mock is itself hoisted above imports.
+const { mockFlags } = vi.hoisted(() => ({ mockFlags: { value: { search: true } } }));
+vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({
+  featureFlagsManager: mockFlags,
+}));
+
+vi.mock('@immich/sdk', async () => {
+  const actual = await vi.importActual<typeof import('@immich/sdk')>('@immich/sdk');
+  return {
+    ...actual,
+    searchSmart: vi.fn().mockResolvedValue({ assets: { items: [], nextPage: null } }),
+    searchAssets: vi.fn().mockResolvedValue({ assets: { items: [], nextPage: null } }),
+    searchPerson: vi.fn().mockResolvedValue([]),
+    searchPlaces: vi.fn().mockResolvedValue([]),
+    getAllTags: vi.fn().mockResolvedValue([]),
+  };
+});
+
+import { globalSearchManager } from '$lib/managers/global-search-manager.svelte';
+import GlobalSearchTrigger from '../global-search-trigger.svelte';
+
+describe('global-search-trigger + feature flag', () => {
+  beforeEach(() => {
+    mockFlags.value.search = true;
+    globalSearchManager.close();
+    vi.clearAllMocks();
+  });
+
+  it('renders a button when flag is on', () => {
+    render(GlobalSearchTrigger);
+    expect(screen.getByRole('button')).toBeInTheDocument();
+  });
+
+  it('hides when flag is off', () => {
+    mockFlags.value.search = false;
+    render(GlobalSearchTrigger);
+    expect(screen.queryByRole('button')).toBeNull();
+  });
+
+  it('clicking opens the global palette', async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    render(GlobalSearchTrigger);
+    await user.click(screen.getByRole('button'));
+    expect(globalSearchManager.isOpen).toBe(true);
+  });
+
+  it('shows the ⌘K keybind chip', () => {
+    render(GlobalSearchTrigger);
+    expect(screen.getByText('⌘K')).toBeInTheDocument();
+  });
+});

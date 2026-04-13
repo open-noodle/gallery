@@ -6,7 +6,7 @@
   import { page } from '$app/state';
   import { clickOutside } from '$lib/actions/click-outside';
   import NotificationPanel from '$lib/components/shared-components/navigation-bar/notification-panel.svelte';
-  import SearchBar from '$lib/components/shared-components/search-bar/search-bar.svelte';
+  import GlobalSearchTrigger from '$lib/components/global-search/global-search-trigger.svelte';
   import SkipLink from '$lib/elements/SkipLink.svelte';
   import { authManager } from '$lib/managers/auth-manager.svelte';
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
@@ -84,9 +84,7 @@
     </div>
     <div class="flex justify-between gap-4 lg:gap-8 pe-6">
       <div class="hidden w-full max-w-5xl flex-1 tall:ps-0 sm:block">
-        {#if featureFlagsManager.value.search}
-          <SearchBar grayTheme={true} />
-        {/if}
+        <GlobalSearchTrigger />
       </div>
 
       <section class="flex place-items-center justify-end gap-1 md:gap-2 w-full sm:w-auto">
