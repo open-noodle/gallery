@@ -777,8 +777,12 @@ git commit -m "feat(web): static NAVIGATION_ITEMS list for cmdk navigation provi
 ```ts
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { NAVIGATION_ITEMS } from './navigation-items';
+
+// __dirname is not defined in ESM (vitest default). Derive it from import.meta.url.
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 describe('NAVIGATION_ITEMS schema', () => {
   it('has exactly 36 items', () => {
@@ -838,17 +842,8 @@ describe('NAVIGATION_ITEMS schema', () => {
   });
 
   it('drift guard: every systemSettings isOpen key exists in the accordion source', () => {
-    const sourcePath = resolve(
-      __dirname,
-      '..',
-      '..',
-      '..',
-      'src',
-      'routes',
-      'admin',
-      'system-settings',
-      '+page.svelte',
-    );
+    // From web/src/lib/managers/ up 2 dirs → web/src/, then into routes/admin/...
+    const sourcePath = resolve(__dirname, '..', '..', 'routes', 'admin', 'system-settings', '+page.svelte');
     const source = readFileSync(sourcePath, 'utf-8');
     const sourceKeys = new Set([...source.matchAll(/key:\s*'([a-z-]+)'/g)].map((m) => m[1]));
     const ourKeys = NAVIGATION_ITEMS.filter((i) => i.category === 'systemSettings').map((i) =>
@@ -1197,7 +1192,9 @@ git commit -m "feat(web): navigation memo cache + locale subscription"
 
 **Step 1: Write failing tests**
 
-**IMPORTANT:** These tests require the shared `vi.hoisted` mocking patterns from the "Conventions for every task" section. Add these `vi.hoisted` + `vi.mock` blocks at the TOP of `global-search-manager.svelte.spec.ts` (if not already added by an earlier task) — `vi.doMock` inside individual tests does NOT work because `GlobalSearchManager` binds `user` and `featureFlagsManager` at module load:
+**IMPORTANT — shared mocks live in ONE place.** These tests use the `mockUser` and `mockFlags` constants from the shared `vi.hoisted` blocks. Place those blocks at the **very top** of `global-search-manager.svelte.spec.ts`, **above all other imports** (including the import of `GlobalSearchManager` itself). Tasks 11, 12, and 15 (any subsequent task that flips `mockUser.current` or `mockFlags.valueOrUndefined`) reference the same constants — do **NOT** re-declare them per-describe block. Vitest hoists `vi.mock` calls above every import, so the mocks must appear before TS code that touches the mocked modules.
+
+`vi.doMock` inside individual tests does NOT work for this case because `GlobalSearchManager` binds `user` and `featureFlagsManager` at module load:
 
 ```ts
 // Top of file, before the import of GlobalSearchManager
@@ -1618,6 +1615,54 @@ describe('SWR loading rules', () => {
     expect(m.batchInFlight).toBe(false);
   });
 
+  it('stale-batch providers do not deadlock batchInFlight after a new batch supersedes', async () => {
+    // Simulate a provider that ignores abort signals (worst case — mocks that don't
+    // listen to the AbortSignal, or real backends that are slow to cancel).
+    let resolveStalePhotos!: () => void;
+    vi.mocked(searchSmart).mockImplementationOnce(
+      () => new Promise((r) => (resolveStalePhotos = () => r({ assets: { items: [], nextPage: null } } as never))),
+    );
+    const m = new GlobalSearchManager();
+    m.open();
+    m.setQuery('first');
+    await vi.advanceTimersByTimeAsync(200); // runBatch1 fires, stuck on photos
+    expect(m.batchInFlight).toBe(true);
+    // Second query — runBatch2 replaces runBatch1. Uses the default mockResolvedValue
+    // (empty + instant) so runBatch2 settles quickly.
+    m.setQuery('second');
+    await vi.advanceTimersByTimeAsync(200);
+    // runBatch2 fully settled; runBatch1's stale photos still pending. batchInFlight
+    // should be FALSE because the current batch (runBatch2) has no pending providers.
+    expect(m.batchInFlight).toBe(false);
+    // Release the stale photos; the counter must NOT go negative (check-before-decrement
+    // guard in onSettle drops stale settles).
+    resolveStalePhotos();
+    await vi.advanceTimersByTimeAsync(10);
+    expect((m as unknown as { inFlightCounter: number }).inFlightCounter).toBe(0);
+    expect(m.batchInFlight).toBe(false);
+  });
+
+  it('runBatch entry resets inFlightCounter to zero before incrementing per-provider', async () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    // Force a non-zero counter to simulate stale bookkeeping.
+    (m as unknown as { inFlightCounter: number }).inFlightCounter = 99;
+    m.setQuery('beach');
+    await vi.advanceTimersByTimeAsync(200);
+    // After runBatch has started and settled, counter should be 0 — not 99 minus N.
+    expect((m as unknown as { inFlightCounter: number }).inFlightCounter).toBe(0);
+  });
+
+  it('setMode with empty query is a no-op (cold open)', () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    // No setQuery call, query is empty.
+    m.setMode('metadata');
+    expect(m.batchInFlight).toBe(false);
+    expect(m.sections.photos.status).toBe('idle');
+    expect((m as unknown as { inFlightCounter: number }).inFlightCounter).toBe(0);
+  });
+
   it('rapid mode switching does not decrement counter below zero', async () => {
     vi.mocked(searchSmart).mockResolvedValue({ assets: { items: [], nextPage: null } } as never);
     vi.mocked(searchAssets).mockResolvedValue({ assets: { items: [], nextPage: null } } as never);
@@ -1674,7 +1719,7 @@ this.batchInFlight = true;
 this.debounceTimer = setTimeout(() => this.runBatch(text, this.mode), 150);
 ```
 
-Update `runBatch` — set `batchInFlightStartedAt` HERE (at debounce-fire time, not setQuery time) and introduce a counter that clears `batchInFlight` when it reaches zero:
+Update `runBatch` — set `batchInFlightStartedAt` HERE (at debounce-fire time, not setQuery time), **reset the counter at batch entry** (this batch owns the bookkeeping), and **check-before-decrement** so stale providers from superseded batches no-op on settle:
 
 ```ts
 protected runBatch(text: string, mode: SearchMode) {
@@ -1684,6 +1729,12 @@ protected runBatch(text: string, mode: SearchMode) {
   const photosLocal = new AbortController();
   this.batchController = batch;
   this.photosController = photosLocal;
+
+  // Reset the counter — this batch owns the bookkeeping from here on. Any stale
+  // onSettle calls from a prior batch will no-op via the check-below guard. Without
+  // the reset, a stale batch whose providers don't respect AbortSignal could keep
+  // incrementing/decrementing the shared counter and corrupt the state.
+  this.inFlightCounter = 0;
 
   const keys = ['photos', 'people', 'places', 'tags'] as const;
 
@@ -1698,8 +1749,16 @@ protected runBatch(text: string, mode: SearchMode) {
     const signal = AbortSignal.any([...controllers, AbortSignal.timeout(5000)]);
 
     const onSettle = () => {
+      // Check-before-decrement: stale batches' providers no-op. Without this,
+      // a provider that ignores AbortSignal (buggy mock or real slow backend)
+      // could decrement the counter after a new batch has started, deadlocking
+      // batchInFlight at true because the *new* batch's final-settle would find
+      // counter > 0 while nothing meaningful is pending.
+      if (batch !== this.batchController) {
+        return;
+      }
       this.inFlightCounter--;
-      if (this.inFlightCounter === 0 && batch === this.batchController) {
+      if (this.inFlightCounter === 0) {
         this.batchInFlight = false;
       }
     };
@@ -1708,7 +1767,7 @@ protected runBatch(text: string, mode: SearchMode) {
       .then(() => provider.run(text, mode, signal))
       .then((result) => {
         if (batch !== this.batchController) {
-          onSettle();
+          // Stale batch: don't update sections. onSettle no-ops per guard above.
           return;
         }
         this.sections[key] = result;
@@ -1720,7 +1779,6 @@ protected runBatch(text: string, mode: SearchMode) {
       })
       .catch((err: unknown) => {
         if (batch !== this.batchController) {
-          onSettle();
           return;
         }
         if (err instanceof Error && err.name === 'AbortError') {
@@ -1857,8 +1915,7 @@ describe('activateRecent stale admin purge', () => {
   });
 
   it('admin user: navigates normally and does NOT purge', () => {
-    // Mock admin user
-    // ...
+    mockUser.current = { isAdmin: true };
     const m = new GlobalSearchManager();
     m.open();
     addEntry({
@@ -1884,7 +1941,7 @@ describe('activateRecent stale admin purge', () => {
   });
 
   it('non-admin user: warns, purges entry, does NOT navigate', () => {
-    // Mock non-admin user
+    mockUser.current = { isAdmin: false };
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const m = new GlobalSearchManager();
     m.open();
@@ -1911,6 +1968,36 @@ describe('activateRecent stale admin purge', () => {
     expect(getEntries().some((e) => e.id === 'nav:admin:users')).toBe(false);
     expect(m.isOpen).toBe(false);
     warnSpy.mockRestore();
+  });
+
+  it('purge mechanism: activateRecent calls removeEntry (not some other clearing path)', async () => {
+    // Spy on the actual removeEntry export to pin the contract — guards against a
+    // future refactor that "purges" stale entries via clearEntries() or similar.
+    const recentModule = await import('$lib/stores/cmdk-recent');
+    const removeSpy = vi.spyOn(recentModule, 'removeEntry');
+    mockUser.current = { isAdmin: false };
+    const m = new GlobalSearchManager();
+    m.open();
+    addEntry({
+      kind: 'navigate',
+      id: 'nav:admin:users',
+      route: '/admin/users',
+      labelKey: 'users',
+      icon: 'x',
+      adminOnly: true,
+      lastUsed: 1,
+    });
+    m.activateRecent({
+      kind: 'navigate',
+      id: 'nav:admin:users',
+      route: '/admin/users',
+      labelKey: 'users',
+      icon: 'x',
+      adminOnly: true,
+      lastUsed: 1,
+    });
+    expect(removeSpy).toHaveBeenCalledWith('nav:admin:users');
+    removeSpy.mockRestore();
   });
 });
 ```
@@ -2421,6 +2508,8 @@ Add the progress stripe + nav sections mount + recent filter. Relevant additions
 
 **Note:** the setTimeout pattern above does not read `batchInFlightStartedAt` at all — the 200 ms grace is encoded purely as a timer. Task 11 still exposes `batchInFlightStartedAt` via a public getter, but this component no longer depends on it. The getter remains for future diagnostic use and for any test that wants to assert the timing invariant.
 
+**Note on rapid batch cycles:** If `batchInFlight` flips `true → false → true` in under 200 ms (e.g. the user is typing fast, each batch settles quickly), the `$effect` cleanup fires on each `false` transition, clearing the pending timer and resetting `stripeArmed`. The next `true` transition starts a fresh 200 ms timer. Practical effect: **the stripe only appears when a single batch takes > 200 ms to settle**, which is exactly the intent — fast sessions never see a stripe at all. This is desirable behavior, not a bug.
+
 Add to `web/src/app.css`:
 
 ```css
@@ -2527,6 +2616,16 @@ git commit -m "feat(web): disable @immich/ui palette; reclaim Ctrl+K, re-registe
 **Files:**
 
 - Modify: `e2e/src/specs/web/global-search.e2e-spec.ts`
+
+**Step 0: Verify e2e helpers exist**
+
+Before writing the test bodies, grep `e2e/src/utils.ts` for the helpers used below — adapt the call sites if any signature differs:
+
+```bash
+grep -n "userSetup\|setAuthCookies\|adminSetup" e2e/src/utils.ts
+```
+
+Expected: `userSetup` takes `(accessToken: string, dto: { email: string; password: string; name: string })` and returns a `LoginResponseDto`. `setAuthCookies` takes `(context, accessToken)`. If either differs, swap the test calls accordingly. The e2e file already uses these helpers in earlier tests in this branch, so the pattern is proven.
 
 **Step 1: Append tests**
 
