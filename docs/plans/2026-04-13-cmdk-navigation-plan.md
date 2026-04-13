@@ -67,6 +67,8 @@
 
   Tests then flip `mockUser.current = { isAdmin: false }` before constructing a new manager. This pattern is proven in `web/src/lib/components/global-search/__tests__/global-search-trigger.spec.ts` for the `featureFlagsManager` case.
 
+  **CRITICAL — set mock state BEFORE mounting components.** The mock's `subscribe` callback fires once with the current value at subscribe time and does NOT re-emit when `mockUser.current` is later reassigned. Imperative `get(user)` reads (used in `runNavigationProvider`) work correctly because they re-subscribe each call, but Svelte component reactive subscriptions (`$user` inside `.svelte` files) cache the value at mount time. **Component tests that need a non-default user state must assign `mockUser.current = { isAdmin: false }` BEFORE the `render(Component, ...)` call.** Same constraint applies to `mockFlags.valueOrUndefined` and `mockI18nLocale.current`.
+
 - **Feature flags mocking pattern (shared).** Same rule — use `vi.hoisted` for mutable mock state:
 
   ```ts
@@ -1088,16 +1090,38 @@ describe('navigation memo cache', () => {
   });
 
   it('handles a null locale gracefully (svelte-i18n before init)', () => {
-    // The `get(i18nLocale) ?? 'en'` fallback handles this. Verify no throw and cache still built.
-    // Implementation-side: if `get(locale)` ever returns null/undefined, the cache is keyed under 'en'.
+    // Set the mocked locale to null — simulates svelte-i18n's pre-init state.
+    // The `get(i18nLocale) ?? 'en'` fallback in getNavigationSearchStrings should
+    // build the cache under the 'en' key without throwing.
+    mockI18nLocale.current = null;
     const m = new GlobalSearchManager();
-    // Replace the private locale getter with one that returns null.
-    const result = (
+    const cache = (
       m as unknown as { getNavigationSearchStrings: () => Map<string, string> }
     ).getNavigationSearchStrings();
-    expect(() => result).not.toThrow();
-    expect(result.size).toBeGreaterThan(0);
+    expect(cache.size).toBe(36);
+    // Reset for subsequent tests in the file.
+    mockI18nLocale.current = 'en';
   });
+});
+```
+
+**Add a third hoisted mock block** alongside `mockUser` and `mockFlags` at the top of the spec file. This mocks ONLY the `locale` store — `t` stays as the real implementation so existing translation calls continue to work via the `fallbackLocale: 'dev'` setup:
+
+```ts
+const { mockI18nLocale } = vi.hoisted(() => ({
+  mockI18nLocale: { current: 'en' as string | null },
+}));
+vi.mock('svelte-i18n', async (orig) => {
+  const actual = await orig<typeof import('svelte-i18n')>();
+  return {
+    ...actual,
+    locale: {
+      subscribe: (run: (v: string | null) => void) => {
+        run(mockI18nLocale.current);
+        return () => {};
+      },
+    },
+  };
 });
 ```
 
@@ -1286,9 +1310,15 @@ describe('runNavigationProvider', () => {
     }
   });
 
-  it('hyphenated query matches (auto-class → Auto-Classification)', () => {
+  it('hyphenated query is tolerated by computeCommandScore (key fallback locale)', () => {
+    // Test setup uses svelte-i18n with `fallbackLocale: 'dev'`, which renders the literal
+    // i18n key for missing translations. The searchable corpus for the classification item
+    // is therefore "admin.classification_settings admin.classification_settings_description".
+    // 'auto-class' would NOT match the key (no 'u' / 't' in the right positions), but
+    // 'class-set' DOES — chars c-l-a-s-s-_-s-e-t all appear in order. The hyphen in the
+    // query is tolerated by bits-ui's tokenizer.
     const m = new GlobalSearchManager();
-    const result = runNav(m, 'auto-class');
+    const result = runNav(m, 'class-set');
     expect(result.status).toBe('ok');
     if (result.status === 'ok') {
       const labels = result.items.map((i) => (i as { labelKey: string }).labelKey);
@@ -1807,7 +1837,7 @@ protected runBatch(text: string, mode: SearchMode) {
 }
 ```
 
-`setMode`'s photos-only re-run must use the same SWR rule AND integrate with the in-flight counter (not flip `batchInFlight` directly) — otherwise a mode switch during an active batch would prematurely drop the progress stripe:
+`setMode`'s photos-only re-run must use the same SWR rule AND integrate with the in-flight counter (not flip `batchInFlight` directly) — otherwise a mode switch during an active batch would prematurely drop the progress stripe. It also needs the SAME stale-batch guard as `runBatch`'s `onSettle`, otherwise a slow setMode re-run that resolves AFTER a new `runBatch` has reset the counter would corrupt the new batch's bookkeeping:
 
 ```ts
 // In setMode's non-debounce branch, replace the current loading flip:
@@ -1815,8 +1845,11 @@ if (this.sections.photos.status !== 'ok') {
   this.sections.photos = { status: 'loading' };
 }
 
-// Join the in-flight counter. If a runBatch is already active, pending > 0 and this
-// call just increments. If no batch is in flight, this starts a single-provider batch.
+// Capture the current batch identity so a stale setMode straggler doesn't decrement
+// a future batch's counter. If no batch is active, capture null.
+const setModeBatch = this.batchController;
+
+// Join the in-flight counter.
 this.inFlightCounter++;
 if (!this.batchInFlight) {
   this.batchInFlight = true;
@@ -1824,17 +1857,31 @@ if (!this.batchInFlight) {
 }
 ```
 
-In the promise `.then`/`.catch` of the setMode re-run:
+In the promise `.then`/`.catch` of the setMode re-run, both paths share the same guard:
 
 ```ts
-// On settle (success OR failure):
-this.inFlightCounter--;
-if (this.inFlightCounter === 0) {
-  this.batchInFlight = false;
-}
+const onSetModeSettle = () => {
+  // Stale-batch guard — same pattern as runBatch.onSettle. If a new runBatch has
+  // taken over the batchController since setMode fired, this stale settle no-ops.
+  if (this.batchController !== setModeBatch) {
+    return;
+  }
+  this.inFlightCounter--;
+  if (this.inFlightCounter === 0) {
+    this.batchInFlight = false;
+  }
+};
+
+// In .then:
+this.sections.photos = result;
+this.onPhotosSettled();
+this.reconcileCursor();
+onSetModeSettle();
+
+// In .catch (AbortError + non-AbortError branches both call onSetModeSettle()).
 ```
 
-This ensures mode switches share bookkeeping with the main batch — `batchInFlight` stays true until everything is settled.
+This ensures mode switches share bookkeeping with the main batch AND tolerate stale settles after a new batch supersedes — `batchInFlight` stays accurate in both directions.
 
 **Step 4: Run — expect pass**
 
