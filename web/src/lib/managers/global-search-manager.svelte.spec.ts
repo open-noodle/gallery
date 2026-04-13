@@ -29,7 +29,8 @@ import { searchSmart, searchAssets, searchPerson, searchPlaces, getAllTags, getM
 import { computeCommandScore } from 'bits-ui';
 import { GlobalSearchManager, type Provider, type ProviderStatus, type SearchMode, type Sections } from './global-search-manager.svelte';
 import { installFakeAbortTimeout, restoreAbortTimeout } from './__tests__/fake-abort-timeout';
-import { __resetForTests as resetRecentStore, getEntries } from '$lib/stores/cmdk-recent';
+import { __resetForTests as resetRecentStore, getEntries, addEntry } from '$lib/stores/cmdk-recent';
+import { themeManager } from '$lib/managers/theme-manager.svelte';
 
 // File-level reset so mock state cannot leak between describe blocks. Tests that
 // mutate these should still set what they want in their own beforeEach, but this
@@ -1692,5 +1693,152 @@ describe('SWR loading rules', () => {
     await vi.advanceTimersByTimeAsync(100);
     expect(m.batchInFlight).toBe(false);
     expect((m as unknown as { inFlightCounter: number }).inFlightCounter).toBe(0);
+  });
+});
+
+describe('activate navigation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    resetRecentStore();
+    mockUser.current = { isAdmin: true };
+    mockFlags.valueOrUndefined = { search: true, map: true, trash: true };
+  });
+
+  const themeItem = {
+    id: 'nav:theme',
+    category: 'actions' as const,
+    labelKey: 'theme',
+    descriptionKey: 'toggle_theme_description',
+    icon: 'x',
+    route: '',
+    adminOnly: false,
+  };
+
+  const classificationItem = {
+    id: 'nav:systemSettings:classification',
+    category: 'systemSettings' as const,
+    labelKey: 'admin.classification_settings',
+    descriptionKey: 'admin.classification_settings_description',
+    icon: 'x',
+    route: '/admin/system-settings?isOpen=classification',
+    adminOnly: true,
+  };
+
+  it('theme toggle: calls toggleTheme and does NOT persist a recent', () => {
+    const toggleSpy = vi.spyOn(themeManager, 'toggleTheme').mockImplementation(() => {});
+    const m = new GlobalSearchManager();
+    m.open();
+    m.activate('nav', themeItem);
+    expect(toggleSpy).toHaveBeenCalled();
+    expect(getEntries().find((e) => e.id === 'nav:theme')).toBeUndefined();
+    toggleSpy.mockRestore();
+  });
+
+  it('theme toggle closes the palette', () => {
+    const toggleSpy = vi.spyOn(themeManager, 'toggleTheme').mockImplementation(() => {});
+    const m = new GlobalSearchManager();
+    m.open();
+    m.activate('nav', themeItem);
+    expect(m.isOpen).toBe(false);
+    toggleSpy.mockRestore();
+  });
+
+  it('system-settings item: goto + persist navigate recent', () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    m.activate('nav', classificationItem);
+    expect(goto).toHaveBeenCalledWith('/admin/system-settings?isOpen=classification');
+    const entries = getEntries();
+    expect(entries[0]).toMatchObject({
+      kind: 'navigate',
+      id: 'nav:systemSettings:classification',
+      route: '/admin/system-settings?isOpen=classification',
+      adminOnly: true,
+    });
+  });
+
+  it('user-page item: goto + persist navigate recent with adminOnly:false', () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    m.activate('nav', {
+      id: 'nav:userPages:photos',
+      category: 'userPages' as const,
+      labelKey: 'photos',
+      descriptionKey: 'cmdk_nav_photos_description',
+      icon: 'x',
+      route: '/photos',
+      adminOnly: false,
+    });
+    expect(goto).toHaveBeenCalledWith('/photos');
+    expect(getEntries()[0]).toMatchObject({ kind: 'navigate', id: 'nav:userPages:photos', adminOnly: false });
+  });
+
+  it('closes the palette after navigating', () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    m.activate('nav', classificationItem);
+    expect(m.isOpen).toBe(false);
+  });
+});
+
+describe('activateRecent stale admin purge', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    resetRecentStore();
+  });
+
+  const navEntry = {
+    kind: 'navigate' as const,
+    id: 'nav:admin:users',
+    route: '/admin/users',
+    labelKey: 'users',
+    icon: 'x',
+    adminOnly: true,
+    lastUsed: 1,
+  };
+
+  it('admin user: navigates normally and does NOT purge', () => {
+    mockUser.current = { isAdmin: true };
+    const m = new GlobalSearchManager();
+    m.open();
+    addEntry(navEntry);
+    m.activateRecent(navEntry);
+    expect(goto).toHaveBeenCalledWith('/admin/users');
+    expect(getEntries().some((e) => e.id === 'nav:admin:users')).toBe(true);
+  });
+
+  it('non-admin user: warns, purges entry, does NOT navigate', () => {
+    mockUser.current = { isAdmin: false };
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const m = new GlobalSearchManager();
+    m.open();
+    addEntry(navEntry);
+    m.activateRecent(navEntry);
+    expect(warnSpy).toHaveBeenCalled();
+    expect(goto).not.toHaveBeenCalled();
+    expect(getEntries().some((e) => e.id === 'nav:admin:users')).toBe(false);
+    expect(m.isOpen).toBe(false);
+    warnSpy.mockRestore();
+  });
+
+  it('non-admin user navigating to a NON-admin recent entry works normally', () => {
+    mockUser.current = { isAdmin: false };
+    const m = new GlobalSearchManager();
+    m.open();
+    const userPageEntry = {
+      kind: 'navigate' as const,
+      id: 'nav:userPages:photos',
+      route: '/photos',
+      labelKey: 'photos',
+      icon: 'x',
+      adminOnly: false,
+      lastUsed: 1,
+    };
+    addEntry(userPageEntry);
+    m.activateRecent(userPageEntry);
+    expect(goto).toHaveBeenCalledWith('/photos');
+    expect(getEntries().some((e) => e.id === 'nav:userPages:photos')).toBe(true);
   });
 });

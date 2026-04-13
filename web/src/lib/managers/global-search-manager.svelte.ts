@@ -1,7 +1,8 @@
 import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
 import { Route } from '$lib/route';
-import { addEntry, makePlaceId, type RecentEntry } from '$lib/stores/cmdk-recent';
+import { addEntry, makePlaceId, removeEntry, type RecentEntry } from '$lib/stores/cmdk-recent';
+import { themeManager } from '$lib/managers/theme-manager.svelte';
 import {
   getAllTags,
   getMlHealth,
@@ -398,7 +399,7 @@ export class GlobalSearchManager {
     this.activeItemId = null;
   }
 
-  activate(kind: 'photo' | 'person' | 'place' | 'tag', item: unknown) {
+  activate(kind: 'photo' | 'person' | 'place' | 'tag' | 'nav', item: unknown) {
     const now = Date.now();
     switch (kind) {
       case 'photo': {
@@ -451,6 +452,25 @@ export class GlobalSearchManager {
         void goto(Route.search({ tagIds: [t.id] }));
         break;
       }
+      case 'nav': {
+        const n = item as NavigationItem;
+        if (n.category === 'actions' && n.id === 'nav:theme') {
+          // Theme toggle is stateless — not persisted to recents.
+          themeManager.toggleTheme();
+        } else {
+          addEntry({
+            kind: 'navigate',
+            id: n.id,
+            route: n.route,
+            labelKey: n.labelKey,
+            icon: n.icon,
+            adminOnly: n.adminOnly,
+            lastUsed: now,
+          });
+          void goto(n.route);
+        }
+        break;
+      }
     }
     this.close();
   }
@@ -462,6 +482,15 @@ export class GlobalSearchManager {
     if (!isValidRecentEntry(entry)) {
       // eslint-disable-next-line no-console
       console.warn('[cmdk] ignoring corrupt recent entry', entry);
+      this.close();
+      return;
+    }
+    // Admin re-check for stale navigate entries: an admin user may have been
+    // demoted since the recent was saved. Purge the stale entry and close.
+    if (entry.kind === 'navigate' && entry.adminOnly && !(get(user)?.isAdmin ?? false)) {
+      // eslint-disable-next-line no-console
+      console.warn('[cmdk] purging stale admin recent', entry);
+      removeEntry(entry.id);
       this.close();
       return;
     }
@@ -487,6 +516,10 @@ export class GlobalSearchManager {
       }
       case 'tag': {
         void goto(Route.search({ tagIds: [entry.tagId] }));
+        break;
+      }
+      case 'navigate': {
+        void goto(entry.route);
         break;
       }
     }
