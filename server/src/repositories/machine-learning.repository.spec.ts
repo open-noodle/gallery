@@ -347,9 +347,7 @@ describe(MachineLearningRepository.name, () => {
       mockFetch.mockImplementation(
         (_url: URL, init: RequestInit) =>
           new Promise((_resolve, reject) => {
-            init.signal?.addEventListener('abort', () =>
-              reject(Object.assign(new Error('t'), { name: 'AbortError' })),
-            );
+            init.signal?.addEventListener('abort', () => reject(Object.assign(new Error('t'), { name: 'AbortError' })));
           }),
       );
       await expect(sut.ping()).resolves.toEqual({ ok: false, contentType: null });
@@ -403,9 +401,9 @@ describe(MachineLearningRepository.name, () => {
         // Attach the .rejects assertion synchronously before advancing timers so
         // the handler is in place when the fetch promise rejects. Without this,
         // the rejection becomes "unhandled" during vi.advanceTimersByTimeAsync.
-        const assertion = expect(
-          sut.encodeText('hello', { language: 'en', modelName: 'clip' }),
-        ).rejects.toMatchObject({ name: 'AbortError' });
+        const assertion = expect(sut.encodeText('hello', { language: 'en', modelName: 'clip' })).rejects.toMatchObject({
+          name: 'AbortError',
+        });
         await vi.advanceTimersByTimeAsync(15_000);
         await assertion;
       } finally {

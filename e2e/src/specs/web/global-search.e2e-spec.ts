@@ -44,7 +44,10 @@ test.describe('global search palette', () => {
   });
 
   test('clicking the trigger opens the palette', async ({ page }) => {
-    await page.getByRole('button', { name: /search/i }).first().click();
+    await page
+      .getByRole('button', { name: /search/i })
+      .first()
+      .click();
     await expect(page.getByRole('dialog')).toBeVisible();
   });
 
