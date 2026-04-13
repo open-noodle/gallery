@@ -201,30 +201,34 @@ jobs:
           path: mobile/build/app/outputs/flutter-apk/gallery-${{ inputs.version }}.apk
           if-no-files-found: error
 
-      - name: Setup Ruby
-        if: inputs.version != ''
-        uses: ruby/setup-ruby@c515ec17f69368147deb311832da000dd229d338 # v1.297.0
-        with:
-          ruby-version: '3.3'
-          bundler-cache: true
-          working-directory: ./mobile/android/gallery-release
-
-      - name: Write Play Store service account key
-        if: inputs.version != ''
-        working-directory: ./mobile/android/gallery-release
-        env:
-          PLAY_STORE_JSON_KEY: ${{ secrets.PLAY_STORE_JSON_KEY }}
-        run: printf '%s' "$PLAY_STORE_JSON_KEY" > fastlane/play-store-key.json
-
-      - name: Upload to Play Store internal track
-        if: inputs.version != ''
-        working-directory: ./mobile/android/gallery-release
-        run: bundle exec fastlane android internal
-
-      - name: Remove Play Store service account key
-        if: always()
-        working-directory: ./mobile/android/gallery-release
-        run: rm -f fastlane/play-store-key.json
+      # Play Store upload temporarily disabled while the app is in review —
+      # new internal-track builds can't be pushed until Google finishes review.
+      # The AAB artifact is still produced above and the APK is attached to the
+      # GitHub Release, so sideload users remain unblocked.
+      # - name: Setup Ruby
+      #   if: inputs.version != ''
+      #   uses: ruby/setup-ruby@c515ec17f69368147deb311832da000dd229d338 # v1.297.0
+      #   with:
+      #     ruby-version: '3.3'
+      #     bundler-cache: true
+      #     working-directory: ./mobile/android/gallery-release
+      #
+      # - name: Write Play Store service account key
+      #   if: inputs.version != ''
+      #   working-directory: ./mobile/android/gallery-release
+      #   env:
+      #     PLAY_STORE_JSON_KEY: ${{ secrets.PLAY_STORE_JSON_KEY }}
+      #   run: printf '%s' "$PLAY_STORE_JSON_KEY" > fastlane/play-store-key.json
+      #
+      # - name: Upload to Play Store internal track
+      #   if: inputs.version != ''
+      #   working-directory: ./mobile/android/gallery-release
+      #   run: bundle exec fastlane android internal
+      #
+      # - name: Remove Play Store service account key
+      #   if: always()
+      #   working-directory: ./mobile/android/gallery-release
+      #   run: rm -f fastlane/play-store-key.json
 
       - name: Save Gradle Cache
         id: cache-gradle-save
