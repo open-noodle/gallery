@@ -1,4 +1,12 @@
 import { browser } from '$app/environment';
+import {
+  searchAssets,
+  searchPerson,
+  searchPlaces,
+  searchSmart,
+  type MetadataSearchDto,
+  type SmartSearchDto,
+} from '@immich/sdk';
 
 export type SearchMode = 'smart' | 'metadata' | 'description' | 'ocr';
 
@@ -163,17 +171,80 @@ export class GlobalSearchManager {
   }
 
   protected buildProviders(): Record<keyof Sections, Provider> {
-    const stub = (key: keyof Sections, topN: number, minLen: number): Provider => ({
-      key,
-      topN,
-      minQueryLength: minLen,
-      run: async () => ({ status: 'empty' }),
-    });
-    return {
-      photos: stub('photos', 5, 1),
-      people: stub('people', 5, 2),
-      places: stub('places', 3, 2),
-      tags: stub('tags', 5, 2),
+    const photos: Provider = {
+      key: 'photos',
+      topN: 5,
+      minQueryLength: 1,
+      run: async (query, mode, signal) => {
+        try {
+          if (mode === 'smart') {
+            const response = await searchSmart({ smartSearchDto: { query, size: 5 } as SmartSearchDto }, { signal });
+            const items = response.assets.items;
+            return items.length === 0 ? { status: 'empty' } : { status: 'ok', items, total: items.length };
+          }
+          const metadataSearchDto: MetadataSearchDto = {
+            size: 5,
+            ...(mode === 'metadata' ? { originalFileName: query } : {}),
+            ...(mode === 'description' ? { description: query } : {}),
+            ...(mode === 'ocr' ? { ocr: query } : {}),
+          };
+          const response = await searchAssets({ metadataSearchDto }, { signal });
+          const items = response.assets.items;
+          return items.length === 0 ? { status: 'empty' } : { status: 'ok', items, total: items.length };
+        } catch (err: unknown) {
+          if (err instanceof Error && err.name === 'AbortError') {
+            throw err;
+          }
+          return { status: 'error', message: err instanceof Error ? err.message : 'unknown error' };
+        }
+      },
     };
+
+    const people: Provider = {
+      key: 'people',
+      topN: 5,
+      minQueryLength: 2,
+      run: async (query, _mode, signal) => {
+        try {
+          const results = await searchPerson({ name: query, withHidden: false }, { signal });
+          return results.length === 0
+            ? { status: 'empty' }
+            : { status: 'ok', items: results.slice(0, 5), total: results.length };
+        } catch (err: unknown) {
+          if (err instanceof Error && err.name === 'AbortError') {
+            throw err;
+          }
+          return { status: 'error', message: err instanceof Error ? err.message : 'unknown error' };
+        }
+      },
+    };
+
+    const places: Provider = {
+      key: 'places',
+      topN: 3,
+      minQueryLength: 2,
+      run: async (query, _mode, signal) => {
+        try {
+          const results = await searchPlaces({ name: query }, { signal });
+          return results.length === 0
+            ? { status: 'empty' }
+            : { status: 'ok', items: results.slice(0, 3), total: results.length };
+        } catch (err: unknown) {
+          if (err instanceof Error && err.name === 'AbortError') {
+            throw err;
+          }
+          return { status: 'error', message: err instanceof Error ? err.message : 'unknown error' };
+        }
+      },
+    };
+
+    const tagsStub: Provider = {
+      key: 'tags',
+      topN: 5,
+      minQueryLength: 2,
+      run: async () => ({ status: 'empty' }),
+    };
+
+    return { photos, people, places, tags: tagsStub };
   }
 }

@@ -1,6 +1,15 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import { searchSmart, searchAssets, searchPerson, searchPlaces } from '@immich/sdk';
 import { GlobalSearchManager, type Provider, type ProviderStatus, type SearchMode, type Sections } from './global-search-manager.svelte';
 import { installFakeAbortTimeout, restoreAbortTimeout } from './__tests__/fake-abort-timeout';
+
+vi.mock('@immich/sdk', async () => ({
+  ...(await vi.importActual<typeof import('@immich/sdk')>('@immich/sdk')),
+  searchSmart: vi.fn(),
+  searchAssets: vi.fn(),
+  searchPerson: vi.fn(),
+  searchPlaces: vi.fn(),
+}));
 
 describe('GlobalSearchManager (skeleton)', () => {
   let manager: GlobalSearchManager;
@@ -194,5 +203,97 @@ describe('setQuery', () => {
     manager.setQuery('beach');
     await vi.advanceTimersByTimeAsync(200);
     expect(manager.sections.photos).toEqual({ status: 'error', message: 'sync boom' });
+  });
+});
+
+describe('real providers', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.useFakeTimers();
+    installFakeAbortTimeout();
+    vi.mocked(searchSmart).mockResolvedValue({
+      assets: { items: [{ id: 'a' }, { id: 'b' }], nextPage: null },
+    } as unknown as Awaited<ReturnType<typeof searchSmart>>);
+    vi.mocked(searchAssets).mockResolvedValue({
+      assets: { items: [], nextPage: null },
+    } as unknown as Awaited<ReturnType<typeof searchAssets>>);
+    vi.mocked(searchPerson).mockResolvedValue([{ id: 'p1', name: 'Alice' }] as unknown as Awaited<
+      ReturnType<typeof searchPerson>
+    >);
+    vi.mocked(searchPlaces).mockResolvedValue([
+      { name: 'Santa Cruz', latitude: 36.97, longitude: -122.03 },
+    ] as unknown as Awaited<ReturnType<typeof searchPlaces>>);
+  });
+
+  afterEach(() => {
+    restoreAbortTimeout();
+    vi.useRealTimers();
+  });
+
+  it('photos uses searchSmart in smart mode', async () => {
+    const m = new GlobalSearchManager();
+    m.setQuery('beach');
+    await vi.advanceTimersByTimeAsync(200);
+    expect(searchSmart).toHaveBeenCalledOnce();
+    expect(m.sections.photos.status).toBe('ok');
+  });
+
+  it('photos uses searchAssets with originalFileName in metadata mode', async () => {
+    localStorage.setItem('searchQueryType', 'metadata');
+    const m = new GlobalSearchManager();
+    m.setQuery('IMG_0042');
+    await vi.advanceTimersByTimeAsync(200);
+    expect(searchAssets).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadataSearchDto: expect.objectContaining({ originalFileName: 'IMG_0042' }),
+      }),
+      expect.anything(),
+    );
+  });
+
+  it('photos uses searchAssets with description field in description mode', async () => {
+    localStorage.setItem('searchQueryType', 'description');
+    const m = new GlobalSearchManager();
+    m.setQuery('sunset');
+    await vi.advanceTimersByTimeAsync(200);
+    expect(searchAssets).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadataSearchDto: expect.objectContaining({ description: 'sunset' }),
+      }),
+      expect.anything(),
+    );
+  });
+
+  it('photos uses searchAssets with ocr field in ocr mode', async () => {
+    localStorage.setItem('searchQueryType', 'ocr');
+    const m = new GlobalSearchManager();
+    m.setQuery('ACME');
+    await vi.advanceTimersByTimeAsync(200);
+    expect(searchAssets).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadataSearchDto: expect.objectContaining({ ocr: 'ACME' }),
+      }),
+      expect.anything(),
+    );
+  });
+
+  it('people provider calls searchPerson with name and withHidden=false', async () => {
+    const m = new GlobalSearchManager();
+    m.setQuery('alice');
+    await vi.advanceTimersByTimeAsync(200);
+    expect(searchPerson).toHaveBeenCalledWith(
+      { name: 'alice', withHidden: false },
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
+  });
+
+  it('places provider calls searchPlaces with name', async () => {
+    const m = new GlobalSearchManager();
+    m.setQuery('santa');
+    await vi.advanceTimersByTimeAsync(200);
+    expect(searchPlaces).toHaveBeenCalledWith(
+      { name: 'santa' },
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
   });
 });
