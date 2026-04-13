@@ -211,6 +211,30 @@ describe('global-search root', () => {
     await vi.waitFor(() => expect(m.activeItemId).toBe('photo:a1'));
   });
 
+  it('arrow keys wrap around at both ends (Command.Root loop=true)', async () => {
+    // ARIA APG's listbox pattern explicitly permits wrapping as an optional behavior,
+    // and wrap is the dominant convention for command palettes (VS Code, Raycast,
+    // Linear, GitHub). bits-ui's `loop` prop enables it. This test pins the behavior
+    // so a future refactor can't silently drop the `loop` attribute.
+    const m = new GlobalSearchManager();
+    installPhotoStub(m, [{ id: 'a1' }, { id: 'a2' }, { id: 'a3' }]);
+    (m as unknown as { runNavigationProvider: (q: string) => { status: 'empty' } }).runNavigationProvider =
+      () => ({ status: 'empty' });
+    m.open();
+    render(GlobalSearch, { props: { manager: m } });
+    await user.type(screen.getByRole('combobox'), 'beach');
+    await vi.waitFor(() => expect(m.activeItemId).toBe('photo:a1'), { timeout: 2000 });
+    // Walk to the last item.
+    await user.keyboard('{End}');
+    await vi.waitFor(() => expect(m.activeItemId).toBe('photo:a3'));
+    // ArrowDown from the last item — should wrap to the first.
+    await user.keyboard('{ArrowDown}');
+    await vi.waitFor(() => expect(m.activeItemId).toBe('photo:a1'));
+    // ArrowUp from the first item — should wrap to the last.
+    await user.keyboard('{ArrowUp}');
+    await vi.waitFor(() => expect(m.activeItemId).toBe('photo:a3'));
+  });
+
   it('renders recent entries when store is non-empty and query is blank', () => {
     addEntry({ kind: 'query', id: 'q:beach', text: 'beach', mode: 'smart', lastUsed: 1 });
     addEntry({ kind: 'photo', id: 'photo:a1', assetId: 'a1', label: 'sunset.jpg', lastUsed: 2 });

@@ -163,6 +163,7 @@
         <Command.Root
           shouldFilter={false}
           vimBindings={false}
+          loop
           bind:value={selectedValue}
           aria-labelledby="global-search-label"
           class="flex flex-col"
