@@ -11,6 +11,11 @@ on:
         options:
           - development
           - production
+      version:
+        description: 'Fork version to stamp and deploy (e.g. v4.48.5). Leave empty for a smoke build with no store upload.'
+        required: false
+        type: string
+        default: ''
   workflow_call:
     inputs:
       ref:
@@ -21,6 +26,11 @@ on:
         required: true
         default: 'development'
         type: string
+      version:
+        description: 'Fork version to stamp (e.g. v4.48.5). When set, the build is stamped with this version and deployed to the stores; when empty, the job runs as a smoke build only.'
+        required: false
+        type: string
+        default: ''
     secrets:
       KEY_JKS:
         required: true
@@ -76,9 +86,12 @@ jobs:
           ref: ${{ inputs.ref || github.sha }}
           persist-credentials: false
           token: ${{ github.token }}
+          fetch-depth: 0
           fetch-tags: true
 
       - uses: ./.github/actions/apply-branding
+        with:
+          version: ${{ inputs.version }}
 
       - name: Create the Keystore
         env:
@@ -132,7 +145,11 @@ jobs:
         working-directory: ./mobile
         run: |
           version_name=$(awk -F'[ +]' '/^version:/ {print $2}' pubspec.yaml)
-          version_code=$(( 1000 + GITHUB_RUN_NUMBER ))
+          # Monotonic, trigger-independent version code: commit count on the
+          # current ref. Must not depend on GITHUB_RUN_NUMBER because this
+          # workflow is invoked from multiple callers (push, workflow_call
+          # from Release Gallery) whose run numbers aren't comparable.
+          version_code=$(git -C .. rev-list --count HEAD)
           echo "version_name=$version_name" >> "$GITHUB_OUTPUT"
           echo "version_code=$version_code" >> "$GITHUB_OUTPUT"
           echo "Building $version_name ($version_code)"
@@ -157,7 +174,7 @@ jobs:
           path: mobile/build/app/outputs/bundle/release/app-release.aab
 
       - name: Setup Ruby
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: inputs.version != ''
         uses: ruby/setup-ruby@c515ec17f69368147deb311832da000dd229d338 # v1.297.0
         with:
           ruby-version: '3.3'
@@ -165,14 +182,14 @@ jobs:
           working-directory: ./mobile/android/gallery-release
 
       - name: Write Play Store service account key
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: inputs.version != ''
         working-directory: ./mobile/android/gallery-release
         env:
           PLAY_STORE_JSON_KEY: ${{ secrets.PLAY_STORE_JSON_KEY }}
         run: printf '%s' "$PLAY_STORE_JSON_KEY" > fastlane/play-store-key.json
 
       - name: Upload to Play Store internal track
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: inputs.version != ''
         working-directory: ./mobile/android/gallery-release
         run: bundle exec fastlane android internal
 
@@ -214,6 +231,8 @@ jobs:
           fetch-tags: true
 
       - uses: ./.github/actions/apply-branding
+        with:
+          version: ${{ inputs.version }}
 
       - name: Setup Flutter SDK
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
@@ -276,7 +295,7 @@ jobs:
           security find-identity -v -p codesigning build.keychain
 
       - name: Build and deploy to TestFlight
-        if: github.ref == 'refs/heads/main'
+        if: inputs.version != ''
         env:
           FASTLANE_TEAM_ID: ${{ secrets.FASTLANE_TEAM_ID }}
           IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
@@ -291,7 +310,7 @@ jobs:
         run: bundle exec fastlane gha_release_prod
 
       - name: Build iOS (no upload)
-        if: github.ref != 'refs/heads/main'
+        if: inputs.version == ''
         working-directory: ./mobile
         run: |
           flutter build ipa --no-codesign
