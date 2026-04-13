@@ -19,6 +19,24 @@ vi.mock('$app/navigation', () => ({
   goto: vi.fn(),
 }));
 
+// Mock ONLY svelte-i18n's `locale` store so tests can control it. The `t` store
+// keeps its real implementation so translation calls resolve via fallbackLocale='dev'.
+const { mockI18nLocale } = vi.hoisted(() => ({
+  mockI18nLocale: { current: 'en' as string | null },
+}));
+vi.mock('svelte-i18n', async (orig) => {
+  const actual = await orig<typeof import('svelte-i18n')>();
+  return {
+    ...actual,
+    locale: {
+      subscribe: (run: (v: string | null) => void) => {
+        run(mockI18nLocale.current);
+        return () => {};
+      },
+    },
+  };
+});
+
 describe('GlobalSearchManager (skeleton)', () => {
   let manager: GlobalSearchManager;
 
@@ -1136,5 +1154,46 @@ describe('navigation section scaffolding', () => {
     m.activeItemId = null;
     m.reconcileCursor();
     expect(m.activeItemId).toBe('nav:theme');
+  });
+});
+
+describe('navigation memo cache', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    mockI18nLocale.current = 'en';
+  });
+
+  it('builds cache on first access for the current locale', () => {
+    const m = new GlobalSearchManager();
+    const cache = (
+      m as unknown as { getNavigationSearchStrings: () => Map<string, string> }
+    ).getNavigationSearchStrings();
+    expect(cache.size).toBe(36);
+    for (const [id, str] of cache) {
+      expect(id.startsWith('nav:')).toBe(true);
+      expect(str.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('reuses the cached table on subsequent calls', () => {
+    const m = new GlobalSearchManager();
+    const a = (
+      m as unknown as { getNavigationSearchStrings: () => Map<string, string> }
+    ).getNavigationSearchStrings();
+    const b = (
+      m as unknown as { getNavigationSearchStrings: () => Map<string, string> }
+    ).getNavigationSearchStrings();
+    expect(a).toBe(b);
+  });
+
+  it('handles a null locale gracefully (svelte-i18n before init)', () => {
+    mockI18nLocale.current = null;
+    const m = new GlobalSearchManager();
+    const cache = (
+      m as unknown as { getNavigationSearchStrings: () => Map<string, string> }
+    ).getNavigationSearchStrings();
+    expect(cache.size).toBe(36);
+    mockI18nLocale.current = 'en';
   });
 });

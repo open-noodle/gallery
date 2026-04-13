@@ -12,7 +12,9 @@ import {
   type MetadataSearchDto,
   type TagResponseDto,
 } from '@immich/sdk';
-import type { NavigationItem } from './navigation-items';
+import { get } from 'svelte/store';
+import { locale as i18nLocale, t, type Translations } from 'svelte-i18n';
+import { NAVIGATION_ITEMS, type NavigationItem } from './navigation-items';
 
 export type SearchMode = 'smart' | 'metadata' | 'description' | 'ocr';
 
@@ -120,6 +122,14 @@ export class GlobalSearchManager {
   private storageListener?: (e: StorageEvent) => void;
   private mlProbed = false;
 
+  /**
+   * Locale-keyed memo cache for navigation item search strings.
+   * Keys: locale code (e.g. 'en'). Values: Map<navItemId, searchableString> where
+   * searchableString is `${label} ${description}`. Rebuilt on locale change.
+   */
+  private navigationSearchCache: Map<string, Map<string, string>> = new Map();
+  private localeUnsubscribe?: () => void;
+
   constructor() {
     this.providers = this.buildProviders();
     if (browser) {
@@ -129,6 +139,13 @@ export class GlobalSearchManager {
         }
       };
       window.addEventListener('storage', this.storageListener);
+
+      // Invalidate the navigation search cache when the locale changes.
+      // The unsubscribe handle is stored on `this.localeUnsubscribe` for test isolation.
+      // In production it is never called — the singleton lives for the tab's lifetime.
+      this.localeUnsubscribe = i18nLocale.subscribe(() => {
+        this.navigationSearchCache.clear();
+      });
     }
   }
 
@@ -136,6 +153,34 @@ export class GlobalSearchManager {
     if (this.storageListener) {
       window.removeEventListener('storage', this.storageListener);
     }
+    if (this.localeUnsubscribe) {
+      this.localeUnsubscribe();
+    }
+  }
+
+  /**
+   * Build or fetch the memoized search-string table for the current locale. Called
+   * synchronously from runNavigationProvider. O(1) cache hit; O(NAVIGATION_ITEMS.length)
+   * rebuild on locale change or first call.
+   */
+  private getNavigationSearchStrings(): Map<string, string> {
+    const currentLocale = (get(i18nLocale) ?? 'en') as string;
+    let table = this.navigationSearchCache.get(currentLocale);
+    if (table) {
+      return table;
+    }
+    const translate = get(t);
+    table = new Map();
+    for (const item of NAVIGATION_ITEMS) {
+      // labelKey/descriptionKey are typed `string` on NavigationItem but every value is a
+      // valid i18n key generated at build time — cast to Translations to satisfy the
+      // Gallery-augmented MessageFormatter signature.
+      const label = translate(item.labelKey as Translations);
+      const description = translate(item.descriptionKey as Translations);
+      table.set(item.id, `${label} ${description}`);
+    }
+    this.navigationSearchCache.set(currentLocale, table);
+    return table;
   }
 
   open() {
