@@ -65,7 +65,10 @@ on:
       - '.github/workflows/gallery-build-mobile.yml'
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  # Literal prefix — when called via workflow_call from Release Gallery,
+  # ${{ github.workflow }} resolves to the caller's name and the group
+  # string collides with the parent run, deadlocking the reusable call.
+  group: gallery-build-mobile-${{ github.ref }}
   cancel-in-progress: true
 
 permissions: {}
