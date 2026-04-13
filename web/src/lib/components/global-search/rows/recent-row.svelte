@@ -12,7 +12,9 @@
 </script>
 
 {#if entry.kind === 'query'}
-  <div class="flex h-[52px] items-center gap-3 rounded-lg px-3 py-2 data-[selected=true]:bg-primary/10">
+  <div
+    class="flex h-[52px] items-center gap-3 rounded-lg px-3 py-2 transition-colors duration-[80ms] ease-out data-[selected=true]:bg-primary/10"
+  >
     <span class="text-sm text-gray-500 dark:text-gray-400" aria-hidden="true">🔍</span>
     <div class="truncate text-sm">{entry.text}</div>
   </div>

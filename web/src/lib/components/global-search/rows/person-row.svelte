@@ -13,7 +13,9 @@
   );
 </script>
 
-<div class="flex h-[52px] items-center gap-3 rounded-lg px-3 py-2 data-[selected=true]:bg-primary/10">
+<div
+  class="flex h-[52px] items-center gap-3 rounded-lg px-3 py-2 transition-colors duration-[80ms] ease-out data-[selected=true]:bg-primary/10"
+>
   {#if thumbUrl}
     <img src={thumbUrl} alt="" class="h-10 w-10 rounded-full object-cover" loading="lazy" />
   {:else}

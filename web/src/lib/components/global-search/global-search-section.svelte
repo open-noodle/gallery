@@ -3,6 +3,7 @@
   import type { Snippet } from 'svelte';
   import { t } from 'svelte-i18n';
   import { Command } from 'bits-ui';
+  import { fade } from 'svelte/transition';
   import Skeleton from '$lib/elements/Skeleton.svelte';
 
   interface Props {
@@ -35,31 +36,37 @@
     </Command.GroupHeading>
     <Command.GroupItems>
       {#if status.status === 'loading'}
-        {#each [0, 1, 2] as i (i)}
-          <div class="mx-3 mb-1">
-            <Skeleton height={52} />
-          </div>
-        {/each}
+        <div in:fade={{ duration: 120 }} out:fade={{ duration: 80 }}>
+          {#each [0, 1, 2] as i (i)}
+            <div class="mx-3 mb-1">
+              <Skeleton height={52} />
+            </div>
+          {/each}
+        </div>
       {:else if status.status === 'ok'}
-        {#each status.items as item (itemKey(item))}
-          <Command.Item value={itemKey(item)} onSelect={() => onActivate(item)}>
-            {@render renderRow(item)}
-          </Command.Item>
-        {/each}
-        {#if onSeeAll && status.total > status.items.length}
-          <button
-            type="button"
-            onclick={onSeeAll}
-            class="mt-1 flex w-full items-center justify-between px-3 py-2 text-xs font-medium text-primary tabular-nums"
-          >
-            <span>{$t('cmdk_see_all', { values: { count: status.total } })}</span>
-            <span aria-hidden="true">→</span>
-          </button>
-        {/if}
+        <div in:fade={{ duration: 120 }} out:fade={{ duration: 80 }}>
+          {#each status.items as item (itemKey(item))}
+            <Command.Item value={itemKey(item)} onSelect={() => onActivate(item)}>
+              {@render renderRow(item)}
+            </Command.Item>
+          {/each}
+          {#if onSeeAll && status.total > status.items.length}
+            <button
+              type="button"
+              onclick={onSeeAll}
+              class="mt-1 flex w-full items-center justify-between px-3 py-2 text-xs font-medium text-primary tabular-nums"
+            >
+              <span>{$t('cmdk_see_all', { values: { count: status.total } })}</span>
+              <span aria-hidden="true">→</span>
+            </button>
+          {/if}
+        </div>
       {:else if status.status === 'timeout'}
-        <div class="px-3 py-2 text-xs text-gray-500 dark:text-gray-400">{$t('cmdk_slow_results')}</div>
+        <div class="px-3 py-2 text-xs text-gray-500 dark:text-gray-400" in:fade={{ duration: 120 }}>
+          {$t('cmdk_slow_results')}
+        </div>
       {:else if status.status === 'error'}
-        <div class="px-3 py-2 text-xs text-gray-500 dark:text-gray-400">
+        <div class="px-3 py-2 text-xs text-gray-500 dark:text-gray-400" in:fade={{ duration: 120 }}>
           {#if status.message === 'tag_cache_too_large'}
             {$t('cmdk_tag_cache_too_large')}
           {:else}
