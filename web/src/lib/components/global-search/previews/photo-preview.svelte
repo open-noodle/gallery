@@ -26,12 +26,18 @@
 </script>
 
 <div class="flex h-full flex-col gap-3 p-5">
-  <img
-    src={thumbUrl}
-    alt={photo.originalFileName ?? ''}
-    class="aspect-[4/3] w-full rounded-md object-cover"
-    loading="lazy"
-  />
+  <!-- Letterbox the image inside a fixed-aspect frame: `object-contain` shows the full
+       image without cropping, `bg-subtle/40` fills the non-image area when the source
+       aspect doesn't match 4:3. Previously we used `object-cover` which cropped both
+       landscape (sides) and portrait (top/bottom) sources. -->
+  <div class="aspect-[4/3] w-full overflow-hidden rounded-md bg-subtle/40">
+    <img
+      src={thumbUrl}
+      alt={photo.originalFileName ?? ''}
+      class="h-full w-full object-contain"
+      loading="lazy"
+    />
+  </div>
   <div class="min-w-0">
     <div class="truncate text-base font-semibold">{photo.originalFileName}</div>
     {#if dateLine}

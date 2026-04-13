@@ -921,6 +921,9 @@ describe('reconcileCursor fallback + getActiveItem edge cases', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    // getActiveItem now consults recents when the query is empty, so stale entries
+    // from prior describes would mask the section-based edge cases this block tests.
+    resetRecentStore();
   });
 
   it('reconcileCursor sets activeItemId to null when all sections are empty', () => {
@@ -2215,5 +2218,202 @@ describe('Batch 4 post-review: route consistency, SWR cursor, debounce-window cl
     m.activateRecent(mapEntry);
     expect(goto).toHaveBeenCalledWith('/map');
     expect(getEntries().some((e) => e.id === 'nav:userPages:map')).toBe(true);
+  });
+});
+
+describe('getActiveItem recent-entry preview lookup (cold open)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    resetRecentStore();
+  });
+
+  it('synthesizes a photo ActiveItem from a photo recent when the query is empty', () => {
+    addEntry({ kind: 'photo', id: 'photo:a1', assetId: 'a1', label: 'sunset.jpg', lastUsed: 1 });
+    const m = new GlobalSearchManager();
+    m.open();
+    m.activeItemId = 'photo:a1';
+    const active = m.getActiveItem();
+    expect(active).not.toBeNull();
+    expect(active?.kind).toBe('photo');
+    if (active?.kind === 'photo') {
+      const data = active.data as { id: string; originalFileName: string };
+      expect(data.id).toBe('a1');
+      expect(data.originalFileName).toBe('sunset.jpg');
+    }
+  });
+
+  it('synthesizes a person ActiveItem from a person recent', () => {
+    addEntry({
+      kind: 'person',
+      id: 'person:p1',
+      personId: 'p1',
+      label: 'Alice',
+      thumbnailAssetId: 'face-1',
+      lastUsed: 1,
+    });
+    const m = new GlobalSearchManager();
+    m.open();
+    m.activeItemId = 'person:p1';
+    const active = m.getActiveItem();
+    expect(active?.kind).toBe('person');
+    if (active?.kind === 'person') {
+      const data = active.data as { id: string; name: string; faceAssetId: string };
+      expect(data.id).toBe('p1');
+      expect(data.name).toBe('Alice');
+      expect(data.faceAssetId).toBe('face-1');
+    }
+  });
+
+  it('synthesizes a place ActiveItem from a place recent', () => {
+    addEntry({
+      kind: 'place',
+      id: 'place:48.8566:2.3522',
+      label: 'Paris',
+      latitude: 48.8566,
+      longitude: 2.3522,
+      lastUsed: 1,
+    });
+    const m = new GlobalSearchManager();
+    m.open();
+    m.activeItemId = 'place:48.8566:2.3522';
+    const active = m.getActiveItem();
+    expect(active?.kind).toBe('place');
+    if (active?.kind === 'place') {
+      const data = active.data as { name: string; latitude: number; longitude: number };
+      expect(data.name).toBe('Paris');
+      expect(data.latitude).toBe(48.8566);
+      expect(data.longitude).toBe(2.3522);
+    }
+  });
+
+  it('synthesizes a tag ActiveItem from a tag recent', () => {
+    addEntry({ kind: 'tag', id: 'tag:t1', tagId: 't1', label: 'vacation', lastUsed: 1 });
+    const m = new GlobalSearchManager();
+    m.open();
+    m.activeItemId = 'tag:t1';
+    const active = m.getActiveItem();
+    expect(active?.kind).toBe('tag');
+    if (active?.kind === 'tag') {
+      const data = active.data as { id: string; name: string };
+      expect(data.id).toBe('t1');
+      expect(data.name).toBe('vacation');
+    }
+  });
+
+  it('returns null for a query-kind recent (no meaningful preview)', () => {
+    addEntry({ kind: 'query', id: 'q:beach', text: 'beach', mode: 'smart', lastUsed: 1 });
+    const m = new GlobalSearchManager();
+    m.open();
+    m.activeItemId = 'q:beach';
+    expect(m.getActiveItem()).toBeNull();
+  });
+
+  it('returns null for a navigate-kind recent (no preview pane for nav items)', () => {
+    addEntry({
+      kind: 'navigate',
+      id: 'nav:userPages:photos',
+      route: '/photos',
+      labelKey: 'photos',
+      icon: 'x',
+      adminOnly: false,
+      lastUsed: 1,
+    });
+    const m = new GlobalSearchManager();
+    m.open();
+    m.activeItemId = 'nav:userPages:photos';
+    expect(m.getActiveItem()).toBeNull();
+  });
+
+  it('activate nav: same-pathname navigation uses a full browser reload, not goto', () => {
+    // When the user is already on /admin/system-settings and picks a different
+    // system-settings accordion, SvelteKit's client-side `goto` only updates query
+    // params without re-running the page component — URL-backed state (e.g.,
+    // SettingAccordionState) stays on its stale initial value. The manager must
+    // detect this case and do a full browser navigation so every component remounts.
+    const originalLocation = globalThis.location;
+    const hrefSetter = vi.fn();
+    const fakeLocation: Record<string, unknown> = {
+      pathname: '/admin/system-settings',
+    };
+    Object.defineProperty(fakeLocation, 'href', {
+      configurable: true,
+      get: () => 'http://localhost/admin/system-settings?isOpen=classification',
+      set: (v: string) => hrefSetter(v),
+    });
+    Object.defineProperty(globalThis, 'location', {
+      configurable: true,
+      value: fakeLocation,
+    });
+    try {
+      const m = new GlobalSearchManager();
+      m.open();
+      m.activate('nav', {
+        id: 'nav:systemSettings:video-transcoding',
+        category: 'systemSettings' as const,
+        labelKey: 'admin.transcoding_settings',
+        descriptionKey: 'admin.transcoding_settings_description',
+        icon: 'x',
+        route: '/admin/system-settings?isOpen=video-transcoding',
+        adminOnly: true,
+      });
+      // Full browser navigation via location.href = route
+      expect(hrefSetter).toHaveBeenCalledWith('/admin/system-settings?isOpen=video-transcoding');
+      // Client-side goto must NOT have fired — that would leave the accordion stale.
+      expect(goto).not.toHaveBeenCalled();
+    } finally {
+      Object.defineProperty(globalThis, 'location', {
+        configurable: true,
+        value: originalLocation,
+      });
+    }
+  });
+
+  it('activate nav: different-pathname navigation uses client-side goto (unchanged)', () => {
+    const originalLocation = globalThis.location;
+    const fakeLocation: Record<string, unknown> = {
+      pathname: '/photos',
+      href: 'http://localhost/photos',
+    };
+    Object.defineProperty(globalThis, 'location', {
+      configurable: true,
+      value: fakeLocation,
+    });
+    try {
+      const m = new GlobalSearchManager();
+      m.open();
+      m.activate('nav', {
+        id: 'nav:systemSettings:video-transcoding',
+        category: 'systemSettings' as const,
+        labelKey: 'admin.transcoding_settings',
+        descriptionKey: 'admin.transcoding_settings_description',
+        icon: 'x',
+        route: '/admin/system-settings?isOpen=video-transcoding',
+        adminOnly: true,
+      });
+      expect(goto).toHaveBeenCalledWith('/admin/system-settings?isOpen=video-transcoding');
+    } finally {
+      Object.defineProperty(globalThis, 'location', {
+        configurable: true,
+        value: originalLocation,
+      });
+    }
+  });
+
+  it('falls through to section lookup when activeItemId does not match any recent', () => {
+    // Empty recents store, activeItemId matches a section item. getActiveItem should
+    // still resolve via the section path (not dead-end at the recent-lookup branch).
+    const m = new GlobalSearchManager();
+    m.activeItemId = 'photo:a1';
+    m.sections = {
+      photos: { status: 'ok', items: [{ id: 'a1', originalFileName: 'x.jpg' } as never], total: 1 },
+      people: { status: 'empty' },
+      places: { status: 'empty' },
+      tags: { status: 'empty' },
+      navigation: { status: 'empty' },
+    };
+    // query is empty but no recent matches — fall-through to section.
+    const active = m.getActiveItem();
+    expect(active?.kind).toBe('photo');
   });
 });

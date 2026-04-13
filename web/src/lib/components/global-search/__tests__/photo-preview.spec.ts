@@ -36,4 +36,22 @@ describe('photo-preview', () => {
     });
     expect(screen.getByText('plain.jpg')).toBeInTheDocument();
   });
+
+  it('letterboxes the image with object-contain (not cropped via object-cover)', () => {
+    // Regression guard: images inside the preview must NOT be cropped to fit 4:3 —
+    // portrait photos would lose their top/bottom and the user sees a "cut off"
+    // preview. Instead, wrap in an aspect-[4/3] container with bg-subtle and use
+    // object-contain so the full image shows, letterboxed when the source aspect
+    // doesn't match.
+    const { container } = render(PhotoPreview, {
+      props: { photo: { id: 'a1', originalFileName: 'plain.jpg' } as never },
+    });
+    const img = container.querySelector('img');
+    expect(img).not.toBeNull();
+    expect(img?.className).toContain('object-contain');
+    expect(img?.className).not.toContain('object-cover');
+    // The aspect-ratio frame is on the parent wrapper, not the image itself.
+    const frame = img?.parentElement as HTMLElement | null;
+    expect(frame?.className).toContain('aspect-[4/3]');
+  });
 });

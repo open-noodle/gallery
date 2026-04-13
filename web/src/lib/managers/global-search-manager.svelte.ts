@@ -1,7 +1,7 @@
 import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
 import { Route } from '$lib/route';
-import { addEntry, makePlaceId, removeEntry, type RecentEntry } from '$lib/stores/cmdk-recent';
+import { addEntry, getEntries, makePlaceId, removeEntry, type RecentEntry } from '$lib/stores/cmdk-recent';
 import { themeManager } from '$lib/managers/theme-manager.svelte';
 import {
   getAllTags,
@@ -313,6 +313,17 @@ export class GlobalSearchManager {
     if (!id) {
       return null;
     }
+    // Empty-query branch: the list is showing recents, not live section results. If
+    // the active id matches a recent entry, synthesize a lightweight preview payload
+    // from its stored fields. Fall through to the section lookup below if no recent
+    // matches — that path is still used by direct-state tests that poke sections with
+    // an empty query.
+    if (this.query.trim() === '') {
+      const entry = getEntries().find((e) => e.id === id);
+      if (entry) {
+        return this.activeItemFromRecent(entry);
+      }
+    }
     // Navigation item IDs are themselves prefixed `nav:...` so the split-on-first-colon
     // trick is inverted: the whole id is the cursor value, and the kind prefix is the
     // string BEFORE the first colon. For nav items, the "kind prefix" is literally `nav`.
@@ -349,6 +360,53 @@ export class GlobalSearchManager {
       return null;
     }
     return { kind: kind as 'photo' | 'person' | 'place' | 'tag', data: match };
+  }
+
+  /**
+   * Build a lightweight ActiveItem from a RecentEntry. Recent entries only store the
+   * minimum fields needed for row rendering (id, label, a thumbnail hint), not the
+   * full API DTO — so the resulting preview payload is intentionally sparse. The per-
+   * kind preview components tolerate missing fields via optional chaining.
+   *
+   *   - photo/person/place/tag → return a `{ kind, data }` pair suitable for their
+   *     existing preview components.
+   *   - query/navigate → no preview (nothing interesting to show beyond the row itself).
+   */
+  private activeItemFromRecent(entry: RecentEntry): ActiveItem | null {
+    switch (entry.kind) {
+      case 'photo': {
+        return {
+          kind: 'photo',
+          data: { id: entry.assetId, originalFileName: entry.label } as unknown,
+        };
+      }
+      case 'person': {
+        return {
+          kind: 'person',
+          data: {
+            id: entry.personId,
+            name: entry.label,
+            faceAssetId: entry.thumbnailAssetId,
+          } as unknown,
+        };
+      }
+      case 'place': {
+        return {
+          kind: 'place',
+          data: { name: entry.label, latitude: entry.latitude, longitude: entry.longitude } as unknown,
+        };
+      }
+      case 'tag': {
+        return {
+          kind: 'tag',
+          data: { id: entry.tagId, name: entry.label } as unknown,
+        };
+      }
+      case 'query':
+      case 'navigate': {
+        return null;
+      }
+    }
   }
 
   private sectionForKind(kind: string): ProviderStatus<unknown> | null {
@@ -403,6 +461,30 @@ export class GlobalSearchManager {
       }
     }
     this.activeItemId = null;
+  }
+
+  /**
+   * Navigate to a NavigationItem route. If the target's pathname matches the current
+   * pathname (only query params differ), SvelteKit's client-side `goto` updates the
+   * URL without re-running the page component — URL-backed component state such as
+   * `SettingAccordionState` in the system-settings page would then be stuck on its
+   * stale initial value. Fall back to a full browser navigation in that case so
+   * every component remounts with the fresh URL and re-reads its query params.
+   */
+  private navigateNav(route: string) {
+    if (!browser) {
+      return;
+    }
+    try {
+      const target = new URL(route, globalThis.location.href);
+      if (target.pathname === globalThis.location.pathname) {
+        globalThis.location.href = route;
+        return;
+      }
+    } catch {
+      // Fall through to goto if URL parsing fails.
+    }
+    void goto(route);
   }
 
   activate(kind: 'photo' | 'person' | 'place' | 'tag' | 'nav', item: unknown) {
@@ -480,7 +562,7 @@ export class GlobalSearchManager {
             adminOnly: n.adminOnly,
             lastUsed: now,
           });
-          void goto(n.route);
+          this.navigateNav(n.route);
         }
         break;
       }
@@ -561,7 +643,7 @@ export class GlobalSearchManager {
         // leave the user stranded on a 404 even though we just validated the entry.
         // liveNavItem is guaranteed set here (unknown-item branch returned early),
         // but fall back to entry.route for defensive robustness.
-        void goto(liveNavItem?.route ?? entry.route);
+        this.navigateNav(liveNavItem?.route ?? entry.route);
         break;
       }
     }

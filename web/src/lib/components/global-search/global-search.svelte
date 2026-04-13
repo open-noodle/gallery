@@ -61,6 +61,22 @@
     return () => cancelAnimationFrame(raf);
   });
 
+  // Reset the preview pane's scroll position whenever the active item changes. The
+  // pane has `overflow-y-auto`, and browser behavior around `scrollIntoView` on
+  // deeply-nested descendants can leave unrelated scrollable ancestors in a non-zero
+  // scroll state, clipping the top of the newly-rendered preview. Forcing scrollTop
+  // = 0 here guarantees each fresh preview starts at the top with its own padding
+  // intact.
+  $effect(() => {
+    void manager.activeItemId;
+    queueMicrotask(() => {
+      const pane = document.querySelector<HTMLElement>('[data-cmdk-preview]');
+      if (pane) {
+        pane.scrollTop = 0;
+      }
+    });
+  });
+
   $effect(() => {
     if (manager.activeItemId && manager.activeItemId !== selectedValue) {
       selectedValue = manager.activeItemId;
