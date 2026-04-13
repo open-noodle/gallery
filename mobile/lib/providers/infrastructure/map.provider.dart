@@ -17,7 +17,7 @@ final mapServiceProvider = Provider<MapService>(
         : [user.id];
 
     final mapFactory = MapFactory(mapRepository: ref.watch(driftProvider).mapRepository);
-    final mapService = mapFactory.remote(users, ref.watch(mapStateProvider).toOptions());
+    final mapService = mapFactory.remote(users, user.id, ref.watch(mapStateProvider).toOptions());
     return mapService;
   },
   // Empty dependencies to inform the framework that this provider

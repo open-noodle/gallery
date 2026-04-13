@@ -6,6 +6,7 @@ import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/map.model.dart';
 import 'package:immich_mobile/domain/services/map.service.dart';
 import 'package:immich_mobile/infrastructure/repositories/map.repository.drift.dart';
+import 'package:immich_mobile/infrastructure/repositories/viewer_visibility.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 
 @DriftAccessor()
@@ -14,11 +15,11 @@ class MapRepository extends DatabaseAccessor<Drift> with $MapRepositoryMixin {
 
   Drift get _db => attachedDatabase;
 
-  MapQuery remote(List<String> ownerIds, TimelineMapOptions options) => _mapQueryBuilder(
+  MapQuery remote(List<String> userIds, String currentUserId, TimelineMapOptions options) => _mapQueryBuilder(
     assetFilter: (row) {
       Expression<bool> condition =
           row.deletedAt.isNull() &
-          row.ownerId.isIn(ownerIds) &
+          viewerVisibilityPredicate(_db, row, userIds, currentUserId) &
           _db.remoteAssetEntity.visibility.isIn([
             AssetVisibility.timeline.index,
             if (options.includeArchived) AssetVisibility.archive.index,
@@ -63,6 +64,13 @@ class MapRepository extends DatabaseAccessor<Drift> with $MapRepositoryMixin {
     final query = _db.remoteExifEntity.selectOnly()
       ..addColumns([assetId, latitude, longitude])
       ..join([innerJoin(_db.remoteAssetEntity, _db.remoteAssetEntity.id.equalsExp(assetId), useColumns: false)])
+      // NOTE: The 10000-row limit is pre-existing. Under shared-space
+      // visibility, the cap now applies to the combined (owner + partners +
+      // shared-space) set, which on large deployments could silently drop
+      // some of the user's own pins if shared-space pins dominate the
+      // most-recent window. Follow-up ticket should either raise the limit,
+      // rank owner pins first, or paginate properly. Tracked out-of-scope
+      // for the visibility fix.
       ..limit(10000);
 
     if (assetFilter != null) {
