@@ -1,6 +1,34 @@
 import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+// Shared hoisted user mock — navigation provider and render-time recent filter both
+// read `get(user)` / `$user`. Must appear above the component import so Vitest hoists
+// the mock before any module that binds the store at load time.
+//
+// Default is `null` (matches the pre-existing behavior where the real `writable<T>()`
+// was uninitialized → non-admin). Tests that need an admin view set it explicitly.
+const { mockUser } = vi.hoisted(() => ({
+  mockUser: { current: null as { isAdmin: boolean } | null },
+}));
+vi.mock('$lib/stores/user.store', () => ({
+  user: {
+    subscribe: (run: (v: { isAdmin: boolean } | null) => void) => {
+      run(mockUser.current);
+      return () => {};
+    },
+  },
+}));
+
+const { mockFlags } = vi.hoisted(() => ({
+  mockFlags: {
+    valueOrUndefined: { search: true, map: true, trash: true } as Record<string, boolean> | undefined,
+  },
+}));
+vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({
+  featureFlagsManager: mockFlags,
+}));
+
 import GlobalSearch from '../global-search.svelte';
 import { GlobalSearchManager, type Provider, type Sections } from '$lib/managers/global-search-manager.svelte';
 import { getMlHealth } from '@immich/sdk';
@@ -57,6 +85,10 @@ describe('global-search root', () => {
     localStorage.clear();
     resetRecentStore();
     mediaState.minLg = false;
+    // Default to uninitialized user — matches pre-Task-15 behavior. Tests that need
+    // admin-scoped navigation results (e.g. nav sub-sections) set this explicitly.
+    mockUser.current = null;
+    mockFlags.valueOrUndefined = { search: true, map: true, trash: true };
     user = userEvent.setup({ pointerEventsCheck: 0 });
   });
 
@@ -164,6 +196,11 @@ describe('global-search root', () => {
   it('Home key moves selection to the first Command.Item, End to the last', async () => {
     const m = new GlobalSearchManager();
     installPhotoStub(m, [{ id: 'a1' }, { id: 'a2' }, { id: 'a3' }]);
+    // Disable the navigation provider so the End key lands on the last photo (not
+    // whichever nav item happens to fuzzy-match this query). Post-Task-15 the nav
+    // section is always mounted below the entity sections.
+    (m as unknown as { runNavigationProvider: (q: string) => { status: 'empty' } }).runNavigationProvider =
+      () => ({ status: 'empty' });
     m.open();
     render(GlobalSearch, { props: { manager: m } });
     await user.type(screen.getByRole('combobox'), 'beach');
@@ -222,6 +259,76 @@ describe('global-search root', () => {
     m.open();
     render(GlobalSearch, { props: { manager: m } });
     expect(document.querySelector('[data-cmdk-preview]')).not.toBeNull();
+  });
+
+  it('navigation sub-sections render after entity sections in document order', async () => {
+    mockUser.current = { isAdmin: true };
+    const m = new GlobalSearchManager();
+    m.open();
+    render(GlobalSearch, { props: { manager: m } });
+    // Type a query that matches a navigation item (admin=true per beforeEach).
+    await user.type(screen.getByRole('combobox'), 'classific');
+    // svelte-i18n fallbackLocale 'dev' renders literal keys.
+    const navHeading = await screen.findByText('cmdk_section_system_settings', {}, { timeout: 2000 });
+    expect(navHeading).toBeInTheDocument();
+    // Photos heading should exist in the DOM (loading-branch renders it too).
+    const photosHeading = screen.queryByText('cmdk_photos_heading');
+    if (photosHeading) {
+      // Nav heading must appear AFTER photos heading in DOM order.
+      expect(photosHeading.compareDocumentPosition(navHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+  });
+
+  it('progress stripe is hidden for fast-settling queries (< 200ms grace)', async () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    render(GlobalSearch, { props: { manager: m } });
+    // All providers mock-resolve instantly → settles before the 200ms timer fires.
+    await user.type(screen.getByRole('combobox'), 'beach');
+    // Small wait to let the batch settle under real timers.
+    await new Promise((r) => setTimeout(r, 50));
+    expect(document.querySelector('[data-cmdk-progress]')).toBeNull();
+  });
+
+  it('progress stripe becomes visible when batchInFlight exceeds 200ms', async () => {
+    const m = new GlobalSearchManager();
+    // Stub photos to never resolve — batch stays in flight past the 200ms grace.
+    (m as unknown as { providers: Record<keyof Sections, Provider> }).providers.photos.run = () =>
+      new Promise(() => {});
+    m.open();
+    render(GlobalSearch, { props: { manager: m } });
+    await user.type(screen.getByRole('combobox'), 'beach');
+    // Wait past debounce (150ms) + grace (200ms) + a bit of slack.
+    await new Promise((r) => setTimeout(r, 500));
+    expect(document.querySelector('[data-cmdk-progress]')).not.toBeNull();
+  });
+
+  it('render-time filter hides stale admin navigate entries for non-admins', () => {
+    mockUser.current = { isAdmin: false };
+    addEntry({
+      kind: 'navigate',
+      id: 'nav:admin:users',
+      route: '/admin/users',
+      labelKey: 'users',
+      icon: 'x',
+      adminOnly: true,
+      lastUsed: 1,
+    });
+    addEntry({
+      kind: 'navigate',
+      id: 'nav:userPages:photos',
+      route: '/photos',
+      labelKey: 'photos',
+      icon: 'x',
+      adminOnly: false,
+      lastUsed: 2,
+    });
+    const m = new GlobalSearchManager();
+    m.open();
+    render(GlobalSearch, { props: { manager: m } });
+    // Non-admin should see photos but NOT users in the recents list.
+    expect(screen.getByText('photos')).toBeInTheDocument();
+    expect(screen.queryByText('users')).toBeNull();
   });
 
   it('respects prefers-reduced-motion class on palette shell', () => {

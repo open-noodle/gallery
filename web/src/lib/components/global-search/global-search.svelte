@@ -2,8 +2,10 @@
   import { Modal, ModalBody } from '@immich/ui';
   import { Command } from 'bits-ui';
   import { t } from 'svelte-i18n';
+  import { get } from 'svelte/store';
   import type { GlobalSearchManager } from '$lib/managers/global-search-manager.svelte';
   import GlobalSearchSection from './global-search-section.svelte';
+  import GlobalSearchNavigationSections from './global-search-navigation-sections.svelte';
   import PhotoRow from './rows/photo-row.svelte';
   import PersonRow from './rows/person-row.svelte';
   import PlaceRow from './rows/place-row.svelte';
@@ -13,6 +15,7 @@
   import GlobalSearchPreview from './global-search-preview.svelte';
   import { mediaQueryManager } from '$lib/stores/media-query-manager.svelte';
   import { getEntries, type RecentEntry } from '$lib/stores/cmdk-recent';
+  import { user } from '$lib/stores/user.store';
 
   interface Props {
     manager: GlobalSearchManager;
@@ -43,8 +46,44 @@
     }
   });
 
-  const recentEntries = $derived<RecentEntry[]>(inputValue.trim() === '' ? getEntries() : []);
+  // Render-time filter: drop stale admin navigate recents for non-admin users. This
+  // catches the window between a demotion and the next activation of the entry —
+  // activateRecent already handles the activation path, but the recents list itself
+  // must not display unreachable items.
+  const recentEntries = $derived<RecentEntry[]>(
+    (() => {
+      if (inputValue.trim() !== '') {
+        return [];
+      }
+      const isAdmin = get(user)?.isAdmin ?? false;
+      return getEntries().filter((e) => !(e.kind === 'navigate' && e.adminOnly && !isAdmin));
+    })(),
+  );
   const showPreview = $derived(mediaQueryManager.minLg);
+
+  // Progress stripe: only show after a 200ms grace window. A clean setTimeout
+  // pattern — the effect fires on every batchInFlight transition and the cleanup
+  // cancels any pending stripe when the batch settles before the 200ms mark.
+  // Fast batches never flash the stripe because the cleanup runs before the timer.
+  let stripeArmed = $state(false);
+  let stripeTimer: ReturnType<typeof setTimeout> | null = null;
+
+  $effect(() => {
+    if (manager.batchInFlight) {
+      stripeTimer = setTimeout(() => {
+        stripeArmed = true;
+      }, 200);
+      return () => {
+        if (stripeTimer !== null) {
+          clearTimeout(stripeTimer);
+          stripeTimer = null;
+        }
+        stripeArmed = false;
+      };
+    }
+  });
+
+  const showProgressStripe = $derived(stripeArmed && manager.batchInFlight);
 
   function onKeyDown(e: KeyboardEvent) {
     if (e.key === 'Escape') {
@@ -105,6 +144,13 @@
             onkeydown={onKeyDown}
             class="w-full border-b border-gray-200 bg-transparent px-4 py-3 text-sm focus:outline-none dark:border-gray-700"
           />
+          {#if showProgressStripe}
+            <div
+              aria-hidden="true"
+              data-cmdk-progress
+              class="h-0.5 bg-gradient-to-r from-transparent via-primary to-transparent bg-[length:200%_100%] animate-cmdk-shimmer motion-reduce:animate-none"
+            ></div>
+          {/if}
 
           <div class="flex min-h-[420px] max-h-[60vh] flex-1">
             <div class="flex flex-1 flex-col {showPreview ? 'border-e border-gray-200 dark:border-gray-700' : ''}">
@@ -183,6 +229,10 @@
                       <TagRow item={item as never} />
                     {/snippet}
                   </GlobalSearchSection>
+                  <GlobalSearchNavigationSections
+                    status={manager.sections.navigation}
+                    onActivate={(item) => manager.activate('nav', item)}
+                  />
                 {/if}
               </Command.List>
             </div>

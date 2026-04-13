@@ -175,3 +175,17 @@
     @apply bg-subtle rounded-lg;
   }
 }
+
+/* cmdk palette progress stripe — shimmer animation used after the 200ms grace window.
+   The utility `animate-cmdk-shimmer` is referenced directly from global-search.svelte. */
+@keyframes cmdk-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+.animate-cmdk-shimmer {
+  animation: cmdk-shimmer 1.6s linear infinite;
+}
