@@ -6,7 +6,7 @@
   import { t } from 'svelte-i18n';
 </script>
 
-{#if featureFlagsManager.value.search}
+{#if featureFlagsManager.valueOrUndefined?.search}
   <button
     type="button"
     onclick={() => globalSearchManager.open()}

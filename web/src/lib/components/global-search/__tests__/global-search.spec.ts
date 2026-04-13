@@ -3,9 +3,34 @@ import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import GlobalSearch from '../global-search.svelte';
 import { GlobalSearchManager, type Provider, type Sections } from '$lib/managers/global-search-manager.svelte';
+import { getMlHealth } from '@immich/sdk';
 import { __resetForTests as resetRecentStore, addEntry } from '$lib/stores/cmdk-recent';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
+
+// svelte/reactivity's MediaQuery captures matchMedia at module load time — mocking
+// window.matchMedia in a test doesn't retroactively update existing instances.
+// Mock the manager module directly and expose a mutable flag.
+const { mediaState } = vi.hoisted(() => ({ mediaState: { minLg: false } }));
+vi.mock('$lib/stores/media-query-manager.svelte', () => ({
+  mediaQueryManager: {
+    get minLg() {
+      return mediaState.minLg;
+    },
+    get pointerCoarse() {
+      return false;
+    },
+    get maxMd() {
+      return false;
+    },
+    get isFullSidebar() {
+      return true;
+    },
+    get reducedMotion() {
+      return false;
+    },
+  },
+}));
 vi.mock('@immich/sdk', async () => {
   const actual = await vi.importActual<typeof import('@immich/sdk')>('@immich/sdk');
   return {
@@ -15,6 +40,7 @@ vi.mock('@immich/sdk', async () => {
     searchPerson: vi.fn().mockResolvedValue([]),
     searchPlaces: vi.fn().mockResolvedValue([]),
     getAllTags: vi.fn().mockResolvedValue([]),
+    getMlHealth: vi.fn().mockResolvedValue({ smartSearchHealthy: true }),
   };
 });
 
@@ -30,6 +56,7 @@ describe('global-search root', () => {
     vi.clearAllMocks();
     localStorage.clear();
     resetRecentStore();
+    mediaState.minLg = false;
     user = userEvent.setup({ pointerEventsCheck: 0 });
   });
 
@@ -112,9 +139,12 @@ describe('global-search root', () => {
   });
 
   it('ML banner hides when switching to metadata, re-shows when switching back to smart', async () => {
+    vi.mocked(getMlHealth).mockResolvedValueOnce({ smartSearchHealthy: false });
     const m = new GlobalSearchManager();
-    m.mlHealthy = false;
     m.open();
+    // Give the probe a tick to resolve before rendering so mlHealthy flips to false.
+    await Promise.resolve();
+    await Promise.resolve();
     render(GlobalSearch, { props: { manager: m } });
     await user.type(screen.getByRole('combobox'), 'beach');
     // Banner key renders the key text under i18n fallback mode
@@ -179,20 +209,19 @@ describe('global-search root', () => {
   });
 
   it('preview pane is not mounted below 1024 px', () => {
-    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
-      matches: query === '(min-width: 1024px)' ? false : true,
-      media: query,
-      addListener: () => {},
-      removeListener: () => {},
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      dispatchEvent: () => false,
-      onchange: null,
-    }));
+    mediaState.minLg = false;
     const m = new GlobalSearchManager();
     m.open();
     render(GlobalSearch, { props: { manager: m } });
     expect(document.querySelector('[data-cmdk-preview]')).toBeNull();
+  });
+
+  it('preview pane mounts at ≥ 1024 px', () => {
+    mediaState.minLg = true;
+    const m = new GlobalSearchManager();
+    m.open();
+    render(GlobalSearch, { props: { manager: m } });
+    expect(document.querySelector('[data-cmdk-preview]')).not.toBeNull();
   });
 
   it('respects prefers-reduced-motion class on palette shell', () => {

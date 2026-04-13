@@ -243,7 +243,9 @@
     {
       shortcut: { ctrl: true, key: 'k' },
       onShortcut: () => {
-        if (featureFlagsManager.value.search) {
+        // Use valueOrUndefined so the shortcut never throws if it fires before
+        // feature flags have loaded (SSR→hydration race).
+        if (featureFlagsManager.valueOrUndefined?.search) {
           globalSearchManager.toggle();
         }
       },

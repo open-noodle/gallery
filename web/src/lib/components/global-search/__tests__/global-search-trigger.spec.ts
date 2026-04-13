@@ -5,7 +5,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // Hoisted mutable feature-flag object so tests can flip `.search` between runs.
 // Must use vi.hoisted so the reference inside vi.mock's factory is resolvable —
 // vi.mock is itself hoisted above imports.
-const { mockFlags } = vi.hoisted(() => ({ mockFlags: { value: { search: true } } }));
+const { mockFlags } = vi.hoisted(() => ({
+  mockFlags: {
+    value: { search: true },
+    valueOrUndefined: undefined as { search: boolean } | undefined,
+  },
+}));
+mockFlags.valueOrUndefined = mockFlags.value;
 vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({
   featureFlagsManager: mockFlags,
 }));
@@ -28,6 +34,7 @@ import GlobalSearchTrigger from '../global-search-trigger.svelte';
 describe('global-search-trigger + feature flag', () => {
   beforeEach(() => {
     mockFlags.value.search = true;
+    mockFlags.valueOrUndefined = mockFlags.value;
     globalSearchManager.close();
     vi.clearAllMocks();
   });
@@ -39,6 +46,12 @@ describe('global-search-trigger + feature flag', () => {
 
   it('hides when flag is off', () => {
     mockFlags.value.search = false;
+    render(GlobalSearchTrigger);
+    expect(screen.queryByRole('button')).toBeNull();
+  });
+
+  it('hides gracefully when feature flags are not yet initialized', () => {
+    mockFlags.valueOrUndefined = undefined;
     render(GlobalSearchTrigger);
     expect(screen.queryByRole('button')).toBeNull();
   });

@@ -121,69 +121,69 @@
                 </div>
               {/if}
               <Command.List class="flex-1 overflow-y-auto py-2">
-            {#if inputValue.trim() === ''}
-              {#if recentEntries.length > 0}
-                <Command.Group>
-                  <Command.GroupHeading
-                    class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400"
+                {#if inputValue.trim() === ''}
+                  {#if recentEntries.length > 0}
+                    <Command.Group>
+                      <Command.GroupHeading
+                        class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400"
+                      >
+                        {$t('cmdk_recent_heading')}
+                      </Command.GroupHeading>
+                      <Command.GroupItems>
+                        {#each recentEntries as entry (entry.id)}
+                          <Command.Item value={entry.id} onSelect={() => manager.activateRecent(entry)}>
+                            <RecentRow {entry} />
+                          </Command.Item>
+                        {/each}
+                      </Command.GroupItems>
+                    </Command.Group>
+                  {:else}
+                    <div class="p-6 text-center text-[13px] font-normal text-gray-500 dark:text-gray-400">
+                      {$t('cmdk_helper')}
+                    </div>
+                  {/if}
+                {:else}
+                  <GlobalSearchSection
+                    heading={$t('cmdk_photos_heading')}
+                    status={manager.sections.photos}
+                    idPrefix="photo"
+                    onActivate={(item) => manager.activate('photo', item)}
                   >
-                    {$t('cmdk_recent_heading')}
-                  </Command.GroupHeading>
-                  <Command.GroupItems>
-                    {#each recentEntries as entry (entry.id)}
-                      <Command.Item value={entry.id} onSelect={() => manager.activateRecent(entry)}>
-                        <RecentRow {entry} />
-                      </Command.Item>
-                    {/each}
-                  </Command.GroupItems>
-                </Command.Group>
-              {:else}
-                <div class="p-6 text-center text-[13px] font-normal text-gray-500 dark:text-gray-400">
-                  {$t('cmdk_helper')}
-                </div>
-              {/if}
-            {:else}
-              <GlobalSearchSection
-                heading={$t('cmdk_photos_heading')}
-                status={manager.sections.photos}
-                idPrefix="photo"
-                onActivate={(item) => manager.activate('photo', item)}
-              >
-                {#snippet renderRow(item)}
-                  <PhotoRow item={item as never} />
-                {/snippet}
-              </GlobalSearchSection>
-              <GlobalSearchSection
-                heading={$t('cmdk_people_heading')}
-                status={manager.sections.people}
-                idPrefix="person"
-                onActivate={(item) => manager.activate('person', item)}
-              >
-                {#snippet renderRow(item)}
-                  <PersonRow item={item as never} />
-                {/snippet}
-              </GlobalSearchSection>
-              <GlobalSearchSection
-                heading={$t('cmdk_places_heading')}
-                status={manager.sections.places}
-                idPrefix="place"
-                onActivate={(item) => manager.activate('place', item)}
-              >
-                {#snippet renderRow(item)}
-                  <PlaceRow item={item as never} />
-                {/snippet}
-              </GlobalSearchSection>
-              <GlobalSearchSection
-                heading={$t('cmdk_tags_heading')}
-                status={manager.sections.tags}
-                idPrefix="tag"
-                onActivate={(item) => manager.activate('tag', item)}
-              >
-                {#snippet renderRow(item)}
-                  <TagRow item={item as never} />
-                {/snippet}
-              </GlobalSearchSection>
-            {/if}
+                    {#snippet renderRow(item)}
+                      <PhotoRow item={item as never} />
+                    {/snippet}
+                  </GlobalSearchSection>
+                  <GlobalSearchSection
+                    heading={$t('cmdk_people_heading')}
+                    status={manager.sections.people}
+                    idPrefix="person"
+                    onActivate={(item) => manager.activate('person', item)}
+                  >
+                    {#snippet renderRow(item)}
+                      <PersonRow item={item as never} />
+                    {/snippet}
+                  </GlobalSearchSection>
+                  <GlobalSearchSection
+                    heading={$t('cmdk_places_heading')}
+                    status={manager.sections.places}
+                    idPrefix="place"
+                    onActivate={(item) => manager.activate('place', item)}
+                  >
+                    {#snippet renderRow(item)}
+                      <PlaceRow item={item as never} />
+                    {/snippet}
+                  </GlobalSearchSection>
+                  <GlobalSearchSection
+                    heading={$t('cmdk_tags_heading')}
+                    status={manager.sections.tags}
+                    idPrefix="tag"
+                    onActivate={(item) => manager.activate('tag', item)}
+                  >
+                    {#snippet renderRow(item)}
+                      <TagRow item={item as never} />
+                    {/snippet}
+                  </GlobalSearchSection>
+                {/if}
               </Command.List>
             </div>
             {#if showPreview}
