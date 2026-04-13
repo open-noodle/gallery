@@ -1,7 +1,7 @@
-import { render, screen } from '@testing-library/svelte';
-import { describe, it, expect } from 'vitest';
-import NavigationRow from '../rows/navigation-row.svelte';
 import type { NavigationItem } from '$lib/managers/navigation-items';
+import { render, screen } from '@testing-library/svelte';
+import { describe, expect, it } from 'vitest';
+import NavigationRow from '../rows/navigation-row.svelte';
 
 const baseItem: NavigationItem = {
   id: 'nav:systemSettings:classification',

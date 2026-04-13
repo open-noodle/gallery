@@ -1,8 +1,10 @@
 import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
+import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
+import { themeManager } from '$lib/managers/theme-manager.svelte';
 import { Route } from '$lib/route';
 import { addEntry, getEntries, makePlaceId, removeEntry, type RecentEntry } from '$lib/stores/cmdk-recent';
-import { themeManager } from '$lib/managers/theme-manager.svelte';
+import { user } from '$lib/stores/user.store';
 import {
   getAllTags,
   getMlHealth,
@@ -13,11 +15,10 @@ import {
   type MetadataSearchDto,
   type TagResponseDto,
 } from '@immich/sdk';
-import { get } from 'svelte/store';
-import { locale as i18nLocale, t, type Translations } from 'svelte-i18n';
 import { computeCommandScore } from 'bits-ui';
-import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
-import { user } from '$lib/stores/user.store';
+import { locale as i18nLocale, t, type Translations } from 'svelte-i18n';
+import { SvelteMap } from 'svelte/reactivity';
+import { get } from 'svelte/store';
 import { NAVIGATION_ITEMS, type NavigationItem } from './navigation-items';
 
 export type SearchMode = 'smart' | 'metadata' | 'description' | 'ocr';
@@ -153,7 +154,10 @@ export class GlobalSearchManager {
    * Keys: locale code (e.g. 'en'). Values: Map<navItemId, searchableString> where
    * searchableString is `${label} ${description}`. Rebuilt on locale change.
    */
-  private navigationSearchCache: Map<string, Map<string, string>> = new Map();
+  // SvelteMap used per the svelte/prefer-svelte-reactivity lint rule. This is a
+  // non-reactive memoization cache — the reactivity machinery isn't needed here, but
+  // using the Svelte-aware type keeps the rule happy and has negligible overhead.
+  private navigationSearchCache: SvelteMap<string, SvelteMap<string, string>> = new SvelteMap();
   private localeUnsubscribe?: () => void;
 
   constructor() {
@@ -164,7 +168,7 @@ export class GlobalSearchManager {
           this.tagsCache = null;
         }
       };
-      window.addEventListener('storage', this.storageListener);
+      globalThis.addEventListener('storage', this.storageListener);
 
       // Invalidate the navigation search cache when the locale changes.
       // The unsubscribe handle is stored on `this.localeUnsubscribe` for test isolation.
@@ -177,7 +181,7 @@ export class GlobalSearchManager {
 
   destroy() {
     if (this.storageListener) {
-      window.removeEventListener('storage', this.storageListener);
+      globalThis.removeEventListener('storage', this.storageListener);
     }
     if (this.localeUnsubscribe) {
       this.localeUnsubscribe();
@@ -189,14 +193,14 @@ export class GlobalSearchManager {
    * synchronously from runNavigationProvider. O(1) cache hit; O(NAVIGATION_ITEMS.length)
    * rebuild on locale change or first call.
    */
-  private getNavigationSearchStrings(): Map<string, string> {
+  private getNavigationSearchStrings(): SvelteMap<string, string> {
     const currentLocale = (get(i18nLocale) ?? 'en') as string;
-    let table = this.navigationSearchCache.get(currentLocale);
-    if (table) {
-      return table;
+    const cached = this.navigationSearchCache.get(currentLocale);
+    if (cached) {
+      return cached;
     }
     const translate = get(t);
-    table = new Map();
+    const table = new SvelteMap<string, string>();
     for (const item of NAVIGATION_ITEMS) {
       // labelKey/descriptionKey are typed `string` on NavigationItem but every value is a
       // valid i18n key generated at build time — cast to Translations to satisfy the
@@ -476,6 +480,9 @@ export class GlobalSearchManager {
       return;
     }
     try {
+      // Plain URL parsing, not reactive state — the instance is discarded after the
+      // pathname comparison. SvelteURL would be overkill here.
+      // eslint-disable-next-line svelte/prefer-svelte-reactivity
       const target = new URL(route, globalThis.location.href);
       if (target.pathname === globalThis.location.pathname) {
         globalThis.location.href = route;
@@ -549,7 +556,7 @@ export class GlobalSearchManager {
           if (n.id === 'nav:theme') {
             themeManager.toggleTheme();
           } else {
-            // eslint-disable-next-line no-console
+             
             console.warn('[cmdk] unknown action navigation item', n.id);
           }
         } else {
@@ -575,7 +582,7 @@ export class GlobalSearchManager {
     // schema from an older version). Missing the kind-specific id fields would cause
     // goto('/photos/undefined') or similar bad URLs, so bail out silently.
     if (!isValidRecentEntry(entry)) {
-      // eslint-disable-next-line no-console
+       
       console.warn('[cmdk] ignoring corrupt recent entry', entry);
       this.close();
       return;
@@ -593,21 +600,21 @@ export class GlobalSearchManager {
       const isAdmin = get(user)?.isAdmin ?? false;
       const flags = featureFlagsManager.valueOrUndefined;
       if (!liveNavItem) {
-        // eslint-disable-next-line no-console
+         
         console.warn('[cmdk] purging stale recent — unknown nav item', entry.id);
         removeEntry(entry.id);
         this.close();
         return;
       }
       if (liveNavItem.adminOnly && !isAdmin) {
-        // eslint-disable-next-line no-console
+         
         console.warn('[cmdk] purging stale admin recent', entry.id);
         removeEntry(entry.id);
         this.close();
         return;
       }
       if (liveNavItem.featureFlag && !flags?.[liveNavItem.featureFlag]) {
-        // eslint-disable-next-line no-console
+         
         console.warn('[cmdk] purging stale recent — feature flag disabled', entry.id);
         removeEntry(entry.id);
         this.close();
@@ -734,11 +741,11 @@ export class GlobalSearchManager {
         this.reconcileCursor();
         onSetModeSettle();
       })
-      .catch((err: unknown) => {
+      .catch((error: unknown) => {
         if (setModeBatch !== this.batchController) {
           return;
         }
-        if (err instanceof Error && err.name === 'AbortError') {
+        if (error instanceof Error && error.name === 'AbortError') {
           if (signal.aborted && signal.reason instanceof DOMException && signal.reason.name === 'TimeoutError') {
             this.sections.photos = { status: 'timeout' };
             this.onPhotosSettled();
@@ -748,7 +755,7 @@ export class GlobalSearchManager {
         }
         this.sections.photos = {
           status: 'error',
-          message: err instanceof Error ? err.message : 'unknown error',
+          message: error instanceof Error ? error.message : 'unknown error',
         };
         this.onPhotosSettled();
         onSetModeSettle();
@@ -897,11 +904,11 @@ export class GlobalSearchManager {
           this.reconcileCursor();
           onSettle();
         })
-        .catch((err: unknown) => {
+        .catch((error: unknown) => {
           if (batch !== this.batchController) {
             return;
           }
-          if (err instanceof Error && err.name === 'AbortError') {
+          if (error instanceof Error && error.name === 'AbortError') {
             if (signal.aborted && signal.reason instanceof DOMException && signal.reason.name === 'TimeoutError') {
               this.sections[key] = { status: 'timeout' };
               if (key === 'photos') {
@@ -911,7 +918,7 @@ export class GlobalSearchManager {
             onSettle();
             return;
           }
-          const message = err instanceof Error ? err.message : 'unknown error';
+          const message = error instanceof Error ? error.message : 'unknown error';
           this.sections[key] = { status: 'error', message };
           if (key === 'photos') {
             this.onPhotosSettled();
@@ -942,20 +949,20 @@ export class GlobalSearchManager {
         const all = await getAllTags({ signal });
         if (all.length > 20_000) {
           this.tagsDisabled = true;
-          // eslint-disable-next-line no-console
+           
           console.warn('[cmdk] tag cache > 20k, disabling tag provider for session');
           return { status: 'error', message: 'tag_cache_too_large' };
         }
-        if (all.length > 5_000) {
-          // eslint-disable-next-line no-console
+        if (all.length > 5000) {
+           
           console.warn(`[cmdk] tag cache is large (${all.length} entries)`);
         }
         this.tagsCache = all;
-      } catch (err: unknown) {
-        if (err instanceof Error && err.name === 'AbortError') {
-          throw err;
+      } catch (error: unknown) {
+        if (error instanceof Error && error.name === 'AbortError') {
+          throw error;
         }
-        return { status: 'error', message: err instanceof Error ? err.message : 'getAllTags failed' };
+        return { status: 'error', message: error instanceof Error ? error.message : 'getAllTags failed' };
       }
     }
     const q = query.toLowerCase();
@@ -992,11 +999,11 @@ export class GlobalSearchManager {
           const response = await searchAssets({ metadataSearchDto }, { signal });
           const items = response.assets.items;
           return items.length === 0 ? { status: 'empty' } : { status: 'ok', items, total: items.length };
-        } catch (err: unknown) {
-          if (err instanceof Error && err.name === 'AbortError') {
-            throw err;
+        } catch (error: unknown) {
+          if (error instanceof Error && error.name === 'AbortError') {
+            throw error;
           }
-          return { status: 'error', message: err instanceof Error ? err.message : 'unknown error' };
+          return { status: 'error', message: error instanceof Error ? error.message : 'unknown error' };
         }
       },
     };
@@ -1011,11 +1018,11 @@ export class GlobalSearchManager {
           return results.length === 0
             ? { status: 'empty' }
             : { status: 'ok', items: results.slice(0, 5), total: results.length };
-        } catch (err: unknown) {
-          if (err instanceof Error && err.name === 'AbortError') {
-            throw err;
+        } catch (error: unknown) {
+          if (error instanceof Error && error.name === 'AbortError') {
+            throw error;
           }
-          return { status: 'error', message: err instanceof Error ? err.message : 'unknown error' };
+          return { status: 'error', message: error instanceof Error ? error.message : 'unknown error' };
         }
       },
     };
@@ -1030,11 +1037,11 @@ export class GlobalSearchManager {
           return results.length === 0
             ? { status: 'empty' }
             : { status: 'ok', items: results.slice(0, 3), total: results.length };
-        } catch (err: unknown) {
-          if (err instanceof Error && err.name === 'AbortError') {
-            throw err;
+        } catch (error: unknown) {
+          if (error instanceof Error && error.name === 'AbortError') {
+            throw error;
           }
-          return { status: 'error', message: err instanceof Error ? err.message : 'unknown error' };
+          return { status: 'error', message: error instanceof Error ? error.message : 'unknown error' };
         }
       },
     };
@@ -1054,7 +1061,7 @@ export class GlobalSearchManager {
       key: 'navigation',
       topN: 5,
       minQueryLength: 2,
-      run: async () => ({ status: 'empty' }),
+      run: () => Promise.resolve({ status: 'empty' as const }),
     };
 
     return { photos, people, places, tags, navigation: navigationStub };

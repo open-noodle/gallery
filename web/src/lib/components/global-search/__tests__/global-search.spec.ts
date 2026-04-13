@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Shared hoisted user mock — navigation provider and render-time recent filter both
 // read `get(user)` / `$user`. Must appear above the component import so Vitest hoists
@@ -29,10 +29,10 @@ vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({
   featureFlagsManager: mockFlags,
 }));
 
-import GlobalSearch from '../global-search.svelte';
 import { GlobalSearchManager, type Provider, type Sections } from '$lib/managers/global-search-manager.svelte';
+import { addEntry, __resetForTests as resetRecentStore } from '$lib/stores/cmdk-recent';
 import { getMlHealth } from '@immich/sdk';
-import { __resetForTests as resetRecentStore, addEntry } from '$lib/stores/cmdk-recent';
+import GlobalSearch from '../global-search.svelte';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
 
@@ -74,7 +74,7 @@ vi.mock('@immich/sdk', async () => {
 
 function installPhotoStub(m: GlobalSearchManager, items: Array<{ id: string; originalFileName?: string }>) {
   const providers = (m as unknown as { providers: Record<keyof Sections, Provider> }).providers;
-  providers.photos.run = async () => ({ status: 'ok', items, total: items.length });
+  providers.photos.run = () => Promise.resolve({ status: 'ok' as const, items, total: items.length });
 }
 
 describe('global-search root', () => {
@@ -99,7 +99,7 @@ describe('global-search root', () => {
     // Modal provides role="dialog"; the global-search-label span provides the sr-only heading
     // for the nested Command.Root. Assert the dialog mounts and the label span exists.
     expect(screen.getByRole('dialog')).toBeInTheDocument();
-    expect(document.getElementById('global-search-label')).not.toBeNull();
+    expect(document.querySelector('#global-search-label')).not.toBeNull();
   });
 
   it('left column has min-w-0 so flex-1 shrinks below long-filename content', () => {
@@ -111,7 +111,7 @@ describe('global-search root', () => {
     // actually kicks in.
     const m = new GlobalSearchManager();
     m.open();
-    const { container } = render(GlobalSearch, { props: { manager: m } });
+    render(GlobalSearch, { props: { manager: m } });
     // Locate the left column: the first child of the palette's row div that is
     // NOT the preview pane (which has data-cmdk-preview).
     // Modal portals into document.body, not the render container — search the whole document.
@@ -242,8 +242,9 @@ describe('global-search root', () => {
     // Disable the navigation provider so the End key lands on the last photo (not
     // whichever nav item happens to fuzzy-match this query). Post-Task-15 the nav
     // section is always mounted below the entity sections.
-    (m as unknown as { runNavigationProvider: (q: string) => { status: 'empty' } }).runNavigationProvider =
-      () => ({ status: 'empty' });
+    (m as unknown as { runNavigationProvider: (q: string) => { status: 'empty' } }).runNavigationProvider = () => ({
+      status: 'empty',
+    });
     m.open();
     render(GlobalSearch, { props: { manager: m } });
     await user.type(screen.getByRole('combobox'), 'beach');
@@ -264,8 +265,9 @@ describe('global-search root', () => {
     const scrollSpy = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {});
     const m = new GlobalSearchManager();
     installPhotoStub(m, [{ id: 'a1' }, { id: 'a2' }]);
-    (m as unknown as { runNavigationProvider: (q: string) => { status: 'empty' } }).runNavigationProvider =
-      () => ({ status: 'empty' });
+    (m as unknown as { runNavigationProvider: (q: string) => { status: 'empty' } }).runNavigationProvider = () => ({
+      status: 'empty',
+    });
     m.open();
     render(GlobalSearch, { props: { manager: m } });
     await user.type(screen.getByRole('combobox'), 'beach');
@@ -279,11 +281,11 @@ describe('global-search root', () => {
     // whose data-value matches the selected id. bits-ui's own scroll may also have
     // fired earlier in the same microtask — filter to our target.
     const matchingCalls = scrollSpy.mock.calls.filter((_, i) => {
-      const target = scrollSpy.mock.instances[i] as Element | undefined;
+      const target = scrollSpy.mock.instances[i];
       return (
-        target instanceof Element &&
-        target.getAttribute('data-command-item') !== null &&
-        target.getAttribute('data-value') === 'photo:a2'
+        target instanceof HTMLElement &&
+        target.dataset.commandItem !== undefined &&
+        target.dataset.value === 'photo:a2'
       );
     });
     expect(matchingCalls.length).toBeGreaterThan(0);
@@ -297,8 +299,9 @@ describe('global-search root', () => {
     // so a future refactor can't silently drop the `loop` attribute.
     const m = new GlobalSearchManager();
     installPhotoStub(m, [{ id: 'a1' }, { id: 'a2' }, { id: 'a3' }]);
-    (m as unknown as { runNavigationProvider: (q: string) => { status: 'empty' } }).runNavigationProvider =
-      () => ({ status: 'empty' });
+    (m as unknown as { runNavigationProvider: (q: string) => { status: 'empty' } }).runNavigationProvider = () => ({
+      status: 'empty',
+    });
     m.open();
     render(GlobalSearch, { props: { manager: m } });
     await user.type(screen.getByRole('combobox'), 'beach');
@@ -539,7 +542,7 @@ describe('global-search root', () => {
   });
 
   it('respects prefers-reduced-motion class on palette shell', () => {
-    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+    globalThis.matchMedia = vi.fn().mockImplementation((query: string) => ({
       matches: query === '(prefers-reduced-motion: reduce)',
       media: query,
       addListener: () => {},

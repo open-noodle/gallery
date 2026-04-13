@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { getServerFeatures } from '@immich/sdk';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@immich/sdk', async () => {
   const actual = await vi.importActual<typeof import('@immich/sdk')>('@immich/sdk');

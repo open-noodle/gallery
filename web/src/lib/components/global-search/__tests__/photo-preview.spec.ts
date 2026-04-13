@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/svelte';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import PhotoPreview from '../previews/photo-preview.svelte';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));

@@ -1,7 +1,7 @@
-import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { describe, expect, it } from 'vitest';
 import { NAVIGATION_ITEMS } from './navigation-items';
 
 // __dirname is not defined in ESM (vitest default). Derive it from import.meta.url.
@@ -67,7 +67,7 @@ describe('NAVIGATION_ITEMS schema', () => {
   it('drift guard: every systemSettings isOpen key exists in the accordion source', () => {
     // From web/src/lib/managers/ up 2 dirs → web/src/, then into routes/admin/...
     const sourcePath = resolve(here, '..', '..', 'routes', 'admin', 'system-settings', '+page.svelte');
-    const source = readFileSync(sourcePath, 'utf-8');
+    const source = readFileSync(sourcePath, 'utf8');
     const sourceKeys = new Set([...source.matchAll(/key:\s*'([a-z-]+)'/g)].map((m) => m[1]));
     const ourKeys = NAVIGATION_ITEMS.filter((i) => i.category === 'systemSettings').map((i) =>
       i.route.replace('/admin/system-settings?isOpen=', ''),

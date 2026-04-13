@@ -8,8 +8,7 @@
   // Platform-aware hotkey label: ⌘K on Mac / iOS, Ctrl+K everywhere else. csr=true
   // in +layout.ts so `navigator` is always defined client-side; the value never
   // changes mid-session, so read it once at module load.
-  const isMac =
-    typeof navigator !== 'undefined' && /Mac|iPhone|iPod|iPad/.test(navigator.platform);
+  const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPod|iPad/.test(navigator.platform);
   const hotkeyLabel = isMac ? '⌘K' : 'Ctrl+K';
 </script>
 

@@ -1,7 +1,7 @@
-import { render } from '@testing-library/svelte';
-import { describe, it, expect } from 'vitest';
-import CommandRootWrapper from './test-harness/command-root-wrapper.svelte';
 import type { NavigationItem } from '$lib/managers/navigation-items';
+import { render } from '@testing-library/svelte';
+import { describe, expect, it } from 'vitest';
+import CommandRootWrapper from './test-harness/command-root-wrapper.svelte';
 
 function makeItem(category: NavigationItem['category'], id: string): NavigationItem {
   return {
@@ -119,6 +119,6 @@ describe('global-search-navigation-sections', () => {
     });
     const item = container.querySelector('[data-command-item]') as HTMLElement | null;
     expect(item).not.toBeNull();
-    expect(item?.getAttribute('data-value')).toBe('nav:userPages:photos');
+    expect(item?.dataset.value).toBe('nav:userPages:photos');
   });
 });

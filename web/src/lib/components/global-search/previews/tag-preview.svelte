@@ -17,24 +17,26 @@
     const tagId = tag.id;
     photos = [];
     loaded = false;
-    const dwell = setTimeout(async () => {
-      const ctrl = new AbortController();
-      try {
-        const response = await searchAssets(
-          { metadataSearchDto: { tagIds: [tagId], size: 6 } },
-          { signal: ctrl.signal },
-        );
-        if (gen !== generation) {
-          return;
+    const dwell = setTimeout(() => {
+      void (async () => {
+        const ctrl = new AbortController();
+        try {
+          const response = await searchAssets(
+            { metadataSearchDto: { tagIds: [tagId], size: 6 } },
+            { signal: ctrl.signal },
+          );
+          if (gen !== generation) {
+            return;
+          }
+          photos = response.assets.items;
+        } catch {
+          // ignore
+        } finally {
+          if (gen === generation) {
+            loaded = true;
+          }
         }
-        photos = response.assets.items;
-      } catch {
-        // ignore
-      } finally {
-        if (gen === generation) {
-          loaded = true;
-        }
-      }
+      })();
     }, 300);
     return () => clearTimeout(dwell);
   });

@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { addEntry, getEntries, clearEntries, makePlaceId, removeEntry, __resetForTests } from './cmdk-recent';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { __resetForTests, addEntry, clearEntries, getEntries, makePlaceId, removeEntry } from './cmdk-recent';
 
 describe('cmdk-recent', () => {
   beforeEach(() => {
@@ -60,9 +60,7 @@ describe('cmdk-recent', () => {
       throw new Error('SecurityError');
     });
     expect(getEntries()).toEqual([]);
-    expect(() =>
-      addEntry({ kind: 'query', id: 'q:x', text: 'x', mode: 'smart', lastUsed: 1 }),
-    ).not.toThrow();
+    expect(() => addEntry({ kind: 'query', id: 'q:x', text: 'x', mode: 'smart', lastUsed: 1 })).not.toThrow();
     spy.mockRestore();
   });
 
@@ -80,7 +78,7 @@ describe('cmdk-recent', () => {
       'cmdk.recent',
       JSON.stringify([{ kind: 'query', id: 'q:b', text: 'b', mode: 'smart', lastUsed: 2 }]),
     );
-    window.dispatchEvent(new StorageEvent('storage', { key: 'cmdk.recent' }));
+    globalThis.dispatchEvent(new StorageEvent('storage', { key: 'cmdk.recent' }));
     const entries = getEntries();
     expect(entries.map((e) => e.id)).toEqual(['q:b']);
   });
@@ -88,14 +86,14 @@ describe('cmdk-recent', () => {
   it('invalidates cache on storage event with null key (full clear)', () => {
     addEntry({ kind: 'query', id: 'q:a', text: 'a', mode: 'smart', lastUsed: 1 });
     localStorage.clear();
-    window.dispatchEvent(new StorageEvent('storage', { key: null }));
+    globalThis.dispatchEvent(new StorageEvent('storage', { key: null }));
     expect(getEntries()).toEqual([]);
   });
 
   it('ignores storage events for unrelated keys', () => {
     addEntry({ kind: 'query', id: 'q:a', text: 'a', mode: 'smart', lastUsed: 1 });
     // Fire an unrelated key event — in-memory copy should survive.
-    window.dispatchEvent(new StorageEvent('storage', { key: 'some.other.key' }));
+    globalThis.dispatchEvent(new StorageEvent('storage', { key: 'some.other.key' }));
     const entries = getEntries();
     expect(entries.map((e) => e.id)).toEqual(['q:a']);
   });
@@ -182,9 +180,9 @@ describe('removeEntry', () => {
 
 describe('makePlaceId precision', () => {
   it('rounds to 4 decimals so near-identical coords collapse', () => {
-    expect(makePlaceId(48.85664567, 2.35221001)).toBe('place:48.8566:2.3522');
-    expect(makePlaceId(48.85661111, 2.35219999)).toBe('place:48.8566:2.3522');
-    expect(makePlaceId(48.85664567, 2.35221001)).toBe(makePlaceId(48.85661111, 2.35219999));
+    expect(makePlaceId(48.856_645_67, 2.352_210_01)).toBe('place:48.8566:2.3522');
+    expect(makePlaceId(48.856_611_11, 2.352_199_99)).toBe('place:48.8566:2.3522');
+    expect(makePlaceId(48.856_645_67, 2.352_210_01)).toBe(makePlaceId(48.856_611_11, 2.352_199_99));
   });
 
   it('coords far apart produce different keys', () => {

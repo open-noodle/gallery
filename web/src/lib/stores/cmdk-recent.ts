@@ -7,9 +7,10 @@ const MAX_ENTRIES = 20;
 // tab's updates to cmdk.recent drop our in-memory cache and the next read re-fetches
 // from localStorage. Without this, two tabs silently diverge until one of them clears
 // or mutates its own entries.
-if (typeof window !== 'undefined') {
-  window.addEventListener('storage', (e) => {
-    if (e.key === STORAGE_KEY || e.key === null) {
+if (globalThis.window !== undefined) {
+  globalThis.addEventListener('storage', (event) => {
+    const storageEvent = event as StorageEvent;
+    if (storageEvent.key === STORAGE_KEY || storageEvent.key === null) {
       memory = null;
     }
   });
@@ -39,7 +40,7 @@ function warn(err: unknown) {
     return;
   }
   warnedOnce = true;
-  // eslint-disable-next-line no-console
+   
   console.warn('[cmdk.recent]', err);
 }
 
@@ -51,8 +52,8 @@ function rawRead(): RecentEntry[] {
     }
     const parsed: unknown = JSON.parse(raw);
     return Array.isArray(parsed) ? (parsed as RecentEntry[]) : [];
-  } catch (err) {
-    warn(err);
+  } catch (error) {
+    warn(error);
     return [];
   }
 }
@@ -60,8 +61,8 @@ function rawRead(): RecentEntry[] {
 function rawWrite(entries: RecentEntry[]) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
-  } catch (err) {
-    warn(err);
+  } catch (error) {
+    warn(error);
   }
 }
 

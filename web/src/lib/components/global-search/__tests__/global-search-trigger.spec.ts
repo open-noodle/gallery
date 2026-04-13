@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Hoisted mutable feature-flag object so tests can flip `.search` between runs.
 // Must use vi.hoisted so the reference inside vi.mock's factory is resolvable —

@@ -1,6 +1,6 @@
-import { render, screen } from '@testing-library/svelte';
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { searchAssets } from '@immich/sdk';
+import { render, screen } from '@testing-library/svelte';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import PersonPreview from '../previews/person-preview.svelte';
 
 vi.mock('@immich/sdk', async () => {

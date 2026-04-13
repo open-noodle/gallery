@@ -3,6 +3,7 @@
   import type { ProviderStatus } from '$lib/managers/global-search-manager.svelte';
   import { Command } from 'bits-ui';
   import { t, type Translations } from 'svelte-i18n';
+  import { SvelteMap } from 'svelte/reactivity';
   import { fade } from 'svelte/transition';
   import NavigationRow from './rows/navigation-row.svelte';
 
@@ -28,7 +29,7 @@
     // Group by category at render time, slicing each to TOP_N. The manager already
     // sorted the flat list by score descending, so topN-per-bucket preserves the
     // strongest matches per category.
-    const byCategory = new Map<NavigationCategory, NavigationItem[]>();
+    const byCategory = new SvelteMap<NavigationCategory, NavigationItem[]>();
     for (const item of status.items) {
       const arr = byCategory.get(item.category) ?? [];
       if (arr.length < TOP_N) {

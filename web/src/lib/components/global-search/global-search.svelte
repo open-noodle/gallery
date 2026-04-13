@@ -23,8 +23,14 @@
   }
   let { manager }: Props = $props();
 
-  // Initialize from the manager's query. Captures the current value at mount; subsequent changes
-  // come through the $effect below.
+  // Two-way sync with manager.query: the user types into the Command.Input (writes to
+  // inputValue), and the manager can also update its own query internally (e.g. when
+  // activateRecent replays a saved query). A plain `$derived(manager.query)` isn't
+  // enough because inputValue needs to be writable (bound by Command.Input); and
+  // `$state` + `$effect` is flagged by svelte/prefer-writable-derived. The cleanest
+  // Svelte 5 shape for a bi-directional mirror is to keep $state and push changes in
+  // both directions via $effect. The rule's preferred pattern doesn't fit this case.
+  // eslint-disable-next-line svelte/prefer-writable-derived
   let inputValue = $state('');
   $effect(() => {
     inputValue = manager.query;
@@ -171,12 +177,13 @@
       // bits-ui tags each Command.Item with a data-command-item attribute (see
       // bits-ui command.svelte.js:1204 — `createBitsAttrs({ component: 'command' ... })`
       // yields `data-command-${part}`). Using the wrong attribute name silently breaks nav.
-      const items = document.querySelectorAll<HTMLElement>('[data-command-item]');
+      // NodeList doesn't support .at() in happy-dom, so materialise to an array first.
+      const items = [...document.querySelectorAll<HTMLElement>('[data-command-item]')];
       if (items.length === 0) {
         return;
       }
-      const target = e.key === 'Home' ? items[0] : items[items.length - 1];
-      const value = target.getAttribute('data-value');
+      const target = e.key === 'Home' ? items[0] : items.at(-1);
+      const value = target?.dataset.value;
       if (value) {
         manager.setActiveItem(value);
         e.preventDefault();
@@ -192,10 +199,8 @@
   onClose={() => manager.close()}
   class="motion-reduce:transition-none motion-reduce:transform-none !p-0"
 >
-  {#snippet children()}
-    <ModalBody class="!p-0">
-      {#snippet children()}
-        <span class="sr-only" id="global-search-label">{$t('global_search')}</span>
+  <ModalBody class="!p-0">
+    <span class="sr-only" id="global-search-label">{$t('global_search')}</span>
         <Command.Root
           shouldFilter={false}
           vimBindings={false}
@@ -235,7 +240,11 @@
                pane off-screen. With min-w-0, flex-1 can shrink below content width
                and the rows' `truncate` class ellipsizes long text. -->
           <div class="flex h-[520px] max-h-[80vh] min-h-0">
-            <div class="flex min-h-0 min-w-0 flex-1 flex-col {showPreview ? 'border-e border-gray-200 dark:border-gray-700' : ''}">
+            <div
+              class="flex min-h-0 min-w-0 flex-1 flex-col {showPreview
+                ? 'border-e border-gray-200 dark:border-gray-700'
+                : ''}"
+            >
               {#if manager.mode === 'smart' && !manager.mlHealthy && inputValue.trim() !== ''}
                 <div class="mx-3 mt-3 rounded-md bg-subtle/60 px-3 py-2 text-xs">
                   {$t('cmdk_smart_unavailable')}
@@ -259,11 +268,7 @@
                       </Command.GroupHeading>
                       <Command.GroupItems>
                         {#each recentEntries as entry (entry.id)}
-                          <Command.Item
-                            value={entry.id}
-                            onSelect={() => manager.activateRecent(entry)}
-                            class="group"
-                          >
+                          <Command.Item value={entry.id} onSelect={() => manager.activateRecent(entry)} class="group">
                             <RecentRow {entry} />
                           </Command.Item>
                         {/each}
@@ -332,7 +337,5 @@
           <div aria-live="polite" aria-atomic="true" class="sr-only">{manager.announcementText}</div>
           <GlobalSearchFooter {manager} />
         </Command.Root>
-      {/snippet}
-    </ModalBody>
-  {/snippet}
+  </ModalBody>
 </Modal>

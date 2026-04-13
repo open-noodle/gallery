@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Shared hoisted mocks — used by navigation tests to flip admin/feature-flag state.
 // Must appear BEFORE the GlobalSearchManager import because the manager binds these
@@ -25,12 +25,18 @@ vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({
 }));
 
 import { goto } from '$app/navigation';
-import { searchSmart, searchAssets, searchPerson, searchPlaces, getAllTags, getMlHealth } from '@immich/sdk';
-import { computeCommandScore } from 'bits-ui';
-import { GlobalSearchManager, type Provider, type ProviderStatus, type SearchMode, type Sections } from './global-search-manager.svelte';
-import { installFakeAbortTimeout, restoreAbortTimeout } from './__tests__/fake-abort-timeout';
-import { __resetForTests as resetRecentStore, getEntries, addEntry } from '$lib/stores/cmdk-recent';
 import { themeManager } from '$lib/managers/theme-manager.svelte';
+import { addEntry, getEntries, __resetForTests as resetRecentStore } from '$lib/stores/cmdk-recent';
+import { getAllTags, getMlHealth, searchAssets, searchPerson, searchPlaces, searchSmart } from '@immich/sdk';
+import { computeCommandScore } from 'bits-ui';
+import { installFakeAbortTimeout, restoreAbortTimeout } from './__tests__/fake-abort-timeout';
+import {
+  GlobalSearchManager,
+  type Provider,
+  type ProviderStatus,
+  type SearchMode,
+  type Sections,
+} from './global-search-manager.svelte';
 
 // File-level reset so mock state cannot leak between describe blocks. Tests that
 // mutate these should still set what they want in their own beforeEach, but this
@@ -197,9 +203,7 @@ describe('setQuery', () => {
       run: async (query, mode, signal) => {
         calls.push({ key, query, mode });
         return new Promise<ProviderStatus>((resolve, reject) => {
-          signal.addEventListener('abort', () =>
-            reject(Object.assign(new Error('aborted'), { name: 'AbortError' })),
-          );
+          signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })));
           setTimeout(() => resolve({ status: 'ok', items: [], total: 0 }), 0);
         });
       },
@@ -266,7 +270,7 @@ describe('setQuery', () => {
       });
     manager.setQuery('hang');
     await vi.advanceTimersByTimeAsync(200);
-    await vi.advanceTimersByTimeAsync(5_100);
+    await vi.advanceTimersByTimeAsync(5100);
     expect(manager.sections.photos.status).toBe('timeout');
   });
 
@@ -511,7 +515,7 @@ describe('tag provider', () => {
     const m = new GlobalSearchManager();
     m.setQuery('be');
     await vi.advanceTimersByTimeAsync(200);
-    window.dispatchEvent(new StorageEvent('storage', { key: 'cmdk.tags.version', newValue: '2' }));
+    globalThis.dispatchEvent(new StorageEvent('storage', { key: 'cmdk.tags.version', newValue: '2' }));
     m.setQuery('mou');
     await vi.advanceTimersByTimeAsync(200);
     expect(getAllTags).toHaveBeenCalledTimes(2);
@@ -523,9 +527,9 @@ describe('tag provider', () => {
     m.setQuery('be');
     await vi.advanceTimersByTimeAsync(200);
     expect(m.sections.tags.status).toBe('error');
-    vi.mocked(getAllTags).mockResolvedValueOnce([
-      { id: 't1', name: 'beach', color: null },
-    ] as unknown as Awaited<ReturnType<typeof getAllTags>>);
+    vi.mocked(getAllTags).mockResolvedValueOnce([{ id: 't1', name: 'beach', color: null }] as unknown as Awaited<
+      ReturnType<typeof getAllTags>
+    >);
     m.setQuery('bea');
     await vi.advanceTimersByTimeAsync(200);
     expect(m.sections.tags.status).toBe('ok');
@@ -558,13 +562,13 @@ describe('setMode', () => {
     let peopleCalls = 0;
     const m = new GlobalSearchManager();
     const providers = (m as unknown as { providers: Record<keyof Sections, Provider> }).providers;
-    providers.photos.run = async () => {
+    providers.photos.run = () => {
       photosCalls++;
-      return { status: 'ok', items: [], total: 0 };
+      return Promise.resolve({ status: 'ok' as const, items: [], total: 0 });
     };
-    providers.people.run = async () => {
+    providers.people.run = () => {
       peopleCalls++;
-      return { status: 'ok', items: [], total: 0 };
+      return Promise.resolve({ status: 'ok' as const, items: [], total: 0 });
     };
     m.setQuery('beach');
     await vi.advanceTimersByTimeAsync(200);
@@ -630,8 +634,10 @@ describe('cursor identity', () => {
   it('preserves activeItemId when a later section populates above it', async () => {
     const m = new GlobalSearchManager();
     const providers = (m as unknown as { providers: Record<keyof Sections, Provider> }).providers;
-    providers.people.run = async () => ({ status: 'ok', items: [{ id: 'p1', name: 'Alice' }], total: 1 });
-    providers.photos.run = async () => ({ status: 'ok', items: [{ id: 'a1' }, { id: 'a2' }], total: 2 });
+    providers.people.run = () =>
+      Promise.resolve({ status: 'ok' as const, items: [{ id: 'p1', name: 'Alice' }], total: 1 });
+    providers.photos.run = () =>
+      Promise.resolve({ status: 'ok' as const, items: [{ id: 'a1' }, { id: 'a2' }], total: 2 });
     m.setQuery('alice');
     await vi.advanceTimersByTimeAsync(200);
     m.setActiveItem('person:p1');
@@ -644,11 +650,12 @@ describe('cursor identity', () => {
   it('falls back to first top-section row when tracked id disappears', async () => {
     const m = new GlobalSearchManager();
     const providers = (m as unknown as { providers: Record<keyof Sections, Provider> }).providers;
-    providers.photos.run = async () => ({ status: 'ok', items: [{ id: 'a1' }, { id: 'a2' }], total: 2 });
+    providers.photos.run = () =>
+      Promise.resolve({ status: 'ok' as const, items: [{ id: 'a1' }, { id: 'a2' }], total: 2 });
     m.setQuery('beach');
     await vi.advanceTimersByTimeAsync(200);
     m.setActiveItem('photo:a1');
-    providers.photos.run = async () => ({ status: 'ok', items: [{ id: 'a9' }], total: 1 });
+    providers.photos.run = () => Promise.resolve({ status: 'ok' as const, items: [{ id: 'a9' }], total: 1 });
     m.setQuery('sunset');
     await vi.advanceTimersByTimeAsync(200);
     expect(m.activeItemId).toBe('photo:a9');
@@ -679,7 +686,7 @@ describe('Enter race', () => {
   it('getActiveItem captures the currently-highlighted item by reference', async () => {
     const m = new GlobalSearchManager();
     const providers = (m as unknown as { providers: Record<keyof Sections, Provider> }).providers;
-    providers.photos.run = async () => ({ status: 'ok', items: [{ id: 'a1' }], total: 1 });
+    providers.photos.run = () => Promise.resolve({ status: 'ok' as const, items: [{ id: 'a1' }], total: 1 });
     m.setQuery('beach');
     await vi.advanceTimersByTimeAsync(200);
     m.setActiveItem('photo:a1');
@@ -725,7 +732,7 @@ describe('ML health retroactive promotion', () => {
       });
     m.setQuery('beach');
     await vi.advanceTimersByTimeAsync(200);
-    await vi.advanceTimersByTimeAsync(5_100);
+    await vi.advanceTimersByTimeAsync(5100);
     expect(m.mlHealthy).toBe(false);
   });
 
@@ -739,7 +746,7 @@ describe('ML health retroactive promotion', () => {
       });
     m.setQuery('beach');
     await vi.advanceTimersByTimeAsync(200);
-    await vi.advanceTimersByTimeAsync(5_100);
+    await vi.advanceTimersByTimeAsync(5100);
     expect(m.mlHealthy).toBe(true);
   });
 });
@@ -814,7 +821,7 @@ describe('activateRecent()', () => {
     vi.useRealTimers();
   });
 
-  it('query entry re-runs the search in place without closing', async () => {
+  it('query entry re-runs the search in place without closing', () => {
     const m = new GlobalSearchManager();
     m.open();
     m.activateRecent({ kind: 'query', id: 'q:beach', text: 'beach', mode: 'metadata', lastUsed: 1 });
@@ -1150,9 +1157,9 @@ describe('tagsDisabled persists across close/reopen', () => {
     m.close();
     m.open();
     // Swap mock to a tiny list — if tagsDisabled reset, this would succeed and repopulate.
-    vi.mocked(getAllTags).mockResolvedValue([
-      { id: 't1', name: 'beach', color: null },
-    ] as unknown as Awaited<ReturnType<typeof getAllTags>>);
+    vi.mocked(getAllTags).mockResolvedValue([{ id: 't1', name: 'beach', color: null }] as unknown as Awaited<
+      ReturnType<typeof getAllTags>
+    >);
     m.setQuery('tag');
     await vi.advanceTimersByTimeAsync(200);
     expect(m.sections.tags).toEqual({ status: 'error', message: 'tag_cache_too_large' });
@@ -1233,12 +1240,8 @@ describe('navigation memo cache', () => {
 
   it('reuses the cached table on subsequent calls', () => {
     const m = new GlobalSearchManager();
-    const a = (
-      m as unknown as { getNavigationSearchStrings: () => Map<string, string> }
-    ).getNavigationSearchStrings();
-    const b = (
-      m as unknown as { getNavigationSearchStrings: () => Map<string, string> }
-    ).getNavigationSearchStrings();
+    const a = (m as unknown as { getNavigationSearchStrings: () => Map<string, string> }).getNavigationSearchStrings();
+    const b = (m as unknown as { getNavigationSearchStrings: () => Map<string, string> }).getNavigationSearchStrings();
     expect(a).toBe(b);
   });
 
@@ -1334,9 +1337,9 @@ describe('runNavigationProvider', () => {
   });
 
   function runNav(m: GlobalSearchManager, query: string): ProviderStatus<unknown> {
-    return (
-      m as unknown as { runNavigationProvider: (q: string) => ProviderStatus<unknown> }
-    ).runNavigationProvider(query);
+    return (m as unknown as { runNavigationProvider: (q: string) => ProviderStatus<unknown> }).runNavigationProvider(
+      query,
+    );
   }
 
   it('returns empty for short queries (below minQueryLength 2)', () => {
@@ -1506,10 +1509,7 @@ describe('setQuery synchronous navigation', () => {
 
   it('runBatch does NOT re-invoke runNavigationProvider after the debounce', () => {
     const m = new GlobalSearchManager();
-    const spy = vi.spyOn(
-      m as unknown as { runNavigationProvider: (q: string) => unknown },
-      'runNavigationProvider',
-    );
+    const spy = vi.spyOn(m as unknown as { runNavigationProvider: (q: string) => unknown }, 'runNavigationProvider');
     m.open();
     m.setQuery('classific');
     expect(spy).toHaveBeenCalledTimes(1);
@@ -1647,8 +1647,7 @@ describe('SWR loading rules', () => {
   it('stale-batch providers do not deadlock batchInFlight after a new batch supersedes', async () => {
     let resolveStalePhotos!: () => void;
     vi.mocked(searchSmart).mockImplementationOnce(
-      () =>
-        new Promise((r) => (resolveStalePhotos = () => r({ assets: { items: [], nextPage: null } } as never))),
+      () => new Promise((r) => (resolveStalePhotos = () => r({ assets: { items: [], nextPage: null } } as never))),
     );
     const m = new GlobalSearchManager();
     m.open();
@@ -1869,8 +1868,7 @@ describe('batch lifecycle: close, empty-query, grace window (review fixes)', () 
   it('close() resets batchInFlight and inFlightCounter even when a batch is in flight', async () => {
     let resolveStale!: () => void;
     vi.mocked(searchSmart).mockImplementationOnce(
-      () =>
-        new Promise((r) => (resolveStale = () => r({ assets: { items: [], nextPage: null } } as never))),
+      () => new Promise((r) => (resolveStale = () => r({ assets: { items: [], nextPage: null } } as never))),
     );
     const m = new GlobalSearchManager();
     m.open();
@@ -2084,9 +2082,7 @@ describe('setMode stale photos race (review fix U3)', () => {
     vi.mocked(searchAssets).mockImplementationOnce(
       () =>
         new Promise(
-          (r) =>
-            (resolvePhotos1 = () =>
-              r({ assets: { items: [{ id: 'stale' } as never], nextPage: null } } as never)),
+          (r) => (resolvePhotos1 = () => r({ assets: { items: [{ id: 'stale' } as never], nextPage: null } } as never)),
         ),
     );
     // Second setMode (description): fast — resolves to {fresh}.

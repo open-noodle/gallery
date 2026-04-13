@@ -30,8 +30,8 @@ import {
   mdiThemeLightDark,
   mdiTrashCanOutline,
   mdiUpdate,
-  mdiViewAgenda,
   mdiVideoOutline,
+  mdiViewAgenda,
 } from '@mdi/js';
 
 export type NavigationCategory = 'systemSettings' | 'admin' | 'userPages' | 'actions';

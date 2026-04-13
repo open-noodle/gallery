@@ -1,8 +1,8 @@
+import { GlobalSearchManager } from '$lib/managers/global-search-manager.svelte';
 import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import GlobalSearchFooter from '../global-search-footer.svelte';
-import { GlobalSearchManager } from '$lib/managers/global-search-manager.svelte';
 
 vi.mock('@immich/sdk', async () => {
   const actual = await vi.importActual<typeof import('@immich/sdk')>('@immich/sdk');

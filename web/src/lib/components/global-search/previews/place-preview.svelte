@@ -20,30 +20,32 @@
     const stateName = place.admin1name;
     photos = [];
     loaded = false;
-    const dwell = setTimeout(async () => {
-      const ctrl = new AbortController();
-      try {
-        const response = await searchAssets(
-          {
-            metadataSearchDto: {
-              city: cityName,
-              state: stateName ?? undefined,
-              size: 4,
+    const dwell = setTimeout(() => {
+      void (async () => {
+        const ctrl = new AbortController();
+        try {
+          const response = await searchAssets(
+            {
+              metadataSearchDto: {
+                city: cityName,
+                state: stateName ?? undefined,
+                size: 4,
+              },
             },
-          },
-          { signal: ctrl.signal },
-        );
-        if (gen !== generation) {
-          return;
+            { signal: ctrl.signal },
+          );
+          if (gen !== generation) {
+            return;
+          }
+          photos = response.assets.items;
+        } catch {
+          // ignore
+        } finally {
+          if (gen === generation) {
+            loaded = true;
+          }
         }
-        photos = response.assets.items;
-      } catch {
-        // ignore
-      } finally {
-        if (gen === generation) {
-          loaded = true;
-        }
-      }
+      })();
     }, 300);
     return () => clearTimeout(dwell);
   });

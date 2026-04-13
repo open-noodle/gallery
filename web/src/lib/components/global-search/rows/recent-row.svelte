@@ -25,9 +25,7 @@
 {:else if entry.kind === 'person'}
   <PersonRow item={{ id: entry.personId, name: entry.label, faceAssetId: entry.thumbnailAssetId } as never} />
 {:else if entry.kind === 'place'}
-  <PlaceRow
-    item={{ name: entry.label, latitude: entry.latitude, longitude: entry.longitude } as never}
-  />
+  <PlaceRow item={{ name: entry.label, latitude: entry.latitude, longitude: entry.longitude } as never} />
 {:else if entry.kind === 'tag'}
   <TagRow item={{ id: entry.tagId, name: entry.label, color: null } as never} />
 {:else if entry.kind === 'navigate'}

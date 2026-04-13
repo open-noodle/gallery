@@ -1,6 +1,6 @@
 import { render } from '@testing-library/svelte';
-import { describe, it, expect } from 'vitest';
 import { createRawSnippet } from 'svelte';
+import { describe, expect, it } from 'vitest';
 import GlobalSearchSection from '../global-search-section.svelte';
 
 // Note: the `ok` rendering path requires a Command.Root ancestor context (bits-ui

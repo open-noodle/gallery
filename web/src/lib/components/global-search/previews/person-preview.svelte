@@ -21,24 +21,29 @@
     const id = person.id;
     photos = [];
     loaded = false;
-    const dwell = setTimeout(async () => {
-      const ctrl = new AbortController();
-      try {
-        const response = await searchAssets(
-          { metadataSearchDto: { personIds: [id], size: 4 } },
-          { signal: ctrl.signal },
-        );
-        if (gen !== generation) {
-          return;
+    const dwell = setTimeout(() => {
+      // Wrap the async work in an IIFE so setTimeout's callback is synchronous.
+      // ESLint's `no-misused-promises` flags async setTimeout callbacks because
+      // setTimeout doesn't await the returned promise.
+      void (async () => {
+        const ctrl = new AbortController();
+        try {
+          const response = await searchAssets(
+            { metadataSearchDto: { personIds: [id], size: 4 } },
+            { signal: ctrl.signal },
+          );
+          if (gen !== generation) {
+            return;
+          }
+          photos = response.assets.items;
+        } catch {
+          // ignore — preview is best-effort
+        } finally {
+          if (gen === generation) {
+            loaded = true;
+          }
         }
-        photos = response.assets.items;
-      } catch {
-        // ignore — preview is best-effort
-      } finally {
-        if (gen === generation) {
-          loaded = true;
-        }
-      }
+      })();
     }, 300);
     return () => clearTimeout(dwell);
   });
