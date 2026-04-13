@@ -14,6 +14,9 @@ import {
 } from '@immich/sdk';
 import { get } from 'svelte/store';
 import { locale as i18nLocale, t, type Translations } from 'svelte-i18n';
+import { computeCommandScore } from 'bits-ui';
+import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
+import { user } from '$lib/stores/user.store';
 import { NAVIGATION_ITEMS, type NavigationItem } from './navigation-items';
 
 export type SearchMode = 'smart' | 'metadata' | 'description' | 'ocr';
@@ -181,6 +184,46 @@ export class GlobalSearchManager {
     }
     this.navigationSearchCache.set(currentLocale, table);
     return table;
+  }
+
+  /**
+   * Synchronously filter NAVIGATION_ITEMS for a query. Applies admin + feature-flag gates,
+   * scores via `computeCommandScore`, and returns a flat `ProviderStatus` (no grouping).
+   * Runs on every keystroke off the main path — bypasses the 150 ms debounce.
+   */
+  private runNavigationProvider(query: string): ProviderStatus<NavigationItem> {
+    if (query.length < 2) {
+      return { status: 'empty' };
+    }
+    const u = get(user);
+    const isAdmin = u?.isAdmin ?? false;
+    const flags = featureFlagsManager.valueOrUndefined;
+    const searchStrings = this.getNavigationSearchStrings();
+
+    const scored: Array<{ item: NavigationItem; score: number }> = [];
+    for (const item of NAVIGATION_ITEMS) {
+      if (item.adminOnly && !isAdmin) {
+        continue;
+      }
+      if (item.featureFlag && !flags?.[item.featureFlag]) {
+        continue;
+      }
+      const corpus = searchStrings.get(item.id);
+      if (!corpus) {
+        continue;
+      }
+      const score = computeCommandScore(corpus, query);
+      if (score <= 0) {
+        continue;
+      }
+      scored.push({ item, score });
+    }
+    if (scored.length === 0) {
+      return { status: 'empty' };
+    }
+    scored.sort((a, b) => b.score - a.score);
+    const items = scored.map((s) => s.item);
+    return { status: 'ok', items, total: items.length };
   }
 
   open() {

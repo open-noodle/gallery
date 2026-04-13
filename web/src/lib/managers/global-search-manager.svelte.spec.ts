@@ -1,4 +1,29 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+
+// Shared hoisted mocks — used by navigation tests to flip admin/feature-flag state.
+// Must appear BEFORE the GlobalSearchManager import because the manager binds these
+// modules at module load; vi.doMock inside tests is too late.
+const { mockUser } = vi.hoisted(() => ({
+  mockUser: { current: { isAdmin: true } as { isAdmin: boolean } | null },
+}));
+vi.mock('$lib/stores/user.store', () => ({
+  user: {
+    subscribe: (run: (v: { isAdmin: boolean } | null) => void) => {
+      run(mockUser.current);
+      return () => {};
+    },
+  },
+}));
+
+const { mockFlags } = vi.hoisted(() => ({
+  mockFlags: {
+    valueOrUndefined: { search: true, map: true, trash: true } as Record<string, boolean> | undefined,
+  },
+}));
+vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({
+  featureFlagsManager: mockFlags,
+}));
+
 import { goto } from '$app/navigation';
 import { searchSmart, searchAssets, searchPerson, searchPlaces, getAllTags, getMlHealth } from '@immich/sdk';
 import { GlobalSearchManager, type Provider, type ProviderStatus, type SearchMode, type Sections } from './global-search-manager.svelte';
@@ -1195,5 +1220,83 @@ describe('navigation memo cache', () => {
     ).getNavigationSearchStrings();
     expect(cache.size).toBe(36);
     mockI18nLocale.current = 'en';
+  });
+});
+
+describe('runNavigationProvider', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    mockUser.current = { isAdmin: true };
+    mockFlags.valueOrUndefined = { search: true, map: true, trash: true };
+    mockI18nLocale.current = 'en';
+  });
+
+  function runNav(m: GlobalSearchManager, query: string): ProviderStatus<unknown> {
+    return (
+      m as unknown as { runNavigationProvider: (q: string) => ProviderStatus<unknown> }
+    ).runNavigationProvider(query);
+  }
+
+  it('returns empty for short queries (below minQueryLength 2)', () => {
+    const m = new GlobalSearchManager();
+    expect(runNav(m, '').status).toBe('empty');
+    expect(runNav(m, 'a').status).toBe('empty');
+  });
+
+  it('returns ok with classification_settings in the result set for query "classific"', () => {
+    const m = new GlobalSearchManager();
+    const result = runNav(m, 'classific');
+    expect(result.status).toBe('ok');
+    if (result.status === 'ok') {
+      const labels = result.items.map((i) => (i as { labelKey: string }).labelKey);
+      expect(labels).toContain('admin.classification_settings');
+    }
+  });
+
+  it('filters admin-only items for non-admin users', () => {
+    mockUser.current = { isAdmin: false };
+    const m = new GlobalSearchManager();
+    const result = runNav(m, 'classific');
+    if (result.status === 'ok') {
+      for (const item of result.items) {
+        expect((item as { adminOnly: boolean }).adminOnly).toBe(false);
+      }
+    }
+  });
+
+  it('filters items gated on a disabled feature flag', () => {
+    mockFlags.valueOrUndefined = { search: true, map: false, trash: true };
+    const m = new GlobalSearchManager();
+    const result = runNav(m, 'map');
+    if (result.status === 'ok') {
+      const ids = result.items.map((i) => (i as { id: string }).id);
+      expect(ids).not.toContain('nav:userPages:map');
+    }
+  });
+
+  it('items gated on a feature flag are hidden when flags have not loaded yet (SSR window)', () => {
+    mockFlags.valueOrUndefined = undefined;
+    const m = new GlobalSearchManager();
+    const result = runNav(m, 'map');
+    if (result.status === 'ok') {
+      const ids = result.items.map((i) => (i as { id: string }).id);
+      expect(ids).not.toContain('nav:userPages:map');
+    }
+  });
+
+  it('hyphenated query is tolerated by computeCommandScore (key fallback locale)', () => {
+    // Test setup uses svelte-i18n with `fallbackLocale: 'dev'`, which renders the literal
+    // i18n key for missing translations. The searchable corpus for the classification item
+    // is therefore "admin.classification_settings admin.classification_settings_description".
+    // 'class-set' matches because chars c-l-a-s-s-_-s-e-t all appear in order and the
+    // hyphen is tolerated by bits-ui's tokenizer.
+    const m = new GlobalSearchManager();
+    const result = runNav(m, 'class-set');
+    expect(result.status).toBe('ok');
+    if (result.status === 'ok') {
+      const labels = result.items.map((i) => (i as { labelKey: string }).labelKey);
+      expect(labels).toContain('admin.classification_settings');
+    }
   });
 });
