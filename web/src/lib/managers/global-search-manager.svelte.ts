@@ -4,6 +4,7 @@ import { Route } from '$lib/route';
 import { addEntry, makePlaceId, type RecentEntry } from '$lib/stores/cmdk-recent';
 import {
   getAllTags,
+  getMlHealth,
   searchAssets,
   searchPerson,
   searchPlaces,
@@ -79,6 +80,7 @@ export class GlobalSearchManager {
   private tagsCache: TagResponseDto[] | null = null;
   private tagsDisabled = false;
   private storageListener?: (e: StorageEvent) => void;
+  private mlProbed = false;
 
   constructor() {
     this.providers = this.buildProviders();
@@ -100,6 +102,19 @@ export class GlobalSearchManager {
 
   open() {
     this.isOpen = true;
+    if (!this.mlProbed) {
+      this.mlProbed = true;
+      void this.probeMlHealth();
+    }
+  }
+
+  private async probeMlHealth() {
+    try {
+      const result = await getMlHealth();
+      this.mlHealthy = result.smartSearchHealthy;
+    } catch {
+      // Retroactive promotion (onPhotosSettled) handles mid-session failure.
+    }
   }
 
   close() {

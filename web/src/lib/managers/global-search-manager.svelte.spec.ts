@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { goto } from '$app/navigation';
-import { searchSmart, searchAssets, searchPerson, searchPlaces, getAllTags } from '@immich/sdk';
+import { searchSmart, searchAssets, searchPerson, searchPlaces, getAllTags, getMlHealth } from '@immich/sdk';
 import { GlobalSearchManager, type Provider, type ProviderStatus, type SearchMode, type Sections } from './global-search-manager.svelte';
 import { installFakeAbortTimeout, restoreAbortTimeout } from './__tests__/fake-abort-timeout';
 import { __resetForTests as resetRecentStore, getEntries } from '$lib/stores/cmdk-recent';
@@ -12,6 +12,7 @@ vi.mock('@immich/sdk', async () => ({
   searchPerson: vi.fn(),
   searchPlaces: vi.fn(),
   getAllTags: vi.fn(),
+  getMlHealth: vi.fn(),
 }));
 
 vi.mock('$app/navigation', () => ({
@@ -871,6 +872,46 @@ describe('reconcileCursor fallback + getActiveItem edge cases', () => {
     const m = new GlobalSearchManager();
     m.activeItemId = 'malformed';
     expect(m.getActiveItem()).toBe(null);
+  });
+});
+
+describe('ML health probe on open', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    vi.useFakeTimers();
+    installFakeAbortTimeout();
+    vi.mocked(getMlHealth).mockResolvedValue({ smartSearchHealthy: true } as never);
+  });
+  afterEach(() => {
+    restoreAbortTimeout();
+    vi.useRealTimers();
+  });
+
+  it('probes on first open and caches for the session', async () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    await vi.advanceTimersByTimeAsync(0);
+    m.close();
+    m.open();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(getMlHealth).toHaveBeenCalledOnce();
+  });
+
+  it('sets mlHealthy=false when probe reports unhealthy', async () => {
+    vi.mocked(getMlHealth).mockResolvedValue({ smartSearchHealthy: false } as never);
+    const m = new GlobalSearchManager();
+    m.open();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(m.mlHealthy).toBe(false);
+  });
+
+  it('trusts current state if probe throws', async () => {
+    vi.mocked(getMlHealth).mockRejectedValue(new Error('net'));
+    const m = new GlobalSearchManager();
+    m.open();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(m.mlHealthy).toBe(true);
   });
 });
 
