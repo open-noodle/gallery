@@ -105,6 +105,7 @@ jobs:
               -e DB_USERNAME="$DB_USERNAME" \
               -e DB_PASSWORD="$DB_PASSWORD" \
               -e DB_DATABASE_NAME="$DB_DATABASE_NAME" \
+              -e IMMICH_IGNORE_MOUNT_CHECK_ERRORS=true \
               "$image"
             if ! wait_for_server "$phase"; then
               return 1
@@ -115,6 +116,19 @@ jobs:
             # docker rm -f is synchronous on Linux so :2283 is released
             # before the next boot_server binds it. No sleep needed.
             docker rm -f server >/dev/null
+          }
+
+          # Extract schema drift items from the currently-running `server`
+          # container's logs. Each drift item is one log line with the
+          # pattern "[...DatabaseService...]  - The/Table <thing> is ...".
+          # Strips Nest's ANSI color codes and the log-line prefix so
+          # output is stable across runs and easy to diff.
+          extract_drift() {
+            docker logs server 2>&1 \
+              | sed -E 's/\x1b\[[0-9;]*m//g' \
+              | grep -F 'DatabaseService' \
+              | grep -oE '- (The|Table) .*' \
+              | sort -u
           }
 
           ############################################################
@@ -164,9 +178,19 @@ jobs:
 
           ############################################################
           # Step 8: boot upstream Immich (pre-phase) to seed kysely_migration
+          #
+          # Also captures a "baseline drift" snapshot: upstream Immich on a
+          # fresh install already warns about pre-existing drift (e.g.
+          # geodata_places_pkey), so a raw grep for 'schema drift' in the
+          # post-phase logs would false-positive on a correctly-working
+          # revert. The post-phase drift check diffs against this baseline
+          # and only fails on drift items that are NEW after the revert.
           ############################################################
 
           boot_server "ghcr.io/immich-app/immich-server:${UPSTREAM_TAG}" pre
+          extract_drift > /tmp/drift-baseline.txt
+          echo "Pre-phase baseline drift ($(wc -l < /tmp/drift-baseline.txt) item(s)):"
+          cat /tmp/drift-baseline.txt || true
           stop_server
 
           ############################################################
@@ -215,19 +239,37 @@ jobs:
 
           ############################################################
           # Step 13: schema drift check
+          #
+          # Compares post-phase drift items against the pre-phase baseline
+          # captured in step 8. Fails only if post-phase has drift items
+          # that did NOT appear on a vanilla upstream-Immich boot — i.e.
+          # drift caused by the revert, not pre-existing upstream quirks
+          # like the geodata_places pkey warning.
+          #
+          # extract_drift() is coupled to the Nest logger format and the
+          # "- The/Table X is ..." drift item prefix used at
+          # server/src/services/database.service.ts:133 via
+          # ErrorMessages.SchemaDrift (constants.ts:12). If upstream
+          # reworks that warning format, update extract_drift accordingly.
           ############################################################
 
-          # Coupled to the exact "Detected schema drift." substring defined
-          # in server/src/constants.ts:12 (ErrorMessages.SchemaDrift). If an
-          # upstream rebase reworks that constant (e.g. "schema mismatch"),
-          # this grep goes silently-inert — update the pattern as part of
-          # the rebase report when that happens.
-          if docker logs server 2>&1 | grep -qi 'schema drift'; then
-            echo "::error::Schema drift detected after revert — scripts/revert-to-immich.sql is missing cleanup for one or more Gallery objects"
+          extract_drift > /tmp/drift-post.txt
+          echo "Post-phase drift ($(wc -l < /tmp/drift-post.txt) item(s)):"
+          cat /tmp/drift-post.txt || true
+
+          # `comm -23` prints lines only in post (not in baseline) —
+          # items introduced after the revert cycle. Requires sorted
+          # input, which extract_drift already provides.
+          comm -23 /tmp/drift-post.txt /tmp/drift-baseline.txt > /tmp/drift-new.txt
+          if [ -s /tmp/drift-new.txt ]; then
+            echo "::error::Schema drift introduced by revert — scripts/revert-to-immich.sql is missing cleanup for the following Gallery objects:"
+            cat /tmp/drift-new.txt
+            echo
+            echo "Full post-phase container logs:"
             docker logs server
             exit 1
           fi
-          echo "::notice::post: no schema drift in server logs"
+          echo "::notice::post: no new schema drift compared to pre-phase baseline"
 
           echo "::notice::revert-to-immich validation PASSED"
 
