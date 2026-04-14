@@ -105,7 +105,7 @@ jobs:
               -e DB_USERNAME="$DB_USERNAME" \
               -e DB_PASSWORD="$DB_PASSWORD" \
               -e DB_DATABASE_NAME="$DB_DATABASE_NAME" \
-              -e IMMICH_IGNORE_MOUNT_CHECK_ERRORS=true \
+              -v "$UPLOAD_DIR:/data" \
               "$image"
             if ! wait_for_server "$phase"; then
               return 1
@@ -147,6 +147,31 @@ jobs:
           UPSTREAM_TAG=v$(jq -r .version server/package.json)
           echo "Testing revert against upstream Immich ${UPSTREAM_TAG} (from server/package.json)"
           echo "Gallery image: ${GALLERY_IMAGE}"
+
+          ############################################################
+          # Step 3.5: prepare /data with .immich marker files
+          #
+          # Immich's StorageService.verifyReadAccess (storage.service.ts:117)
+          # reads a `.immich` marker in each of six folders on startup. If
+          # any are missing, the bootstrap throws, the microservices worker
+          # dies, and the supervisor kills the whole container. Pre-creating
+          # the marker files skips the "create from scratch" path and
+          # satisfies verifyReadAccess on all three server boots.
+          #
+          # chmod 0777 because mktemp -d creates 0700 on the runner user
+          # and the immich-server container runs as a non-root user that
+          # can't otherwise read into it.
+          ############################################################
+
+          UPLOAD_DIR=$(mktemp -d)
+          chmod 0777 "$UPLOAD_DIR"
+          for d in thumbs upload backups library profile encoded-video; do
+            mkdir "$UPLOAD_DIR/$d"
+            chmod 0777 "$UPLOAD_DIR/$d"
+            printf '%s' "$(date +%s000)" > "$UPLOAD_DIR/$d/.immich"
+            chmod 0666 "$UPLOAD_DIR/$d/.immich"
+          done
+          echo "Prepared /data mount at ${UPLOAD_DIR}"
 
           ############################################################
           # Step 4-6: network + postgres + redis
