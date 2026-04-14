@@ -123,15 +123,22 @@ jobs:
           # pattern "[...DatabaseService...]  - The/Table <thing> is ...".
           # Strips Nest's ANSI color codes and the log-line prefix so
           # output is stable across runs and easy to diff.
-          extract_drift() {
-            # `grep -oE -e` is used instead of `grep -oE '- ...'` because a
-            # pattern starting with `-` is otherwise parsed as an option.
+          extract_drift() (
+            # Parentheses make this a subshell so `set +o pipefail` is
+            # scoped locally. pipefail must be off because `grep` exits
+            # with 1 on "no match", and a run against a clean upstream
+            # Immich legitimately emits no drift warnings — an empty
+            # drift list is the success case, not an error.
+            #
+            # `grep -oE -e` is used instead of `grep -oE '- ...'` because
+            # a pattern starting with `-` is otherwise parsed as an option.
+            set +o pipefail
             docker logs server 2>&1 \
               | sed -E 's/\x1b\[[0-9;]*m//g' \
               | grep -F 'DatabaseService' \
               | grep -oE -e '- (The|Table) .*' \
               | sort -u
-          }
+          )
 
           ############################################################
           # Step 3: determine upstream Immich version
