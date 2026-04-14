@@ -4,15 +4,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Immich is a self-hosted photo and video management solution. It's a monorepo managed with **pnpm workspaces** containing:
+Gallery is a community fork of [Immich](https://github.com/immich-app/immich), a self-hosted photo and video management solution. The fork is currently based on **Immich v2.7.5** and regularly rebased onto upstream. Source package names are still `immich` / `immich-web` so the rebase path stays clean — only branding, Docker image names, and fork-only code diverge.
+
+Fork-specific features layered on top of upstream include: shared spaces, smart search & filters, user groups, S3-compatible storage, auto-classification, video duplicate detection, pet detection, Google Photos import, image editing & video trimming, and structured JSON logging. See `README.md` for the full list and docs links.
+
+It's a monorepo managed with **pnpm workspaces** containing:
 
 - **server/** — NestJS 11 backend (TypeScript) — package name: `immich`
 - **web/** — SvelteKit frontend with Svelte 5 (TypeScript) — package name: `immich-web`
 - **mobile/** — Flutter/Dart app with Riverpod state management
-- **machine-learning/** — Python FastAPI service (CLIP, facial recognition, OCR via ONNX Runtime)
+- **machine-learning/** — Python FastAPI service (CLIP, facial recognition, OCR, YOLO pet detection via ONNX Runtime)
 - **cli/** — Node.js CLI (`@immich/cli`)
 - **open-api/** — OpenAPI spec and generated SDKs (`@immich/sdk`)
 - **e2e/** — End-to-end tests (Playwright + Vitest)
+- **docs/** — Docusaurus site deployed to `docs.opennoodle.de`
+- **branding/** — Fork branding assets and the `apply-branding` script that rewrites upstream Immich references before Docker builds
+- **deployment/** — Demo, personal, and marketing deploy configs and scripts
 
 ## Common Commands
 
@@ -52,6 +59,12 @@ pnpm test -- --run src/lib/components/MyComponent.spec.ts  # Single test file
 cd e2e
 pnpm test                                    # API tests (vitest)
 pnpm test:web                                # Playwright web tests
+
+# Run Playwright against an already-running `make dev` stack on :2283
+make e2e-web-dev                             # web suite
+make e2e-web-dev-ui                          # web suite with Playwright UI
+make e2e-api-dev                             # API tests
+make e2e-integration-dev                     # integration suite
 ```
 
 ### Linting & Formatting
@@ -124,6 +137,7 @@ This merge is needed because:
 - **Middleware**: Auth guards, error interceptors, file upload handling in `src/middleware/`
 - **Database**: PostgreSQL with extensions (pgvectors/vectorchord for embeddings, cube, earthdistance, pg_trgm)
 - **Testing**: Vitest with `newTestService()` factory in `test/utils.ts` for auto-mocking dependencies. Medium tests use real DB via testcontainers
+- **Fork-only services**: `shared-space.service.ts`, `classification.service.ts`, `pet-detection.service.ts`, and extensions to `duplicate.service.ts` (video dedup) live alongside upstream services. S3 support is wired through `storage.service.ts` / `storage.repository.ts` with both disk and S3 backends active simultaneously.
 
 ### Web (SvelteKit)
 
@@ -168,4 +182,20 @@ When server API endpoints change:
 2. Regenerate specs: `pnpm sync:open-api`
 3. Regenerate clients: `make open-api` (generates both TypeScript SDK and Dart client)
 
-The TypeScript SDK uses `oazapfts` for generation. The Dart client uses OpenAPI Generator with custom mustache templates and patches.
+The TypeScript SDK uses `oazapfts` for generation. The Dart client uses OpenAPI Generator with custom mustache templates and patches (Java required — see `feedback_openapi_dart_generation`).
+
+## Fork Branding
+
+Upstream Immich references are rewritten to Gallery at build time by `branding/apply-branding.sh`. This runs automatically inside the Dockerfiles before `nest build` / the web build, so local `pnpm dev` and `make dev` keep upstream names in source. **Do not commit branded output**: edit the original Immich references and let the script rewrite them during Docker builds. Skipping `apply-branding` before a Docker build will leak upstream names into deployed artifacts.
+
+## Releases & Deploys
+
+- **Release workflow** (`.github/workflows/gallery-release.yml`): manual-only (`workflow_dispatch`) — a maintainer triggers it from the Actions tab or via `gh workflow run gallery-release.yml`. It builds `gallery-server`, `gallery-ml`, and `gallery-ml:*-cuda` in parallel, computes the next semver from commit prefixes / PR labels since the last tag (`feat:` → minor, `BREAKING CHANGE` → major, anything else → patch, `changelog:skip` → no release), and pushes to `ghcr.io/open-noodle/*`.
+- **Deploy targets**: `demo.opennoodle.de` (demo), `pierre.opennoodle.de` (personal), `opennoodle.de` (marketing Astro site), `test.opennoodle.de` (marketing staging), `docs.opennoodle.de` (Docusaurus). Each has a corresponding skill in `.claude/skills/` (see `/deploy-gallery-*` slash commands).
+- **RC builds**: `rc-personal` skill ships a tagged server image to the personal instance via a compose override — remember to remove the override after merge or release deploys will ship stale RC images.
+
+## Contributing & Docs
+
+- `CONTRIBUTING.md` and the README's Contributing section cover the dev-environment setup (`cp docker/example.env docker/.env`, `pnpm install`, `make dev`).
+- User-facing docs live in `docs/docs/` and are deployed to `docs.opennoodle.de`. Run prettier on any markdown under `docs/` or `docs/plans/` before committing — CI Docs Build is strict.
+- Guides for switching to / from Gallery live under `docs/docs/guides/` — the switch-back-to-immich script is at `scripts/revert-to-immich/`.
