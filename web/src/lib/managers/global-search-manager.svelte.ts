@@ -840,11 +840,15 @@ export class GlobalSearchManager {
       return;
     }
 
-    // SWR (stale-while-revalidate): only flip sections that are NOT already 'ok' to
-    // loading. Preserving ok content across keystrokes fixes the jitter bug where the
-    // palette flashed skeletons between every character.
+    // SWR (stale-while-revalidate): preserve any previously-settled section across
+    // keystrokes. 'ok' obviously stays so populated results don't flash skeletons.
+    // 'empty' also stays — if 'beach' returned 0 matches, typing 'beachy' won't
+    // suddenly start matching, and flashing skeletons over an empty section is the
+    // same jitter bug in a different skin. Only flip sections that never settled
+    // (idle) or had a transient failure (loading/timeout/error) to loading.
     for (const key of ['photos', 'people', 'places', 'tags'] as const) {
-      if (this.sections[key].status !== 'ok') {
+      const current = this.sections[key].status;
+      if (current !== 'ok' && current !== 'empty') {
         this.sections[key] = { status: 'loading' };
       }
     }

@@ -192,6 +192,7 @@ test.describe('global search palette', () => {
 
     test('System Settings and Admin sub-sections are absent', async ({ page }) => {
       await page.goto('/photos');
+      await page.getByTestId('cmdk-trigger').waitFor({ state: 'visible' });
       await page.keyboard.press('Control+k');
       await page.getByRole('dialog').getByRole('combobox').fill('classific');
       // 'classific' matches only admin system-settings item, which is gated out.
@@ -203,6 +204,7 @@ test.describe('global search palette', () => {
       // Step 1: as admin, navigate via palette to seed a recent entry.
       await utils.setAuthCookies(context, admin.accessToken);
       await page.goto('/photos');
+      await page.getByTestId('cmdk-trigger').waitFor({ state: 'visible' });
       await page.keyboard.press('Control+k');
       await page.getByRole('dialog').getByRole('combobox').fill('auto');
       await expect(page.getByText(/auto-classification/i)).toBeVisible();
@@ -211,6 +213,7 @@ test.describe('global search palette', () => {
       // Step 2: swap to non-admin cookies (simulating a demotion).
       await utils.setAuthCookies(context, nonAdmin.accessToken);
       await page.goto('/photos');
+      await page.getByTestId('cmdk-trigger').waitFor({ state: 'visible' });
       await page.keyboard.press('Control+k');
       // Empty query → Recent section should NOT contain Auto-Classification.
       await expect(page.getByText(/auto-classification/i)).toHaveCount(0);
