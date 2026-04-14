@@ -16,6 +16,14 @@ test.describe('global search palette', () => {
   test.beforeEach(async ({ context, page }) => {
     await utils.setAuthCookies(context, admin.accessToken);
     await page.goto('/photos');
+    // Wait for SvelteKit CSR hydration to finish before any keyboard.press —
+    // page.goto resolves on the `load` event, but hydration (which binds our
+    // svelte:document use:shortcut handler for Ctrl+K / Shift+T / …) happens
+    // asynchronously after that. The cmdk-trigger button is rendered under
+    // `{#if featureFlagsManager.valueOrUndefined?.search}` in the navbar, so
+    // seeing it proves the feature-flag manager loaded AND the navbar
+    // hydrated — i.e. the whole layout's actions are wired up.
+    await page.getByTestId('cmdk-trigger').waitFor({ state: 'visible' });
   });
 
   // The classic SearchBar (in the navbar) and the cmdk Command.Input both expose
