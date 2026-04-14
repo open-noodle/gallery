@@ -118,6 +118,27 @@ jobs:
             docker rm -f server >/dev/null
           }
 
+          # `wait_for_server` returns when the api worker is listening, but
+          # schema drift warnings are emitted by the *microservices* worker
+          # on a separate startup path. extract_drift is race-prone unless
+          # we first confirm the drift check has completed. DatabaseService
+          # logs either "No schema drift detected" (drift.items.length == 0)
+          # or "Detected schema drift" (items > 0) exactly once per boot,
+          # so grepping for either is a reliable "drift check done" signal.
+          wait_for_drift_check() {
+            local phase=$1
+            local deadline=$(( $(date +%s) + 60 ))
+            while [ "$(date +%s)" -lt "$deadline" ]; do
+              if docker logs server 2>&1 | grep -qE 'No schema drift detected|Detected schema drift'; then
+                return 0
+              fi
+              sleep 1
+            done
+            echo "::error::${phase}: drift check did not complete within 60s after ping OK"
+            docker logs server || true
+            return 1
+          }
+
           # Extract schema drift items from the currently-running `server`
           # container's logs. Each drift item is one log line with the
           # pattern "[...DatabaseService...]  - The/Table <thing> is ...".
@@ -222,6 +243,7 @@ jobs:
           ############################################################
 
           boot_server "ghcr.io/immich-app/immich-server:${UPSTREAM_TAG}" pre
+          if ! wait_for_drift_check pre; then exit 1; fi
           extract_drift > /tmp/drift-baseline.txt
           echo "Pre-phase baseline drift ($(wc -l < /tmp/drift-baseline.txt) item(s)):"
           cat /tmp/drift-baseline.txt || true
@@ -287,6 +309,7 @@ jobs:
           # reworks that warning format, update extract_drift accordingly.
           ############################################################
 
+          if ! wait_for_drift_check post; then exit 1; fi
           extract_drift > /tmp/drift-post.txt
           echo "Post-phase drift ($(wc -l < /tmp/drift-post.txt) item(s)):"
           cat /tmp/drift-post.txt || true
