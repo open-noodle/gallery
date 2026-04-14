@@ -1218,7 +1218,7 @@ Set `machineLearning.clip.maxDistance` in **Administration > Machine Learning > 
 
 #### Tuning tips
 
-- **Start at 0.75** and adjust based on your results. Lower values are stricter.
+- **Start at 0.75** and adjust based on your results. Lower values are stricter. If searches return nothing at 0.75, raise the threshold in small steps until relevant photos reappear — some libraries and CLIP models produce higher distances than others.
 - **Small changes can have a large effect.** CLIP embeddings tend to cluster in a narrow distance range rather than being spread evenly. This means a threshold change from, say, 0.75 to 0.80 may dramatically increase the number of results. This is normal — not a bug.
 - **Different CLIP models produce different distance distributions.** If you change your CLIP model, you may need to re-tune the threshold.
 - **Text-to-image vs. image-to-image searches** have different distance characteristics. Text queries typically produce higher distances (looser matches) than searching by a similar photo. If you use both search modes, pick a threshold that works for text queries — it will be permissive enough for image-based searches too.

@@ -148,7 +148,7 @@
             label={$t('admin.machine_learning_clip_max_distance')}
             description={$t('admin.machine_learning_clip_max_distance_description')}
             bind:value={configToEdit.machineLearning.clip.maxDistance}
-            step="0.05"
+            step="0.01"
             min={0}
             max={2}
             disabled={disabled || !configToEdit.machineLearning.enabled || !configToEdit.machineLearning.clip.enabled}
