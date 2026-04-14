@@ -61,8 +61,9 @@ prefix matches the repository's convention for fork-only workflows
 ```yaml
 on:
   schedule:
-    - cron: '0 5 * * *'  # 05:00 UTC nightly — leaves ~1h buffer after late-night
-                         # main merges so docker.yml has time to publish :main
+    - cron:
+        '0 5 * * *' # 05:00 UTC nightly — leaves ~1h buffer after late-night
+        # main merges so docker.yml has time to publish :main
   workflow_dispatch:
     inputs:
       gallery_image:
@@ -141,8 +142,8 @@ cleanup (step 14) remains separate because it needs `if: always()`.
    manual edits.
 4. **Create docker network** — `docker network create "$NETWORK_NAME"`.
 5. **Start postgres** — `docker run -d --name database --network "$NETWORK_NAME"
-   -e POSTGRES_USER -e POSTGRES_PASSWORD -e POSTGRES_DB
-   -e POSTGRES_INITDB_ARGS=--data-checksums "$POSTGRES_IMAGE"`.
+-e POSTGRES_USER -e POSTGRES_PASSWORD -e POSTGRES_DB
+-e POSTGRES_INITDB_ARGS=--data-checksums "$POSTGRES_IMAGE"`.
    Container name `database` matches the server's default `DB_HOSTNAME`
    (verified at `server/src/repositories/config.repository.ts:248`), so no
    `DB_HOSTNAME` env plumbing is needed.
@@ -155,10 +156,10 @@ cleanup (step 14) remains separate because it needs `if: always()`.
    `--data-checksums` initdb enough headroom on a congested runner.
 8. **Boot upstream Immich (pre-phase)** — explicit `docker pull` (for clean
    error messages if the tag is gone) then `docker run -d --name server
-   --network "$NETWORK_NAME" -p 2283:2283
-   -e DB_USERNAME -e DB_PASSWORD -e DB_DATABASE_NAME
-   "ghcr.io/immich-app/immich-server:$UPSTREAM_TAG"`. Then `wait_for_server
-   pre` (see below). On success, `docker stop server && docker rm server`
+--network "$NETWORK_NAME" -p 2283:2283
+-e DB_USERNAME -e DB_PASSWORD -e DB_DATABASE_NAME
+"ghcr.io/immich-app/immich-server:$UPSTREAM_TAG"`. Then `wait_for_server
+pre` (see below). On success, `docker stop server && docker rm server`
    (`rm -f` is synchronous on Linux, so `:2283` releases before the next
    `docker run` binds it — no `sleep` needed). This phase seeds
    `kysely_migration` with all upstream rows — the realistic "I was running
@@ -168,6 +169,7 @@ cleanup (step 14) remains separate because it needs `if: always()`.
    to `/data`. Skipping the mount avoids a permissions footgun where a
    GHA-owned `mktemp -d` dir (`0700` on the runner user) would be unwritable
    by the container's non-root user on first write.
+
 9. **Boot Gallery phase** — same pattern with `${GALLERY_IMAGE}`. Gallery's
    migrator applies the 27 fork migrations (using
    `allowUnorderedMigrations: true`, so interleaved timestamps work against
@@ -210,6 +212,7 @@ cleanup (step 14) remains separate because it needs `if: always()`.
     drift makes the migrator bail.
 13. **Schema drift check** — after the post-phase probe succeeds, grep
     server logs for drift warnings:
+
     ```bash
     # Coupled to the exact "Detected schema drift." substring defined in
     # server/src/constants.ts:12 (ErrorMessages.SchemaDrift). If an upstream
@@ -223,6 +226,7 @@ cleanup (step 14) remains separate because it needs `if: always()`.
       exit 1
     fi
     ```
+
     Matches `database.service.ts:133`'s
     `this.logger.warn(${ErrorMessages.SchemaDrift} ...)`. The grep is
     case-insensitive and substring-based to survive minor wording changes
@@ -237,6 +241,7 @@ cleanup (step 14) remains separate because it needs `if: always()`.
     has to `wait_for_server gallery` cleanly for us to continue to the
     revert test, and any Gallery-side drift is tracked as a separate
     concern.
+
 14. **Cleanup** — `if: always()` step:
     ```bash
     docker rm -f server database redis || true
@@ -284,17 +289,17 @@ green-light a broken revert script.
 
 ## Failure modes and their signals
 
-| Scenario                                              | Where it fires     | How it surfaces                                             |
-| ----------------------------------------------------- | ------------------ | ----------------------------------------------------------- |
-| Upstream image tag gone                               | pre-phase pull     | `docker pull` exits non-zero, `::error::` annotation        |
-| Gallery image missing or private                      | Gallery pull       | same                                                        |
-| Upstream boot broken (unrelated to this test)         | pre-phase probe    | 180s timeout, `docker logs server` dumped                   |
-| Gallery migration broken                              | Gallery probe      | same, with Gallery logs                                     |
-| Gallery image is actually upstream Immich (wrong tag) | Gallery sanity step | `SELECT count(*) ... LIKE '%SharedSpace%'` = 0, hard error   |
-| Revert SQL syntax error                               | revert step        | `ON_ERROR_STOP=1` exits psql non-zero, step fails           |
-| Revert SQL leaves a stale `kysely_migration` row      | post-phase probe   | `NestFactory.create` throws, 180s timeout, logs dumped      |
-| Revert SQL leaves schema drift (a table or column)    | drift-check step   | **the headline failure mode.** log grep matches, hard error |
-| Post-phase takes > 180s on a slow runner              | post-phase probe   | False positive. If we see one flake, bump to 240s. Don't pre-optimize. |
+| Scenario                                              | Where it fires      | How it surfaces                                                        |
+| ----------------------------------------------------- | ------------------- | ---------------------------------------------------------------------- |
+| Upstream image tag gone                               | pre-phase pull      | `docker pull` exits non-zero, `::error::` annotation                   |
+| Gallery image missing or private                      | Gallery pull        | same                                                                   |
+| Upstream boot broken (unrelated to this test)         | pre-phase probe     | 180s timeout, `docker logs server` dumped                              |
+| Gallery migration broken                              | Gallery probe       | same, with Gallery logs                                                |
+| Gallery image is actually upstream Immich (wrong tag) | Gallery sanity step | `SELECT count(*) ... LIKE '%SharedSpace%'` = 0, hard error             |
+| Revert SQL syntax error                               | revert step         | `ON_ERROR_STOP=1` exits psql non-zero, step fails                      |
+| Revert SQL leaves a stale `kysely_migration` row      | post-phase probe    | `NestFactory.create` throws, 180s timeout, logs dumped                 |
+| Revert SQL leaves schema drift (a table or column)    | drift-check step    | **the headline failure mode.** log grep matches, hard error            |
+| Post-phase takes > 180s on a slow runner              | post-phase probe    | False positive. If we see one flake, bump to 240s. Don't pre-optimize. |
 
 ## YAGNI
 
@@ -320,7 +325,7 @@ Explicitly not doing:
    and mounted it into each server boot (superseded below).
 2. **`pg_isready` was called on the GHA host**; `ubuntu-latest` doesn't
    ship `postgresql-client` by default. Fixed by switching to `docker exec
-   database pg_isready`.
+database pg_isready`.
 3. **GUC carryover via `-c "SET..." -f file.sql`** is correct but
    non-obvious; switched to an explicit pipe that makes the single-session
    guarantee visible at a glance.
