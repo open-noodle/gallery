@@ -66,18 +66,24 @@ on:
   workflow_dispatch:
     inputs:
       gallery_image:
-        description: 'Gallery server image tag to test'
-        default: 'ghcr.io/open-noodle/immich-server:main'
-        required: true
+        description: 'Gallery server image tag to test (default: ghcr.io/open-noodle/immich-server:main)'
+        required: false
 
 concurrency:
-  group: gallery-revert-validation
+  group: gallery-revert-to-immich-validation
   cancel-in-progress: false
 
 permissions:
   contents: read
   packages: read
 ```
+
+The dispatch input has no `default:` field — leaving the hardcoded
+`ghcr.io/open-noodle/immich-server:main` to live in exactly one place
+(the `GALLERY_IMAGE` env below). Manual dispatchers see the default value
+in the input's `description` and can leave the field empty to accept it.
+The concurrency group name matches the workflow filename so a future
+`grep -r gallery-revert-to-immich` finds both.
 
 The default `ghcr.io/open-noodle/immich-server:main` is the tag that
 `.github/workflows/docker.yml` publishes on every push to `main` (confirmed
@@ -113,6 +119,14 @@ ping-only test. If that changes upstream, the server boot will fail loudly
 in the pre-phase and the workflow will point at the missing env var.
 
 ### Step sequence
+
+**Shell scope:** steps 3 through 13 live inside a **single multi-step `run:`
+block**. This is deliberate — it lets bash variables (`UPSTREAM_TAG`,
+`gallery_rows`, etc.) and the `wait_for_server` helper function persist
+across what the prose calls "steps" without having to round-trip values
+through `$GITHUB_ENV`. Checkout (step 1) and ghcr login (step 2) remain
+separate `uses:` steps because they need action invocations, and the
+cleanup (step 14) remains separate because it needs `if: always()`.
 
 1. **Checkout** — `actions/checkout@v4` pinned by commit SHA.
 2. **ghcr login** — `docker/login-action` with `${{ github.token }}`. Cheap
@@ -160,6 +174,11 @@ in the pre-phase and the workflow will point at the missing env var.
    the pre-seeded upstream rows). `wait_for_server gallery`, stop, rm.
 10. **Sanity check that Gallery actually ran** —
     ```bash
+    # The '%SharedSpace%' pattern is coupled to the current set of fork
+    # migration filenames in server/src/schema/migrations-gallery/. If a
+    # future Gallery refactor renames these, update the pattern here — a
+    # pattern that returns 0 against a correctly-migrated Gallery DB would
+    # turn this check into a false-failure tripwire.
     gallery_rows=$(docker exec database psql -U postgres -d immich -Atc \
       "SELECT count(*) FROM kysely_migration WHERE name LIKE '%SharedSpace%'")
     if [ "$gallery_rows" -eq 0 ]; then
@@ -192,6 +211,11 @@ in the pre-phase and the workflow will point at the missing env var.
 13. **Schema drift check** — after the post-phase probe succeeds, grep
     server logs for drift warnings:
     ```bash
+    # Coupled to the exact "Detected schema drift." substring defined in
+    # server/src/constants.ts:12 (ErrorMessages.SchemaDrift). If an upstream
+    # rebase reworks that constant (e.g. renames it to "schema mismatch"),
+    # the grep will silently pass and this check becomes inert — update the
+    # pattern as part of the rebase report when that happens.
     if docker logs server 2>&1 | grep -qi 'schema drift'; then
       echo "::error::Schema drift detected after revert — \
     revert-to-immich.sql is missing cleanup for one or more Gallery objects"
@@ -201,9 +225,18 @@ in the pre-phase and the workflow will point at the missing env var.
     ```
     Matches `database.service.ts:133`'s
     `this.logger.warn(${ErrorMessages.SchemaDrift} ...)`. The grep is
-    case-insensitive and substring-based to survive minor wording changes.
-    This is the step that turns "catches most regressions" into "catches
-    every regression the revert script can cause."
+    case-insensitive and substring-based to survive minor wording changes
+    that still contain the "schema drift" phrase. This is the step that
+    turns "catches most regressions" into "catches every regression the
+    revert script can cause."
+
+    **Out of scope:** the grep only inspects the **post-phase** container
+    logs. If Gallery itself leaves drift during the Gallery phase — a
+    Gallery bug, not a revert bug — it will surface in that phase's logs
+    but this step won't see it. That's by design: the Gallery phase only
+    has to `wait_for_server gallery` cleanly for us to continue to the
+    revert test, and any Gallery-side drift is tracked as a separate
+    concern.
 14. **Cleanup** — `if: always()` step:
     ```bash
     docker rm -f server database redis || true
@@ -244,8 +277,10 @@ interacts cleanly with the helper's own `return 1` path.
 `/api/server/ping` is the correct health route: verified at
 `server/src/controllers/server.controller.ts:67`
 (`@Controller('server')` + `@Get('ping')`). 200 OK means the HTTP layer is
-up, which in turn means the migrator completed — which is exactly the signal
-we want.
+up, which in turn means the migrator completed — **necessary but not
+sufficient.** The drift grep in step 13 completes the pass criterion; see
+the "Pass criterion" section for why the ping alone would silently
+green-light a broken revert script.
 
 ## Failure modes and their signals
 
@@ -294,10 +329,10 @@ Explicitly not doing:
 5. **Concurrency guard missing**; added.
 6. Timeout dropped 30 → 15 min.
 
-### Second review (`/review` on this doc)
+### Second review (`/review` on this doc, first pass)
 
 Caught that the pass criterion as originally written was **weaker than
-claimed**. Issues fixed in this revision:
+claimed**. Issues fixed:
 
 1. **Schema drift was a silent pass.** `database.service.ts:130` emits
    `logger.warn` and keeps going when drift is found, so the original
@@ -319,6 +354,33 @@ claimed**. Issues fixed in this revision:
    a future reader doesn't add a defensive `sleep`.
 7. **Missing failure-mode row** for "Gallery image is actually upstream":
    added.
+
+### Third review (`/review` on this doc, second pass)
+
+Found polish issues that the first-pass review introduced or left. Fixed
+in this revision:
+
+1. **Health-probe helper comment contradicted the updated pass criterion**
+   ("exactly the signal we want" vs. "necessary but not sufficient").
+   Rewrote the paragraph under the helper definition to cross-reference
+   the drift check.
+2. **Step 3's `$UPSTREAM_TAG` env-var scope was ambiguous** — a reader
+   couldn't tell whether steps 3-13 shared one shell or were separate
+   `run:` steps with `$GITHUB_ENV` round-trips. Added a "Shell scope"
+   paragraph at the top of the step sequence stating they live in one
+   multi-step `run:` block.
+3. **Drift grep / SharedSpace sanity pattern brittleness** — both are
+   coupled to specific upstream and Gallery-internal strings. Added
+   inline comments at the grep and the `SELECT` so a future rebase or
+   migration rename updates them deliberately rather than silently
+   bypassing the check.
+4. **Concurrency group name** (`gallery-revert-validation`) didn't match
+   the workflow filename (`gallery-revert-to-immich-validation.yml`).
+   Aligned to `gallery-revert-to-immich-validation` for `grep`-ability.
+5. **`GALLERY_IMAGE` default was duplicated** between the dispatch input's
+   `default:` field and the job env's `||` fallback. Dropped the input's
+   `default:` and moved the default value into the input description
+   instead, so the string lives in exactly one machine-read place.
 
 ## Open questions
 
