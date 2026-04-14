@@ -234,12 +234,12 @@ Pre-built Docker images are published to GitHub Container Registry (GHCR) under 
 
 ### Publishing
 
-Images are automatically built and published on every push to `main` via the **Release** GitHub Actions workflow (`.github/workflows/release.yml`).
+Images are built and published by the **Release Gallery** GitHub Actions workflow (`.github/workflows/gallery-release.yml`). The workflow is **manually triggered** via `workflow_dispatch` — it does not run automatically on merges to `main`.
 
 **How it works:**
 
-1. Every merged PR triggers an automatic build (unless the PR has the `changelog:skip` label)
-2. The version is computed from the latest git tag using semantic versioning:
+1. A maintainer triggers the workflow from the Actions tab (or via `gh workflow run`), optionally passing an explicit version.
+2. If no version is passed, the next semver is computed from commits since the latest tag:
    - `changelog:skip` PR label → **no release** (skips build, tag, and push entirely)
    - `feat:` commit or `changelog:feat` PR label → **minor** bump (e.g. `v4.2.6` → `v4.3.0`)
    - `BREAKING CHANGE` in commit body → **major** bump (e.g. `v4.3.0` → `v5.0.0`)
@@ -249,13 +249,13 @@ Images are automatically built and published on every push to `main` via the **R
 5. Git tags are created after successful builds
 6. Images are pushed to GHCR using the built-in `GITHUB_TOKEN` — no extra secrets needed
 
-**To manually publish a specific version:**
+**To publish a specific version:**
 
 ```bash
-gh workflow run release.yml --ref main -f version=v4.2.6
+gh workflow run gallery-release.yml --ref main -f version=v4.2.6
 ```
 
-Or use the GitHub Actions UI: Actions > Release > Run workflow > enter version > Run.
+Or use the GitHub Actions UI: Actions > Release Gallery > Run workflow > enter version (or leave blank for auto-bump) > Run.
 
 ## Contributing
 
