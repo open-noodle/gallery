@@ -28,6 +28,7 @@ import {
   JobName,
   JobStatus,
   Permission,
+  PersonDatabaseMode,
   PersonPathType,
   QueueName,
   SourceType,
@@ -435,6 +436,19 @@ export class PersonService extends BaseService {
       // space-persons are lost by design (Force already clears named native persons).
       await this.sharedSpaceRepository.deleteAllPersonFaces();
       await this.sharedSpaceRepository.deleteAllPersons();
+
+      // Queue one SharedSpaceFaceMatchAll per face-recognition-enabled space.
+      // handleRecognizeFaces returns early for faces whose personId is already set
+      // (EXIF/manual-sourced), so the normal per-face SharedSpaceFaceMatch path is
+      // skipped for them. Without this explicit re-queue, those faces would vanish
+      // from every space after Force and never come back.
+      const spaceIds = await this.sharedSpaceRepository.getSpaceIdsWithFaceRecognitionEnabled();
+      await this.jobRepository.queueAll(
+        spaceIds.map((spaceId) => ({
+          name: JobName.SharedSpaceFaceMatchAll as const,
+          data: { spaceId },
+        })),
+      );
     } else if (waiting) {
       this.logger.debug(
         `Skipping facial recognition queueing because ${waiting} job${waiting > 1 ? 's are' : ' is'} already queued`,
@@ -461,20 +475,6 @@ export class PersonService extends BaseService {
 
     await this.jobRepository.queueAll(jobs);
 
-    // Queue SharedSpaceFaceMatchAll AFTER recognition jobs so it runs last.
-    // This catches EXIF/manual-sourced faces whose personIds survive
-    // unassignFaces (non-ML source). Queued after recognition jobs so
-    // ML faces have been processed by the per-face space matching path first.
-    if (force) {
-      const spaceIds = await this.sharedSpaceRepository.getSpaceIdsWithFaceRecognitionEnabled();
-      await this.jobRepository.queueAll(
-        spaceIds.map((spaceId) => ({
-          name: JobName.SharedSpaceFaceMatchAll as const,
-          data: { spaceId },
-        })),
-      );
-    }
-
     await this.systemMetadataRepository.set(SystemMetadataKey.FacialRecognitionState, { lastRun });
 
     return JobStatus.Success;
@@ -482,10 +482,12 @@ export class PersonService extends BaseService {
 
   @OnJob({ name: JobName.FacialRecognition, queue: QueueName.FacialRecognition })
   async handleRecognizeFaces({ id, deferred }: JobOf<JobName.FacialRecognition>): Promise<JobStatus> {
-    const { machineLearning } = await this.getConfig({ withCache: true });
+    const { machineLearning, person: personConfig } = await this.getConfig({ withCache: true });
     if (!isFacialRecognitionEnabled(machineLearning)) {
       return JobStatus.Skipped;
     }
+
+    const isGlobalMode = personConfig.databaseMode === PersonDatabaseMode.Global;
 
     const face = await this.personRepository.getFaceForFacialRecognitionJob(id);
     if (!face || !face.asset) {
@@ -505,22 +507,14 @@ export class PersonService extends BaseService {
 
     if (face.personId) {
       this.logger.debug(`Face ${id} already has a person assigned`);
-
-      // Still queue space face matching — this face may belong to a space
-      // that was created/linked after the face was originally recognized.
-      const spaceIds = await this.sharedSpaceRepository.getSpaceIdsForAsset(face.assetId);
-      for (const { spaceId } of spaceIds) {
-        await this.jobRepository.queue({
-          name: JobName.SharedSpaceFaceMatch,
-          data: { spaceId, assetId: face.assetId },
-        });
-      }
-
       return JobStatus.Skipped;
     }
 
+    // Phase 2.1: In global mode search across all users, in space mode only within the asset owner
+    const searchUserIds = isGlobalMode ? undefined : [face.asset.ownerId];
+
     const matches = await this.searchRepository.searchFaces({
-      userIds: [face.asset.ownerId],
+      userIds: searchUserIds,
       embedding: face.faceSearch.embedding,
       maxDistance: machineLearning.facialRecognition.maxDistance,
       numResults: machineLearning.facialRecognition.minFaces,
@@ -547,7 +541,7 @@ export class PersonService extends BaseService {
     let personId = matches.find((match) => match.personId)?.personId;
     if (!personId) {
       const matchWithPerson = await this.searchRepository.searchFaces({
-        userIds: [face.asset.ownerId],
+        userIds: searchUserIds,
         embedding: face.faceSearch.embedding,
         maxDistance: machineLearning.facialRecognition.maxDistance,
         numResults: 1,
@@ -560,6 +554,7 @@ export class PersonService extends BaseService {
       }
     }
 
+    // Phase 2.2: In global mode use the asset owner as creator (not exclusive owner)
     if (isCore && !personId) {
       this.logger.log(`Creating new person for face ${id}`);
       const newPerson = await this.personRepository.create({ ownerId: face.asset.ownerId, faceAssetId: face.id });
@@ -572,13 +567,15 @@ export class PersonService extends BaseService {
       await this.personRepository.reassignFaces({ faceIds: [id], newPersonId: personId });
     }
 
-    // Queue shared space face matching for any spaces containing this asset
-    const spaceIds = await this.sharedSpaceRepository.getSpaceIdsForAsset(face.assetId);
-    for (const { spaceId } of spaceIds) {
-      await this.jobRepository.queue({
-        name: JobName.SharedSpaceFaceMatch,
-        data: { spaceId, assetId: face.assetId },
-      });
+    // Phase 2.3: In global mode face matching is already done globally — skip space-level matching
+    if (!isGlobalMode) {
+      const spaceIds = await this.sharedSpaceRepository.getSpaceIdsForAsset(face.assetId);
+      for (const { spaceId } of spaceIds) {
+        await this.jobRepository.queue({
+          name: JobName.SharedSpaceFaceMatch,
+          data: { spaceId, assetId: face.assetId },
+        });
+      }
     }
 
     return JobStatus.Success;

@@ -774,7 +774,6 @@ export enum DatabaseLock {
   BackupDatabase = 42,
   MaintenanceOperation = 621,
   MemoryCreation = 777,
-  VersionCheck = 800,
 }
 
 export enum MaintenanceAction {
@@ -1020,4 +1019,9 @@ export enum PluginContext {
 export enum PluginTriggerType {
   AssetCreate = 'AssetCreate',
   PersonRecognized = 'PersonRecognized',
+}
+
+export enum PersonDatabaseMode {
+  Space = 'space',
+  Global = 'global',
 }

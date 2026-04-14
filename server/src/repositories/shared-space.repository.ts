@@ -553,6 +553,8 @@ export class SharedSpaceRepository {
       .where('shared_space_person.spaceId', '=', spaceId)
       .$if(!options.withHidden, (qb) => qb.where('shared_space_person.isHidden', '=', false))
       .$if(!options.petsEnabled, (qb) => qb.where('shared_space_person.type', '!=', 'pet'))
+      .where('person.thumbnailPath', 'is not', null)
+      .where('person.thumbnailPath', '!=', '')
       .$if(!!options.named, (qb) =>
         qb.where((eb) =>
           eb.or([
@@ -584,6 +586,250 @@ export class SharedSpaceRepository {
       .$if(!!options.limit, (qb) => qb.limit(options.limit!))
       .$if(!!options.offset, (qb) => qb.offset(options.offset!))
       .execute();
+  }
+
+  /**
+   * Global person mode: returns persons from the central `person` table whose
+   * faces appear on assets belonging to the given space (via direct asset link
+   * or library link). No ownerId filter is applied.
+   * Returns faceCount and assetCount scoped to this space.
+   */
+  @GenerateSql({ params: [DummyValue.UUID] })
+  getGlobalPersonsBySpaceId(
+    spaceId: string,
+    options: {
+      withHidden?: boolean;
+      petsEnabled?: boolean;
+      limit?: number;
+      offset?: number;
+      minimumFaceCount?: number;
+    } = {},
+  ) {
+    return this.db
+      .selectFrom('person')
+      .selectAll('person')
+      .select([
+        sql<number>`cast(count(distinct asset_face.id) as integer)`.as('faceCount'),
+        sql<number>`cast(count(distinct asset.id) as integer)`.as('assetCount'),
+      ])
+      .innerJoin('asset_face', 'asset_face.personId', 'person.id')
+      .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+      .where((eb) =>
+        eb.or([
+          eb.exists(
+            eb
+              .selectFrom('shared_space_asset')
+              .select('shared_space_asset.assetId')
+              .whereRef('shared_space_asset.assetId', '=', 'asset.id')
+              .where('shared_space_asset.spaceId', '=', spaceId),
+          ),
+          eb.exists(
+            eb
+              .selectFrom('shared_space_library')
+              .select('shared_space_library.libraryId')
+              .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
+              .where('shared_space_library.spaceId', '=', spaceId),
+          ),
+        ]),
+      )
+      .where('asset_face.deletedAt', 'is', null)
+      .where('asset_face.isVisible', 'is', true)
+      .where('asset.deletedAt', 'is', null)
+      .$if(!options.withHidden, (qb) => qb.where('person.isHidden', '=', false))
+      .$if(!options.petsEnabled, (qb) => qb.where('person.type', '!=', 'pet'))
+      .groupBy('person.id')
+      .having((eb) =>
+        eb.or([
+          eb('person.name', '!=', ''),
+          eb(eb.fn.count('asset_face.id'), '>=', options.minimumFaceCount ?? 1),
+        ]),
+      )
+      .orderBy(sql`NULLIF(person.name, '') is null`, 'asc')
+      .orderBy((eb) => eb.fn.count('asset_face.id'), 'desc')
+      .orderBy(sql`NULLIF(person.name, '')`, (om) => om.asc().nullsLast())
+      .orderBy('person.createdAt')
+      .$if(!!options.limit, (qb) => qb.limit(options.limit!))
+      .$if(!!options.offset, (qb) => qb.offset(options.offset!))
+      .execute();
+  }
+
+  /** Global person mode: fetches a single person with asset/face counts scoped to the given space. */
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
+  getGlobalPersonByIdForSpace(personId: string, spaceId: string) {
+    return this.db
+      .selectFrom('person')
+      .selectAll('person')
+      .select([
+        sql<number>`cast(count(distinct asset_face.id) as integer)`.as('faceCount'),
+        sql<number>`cast(count(distinct asset.id) as integer)`.as('assetCount'),
+      ])
+      .innerJoin('asset_face', 'asset_face.personId', 'person.id')
+      .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+      .where('person.id', '=', personId)
+      .where((eb) =>
+        eb.or([
+          eb.exists(
+            eb
+              .selectFrom('shared_space_asset')
+              .select('shared_space_asset.assetId')
+              .whereRef('shared_space_asset.assetId', '=', 'asset.id')
+              .where('shared_space_asset.spaceId', '=', spaceId),
+          ),
+          eb.exists(
+            eb
+              .selectFrom('shared_space_library')
+              .select('shared_space_library.libraryId')
+              .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
+              .where('shared_space_library.spaceId', '=', spaceId),
+          ),
+        ]),
+      )
+      .where('asset_face.deletedAt', 'is', null)
+      .where('asset_face.isVisible', 'is', true)
+      .where('asset.deletedAt', 'is', null)
+      .groupBy('person.id')
+      .executeTakeFirst();
+  }
+
+  /** Global person mode: checks if a global person appears in the given space. */
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
+  isGlobalPersonInSpace(personId: string, spaceId: string) {
+    return this.db
+      .selectFrom('person')
+      .select('person.id')
+      .innerJoin('asset_face', 'asset_face.personId', 'person.id')
+      .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+      .where('person.id', '=', personId)
+      .where((eb) =>
+        eb.or([
+          eb.exists(
+            eb
+              .selectFrom('shared_space_asset')
+              .select('shared_space_asset.assetId')
+              .whereRef('shared_space_asset.assetId', '=', 'asset.id')
+              .where('shared_space_asset.spaceId', '=', spaceId),
+          ),
+          eb.exists(
+            eb
+              .selectFrom('shared_space_library')
+              .select('shared_space_library.libraryId')
+              .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
+              .where('shared_space_library.spaceId', '=', spaceId),
+          ),
+        ]),
+      )
+      .where('asset_face.deletedAt', 'is', null)
+      .where('asset_face.isVisible', 'is', true)
+      .where('asset.deletedAt', 'is', null)
+      .limit(1)
+      .executeTakeFirst();
+  }
+
+  /** Global person mode: returns which of the given global person IDs are visible in the given space. */
+  @GenerateSql({ params: [[DummyValue.UUID], DummyValue.UUID] })
+  async getGlobalPersonIdsInSpace(personIds: string[], spaceId: string): Promise<Set<string>> {
+    if (personIds.length === 0) {
+      return new Set<string>();
+    }
+    const rows = await this.db
+      .selectFrom('person')
+      .select('person.id')
+      .innerJoin('asset_face', 'asset_face.personId', 'person.id')
+      .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+      .where('person.id', 'in', personIds)
+      .where((eb) =>
+        eb.or([
+          eb.exists(
+            eb
+              .selectFrom('shared_space_asset')
+              .select('shared_space_asset.assetId')
+              .whereRef('shared_space_asset.assetId', '=', 'asset.id')
+              .where('shared_space_asset.spaceId', '=', spaceId),
+          ),
+          eb.exists(
+            eb
+              .selectFrom('shared_space_library')
+              .select('shared_space_library.libraryId')
+              .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
+              .where('shared_space_library.spaceId', '=', spaceId),
+          ),
+        ]),
+      )
+      .where('asset_face.deletedAt', 'is', null)
+      .where('asset_face.isVisible', 'is', true)
+      .where('asset.deletedAt', 'is', null)
+      .distinct()
+      .execute();
+    return new Set(rows.map((r) => r.id));
+  }
+
+  /** Global person mode: returns asset IDs for a global person scoped to a space. */
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
+  getGlobalPersonAssetIdsForSpace(personId: string, spaceId: string) {
+    return this.db
+      .selectFrom('asset_face')
+      .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+      .select('asset.id as assetId')
+      .where('asset_face.personId', '=', personId)
+      .where('asset_face.deletedAt', 'is', null)
+      .where('asset_face.isVisible', 'is', true)
+      .where('asset.deletedAt', 'is', null)
+      .where((eb) =>
+        eb.or([
+          eb.exists(
+            eb
+              .selectFrom('shared_space_asset')
+              .select('shared_space_asset.assetId')
+              .whereRef('shared_space_asset.assetId', '=', 'asset.id')
+              .where('shared_space_asset.spaceId', '=', spaceId),
+          ),
+          eb.exists(
+            eb
+              .selectFrom('shared_space_library')
+              .select('shared_space_library.libraryId')
+              .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
+              .where('shared_space_library.spaceId', '=', spaceId),
+          ),
+        ]),
+      )
+      .distinct()
+      .execute();
+  }
+
+  /** Global person mode: returns total person count and total face count for a space. */
+  @GenerateSql({ params: [DummyValue.UUID] })
+  getGlobalPersonStatsForSpace(spaceId: string) {
+    return this.db
+      .selectFrom('asset_face')
+      .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+      .innerJoin('person', 'person.id', 'asset_face.personId')
+      .select([
+        sql<number>`cast(count(distinct person.id) as integer)`.as('totalPersons'),
+        sql<number>`cast(count(distinct asset_face.id) as integer)`.as('totalFaces'),
+      ])
+      .where('asset_face.deletedAt', 'is', null)
+      .where('asset_face.isVisible', 'is', true)
+      .where('asset.deletedAt', 'is', null)
+      .where('person.isHidden', '=', false)
+      .where((eb) =>
+        eb.or([
+          eb.exists(
+            eb
+              .selectFrom('shared_space_asset')
+              .select('shared_space_asset.assetId')
+              .whereRef('shared_space_asset.assetId', '=', 'asset.id')
+              .where('shared_space_asset.spaceId', '=', spaceId),
+          ),
+          eb.exists(
+            eb
+              .selectFrom('shared_space_library')
+              .select('shared_space_library.libraryId')
+              .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
+              .where('shared_space_library.spaceId', '=', spaceId),
+          ),
+        ]),
+      )
+      .executeTakeFirstOrThrow();
   }
 
   @GenerateSql({ params: [DummyValue.UUID] })
@@ -673,42 +919,6 @@ export class SharedSpaceRepository {
       .updateTable('shared_space_person_face')
       .set({ personId: toPersonId })
       .where('personId', '=', fromPersonId)
-      .execute();
-  }
-
-  @GenerateSql({ params: [DummyValue.UUID] })
-  async getFirstFaceIdForPerson(personId: string): Promise<string | null> {
-    const result = await this.db
-      .selectFrom('shared_space_person_face')
-      .innerJoin('face_search', 'face_search.faceId', 'shared_space_person_face.assetFaceId')
-      .select('shared_space_person_face.assetFaceId')
-      .where('shared_space_person_face.personId', '=', personId)
-      .limit(1)
-      .executeTakeFirst();
-    return result?.assetFaceId ?? null;
-  }
-
-  @GenerateSql({ params: [DummyValue.UUID] })
-  async repairOrphanedRepresentativeFaces(spaceId: string) {
-    await this.db
-      .updateTable('shared_space_person')
-      .set((eb) => ({
-        representativeFaceId: eb
-          .selectFrom('shared_space_person_face')
-          .innerJoin('face_search', 'face_search.faceId', 'shared_space_person_face.assetFaceId')
-          .select('shared_space_person_face.assetFaceId')
-          .whereRef('shared_space_person_face.personId', '=', 'shared_space_person.id')
-          .limit(1),
-      }))
-      .where('shared_space_person.spaceId', '=', spaceId)
-      .where('shared_space_person.representativeFaceId', 'is', null)
-      .where((eb) =>
-        eb.exists(
-          eb
-            .selectFrom('shared_space_person_face')
-            .whereRef('shared_space_person_face.personId', '=', 'shared_space_person.id'),
-        ),
-      )
       .execute();
   }
 
@@ -956,7 +1166,6 @@ export class SharedSpaceRepository {
         'shared_space_person.type',
         'shared_space_person.isHidden',
         'shared_space_person.faceCount',
-        'shared_space_person.representativeFaceId',
         'face_search.embedding',
       ])
       .where('shared_space_person.spaceId', '=', spaceId)

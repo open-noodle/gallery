@@ -82,7 +82,8 @@ export interface SearchExifOptions {
 
 export interface SearchEmbeddingOptions {
   embedding: string;
-  userIds: string[];
+  /** When undefined, searches across all users (global person mode). */
+  userIds?: string[];
   maxDistance?: number;
 }
 
@@ -203,6 +204,7 @@ export interface GetCameraLensModelsOptions extends SpaceScopeOptions {
 
 export interface FilterSuggestionsOptions extends SpaceScopeOptions {
   personIds?: string[];
+  isGlobalPersonMode?: boolean;
   country?: string;
   city?: string;
   make?: string;
@@ -425,7 +427,7 @@ export class SearchRepository {
             .innerJoin('asset', 'asset.id', 'asset_face.assetId')
             .innerJoin('face_search', 'face_search.faceId', 'asset_face.id')
             .leftJoin('person', 'person.id', 'asset_face.personId')
-            .where('asset.ownerId', '=', anyUuid(userIds))
+            .$if(!!userIds && userIds.length > 0, (qb) => qb.where('asset.ownerId', '=', anyUuid(userIds!)))
             .where('asset.deletedAt', 'is', null)
             .$if(!!hasPerson, (qb) => qb.where('asset_face.personId', 'is not', null))
             .$if(!!minBirthDate, (qb) =>
@@ -774,7 +776,7 @@ export class SearchRepository {
           .$if(!!options.model, (qb) => qb.where('asset_exif.model', '=', options.model!))
           .$if(!!options.rating, (qb) => qb.where('asset_exif.rating', '=', options.rating!)),
       )
-      .$if(!!options.personIds?.length && !!options.spaceId, (qb) =>
+      .$if(!!options.personIds?.length && !!options.spaceId && !options.isGlobalPersonMode, (qb) =>
         qb.where((eb) =>
           eb.exists(
             eb
@@ -787,7 +789,7 @@ export class SearchRepository {
           ),
         ),
       )
-      .$if(!!options.personIds?.length && !options.spaceId, (qb) =>
+      .$if(!!options.personIds?.length && (!options.spaceId || !!options.isGlobalPersonMode), (qb) =>
         qb.where((eb) =>
           eb.exists(
             eb
@@ -862,8 +864,53 @@ export class SearchRepository {
   ): Promise<{ people: Array<{ id: string; name: string }>; hasUnnamedPeople: boolean }> {
     const filteredIds = this.buildFilteredAssetIds(userIds, options);
 
-    // When spaceId is set, return shared_space_person records (space-specific IDs and names)
     if (options.spaceId) {
+      const spaceId = options.spaceId;
+
+      if (options.isGlobalPersonMode) {
+        // Global mode: read from central person table (single source of truth)
+        const globalPeople = await this.db
+          .selectFrom('person')
+          .select(['person.id', 'person.name'])
+          .where('person.name', '!=', '')
+          .where('person.isHidden', '=', false)
+          .where((eb) =>
+            eb.exists(
+              eb
+                .selectFrom('asset_face')
+                .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+                .whereRef('asset_face.personId', '=', 'person.id')
+                .where('asset_face.deletedAt', 'is', null)
+                .where('asset_face.isVisible', 'is', true)
+                .where('asset.deletedAt', 'is', null)
+                .where('asset_face.assetId', 'in', filteredIds)
+                .where((eb2) =>
+                  eb2.or([
+                    eb2.exists(
+                      eb2
+                        .selectFrom('shared_space_asset')
+                        .select('shared_space_asset.assetId')
+                        .whereRef('shared_space_asset.assetId', '=', 'asset.id')
+                        .where('shared_space_asset.spaceId', '=', asUuid(spaceId)),
+                    ),
+                    eb2.exists(
+                      eb2
+                        .selectFrom('shared_space_library')
+                        .select('shared_space_library.libraryId')
+                        .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
+                        .where('shared_space_library.spaceId', '=', asUuid(spaceId)),
+                    ),
+                  ]),
+                ),
+            ),
+          )
+          .orderBy('person.name')
+          .execute();
+
+        return { people: globalPeople, hasUnnamedPeople: false };
+      }
+
+      // Space mode: return shared_space_person records (space-specific IDs and names)
       const spacePeople = await this.db
         .selectFrom('shared_space_person')
         .leftJoin('asset_face', 'asset_face.id', 'shared_space_person.representativeFaceId')

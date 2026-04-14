@@ -6,6 +6,7 @@ import {
   ImageFormat,
   LogLevel,
   OAuthTokenEndpointAuthMethod,
+  PersonDatabaseMode,
   QueueName,
   ToneMapping,
   TranscodeHardwareAcceleration,
@@ -202,6 +203,9 @@ export type SystemConfig = {
   };
   user: {
     deleteDelay: number;
+  };
+  person: {
+    databaseMode: PersonDatabaseMode;
   };
 };
 
@@ -422,5 +426,8 @@ export const defaults = Object.freeze<SystemConfig>({
   },
   user: {
     deleteDelay: 7,
+  },
+  person: {
+    databaseMode: PersonDatabaseMode.Space,
   },
 });

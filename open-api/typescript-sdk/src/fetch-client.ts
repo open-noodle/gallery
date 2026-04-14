@@ -1,6 +1,6 @@
 /**
  * Immich
- * 2.7.5
+ * 2.7.2
  * DO NOT MODIFY - This file has been generated using oazapfts.
  * See https://www.npmjs.com/package/oazapfts
  */
@@ -57,17 +57,8 @@ export type ActivityStatisticsResponseDto = {
     /** Number of likes */
     likes: number;
 };
-export type DatabaseBackupDeleteDto = {
-    backups: string[];
-};
-export type DatabaseBackupDto = {
-    filename: string;
-    filesize: number;
-    timezone: string;
-};
-export type DatabaseBackupListResponseDto = {
-    backups: DatabaseBackupDto[];
-};
+export type DatabaseBackupDeleteDto = {};
+export type DatabaseBackupListResponseDto = {};
 export type DatabaseBackupUploadDto = {
     file?: Blob;
 };
@@ -2594,6 +2585,12 @@ export type SharedSpacePersonResponseDto = {
     /** Last update date */
     updatedAt: string;
 };
+export type SharedSpacePeopleStatsResponseDto = {
+    /** Total number of face detections across all persons in this space */
+    totalFaces: number;
+    /** Total number of distinct persons visible in this space */
+    totalPersons: number;
+};
 export type SharedSpacePersonUpdateDto = {
     /** Person date of birth */
     birthDate?: string | null;
@@ -2973,6 +2970,10 @@ export type SystemConfigPasswordLoginDto = {
     /** Enabled */
     enabled: boolean;
 };
+export type SystemConfigPersonDto = {
+    /** Person database mode */
+    databaseMode: PersonDatabaseMode;
+};
 export type SystemConfigReverseGeocodingDto = {
     /** Enabled */
     enabled: boolean;
@@ -3031,6 +3032,7 @@ export type SystemConfigDto = {
     notifications: SystemConfigNotificationsDto;
     oauth: SystemConfigOAuthDto;
     passwordLogin: SystemConfigPasswordLoginDto;
+    person: SystemConfigPersonDto;
     reverseGeocoding: SystemConfigReverseGeocodingDto;
     server: SystemConfigServerDto;
     storageTemplate: SystemConfigStorageTemplateDto;
@@ -6909,6 +6911,19 @@ export function deduplicateSpacePeople({ id }: {
     }));
 }
 /**
+ * Get people stats for a shared space
+ */
+export function getSpacePeopleStats({ id }: {
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: SharedSpacePeopleStatsResponseDto;
+    }>(`/shared-spaces/${encodeURIComponent(id)}/people/stats`, {
+        ...opts
+    }));
+}
+/**
  * Delete a person from a shared space
  */
 export function deleteSpacePerson({ id, personId }: {
@@ -8657,6 +8672,10 @@ export enum LogLevel {
 export enum OAuthTokenEndpointAuthMethod {
     ClientSecretPost = "client_secret_post",
     ClientSecretBasic = "client_secret_basic"
+}
+export enum PersonDatabaseMode {
+    Space = "space",
+    Global = "global"
 }
 export enum UserMetadataKey {
     Preferences = "preferences",

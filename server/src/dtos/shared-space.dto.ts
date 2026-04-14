@@ -247,6 +247,14 @@ export class SharedSpaceActivityQueryDto {
   offset?: number;
 }
 
+export class SharedSpacePeopleStatsResponseDto {
+  @ApiProperty({ description: 'Total number of distinct persons visible in this space' })
+  totalPersons!: number;
+
+  @ApiProperty({ description: 'Total number of face detections across all persons in this space' })
+  totalFaces!: number;
+}
+
 export class SharedSpaceActivityResponseDto {
   @ApiProperty({ description: 'Activity ID' })
   id!: string;

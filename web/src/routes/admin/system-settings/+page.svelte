@@ -13,6 +13,7 @@
   import NewVersionCheckSettings from '$lib/components/admin-settings/NewVersionCheckSettings.svelte';
   import NightlyTasksSettings from '$lib/components/admin-settings/NightlyTasksSettings.svelte';
   import NotificationSettings from '$lib/components/admin-settings/NotificationSettings.svelte';
+  import PersonSettings from '$lib/components/admin-settings/PersonSettings.svelte';
   import ServerSettings from '$lib/components/admin-settings/ServerSettings.svelte';
   import StorageTemplateSettings from '$lib/components/admin-settings/StorageTemplateSettings.svelte';
   import ThemeSettings from '$lib/components/admin-settings/ThemeSettings.svelte';
@@ -29,6 +30,7 @@
   import { Alert, CommandPaletteDefaultProvider, Container } from '@immich/ui';
   import {
     mdiAccountOutline,
+    mdiAccountGroupOutline,
     mdiBackupRestore,
     mdiBellOutline,
     mdiBookshelf,
@@ -176,6 +178,13 @@
       subtitle: $t('admin.trash_settings_description'),
       key: 'trash',
       icon: mdiTrashCanOutline,
+    },
+    {
+      component: PersonSettings,
+      title: $t('admin.person_settings'),
+      subtitle: $t('admin.person_settings_description'),
+      key: 'person-settings',
+      icon: mdiAccountGroupOutline,
     },
     {
       component: UserSettings,

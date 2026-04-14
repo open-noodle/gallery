@@ -1,5 +1,5 @@
 import { authenticate } from '$lib/utils/auth';
-import { getMembers, getSpace, getSpacePeople } from '@immich/sdk';
+import { getConfig, getMembers, getSpace, getSpacePeople, PersonDatabaseMode } from '@immich/sdk';
 import type { PageLoad } from './$types';
 
 export const load = (async ({ url, params }) => {
@@ -10,10 +10,20 @@ export const load = (async ({ url, params }) => {
     getSpacePeople({ id: params.spaceId, limit: 100 }),
   ]);
 
+  // Fetch person database mode; falls back to Space if the user lacks admin access
+  let personDatabaseMode: PersonDatabaseMode = PersonDatabaseMode.Space;
+  try {
+    const config = await getConfig();
+    personDatabaseMode = config.person.databaseMode as PersonDatabaseMode;
+  } catch {
+    // non-admin user or config unavailable — default to Space mode
+  }
+
   return {
     space,
     members,
     people,
+    personDatabaseMode,
     meta: {
       title: `${space.name} - People`,
     },

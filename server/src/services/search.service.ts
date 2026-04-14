@@ -22,7 +22,7 @@ import {
   TagSuggestionRequestDto,
   TagSuggestionResponseDto,
 } from 'src/dtos/search.dto';
-import { AssetOrder, AssetVisibility, Permission } from 'src/enum';
+import { AssetOrder, AssetVisibility, Permission, PersonDatabaseMode } from 'src/enum';
 import { BaseService } from 'src/services/base.service';
 import { requireElevatedPermission } from 'src/utils/access';
 import { getMyPartnerIds } from 'src/utils/asset.util';
@@ -261,7 +261,10 @@ export class SearchService extends BaseService {
       }
     }
 
-    const result = await this.searchRepository.getFilterSuggestions(userIds, { ...dto, timelineSpaceIds });
+    const { person: personConfig } = await this.getConfig({ withCache: true });
+    const isGlobalPersonMode = personConfig.databaseMode === PersonDatabaseMode.Global;
+
+    const result = await this.searchRepository.getFilterSuggestions(userIds, { ...dto, timelineSpaceIds, isGlobalPersonMode });
     return { ...result, people: result.people.toSorted((a, b) => a.name.localeCompare(b.name)) };
   }
 

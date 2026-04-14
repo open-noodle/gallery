@@ -38,6 +38,7 @@ import {
   JobName,
   JobStatus,
   Permission,
+  PersonDatabaseMode,
   QueueName,
 } from 'src/enum';
 import { BaseService } from 'src/services/base.service';
@@ -126,34 +127,68 @@ export class AssetService extends BaseService {
           data.people = [];
         } else {
           const globalPersonIds = data.people.map((p) => p.id);
-          const spacePersonMap = await this.sharedSpaceRepository.findSpacePersonsByLinkedPersonIds(
-            spaceId,
-            globalPersonIds,
-          );
-          for (const person of data.people) {
-            const spacePerson = spacePersonMap.get(person.id);
-            if (spacePerson) {
-              person.spacePersonId = spacePerson.id;
+          const { person: personConfig } = await this.getConfig({ withCache: true });
+          const isGlobalMode = personConfig.databaseMode === PersonDatabaseMode.Global;
+
+          if (isGlobalMode) {
+            // Global Mode: shared_space_person table is empty — use person.id directly as spacePersonId
+            // The /shared-spaces/:id/people/:personId/thumbnail endpoint accepts global person IDs in Global Mode
+            const personIdsInSpace = await this.sharedSpaceRepository.getGlobalPersonIdsInSpace(
+              globalPersonIds,
+              spaceId,
+            );
+            for (const person of data.people) {
+              if (personIdsInSpace.has(person.id)) {
+                person.spacePersonId = person.id;
+              }
             }
+            data.people = data.people.filter((p) => p.spacePersonId);
+          } else {
+            const spacePersonMap = await this.sharedSpaceRepository.findSpacePersonsByLinkedPersonIds(
+              spaceId,
+              globalPersonIds,
+            );
+            for (const person of data.people) {
+              const spacePerson = spacePersonMap.get(person.id);
+              if (spacePerson) {
+                person.spacePersonId = spacePerson.id;
+              }
+            }
+            data.people = data.people.filter((p) => p.spacePersonId && !spacePersonMap.get(p.id)?.isHidden);
           }
-          data.people = data.people.filter((p) => p.spacePersonId && !spacePersonMap.get(p.id)?.isHidden);
         }
       } else {
         // No spaceId — try to find a space containing this asset for this user
         const spaceForAsset = await this.sharedSpaceRepository.findSpaceForAssetAndUser(id, auth.user.id);
         if (spaceForAsset) {
           const globalPersonIds = (data.people || []).map((p) => p.id);
-          const spacePersonMap = await this.sharedSpaceRepository.findSpacePersonsByLinkedPersonIds(
-            spaceForAsset.spaceId,
-            globalPersonIds,
-          );
-          for (const person of data.people || []) {
-            const spacePerson = spacePersonMap.get(person.id);
-            if (spacePerson) {
-              person.spacePersonId = spacePerson.id;
+          const { person: personConfig } = await this.getConfig({ withCache: true });
+          const isGlobalMode = personConfig.databaseMode === PersonDatabaseMode.Global;
+
+          if (isGlobalMode) {
+            const personIdsInSpace = await this.sharedSpaceRepository.getGlobalPersonIdsInSpace(
+              globalPersonIds,
+              spaceForAsset.spaceId,
+            );
+            for (const person of data.people || []) {
+              if (personIdsInSpace.has(person.id)) {
+                person.spacePersonId = person.id;
+              }
             }
+            data.people = (data.people || []).filter((p) => p.spacePersonId);
+          } else {
+            const spacePersonMap = await this.sharedSpaceRepository.findSpacePersonsByLinkedPersonIds(
+              spaceForAsset.spaceId,
+              globalPersonIds,
+            );
+            for (const person of data.people || []) {
+              const spacePerson = spacePersonMap.get(person.id);
+              if (spacePerson) {
+                person.spacePersonId = spacePerson.id;
+              }
+            }
+            data.people = (data.people || []).filter((p) => p.spacePersonId && !spacePersonMap.get(p.id)?.isHidden);
           }
-          data.people = (data.people || []).filter((p) => p.spacePersonId && !spacePersonMap.get(p.id)?.isHidden);
           data.resolvedSpaceId = spaceForAsset.spaceId;
         } else {
           data.people = [];

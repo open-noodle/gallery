@@ -23,6 +23,7 @@ import {
   SharedSpaceMemberResponseDto,
   SharedSpaceMemberTimelineDto,
   SharedSpaceMemberUpdateDto,
+  SharedSpacePeopleStatsResponseDto,
   SharedSpaceResponseDto,
   SharedSpaceUpdateDto,
 } from 'src/dtos/shared-space.dto';
@@ -35,6 +36,7 @@ import {
   NotificationLevel,
   NotificationType,
   Permission,
+  PersonDatabaseMode,
   QueueName,
   SharedSpaceActivityType,
   SharedSpaceRole,
@@ -42,6 +44,7 @@ import {
 } from 'src/enum';
 import { BaseService } from 'src/services/base.service';
 import { JobOf } from 'src/types';
+import { asBirthDateString } from 'src/utils/date';
 import { ImmichMediaResponse } from 'src/utils/file';
 import { mimeTypes } from 'src/utils/mime-types';
 
@@ -215,40 +218,15 @@ export class SharedSpaceService extends BaseService {
     const thumbnailCropY = dto.thumbnailAssetId === undefined ? dto.thumbnailCropY : null;
 
     const existing = await this.sharedSpaceRepository.getById(id);
-
-    // Build update payload with only defined fields — Kysely's .set() with all-undefined
-    // values produces an empty SET clause and a SQL syntax error.
-    const updatePayload: Parameters<typeof this.sharedSpaceRepository.update>[1] = {};
-    if (dto.name !== undefined) {
-      updatePayload.name = dto.name;
-    }
-    if (dto.description !== undefined) {
-      updatePayload.description = dto.description;
-    }
-    if (dto.thumbnailAssetId !== undefined) {
-      updatePayload.thumbnailAssetId = dto.thumbnailAssetId;
-    }
-    if (thumbnailCropY !== undefined) {
-      updatePayload.thumbnailCropY = thumbnailCropY;
-    }
-    if (dto.color !== undefined) {
-      updatePayload.color = dto.color;
-    }
-    if (dto.faceRecognitionEnabled !== undefined) {
-      updatePayload.faceRecognitionEnabled = dto.faceRecognitionEnabled;
-    }
-    if (dto.petsEnabled !== undefined) {
-      updatePayload.petsEnabled = dto.petsEnabled;
-    }
-
-    const space =
-      Object.keys(updatePayload).length > 0 && existing
-        ? await this.sharedSpaceRepository.update(id, updatePayload)
-        : existing;
-
-    if (!space) {
-      throw new BadRequestException('Space not found');
-    }
+    const space = await this.sharedSpaceRepository.update(id, {
+      name: dto.name,
+      description: dto.description,
+      thumbnailAssetId: dto.thumbnailAssetId,
+      thumbnailCropY,
+      color: dto.color,
+      faceRecognitionEnabled: dto.faceRecognitionEnabled,
+      petsEnabled: dto.petsEnabled,
+    });
 
     if (existing) {
       if (dto.name !== undefined && dto.name !== existing.name) {
@@ -627,11 +605,27 @@ export class SharedSpaceService extends BaseService {
   ): Promise<SharedSpacePersonResponseDto[]> {
     await this.requireMembership(auth, spaceId);
 
+    const { machineLearning, person: personConfig } = await this.getConfig({ withCache: true });
+    const isGlobalMode = personConfig.databaseMode === PersonDatabaseMode.Global;
+
     const space = await this.sharedSpaceRepository.getById(spaceId);
     if (!space?.faceRecognitionEnabled) {
       return [];
     }
 
+    // Global mode: read from central person table, filtered to this space's assets
+    if (isGlobalMode) {
+      const persons = await this.sharedSpaceRepository.getGlobalPersonsBySpaceId(spaceId, {
+        withHidden: query?.withHidden ?? false,
+        petsEnabled: space.petsEnabled ?? false,
+        limit: query?.limit,
+        offset: query?.offset,
+        minimumFaceCount: machineLearning.facialRecognition.minFaces,
+      });
+      return persons.map((person) => this.mapGlobalPerson(person, spaceId));
+    }
+
+    // Space mode (default): read from space-specific person table
     const persons = await this.sharedSpaceRepository.getPersonsBySpaceId(spaceId, {
       withHidden: query?.withHidden ?? false,
       petsEnabled: space.petsEnabled,
@@ -652,6 +646,22 @@ export class SharedSpaceService extends BaseService {
   async getSpacePerson(auth: AuthDto, spaceId: string, personId: string): Promise<SharedSpacePersonResponseDto> {
     await this.requireMembership(auth, spaceId);
 
+    const { person: personConfig } = await this.getConfig({ withCache: true });
+    const isGlobalMode = personConfig.databaseMode === PersonDatabaseMode.Global;
+
+    if (isGlobalMode) {
+      // Use space-scoped query so assetCount/faceCount reflect only this space's assets
+      const person = await this.sharedSpaceRepository.getGlobalPersonByIdForSpace(personId, spaceId);
+      if (!person) {
+        throw new BadRequestException('Person not found');
+      }
+      const space = await this.sharedSpaceRepository.getById(spaceId);
+      if (!space?.petsEnabled && person.type === 'pet') {
+        throw new BadRequestException('Person not found');
+      }
+      return this.mapGlobalPerson(person, spaceId);
+    }
+
     const person = await this.sharedSpaceRepository.getPersonById(personId);
     if (!person || person.spaceId !== spaceId) {
       throw new BadRequestException('Person not found');
@@ -669,6 +679,22 @@ export class SharedSpaceService extends BaseService {
 
   async getSpacePersonThumbnail(auth: AuthDto, spaceId: string, personId: string): Promise<ImmichMediaResponse> {
     await this.requireMembership(auth, spaceId);
+
+    const { person: personConfig } = await this.getConfig({ withCache: true });
+    const isGlobalMode = personConfig.databaseMode === PersonDatabaseMode.Global;
+
+    if (isGlobalMode) {
+      const person = await this.personRepository.getById(personId);
+      const inSpace = person && (await this.sharedSpaceRepository.isGlobalPersonInSpace(personId, spaceId));
+      if (!person || !inSpace || !person.thumbnailPath) {
+        throw new NotFoundException();
+      }
+      return this.serveFromBackend(
+        person.thumbnailPath,
+        mimeTypes.lookup(person.thumbnailPath),
+        CacheControl.PrivateWithoutCache,
+      );
+    }
 
     const person = await this.sharedSpaceRepository.getPersonById(personId);
     if (!person || person.spaceId !== spaceId) {
@@ -691,6 +717,58 @@ export class SharedSpaceService extends BaseService {
   ): Promise<SharedSpacePersonResponseDto> {
     await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
 
+    const { person: personConfig } = await this.getConfig({ withCache: true });
+    const isGlobalMode = personConfig.databaseMode === PersonDatabaseMode.Global;
+
+    if (isGlobalMode) {
+      // Global mode: write directly to the central person table (single source of truth)
+      const person = await this.personRepository.getById(personId);
+      if (!person) {
+        throw new BadRequestException('Person not found');
+      }
+      const inSpace = await this.sharedSpaceRepository.isGlobalPersonInSpace(personId, spaceId);
+      if (!inSpace) {
+        throw new BadRequestException('Person not found');
+      }
+
+      if (dto.representativeFaceId) {
+        const isInSpace = await this.sharedSpaceRepository.isFaceInSpace(spaceId, dto.representativeFaceId);
+        if (!isInSpace) {
+          throw new BadRequestException('Representative face must belong to an asset in the space');
+        }
+      }
+
+      const updateData: Record<string, unknown> = {};
+      if (dto.name !== undefined) {
+        updateData.name = dto.name;
+      }
+      if (dto.isHidden !== undefined) {
+        updateData.isHidden = dto.isHidden;
+      }
+      if (dto.birthDate !== undefined) {
+        updateData.birthDate = dto.birthDate;
+      }
+      if (dto.representativeFaceId !== undefined) {
+        updateData.faceAssetId = dto.representativeFaceId;
+      }
+
+      await this.personRepository.update({ id: personId, ...updateData });
+
+      await this.sharedSpaceRepository.logActivity({
+        spaceId,
+        userId: auth.user.id,
+        type: SharedSpaceActivityType.PersonUpdate,
+        data: { personId },
+      });
+
+      const updated = await this.personRepository.getById(personId);
+      if (!updated) {
+        throw new BadRequestException('Person not found');
+      }
+      return this.mapGlobalPerson(updated, spaceId);
+    }
+
+    // Space mode: write to space-specific person table
     const person = await this.sharedSpaceRepository.getPersonById(personId);
     if (!person || person.spaceId !== spaceId) {
       throw new BadRequestException('Person not found');
@@ -730,6 +808,32 @@ export class SharedSpaceService extends BaseService {
   async deleteSpacePerson(auth: AuthDto, spaceId: string, personId: string): Promise<void> {
     await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
 
+    const { person: personConfig } = await this.getConfig({ withCache: true });
+    const isGlobalMode = personConfig.databaseMode === PersonDatabaseMode.Global;
+
+    if (isGlobalMode) {
+      // Global mode: hide the person in the central table (not delete, to preserve data)
+      const person = await this.personRepository.getById(personId);
+      if (!person) {
+        throw new BadRequestException('Person not found');
+      }
+      const inSpace = await this.sharedSpaceRepository.isGlobalPersonInSpace(personId, spaceId);
+      if (!inSpace) {
+        throw new BadRequestException('Person not found');
+      }
+
+      await this.personRepository.update({ id: personId, isHidden: true });
+
+      await this.sharedSpaceRepository.logActivity({
+        spaceId,
+        userId: auth.user.id,
+        type: SharedSpaceActivityType.PersonDelete,
+        data: { personId, personName: person.name },
+      });
+      return;
+    }
+
+    // Space mode: delete from space-specific person table
     const person = await this.sharedSpaceRepository.getPersonById(personId);
     if (!person || person.spaceId !== spaceId) {
       throw new BadRequestException('Person not found');
@@ -810,6 +914,11 @@ export class SharedSpaceService extends BaseService {
     personId: string,
     dto: SharedSpacePersonAliasDto,
   ): Promise<void> {
+    const { person: personConfig } = await this.getConfig({ withCache: true });
+    if (personConfig.databaseMode === PersonDatabaseMode.Global) {
+      throw new BadRequestException('Person aliases are not supported in Global Person Mode');
+    }
+
     await this.requireMembership(auth, spaceId);
 
     const person = await this.sharedSpaceRepository.getPersonById(personId);
@@ -825,12 +934,42 @@ export class SharedSpaceService extends BaseService {
   }
 
   async deleteSpacePersonAlias(auth: AuthDto, spaceId: string, personId: string): Promise<void> {
+    const { person: personConfig } = await this.getConfig({ withCache: true });
+    if (personConfig.databaseMode === PersonDatabaseMode.Global) {
+      throw new BadRequestException('Person aliases are not supported in Global Person Mode');
+    }
+
     await this.requireMembership(auth, spaceId);
     await this.sharedSpaceRepository.deleteAlias(personId, auth.user.id);
   }
 
+  async getSpacePeopleStats(
+    auth: AuthDto,
+    spaceId: string,
+  ): Promise<SharedSpacePeopleStatsResponseDto> {
+    await this.requireMembership(auth, spaceId);
+    const { person: personConfig } = await this.getConfig({ withCache: true });
+    const isGlobalMode = personConfig.databaseMode === PersonDatabaseMode.Global;
+    if (!isGlobalMode) {
+      return { totalPersons: 0, totalFaces: 0 };
+    }
+    return this.sharedSpaceRepository.getGlobalPersonStatsForSpace(spaceId);
+  }
+
   async getSpacePersonAssets(auth: AuthDto, spaceId: string, personId: string): Promise<string[]> {
     await this.requireMembership(auth, spaceId);
+
+    const { person: personConfig } = await this.getConfig({ withCache: true });
+    const isGlobalMode = personConfig.databaseMode === PersonDatabaseMode.Global;
+
+    if (isGlobalMode) {
+      const inSpace = await this.sharedSpaceRepository.isGlobalPersonInSpace(personId, spaceId);
+      if (!inSpace) {
+        throw new BadRequestException('Person not found');
+      }
+      const assets = await this.sharedSpaceRepository.getGlobalPersonAssetIdsForSpace(personId, spaceId);
+      return assets.map((a) => a.assetId);
+    }
 
     const person = await this.sharedSpaceRepository.getPersonById(personId);
     if (!person || person.spaceId !== spaceId) {
@@ -875,13 +1014,6 @@ export class SharedSpaceService extends BaseService {
     let offset = 0;
 
     while (true) {
-      // Re-check link each batch to handle concurrent unlink
-      const stillLinked = await this.sharedSpaceRepository.hasLibraryLink(job.spaceId, job.libraryId);
-      if (!stillLinked) {
-        this.logger.log(`Library ${job.libraryId} was unlinked from space ${job.spaceId} during sync, stopping`);
-        break;
-      }
-
       const assets = await this.assetRepository.getByLibraryIdWithFaces(job.libraryId, batchSize, offset);
       if (assets.length === 0) {
         break;
@@ -937,11 +1069,6 @@ export class SharedSpaceService extends BaseService {
 
     const { machineLearning } = await this.getConfig({ withCache: true });
     const maxDistance = machineLearning.facialRecognition.maxDistance;
-
-    // Repair persons that have faces but lost their representativeFaceId
-    // (e.g., after force-detection reset). Without this, they are invisible
-    // to getSpacePersonsWithEmbeddings due to the INNER JOIN on face_search.
-    await this.sharedSpaceRepository.repairOrphanedRepresentativeFaces(job.spaceId);
 
     const MAX_PASSES = 100;
     let totalMerges = 0;
@@ -1006,16 +1133,6 @@ export class SharedSpaceService extends BaseService {
         // Reassign faces and migrate aliases
         await this.sharedSpaceRepository.reassignPersonFacesSafe(source.id, target.id);
         await this.sharedSpaceRepository.migrateAliases(source.id, target.id);
-
-        // Refresh representativeFaceId to a face with a valid embedding from the merged pool
-        const newRepFace = await this.sharedSpaceRepository.getFirstFaceIdForPerson(target.id);
-        if (newRepFace && newRepFace !== target.representativeFaceId) {
-          try {
-            await this.sharedSpaceRepository.updatePerson(target.id, { representativeFaceId: newRepFace });
-          } catch (error) {
-            this.logger.warn(`Dedup: failed to update representativeFaceId for target ${target.id}: ${error}`);
-          }
-        }
 
         // Determine merged properties
         const updates: Partial<{ name: string; isHidden: boolean }> = {};
@@ -1123,7 +1240,13 @@ export class SharedSpaceService extends BaseService {
   }
 
   private async processSpaceFaceMatch(spaceId: string, assetId: string): Promise<void> {
-    const { machineLearning } = await this.getConfig({ withCache: true });
+    const { machineLearning, person: personConfig } = await this.getConfig({ withCache: true });
+
+    // Phase 2.4: In global mode face recognition runs globally — space-level matching is not needed
+    if (personConfig.databaseMode === PersonDatabaseMode.Global) {
+      return;
+    }
+
     const maxDistance = machineLearning.facialRecognition.maxDistance;
     const affectedPersonIds = new Set<string>();
 
@@ -1287,6 +1410,40 @@ export class SharedSpaceService extends BaseService {
       faceRecognitionEnabled: space.faceRecognitionEnabled ?? true,
       petsEnabled: space.petsEnabled ?? true,
       lastActivityAt: space.lastActivityAt ? space.lastActivityAt.toISOString() : null,
+    };
+  }
+
+  /** Maps a global person (from central person table) to the space person DTO. */
+  private mapGlobalPerson(
+    person: {
+      id: string;
+      name: string;
+      thumbnailPath: string | null;
+      isHidden: boolean;
+      birthDate: Date | string | null;
+      faceAssetId: string | null;
+      createdAt: Date | unknown;
+      updatedAt: Date | unknown;
+      type: string;
+      faceCount?: number;
+      assetCount?: number;
+    },
+    spaceId: string,
+  ): SharedSpacePersonResponseDto {
+    return {
+      id: person.id,
+      spaceId,
+      name: person.name,
+      thumbnailPath: person.thumbnailPath ?? '',
+      isHidden: person.isHidden,
+      birthDate: asBirthDateString(person.birthDate as Date | string | null),
+      representativeFaceId: person.faceAssetId,
+      faceCount: person.faceCount ?? 0,
+      assetCount: person.assetCount ?? 0,
+      alias: null,
+      createdAt: (person.createdAt as unknown as Date).toISOString(),
+      updatedAt: (person.updatedAt as unknown as Date).toISOString(),
+      type: person.type,
     };
   }
 

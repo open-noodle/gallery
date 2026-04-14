@@ -13500,6 +13500,62 @@
         "x-immich-state": "Beta"
       }
     },
+    "/shared-spaces/{id}/people/stats": {
+      "get": {
+        "description": "Returns total person count and total face count for a space (global mode only).",
+        "operationId": "getSpacePeopleStats",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedSpacePeopleStatsResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Get people stats for a shared space",
+        "tags": [
+          "Shared Spaces"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "sharedSpace.read",
+        "x-immich-state": "Beta"
+      }
+    },
     "/shared-spaces/{id}/people/{personId}": {
       "delete": {
         "description": "Permanently delete a person and their face assignments from a shared space.",
@@ -18280,7 +18336,7 @@
   "info": {
     "title": "Immich",
     "description": "Immich API",
-    "version": "2.7.5",
+    "version": "2.7.2",
     "contact": {}
   },
   "tags": [
@@ -20791,50 +20847,11 @@
         "type": "object"
       },
       "DatabaseBackupDeleteDto": {
-        "properties": {
-          "backups": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array"
-          }
-        },
-        "required": [
-          "backups"
-        ],
-        "type": "object"
-      },
-      "DatabaseBackupDto": {
-        "properties": {
-          "filename": {
-            "type": "string"
-          },
-          "filesize": {
-            "type": "number"
-          },
-          "timezone": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "filename",
-          "filesize",
-          "timezone"
-        ],
+        "properties": {},
         "type": "object"
       },
       "DatabaseBackupListResponseDto": {
-        "properties": {
-          "backups": {
-            "items": {
-              "$ref": "#/components/schemas/DatabaseBackupDto"
-            },
-            "type": "array"
-          }
-        },
-        "required": [
-          "backups"
-        ],
+        "properties": {},
         "type": "object"
       },
       "DatabaseBackupUploadDto": {
@@ -21635,7 +21652,6 @@
           },
           "licenseKey": {
             "description": "License key (format: IM(SV|CL)(-XXXX){8})",
-            "pattern": "/IM(SV|CL)(-[\\dA-Za-z]{4}){8}/",
             "type": "string"
           }
         },
@@ -21658,7 +21674,6 @@
           },
           "licenseKey": {
             "description": "License key (format: IM(SV|CL)(-XXXX){8})",
-            "pattern": "/IM(SV|CL)(-[\\dA-Za-z]{4}){8}/",
             "type": "string"
           }
         },
@@ -23219,6 +23234,14 @@
           }
         },
         "type": "object"
+      },
+      "PersonDatabaseMode": {
+        "description": "Person database mode",
+        "enum": [
+          "space",
+          "global"
+        ],
+        "type": "string"
       },
       "PersonResponseDto": {
         "properties": {
@@ -25725,6 +25748,23 @@
         },
         "required": [
           "role"
+        ],
+        "type": "object"
+      },
+      "SharedSpacePeopleStatsResponseDto": {
+        "properties": {
+          "totalFaces": {
+            "description": "Total number of face detections across all persons in this space",
+            "type": "number"
+          },
+          "totalPersons": {
+            "description": "Total number of distinct persons visible in this space",
+            "type": "number"
+          }
+        },
+        "required": [
+          "totalFaces",
+          "totalPersons"
         ],
         "type": "object"
       },
@@ -28385,6 +28425,9 @@
           "passwordLogin": {
             "$ref": "#/components/schemas/SystemConfigPasswordLoginDto"
           },
+          "person": {
+            "$ref": "#/components/schemas/SystemConfigPersonDto"
+          },
           "reverseGeocoding": {
             "$ref": "#/components/schemas/SystemConfigReverseGeocodingDto"
           },
@@ -28423,6 +28466,7 @@
           "notifications",
           "oauth",
           "passwordLogin",
+          "person",
           "reverseGeocoding",
           "server",
           "storageTemplate",
@@ -29083,6 +29127,22 @@
         },
         "required": [
           "enabled"
+        ],
+        "type": "object"
+      },
+      "SystemConfigPersonDto": {
+        "properties": {
+          "databaseMode": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PersonDatabaseMode"
+              }
+            ],
+            "description": "Person database mode"
+          }
+        },
+        "required": [
+          "databaseMode"
         ],
         "type": "object"
       },

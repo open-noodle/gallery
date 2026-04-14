@@ -10,14 +10,16 @@
   import { createUrl } from '$lib/utils';
   import { handleError } from '$lib/utils/handle-error';
   import {
+    deduplicateSpacePeople,
     getSpacePeople,
+    PersonDatabaseMode,
     Role,
     updateSpacePerson,
     type SharedSpaceMemberResponseDto,
     type SharedSpacePersonResponseDto,
     type SharedSpaceResponseDto,
   } from '@immich/sdk';
-  import { Button, Icon, IconButton, toastManager } from '@immich/ui';
+  import { Alert, Button, Icon, IconButton, modalManager, toastManager } from '@immich/ui';
   import {
     mdiAccountGroupOutline,
     mdiAccountMultipleCheckOutline,
@@ -30,6 +32,7 @@
   import { fly } from 'svelte/transition';
   import { quintOut } from 'svelte/easing';
   import { t } from 'svelte-i18n';
+  import { locale } from '$lib/stores/preferences.store';
   import type { PageData } from './$types';
 
   interface Props {
@@ -70,6 +73,28 @@
   const currentMember = $derived(members.find((m) => m.userId === $user.id));
   const isOwner = $derived(currentMember?.role === Role.Owner);
   const isEditor = $derived(isOwner || currentMember?.role === Role.Editor);
+
+  const isGlobalPersonMode = $derived(data.personDatabaseMode === PersonDatabaseMode.Global);
+
+  // Global mode: fetch stats (total faces + persons) from server
+  let spaceStats = $state<{ totalPersons: number; totalFaces: number } | null>(null);
+
+  async function loadSpaceStats() {
+    try {
+      const response = await fetch(`/api/shared-spaces/${space.id}/people/stats`, { credentials: 'include' });
+      if (response.ok) {
+        spaceStats = await response.json();
+      }
+    } catch {
+      // stats are non-critical, silently ignore
+    }
+  }
+
+  $effect(() => {
+    if (isGlobalPersonMode) {
+      loadSpaceStats();
+    }
+  });
 
   const getThumbUrl = (person: SharedSpacePersonResponseDto): string => {
     return createUrl(`/shared-spaces/${space.id}/people/${person.id}/thumbnail`, { updatedAt: person.updatedAt });
@@ -172,6 +197,26 @@
     void goto(`/spaces/${space.id}/people/${personId}?action=merge`);
   }
 
+  async function handleDeduplicate() {
+    const confirmed = await modalManager.showDialog({
+      title: $t('deduplicate_people'),
+      prompt: $t('dedup_people_confirm'),
+      confirmText: $t('start'),
+      confirmColor: 'primary',
+    });
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await deduplicateSpacePeople({ id: space.id });
+      toastManager.info($t('dedup_people_started'));
+    } catch (error) {
+      handleError(error, $t('dedup_people_error'));
+    }
+  }
+
   async function handleHide(person: SharedSpacePersonResponseDto) {
     try {
       await updateSpacePerson({
@@ -210,7 +255,10 @@
   });
 </script>
 
-<UserPageLayout title={$t('spaces_people_title')}>
+<UserPageLayout
+  title={$t('spaces_people_title')}
+  description={isGlobalPersonMode && spaceStats ? `(${spaceStats.totalPersons.toLocaleString($locale)})` : undefined}
+>
   {#snippet leading()}
     <IconButton
       variant="ghost"
@@ -222,12 +270,30 @@
     />
   {/snippet}
   {#snippet buttons()}
+    {#if isOwner && !isGlobalPersonMode}
+      <Button
+        leadingIcon={mdiAccountMultipleCheckOutline}
+        onclick={handleDeduplicate}
+        size="small"
+        variant="ghost"
+        color="secondary"
+      >
+        {$t('deduplicate_people')}
+      </Button>
+    {/if}
     {#if isEditor}
       <Button leadingIcon={mdiEyeOutline} onclick={openVisibilityModal} size="small" variant="ghost" color="secondary"
         >{$t('show_and_hide_people')}</Button
       >
     {/if}
   {/snippet}
+
+  {#if isGlobalPersonMode && spaceStats}
+    <div class="flex items-center gap-4 px-4 pt-4 text-sm text-gray-500 dark:text-gray-400">
+      <span>{$t('faces')}: <strong class="text-gray-700 dark:text-gray-200">{spaceStats.totalFaces.toLocaleString($locale)}</strong></span>
+      <span>{$t('people')}: <strong class="text-gray-700 dark:text-gray-200">{spaceStats.totalPersons.toLocaleString($locale)}</strong></span>
+    </div>
+  {/if}
 
   {#if visiblePeople.length === 0}
     <div class="flex min-h-[calc(66vh-11rem)] w-full place-content-center items-center dark:text-white">

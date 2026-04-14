@@ -61,6 +61,7 @@
     getSpaceActivities,
     getSpacePeople,
     markSpaceViewed,
+    PersonDatabaseMode,
     removeSpace,
     Role,
     SearchSuggestionType,
@@ -273,9 +274,15 @@
       return { visibility: AssetVisibility.Timeline, timelineSpaceId: space.id };
     }
     const base: Record<string, unknown> = { spaceId: space.id, withStacked: true };
-    // Apply filter state — personIds maps to spacePersonIds for Spaces context
+    // Apply filter state — in Global Person Mode, use personIds directly (person table IDs match asset_face.personId);
+    // in Space mode, map to spacePersonIds (resolved via shared_space_person_face)
+    const isGlobalPersonMode = data.personDatabaseMode === PersonDatabaseMode.Global;
     if (filters.personIds.length > 0) {
-      base.spacePersonIds = filters.personIds;
+      if (isGlobalPersonMode) {
+        base.personIds = filters.personIds;
+      } else {
+        base.spacePersonIds = filters.personIds;
+      }
     }
     if (filters.city) {
       base.city = filters.city;

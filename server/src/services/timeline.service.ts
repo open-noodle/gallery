@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { AuthDto } from 'src/dtos/auth.dto';
 import { TimeBucketAssetDto, TimeBucketDto, TimeBucketsResponseDto } from 'src/dtos/time-bucket.dto';
-import { AssetVisibility, Permission } from 'src/enum';
+import { AssetVisibility, Permission, PersonDatabaseMode } from 'src/enum';
 import { TimeBucketOptions } from 'src/repositories/asset.repository';
 import { BaseService } from 'src/services/base.service';
 import { requireElevatedPermission } from 'src/utils/access';
@@ -62,6 +62,16 @@ export class TimelineService extends BaseService {
         if (spaceRows.length > 0) {
           timelineSpaceIds = spaceRows.map((row) => row.spaceId);
         }
+      }
+    }
+
+    // In Global Person Mode, spacePersonIds are global person IDs — route them through
+    // personIds so the asset query uses asset_face directly instead of shared_space_person_face
+    if (options.spacePersonIds?.length) {
+      const { person: personConfig } = await this.getConfig({ withCache: true });
+      if (personConfig.databaseMode === PersonDatabaseMode.Global) {
+        options.personIds = [...(options.personIds ?? []), ...options.spacePersonIds];
+        options.spacePersonIds = undefined;
       }
     }
 

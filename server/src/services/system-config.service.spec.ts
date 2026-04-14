@@ -7,6 +7,7 @@ import {
   ImageFormat,
   LogLevel,
   OAuthTokenEndpointAuthMethod,
+  PersonDatabaseMode,
   QueueName,
   ToneMapping,
   TranscodeHardwareAcceleration,
@@ -234,6 +235,9 @@ const updatedConfig = Object.freeze<SystemConfig>({
   classification: {
     enabled: true,
     categories: [],
+  },
+  person: {
+    databaseMode: PersonDatabaseMode.Space,
   },
 });
 

@@ -34,6 +34,7 @@ import {
   ImageFormat,
   LogLevel,
   OAuthTokenEndpointAuthMethod,
+  PersonDatabaseMode,
   QueueName,
   ToneMapping,
   TranscodeHardwareAcceleration,
@@ -787,6 +788,11 @@ class SystemConfigUserDto {
   deleteDelay!: number;
 }
 
+class SystemConfigPersonDto {
+  @ValidateEnum({ enum: PersonDatabaseMode, name: 'PersonDatabaseMode', description: 'Person database mode' })
+  databaseMode!: PersonDatabaseMode;
+}
+
 export class SystemConfigDto implements SystemConfig {
   // Description lives on schema to avoid duplication
   @ApiProperty({ description: undefined })
@@ -941,6 +947,13 @@ export class SystemConfigDto implements SystemConfig {
   @ValidateNested()
   @IsObject()
   user!: SystemConfigUserDto;
+
+  // Description lives on schema to avoid duplication
+  @ApiProperty({ description: undefined })
+  @Type(() => SystemConfigPersonDto)
+  @ValidateNested()
+  @IsObject()
+  person!: SystemConfigPersonDto;
 }
 
 export function mapConfig(config: SystemConfig): SystemConfigDto {

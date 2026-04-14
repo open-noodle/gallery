@@ -36,6 +36,7 @@ import {
   SharedSpaceMemberResponseDto,
   SharedSpaceMemberTimelineDto,
   SharedSpaceMemberUpdateDto,
+  SharedSpacePeopleStatsResponseDto,
   SharedSpaceResponseDto,
   SharedSpaceUpdateDto,
 } from 'src/dtos/shared-space.dto';
@@ -272,6 +273,20 @@ export class SharedSpaceController {
     @Query() query: SpacePeopleQueryDto,
   ): Promise<SharedSpacePersonResponseDto[]> {
     return this.service.getSpacePeople(auth, id, query);
+  }
+
+  @Get(':id/people/stats')
+  @Authenticated({ permission: Permission.SharedSpaceRead })
+  @Endpoint({
+    summary: 'Get people stats for a shared space',
+    description: 'Returns total person count and total face count for a space (global mode only).',
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  getSpacePeopleStats(
+    @Auth() auth: AuthDto,
+    @Param() { id }: UUIDParamDto,
+  ): Promise<SharedSpacePeopleStatsResponseDto> {
+    return this.service.getSpacePeopleStats(auth, id);
   }
 
   @Post(':id/people/deduplicate')
