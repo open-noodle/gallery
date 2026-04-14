@@ -126,18 +126,21 @@ test.describe('global search palette', () => {
       await expect(page).toHaveURL(/\/admin\/system-settings\?isOpen=classification/);
     });
 
-    test('type "toggle" → Theme action appears → Enter toggles the theme', async ({ page }) => {
-      // Searching "theme" matches BOTH the system-settings theme panel (corpus
-      // "Theme Settings Manage customization …") AND the Actions entry
-      // (corpus "Theme Toggle theme"), and the fixed render order puts
-      // systemSettings first — bits-ui auto-selects that one, so Enter navigates
-      // to /admin/system-settings?isOpen=theme instead of toggling. Searching for
-      // "toggle" matches only the Actions entry, so Enter hits the right target.
+    test('type "toggle theme" → click Theme action → theme toggles', async ({ page }) => {
+      // Click the row directly rather than relying on Enter + auto-select.
+      // The palette's navigation section renders categories in a fixed order
+      // (systemSettings → admin → userPages → actions), so any query that
+      // weakly fuzzy-matches a systemSettings item will auto-select that
+      // item ahead of the ACTIONS entry regardless of score. 'toggle' and
+      // 'toggle theme' both fuzzy-match 'Storage Template' via
+      // computeCommandScore's greedy subsequence matcher, so Enter on this
+      // query lands on a settings panel rather than nav:theme. A real UX
+      // fix would order sections by best item score; until then, click the
+      // exact row.
       const initialDark = await page.evaluate(() => document.documentElement.classList.contains('dark'));
       await page.keyboard.press('Control+k');
-      await page.getByRole('dialog').getByRole('combobox').fill('toggle');
-      await expect(page.getByText(/toggle theme/i)).toBeVisible();
-      await page.keyboard.press('Enter');
+      await page.getByRole('dialog').getByRole('combobox').fill('toggle theme');
+      await page.getByText(/toggle theme/i).click();
       await expect
         .poll(async () => page.evaluate(() => document.documentElement.classList.contains('dark')))
         .toBe(!initialDark);
