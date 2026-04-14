@@ -18,6 +18,13 @@ on:
       gallery_image:
         description: 'Gallery server image tag to test (default: ghcr.io/open-noodle/immich-server:main)'
         required: false
+  pull_request:
+    # Only run on PRs that actually change something this workflow validates,
+    # so unrelated PRs don't pay the ~10min boot/pull cost on every push.
+    paths:
+      - 'scripts/revert-to-immich.sql'
+      - 'server/src/schema/migrations-gallery/**'
+      - '.github/workflows/gallery-revert-to-immich-validation.yml'
 
 concurrency:
   group: gallery-revert-to-immich-validation
