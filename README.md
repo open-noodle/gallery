@@ -256,3 +256,76 @@ gh workflow run release.yml --ref main -f version=v4.2.6
 ```
 
 Or use the GitHub Actions UI: Actions > Release > Run workflow > enter version > Run.
+
+## Contributing
+
+Gallery is a community fork and contributions are welcome — bug fixes, features, docs, translations. Come say hi on [Discord](https://discord.gg/cxBfbuxyG4) if you want to chat about an idea before diving in.
+
+### Setting Up a Dev Environment
+
+The repo is a `pnpm` workspace monorepo — server (NestJS), web (SvelteKit), mobile (Flutter), machine-learning (Python), and a few supporting packages. The dev stack runs in Docker Compose with live reload for the server and web.
+
+**Prerequisites:** Docker, Docker Compose, Node.js 22+, and [pnpm](https://pnpm.io/installation).
+
+1. **Fork and clone the repo**
+
+   ```bash
+   git clone https://github.com/<your-username>/gallery.git
+   cd gallery
+   ```
+
+2. **Copy the example env file**
+
+   ```bash
+   cp docker/example.env docker/.env
+   ```
+
+   The defaults work out of the box for local development. Adjust `UPLOAD_LOCATION` and `DB_DATA_LOCATION` if you want to store data somewhere other than the repo directory.
+
+3. **Install dependencies**
+
+   ```bash
+   pnpm install
+   ```
+
+   This installs deps for every workspace package (server, web, cli, sdk, e2e).
+
+4. **Start the dev stack**
+
+   ```bash
+   make dev
+   ```
+
+   This brings up Postgres, Redis, the ML service, the server (with hot reload), and the web UI on http://localhost:2283. The first run downloads ML models and builds containers, so give it a few minutes.
+
+### Running Tests and Checks Before You Push
+
+```bash
+# Server
+cd server && pnpm test          # unit tests
+cd server && pnpm check         # TypeScript type check
+
+# Web
+cd web && pnpm test             # unit tests
+cd web && pnpm check            # svelte-check + tsc
+
+# All modules from the repo root
+make check-all                  # type checks everywhere
+make format-all                 # prettier --write
+```
+
+CI runs lint, type checks, unit tests, and e2e tests on every PR. If you're touching server controllers or repositories, regenerate the OpenAPI clients and SQL query files:
+
+```bash
+make open-api                   # regenerates TS SDK + Dart client
+make sql                        # regenerates SQL query docs (needs DB running)
+```
+
+### Opening a Pull Request
+
+- Branch off `main` and keep PRs focused on one change.
+- Follow [Conventional Commits](https://www.conventionalcommits.org/) for your commit messages (`feat:`, `fix:`, `docs:`, `chore:`, etc.) — the release workflow uses them to compute version bumps.
+- Include a short description of what changed and why, plus screenshots or screen recordings for UI work.
+- Make sure CI is green before requesting review.
+
+See [CLAUDE.md](CLAUDE.md) for a deeper tour of the codebase architecture and common commands.
