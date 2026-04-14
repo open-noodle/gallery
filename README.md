@@ -24,6 +24,11 @@
 > [!TIP]
 > **Noodle Gallery for iPhone is now on the App Store!** Back up your photos and browse your library on the go. [Download on the App Store](https://apps.apple.com/il/app/noodle-gallery/id6761776289)
 
+> [!TIP]
+> **Already running Immich?** Switching to Gallery is a three-line config change — two image names in your `docker-compose.yml` and `IMMICH_VERSION=v4` in your `.env`. Your library, database, and mobile apps are fully compatible. See the [install guide](https://opennoodle.de/install/#migrate-from-immich).
+>
+> **Not for you?** A one-command [switch-back script](https://docs.opennoodle.de/guides/switch-back-to-immich) cleans up Gallery-specific tables and columns and puts you back on upstream Immich. Your photos and videos never move.
+
 ## What's Different from Upstream Immich
 
 This fork builds on top of Immich with the following improvements:
@@ -117,7 +122,7 @@ docker compose pull
 docker compose up -d
 ```
 
-That's it. To switch back to upstream Immich, reverse the image names and restore your database backup.
+That's it. To switch back to upstream Immich later, flip the two image names back and either restore your database backup or run the [automated switch-back script](https://docs.opennoodle.de/guides/switch-back-to-immich), which drops Gallery-specific tables, columns, and migration records — shared spaces, pet detection, classifications, duplicate data — leaving a plain upstream Immich database. Your photos and videos are never touched.
 
 ---
 
