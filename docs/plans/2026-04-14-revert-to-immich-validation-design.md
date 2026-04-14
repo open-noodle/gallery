@@ -334,7 +334,7 @@ Explicitly not doing:
 Caught that the pass criterion as originally written was **weaker than
 claimed**. Issues fixed:
 
-1. **Schema drift was a silent pass.** `database.service.ts:130` emits
+1. **Schema drift was a silent pass.** `database.service.ts:133` emits
    `logger.warn` and keeps going when drift is found, so the original
    `/api/server/ping` check would pass even on a broken revert script.
    Added step 13 (schema drift log grep) and rewrote the "Pass criterion"
