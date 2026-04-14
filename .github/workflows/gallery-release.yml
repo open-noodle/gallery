@@ -195,7 +195,7 @@ jobs:
           build-args: |
             DEVICE=cpu
             BUILD_ID=${{ github.run_id }}
-            BUILD_SOURCE_REF=${{ github.ref_name }}
+            BUILD_SOURCE_REF=${{ needs.version.outputs.version }}
             BUILD_SOURCE_COMMIT=${{ github.sha }}
           outputs: type=image,"name=ghcr.io/open-noodle/gallery-server",push-by-digest=true,name-resolution=short,push=true
           cache-from: type=gha,scope=server-${{ steps.prepare.outputs.platform-pair }}
