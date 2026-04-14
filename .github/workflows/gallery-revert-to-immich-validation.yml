@@ -120,21 +120,26 @@ jobs:
 
           # `wait_for_server` returns when the api worker is listening, but
           # schema drift warnings are emitted by the *microservices* worker
-          # on a separate startup path. extract_drift is race-prone unless
-          # we first confirm the drift check has completed. DatabaseService
-          # logs either "No schema drift detected" (drift.items.length == 0)
-          # or "Detected schema drift" (items > 0) exactly once per boot,
-          # so grepping for either is a reliable "drift check done" signal.
+          # on a separate startup path AND Node.js block-buffers stdout
+          # when writing to a non-TTY pipe — the drift header line and the
+          # individual item lines can land in the docker log stream in
+          # separate flushes. To guarantee both are present, we wait for a
+          # sentinel log line that is ONLY emitted after DatabaseService's
+          # drift check has fully finished: StorageService's
+          # "Verifying system mount folder checks" line (storage.service.ts
+          # :96). StorageService is initialized after DatabaseService in
+          # the NestJS dependency graph, so the sentinel proves drift
+          # logging has flushed.
           wait_for_drift_check() {
             local phase=$1
             local deadline=$(( $(date +%s) + 60 ))
             while [ "$(date +%s)" -lt "$deadline" ]; do
-              if docker logs server 2>&1 | grep -qE 'No schema drift detected|Detected schema drift'; then
+              if docker logs server 2>&1 | grep -qF 'Verifying system mount folder checks'; then
                 return 0
               fi
               sleep 1
             done
-            echo "::error::${phase}: drift check did not complete within 60s after ping OK"
+            echo "::error::${phase}: drift-check sentinel 'Verifying system mount folder checks' did not appear within 60s after ping OK"
             docker logs server || true
             return 1
           }
