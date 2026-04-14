@@ -283,9 +283,7 @@ describe('global-search root', () => {
     const matchingCalls = scrollSpy.mock.calls.filter((_, i) => {
       const target = scrollSpy.mock.instances[i];
       return (
-        target instanceof HTMLElement &&
-        target.dataset.commandItem !== undefined &&
-        target.dataset.value === 'photo:a2'
+        target instanceof HTMLElement && target.dataset.commandItem !== undefined && target.dataset.value === 'photo:a2'
       );
     });
     expect(matchingCalls.length).toBeGreaterThan(0);

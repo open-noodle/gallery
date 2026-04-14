@@ -201,31 +201,31 @@
 >
   <ModalBody class="!p-0">
     <span class="sr-only" id="global-search-label">{$t('global_search')}</span>
-        <Command.Root
-          shouldFilter={false}
-          vimBindings={false}
-          loop
-          bind:value={selectedValue}
-          aria-labelledby="global-search-label"
-          class="flex flex-col"
-        >
-          <Command.Input
-            bind:value={inputValue}
-            autofocus
-            placeholder={$t('cmdk_placeholder')}
-            maxlength={256}
-            onkeydown={onKeyDown}
-            class="w-full border-b border-gray-200 bg-transparent px-4 py-3 text-sm focus:outline-none dark:border-gray-700"
-          />
-          {#if showProgressStripe}
-            <div
-              aria-hidden="true"
-              data-cmdk-progress
-              class="h-0.5 bg-gradient-to-r from-transparent via-primary to-transparent bg-[length:200%_100%] animate-cmdk-shimmer motion-reduce:animate-none"
-            ></div>
-          {/if}
+    <Command.Root
+      shouldFilter={false}
+      vimBindings={false}
+      loop
+      bind:value={selectedValue}
+      aria-labelledby="global-search-label"
+      class="flex flex-col"
+    >
+      <Command.Input
+        bind:value={inputValue}
+        autofocus
+        placeholder={$t('cmdk_placeholder')}
+        maxlength={256}
+        onkeydown={onKeyDown}
+        class="w-full border-b border-gray-200 bg-transparent px-4 py-3 text-sm focus:outline-none dark:border-gray-700"
+      />
+      {#if showProgressStripe}
+        <div
+          aria-hidden="true"
+          data-cmdk-progress
+          class="h-0.5 bg-gradient-to-r from-transparent via-primary to-transparent bg-[length:200%_100%] animate-cmdk-shimmer motion-reduce:animate-none"
+        ></div>
+      {/if}
 
-          <!-- Explicit fixed height instead of flex-1 + max-h. The flex-1 approach
+      <!-- Explicit fixed height instead of flex-1 + max-h. The flex-1 approach
                relied on the parent (Command.Root / ModalBody) having a definite
                height, which it doesn't — so the row grew to its content (the full
                results list), the preview pane stretched to match, and the whole
@@ -233,109 +233,109 @@
                `max-h-[80vh]` as a clamp for small viewports makes both columns
                definite-sized so Command.List's `overflow-y-auto` actually scrolls
                internally, and the preview pane is bounded by its column's height. -->
-          <!-- `min-w-0` on the left column is critical: flex children default to
+      <!-- `min-w-0` on the left column is critical: flex children default to
                `min-width: auto` (= content size), so without it the column refuses
                to shrink below the widest row (long filenames) and the whole row
                grows wider than the modal/viewport — pushing the fixed-width preview
                pane off-screen. With min-w-0, flex-1 can shrink below content width
                and the rows' `truncate` class ellipsizes long text. -->
-          <div class="flex h-[520px] max-h-[80vh] min-h-0">
-            <div
-              class="flex min-h-0 min-w-0 flex-1 flex-col {showPreview
-                ? 'border-e border-gray-200 dark:border-gray-700'
-                : ''}"
-            >
-              {#if manager.mode === 'smart' && !manager.mlHealthy && inputValue.trim() !== ''}
-                <div class="mx-3 mt-3 rounded-md bg-subtle/60 px-3 py-2 text-xs">
-                  {$t('cmdk_smart_unavailable')}
-                  <button
-                    type="button"
-                    onclick={() => manager.setMode('metadata')}
-                    class="ml-2 text-primary transition-colors duration-[80ms] ease-out"
+      <div class="flex h-[520px] max-h-[80vh] min-h-0">
+        <div
+          class="flex min-h-0 min-w-0 flex-1 flex-col {showPreview
+            ? 'border-e border-gray-200 dark:border-gray-700'
+            : ''}"
+        >
+          {#if manager.mode === 'smart' && !manager.mlHealthy && inputValue.trim() !== ''}
+            <div class="mx-3 mt-3 rounded-md bg-subtle/60 px-3 py-2 text-xs">
+              {$t('cmdk_smart_unavailable')}
+              <button
+                type="button"
+                onclick={() => manager.setMode('metadata')}
+                class="ml-2 text-primary transition-colors duration-[80ms] ease-out"
+              >
+                {$t('cmdk_try_filename')}
+              </button>
+            </div>
+          {/if}
+          <Command.List class="flex-1 overflow-y-auto py-2">
+            {#if inputValue.trim() === ''}
+              {#if recentEntries.length > 0}
+                <Command.Group>
+                  <Command.GroupHeading
+                    class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400"
                   >
-                    {$t('cmdk_try_filename')}
-                  </button>
+                    {$t('cmdk_recent_heading')}
+                  </Command.GroupHeading>
+                  <Command.GroupItems>
+                    {#each recentEntries as entry (entry.id)}
+                      <Command.Item value={entry.id} onSelect={() => manager.activateRecent(entry)} class="group">
+                        <RecentRow {entry} />
+                      </Command.Item>
+                    {/each}
+                  </Command.GroupItems>
+                </Command.Group>
+              {:else}
+                <div class="p-6 text-center text-[13px] font-normal text-gray-500 dark:text-gray-400">
+                  {$t('cmdk_helper')}
                 </div>
               {/if}
-              <Command.List class="flex-1 overflow-y-auto py-2">
-                {#if inputValue.trim() === ''}
-                  {#if recentEntries.length > 0}
-                    <Command.Group>
-                      <Command.GroupHeading
-                        class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400"
-                      >
-                        {$t('cmdk_recent_heading')}
-                      </Command.GroupHeading>
-                      <Command.GroupItems>
-                        {#each recentEntries as entry (entry.id)}
-                          <Command.Item value={entry.id} onSelect={() => manager.activateRecent(entry)} class="group">
-                            <RecentRow {entry} />
-                          </Command.Item>
-                        {/each}
-                      </Command.GroupItems>
-                    </Command.Group>
-                  {:else}
-                    <div class="p-6 text-center text-[13px] font-normal text-gray-500 dark:text-gray-400">
-                      {$t('cmdk_helper')}
-                    </div>
-                  {/if}
-                {:else}
-                  <GlobalSearchSection
-                    heading={$t('cmdk_photos_heading')}
-                    status={manager.sections.photos}
-                    idPrefix="photo"
-                    onActivate={(item) => manager.activate('photo', item)}
-                  >
-                    {#snippet renderRow(item)}
-                      <PhotoRow item={item as never} />
-                    {/snippet}
-                  </GlobalSearchSection>
-                  <GlobalSearchSection
-                    heading={$t('cmdk_people_heading')}
-                    status={manager.sections.people}
-                    idPrefix="person"
-                    onActivate={(item) => manager.activate('person', item)}
-                  >
-                    {#snippet renderRow(item)}
-                      <PersonRow item={item as never} />
-                    {/snippet}
-                  </GlobalSearchSection>
-                  <GlobalSearchSection
-                    heading={$t('cmdk_places_heading')}
-                    status={manager.sections.places}
-                    idPrefix="place"
-                    onActivate={(item) => manager.activate('place', item)}
-                  >
-                    {#snippet renderRow(item)}
-                      <PlaceRow item={item as never} />
-                    {/snippet}
-                  </GlobalSearchSection>
-                  <GlobalSearchSection
-                    heading={$t('cmdk_tags_heading')}
-                    status={manager.sections.tags}
-                    idPrefix="tag"
-                    onActivate={(item) => manager.activate('tag', item)}
-                  >
-                    {#snippet renderRow(item)}
-                      <TagRow item={item as never} />
-                    {/snippet}
-                  </GlobalSearchSection>
-                  <GlobalSearchNavigationSections
-                    status={manager.sections.navigation}
-                    onActivate={(item) => manager.activate('nav', item)}
-                  />
-                {/if}
-              </Command.List>
-            </div>
-            {#if showPreview}
-              <div data-cmdk-preview class="w-[280px] shrink-0 overflow-y-auto min-h-0">
-                <GlobalSearchPreview activeItem={manager.getActiveItem()} />
-              </div>
+            {:else}
+              <GlobalSearchSection
+                heading={$t('cmdk_photos_heading')}
+                status={manager.sections.photos}
+                idPrefix="photo"
+                onActivate={(item) => manager.activate('photo', item)}
+              >
+                {#snippet renderRow(item)}
+                  <PhotoRow item={item as never} />
+                {/snippet}
+              </GlobalSearchSection>
+              <GlobalSearchSection
+                heading={$t('cmdk_people_heading')}
+                status={manager.sections.people}
+                idPrefix="person"
+                onActivate={(item) => manager.activate('person', item)}
+              >
+                {#snippet renderRow(item)}
+                  <PersonRow item={item as never} />
+                {/snippet}
+              </GlobalSearchSection>
+              <GlobalSearchSection
+                heading={$t('cmdk_places_heading')}
+                status={manager.sections.places}
+                idPrefix="place"
+                onActivate={(item) => manager.activate('place', item)}
+              >
+                {#snippet renderRow(item)}
+                  <PlaceRow item={item as never} />
+                {/snippet}
+              </GlobalSearchSection>
+              <GlobalSearchSection
+                heading={$t('cmdk_tags_heading')}
+                status={manager.sections.tags}
+                idPrefix="tag"
+                onActivate={(item) => manager.activate('tag', item)}
+              >
+                {#snippet renderRow(item)}
+                  <TagRow item={item as never} />
+                {/snippet}
+              </GlobalSearchSection>
+              <GlobalSearchNavigationSections
+                status={manager.sections.navigation}
+                onActivate={(item) => manager.activate('nav', item)}
+              />
             {/if}
+          </Command.List>
+        </div>
+        {#if showPreview}
+          <div data-cmdk-preview class="w-[280px] shrink-0 overflow-y-auto min-h-0">
+            <GlobalSearchPreview activeItem={manager.getActiveItem()} />
           </div>
+        {/if}
+      </div>
 
-          <div aria-live="polite" aria-atomic="true" class="sr-only">{manager.announcementText}</div>
-          <GlobalSearchFooter {manager} />
-        </Command.Root>
+      <div aria-live="polite" aria-atomic="true" class="sr-only">{manager.announcementText}</div>
+      <GlobalSearchFooter {manager} />
+    </Command.Root>
   </ModalBody>
 </Modal>

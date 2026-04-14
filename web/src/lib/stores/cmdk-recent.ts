@@ -40,7 +40,7 @@ function warn(err: unknown) {
     return;
   }
   warnedOnce = true;
-   
+
   console.warn('[cmdk.recent]', err);
 }
 

@@ -570,7 +570,6 @@ export class GlobalSearchManager {
           if (n.id === 'nav:theme') {
             themeManager.toggleTheme();
           } else {
-             
             console.warn('[cmdk] unknown action navigation item', n.id);
           }
         } else {
@@ -596,7 +595,6 @@ export class GlobalSearchManager {
     // schema from an older version). Missing the kind-specific id fields would cause
     // goto('/photos/undefined') or similar bad URLs, so bail out silently.
     if (!isValidRecentEntry(entry)) {
-       
       console.warn('[cmdk] ignoring corrupt recent entry', entry);
       this.close();
       return;
@@ -614,21 +612,18 @@ export class GlobalSearchManager {
       const isAdmin = get(user)?.isAdmin ?? false;
       const flags = featureFlagsManager.valueOrUndefined;
       if (!liveNavItem) {
-         
         console.warn('[cmdk] purging stale recent — unknown nav item', entry.id);
         removeEntry(entry.id);
         this.close();
         return;
       }
       if (liveNavItem.adminOnly && !isAdmin) {
-         
         console.warn('[cmdk] purging stale admin recent', entry.id);
         removeEntry(entry.id);
         this.close();
         return;
       }
       if (liveNavItem.featureFlag && !flags?.[liveNavItem.featureFlag]) {
-         
         console.warn('[cmdk] purging stale recent — feature flag disabled', entry.id);
         removeEntry(entry.id);
         this.close();
@@ -971,12 +966,11 @@ export class GlobalSearchManager {
         const all = await getAllTags({ signal });
         if (all.length > 20_000) {
           this.tagsDisabled = true;
-           
+
           console.warn('[cmdk] tag cache > 20k, disabling tag provider for session');
           return { status: 'error', message: 'tag_cache_too_large' };
         }
         if (all.length > 5000) {
-           
           console.warn(`[cmdk] tag cache is large (${all.length} entries)`);
         }
         this.tagsCache = all;
