@@ -31,11 +31,25 @@ export type ProviderStatus<T = unknown> =
   | { status: 'error'; message: string }
   | { status: 'empty' };
 
+/**
+ * Common shape for entity section items. Each entity DTO (photo / person / place /
+ * tag) satisfies this structurally — photos/people/tags have `id`, places have
+ * `latitude`/`longitude`. Using this as the Sections generic argument matches the
+ * shape `GlobalSearchSection` expects and keeps svelte-check happy; plain
+ * `ProviderStatus` (default generic `unknown`) would not satisfy the component's
+ * `T extends { id?; latitude?; longitude? }` constraint.
+ */
+export type EntityItem = {
+  id?: string;
+  latitude?: number;
+  longitude?: number;
+};
+
 export type Sections = {
-  photos: ProviderStatus;
-  people: ProviderStatus;
-  places: ProviderStatus;
-  tags: ProviderStatus;
+  photos: ProviderStatus<EntityItem>;
+  people: ProviderStatus<EntityItem>;
+  places: ProviderStatus<EntityItem>;
+  tags: ProviderStatus<EntityItem>;
   navigation: ProviderStatus<NavigationItem>;
 };
 
@@ -736,7 +750,12 @@ export class GlobalSearchManager {
           onSetModeSettle();
           return;
         }
-        this.sections.photos = result;
+        // Providers return `ProviderStatus<unknown>` because each one handles its own
+        // concrete DTO type internally. The Sections type uses `EntityItem` — a
+        // structural superset that every entity DTO (photo/person/place/tag)
+        // satisfies. The cast is sound because runBatch's key iteration and the
+        // provider contract ensure we never write a NavigationItem here.
+        this.sections.photos = result as ProviderStatus<EntityItem>;
         this.onPhotosSettled();
         this.reconcileCursor();
         onSetModeSettle();
@@ -897,7 +916,10 @@ export class GlobalSearchManager {
           if (batch !== this.batchController) {
             return;
           }
-          this.sections[key] = result;
+          // Cast from `ProviderStatus<unknown>` to the entity section's concrete
+          // generic. See the comment on EntityItem — every entity DTO structurally
+          // satisfies it, and runBatch only iterates entity keys (not navigation).
+          this.sections[key] = result as ProviderStatus<EntityItem>;
           if (key === 'photos') {
             this.onPhotosSettled();
           }

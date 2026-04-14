@@ -642,7 +642,7 @@ describe('cursor identity', () => {
     await vi.advanceTimersByTimeAsync(200);
     m.setActiveItem('person:p1');
     expect(m.activeItemId).toBe('person:p1');
-    m.sections.photos = { status: 'ok', items: [{ id: 'a3' }] as unknown[], total: 1 };
+    m.sections.photos = { status: 'ok', items: [{ id: 'a3' }], total: 1 };
     m.reconcileCursor();
     expect(m.activeItemId).toBe('person:p1');
   });

@@ -1,17 +1,17 @@
 <script lang="ts">
   import type { GlobalSearchManager, SearchMode } from '$lib/managers/global-search-manager.svelte';
-  import { t } from 'svelte-i18n';
+  import { t, type Translations } from 'svelte-i18n';
 
   interface Props {
     manager: GlobalSearchManager;
   }
   let { manager }: Props = $props();
 
-  const options: Array<{ value: SearchMode; labelKey: string }> = [
-    { value: 'smart', labelKey: 'cmdk_mode_smart' },
-    { value: 'metadata', labelKey: 'cmdk_mode_filename' },
-    { value: 'description', labelKey: 'cmdk_mode_description' },
-    { value: 'ocr', labelKey: 'cmdk_mode_ocr' },
+  const options: Array<{ value: SearchMode; labelKey: Translations }> = [
+    { value: 'smart', labelKey: 'cmdk_mode_smart' as Translations },
+    { value: 'metadata', labelKey: 'cmdk_mode_filename' as Translations },
+    { value: 'description', labelKey: 'cmdk_mode_description' as Translations },
+    { value: 'ocr', labelKey: 'cmdk_mode_ocr' as Translations },
   ];
 
   // Sliding pill indicator — tracks the currently selected label's bounding box
