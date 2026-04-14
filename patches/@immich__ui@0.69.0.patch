@@ -1,0 +1,23 @@
+diff --git a/dist/services/command-palette-manager.svelte.js b/dist/services/command-palette-manager.svelte.js
+index e649c9c881ff65eb857d14e86f649faed15fe574..a439e0f213231f3c60da9aaf94d4b64a7f4a49a5 100644
+--- a/dist/services/command-palette-manager.svelte.js
++++ b/dist/services/command-palette-manager.svelte.js
+@@ -36,11 +36,13 @@ class CommandPaletteManager {
+         }
+         this.#isEnabled = true;
+         if (globalThis.window && document.body) {
+-            shortcuts(document.body, [
+-                { shortcut: { key: 'k', meta: true }, onShortcut: () => this.open() },
+-                { shortcut: { key: 'k', ctrl: true }, onShortcut: () => this.open() },
+-                { shortcut: { key: '/' }, preventDefault: true, onShortcut: () => this.open() },
+-            ]);
++            // [Gallery patch] The upstream palette-open shortcuts (Ctrl+K, Cmd+K, `/`)
++            // are intentionally NOT registered here. Gallery owns Ctrl+K / Cmd+K / `/`
++            // for its own cmdk palette (GlobalSearchManager). We still call enable()
++            // so that #handleKeydown — the dispatcher for per-page ActionItem shortcuts
++            // registered via <CommandPaletteDefaultProvider> (F=favorite, I=info,
++            // face-editor keys, etc.) — runs. Without this dispatcher every page-level
++            // keyboard action silently dies. See patches/@immich__ui@0.69.0.patch.
+             on(document.body, 'keydown', (event) => this.#handleKeydown(event));
+         }
+     }
