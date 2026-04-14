@@ -1,0 +1,366 @@
+name: Gallery Revert-to-Immich Validation
+
+# Nightly end-to-end check that scripts/revert-to-immich.sql actually does
+# what it claims: takes a Gallery-migrated database and resets it to a state
+# where upstream Immich boots cleanly, with no schema drift warnings and no
+# stale kysely_migration rows.
+#
+# See docs/plans/2026-04-14-revert-to-immich-validation-design.md for the
+# full design, the pass-criterion rationale, and the review history.
+
+on:
+  schedule:
+    # 05:00 UTC nightly — leaves ~1h buffer after late-night main merges so
+    # docker.yml has time to publish :main before we pull it.
+    - cron: '0 5 * * *'
+  workflow_dispatch:
+    inputs:
+      gallery_image:
+        description: 'Gallery server image tag to test (default: ghcr.io/open-noodle/immich-server:main)'
+        required: false
+  pull_request:
+    # Only run on PRs that actually change something this workflow validates,
+    # so unrelated PRs don't pay the ~10min boot/pull cost on every push.
+    paths:
+      - 'scripts/revert-to-immich.sql'
+      - 'server/src/schema/migrations-gallery/**'
+      - '.github/workflows/gallery-revert-to-immich-validation.yml'
+
+concurrency:
+  group: gallery-revert-to-immich-validation
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  validate:
+    name: Validate revert-to-immich.sql
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # Lifted verbatim from docker/docker-compose.yml so the test runs the
+      # same images a user would run in production.
+      POSTGRES_IMAGE: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0@sha256:bcf63357191b76a916ae5eb93464d65c07511da41e3bf7a8416db519b40b1c23
+      REDIS_IMAGE: docker.io/valkey/valkey:9@sha256:3b55fbaa0cd93cf0d9d961f405e4dfcc70efe325e2d84da207a0a8e6d8fde4f9
+      NETWORK_NAME: immich-revert-test
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      DB_DATABASE_NAME: immich
+      # Single source of truth for the Gallery image tag. Scheduled runs get
+      # the ':main' fallback; manual dispatches can override via input.
+      GALLERY_IMAGE: ${{ inputs.gallery_image || 'ghcr.io/open-noodle/immich-server:main' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Log in to GitHub Container Registry
+        # Cheap belt-and-braces in case open-noodle/* packages ever go
+        # private. No-op for public packages.
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run validation
+        # Everything below lives in one shell so bash variables and the
+        # wait_for_server helper persist across the numbered phases in the
+        # design doc (3-13). Cleanup is a separate step because it needs
+        # `if: always()`.
+        run: |
+          set -euo pipefail
+
+          ############################################################
+          # Helpers
+          ############################################################
+
+          wait_for_server() {
+            local phase=$1
+            local deadline=$(( $(date +%s) + 180 ))
+            while [ "$(date +%s)" -lt "$deadline" ]; do
+              if curl -fsS http://localhost:2283/api/server/ping >/dev/null 2>&1; then
+                echo "::notice::${phase}: /api/server/ping OK"
+                return 0
+              fi
+              sleep 2
+            done
+            echo "::error::${phase}: server did not respond to /api/server/ping within 180s"
+            docker logs server || true
+            return 1
+          }
+
+          boot_server() {
+            local image=$1
+            local phase=$2
+            echo "::group::${phase}: pull ${image}"
+            docker pull "$image"
+            echo "::endgroup::"
+            docker run -d \
+              --name server \
+              --network "$NETWORK_NAME" \
+              -p 2283:2283 \
+              -e DB_USERNAME="$DB_USERNAME" \
+              -e DB_PASSWORD="$DB_PASSWORD" \
+              -e DB_DATABASE_NAME="$DB_DATABASE_NAME" \
+              -v "$UPLOAD_DIR:/data" \
+              "$image"
+            if ! wait_for_server "$phase"; then
+              return 1
+            fi
+          }
+
+          stop_server() {
+            # docker rm -f is synchronous on Linux so :2283 is released
+            # before the next boot_server binds it. No sleep needed.
+            docker rm -f server >/dev/null
+          }
+
+          # MapRepository.init() runs importGeodata() and
+          # importNaturalEarthCountries() in parallel as a background task
+          # — the api worker reports "ping OK" long before either has
+          # finished, and the database constraint state is in flux while
+          # they run (the imports drop+recreate naturalearth_countries
+          # and add primary keys at the end). Running schema-check during
+          # that window produces nondeterministic drift reports.
+          #
+          # Two cases:
+          #
+          #   1. Import runs (DB metadata.lastUpdate != current
+          #      geodataDate) — wait for the synchronous "Geodata import
+          #      completed" log line at map.repository.ts:76.
+          #
+          #   2. Import skipped (early-return at map.repository.ts:65 when
+          #      metadata.lastUpdate matches the bundled geodataDate).
+          #      No "Geodata import completed" log ever fires. The DB
+          #      state was already final when the container started, so
+          #      it's safe to snapshot immediately — we just need to know
+          #      we're in this case. We poll for up to 60s; if the
+          #      completion log never appears we assume early-return and
+          #      proceed. 60s is well over the typical ~7s import time.
+          wait_for_geodata_init() {
+            local phase=$1
+            local deadline=$(( $(date +%s) + 60 ))
+            while [ "$(date +%s)" -lt "$deadline" ]; do
+              if docker logs server 2>&1 | grep -qF 'Geodata import completed'; then
+                echo "::notice::${phase}: geodata import completed"
+                return 0
+              fi
+              sleep 2
+            done
+            echo "::notice::${phase}: no 'Geodata import completed' after 60s — assuming init() early-returned (DB already in final state)"
+            return 0
+          }
+
+          # Run immich-admin schema-check inside the running `server`
+          # container and extract its drift item list. This is more
+          # reliable than grepping `docker logs` because:
+          #
+          #   (a) schema-check queries the DB synchronously and writes
+          #       its output in one shot — no Node.js stdout-buffering
+          #       race between a WARN header line and the individual
+          #       item lines that follow it.
+          #   (b) It's the exact same code path `docs/errors#schema-drift`
+          #       tells users to run, so whatever it reports is the
+          #       canonical drift definition.
+          #
+          # Output format from server/src/commands/schema-check.ts:
+          #
+          #   Migrations are up to date
+          #
+          #   No schema drift detected              (clean case)
+          #
+          # or
+          #
+          #   Detected schema drift. ...
+          #     - <type>: <human description>      (drift item, one per line)
+          #     - <type>: <human description>
+          #   ```sql
+          #   <auto-generated SQL>                  (we don't want this)
+          #   ```
+          #
+          # The grep pulls only the "  - " drift item lines. sort -u
+          # guarantees stable output across runs.
+          extract_drift() (
+            set +o pipefail
+            docker exec server immich-admin schema-check 2>&1 \
+              | grep -E -e '^  - ' \
+              | sort -u
+          )
+
+          ############################################################
+          # Step 3: determine upstream Immich version
+          ############################################################
+
+          UPSTREAM_TAG=v$(jq -r .version server/package.json)
+          echo "Testing revert against upstream Immich ${UPSTREAM_TAG} (from server/package.json)"
+          echo "Gallery image: ${GALLERY_IMAGE}"
+
+          ############################################################
+          # Step 3.5: prepare /data with .immich marker files
+          #
+          # Immich's StorageService.verifyReadAccess (storage.service.ts:117)
+          # reads a `.immich` marker in each of six folders on startup. If
+          # any are missing, the bootstrap throws, the microservices worker
+          # dies, and the supervisor kills the whole container. Pre-creating
+          # the marker files skips the "create from scratch" path and
+          # satisfies verifyReadAccess on all three server boots.
+          #
+          # chmod 0777 because mktemp -d creates 0700 on the runner user
+          # and the immich-server container runs as a non-root user that
+          # can't otherwise read into it.
+          ############################################################
+
+          UPLOAD_DIR=$(mktemp -d)
+          chmod 0777 "$UPLOAD_DIR"
+          for d in thumbs upload backups library profile encoded-video; do
+            mkdir "$UPLOAD_DIR/$d"
+            chmod 0777 "$UPLOAD_DIR/$d"
+            printf '%s' "$(date +%s000)" > "$UPLOAD_DIR/$d/.immich"
+            chmod 0666 "$UPLOAD_DIR/$d/.immich"
+          done
+          echo "Prepared /data mount at ${UPLOAD_DIR}"
+
+          ############################################################
+          # Step 4-6: network + postgres + redis
+          ############################################################
+
+          docker network create "$NETWORK_NAME"
+
+          docker run -d \
+            --name database \
+            --network "$NETWORK_NAME" \
+            -e POSTGRES_USER="$DB_USERNAME" \
+            -e POSTGRES_PASSWORD="$DB_PASSWORD" \
+            -e POSTGRES_DB="$DB_DATABASE_NAME" \
+            -e POSTGRES_INITDB_ARGS=--data-checksums \
+            "$POSTGRES_IMAGE"
+
+          docker run -d \
+            --name redis \
+            --network "$NETWORK_NAME" \
+            "$REDIS_IMAGE"
+
+          ############################################################
+          # Step 7: wait for postgres
+          ############################################################
+
+          # 60s cap — --data-checksums initdb can be slow on congested runners.
+          for _ in $(seq 1 60); do
+            if docker exec database pg_isready -U "$DB_USERNAME" -q >/dev/null 2>&1; then
+              break
+            fi
+            sleep 1
+          done
+          if ! docker exec database pg_isready -U "$DB_USERNAME" -q; then
+            echo "::error::postgres did not become ready within 60s"
+            docker logs database || true
+            exit 1
+          fi
+
+          ############################################################
+          # Step 8: boot upstream Immich (pre-phase) to seed kysely_migration
+          #
+          # Also captures a "baseline drift" snapshot: upstream Immich on a
+          # fresh install already warns about pre-existing drift (e.g.
+          # geodata_places_pkey), so a raw grep for 'schema drift' in the
+          # post-phase logs would false-positive on a correctly-working
+          # revert. The post-phase drift check diffs against this baseline
+          # and only fails on drift items that are NEW after the revert.
+          ############################################################
+
+          boot_server "ghcr.io/immich-app/immich-server:${UPSTREAM_TAG}" pre
+          if ! wait_for_geodata_init pre; then exit 1; fi
+          extract_drift > /tmp/drift-baseline.txt
+          echo "Pre-phase baseline drift ($(wc -l < /tmp/drift-baseline.txt) item(s)):"
+          cat /tmp/drift-baseline.txt || true
+          stop_server
+
+          ############################################################
+          # Step 9: boot Gallery (applies the 27 fork migrations)
+          ############################################################
+
+          boot_server "$GALLERY_IMAGE" gallery
+          stop_server
+
+          ############################################################
+          # Step 10: sanity check that Gallery actually ran
+          ############################################################
+
+          # The '%SharedSpace%' pattern is coupled to the current set of fork
+          # migration filenames in server/src/schema/migrations-gallery/. If
+          # a future Gallery refactor renames these, update the pattern here
+          # — a pattern that returns 0 against a correctly-migrated Gallery
+          # DB would turn this check into a false-failure tripwire.
+          gallery_rows=$(docker exec database psql \
+            -U "$DB_USERNAME" -d "$DB_DATABASE_NAME" -Atc \
+            "SELECT count(*) FROM kysely_migrations WHERE name LIKE '%SharedSpace%'")
+          if [ "$gallery_rows" -eq 0 ]; then
+            echo "::error::Gallery phase applied 0 SharedSpace migrations — GALLERY_IMAGE is probably pointing at an upstream Immich image, not Gallery."
+            exit 1
+          fi
+          echo "::notice::Gallery sanity: ${gallery_rows} SharedSpace migration row(s) in kysely_migrations"
+
+          ############################################################
+          # Step 11: run revert-to-immich.sql
+          ############################################################
+
+          # SET must come BEFORE the script's BEGIN — `cat` appends after
+          # `echo`, so ordering is guaranteed. Pipe form keeps both in one
+          # unambiguous psql session.
+          { echo "SET gallery.revert_token = 'i_accept_data_loss';"; \
+            cat scripts/revert-to-immich.sql; } | \
+            docker exec -i database psql \
+              -U "$DB_USERNAME" -d "$DB_DATABASE_NAME" \
+              -v ON_ERROR_STOP=1
+
+          ############################################################
+          # Step 12: boot upstream Immich post-revert (the real test)
+          ############################################################
+
+          boot_server "ghcr.io/immich-app/immich-server:${UPSTREAM_TAG}" post
+
+          ############################################################
+          # Step 13: schema drift check
+          #
+          # Compares post-phase drift items against the pre-phase baseline
+          # captured in step 8. Fails only if post-phase has drift items
+          # that did NOT appear on a vanilla upstream-Immich boot — i.e.
+          # drift caused by the revert, not pre-existing upstream quirks
+          # like the geodata_places pkey warning.
+          #
+          # extract_drift() is coupled to the Nest logger format and the
+          # "- The/Table X is ..." drift item prefix used at
+          # server/src/services/database.service.ts:133 via
+          # ErrorMessages.SchemaDrift (constants.ts:12). If upstream
+          # reworks that warning format, update extract_drift accordingly.
+          ############################################################
+
+          if ! wait_for_geodata_init post; then exit 1; fi
+          extract_drift > /tmp/drift-post.txt
+          echo "Post-phase drift ($(wc -l < /tmp/drift-post.txt) item(s)):"
+          cat /tmp/drift-post.txt || true
+
+          # `comm -23` prints lines only in post (not in baseline) —
+          # items introduced after the revert cycle. Requires sorted
+          # input, which extract_drift already provides.
+          comm -23 /tmp/drift-post.txt /tmp/drift-baseline.txt > /tmp/drift-new.txt
+          if [ -s /tmp/drift-new.txt ]; then
+            echo "::error::Schema drift introduced by revert — scripts/revert-to-immich.sql is missing cleanup for the following Gallery objects:"
+            cat /tmp/drift-new.txt
+            echo
+            echo "Full post-phase container logs:"
+            docker logs server
+            exit 1
+          fi
+          echo "::notice::post: no new schema drift compared to pre-phase baseline"
+
+          echo "::notice::revert-to-immich validation PASSED"
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker rm -f server database redis 2>/dev/null || true
+          docker network rm "$NETWORK_NAME" 2>/dev/null || true
