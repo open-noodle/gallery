@@ -220,12 +220,12 @@ jobs:
           # DB would turn this check into a false-failure tripwire.
           gallery_rows=$(docker exec database psql \
             -U "$DB_USERNAME" -d "$DB_DATABASE_NAME" -Atc \
-            "SELECT count(*) FROM kysely_migration WHERE name LIKE '%SharedSpace%'")
+            "SELECT count(*) FROM kysely_migrations WHERE name LIKE '%SharedSpace%'")
           if [ "$gallery_rows" -eq 0 ]; then
             echo "::error::Gallery phase applied 0 SharedSpace migrations — GALLERY_IMAGE is probably pointing at an upstream Immich image, not Gallery."
             exit 1
           fi
-          echo "::notice::Gallery sanity: ${gallery_rows} SharedSpace migration row(s) in kysely_migration"
+          echo "::notice::Gallery sanity: ${gallery_rows} SharedSpace migration row(s) in kysely_migrations"
 
           ############################################################
           # Step 11: run revert-to-immich.sql

@@ -219,13 +219,13 @@ DELETE FROM "migration_overrides"
  );
 
 -- -----------------------------------------------------------------------------
--- 7. Delete Gallery migration rows from kysely_migration.
+-- 7. Delete Gallery migration rows from kysely_migrations.
 --
 -- This is the ONE step that is load-bearing for "Immich starts up cleanly."
 -- Without it, Immich's migrator sees rows for files it does not have and
 -- aborts with the classic "corrupted migrations" error.
 -- -----------------------------------------------------------------------------
-DELETE FROM "kysely_migration"
+DELETE FROM "kysely_migrations"
  WHERE "name" IN (
    '1772230000000-CreateStorageMigrationLogTable',
    '1772240000000-CreateSharedSpaceTables',
@@ -262,7 +262,24 @@ DELETE FROM "kysely_migration"
 DO $$
 DECLARE
   fork_tables_left int;
+  fork_rows_left int;
 BEGIN
+  SELECT count(*) INTO fork_rows_left
+    FROM "kysely_migrations"
+   WHERE "name" LIKE '%SharedSpace%'
+      OR "name" LIKE '%StorageMigrationLog%'
+      OR "name" LIKE '%PetDetection%'
+      OR "name" LIKE '%UserGroup%'
+      OR "name" LIKE '%Classification%'
+      OR "name" LIKE '%LibraryAudit%'
+      OR "name" LIKE '%LibrarySync%'
+      OR "name" LIKE '%LibraryUser%'
+      OR "name" LIKE '%AddAssetDuplicateChecksum%'
+      OR "name" LIKE '%AddPersonNameTrigramIndex%';
+  IF fork_rows_left > 0 THEN
+    RAISE EXCEPTION 'revert-to-immich: % Gallery row(s) still present in kysely_migrations after cleanup — aborting.', fork_rows_left;
+  END IF;
+
   SELECT count(*) INTO fork_tables_left
     FROM pg_tables
    WHERE schemaname = current_schema()
