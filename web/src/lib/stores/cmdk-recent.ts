@@ -1,20 +1,14 @@
 import type { SearchMode } from '$lib/managers/global-search-manager.svelte';
+import { user } from '$lib/stores/user.store';
+import { get } from 'svelte/store';
 
-const STORAGE_KEY = 'cmdk.recent';
+// Recents are scoped per logged-in user so multi-account browsers (user A logs
+// out, user B logs in on the same device) never leak each other's palette
+// history. The localStorage key is suffixed with the user id, and reads/writes
+// for a null user are a silent no-op — an anonymous bucket would get inherited
+// by whichever user logs in next, which is the same bug we are trying to fix.
+const STORAGE_KEY_PREFIX = 'cmdk.recent:';
 const MAX_ENTRIES = 20;
-
-// Register a 'storage' listener once at module load (browser only) so that another
-// tab's updates to cmdk.recent drop our in-memory cache and the next read re-fetches
-// from localStorage. Without this, two tabs silently diverge until one of them clears
-// or mutates its own entries.
-if (globalThis.window !== undefined) {
-  globalThis.addEventListener('storage', (event) => {
-    const storageEvent = event as StorageEvent;
-    if (storageEvent.key === STORAGE_KEY || storageEvent.key === null) {
-      memory = null;
-    }
-  });
-}
 
 export type RecentEntry =
   | { kind: 'query'; id: string; text: string; mode: SearchMode; lastUsed: number }
@@ -32,7 +26,6 @@ export type RecentEntry =
       lastUsed: number;
     };
 
-let memory: RecentEntry[] | null = null;
 let warnedOnce = false;
 
 function warn(err: unknown) {
@@ -44,9 +37,15 @@ function warn(err: unknown) {
   console.warn('[cmdk.recent]', err);
 }
 
-function rawRead(): RecentEntry[] {
+function currentStorageKey(): string | null {
+  const current = get(user) as { id?: string } | null;
+  const id = current?.id;
+  return id ? `${STORAGE_KEY_PREFIX}${id}` : null;
+}
+
+function rawRead(key: string): RecentEntry[] {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(key);
     if (raw === null) {
       return [];
     }
@@ -58,45 +57,51 @@ function rawRead(): RecentEntry[] {
   }
 }
 
-function rawWrite(entries: RecentEntry[]) {
+function rawWrite(key: string, entries: RecentEntry[]) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+    localStorage.setItem(key, JSON.stringify(entries));
   } catch (error) {
     warn(error);
   }
 }
 
 export function getEntries(): RecentEntry[] {
-  if (memory === null) {
-    memory = rawRead();
+  const key = currentStorageKey();
+  if (key === null) {
+    return [];
   }
-  return [...memory].sort((a, b) => b.lastUsed - a.lastUsed);
+  return rawRead(key).sort((a, b) => b.lastUsed - a.lastUsed);
 }
 
 export function addEntry(entry: RecentEntry) {
-  if (memory === null) {
-    memory = rawRead();
+  const key = currentStorageKey();
+  if (key === null) {
+    return;
   }
-  const deduped = memory.filter((e) => e.id !== entry.id);
+  const existing = rawRead(key);
+  const deduped = existing.filter((e) => e.id !== entry.id);
   deduped.push(entry);
   deduped.sort((a, b) => b.lastUsed - a.lastUsed);
-  memory = deduped.slice(0, MAX_ENTRIES);
-  rawWrite(memory);
+  rawWrite(key, deduped.slice(0, MAX_ENTRIES));
 }
 
 export function clearEntries() {
-  memory = [];
-  rawWrite([]);
+  const key = currentStorageKey();
+  if (key === null) {
+    return;
+  }
+  rawWrite(key, []);
 }
 
 export function removeEntry(id: string) {
-  if (memory === null) {
-    memory = rawRead();
+  const key = currentStorageKey();
+  if (key === null) {
+    return;
   }
-  const before = memory.length;
-  memory = memory.filter((e) => e.id !== id);
-  if (memory.length !== before) {
-    rawWrite(memory);
+  const existing = rawRead(key);
+  const next = existing.filter((e) => e.id !== id);
+  if (next.length !== existing.length) {
+    rawWrite(key, next);
   }
 }
 
@@ -104,9 +109,8 @@ export function makePlaceId(lat: number, lng: number): string {
   return `place:${lat.toFixed(4)}:${lng.toFixed(4)}`;
 }
 
-// Test-only escape hatch: reset the in-memory cache so tests get a clean slate
-// without leaking state across `localStorage.clear()`.
+// Test-only escape hatch: resets the one-shot warn flag so tests that exercise
+// the error paths can observe fresh warning behaviour across cases.
 export function __resetForTests() {
-  memory = null;
   warnedOnce = false;
 }

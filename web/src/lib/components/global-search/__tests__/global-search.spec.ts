@@ -9,11 +9,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // Default is `null` (matches the pre-existing behavior where the real `writable<T>()`
 // was uninitialized → non-admin). Tests that need an admin view set it explicitly.
 const { mockUser } = vi.hoisted(() => ({
-  mockUser: { current: null as { isAdmin: boolean } | null },
+  // id is read by the cmdk-recent store to scope localStorage per user. Default
+  // to a non-admin user with a stable id so entries persisted in tests are
+  // actually readable; admin-scoped tests override isAdmin explicitly.
+  mockUser: {
+    current: { id: 'test-user', isAdmin: false } as { id: string; isAdmin: boolean } | null,
+  },
 }));
 vi.mock('$lib/stores/user.store', () => ({
   user: {
-    subscribe: (run: (v: { isAdmin: boolean } | null) => void) => {
+    subscribe: (run: (v: { id: string; isAdmin: boolean } | null) => void) => {
       run(mockUser.current);
       return () => {};
     },
@@ -85,9 +90,10 @@ describe('global-search root', () => {
     localStorage.clear();
     resetRecentStore();
     mediaState.minLg = false;
-    // Default to uninitialized user — matches pre-Task-15 behavior. Tests that need
-    // admin-scoped navigation results (e.g. nav sub-sections) set this explicitly.
-    mockUser.current = null;
+    // Default: stable non-admin user with an id so cmdk-recent scoping writes to a
+    // predictable localStorage key. Tests that need admin-scoped navigation results
+    // override `isAdmin` explicitly; anonymous-user edge cases flip to `null`.
+    mockUser.current = { id: 'test-user', isAdmin: false };
     mockFlags.valueOrUndefined = { search: true, map: true, trash: true };
     user = userEvent.setup({ pointerEventsCheck: 0 });
   });
@@ -392,7 +398,7 @@ describe('global-search root', () => {
   });
 
   it('navigation sub-sections render after entity sections in document order', async () => {
-    mockUser.current = { isAdmin: true };
+    mockUser.current = { id: 'test-user', isAdmin: true };
     const m = new GlobalSearchManager();
     m.open();
     render(GlobalSearch, { props: { manager: m } });
@@ -438,7 +444,7 @@ describe('global-search root', () => {
   });
 
   it('render-time filter hides stale admin navigate entries for non-admins', () => {
-    mockUser.current = { isAdmin: false };
+    mockUser.current = { id: 'test-user', isAdmin: false };
     addEntry({
       kind: 'navigate',
       id: 'nav:admin:users',
@@ -468,7 +474,7 @@ describe('global-search root', () => {
   // NF2: the filter uses the LIVE NavigationItem.adminOnly, not the stored entry.adminOnly,
   // so a stale `adminOnly: false` entry pointing at a currently-admin-only item is dropped.
   it('render-time filter uses live NavigationItem.adminOnly, not the stale saved entry field', () => {
-    mockUser.current = { isAdmin: false };
+    mockUser.current = { id: 'test-user', isAdmin: false };
     // classification_settings is live adminOnly=true, but the saved entry has stale adminOnly=false.
     addEntry({
       kind: 'navigate',
@@ -488,7 +494,7 @@ describe('global-search root', () => {
 
   // CG6: feature-flag-disabled navigate recents must also be hidden pre-click.
   it('render-time filter hides navigate recents whose feature flag is now disabled', () => {
-    mockUser.current = { isAdmin: true };
+    mockUser.current = { id: 'test-user', isAdmin: true };
     mockFlags.valueOrUndefined = { search: true, map: false, trash: true };
     addEntry({
       kind: 'navigate',
@@ -517,7 +523,7 @@ describe('global-search root', () => {
 
   // NF2: the filter also drops ghost entries whose NavigationItem was removed upstream.
   it('render-time filter hides navigate recents for unknown (ghost) NavigationItems', () => {
-    mockUser.current = { isAdmin: true };
+    mockUser.current = { id: 'test-user', isAdmin: true };
     addEntry({
       kind: 'navigate',
       id: 'nav:removed:feature',
@@ -535,7 +541,7 @@ describe('global-search root', () => {
 
   // CG8: cold open (empty query) must not render any navigation sub-section headings.
   it('cold open (empty query) does NOT render navigation sub-sections', () => {
-    mockUser.current = { isAdmin: true };
+    mockUser.current = { id: 'test-user', isAdmin: true };
     const m = new GlobalSearchManager();
     m.open();
     render(GlobalSearch, { props: { manager: m } });

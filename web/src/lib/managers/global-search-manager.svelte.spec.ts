@@ -4,11 +4,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // Must appear BEFORE the GlobalSearchManager import because the manager binds these
 // modules at module load; vi.doMock inside tests is too late.
 const { mockUser } = vi.hoisted(() => ({
-  mockUser: { current: { isAdmin: true } as { isAdmin: boolean } | null },
+  // id is used by the cmdk-recent store to scope localStorage per user — every
+  // test in this suite runs under the same synthetic user unless it explicitly
+  // flips `mockUser.current` to something else.
+  mockUser: { current: { id: 'test-user', isAdmin: true } as { id: string; isAdmin: boolean } | null },
 }));
 vi.mock('$lib/stores/user.store', () => ({
   user: {
-    subscribe: (run: (v: { isAdmin: boolean } | null) => void) => {
+    subscribe: (run: (v: { id: string; isAdmin: boolean } | null) => void) => {
       run(mockUser.current);
       return () => {};
     },
@@ -42,7 +45,7 @@ import {
 // mutate these should still set what they want in their own beforeEach, but this
 // guarantees that forgetting to reset cannot poison later tests.
 afterEach(() => {
-  mockUser.current = { isAdmin: true };
+  mockUser.current = { id: 'test-user', isAdmin: true };
   mockFlags.valueOrUndefined = { search: true, map: true, trash: true };
   mockI18nLocale.current = 'en';
 });
@@ -1331,7 +1334,7 @@ describe('runNavigationProvider', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
-    mockUser.current = { isAdmin: true };
+    mockUser.current = { id: 'test-user', isAdmin: true };
     mockFlags.valueOrUndefined = { search: true, map: true, trash: true };
     mockI18nLocale.current = 'en';
   });
@@ -1366,7 +1369,7 @@ describe('runNavigationProvider', () => {
     //   - nav:systemSettings:theme      (adminOnly:true,  labelKey='admin.theme_settings')
     // Under non-admin this yields status='ok' with exactly nav:theme, so the
     // assertion is forced to run (no vacuous-loop path).
-    mockUser.current = { isAdmin: false };
+    mockUser.current = { id: 'test-user', isAdmin: false };
     const m = new GlobalSearchManager();
     const result = runNav(m, 'theme');
     expect(result.status).toBe('ok');
@@ -1379,7 +1382,7 @@ describe('runNavigationProvider', () => {
   });
 
   it('admin users see both admin and non-admin matches (baseline for the admin filter test)', () => {
-    mockUser.current = { isAdmin: true };
+    mockUser.current = { id: 'test-user', isAdmin: true };
     const m = new GlobalSearchManager();
     const result = runNav(m, 'theme');
     expect(result.status).toBe('ok');
@@ -1396,7 +1399,7 @@ describe('runNavigationProvider', () => {
     //   - nav:systemSettings:location  (labelKey='admin.map_gps_settings', no flag)
     // With map flag disabled, status='ok' is guaranteed because the system-settings
     // item is still present, so the negative assertion is non-vacuous.
-    mockUser.current = { isAdmin: true };
+    mockUser.current = { id: 'test-user', isAdmin: true };
     mockFlags.valueOrUndefined = { search: true, map: false, trash: true };
     const m = new GlobalSearchManager();
     const result = runNav(m, 'map');
@@ -1409,7 +1412,7 @@ describe('runNavigationProvider', () => {
   });
 
   it('items gated on a feature flag are hidden when flags have not loaded yet (SSR window)', () => {
-    mockUser.current = { isAdmin: true };
+    mockUser.current = { id: 'test-user', isAdmin: true };
     mockFlags.valueOrUndefined = undefined;
     const m = new GlobalSearchManager();
     const result = runNav(m, 'map');
@@ -1422,7 +1425,7 @@ describe('runNavigationProvider', () => {
   });
 
   it('includes a featureFlag-gated item when the flag is enabled (positive path)', () => {
-    mockUser.current = { isAdmin: false };
+    mockUser.current = { id: 'test-user', isAdmin: false };
     mockFlags.valueOrUndefined = { search: true, map: true, trash: true };
     const m = new GlobalSearchManager();
     const result = runNav(m, 'map');
@@ -1434,7 +1437,7 @@ describe('runNavigationProvider', () => {
   });
 
   it('sorts results by descending computeCommandScore', () => {
-    mockUser.current = { isAdmin: true };
+    mockUser.current = { id: 'test-user', isAdmin: true };
     const m = new GlobalSearchManager();
     // Reproduce the corpus lookups via the same cache the implementation uses, so
     // we can re-score each item and assert the returned order is monotonically
@@ -1482,7 +1485,7 @@ describe('setQuery synchronous navigation', () => {
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
-    mockUser.current = { isAdmin: true };
+    mockUser.current = { id: 'test-user', isAdmin: true };
     mockFlags.valueOrUndefined = { search: true, map: true, trash: true };
     mockI18nLocale.current = 'en';
     vi.mocked(searchSmart).mockResolvedValue({ assets: { items: [], nextPage: null } } as never);
@@ -1535,7 +1538,7 @@ describe('SWR loading rules', () => {
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
-    mockUser.current = { isAdmin: true };
+    mockUser.current = { id: 'test-user', isAdmin: true };
     mockFlags.valueOrUndefined = { search: true, map: true, trash: true };
     mockI18nLocale.current = 'en';
     vi.mocked(searchSmart).mockResolvedValue({ assets: { items: [], nextPage: null } } as never);
@@ -1705,7 +1708,7 @@ describe('activate navigation', () => {
     vi.clearAllMocks();
     localStorage.clear();
     resetRecentStore();
-    mockUser.current = { isAdmin: true };
+    mockUser.current = { id: 'test-user', isAdmin: true };
     mockFlags.valueOrUndefined = { search: true, map: true, trash: true };
   });
 
@@ -1804,7 +1807,7 @@ describe('activateRecent stale admin purge', () => {
   };
 
   it('admin user: navigates normally and does NOT purge', () => {
-    mockUser.current = { isAdmin: true };
+    mockUser.current = { id: 'test-user', isAdmin: true };
     const m = new GlobalSearchManager();
     m.open();
     addEntry(navEntry);
@@ -1814,7 +1817,7 @@ describe('activateRecent stale admin purge', () => {
   });
 
   it('non-admin user: warns, purges entry, does NOT navigate', () => {
-    mockUser.current = { isAdmin: false };
+    mockUser.current = { id: 'test-user', isAdmin: false };
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const m = new GlobalSearchManager();
     m.open();
@@ -1828,7 +1831,7 @@ describe('activateRecent stale admin purge', () => {
   });
 
   it('non-admin user navigating to a NON-admin recent entry works normally', () => {
-    mockUser.current = { isAdmin: false };
+    mockUser.current = { id: 'test-user', isAdmin: false };
     const m = new GlobalSearchManager();
     m.open();
     const userPageEntry = {
@@ -1853,7 +1856,7 @@ describe('batch lifecycle: close, empty-query, grace window (review fixes)', () 
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
-    mockUser.current = { isAdmin: true };
+    mockUser.current = { id: 'test-user', isAdmin: true };
     mockFlags.valueOrUndefined = { search: true, map: true, trash: true };
     mockI18nLocale.current = 'en';
     vi.mocked(searchSmart).mockResolvedValue({ assets: { items: [], nextPage: null } } as never);
@@ -1955,7 +1958,7 @@ describe('activate non-theme action (review fix U1)', () => {
     vi.clearAllMocks();
     localStorage.clear();
     resetRecentStore();
-    mockUser.current = { isAdmin: true };
+    mockUser.current = { id: 'test-user', isAdmin: true };
   });
 
   it('warns and does NOT navigate when activate("nav") receives a non-theme actions item', () => {
@@ -1984,7 +1987,7 @@ describe('activateRecent stale-state purge (review fix U2)', () => {
     vi.clearAllMocks();
     localStorage.clear();
     resetRecentStore();
-    mockUser.current = { isAdmin: true };
+    mockUser.current = { id: 'test-user', isAdmin: true };
     mockFlags.valueOrUndefined = { search: true, map: true, trash: true };
   });
 
@@ -2034,7 +2037,7 @@ describe('activateRecent stale-state purge (review fix U2)', () => {
   it('admin status re-check uses the live NavigationItem.adminOnly, not the stored entry', () => {
     // Saved entry has adminOnly=false (stale), but nav:systemSettings:classification is
     // actually adminOnly=true in the live catalog. A non-admin user should still be purged.
-    mockUser.current = { isAdmin: false };
+    mockUser.current = { id: 'test-user', isAdmin: false };
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const m = new GlobalSearchManager();
     m.open();
@@ -2062,7 +2065,7 @@ describe('setMode stale photos race (review fix U3)', () => {
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
-    mockUser.current = { isAdmin: true };
+    mockUser.current = { id: 'test-user', isAdmin: true };
     mockFlags.valueOrUndefined = { search: true, map: true, trash: true };
     mockI18nLocale.current = 'en';
     vi.mocked(searchPerson).mockResolvedValue([] as never);
@@ -2128,7 +2131,7 @@ describe('Batch 4 post-review: route consistency, SWR cursor, debounce-window cl
     resetRecentStore();
     vi.useFakeTimers();
     installFakeAbortTimeout();
-    mockUser.current = { isAdmin: true };
+    mockUser.current = { id: 'test-user', isAdmin: true };
     mockFlags.valueOrUndefined = { search: true, map: true, trash: true };
     mockI18nLocale.current = 'en';
     vi.mocked(searchSmart).mockResolvedValue({ assets: { items: [], nextPage: null } } as never);

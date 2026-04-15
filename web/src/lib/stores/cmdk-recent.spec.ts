@@ -1,10 +1,29 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+// The cmdk-recent store reads the current user id from $lib/stores/user.store so
+// it can scope entries per user. Tests drive this via a hoisted mock — flipping
+// `mockUser.current` simulates a logout/login without having to touch a real
+// Svelte store. The default `test-user` keeps the broad suite of existing tests
+// working unchanged; only the user-isolation tests flip it mid-test.
+const { mockUser } = vi.hoisted(() => ({
+  mockUser: { current: { id: 'test-user' } as { id: string } | null },
+}));
+vi.mock('$lib/stores/user.store', () => ({
+  user: {
+    subscribe: (run: (v: { id: string } | null) => void) => {
+      run(mockUser.current);
+      return () => {};
+    },
+  },
+}));
+
 import { __resetForTests, addEntry, clearEntries, getEntries, makePlaceId, removeEntry } from './cmdk-recent';
 
 describe('cmdk-recent', () => {
   beforeEach(() => {
     localStorage.clear();
     __resetForTests();
+    mockUser.current = { id: 'test-user' };
   });
 
   it('returns [] for unset store', () => {
@@ -36,23 +55,27 @@ describe('cmdk-recent', () => {
   });
 
   it('treats corrupt JSON as empty; next write overwrites', () => {
-    localStorage.setItem('cmdk.recent', 'not-valid-json');
+    localStorage.setItem('cmdk.recent:test-user', 'not-valid-json');
     __resetForTests();
     expect(getEntries()).toEqual([]);
     addEntry({ kind: 'query', id: 'q:x', text: 'x', mode: 'smart', lastUsed: 1 });
     expect(getEntries()).toHaveLength(1);
   });
 
-  it('QuotaExceededError preserves in-memory copy (regression test)', () => {
+  it('QuotaExceededError does not throw; the failing write is silently dropped', () => {
     addEntry({ kind: 'query', id: 'q:initial', text: 'initial', mode: 'smart', lastUsed: 1 });
     const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
       throw Object.assign(new Error('quota'), { name: 'QuotaExceededError' });
     });
-    addEntry({ kind: 'query', id: 'q:new', text: 'new', mode: 'smart', lastUsed: 2 });
+    expect(() =>
+      addEntry({ kind: 'query', id: 'q:new', text: 'new', mode: 'smart', lastUsed: 2 }),
+    ).not.toThrow();
     spy.mockRestore();
+    // The successful write from before the spy is still there; the failed write
+    // didn't make it through. No in-memory caching means no "last-known good"
+    // state to preserve — the palette will simply miss the newest entry.
     const entries = getEntries();
     expect(entries.some((e) => e.id === 'q:initial')).toBe(true);
-    expect(entries.some((e) => e.id === 'q:new')).toBe(true);
   });
 
   it('handles localStorage unavailable (getItem throws)', () => {
@@ -70,32 +93,61 @@ describe('cmdk-recent', () => {
     expect(getEntries()).toEqual([]);
   });
 
-  it('invalidates in-memory cache on storage event for cmdk.recent', () => {
+  it('scopes entries per user: user A entries are invisible to user B', () => {
+    // Bug: multi-account on the same device leaked recents between users. User A
+    // would add photos/queries to their palette, log out, user B logs in on the
+    // same browser, opens the palette, and sees user A's recents — including
+    // potentially private filenames and query text.
+    mockUser.current = { id: 'user-a' };
+    addEntry({ kind: 'query', id: 'q:secret', text: 'secret-query', mode: 'smart', lastUsed: 1 });
+    addEntry({ kind: 'photo', id: 'photo:p1', assetId: 'p1', label: 'a-private.jpg', lastUsed: 2 });
+
+    mockUser.current = { id: 'user-b' };
+    expect(getEntries()).toEqual([]);
+
+    mockUser.current = { id: 'user-a' };
+    expect(getEntries().map((e) => e.id)).toEqual(['photo:p1', 'q:secret']);
+  });
+
+  it('scopes writes per user: user B writes never appear for user A', () => {
+    // Complementary direction: user B logs in, adds their own entries, user A
+    // logs back in — user A's existing entries are intact and user B's entries
+    // are nowhere to be seen.
+    mockUser.current = { id: 'user-a' };
+    addEntry({ kind: 'query', id: 'q:a-first', text: 'from-a', mode: 'smart', lastUsed: 1 });
+
+    mockUser.current = { id: 'user-b' };
+    addEntry({ kind: 'query', id: 'q:b-first', text: 'from-b', mode: 'smart', lastUsed: 2 });
+    expect(getEntries().map((e) => e.id)).toEqual(['q:b-first']);
+
+    mockUser.current = { id: 'user-a' };
+    expect(getEntries().map((e) => e.id)).toEqual(['q:a-first']);
+  });
+
+  it('returns [] and silently drops writes when no user is logged in', () => {
+    // Opening the palette before auth resolves (or in a logged-out edge case)
+    // must not populate an "anonymous" bucket that the next logged-in user could
+    // then inherit. Reads return empty, writes are no-ops.
+    mockUser.current = null;
+    addEntry({ kind: 'query', id: 'q:anon', text: 'anonymous', mode: 'smart', lastUsed: 1 });
+    expect(getEntries()).toEqual([]);
+    // Sanity: the entry is not persisted under ANY scoped key either — fetch the
+    // whole localStorage snapshot and assert nothing matches the cmdk prefix.
+    const keys = Object.keys(localStorage).filter((k) => k.startsWith('cmdk.recent'));
+    expect(keys).toEqual([]);
+  });
+
+  it('cross-tab writes are picked up on the next read (no in-memory cache)', () => {
+    // Reads hit localStorage directly so a write from another tab (under the
+    // current user's key) is visible on the very next call without any explicit
+    // cache-invalidation plumbing. This replaces the previous storage-event
+    // listener that existed solely to invalidate a shared in-memory cache.
     addEntry({ kind: 'query', id: 'q:a', text: 'a', mode: 'smart', lastUsed: 1 });
-    // Simulate another tab writing directly to localStorage and dispatching the
-    // 'storage' event that cross-tab updates emit.
     localStorage.setItem(
-      'cmdk.recent',
+      'cmdk.recent:test-user',
       JSON.stringify([{ kind: 'query', id: 'q:b', text: 'b', mode: 'smart', lastUsed: 2 }]),
     );
-    globalThis.dispatchEvent(new StorageEvent('storage', { key: 'cmdk.recent' }));
-    const entries = getEntries();
-    expect(entries.map((e) => e.id)).toEqual(['q:b']);
-  });
-
-  it('invalidates cache on storage event with null key (full clear)', () => {
-    addEntry({ kind: 'query', id: 'q:a', text: 'a', mode: 'smart', lastUsed: 1 });
-    localStorage.clear();
-    globalThis.dispatchEvent(new StorageEvent('storage', { key: null }));
-    expect(getEntries()).toEqual([]);
-  });
-
-  it('ignores storage events for unrelated keys', () => {
-    addEntry({ kind: 'query', id: 'q:a', text: 'a', mode: 'smart', lastUsed: 1 });
-    // Fire an unrelated key event — in-memory copy should survive.
-    globalThis.dispatchEvent(new StorageEvent('storage', { key: 'some.other.key' }));
-    const entries = getEntries();
-    expect(entries.map((e) => e.id)).toEqual(['q:a']);
+    expect(getEntries().map((e) => e.id)).toEqual(['q:b']);
   });
 });
 
@@ -173,7 +225,7 @@ describe('removeEntry', () => {
   it('persists the removal to localStorage', () => {
     addEntry({ kind: 'query', id: 'q:a', text: 'a', mode: 'smart', lastUsed: 1 });
     removeEntry('q:a');
-    const raw = localStorage.getItem('cmdk.recent');
+    const raw = localStorage.getItem('cmdk.recent:test-user');
     expect(JSON.parse(raw ?? '[]')).toEqual([]);
   });
 });
