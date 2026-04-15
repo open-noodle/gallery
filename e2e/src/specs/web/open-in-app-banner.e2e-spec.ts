@@ -6,6 +6,14 @@ import { testAssetDir, utils } from 'src/utils';
 const SCHEME_RX = /^(immich|noodle-gallery):\/\/asset\?id=[0-9a-fA-F-]{36}$/;
 const BANNER = 'open-in-app-banner';
 
+// Strip `defaultBrowserType` from device configs — Playwright forbids switching
+// browser types across describe groups within a single project. The web e2e
+// project runs Desktop Chrome, and we just need the mobile UA / viewport /
+// touch points to drive `detectPlatform`.
+const omitBrowserType = <T extends { defaultBrowserType?: string }>({ defaultBrowserType: _, ...rest }: T) => rest;
+const iPhone13 = omitBrowserType(devices['iPhone 13']);
+const pixel5 = omitBrowserType(devices['Pixel 5']);
+
 test.describe('open-in-app banner', () => {
   let admin: LoginResponseDto;
   let assetId: string;
@@ -24,7 +32,7 @@ test.describe('open-in-app banner', () => {
   });
 
   test.describe('iPhone 13', () => {
-    test.use({ ...devices['iPhone 13'] });
+    test.use({ ...iPhone13 });
 
     test('renders on cold-nav to /photos/:id with the right deep link', async ({ context, page }) => {
       await utils.setAuthCookies(context, admin.accessToken);
@@ -73,7 +81,7 @@ test.describe('open-in-app banner', () => {
   });
 
   test.describe('Pixel 5', () => {
-    test.use({ ...devices['Pixel 5'] });
+    test.use({ ...pixel5 });
 
     test("Don't have the app? routes to /install on Android", async ({ context, page }) => {
       await utils.setAuthCookies(context, admin.accessToken);
