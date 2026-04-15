@@ -133,6 +133,16 @@ export class GlobalSearchManager {
   activeItemId = $state<string | null>(null);
   mlHealthy = $state(true);
   /**
+   * Monotonic counter bumped on every mid-session mutation of the cmdk-recent
+   * store (e.g. `removeRecent`). The component's `recentEntries` $derived reads
+   * it so deleting a highlighted entry re-evaluates the derived in the same
+   * tick — without it, the DOM would show the deleted row until the palette
+   * closed and reopened. The counter value itself is not meaningful; its role
+   * is purely to register a reactive dependency on mutations the cmdk-recent
+   * store cannot signal on its own (plain functions, not a Svelte store).
+   */
+  recentsRevision = $state(0);
+  /**
    * True while any provider in the current batch (or a mode-switch re-run) is in flight.
    * Drives the progress stripe on the palette header.
    */
@@ -664,6 +674,29 @@ export class GlobalSearchManager {
       }
     }
     this.close();
+  }
+
+  /**
+   * Removes a recent entry from the cmdk-recent store and re-homes the highlight
+   * if the caller deleted the currently-active row. Called from Delete/Backspace
+   * key handling and the per-row X button. No-op on unknown ids so a stale cursor
+   * from an out-of-date view does not accidentally bump the revision.
+   */
+  removeRecent(id: string) {
+    const before = getEntries();
+    if (!before.some((e) => e.id === id)) {
+      return;
+    }
+    removeEntry(id);
+    this.recentsRevision++;
+    // If the deleted row was the active one, pick the next-newest remaining
+    // entry so keyboard users are not stranded on a dead cursor. `getEntries`
+    // returns newest-first, and since `id` is guaranteed present in `before`
+    // but absent from the post-removal list, we just take the first survivor.
+    if (this.activeItemId === id) {
+      const remaining = before.filter((e) => e.id !== id);
+      this.activeItemId = remaining[0]?.id ?? null;
+    }
   }
 
   setMode(newMode: SearchMode) {

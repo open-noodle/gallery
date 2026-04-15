@@ -35,7 +35,7 @@ vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({
 }));
 
 import { GlobalSearchManager, type Provider, type Sections } from '$lib/managers/global-search-manager.svelte';
-import { addEntry, __resetForTests as resetRecentStore } from '$lib/stores/cmdk-recent';
+import { addEntry, getEntries, __resetForTests as resetRecentStore } from '$lib/stores/cmdk-recent';
 import { getMlHealth } from '@immich/sdk';
 import GlobalSearch from '../global-search.svelte';
 
@@ -355,6 +355,81 @@ describe('global-search root', () => {
     render(GlobalSearch, { props: { manager: m } });
     expect(screen.getByText('beach')).toBeInTheDocument();
     expect(screen.getByText('sunset.jpg')).toBeInTheDocument();
+  });
+
+  it('Delete on a highlighted recent removes it from the visible list', async () => {
+    // Seed two recents, highlight the newest, press Delete, assert the row
+    // disappears from the DOM in the same tick. This pins the reactive-tick
+    // contract between the component and manager.removeRecent/recentsRevision.
+    addEntry({ kind: 'query', id: 'q:beach', text: 'beach', mode: 'smart', lastUsed: 1 });
+    addEntry({ kind: 'query', id: 'q:sunset', text: 'sunset', mode: 'smart', lastUsed: 2 });
+    const m = new GlobalSearchManager();
+    m.open();
+    render(GlobalSearch, { props: { manager: m } });
+    // Focus the input so key events are routed to the combobox handler.
+    const input = screen.getByRole('combobox');
+    input.focus();
+    // Highlight the newer entry — mirrors what the auto-highlight / ArrowDown
+    // path would do. `{Delete}` is the forward-delete key on full keyboards; on
+    // Mac laptops the OS maps Fn+Backspace to it.
+    m.setActiveItem('q:sunset');
+    await user.keyboard('{Delete}');
+    await vi.waitFor(() => expect(screen.queryByText('sunset')).toBeNull());
+    expect(screen.getByText('beach')).toBeInTheDocument();
+    expect(getEntries().map((e) => e.id)).toEqual(['q:beach']);
+  });
+
+  it('Backspace on a highlighted recent (empty input) removes it', async () => {
+    // Backspace is a safe alternative to Delete because it is a no-op in an
+    // empty text input — users on Mac laptops without a forward-delete key can
+    // still prune recents without an Fn chord.
+    addEntry({ kind: 'query', id: 'q:beach', text: 'beach', mode: 'smart', lastUsed: 1 });
+    addEntry({ kind: 'query', id: 'q:sunset', text: 'sunset', mode: 'smart', lastUsed: 2 });
+    const m = new GlobalSearchManager();
+    m.open();
+    render(GlobalSearch, { props: { manager: m } });
+    const input = screen.getByRole('combobox');
+    input.focus();
+    m.setActiveItem('q:sunset');
+    await user.keyboard('{Backspace}');
+    await vi.waitFor(() => expect(screen.queryByText('sunset')).toBeNull());
+    expect(getEntries().map((e) => e.id)).toEqual(['q:beach']);
+  });
+
+  it('Backspace does NOT remove a recent while the input has text', async () => {
+    // Regression guard: Backspace in the empty-input "recents mode" prunes, but
+    // once the user has typed something Backspace must revert to its usual text
+    // behaviour (delete a character) so the combobox is still editable.
+    addEntry({ kind: 'query', id: 'q:beach', text: 'beach', mode: 'smart', lastUsed: 1 });
+    const m = new GlobalSearchManager();
+    m.open();
+    render(GlobalSearch, { props: { manager: m } });
+    const input = screen.getByRole('combobox') as HTMLInputElement;
+    await user.type(input, 'hi');
+    expect(input.value).toBe('hi');
+    await user.keyboard('{Backspace}');
+    // Backspace ate the 'i'; the recent entry is still in the store.
+    expect(input.value).toBe('h');
+    expect(getEntries().map((e) => e.id)).toEqual(['q:beach']);
+  });
+
+  it('per-row X button removes the recent entry without activating the row', async () => {
+    // The X button is the pointer-user affordance for the Delete key. It must
+    // call removeRecent, NOT activateRecent — clicking it should never navigate
+    // away from the palette. `stopPropagation` on the button click is the key
+    // implementation detail this regression guards.
+    addEntry({ kind: 'query', id: 'q:beach', text: 'beach', mode: 'smart', lastUsed: 1 });
+    const m = new GlobalSearchManager();
+    const activateSpy = vi.spyOn(m, 'activateRecent').mockImplementation(() => {});
+    m.open();
+    render(GlobalSearch, { props: { manager: m } });
+    // svelte-i18n runs with fallbackLocale 'dev' in tests, so aria-labels render
+    // as the literal i18n key — match against the key or the English fallback.
+    const removeBtn = await screen.findByRole('button', { name: /cmdk_remove_from_recents|remove from recents/i });
+    await user.click(removeBtn);
+    await vi.waitFor(() => expect(screen.queryByText('beach')).toBeNull());
+    expect(activateSpy).not.toHaveBeenCalled();
+    expect(getEntries()).toEqual([]);
   });
 
   it('Enter on a highlighted photo row calls manager.activate("photo", item)', async () => {

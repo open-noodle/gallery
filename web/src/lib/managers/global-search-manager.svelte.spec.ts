@@ -884,6 +884,54 @@ describe('activateRecent()', () => {
   });
 });
 
+describe('removeRecent()', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    resetRecentStore();
+  });
+
+  it('removes the matching recent entry from the store', () => {
+    addEntry({ kind: 'query', id: 'q:beach', text: 'beach', mode: 'smart', lastUsed: 1 });
+    addEntry({ kind: 'query', id: 'q:sunset', text: 'sunset', mode: 'smart', lastUsed: 2 });
+    const m = new GlobalSearchManager();
+    m.removeRecent('q:beach');
+    expect(getEntries().map((e) => e.id)).toEqual(['q:sunset']);
+  });
+
+  it('bumps recentsRevision so Svelte-derived views can re-read', () => {
+    // The component's `recentEntries` derived depends on `manager.recentsRevision`
+    // because cmdk-recent is a plain-function store (not a Svelte store). Without
+    // a reactive tick, a mid-session mutation would leave the deleted row in the
+    // DOM until the palette closed and reopened.
+    addEntry({ kind: 'query', id: 'q:beach', text: 'beach', mode: 'smart', lastUsed: 1 });
+    const m = new GlobalSearchManager();
+    const before = m.recentsRevision;
+    m.removeRecent('q:beach');
+    expect(m.recentsRevision).toBeGreaterThan(before);
+  });
+
+  it('no-op on a missing id — revision unchanged', () => {
+    const m = new GlobalSearchManager();
+    const before = m.recentsRevision;
+    m.removeRecent('does-not-exist');
+    expect(m.recentsRevision).toBe(before);
+  });
+
+  it('reconciles the cursor after removing the currently-highlighted recent', () => {
+    // When the user deletes the active row, the highlight must move to the next
+    // available entry so keyboard users do not end up on a dead cursor.
+    addEntry({ kind: 'query', id: 'q:beach', text: 'beach', mode: 'smart', lastUsed: 1 });
+    addEntry({ kind: 'query', id: 'q:sunset', text: 'sunset', mode: 'smart', lastUsed: 2 });
+    const m = new GlobalSearchManager();
+    m.open();
+    m.setActiveItem('q:sunset');
+    m.removeRecent('q:sunset');
+    // 'q:sunset' is gone, the remaining entry 'q:beach' must take the highlight.
+    expect(m.activeItemId).toBe('q:beach');
+  });
+});
+
 describe('announcementText', () => {
   beforeEach(() => {
     vi.clearAllMocks();

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { IconButton, Modal, ModalBody } from '@immich/ui';
+  import { Icon, IconButton, Modal, ModalBody } from '@immich/ui';
   import { mdiClose } from '@mdi/js';
   import { Command } from 'bits-ui';
   import { t } from 'svelte-i18n';
@@ -96,11 +96,17 @@
   // stale recents visible until clicked. Using `$user` (reactive auto-subscription)
   // instead of `get(user)` so the derived re-runs when the user store updates
   // mid-session (logout/login, role change).
+  //
+  // `manager.recentsRevision` is read as a reactive dependency so mid-session
+  // mutations (deleting a highlighted row, per-row X click) re-evaluate this
+  // derived in the same tick — cmdk-recent is a plain-function store so we
+  // cannot rely on Svelte store subscriptions to invalidate the list.
   const recentEntries = $derived<RecentEntry[]>(
     (() => {
       if (inputValue.trim() !== '') {
         return [];
       }
+      void manager.recentsRevision;
       const isAdmin = $user?.isAdmin ?? false;
       const flags = featureFlagsManager.valueOrUndefined;
       return getEntries().filter((e) => {
@@ -174,6 +180,17 @@
       const order: SearchMode[] = ['smart', 'metadata', 'description', 'ocr'];
       const next = order[(order.indexOf(manager.mode) + 1) % order.length];
       manager.setMode(next);
+      e.preventDefault();
+      return;
+    }
+    // Delete / Backspace in recents mode (empty input) prunes the highlighted
+    // row. Backspace is a no-op in an empty input so hijacking it doesn't
+    // interfere with text editing; Delete is the forward-delete semantic and
+    // does nothing useful in an empty input either. Once the user has typed
+    // anything, both keys revert to their native behaviour so the combobox is
+    // still editable.
+    if ((e.key === 'Delete' || e.key === 'Backspace') && inputValue === '' && manager.activeItemId) {
+      manager.removeRecent(manager.activeItemId);
       e.preventDefault();
       return;
     }
@@ -284,8 +301,30 @@
                   </Command.GroupHeading>
                   <Command.GroupItems>
                     {#each recentEntries as entry (entry.id)}
-                      <Command.Item value={entry.id} onSelect={() => manager.activateRecent(entry)} class="group">
+                      <Command.Item
+                        value={entry.id}
+                        onSelect={() => manager.activateRecent(entry)}
+                        class="group relative"
+                      >
                         <RecentRow {entry} />
+                        <!-- Per-row remove affordance. Hidden by default, surfaced on
+                             hover OR when the row is keyboard-selected (data-selected
+                             from bits-ui) so both input modes have a visible target.
+                             stopPropagation is load-bearing: without it, the surrounding
+                             Command.Item treats the click as a selection and triggers
+                             activateRecent, which would navigate before the removal UI
+                             update could render. -->
+                        <button
+                          type="button"
+                          aria-label={$t('cmdk_remove_from_recents')}
+                          class="absolute end-3 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-gray-500 opacity-0 transition-opacity duration-[80ms] ease-out hover:bg-black/10 hover:text-gray-900 group-hover:opacity-100 group-data-[selected]:opacity-100 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-gray-100"
+                          onclick={(e) => {
+                            e.stopPropagation();
+                            manager.removeRecent(entry.id);
+                          }}
+                        >
+                          <Icon icon={mdiClose} size="1em" aria-hidden />
+                        </button>
                       </Command.Item>
                     {/each}
                   </Command.GroupItems>
