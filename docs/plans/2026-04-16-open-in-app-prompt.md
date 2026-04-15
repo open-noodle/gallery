@@ -1255,7 +1255,7 @@ If individual tests are flaky on first run, re-run; if persistently flaky, do no
 **Step 3: Commit**
 
 ```bash
-git add e2e/web/specs/open-in-app-banner.e2e.ts
+git add e2e/src/specs/web/open-in-app-banner.e2e-spec.ts
 git commit -m "test(e2e): cover open-in-app banner across devices"
 ```
 
@@ -1271,14 +1271,13 @@ cd web && pnpm check && pnpm test -- --run
 
 Expected: PASS, no warnings.
 
-**Step 2: Verify branding cycle locally one more time**
+**Step 2: Verify branding cycle locally one more time** — use the same isolated mktemp-clone pattern from Task 17 so the working tree is never mutated:
 
 ```bash
-git stash
-./branding/scripts/apply-branding.sh
-./branding/scripts/verify-branding.sh
-git checkout -- .
-git stash pop || true
+WORK=$(mktemp -d)
+git clone --branch HEAD --depth 1 . "$WORK"
+(cd "$WORK" && ./branding/scripts/apply-branding.sh && ./branding/scripts/verify-branding.sh)
+rm -rf "$WORK"
 ```
 
 **Step 3: Push branch**
