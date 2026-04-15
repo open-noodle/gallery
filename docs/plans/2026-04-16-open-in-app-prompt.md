@@ -355,7 +355,6 @@ git commit -m "feat(web): add IOS_APP_STORE_URL and ANDROID_INSTALL_URL constant
 **Files:**
 
 - Create: `web/src/routes/(user)/install/+page.svelte`
-- Create: `web/src/routes/(user)/install/+page.ts`
 
 **Step 1: Create page**
 
@@ -363,24 +362,19 @@ git commit -m "feat(web): add IOS_APP_STORE_URL and ANDROID_INSTALL_URL constant
 <!-- web/src/routes/(user)/install/+page.svelte -->
 <script lang="ts">
   import OnboardingMobileApp from '$lib/components/onboarding-page/onboarding-mobile-app.svelte';
+  import { t } from 'svelte-i18n';
 </script>
+
+<svelte:head>
+  <title>{$t('install_app_title')}</title>
+</svelte:head>
 
 <div class="mx-auto max-w-2xl p-6">
   <OnboardingMobileApp />
 </div>
 ```
 
-```ts
-// web/src/routes/(user)/install/+page.ts
-import { t } from 'svelte-i18n';
-import { get } from 'svelte/store';
-
-export const load = () => ({
-  meta: { title: get(t)('install_app_title' as never) || 'Install the app' },
-});
-```
-
-NOTE: verify `OnboardingMobileApp` component path during execution — it lives at `web/src/lib/components/onboarding-page/onboarding-mobile-app.svelte` per the design.
+NOTE: do NOT add a `+page.ts` — i18n strings aren't available reliably at SvelteKit `load` time, so resolving the title via `$t` inside `<svelte:head>` is correct. Verified at `web/src/lib/components/onboarding-page/onboarding-mobile-app.svelte`.
 
 **Step 2: Manual smoke check**
 
@@ -399,7 +393,7 @@ git commit -m "feat(web): add /install route wrapping OnboardingMobileApp"
 
 **Files:**
 
-- Modify: `i18n/en.json` (or `i18n/src/en.json` — verify which is the source-of-truth)
+- Modify: `i18n/en.json` (the source-of-truth; there is NO `i18n/src/` directory)
 - Modify: `branding/i18n/overrides-en.json`
 
 **Step 1: Add source keys (Immich-branded)**
@@ -753,12 +747,12 @@ Replace the `{#if visible && eligibility.eligible}` block with the full UI per t
   >
     <div class="flex items-center gap-3 px-3 py-2">
       <img
-        src="/icon-192.png"
+        src="/apple-icon-180.png"
         alt=""
         class="h-12 w-12 flex-shrink-0 rounded-xl shadow-sm ring-1 ring-light/10 dark:ring-dark/10"
       />
       <div class="min-w-0 flex-1">
-        <p class="truncate text-base font-semibold leading-tight text-text">
+        <p class="truncate text-base font-semibold leading-tight">
           {$t('open_in_app_banner_title')}
         </p>
         <p class="truncate text-xs text-subtle sm:hidden">
@@ -777,10 +771,7 @@ Replace the `{#if visible && eligibility.eligible}` block with the full UI per t
       />
     </div>
     <div class="flex justify-end px-3 pb-2 sm:hidden">
-      <a
-        href={getAppHref(eligibility.platform)}
-        class="text-xs text-subtle underline underline-offset-2"
-      >
+      <a href={getAppHref(eligibility.platform)} class="text-xs text-subtle underline underline-offset-2">
         {$t('open_in_app_banner_get_app')}
       </a>
     </div>
@@ -789,9 +780,13 @@ Replace the `{#if visible && eligibility.eligible}` block with the full UI per t
 {/if}
 ```
 
-NOTE: `Button` from `@immich/ui` accepts an `href` prop for anchor rendering. If it doesn't, wrap an `<a>` styled as a button.
+NOTES:
 
-Add a tiny CSS keyframe in the same file (Svelte scoped):
+- The icon path `/apple-icon-180.png` is the standard upstream PWA asset already in `web/static/` (verified). Don't reference the fork-only `gallery-logo-mark.svg` — it would surprise upstream rebases.
+- Default body text colour comes from the layout — no `text-text` class (it doesn't exist in `@immich/ui`'s theme). Verified tokens in this banner: `bg-light/dark`, `border-light-100/dark-100`, `text-subtle`, `ring-light/dark`. Do NOT add `text-text`.
+- `Button` from `@immich/ui` accepts an `href` prop for anchor rendering — confirmed by `web/src/lib/components/import/import-progress-step.svelte`.
+
+Add a tiny CSS keyframe (Tailwind's `motion-safe:` variant already wraps the keyframe in the `prefers-reduced-motion: no-preference` media query — no separate `@media` override needed):
 
 ```svelte
 <style>
@@ -803,16 +798,13 @@ Add a tiny CSS keyframe in the same file (Svelte scoped):
       transform: translateY(0);
     }
   }
-  .motion-safe\:animate-slide-down {
+  :global(.motion-safe\:animate-slide-down) {
     animation: slide-down 0.28s cubic-bezier(0.32, 0.72, 0, 1);
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .motion-safe\:animate-slide-down {
-      animation: none;
-    }
   }
 </style>
 ```
+
+NOTE: `motion-safe:` in Tailwind 4 only applies the class when `prefers-reduced-motion: no-preference` matches. Users with reduced-motion preference get no animation automatically.
 
 **Step 2: Type-check**
 
@@ -939,13 +931,23 @@ Future<PageRouteInfo?> _buildSpaceDeepLink(String spaceId) async {
 
 Inject any new service via the constructor + provider just like `_betaRemoteAlbumService` etc. is wired.
 
-**Step 3: Run mobile tests if any exist for deep_link.service**
+**Step 3: Add a unit test for the new intent (REQUIRED, not optional)**
+
+Look for an existing test file:
 
 ```bash
-cd mobile && find test -name 'deep_link*'
+cd mobile && find test -name 'deep_link*' -o -name '*deep*link*'
 ```
 
-If a test file exists, add a test for the new `space` intent (mirror the album test). Otherwise, skip — the e2e via the web banner will exercise the wiring (in a manual test with the app installed).
+If one exists, mirror the album case to assert that `handleScheme` parses `noodle-gallery://space?id=<uuid>` and returns the expected `PageRouteInfo`. Mock the space provider/service.
+
+If no test file exists yet, create `mobile/test/services/deep_link_service_test.dart` with a minimal Riverpod test using `ProviderContainer` overrides. Pattern from any other service test in `mobile/test/services/`. Test cases:
+
+- `handleScheme(immich://space?id=<known-id>, ...)` → returns the expected route.
+- `handleScheme(immich://space?id=, ...)` → returns `DeepLink.defaultPath` on cold start, `DeepLink.none` otherwise.
+- Same two cases with `noodle-gallery://space?id=...` to confirm scheme-agnostic behaviour.
+
+Run: `cd mobile && flutter test test/services/deep_link_service_test.dart`.
 
 **Step 4: Commit**
 
@@ -1110,19 +1112,22 @@ fi
 echo "  Open-in-app scheme registration verified"
 ```
 
-**Step 2: Manually run the full branding+verify cycle**
+**Step 2: Manually run the full branding+verify cycle in an isolated worktree copy**
+
+To avoid risking local changes, run in a fresh worktree:
 
 ```bash
-# Stash any local changes that branding may overwrite
-git stash
+# From the worktree root:
+WORK=$(mktemp -d)
+git clone --branch HEAD --depth 1 . "$WORK"
+cd "$WORK"
 ./branding/scripts/apply-branding.sh
 ./branding/scripts/verify-branding.sh
-# Restore source state — branding modifies many files
-git checkout -- .
-git stash pop || true
+cd -
+rm -rf "$WORK"
 ```
 
-Expected: verify-branding exits 0 with "Open-in-app scheme registration verified" line.
+Expected: verify-branding exits 0 with "Open-in-app scheme registration verified" line. No mutation to the working repo.
 
 **Step 3: Commit**
 
@@ -1137,102 +1142,113 @@ git commit -m "test(branding): verify dual-scheme registration after branding"
 
 **Files:**
 
-- Create: `e2e/web/specs/open-in-app-banner.e2e.ts`
+- Create: `e2e/src/specs/web/open-in-app-banner.e2e-spec.ts`
+
+The actual file naming convention is `<topic>.e2e-spec.ts` under `e2e/src/specs/web/` (verified against `e2e/src/specs/web/album.e2e-spec.ts`). Utility API: `utils.initSdk()`, `utils.resetDatabase()`, `utils.adminSetup()`, `utils.setAuthCookies(context, accessToken)`, asset path via `${testAssetDir}/...`. Both come from `'src/utils'`.
 
 **Step 1: Write E2E**
 
 ```ts
-// e2e/web/specs/open-in-app-banner.e2e.ts
+// e2e/src/specs/web/open-in-app-banner.e2e-spec.ts
+import { type LoginResponseDto } from '@immich/sdk';
 import { devices, expect, test } from '@playwright/test';
-import { utils } from 'src/utils';
+import { readFileSync } from 'node:fs';
+import { testAssetDir, utils } from 'src/utils';
 
-const ASSET_REGEX = /immich:\/\/asset\?id=[0-9a-fA-F-]{36}$/;
+const SCHEME_RX = /^(immich|noodle-gallery):\/\/asset\?id=[0-9a-fA-F-]{36}$/;
 
 test.describe('open-in-app banner', () => {
+  let admin: LoginResponseDto;
   let assetId: string;
 
   test.beforeAll(async () => {
-    const { admin } = await utils.setupTestEnvironment();
-    const asset = await utils.uploadAsset(admin, 'formats/jpg/el_torcal_rocks.jpg');
+    utils.initSdk();
+    await utils.resetDatabase();
+    admin = await utils.adminSetup();
+    const asset = await utils.createAsset(admin.accessToken, {
+      assetData: {
+        bytes: readFileSync(`${testAssetDir}/formats/jpg/el_torcal_rocks.jpg`),
+        filename: 'el_torcal_rocks.jpg',
+      },
+    });
     assetId = asset.id;
   });
 
-  test.use({ ...devices['iPhone 13'] });
+  test.describe('iPhone 13', () => {
+    test.use({ ...devices['iPhone 13'] });
 
-  test('renders on cold-nav to /photos/:id and links to noodle-gallery:// (post-branding) or immich:// (dev)', async ({
-    page,
-  }) => {
-    await utils.signInAsAdmin(page);
-    await page.goto(`/photos/${assetId}`);
+    test('renders on cold-nav to /photos/:id with the right deep link', async ({ context, page }) => {
+      await utils.setAuthCookies(context, admin.accessToken);
+      await page.goto(`/photos/${assetId}`);
 
-    const banner = page.getByRole('region', { name: /mobile app suggestion/i });
-    await expect(banner).toBeVisible();
+      const banner = page.getByRole('region', { name: /mobile app suggestion/i });
+      await expect(banner).toBeVisible();
 
-    const openLink = banner.getByRole('link', { name: /^open$/i });
-    const href = await openLink.getAttribute('href');
-    // Source uses immich://, branded build uses noodle-gallery://
-    expect(href).toMatch(/^(immich|noodle-gallery):\/\/asset\?id=[0-9a-fA-F-]{36}$/);
+      const openLink = banner.getByRole('link', { name: /^open$/i });
+      await expect(openLink).toHaveAttribute('href', expect.stringMatching(SCHEME_RX));
+    });
+
+    test('hides on internal SPA navigation back to the timeline', async ({ context, page }) => {
+      await utils.setAuthCookies(context, admin.accessToken);
+      await page.goto(`/photos/${assetId}`);
+      await expect(page.getByRole('region', { name: /mobile app suggestion/i })).toBeVisible();
+
+      await page.goBack();
+      await expect(page.getByRole('region', { name: /mobile app suggestion/i })).not.toBeVisible();
+    });
+
+    test('dismiss persists across reload', async ({ context, page }) => {
+      await utils.setAuthCookies(context, admin.accessToken);
+      await page.goto(`/photos/${assetId}`);
+      await page.getByRole('button', { name: /dismiss banner/i }).click();
+      await expect(page.getByRole('region', { name: /mobile app suggestion/i })).not.toBeVisible();
+
+      await page.reload();
+      await expect(page.getByRole('region', { name: /mobile app suggestion/i })).not.toBeVisible();
+    });
+
+    test('"Don\'t have the app?" routes to App Store on iOS', async ({ context, page }) => {
+      await utils.setAuthCookies(context, admin.accessToken);
+      await page.goto(`/photos/${assetId}`);
+      const link = page.getByRole('link', { name: /don't have the app/i });
+      await expect(link).toHaveAttribute('href', /apps\.apple\.com/);
+    });
   });
 
-  test('hides on internal SPA navigation', async ({ page }) => {
-    await utils.signInAsAdmin(page);
-    await page.goto(`/photos/${assetId}`);
-    await expect(page.getByRole('region', { name: /mobile app suggestion/i })).toBeVisible();
+  test.describe('Pixel 5', () => {
+    test.use({ ...devices['Pixel 5'] });
 
-    // Click an in-app nav (back to timeline)
-    await page.getByRole('link', { name: /back/i }).click();
-    await expect(page.getByRole('region', { name: /mobile app suggestion/i })).not.toBeVisible();
+    test('"Don\'t have the app?" routes to /install on Android', async ({ context, page }) => {
+      await utils.setAuthCookies(context, admin.accessToken);
+      await page.goto(`/photos/${assetId}`);
+      const link = page.getByRole('link', { name: /don't have the app/i });
+      await expect(link).toHaveAttribute('href', '/install');
+    });
   });
 
-  test('dismiss persists across reload', async ({ page }) => {
-    await utils.signInAsAdmin(page);
-    await page.goto(`/photos/${assetId}`);
-    await page.getByRole('button', { name: /dismiss banner/i }).click();
-    await expect(page.getByRole('region', { name: /mobile app suggestion/i })).not.toBeVisible();
-
-    await page.reload();
-    await expect(page.getByRole('region', { name: /mobile app suggestion/i })).not.toBeVisible();
-  });
-});
-
-test.describe('open-in-app banner (Pixel 5)', () => {
-  test.use({ ...devices['Pixel 5'] });
-
-  test("Don't have the app? routes to /install on Android", async ({ page }) => {
-    const { admin } = await utils.setupTestEnvironment();
-    const asset = await utils.uploadAsset(admin, 'formats/jpg/el_torcal_rocks.jpg');
-
-    await utils.signInAsAdmin(page);
-    await page.goto(`/photos/${asset.id}`);
-
-    const link = page.getByRole('link', { name: /don't have the app/i });
-    await expect(link).toHaveAttribute('href', '/install');
-  });
-});
-
-test.describe('open-in-app banner (desktop)', () => {
-  test('does not render on desktop', async ({ page }) => {
-    const { admin } = await utils.setupTestEnvironment();
-    const asset = await utils.uploadAsset(admin, 'formats/jpg/el_torcal_rocks.jpg');
-
-    await utils.signInAsAdmin(page);
-    await page.goto(`/photos/${asset.id}`);
-
-    await expect(page.getByRole('region', { name: /mobile app suggestion/i })).not.toBeVisible();
+  test.describe('desktop', () => {
+    test('does not render banner on desktop', async ({ context, page }) => {
+      await utils.setAuthCookies(context, admin.accessToken);
+      await page.goto(`/photos/${assetId}`);
+      await expect(page.getByRole('region', { name: /mobile app suggestion/i })).not.toBeVisible();
+    });
   });
 });
 ```
 
-NOTE: `utils.setupTestEnvironment`, `utils.signInAsAdmin`, `utils.uploadAsset` reflect the existing E2E utility shape — verify against `e2e/web/specs/src/utils.ts` (or similar) and adjust import paths.
+NOTE on `utils.createAsset`: this is the canonical upload helper used across the e2e suite. If the actual signature differs slightly (it's a generated SDK call), grep `e2e/src/specs/web/*.e2e-spec.ts` for an existing `createAsset` call and copy that shape exactly.
 
 **Step 2: Run E2E against a running dev stack**
 
 ```bash
-make dev   # in another terminal
+# Terminal 1:
+make dev
+
+# Terminal 2:
 make e2e-web-dev -- -g "open-in-app banner"
 ```
 
-Expected: all four e2e cases pass.
+Expected: all e2e cases pass.
 
 If individual tests are flaky on first run, re-run; if persistently flaky, do not skip — fix root cause (per `feedback_never_skip_tests.md`).
 
