@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/svelte';
+import { fireEvent, render, screen } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -80,6 +80,33 @@ describe('OpenInAppBanner', () => {
     render(OpenInAppBanner);
     await tick();
     navState.callback!({ type: 'link' });
+    await tick();
+    expect(screen.queryByRole('region', { name: /mobile app suggestion/i })).not.toBeInTheDocument();
+  });
+
+  it('dismiss writes localStorage with ~30 day expiry', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-16T12:00:00Z'));
+
+    render(OpenInAppBanner);
+    await tick();
+
+    const dismiss = screen.getByRole('button', { name: 'open_in_app_banner_dismiss' });
+    await fireEvent.click(dismiss);
+    await tick();
+
+    expect(screen.queryByRole('region', { name: /mobile app suggestion/i })).not.toBeInTheDocument();
+
+    const stored = localStorage.getItem('gallery.openInApp.dismissedUntil');
+    expect(stored).toBe('2026-05-16T12:00:00.000Z');
+
+    vi.useRealTimers();
+  });
+
+  it('does not render when dismissal is in the future', async () => {
+    const future = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toISOString();
+    localStorage.setItem('gallery.openInApp.dismissedUntil', future);
+    render(OpenInAppBanner);
     await tick();
     expect(screen.queryByRole('region', { name: /mobile app suggestion/i })).not.toBeInTheDocument();
   });
