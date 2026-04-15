@@ -233,7 +233,7 @@ export class GlobalSearchManager {
    * Runs on every keystroke off the main path — bypasses the 150 ms debounce.
    */
   private runNavigationProvider(query: string): ProviderStatus<NavigationItem> {
-    if (query.length < 2) {
+    if (query.length < 1) {
       return { status: 'empty' };
     }
     const u = get(user);

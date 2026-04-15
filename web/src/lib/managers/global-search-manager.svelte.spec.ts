@@ -1342,10 +1342,12 @@ describe('runNavigationProvider', () => {
     );
   }
 
-  it('returns empty for short queries (below minQueryLength 2)', () => {
+  it('returns empty only for an empty query; fires on a single character', () => {
     const m = new GlobalSearchManager();
     expect(runNav(m, '').status).toBe('empty');
-    expect(runNav(m, 'a').status).toBe('empty');
+    // Single-letter queries must reach the scorer so system-settings and
+    // action items surface immediately as the user starts typing.
+    expect(runNav(m, 't').status).toBe('ok');
   });
 
   it('returns ok with classification_settings in the result set for query "classific"', () => {
