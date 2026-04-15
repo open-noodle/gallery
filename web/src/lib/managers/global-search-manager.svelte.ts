@@ -243,7 +243,7 @@ export class GlobalSearchManager {
    * Runs on every keystroke off the main path — bypasses the 150 ms debounce.
    */
   private runNavigationProvider(query: string): ProviderStatus<NavigationItem> {
-    if (query.length < 1) {
+    if (query.length === 0) {
       return { status: 'empty' };
     }
     const u = get(user);
@@ -694,8 +694,8 @@ export class GlobalSearchManager {
     // returns newest-first, and since `id` is guaranteed present in `before`
     // but absent from the post-removal list, we just take the first survivor.
     if (this.activeItemId === id) {
-      const remaining = before.filter((e) => e.id !== id);
-      this.activeItemId = remaining[0]?.id ?? null;
+      const next = before.find((e) => e.id !== id);
+      this.activeItemId = next?.id ?? null;
     }
   }
 

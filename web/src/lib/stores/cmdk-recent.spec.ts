@@ -67,9 +67,7 @@ describe('cmdk-recent', () => {
     const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
       throw Object.assign(new Error('quota'), { name: 'QuotaExceededError' });
     });
-    expect(() =>
-      addEntry({ kind: 'query', id: 'q:new', text: 'new', mode: 'smart', lastUsed: 2 }),
-    ).not.toThrow();
+    expect(() => addEntry({ kind: 'query', id: 'q:new', text: 'new', mode: 'smart', lastUsed: 2 })).not.toThrow();
     spy.mockRestore();
     // The successful write from before the spy is still there; the failed write
     // didn't make it through. No in-memory caching means no "last-known good"
