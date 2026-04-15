@@ -10,7 +10,11 @@ const BANNER = 'open-in-app-banner';
 // browser types across describe groups within a single project. The web e2e
 // project runs Desktop Chrome, and we just need the mobile UA / viewport /
 // touch points to drive `detectPlatform`.
-const omitBrowserType = <T extends { defaultBrowserType?: string }>({ defaultBrowserType: _, ...rest }: T) => rest;
+const omitBrowserType = (device: (typeof devices)[keyof typeof devices]) => {
+  const copy: Record<string, unknown> = { ...device };
+  delete copy.defaultBrowserType;
+  return copy;
+};
 const iPhone13 = omitBrowserType(devices['iPhone 13']);
 const pixel5 = omitBrowserType(devices['Pixel 5']);
 
