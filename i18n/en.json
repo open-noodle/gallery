@@ -1800,6 +1800,7 @@
   "only_favorites": "Only favorites",
   "open": "Open",
   "open_calendar": "Open calendar",
+  "open_in_app_banner_aria_label": "Mobile app suggestion",
   "open_in_app_banner_dismiss": "Dismiss banner",
   "open_in_app_banner_get_app": "Don't have the app?",
   "open_in_app_banner_open": "Open",

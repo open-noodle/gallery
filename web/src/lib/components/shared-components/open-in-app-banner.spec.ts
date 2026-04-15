@@ -43,7 +43,7 @@ describe('OpenInAppBanner', () => {
   it('renders the banner when all gates pass', async () => {
     render(OpenInAppBanner);
     await tick();
-    expect(screen.getByRole('region', { name: /mobile app suggestion/i })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'open_in_app_banner_aria_label' })).toBeInTheDocument();
     const openLink = screen.getByRole('link', { name: 'open_in_app_banner_open' });
     expect(openLink).toHaveAttribute('href', expect.stringMatching(/^immich:\/\/asset\?id=/));
   });
@@ -52,28 +52,28 @@ describe('OpenInAppBanner', () => {
     pageState.url.pathname = '/admin/users';
     render(OpenInAppBanner);
     await tick();
-    expect(screen.queryByRole('region', { name: /mobile app suggestion/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'open_in_app_banner_aria_label' })).not.toBeInTheDocument();
   });
 
   it('appears after auth resolves (auth-late race)', async () => {
     userStore.set(null);
     render(OpenInAppBanner);
     await tick();
-    expect(screen.queryByRole('region', { name: /mobile app suggestion/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'open_in_app_banner_aria_label' })).not.toBeInTheDocument();
 
     userStore.set({ id: 'user-1' });
     await tick();
-    expect(screen.getByRole('region', { name: /mobile app suggestion/i })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'open_in_app_banner_aria_label' })).toBeInTheDocument();
   });
 
   it('does not hide on the initial enter-fire of afterNavigate', async () => {
     render(OpenInAppBanner);
     await tick();
-    expect(screen.getByRole('region', { name: /mobile app suggestion/i })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'open_in_app_banner_aria_label' })).toBeInTheDocument();
 
     navState.callback!({ type: 'enter' });
     await tick();
-    expect(screen.getByRole('region', { name: /mobile app suggestion/i })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'open_in_app_banner_aria_label' })).toBeInTheDocument();
   });
 
   it('hides on subsequent navigation', async () => {
@@ -81,7 +81,7 @@ describe('OpenInAppBanner', () => {
     await tick();
     navState.callback!({ type: 'link' });
     await tick();
-    expect(screen.queryByRole('region', { name: /mobile app suggestion/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'open_in_app_banner_aria_label' })).not.toBeInTheDocument();
   });
 
   it('dismiss writes localStorage with ~30 day expiry', async () => {
@@ -95,7 +95,7 @@ describe('OpenInAppBanner', () => {
     await fireEvent.click(dismiss);
     await tick();
 
-    expect(screen.queryByRole('region', { name: /mobile app suggestion/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'open_in_app_banner_aria_label' })).not.toBeInTheDocument();
 
     const stored = localStorage.getItem('gallery.openInApp.dismissedUntil');
     expect(stored).toBe('2026-05-16T12:00:00.000Z');
@@ -108,6 +108,6 @@ describe('OpenInAppBanner', () => {
     localStorage.setItem('gallery.openInApp.dismissedUntil', future);
     render(OpenInAppBanner);
     await tick();
-    expect(screen.queryByRole('region', { name: /mobile app suggestion/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'open_in_app_banner_aria_label' })).not.toBeInTheDocument();
   });
 });

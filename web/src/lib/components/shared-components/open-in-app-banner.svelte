@@ -56,7 +56,7 @@
 {#if visible && eligibility.eligible}
   <div
     role="region"
-    aria-label="Mobile app suggestion"
+    aria-label={$t('open_in_app_banner_aria_label')}
     class="fixed inset-x-0 top-0 z-40 border-b border-light-100 bg-light shadow-sm motion-safe:animate-slide-down dark:border-dark-100 dark:bg-dark"
   >
     <div class="flex items-center gap-3 px-3 py-2">
