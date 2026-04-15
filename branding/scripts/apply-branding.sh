@@ -367,8 +367,10 @@ patch_android() {
   # AndroidManifest.xml — app label
   sed -i "s/android:label=\"Immich\"/android:label=\"${NAME}\"/g" "$manifest"
 
-  # AndroidManifest.xml — deep link scheme
-  sed -i "s|<data android:scheme=\"immich\"|<data android:scheme=\"${DEEP_LINK_SCHEME}\"|g" "$manifest"
+  # AndroidManifest.xml — register branded deep link scheme alongside immich:// (additive, idempotent)
+  if ! grep -q "android:scheme=\"${DEEP_LINK_SCHEME}\"" "$manifest"; then
+    sed -i "/        <data android:scheme=\"immich\" \/>/a\\        <data android:scheme=\"${DEEP_LINK_SCHEME}\" />" "$manifest"
+  fi
 
   # AndroidManifest.xml — deep link host
   sed -i "s|android:host=\"my\.immich\.app\"|android:host=\"my.noodle.gallery\"|g" "$manifest"
@@ -416,8 +418,14 @@ patch_ios() {
   # Info.plist — bundle name
   sed -i "s|<string>immich_mobile</string>|<string>${NAME_SLUG}</string>|g" "$info_plist"
 
-  # Info.plist — URL scheme for deep links
-  sed -i "s|<string>immich</string>|<string>${DEEP_LINK_SCHEME}</string>|g" "$info_plist"
+  # Info.plist — register branded URL scheme alongside immich:// (additive, idempotent)
+  # The CFBundleURLSchemes <string>immich</string> entry sits at 4-tab indent inside
+  # CFBundleURLTypes; CFBundleName (also <string>${NAME_SLUG}</string>) is at 1-tab indent,
+  # so we anchor the idempotency check to the 4-tab prefix to avoid a false-positive when
+  # NAME_SLUG happens to equal DEEP_LINK_SCHEME.
+  if ! grep -qP "^\t\t\t\t<string>${DEEP_LINK_SCHEME}</string>" "$info_plist"; then
+    sed -i $'/\t\t\t\t<string>immich<\\/string>/a\\\n\t\t\t\t<string>'"${DEEP_LINK_SCHEME}"$'<\\/string>' "$info_plist"
+  fi
 
   # Info.plist — background task identifiers
   sed -i "s/app\.alextran\.immich\.background/${BG_TASK_PREFIX}/g" "$info_plist"
