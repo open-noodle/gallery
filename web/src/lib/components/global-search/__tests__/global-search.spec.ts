@@ -115,7 +115,7 @@ describe('global-search root', () => {
     // Locate the left column: the first child of the palette's row div that is
     // NOT the preview pane (which has data-cmdk-preview).
     // Modal portals into document.body, not the render container — search the whole document.
-    const row = document.querySelector<HTMLElement>('div.flex[class*="h-[520px]"]');
+    const row = document.querySelector<HTMLElement>('div.flex[class*="sm:h-[520px]"]');
     expect(row).not.toBeNull();
     const leftColumn = row?.firstElementChild as HTMLElement | null;
     expect(leftColumn).not.toBeNull();
@@ -126,23 +126,28 @@ describe('global-search root', () => {
     // regression, only the left column's constraint matters.
   });
 
-  it('row uses explicit h-[520px] / max-h-[80vh] / min-h-0 (not flex-1)', () => {
-    // Regression guard: the row previously used `flex min-h-[420px] max-h-[60vh]
-    // flex-1`, which grew to content because `flex-1` in a column without a
-    // definite parent height doesn't respect max-height. Explicit fixed height
-    // with min-h-0 makes both columns definite-sized so Command.List scrolls
-    // internally instead of stretching the preview pane.
+  it('row is responsive: flex-1 on mobile, fixed sm:h-[520px] on desktop', () => {
+    // Regression guard for two layout bugs:
+    //   1. The pre-Task-X pattern was `flex min-h-[420px] max-h-[60vh] flex-1` which
+    //      grew to content because `flex-1` in a column without a definite parent
+    //      height doesn't respect max-height.
+    //   2. The intermediate fix used a fixed `h-[520px] max-h-[80vh]` that didn't fill
+    //      the full-height mobile Modal Card, leaving a huge dead zone below the footer.
+    //   The current pattern combines the two: `flex-1 min-h-0` so it grows on mobile
+    //   (where the Modal Card is h-full) and `sm:h-[520px] sm:flex-none` to lock to a
+    //   definite height on desktop (where the Modal Card collapses to sm:h-min and
+    //   `flex-1` would otherwise have no basis).
     const m = new GlobalSearchManager();
     m.open();
     render(GlobalSearch, { props: { manager: m } });
     // Modal portals into document.body, not the render container — search the whole document.
-    const row = document.querySelector<HTMLElement>('div.flex[class*="h-[520px]"]');
+    const row = document.querySelector<HTMLElement>('div.flex[class*="sm:h-[520px]"]');
     expect(row).not.toBeNull();
-    expect(row?.className).toContain('h-[520px]');
-    expect(row?.className).toContain('max-h-[80vh]');
+    expect(row?.className).toContain('sm:h-[520px]');
+    expect(row?.className).toContain('sm:max-h-[80vh]');
+    expect(row?.className).toContain('sm:flex-none');
+    expect(row?.className).toContain('flex-1');
     expect(row?.className).toContain('min-h-0');
-    // Explicitly guard against the broken `flex-1` pattern returning.
-    expect(row?.className).not.toMatch(/\bflex-1\b/);
   });
 
   it('does NOT render a visible Modal title header', () => {
@@ -153,6 +158,27 @@ describe('global-search root', () => {
     for (const h of visibleHeaders) {
       expect(h.textContent).not.toMatch(/global search/i);
     }
+  });
+
+  it('clear/close button: clears input when non-empty, closes when empty', async () => {
+    // Touch users (no Esc key) need a tap target to dismiss the palette and clear
+    // the query. The button mirrors the Escape two-stage behaviour: clears the
+    // input on the first tap, closes the modal on the second.
+    const m = new GlobalSearchManager();
+    m.open();
+    render(GlobalSearch, { props: { manager: m } });
+    const input = screen.getByRole('combobox') as HTMLInputElement;
+    await user.type(input, 'hello');
+    expect(input.value).toBe('hello');
+    // aria-label flips to "clear" when there is text in the input.
+    const clearBtn = screen.getByRole('button', { name: /clear/i });
+    await user.click(clearBtn);
+    expect(input.value).toBe('');
+    expect(m.isOpen).toBe(true);
+    // After clearing, the same button's aria-label flips to "close".
+    const closeBtn = screen.getByRole('button', { name: /close/i });
+    await user.click(closeBtn);
+    expect(m.isOpen).toBe(false);
   });
 
   it('Esc once clears input, twice closes (APG two-stage)', async () => {

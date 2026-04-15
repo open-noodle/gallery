@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { Modal, ModalBody } from '@immich/ui';
+  import { IconButton, Modal, ModalBody } from '@immich/ui';
+  import { mdiClose } from '@mdi/js';
   import { Command } from 'bits-ui';
   import { t } from 'svelte-i18n';
   import type { GlobalSearchManager, SearchMode } from '$lib/managers/global-search-manager.svelte';
@@ -146,14 +147,17 @@
 
   const showProgressStripe = $derived(stripeArmed && manager.batchInFlight);
 
+  function clearOrClose() {
+    if (inputValue !== '') {
+      inputValue = '';
+      return;
+    }
+    manager.close();
+  }
+
   function onKeyDown(e: KeyboardEvent) {
     if (e.key === 'Escape') {
-      if (inputValue !== '') {
-        inputValue = '';
-        e.preventDefault();
-        return;
-      }
-      manager.close();
+      clearOrClose();
       e.preventDefault();
       return;
     }
@@ -207,16 +211,28 @@
       loop
       bind:value={selectedValue}
       aria-labelledby="global-search-label"
-      class="flex flex-col"
+      class="flex h-full min-h-0 flex-col"
     >
-      <Command.Input
-        bind:value={inputValue}
-        autofocus
-        placeholder={$t('cmdk_placeholder')}
-        maxlength={256}
-        onkeydown={onKeyDown}
-        class="w-full border-b border-gray-200 bg-transparent px-4 py-3 text-sm focus:outline-none dark:border-gray-700"
-      />
+      <div class="flex items-center border-b border-gray-200 dark:border-gray-700">
+        <Command.Input
+          bind:value={inputValue}
+          autofocus
+          placeholder={$t('cmdk_placeholder')}
+          maxlength={256}
+          onkeydown={onKeyDown}
+          class="min-w-0 flex-1 bg-transparent px-4 py-3 text-sm focus:outline-none"
+        />
+        <IconButton
+          icon={mdiClose}
+          size="small"
+          variant="ghost"
+          shape="round"
+          color="secondary"
+          class="me-2"
+          onclick={clearOrClose}
+          aria-label={inputValue === '' ? $t('close') : $t('clear')}
+        />
+      </div>
       {#if showProgressStripe}
         <div
           aria-hidden="true"
@@ -225,21 +241,21 @@
         ></div>
       {/if}
 
-      <!-- Explicit fixed height instead of flex-1 + max-h. The flex-1 approach
-               relied on the parent (Command.Root / ModalBody) having a definite
-               height, which it doesn't — so the row grew to its content (the full
-               results list), the preview pane stretched to match, and the whole
-               palette ballooned well past 60vh. A fixed height (`h-[520px]`) with
-               `max-h-[80vh]` as a clamp for small viewports makes both columns
-               definite-sized so Command.List's `overflow-y-auto` actually scrolls
-               internally, and the preview pane is bounded by its column's height. -->
+      <!-- Mobile (<sm): grow into the full-height Modal Card via flex-1 + min-h-0
+               so the palette fills the screen instead of leaving dead space below
+               the footer. The chain is Modal h-full → CardBody h-full → Command.Root
+               h-full → this row flex-1.
+           Desktop (sm+): Modal collapses to sm:h-min, so flex-1 has no basis.
+               Switch to a fixed `sm:h-[520px]` (with `sm:max-h-[80vh]` clamp for
+               short viewports) to give Command.List + the preview pane a definite
+               height so internal `overflow-y-auto` actually scrolls. -->
       <!-- `min-w-0` on the left column is critical: flex children default to
                `min-width: auto` (= content size), so without it the column refuses
                to shrink below the widest row (long filenames) and the whole row
                grows wider than the modal/viewport — pushing the fixed-width preview
                pane off-screen. With min-w-0, flex-1 can shrink below content width
                and the rows' `truncate` class ellipsizes long text. -->
-      <div class="flex h-[520px] max-h-[80vh] min-h-0">
+      <div class="flex flex-1 min-h-0 sm:h-[520px] sm:max-h-[80vh] sm:flex-none">
         <div
           class="flex min-h-0 min-w-0 flex-1 flex-col {showPreview
             ? 'border-e border-gray-200 dark:border-gray-700'
