@@ -17,6 +17,7 @@ import 'package:immich_mobile/providers/infrastructure/memory.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/people.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
+import 'package:immich_mobile/repositories/shared_space_api.repository.dart';
 import 'package:immich_mobile/routing/router.dart';
 import 'package:immich_mobile/services/album.service.dart';
 import 'package:immich_mobile/services/asset.service.dart';
@@ -36,6 +37,7 @@ final deepLinkServiceProvider = Provider(
     ref.watch(remoteAlbumServiceProvider),
     ref.watch(driftMemoryServiceProvider),
     ref.watch(driftPeopleServiceProvider),
+    ref.watch(sharedSpaceApiRepositoryProvider),
     ref.watch(currentUserProvider),
   ),
 );
@@ -55,6 +57,9 @@ class DeepLinkService {
   final DriftMemoryService _betaMemoryService;
   final DriftPeopleService _betaPeopleService;
 
+  /// Fork-only: shared spaces are a Gallery feature with no Immich equivalent.
+  final SharedSpaceApiRepository _sharedSpaceApiRepository;
+
   final UserDto? _currentUser;
 
   const DeepLinkService(
@@ -68,6 +73,7 @@ class DeepLinkService {
     this._betaRemoteAlbumService,
     this._betaMemoryService,
     this._betaPeopleService,
+    this._sharedSpaceApiRepository,
     this._currentUser,
   );
 
@@ -89,6 +95,7 @@ class DeepLinkService {
       "memory" => await _buildMemoryDeepLink(queryParams['id'] ?? ''),
       "asset" => await _buildAssetDeepLink(queryParams['id'] ?? '', ref),
       "album" => await _buildAlbumDeepLink(queryParams['id'] ?? ''),
+      "space" => await _buildSpaceDeepLink(queryParams['id'] ?? ''),
       "people" => await _buildPeopleDeepLink(queryParams['id'] ?? ''),
       "activity" => await _buildActivityDeepLink(queryParams['albumId'] ?? ''),
       _ => null,
@@ -220,6 +227,29 @@ class DeepLinkService {
       _currentAlbum.set(album);
       return AlbumViewerRoute(albumId: album.id);
     }
+  }
+
+  Future<PageRouteInfo?> _buildSpaceDeepLink(String spaceId) async {
+    // Shared spaces are a fork-only feature wired into the Drift-backed
+    // beta timeline navigation. Outside of beta we have no surface to land on,
+    // so return null and let the caller fall back to the default route.
+    if (Store.isBetaTimelineEnabled == false) {
+      return null;
+    }
+
+    if (spaceId.isEmpty) {
+      return null;
+    }
+
+    try {
+      // Verifies the space exists and is accessible to the current user before
+      // we attempt to navigate. The space detail page only needs the id.
+      await _sharedSpaceApiRepository.get(spaceId);
+    } catch (_) {
+      return null;
+    }
+
+    return SpaceDetailRoute(spaceId: spaceId);
   }
 
   Future<PageRouteInfo?> _buildActivityDeepLink(String albumId) async {
