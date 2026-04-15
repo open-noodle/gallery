@@ -43,6 +43,11 @@
     });
   });
 
+  // The asset viewer paints its own pitch-black surface regardless of theme —
+  // match that with a dark translucent banner so we read as part of the viewer
+  // chrome instead of a foreign light strip.
+  const darkContext = $derived(isAssetViewerRoute(page));
+
   $effect(() => {
     if (eligibility.eligible) {
       visible = true;
@@ -79,13 +84,17 @@
     class="fixed inset-x-0 top-0 z-40 motion-safe:animate-slide-down"
   >
     <div
-      class="flex items-center gap-3 border-b border-black/5 bg-light/95 px-3 py-2 shadow-sm backdrop-blur-xl dark:border-white/5 dark:bg-dark/95"
+      class="flex items-center gap-3 border-b px-3 py-2 shadow-sm backdrop-blur-xl {darkContext
+        ? 'border-white/10 bg-black/60 text-white'
+        : 'border-black/5 bg-light/95 dark:border-white/5 dark:bg-dark/95'}"
       style="height: {BANNER_HEIGHT_PX}px"
     >
       <img
         src="/apple-icon-180.png"
         alt=""
-        class="h-10 w-10 flex-shrink-0 rounded-[9px] shadow-sm ring-1 ring-black/5 dark:ring-white/10"
+        class="h-10 w-10 flex-shrink-0 rounded-[9px] shadow-sm ring-1 {darkContext
+          ? 'ring-white/15'
+          : 'ring-black/5 dark:ring-white/10'}"
       />
       <div class="min-w-0 flex-1 leading-tight">
         <p class="truncate text-sm font-semibold">
@@ -93,7 +102,9 @@
         </p>
         <a
           href={getAppHref(eligibility.platform)}
-          class="mt-0.5 inline-block truncate text-[11px] text-subtle underline-offset-2 hover:underline"
+          class="mt-0.5 inline-block truncate text-[11px] underline decoration-current/40 underline-offset-2 {darkContext
+            ? 'text-white/70 hover:text-white'
+            : 'text-subtle hover:text-current'}"
         >
           {$t('open_in_app_banner_get_app')}
         </a>
@@ -109,7 +120,7 @@
         size="small"
         color="secondary"
         onclick={dismiss}
-        class="-mr-1 flex-shrink-0"
+        class="-mr-1 flex-shrink-0 {darkContext ? 'text-white/70 hover:text-white' : ''}"
       />
     </div>
   </div>
