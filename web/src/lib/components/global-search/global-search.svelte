@@ -154,6 +154,19 @@
       });
     })(),
   );
+  // Strip the promoted "Top result" nav item out of the regular Navigation
+  // section below so the same Command.Item id doesn't render twice. bits-ui
+  // routes keyboard selection via the `value` attribute, so duplicates would
+  // highlight both rows and break the cursor model.
+  const dedupedNavigationStatus = $derived.by(() => {
+    const status = manager.sections.navigation;
+    const top = manager.topNavigationMatch;
+    if (!top || status.status !== 'ok') {
+      return status;
+    }
+    const items = status.items.filter((i) => (i as NavigationItem).id !== top.id);
+    return { status: 'ok' as const, items, total: items.length };
+  });
   const showPreview = $derived(mediaQueryManager.minLg);
 
   // Progress stripe: only show after a 200ms grace window. A clean setTimeout
@@ -377,6 +390,24 @@
                 </div>
               {/if}
             {:else}
+              {#if manager.topNavigationMatch}
+                <Command.Group class="mb-4">
+                  <Command.GroupHeading
+                    class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400"
+                  >
+                    {$t('cmdk_top_result')}
+                  </Command.GroupHeading>
+                  <Command.GroupItems>
+                    <Command.Item
+                      value={manager.topNavigationMatch.id}
+                      onSelect={() => manager.topNavigationMatch && manager.activate('nav', manager.topNavigationMatch)}
+                      class="group"
+                    >
+                      <NavigationRow item={manager.topNavigationMatch} />
+                    </Command.Item>
+                  </Command.GroupItems>
+                </Command.Group>
+              {/if}
               <GlobalSearchSection
                 heading={$t('cmdk_photos_heading')}
                 status={manager.sections.photos}
@@ -418,7 +449,7 @@
                 {/snippet}
               </GlobalSearchSection>
               <GlobalSearchNavigationSections
-                status={manager.sections.navigation}
+                status={dedupedNavigationStatus}
                 onActivate={(item) => manager.activate('nav', item)}
               />
             {/if}

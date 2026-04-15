@@ -19,7 +19,7 @@ import { computeCommandScore } from 'bits-ui';
 import { locale as i18nLocale, t, type Translations } from 'svelte-i18n';
 import { SvelteMap } from 'svelte/reactivity';
 import { get } from 'svelte/store';
-import { NAVIGATION_ITEMS, type NavigationItem } from './navigation-items';
+import { isAlmostExactNavMatch, NAVIGATION_ITEMS, type NavigationItem } from './navigation-items';
 
 export type SearchMode = 'smart' | 'metadata' | 'description' | 'ocr';
 
@@ -818,6 +818,43 @@ export class GlobalSearchManager {
       this.mlHealthy = false;
     }
   }
+
+  /**
+   * Top navigation result — the single most confident nav-item promotion for
+   * the current query. Null when the query is empty or when no item's label
+   * passes the almost-exact gate. The palette renders this above photos/
+   * places/etc. so power users who know the page they want jump straight to
+   * it without scrolling past content results.
+   *
+   * Scans the FULL catalog (filtered by admin + feature flags), not just
+   * whatever `sections.navigation` currently holds — cmdk's fuzzy scorer
+   * discards items with weak char-overlap even when a compound query contains
+   * the literal label word (e.g. `auto-classification` vs `Classification
+   * Settings`), and the almost-exact rule is strict enough that scanning the
+   * unfiltered catalog is still safe.
+   */
+  topNavigationMatch = $derived.by<NavigationItem | null>(() => {
+    const q = this.query.trim();
+    if (q.length === 0) {
+      return null;
+    }
+    const isAdmin = get(user)?.isAdmin ?? false;
+    const flags = featureFlagsManager.valueOrUndefined;
+    const translate = get(t);
+    for (const item of NAVIGATION_ITEMS) {
+      if (item.adminOnly && !isAdmin) {
+        continue;
+      }
+      if (item.featureFlag && !flags?.[item.featureFlag]) {
+        continue;
+      }
+      const label = translate(item.labelKey as Translations);
+      if (isAlmostExactNavMatch(q, label)) {
+        return item;
+      }
+    }
+    return null;
+  });
 
   announcementText = $derived.by(() => {
     const s = this.sections;

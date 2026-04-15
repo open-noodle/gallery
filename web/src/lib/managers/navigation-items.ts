@@ -260,3 +260,41 @@ export const NAVIGATION_ITEMS: readonly NavigationItem[] = [
   ...USER_PAGES,
   ...ACTIONS,
 ];
+
+const MIN_MATCH_LENGTH = 3;
+const NON_ALNUM = /[^a-z0-9]+/;
+
+/**
+ * "Almost exact" match — used to promote a navigation item to the palette's
+ * "Top result" band above photos/places/etc. when the query unambiguously
+ * points at its label.
+ *
+ * Rule: after case-folding and splitting both sides on non-alphanumerics, at
+ * least one query word ≥ 3 chars must be a prefix of some label word. The
+ * length floor keeps single-letter queries from promoting the first match in
+ * the catalog, and working at word granularity lets compound queries like
+ * `auto-classification` still promote `Classification Settings` by matching
+ * on the second query word.
+ *
+ * Only the label is inspected, not the description — the description is
+ * richer and would promote items the user did not visually intend to pick.
+ */
+export function isAlmostExactNavMatch(query: string, label: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (q.length < MIN_MATCH_LENGTH) {
+    return false;
+  }
+  const qWords = q.split(NON_ALNUM).filter((w) => w.length >= MIN_MATCH_LENGTH);
+  if (qWords.length === 0) {
+    return false;
+  }
+  const labelWords = label.toLowerCase().split(NON_ALNUM).filter(Boolean);
+  for (const qw of qWords) {
+    for (const lw of labelWords) {
+      if (lw.startsWith(qw)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}

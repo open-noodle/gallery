@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { NAVIGATION_ITEMS } from './navigation-items';
+import { NAVIGATION_ITEMS, isAlmostExactNavMatch } from './navigation-items';
 
 // __dirname is not defined in ESM (vitest default). Derive it from import.meta.url.
 const here = dirname(fileURLToPath(import.meta.url));
@@ -75,5 +75,51 @@ describe('NAVIGATION_ITEMS schema', () => {
     for (const key of ourKeys) {
       expect(sourceKeys.has(key)).toBe(true);
     }
+  });
+});
+
+describe('isAlmostExactNavMatch', () => {
+  // Promotes a navigation item to the palette's "Top result" band when the
+  // user's query unambiguously points at the item. Word-level prefix match is
+  // the sweet spot: strict enough to avoid promoting weak matches, loose
+  // enough to handle compound queries ("auto-classification") and prefixes
+  // ("album" → "Albums"). Rejects queries shorter than 3 chars and words
+  // shorter than 3 chars to avoid promoting on a single keystroke.
+
+  it('returns true on an exact case-insensitive match', () => {
+    expect(isAlmostExactNavMatch('people', 'People')).toBe(true);
+    expect(isAlmostExactNavMatch('PHOTOS', 'photos')).toBe(true);
+  });
+
+  it('returns true when the label starts with the query (prefix match)', () => {
+    expect(isAlmostExactNavMatch('album', 'Albums')).toBe(true);
+    expect(isAlmostExactNavMatch('classif', 'Classification Settings')).toBe(true);
+  });
+
+  it('returns true when a whole word in the label starts with the query', () => {
+    expect(isAlmostExactNavMatch('classification', 'Classification Settings')).toBe(true);
+    // Compound query: even though the full query "auto-classification" is not
+    // a prefix of "Classification Settings", the word "classification" inside
+    // the query is a word-prefix of "Classification" inside the label.
+    expect(isAlmostExactNavMatch('auto-classification', 'Classification Settings')).toBe(true);
+  });
+
+  it('rejects queries shorter than 3 characters (too noisy to promote)', () => {
+    expect(isAlmostExactNavMatch('sp', 'Spaces')).toBe(false);
+    expect(isAlmostExactNavMatch('', 'Photos')).toBe(false);
+  });
+
+  it('rejects when no word-prefix match exists', () => {
+    expect(isAlmostExactNavMatch('xyz', 'Spaces')).toBe(false);
+    expect(isAlmostExactNavMatch('people', 'Sharing')).toBe(false);
+  });
+
+  it('ignores query words shorter than 3 chars when scanning a compound query', () => {
+    // "a-classification" — the first word 'a' is too short but the second word
+    // 'classification' still carries the match.
+    expect(isAlmostExactNavMatch('a-classification', 'Classification Settings')).toBe(true);
+    // A query consisting solely of short words fails even if it is otherwise
+    // a substring of the label.
+    expect(isAlmostExactNavMatch('a b', 'Albums')).toBe(false);
   });
 });

@@ -407,6 +407,40 @@ describe('global-search root', () => {
     expect(activateSpy).toHaveBeenCalledWith('nav', expect.objectContaining({ id: 'nav:userPages:photos' }));
   });
 
+  it('renders a "Top result" band above content sections when a query almost-exactly matches a nav item', async () => {
+    // User types "people" — the Navigation > People item is a near-exact
+    // label match and gets promoted into a top-of-palette row. The row must
+    // appear in the DOM BEFORE the first content section (Photos) so the
+    // keyboard cursor lands on it first.
+    const m = new GlobalSearchManager();
+    m.open();
+    render(GlobalSearch, { props: { manager: m } });
+    await user.type(screen.getByRole('combobox'), 'people');
+    const topHeading = await screen.findByText(/cmdk_top_result|top result/i);
+    expect(topHeading).toBeInTheDocument();
+    // The promoted Navigation > People row is inside the top result group,
+    // and must precede the Photos section in DOM order.
+    const photosHeading = screen.queryByText(/^cmdk_photos_heading$|^photos$/i);
+    if (photosHeading) {
+      expect(topHeading.compareDocumentPosition(photosHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+  });
+
+  it('top-result promoted item is removed from the regular Navigation section below (no dup)', async () => {
+    // Prevents a duplicate row: whichever nav item wins the promotion slot
+    // should not also render in the Navigation section at the bottom of the
+    // palette. cmdk Command.Item values must be unique for bits-ui to route
+    // keyboard selection correctly.
+    const m = new GlobalSearchManager();
+    m.open();
+    render(GlobalSearch, { props: { manager: m } });
+    await user.type(screen.getByRole('combobox'), 'people');
+    await screen.findByText(/cmdk_top_result|top result/i);
+    // There should be exactly one row carrying the People nav id.
+    const rows = document.querySelectorAll('[data-command-item][data-value="nav:userPages:people"]');
+    expect(rows).toHaveLength(1);
+  });
+
   it('renders recent entries when store is non-empty and query is blank', () => {
     addEntry({ kind: 'query', id: 'q:beach', text: 'beach', mode: 'smart', lastUsed: 1 });
     addEntry({ kind: 'photo', id: 'photo:a1', assetId: 'a1', label: 'sunset.jpg', lastUsed: 2 });

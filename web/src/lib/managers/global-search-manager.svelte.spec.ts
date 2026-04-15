@@ -884,6 +884,80 @@ describe('activateRecent()', () => {
   });
 });
 
+describe('topNavigationMatch', () => {
+  // Promotes a nav item to the "Top result" band when the query almost-exactly
+  // matches its label. Read-only derived on the manager, sourced from whatever
+  // `sections.navigation` currently holds — the nav provider runs synchronously
+  // so these tests drive it via the full setQuery/debounce flow.
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    mockUser.current = { id: 'test-user', isAdmin: true };
+    mockFlags.valueOrUndefined = { search: true, map: true, trash: true };
+    vi.useFakeTimers();
+    installFakeAbortTimeout();
+    vi.mocked(searchSmart).mockResolvedValue({
+      assets: { items: [], nextPage: null },
+    } as unknown as Awaited<ReturnType<typeof searchSmart>>);
+    vi.mocked(searchAssets).mockResolvedValue({
+      assets: { items: [], nextPage: null },
+    } as unknown as Awaited<ReturnType<typeof searchAssets>>);
+    vi.mocked(searchPerson).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof searchPerson>>);
+    vi.mocked(searchPlaces).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof searchPlaces>>);
+    vi.mocked(getAllTags).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof getAllTags>>);
+  });
+  afterEach(() => {
+    restoreAbortTimeout();
+    vi.useRealTimers();
+  });
+
+  it('is null before any query is set', () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    expect(m.topNavigationMatch).toBeNull();
+  });
+
+  it('promotes People when the user types "people"', () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    m.setQuery('people');
+    // Navigation runs synchronously inside setQuery so sections.navigation is
+    // already populated; no timers or awaits needed.
+    expect(m.topNavigationMatch?.id).toBe('nav:userPages:people');
+  });
+
+  it('promotes Albums when the user types "album" (prefix match)', () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    m.setQuery('album');
+    expect(m.topNavigationMatch?.id).toBe('nav:userPages:albums');
+  });
+
+  it('promotes Classification Settings for "auto-classification" (compound query)', () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    m.setQuery('auto-classification');
+    // Admin user in beforeEach — the item is adminOnly.
+    expect(m.topNavigationMatch?.id).toBe('nav:systemSettings:classification');
+  });
+
+  it('returns null when the query is shorter than the 3-char floor', () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    m.setQuery('sp');
+    // The nav provider runs from 1 char so it fires, but the almost-exact
+    // gate still rejects short queries so the promotion slot stays empty.
+    expect(m.topNavigationMatch).toBeNull();
+  });
+
+  it('returns null when no nav item label almost-matches the query', () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    m.setQuery('zzzzzz');
+    expect(m.topNavigationMatch).toBeNull();
+  });
+});
+
 describe('removeRecent()', () => {
   beforeEach(() => {
     vi.clearAllMocks();

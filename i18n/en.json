@@ -849,6 +849,7 @@
   "cmdk_smart_unavailable": "Smart search is unavailable",
   "cmdk_tag_cache_too_large": "Too many tags to search in-browser — use the Tags page",
   "cmdk_tags_heading": "Tags",
+  "cmdk_top_result": "Top result",
   "cmdk_try_filename": "Try Filename mode",
   "cmdk_unnamed_person": "Unnamed person",
   "collapse": "Collapse",
