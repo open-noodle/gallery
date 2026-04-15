@@ -2,11 +2,12 @@ import { render, screen } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { pageState, userStore } = await vi.hoisted(async () => {
+const { pageState, userStore, navState } = await vi.hoisted(async () => {
   const { writable } = await import('svelte/store');
   return {
     pageState: { url: { pathname: '/photos/550e8400-e29b-41d4-a716-446655440000' } },
     userStore: writable<{ id: string } | null>({ id: 'user-1' }),
+    navState: { callback: undefined as ((nav: { type: string }) => void) | undefined },
   };
 });
 
@@ -16,7 +17,9 @@ vi.mock('@immich/ui', async () => {
 });
 
 vi.mock('$app/navigation', () => ({
-  afterNavigate: vi.fn(),
+  afterNavigate: (cb: (nav: { type: string }) => void) => {
+    navState.callback = cb;
+  },
 }));
 
 vi.mock('$lib/stores/user.store', () => ({ user: userStore }));
@@ -61,5 +64,23 @@ describe('OpenInAppBanner', () => {
     userStore.set({ id: 'user-1' });
     await tick();
     expect(screen.getByRole('region', { name: /mobile app suggestion/i })).toBeInTheDocument();
+  });
+
+  it('does not hide on the initial enter-fire of afterNavigate', async () => {
+    render(OpenInAppBanner);
+    await tick();
+    expect(screen.getByRole('region', { name: /mobile app suggestion/i })).toBeInTheDocument();
+
+    navState.callback!({ type: 'enter' });
+    await tick();
+    expect(screen.getByRole('region', { name: /mobile app suggestion/i })).toBeInTheDocument();
+  });
+
+  it('hides on subsequent navigation', async () => {
+    render(OpenInAppBanner);
+    await tick();
+    navState.callback!({ type: 'link' });
+    await tick();
+    expect(screen.queryByRole('region', { name: /mobile app suggestion/i })).not.toBeInTheDocument();
   });
 });
