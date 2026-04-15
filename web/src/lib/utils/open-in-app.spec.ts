@@ -42,18 +42,18 @@ const UA = {
   iPhone: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15',
   iPadOld: 'Mozilla/5.0 (iPad; CPU OS 12_0 like Mac OS X) AppleWebKit/605.1.15',
   iPadAsMac: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/17.0 Safari/605.1.15',
-  pixel: 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
-  desktopChrome: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  pixel:
+    'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+  desktopChrome:
+    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
   desktopSafari: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/17.0 Safari/605.1.15',
 };
 
 describe('detectPlatform', () => {
   it('detects iPhone as ios', () => expect(detectPlatform(UA.iPhone, 0)).toBe('ios'));
   it('detects classic iPad as ios', () => expect(detectPlatform(UA.iPadOld, 0)).toBe('ios'));
-  it('detects modern iPad-as-Mac (touch points > 1) as ios', () =>
-    expect(detectPlatform(UA.iPadAsMac, 5)).toBe('ios'));
-  it('detects desktop Safari (touch points = 0) as null', () =>
-    expect(detectPlatform(UA.desktopSafari, 0)).toBeNull());
+  it('detects modern iPad-as-Mac (touch points > 1) as ios', () => expect(detectPlatform(UA.iPadAsMac, 5)).toBe('ios'));
+  it('detects desktop Safari (touch points = 0) as null', () => expect(detectPlatform(UA.desktopSafari, 0)).toBeNull());
   it('detects Pixel as android', () => expect(detectPlatform(UA.pixel, 5)).toBe('android'));
   it('detects desktop Chrome as null', () => expect(detectPlatform(UA.desktopChrome, 0)).toBeNull());
 });
@@ -62,12 +62,9 @@ describe('isDismissed', () => {
   const NOW = new Date('2026-04-16T12:00:00Z');
 
   it('returns false when value is null', () => expect(isDismissed(null, NOW)).toBe(false));
-  it('returns false when expiry is in the past', () =>
-    expect(isDismissed('2026-04-15T12:00:00Z', NOW)).toBe(false));
-  it('returns true when expiry is in the future', () =>
-    expect(isDismissed('2026-05-16T12:00:00Z', NOW)).toBe(true));
-  it('returns false when value is malformed (graceful)', () =>
-    expect(isDismissed('not-a-date', NOW)).toBe(false));
+  it('returns false when expiry is in the past', () => expect(isDismissed('2026-04-15T12:00:00Z', NOW)).toBe(false));
+  it('returns true when expiry is in the future', () => expect(isDismissed('2026-05-16T12:00:00Z', NOW)).toBe(true));
+  it('returns false when value is malformed (graceful)', () => expect(isDismissed('not-a-date', NOW)).toBe(false));
   it('returns false when value is empty string', () => expect(isDismissed('', NOW)).toBe(false));
 });
 
