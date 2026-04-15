@@ -12,6 +12,7 @@
 
   const DISMISSAL_KEY = 'gallery.openInApp.dismissedUntil';
   const DISMISSAL_DAYS = 30;
+  const BANNER_HEIGHT_PX = 64;
 
   let coldEntry = $state(true);
   let visible = $state(false);
@@ -75,40 +76,44 @@
     role="region"
     aria-label={$t('open_in_app_banner_aria_label')}
     data-testid="open-in-app-banner"
-    class="fixed inset-x-0 top-0 z-40 border-b border-light-100 bg-light shadow-sm motion-safe:animate-slide-down dark:border-dark-100 dark:bg-dark"
+    class="fixed inset-x-0 top-0 z-40 motion-safe:animate-slide-down"
   >
-    <div class="flex items-center gap-3 px-3 py-2">
+    <div
+      class="flex items-center gap-3 border-b border-black/5 bg-light/95 px-3 py-2 shadow-sm backdrop-blur-xl dark:border-white/5 dark:bg-dark/95"
+      style="height: {BANNER_HEIGHT_PX}px"
+    >
       <img
         src="/apple-icon-180.png"
         alt=""
-        class="h-12 w-12 flex-shrink-0 rounded-xl shadow-sm ring-1 ring-light/10 dark:ring-dark/10"
+        class="h-10 w-10 flex-shrink-0 rounded-[9px] shadow-sm ring-1 ring-black/5 dark:ring-white/10"
       />
-      <div class="min-w-0 flex-1">
-        <p class="truncate text-base font-semibold leading-tight">
+      <div class="min-w-0 flex-1 leading-tight">
+        <p class="truncate text-sm font-semibold">
           {$t('open_in_app_banner_title')}
         </p>
-        <p class="truncate text-xs text-subtle sm:hidden">
-          {$t('open_in_app_banner_subtitle')}
-        </p>
+        <a
+          href={getAppHref(eligibility.platform)}
+          class="mt-0.5 inline-block truncate text-[11px] text-subtle underline-offset-2 hover:underline"
+        >
+          {$t('open_in_app_banner_get_app')}
+        </a>
       </div>
-      <Button href={eligibility.deepLink} size="small" class="flex-shrink-0">
+      <Button href={eligibility.deepLink} size="small" shape="round" class="flex-shrink-0">
         {$t('open_in_app_banner_open')}
       </Button>
       <IconButton
         aria-label={$t('open_in_app_banner_dismiss')}
         icon={mdiClose}
         variant="ghost"
+        shape="round"
         size="small"
+        color="secondary"
         onclick={dismiss}
+        class="-mr-1 flex-shrink-0"
       />
     </div>
-    <div class="flex justify-end px-3 pb-2 sm:hidden">
-      <a href={getAppHref(eligibility.platform)} class="text-xs text-subtle underline underline-offset-2">
-        {$t('open_in_app_banner_get_app')}
-      </a>
-    </div>
   </div>
-  <div aria-hidden="true" class="h-[88px] sm:h-[56px]"></div>
+  <div aria-hidden="true" style="height: {BANNER_HEIGHT_PX}px"></div>
 {/if}
 
 <style>
