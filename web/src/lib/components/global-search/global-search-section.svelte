@@ -4,7 +4,6 @@
   import { t } from 'svelte-i18n';
   import { Command } from 'bits-ui';
   import { fade } from 'svelte/transition';
-  import Skeleton from '$lib/elements/Skeleton.svelte';
 
   interface Props {
     heading: string;
@@ -27,7 +26,7 @@
   }
 </script>
 
-{#if status.status !== 'idle' && status.status !== 'empty'}
+{#if status.status !== 'idle' && status.status !== 'empty' && status.status !== 'loading'}
   <Command.Group class="mb-4">
     <Command.GroupHeading
       class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400"
@@ -35,15 +34,7 @@
       {heading}
     </Command.GroupHeading>
     <Command.GroupItems>
-      {#if status.status === 'loading'}
-        <div in:fade={{ duration: 120 }} out:fade={{ duration: 80 }}>
-          {#each [0, 1, 2] as i (i)}
-            <div class="mx-3 mb-1">
-              <Skeleton height={52} />
-            </div>
-          {/each}
-        </div>
-      {:else if status.status === 'ok'}
+      {#if status.status === 'ok'}
         <div in:fade={{ duration: 120 }} out:fade={{ duration: 80 }}>
           {#each status.items as item (itemKey(item))}
             <Command.Item value={itemKey(item)} onSelect={() => onActivate(item)} class="group">
