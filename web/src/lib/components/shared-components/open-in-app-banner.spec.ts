@@ -2,6 +2,12 @@ import { fireEvent, render, screen } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+type Nav = {
+  type: string;
+  from?: { route?: { id?: string | null }; params?: Record<string, string> | null } | null;
+  to?: { route?: { id?: string | null }; params?: Record<string, string> | null } | null;
+};
+
 const { pageState, userStore, navState } = await vi.hoisted(async () => {
   const { writable } = await import('svelte/store');
   return {
@@ -10,6 +16,11 @@ const { pageState, userStore, navState } = await vi.hoisted(async () => {
     navState: { callback: undefined as ((nav: { type: string }) => void) | undefined },
   };
 });
+
+const ASSET_VIEWER_TARGET = {
+  route: { id: '/(user)/photos/[[assetId=id]]' },
+  params: { assetId: '550e8400-e29b-41d4-a716-446655440000' },
+};
 
 vi.mock('@immich/ui', async () => {
   const actual = await vi.importActual<typeof import('@immich/ui')>('@immich/ui');
@@ -76,12 +87,53 @@ describe('OpenInAppBanner', () => {
     expect(screen.getByRole('region', { name: 'open_in_app_banner_aria_label' })).toBeInTheDocument();
   });
 
-  it('hides on subsequent navigation', async () => {
+  it('hides on subsequent navigation away from the deep-link route', async () => {
     render(OpenInAppBanner);
     await tick();
-    navState.callback!({ type: 'link' });
+    (navState.callback as (nav: Nav) => void)({
+      type: 'link',
+      from: ASSET_VIEWER_TARGET,
+      to: { route: { id: '/(user)/search' }, params: {} },
+    });
     await tick();
     expect(screen.queryByRole('region', { name: 'open_in_app_banner_aria_label' })).not.toBeInTheDocument();
+  });
+
+  it('keeps banner visible when navigating between asset-viewer routes (swipe between photos)', async () => {
+    render(OpenInAppBanner);
+    await tick();
+    expect(screen.getByRole('region', { name: 'open_in_app_banner_aria_label' })).toBeInTheDocument();
+
+    (navState.callback as (nav: Nav) => void)({
+      type: 'link',
+      from: ASSET_VIEWER_TARGET,
+      to: {
+        route: { id: '/(user)/photos/[[assetId=id]]' },
+        params: { assetId: '6ba7b810-9dad-11d1-80b4-00c04fd430c8' },
+      },
+    });
+    await tick();
+    expect(screen.getByRole('region', { name: 'open_in_app_banner_aria_label' })).toBeInTheDocument();
+  });
+
+  it('re-arms cold-entry when auth resolves after a prior navigation', async () => {
+    userStore.set(null);
+    render(OpenInAppBanner);
+    await tick();
+
+    // A pre-auth nav fires (e.g. OAuth callback redirect) — would normally clear coldEntry.
+    (navState.callback as (nav: Nav) => void)({
+      type: 'link',
+      from: { route: { id: '/(user)/auth/login' }, params: {} },
+      to: ASSET_VIEWER_TARGET,
+    });
+    await tick();
+    expect(screen.queryByRole('region', { name: 'open_in_app_banner_aria_label' })).not.toBeInTheDocument();
+
+    // Now auth resolves — banner should still appear.
+    userStore.set({ id: 'user-1' });
+    await tick();
+    expect(screen.getByRole('region', { name: 'open_in_app_banner_aria_label' })).toBeInTheDocument();
   });
 
   it('dismiss writes localStorage with ~30 day expiry', async () => {

@@ -4,6 +4,7 @@
   import { page } from '$app/state';
   import { ANDROID_INSTALL_URL, IOS_APP_STORE_URL } from '$lib/constants';
   import { user } from '$lib/stores/user.store';
+  import { isAssetViewerRoute } from '$lib/utils/navigation';
   import { isEligible, type Eligibility, type Platform } from '$lib/utils/open-in-app';
   import { Button, IconButton } from '@immich/ui';
   import { mdiClose } from '@mdi/js';
@@ -14,6 +15,17 @@
 
   let coldEntry = $state(true);
   let visible = $state(false);
+  let lastUserId = $state<string | null>(null);
+
+  // Re-arm cold-entry when auth resolves (null → user) so the banner survives
+  // any pre-auth redirects that fired afterNavigate before the user store hydrated.
+  $effect(() => {
+    const currentUserId = $user?.id ?? null;
+    if (currentUserId && !lastUserId) {
+      coldEntry = true;
+    }
+    lastUserId = currentUserId;
+  });
 
   const eligibility: Eligibility = $derived.by(() => {
     if (!browser) {
@@ -36,8 +48,13 @@
     }
   });
 
-  afterNavigate(({ type }) => {
+  afterNavigate(({ type, from, to }) => {
     if (type === 'enter') {
+      return;
+    }
+    // Asset-viewer-to-asset-viewer swipes (e.g. /photos/A → /photos/B) are not
+    // user-initiated leave-the-content navigations — keep the banner.
+    if (isAssetViewerRoute(from) && isAssetViewerRoute(to)) {
       return;
     }
     coldEntry = false;
@@ -57,6 +74,7 @@
   <div
     role="region"
     aria-label={$t('open_in_app_banner_aria_label')}
+    data-testid="open-in-app-banner"
     class="fixed inset-x-0 top-0 z-40 border-b border-light-100 bg-light shadow-sm motion-safe:animate-slide-down dark:border-dark-100 dark:bg-dark"
   >
     <div class="flex items-center gap-3 px-3 py-2">
