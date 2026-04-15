@@ -23,6 +23,7 @@ import 'package:immich_mobile/services/album.service.dart';
 import 'package:immich_mobile/services/asset.service.dart';
 import 'package:immich_mobile/services/memory.service.dart';
 import 'package:immich_mobile/widgets/asset_grid/asset_grid_data_structure.dart';
+import 'package:logging/logging.dart';
 
 final deepLinkServiceProvider = Provider(
   (ref) => DeepLinkService(
@@ -43,6 +44,8 @@ final deepLinkServiceProvider = Provider(
 );
 
 class DeepLinkService {
+  static final Logger _log = Logger('DeepLinkService');
+
   /// TODO: Remove this when beta is default
   final MemoryService _memoryService;
   final AssetService _assetService;
@@ -245,7 +248,8 @@ class DeepLinkService {
       // Verifies the space exists and is accessible to the current user before
       // we attempt to navigate. The space detail page only needs the id.
       await _sharedSpaceApiRepository.get(spaceId);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      _log.warning('Failed to resolve space deep link for $spaceId', error, stackTrace);
       return null;
     }
 
