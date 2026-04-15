@@ -47,3 +47,39 @@ export const isDismissed = (value: string | null, now: Date): boolean => {
   }
   return ts > now.getTime();
 };
+
+export type Eligibility = { eligible: false } | { eligible: true; deepLink: string; platform: Platform };
+
+export interface EligibilityOpts {
+  userAgent: string;
+  maxTouchPoints: number;
+  pathname: string;
+  isAuthenticated: boolean;
+  coldEntry: boolean;
+  dismissedUntil: string | null;
+  now: Date;
+}
+
+export const isEligible = (opts: EligibilityOpts): Eligibility => {
+  if (!opts.coldEntry) {
+    return { eligible: false };
+  }
+  if (!opts.isAuthenticated) {
+    return { eligible: false };
+  }
+  if (isDismissed(opts.dismissedUntil, opts.now)) {
+    return { eligible: false };
+  }
+
+  const platform = detectPlatform(opts.userAgent, opts.maxTouchPoints);
+  if (!platform) {
+    return { eligible: false };
+  }
+
+  const deepLink = pathToDeepLink(opts.pathname);
+  if (!deepLink) {
+    return { eligible: false };
+  }
+
+  return { eligible: true, platform, deepLink };
+};

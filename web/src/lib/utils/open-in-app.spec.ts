@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { detectPlatform, isDismissed, pathToDeepLink } from './open-in-app';
+import { detectPlatform, isDismissed, isEligible, pathToDeepLink } from './open-in-app';
 
 const UUID = '550e8400-e29b-41d4-a716-446655440000';
 const UUID2 = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
@@ -65,4 +65,38 @@ describe('isDismissed', () => {
   it('returns false when value is malformed (graceful)', () =>
     expect(isDismissed('not-a-date', NOW)).toBe(false));
   it('returns false when value is empty string', () => expect(isDismissed('', NOW)).toBe(false));
+});
+
+describe('isEligible', () => {
+  const NOW = new Date('2026-04-16T12:00:00Z');
+  const UUID_LOCAL = '550e8400-e29b-41d4-a716-446655440000';
+
+  const baseOpts = {
+    userAgent: UA.iPhone,
+    maxTouchPoints: 0,
+    pathname: `/photos/${UUID_LOCAL}`,
+    isAuthenticated: true,
+    coldEntry: true,
+    dismissedUntil: null,
+    now: NOW,
+  };
+
+  it('returns eligible with deep link + platform when all gates pass', () => {
+    expect(isEligible(baseOpts)).toEqual({
+      eligible: true,
+      platform: 'ios',
+      deepLink: `immich://asset?id=${UUID_LOCAL}`,
+    });
+  });
+
+  it.each([
+    ['cold entry false', { coldEntry: false }],
+    ['unauthenticated', { isAuthenticated: false }],
+    ['dismissed in future', { dismissedUntil: '2026-05-16T12:00:00Z' }],
+    ['desktop UA', { userAgent: UA.desktopChrome }],
+    ['unmatched route', { pathname: '/share/abc' }],
+    ['invalid uuid in path', { pathname: '/photos/not-a-uuid' }],
+  ])('returns ineligible when %s', (_label, override) => {
+    expect(isEligible({ ...baseOpts, ...override })).toEqual({ eligible: false });
+  });
 });
