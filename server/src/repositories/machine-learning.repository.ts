@@ -259,16 +259,16 @@ export class MachineLearningRepository {
     return response[ModelTask.OCR];
   }
 
-  async ping(): Promise<{ ok: boolean; contentType: string | null }> {
+  async ping(): Promise<{ ok: boolean }> {
     const url = this.config.urls[0];
     if (!url) {
-      return { ok: false, contentType: null };
+      return { ok: false };
     }
     try {
       const response = await fetch(new URL('/ping', url), { signal: AbortSignal.timeout(2000) });
-      return { ok: response.ok, contentType: response.headers.get('content-type') };
+      return { ok: response.ok };
     } catch {
-      return { ok: false, contentType: null };
+      return { ok: false };
     }
   }
 

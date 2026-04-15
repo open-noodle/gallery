@@ -588,28 +588,18 @@ describe(ServerService.name, () => {
       vi.useRealTimers();
     });
 
-    it('returns true when /ping is 200 + JSON', async () => {
-      mocks.machineLearning.ping.mockResolvedValue({ ok: true, contentType: 'application/json' });
+    it('returns true when /ping is 200', async () => {
+      mocks.machineLearning.ping.mockResolvedValue({ ok: true });
       await expect(sut.getMlHealth()).resolves.toEqual({ smartSearchHealthy: true });
     });
 
     it('returns false on ping failure', async () => {
-      mocks.machineLearning.ping.mockResolvedValue({ ok: false, contentType: null });
-      await expect(sut.getMlHealth()).resolves.toEqual({ smartSearchHealthy: false });
-    });
-
-    it('returns false on 200 text/html (reverse-proxy error page)', async () => {
-      mocks.machineLearning.ping.mockResolvedValue({ ok: true, contentType: 'text/html' });
-      await expect(sut.getMlHealth()).resolves.toEqual({ smartSearchHealthy: false });
-    });
-
-    it('returns false when content-type is null', async () => {
-      mocks.machineLearning.ping.mockResolvedValue({ ok: true, contentType: null });
+      mocks.machineLearning.ping.mockResolvedValue({ ok: false });
       await expect(sut.getMlHealth()).resolves.toEqual({ smartSearchHealthy: false });
     });
 
     it('caches for 30 seconds', async () => {
-      mocks.machineLearning.ping.mockResolvedValue({ ok: true, contentType: 'application/json' });
+      mocks.machineLearning.ping.mockResolvedValue({ ok: true });
       await sut.getMlHealth();
       await sut.getMlHealth();
       expect(mocks.machineLearning.ping).toHaveBeenCalledTimes(1);
@@ -619,19 +609,19 @@ describe(ServerService.name, () => {
     });
 
     it('single-flight: concurrent callers share one in-flight probe', async () => {
-      let resolveProbe!: (v: { ok: boolean; contentType: string }) => void;
+      let resolveProbe!: (v: { ok: boolean }) => void;
       mocks.machineLearning.ping.mockImplementation(() => new Promise((r) => (resolveProbe = r)));
       const [a, b, c] = [sut.getMlHealth(), sut.getMlHealth(), sut.getMlHealth()];
       expect(mocks.machineLearning.ping).toHaveBeenCalledTimes(1);
-      resolveProbe({ ok: true, contentType: 'application/json' });
+      resolveProbe({ ok: true });
       const results = await Promise.all([a, b, c]);
       expect(results.every((r: { smartSearchHealthy: boolean }) => r.smartSearchHealthy === true)).toBe(true);
     });
 
     it('second call within TTL returns the cached value without re-probing', async () => {
-      mocks.machineLearning.ping.mockResolvedValueOnce({ ok: true, contentType: 'application/json' });
+      mocks.machineLearning.ping.mockResolvedValueOnce({ ok: true });
       await sut.getMlHealth();
-      mocks.machineLearning.ping.mockResolvedValueOnce({ ok: false, contentType: null });
+      mocks.machineLearning.ping.mockResolvedValueOnce({ ok: false });
       await sut.getMlHealth(); // served from cache; ping not re-called
       expect(
         (sut as unknown as { mlHealthCache: { value: { smartSearchHealthy: boolean } } }).mlHealthCache.value,

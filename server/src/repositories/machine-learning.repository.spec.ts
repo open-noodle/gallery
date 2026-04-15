@@ -335,48 +335,29 @@ describe(MachineLearningRepository.name, () => {
   });
 
   describe('ping()', () => {
-    it('returns { ok: true, contentType } when /ping responds with JSON', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        headers: new Headers({ 'content-type': 'application/json' }),
-      });
-      await expect(sut.ping()).resolves.toEqual({ ok: true, contentType: 'application/json' });
+    it('returns { ok: true } when /ping responds 200', async () => {
+      mockFetch.mockResolvedValue({ ok: true, headers: new Headers() });
+      await expect(sut.ping()).resolves.toEqual({ ok: true });
     });
 
-    it('returns { ok: false, contentType: null } on timeout/abort', async () => {
+    it('returns { ok: false } on timeout/abort', async () => {
       mockFetch.mockImplementation(
         (_url: URL, init: RequestInit) =>
           new Promise((_resolve, reject) => {
             init.signal?.addEventListener('abort', () => reject(Object.assign(new Error('t'), { name: 'AbortError' })));
           }),
       );
-      await expect(sut.ping()).resolves.toEqual({ ok: false, contentType: null });
+      await expect(sut.ping()).resolves.toEqual({ ok: false });
     });
 
-    it('returns { ok: true, contentType: "text/html" } when ML returns HTML', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        headers: new Headers({ 'content-type': 'text/html' }),
-      });
-      await expect(sut.ping()).resolves.toEqual({ ok: true, contentType: 'text/html' });
-    });
-
-    it('returns { ok: false, contentType: null } when no URLs configured', async () => {
+    it('returns { ok: false } when no URLs configured', async () => {
       sut.setup({ ...baseConfig, urls: [] });
-      await expect(sut.ping()).resolves.toEqual({ ok: false, contentType: null });
+      await expect(sut.ping()).resolves.toEqual({ ok: false });
     });
 
-    it('returns { ok: false, contentType } when /ping returns HTTP 500 with a valid content-type', async () => {
-      mockFetch.mockResolvedValue({
-        ok: false,
-        headers: new Headers({ 'content-type': 'application/json' }),
-      });
-      await expect(sut.ping()).resolves.toEqual({ ok: false, contentType: 'application/json' });
-    });
-
-    it('returns { ok: true, contentType: null } when /ping 200s with no content-type header', async () => {
-      mockFetch.mockResolvedValue({ ok: true, headers: new Headers() });
-      await expect(sut.ping()).resolves.toEqual({ ok: true, contentType: null });
+    it('returns { ok: false } when /ping returns HTTP 500', async () => {
+      mockFetch.mockResolvedValue({ ok: false, headers: new Headers() });
+      await expect(sut.ping()).resolves.toEqual({ ok: false });
     });
   });
 
