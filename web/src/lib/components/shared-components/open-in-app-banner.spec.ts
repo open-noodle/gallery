@@ -51,4 +51,15 @@ describe('OpenInAppBanner', () => {
     await tick();
     expect(screen.queryByRole('region', { name: /mobile app suggestion/i })).not.toBeInTheDocument();
   });
+
+  it('appears after auth resolves (auth-late race)', async () => {
+    userStore.set(null);
+    render(OpenInAppBanner);
+    await tick();
+    expect(screen.queryByRole('region', { name: /mobile app suggestion/i })).not.toBeInTheDocument();
+
+    userStore.set({ id: 'user-1' });
+    await tick();
+    expect(screen.getByRole('region', { name: /mobile app suggestion/i })).toBeInTheDocument();
+  });
 });
