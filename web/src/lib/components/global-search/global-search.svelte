@@ -11,12 +11,13 @@
   import PlaceRow from './rows/place-row.svelte';
   import TagRow from './rows/tag-row.svelte';
   import RecentRow from './rows/recent-row.svelte';
+  import NavigationRow from './rows/navigation-row.svelte';
   import GlobalSearchFooter from './global-search-footer.svelte';
   import GlobalSearchPreview from './global-search-preview.svelte';
   import { mediaQueryManager } from '$lib/stores/media-query-manager.svelte';
   import { getEntries, type RecentEntry } from '$lib/stores/cmdk-recent';
   import { user } from '$lib/stores/user.store';
-  import { NAVIGATION_ITEMS } from '$lib/managers/navigation-items';
+  import { NAVIGATION_ITEMS, type NavigationItem } from '$lib/managers/navigation-items';
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
 
   interface Props {
@@ -121,6 +122,32 @@
           return false;
         }
         if (live.featureFlag && !flags?.[live.featureFlag]) {
+          return false;
+        }
+        return true;
+      });
+    })(),
+  );
+  // Cold-start "quick links" fallback. When the palette opens with a blank
+  // query AND no recents, it's a visually empty surface — just a helper
+  // string. Surface the user-pages navigation catalog (Photos, Albums,
+  // Spaces, People, Map, etc.) so there is something immediately clickable
+  // and keyboard-navigable. Filtered by the same feature-flag / admin gates
+  // as the navigation provider.
+  // Admin items are intentionally excluded — the cold palette is a quick-jump
+  // surface for the user's own content, not a settings drawer. Admins still
+  // reach admin pages via typed search.
+  const quickLinks = $derived<NavigationItem[]>(
+    (() => {
+      if (inputValue.trim() !== '' || recentEntries.length > 0) {
+        return [];
+      }
+      const flags = featureFlagsManager.valueOrUndefined;
+      return NAVIGATION_ITEMS.filter((item) => {
+        if (item.category !== 'userPages') {
+          return false;
+        }
+        if (item.featureFlag && !flags?.[item.featureFlag]) {
           return false;
         }
         return true;
@@ -325,6 +352,21 @@
                         >
                           <Icon icon={mdiClose} size="1em" aria-hidden />
                         </button>
+                      </Command.Item>
+                    {/each}
+                  </Command.GroupItems>
+                </Command.Group>
+              {:else if quickLinks.length > 0}
+                <Command.Group class="mb-4">
+                  <Command.GroupHeading
+                    class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400"
+                  >
+                    {$t('cmdk_quick_links')}
+                  </Command.GroupHeading>
+                  <Command.GroupItems>
+                    {#each quickLinks as item (item.id)}
+                      <Command.Item value={item.id} onSelect={() => manager.activate('nav', item)} class="group">
+                        <NavigationRow {item} />
                       </Command.Item>
                     {/each}
                   </Command.GroupItems>

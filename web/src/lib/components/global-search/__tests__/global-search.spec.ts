@@ -211,12 +211,17 @@ describe('global-search root', () => {
     expect(m.isOpen).toBe(false);
   });
 
-  it('helper row appears on cold open with no recent entries', () => {
+  it('helper row is replaced by the quick-links fallback on cold open (no recents, blank query)', () => {
+    // The previous UX showed only a "Start typing — ..." helper string on a
+    // cold palette open with no recents. That left users staring at a mostly
+    // empty surface, so we now surface the user-pages navigation catalog
+    // (Photos, Albums, Spaces, …) as a fallback and suppress the helper text
+    // when the catalog has at least one entry.
     const m = new GlobalSearchManager();
     m.open();
     render(GlobalSearch, { props: { manager: m } });
-    // i18n fallback renders the key name — match on the key or any fallback text
-    expect(screen.getByText(/cmdk_helper|Start typing/)).toBeInTheDocument();
+    expect(screen.queryByText(/cmdk_helper|Start typing/)).toBeNull();
+    expect(screen.getByText(/^photos$/i)).toBeInTheDocument();
   });
 
   it('helper row disappears after first keystroke', async () => {
@@ -345,6 +350,61 @@ describe('global-search root', () => {
     // ArrowUp from the first item — should wrap to the last.
     await user.keyboard('{ArrowUp}');
     await vi.waitFor(() => expect(m.activeItemId).toBe('photo:a3'));
+  });
+
+  it('empty-empty state (no recents, blank query) shows a quick-links nav fallback', () => {
+    // Cold-open UX: if the user has no history AND has not typed anything, the
+    // palette should not just sit at the helper text — surface the user-pages
+    // navigation catalog so there is something to click and keyboard-navigate
+    // through. Pins "Photos" and "Spaces" from USER_PAGES because they are the
+    // most obvious entry points and always admin-independent.
+    const m = new GlobalSearchManager();
+    m.open();
+    render(GlobalSearch, { props: { manager: m } });
+    // svelte-i18n fallbackLocale 'dev' renders literal keys — match either the
+    // raw label key or the English label.
+    expect(screen.getByText(/^photos$/i)).toBeInTheDocument();
+    expect(screen.getByText(/^spaces$/i)).toBeInTheDocument();
+    expect(screen.getByText(/^albums$/i)).toBeInTheDocument();
+  });
+
+  it('quick-links fallback is replaced by recents once any recent exists', () => {
+    // Recents take priority — the empty-empty nav fallback is only the cold
+    // path, so a single recent entry must collapse it.
+    addEntry({ kind: 'query', id: 'q:beach', text: 'beach-query-text', mode: 'smart', lastUsed: 1 });
+    const m = new GlobalSearchManager();
+    m.open();
+    render(GlobalSearch, { props: { manager: m } });
+    expect(screen.getByText('beach-query-text')).toBeInTheDocument();
+    // No quick-links album entry — recents take over. Match the USER_PAGES
+    // "albums" label specifically (lowercase literal key / label) to ensure
+    // the nav fallback is gone.
+    expect(screen.queryByText(/^albums$/i)).toBeNull();
+  });
+
+  it('quick-links fallback respects disabled feature flags (map hidden)', () => {
+    mockFlags.valueOrUndefined = { search: true, map: false, trash: true };
+    const m = new GlobalSearchManager();
+    m.open();
+    render(GlobalSearch, { props: { manager: m } });
+    // Photos always visible — admin-independent, no feature flag.
+    expect(screen.getByText(/^photos$/i)).toBeInTheDocument();
+    // Map gated behind the `map` feature flag.
+    expect(screen.queryByText(/^map$/i)).toBeNull();
+  });
+
+  it('Enter on a highlighted quick-links item calls manager.activate("nav", item)', async () => {
+    const m = new GlobalSearchManager();
+    const activateSpy = vi.spyOn(m, 'activate').mockImplementation(() => {});
+    m.open();
+    render(GlobalSearch, { props: { manager: m } });
+    const input = screen.getByRole('combobox');
+    input.focus();
+    // Highlight the Photos nav fallback row explicitly — auto-highlight may
+    // pick any ordering, so drive the cursor directly for determinism.
+    m.setActiveItem('nav:userPages:photos');
+    await user.keyboard('{Enter}');
+    expect(activateSpy).toHaveBeenCalledWith('nav', expect.objectContaining({ id: 'nav:userPages:photos' }));
   });
 
   it('renders recent entries when store is non-empty and query is blank', () => {
