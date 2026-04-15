@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { testAssetDir, utils } from 'src/utils';
 
 const SCHEME_RX = /^(immich|noodle-gallery):\/\/asset\?id=[0-9a-fA-F-]{36}$/;
+const BANNER = 'open-in-app-banner';
 
 test.describe('open-in-app banner', () => {
   let admin: LoginResponseDto;
@@ -29,30 +30,38 @@ test.describe('open-in-app banner', () => {
       await utils.setAuthCookies(context, admin.accessToken);
       await page.goto(`/photos/${assetId}`);
 
-      const banner = page.getByRole('region', { name: /mobile app suggestion/i });
+      const banner = page.getByTestId(BANNER);
       await expect(banner).toBeVisible();
 
       const openLink = banner.getByRole('link', { name: /^open$/i });
       await expect(openLink).toHaveAttribute('href', expect.stringMatching(SCHEME_RX));
     });
 
-    test('hides on internal SPA navigation back to the timeline', async ({ context, page }) => {
+    test('hides after navigating away from the deep-link route', async ({ context, page }) => {
       await utils.setAuthCookies(context, admin.accessToken);
+      // Establish a real history entry so that goBack() does not no-op on a
+      // freshly-opened tab. Two full page loads also exercise the cold-mount
+      // path on /photos/:id (where the banner SHOULD show).
+      await page.goto('/photos');
       await page.goto(`/photos/${assetId}`);
-      await expect(page.getByRole('region', { name: /mobile app suggestion/i })).toBeVisible();
+      await expect(page.getByTestId(BANNER)).toBeVisible();
 
+      // Going back lands on /photos (root timeline) — not in the route
+      // allowlist, so the banner must not render. (Whether SvelteKit treats
+      // the back as a SPA popstate or a full reload, the user-facing
+      // behaviour is the same: no banner on a non-deep-link route.)
       await page.goBack();
-      await expect(page.getByRole('region', { name: /mobile app suggestion/i })).not.toBeVisible();
+      await expect(page.getByTestId(BANNER)).not.toBeVisible();
     });
 
     test('dismiss persists across reload', async ({ context, page }) => {
       await utils.setAuthCookies(context, admin.accessToken);
       await page.goto(`/photos/${assetId}`);
       await page.getByRole('button', { name: /dismiss banner/i }).click();
-      await expect(page.getByRole('region', { name: /mobile app suggestion/i })).not.toBeVisible();
+      await expect(page.getByTestId(BANNER)).not.toBeVisible();
 
       await page.reload();
-      await expect(page.getByRole('region', { name: /mobile app suggestion/i })).not.toBeVisible();
+      await expect(page.getByTestId(BANNER)).not.toBeVisible();
     });
 
     test("Don't have the app? routes to App Store on iOS", async ({ context, page }) => {
@@ -78,7 +87,7 @@ test.describe('open-in-app banner', () => {
     test('does not render banner on desktop', async ({ context, page }) => {
       await utils.setAuthCookies(context, admin.accessToken);
       await page.goto(`/photos/${assetId}`);
-      await expect(page.getByRole('region', { name: /mobile app suggestion/i })).not.toBeVisible();
+      await expect(page.getByTestId(BANNER)).not.toBeVisible();
     });
   });
 });
