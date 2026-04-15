@@ -132,6 +132,13 @@ patch_web() {
     echo "  Patched security.txt"
   fi
 
+  # Open-in-app deep-link scheme — rewrite immich:// to ${DEEP_LINK_SCHEME}://
+  local open_in_app="$REPO_ROOT/web/src/lib/utils/open-in-app.ts"
+  if [[ -f "$open_in_app" ]]; then
+    sed -i "s|immich://|${DEEP_LINK_SCHEME}://|g" "$open_in_app"
+    echo "  Patched open-in-app.ts"
+  fi
+
   # OpenAPI spec
   local openapi="$REPO_ROOT/open-api/immich-openapi-specs.json"
   if [[ -f "$openapi" ]]; then
