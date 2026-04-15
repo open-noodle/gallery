@@ -21,3 +21,18 @@ export const pathToDeepLink = (pathname: string): string | null => {
   }
   return null;
 };
+
+export type Platform = 'ios' | 'android';
+
+export const detectPlatform = (userAgent: string, maxTouchPoints: number): Platform | null => {
+  if (/iPhone|iPod|iPad/i.test(userAgent)) {
+    return 'ios';
+  }
+  if (maxTouchPoints > 1 && /Macintosh/i.test(userAgent)) {
+    return 'ios';
+  }
+  if (/Android/i.test(userAgent)) {
+    return 'android';
+  }
+  return null;
+};
