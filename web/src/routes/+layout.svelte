@@ -9,6 +9,7 @@
   import ErrorLayout from '$lib/components/layouts/ErrorLayout.svelte';
   import OnEvents from '$lib/components/OnEvents.svelte';
   import NavigationLoadingBar from '$lib/components/shared-components/navigation-loading-bar.svelte';
+  import OpenInAppBanner from '$lib/components/shared-components/open-in-app-banner.svelte';
   import UploadPanel from '$lib/components/shared-components/upload-panel.svelte';
   import VersionAnnouncement from '$lib/components/VersionAnnouncement.svelte';
   import { eventManager } from '$lib/managers/event-manager.svelte';
@@ -269,6 +270,7 @@
 />
 
 <TooltipProvider>
+  <OpenInAppBanner />
   {#if page.data.error}
     <ErrorLayout error={page.data.error}></ErrorLayout>
   {:else}
