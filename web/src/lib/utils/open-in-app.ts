@@ -13,8 +13,10 @@ const ROUTES: { regex: RegExp; build: (m: RegExpMatchArray) => string }[] = [
 ];
 
 export const pathToDeepLink = (pathname: string): string | null => {
+  // Tolerate trailing slashes (server redirects, hand-pasted URLs).
+  const normalized = pathname.length > 1 && pathname.endsWith('/') ? pathname.slice(0, -1) : pathname;
   for (const { regex, build } of ROUTES) {
-    const match = pathname.match(regex);
+    const match = normalized.match(regex);
     if (match) {
       return build(match);
     }

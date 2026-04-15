@@ -14,6 +14,10 @@ describe('pathToDeepLink', () => {
     [`/memory`, `immich://memory`],
     [`/spaces/${UUID}`, `immich://space?id=${UUID}`],
     [`/spaces/${UUID}/photos/${UUID2}`, `immich://asset?id=${UUID2}`],
+    // Trailing slashes (server redirects, hand-pasted URLs)
+    [`/photos/${UUID}/`, `immich://asset?id=${UUID}`],
+    [`/spaces/${UUID}/`, `immich://space?id=${UUID}`],
+    [`/memory/`, `immich://memory`],
   ])('maps %s → %s', (path, expected) => {
     expect(pathToDeepLink(path)).toBe(expected);
   });
