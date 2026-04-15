@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { detectPlatform, pathToDeepLink } from './open-in-app';
+import { detectPlatform, isDismissed, pathToDeepLink } from './open-in-app';
 
 const UUID = '550e8400-e29b-41d4-a716-446655440000';
 const UUID2 = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
@@ -52,4 +52,17 @@ describe('detectPlatform', () => {
     expect(detectPlatform(UA.desktopSafari, 0)).toBeNull());
   it('detects Pixel as android', () => expect(detectPlatform(UA.pixel, 5)).toBe('android'));
   it('detects desktop Chrome as null', () => expect(detectPlatform(UA.desktopChrome, 0)).toBeNull());
+});
+
+describe('isDismissed', () => {
+  const NOW = new Date('2026-04-16T12:00:00Z');
+
+  it('returns false when value is null', () => expect(isDismissed(null, NOW)).toBe(false));
+  it('returns false when expiry is in the past', () =>
+    expect(isDismissed('2026-04-15T12:00:00Z', NOW)).toBe(false));
+  it('returns true when expiry is in the future', () =>
+    expect(isDismissed('2026-05-16T12:00:00Z', NOW)).toBe(true));
+  it('returns false when value is malformed (graceful)', () =>
+    expect(isDismissed('not-a-date', NOW)).toBe(false));
+  it('returns false when value is empty string', () => expect(isDismissed('', NOW)).toBe(false));
 });

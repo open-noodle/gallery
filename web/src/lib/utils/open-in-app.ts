@@ -36,3 +36,14 @@ export const detectPlatform = (userAgent: string, maxTouchPoints: number): Platf
   }
   return null;
 };
+
+export const isDismissed = (value: string | null, now: Date): boolean => {
+  if (!value) {
+    return false;
+  }
+  const ts = Date.parse(value);
+  if (Number.isNaN(ts)) {
+    return false;
+  }
+  return ts > now.getTime();
+};
