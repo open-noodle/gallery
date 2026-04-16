@@ -31,27 +31,29 @@ describe(MachineLearningRepository.name, () => {
 
   const mlUrl = 'http://ml-server:3003';
 
+  const baseConfig = {
+    enabled: true,
+    urls: [mlUrl],
+    availabilityChecks: { enabled: false, timeout: 2000, interval: 30_000 },
+    clip: { enabled: true, modelName: 'ViT-B-32__openai', maxDistance: 0 },
+    duplicateDetection: { enabled: true, maxDistance: 0.01 },
+    facialRecognition: { enabled: true, modelName: 'buffalo_l', minScore: 0.7, maxDistance: 0.5, minFaces: 1 },
+    ocr: {
+      enabled: false,
+      modelName: 'default-ocr',
+      minDetectionScore: 0.5,
+      minRecognitionScore: 0.5,
+      maxResolution: 0,
+    },
+    petDetection: {
+      enabled: false,
+      modelName: 'yolo11s',
+      minScore: 0.6,
+    },
+  };
+
   const setupConfig = () => {
-    sut.setup({
-      enabled: true,
-      urls: [mlUrl],
-      availabilityChecks: { enabled: false, timeout: 2000, interval: 30_000 },
-      clip: { enabled: true, modelName: 'ViT-B-32__openai', maxDistance: 0 },
-      duplicateDetection: { enabled: true, maxDistance: 0.01 },
-      facialRecognition: { enabled: true, modelName: 'buffalo_l', minScore: 0.7, maxDistance: 0.5, minFaces: 1 },
-      ocr: {
-        enabled: false,
-        modelName: 'default-ocr',
-        minDetectionScore: 0.5,
-        minRecognitionScore: 0.5,
-        maxResolution: 0,
-      },
-      petDetection: {
-        enabled: false,
-        modelName: 'yolo11s',
-        minScore: 0.6,
-      },
-    });
+    sut.setup(baseConfig);
   };
 
   beforeEach(() => {
@@ -329,6 +331,142 @@ describe(MachineLearningRepository.name, () => {
       await expect(sut.encodeImage('thumbs/user1/preview.webp', clipConfig)).rejects.toThrow('failed for all URLs');
 
       expect(mockBackend.get).toHaveBeenCalledWith('thumbs/user1/preview.webp');
+    });
+  });
+
+  describe('ping()', () => {
+    it('returns { ok: true } when /ping responds 200', async () => {
+      mockFetch.mockResolvedValue({ ok: true, headers: new Headers() });
+      await expect(sut.ping()).resolves.toEqual({ ok: true });
+    });
+
+    it('returns { ok: false } on timeout/abort', async () => {
+      mockFetch.mockImplementation(
+        (_url: URL, init: RequestInit) =>
+          new Promise((_resolve, reject) => {
+            init.signal?.addEventListener('abort', () => reject(Object.assign(new Error('t'), { name: 'AbortError' })));
+          }),
+      );
+      await expect(sut.ping()).resolves.toEqual({ ok: false });
+    });
+
+    it('returns { ok: false } when no URLs configured', async () => {
+      sut.setup({ ...baseConfig, urls: [] });
+      await expect(sut.ping()).resolves.toEqual({ ok: false });
+    });
+
+    it('returns { ok: false } when /ping returns HTTP 500', async () => {
+      mockFetch.mockResolvedValue({ ok: false, headers: new Headers() });
+      await expect(sut.ping()).resolves.toEqual({ ok: false });
+    });
+  });
+
+  describe('encodeText()', () => {
+    it('15s timeout aborts when ML never responds', async () => {
+      vi.useFakeTimers();
+      const originalTimeout = AbortSignal.timeout;
+      AbortSignal.timeout = (ms: number) => {
+        const c = new AbortController();
+        setTimeout(() => c.abort(new DOMException('timeout', 'TimeoutError')), ms);
+        return c.signal;
+      };
+      try {
+        mockFetch.mockImplementation(
+          (_url: URL, init: RequestInit) =>
+            new Promise((_resolve, reject) => {
+              init.signal?.addEventListener('abort', () =>
+                reject(Object.assign(new Error('t'), { name: 'AbortError' })),
+              );
+            }),
+        );
+        // Attach the .rejects assertion synchronously before advancing timers so
+        // the handler is in place when the fetch promise rejects. Without this,
+        // the rejection becomes "unhandled" during vi.advanceTimersByTimeAsync.
+        const assertion = expect(sut.encodeText('hello', { language: 'en', modelName: 'clip' })).rejects.toMatchObject({
+          name: 'AbortError',
+        });
+        await vi.advanceTimersByTimeAsync(15_000);
+        await assertion;
+      } finally {
+        AbortSignal.timeout = originalTimeout;
+        vi.useRealTimers();
+      }
+    });
+
+    it('non-abort errors still surface as the multi-URL failure', async () => {
+      mockFetch.mockRejectedValue(new Error('ECONNREFUSED'));
+      await expect(sut.encodeText('hello', { language: 'en', modelName: 'clip' })).rejects.toThrow(
+        /failed for all URLs/,
+      );
+    });
+
+    it('other ML callers do NOT get the 15s timeout (blast radius)', async () => {
+      const signalsUsed: (AbortSignal | undefined)[] = [];
+      mockFetch.mockImplementation((_url: URL, init: RequestInit) => {
+        signalsUsed.push(init.signal ?? undefined);
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ [ModelTask.SEARCH]: 'x', imageHeight: 1, imageWidth: 1 }),
+        });
+      });
+      mockReadFile.mockResolvedValue(Buffer.from('img'));
+      await sut.encodeImage('/data/upload/thumbs/a/b/c.webp', clipConfig);
+      expect(signalsUsed[0]).toBeUndefined();
+    });
+  });
+
+  describe('predict()', () => {
+    it('propagates AbortError when caller-supplied timeoutMs elapses', async () => {
+      mockFetch.mockImplementation(
+        (_url: URL, init: RequestInit) =>
+          new Promise((_resolve, reject) => {
+            init.signal?.addEventListener('abort', () =>
+              reject(Object.assign(new Error('timeout'), { name: 'AbortError' })),
+            );
+          }),
+      );
+      const predictFn = (sut as unknown as { predict: (...args: unknown[]) => Promise<unknown> }).predict.bind(sut);
+      await expect(
+        predictFn(
+          { text: 'hello' },
+          { [ModelTask.SEARCH]: { [ModelType.TEXTUAL]: { modelName: 'clip' } } },
+          { timeoutMs: 50 },
+        ),
+      ).rejects.toMatchObject({ name: 'AbortError' });
+    });
+
+    it('does not apply any timeout when caller omits timeoutMs (backward compat)', async () => {
+      mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ [ModelTask.SEARCH]: 'embedding' }) });
+      const predictFn = (sut as unknown as { predict: (...args: unknown[]) => Promise<unknown> }).predict.bind(sut);
+      await expect(
+        predictFn({ text: 'hello' }, { [ModelTask.SEARCH]: { [ModelType.TEXTUAL]: { modelName: 'clip' } } }),
+      ).resolves.toBeDefined();
+      const [, init] = mockFetch.mock.calls[0] as [URL, RequestInit];
+      expect(init.signal).toBeUndefined();
+    });
+
+    it('different callers can pass different timeoutMs values (option is per-call)', async () => {
+      const signalsUsed: (AbortSignal | undefined)[] = [];
+      mockFetch.mockImplementation((_url: URL, init: RequestInit) => {
+        signalsUsed.push(init.signal ?? undefined);
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ [ModelTask.SEARCH]: 'x' }) });
+      });
+      const predictFn = (sut as unknown as { predict: (...args: unknown[]) => Promise<unknown> }).predict.bind(sut);
+      await predictFn(
+        { text: 'a' },
+        { [ModelTask.SEARCH]: { [ModelType.TEXTUAL]: { modelName: 'clip' } } },
+        { timeoutMs: 100 },
+      );
+      await predictFn(
+        { text: 'b' },
+        { [ModelTask.SEARCH]: { [ModelType.TEXTUAL]: { modelName: 'clip' } } },
+        { timeoutMs: 5000 },
+      );
+      await predictFn({ text: 'c' }, { [ModelTask.SEARCH]: { [ModelType.TEXTUAL]: { modelName: 'clip' } } });
+      expect(signalsUsed[0]).toBeInstanceOf(AbortSignal);
+      expect(signalsUsed[1]).toBeInstanceOf(AbortSignal);
+      expect(signalsUsed[2]).toBeUndefined();
+      expect(signalsUsed[0]).not.toBe(signalsUsed[1]);
     });
   });
 });

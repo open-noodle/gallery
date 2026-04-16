@@ -12,6 +12,10 @@ RUN npm install --global corepack@latest && \
 WORKDIR /usr/src/app
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .pnpmfile.cjs ./
+# Gallery patches @immich/ui via pnpm patchedDependencies, so patches/ must be present for every
+# `pnpm install --frozen-lockfile` below. Upstream #30874 removed the per-stage bind mounts this
+# used to ride on, so it is expressed once here and inherited by every stage built FROM builder.
+COPY patches ./patches/
 
 FROM builder AS sdk
 
