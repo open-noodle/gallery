@@ -861,11 +861,14 @@ export const utils = {
   },
 
   // Inject a recent entry pointing at a space id that doesn't exist server-side,
-  // so activation triggers the 404 → toast → removal path (Task 28).
+  // so activation triggers the stale-cache → toast → removal path (Task 28).
   // The localStorage key matches cmdk-recent.ts's STORAGE_KEY_PREFIX scheme.
   // Use a well-formed-but-unallocated UUID so the server's UUIDParamDto accepts
-  // the param and the controller actually reaches the 404 branch — a literal
-  // 'nonexistent' string would be rejected with a 400 before getSpace runs.
+  // the param and the controller actually reaches `requireAccess` — Gallery's
+  // requireAccess middleware raises BadRequestException (HTTP 400) for both
+  // "row missing" and "user lacks access", which the activate handler treats
+  // identically to 404/403. A literal 'nonexistent' string would also 400, but
+  // earlier (UUID validation), bypassing the access check we want to exercise.
   cmdkSeedRecentWithNonexistentSpace: async (page: Page, userId: string): Promise<void> => {
     await page.evaluate(
       ({ userId }) => {

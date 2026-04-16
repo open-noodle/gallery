@@ -259,6 +259,51 @@ test.describe('global search palette', () => {
     await expect(recentGroup.getByText('Vacation 2024')).toBeVisible();
   });
 
+  test('stale RECENT space entry triggers toast + removal on activate', async ({ page }) => {
+    // Seed a RECENT entry pointing at a well-formed-but-unallocated space UUID
+    // for the admin user. The localStorage write happens on the page that's
+    // already loaded, so reload to pick it up before opening the palette.
+    await utils.cmdkSeedRecentWithNonexistentSpace(page, admin.userId);
+    await page.reload();
+    await page.getByTestId('cmdk-trigger').waitFor({ state: 'visible' });
+
+    // Cold open with empty query → cmdk renders RECENT (the only seeded source
+    // for this user, since prior tests in this file run their own resetDatabase
+    // is NOT used between tests — but the recent localStorage was just primed).
+    await page.keyboard.press('Control+k');
+    let dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    const recentGroup = dialog.getByRole('group', { name: /^recent/i });
+    const ghostRow = recentGroup.locator('[data-command-item]', { hasText: 'Ghost Space' });
+    await expect(ghostRow).toBeVisible();
+
+    // Activate the stale entry. Gallery's `requireAccess` middleware returns
+    // BadRequestException (HTTP 400) for both "row missing" and "no access",
+    // which the activateSpace handler treats as the stale-cache signal:
+    // removeEntry + warning toast.
+    await ghostRow.click();
+
+    // The warning toast title is "Warning" (i18n key 'warning') with body text
+    // from cmdk_toast_space_unavailable: "You no longer have access to this
+    // space". Match the body text — it is unambiguous in this CI stack and
+    // matches the regex contract from the Task 28 spec.
+    await expect(page.getByText(/no longer have access|no longer available/i)).toBeVisible();
+
+    // Close + reopen the palette and assert the Ghost Space row was purged
+    // from RECENT. Re-focus the combobox first — clicking the row may have
+    // landed focus outside the dialog (inside the clicked item), and the
+    // @immich/ui Modal's Escape binding only fires when focus lives within
+    // the dialog's focus trap. With no other recent entries in this isolated
+    // test, the Recent section disappears entirely (cmdk hides empty groups).
+    await dialog.getByRole('combobox').focus();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog')).toBeHidden();
+    await page.keyboard.press('Control+k');
+    dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    await expect(dialog.locator('[data-command-item]', { hasText: 'Ghost Space' })).toHaveCount(0);
+  });
+
   test('palette renders sections in designed order when populated', async ({ page }) => {
     // Seed at least one match in every entity section the palette renders. Per
     // the helper docstring, People + Places are best-effort (people need faces,
