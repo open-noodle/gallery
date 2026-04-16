@@ -915,6 +915,121 @@ describe('activateRecent()', () => {
     const entries = getEntries();
     expect(entries[0].lastUsed).toBeGreaterThanOrEqual(now);
   });
+
+  it('delegates album entries to activateAlbum', () => {
+    const m = new GlobalSearchManager();
+    // Stub the inner method so the test does not depend on the SDK / addEntry plumbing.
+    const spy = vi.spyOn(m, 'activateAlbum').mockResolvedValue(undefined);
+    m.open();
+    m.activateRecent({
+      kind: 'album',
+      id: 'album:abc',
+      albumId: 'abc',
+      label: 'x',
+      thumbnailAssetId: null,
+      lastUsed: 1,
+    });
+    expect(spy).toHaveBeenCalledWith('abc');
+    expect(goto).not.toHaveBeenCalled();
+  });
+
+  it('delegates space entries to activateSpace', () => {
+    const m = new GlobalSearchManager();
+    const spy = vi.spyOn(m, 'activateSpace').mockResolvedValue(undefined);
+    m.open();
+    m.activateRecent({
+      kind: 'space',
+      id: 'space:s1',
+      spaceId: 's1',
+      label: 'x',
+      colorHex: null,
+      lastUsed: 1,
+    });
+    expect(spy).toHaveBeenCalledWith('s1');
+    expect(goto).not.toHaveBeenCalled();
+  });
+
+  it('does NOT bump lastUsed on album entries (inner activateAlbum owns the write)', () => {
+    const m = new GlobalSearchManager();
+    // Stub the inner activate so it cannot perform the success-path addEntry.
+    // What remains in the recent store after activateRecent must therefore be
+    // exactly what the caller put there pre-activation — no up-front bump.
+    vi.spyOn(m, 'activateAlbum').mockResolvedValue(undefined);
+    addEntry({
+      kind: 'album',
+      id: 'album:abc',
+      albumId: 'abc',
+      label: 'x',
+      thumbnailAssetId: null,
+      lastUsed: 1,
+    });
+    m.open();
+    m.activateRecent({
+      kind: 'album',
+      id: 'album:abc',
+      albumId: 'abc',
+      label: 'x',
+      thumbnailAssetId: null,
+      lastUsed: 1,
+    });
+    const entry = getEntries().find((e) => e.id === 'album:abc');
+    expect(entry?.lastUsed).toBe(1);
+  });
+
+  it('does NOT bump lastUsed on space entries (inner activateSpace owns the write)', () => {
+    const m = new GlobalSearchManager();
+    vi.spyOn(m, 'activateSpace').mockResolvedValue(undefined);
+    addEntry({
+      kind: 'space',
+      id: 'space:s1',
+      spaceId: 's1',
+      label: 'x',
+      colorHex: null,
+      lastUsed: 1,
+    });
+    m.open();
+    m.activateRecent({
+      kind: 'space',
+      id: 'space:s1',
+      spaceId: 's1',
+      label: 'x',
+      colorHex: null,
+      lastUsed: 1,
+    });
+    const entry = getEntries().find((e) => e.id === 'space:s1');
+    expect(entry?.lastUsed).toBe(1);
+  });
+
+  it('does NOT call this.close() for album entries (close would abort closeSignal)', () => {
+    const m = new GlobalSearchManager();
+    vi.spyOn(m, 'activateAlbum').mockResolvedValue(undefined);
+    m.open();
+    m.activateRecent({
+      kind: 'album',
+      id: 'album:abc',
+      albumId: 'abc',
+      label: 'x',
+      thumbnailAssetId: null,
+      lastUsed: 1,
+    });
+    // Palette stays open; the eventual route navigation (or 404 toast) dismisses it.
+    expect(m.isOpen).toBe(true);
+  });
+
+  it('does NOT call this.close() for space entries (close would abort closeSignal)', () => {
+    const m = new GlobalSearchManager();
+    vi.spyOn(m, 'activateSpace').mockResolvedValue(undefined);
+    m.open();
+    m.activateRecent({
+      kind: 'space',
+      id: 'space:s1',
+      spaceId: 's1',
+      label: 'x',
+      colorHex: null,
+      lastUsed: 1,
+    });
+    expect(m.isOpen).toBe(true);
+  });
 });
 
 describe('topNavigationMatch', () => {

@@ -863,13 +863,17 @@ export const utils = {
   // Inject a recent entry pointing at a space id that doesn't exist server-side,
   // so activation triggers the 404 → toast → removal path (Task 28).
   // The localStorage key matches cmdk-recent.ts's STORAGE_KEY_PREFIX scheme.
+  // Use a well-formed-but-unallocated UUID so the server's UUIDParamDto accepts
+  // the param and the controller actually reaches the 404 branch — a literal
+  // 'nonexistent' string would be rejected with a 400 before getSpace runs.
   cmdkSeedRecentWithNonexistentSpace: async (page: Page, userId: string): Promise<void> => {
     await page.evaluate(
       ({ userId }) => {
+        const ghostSpaceId = '00000000-0000-0000-0000-000000000000';
         const entry = {
           kind: 'space',
-          id: 'space:nonexistent',
-          spaceId: 'nonexistent',
+          id: `space:${ghostSpaceId}`,
+          spaceId: ghostSpaceId,
           label: 'Ghost Space',
           colorHex: null,
           lastUsed: Date.now(),

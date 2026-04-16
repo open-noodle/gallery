@@ -941,6 +941,24 @@ export class GlobalSearchManager {
         return;
       }
     }
+    // Album / space entries route through their dedicated activate methods, which
+    // own the SDK round-trip, the addEntry-on-success / removeEntry-on-404,403, the
+    // pending-row affordance, and the navigation. Skipping the unconditional
+    // addEntry below means a stale entry isn't bumped just before the 404 branch
+    // purges it (cleaner store + no flicker) and prevents double-writes on the
+    // happy path. We must NOT call this.close() here — it would abort closeSignal
+    // and cancel the in-flight fetch. The palette dismissal mirrors the fresh-
+    // result activation path (global-search.svelte): rely on the route change to
+    // tear down the modal, and on the 404/403 toast branch to leave the palette
+    // open so the stale row gets removed in place.
+    if (entry.kind === 'album') {
+      void this.activateAlbum(entry.albumId);
+      return;
+    }
+    if (entry.kind === 'space') {
+      void this.activateSpace(entry.spaceId);
+      return;
+    }
     const now = Date.now();
     addEntry({ ...entry, lastUsed: now });
     if (entry.kind === 'query') {
