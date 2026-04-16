@@ -1,7 +1,10 @@
 <script lang="ts">
   import { afterNavigate, beforeNavigate } from '$app/navigation';
   import { page } from '$app/state';
-  import { getPagesProvider, getSettingsProvider } from '$lib/commands';
+  import { shortcut, shortcuts } from '$lib/actions/shortcut';
+  import GlobalSearch from '$lib/components/global-search/global-search.svelte';
+  import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
+  import { globalSearchManager, type SearchMode } from '$lib/managers/global-search-manager.svelte';
   import DownloadPanel from './DownloadPanel.svelte';
   import ErrorLayout from './ErrorLayout.svelte';
   import OnEvents from '$lib/components/OnEvents.svelte';
@@ -16,20 +19,13 @@
   import { lang, locale } from '$lib/stores/preferences.store';
   import { sidebarStore } from '$lib/stores/sidebar.svelte';
   import { closeWebsocketConnection, openWebsocketConnection, websocketStore } from '$lib/stores/websocket';
+  import { copyToClipboard } from '$lib/utils';
   import { maintenanceShouldRedirect } from '$lib/utils/maintenance';
   import { getServerConfig } from '@immich/sdk';
   import {
-    CommandPaletteProvider,
-    CORE_PAGE_COMMANDS,
-    defaultProvider,
-    MOBILE_APP_COMMANDS,
     modalManager,
-    OTHER_SITE_COMMANDS,
-    PROJECT_SUPPORT_COMMANDS,
-    ScreencastOverlay,
     setLocale,
     setTranslations,
-    SOCIAL_COMMANDS,
     Theme,
     themeManager,
     toastManager,
@@ -167,6 +163,8 @@
 
   let showNavigationLoadingBar = $state(false);
 
+  const getMyImmichLink = () => new URL(page.url.pathname + page.url.search, 'https://my.immich.app');
+
   toastManager.setOptions({ class: 'top-16 fixed' });
 
   onMount(() => {
@@ -256,6 +254,40 @@
   {/if}
 </svelte:head>
 
+<svelte:document
+  use:shortcut={{
+    shortcut: { ctrl: true, shift: true, key: 'm' },
+    onShortcut: () => copyToClipboard(getMyImmichLink().toString()),
+  }}
+  use:shortcut={{
+    shortcut: { shift: true, key: 't' },
+    onShortcut: () => themeManager.toggleTheme(),
+  }}
+  use:shortcuts={[
+    {
+      shortcut: { ctrl: true, key: 'k' },
+      onShortcut: () => {
+        // Use valueOrUndefined so the shortcut never throws if it fires before
+        // feature flags have loaded (SSR→hydration race).
+        if (featureFlagsManager.valueOrUndefined?.search) {
+          globalSearchManager.toggle();
+        }
+      },
+    },
+    {
+      shortcut: { ctrl: true, key: '/' },
+      onShortcut: () => {
+        if (!globalSearchManager.isOpen) {
+          return;
+        }
+        const order: SearchMode[] = ['smart', 'metadata', 'description', 'ocr'];
+        const next = order[(order.indexOf(globalSearchManager.mode) + 1) % order.length];
+        globalSearchManager.setMode(next);
+      },
+    },
+  ]}
+/>
+
 <TooltipProvider>
   {#if page.data.error}
     <ErrorLayout error={page.data.error}></ErrorLayout>
@@ -269,17 +301,7 @@
 
   <DownloadPanel />
   <UploadPanel />
-  <ScreencastOverlay />
-
-  <CommandPaletteProvider
-    providers={[
-      getPagesProvider($t),
-      getSettingsProvider($t),
-      defaultProvider({ name: $t('documentation'), types: ['doc', 'documentation'], actions: CORE_PAGE_COMMANDS }),
-      defaultProvider({ name: $t('support'), actions: PROJECT_SUPPORT_COMMANDS }),
-      defaultProvider({ name: 'Socials', types: ['social', 'socials'], actions: SOCIAL_COMMANDS }),
-      defaultProvider({ name: $t('mobile_app'), actions: MOBILE_APP_COMMANDS }),
-      defaultProvider({ name: 'Sites', types: ['site', 'sites'], actions: OTHER_SITE_COMMANDS }),
-    ]}
-  />
+  {#if globalSearchManager.isOpen}
+    <GlobalSearch manager={globalSearchManager} />
+  {/if}
 </TooltipProvider>

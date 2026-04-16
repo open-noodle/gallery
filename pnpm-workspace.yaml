@@ -27,42 +27,42 @@ allowBuilds:
   '@tailwindcss/oxide': true
   core-js-pure: false
   postman-code-generators: false
+dedupePeerDependents: false
+injectWorkspacePackages: true
 overrides:
   canvas: 3.2.3
   sharp: ^0.35.3
 packageExtensions:
-  nestjs-kysely:
+  '@immich/ui':
     dependencies:
-      tslib: '*'
-  nestjs-otel:
-    dependencies:
-      tslib: '*'
+      tailwindcss: '>=4.1'
   '@photo-sphere-viewer/equirectangular-video-adapter':
     dependencies:
       three: '*'
   '@photo-sphere-viewer/video-plugin':
     dependencies:
       three: '*'
-  sharp:
-    dependencies:
-      node-addon-api: '*'
-      node-gyp: '*'
-  '@immich/ui':
-    dependencies:
-      tailwindcss: '>=4.1'
-  tailwind-variants:
-    dependencies:
-      tailwindcss: '>=4.1'
   bcrypt:
     dependencies:
       node-addon-api: '*'
       node-gyp: '*'
+  nestjs-kysely:
+    dependencies:
+      tslib: '*'
+  nestjs-otel:
+    dependencies:
+      tslib: '*'
+  sharp:
+    dependencies:
+      node-addon-api: '*'
+      node-gyp: '*'
+  tailwind-variants:
+    dependencies:
+      tailwindcss: '>=4.1'
   '@nestjs/swagger':
     peerDependencies:
       typescript: '*'
-dedupePeerDependents: false
 preferWorkspacePackages: true
-injectWorkspacePackages: true
 shamefullyHoist: false
 verifyDepsBeforeRun: install
 minimumReleaseAgeExclude:
