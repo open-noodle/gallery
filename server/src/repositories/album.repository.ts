@@ -204,6 +204,47 @@ export class AlbumRepository {
   }
 
   /**
+   * Lightweight projection for the command palette: returns only the fields
+   * needed to render an album entry (name, thumbnail, asset count, date range)
+   * without the full MapAlbumDto shape or the updateThumbnails write side-effect.
+   */
+  @GenerateSql({ params: [DummyValue.UUID] })
+  async getOwnedNames(ownerId: string) {
+    return this.db
+      .selectFrom('album')
+      .select(['album.id', 'album.albumName', 'album.albumThumbnailAssetId'])
+      .select((eb) =>
+        eb
+          .selectFrom('album_asset')
+          .select((eb) => sql<number>`${eb.fn.count('album_asset.assetId')}::int`.as('assetCount'))
+          .whereRef('album_asset.albumId', '=', 'album.id')
+          .as('assetCount'),
+      )
+      .select((eb) =>
+        eb
+          .selectFrom('album_asset')
+          .innerJoin('asset', 'asset.id', 'album_asset.assetId')
+          .select((eb) => eb.fn.min('asset.localDateTime').as('startDate'))
+          .whereRef('album_asset.albumId', '=', 'album.id')
+          .where('asset.deletedAt', 'is', null)
+          .as('startDate'),
+      )
+      .select((eb) =>
+        eb
+          .selectFrom('album_asset')
+          .innerJoin('asset', 'asset.id', 'album_asset.assetId')
+          .select((eb) => eb.fn.max('asset.localDateTime').as('endDate'))
+          .whereRef('album_asset.albumId', '=', 'album.id')
+          .where('asset.deletedAt', 'is', null)
+          .as('endDate'),
+      )
+      .where('album.ownerId', '=', ownerId)
+      .where('album.deletedAt', 'is', null)
+      .orderBy('album.albumName')
+      .execute();
+  }
+
+  /**
    * Get albums shared with and shared by owner.
    */
   @GenerateSql({ params: [DummyValue.UUID] })
