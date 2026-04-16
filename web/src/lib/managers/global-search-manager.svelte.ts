@@ -491,6 +491,12 @@ export class GlobalSearchManager {
         lastUsed: Date.now(),
       });
       void goto(Route.viewAlbum({ id }));
+      // Dismiss the palette after handing off to the router. goto is fire-and-forget
+      // so navigation and palette close happen in parallel — matches v1's activate()
+      // pattern for other kinds (photo/person/place/tag/nav all close post-navigate).
+      // Intentionally only on the happy path: the stale-entry (400/403/404) branch
+      // leaves the palette open so the user sees the toast and the purged RECENT.
+      this.close();
     } catch (error: unknown) {
       if (error instanceof Error && error.name === 'AbortError') {
         return;
@@ -558,6 +564,8 @@ export class GlobalSearchManager {
         lastUsed: Date.now(),
       });
       void goto(Route.viewSpace({ id }));
+      // See activateAlbum for rationale — close after goto, happy path only.
+      this.close();
     } catch (error: unknown) {
       if (error instanceof Error && error.name === 'AbortError') {
         return;

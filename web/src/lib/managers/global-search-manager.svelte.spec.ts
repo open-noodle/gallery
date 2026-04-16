@@ -2998,6 +2998,16 @@ describe('activateAlbum', () => {
     });
   });
 
+  it('closes the palette after successful navigation', async () => {
+    vi.mocked(getAlbumInfo).mockResolvedValue(albumResponse);
+
+    const sut = new GlobalSearchManager();
+    sut.open();
+    expect(sut.isOpen).toBe(true);
+    await sut.activateAlbum('a1');
+    expect(sut.isOpen).toBe(false);
+  });
+
   it('404: toast + removeById + no navigation', async () => {
     // Seed a stale recent so the purge path has something to remove.
     addEntry({
@@ -3017,6 +3027,15 @@ describe('activateAlbum', () => {
     expect(toastManager.warning).toHaveBeenCalledTimes(1);
     expect(getEntries().find((e) => e.id === 'album:a1')).toBeUndefined();
     expect(goto).not.toHaveBeenCalled();
+  });
+
+  it('does NOT close the palette on stale-entry (404) so the user sees the toast', async () => {
+    vi.mocked(getAlbumInfo).mockRejectedValue(Object.assign(new Error('not found'), { status: 404 }));
+
+    const sut = new GlobalSearchManager();
+    sut.open();
+    await sut.activateAlbum('a1');
+    expect(sut.isOpen).toBe(true);
   });
 
   it('403: toast + removeById + no navigation', async () => {
@@ -3224,6 +3243,25 @@ describe('activateSpace', () => {
       label: 'Family',
       colorHex: 'primary',
     });
+  });
+
+  it('closes the palette after successful navigation', async () => {
+    vi.mocked(getSpace).mockResolvedValue(spaceResponse);
+
+    const sut = new GlobalSearchManager();
+    sut.open();
+    expect(sut.isOpen).toBe(true);
+    await sut.activateSpace('s1');
+    expect(sut.isOpen).toBe(false);
+  });
+
+  it('does NOT close the palette on stale-entry (404) so the user sees the toast', async () => {
+    vi.mocked(getSpace).mockRejectedValue(Object.assign(new Error('not found'), { status: 404 }));
+
+    const sut = new GlobalSearchManager();
+    sut.open();
+    await sut.activateSpace('s1');
+    expect(sut.isOpen).toBe(true);
   });
 
   it('404: toast + removeById + no navigation', async () => {
