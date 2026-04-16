@@ -1,0 +1,116 @@
+import type { SearchMode } from '$lib/managers/global-search-manager.svelte';
+import { user } from '$lib/stores/user.store';
+import { get } from 'svelte/store';
+
+// Recents are scoped per logged-in user so multi-account browsers (user A logs
+// out, user B logs in on the same device) never leak each other's palette
+// history. The localStorage key is suffixed with the user id, and reads/writes
+// for a null user are a silent no-op — an anonymous bucket would get inherited
+// by whichever user logs in next, which is the same bug we are trying to fix.
+const STORAGE_KEY_PREFIX = 'cmdk.recent:';
+const MAX_ENTRIES = 20;
+
+export type RecentEntry =
+  | { kind: 'query'; id: string; text: string; mode: SearchMode; lastUsed: number }
+  | { kind: 'photo'; id: string; assetId: string; label: string; lastUsed: number }
+  | { kind: 'person'; id: string; personId: string; label: string; thumbnailAssetId?: string; lastUsed: number }
+  | { kind: 'place'; id: string; latitude: number; longitude: number; label: string; lastUsed: number }
+  | { kind: 'tag'; id: string; tagId: string; label: string; lastUsed: number }
+  | {
+      kind: 'navigate';
+      id: string;
+      route: string;
+      labelKey: string;
+      icon: string;
+      adminOnly: boolean;
+      lastUsed: number;
+    };
+
+let warnedOnce = false;
+
+function warn(err: unknown) {
+  if (warnedOnce) {
+    return;
+  }
+  warnedOnce = true;
+
+  console.warn('[cmdk.recent]', err);
+}
+
+function currentStorageKey(): string | null {
+  const current = get(user) as { id?: string } | null;
+  const id = current?.id;
+  return id ? `${STORAGE_KEY_PREFIX}${id}` : null;
+}
+
+function rawRead(key: string): RecentEntry[] {
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw === null) {
+      return [];
+    }
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as RecentEntry[]) : [];
+  } catch (error) {
+    warn(error);
+    return [];
+  }
+}
+
+function rawWrite(key: string, entries: RecentEntry[]) {
+  try {
+    localStorage.setItem(key, JSON.stringify(entries));
+  } catch (error) {
+    warn(error);
+  }
+}
+
+export function getEntries(): RecentEntry[] {
+  const key = currentStorageKey();
+  if (key === null) {
+    return [];
+  }
+  return rawRead(key).sort((a, b) => b.lastUsed - a.lastUsed);
+}
+
+export function addEntry(entry: RecentEntry) {
+  const key = currentStorageKey();
+  if (key === null) {
+    return;
+  }
+  const existing = rawRead(key);
+  const deduped = existing.filter((e) => e.id !== entry.id);
+  deduped.push(entry);
+  deduped.sort((a, b) => b.lastUsed - a.lastUsed);
+  rawWrite(key, deduped.slice(0, MAX_ENTRIES));
+}
+
+export function clearEntries() {
+  const key = currentStorageKey();
+  if (key === null) {
+    return;
+  }
+  rawWrite(key, []);
+}
+
+export function removeEntry(id: string) {
+  const key = currentStorageKey();
+  if (key === null) {
+    return;
+  }
+  const existing = rawRead(key);
+  const next = existing.filter((e) => e.id !== id);
+  if (next.length !== existing.length) {
+    rawWrite(key, next);
+  }
+}
+
+export function makePlaceId(lat: number, lng: number): string {
+  return `place:${lat.toFixed(4)}:${lng.toFixed(4)}`;
+}
+
+// Test-only escape hatch: resets the one-shot warn flag so tests that exercise
+// the error paths can observe fresh warning behaviour across cases.
+export function __resetForTests() {
+  warnedOnce = false;
+}
