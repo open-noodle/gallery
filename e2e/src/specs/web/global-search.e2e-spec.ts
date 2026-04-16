@@ -322,6 +322,41 @@ test.describe('global search palette', () => {
     expect(spacesIdx).toBeLessThan(tagsIdx);
   });
 
+  test('album owned by user A and shared to user B appears once with Shared badge', async ({ page }) => {
+    // Buddy is the recipient of the share — admin is both the owner AND the
+    // sharer-out, which means admin's getAlbumNames returns the album under
+    // BOTH the owned list (shared:false) AND the shared list (shared:true)
+    // (per album.repository.ts:253 — "includes albums owned-and-shared-out by
+    // the user"). The cmdk fetchAlbumsCatalog dedupes by id and prefers the
+    // shared:true record, so a single "Vacation 2024" row should appear with
+    // the Shared badge.
+    const buddy = await utils.userSetup(admin.accessToken, {
+      email: 'buddy-dedupe@cmdk.test',
+      password: 'pw',
+      name: 'Buddy Dedupe',
+    });
+    await utils.cmdkCreateAndShareAlbum(admin.accessToken, buddy.userId, 'Vacation 2024');
+
+    await page.keyboard.press('Control+k');
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('combobox').fill('vacation');
+
+    const albumsGroup = dialog.getByRole('group', { name: /^albums/i });
+    await expect(albumsGroup).toBeVisible();
+
+    // Exactly one album row matching /Vacation 2024/. If dedupe regressed, this
+    // count would be 2 (one owned-record row, one shared-record row).
+    const matchingRows = albumsGroup.locator('[data-command-item]', { hasText: 'Vacation 2024' });
+    await expect(matchingRows).toHaveCount(1);
+
+    // The dedupe keeper is the shared:true record, so AlbumRow renders the
+    // Shared badge ($t('shared') → "Shared"). Use a regex anchored to whole-word
+    // "Shared" so we don't false-positive against album titles that happen to
+    // include the substring.
+    await expect(matchingRows.getByText(/^shared$/i)).toBeVisible();
+  });
+
   test.describe('ML unhealthy banner', () => {
     // CI runs with ML disabled, so /server/ml-health reports { smartSearchHealthy: false }.
     test('shows the smart-search-unavailable banner in smart mode after typing', async ({ page }) => {
