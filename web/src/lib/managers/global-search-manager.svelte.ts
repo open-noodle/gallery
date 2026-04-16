@@ -400,9 +400,11 @@ export class GlobalSearchManager {
   private async fetchAlbumsCatalog(): Promise<void> {
     try {
       const response = await getAlbumNames({ signal: this.closeSignal });
-      // Plain Map — this is a local dedupe accumulator, not reactive state. SvelteMap
-      // is only required for `$state`-backed collections.
-      const byId = new Map<string, AlbumNameDto>();
+      // SvelteMap instead of plain Map to satisfy the `svelte/prefer-svelte-reactivity`
+      // ESLint rule — it flags any Map instance inside .svelte.ts files regardless of
+      // whether it's reactive state. This is a local dedupe accumulator; the SvelteMap
+      // reactivity overhead is negligible at this scale.
+      const byId = new SvelteMap<string, AlbumNameDto>();
       for (const record of response) {
         const existing = byId.get(record.id);
         if (existing === undefined || (record.shared && !existing.shared)) {
