@@ -93,6 +93,31 @@ test.describe('global search palette', () => {
     await expect(page.getByRole('radio', { name: /description/i })).toBeChecked();
   });
 
+  test('mixed-section query surfaces album + space results', async ({ page }) => {
+    // Seed 2 Hawaii albums + 2 Hawaii spaces under the admin account. The seed
+    // helper composes the granular createAlbum/createSpace utils so the names
+    // appear verbatim in the cmdk Albums and Spaces sections (see
+    // utils.cmdkSetupAlbumsAndSpaces). Admin is already logged in and on
+    // /photos via the outer beforeEach.
+    await utils.cmdkSetupAlbumsAndSpaces(admin.accessToken);
+
+    await page.keyboard.press('Control+k');
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('combobox').fill('hawaii');
+
+    // Scope assertions to each section's role="group" container — bits-ui's
+    // Command.GroupItems wires `aria-labelledby` to the heading, so the group's
+    // accessible name matches its rendered heading text. This avoids brittle
+    // DOM walks while still asserting that a result row lives UNDER the right
+    // section (not just somewhere in the dialog).
+    const albumsGroup = dialog.getByRole('group', { name: /^albums$/i });
+    await expect(albumsGroup.getByText(/hawaii (beach|mountains)/i).first()).toBeVisible();
+
+    const spacesGroup = dialog.getByRole('group', { name: /^spaces$/i });
+    await expect(spacesGroup.getByText(/hawaii (family|friends)/i).first()).toBeVisible();
+  });
+
   test.describe('ML unhealthy banner', () => {
     // CI runs with ML disabled, so /server/ml-health reports { smartSearchHealthy: false }.
     test('shows the smart-search-unavailable banner in smart mode after typing', async ({ page }) => {
