@@ -73,7 +73,7 @@
           class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400"
         >
           {$t(bucket.headingKey)}{#if showChip}
-            <span class="tabular-nums"> ({bucket.items.length} of {bucket.preSliceCount})</span>
+            <span class="tabular-nums"> ({$t('cmdk_section_count_of', { values: { shown: bucket.items.length, total: bucket.preSliceCount } })})</span>
           {/if}
         </Command.GroupHeading>
         <Command.GroupItems>
@@ -88,7 +88,7 @@
               aria-hidden="true"
               class="mt-1 px-3 py-1 text-[12px] font-[410] text-gray-500 dark:text-gray-400 tabular-nums"
             >
-              × {bucket.preSliceCount - bucket.items.length} more
+              {$t('cmdk_section_more_count', { values: { count: bucket.preSliceCount - bucket.items.length } })}
             </div>
           {/if}
         </Command.GroupItems>

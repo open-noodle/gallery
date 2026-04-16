@@ -5,6 +5,7 @@
   import { Button, Icon } from '@immich/ui';
   import { mdiImageMultipleOutline } from '@mdi/js';
   import { DateTime } from 'luxon';
+  import { t } from 'svelte-i18n';
 
   interface Props {
     item: AlbumNameDto;
@@ -17,10 +18,7 @@
       : '',
   );
 
-  // svelte-i18n's test setup uses `fallbackLocale: 'dev'` which returns the raw key,
-  // so the `items_count` ICU plural can't be resolved in unit tests. Use a hardcoded
-  // English fallback here; formal i18n wiring is owned by a later task.
-  const countLabel = $derived(`${item.assetCount} item${item.assetCount === 1 ? '' : 's'}`);
+  const countLabel = $derived($t('cmdk_preview_item_count', { values: { count: item.assetCount } }));
 
   const formatMonthYear = (iso: string) => DateTime.fromISO(iso, { zone: 'UTC' }).toFormat('LLL yyyy');
 
@@ -58,7 +56,7 @@
         <span
           class="shrink-0 rounded-full bg-subtle/60 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-600 dark:text-gray-300"
         >
-          Shared
+          {$t('shared')}
         </span>
       {/if}
     </div>
@@ -66,6 +64,6 @@
   </div>
 
   <div class="flex gap-2">
-    <Button variant="ghost" size="small" onclick={() => goto(`/albums/${item.id}`)}>Open</Button>
+    <Button variant="ghost" size="small" onclick={() => goto(`/albums/${item.id}`)}>{$t('cmdk_open')}</Button>
   </div>
 </div>

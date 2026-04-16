@@ -1,11 +1,20 @@
 import { render, screen } from '@testing-library/svelte';
-import { describe, expect, it, vi } from 'vitest';
+import { init, register, waitLocale } from 'svelte-i18n';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import SpacePreview from './space-preview.svelte';
 
 vi.mock('@immich/ui', async (orig) => ({
   ...(await (orig as () => Promise<Record<string, unknown>>)()),
   IconButton: vi.fn(() => ({ $$typeof: Symbol.for('svelte.component') })),
 }));
+
+beforeAll(async () => {
+  // Load the real en bundle so `$t('cmdk_preview_photo_count')` and
+  // `$t('cmdk_preview_member_count')` resolve to English ICU output rather than raw keys.
+  register('en-US', () => import('$i18n/en.json'));
+  await init({ fallbackLocale: 'en-US' });
+  await waitLocale('en-US');
+});
 
 interface MemberOverride {
   userId: string;

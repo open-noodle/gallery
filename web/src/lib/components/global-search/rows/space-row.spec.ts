@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/svelte';
-import { describe, expect, it, vi } from 'vitest';
+import { init, register, waitLocale } from 'svelte-i18n';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import SpaceRow from './space-row.svelte';
 
 vi.mock('@immich/ui', async (orig) => ({
@@ -8,6 +9,15 @@ vi.mock('@immich/ui', async (orig) => ({
 }));
 
 describe('space-row', () => {
+  beforeAll(async () => {
+    // Load the real en bundle so `$t('cmdk_preview_member_count', { values: { count } })`
+    // resolves to English ICU output ("1 member" / "3 members") instead of the raw key
+    // (global test setup uses `fallbackLocale: 'dev'` which returns keys).
+    register('en-US', () => import('$i18n/en.json'));
+    await init({ fallbackLocale: 'en-US' });
+    await waitLocale('en-US');
+  });
+
   const baseProps = {
     item: {
       id: 's1',

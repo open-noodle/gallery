@@ -2,6 +2,7 @@
   import { UserAvatarColor, type SharedSpaceResponseDto } from '@immich/sdk';
   import { Icon } from '@immich/ui';
   import { mdiAccountMultipleOutline } from '@mdi/js';
+  import { t } from 'svelte-i18n';
 
   interface Props {
     item: SharedSpaceResponseDto;
@@ -46,7 +47,7 @@
       <span
         class="shrink-0 rounded-full bg-subtle/60 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-600 dark:text-gray-300"
       >
-        {memberCount} {memberCount === 1 ? 'member' : 'members'}
+        {$t('cmdk_preview_member_count', { values: { count: memberCount } })}
       </span>
     </div>
   </div>

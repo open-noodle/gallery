@@ -6,6 +6,7 @@
   import { UserAvatarColor, type SharedSpaceResponseDto } from '@immich/sdk';
   import { Button, Icon } from '@immich/ui';
   import { mdiAccountMultipleOutline } from '@mdi/js';
+  import { t } from 'svelte-i18n';
 
   interface Props {
     item: SharedSpaceResponseDto;
@@ -41,13 +42,10 @@
   const visibleMembers = $derived((item.members ?? []).slice(0, MAX_AVATARS));
   const overflowCount = $derived(Math.max(0, (item.members ?? []).length - MAX_AVATARS));
 
-  // svelte-i18n's test setup uses `fallbackLocale: 'dev'` which returns the raw key,
-  // so ICU plural messages can't be resolved in unit tests. Use a hardcoded English
-  // fallback here; formal i18n wiring is owned by a later task.
   const assetCount = $derived(item.assetCount ?? 0);
-  const photoLabel = $derived(`${assetCount} photo${assetCount === 1 ? '' : 's'}`);
+  const photoLabel = $derived($t('cmdk_preview_photo_count', { values: { count: assetCount } }));
   const memberCount = $derived(item.memberCount ?? 0);
-  const memberLabel = $derived(`${memberCount} member${memberCount === 1 ? '' : 's'}`);
+  const memberLabel = $derived($t('cmdk_preview_member_count', { values: { count: memberCount } }));
   const metadataLine = $derived(`${photoLabel} · ${memberLabel}`);
 </script>
 
@@ -101,6 +99,6 @@
   {/if}
 
   <div class="flex gap-2">
-    <Button variant="ghost" size="small" onclick={() => goto(Route.viewSpace({ id: item.id }))}>Open</Button>
+    <Button variant="ghost" size="small" onclick={() => goto(Route.viewSpace({ id: item.id }))}>{$t('cmdk_open')}</Button>
   </div>
 </div>

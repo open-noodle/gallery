@@ -421,12 +421,12 @@
                 {/snippet}
               </GlobalSearchSection>
               <!-- Albums + Spaces sit between Photos and People per the v1.1 plan's
-                   declared section sequence. Headings are hardcoded English — Task 24
-                   introduces `cmdk_section_albums` / `cmdk_section_spaces` and swaps
-                   them in. `isPending` wiring reads `manager.pendingActivation` so the
-                   row spinner affordance appears for the exact key being activated. -->
+                   declared section sequence. Headings use `cmdk_section_albums` /
+                   `cmdk_section_spaces` (Task 24). `isPending` wiring reads
+                   `manager.pendingActivation` so the row spinner affordance appears for
+                   the exact key being activated. -->
               <GlobalSearchSection
-                heading="Albums"
+                heading={$t('cmdk_section_albums')}
                 status={manager.sections.albums}
                 idPrefix="album"
                 onActivate={(item) => void manager.activateAlbum((item as { id: string }).id)}
@@ -439,7 +439,7 @@
                 {/snippet}
               </GlobalSearchSection>
               <GlobalSearchSection
-                heading="Spaces"
+                heading={$t('cmdk_section_spaces')}
                 status={manager.sections.spaces}
                 idPrefix="space"
                 onActivate={(item) => void manager.activateSpace((item as { id: string }).id)}

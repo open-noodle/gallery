@@ -496,9 +496,7 @@ export class GlobalSearchManager {
       const status = (error as { status?: number } | null)?.status;
       if (status === 404 || status === 403) {
         removeEntry(key);
-        // Hardcoded English fallback — Task 24 formally adds the i18n key
-        // `cmdk_toast_album_unavailable`. Matches Tasks 14/15/16.
-        toastManager.warning('Album no longer available');
+        toastManager.warning(get(t)('cmdk_toast_album_unavailable'));
         return;
       }
       throw error;
@@ -563,9 +561,7 @@ export class GlobalSearchManager {
       const status = (error as { status?: number } | null)?.status;
       if (status === 404 || status === 403) {
         removeEntry(key);
-        // Hardcoded English fallback — Task 24 formally adds the i18n key
-        // `cmdk_toast_space_unavailable`. Matches Tasks 14/15/16/20.
-        toastManager.warning('You no longer have access to this space');
+        toastManager.warning(get(t)('cmdk_toast_space_unavailable'));
         return;
       }
       throw error;

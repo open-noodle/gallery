@@ -1,8 +1,17 @@
 import { render } from '@testing-library/svelte';
 import { createRawSnippet } from 'svelte';
-import { describe, expect, it, vi } from 'vitest';
+import { init, register, waitLocale } from 'svelte-i18n';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import GlobalSearchSection from '../global-search-section.svelte';
 import SectionRootWrapper from './test-harness/section-root-wrapper.svelte';
+
+beforeAll(async () => {
+  // Load en so `$t('cmdk_section_count_of')` and `$t('cmdk_section_more_count')`
+  // resolve to "{shown} of {total}" / "× N more" rather than raw keys.
+  register('en-US', () => import('$i18n/en.json'));
+  await init({ fallbackLocale: 'en-US' });
+  await waitLocale('en-US');
+});
 
 // Note: the `ok` rendering path requires a Command.Root ancestor context (bits-ui
 // Command.Group throws without one). That path is covered by the integration tests in
