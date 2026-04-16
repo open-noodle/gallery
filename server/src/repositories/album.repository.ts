@@ -207,40 +207,40 @@ export class AlbumRepository {
    * Lightweight projection for the command palette: returns only the fields
    * needed to render an album entry (name, thumbnail, asset count, date range)
    * without the full MapAlbumDto shape or the updateThumbnails write side-effect.
+   *
+   * Uses a single grouped LEFT JOIN (mirroring `getMetadataForIds`) so one
+   * subquery produces count + date range in a single plan, rather than three
+   * correlated subqueries per row. Empty albums still appear with
+   * `assetCount = 0` and null date range via COALESCE on the count.
    */
   @GenerateSql({ params: [DummyValue.UUID] })
   async getOwnedNames(ownerId: string) {
     return this.db
       .selectFrom('album')
+      .leftJoin(
+        (eb) =>
+          eb
+            .selectFrom('album_asset')
+            .innerJoin('asset', 'asset.id', 'album_asset.assetId')
+            .where('asset.deletedAt', 'is', null)
+            .select('album_asset.albumId as albumId')
+            .select((eb) => sql<number>`${eb.fn.count('album_asset.assetId')}::int`.as('assetCount'))
+            .select((eb) =>
+              eb.fn.min(sql<Date>`("asset"."localDateTime" AT TIME ZONE 'UTC'::text)::date`).as('startDate'),
+            )
+            .select((eb) =>
+              eb.fn.max(sql<Date>`("asset"."localDateTime" AT TIME ZONE 'UTC'::text)::date`).as('endDate'),
+            )
+            .groupBy('album_asset.albumId')
+            .as('metadata'),
+        (join) => join.onRef('metadata.albumId', '=', 'album.id'),
+      )
       .select(['album.id', 'album.albumName', 'album.albumThumbnailAssetId'])
-      .select((eb) =>
-        eb
-          .selectFrom('album_asset')
-          .select((eb) => sql<number>`${eb.fn.count('album_asset.assetId')}::int`.as('assetCount'))
-          .whereRef('album_asset.albumId', '=', 'album.id')
-          .as('assetCount'),
-      )
-      .select((eb) =>
-        eb
-          .selectFrom('album_asset')
-          .innerJoin('asset', 'asset.id', 'album_asset.assetId')
-          .select((eb) => eb.fn.min('asset.localDateTime').as('startDate'))
-          .whereRef('album_asset.albumId', '=', 'album.id')
-          .where('asset.deletedAt', 'is', null)
-          .as('startDate'),
-      )
-      .select((eb) =>
-        eb
-          .selectFrom('album_asset')
-          .innerJoin('asset', 'asset.id', 'album_asset.assetId')
-          .select((eb) => eb.fn.max('asset.localDateTime').as('endDate'))
-          .whereRef('album_asset.albumId', '=', 'album.id')
-          .where('asset.deletedAt', 'is', null)
-          .as('endDate'),
-      )
+      .select((eb) => sql<number>`coalesce(${eb.ref('metadata.assetCount')}, 0)::int`.as('assetCount'))
+      .select('metadata.startDate as startDate')
+      .select('metadata.endDate as endDate')
       .where('album.ownerId', '=', ownerId)
       .where('album.deletedAt', 'is', null)
-      .orderBy('album.albumName')
       .execute();
   }
 

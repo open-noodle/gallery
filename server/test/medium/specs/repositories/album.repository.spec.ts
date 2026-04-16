@@ -61,5 +61,18 @@ describe(AlbumRepository.name, () => {
 
       expect(spy).not.toHaveBeenCalled();
     });
+
+    it('returns empty-album with assetCount=0 and null date range', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      await ctx.newAlbum({ ownerId: owner.id, albumName: 'Empty' });
+
+      const rows = await sut.getOwnedNames(owner.id);
+
+      expect(rows).toHaveLength(1);
+      expect(rows[0].assetCount).toBe(0);
+      expect(rows[0].startDate).toBeNull();
+      expect(rows[0].endDate).toBeNull();
+    });
   });
 });
