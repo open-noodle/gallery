@@ -317,6 +317,9 @@ describe('global-search root', () => {
     render(GlobalSearch, { props: { manager: m } });
     await user.type(screen.getByRole('combobox'), 'beach');
     await vi.waitFor(() => expect(m.activeItemId).toBe('photo:a1'), { timeout: 2000 });
+    // Wait for the full item registry before keyboard navigation — see
+    // later tests for the full rationale (activeItemId flips before DOM flushes).
+    await vi.waitFor(() => expect(document.querySelectorAll('[data-command-item]').length).toBe(3));
     await user.keyboard('{End}');
     await vi.waitFor(() => expect(m.activeItemId).toBe('photo:a3'));
     await user.keyboard('{Home}');
@@ -340,6 +343,12 @@ describe('global-search root', () => {
     render(GlobalSearch, { props: { manager: m } });
     await user.type(screen.getByRole('combobox'), 'beach');
     await vi.waitFor(() => expect(m.activeItemId).toBe('photo:a1'), { timeout: 2000 });
+    // activeItemId flips reactively as soon as the provider resolves, but Svelte
+    // flushes the item list DOM in a later microtask and bits-ui's Command.Root
+    // only registers items as their Command.Item nodes mount. Pressing {End}
+    // before BOTH data-command-item nodes are in the registry would be a no-op
+    // (End navigates to "last registered item", which would still be a1).
+    await vi.waitFor(() => expect(document.querySelectorAll('[data-command-item]').length).toBe(2));
     // Force a selection change so the override effect re-runs.
     await user.keyboard('{End}');
     await vi.waitFor(() => expect(m.activeItemId).toBe('photo:a2'));
@@ -372,6 +381,9 @@ describe('global-search root', () => {
     render(GlobalSearch, { props: { manager: m } });
     await user.type(screen.getByRole('combobox'), 'beach');
     await vi.waitFor(() => expect(m.activeItemId).toBe('photo:a1'), { timeout: 2000 });
+    // Wait for all three data-command-item nodes to be registered with Command.Root
+    // before pressing End — otherwise End is a no-op against a partial registry.
+    await vi.waitFor(() => expect(document.querySelectorAll('[data-command-item]').length).toBe(3));
     // Walk to the last item.
     await user.keyboard('{End}');
     await vi.waitFor(() => expect(m.activeItemId).toBe('photo:a3'));
