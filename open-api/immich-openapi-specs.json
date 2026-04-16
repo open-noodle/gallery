@@ -12706,6 +12706,47 @@
         "x-immich-state": "Stable"
       }
     },
+    "/server/ml-health": {
+      "get": {
+        "description": "Reports whether the ML server is currently reachable and healthy for smart search.",
+        "operationId": "getMlHealth",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServerMlHealthResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Smart search health",
+        "tags": [
+          "Server"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v2",
+            "state": "Added"
+          }
+        ],
+        "x-immich-permission": "server.about"
+      }
+    },
     "/server/ping": {
       "get": {
         "description": "Pong",
@@ -26500,6 +26541,18 @@
           "image",
           "sidecar",
           "video"
+        ],
+        "type": "object"
+      },
+      "ServerMlHealthResponseDto": {
+        "properties": {
+          "smartSearchHealthy": {
+            "description": "Whether the ML server is currently reachable and healthy for smart search",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "smartSearchHealthy"
         ],
         "type": "object"
       },
