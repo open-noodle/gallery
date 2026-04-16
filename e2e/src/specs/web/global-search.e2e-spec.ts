@@ -39,7 +39,10 @@ test.describe('global search palette', () => {
 
   test('Esc clears input, second Esc closes (APG two-stage)', async ({ page }) => {
     await page.keyboard.press('Control+k');
-    const combobox = page.getByRole('dialog').getByRole('combobox');
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    const combobox = dialog.getByRole('combobox');
+    await expect(combobox).toBeFocused();
     await combobox.fill('beach');
     await expect(combobox).toHaveValue('beach');
     await page.keyboard.press('Escape');
