@@ -5,6 +5,7 @@
 <script lang="ts">
   import { page } from '$app/state';
   import { clickOutside } from '#lib/actions/click-outside.ts';
+  import GlobalSearchTrigger from '#lib/components/global-search/global-search-trigger.svelte';
   import NotificationPanel from '#lib/components/shared-components/navigation-bar/NotificationPanel.svelte';
   import SearchBar from '#lib/components/shared-components/search-bar/SearchBar.svelte';
   import SkipLink from '#lib/elements/SkipLink.svelte';
@@ -80,6 +81,9 @@
       </div>
 
       <section class="flex w-full place-items-center justify-end gap-1 sm:w-auto md:gap-2">
+        <div class="hidden sm:flex">
+          <GlobalSearchTrigger />
+        </div>
         <IconButton
           color="secondary"
           shape="round"

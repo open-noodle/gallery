@@ -22,6 +22,15 @@ class FeatureFlagsManager {
     return this.#value;
   }
 
+  /**
+   * Safe read that returns undefined instead of throwing when the manager has not been
+   * initialized. Use this at call sites that might run before `init()` completes — e.g.
+   * global keyboard shortcuts that fire during the initial SSR→hydration window.
+   */
+  get valueOrUndefined(): ServerFeaturesDto | undefined {
+    return this.#value;
+  }
+
   async #loadFeatureFlags() {
     this.#value = await getServerFeatures();
   }
