@@ -9,6 +9,7 @@ import {
   ServerConfigDto,
   ServerFeaturesDto,
   ServerMediaTypesResponseDto,
+  ServerMlHealthResponseDto,
   ServerPingResponse,
   ServerStatsResponseDto,
   ServerStorageResponseDto,
@@ -28,6 +29,9 @@ import {
 
 @Injectable()
 export class ServerService extends BaseService {
+  private mlHealthCache?: { value: ServerMlHealthResponseDto; expiresAt: number };
+  private mlHealthInFlight?: Promise<ServerMlHealthResponseDto>;
+
   @OnEvent({ name: 'AppBootstrap' })
   async onBootstrap(): Promise<void> {
     const featureFlags = await this.getFeatures();
@@ -37,6 +41,27 @@ export class ServerService extends BaseService {
       });
     }
     this.logger.log(`Feature Flags: ${JSON.stringify(await this.getFeatures(), null, 2)}`);
+  }
+
+  async getMlHealth(): Promise<ServerMlHealthResponseDto> {
+    const now = Date.now();
+    if (this.mlHealthCache && this.mlHealthCache.expiresAt > now) {
+      return this.mlHealthCache.value;
+    }
+    if (this.mlHealthInFlight) {
+      return this.mlHealthInFlight;
+    }
+    this.mlHealthInFlight = (async () => {
+      try {
+        const { ok } = await this.machineLearningRepository.ping();
+        const value: ServerMlHealthResponseDto = { smartSearchHealthy: ok };
+        this.mlHealthCache = { value, expiresAt: Date.now() + 30_000 };
+        return value;
+      } finally {
+        this.mlHealthInFlight = undefined;
+      }
+    })();
+    return this.mlHealthInFlight;
   }
 
   async getAboutInfo(): Promise<ServerAboutResponseDto> {
