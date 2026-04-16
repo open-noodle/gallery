@@ -24,17 +24,6 @@
     }
     return '';
   }
-
-  // Truncation flag: only meaningful for the `ok` status. When total > shown we consider
-  // the section truncated. The chip + heading-count are opt-in UX for sections that
-  // lack a canonical see-all row (Task 18 of cmdk v1.1 plan).
-  const isTruncated = $derived(status.status === 'ok' && status.total > status.items.length);
-  // Gate chip + count on absence of an `onSeeAll` handler — if a see-all row exists,
-  // it is the canonical overflow affordance and the chip would be redundant.
-  const showChip = $derived(isTruncated && !onSeeAll);
-  // Separate flag so divergence between chip visibility and heading-count visibility
-  // can happen later (e.g. count-always-shown) without bleeding into chip gating.
-  const showCount = $derived(isTruncated && !onSeeAll);
 </script>
 
 {#if status.status !== 'idle' && status.status !== 'empty' && status.status !== 'loading'}
@@ -43,11 +32,7 @@
       data-testid="section-heading"
       class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400"
     >
-      {heading}{#if showCount && status.status === 'ok'}
-        <span class="tabular-nums">
-          ({$t('cmdk_section_count_of', { values: { shown: status.items.length, total: status.total } })})</span
-        >
-      {/if}
+      {heading}
     </Command.GroupHeading>
     <Command.GroupItems>
       {#if status.status === 'ok'}
@@ -66,15 +51,6 @@
               <span>{$t('cmdk_see_all', { values: { count: status.total } })}</span>
               <span aria-hidden="true">→</span>
             </button>
-          {/if}
-          {#if showChip}
-            <div
-              data-testid="more-chip"
-              aria-hidden="true"
-              class="mt-1 px-3 py-1 text-[12px] font-[410] text-gray-500 dark:text-gray-400 tabular-nums"
-            >
-              {$t('cmdk_section_more_count', { values: { count: status.total - status.items.length } })}
-            </div>
           {/if}
         </div>
       {:else if status.status === 'timeout'}

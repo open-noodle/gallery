@@ -1,13 +1,10 @@
 import { render } from '@testing-library/svelte';
 import { createRawSnippet } from 'svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
-import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import GlobalSearchSection from '../global-search-section.svelte';
-import SectionRootWrapper from './test-harness/section-root-wrapper.svelte';
 
 beforeAll(async () => {
-  // Load en so `$t('cmdk_section_count_of')` and `$t('cmdk_section_more_count')`
-  // resolve to "{shown} of {total}" / "× N more" rather than raw keys.
   register('en-US', () => import('$i18n/en.json'));
   await init({ fallbackLocale: 'en-US' });
   await waitLocale('en-US');
@@ -84,71 +81,5 @@ describe('global-search-section empty-state', () => {
         },
       }),
     ).not.toThrow();
-  });
-});
-
-describe('global-search-section truncation rendering (state-machine)', () => {
-  // Produce a fresh mock per test case — do NOT share one vi.fn() across all
-  // cases (common gotcha: the mock accumulates calls from earlier iterations
-  // and inter-test assertions bleed through).
-  const cases = (['idle', 'loading', 'ok', 'error'] as const).flatMap((status) =>
-    [true, false].flatMap((truncated) =>
-      [{ kind: 'no-handler' }, { kind: 'handler' }].map((seeAllKind) => ({ status, truncated, seeAllKind })),
-    ),
-  );
-
-  it.each(cases)(
-    'status=$status truncated=$truncated onSeeAll=$seeAllKind.kind',
-    ({ status, truncated, seeAllKind }) => {
-      const onSeeAll = seeAllKind.kind === 'handler' ? vi.fn() : undefined;
-      const mockStatus =
-        status === 'ok'
-          ? ({ status: 'ok', items: [{ id: '1' }], total: truncated ? 8 : 1 } as const)
-          : status === 'error'
-            ? ({ status: 'error', message: 'boom' } as const)
-            : ({ status } as const);
-      const { container } = render(SectionRootWrapper, {
-        props: {
-          heading: 'Albums',
-          status: mockStatus,
-          idPrefix: 'album' as const,
-          renderRow: createRawSnippet(() => ({ render: () => '<span></span>' })),
-          onActivate: () => {},
-          onSeeAll,
-        },
-      });
-
-      const shouldRenderChip = status === 'ok' && truncated && !onSeeAll;
-      const chip = container.querySelector('[data-testid="more-chip"]');
-      expect(Boolean(chip)).toBe(shouldRenderChip);
-
-      const heading = container.querySelector('[data-testid="section-heading"]');
-      if (shouldRenderChip) {
-        expect(heading?.textContent).toMatch(/\(1 of 8\)/);
-      } else if (heading) {
-        // When the heading is rendered (status='ok' without truncation, or status='error'),
-        // it must NOT include a "(M of N)" suffix.
-        expect(heading.textContent).not.toMatch(/\(/);
-      }
-      // idle/loading/empty statuses render no heading at all — that's covered by the
-      // empty-state describe block above. Here we only gate on "when heading exists,
-      // it must be clean".
-    },
-  );
-
-  it('chip element has no role="option" and is aria-hidden', () => {
-    const { container } = render(SectionRootWrapper, {
-      props: {
-        heading: 'Albums',
-        status: { status: 'ok', items: [{ id: '1' }], total: 8 },
-        idPrefix: 'album' as const,
-        renderRow: createRawSnippet(() => ({ render: () => '<span></span>' })),
-        onActivate: () => {},
-      },
-    });
-    const chip = container.querySelector('[data-testid="more-chip"]');
-    expect(chip).not.toBeNull();
-    expect(chip?.getAttribute('role')).not.toBe('option');
-    expect(chip?.getAttribute('aria-hidden')).toBe('true');
   });
 });

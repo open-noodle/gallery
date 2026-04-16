@@ -91,53 +91,25 @@ describe('global-search-navigation-sections', () => {
     expect(rows.length).toBe(5);
   });
 
-  it('renders chip + heading count when a sub-section exceeds topN', () => {
-    // Seed 6 matching items in ONE sub-section only (User Pages). Other sub-sections
-    // have at most topN items and therefore must NOT render a chip or count suffix.
+  it('× N more affordance is currently absent', () => {
+    // Regression pin: the "× N more" chip + "(M of N)" heading count were removed
+    // from navigation sub-sections. Seed 6 items in one sub-section (one more than
+    // TOP_N=5) and assert that neither affordance renders.
     const items: NavigationItem[] = [];
     for (let i = 0; i < 6; i++) {
       items.push(makeItem('userPages', `nav:userPages:k${i}`));
     }
-    // Add a sibling category with < topN so we can verify the chip is scoped per-bucket.
-    items.push(makeItem('actions', 'nav:actions:theme'));
     const { container } = render(CommandRootWrapper, {
       props: { status: { status: 'ok', items, total: items.length } },
     });
 
-    const groups = [...container.querySelectorAll('[data-command-group]')] as HTMLElement[];
-    // Two buckets render: userPages and actions.
-    expect(groups).toHaveLength(2);
+    // No chip anywhere.
+    expect(container.querySelector('[data-testid="more-chip"]')).toBeNull();
 
-    // Identify the userPages group by its heading text.
-    const userPagesGroup = groups.find((g) =>
-      g.querySelector('[data-command-group-heading]')?.textContent?.includes('Navigation'),
-    );
-    const actionsGroup = groups.find((g) =>
-      g.querySelector('[data-command-group-heading]')?.textContent?.includes('Actions'),
-    );
-    expect(userPagesGroup).toBeTruthy();
-    expect(actionsGroup).toBeTruthy();
-
-    // The userPages heading must contain "(5 of 6)" and exactly one chip element.
-    const userPagesHeading = userPagesGroup!.querySelector('[data-command-group-heading]');
-    expect(userPagesHeading?.textContent).toMatch(/\(5 of 6\)/);
-    const userPagesChip = userPagesGroup!.querySelector('[data-testid="more-chip"]');
-    expect(userPagesChip).not.toBeNull();
-    expect(userPagesChip?.getAttribute('aria-hidden')).toBe('true');
-    expect(userPagesChip?.textContent).toMatch(/×\s*1\s*more/);
-
-    // The actions bucket must have NO chip and NO count suffix.
-    const actionsHeading = actionsGroup!.querySelector('[data-command-group-heading]');
-    expect(actionsHeading?.textContent).not.toMatch(/\(/);
-    expect(actionsGroup!.querySelector('[data-testid="more-chip"]')).toBeNull();
-  });
-
-  it('does NOT render chip on first keystroke frame (hasResolvedOnce=false)', () => {
-    // Before any filter pass has resolved, the provider's status is idle/loading/empty.
-    // Each of these variants must produce zero chip elements anywhere in the tree.
-    for (const status of [{ status: 'idle' as const }, { status: 'loading' as const }, { status: 'empty' as const }]) {
-      const { container } = render(CommandRootWrapper, { props: { status } });
-      expect(container.querySelector('[data-testid="more-chip"]')).toBeNull();
+    // Heading must not contain a "(M of N)" suffix.
+    const headings = [...container.querySelectorAll('[data-command-group-heading]')];
+    for (const h of headings) {
+      expect((h as HTMLElement).textContent ?? '').not.toMatch(/\(/);
     }
   });
 
