@@ -75,4 +75,36 @@ describe(AlbumRepository.name, () => {
       expect(rows[0].endDate).toBeNull();
     });
   });
+
+  describe('getSharedNames', () => {
+    it('returns lightweight projection of albums shared with the user', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: viewer } = await ctx.newUser();
+      const { album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'Shared Trip' });
+      await ctx.newAlbumUser({ albumId: album.id, userId: viewer.id });
+
+      const rows = await sut.getSharedNames(viewer.id);
+
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({
+        id: album.id,
+        albumName: 'Shared Trip',
+      });
+      // Note: `shared: true` is NOT asserted at the repo layer — service (Task 3)
+      // hardcodes it based on which repo method produced the record.
+    });
+
+    it('includes albums owned-and-shared-out (dedup is downstream responsibility)', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: buddy } = await ctx.newUser();
+      const { album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'Beach' });
+      await ctx.newAlbumUser({ albumId: album.id, userId: buddy.id });
+
+      // Owner's "shared" query returns the album too (they share it out)
+      const ownerShared = await sut.getSharedNames(owner.id);
+      expect(ownerShared.map((r) => r.id)).toContain(album.id);
+    });
+  });
 });
