@@ -30,7 +30,16 @@ vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({
 import { goto } from '$app/navigation';
 import { themeManager } from '$lib/managers/theme-manager.svelte';
 import { addEntry, getEntries, __resetForTests as resetRecentStore } from '$lib/stores/cmdk-recent';
-import { getAllTags, getMlHealth, searchAssets, searchPerson, searchPlaces, searchSmart } from '@immich/sdk';
+import {
+  getAlbumNames,
+  getAllSpaces,
+  getAllTags,
+  getMlHealth,
+  searchAssets,
+  searchPerson,
+  searchPlaces,
+  searchSmart,
+} from '@immich/sdk';
 import { computeCommandScore } from 'bits-ui';
 import { installFakeAbortTimeout, restoreAbortTimeout } from './__tests__/fake-abort-timeout';
 import {
@@ -58,6 +67,8 @@ vi.mock('@immich/sdk', async () => ({
   searchPlaces: vi.fn(),
   getAllTags: vi.fn(),
   getMlHealth: vi.fn(),
+  getAlbumNames: vi.fn(),
+  getAllSpaces: vi.fn(),
 }));
 
 vi.mock('$app/navigation', () => ({
@@ -146,9 +157,17 @@ describe('GlobalSearchManager (skeleton)', () => {
     expect(manager.isOpen).toBe(false);
   });
 
-  it('providers is an instance-bound record with five keys', () => {
+  it('providers is an instance-bound record with one entry per Sections key', () => {
     const providers = (manager as unknown as { providers: Record<string, unknown> }).providers;
-    expect(Object.keys(providers).sort()).toEqual(['navigation', 'people', 'photos', 'places', 'tags']);
+    expect(Object.keys(providers).sort()).toEqual([
+      'albums',
+      'navigation',
+      'people',
+      'photos',
+      'places',
+      'spaces',
+      'tags',
+    ]);
   });
 
   describe('searchQueryType sanity check', () => {
@@ -216,6 +235,8 @@ describe('setQuery', () => {
       people: makeStub('people', 2),
       places: makeStub('places', 2),
       tags: makeStub('tags', 2),
+      albums: makeStub('albums', 2),
+      spaces: makeStub('spaces', 2),
       navigation: makeStub('navigation', 2),
     };
   });
@@ -1019,6 +1040,8 @@ describe('announcementText', () => {
       people: { status: 'ok', items: [{ id: 'p1' }], total: 1 },
       places: { status: 'empty' },
       tags: { status: 'empty' },
+      albums: { status: 'empty' },
+      spaces: { status: 'empty' },
       navigation: { status: 'empty' },
     };
     expect(m.announcementText).toBe('');
@@ -1031,6 +1054,8 @@ describe('announcementText', () => {
       people: { status: 'ok', items: [{ id: 'p1' }], total: 5 },
       places: { status: 'empty' },
       tags: { status: 'ok', items: [{ id: 't1' }], total: 3 },
+      albums: { status: 'empty' },
+      spaces: { status: 'empty' },
       navigation: { status: 'empty' },
     };
     expect(m.announcementText).toBe('42 photos, 5 people, 3 tags');
@@ -1043,6 +1068,8 @@ describe('announcementText', () => {
       people: { status: 'empty' },
       places: { status: 'empty' },
       tags: { status: 'empty' },
+      albums: { status: 'empty' },
+      spaces: { status: 'empty' },
       navigation: { status: 'empty' },
     };
     expect(m.announcementText).toBe('');
@@ -1066,6 +1093,8 @@ describe('reconcileCursor fallback + getActiveItem edge cases', () => {
       people: { status: 'empty' },
       places: { status: 'empty' },
       tags: { status: 'empty' },
+      albums: { status: 'empty' },
+      spaces: { status: 'empty' },
       navigation: { status: 'empty' },
     };
     m.reconcileCursor();
@@ -1080,6 +1109,8 @@ describe('reconcileCursor fallback + getActiveItem edge cases', () => {
       people: { status: 'idle' },
       places: { status: 'idle' },
       tags: { status: 'idle' },
+      albums: { status: 'idle' },
+      spaces: { status: 'idle' },
       navigation: { status: 'idle' },
     };
     expect(m.getActiveItem()).toBe(null);
@@ -1324,6 +1355,8 @@ describe('navigation section scaffolding', () => {
       people: { status: 'empty' },
       places: { status: 'empty' },
       tags: { status: 'empty' },
+      albums: { status: 'empty' },
+      spaces: { status: 'empty' },
       navigation: { status: 'ok', items: [{ id: 'nav:theme' }] as never[], total: 5 },
     };
     expect(m.announcementText).toBe('5 pages');
@@ -1336,6 +1369,8 @@ describe('navigation section scaffolding', () => {
       people: { status: 'empty' },
       places: { status: 'empty' },
       tags: { status: 'empty' },
+      albums: { status: 'empty' },
+      spaces: { status: 'empty' },
       navigation: { status: 'ok', items: [{ id: 'nav:theme' }] as never[], total: 1 },
     };
     m.activeItemId = null;
@@ -1409,6 +1444,8 @@ describe('getActiveItem nav branch', () => {
       people: { status: 'empty' },
       places: { status: 'empty' },
       tags: { status: 'empty' },
+      albums: { status: 'empty' },
+      spaces: { status: 'empty' },
       navigation: {
         status: 'ok',
         items: [
@@ -1441,6 +1478,8 @@ describe('getActiveItem nav branch', () => {
       people: { status: 'empty' },
       places: { status: 'empty' },
       tags: { status: 'empty' },
+      albums: { status: 'empty' },
+      spaces: { status: 'empty' },
       navigation: {
         status: 'ok',
         items: [{ id: 'nav:theme' } as never],
@@ -2533,6 +2572,8 @@ describe('getActiveItem recent-entry preview lookup (cold open)', () => {
       people: { status: 'empty' },
       places: { status: 'empty' },
       tags: { status: 'empty' },
+      albums: { status: 'empty' },
+      spaces: { status: 'empty' },
       navigation: { status: 'empty' },
     };
     // query is empty but no recent matches — fall-through to section.
@@ -2554,5 +2595,165 @@ describe('closeSignal lifecycle', () => {
     sut.open();
     expect(sut.closeSignal.aborted).toBe(false);
     expect(sut.closeSignal).not.toBe(firstSignal);
+  });
+});
+
+describe('album catalog fetch', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
+
+  it('dedupes by id, preferring the shared record', async () => {
+    const response = [
+      { id: 'a1', albumName: 'Beach', shared: false, albumThumbnailAssetId: null, assetCount: 1 },
+      { id: 'a1', albumName: 'Beach', shared: true, albumThumbnailAssetId: 't', assetCount: 1 },
+      { id: 'a2', albumName: 'Solo', shared: false, albumThumbnailAssetId: null, assetCount: 0 },
+    ];
+    vi.mocked(getAlbumNames).mockResolvedValue(response as unknown as Awaited<ReturnType<typeof getAlbumNames>>);
+
+    const sut = new GlobalSearchManager();
+    sut.open();
+    await sut.ensureAlbumsCache();
+
+    expect(sut.albumsCache).toHaveLength(2);
+    expect(sut.albumsCache?.find((a) => a.id === 'a1')).toMatchObject({
+      shared: true,
+      albumThumbnailAssetId: 't',
+    });
+    expect(sut.albumsCache?.find((a) => a.id === 'a2')).toMatchObject({ shared: false });
+  });
+
+  it('returns the same in-flight promise across concurrent ensureAlbumsCache() calls', async () => {
+    vi.mocked(getAlbumNames).mockResolvedValue([
+      { id: 'a1', albumName: 'X', shared: false, albumThumbnailAssetId: null, assetCount: 0 },
+    ] as unknown as Awaited<ReturnType<typeof getAlbumNames>>);
+
+    const sut = new GlobalSearchManager();
+    sut.open();
+    const p1 = sut.ensureAlbumsCache();
+    const p2 = sut.ensureAlbumsCache();
+    await Promise.all([p1, p2]);
+
+    expect(getAlbumNames).toHaveBeenCalledTimes(1);
+    expect(sut.albumsCache).toHaveLength(1);
+  });
+
+  it('uses closeSignal for the fetch (survives batch rotation)', async () => {
+    // The fetch binds to closeSignal, not the per-keystroke batchController, so
+    // rotating the batch must NOT reject the catalog fetch.
+    let capturedSignal: AbortSignal | undefined;
+    vi.mocked(getAlbumNames).mockImplementation((opts) => {
+      capturedSignal = (opts as { signal?: AbortSignal } | undefined)?.signal;
+      return Promise.resolve([]) as unknown as ReturnType<typeof getAlbumNames>;
+    });
+
+    const sut = new GlobalSearchManager();
+    sut.open();
+    const promise = sut.ensureAlbumsCache();
+    // batchController is protected; cast to reach it from the test — the test
+    // must exercise batch rotation specifically, which lives on that field.
+    (sut as unknown as { batchController: AbortController | null }).batchController?.abort();
+    await expect(promise).resolves.toBeUndefined();
+    expect(capturedSignal).toBe(sut.closeSignal);
+  });
+
+  it('AbortError on close does NOT transition section to error', async () => {
+    vi.mocked(getAlbumNames).mockImplementation((opts) => {
+      const signal = (opts as { signal?: AbortSignal } | undefined)?.signal;
+      return new Promise((_, reject) => {
+        signal?.addEventListener('abort', () =>
+          reject(Object.assign(new Error('aborted'), { name: 'AbortError' })),
+        );
+      }) as unknown as ReturnType<typeof getAlbumNames>;
+    });
+
+    const sut = new GlobalSearchManager();
+    sut.open();
+    const p = sut.ensureAlbumsCache();
+    sut.close();
+    await p;
+    expect(sut.sections.albums.status).not.toBe('error');
+  });
+
+  it('non-abort error transitions albums section to error and rethrows', async () => {
+    vi.mocked(getAlbumNames).mockRejectedValue(new Error('network down'));
+    const sut = new GlobalSearchManager();
+    sut.open();
+    await expect(sut.ensureAlbumsCache()).rejects.toThrow('network down');
+    expect(sut.sections.albums.status).toBe('error');
+  });
+
+  it('reopening after a rejected fetch does not satisfy the next ensureAlbumsCache()', async () => {
+    vi.mocked(getAlbumNames).mockRejectedValueOnce(new Error('first fails'));
+    const sut = new GlobalSearchManager();
+    sut.open();
+    await expect(sut.ensureAlbumsCache()).rejects.toThrow('first fails');
+
+    // Next open: must reset the cached promise so the retry actually fires.
+    vi.mocked(getAlbumNames).mockResolvedValueOnce([
+      { id: 'a1', albumName: 'Recovered', shared: false, albumThumbnailAssetId: null, assetCount: 0 },
+    ] as unknown as Awaited<ReturnType<typeof getAlbumNames>>);
+    sut.close();
+    sut.open();
+    await sut.ensureAlbumsCache();
+    expect(getAlbumNames).toHaveBeenCalledTimes(2);
+    expect(sut.albumsCache).toHaveLength(1);
+  });
+});
+
+describe('spaces catalog fetch', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
+
+  it('populates spacesCache with the raw response (no dedupe needed)', async () => {
+    const response = [
+      { id: 's1', name: 'Family', createdAt: '2026-01-01', createdById: 'u1' },
+      { id: 's2', name: 'Friends', createdAt: '2026-01-02', createdById: 'u1' },
+    ];
+    vi.mocked(getAllSpaces).mockResolvedValue(response as unknown as Awaited<ReturnType<typeof getAllSpaces>>);
+
+    const sut = new GlobalSearchManager();
+    sut.open();
+    await sut.ensureSpacesCache();
+
+    expect(sut.spacesCache).toHaveLength(2);
+    expect(getAllSpaces).toHaveBeenCalledWith(expect.objectContaining({ signal: sut.closeSignal }));
+  });
+
+  it('AbortError on close does NOT transition section to error', async () => {
+    vi.mocked(getAllSpaces).mockImplementation((opts) => {
+      const signal = (opts as { signal?: AbortSignal } | undefined)?.signal;
+      return new Promise((_, reject) => {
+        signal?.addEventListener('abort', () =>
+          reject(Object.assign(new Error('aborted'), { name: 'AbortError' })),
+        );
+      }) as unknown as ReturnType<typeof getAllSpaces>;
+    });
+
+    const sut = new GlobalSearchManager();
+    sut.open();
+    const p = sut.ensureSpacesCache();
+    sut.close();
+    await p;
+    expect(sut.sections.spaces.status).not.toBe('error');
+  });
+
+  it('non-abort error transitions spaces section to error and rethrows', async () => {
+    vi.mocked(getAllSpaces).mockRejectedValue(new Error('boom'));
+    const sut = new GlobalSearchManager();
+    sut.open();
+    await expect(sut.ensureSpacesCache()).rejects.toThrow('boom');
+    expect(sut.sections.spaces.status).toBe('error');
+  });
+
+  it('dedupes concurrent ensureSpacesCache() calls into a single fetch', async () => {
+    vi.mocked(getAllSpaces).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof getAllSpaces>>);
+    const sut = new GlobalSearchManager();
+    sut.open();
+    await Promise.all([sut.ensureSpacesCache(), sut.ensureSpacesCache()]);
+    expect(getAllSpaces).toHaveBeenCalledTimes(1);
   });
 });

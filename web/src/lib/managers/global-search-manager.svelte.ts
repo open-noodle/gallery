@@ -6,13 +6,17 @@ import { Route } from '$lib/route';
 import { addEntry, getEntries, makePlaceId, removeEntry, type RecentEntry } from '$lib/stores/cmdk-recent';
 import { user } from '$lib/stores/user.store';
 import {
+  getAlbumNames,
+  getAllSpaces,
   getAllTags,
   getMlHealth,
   searchAssets,
   searchPerson,
   searchPlaces,
   searchSmart,
+  type AlbumNameDto,
   type MetadataSearchDto,
+  type SharedSpaceResponseDto,
   type TagResponseDto,
 } from '@immich/sdk';
 import { computeCommandScore } from 'bits-ui';
@@ -50,6 +54,8 @@ export type Sections = {
   people: ProviderStatus<EntityItem>;
   places: ProviderStatus<EntityItem>;
   tags: ProviderStatus<EntityItem>;
+  albums: ProviderStatus<EntityItem>;
+  spaces: ProviderStatus<EntityItem>;
   navigation: ProviderStatus<NavigationItem>;
 };
 
@@ -135,7 +141,15 @@ export class GlobalSearchManager {
   isOpen = $state(false);
   query = $state('');
   mode = $state<SearchMode>(loadSearchQueryType());
-  sections = $state<Sections>({ photos: idle, people: idle, places: idle, tags: idle, navigation: idle });
+  sections = $state<Sections>({
+    photos: idle,
+    people: idle,
+    places: idle,
+    tags: idle,
+    albums: idle,
+    spaces: idle,
+    navigation: idle,
+  });
   activeItemId = $state<string | null>(null);
   mlHealthy = $state(true);
   /**
@@ -188,6 +202,17 @@ export class GlobalSearchManager {
   private tagsDisabled = false;
   private storageListener?: (e: StorageEvent) => void;
   private mlProbed = false;
+
+  /**
+   * Catalogs fetched lazily on first provider run and shared for the remainder of the
+   * open session. Bound to `closeSignal` so closing the palette cancels in-flight work;
+   * the promise fields are reset on `open()` so a prior rejected fetch does not
+   * short-circuit the next session's retry.
+   */
+  albumsCache: AlbumNameDto[] | undefined = $state(undefined);
+  spacesCache: SharedSpaceResponseDto[] | undefined = $state(undefined);
+  private albumsPromise: Promise<void> | undefined;
+  private spacesPromise: Promise<void> | undefined;
 
   /**
    * Locale-keyed memo cache for navigation item search strings.
@@ -298,6 +323,11 @@ export class GlobalSearchManager {
     if (this.closeController.signal.aborted) {
       this.closeController = new AbortController();
     }
+    // Clear any stale promise from the previous session. Without this, a rejected
+    // fetch in session N would permanently short-circuit ensureAlbumsCache() in
+    // session N+1 (the rejected promise is still memoized in albumsPromise).
+    this.albumsPromise = undefined;
+    this.spacesPromise = undefined;
     if (!this.mlProbed) {
       this.mlProbed = true;
       void this.probeMlHealth();
@@ -319,6 +349,76 @@ export class GlobalSearchManager {
     }
   }
 
+  /**
+   * Fetch (and memoize) the albums catalog for the current open session. Callers
+   * should `await` this before scoring so the cache is populated. Safe to call
+   * concurrently — all callers join the same in-flight promise.
+   */
+  async ensureAlbumsCache(): Promise<void> {
+    if (this.albumsCache !== undefined) {
+      return;
+    }
+    if (this.albumsPromise === undefined) {
+      this.albumsPromise = this.fetchAlbumsCatalog();
+    }
+    return this.albumsPromise;
+  }
+
+  /**
+   * Fetch `GET /albums/names` and dedupe the concatenated owned+shared response by
+   * album id, preferring the `shared: true` record when both variants are present.
+   * On AbortError (palette closed mid-fetch) the section status stays untouched so
+   * reopening the palette is a clean slate; other errors flip the section to
+   * `'error'` and rethrow so the caller sees the failure.
+   */
+  private async fetchAlbumsCatalog(): Promise<void> {
+    try {
+      const response = await getAlbumNames({ signal: this.closeSignal });
+      // Plain Map — this is a local dedupe accumulator, not reactive state. SvelteMap
+      // is only required for `$state`-backed collections.
+      const byId = new Map<string, AlbumNameDto>();
+      for (const record of response) {
+        const existing = byId.get(record.id);
+        if (existing === undefined || (record.shared && !existing.shared)) {
+          byId.set(record.id, record);
+        }
+      }
+      this.albumsCache = [...byId.values()];
+    } catch (error: unknown) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        return;
+      }
+      this.sections.albums = { status: 'error', message: error instanceof Error ? error.message : 'unknown error' };
+      throw error;
+    }
+  }
+
+  /**
+   * Fetch (and memoize) the shared-spaces catalog for the current open session.
+   * Mirrors `ensureAlbumsCache()` — callers join a shared in-flight promise.
+   */
+  async ensureSpacesCache(): Promise<void> {
+    if (this.spacesCache !== undefined) {
+      return;
+    }
+    if (this.spacesPromise === undefined) {
+      this.spacesPromise = this.fetchSpacesCatalog();
+    }
+    return this.spacesPromise;
+  }
+
+  private async fetchSpacesCatalog(): Promise<void> {
+    try {
+      this.spacesCache = await getAllSpaces({ signal: this.closeSignal });
+    } catch (error: unknown) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        return;
+      }
+      this.sections.spaces = { status: 'error', message: error instanceof Error ? error.message : 'unknown error' };
+      throw error;
+    }
+  }
+
   close() {
     this.isOpen = false;
     this.closeController.abort();
@@ -330,7 +430,15 @@ export class GlobalSearchManager {
     this.batchController = null;
     this.photosController?.abort();
     this.photosController = null;
-    this.sections = { photos: idle, people: idle, places: idle, tags: idle, navigation: idle };
+    this.sections = {
+      photos: idle,
+      people: idle,
+      places: idle,
+      tags: idle,
+      albums: idle,
+      spaces: idle,
+      navigation: idle,
+    };
     this.activeItemId = null;
     this.tagsCache = null;
     // Clear batch bookkeeping. Without this, closing mid-batch leaves batchInFlight=true
@@ -492,6 +600,8 @@ export class GlobalSearchManager {
       people: 'person',
       places: 'place',
       tags: 'tag',
+      albums: 'album',
+      spaces: 'space',
       navigation: 'nav',
     };
     for (const key of order) {
@@ -925,7 +1035,15 @@ export class GlobalSearchManager {
     this.photosController = null;
 
     if (text.trim() === '') {
-      this.sections = { photos: idle, people: idle, places: idle, tags: idle, navigation: idle };
+      this.sections = {
+      photos: idle,
+      people: idle,
+      places: idle,
+      tags: idle,
+      albums: idle,
+      spaces: idle,
+      navigation: idle,
+    };
       this.batchInFlight = false;
       this.inFlightCounter = 0;
       this._batchInFlightStartedAt = 0;
@@ -1172,7 +1290,24 @@ export class GlobalSearchManager {
       run: () => Promise.resolve({ status: 'empty' as const }),
     };
 
-    return { photos, people, places, tags, navigation: navigationStub };
+    // Albums and spaces providers are stubs for the same reason as navigation: runBatch
+    // iterates only over `['photos', 'people', 'places', 'tags']`. Album and space
+    // scoring happens later (Task 9+) via a separate path that consumes the cache fields
+    // populated by `ensureAlbumsCache()` / `ensureSpacesCache()`.
+    const albumsStub: Provider = {
+      key: 'albums',
+      topN: 5,
+      minQueryLength: 2,
+      run: () => Promise.resolve({ status: 'empty' as const }),
+    };
+    const spacesStub: Provider = {
+      key: 'spaces',
+      topN: 5,
+      minQueryLength: 2,
+      run: () => Promise.resolve({ status: 'empty' as const }),
+    };
+
+    return { photos, people, places, tags, albums: albumsStub, spaces: spacesStub, navigation: navigationStub };
   }
 }
 
