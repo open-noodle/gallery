@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { AlbumNameDto } from 'src/dtos/album-name.dto';
 import {
   AddUsersDto,
   AlbumInfoDto,
@@ -38,6 +39,27 @@ export class AlbumService extends BaseService {
       shared: shared.length,
       notShared: notShared.length,
     };
+  }
+
+  async getNames(auth: AuthDto): Promise<AlbumNameDto[]> {
+    const [owned, shared] = await Promise.all([
+      this.albumRepository.getOwnedNames(auth.user.id),
+      this.albumRepository.getSharedNames(auth.user.id),
+    ]);
+    return [
+      ...owned.map((r) => ({
+        ...r,
+        shared: false,
+        startDate: asDateString(r.startDate ?? undefined),
+        endDate: asDateString(r.endDate ?? undefined),
+      })),
+      ...shared.map((r) => ({
+        ...r,
+        shared: true,
+        startDate: asDateString(r.startDate ?? undefined),
+        endDate: asDateString(r.endDate ?? undefined),
+      })),
+    ];
   }
 
   async getAll({ user: { id: ownerId } }: AuthDto, { assetId, shared }: GetAlbumsDto): Promise<AlbumResponseDto[]> {

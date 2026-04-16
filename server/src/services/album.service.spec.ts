@@ -24,6 +24,75 @@ describe(AlbumService.name, () => {
     expect(sut).toBeDefined();
   });
 
+  describe('getNames', () => {
+    it('returns owned + shared albums in one list', async () => {
+      mocks.album.getOwnedNames.mockResolvedValue([
+        {
+          id: 'a1',
+          albumName: 'Owned',
+          albumThumbnailAssetId: null,
+          assetCount: 0,
+          startDate: null,
+          endDate: null,
+        },
+      ] as any);
+      mocks.album.getSharedNames.mockResolvedValue([
+        {
+          id: 'a2',
+          albumName: 'Shared',
+          albumThumbnailAssetId: null,
+          assetCount: 0,
+          startDate: null,
+          endDate: null,
+        },
+      ] as any);
+
+      const result = await sut.getNames(authStub.admin);
+
+      expect(result).toHaveLength(2);
+      expect(result.map((a) => a.id).toSorted()).toEqual(['a1', 'a2']);
+      expect(mocks.album.getOwnedNames).toHaveBeenCalledWith(authStub.admin.user.id);
+      expect(mocks.album.getSharedNames).toHaveBeenCalledWith(authStub.admin.user.id);
+    });
+
+    it('does NOT call updateThumbnails', async () => {
+      mocks.album.getOwnedNames.mockResolvedValue([]);
+      mocks.album.getSharedNames.mockResolvedValue([]);
+
+      await sut.getNames(authStub.admin);
+
+      expect(mocks.album.updateThumbnails).not.toHaveBeenCalled();
+    });
+
+    it('hardcodes shared=false on owned records and shared=true on shared records', async () => {
+      mocks.album.getOwnedNames.mockResolvedValue([
+        {
+          id: 'a1',
+          albumName: 'Owned',
+          albumThumbnailAssetId: null,
+          assetCount: 0,
+          startDate: null,
+          endDate: null,
+        },
+      ] as any);
+      mocks.album.getSharedNames.mockResolvedValue([
+        {
+          id: 'a2',
+          albumName: 'Shared',
+          albumThumbnailAssetId: null,
+          assetCount: 0,
+          startDate: null,
+          endDate: null,
+        },
+      ] as any);
+
+      const result = await sut.getNames(authStub.admin);
+
+      expect(result.find((r) => r.id === 'a1')?.shared).toBe(false);
+      expect(result.find((r) => r.id === 'a2')?.shared).toBe(true);
+    });
+  });
+
   describe('getStatistics', () => {
     it('should get the album count', async () => {
       mocks.album.getOwned.mockResolvedValue([]);
