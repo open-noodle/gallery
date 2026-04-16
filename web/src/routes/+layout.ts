@@ -22,6 +22,13 @@ export const load = (async ({ fetch, url }) => {
     error = initError;
   }
 
+  // Enable the @immich/ui command palette manager *only* for its #handleKeydown
+  // dispatcher, which fires per-page <CommandPaletteDefaultProvider> action
+  // shortcuts (F=favorite, I=info, face-editor keys, etc.). The upstream's
+  // Ctrl+K / Cmd+K / `/` palette-open shortcuts are stripped at the package
+  // level via patches/@immich__ui@0.69.0.patch so Gallery owns those keys for
+  // its own cmdk palette (GlobalSearchManager). Without this enable() call,
+  // every page-level keyboard action silently dies.
   commandPaletteManager.enable();
 
   return {

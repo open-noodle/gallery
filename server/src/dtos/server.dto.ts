@@ -96,13 +96,21 @@ const ServerStatsResponseSchema = z
   })
   .meta({ id: 'ServerStatsResponseDto' });
 
-const ServerMediaTypesResponseSchema = z
-  .object({
-    video: z.array(z.string()).describe('Supported video MIME types'),
-    image: z.array(z.string()).describe('Supported image MIME types'),
-    sidecar: z.array(z.string()).describe('Supported sidecar MIME types'),
-  })
-  .meta({ id: 'ServerMediaTypesResponseDto' });
+export class ServerMlHealthResponseDto {
+  @ApiProperty({ description: 'Whether the ML server is currently reachable and healthy for smart search' })
+  smartSearchHealthy!: boolean;
+}
+
+export class ServerApkLinksDto {
+  @ApiProperty({ description: 'APK download link for ARM64 v8a architecture' })
+  arm64v8a!: string;
+  @ApiProperty({ description: 'APK download link for ARM EABI v7a architecture' })
+  armeabiv7a!: string;
+  @ApiProperty({ description: 'APK download link for universal architecture' })
+  universal!: string;
+  @ApiProperty({ description: 'APK download link for x86_64 architecture' })
+  x86_64!: string;
+}
 
 const ServerConfigSchema = z
   .object({

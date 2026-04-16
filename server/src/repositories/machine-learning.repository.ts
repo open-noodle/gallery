@@ -183,8 +183,13 @@ export class MachineLearningRepository {
     return this.healthyMap[url];
   }
 
-  private async predict<T>(payload: ModelPayload, config: MachineLearningRequest): Promise<T> {
+  private async predict<T>(
+    payload: ModelPayload,
+    config: MachineLearningRequest,
+    options?: { timeoutMs?: number },
+  ): Promise<T> {
     const formData = await this.getFormData(payload, config);
+    const signal = options?.timeoutMs === undefined ? undefined : AbortSignal.timeout(options.timeoutMs);
 
     for (const url of [
       // try healthy servers first
@@ -192,7 +197,7 @@ export class MachineLearningRepository {
       ...this.config.urls.filter((url) => !this.isHealthy(url)),
     ]) {
       try {
-        const response = await fetch(new URL('predict', url), { method: 'POST', body: formData });
+        const response = await fetch(new URL('predict', url), { method: 'POST', body: formData, signal });
         if (response.ok) {
           this.setHealthy(url, true);
           return response.json();
@@ -202,6 +207,9 @@ export class MachineLearningRepository {
           `Machine learning request to "${url}" failed with status ${response.status}: ${response.statusText}`,
         );
       } catch (error: Error | unknown) {
+        if (error instanceof Error && error.name === 'AbortError') {
+          throw error;
+        }
         this.logger.warn(
           `Machine learning request to "${url}" failed: ${error instanceof Error ? error.message : error}`,
         );
@@ -236,7 +244,7 @@ export class MachineLearningRepository {
 
   async encodeText(text: string, { language, modelName }: TextEncodingOptions) {
     const request = { [ModelTask.SEARCH]: { [ModelType.TEXTUAL]: { modelName, options: { language } } } };
-    const response = await this.predict<ClipTextualResponse>({ text }, request);
+    const response = await this.predict<ClipTextualResponse>({ text }, request, { timeoutMs: 15_000 });
     return response[ModelTask.SEARCH];
   }
 
@@ -249,6 +257,19 @@ export class MachineLearningRepository {
     };
     const response = await this.predict<OcrResponse>({ imagePath }, request);
     return response[ModelTask.OCR];
+  }
+
+  async ping(): Promise<{ ok: boolean }> {
+    const url = this.config.urls[0];
+    if (!url) {
+      return { ok: false };
+    }
+    try {
+      const response = await fetch(new URL('/ping', url), { signal: AbortSignal.timeout(2000) });
+      return { ok: response.ok };
+    } catch {
+      return { ok: false };
+    }
   }
 
   async detectPets(imagePath: string, { modelName, minScore }: { modelName: string; minScore: number }) {

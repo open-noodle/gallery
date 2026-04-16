@@ -32,4 +32,24 @@ describe(ServerController.name, () => {
       expect(ctx.authenticate).toHaveBeenCalled();
     });
   });
+
+  describe('GET /server/ml-health', () => {
+    it('should be an authenticated route', async () => {
+      await request(ctx.getHttpServer()).get('/server/ml-health');
+      expect(ctx.authenticate).toHaveBeenCalled();
+    });
+
+    it('returns { smartSearchHealthy: true } when service reports healthy', async () => {
+      serverService.getMlHealth.mockResolvedValue({ smartSearchHealthy: true });
+      const { status, body } = await request(ctx.getHttpServer()).get('/server/ml-health');
+      expect(status).toBe(200);
+      expect(body).toEqual({ smartSearchHealthy: true });
+    });
+
+    it('returns { smartSearchHealthy: false } when service reports unhealthy', async () => {
+      serverService.getMlHealth.mockResolvedValue({ smartSearchHealthy: false });
+      const { body } = await request(ctx.getHttpServer()).get('/server/ml-health');
+      expect(body).toEqual({ smartSearchHealthy: false });
+    });
+  });
 });

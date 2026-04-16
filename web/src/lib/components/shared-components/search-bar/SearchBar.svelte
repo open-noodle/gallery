@@ -250,12 +250,7 @@
   ] as const;
 </script>
 
-<svelte:document
-  use:shortcuts={[
-    { shortcut: { ctrl: true, key: 'k' }, onShortcut: () => input?.select() },
-    { shortcut: { ctrl: true, shift: true, key: 'k' }, onShortcut: onFilterClick },
-  ]}
-/>
+<svelte:document use:shortcuts={[{ shortcut: { ctrl: true, shift: true, key: 'k' }, onShortcut: onFilterClick }]} />
 
 <div class="relative z-auto w-full" use:focusOutside={{ onFocusOut }} tabindex="-1">
   <form
