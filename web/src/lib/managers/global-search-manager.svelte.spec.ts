@@ -3043,6 +3043,29 @@ describe('activateAlbum', () => {
     expect(goto).not.toHaveBeenCalled();
   });
 
+  // Gallery's server `requireAccess` middleware raises BadRequestException (HTTP 400)
+  // for both "row missing" and "no access" — so a stale RECENT id surfaces as 400,
+  // not 404/403. Treat it identically to the canonical stale-cache statuses.
+  it('400: toast + removeById + no navigation (Gallery requireAccess)', async () => {
+    addEntry({
+      kind: 'album',
+      id: 'album:a1',
+      albumId: 'a1',
+      label: 'Stale',
+      thumbnailAssetId: null,
+      lastUsed: 1,
+    });
+    vi.mocked(getAlbumInfo).mockRejectedValue(Object.assign(new Error('bad request'), { status: 400 }));
+
+    const sut = new GlobalSearchManager();
+    sut.open();
+    await sut.activateAlbum('a1');
+
+    expect(toastManager.warning).toHaveBeenCalledTimes(1);
+    expect(getEntries().find((e) => e.id === 'album:a1')).toBeUndefined();
+    expect(goto).not.toHaveBeenCalled();
+  });
+
   it('401: re-throws to global auth interceptor', async () => {
     const authError = Object.assign(new Error('unauthorized'), { status: 401 });
     vi.mocked(getAlbumInfo).mockRejectedValue(authError);
@@ -3240,6 +3263,29 @@ describe('activateSpace', () => {
       lastUsed: 1,
     });
     vi.mocked(getSpace).mockRejectedValue(Object.assign(new Error('forbidden'), { status: 403 }));
+
+    const sut = new GlobalSearchManager();
+    sut.open();
+    await sut.activateSpace('s1');
+
+    expect(toastManager.warning).toHaveBeenCalledTimes(1);
+    expect(getEntries().find((e) => e.id === 'space:s1')).toBeUndefined();
+    expect(goto).not.toHaveBeenCalled();
+  });
+
+  // Gallery's server `requireAccess` middleware raises BadRequestException (HTTP 400)
+  // for both "row missing" and "no access" — so a stale RECENT id surfaces as 400,
+  // not 404/403. Treat it identically to the canonical stale-cache statuses.
+  it('400: toast + removeById + no navigation (Gallery requireAccess)', async () => {
+    addEntry({
+      kind: 'space',
+      id: 'space:s1',
+      spaceId: 's1',
+      label: 'Stale',
+      colorHex: null,
+      lastUsed: 1,
+    });
+    vi.mocked(getSpace).mockRejectedValue(Object.assign(new Error('bad request'), { status: 400 }));
 
     const sut = new GlobalSearchManager();
     sut.open();

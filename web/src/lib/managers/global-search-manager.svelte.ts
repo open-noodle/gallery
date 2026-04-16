@@ -457,8 +457,10 @@ export class GlobalSearchManager {
    *    the fetch and the post-await `aborted` check short-circuits the navigate.
    *  - Batch rotation does NOT affect activation. The per-keystroke
    *    `batchController` owns the fan-out providers; activation survives typing.
-   *  - 404 / 403: treat as "stale cache" — toast + purge the RECENT (no-op if
-   *    absent) so the next open does not re-show a dead row.
+   *  - 400 / 404 / 403: treat as "stale cache" — toast + purge the RECENT (no-op
+   *    if absent) so the next open does not re-show a dead row. Gallery's server
+   *    `requireAccess` middleware returns 400 (BadRequestException) for both
+   *    "row missing" and "no access", so 400 sits alongside the canonical 404/403.
    *  - 401 and other statuses propagate unchanged to the global SDK auth
    *    interceptor (redirect-to-login lives there, not here).
    *  - Pending affordance: the 200 ms `pendingActivation` flag is cleared in
@@ -494,7 +496,7 @@ export class GlobalSearchManager {
         return;
       }
       const status = (error as { status?: number } | null)?.status;
-      if (status === 404 || status === 403) {
+      if (status === 400 || status === 404 || status === 403) {
         removeEntry(key);
         toastManager.warning(get(t)('cmdk_toast_album_unavailable'));
         return;
@@ -522,8 +524,10 @@ export class GlobalSearchManager {
    *    the fetch and the post-await `aborted` check short-circuits the navigate.
    *  - Batch rotation does NOT affect activation. The per-keystroke
    *    `batchController` owns the fan-out providers; activation survives typing.
-   *  - 404 / 403: treat as "stale cache" — toast + purge the RECENT (no-op if
-   *    absent) so the next open does not re-show a dead row.
+   *  - 400 / 404 / 403: treat as "stale cache" — toast + purge the RECENT (no-op
+   *    if absent) so the next open does not re-show a dead row. Gallery's server
+   *    `requireAccess` middleware returns 400 (BadRequestException) for both
+   *    "row missing" and "no access", so 400 sits alongside the canonical 404/403.
    *  - 401 and other statuses propagate unchanged to the global SDK auth
    *    interceptor (redirect-to-login lives there, not here).
    *  - Pending affordance: the 200 ms `pendingActivation` flag is cleared in
@@ -559,7 +563,7 @@ export class GlobalSearchManager {
         return;
       }
       const status = (error as { status?: number } | null)?.status;
-      if (status === 404 || status === 403) {
+      if (status === 400 || status === 404 || status === 403) {
         removeEntry(key);
         toastManager.warning(get(t)('cmdk_toast_space_unavailable'));
         return;
