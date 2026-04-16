@@ -77,6 +77,9 @@ const VALID_MODES: ReadonlySet<SearchMode> = new Set(['smart', 'metadata', 'desc
 // Slice size for the albums section. Kept as a named constant so the buildProviders
 // `topN: 5` and the runAlbums slice cannot drift apart silently.
 const ALBUMS_TOP_N = 5;
+// Slice size for the spaces section. Same rationale as ALBUMS_TOP_N — pin the
+// buildProviders `topN` and the runSpaces slice to a single source of truth.
+const SPACES_TOP_N = 5;
 // Narrow literal type so it can be assigned to both `ProviderStatus<unknown>` and
 // `ProviderStatus<NavigationItem>` without the generic T widening fighting the assignment.
 // Frozen so a future engineer cannot accidentally mutate the shared reference and
@@ -1236,6 +1239,59 @@ export class GlobalSearchManager {
     };
   }
 
+  /**
+   * Filter / rank / slice the in-memory shared-spaces catalog for `rawQuery` and
+   * write the result into `sections.spaces`. Mirrors `runAlbums` — matches on
+   * `space.name` (not `albumName`), single source so no owned/shared dedupe. The
+   * spaces provider entry in `buildProviders()` dispatches here; runBatch only
+   * iterates entity keys (photos/people/places/tags), so this is the sole writer
+   * for the spaces section.
+   *
+   * Scoring rules (all case-insensitive, query is trimmed):
+   *   - name.startsWith(query) → score 2
+   *   - name.includes(query)    → score 1
+   *   - else                    → filtered out
+   * Ties break alphabetically by `name`. Slice to top 5; `total` reports the full
+   * pre-slice match count so the palette can render a "+N more" affordance.
+   *
+   * Queries under 2 chars short-circuit back to idle and skip the catalog fetch —
+   * matches the other providers' minQueryLength contract.
+   */
+  async runSpaces(rawQuery: string): Promise<void> {
+    const query = rawQuery.trim().toLowerCase();
+    if (query.length < 2) {
+      this.sections.spaces = { status: 'idle' };
+      return;
+    }
+    await this.ensureSpacesCache();
+    if (this.spacesCache === undefined) {
+      // Catalog fetch failed mid-flight (AbortError) or was rejected and already
+      // transitioned the section to 'error' via fetchSpacesCatalog. Nothing to do.
+      return;
+    }
+
+    type Scored = { space: SharedSpaceResponseDto; score: number };
+    const matches: Scored[] = [];
+    for (const space of this.spacesCache) {
+      const name = space.name.toLowerCase();
+      if (name.includes(query)) {
+        matches.push({ space, score: name.startsWith(query) ? 2 : 1 });
+      }
+    }
+    matches.sort((a, b) => b.score - a.score || a.space.name.localeCompare(b.space.name));
+
+    if (matches.length === 0) {
+      this.sections.spaces = { status: 'empty' };
+      return;
+    }
+
+    this.sections.spaces = {
+      status: 'ok',
+      items: matches.slice(0, SPACES_TOP_N).map((m) => m.space) as unknown as EntityItem[],
+      total: matches.length,
+    };
+  }
+
   private async runTagsProvider(query: string, signal: AbortSignal): Promise<ProviderStatus<TagResponseDto>> {
     if (this.tagsDisabled) {
       return { status: 'error', message: 'tag_cache_too_large' };
@@ -1376,16 +1432,22 @@ export class GlobalSearchManager {
         return this.sections.albums as ProviderStatus<EntityItem>;
       },
     };
-    // Spaces remains a stub — its filter/rank/slice lands in a later task. runBatch
-    // does not iterate over 'spaces', so this is unreachable at runtime.
-    const spacesStub: Provider = {
+    // Spaces provider dispatches to `runSpaces`, which filters the in-memory catalog
+    // and writes `sections.spaces` directly. Same Provider-contract rationale as
+    // `albums` above — runBatch iterates only entity keys, so this `run()` is not
+    // invoked on the batch path, but a future refactor unifying all section
+    // scheduling under runBatch will still produce the right state.
+    const spaces: Provider = {
       key: 'spaces',
-      topN: 5,
+      topN: SPACES_TOP_N,
       minQueryLength: 2,
-      run: () => Promise.resolve({ status: 'empty' as const }),
+      run: async (query) => {
+        await this.runSpaces(query);
+        return this.sections.spaces as ProviderStatus<EntityItem>;
+      },
     };
 
-    return { photos, people, places, tags, albums, spaces: spacesStub, navigation: navigationStub };
+    return { photos, people, places, tags, albums, spaces, navigation: navigationStub };
   }
 }
 
