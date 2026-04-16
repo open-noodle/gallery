@@ -204,6 +204,61 @@ test.describe('global search palette', () => {
     // above closes the loop.
   });
 
+  test('album activation navigates and populates RECENT', async ({ page }) => {
+    // Use a query unique to this test so prior tests' Hawaii/Trunc8 albums
+    // don't pollute the Albums section. Single seeded album → single Enter
+    // hit, no ambiguity for the auto-selected first row.
+    await utils.cmdkSeedAlbums(admin.accessToken, ['Iceland Trip 2024']);
+
+    await page.keyboard.press('Control+k');
+    let dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('combobox').fill('iceland');
+
+    const albumsGroup = dialog.getByRole('group', { name: /^albums/i });
+    await expect(albumsGroup.getByText('Iceland Trip 2024')).toBeVisible();
+
+    await page.keyboard.press('Enter');
+    // Album view route is /albums/<uuid> per Route.viewAlbum.
+    await expect(page).toHaveURL(/\/albums\/[\da-f-]{36}$/);
+
+    // Reopen the palette on the same page (no full reload) — this hits the
+    // RECENT branch (empty query). Recent entries are persisted to localStorage
+    // synchronously inside activateAlbum's success path, so they are visible
+    // on the very next palette open.
+    await page.goto('/photos');
+    await page.getByTestId('cmdk-trigger').waitFor({ state: 'visible' });
+    await page.keyboard.press('Control+k');
+    dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    const recentGroup = dialog.getByRole('group', { name: /^recent/i });
+    await expect(recentGroup.getByText('Iceland Trip 2024')).toBeVisible();
+  });
+
+  test('space activation navigates and populates RECENT', async ({ page }) => {
+    await utils.cmdkSeedSpaces(admin.accessToken, ['Vacation 2024']);
+
+    await page.keyboard.press('Control+k');
+    let dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('combobox').fill('vacation');
+
+    const spacesGroup = dialog.getByRole('group', { name: /^spaces/i });
+    await expect(spacesGroup.getByText('Vacation 2024')).toBeVisible();
+
+    await page.keyboard.press('Enter');
+    // Space view route is /spaces/<uuid> per Route.viewSpace.
+    await expect(page).toHaveURL(/\/spaces\/[\da-f-]{36}$/);
+
+    await page.goto('/photos');
+    await page.getByTestId('cmdk-trigger').waitFor({ state: 'visible' });
+    await page.keyboard.press('Control+k');
+    dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    const recentGroup = dialog.getByRole('group', { name: /^recent/i });
+    await expect(recentGroup.getByText('Vacation 2024')).toBeVisible();
+  });
+
   test.describe('ML unhealthy banner', () => {
     // CI runs with ML disabled, so /server/ml-health reports { smartSearchHealthy: false }.
     test('shows the smart-search-unavailable banner in smart mode after typing', async ({ page }) => {
