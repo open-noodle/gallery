@@ -91,6 +91,12 @@ function isValidRecentEntry(e: RecentEntry): boolean {
     case 'tag': {
       return typeof e.tagId === 'string' && e.tagId.length > 0;
     }
+    case 'album': {
+      return typeof e.albumId === 'string' && typeof e.label === 'string';
+    }
+    case 'space': {
+      return typeof e.spaceId === 'string' && typeof e.label === 'string';
+    }
     case 'navigate': {
       return (
         typeof e.route === 'string' &&
@@ -431,6 +437,8 @@ export class GlobalSearchManager {
         };
       }
       case 'query':
+      case 'album':
+      case 'space':
       case 'navigate': {
         return null;
       }
