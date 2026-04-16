@@ -31,6 +31,7 @@ import { goto } from '$app/navigation';
 import { themeManager } from '$lib/managers/theme-manager.svelte';
 import { addEntry, getEntries, __resetForTests as resetRecentStore } from '$lib/stores/cmdk-recent';
 import {
+  getAlbumInfo,
   getAlbumNames,
   getAllSpaces,
   getAllTags,
@@ -40,6 +41,7 @@ import {
   searchPlaces,
   searchSmart,
 } from '@immich/sdk';
+import { toastManager } from '@immich/ui';
 import { computeCommandScore } from 'bits-ui';
 import { installFakeAbortTimeout, restoreAbortTimeout } from './__tests__/fake-abort-timeout';
 import {
@@ -69,10 +71,18 @@ vi.mock('@immich/sdk', async () => ({
   getMlHealth: vi.fn(),
   getAlbumNames: vi.fn(),
   getAllSpaces: vi.fn(),
+  getAlbumInfo: vi.fn(),
 }));
 
 vi.mock('$app/navigation', () => ({
   goto: vi.fn(),
+}));
+
+// Stub `@immich/ui` so `toastManager.warning` is spyable. The components that
+// use the real toast UI are not exercised in this manager-only suite; keep the
+// stub minimal (just the members the manager actually touches).
+vi.mock('@immich/ui', () => ({
+  toastManager: { warning: vi.fn(), danger: vi.fn(), primary: vi.fn(), success: vi.fn() },
 }));
 
 // Mock ONLY svelte-i18n's `locale` store so tests can control it. The `t` store
@@ -2819,6 +2829,221 @@ describe('activation state', () => {
 
   it('pendingActivation is initially null', () => {
     const sut = new GlobalSearchManager();
+    expect(sut.pendingActivation).toBeNull();
+  });
+});
+
+describe('activateAlbum', () => {
+  // Minimum fields that satisfy AlbumResponseDto for the code paths exercised here.
+  // The manager only reads `albumName` and `albumThumbnailAssetId` when writing the
+  // recent entry — the rest is structural padding to keep the Awaited<> cast happy.
+  const albumResponse = {
+    id: 'a1',
+    albumName: 'Hawaii 2024',
+    albumThumbnailAssetId: 'thumb-a1',
+    shared: false,
+    assetCount: 42,
+    albumUsers: [],
+    assets: [],
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+    hasSharedLink: false,
+    owner: { id: 'u1', name: 'me', email: 'me@x', profileImagePath: '', avatarColor: 'primary' },
+    ownerId: 'u1',
+    startDate: '2026-01-01T00:00:00Z',
+    endDate: '2026-01-02T00:00:00Z',
+  } as unknown as Awaited<ReturnType<typeof getAlbumInfo>>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    resetRecentStore();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('happy path: resolves + writes recent + navigates', async () => {
+    vi.mocked(getAlbumInfo).mockResolvedValue(albumResponse);
+
+    const sut = new GlobalSearchManager();
+    sut.open();
+    await sut.activateAlbum('a1');
+
+    expect(getAlbumInfo).toHaveBeenCalledWith({ id: 'a1' }, expect.objectContaining({ signal: sut.closeSignal }));
+    expect(goto).toHaveBeenCalledWith('/albums/a1');
+
+    const entries = getEntries();
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      kind: 'album',
+      id: 'album:a1',
+      albumId: 'a1',
+      label: 'Hawaii 2024',
+      thumbnailAssetId: 'thumb-a1',
+    });
+  });
+
+  it('404: toast + removeById + no navigation', async () => {
+    // Seed a stale recent so the purge path has something to remove.
+    addEntry({
+      kind: 'album',
+      id: 'album:a1',
+      albumId: 'a1',
+      label: 'Stale',
+      thumbnailAssetId: null,
+      lastUsed: 1,
+    });
+    vi.mocked(getAlbumInfo).mockRejectedValue(Object.assign(new Error('not found'), { status: 404 }));
+
+    const sut = new GlobalSearchManager();
+    sut.open();
+    await sut.activateAlbum('a1');
+
+    expect(toastManager.warning).toHaveBeenCalledTimes(1);
+    expect(getEntries().find((e) => e.id === 'album:a1')).toBeUndefined();
+    expect(goto).not.toHaveBeenCalled();
+  });
+
+  it('403: toast + removeById + no navigation', async () => {
+    addEntry({
+      kind: 'album',
+      id: 'album:a1',
+      albumId: 'a1',
+      label: 'Stale',
+      thumbnailAssetId: null,
+      lastUsed: 1,
+    });
+    vi.mocked(getAlbumInfo).mockRejectedValue(Object.assign(new Error('forbidden'), { status: 403 }));
+
+    const sut = new GlobalSearchManager();
+    sut.open();
+    await sut.activateAlbum('a1');
+
+    expect(toastManager.warning).toHaveBeenCalledTimes(1);
+    expect(getEntries().find((e) => e.id === 'album:a1')).toBeUndefined();
+    expect(goto).not.toHaveBeenCalled();
+  });
+
+  it('401: re-throws to global auth interceptor', async () => {
+    const authError = Object.assign(new Error('unauthorized'), { status: 401 });
+    vi.mocked(getAlbumInfo).mockRejectedValue(authError);
+
+    const sut = new GlobalSearchManager();
+    sut.open();
+    await expect(sut.activateAlbum('a1')).rejects.toBe(authError);
+
+    expect(toastManager.warning).not.toHaveBeenCalled();
+    expect(goto).not.toHaveBeenCalled();
+    expect(getEntries()).toHaveLength(0);
+  });
+
+  it('double-Enter guard: second call no-ops while first is in flight', async () => {
+    // Deferred promise so the first activation sits pending while we fire the second.
+    let resolveInfo: (v: Awaited<ReturnType<typeof getAlbumInfo>>) => void = () => {};
+    const deferred = new Promise<Awaited<ReturnType<typeof getAlbumInfo>>>((resolve) => {
+      resolveInfo = resolve;
+    });
+    vi.mocked(getAlbumInfo).mockReturnValue(deferred as ReturnType<typeof getAlbumInfo>);
+
+    const sut = new GlobalSearchManager();
+    sut.open();
+    const first = sut.activateAlbum('a1');
+    const second = sut.activateAlbum('a1');
+    resolveInfo(albumResponse);
+    await Promise.all([first, second]);
+
+    expect(getAlbumInfo).toHaveBeenCalledTimes(1);
+    expect(goto).toHaveBeenCalledTimes(1);
+  });
+
+  it('escape-during-resolve: close() aborts, no navigation', async () => {
+    vi.mocked(getAlbumInfo).mockImplementation((_args, opts) => {
+      const signal = (opts as { signal?: AbortSignal } | undefined)?.signal;
+      return new Promise((_, reject) => {
+        signal?.addEventListener('abort', () =>
+          reject(Object.assign(new Error('aborted'), { name: 'AbortError' })),
+        );
+      }) as unknown as ReturnType<typeof getAlbumInfo>;
+    });
+
+    const sut = new GlobalSearchManager();
+    sut.open();
+    const activation = sut.activateAlbum('a1');
+    sut.close();
+    await activation;
+
+    expect(goto).not.toHaveBeenCalled();
+    expect(toastManager.warning).not.toHaveBeenCalled();
+  });
+
+  it('keystroke-during-activation: batch.abort() does NOT abort activation', async () => {
+    let resolveInfo: (v: Awaited<ReturnType<typeof getAlbumInfo>>) => void = () => {};
+    const deferred = new Promise<Awaited<ReturnType<typeof getAlbumInfo>>>((resolve) => {
+      resolveInfo = resolve;
+    });
+    // Implementation ignores the signal — we want the activation to survive a batch
+    // rotation, so even if the batch controller aborts the fetch must still resolve.
+    vi.mocked(getAlbumInfo).mockReturnValue(deferred as ReturnType<typeof getAlbumInfo>);
+
+    const sut = new GlobalSearchManager();
+    sut.open();
+    const activation = sut.activateAlbum('a1');
+    // Rotate the batch controller — simulates a fresh keystroke landing while the
+    // activation is still in flight. Activation binds to closeSignal, not
+    // batchController, so this must NOT short-circuit the navigation.
+    (sut as unknown as { batchController: AbortController | null }).batchController = new AbortController();
+    (sut as unknown as { batchController: AbortController }).batchController.abort();
+    resolveInfo(albumResponse);
+    await activation;
+
+    expect(goto).toHaveBeenCalledWith('/albums/a1');
+  });
+
+  it('pending-row affordance: pendingActivation set at 200ms', async () => {
+    vi.useFakeTimers();
+    vi.mocked(getAlbumInfo).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          // Resolve after 300ms of virtual time.
+          setTimeout(() => resolve(albumResponse), 300);
+        }) as unknown as ReturnType<typeof getAlbumInfo>,
+    );
+
+    const sut = new GlobalSearchManager();
+    sut.open();
+    const activation = sut.activateAlbum('a1');
+
+    await vi.advanceTimersByTimeAsync(100);
+    expect(sut.pendingActivation).toBeNull();
+
+    await vi.advanceTimersByTimeAsync(100); // total = 200ms
+    expect(sut.pendingActivation).toBe('album:a1');
+
+    await vi.advanceTimersByTimeAsync(200); // total = 400ms — past the 300ms resolve
+    await activation;
+    expect(sut.pendingActivation).toBeNull();
+  });
+
+  it('pending-timer cleared on fast resolve (<200ms)', async () => {
+    vi.useFakeTimers();
+    vi.mocked(getAlbumInfo).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          setTimeout(() => resolve(albumResponse), 50);
+        }) as unknown as ReturnType<typeof getAlbumInfo>,
+    );
+
+    const sut = new GlobalSearchManager();
+    sut.open();
+    const activation = sut.activateAlbum('a1');
+    await vi.advanceTimersByTimeAsync(50);
+    await activation;
+    // Past the 200ms pending threshold — if the timer wasn't cleared in `finally`,
+    // pendingActivation would now flip to 'album:a1' even though activation is done.
+    await vi.advanceTimersByTimeAsync(300);
+
     expect(sut.pendingActivation).toBeNull();
   });
 });

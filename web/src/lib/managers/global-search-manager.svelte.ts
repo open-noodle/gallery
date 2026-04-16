@@ -6,6 +6,7 @@ import { Route } from '$lib/route';
 import { addEntry, getEntries, makePlaceId, removeEntry, type RecentEntry } from '$lib/stores/cmdk-recent';
 import { user } from '$lib/stores/user.store';
 import {
+  getAlbumInfo,
   getAlbumNames,
   getAllSpaces,
   getAllTags,
@@ -19,6 +20,7 @@ import {
   type SharedSpaceResponseDto,
   type TagResponseDto,
 } from '@immich/sdk';
+import { toastManager } from '@immich/ui';
 import { computeCommandScore } from 'bits-ui';
 import { locale as i18nLocale, t, type Translations } from 'svelte-i18n';
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
@@ -437,6 +439,72 @@ export class GlobalSearchManager {
       }
       this.sections.spaces = { status: 'error', message: error instanceof Error ? error.message : 'unknown error' };
       throw error;
+    }
+  }
+
+  /**
+   * Resolve an album id through the SDK, write a fresh RECENT entry, and navigate.
+   * All guards live here so every Enter-on-row path — fresh result, RECENT, almost-
+   * exact nav promotion — routes through a single handler with uniform semantics.
+   *
+   * Guards:
+   *  - Double-Enter: a second call for the same key is a no-op while the first is
+   *    still resolving. Cleared in `finally` so retry after settlement works.
+   *  - Escape-during-resolve: activation binds to `closeSignal`, so `close()` aborts
+   *    the fetch and the post-await `aborted` check short-circuits the navigate.
+   *  - Batch rotation does NOT affect activation. The per-keystroke
+   *    `batchController` owns the fan-out providers; activation survives typing.
+   *  - 404 / 403: treat as "stale cache" — toast + purge the RECENT (no-op if
+   *    absent) so the next open does not re-show a dead row.
+   *  - 401 and other statuses propagate unchanged to the global SDK auth
+   *    interceptor (redirect-to-login lives there, not here).
+   *  - Pending affordance: the 200 ms `pendingActivation` flag is cleared in
+   *    `finally` regardless of which branch settled the activation.
+   */
+  async activateAlbum(id: string) {
+    const key = `album:${id}`;
+    if (this.activationInFlight.has(key)) {
+      return;
+    }
+    this.activationInFlight.add(key);
+
+    const pendingTimer = setTimeout(() => {
+      this.pendingActivation = key;
+    }, 200);
+
+    try {
+      const album = await getAlbumInfo({ id }, { signal: this.closeSignal });
+      if (this.closeSignal.aborted) {
+        return;
+      }
+      addEntry({
+        kind: 'album',
+        id: key,
+        albumId: id,
+        label: album.albumName,
+        thumbnailAssetId: album.albumThumbnailAssetId,
+        lastUsed: Date.now(),
+      });
+      void goto(Route.viewAlbum({ id }));
+    } catch (error: unknown) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        return;
+      }
+      const status = (error as { status?: number } | null)?.status;
+      if (status === 404 || status === 403) {
+        removeEntry(key);
+        // Hardcoded English fallback — Task 24 formally adds the i18n key
+        // `cmdk_toast_album_unavailable`. Matches Tasks 14/15/16.
+        toastManager.warning('Album no longer available');
+        return;
+      }
+      throw error;
+    } finally {
+      clearTimeout(pendingTimer);
+      this.activationInFlight.delete(key);
+      if (this.pendingActivation === key) {
+        this.pendingActivation = null;
+      }
     }
   }
 
