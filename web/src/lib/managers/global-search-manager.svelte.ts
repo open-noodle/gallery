@@ -74,6 +74,8 @@ export type ActiveItem =
   | { kind: 'person'; data: unknown }
   | { kind: 'place'; data: unknown }
   | { kind: 'tag'; data: unknown }
+  | { kind: 'album'; data: AlbumNameDto }
+  | { kind: 'space'; data: SharedSpaceResponseDto }
   | { kind: 'nav'; data: NavigationItem };
 
 const VALID_MODES: ReadonlySet<SearchMode> = new Set(['smart', 'metadata', 'description', 'ocr']);
@@ -672,7 +674,15 @@ export class GlobalSearchManager {
     if (!match) {
       return null;
     }
-    return { kind: kind as 'photo' | 'person' | 'place' | 'tag', data: match };
+    // kind is narrowed by sectionForKind — only the entity kinds below can reach
+    // here (nav is handled in the branch above, unknown kinds return null via
+    // `sectionForKind`). Cast is split into an intermediate union so album/space
+    // carry their DTO types through to the ActiveItem union without forcing the
+    // structural entity match through `as unknown`.
+    return {
+      kind: kind as 'photo' | 'person' | 'place' | 'tag' | 'album' | 'space',
+      data: match,
+    } as ActiveItem;
   }
 
   /**
@@ -737,6 +747,12 @@ export class GlobalSearchManager {
       }
       case 'tag': {
         return this.sections.tags;
+      }
+      case 'album': {
+        return this.sections.albums;
+      }
+      case 'space': {
+        return this.sections.spaces;
       }
       case 'nav': {
         return this.sections.navigation;
