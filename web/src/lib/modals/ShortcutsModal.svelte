@@ -31,7 +31,8 @@
         { key: ['g'], action: $t('navigate_to_time') },
         { key: ['x'], action: $t('select') },
         { key: ['Esc'], action: $t('back_close_deselect') },
-        { key: ['Ctrl', 'k'], action: $t('search_your_photos') },
+        { key: ['Ctrl', 'k'], action: $t('shortcut_open_global_search') },
+        { key: ['Ctrl', '/'], action: $t('shortcut_cycle_search_mode') },
         { key: ['Ctrl', '⇧', 'k'], action: $t('open_the_search_filters') },
       ],
       actions: [
