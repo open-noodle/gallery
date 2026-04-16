@@ -2540,3 +2540,19 @@ describe('getActiveItem recent-entry preview lookup (cold open)', () => {
     expect(active?.kind).toBe('photo');
   });
 });
+
+describe('closeSignal lifecycle', () => {
+  it('aborts on close(), creates fresh signal on open()', () => {
+    const sut = new GlobalSearchManager();
+    sut.open();
+    const firstSignal = sut.closeSignal;
+    expect(firstSignal.aborted).toBe(false);
+
+    sut.close();
+    expect(firstSignal.aborted).toBe(true);
+
+    sut.open();
+    expect(sut.closeSignal.aborted).toBe(false);
+    expect(sut.closeSignal).not.toBe(firstSignal);
+  });
+});

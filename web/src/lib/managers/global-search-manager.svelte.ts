@@ -159,6 +159,16 @@ export class GlobalSearchManager {
   protected batchController: AbortController | null = null;
   protected photosController: AbortController | null = null;
   /**
+   * Aborted on `close()`, replaced with a fresh controller on `open()`. Scoped to the
+   * open-session lifetime — activation-dispatch and catalog fetches (later tasks) bind
+   * to `closeSignal` so closing the palette cancels their long-lived work without
+   * disrupting the per-keystroke `batchController` fan-out.
+   */
+  private closeController = new AbortController();
+  get closeSignal() {
+    return this.closeController.signal;
+  }
+  /**
    * Count of providers currently in flight. runBatch resets this at entry so a stale
    * batch's decrements cannot corrupt the new batch's bookkeeping (onSettle checks
    * `batch !== this.batchController` before decrementing — see the stale-batch guard).
@@ -285,6 +295,9 @@ export class GlobalSearchManager {
 
   open() {
     this.isOpen = true;
+    if (this.closeController.signal.aborted) {
+      this.closeController = new AbortController();
+    }
     if (!this.mlProbed) {
       this.mlProbed = true;
       void this.probeMlHealth();
@@ -308,6 +321,7 @@ export class GlobalSearchManager {
 
   close() {
     this.isOpen = false;
+    this.closeController.abort();
     if (this.debounceTimer !== null) {
       clearTimeout(this.debounceTimer);
     }
