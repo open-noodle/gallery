@@ -19,7 +19,7 @@ The install script only supports Linux operating systems and requires Docker to 
 In the shell, from a directory of your choice, run the following command:
 
 ```bash
-curl -o- https://raw.githubusercontent.com/immich-app/immich/main/install.sh | bash
+curl -o- https://raw.githubusercontent.com/open-noodle/gallery/main/install.sh | bash
 ```
 
 The script will perform the following actions:
