@@ -8,6 +8,7 @@ CONFIG="$BRANDING_DIR/config.json"
 
 NAME=$(jq -r '.name' "$CONFIG")
 UPSTREAM_NAME=$(jq -r '.upstream_name' "$CONFIG")
+DEEP_LINK_SCHEME=$(jq -r '.mobile.deep_link_scheme' "$CONFIG")
 EXIT_CODE=0
 
 echo "=== Verifying branding: $NAME ==="
@@ -127,6 +128,57 @@ if [[ -f "$env_example" ]]; then
     echo "  WARN: example.env missing IMMICH_REPOSITORY"
     EXIT_CODE=1
   fi
+fi
+
+# Open-in-app scheme registration: web rewrite + Android/iOS dual-scheme
+echo "--- Checking open-in-app scheme registration ---"
+
+open_in_app="$REPO_ROOT/web/src/lib/utils/open-in-app.ts"
+if [[ -f "$open_in_app" ]]; then
+  if grep -q "immich://" "$open_in_app"; then
+    echo "  FAIL: open-in-app.ts still contains 'immich://' — branding rewrite did not run"
+    EXIT_CODE=1
+  elif ! grep -q "${DEEP_LINK_SCHEME}://" "$open_in_app"; then
+    echo "  FAIL: open-in-app.ts does not contain '${DEEP_LINK_SCHEME}://'"
+    EXIT_CODE=1
+  else
+    echo "  OK: open-in-app.ts uses ${DEEP_LINK_SCHEME}://"
+  fi
+else
+  echo "  FAIL: open-in-app.ts not found at $open_in_app"
+  EXIT_CODE=1
+fi
+
+android_manifest="$REPO_ROOT/mobile/android/app/src/main/AndroidManifest.xml"
+if [[ -f "$android_manifest" ]]; then
+  if ! grep -q "android:scheme=\"immich\"" "$android_manifest"; then
+    echo "  FAIL: AndroidManifest.xml missing android:scheme=\"immich\" (legacy scheme must remain)"
+    EXIT_CODE=1
+  elif ! grep -q "android:scheme=\"${DEEP_LINK_SCHEME}\"" "$android_manifest"; then
+    echo "  FAIL: AndroidManifest.xml missing android:scheme=\"${DEEP_LINK_SCHEME}\""
+    EXIT_CODE=1
+  else
+    echo "  OK: AndroidManifest.xml registers both immich and ${DEEP_LINK_SCHEME}"
+  fi
+fi
+
+info_plist="$REPO_ROOT/mobile/ios/Runner/Info.plist"
+if [[ -f "$info_plist" ]]; then
+  # CFBundleURLSchemes entries sit at 4-tab indent; anchor to that to avoid matching
+  # CFBundleName (<string>${NAME_SLUG}</string>) at 1-tab indent.
+  if ! grep -qP "^\t\t\t\t<string>immich</string>" "$info_plist"; then
+    echo "  FAIL: Info.plist missing <string>immich</string> in CFBundleURLSchemes (legacy scheme must remain)"
+    EXIT_CODE=1
+  elif ! grep -qP "^\t\t\t\t<string>${DEEP_LINK_SCHEME}</string>" "$info_plist"; then
+    echo "  FAIL: Info.plist missing <string>${DEEP_LINK_SCHEME}</string> in CFBundleURLSchemes"
+    EXIT_CODE=1
+  else
+    echo "  OK: Info.plist CFBundleURLSchemes registers both immich and ${DEEP_LINK_SCHEME}"
+  fi
+fi
+
+if [[ $EXIT_CODE -eq 0 ]]; then
+  echo "Open-in-app scheme registration verified"
 fi
 
 if [[ $EXIT_CODE -eq 0 ]]; then

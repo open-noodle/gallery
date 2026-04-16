@@ -321,3 +321,6 @@ export const libraryTableClasses = {
   column5: 'w-1/12',
   column6: 'w-1/12 flex justify-end',
 };
+
+export const IOS_APP_STORE_URL = 'https://apps.apple.com/app/id6761776289';
+export const ANDROID_INSTALL_URL = '/install';
