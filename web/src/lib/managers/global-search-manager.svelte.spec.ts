@@ -2757,3 +2757,17 @@ describe('spaces catalog fetch', () => {
     expect(getAllSpaces).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('activation state', () => {
+  it('tracks in-flight activations', () => {
+    const sut = new GlobalSearchManager();
+    sut.activationInFlight.add('album:x');
+    expect(sut.activationInFlight.has('album:x')).toBe(true);
+    expect(sut.activationInFlight.size).toBe(1);
+  });
+
+  it('pendingActivation is initially null', () => {
+    const sut = new GlobalSearchManager();
+    expect(sut.pendingActivation).toBeNull();
+  });
+});

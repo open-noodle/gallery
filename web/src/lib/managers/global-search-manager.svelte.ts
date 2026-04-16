@@ -21,7 +21,7 @@ import {
 } from '@immich/sdk';
 import { computeCommandScore } from 'bits-ui';
 import { locale as i18nLocale, t, type Translations } from 'svelte-i18n';
-import { SvelteMap } from 'svelte/reactivity';
+import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import { get } from 'svelte/store';
 import { isAlmostExactNavMatch, NAVIGATION_ITEMS, type NavigationItem } from './navigation-items';
 
@@ -167,6 +167,21 @@ export class GlobalSearchManager {
    * Drives the progress stripe on the palette header.
    */
   batchInFlight = $state(false);
+  /**
+   * Set of row ids whose activation is currently in flight. Prevents double-Enter on
+   * the same row while an async activation handler (e.g. album/space navigate) is
+   * still resolving. Entries added at activation start and removed when the handler
+   * settles (or the palette closes).
+   */
+  activationInFlight: SvelteSet<string> = $state(new SvelteSet());
+  /**
+   * Id of the row currently showing the 200 ms "pending" affordance (subtle spinner
+   * on the row) while its activation handler is resolving. Null when no activation is
+   * pending. Separate from `activationInFlight` because the affordance is delayed —
+   * only shown when the handler takes longer than 200 ms — while the double-Enter
+   * guard is immediate.
+   */
+  pendingActivation: string | null = $state(null);
 
   protected providers: Record<keyof Sections, Provider>;
   protected debounceTimer: ReturnType<typeof setTimeout> | null = null;
