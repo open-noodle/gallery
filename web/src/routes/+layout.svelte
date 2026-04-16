@@ -1,6 +1,16 @@
 <script lang="ts">
-  import { getPagesProvider, getSettingsProvider } from '#lib/commands.ts';
+  import { afterNavigate, beforeNavigate } from '$app/navigation';
+  import { page } from '$app/state';
+  import { shortcut, shortcuts } from '#lib/actions/shortcut.ts';
+  import GlobalSearch from '#lib/components/global-search/global-search.svelte';
+  import { featureFlagsManager } from '#lib/managers/feature-flags-manager.svelte.ts';
+  import { globalSearchManager, type SearchMode } from '#lib/managers/global-search-manager.svelte.ts';
+  import DownloadPanel from './DownloadPanel.svelte';
+  import ErrorLayout from './ErrorLayout.svelte';
   import OnEvents from '#lib/components/OnEvents.svelte';
+  import NavigationLoadingBar from './NavigationLoadingBar.svelte';
+  import UploadPanel from './UploadPanel.svelte';
+  import VersionAnnouncement from './VersionAnnouncement.svelte';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import { eventManager } from '#lib/managers/event-manager.svelte.ts';
   import ServerRestartingModal from '#lib/modals/ServerRestartingModal.svelte';
@@ -9,38 +19,25 @@
   import { lang, locale } from '#lib/stores/preferences.store.ts';
   import { sidebarStore } from '#lib/stores/sidebar.svelte.ts';
   import { closeWebsocketConnection, openWebsocketConnection, websocketStore } from '#lib/stores/websocket.ts';
+  import { copyToClipboard } from '#lib/utils.ts';
   import { maintenanceShouldRedirect } from '#lib/utils/maintenance.ts';
-  import { getUiTranslations } from '#lib/utils/ui-translations.ts';
   import { getServerConfig } from '@immich/sdk';
   import {
-    CORE_PAGE_COMMANDS,
-    CommandPaletteProvider,
-    MOBILE_APP_COMMANDS,
-    OTHER_SITE_COMMANDS,
-    PROJECT_SUPPORT_COMMANDS,
-    SOCIAL_COMMANDS,
-    ScreencastOverlay,
-    TooltipProvider,
-    defaultProvider,
     modalManager,
     setLocale,
     setTranslations,
+    Theme,
+    themeManager,
     toastManager,
+    TooltipProvider,
   } from '@immich/ui';
-  import { QueryClientProvider } from '@tanstack/svelte-query';
   import { En } from 'media-chrome/lang/en';
   import { addTranslation } from 'media-chrome/utils/i18n';
+  import { QueryClientProvider } from '@tanstack/svelte-query';
   import { onMount, type Snippet } from 'svelte';
   import { t } from 'svelte-i18n';
   import { get } from 'svelte/store';
-  import { afterNavigate, beforeNavigate } from '$app/navigation';
-  import { page } from '$app/state';
   import '../app.css';
-  import DownloadPanel from './DownloadPanel.svelte';
-  import ErrorLayout from './ErrorLayout.svelte';
-  import NavigationLoadingBar from './NavigationLoadingBar.svelte';
-  import UploadPanel from './UploadPanel.svelte';
-  import VersionAnnouncement from './VersionAnnouncement.svelte';
 
   interface Props {
     children?: Snippet;
@@ -79,7 +76,34 @@
   };
 
   $effect(() => {
-    setTranslations(getUiTranslations($t));
+    setTranslations({
+      cancel: $t('cancel'),
+      close: $t('close'),
+      confirm: $t('confirm'),
+      expand: $t('expand'),
+      collapse: $t('collapse'),
+      search_placeholder: $t('search'),
+      search_no_results: $t('no_results'),
+      prompt_default: $t('are_you_sure_to_do_this'),
+      show_password: $t('show_password'),
+      hide_password: $t('hide_password'),
+      dark_theme: themeManager.value === Theme.Dark ? $t('light_theme') : $t('dark_theme'),
+      open_menu: $t('open'),
+      command_palette_prompt_default: $t('command_palette_prompt'),
+      command_palette_to_select: $t('command_palette_to_select'),
+      command_palette_to_navigate: $t('command_palette_to_navigate'),
+      command_palette_to_close: $t('command_palette_to_close'),
+      command_palette_to_show_all: $t('command_palette_to_show_all'),
+      navigate_next: $t('next'),
+      navigate_previous: $t('previous'),
+      open_calendar: $t('open_calendar'),
+      toast_success_title: $t('success'),
+      toast_info_title: $t('info'),
+      toast_warning_title: $t('warning'),
+      toast_danger_title: $t('error'),
+      save: $t('save'),
+      supporter: $t('supporter'),
+    });
 
     addTranslation($lang, {
       ...MediaChromeDefaults,
@@ -139,6 +163,8 @@
   let { children }: Props = $props();
 
   let showNavigationLoadingBar = $state(false);
+
+  const getMyImmichLink = () => new URL(page.url.pathname + page.url.search, 'https://my.immich.app');
 
   toastManager.setOptions({ class: 'top-16 fixed' });
 
@@ -218,32 +244,54 @@
   <meta name="theme-color" content="black" media="(prefers-color-scheme: dark)" />
 </svelte:head>
 
-<QueryClientProvider client={queryClient}>
-  <TooltipProvider>
-    {#if page.data.error}
-      <ErrorLayout error={page.data.error} />
-    {:else}
-      {@render children?.()}
-    {/if}
+<svelte:document
+  use:shortcut={{
+    shortcut: { ctrl: true, shift: true, key: 'm' },
+    onShortcut: () => copyToClipboard(getMyImmichLink().toString()),
+  }}
+  use:shortcut={{
+    shortcut: { shift: true, key: 't' },
+    onShortcut: () => themeManager.toggleTheme(),
+  }}
+  use:shortcuts={[
+    {
+      shortcut: { ctrl: true, key: 'k' },
+      onShortcut: () => {
+        // Use valueOrUndefined so the shortcut never throws if it fires before
+        // feature flags have loaded (SSR→hydration race).
+        if (featureFlagsManager.valueOrUndefined?.search) {
+          globalSearchManager.toggle();
+        }
+      },
+    },
+    {
+      shortcut: { ctrl: true, key: '/' },
+      onShortcut: () => {
+        if (!globalSearchManager.isOpen) {
+          return;
+        }
+        const order: SearchMode[] = ['smart', 'metadata', 'description', 'ocr'];
+        const next = order[(order.indexOf(globalSearchManager.mode) + 1) % order.length];
+        globalSearchManager.setMode(next);
+      },
+    },
+  ]}
+/>
 
-    {#if showNavigationLoadingBar}
-      <NavigationLoadingBar />
-    {/if}
+<TooltipProvider>
+  {#if page.data.error}
+    <ErrorLayout error={page.data.error}></ErrorLayout>
+  {:else}
+    {@render children?.()}
+  {/if}
 
-    <DownloadPanel />
-    <UploadPanel />
-    <ScreencastOverlay />
+  {#if showNavigationLoadingBar}
+    <NavigationLoadingBar />
+  {/if}
 
-    <CommandPaletteProvider
-      providers={[
-        getPagesProvider($t),
-        getSettingsProvider($t),
-        defaultProvider({ name: $t('documentation'), types: ['doc', 'documentation'], actions: CORE_PAGE_COMMANDS }),
-        defaultProvider({ name: $t('support'), actions: PROJECT_SUPPORT_COMMANDS }),
-        defaultProvider({ name: 'Socials', types: ['social', 'socials'], actions: SOCIAL_COMMANDS }),
-        defaultProvider({ name: $t('mobile_app'), actions: MOBILE_APP_COMMANDS }),
-        defaultProvider({ name: 'Sites', types: ['site', 'sites'], actions: OTHER_SITE_COMMANDS }),
-      ]}
-    />
-  </TooltipProvider>
-</QueryClientProvider>
+  <DownloadPanel />
+  <UploadPanel />
+  {#if globalSearchManager.isOpen}
+    <GlobalSearch manager={globalSearchManager} />
+  {/if}
+</TooltipProvider>
