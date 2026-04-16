@@ -11,6 +11,7 @@ import {
   getAllSpaces,
   getAllTags,
   getMlHealth,
+  getSpace,
   searchAssets,
   searchPerson,
   searchPlaces,
@@ -496,6 +497,73 @@ export class GlobalSearchManager {
         // Hardcoded English fallback — Task 24 formally adds the i18n key
         // `cmdk_toast_album_unavailable`. Matches Tasks 14/15/16.
         toastManager.warning('Album no longer available');
+        return;
+      }
+      throw error;
+    } finally {
+      clearTimeout(pendingTimer);
+      this.activationInFlight.delete(key);
+      if (this.pendingActivation === key) {
+        this.pendingActivation = null;
+      }
+    }
+  }
+
+  /**
+   * Resolve a space id through the SDK, write a fresh RECENT entry, and navigate.
+   * Mirrors `activateAlbum` — same guard set, just swapped for the space-shaped
+   * SDK call, route helper, and recent entry. The design doc explicitly defers
+   * factoring the two into a generic helper until a future YAGNI follow-up.
+   *
+   * Guards:
+   *  - Double-Enter: a second call for the same key is a no-op while the first is
+   *    still resolving. Cleared in `finally` so retry after settlement works.
+   *  - Escape-during-resolve: activation binds to `closeSignal`, so `close()` aborts
+   *    the fetch and the post-await `aborted` check short-circuits the navigate.
+   *  - Batch rotation does NOT affect activation. The per-keystroke
+   *    `batchController` owns the fan-out providers; activation survives typing.
+   *  - 404 / 403: treat as "stale cache" — toast + purge the RECENT (no-op if
+   *    absent) so the next open does not re-show a dead row.
+   *  - 401 and other statuses propagate unchanged to the global SDK auth
+   *    interceptor (redirect-to-login lives there, not here).
+   *  - Pending affordance: the 200 ms `pendingActivation` flag is cleared in
+   *    `finally` regardless of which branch settled the activation.
+   */
+  async activateSpace(id: string) {
+    const key = `space:${id}`;
+    if (this.activationInFlight.has(key)) {
+      return;
+    }
+    this.activationInFlight.add(key);
+
+    const pendingTimer = setTimeout(() => {
+      this.pendingActivation = key;
+    }, 200);
+
+    try {
+      const space = await getSpace({ id }, { signal: this.closeSignal });
+      if (this.closeSignal.aborted) {
+        return;
+      }
+      addEntry({
+        kind: 'space',
+        id: key,
+        spaceId: id,
+        label: space.name,
+        colorHex: space.color ?? null,
+        lastUsed: Date.now(),
+      });
+      void goto(Route.viewSpace({ id }));
+    } catch (error: unknown) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        return;
+      }
+      const status = (error as { status?: number } | null)?.status;
+      if (status === 404 || status === 403) {
+        removeEntry(key);
+        // Hardcoded English fallback — Task 24 formally adds the i18n key
+        // `cmdk_toast_space_unavailable`. Matches Tasks 14/15/16/20.
+        toastManager.warning('You no longer have access to this space');
         return;
       }
       throw error;

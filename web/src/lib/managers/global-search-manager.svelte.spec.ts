@@ -36,6 +36,7 @@ import {
   getAllSpaces,
   getAllTags,
   getMlHealth,
+  getSpace,
   searchAssets,
   searchPerson,
   searchPlaces,
@@ -72,6 +73,7 @@ vi.mock('@immich/sdk', async () => ({
   getAlbumNames: vi.fn(),
   getAllSpaces: vi.fn(),
   getAlbumInfo: vi.fn(),
+  getSpace: vi.fn(),
 }));
 
 vi.mock('$app/navigation', () => ({
@@ -3042,6 +3044,213 @@ describe('activateAlbum', () => {
     await activation;
     // Past the 200ms pending threshold — if the timer wasn't cleared in `finally`,
     // pendingActivation would now flip to 'album:a1' even though activation is done.
+    await vi.advanceTimersByTimeAsync(300);
+
+    expect(sut.pendingActivation).toBeNull();
+  });
+});
+
+describe('activateSpace', () => {
+  // Minimum fields that satisfy SharedSpaceResponseDto for the code paths exercised
+  // here. The manager only reads `name` and `color` when writing the recent entry —
+  // the rest is structural padding to keep the Awaited<> cast happy.
+  const spaceResponse = {
+    id: 's1',
+    name: 'Family',
+    color: 'primary',
+    createdAt: '2026-01-01T00:00:00Z',
+    createdById: 'u1',
+    updatedAt: '2026-01-01T00:00:00Z',
+  } as unknown as Awaited<ReturnType<typeof getSpace>>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    resetRecentStore();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('happy path: resolves + writes recent + navigates', async () => {
+    vi.mocked(getSpace).mockResolvedValue(spaceResponse);
+
+    const sut = new GlobalSearchManager();
+    sut.open();
+    await sut.activateSpace('s1');
+
+    expect(getSpace).toHaveBeenCalledWith({ id: 's1' }, expect.objectContaining({ signal: sut.closeSignal }));
+    expect(goto).toHaveBeenCalledWith('/spaces/s1');
+
+    const entries = getEntries();
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      kind: 'space',
+      id: 'space:s1',
+      spaceId: 's1',
+      label: 'Family',
+      colorHex: 'primary',
+    });
+  });
+
+  it('404: toast + removeById + no navigation', async () => {
+    // Seed a stale recent so the purge path has something to remove.
+    addEntry({
+      kind: 'space',
+      id: 'space:s1',
+      spaceId: 's1',
+      label: 'Stale',
+      colorHex: null,
+      lastUsed: 1,
+    });
+    vi.mocked(getSpace).mockRejectedValue(Object.assign(new Error('not found'), { status: 404 }));
+
+    const sut = new GlobalSearchManager();
+    sut.open();
+    await sut.activateSpace('s1');
+
+    expect(toastManager.warning).toHaveBeenCalledTimes(1);
+    expect(getEntries().find((e) => e.id === 'space:s1')).toBeUndefined();
+    expect(goto).not.toHaveBeenCalled();
+  });
+
+  it('403: toast + removeById + no navigation', async () => {
+    addEntry({
+      kind: 'space',
+      id: 'space:s1',
+      spaceId: 's1',
+      label: 'Stale',
+      colorHex: null,
+      lastUsed: 1,
+    });
+    vi.mocked(getSpace).mockRejectedValue(Object.assign(new Error('forbidden'), { status: 403 }));
+
+    const sut = new GlobalSearchManager();
+    sut.open();
+    await sut.activateSpace('s1');
+
+    expect(toastManager.warning).toHaveBeenCalledTimes(1);
+    expect(getEntries().find((e) => e.id === 'space:s1')).toBeUndefined();
+    expect(goto).not.toHaveBeenCalled();
+  });
+
+  it('401: re-throws to global auth interceptor', async () => {
+    const authError = Object.assign(new Error('unauthorized'), { status: 401 });
+    vi.mocked(getSpace).mockRejectedValue(authError);
+
+    const sut = new GlobalSearchManager();
+    sut.open();
+    await expect(sut.activateSpace('s1')).rejects.toBe(authError);
+
+    expect(toastManager.warning).not.toHaveBeenCalled();
+    expect(goto).not.toHaveBeenCalled();
+    expect(getEntries()).toHaveLength(0);
+  });
+
+  it('double-Enter guard: second call no-ops while first is in flight', async () => {
+    // Deferred promise so the first activation sits pending while we fire the second.
+    let resolveInfo: (v: Awaited<ReturnType<typeof getSpace>>) => void = () => {};
+    const deferred = new Promise<Awaited<ReturnType<typeof getSpace>>>((resolve) => {
+      resolveInfo = resolve;
+    });
+    vi.mocked(getSpace).mockReturnValue(deferred as ReturnType<typeof getSpace>);
+
+    const sut = new GlobalSearchManager();
+    sut.open();
+    const first = sut.activateSpace('s1');
+    const second = sut.activateSpace('s1');
+    resolveInfo(spaceResponse);
+    await Promise.all([first, second]);
+
+    expect(getSpace).toHaveBeenCalledTimes(1);
+    expect(goto).toHaveBeenCalledTimes(1);
+  });
+
+  it('escape-during-resolve: close() aborts, no navigation', async () => {
+    vi.mocked(getSpace).mockImplementation((_args, opts) => {
+      const signal = (opts as { signal?: AbortSignal } | undefined)?.signal;
+      return new Promise((_, reject) => {
+        signal?.addEventListener('abort', () =>
+          reject(Object.assign(new Error('aborted'), { name: 'AbortError' })),
+        );
+      }) as unknown as ReturnType<typeof getSpace>;
+    });
+
+    const sut = new GlobalSearchManager();
+    sut.open();
+    const activation = sut.activateSpace('s1');
+    sut.close();
+    await activation;
+
+    expect(goto).not.toHaveBeenCalled();
+    expect(toastManager.warning).not.toHaveBeenCalled();
+  });
+
+  it('keystroke-during-activation: batch.abort() does NOT abort activation', async () => {
+    let resolveInfo: (v: Awaited<ReturnType<typeof getSpace>>) => void = () => {};
+    const deferred = new Promise<Awaited<ReturnType<typeof getSpace>>>((resolve) => {
+      resolveInfo = resolve;
+    });
+    // Implementation ignores the signal — we want the activation to survive a batch
+    // rotation, so even if the batch controller aborts the fetch must still resolve.
+    vi.mocked(getSpace).mockReturnValue(deferred as ReturnType<typeof getSpace>);
+
+    const sut = new GlobalSearchManager();
+    sut.open();
+    const activation = sut.activateSpace('s1');
+    // Rotate the batch controller — simulates a fresh keystroke landing while the
+    // activation is still in flight. Activation binds to closeSignal, not
+    // batchController, so this must NOT short-circuit the navigation.
+    (sut as unknown as { batchController: AbortController | null }).batchController = new AbortController();
+    (sut as unknown as { batchController: AbortController }).batchController.abort();
+    resolveInfo(spaceResponse);
+    await activation;
+
+    expect(goto).toHaveBeenCalledWith('/spaces/s1');
+  });
+
+  it('pending-row affordance: pendingActivation set at 200ms', async () => {
+    vi.useFakeTimers();
+    vi.mocked(getSpace).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          // Resolve after 300ms of virtual time.
+          setTimeout(() => resolve(spaceResponse), 300);
+        }) as unknown as ReturnType<typeof getSpace>,
+    );
+
+    const sut = new GlobalSearchManager();
+    sut.open();
+    const activation = sut.activateSpace('s1');
+
+    await vi.advanceTimersByTimeAsync(100);
+    expect(sut.pendingActivation).toBeNull();
+
+    await vi.advanceTimersByTimeAsync(100); // total = 200ms
+    expect(sut.pendingActivation).toBe('space:s1');
+
+    await vi.advanceTimersByTimeAsync(200); // total = 400ms — past the 300ms resolve
+    await activation;
+    expect(sut.pendingActivation).toBeNull();
+  });
+
+  it('pending-timer cleared on fast resolve (<200ms)', async () => {
+    vi.useFakeTimers();
+    vi.mocked(getSpace).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          setTimeout(() => resolve(spaceResponse), 50);
+        }) as unknown as ReturnType<typeof getSpace>,
+    );
+
+    const sut = new GlobalSearchManager();
+    sut.open();
+    const activation = sut.activateSpace('s1');
+    await vi.advanceTimersByTimeAsync(50);
+    await activation;
+    // Past the 200ms pending threshold — if the timer wasn't cleared in `finally`,
+    // pendingActivation would now flip to 'space:s1' even though activation is done.
     await vi.advanceTimersByTimeAsync(300);
 
     expect(sut.pendingActivation).toBeNull();
