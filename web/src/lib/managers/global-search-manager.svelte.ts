@@ -74,6 +74,9 @@ export type ActiveItem =
   | { kind: 'nav'; data: NavigationItem };
 
 const VALID_MODES: ReadonlySet<SearchMode> = new Set(['smart', 'metadata', 'description', 'ocr']);
+// Slice size for the albums section. Kept as a named constant so the buildProviders
+// `topN: 5` and the runAlbums slice cannot drift apart silently.
+const ALBUMS_TOP_N = 5;
 // Narrow literal type so it can be assigned to both `ProviderStatus<unknown>` and
 // `ProviderStatus<NavigationItem>` without the generic T widening fighting the assignment.
 // Frozen so a future engineer cannot accidentally mutate the shared reference and
@@ -1182,6 +1185,57 @@ export class GlobalSearchManager {
     }
   }
 
+  /**
+   * Filter / rank / slice the in-memory albums catalog for `rawQuery` and write the
+   * result into `sections.albums`. Called by the albums provider entry in
+   * `buildProviders()` — runBatch only iterates entity keys (photos/people/places/
+   * tags), so this is the sole writer for the albums section.
+   *
+   * Scoring rules (all case-insensitive, query is trimmed):
+   *   - name.startsWith(query) → score 2
+   *   - name.includes(query)    → score 1
+   *   - else                    → filtered out
+   * Ties break alphabetically by `albumName`. Slice to top 5; `total` reports the
+   * full pre-slice match count so the palette can render a "+N more" affordance.
+   *
+   * Queries under 2 chars short-circuit back to idle and skip the catalog fetch —
+   * matches the other providers' minQueryLength contract.
+   */
+  async runAlbums(rawQuery: string): Promise<void> {
+    const query = rawQuery.trim().toLowerCase();
+    if (query.length < 2) {
+      this.sections.albums = { status: 'idle' };
+      return;
+    }
+    await this.ensureAlbumsCache();
+    if (this.albumsCache === undefined) {
+      // Catalog fetch failed mid-flight (AbortError) or was rejected and already
+      // transitioned the section to 'error' via fetchAlbumsCatalog. Nothing to do.
+      return;
+    }
+
+    type Scored = { album: AlbumNameDto; score: number };
+    const matches: Scored[] = [];
+    for (const album of this.albumsCache) {
+      const name = album.albumName.toLowerCase();
+      if (name.includes(query)) {
+        matches.push({ album, score: name.startsWith(query) ? 2 : 1 });
+      }
+    }
+    matches.sort((a, b) => b.score - a.score || a.album.albumName.localeCompare(b.album.albumName));
+
+    if (matches.length === 0) {
+      this.sections.albums = { status: 'empty' };
+      return;
+    }
+
+    this.sections.albums = {
+      status: 'ok',
+      items: matches.slice(0, ALBUMS_TOP_N).map((m) => m.album) as unknown as EntityItem[],
+      total: matches.length,
+    };
+  }
+
   private async runTagsProvider(query: string, signal: AbortSignal): Promise<ProviderStatus<TagResponseDto>> {
     if (this.tagsDisabled) {
       return { status: 'error', message: 'tag_cache_too_large' };
@@ -1305,16 +1359,25 @@ export class GlobalSearchManager {
       run: () => Promise.resolve({ status: 'empty' as const }),
     };
 
-    // Albums and spaces providers are stubs for the same reason as navigation: runBatch
-    // iterates only over `['photos', 'people', 'places', 'tags']`. Album and space
-    // scoring happens later (Task 9+) via a separate path that consumes the cache fields
-    // populated by `ensureAlbumsCache()` / `ensureSpacesCache()`.
-    const albumsStub: Provider = {
+    // Albums provider dispatches to `runAlbums`, which filters the in-memory catalog
+    // and writes `sections.albums` directly. runBatch iterates only entity keys
+    // (photos/people/places/tags), so this `run()` is not invoked on the batch path —
+    // the albums dispatch happens via a separate path that calls `runAlbums()`
+    // directly. The `run()` function exists to satisfy the `Record<keyof Sections,
+    // Provider>` contract and is safe to call as a no-op that returns whatever
+    // `runAlbums` wrote: any future refactor that DOES invoke it (e.g. unifying all
+    // section scheduling under runBatch) will still produce the right state.
+    const albums: Provider = {
       key: 'albums',
-      topN: 5,
+      topN: ALBUMS_TOP_N,
       minQueryLength: 2,
-      run: () => Promise.resolve({ status: 'empty' as const }),
+      run: async (query) => {
+        await this.runAlbums(query);
+        return this.sections.albums as ProviderStatus<EntityItem>;
+      },
     };
+    // Spaces remains a stub — its filter/rank/slice lands in a later task. runBatch
+    // does not iterate over 'spaces', so this is unreachable at runtime.
     const spacesStub: Provider = {
       key: 'spaces',
       topN: 5,
@@ -1322,7 +1385,7 @@ export class GlobalSearchManager {
       run: () => Promise.resolve({ status: 'empty' as const }),
     };
 
-    return { photos, people, places, tags, albums: albumsStub, spaces: spacesStub, navigation: navigationStub };
+    return { photos, people, places, tags, albums, spaces: spacesStub, navigation: navigationStub };
   }
 }
 
