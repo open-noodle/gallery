@@ -9,6 +9,7 @@
   import ErrorLayout from './ErrorLayout.svelte';
   import OnEvents from '#lib/components/OnEvents.svelte';
   import NavigationLoadingBar from './NavigationLoadingBar.svelte';
+  import OpenInAppBanner from '$lib/components/shared-components/open-in-app-banner.svelte';
   import UploadPanel from './UploadPanel.svelte';
   import VersionAnnouncement from './VersionAnnouncement.svelte';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
@@ -247,7 +248,7 @@
 <svelte:document
   use:shortcut={{
     shortcut: { ctrl: true, shift: true, key: 'm' },
-    onShortcut: () => copyToClipboard(getMyImmichLink().toString()),
+    onShortcut: () => void copyToClipboard(getMyImmichLink().toString()),
   }}
   use:shortcut={{
     shortcut: { shift: true, key: 't' },
@@ -279,6 +280,7 @@
 />
 
 <TooltipProvider>
+  <OpenInAppBanner />
   {#if page.data.error}
     <ErrorLayout error={page.data.error}></ErrorLayout>
   {:else}

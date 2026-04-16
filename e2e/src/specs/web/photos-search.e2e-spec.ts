@@ -174,15 +174,14 @@ test.describe('Photos Search', () => {
     expect(afterCount).toBeGreaterThan(0);
   });
 
-  test('mobile viewport hides the SearchBar', async ({ context, page }) => {
-    // Gallery's Tailwind theme defines --breakpoint-sm: 639px, so sm:block
-    // still matches at 639. Use a clearly-sub-breakpoint width here.
+  test('mobile viewport keeps the SearchBar visible', async ({ context, page }) => {
+    // Gallery's Tailwind theme defines --breakpoint-sm: 639px. The SearchBar
+    // wrapper expands to w-full on <sm so the /photos header row isn't an
+    // empty gap — keep it reachable on mobile.
     await page.setViewportSize({ width: 500, height: 900 });
     await gotoPhotos(context, page);
 
-    // The SearchBar is inside a hidden sm:block container, so it should
-    // not be visible below the sm breakpoint.
-    await expect(page.locator('input[placeholder="Search"]')).not.toBeVisible();
+    await expect(page.locator('input[placeholder="Search"]')).toBeVisible();
   });
 
   test('typing characters does not trigger a search or unmount the timeline until Enter is pressed', async ({
