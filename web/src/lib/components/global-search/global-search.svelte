@@ -10,6 +10,8 @@
   import PersonRow from './rows/person-row.svelte';
   import PlaceRow from './rows/place-row.svelte';
   import TagRow from './rows/tag-row.svelte';
+  import AlbumRow from './rows/album-row.svelte';
+  import SpaceRow from './rows/space-row.svelte';
   import RecentRow from './rows/recent-row.svelte';
   import NavigationRow from './rows/navigation-row.svelte';
   import GlobalSearchFooter from './global-search-footer.svelte';
@@ -416,6 +418,37 @@
               >
                 {#snippet renderRow(item)}
                   <PhotoRow item={item as never} />
+                {/snippet}
+              </GlobalSearchSection>
+              <!-- Albums + Spaces sit between Photos and People per the v1.1 plan's
+                   declared section sequence. Headings are hardcoded English — Task 24
+                   introduces `cmdk_section_albums` / `cmdk_section_spaces` and swaps
+                   them in. `isPending` wiring reads `manager.pendingActivation` so the
+                   row spinner affordance appears for the exact key being activated. -->
+              <GlobalSearchSection
+                heading="Albums"
+                status={manager.sections.albums}
+                idPrefix="album"
+                onActivate={(item) => void manager.activateAlbum((item as { id: string }).id)}
+              >
+                {#snippet renderRow(item)}
+                  <AlbumRow
+                    item={item as never}
+                    isPending={manager.pendingActivation === `album:${(item as { id: string }).id}`}
+                  />
+                {/snippet}
+              </GlobalSearchSection>
+              <GlobalSearchSection
+                heading="Spaces"
+                status={manager.sections.spaces}
+                idPrefix="space"
+                onActivate={(item) => void manager.activateSpace((item as { id: string }).id)}
+              >
+                {#snippet renderRow(item)}
+                  <SpaceRow
+                    item={item as never}
+                    isPending={manager.pendingActivation === `space:${(item as { id: string }).id}`}
+                  />
                 {/snippet}
               </GlobalSearchSection>
               <GlobalSearchSection
