@@ -64,13 +64,13 @@ If you only want to do web development connected to an existing, remote backend,
 4. Start the web development server
 
 ```bash
-IMMICH_SERVER_URL=https://demo.immich.app/ pnpm run dev
+IMMICH_SERVER_URL=https://demo.opennoodle.de/ pnpm run dev
 ```
 
 If you're using PowerShell on Windows you may need to set the env var separately like so:
 
 ```powershell
-$env:IMMICH_SERVER_URL = "https://demo.immich.app/"
+$env:IMMICH_SERVER_URL = "https://demo.opennoodle.de/"
 pnpm run dev
 ```
 
@@ -106,7 +106,7 @@ To add a new translation text, enter the key-value pair in the `i18n/en.json` in
 make translation
 ```
 
-The mobile app asks you what backend to connect to. You can utilize the demo backend (https://demo.immich.app/) if you don't need to change server code or upload photos. Alternatively, you can run the server yourself per the instructions above.
+The mobile app asks you what backend to connect to. You can utilize the demo backend (https://demo.opennoodle.de/) if you don't need to change server code or upload photos. Alternatively, you can run the server yourself per the instructions above.
 
 ## IDE setup
 

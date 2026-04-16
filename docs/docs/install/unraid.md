@@ -110,7 +110,7 @@ alt="Go to Docker Tab and visit the address listed next to gallery-web"
 
 <details >
     <summary>Using the FolderView plugin for organizing your Docker containers? Click me! Otherwise you're complete!</summary>
-    <p>If you are using the FolderView plugin go the Docker tab and select "<b>New Folder</b>".<br />Label it <i>"Gallery"</i> and use this URL as the logo: https://raw.githubusercontent.com/immich-app/immich/main/design/immich-logo.png<br/>Then simply select all the Gallery related containers before clicking "<b>Submit</b>"</p>
+    <p>If you are using the FolderView plugin go the Docker tab and select "<b>New Folder</b>".<br />Label it <i>"Gallery"</i> and use this URL as the logo: https://raw.githubusercontent.com/open-noodle/gallery/main/branding/assets/logo-mark.svg<br/>Then simply select all the Gallery related containers before clicking "<b>Submit</b>"</p>
     <img
         src={require('./img/unraid07.webp').default}
         width="80%"

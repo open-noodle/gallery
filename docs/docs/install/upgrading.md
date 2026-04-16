@@ -23,8 +23,8 @@ docker image prune
 ```
 
 [watchtower]: https://containrrr.dev/watchtower/
-[breaking]: https://github.com/immich-app/immich/discussions?discussions_q=label%3Achangelog%3Abreaking-change+sort%3Adate_created
-[releases]: https://github.com/immich-app/immich/releases
+[breaking]: https://github.com/open-noodle/gallery/releases?q=label%3Abreaking&expanded=true
+[releases]: https://github.com/open-noodle/gallery/releases
 
 ## Versioning Policy
 
@@ -103,7 +103,7 @@ After making these changes, you can start Gallery as normal. Gallery will make s
 After switching to VectorChord, you should not downgrade Gallery below 1.133.0.
 :::
 
-Please don’t hesitate to contact us on [GitHub](https://github.com/immich-app/immich/discussions) or [Discord](https://discord.gg/cxBfbuxyG4) if you encounter migration issues.
+Please don’t hesitate to contact us on [GitHub](https://github.com/open-noodle/gallery/discussions) or [Discord](https://discord.gg/cxBfbuxyG4) if you encounter migration issues.
 
 ### VectorChord FAQ
 
