@@ -30,4 +30,49 @@ describe('global-search-section empty-state', () => {
     });
     expect(container.textContent?.trim()).toBe('');
   });
+
+  it('accepts album items via the album idPrefix', () => {
+    const albumItem = {
+      id: 'a1',
+      albumName: 'x',
+      shared: false,
+      albumThumbnailAssetId: null,
+      assetCount: 0,
+    };
+    expect(() =>
+      render(GlobalSearchSection, {
+        props: {
+          heading: 'Albums',
+          idPrefix: 'album' as const,
+          onActivate: () => {},
+          renderRow: createRawSnippet(() => ({ render: () => '<span></span>' })),
+          status: { status: 'empty' },
+          // Reference the item so the generic is inferred as the album shape even on the
+          // `empty` render path — this exercises the T generic for the album variant.
+          onSeeAll: () => void albumItem,
+        },
+      }),
+    ).not.toThrow();
+  });
+
+  it('accepts space items via the space idPrefix', () => {
+    const spaceItem = {
+      id: 's1',
+      name: 'My Space',
+      ownerId: 'o1',
+      assetCount: 0,
+    };
+    expect(() =>
+      render(GlobalSearchSection, {
+        props: {
+          heading: 'Spaces',
+          idPrefix: 'space' as const,
+          onActivate: () => {},
+          renderRow: createRawSnippet(() => ({ render: () => '<span></span>' })),
+          status: { status: 'empty' },
+          onSeeAll: () => void spaceItem,
+        },
+      }),
+    ).not.toThrow();
+  });
 });

@@ -9,7 +9,7 @@
     heading: string;
     status: ProviderStatus<T>;
     renderRow: Snippet<[T]>;
-    idPrefix: 'photo' | 'person' | 'place' | 'tag';
+    idPrefix: 'photo' | 'person' | 'place' | 'tag' | 'album' | 'space';
     onActivate: (item: T) => void;
     onSeeAll?: () => void;
   }
