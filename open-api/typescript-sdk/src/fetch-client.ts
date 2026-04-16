@@ -707,6 +707,15 @@ export type AlbumsAddAssetsResponseDto = {
     /** Operation success */
     success: boolean;
 };
+export type AlbumNameDto = {
+    albumName: string;
+    albumThumbnailAssetId: string | null;
+    assetCount: number;
+    endDate?: string;
+    id: string;
+    shared: boolean;
+    startDate?: string;
+};
 export type AlbumStatisticsResponseDto = {
     /** Number of non-shared albums */
     notShared: number;
@@ -4200,6 +4209,17 @@ export function addAssetsToAlbums({ key, slug, albumsAddAssetsDto }: {
         method: "PUT",
         body: albumsAddAssetsDto
     })));
+}
+/**
+ * Retrieve album names
+ */
+export function getAlbumNames(opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: AlbumNameDto[];
+    }>("/albums/names", {
+        ...opts
+    }));
 }
 /**
  * Retrieve album statistics

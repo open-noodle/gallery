@@ -280,6 +280,90 @@ where
 order by
   "album"."createdAt" desc
 
+-- AlbumRepository.getOwnedNames
+select
+  "album"."id",
+  "album"."albumName",
+  "album"."albumThumbnailAssetId",
+  coalesce("metadata"."assetCount", 0)::int as "assetCount",
+  "metadata"."startDate" as "startDate",
+  "metadata"."endDate" as "endDate"
+from
+  "album"
+  left join (
+    select
+      "album_asset"."albumId" as "albumId",
+      count("album_asset"."assetId")::int as "assetCount",
+      min(
+        ("asset"."localDateTime" AT TIME ZONE 'UTC'::text)::date
+      ) as "startDate",
+      max(
+        ("asset"."localDateTime" AT TIME ZONE 'UTC'::text)::date
+      ) as "endDate"
+    from
+      "album_asset"
+      inner join "asset" on "asset"."id" = "album_asset"."assetId"
+    where
+      "asset"."deletedAt" is null
+    group by
+      "album_asset"."albumId"
+  ) as "metadata" on "metadata"."albumId" = "album"."id"
+where
+  "album"."ownerId" = $1
+  and "album"."deletedAt" is null
+
+-- AlbumRepository.getSharedNames
+select
+  "album"."id",
+  "album"."albumName",
+  "album"."albumThumbnailAssetId",
+  coalesce("metadata"."assetCount", 0)::int as "assetCount",
+  "metadata"."startDate" as "startDate",
+  "metadata"."endDate" as "endDate"
+from
+  "album"
+  left join (
+    select
+      "album_asset"."albumId" as "albumId",
+      count("album_asset"."assetId")::int as "assetCount",
+      min(
+        ("asset"."localDateTime" AT TIME ZONE 'UTC'::text)::date
+      ) as "startDate",
+      max(
+        ("asset"."localDateTime" AT TIME ZONE 'UTC'::text)::date
+      ) as "endDate"
+    from
+      "album_asset"
+      inner join "asset" on "asset"."id" = "album_asset"."assetId"
+    where
+      "asset"."deletedAt" is null
+    group by
+      "album_asset"."albumId"
+  ) as "metadata" on "metadata"."albumId" = "album"."id"
+where
+  (
+    exists (
+      select
+      from
+        "album_user"
+      where
+        "album_user"."albumId" = "album"."id"
+        and (
+          "album"."ownerId" = $1
+          or "album_user"."userId" = $2
+        )
+    )
+    or exists (
+      select
+      from
+        "shared_link"
+      where
+        "shared_link"."albumId" = "album"."id"
+        and "shared_link"."userId" = $3
+    )
+  )
+  and "album"."deletedAt" is null
+
 -- AlbumRepository.getShared
 select
   "album".*,

@@ -82,6 +82,7 @@ part 'model/activity_response_dto.dart';
 part 'model/activity_statistics_response_dto.dart';
 part 'model/add_users_dto.dart';
 part 'model/admin_onboarding_update_dto.dart';
+part 'model/album_name_dto.dart';
 part 'model/album_response_dto.dart';
 part 'model/album_statistics_response_dto.dart';
 part 'model/album_user_add_dto.dart';
