@@ -63,7 +63,7 @@ You can access the web from `http://your-machine-ip:3000` or `http://localhost:3
 If you only want to do web development connected to an existing, remote backend, run from the repo root:
 
 ```bash
-IMMICH_SERVER_URL=https://demo.immich.app/ mise //web:start
+IMMICH_SERVER_URL=https://demo.opennoodle.de/ mise //web:start
 ```
 
 This will install all dependencies (including the SDK) and start the dev server in one step. To connect to the hosted demo server specifically, use the shorthand:
@@ -75,7 +75,7 @@ mise //web:start-demo
 If you're using PowerShell on Windows you may need to set the env var separately like so:
 
 ```powershell
-$env:IMMICH_SERVER_URL = "https://demo.immich.app/"
+$env:IMMICH_SERVER_URL = "https://demo.opennoodle.de/"
 mise //web:start
 ```
 
@@ -122,7 +122,7 @@ To add a new translation text, enter the key-value pair in the `i18n/en.json` in
 mise //mobile:translation
 ```
 
-The mobile app asks you what backend to connect to. You can utilize the demo backend (https://demo.immich.app/) if you don't need to change server code or upload photos. Alternatively, you can run the server yourself per the instructions above.
+The mobile app asks you what backend to connect to. You can utilize the demo backend (https://demo.opennoodle.de/) if you don't need to change server code or upload photos. Alternatively, you can run the server yourself per the instructions above.
 
 #### UI components and widget previews
 
