@@ -1074,14 +1074,15 @@ export class GlobalSearchManager {
     // SWR (stale-while-revalidate): only flip sections that are NOT already 'ok' to
     // loading. Preserving ok content across keystrokes fixes the jitter bug where the
     // palette flashed skeletons between every character.
-    for (const key of ['photos', 'people', 'places', 'tags'] as const) {
+    for (const key of ['photos', 'people', 'places', 'tags', 'albums', 'spaces'] as const) {
       if (this.sections[key].status !== 'ok') {
         this.sections[key] = { status: 'loading' };
       }
     }
     // Navigation runs synchronously on every keystroke, bypassing the 150ms debounce.
     // It's a pure in-memory scan — no rate-limit or network concern. runBatch does NOT
-    // iterate over navigation; its hardcoded tuple is `photos/people/places/tags`.
+    // iterate over navigation; its async dispatch tuple is
+    // `photos/people/places/tags/albums/spaces`.
     this.sections.navigation = this.runNavigationProvider(text);
     // The prior cursor may point at a nav/entity item that no longer exists in the new
     // results. Reconcile synchronously so the highlight doesn't lag the displayed list.
@@ -1111,7 +1112,11 @@ export class GlobalSearchManager {
     // batchInFlight at true).
     this.inFlightCounter = 0;
 
-    for (const key of ['photos', 'people', 'places', 'tags'] as const) {
+    // Navigation intentionally omitted: it flows through the synchronous
+    // runNavigationProvider() call in setQuery and must NOT join the async
+    // batch dispatch. Albums / spaces dispatch through their provider.run()
+    // which delegates to runAlbums() / runSpaces() — see buildProviders().
+    for (const key of ['photos', 'people', 'places', 'tags', 'albums', 'spaces'] as const) {
       const provider = this.providers[key];
       if (text.length < provider.minQueryLength) {
         this.sections[key] = idle;
@@ -1191,8 +1196,8 @@ export class GlobalSearchManager {
   /**
    * Filter / rank / slice the in-memory albums catalog for `rawQuery` and write the
    * result into `sections.albums`. Called by the albums provider entry in
-   * `buildProviders()` — runBatch only iterates entity keys (photos/people/places/
-   * tags), so this is the sole writer for the albums section.
+   * `buildProviders()` — runBatch dispatches the albums key to that provider, which
+   * delegates here, so this is the sole writer for the albums section.
    *
    * Scoring rules (all case-insensitive, query is trimmed):
    *   - name.startsWith(query) → score 2
@@ -1243,9 +1248,9 @@ export class GlobalSearchManager {
    * Filter / rank / slice the in-memory shared-spaces catalog for `rawQuery` and
    * write the result into `sections.spaces`. Mirrors `runAlbums` — matches on
    * `space.name` (not `albumName`), single source so no owned/shared dedupe. The
-   * spaces provider entry in `buildProviders()` dispatches here; runBatch only
-   * iterates entity keys (photos/people/places/tags), so this is the sole writer
-   * for the spaces section.
+   * spaces provider entry in `buildProviders()` dispatches here; runBatch routes
+   * the spaces key through that provider, so this is the sole writer for the
+   * spaces section.
    *
    * Scoring rules (all case-insensitive, query is trimmed):
    *   - name.startsWith(query) → score 2
@@ -1405,9 +1410,10 @@ export class GlobalSearchManager {
     };
 
     // Navigation provider is a stub. Task 10 wires runNavigationProvider into setQuery
-    // directly (synchronous, bypassing the 150ms debounce). runBatch iterates only over
-    // entity keys, so this stub is never invoked at runtime — it exists to satisfy the
-    // Record<keyof Sections, Provider> contract. Regression test in Task 10 pins this.
+    // directly (synchronous, bypassing the 150ms debounce). runBatch iterates only the
+    // entity + albums + spaces keys — navigation is explicitly excluded — so this stub
+    // is never invoked at runtime. It exists to satisfy the `Record<keyof Sections,
+    // Provider>` contract. Regression test in Task 12 pins this.
     const navigationStub: Provider<NavigationItem> = {
       key: 'navigation',
       topN: 5,
@@ -1416,13 +1422,11 @@ export class GlobalSearchManager {
     };
 
     // Albums provider dispatches to `runAlbums`, which filters the in-memory catalog
-    // and writes `sections.albums` directly. runBatch iterates only entity keys
-    // (photos/people/places/tags), so this `run()` is not invoked on the batch path —
-    // the albums dispatch happens via a separate path that calls `runAlbums()`
-    // directly. The `run()` function exists to satisfy the `Record<keyof Sections,
-    // Provider>` contract and is safe to call as a no-op that returns whatever
-    // `runAlbums` wrote: any future refactor that DOES invoke it (e.g. unifying all
-    // section scheduling under runBatch) will still produce the right state.
+    // and writes `sections.albums` directly. Task 12 wired the albums key into
+    // runBatch's iteration tuple, so `run()` is now invoked on the batch path. It
+    // delegates to `runAlbums()` and returns the section state that method wrote,
+    // so runBatch's subsequent `this.sections[key] = result` assignment is a no-op
+    // self-assignment.
     const albums: Provider = {
       key: 'albums',
       topN: ALBUMS_TOP_N,
@@ -1433,10 +1437,9 @@ export class GlobalSearchManager {
       },
     };
     // Spaces provider dispatches to `runSpaces`, which filters the in-memory catalog
-    // and writes `sections.spaces` directly. Same Provider-contract rationale as
-    // `albums` above — runBatch iterates only entity keys, so this `run()` is not
-    // invoked on the batch path, but a future refactor unifying all section
-    // scheduling under runBatch will still produce the right state.
+    // and writes `sections.spaces` directly. Same dispatch path as `albums` above —
+    // runBatch iterates the spaces key, calls `run()`, which delegates to
+    // `runSpaces()` and returns the section state that method wrote.
     const spaces: Provider = {
       key: 'spaces',
       topN: SPACES_TOP_N,

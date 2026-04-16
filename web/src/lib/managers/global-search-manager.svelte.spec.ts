@@ -259,10 +259,10 @@ describe('setQuery', () => {
     expect(calls.map((c) => c.key).sort()).toEqual(['photos']);
   });
 
-  it('query length ≥ 2 fires all four providers', async () => {
+  it('query length ≥ 2 fires all six providers', async () => {
     manager.setQuery('ab');
     await vi.advanceTimersByTimeAsync(200);
-    expect(calls.map((c) => c.key).sort()).toEqual(['people', 'photos', 'places', 'tags']);
+    expect(calls.map((c) => c.key).sort()).toEqual(['albums', 'people', 'photos', 'places', 'spaces', 'tags']);
   });
 
   it('debounces rapid keystrokes — only the last value fires', async () => {
@@ -2755,6 +2755,57 @@ describe('spaces catalog fetch', () => {
     sut.open();
     await Promise.all([sut.ensureSpacesCache(), sut.ensureSpacesCache()]);
     expect(getAllSpaces).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('runBatch dispatches albums and spaces providers', () => {
+  // Wires Task 10's runAlbums + Task 11's runSpaces into the runBatch dispatch.
+  // Without this wiring, typing fires only photos/people/places/tags and the albums
+  // and spaces sections would stay at `loading` forever for any query over
+  // minQueryLength. runBatch is protected and driven from `setQuery` in every
+  // other suite — use the same entry point here.
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    vi.useFakeTimers();
+    installFakeAbortTimeout();
+    // Keep the entity providers quiet so only the methods under test drive state.
+    vi.mocked(searchSmart).mockResolvedValue({ assets: { items: [], nextPage: null } } as never);
+    vi.mocked(searchAssets).mockResolvedValue({ assets: { items: [], nextPage: null } } as never);
+    vi.mocked(searchPerson).mockResolvedValue([] as never);
+    vi.mocked(searchPlaces).mockResolvedValue([] as never);
+    vi.mocked(getAllTags).mockResolvedValue([] as never);
+    vi.mocked(getAlbumNames).mockResolvedValue([] as never);
+    vi.mocked(getAllSpaces).mockResolvedValue([] as never);
+  });
+
+  afterEach(() => {
+    restoreAbortTimeout();
+    vi.useRealTimers();
+  });
+
+  it('runBatch calls runAlbums and runSpaces with the query', async () => {
+    const sut = new GlobalSearchManager();
+    sut.open();
+    const runAlbums = vi.spyOn(sut, 'runAlbums').mockResolvedValue(undefined);
+    const runSpaces = vi.spyOn(sut, 'runSpaces').mockResolvedValue(undefined);
+    sut.setQuery('hawaii');
+    await vi.advanceTimersByTimeAsync(200);
+    expect(runAlbums).toHaveBeenCalledWith('hawaii');
+    expect(runSpaces).toHaveBeenCalledWith('hawaii');
+  });
+
+  it('runBatch still excludes navigation from the async dispatch tuple', async () => {
+    // Regression pin: nav flows through a synchronous filter inside setQuery
+    // (runNavigationProvider), not the async batch. If runBatch ever iterates
+    // 'navigation', the stub provider's run() would fire — assert it does not.
+    const sut = new GlobalSearchManager();
+    sut.open();
+    const providers = (sut as unknown as { providers: Record<keyof Sections, Provider> }).providers;
+    const navRun = vi.spyOn(providers.navigation, 'run');
+    sut.setQuery('hawaii');
+    await vi.advanceTimersByTimeAsync(200);
+    expect(navRun).not.toHaveBeenCalled();
   });
 });
 
