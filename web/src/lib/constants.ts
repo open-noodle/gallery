@@ -303,3 +303,6 @@ export enum BackupFileStatus {
 }
 
 export const assetViewerFadeDuration: number = 150;
+
+export const IOS_APP_STORE_URL = 'https://apps.apple.com/app/id6761776289';
+export const ANDROID_INSTALL_URL = '/install';
