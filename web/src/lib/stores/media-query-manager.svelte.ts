@@ -4,6 +4,7 @@ const pointerCoarse = new MediaQuery('pointer:coarse');
 const maxMd = new MediaQuery('max-width: 767px');
 const sidebar = new MediaQuery(`min-width: 850px`);
 const reducedMotion = new MediaQuery('prefers-reduced-motion: reduce');
+const minLg = new MediaQuery('min-width: 1024px');
 
 export const mediaQueryManager = {
   get pointerCoarse() {
@@ -17,5 +18,8 @@ export const mediaQueryManager = {
   },
   get reducedMotion() {
     return reducedMotion.current;
+  },
+  get minLg() {
+    return minLg.current;
   },
 };
