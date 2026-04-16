@@ -73,7 +73,11 @@
           class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400"
         >
           {$t(bucket.headingKey)}{#if showChip}
-            <span class="tabular-nums"> ({$t('cmdk_section_count_of', { values: { shown: bucket.items.length, total: bucket.preSliceCount } })})</span>
+            <span class="tabular-nums">
+              ({$t('cmdk_section_count_of', {
+                values: { shown: bucket.items.length, total: bucket.preSliceCount },
+              })})</span
+            >
           {/if}
         </Command.GroupHeading>
         <Command.GroupItems>

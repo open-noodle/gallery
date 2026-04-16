@@ -12,14 +12,7 @@
     onActivate?: (item: T) => void;
     onSeeAll?: () => void;
   }
-  let {
-    heading,
-    status,
-    idPrefix,
-    renderRow: renderRowProp,
-    onActivate = () => {},
-    onSeeAll,
-  }: Props = $props();
+  let { heading, status, idPrefix, renderRow: renderRowProp, onActivate = () => {}, onSeeAll }: Props = $props();
 </script>
 
 <Command.Root>

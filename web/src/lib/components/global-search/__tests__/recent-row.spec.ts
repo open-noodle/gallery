@@ -18,7 +18,6 @@ describe('recent-row', () => {
     await waitLocale('en-US');
   });
 
-
   it('renders query kind with text', () => {
     render(RecentRow, {
       props: { entry: { kind: 'query', id: 'q:beach', text: 'beach', mode: 'smart', lastUsed: 1 } },

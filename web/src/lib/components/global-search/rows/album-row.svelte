@@ -27,10 +27,7 @@
   {#if thumbUrl}
     <img src={thumbUrl} alt="" class="h-10 w-10 rounded-md object-cover" loading="lazy" />
   {:else}
-    <div
-      class="flex h-10 w-10 items-center justify-center rounded-md bg-subtle/40"
-      aria-hidden="true"
-    >
+    <div class="flex h-10 w-10 items-center justify-center rounded-md bg-subtle/40" aria-hidden="true">
       <Icon icon={mdiImageMultipleOutline} size="1.125em" class="text-gray-500 dark:text-gray-400" />
     </div>
   {/if}

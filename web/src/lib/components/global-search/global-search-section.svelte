@@ -44,7 +44,9 @@
       class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400"
     >
       {heading}{#if showCount && status.status === 'ok'}
-        <span class="tabular-nums"> ({$t('cmdk_section_count_of', { values: { shown: status.items.length, total: status.total } })})</span>
+        <span class="tabular-nums">
+          ({$t('cmdk_section_count_of', { values: { shown: status.items.length, total: status.total } })})</span
+        >
       {/if}
     </Command.GroupHeading>
     <Command.GroupItems>

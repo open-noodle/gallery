@@ -1227,14 +1227,14 @@ export class GlobalSearchManager {
 
     if (text.trim() === '') {
       this.sections = {
-      photos: idle,
-      people: idle,
-      places: idle,
-      tags: idle,
-      albums: idle,
-      spaces: idle,
-      navigation: idle,
-    };
+        photos: idle,
+        people: idle,
+        places: idle,
+        tags: idle,
+        albums: idle,
+        spaces: idle,
+        navigation: idle,
+      };
       this.batchInFlight = false;
       this.inFlightCounter = 0;
       this._batchInFlightStartedAt = 0;

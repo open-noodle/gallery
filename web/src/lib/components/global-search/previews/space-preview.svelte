@@ -99,6 +99,8 @@
   {/if}
 
   <div class="flex gap-2">
-    <Button variant="ghost" size="small" onclick={() => goto(Route.viewSpace({ id: item.id }))}>{$t('cmdk_open')}</Button>
+    <Button variant="ghost" size="small" onclick={() => goto(Route.viewSpace({ id: item.id }))}
+      >{$t('cmdk_open')}</Button
+    >
   </div>
 </div>

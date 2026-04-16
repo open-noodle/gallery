@@ -109,11 +109,11 @@ describe('global-search-navigation-sections', () => {
     expect(groups).toHaveLength(2);
 
     // Identify the userPages group by its heading text.
-    const userPagesGroup = groups.find(
-      (g) => g.querySelector('[data-command-group-heading]')?.textContent?.includes('Navigation'),
+    const userPagesGroup = groups.find((g) =>
+      g.querySelector('[data-command-group-heading]')?.textContent?.includes('Navigation'),
     );
-    const actionsGroup = groups.find(
-      (g) => g.querySelector('[data-command-group-heading]')?.textContent?.includes('Actions'),
+    const actionsGroup = groups.find((g) =>
+      g.querySelector('[data-command-group-heading]')?.textContent?.includes('Actions'),
     );
     expect(userPagesGroup).toBeTruthy();
     expect(actionsGroup).toBeTruthy();

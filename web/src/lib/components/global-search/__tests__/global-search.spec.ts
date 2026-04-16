@@ -813,9 +813,7 @@ describe('global-search root', () => {
     // below-threshold keys).
     const m = new GlobalSearchManager();
     const providers = (m as unknown as { providers: Record<keyof Sections, Provider> }).providers;
-    const photosSpy = vi.fn(() =>
-      Promise.resolve({ status: 'ok' as const, items: [{ id: 'p1' } as never], total: 1 }),
-    );
+    const photosSpy = vi.fn(() => Promise.resolve({ status: 'ok' as const, items: [{ id: 'p1' } as never], total: 1 }));
     const albumsSpy = vi.fn(() => Promise.resolve({ status: 'empty' as const }));
     const spacesSpy = vi.fn(() => Promise.resolve({ status: 'empty' as const }));
     const peopleSpy = vi.fn(() => Promise.resolve({ status: 'empty' as const }));

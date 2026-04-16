@@ -2789,9 +2789,7 @@ describe('album catalog fetch', () => {
     vi.mocked(getAlbumNames).mockImplementation((opts) => {
       const signal = (opts as { signal?: AbortSignal } | undefined)?.signal;
       return new Promise((_, reject) => {
-        signal?.addEventListener('abort', () =>
-          reject(Object.assign(new Error('aborted'), { name: 'AbortError' })),
-        );
+        signal?.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })));
       }) as unknown as ReturnType<typeof getAlbumNames>;
     });
 
@@ -2854,9 +2852,7 @@ describe('spaces catalog fetch', () => {
     vi.mocked(getAllSpaces).mockImplementation((opts) => {
       const signal = (opts as { signal?: AbortSignal } | undefined)?.signal;
       return new Promise((_, reject) => {
-        signal?.addEventListener('abort', () =>
-          reject(Object.assign(new Error('aborted'), { name: 'AbortError' })),
-        );
+        signal?.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })));
       }) as unknown as ReturnType<typeof getAllSpaces>;
     });
 
@@ -3102,9 +3098,7 @@ describe('activateAlbum', () => {
     vi.mocked(getAlbumInfo).mockImplementation((_args, opts) => {
       const signal = (opts as { signal?: AbortSignal } | undefined)?.signal;
       return new Promise((_, reject) => {
-        signal?.addEventListener('abort', () =>
-          reject(Object.assign(new Error('aborted'), { name: 'AbortError' })),
-        );
+        signal?.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })));
       }) as unknown as ReturnType<typeof getAlbumInfo>;
     });
 
@@ -3332,9 +3326,7 @@ describe('activateSpace', () => {
     vi.mocked(getSpace).mockImplementation((_args, opts) => {
       const signal = (opts as { signal?: AbortSignal } | undefined)?.signal;
       return new Promise((_, reject) => {
-        signal?.addEventListener('abort', () =>
-          reject(Object.assign(new Error('aborted'), { name: 'AbortError' })),
-        );
+        signal?.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })));
       }) as unknown as ReturnType<typeof getSpace>;
     });
 
