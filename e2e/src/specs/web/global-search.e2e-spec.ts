@@ -342,7 +342,7 @@ test.describe('global search palette', () => {
       nodes.map((n) => {
         const labelledBy = n.getAttribute('aria-labelledby');
         if (labelledBy) {
-          const heading = document.getElementById(labelledBy);
+          const heading = document.querySelector(`[id="${labelledBy}"]`);
           if (heading) {
             return (heading.textContent ?? '').toLowerCase();
           }
