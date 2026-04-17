@@ -3552,9 +3552,9 @@ describe('prefix scoping — runBatch gating', () => {
     const getAllTagsSpy = vi.mocked(getAllTags);
     const getAlbumNamesSpy = vi.mocked(getAlbumNames);
     const getAllSpacesSpy = vi.mocked(getAllSpaces);
-    [searchSmartSpy, searchPersonSpy, searchPlacesSpy, getAllTagsSpy, getAlbumNamesSpy, getAllSpacesSpy].forEach((s) =>
-      s.mockClear(),
-    );
+    for (const s of [searchSmartSpy, searchPersonSpy, searchPlacesSpy, getAllTagsSpy, getAlbumNamesSpy, getAllSpacesSpy]) {
+      s.mockClear();
+    }
 
     m.setQuery('>theme');
     await vi.advanceTimersByTimeAsync(150);

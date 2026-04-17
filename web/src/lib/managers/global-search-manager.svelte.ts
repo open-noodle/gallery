@@ -1388,9 +1388,9 @@ export class GlobalSearchManager {
     // in setQuery and is NOT an entity section.
     const scope = this.scope;
     const payload = this.payload;
-    const inScope = new Set(ENTITY_KEYS_BY_SCOPE[scope]);
+    const inScope = ENTITY_KEYS_BY_SCOPE[scope];
     for (const key of ['photos', 'people', 'places', 'tags', 'albums', 'spaces'] as const) {
-      if (!inScope.has(key)) {
+      if (!inScope.includes(key)) {
         this.sections[key] = idle;
       }
     }
