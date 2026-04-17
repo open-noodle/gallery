@@ -519,6 +519,10 @@ const newRealRepository = <T>(key: ClassConstructor<T>, db: Kysely<DB>): T => {
       return new key(db, LoggingRepository.create());
     }
 
+    case MapRepository: {
+      return new key(new ConfigRepository(), new SystemMetadataRepository(db), LoggingRepository.create(), db);
+    }
+
     case LoggingRepository as unknown as ClassConstructor<LoggingRepository>: {
       return new key() as unknown as T;
     }
