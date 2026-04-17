@@ -234,28 +234,7 @@ Pre-built Docker images are published to GitHub Container Registry (GHCR) under 
 
 ### Publishing
 
-Images are built and published by the **Release Gallery** GitHub Actions workflow (`.github/workflows/gallery-release.yml`). The workflow is **manually triggered** via `workflow_dispatch` — it does not run automatically on merges to `main`.
-
-**How it works:**
-
-1. A maintainer triggers the workflow from the Actions tab (or via `gh workflow run`), optionally passing an explicit version.
-2. If no version is passed, the next semver is computed from commits since the latest tag:
-   - `changelog:skip` PR label → **no release** (skips build, tag, and push entirely)
-   - `feat:` commit or `changelog:feat` PR label → **minor** bump (e.g. `v4.2.6` → `v4.3.0`)
-   - `BREAKING CHANGE` in commit body → **major** bump (e.g. `v4.3.0` → `v5.0.0`)
-   - Everything else (`fix:`, `docs:`, `chore:`, etc.) → **patch** bump (e.g. `v4.2.6` → `v4.2.7`)
-3. Three jobs run in parallel: server, ML (CPU), and ML (CUDA)
-4. Each image is tagged with the version, the major version (e.g. `v4`), and `release`
-5. Git tags are created after successful builds
-6. Images are pushed to GHCR using the built-in `GITHUB_TOKEN` — no extra secrets needed
-
-**To publish a specific version:**
-
-```bash
-gh workflow run gallery-release.yml --ref main -f version=v4.2.6
-```
-
-Or use the GitHub Actions UI: Actions > Release Gallery > Run workflow > enter version (or leave blank for auto-bump) > Run.
+Gallery maintainers ship releases via manually-triggered GitHub Actions workflows — the full two-phase (mobile + server) flow and the server-only fast path are documented in [CONTRIBUTING.md](CONTRIBUTING.md#releases).
 
 ## Contributing
 
