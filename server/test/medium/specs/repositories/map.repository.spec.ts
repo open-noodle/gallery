@@ -43,5 +43,30 @@ describe(MapRepository.name, () => {
       expect(results).toHaveLength(1);
       expect(results[0]).toMatchObject({ id: asset.id, lat: 48.8566, lon: 2.3522 });
     });
+
+    it('should include a library-linked asset via shared_space_library for a member', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id });
+      const { library } = await ctx.newLibrary({ ownerId: owner.id });
+      await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id });
+      const { asset } = await ctx.newAsset({
+        ownerId: owner.id,
+        libraryId: library.id,
+        visibility: AssetVisibility.Timeline,
+      });
+      await ctx.database
+        .insertInto('asset_exif')
+        .values({ assetId: asset.id, latitude: 40.7128, longitude: -74.006 })
+        .execute();
+
+      const results = await sut.getMapMarkers([member.id], [], { timelineSpaceIds: [space.id] });
+
+      expect(results).toHaveLength(1);
+      expect(results[0].id).toBe(asset.id);
+    });
   });
 });
