@@ -444,4 +444,270 @@ test.describe('global search palette', () => {
       await expect(page.getByText(/auto-classification/i)).toHaveCount(0);
     });
   });
+
+  test.describe('prefix scoping (cmdk v1.2)', () => {
+    // These 14 tests cover the v1.2 prefix scoping contract. Each test seeds its own
+    // fixtures inline — the outer beforeAll already handled admin setup + the baseline
+    // asset upload + metadata drain. We reuse the outer beforeEach so auth cookies and
+    // the /photos landing + cmdk-trigger hydration wait are handled automatically.
+
+    test('scope @ narrows to people section and activating navigates to /people/:id', async ({ page }) => {
+      // searchPerson (used for `@alice`) runs a trigram word_similarity filter on
+      // person.name and DOES NOT require any asset_face rows, so a bare createPerson
+      // is sufficient to surface the row under named-@ queries.
+      const person = await utils.createPerson(admin.accessToken, { name: 'Alice Scope' });
+
+      await page.keyboard.press('Control+k');
+      const dialog = page.getByRole('dialog');
+      await dialog.getByRole('combobox').fill('@alice');
+
+      const peopleGroup = dialog.getByRole('group', { name: /^people/i });
+      await expect(peopleGroup.getByText(/alice scope/i).first()).toBeVisible();
+      // Photos/Albums should not render under scope 'people'.
+      await expect(dialog.getByRole('group', { name: /^photos/i })).toHaveCount(0);
+      await expect(dialog.getByRole('group', { name: /^albums/i })).toHaveCount(0);
+
+      await peopleGroup
+        .getByText(/alice scope/i)
+        .first()
+        .click();
+      await expect(page).toHaveURL(new RegExp(`/people/${person.id}`));
+    });
+
+    test('scope / activates album', async ({ page }) => {
+      const [album] = await utils.cmdkSeedAlbums(admin.accessToken, ['Scope Iceland Trip']);
+
+      await page.keyboard.press('Control+k');
+      const dialog = page.getByRole('dialog');
+      await dialog.getByRole('combobox').fill('/scope iceland');
+
+      const albumsGroup = dialog.getByRole('group', { name: /^albums/i });
+      await expect(albumsGroup.getByText(/scope iceland trip/i).first()).toBeVisible();
+      // Photos/People/Tags sections hidden under collections scope.
+      await expect(dialog.getByRole('group', { name: /^photos/i })).toHaveCount(0);
+      await expect(dialog.getByRole('group', { name: /^people/i })).toHaveCount(0);
+      await expect(dialog.getByRole('group', { name: /^tags/i })).toHaveCount(0);
+
+      await albumsGroup
+        .getByText(/scope iceland trip/i)
+        .first()
+        .click();
+      await expect(page).toHaveURL(new RegExp(`/albums/${album.id}`));
+    });
+
+    test('scope > toggles theme', async ({ page }) => {
+      const initialDark = await page.evaluate(() => document.documentElement.classList.contains('dark'));
+      await page.keyboard.press('Control+k');
+      const dialog = page.getByRole('dialog');
+      await dialog.getByRole('combobox').fill('>toggle theme');
+
+      // Entity sections are hidden under nav scope.
+      await expect(dialog.getByRole('group', { name: /^photos/i })).toHaveCount(0);
+      await expect(dialog.getByRole('group', { name: /^people/i })).toHaveCount(0);
+
+      await dialog
+        .getByText(/toggle theme/i)
+        .first()
+        .click();
+      await expect
+        .poll(async () => page.evaluate(() => document.documentElement.classList.contains('dark')))
+        .toBe(!initialDark);
+    });
+
+    test('bare # renders top tag suggestions', async ({ page }) => {
+      await utils.upsertTags(admin.accessToken, ['holiday-scope', 'trip-scope', 'family-scope']);
+
+      await page.keyboard.press('Control+k');
+      const dialog = page.getByRole('dialog');
+      await dialog.getByRole('combobox').fill('#');
+
+      const tagsGroup = dialog.getByRole('group', { name: /^tags/i });
+      await expect(tagsGroup).toBeVisible();
+      await expect(tagsGroup.getByText(/holiday-scope|trip-scope|family-scope/i).first()).toBeVisible();
+      await expect(dialog.getByRole('group', { name: /^photos/i })).toHaveCount(0);
+      await expect(dialog.getByRole('group', { name: /^people/i })).toHaveCount(0);
+    });
+
+    test('bare @ renders people suggestions via a single getAllPeople request', async ({ page }) => {
+      // getAllPeople (the bare-@ source) filters by an innerJoin on asset_face, so we
+      // must attach at least one face per person we want to surface. The HAVING clause
+      // is OR-gated on `name != ''`, so minFaces doesn't apply to named persons.
+      const baseAsset = await utils.createAsset(admin.accessToken);
+      const zoe = await utils.createPerson(admin.accessToken, { name: 'Zoe Scope' });
+      const avery = await utils.createPerson(admin.accessToken, { name: 'Avery Scope' });
+      await utils.createFace({ assetId: baseAsset.id, personId: zoe.id });
+      await utils.createFace({ assetId: baseAsset.id, personId: avery.id });
+
+      // Count getAllPeople dispatches. URL is `/api/people?<query>` — the `?` character
+      // in the glob is a glob wildcard for a single char; use `/api/people?*` to match
+      // both the `/api/people?size=10` form and future query variants.
+      let getAllPeopleCalls = 0;
+      await page.route('**/api/people?*', (route) => {
+        if (route.request().method() === 'GET') {
+          getAllPeopleCalls++;
+        }
+        void route.continue();
+      });
+
+      await page.goto('/photos');
+      await page.getByTestId('cmdk-trigger').waitFor({ state: 'visible' });
+      await page.keyboard.press('Control+k');
+      const dialog = page.getByRole('dialog');
+      await dialog.getByRole('combobox').fill('@');
+
+      const peopleGroup = dialog.getByRole('group', { name: /^people/i });
+      await expect(peopleGroup).toBeVisible();
+      await expect(peopleGroup.getByText(/zoe scope|avery scope/i).first()).toBeVisible();
+
+      // Clear + retype @ should hit the per-session people cache, no second request.
+      await dialog.getByRole('combobox').fill('');
+      await dialog.getByRole('combobox').fill('@');
+      await expect(peopleGroup.getByText(/zoe scope|avery scope/i).first()).toBeVisible();
+
+      // Exactly one getAllPeople dispatch across both '@' keystrokes.
+      expect(getAllPeopleCalls).toBe(1);
+    });
+
+    test('backspace-out reverts scope to unscoped then to empty palette', async ({ page }) => {
+      await page.keyboard.press('Control+k');
+      const dialog = page.getByRole('dialog');
+      const combobox = dialog.getByRole('combobox');
+
+      await combobox.fill('@alice');
+      await expect(dialog.getByRole('group', { name: /^photos/i })).toHaveCount(0);
+
+      // Drop the scope prefix → scope becomes 'all', Photos section can render.
+      await combobox.fill('alice');
+      // Give the 150ms debounce a beat.
+      await page.waitForTimeout(200);
+
+      // Clear fully → empty palette state (recents/no-query).
+      await combobox.fill('');
+      await expect(dialog).toBeVisible();
+      // No people group under scope 'all' + empty payload.
+      await expect(dialog.getByRole('group', { name: /^people/i })).toHaveCount(0);
+    });
+
+    test('scope swap @al → #sun leaves no stale sections', async ({ page }) => {
+      // Longer person name so trigram word_similarity ('al' vs 'Alvin Scope')
+      // reliably matches — short 2-char payloads are flaky against pg_trgm's
+      // 0.5 threshold. We type '@alvin' below instead of '@al'.
+      await utils.createPerson(admin.accessToken, { name: 'Alvin Scope' });
+      await utils.upsertTags(admin.accessToken, ['sunrise-scope']);
+
+      await page.keyboard.press('Control+k');
+      const dialog = page.getByRole('dialog');
+      const combobox = dialog.getByRole('combobox');
+
+      await combobox.fill('@alvin');
+      const peopleGroup = dialog.getByRole('group', { name: /^people/i });
+      await expect(peopleGroup).toBeVisible();
+
+      await combobox.fill('#sun');
+      // People section gone; Tags section visible.
+      await expect(dialog.getByRole('group', { name: /^people/i })).toHaveCount(0);
+      await expect(dialog.getByRole('group', { name: /^tags/i })).toBeVisible();
+    });
+
+    test('? keypress opens ShortcutsModal', async ({ page }) => {
+      await page.keyboard.press('Control+k');
+      const dialog = page.getByRole('dialog');
+      await dialog.getByRole('combobox').focus();
+      // Playwright maps the '?' character to Shift+Slash at the OS level. The
+      // Command.Input onkeydown handler branches on e.key === '?'.
+      await page.keyboard.press('?');
+
+      // ShortcutsModal opens on top of the palette; the "Scope prefixes" heading
+      // is the fork-only (Task 14) addition.
+      await expect(page.getByText(/scope prefixes/i)).toBeVisible();
+    });
+
+    test('ShortcutsModal contains the 4 scope rows', async ({ page }) => {
+      await page.keyboard.press('Control+k');
+      const dialog = page.getByRole('dialog');
+      await dialog.getByRole('combobox').focus();
+      await page.keyboard.press('?');
+
+      // All 4 scope prefix rows visible (i18n: cmdk_shortcut_scope_{people,tags,collections,nav}).
+      await expect(page.getByText(/search people/i)).toBeVisible();
+      await expect(page.getByText(/search tags/i)).toBeVisible();
+      await expect(page.getByText(/search albums and spaces|search albums & spaces/i)).toBeVisible();
+      await expect(page.getByText(/jump to pages/i)).toBeVisible();
+    });
+
+    test('footer help button (?) opens ShortcutsModal', async ({ page }) => {
+      await page.keyboard.press('Control+k');
+      const dialog = page.getByRole('dialog');
+      // The help button has data-cmdk-shortcuts-trigger (set in Task 13). It's
+      // `hidden sm:flex`, so only visible at viewports >= 640px wide — Playwright's
+      // default is 1280px, so the button is clickable.
+      const helpBtn = dialog.locator('[data-cmdk-shortcuts-trigger]');
+      await expect(helpBtn).toBeVisible();
+      await helpBtn.click();
+      await expect(page.getByText(/scope prefixes/i)).toBeVisible();
+    });
+
+    test('> bare shows navigation items sorted alphabetically', async ({ page }) => {
+      await page.keyboard.press('Control+k');
+      const dialog = page.getByRole('dialog');
+      await dialog.getByRole('combobox').fill('>');
+
+      // Navigation rows render under their categorical headings (System Settings,
+      // Admin, Navigation, Actions). The Theme toggle is an 'actions' entry.
+      await expect(dialog.getByText(/toggle theme/i).first()).toBeVisible();
+      // No entity section headings under nav scope.
+      await expect(dialog.getByRole('group', { name: /^photos/i })).toHaveCount(0);
+      await expect(dialog.getByRole('group', { name: /^people/i })).toHaveCount(0);
+      await expect(dialog.getByRole('group', { name: /^tags/i })).toHaveCount(0);
+    });
+
+    test('scope people with no results shows empty state', async ({ page }) => {
+      await page.keyboard.press('Control+k');
+      const dialog = page.getByRole('dialog');
+      await dialog.getByRole('combobox').fill('@zzz-nonexistent-scope-name-xyz');
+
+      // People section may render as "empty" (no group rendered) or not at all.
+      // What MUST be true: no OTHER entity sections render.
+      await expect(dialog.getByRole('group', { name: /^photos/i })).toHaveCount(0);
+      await expect(dialog.getByRole('group', { name: /^albums/i })).toHaveCount(0);
+      await expect(dialog.getByRole('group', { name: /^spaces/i })).toHaveCount(0);
+      await expect(dialog.getByRole('group', { name: /^places/i })).toHaveCount(0);
+      await expect(dialog.getByRole('group', { name: /^tags/i })).toHaveCount(0);
+    });
+
+    test('bare / renders Albums AND Spaces sections together', async ({ page }) => {
+      // Bare `/` is the only scope that surfaces two sections at once. Seed one
+      // of each so we can assert both headings render in the same palette frame.
+      await utils.cmdkSeedAlbums(admin.accessToken, ['Bare Slash Album']);
+      await utils.cmdkSeedSpaces(admin.accessToken, ['Bare Slash Space']);
+
+      await page.goto('/photos');
+      await page.getByTestId('cmdk-trigger').waitFor({ state: 'visible' });
+      await page.keyboard.press('Control+k');
+      const dialog = page.getByRole('dialog');
+      await dialog.getByRole('combobox').fill('/');
+
+      // Both sections render under scope `collections`.
+      const albumsGroup = dialog.getByRole('group', { name: /^albums/i });
+      const spacesGroup = dialog.getByRole('group', { name: /^spaces/i });
+      await expect(albumsGroup).toBeVisible();
+      await expect(spacesGroup).toBeVisible();
+      await expect(albumsGroup.getByText(/bare slash album/i).first()).toBeVisible();
+      await expect(spacesGroup.getByText(/bare slash space/i).first()).toBeVisible();
+
+      // Other entity sections stay hidden.
+      await expect(dialog.getByRole('group', { name: /^photos/i })).toHaveCount(0);
+      await expect(dialog.getByRole('group', { name: /^people/i })).toHaveCount(0);
+      await expect(dialog.getByRole('group', { name: /^tags/i })).toHaveCount(0);
+    });
+
+    test('footer scope chip visible: @ # / > and the scope label', async ({ page }) => {
+      await page.keyboard.press('Control+k');
+      const dialog = page.getByRole('dialog');
+      // From Task 13: `<kbd>@ # / ></kbd>` + "scope" label (cmdk_scope_hint_footer
+      // / cmdk_scope_hint_footer_label).
+      await expect(dialog.getByText(/@ # \/ >/)).toBeVisible();
+      await expect(dialog.getByText(/^scope$/i).first()).toBeVisible();
+    });
+  });
 });
