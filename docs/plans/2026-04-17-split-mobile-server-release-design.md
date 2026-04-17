@@ -126,5 +126,5 @@ The first release after merge:
 
 ## Open verification before implementation
 
-- [ ] Confirm `gh release create --draft --target <sha>` + later git-tag-at-`<sha>` + `gh release edit --draft=false` produces a published release whose tag points to `<sha>`. If `gh` ignores `target_commitish` once the tag exists, the SHA binding could be lost; rework needed.
-- [ ] Confirm `--latest=true` on `gh release edit` while transitioning out of draft state behaves as expected when an older release exists. Should be fine since we never expect a newer published release to exist (no `skip_mobile` path).
+- [x] **2026-04-17 verified against `open-noodle/gallery`:** `gh release create --draft --target <sha>` + `git tag <ver> <sha>` + push + `gh release edit --draft=false` produces a published release with `targetCommitish: <sha>` and the remote tag pointing at `<sha>`. SHA pinning is preserved end-to-end.
+- [x] **2026-04-17 verified:** `gh release edit --latest` moves the `/releases/latest` pointer cleanly. The plan's `gh release edit --draft=false --latest` single-call pattern is safe.
