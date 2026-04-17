@@ -234,16 +234,20 @@ Pre-built Docker images are published to GitHub Container Registry (GHCR) under 
 
 ### Publishing
 
-Gallery uses a **two-phase release flow** so mobile app builds are already live on Play Store and App Store before server users see a new version. Both workflows are **manually triggered** via `workflow_dispatch`.
+Gallery uses a **two-phase release flow** so mobile app builds are already live on Play Store and App Store before server users see a new version. All workflows are **manually triggered** via `workflow_dispatch` and appear in the Actions tab as:
 
-**Phase 1 — Release Mobile** (`.github/workflows/gallery-release-mobile.yml`)
+- **Release Mobile P1** — phase 1 (start of a full release)
+- **Release Gallery P2** — phase 2 (after mobile is live on stores)
+- **Release Gallery Server-only** — skip mobile entirely (use for server-only hotfixes)
+
+**Release Mobile P1** (`.github/workflows/gallery-release-mobile.yml`)
 
 1. Maintainer triggers the workflow from the Actions tab. Version is computed automatically from commits since the last tag (rules below), or passed explicitly via input.
 2. The mobile app is built and signed. iOS IPA uploads to TestFlight. Android AAB is attached as a workflow artifact and the APK is attached to the draft release for sideload; Play Store upload is currently disabled while the app is in Google review and will be re-enabled once review completes.
 3. A **draft** GitHub Release is created pinning the version (tag name), commit SHA (`target_commitish`), and APK (asset). The draft is invisible to end users.
 4. The maintainer manually promotes the Play internal build (once Play uploads are re-enabled — currently the AAB must be uploaded by hand) to **production** in Play Console and submits the App Store for review. Once both stores show the new version live to end users, proceed to phase 2. Typically ~24h.
 
-**Phase 2 — Release Gallery** (`.github/workflows/gallery-release.yml`)
+**Release Gallery P2** (`.github/workflows/gallery-release.yml`)
 
 1. Maintainer triggers the workflow from the Actions tab. No inputs.
 2. The workflow discovers the pending draft from phase 1, reads the pinned version + SHA, and checks out at that exact SHA — so the server image matches the commit the mobile app was built from.
@@ -252,14 +256,25 @@ Gallery uses a **two-phase release flow** so mobile app builds are already live 
 5. The draft release is promoted to published (`--latest`). The APK attached in phase 1 becomes the public sideload download.
 6. `version.json` is uploaded to the S3 version endpoint — self-hosted instances polling this endpoint now show "new version available".
 
-**Version selection** (phase 1)
+**Release Gallery Server-only** (`.github/workflows/gallery-release-server-only.yml`)
+
+Use for server / web / docs changes that don't affect the mobile app — ship without the ~24h mobile review wait.
+
+1. Maintainer triggers the workflow from the Actions tab. Version auto-bumps from commits, or passed explicitly.
+2. Fails fast if a pending P1 mobile draft exists (version-number collision risk). Finish the mobile release first, or discard the draft.
+3. Builds and pushes server + ML images at `main` HEAD, tags the release, creates a public GitHub Release, flips the version endpoint.
+4. **No APK attached.** Release notes link to the previous release's APK for sideload users. Mobile users stay on the previous version.
+
+**Do NOT use server-only for major version bumps** or any change that breaks the mobile app's API contract — ship those through the normal P1 → P2 flow so mobile catches up.
+
+**Version selection** (Release Mobile P1 and Release Gallery Server-only)
 
 - `changelog:skip` PR label → commit is excluded from the bump computation
 - `feat:` commit or `changelog:feat` PR label → **minor** bump (e.g. `v4.2.6` → `v4.3.0`)
 - `BREAKING CHANGE` in commit body or `!` in commit prefix (e.g. `feat!:`) → **major** bump
 - Everything else (`fix:`, `docs:`, `chore:`, etc.) → **patch** bump
 
-If every commit since the last tag is `changelog:skip`, phase 1 errors — there is nothing to release.
+If every commit since the last tag is `changelog:skip`, the workflow errors — there is nothing to release.
 
 **Design properties**
 
@@ -270,14 +285,17 @@ If every commit since the last tag is `changelog:skip`, phase 1 errors — there
 **Triggering a release**
 
 ```bash
-# Phase 1 — auto-bump version from commit messages
+# Release Mobile P1 — auto-bump version from commit messages
 gh workflow run gallery-release-mobile.yml --ref main
 
-# Phase 1 — explicit version
+# Release Mobile P1 — explicit version
 gh workflow run gallery-release-mobile.yml --ref main -f version=v4.2.6
 
-# Phase 2 — promote (after mobile is live on both stores)
+# Release Gallery P2 — promote (after mobile is live on both stores)
 gh workflow run gallery-release.yml --ref main
+
+# Release Gallery Server-only — ship server/web/docs without waiting for mobile
+gh workflow run gallery-release-server-only.yml --ref main
 ```
 
 **Recovering from mobile rejection**

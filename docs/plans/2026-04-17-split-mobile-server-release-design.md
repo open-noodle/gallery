@@ -20,9 +20,14 @@ Mobile submission leads server promotion by ~24h while preserving:
 
 - Automated polling of Play Console / App Store Connect for approval state. The maintainer triggers phase 2 manually after confirming mobile is live.
 - Splitting Android and iOS into separate phases. Both are submitted in phase 1.
-- A `skip_mobile` escape hatch for server-only hotfixes. Real hotfixes are rare; if needed, re-run phase 1 — mobile build + submission is cheap relative to the cost of maintaining a second code path.
 - Any change to `gallery-rc-build.yml` or the `rc-personal` flow.
 - Any change to the `version.json` wire format.
+
+## Server-only follow-up
+
+A third workflow `gallery-release-server-only.yml` (named "Release Gallery Server-only" in the Actions UI) was added after the initial design to handle server / web / docs-only releases that don't need the mobile-review wait. It mirrors phase 2 but computes its own version, builds from `main` HEAD, skips the draft-discovery step, and creates a public GitHub Release with no APK (release notes link to the previous release's APK for sideload users). It shares phase 2's concurrency group (`gallery-release-server`) so the two never race on docker tags / git tags / version endpoint. It also fails fast if a pending phase-1 draft exists, to avoid version-number collision between a server-only release and an in-flight mobile release.
+
+Use server-only for: server bug fixes, web UI tweaks, docs updates. Do NOT use for: major version bumps, or any change that breaks the mobile app's API contract.
 
 ## Design
 

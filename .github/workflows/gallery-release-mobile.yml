@@ -1,4 +1,4 @@
-name: Release Gallery — Mobile (phase 1)
+name: Release Mobile P1
 
 # Phase 1 of the split release cycle. Builds mobile, uploads iOS IPA to
 # TestFlight, and publishes the Android AAB as a workflow artifact for
