@@ -41,7 +41,10 @@ class MapApi {
   ///
   /// * [bool] withSharedAlbums:
   ///   Include shared album assets
-  Future<Response> getMapMarkersWithHttpInfo({ DateTime? fileCreatedAfter, DateTime? fileCreatedBefore, bool? isArchived, bool? isFavorite, bool? withPartners, bool? withSharedAlbums, }) async {
+  ///
+  /// * [bool] withSharedSpaces:
+  ///   Include shared space assets
+  Future<Response> getMapMarkersWithHttpInfo({ DateTime? fileCreatedAfter, DateTime? fileCreatedBefore, bool? isArchived, bool? isFavorite, bool? withPartners, bool? withSharedAlbums, bool? withSharedSpaces, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/map/markers';
 
@@ -69,6 +72,9 @@ class MapApi {
     }
     if (withSharedAlbums != null) {
       queryParams.addAll(_queryParams('', 'withSharedAlbums', withSharedAlbums));
+    }
+    if (withSharedSpaces != null) {
+      queryParams.addAll(_queryParams('', 'withSharedSpaces', withSharedSpaces));
     }
 
     const contentTypes = <String>[];
@@ -108,8 +114,11 @@ class MapApi {
   ///
   /// * [bool] withSharedAlbums:
   ///   Include shared album assets
-  Future<List<MapMarkerResponseDto>?> getMapMarkers({ DateTime? fileCreatedAfter, DateTime? fileCreatedBefore, bool? isArchived, bool? isFavorite, bool? withPartners, bool? withSharedAlbums, }) async {
-    final response = await getMapMarkersWithHttpInfo( fileCreatedAfter: fileCreatedAfter, fileCreatedBefore: fileCreatedBefore, isArchived: isArchived, isFavorite: isFavorite, withPartners: withPartners, withSharedAlbums: withSharedAlbums, );
+  ///
+  /// * [bool] withSharedSpaces:
+  ///   Include shared space assets
+  Future<List<MapMarkerResponseDto>?> getMapMarkers({ DateTime? fileCreatedAfter, DateTime? fileCreatedBefore, bool? isArchived, bool? isFavorite, bool? withPartners, bool? withSharedAlbums, bool? withSharedSpaces, }) async {
+    final response = await getMapMarkersWithHttpInfo( fileCreatedAfter: fileCreatedAfter, fileCreatedBefore: fileCreatedBefore, isArchived: isArchived, isFavorite: isFavorite, withPartners: withPartners, withSharedAlbums: withSharedAlbums, withSharedSpaces: withSharedSpaces, );
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
