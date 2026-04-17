@@ -1,151 +1,88 @@
 name: Release Gallery
 
+# Phase 2 of the split release cycle. Reads the draft release created by
+# gallery-release-mobile.yml, builds server + ML at the pinned SHA, moves the
+# `release` / `vN` floating tags, promotes the draft, and publishes the
+# version endpoint. See
+# docs/plans/2026-04-17-split-mobile-server-release-design.md.
+
 on:
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version tag (e.g. v3.0.5) — overrides auto-version'
-        required: false
-        type: string
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: gallery-release-server
   cancel-in-progress: false
 
 permissions: {}
 
 jobs:
-  version:
-    name: Compute Version
+  discover:
+    name: Discover Pending Release Draft
     runs-on: ubuntu-latest
+    # contents: write is REQUIRED so the token can see draft releases.
+    # GitHub returns drafts only to tokens with write permission.
     permissions:
-      contents: read
+      contents: write
     outputs:
-      skip: ${{ steps.version.outputs.skip }}
-      version: ${{ steps.version.outputs.version }}
-      major: ${{ steps.version.outputs.major }}
+      version: ${{ steps.discover.outputs.version }}
+      sha: ${{ steps.discover.outputs.sha }}
+      major: ${{ steps.discover.outputs.major }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-          fetch-tags: true
-
-      - name: Compute next version
-        id: version
+      - name: Require main branch
         env:
-          GH_TOKEN: ${{ github.token }}
-          INPUT_VERSION: ${{ inputs.version }}
+          REF: ${{ github.ref_name }}
         run: |
-          set -euo pipefail
-
-          # Manual override always wins — trust the caller and build.
-          if [[ -n "$INPUT_VERSION" ]]; then
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-            echo "version=$INPUT_VERSION" >> "$GITHUB_OUTPUT"
-            major=$(echo "$INPUT_VERSION" | sed 's/^v//' | cut -d. -f1)
-            echo "major=v${major}" >> "$GITHUB_OUTPUT"
-            echo "Version: $INPUT_VERSION (major: v${major}) — manual override"
-            exit 0
-          fi
-
-          prev_tag=$(git tag --list 'v*.*.*' --sort=-version:refname | head -n1)
-          if [[ -z "$prev_tag" ]]; then
-            echo "::error::No existing version tags found. Run a manual release first."
+          if [[ "$REF" != "main" ]]; then
+            echo "::error::Releases must be triggered from main (got: $REF)"
             exit 1
           fi
 
-          # Walk every commit since prev_tag. Aggregate the max bump level
-          # across all release-worthy commits. Treat changelog:skip as a no-op
-          # — it neither bumps nor blocks by itself. If ALL commits since the
-          # last tag are changelog:skip, there's nothing to release.
-          rank_of() {
-            case "$1" in
-              major) echo 3 ;;
-              minor) echo 2 ;;
-              patch) echo 1 ;;
-              *) echo 0 ;;
-            esac
-          }
-
-          bump=""
-          has_non_skip_commit=false
-          skipped_count=0
-          total_count=0
-
-          # %H is commit hash, %s is subject only (single line). PR number
-          # lives in the subject since we squash-merge with "...(#NNN)".
-          while IFS=$'\t' read -r sha subject; do
-            [[ -z "$sha" ]] && continue
-            total_count=$((total_count + 1))
-
-            pr_num=$(echo "$subject" | grep -oP '#\K[0-9]+' | tail -1 || true)
-            labels=""
-            if [[ -n "$pr_num" ]]; then
-              labels=$(gh pr view "$pr_num" --json labels --jq '.labels[].name' 2>/dev/null || true)
+      - name: Find draft created by phase 1
+        id: discover
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          # Composite filter: drafts whose tag matches v*.*.* AND have at least
+          # one .apk asset. Same predicate phase 1's guard uses.
+          candidates=$(gh release list --repo "$REPO" --limit 1000 \
+            --json tagName,isDraft \
+            --jq '[.[] | select(.isDraft == true and (.tagName | test("^v[0-9]+\\.[0-9]+\\.[0-9]+$")))] | .[].tagName')
+          matches=""
+          for tag in $candidates; do
+            count=$(gh release view "$tag" --repo "$REPO" --json assets \
+              --jq '[.assets[] | select(.name | endswith(".apk"))] | length')
+            if [[ "$count" -gt 0 ]]; then
+              matches="$matches $tag"
             fi
+          done
+          matches=$(echo "$matches" | xargs || true)
 
-            if echo "$labels" | grep -q '^changelog:skip$'; then
-              skipped_count=$((skipped_count + 1))
-              echo "  · ${sha:0:7} ${subject}  [skip]"
-              continue
-            fi
-
-            has_non_skip_commit=true
-            commit_bump="patch"
-
-            if echo "$labels" | grep -q '^changelog:feat$'; then
-              commit_bump="minor"
-            fi
-
-            # Conventional Commits: `feat:` → minor, `feat!:` / `fix!:` → major
-            if echo "$subject" | grep -qP '^[a-z]+(\([^)]+\))?!:'; then
-              commit_bump="major"
-            elif echo "$subject" | grep -qP '^feat(\([^)]+\))?:'; then
-              [[ "$commit_bump" == "patch" ]] && commit_bump="minor"
-            fi
-
-            if [[ -z "$bump" ]] || (( $(rank_of "$commit_bump") > $(rank_of "$bump") )); then
-              bump="$commit_bump"
-            fi
-            echo "  · ${sha:0:7} ${subject}  [${commit_bump}]"
-          done < <(git log --format='%H%x09%s' "${prev_tag}..HEAD")
-
-          echo "Scanned $total_count commits since $prev_tag ($skipped_count skipped)."
-
-          if [[ "$has_non_skip_commit" == "false" ]]; then
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            if (( total_count == 0 )); then
-              echo "Skipping release — no commits since $prev_tag"
-            else
-              echo "Skipping release — all $total_count commits since $prev_tag are changelog:skip"
-            fi
-            exit 0
+          if [[ -z "$matches" ]]; then
+            echo "::error::No pending mobile release draft found."
+            echo "::error::Run gallery-release-mobile.yml first."
+            exit 1
           fi
 
-          bump="${bump:-patch}"
-          echo "skip=false" >> "$GITHUB_OUTPUT"
+          read -r tag rest <<< "$matches"
+          if [[ -n "$rest" ]]; then
+            echo "::error::Multiple pending drafts found: $matches"
+            echo "::error::Resolve before promoting."
+            exit 1
+          fi
 
-          major=$(echo "$prev_tag" | sed 's/^v//' | cut -d. -f1)
-          minor=$(echo "$prev_tag" | sed 's/^v//' | cut -d. -f2)
-          patch=$(echo "$prev_tag" | sed 's/^v//' | cut -d. -f3)
+          sha=$(gh release view "$tag" --repo "$REPO" --json targetCommitish --jq .targetCommitish)
+          major=$(echo "$tag" | sed 's/^v//' | cut -d. -f1)
 
-          case "$bump" in
-            major) version="v$((major + 1)).0.0" ;;
-            minor) version="v${major}.$((minor + 1)).0" ;;
-            patch) version="v${major}.${minor}.$((patch + 1))" ;;
-          esac
-
-          new_major=$(echo "$version" | sed 's/^v//' | cut -d. -f1)
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "major=v${new_major}" >> "$GITHUB_OUTPUT"
-          echo "Version: $version (major: v${new_major}) — ${bump} bump from $prev_tag"
+          echo "version=$tag" >> "$GITHUB_OUTPUT"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "major=v${major}" >> "$GITHUB_OUTPUT"
+          echo "Discovered: $tag at $sha"
 
   build-server:
     name: Build Server (${{ matrix.platform }})
-    if: needs.version.outputs.skip != 'true'
-    needs: version
+    needs: discover
     runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
@@ -163,6 +100,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
+          ref: ${{ needs.discover.outputs.sha }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
@@ -177,7 +115,7 @@ jobs:
       - name: Apply branding
         uses: ./.github/actions/apply-branding
         with:
-          version: ${{ needs.version.outputs.version }}
+          version: ${{ needs.discover.outputs.version }}
 
       - name: Prepare platform pair
         id: prepare
@@ -195,8 +133,8 @@ jobs:
           build-args: |
             DEVICE=cpu
             BUILD_ID=${{ github.run_id }}
-            BUILD_SOURCE_REF=${{ needs.version.outputs.version }}
-            BUILD_SOURCE_COMMIT=${{ github.sha }}
+            BUILD_SOURCE_REF=${{ needs.discover.outputs.version }}
+            BUILD_SOURCE_COMMIT=${{ needs.discover.outputs.sha }}
           outputs: type=image,"name=ghcr.io/open-noodle/gallery-server",push-by-digest=true,name-resolution=short,push=true
           cache-from: type=gha,scope=server-${{ steps.prepare.outputs.platform-pair }}
           cache-to: type=gha,scope=server-${{ steps.prepare.outputs.platform-pair }},mode=max
@@ -217,8 +155,7 @@ jobs:
 
   merge-server:
     name: Merge Server Manifest
-    if: needs.version.outputs.skip != 'true'
-    needs: [version, build-server]
+    needs: [discover, build-server]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -245,8 +182,8 @@ jobs:
         working-directory: ${{ runner.temp }}/digests
         env:
           IMAGE: ghcr.io/open-noodle/gallery-server
-          VERSION: ${{ needs.version.outputs.version }}
-          MAJOR: ${{ needs.version.outputs.major }}
+          VERSION: ${{ needs.discover.outputs.version }}
+          MAJOR: ${{ needs.discover.outputs.major }}
         run: |
           tags="-t ${IMAGE}:${VERSION} -t ${IMAGE}:${MAJOR} -t ${IMAGE}:release"
           sources=$(printf "${IMAGE}@sha256:%s " *)
@@ -254,8 +191,7 @@ jobs:
 
   build-ml:
     name: Build ML ${{ matrix.device }} (${{ matrix.platform }})
-    if: needs.version.outputs.skip != 'true'
-    needs: version
+    needs: discover
     runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
@@ -281,6 +217,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
+          ref: ${{ needs.discover.outputs.sha }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
@@ -295,7 +232,7 @@ jobs:
       - name: Apply branding
         uses: ./.github/actions/apply-branding
         with:
-          version: ${{ needs.version.outputs.version }}
+          version: ${{ needs.discover.outputs.version }}
 
       - name: Prepare platform pair
         id: prepare
@@ -332,8 +269,7 @@ jobs:
 
   merge-ml:
     name: Merge ML Manifest (${{ matrix.device }})
-    if: needs.version.outputs.skip != 'true'
-    needs: [version, build-ml]
+    needs: [discover, build-ml]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -369,30 +305,17 @@ jobs:
         working-directory: ${{ runner.temp }}/digests
         env:
           IMAGE: ghcr.io/open-noodle/gallery-ml
-          VERSION: ${{ needs.version.outputs.version }}
-          MAJOR: ${{ needs.version.outputs.major }}
+          VERSION: ${{ needs.discover.outputs.version }}
+          MAJOR: ${{ needs.discover.outputs.major }}
           SUFFIX: ${{ matrix.suffix }}
         run: |
           tags="-t ${IMAGE}:${VERSION}${SUFFIX} -t ${IMAGE}:${MAJOR}${SUFFIX} -t ${IMAGE}:release${SUFFIX}"
           sources=$(printf "${IMAGE}@sha256:%s " *)
           docker buildx imagetools create ${tags} ${sources}
 
-  build-mobile:
-    name: Build Mobile
-    if: needs.version.outputs.skip != 'true'
-    needs: version
-    permissions:
-      contents: read
-    uses: ./.github/workflows/gallery-build-mobile.yml
-    with:
-      environment: production
-      version: ${{ needs.version.outputs.version }}
-    secrets: inherit
-
   tag:
-    name: Create Git Tag
-    if: needs.version.outputs.skip != 'true'
-    needs: [version, merge-server, merge-ml, build-mobile]
+    name: Create Git Tag and Promote Release
+    needs: [discover, merge-server, merge-ml]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -403,82 +326,39 @@ jobs:
           persist-credentials: true
           fetch-depth: 0
           fetch-tags: true
+          ref: ${{ needs.discover.outputs.sha }}
 
       - name: Create tags
         env:
-          VERSION: ${{ needs.version.outputs.version }}
+          VERSION: ${{ needs.discover.outputs.version }}
+          SHA: ${{ needs.discover.outputs.sha }}
         run: |
           major=$(echo "$VERSION" | sed 's/^v//' | cut -d. -f1)
 
-          # Create version tag (e.g. v3.0.1)
-          git tag "$VERSION"
+          # Create version tag (e.g. v3.0.1) at the pinned SHA
+          git tag "$VERSION" "$SHA"
 
           # Update major version tag (e.g. v3) — floats to latest release
-          git tag -f "v${major}"
+          git tag -f "v${major}" "$SHA"
 
           # Update release tag — always points to latest build
-          git tag -f "release"
+          git tag -f "release" "$SHA"
 
           git push origin "$VERSION" "v${major}" "release" --force
 
-      - name: Download APK artifact
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: gallery-apk
-          path: ${{ runner.temp }}/apk
-
-      - name: Create GitHub Release
+      - name: Promote draft release
         env:
-          VERSION: ${{ needs.version.outputs.version }}
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
+          VERSION: ${{ needs.discover.outputs.version }}
         run: |
-          upstream_version=$(jq -r '.upstream.version' branding/config.json)
-          prev_tag=$(git tag --list 'v*.*.*' --sort=-version:refname | sed -n '2p')
-
-          notes="Based on [Immich v${upstream_version}](https://github.com/immich-app/immich/releases/tag/v${upstream_version})"
-
-          if [[ -n "$prev_tag" ]]; then
-            # Separate Gallery commits (PR# < 1000 or no PR ref) from upstream (PR# >= 1000)
-            # After a rebase, git log shows rewritten Gallery commits as new — skip them.
-            # Note: each loop body uses an explicit if/then so the last command on every
-            # iteration exits 0. Otherwise `[[ ... ]] && echo` returns 1 when the filter
-            # rejects a line, the while loop inherits that exit code, and the command
-            # substitution fails — which on the runner's strict bash kills the whole step.
-            all_commits=$(git log --pretty=format:'%s' "${prev_tag}..HEAD" 2>/dev/null)
-
-            gallery_commits=$(echo "$all_commits" | while IFS= read -r line; do
-              [[ -z "$line" ]] && continue
-              pr_num=$(echo "$line" | grep -oP '\(#\K[0-9]+(?=\))' | head -1)
-              if [[ -z "$pr_num" || "$pr_num" -lt 1000 ]]; then
-                echo "- $line"
-              fi
-            done)
-
-            upstream_commits=$(echo "$all_commits" | while IFS= read -r line; do
-              [[ -z "$line" ]] && continue
-              pr_num=$(echo "$line" | grep -oP '\(#\K[0-9]+(?=\))' | head -1)
-              if [[ -n "$pr_num" && "$pr_num" -ge 1000 ]]; then
-                echo "- $line"
-              fi
-            done)
-
-            if [[ -n "$upstream_commits" ]]; then
-              # Rebase release — only show upstream commits
-              printf -v notes '%s\n\n<details>\n<summary>Upstream commits</summary>\n\n%s\n\n</details>' "$notes" "$upstream_commits"
-            elif [[ -n "$gallery_commits" ]]; then
-              # Normal release — show Gallery changes
-              printf -v notes '%s\n\n## Changes\n\n%s' "$notes" "$gallery_commits"
-            fi
-          fi
-
-          gh release create "$VERSION" "$RUNNER_TEMP/apk/gallery-${VERSION}.apk" \
-            --title "$VERSION" --latest -n "$notes"
+          set -euo pipefail
+          gh release edit "$VERSION" --repo "$REPO" --draft=false --latest
+          echo "Released $VERSION"
 
   publish-version-endpoint:
     name: Publish Version Endpoint
-    if: needs.version.outputs.skip != 'true'
-    needs: [version, tag]
+    needs: [discover, tag]
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -492,7 +372,7 @@ jobs:
 
       - name: Build and upload version.json
         env:
-          VERSION: ${{ needs.version.outputs.version }}
+          VERSION: ${{ needs.discover.outputs.version }}
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
         run: |
@@ -502,8 +382,8 @@ jobs:
             exit 1
           fi
 
-          # Fetch published_at from the GitHub Release created by the tag job.
-          # Retry briefly in case of transient GH API issues immediately after release create.
+          # Fetch published_at from the now-promoted GitHub Release.
+          # Retry briefly in case of transient GH API issues immediately after promotion.
           published_at=""
           for attempt in 1 2 3; do
             published_at=$(gh release view "$VERSION" --repo "$REPO" --json publishedAt --jq .publishedAt 2>/dev/null || true)
