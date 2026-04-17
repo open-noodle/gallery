@@ -391,7 +391,7 @@
                   {$t('cmdk_helper')}
                 </div>
               {/if}
-            {:else}
+            {:else if manager.scope === 'all'}
               {#if manager.topNavigationMatch}
                 <Command.Group class="mb-4">
                   <Command.GroupHeading
@@ -421,10 +421,10 @@
                 {/snippet}
               </GlobalSearchSection>
               <!-- Albums + Spaces sit between Photos and People per the v1.1 plan's
-                   declared section sequence. Headings use `cmdk_section_albums` /
-                   `cmdk_section_spaces` (Task 24). `isPending` wiring reads
-                   `manager.pendingActivation` so the row spinner affordance appears for
-                   the exact key being activated. -->
+                     declared section sequence. Headings use `cmdk_section_albums` /
+                     `cmdk_section_spaces` (Task 24). `isPending` wiring reads
+                     `manager.pendingActivation` so the row spinner affordance appears for
+                     the exact key being activated. -->
               <GlobalSearchSection
                 heading={$t('cmdk_section_albums')}
                 status={manager.sections.albums}

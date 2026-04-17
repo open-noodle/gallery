@@ -812,3 +812,22 @@ describe('global-search root', () => {
     expect(hasReducedMotion).toBe(true);
   });
 });
+
+describe('prefix scoping — UI scope gating', () => {
+  it('scope all still renders existing full section stack (regression pin)', () => {
+    // Scope derives to 'all' for any bare query (no leading prefix), so seed
+    // `manager.query` with a plain string and populate a couple of entity sections.
+    // The gating Task 12a adds must be a pure no-op for unscoped queries: every
+    // section heading that rendered before the wrap must still render under scope=all.
+    // svelte-i18n runs with fallbackLocale='dev' in tests, so headings render as literal
+    // i18n keys — match against either the key or the English label.
+    const manager = new GlobalSearchManager();
+    manager.query = 'alice';
+    manager.sections.photos = { status: 'ok', items: [{ id: 'p1' } as never], total: 1 };
+    manager.sections.people = { status: 'ok', items: [{ id: 'person1', name: 'Alice' } as never], total: 1 };
+    render(GlobalSearch, { props: { manager } });
+    expect(manager.scope).toBe('all');
+    expect(screen.getByText(/^cmdk_photos_heading$|^Photos$/i)).toBeInTheDocument();
+    expect(screen.getByText(/^cmdk_people_heading$|^People$/i)).toBeInTheDocument();
+  });
+});
