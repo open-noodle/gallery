@@ -329,20 +329,35 @@ export class GlobalSearchManager {
   }
 
   /**
-   * Synchronously filter NAVIGATION_ITEMS for a query. Applies admin + feature-flag gates,
-   * scores via `computeCommandScore`, and returns a flat `ProviderStatus` (no grouping).
-   * Runs on every keystroke off the main path — bypasses the 150 ms debounce.
+   * Synchronously filter NAVIGATION_ITEMS for a payload under a given scope. Applies admin +
+   * feature-flag gates, scores via `computeCommandScore`, and returns a flat `ProviderStatus`
+   * (no grouping). Runs on every keystroke off the main path — bypasses the 150 ms debounce.
+   *
+   * Scope semantics:
+   *   - 'people' | 'tags' | 'collections' — navigation section is hidden entirely (empty).
+   *   - 'all' + empty payload — idle navigation (no results when the palette is bare).
+   *   - 'nav' + empty payload — bare `>`: return ALL eligible items sorted alphabetically
+   *     by translated label (no slice, no scoring).
+   *   - 'all' or 'nav' + non-empty payload — fuzzy search payload over eligible items.
    */
-  private runNavigationProvider(query: string): ProviderStatus<NavigationItem> {
-    if (query.length === 0) {
+  private runNavigationProvider(payload: string, scope: Scope): ProviderStatus<NavigationItem> {
+    // Non-nav entity scopes hide the navigation section entirely.
+    if (scope !== 'all' && scope !== 'nav') {
       return { status: 'empty' };
     }
+
+    // Scope 'all' with empty payload matches today's behavior (no nav results on idle).
+    if (scope === 'all' && payload === '') {
+      return { status: 'empty' };
+    }
+
     const u = get(user);
     const isAdmin = u?.isAdmin ?? false;
     const flags = featureFlagsManager.valueOrUndefined;
     const searchStrings = this.getNavigationSearchStrings();
 
-    const scored: Array<{ item: NavigationItem; score: number }> = [];
+    // Admin + flag filter applied in both branches below.
+    const eligible: NavigationItem[] = [];
     for (const item of NAVIGATION_ITEMS) {
       if (item.adminOnly && !isAdmin) {
         continue;
@@ -350,11 +365,26 @@ export class GlobalSearchManager {
       if (item.featureFlag && !flags?.[item.featureFlag]) {
         continue;
       }
+      eligible.push(item);
+    }
+
+    // Scope 'nav' with bare payload → return all eligible items alphabetical by translated label.
+    if (scope === 'nav' && payload === '') {
+      const translate = get(t);
+      const sorted = [...eligible].sort((a, b) =>
+        translate(a.labelKey as Translations).localeCompare(translate(b.labelKey as Translations)),
+      );
+      return sorted.length === 0 ? { status: 'empty' } : { status: 'ok', items: sorted, total: sorted.length };
+    }
+
+    // Non-empty payload (under 'all' or 'nav'): fuzzy score against payload.
+    const scored: Array<{ item: NavigationItem; score: number }> = [];
+    for (const item of eligible) {
       const corpus = searchStrings.get(item.id);
       if (!corpus) {
         continue;
       }
-      const score = computeCommandScore(corpus, query);
+      const score = computeCommandScore(corpus, payload);
       if (score <= 0) {
         continue;
       }
@@ -1349,10 +1379,11 @@ export class GlobalSearchManager {
     // Navigation runs synchronously on every keystroke, bypassing the 150ms debounce.
     // It's a pure in-memory scan — no rate-limit or network concern. runBatch does NOT
     // iterate over navigation; its async dispatch tuple is
-    // `photos/people/places/tags/albums/spaces`. Pass `payload` (not raw `text`) so
-    // prefix-scoped queries search against the unprefixed portion — for scope 'all'
-    // the two are identical, so non-scoped queries retain their existing behavior.
-    this.sections.navigation = this.runNavigationProvider(this.payload);
+    // `photos/people/places/tags/albums/spaces`. Pass `(payload, scope)` so the
+    // provider can branch: non-nav entity scopes hide the section entirely, bare
+    // `>` returns the full filtered catalog sorted alphabetically, and fuzzy search
+    // runs when there's a payload under scope 'all' or 'nav'.
+    this.sections.navigation = this.runNavigationProvider(this.payload, this.scope);
     // The prior cursor may point at a nav/entity item that no longer exists in the new
     // results. Reconcile synchronously so the highlight doesn't lag the displayed list.
     this.reconcileCursor();

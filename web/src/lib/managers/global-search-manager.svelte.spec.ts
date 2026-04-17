@@ -54,6 +54,7 @@ import {
   type SearchMode,
   type Sections,
 } from './global-search-manager.svelte';
+import { NAVIGATION_ITEMS } from './navigation-items';
 
 // File-level reset so mock state cannot leak between describe blocks. Tests that
 // mutate these should still set what they want in their own beforeEach, but this
@@ -1633,10 +1634,15 @@ describe('runNavigationProvider', () => {
     mockI18nLocale.current = 'en';
   });
 
+  // Calls the private runNavigationProvider. The original signature was `(query)`;
+  // Task 7 changed it to `(payload, scope)`. All tests in this block exercise the
+  // scope='all' + non-empty-payload branch (or the empty-payload → empty branch),
+  // both of which still behave identically to the old `(query)` signature. Pass
+  // 'all' as the default so the suite keeps pinning fuzzy search behavior.
   function runNav(m: GlobalSearchManager, query: string): ProviderStatus<unknown> {
-    return (m as unknown as { runNavigationProvider: (q: string) => ProviderStatus<unknown> }).runNavigationProvider(
-      query,
-    );
+    return (
+      m as unknown as { runNavigationProvider: (p: string, s: 'all' | 'nav') => ProviderStatus<unknown> }
+    ).runNavigationProvider(query, 'all');
   }
 
   it('returns empty only for an empty query; fires on a single character', () => {
@@ -1808,7 +1814,10 @@ describe('setQuery synchronous navigation', () => {
 
   it('runBatch does NOT re-invoke runNavigationProvider after the debounce', () => {
     const m = new GlobalSearchManager();
-    const spy = vi.spyOn(m as unknown as { runNavigationProvider: (q: string) => unknown }, 'runNavigationProvider');
+    const spy = vi.spyOn(
+      m as unknown as { runNavigationProvider: (p: string, s: 'all' | 'nav') => unknown },
+      'runNavigationProvider',
+    );
     m.open();
     m.setQuery('classific');
     expect(spy).toHaveBeenCalledTimes(1);
@@ -3552,7 +3561,14 @@ describe('prefix scoping — runBatch gating', () => {
     const getAllTagsSpy = vi.mocked(getAllTags);
     const getAlbumNamesSpy = vi.mocked(getAlbumNames);
     const getAllSpacesSpy = vi.mocked(getAllSpaces);
-    for (const s of [searchSmartSpy, searchPersonSpy, searchPlacesSpy, getAllTagsSpy, getAlbumNamesSpy, getAllSpacesSpy]) {
+    for (const s of [
+      searchSmartSpy,
+      searchPersonSpy,
+      searchPlacesSpy,
+      getAllTagsSpy,
+      getAlbumNamesSpy,
+      getAllSpacesSpy,
+    ]) {
       s.mockClear();
     }
 
@@ -3870,5 +3886,103 @@ describe('prefix scoping — bare @ suggestions', () => {
     await vi.runAllTimersAsync();
 
     expect(getAllPeopleSpy).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('prefix scoping — runNavigationProvider', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    vi.useFakeTimers();
+    installFakeAbortTimeout();
+    mockUser.current = { id: 'test-user', isAdmin: true };
+    mockFlags.valueOrUndefined = { search: true, map: true, trash: true };
+    mockI18nLocale.current = 'en';
+    vi.mocked(searchSmart).mockResolvedValue({ assets: { items: [], nextPage: null } } as never);
+    vi.mocked(searchAssets).mockResolvedValue({ assets: { items: [], nextPage: null } } as never);
+    vi.mocked(searchPerson).mockResolvedValue([] as never);
+    vi.mocked(searchPlaces).mockResolvedValue([] as never);
+    vi.mocked(getAllTags).mockResolvedValue([] as never);
+    vi.mocked(getAlbumNames).mockResolvedValue([] as never);
+    vi.mocked(getAllSpaces).mockResolvedValue([] as never);
+    vi.mocked(getAllPeople).mockResolvedValue({ people: [], total: 0, hidden: 0, hasNextPage: false } as never);
+  });
+
+  afterEach(() => {
+    restoreAbortTimeout();
+    vi.useRealTimers();
+  });
+
+  it('scope nav bare: count equals the filtered catalog length (no slice)', async () => {
+    mockUser.current = { id: 'admin', isAdmin: true };
+    const m = new GlobalSearchManager();
+    m.setQuery('>');
+    await vi.advanceTimersByTimeAsync(150);
+
+    // Filtered catalog: iterate NAVIGATION_ITEMS with the same admin + flag gate.
+    const flags = mockFlags.valueOrUndefined;
+    const expected = NAVIGATION_ITEMS.filter(
+      (i) => (!i.adminOnly || true) && (!i.featureFlag || flags?.[i.featureFlag]),
+    ).length;
+
+    expect(m.sections.navigation.status).toBe('ok');
+    const items = (m.sections.navigation as { items: { id: string }[] }).items;
+    expect(items.length).toBe(expected); // strict equality — no slice
+  });
+
+  it('scope nav bare: items sorted alphabetically by translated label', async () => {
+    mockUser.current = { id: 'admin', isAdmin: true };
+    const m = new GlobalSearchManager();
+    m.setQuery('>');
+    await vi.advanceTimersByTimeAsync(150);
+    const items = (m.sections.navigation as { items: { id: string; labelKey: string }[] }).items;
+    const translate = (k: string) => k; // stub: identity (tests exercise sort stability, not full i18n)
+    const labels = items.map((i) => translate(i.labelKey));
+    const sorted = [...labels].sort((a, b) => a.localeCompare(b));
+    expect(labels).toEqual(sorted);
+  });
+
+  it('scope nav with payload: fuzzy search payload over filtered items', async () => {
+    mockUser.current = { id: 'admin', isAdmin: true };
+    const m = new GlobalSearchManager();
+    m.setQuery('>theme');
+    await vi.advanceTimersByTimeAsync(150);
+    expect(m.sections.navigation.status).toBe('ok');
+    const items = (m.sections.navigation as { items: { id: string }[] }).items;
+    expect(items.some((i) => i.id === 'nav:theme')).toBe(true);
+  });
+
+  it('scope people (any payload): navigation section is empty', async () => {
+    const m = new GlobalSearchManager();
+    m.setQuery('@alice');
+    await vi.advanceTimersByTimeAsync(150);
+    expect(m.sections.navigation.status).toBe('empty');
+  });
+
+  it('scope all with payload: existing fuzzy behavior preserved', async () => {
+    mockUser.current = { id: 'admin', isAdmin: true };
+    const m = new GlobalSearchManager();
+    m.setQuery('classification');
+    await vi.advanceTimersByTimeAsync(150);
+    expect(m.sections.navigation.status).toBe('ok');
+  });
+
+  it('scope nav for non-admin with restrictive flags: returns empty (not ok:[])', async () => {
+    // The provider's empty-guard branch returns { status: 'empty' } when the
+    // scored/sorted list is empty — NOT { status: 'ok', items: [] }. This test
+    // pins that invariant via the fuzzy-match path (an unmatchable payload
+    // under scope 'nav' also hits the empty-guard), because the bare-`>` path
+    // can only yield empty when NAVIGATION_ITEMS itself has zero eligible
+    // rows — unreachable with the current catalog, which contains user pages
+    // without adminOnly or featureFlag gates.
+    mockUser.current = { id: 'user', isAdmin: false };
+    mockFlags.valueOrUndefined = {};
+    const m = new GlobalSearchManager();
+    m.setQuery('>xyz-no-match-at-all-zzz');
+    await vi.advanceTimersByTimeAsync(150);
+    expect(m.sections.navigation.status).toBe('empty');
+    // Crucially, not `{ status: 'ok', items: [] }` — the branch guard
+    // short-circuits to 'empty' so the section is hidden in the palette.
+    expect((m.sections.navigation as { items?: unknown }).items).toBeUndefined();
   });
 });
