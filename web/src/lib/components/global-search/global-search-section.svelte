@@ -9,7 +9,7 @@
     heading: string;
     status: ProviderStatus<T>;
     renderRow: Snippet<[T]>;
-    idPrefix: 'photo' | 'person' | 'place' | 'tag';
+    idPrefix: 'photo' | 'person' | 'place' | 'tag' | 'album' | 'space';
     onActivate: (item: T) => void;
     onSeeAll?: () => void;
   }
@@ -29,6 +29,7 @@
 {#if status.status !== 'idle' && status.status !== 'empty' && status.status !== 'loading'}
   <Command.Group class="mb-4">
     <Command.GroupHeading
+      data-testid="section-heading"
       class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400"
     >
       {heading}
