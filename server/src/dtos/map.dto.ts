@@ -44,6 +44,9 @@ export class MapMarkerDto {
 
   @ValidateBoolean({ optional: true, description: 'Include shared album assets' })
   withSharedAlbums?: boolean;
+
+  @ValidateBoolean({ optional: true, description: 'Include shared space assets' })
+  withSharedSpaces?: boolean;
 }
 
 export class MapMarkerResponseDto {
