@@ -3920,10 +3920,9 @@ describe('prefix scoping — runNavigationProvider', () => {
     await vi.advanceTimersByTimeAsync(150);
 
     // Filtered catalog: iterate NAVIGATION_ITEMS with the same admin + flag gate.
+    // User is admin here, so adminOnly is never restrictive — filter only on flags.
     const flags = mockFlags.valueOrUndefined;
-    const expected = NAVIGATION_ITEMS.filter(
-      (i) => (!i.adminOnly || true) && (!i.featureFlag || flags?.[i.featureFlag]),
-    ).length;
+    const expected = NAVIGATION_ITEMS.filter((i) => !i.featureFlag || flags?.[i.featureFlag]).length;
 
     expect(m.sections.navigation.status).toBe('ok');
     const items = (m.sections.navigation as { items: { id: string }[] }).items;
