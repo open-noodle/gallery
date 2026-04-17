@@ -41,20 +41,23 @@ Pure function `parseScope(rawText: string): ParsedQuery` at the top of `setQuery
 
 Pinned behavior (all verified by unit tests):
 
-| Input           | Scope         | Payload         | Notes                                        |
-| --------------- | ------------- | --------------- | -------------------------------------------- |
-| `""`            | `all`         | `""`            | Empty palette state.                         |
-| `"  "`          | `all`         | `""`            | Whitespace-only.                             |
-| `"alice"`       | `all`         | `"alice"`       | No prefix.                                   |
-| `"@alice"`      | `people`      | `"alice"`       | Canonical case.                              |
-| `"@ alice"`     | `people`      | `"alice"`       | Payload trim is symmetrical.                 |
-| `"@"`           | `people`      | `""`            | Bare prefix → suggestions.                   |
-| `"@@alice"`     | `people`      | `"@alice"`      | Only the first char is consumed.             |
-| `"abc@def"`     | `all`         | `"abc@def"`     | Prefix must be at position 0.                |
-| `"$abc"`        | `all`         | `"$abc"`        | Unsupported char preserved in payload.       |
-| `"＠alice"`     | `all`         | `"＠alice"`     | Fullwidth/unicode look-alike does NOT match. |
-| `"/2024/trips"` | `collections` | `"/2024/trips"` | Slashes after the first are literal.         |
-| `"\t@alice"`    | `people`      | `"alice"`       | Tab is whitespace; stripped by outer trim.   |
+| Input           | Scope         | Payload        | Notes                                                                                            |
+| --------------- | ------------- | -------------- | ------------------------------------------------------------------------------------------------ |
+| `""`            | `all`         | `""`           | Empty palette state.                                                                             |
+| `"  "`          | `all`         | `""`           | Whitespace-only.                                                                                 |
+| `"alice"`       | `all`         | `"alice"`      | No prefix.                                                                                       |
+| `"@alice"`      | `people`      | `"alice"`      | Canonical case.                                                                                  |
+| `"@ alice"`     | `people`      | `"alice"`      | Payload trim is symmetrical.                                                                     |
+| `"@"`           | `people`      | `""`           | Bare prefix → suggestions.                                                                       |
+| `"#"`           | `tags`        | `""`           | Bare prefix.                                                                                     |
+| `"/"`           | `collections` | `""`           | Bare prefix.                                                                                     |
+| `">"`           | `nav`         | `""`           | Bare prefix.                                                                                     |
+| `"@@alice"`     | `people`      | `"@alice"`     | Only the first char is consumed; literal `@` stays in payload.                                   |
+| `"abc@def"`     | `all`         | `"abc@def"`    | Prefix must be at position 0.                                                                    |
+| `"$abc"`        | `all`         | `"$abc"`       | Unsupported char preserved in payload.                                                           |
+| `"＠alice"`     | `all`         | `"＠alice"`    | Fullwidth/unicode look-alike does NOT match.                                                     |
+| `"/2024/trips"` | `collections` | `"2024/trips"` | First `/` is consumed; subsequent slashes stay literal. Payload does NOT retain the leading `/`. |
+| `"\t@alice"`    | `people`      | `"alice"`      | Tab is whitespace; stripped by outer trim.                                                       |
 
 ### Scope transitions
 
@@ -76,6 +79,8 @@ Rendered when `payload === '' && scope !== 'all'`. Each scope has its own sort:
 Pressing `?` while the palette is open — from any focus, including the `Command.Input` — calls `modalManager.show(ShortcutsModal, {})`. The palette stays open behind the modal; dismissing the modal returns focus to the input naturally.
 
 **Explicit override policy:** a literal `?` character is unreachable via keyboard inside the palette input. Users searching for `?` in their library must paste the character. Accepted trade-off — discoverability beats the rare literal-`?` case.
+
+**Modifier combinations:** only a bare `?` (no Ctrl / Alt / Meta; Shift is implicit since `?` on most layouts is `Shift+/`) fires the modal. `Ctrl+?` / `Alt+?` fall through to the input as today (no-op in the default Gallery key map). Pinned by a keydown test so future handlers can't silently steal the combinations.
 
 ### Activation paths — unchanged
 
@@ -168,12 +173,13 @@ No new `Provider` method. Reviewer flagged `runSuggestions?` as YAGNI — folded
 
 `runNavigationProvider(payload, scope)` replaces the current `runNavigationProvider(text)`. Behavior:
 
-| `scope`                       | `payload` | Returns                                                      |
-| ----------------------------- | --------- | ------------------------------------------------------------ |
-| `all`                         | any       | existing fuzzy search over admin+flag-filtered items         |
-| `nav`                         | `''`      | **all** filtered items, alphabetical by translated label     |
-| `nav`                         | non-empty | existing fuzzy search; payload is used in place of raw query |
-| `people`/`tags`/`collections` | any       | `{ status: 'empty' }` — navigation section does not render   |
+| `scope`                       | `payload` | Returns                                                                                                                            |
+| ----------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `all`                         | `''`      | `{ status: 'empty' }` — matches today's behavior; `setQuery`'s empty-text branch already resets sections to idle before this call. |
+| `all`                         | non-empty | existing fuzzy search over admin+flag-filtered items                                                                               |
+| `nav`                         | `''`      | **all** filtered items, alphabetical by translated label                                                                           |
+| `nav`                         | non-empty | existing fuzzy search; payload is used in place of raw query                                                                       |
+| `people`/`tags`/`collections` | any       | `{ status: 'empty' }` — navigation section does not render                                                                         |
 
 Call-site in `setQuery` updates from `runNavigationProvider(text)` to `runNavigationProvider(this.payload, this.scope)`. `navigation` remains excluded from `runBatch`'s iteration tuple.
 
@@ -211,13 +217,34 @@ Screen readers get an immediate mode signal on scope change; sighted users see t
 
 ### Per-scope suggestions details
 
-**People (`@` bare)** — one new SDK caller:
+**People (`@` bare)** — one new SDK caller, with a promise-join pattern mirroring `ensureAlbumsCache` / `ensureSpacesCache`:
 
 ```ts
-this.peopleSuggestionsCache ??= await getAllPeople({ size: 10 }, { signal: this.closeSignal });
+private peoplePromise: Promise<void> | undefined;
+peopleSuggestionsCache: PersonResponseDto[] | undefined = $state(undefined);
+
+async ensurePeopleSuggestionsCache(): Promise<void> {
+  if (this.peopleSuggestionsCache !== undefined) return;
+  this.peoplePromise ??= this.fetchPeopleSuggestions();
+  return this.peoplePromise;
+}
+
+private async fetchPeopleSuggestions(): Promise<void> {
+  try {
+    const response = await getAllPeople({ size: 10 }, { signal: this.closeSignal });
+    // response.people is the list; sort client-side by a resilient recency/popularity key.
+    this.peopleSuggestionsCache = [...response.people].sort(personSuggestionsComparator);
+  } catch (error: unknown) {
+    if (error instanceof Error && error.name === 'AbortError') return;
+    this.sections.people = { status: 'error', message: error instanceof Error ? error.message : 'unknown error' };
+    throw error;
+  }
+}
 ```
 
-Bound to `closeSignal` (not per-keystroke `batchController`) so toggling `@` ↔ `@a` doesn't re-fetch. Cleared in `close()` alongside the other open-session caches. Server's default sort is face count desc; if that changes, we add an explicit client-side `.sort((a, b) => (b.faceCount ?? 0) - (a.faceCount ?? 0))` — pinned by test.
+- **Concurrency:** concurrent `@` retypes join the same in-flight `peoplePromise`; `getAllPeople` fires at most once per open session. Without this pattern, typing `@ → @a → @` fast enough to race the first fetch would fire two concurrent calls. Pinned by a concurrency test.
+- **Close lifecycle:** `close()` clears both `peopleSuggestionsCache` and `peoplePromise` so reopening the palette is a clean slate.
+- **Sort key:** `personSuggestionsComparator` is applied client-side regardless of server default. **The exact sort key is open** — see §Risks for the `PersonResponseDto` field verification that unblocks this. Comparator is a small pure function exported alongside the manager and covered by a table-driven test.
 
 **Tags (`#` bare)** — reuse `tagsCache` (fetched on first `#` or first unscoped tags search). Sort by `updatedAt` desc, slice top 5. `tagsDisabled` branch (`tagsCache.length > 20_000`) returns the same `error: 'tag_cache_too_large'` as unscoped tag search.
 
@@ -292,18 +319,30 @@ English copy uses "Albums & Spaces", not "Collections" (the internal `Scope` typ
 
 ## Edge cases
 
-| Case                                                      | Handling                                                                               |
-| --------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| `getAllPeople` 5 s timeout on bare `@`                    | section transitions to `{ status: 'timeout' }`; palette shows "Search is slow" hint    |
-| `getAllPeople` network failure                            | section transitions to `{ status: 'error' }`                                           |
-| `/` while `albumsCache` / `spacesCache` is mid-fetch      | keystrokes join the in-flight promise; last settled run writes results                 |
-| Scope transition mid-batch (`al` → `@al`)                 | `batchController.abort()` cancels prior; non-people sections forced idle synchronously |
-| Rapid scope thrash (`@`/`#`/`/`)                          | each keystroke re-parses; abort + idle on every transition                             |
-| `#` bare with `tagsDisabled === true`                     | returns `error: 'tag_cache_too_large'` same as unscoped tag search                     |
-| `>` bare for non-admin with restrictive flags             | returns `{ status: 'empty' }` not `{ status: 'ok', items: [] }`                        |
-| `Esc` while ShortcutsModal is open over palette           | modal closes first, focus returns to palette input; palette stays open                 |
-| Tag literally named `#christmas` under `#christmas` query | unreachable (first `#` always consumed); user must search unscoped                     |
-| Album literally named `@2024` under `@` scope             | unreachable (first `@` always consumed); user must search unscoped                     |
+| Case                                                         | Handling                                                                                                      |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| `getAllPeople` 5 s timeout on bare `@`                       | section transitions to `{ status: 'timeout' }`; palette shows "Search is slow" hint                           |
+| `getAllPeople` network failure                               | section transitions to `{ status: 'error' }`                                                                  |
+| Concurrent bare `@` retypes racing first fetch               | callers join `peoplePromise`; `getAllPeople` fires exactly once                                               |
+| `/` while `albumsCache` / `spacesCache` is mid-fetch         | keystrokes join the in-flight promise; last settled run writes results                                        |
+| Scope transition mid-batch (`al` → `@al`)                    | `batchController.abort()` cancels prior; non-people sections forced idle synchronously                        |
+| Rapid scope thrash (`@`/`#`/`/`)                             | each keystroke re-parses; abort + idle on every transition                                                    |
+| Scope transition preserves cursor when target stays in scope | `alice` → `@alice`: cursor on Alice stays on Alice (People still in scope)                                    |
+| Scope transition reconciles cursor when target exits scope   | `@alice` → `#alice`: cursor drops to first tag row                                                            |
+| Scope away → scope back (`alice` → `@alice` → `alice`)       | no stranded `idle` sections; SWR-normal state                                                                 |
+| Bare `@` with zero named people                              | section `{ status: 'empty' }`                                                                                 |
+| Bare `#` with empty `tagsCache`                              | section `{ status: 'empty' }`                                                                                 |
+| Bare `#` with `tagsDisabled === true`                        | returns `error: 'tag_cache_too_large'` same as unscoped tag search                                            |
+| Bare `/` with zero albums AND zero spaces                    | both sections `{ status: 'empty' }`                                                                           |
+| Bare `>` for non-admin with restrictive flags                | returns `{ status: 'empty' }` not `{ status: 'ok', items: [] }`                                               |
+| Bare `>` for admin (~36 items)                               | all render, `Command.List` scrolls; palette height stays within `max-h-[80vh]`                                |
+| `Ctrl+?` / `Alt+?` in palette input                          | modifier combinations fall through to input; only bare `?` opens ShortcutsModal                               |
+| `?` pressed while input has text                             | ShortcutsModal opens; literal `?` not inserted (accepted trade-off)                                           |
+| `Esc` while ShortcutsModal is open over palette              | modal closes first, focus returns to palette input; palette stays open                                        |
+| Mode pill click under scope                                  | `manager.mode` + localStorage updated; no `runBatch`, no photos request                                       |
+| `parseScope('/2024/trips')`                                  | scope `collections`, payload `2024/trips` (first `/` consumed); album named `/2024/...` unreachable under `/` |
+| Tag literally named `#christmas` under `#christmas` query    | unreachable (first `#` always consumed); user must search unscoped                                            |
+| Album literally named `@2024` under `@` scope                | unreachable (first `@` always consumed); user must search unscoped                                            |
 
 ---
 
@@ -335,16 +374,27 @@ _runBatch gating:_
 _Bare-prefix suggestions:_
 
 - `@` bare → `getAllPeople({ size: 10 })` called once. Subsequent `@` re-types read `peopleSuggestionsCache`. `close()` clears the cache.
-- `#` bare → tagsCache sorted by updatedAt desc, top 5.
+- `@ → @a → @` sequence: second `@` reads cache; `getAllPeople` called exactly once.
+- Bare `@` with zero named people → section `{ status: 'empty' }`.
+- `#` bare → tagsCache sorted by `updatedAt` desc, top 5.
 - `#` bare under `tagsDisabled` → `error: 'tag_cache_too_large'`.
+- `#` bare with empty `tagsCache` → `{ status: 'empty' }`.
 - `/` bare → albums sort by `updatedAt`; spaces sort by `lastActivityAt ?? createdAt`. Two independent section writes.
-- `>` bare → admin + feature-flag filtered, alphabetical, all items.
+- `/` bare with zero albums AND zero spaces → both sections `{ status: 'empty' }`.
+- `>` bare → admin + feature-flag filtered, alphabetical, all items. No slice; assert the rendered count equals the filtered catalog length.
 - `>` bare for a non-admin with restrictive flags returns `empty`.
+
+_`personSuggestionsComparator` (pure function):_
+
+- Sorts descending by the chosen recency/popularity key (exact key set at implementation time — see §Risks).
+- Stable ordering: ties break by the field that's always present (fallback to `name` alpha).
+- Handles missing optional field (returns 0 contribution; no crash).
 
 _Cursor:_
 
 - `all` reconcile order is `['photos', 'albums', 'spaces', 'people', 'places', 'tags', 'navigation']` (regression pin).
 - Scope transition drops the cursor onto the first item of the first in-scope section when prior cursor target exits scope.
+- **Scope transition preserves cursor** when the prior target is in the new scope. Case: cursor on Alice (People section) under `all` → prepend `@` → scope `people` → cursor STILL on Alice.
 - `/trip` lands on the first album (albums before spaces).
 
 _SWR / scope transitions:_
@@ -352,11 +402,12 @@ _SWR / scope transitions:_
 - `all` → `people` flips non-people sections from `ok` to `idle` **immediately** (not preserved).
 - Within-scope payload change preserves `ok` sections (existing SWR).
 - Scope transition mid-batch aborts prior `batchController`.
+- Scope-away → Scope-back: `alice` → `@alice` → `alice` leaves all sections in SWR-normal state (no stranded `idle`).
 
 _setMode while scoped:_
 
 - `setMode('metadata')` while `scope === 'people'` persists mode to localStorage but does NOT re-run photos.
-- Clicking a mode pill under scope updates `manager.mode` without dispatching a request.
+- Clicking a mode pill under scope updates `manager.mode` without dispatching a request — assert `runBatch` spy is not called and `photosController` is not aborted/recreated.
 
 _announcementText:_
 
@@ -368,7 +419,8 @@ _Concurrency (new describe block):_
 - Scope transition mid-batch: prior providers abort; non-scope sections reset synchronously.
 - Rapid scope thrash (`@` → `#` → `/`): each transition aborts cleanly, counter bookkeeping stays consistent.
 - `/` while `albumsCache` promise is in-flight: both keystrokes await the same promise, last one writes results.
-- `getAllPeople` cancellation via `closeSignal` on palette close clears `peopleSuggestionsCache`.
+- **Concurrent bare `@` keystrokes** (`@ → @a → @` racing the first fetch): both callers join the same `peoplePromise`; `getAllPeople` is called **exactly once** (spy assertion).
+- `getAllPeople` cancellation via `closeSignal` on palette close clears both `peopleSuggestionsCache` and `peoplePromise`; reopening and typing `@` re-fires exactly once.
 - `getAllPeople` 5 s timeout: section transitions to `timeout`.
 - `getAllPeople` network error: section transitions to `error`.
 
@@ -381,12 +433,22 @@ _Recent replay (defensive):_
 - Scope `people`: only PeopleSection present; no PhotoSection / AlbumSection / SpaceSection / PlaceSection / TagSection / NavigationSection / TopResult / ML banner.
 - Scope `collections`: AlbumSection + SpaceSection present; others hidden.
 - Scope `nav`: NavigationSections present; others hidden.
-- Placeholder text is exactly `Search…`.
+- Placeholder text is exactly `Search…` (string equality, not `toContain`).
 - `?` keypress on the input calls `modalManager.show(ShortcutsModal, {})` (spy).
-- Mode pills under scope carry `opacity-50` class.
+- `?` with modifier (`Ctrl+?` / `Alt+?`) does NOT trigger the modal — falls through to input.
+- **Mode pills under scope (a11y):**
+  - Carry `opacity-50` class.
+  - Do NOT carry `aria-disabled` attribute.
+  - Remain focusable via Tab order.
+  - Clicking sets `manager.mode`, persists to localStorage, does NOT call `runBatch`, does NOT recreate `photosController`.
 - ML banner: with `mlHealthy = false`, visible under scope `all`, hidden under any prefixed scope.
 - TopNavigationMatch: present under `all` when label matches, hidden under any prefixed scope.
-- Preview pane: under `@alice` with Alice highlighted, PersonPreview renders; under `>` with a nav item highlighted, preview falls through to the "Select a result to preview" empty state.
+- **Preview pane per scope:**
+  - `@alice` + Alice highlighted → PersonPreview renders.
+  - `#xmas` + a tag highlighted → TagPreview renders.
+  - `/trip` + album highlighted → AlbumPreview renders; spaces row highlighted → SpacePreview renders.
+  - `>theme` + nav-theme highlighted → preview pane renders _something non-crashing_. Exact behavior — either the empty-state "Select a result to preview" OR a nav-specific preview — is pinned by this test against the **actual** current implementation of `GlobalSearchPreview` (see §Risks for the pre-implementation verification).
+- **`>` bare scroll:** with an admin user and a filtered catalog of 36 items, all 36 render in the DOM; the `Command.List` container scrolls (height is not growing unbounded).
 
 ### Component — `global-search-footer.spec.ts`
 
@@ -403,8 +465,10 @@ _Recent replay (defensive):_
 - **Bare `@`:** type `@` → top-10 people render; one `getAllPeople` request observed.
 - **Backspace-out:** type `@alice` → Backspace × 5 → `@` bare → suggestions; Backspace again → empty palette.
 - **Scope swap mid-stream:** type `@al`, Backspace × 3, type `#sun` — no stale sections; only Tags renders at end.
+- **Cursor preservation across scope transition:** type `alice`, arrow-down to Alice (cursor on `person:<id>`), prepend `@` (input now `@alice`), cursor **stays** on Alice → Enter → navigates to `/people/<id>` correctly.
 - **`?` opens modal:** palette open → press `?` → ShortcutsModal visible with "Scope prefixes" section; close modal, palette still open with focus on input.
 - **`?` overrides literal:** palette input empty → press `?` → ShortcutsModal opens (not a literal `?` in input).
+- **`>` bare scroll for admin:** type `>` as admin → all ~36 filtered items render → scrolling the list doesn't grow the palette height past its `max-h-[80vh]` cap.
 - **Stale album under scope:** scoped `/trip`, activate an album that was deleted server-side → 404 toast + RECENT purge (same path as unscoped activation).
 
 ### Manual visual QA
@@ -419,15 +483,16 @@ _Recent replay (defensive):_
 
 ### New
 
-- `web/src/lib/managers/cmdk-prefix.ts` — parser + `Scope` / `ParsedQuery` types.
-- `web/src/lib/managers/cmdk-prefix.spec.ts` — parser unit tests.
+- `web/src/lib/managers/cmdk-prefix.ts` — parser + `Scope` / `ParsedQuery` types + `personSuggestionsComparator` pure function.
+- `web/src/lib/managers/cmdk-prefix.spec.ts` — parser + comparator unit tests.
 
 ### Modified
 
-- `web/src/lib/managers/global-search-manager.svelte.ts` — parsedQuery/scope/payload deriveds, scope-aware runBatch + reconcileCursor, scope-aware runNavigationProvider signature, per-provider bare-prefix branch, peopleSuggestionsCache, scope emission in announcementText, setMode scope short-circuit.
+- `web/src/lib/managers/global-search-manager.svelte.ts` — parsedQuery/scope/payload deriveds, scope-aware runBatch + reconcileCursor, scope-aware runNavigationProvider signature, per-provider bare-prefix branch, `ensurePeopleSuggestionsCache` + `peopleSuggestionsCache` + `peoplePromise`, scope emission in announcementText, setMode scope short-circuit.
 - `web/src/lib/managers/global-search-manager.svelte.spec.ts` — new describe blocks per §Tests Unit.
 - `web/src/lib/components/global-search/global-search.svelte` — scope-aware section rendering, hidden TopResult + ML banner under scope, dim mode pills, `?` keybind.
-- `web/src/lib/components/global-search/__tests__/global-search.spec.ts` — scope render cases, preview cases, `?` keybind.
+- `web/src/lib/components/global-search/global-search-preview.svelte` — (conditional on pre-implementation check) add `{:else if activeItem?.kind === 'nav'}` branch rendering the empty-state markup, if the component currently has no fall-through for nav active items.
+- `web/src/lib/components/global-search/__tests__/global-search.spec.ts` — scope render cases, preview cases per scope, `?` keybind, Ctrl+?/Alt+? fallthrough, mode-pill a11y.
 - `web/src/lib/components/global-search/global-search-footer.svelte` — scope chip group + `?` icon button (hidden below `sm`).
 - `web/src/lib/components/global-search/__tests__/global-search-footer.spec.ts` — chip + `?` icon tests.
 - `web/src/lib/modals/ShortcutsModal.svelte` — "Scope prefixes" section with 4 kbd-box rows.
@@ -448,11 +513,17 @@ _Recent replay (defensive):_
 
 ## Risks
 
-1. **`getAllPeople` default sort** may not be face-count desc on all server versions. Mitigation: verify at implementation time; add explicit client-side sort if the default is different. Pin the sort with a unit test so a server change can't silently drift it.
-2. **`?` override** prevents literal `?` input in the palette. Accepted trade-off, documented above.
-3. **Mobile `?` icon hidden below `sm`** means mobile users with a Bluetooth keyboard can still use the `?` keybind, but the tap affordance is gone. Acceptable — mobile users rarely need keyboard reference.
-4. **`parseScope` runs on every keystroke** as a $derived. Cost is O(1) per keystroke (one trim, one map lookup, one slice) — negligible.
-5. **Pre-existing `reconcileCursor` miss** (albums/spaces absent from the order) gets tangentially fixed. Regression test pins the new order; if someone later re-removes albums/spaces from the order, the test will flag it.
+1. **`PersonResponseDto` field for sort key is unverified.** The bare-`@` sort needs a "popularity" or "recency" signal. Candidates observed in nearby DTOs: `numberOfAssets`, `faceCount`, `updatedAt`. Exact field must be verified before wiring `personSuggestionsComparator`.
+   - **Pre-implementation check (blocks Task 6 in §Implementation sequence):** grep the SDK `fetch-client.ts` for `PersonResponseDto` and list the available fields. Pick the first of `{ numberOfAssets, faceCount, updatedAt }` that exists; fall back to alphabetical by `name` if none is present.
+   - **Test the chosen comparator** with fixtures that have the field missing (to verify the `?? 0` / fallback path doesn't crash).
+2. **`GlobalSearchPreview`'s handling of `{ kind: 'nav' }` active items is unverified.** The v1.1 nav design claimed the preview "falls through to the empty state" when the cursor is on a nav item, but the design did not add a new test.
+   - **Pre-implementation check (blocks Task 11 in §Implementation sequence):** read `web/src/lib/components/global-search/global-search-preview.svelte`. If the `#if` chain has no `nav` branch and no `{:else}` that renders the empty state for unknown kinds, add a `nav` branch in this PR that renders the empty-state markup. Pin with the component test listed in §Component.
+3. **`getAllPeople` default sort** may not match the chosen sort key on all server versions. Mitigation: `personSuggestionsComparator` runs client-side unconditionally (not just as a fallback) so the order is deterministic regardless of server default. Pinned by test.
+4. **`?` override** prevents literal `?` input in the palette. Accepted trade-off, documented above.
+5. **Mobile `?` icon hidden below `sm`** means mobile users with a Bluetooth keyboard can still use the `?` keybind, but the tap affordance is gone. Acceptable — mobile users rarely need keyboard reference.
+6. **`parseScope` runs on every keystroke** as a $derived. Cost is O(1) per keystroke (one trim, one map lookup, one slice) — negligible.
+7. **Pre-existing `reconcileCursor` miss** (albums/spaces absent from the order) gets tangentially fixed. Regression test pins the new order; if someone later re-removes albums/spaces from the order, the test will flag it.
+8. **Concurrent `getAllPeople` fetches** from rapid `@` retypes are prevented by the `ensurePeopleSuggestionsCache` promise-join pattern — not by `??=` on the cache field alone. Pinned by test.
 
 ---
 
@@ -470,9 +541,14 @@ Not a plan doc — rough order for `superpowers:writing-plans`:
 8. **`setMode` scope short-circuit.**
 9. **`announcementText` scope emission.**
 10. **SWR tweak** — non-scope sections force-idle on scope transition.
-11. **`global-search.svelte` scope-aware rendering** + `?` keybind.
+11. **`global-search.svelte` scope-aware rendering** + `?` keybind. Pre-check: inspect `global-search-preview.svelte` for a `{ kind: 'nav' }` branch; add one in this step if missing (see §Risks #2).
 12. **Footer scope chip + `?` icon button** + `<sm` hide.
 13. **ShortcutsModal "Scope prefixes" section** + kbd-box rows.
 14. **i18n keys** + sort.
 15. **Component + E2E tests.**
 16. **Manual visual QA at 1024/720/480, light + dark.**
+
+**Pre-implementation checks** (do these before starting Task 6 / Task 11):
+
+- **§Risks #1 — `PersonResponseDto` field.** Grep `open-api/typescript-sdk/src/fetch-client.ts` for the DTO definition. Pick the first of `{ numberOfAssets, faceCount, updatedAt }` that exists as the sort key for `personSuggestionsComparator`; fall back to `name` alpha if none. Document the chosen field in the Task 6 implementation notes.
+- **§Risks #2 — `GlobalSearchPreview` nav branch.** Read the component's `#if` chain. If a `nav` active-item kind has no branch and no catch-all `{:else}`, add an `{:else if activeItem?.kind === 'nav'}` branch in Task 11 that renders the existing empty-state markup. Test the branch in the component spec.
