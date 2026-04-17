@@ -34,7 +34,14 @@ describe(MapRepository.name, () => {
       const { asset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
       await ctx.database
         .insertInto('asset_exif')
-        .values({ assetId: asset.id, latitude: 48.8566, longitude: 2.3522, city: 'Paris', state: null, country: 'France' })
+        .values({
+          assetId: asset.id,
+          latitude: 48.8566,
+          longitude: 2.3522,
+          city: 'Paris',
+          state: null,
+          country: 'France',
+        })
         .execute();
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
 
