@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/person.model.dart';
+import 'package:immich_mobile/entities/asset.entity.dart';
 import 'package:immich_mobile/models/search/search_filter.model.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
 
@@ -126,6 +127,20 @@ void main() {
       notifier.setRating(4);
       notifier.setRating(null);
       expect(container.read(photosFilterProvider).rating.rating, null);
+    });
+  });
+
+  group('setMediaType', () {
+    test('sets media type to image', () {
+      final notifier = container.read(photosFilterProvider.notifier);
+      notifier.setMediaType(AssetType.image);
+      expect(container.read(photosFilterProvider).mediaType, AssetType.image);
+    });
+    test('null clears to AssetType.other (match all)', () {
+      final notifier = container.read(photosFilterProvider.notifier);
+      notifier.setMediaType(AssetType.image);
+      notifier.setMediaType(null);
+      expect(container.read(photosFilterProvider).mediaType, AssetType.other);
     });
   });
 }

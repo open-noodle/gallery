@@ -1,5 +1,6 @@
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/person.model.dart';
+import 'package:immich_mobile/entities/asset.entity.dart';
 import 'package:immich_mobile/models/search/search_filter.model.dart';
 
 final photosFilterProvider =
@@ -39,4 +40,7 @@ class PhotosFilterNotifier extends Notifier<SearchFilter> {
 
   void setRating(int? rating) =>
       state = state.copyWith(rating: SearchRatingFilter(rating: rating));
+
+  void setMediaType(AssetType? type) =>
+      state = state.copyWith(mediaType: type ?? AssetType.other);
 }
