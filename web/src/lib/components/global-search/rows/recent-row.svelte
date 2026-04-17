@@ -25,7 +25,7 @@
 {:else if entry.kind === 'photo'}
   <PhotoRow item={{ id: entry.assetId, originalFileName: entry.label } as never} />
 {:else if entry.kind === 'person'}
-  <PersonRow item={{ id: entry.personId, name: entry.label, faceAssetId: entry.thumbnailAssetId } as never} />
+  <PersonRow item={{ id: entry.personId, name: entry.label } as never} />
 {:else if entry.kind === 'place'}
   <PlaceRow item={{ name: entry.label, latitude: entry.latitude, longitude: entry.longitude } as never} />
 {:else if entry.kind === 'tag'}
