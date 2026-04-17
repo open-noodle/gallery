@@ -561,6 +561,54 @@ git add server/src/services/shared-space.service.ts server/src/services/shared-s
 git commit -m "feat(server): thread timelineSpaceIds through filtered map markers"
 ```
 
+### Task 3.7: Behavioral test — cross-space leak guard (matrix row 19)
+
+Row 19 is the user-facing outcome of the double-scope guard: a member of spaces A + B queries the filtered endpoint with `spaceId=B`, but the asset lives only in space A. The marker must NOT be returned. Task 3.2 asserts `getSpaceIdsForTimeline` was not called; this task asserts the repo was called with a shape that cannot leak A's content.
+
+**Files:**
+
+- Modify: `server/src/services/shared-space.service.spec.ts`
+
+**Step 1:** Append inside the existing `describe('getFilteredMapMarkers', ...)` block:
+
+```ts
+it('should NOT leak other-space content when spaceId is set (row 19)', async () => {
+  const auth = factory.auth();
+  const spaceB = newUuid();
+
+  mocks.access.sharedSpace.checkMemberAccess.mockResolvedValue(new Set([spaceB]));
+  mocks.sharedSpace.getFilteredMapMarkers.mockResolvedValue([]);
+
+  await sut.getFilteredMapMarkers(auth, { spaceId: spaceB, withSharedSpaces: true });
+
+  // With spaceId set, the service must scope only to that space — no userIds, no timelineSpaceIds.
+  expect(mocks.sharedSpace.getFilteredMapMarkers).toHaveBeenCalledWith(
+    expect.objectContaining({
+      spaceId: spaceB,
+      userIds: undefined,
+    }),
+  );
+  expect(mocks.sharedSpace.getFilteredMapMarkers).toHaveBeenCalledWith(
+    expect.not.objectContaining({ timelineSpaceIds: expect.anything() }),
+  );
+});
+```
+
+**Step 2:** Run.
+
+```bash
+cd server && pnpm test -- --run src/services/shared-space.service.spec.ts && cd ..
+# Expected: green (the Task 3.6 implementation already satisfies this behavior;
+# this test locks it in against future regressions).
+```
+
+**Step 3:** Commit.
+
+```bash
+git add server/src/services/shared-space.service.spec.ts
+git commit -m "test(server): lock cross-space leak guard on filtered markers (row 19)"
+```
+
 ---
 
 ## Phase 4 — `MapRepository.getMapMarkers` SQL change
@@ -595,10 +643,6 @@ This is the critical SQL change for the basic endpoint. It has a subtle semantic
     );
   }
 
-  if ({ isArchived, isFavorite, fileCreatedAfter, fileCreatedBefore, spaceIds } && spaceIds && spaceIds.length > 0) {
-    // noop — spaceIds handled below (this branch exists only so TypeScript narrows the type)
-  }
-
   if (spaceIds && spaceIds.length > 0) {
     expression.push(
       eb.and([
@@ -628,7 +672,7 @@ This is the critical SQL change for the basic endpoint. It has a subtle semantic
 })
 ```
 
-Delete the throwaway `if (...) { noop }` block if your IDE's TypeScript is happy without it — it's only a narrowing hint. The `spaceIds` comes from the `options` param; destructure it from the existing `options` destructure at the top of the method (line 83):
+`spaceIds` comes from the `options` param; destructure it from the existing `options` destructure at the top of the method (line 83):
 
 ```ts
 getMapMarkers(
@@ -1118,6 +1162,74 @@ git add server/test/medium/specs/repositories/shared-space.repository.spec.ts
 git commit -m "test(server): tag and rating filter × space interaction (rows 23, 24)"
 ```
 
+### Task 6.12: Filtered endpoint — direct + library-linked inclusion (matrix rows 2, 4)
+
+Rows 2 and 4 mirror rows 1 and 3 but on `SharedSpaceRepository.getFilteredMapMarkers` instead of `MapRepository.getMapMarkers`. The medium tests live in the same file as Task 6.11 since it's the shared-space repo.
+
+**Files:**
+
+- Modify: `server/test/medium/specs/repositories/shared-space.repository.spec.ts`
+
+**Step 1:** Append to the `describe('getFilteredMapMarkers — space filter interaction', ...)` block (or add a sibling block titled `describe('getFilteredMapMarkers — space membership inclusion', ...)` if you want them grouped logically):
+
+```ts
+it('should include a direct shared_space_asset via timelineSpaceIds (row 2)', async () => {
+  const { ctx, sut } = setup();
+  const { user: owner } = await ctx.newUser();
+  const { user: member } = await ctx.newUser();
+  const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+  await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id });
+  const { asset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
+  await ctx.database.insertInto('asset_exif').values({ assetId: asset.id, latitude: 20, longitude: 20 }).execute();
+  await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+
+  const results = await sut.getFilteredMapMarkers({
+    userIds: [member.id],
+    timelineSpaceIds: [space.id],
+    visibility: AssetVisibility.Timeline,
+  });
+
+  expect(results.find((r) => r.id === asset.id)).toBeDefined();
+});
+
+it('should include a library-linked asset via timelineSpaceIds (row 4)', async () => {
+  const { ctx, sut } = setup();
+  const { user: owner } = await ctx.newUser();
+  const { user: member } = await ctx.newUser();
+  const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+  await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id });
+  const { library } = await ctx.newLibrary({ ownerId: owner.id });
+  await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id });
+  const { asset } = await ctx.newAsset({
+    ownerId: owner.id,
+    libraryId: library.id,
+    visibility: AssetVisibility.Timeline,
+  });
+  await ctx.database.insertInto('asset_exif').values({ assetId: asset.id, latitude: 21, longitude: 21 }).execute();
+
+  const results = await sut.getFilteredMapMarkers({
+    userIds: [member.id],
+    timelineSpaceIds: [space.id],
+    visibility: AssetVisibility.Timeline,
+  });
+
+  expect(results.find((r) => r.id === asset.id)).toBeDefined();
+});
+```
+
+**Step 2:** Run.
+
+```bash
+cd server && pnpm test:medium -- --run test/medium/specs/repositories/shared-space.repository.spec.ts && cd ..
+```
+
+**Step 3:** Commit.
+
+```bash
+git add server/test/medium/specs/repositories/shared-space.repository.spec.ts
+git commit -m "test(server): filtered endpoint direct + library inclusion (rows 2, 4)"
+```
+
 ---
 
 ## Phase 7 — Web wiring
@@ -1369,22 +1481,54 @@ git commit -m "test(mobile): verify withSharedSpaces reaches API client"
 
 ## Phase 9 — E2E web spec
 
-### Task 9.1: Scaffold the E2E spec file
+### Task 9.1: E2E spec — member visibility on personal map
 
 **Files:**
 
 - Create: `e2e/src/specs/web/space-map-markers.e2e-spec.ts`
 
-**Step 1:** Create the file:
+**SDK helper verification (do this first, before writing any code):** some helpers referenced in earlier drafts of this plan were never in `utils`. Confirmed available vs. missing by `grep -n "^  [a-zA-Z]*:" e2e/src/utils.ts`:
+
+- `utils.adminSetup()` ✅
+- `utils.userSetup(accessToken, dto)` ✅ — **creates** a user, returns a `UserAdminResponseDto`. Does NOT log the user in.
+- `utils.createSpace`, `utils.addSpaceMember`, `utils.addSpaceAssets`, `utils.createAsset` ✅
+- `utils.setAuthCookies(context, accessToken)` ✅
+- `utils.login(...)` ❌ — NOT a helper. Call the SDK's `login` directly: `login({ loginCredentialDto: { email, password } })`.
+- `utils.updateAssets(...)` ❌ — NOT a helper. Call the SDK's `updateAssets` directly.
+- `utils.updateSpaceMember(...)` ❌ — NOT a helper. Use the SDK's `updateMemberTimeline` (confirmed at `open-api/typescript-sdk/src/fetch-client.ts:6847`, endpoint `PATCH /shared-spaces/{id}/members/me/timeline`). **Must be called with the member's own access token** (it's the `/me/` form).
+- `utils.removeSpaceMember(...)` — check `e2e/src/utils.ts`; if absent, call the SDK's `removeMember` directly against `DELETE /shared-spaces/{id}/members/{userId}` from admin.
+
+**Step 1:** Create the file with all four sub-tests (rows 1, 7, 8, 9):
 
 ```ts
-import type { LoginResponseDto, SharedLinkResponseDto } from '@immich/sdk';
+import {
+  asBearerAuth,
+  login,
+  removeMember as removeSpaceMember,
+  updateAssets,
+  updateMemberTimeline,
+} from '@immich/sdk';
+import type { LoginResponseDto } from '@immich/sdk';
 import { expect, test } from '@playwright/test';
 import { utils } from 'src/utils';
+
+// Asset-creation helper: createAsset in utils doesn't set GPS coords, so we
+// patch the asset after upload via the SDK's bulk update endpoint.
+async function setAssetGeo(accessToken: string, assetId: string, latitude: number, longitude: number) {
+  await updateAssets(
+    { assetBulkUpdateDto: { ids: [assetId], latitude, longitude } },
+    { headers: asBearerAuth(accessToken) },
+  );
+}
+
+async function loginAs(email: string, password: string): Promise<LoginResponseDto> {
+  return login({ loginCredentialDto: { email, password } });
+}
 
 test.describe('Space photos on personal map', () => {
   let admin: LoginResponseDto;
   let memberLogin: LoginResponseDto;
+  let memberId: string;
   let spaceId: string;
   let ownerAssetId: string;
 
@@ -1393,105 +1537,117 @@ test.describe('Space photos on personal map', () => {
     await utils.resetDatabase();
     admin = await utils.adminSetup();
 
-    // Admin owns the asset and creates the space
+    // Admin (owner) creates the space and member
     const member = await utils.userSetup(admin.accessToken, {
       email: 'member@test.com',
       name: 'Member',
       password: 'password',
     });
-    memberLogin = await utils.login({ email: 'member@test.com', password: 'password' });
+    memberId = member.id;
+    memberLogin = await loginAs('member@test.com', 'password');
 
     const space = await utils.createSpace(admin.accessToken, { name: 'Trip Photos' });
     spaceId = space.id;
     await utils.addSpaceMember(admin.accessToken, space.id, { userId: member.id, role: 'viewer' });
 
-    // Owner uploads a geo-tagged asset and adds it to the space
-    const asset = await utils.createAsset(admin.accessToken, {
-      isFavorite: false,
-      // utils.createAsset exact signature — grep the file and pick the real options
-    });
+    // Owner uploads an asset, sets its GPS, adds it to the space
+    const asset = await utils.createAsset(admin.accessToken);
     ownerAssetId = asset.id;
-    // If createAsset doesn't set geo, update exif directly via an SDK call — check utils for a helper.
+    await setAssetGeo(admin.accessToken, asset.id, 48.8566, 2.3522); // Paris
     await utils.addSpaceAssets(admin.accessToken, space.id, [asset.id]);
   });
 
-  test('member sees space marker on personal map (matrix rows 1)', async ({ context, page }) => {
-    await utils.setAuthCookies(context, memberLogin.accessToken);
-
+  async function fetchMarkersOnMap(
+    context: import('@playwright/test').BrowserContext,
+    page: import('@playwright/test').Page,
+    accessToken: string,
+  ) {
+    await utils.setAuthCookies(context, accessToken);
     const [markerResponse] = await Promise.all([
       page.waitForResponse((resp) => resp.url().includes('/map/markers') && resp.request().method() === 'GET'),
       page.goto('/map'),
     ]);
+    return (await markerResponse.json()) as Array<{ id: string }>;
+  }
 
-    const body = (await markerResponse.json()) as Array<{ id: string }>;
-    expect(body.find((m) => m.id === ownerAssetId)).toBeDefined();
+  test('member sees space marker on personal map (matrix row 1)', async ({ context, page }) => {
+    const markers = await fetchMarkersOnMap(context, page, memberLogin.accessToken);
+    expect(markers.find((m) => m.id === ownerAssetId)).toBeDefined();
   });
 
-  test('marker disappears when member toggles showInTimeline=false (matrix row 7)', async ({ context, page }) => {
-    // Use the SDK to toggle the member's showInTimeline for this space. Grep utils.ts for
-    // updateSpaceMember / updateSharedSpaceMember — if missing, call the generated SDK directly.
-    // After toggling, re-navigate and assert marker absent.
-    // TODO: fill in the SDK call based on the actual helper names.
+  test('marker disappears when member sets showInTimeline=false (matrix row 7)', async ({ context, page }) => {
+    // Self-PATCH — `/me/timeline` requires the member's own token, not admin's.
+    await updateMemberTimeline(
+      { id: spaceId, sharedSpaceMemberTimelineDto: { showInTimeline: false } },
+      { headers: asBearerAuth(memberLogin.accessToken) },
+    );
+
+    const markers = await fetchMarkersOnMap(context, page, memberLogin.accessToken);
+    expect(markers.find((m) => m.id === ownerAssetId)).toBeUndefined();
+
+    // Restore so subsequent tests in this describe don't inherit the off state.
+    await updateMemberTimeline(
+      { id: spaceId, sharedSpaceMemberTimelineDto: { showInTimeline: true } },
+      { headers: asBearerAuth(memberLogin.accessToken) },
+    );
   });
 
   test('non-member sees no space markers (matrix row 8)', async ({ context, page }) => {
-    const outsider = await utils.userSetup(admin.accessToken, {
+    await utils.userSetup(admin.accessToken, {
       email: 'outsider@test.com',
       name: 'Outsider',
       password: 'password',
     });
-    const outsiderLogin = await utils.login({ email: 'outsider@test.com', password: 'password' });
-    await utils.setAuthCookies(context, outsiderLogin.accessToken);
+    const outsiderLogin = await loginAs('outsider@test.com', 'password');
 
-    const [markerResponse] = await Promise.all([
-      page.waitForResponse((resp) => resp.url().includes('/map/markers') && resp.request().method() === 'GET'),
-      page.goto('/map'),
-    ]);
+    const markers = await fetchMarkersOnMap(context, page, outsiderLogin.accessToken);
+    expect(markers.find((m) => m.id === ownerAssetId)).toBeUndefined();
+  });
 
-    const body = (await markerResponse.json()) as Array<{ id: string }>;
-    expect(body.find((m) => m.id === ownerAssetId)).toBeUndefined();
+  test('former member (removed from space) sees no marker (matrix row 9)', async ({ context, page }) => {
+    // Admin removes the member from the space.
+    await removeSpaceMember({ id: spaceId, userId: memberId }, { headers: asBearerAuth(admin.accessToken) });
+
+    const markers = await fetchMarkersOnMap(context, page, memberLogin.accessToken);
+    expect(markers.find((m) => m.id === ownerAssetId)).toBeUndefined();
+
+    // Re-add the member so we leave state consistent if other specs share this file's describe.
+    await utils.addSpaceMember(admin.accessToken, spaceId, { userId: memberId, role: 'viewer' });
   });
 });
 ```
 
-**Step 2:** **Before running**, verify helper availability:
+**Step 2:** Verify the exact SDK names imported above compile against the regenerated TS SDK (Phase 5 must be done first):
 
 ```bash
-grep -n "userSetup\|createAsset\|updateSpaceMember\|login\|setAuthCookies" e2e/src/utils.ts | head -20
+cd e2e && pnpm tsc --noEmit && cd ..
 ```
 
-If `userSetup` doesn't exist, use the existing admin-creating-user pattern (search for how other specs create additional users, e.g., `spaces-p1.e2e-spec.ts`). If `updateSpaceMember` isn't exposed, call the generated SDK directly via `updateSharedSpaceMember({ id: spaceId, userId: member.id, sharedSpaceMemberUpdateDto: { showInTimeline: false } }, { headers: asBearerAuth(...) })`.
+If `removeMember` (aliased as `removeSpaceMember`), `updateMemberTimeline`, `updateAssets`, or `login` have different exported names in your regenerated SDK, grep for the actual name:
 
-If `createAsset` doesn't set GPS, patch it via the SDK's asset-update flow after creation:
-
-```ts
-await utils.updateAssets(admin.accessToken, {
-  ids: [asset.id],
-  latitude: 48.8566,
-  longitude: 2.3522,
-});
+```bash
+grep -n "export function" open-api/typescript-sdk/src/fetch-client.ts | grep -i "member\|login\|updateAssets" | head
 ```
 
-The plan calls out the scaffolding; the executor fills in the exact helpers after grepping `e2e/src/utils.ts`.
+Adjust the imports accordingly. The SDK is generated from `open-api/immich-openapi-specs.json`; names are stable across regens for unchanged endpoints.
 
 **Step 3:** Run the e2e suite against a running dev stack.
 
 ```bash
-# From the repo root in one terminal:
+# Terminal 1:
 make dev
-# Wait for the stack to be healthy, then in another terminal:
-make e2e-web-dev
-# Or, to run just this spec:
+# Wait for healthy (server + web + postgres + redis + ml)
+# Terminal 2 — run just this spec:
 cd e2e && pnpm exec playwright test src/specs/web/space-map-markers.e2e-spec.ts && cd ..
 ```
 
-**Step 4:** Iterate until all three test bodies pass. Fill in the `TODO` in test 2 (showInTimeline toggle) by calling the member-update endpoint.
+**Step 4:** All four tests should pass. If any flake on marker-list timing, the issue is likely the map page's debounced fetch vs. `page.goto` race — add `await page.waitForLoadState('networkidle')` after the goto, or switch to polling the SDK directly instead of intercepting the network response.
 
 **Step 5:** Commit.
 
 ```bash
 git add e2e/src/specs/web/space-map-markers.e2e-spec.ts
-git commit -m "test(e2e): member visibility on personal map for shared spaces"
+git commit -m "test(e2e): space photos on personal map — rows 1, 7, 8, 9"
 ```
 
 ---
