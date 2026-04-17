@@ -114,4 +114,18 @@ void main() {
       expect(d.takenBefore, null);
     });
   });
+
+  group('setRating', () {
+    test('sets a rating value', () {
+      final notifier = container.read(photosFilterProvider.notifier);
+      notifier.setRating(4);
+      expect(container.read(photosFilterProvider).rating.rating, 4);
+    });
+    test('null clears the rating', () {
+      final notifier = container.read(photosFilterProvider.notifier);
+      notifier.setRating(4);
+      notifier.setRating(null);
+      expect(container.read(photosFilterProvider).rating.rating, null);
+    });
+  });
 }
