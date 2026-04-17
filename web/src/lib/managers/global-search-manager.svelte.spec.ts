@@ -33,6 +33,7 @@ import { addEntry, getEntries, __resetForTests as resetRecentStore } from '$lib/
 import {
   getAlbumInfo,
   getAlbumNames,
+  getAllPeople,
   getAllSpaces,
   getAllTags,
   getMlHealth,
@@ -41,6 +42,7 @@ import {
   searchPerson,
   searchPlaces,
   searchSmart,
+  type PersonResponseDto,
 } from '@immich/sdk';
 import { toastManager } from '@immich/ui';
 import { computeCommandScore } from 'bits-ui';
@@ -74,6 +76,10 @@ vi.mock('@immich/sdk', async () => ({
   getAllSpaces: vi.fn(),
   getAlbumInfo: vi.fn(),
   getSpace: vi.fn(),
+  // Default bare-@ tests in prior suites rely on an empty-people baseline so the
+  // people section lands at `empty` (not `ok`) when a test doesn't set its own mock.
+  // The Task 6 suite overrides this with vi.mocked(getAllPeople).mockResolvedValue(...).
+  getAllPeople: vi.fn().mockResolvedValue({ people: [], total: 0, hidden: 0, hasNextPage: false }),
 }));
 
 vi.mock('$app/navigation', () => ({
@@ -3698,5 +3704,157 @@ describe('prefix scoping — bare suggestions (tags/albums/spaces)', () => {
 
     expect(m.sections.albums.status).toBe('empty');
     expect(m.sections.spaces.status).toBe('ok');
+  });
+});
+
+const mockPerson = (id: string, name: string, updatedAt?: string): PersonResponseDto => ({
+  id,
+  name,
+  birthDate: null,
+  isHidden: false,
+  thumbnailPath: '',
+  type: 'person',
+  updatedAt,
+});
+
+describe('prefix scoping — bare @ suggestions', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    vi.useFakeTimers();
+    installFakeAbortTimeout();
+    // Quiet the other providers so only people drives state.
+    vi.mocked(searchSmart).mockResolvedValue({ assets: { items: [], nextPage: null } } as never);
+    vi.mocked(searchAssets).mockResolvedValue({ assets: { items: [], nextPage: null } } as never);
+    vi.mocked(searchPlaces).mockResolvedValue([] as never);
+    vi.mocked(getAllTags).mockResolvedValue([] as never);
+    vi.mocked(getAlbumNames).mockResolvedValue([] as never);
+    vi.mocked(getAllSpaces).mockResolvedValue([] as never);
+  });
+
+  afterEach(() => {
+    restoreAbortTimeout();
+    vi.useRealTimers();
+  });
+
+  it('bare @ calls getAllPeople once; subsequent bare @ reads cache', async () => {
+    const m = new GlobalSearchManager();
+    const getAllPeopleSpy = vi.mocked(getAllPeople);
+    getAllPeopleSpy.mockResolvedValue({ people: [mockPerson('p1', 'Alice')], total: 1, hidden: 0, hasNextPage: false });
+
+    m.setQuery('@');
+    await vi.advanceTimersByTimeAsync(150);
+    await vi.runAllTimersAsync();
+    m.setQuery('@a');
+    await vi.advanceTimersByTimeAsync(150);
+    m.setQuery('@');
+    await vi.advanceTimersByTimeAsync(150);
+
+    expect(getAllPeopleSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('concurrent bare @ joins same peoplePromise (getAllPeople fires once)', async () => {
+    const m = new GlobalSearchManager();
+    const getAllPeopleSpy = vi.mocked(getAllPeople);
+    let resolve: (v: unknown) => void;
+    getAllPeopleSpy.mockImplementation(() => new Promise((r) => (resolve = r as (v: unknown) => void)) as never);
+
+    m.setQuery('@');
+    await vi.advanceTimersByTimeAsync(150);
+    m.setQuery('@a'); // would fire searchPerson
+    m.setQuery('@'); // back to bare — should NOT start a second getAllPeople
+    await vi.advanceTimersByTimeAsync(150);
+
+    resolve!({ people: [mockPerson('p1', 'Alice')], total: 1, hidden: 0, hasNextPage: false });
+    await vi.runAllTimersAsync();
+
+    expect(getAllPeopleSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('stale bare-@ rejection after @alice resolves does NOT stomp ok results', async () => {
+    const m = new GlobalSearchManager();
+    const getAllPeopleSpy = vi.mocked(getAllPeople);
+    let rejectFn: (e: Error) => void;
+    getAllPeopleSpy.mockImplementation(() => new Promise((_, r) => (rejectFn = r as (e: Error) => void)) as never);
+    vi.mocked(searchPerson).mockResolvedValue([mockPerson('p1', 'Alice')] as never);
+
+    m.setQuery('@'); // bare, starts getAllPeople fetch
+    await vi.advanceTimersByTimeAsync(150);
+    m.setQuery('@alice'); // now non-bare; searchPerson resolves
+    await vi.advanceTimersByTimeAsync(150);
+    await vi.runAllTimersAsync();
+
+    expect(m.sections.people.status).toBe('ok');
+
+    rejectFn!(new Error('network'));
+    // Flush microtasks so the catch branch runs.
+    await vi.runAllTimersAsync();
+    await Promise.resolve();
+
+    expect(m.sections.people.status).toBe('ok'); // not stomped to error
+  });
+
+  it('bare @ network error while still at bare @ writes error to section', async () => {
+    const m = new GlobalSearchManager();
+    vi.mocked(getAllPeople).mockRejectedValue(new Error('network down'));
+
+    m.setQuery('@');
+    await vi.advanceTimersByTimeAsync(150);
+    await vi.runAllTimersAsync();
+    await Promise.resolve();
+
+    expect(m.sections.people.status).toBe('error');
+    expect((m.sections.people as { message: string }).message).toBe('network down');
+  });
+
+  it('bare @ with zero named people returns empty', async () => {
+    const m = new GlobalSearchManager();
+    vi.mocked(getAllPeople).mockResolvedValue({ people: [], total: 0, hidden: 0, hasNextPage: false });
+    m.setQuery('@');
+    await vi.advanceTimersByTimeAsync(150);
+    await vi.runAllTimersAsync();
+    expect(m.sections.people.status).toBe('empty');
+  });
+
+  it('getAllPeople 5-second timeout transitions section to timeout', async () => {
+    const m = new GlobalSearchManager();
+    // getAllPeople binds to closeSignal (not per-keystroke AbortSignal.timeout(5000)),
+    // so this test simulates a fetch that never resolves within the 5s window; the
+    // provider-level AbortSignal.timeout inside runBatch fires at 5s and the
+    // surrounding people.run catch branch writes 'timeout'.
+    vi.mocked(getAllPeople).mockImplementation(
+      ({}, opts) =>
+        new Promise((_, reject) => {
+          opts?.signal?.addEventListener('abort', () => {
+            const err = new DOMException('timeout', 'TimeoutError');
+            reject(err);
+          });
+        }) as never,
+    );
+
+    m.setQuery('@');
+    await vi.advanceTimersByTimeAsync(150); // debounce fires
+    await vi.advanceTimersByTimeAsync(5000); // AbortSignal.timeout fires
+    await vi.runAllTimersAsync();
+
+    expect(m.sections.people.status).toBe('timeout');
+  });
+
+  it('close + reopen resets peopleSuggestionsCache and peoplePromise', async () => {
+    const m = new GlobalSearchManager();
+    const getAllPeopleSpy = vi.mocked(getAllPeople);
+    getAllPeopleSpy.mockResolvedValue({ people: [mockPerson('p1', 'Alice')], total: 1, hidden: 0, hasNextPage: false });
+
+    m.open();
+    m.setQuery('@');
+    await vi.advanceTimersByTimeAsync(150);
+    await vi.runAllTimersAsync();
+    m.close();
+    m.open();
+    m.setQuery('@');
+    await vi.advanceTimersByTimeAsync(150);
+    await vi.runAllTimersAsync();
+
+    expect(getAllPeopleSpy).toHaveBeenCalledTimes(2);
   });
 });

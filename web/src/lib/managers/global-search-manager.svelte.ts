@@ -8,6 +8,7 @@ import { user } from '$lib/stores/user.store';
 import {
   getAlbumInfo,
   getAlbumNames,
+  getAllPeople,
   getAllSpaces,
   getAllTags,
   getMlHealth,
@@ -18,6 +19,7 @@ import {
   searchSmart,
   type AlbumNameDto,
   type MetadataSearchDto,
+  type PersonResponseDto,
   type SharedSpaceResponseDto,
   type TagResponseDto,
 } from '@immich/sdk';
@@ -26,7 +28,7 @@ import { computeCommandScore } from 'bits-ui';
 import { locale as i18nLocale, t, type Translations } from 'svelte-i18n';
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import { get } from 'svelte/store';
-import { parseScope, type ParsedQuery, type Scope } from './cmdk-prefix';
+import { parseScope, personSuggestionsComparator, type ParsedQuery, type Scope } from './cmdk-prefix';
 import { isAlmostExactNavMatch, NAVIGATION_ITEMS, type NavigationItem } from './navigation-items';
 
 export type SearchMode = 'smart' | 'metadata' | 'description' | 'ocr';
@@ -257,8 +259,10 @@ export class GlobalSearchManager {
    */
   albumsCache: AlbumNameDto[] | undefined = $state(undefined);
   spacesCache: SharedSpaceResponseDto[] | undefined = $state(undefined);
+  peopleSuggestionsCache: PersonResponseDto[] | undefined = $state(undefined);
   private albumsPromise: Promise<void> | undefined;
   private spacesPromise: Promise<void> | undefined;
+  private peoplePromise: Promise<void> | undefined;
 
   /**
    * Locale-keyed memo cache for navigation item search strings.
@@ -374,6 +378,11 @@ export class GlobalSearchManager {
     // session N+1 (the rejected promise is still memoized in albumsPromise).
     this.albumsPromise = undefined;
     this.spacesPromise = undefined;
+    // People suggestions follow the same reset-on-open pattern: reset the cache
+    // AND the promise so the next session's fetch actually fires (a rejected prior
+    // promise would otherwise memoize the failure across sessions).
+    this.peopleSuggestionsCache = undefined;
+    this.peoplePromise = undefined;
     if (!this.mlProbed) {
       this.mlProbed = true;
       void this.probeMlHealth();
@@ -463,6 +472,64 @@ export class GlobalSearchManager {
         return;
       }
       this.sections.spaces = { status: 'error', message: error instanceof Error ? error.message : 'unknown error' };
+      throw error;
+    }
+  }
+
+  /**
+   * Fetch (and memoize) the bare-`@` suggestions list for the current open session.
+   * Mirrors `ensureAlbumsCache()` / `ensureSpacesCache()` — callers join a shared
+   * in-flight promise so rapid retype cycles never start a second fetch.
+   */
+  async ensurePeopleSuggestionsCache(): Promise<void> {
+    if (this.peopleSuggestionsCache !== undefined) {
+      return;
+    }
+    if (this.peoplePromise === undefined) {
+      this.peoplePromise = this.fetchPeopleSuggestions();
+    }
+    return this.peoplePromise;
+  }
+
+  private async fetchPeopleSuggestions(): Promise<void> {
+    // 5-second per-request timeout on top of closeSignal. Bare-@ flows through
+    // ensurePeopleSuggestionsCache, which is independent of the per-keystroke
+    // batchController.signal — without this timeout a stuck fetch would leave
+    // the section in 'loading' forever until the palette closes.
+    const signal = AbortSignal.any([this.closeSignal, AbortSignal.timeout(5000)]);
+    try {
+      const response = await getAllPeople({ size: 10 }, { signal });
+      this.peopleSuggestionsCache = [...response.people].sort(personSuggestionsComparator);
+    } catch (error: unknown) {
+      // Distinguish three rejection modes:
+      //   1. Timeout: the composite signal aborted with a TimeoutError reason. Surface
+      //      'timeout' to the section only if the manager is still at bare-@.
+      //   2. Close: the composite signal aborted because of closeSignal. Silent drop —
+      //      the palette is going away and the next open() resets the cache fields.
+      //   3. Other (network / 5xx / JSON parse): surface 'error' if still at bare-@,
+      //      otherwise silently drop so a late rejection can't stomp a fresh
+      //      searchPerson result that already wrote 'ok'.
+      // Check signal.reason first because fetch() rejections can present as
+      // AbortError (browser fetch), TimeoutError (direct signal-driven reject in tests),
+      // or DOMException either way — signal.reason is the single source of truth.
+      const isTimeout =
+        signal.aborted && signal.reason instanceof DOMException && signal.reason.name === 'TimeoutError';
+      const isClose = signal.aborted && !isTimeout;
+      if (isTimeout) {
+        if (this.scope === 'people' && this.payload === '') {
+          this.sections.people = { status: 'timeout' };
+        }
+        return;
+      }
+      if (isClose) {
+        return;
+      }
+      // Stale-rejection guard: only surface an error if the manager is still in the
+      // bare-@ state this fetch was kicked off for. Otherwise the user has typed on
+      // and a fresh searchPerson result must not be stomped by a late rejection.
+      if (this.scope === 'people' && this.payload === '') {
+        this.sections.people = { status: 'error', message: error instanceof Error ? error.message : 'unknown error' };
+      }
       throw error;
     }
   }
@@ -1624,12 +1691,23 @@ export class GlobalSearchManager {
       topN: 5,
       minQueryLength: 2,
       run: async (query, _mode, signal) => {
-        // Bare-@ branch. Task 6 fills this in with cache-backed suggestions; for now
-        // it is a short-circuit that keeps runBatch's scope-aware dispatch honest by
-        // skipping the `searchPerson('')` round-trip which would just echo
-        // cursor-sorted people the server already returns for us.
         if (query === '') {
-          return { status: 'empty' };
+          // Bare-@: suggestions from getAllPeople, sorted via personSuggestionsComparator.
+          try {
+            await this.ensurePeopleSuggestionsCache();
+          } catch {
+            // ensurePeopleSuggestionsCache already transitioned the section (guarded
+            // by scope/payload still being bare-@) or silently dropped an AbortError.
+            // Return the current section state so runBatch's assignment is idempotent.
+            return this.sections.people;
+          }
+          if (this.peopleSuggestionsCache === undefined) {
+            // Mid-flight close (closeSignal abort) drops the cache without transitioning
+            // the section — surface whatever the section currently holds.
+            return this.sections.people;
+          }
+          const items = this.peopleSuggestionsCache.slice(0, 10);
+          return items.length === 0 ? { status: 'empty' } : { status: 'ok', items, total: items.length };
         }
         try {
           const results = await searchPerson({ name: query, withHidden: false }, { signal });
