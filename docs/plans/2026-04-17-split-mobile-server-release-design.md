@@ -36,7 +36,7 @@ Steps:
 
 1. **Dupe guard** — fail if any draft GitHub Release exists where the tag matches `v*.*.*` AND has at least one `.apk` asset attached. This is the same composite predicate phase 2 uses for discovery, so what passes the guard is exactly what phase 2 will find. Filter is intentionally narrow: an unrelated manual draft (docs preview, etc.) does not block.
 2. **Compute version** — same logic as today's `gallery-release.yml` version job, lifted verbatim. Honors manual override.
-3. **Call `gallery-build-mobile.yml`** with `environment: production` and `version: vX.Y.Z`. Builds + signs Android AAB / APK and iOS IPA, uploads AAB to Play **internal** track, uploads IPA to TestFlight. Produces `gallery-vX.Y.Z.apk` artifact.
+3. **Call `gallery-build-mobile.yml`** with `environment: production` and `version: vX.Y.Z`. Builds + signs Android AAB / APK and iOS IPA, uploads IPA to TestFlight. Play Store upload is currently disabled (app is in Google review); the AAB is published as a workflow artifact for manual upload. When Play uploads are re-enabled the fastlane step goes back in. Produces `gallery-vX.Y.Z.apk` artifact.
 4. **Create draft GitHub Release** — `gh release create vX.Y.Z --draft --target <sha> --title vX.Y.Z -n "<notes>" ./gallery-vX.Y.Z.apk`. The git tag is **not** created here; `gh` creates it lazily when the draft is published.
 
 ### Manual step between phases (no workflow)
@@ -59,7 +59,7 @@ Steps:
 
 ### `gallery-build-mobile.yml` (modified)
 
-- Uncomment the Play Store fastlane block (currently commented because the app was in initial Google review). Keep the `inputs.version != ''` gate so PR / push-to-main smoke builds remain upload-free.
+- Leave the Play Store fastlane block commented out until the app clears Google review. When it's ready, uncomment and keep the `inputs.version != ''` gate so PR / push-to-main smoke builds remain upload-free.
 - No workflow signature change.
 - Add a header comment: _"For production releases, trigger via `gallery-release-mobile.yml`. Manual `workflow_dispatch` with a `version` input bypasses the phase-1 handoff and uploads to Play / TestFlight without creating a release draft."_
 
