@@ -1099,4 +1099,49 @@ describe(SharedSpaceRepository.name, () => {
       expect(nonMatching.find((r) => r.id === asset.id)).toBeUndefined();
     });
   });
+
+  describe('getFilteredMapMarkers — space membership inclusion', () => {
+    it('should include a direct shared_space_asset via timelineSpaceIds (row 2)', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id });
+      const { asset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
+      await ctx.database.insertInto('asset_exif').values({ assetId: asset.id, latitude: 20, longitude: 20 }).execute();
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+
+      const results = await sut.getFilteredMapMarkers({
+        userIds: [member.id],
+        timelineSpaceIds: [space.id],
+        visibility: AssetVisibility.Timeline,
+      });
+
+      expect(results.find((r) => r.id === asset.id)).toBeDefined();
+    });
+
+    it('should include a library-linked asset via timelineSpaceIds (row 4)', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id });
+      const { library } = await ctx.newLibrary({ ownerId: owner.id });
+      await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id });
+      const { asset } = await ctx.newAsset({
+        ownerId: owner.id,
+        libraryId: library.id,
+        visibility: AssetVisibility.Timeline,
+      });
+      await ctx.database.insertInto('asset_exif').values({ assetId: asset.id, latitude: 21, longitude: 21 }).execute();
+
+      const results = await sut.getFilteredMapMarkers({
+        userIds: [member.id],
+        timelineSpaceIds: [space.id],
+        visibility: AssetVisibility.Timeline,
+      });
+
+      expect(results.find((r) => r.id === asset.id)).toBeDefined();
+    });
+  });
 });
