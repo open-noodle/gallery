@@ -19,4 +19,15 @@ class PhotosFilterNotifier extends Notifier<SearchFilter> {
     if (!next.add(person)) next.remove(person);
     state = state.copyWith(people: next);
   }
+
+  // SearchFilter.copyWith null-coalesces, so use cascade to set nullable fields.
+  void toggleTag(String tagId) {
+    final current = List<String>.from(state.tagIds ?? const []);
+    if (current.contains(tagId)) {
+      current.remove(tagId);
+    } else {
+      current.add(tagId);
+    }
+    state = state.copyWith()..tagIds = current.isEmpty ? null : current;
+  }
 }

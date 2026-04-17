@@ -49,4 +49,26 @@ void main() {
       expect(container.read(photosFilterProvider).people, {alice, bob});
     });
   });
+
+  group('toggleTag', () {
+    test('adding a tag sets it in state.tagIds', () {
+      final notifier = container.read(photosFilterProvider.notifier);
+      notifier.toggleTag('tag-1');
+      expect(container.read(photosFilterProvider).tagIds, ['tag-1']);
+    });
+    test('toggling same tag twice ends with null or empty tagIds', () {
+      final notifier = container.read(photosFilterProvider.notifier);
+      notifier.toggleTag('tag-1');
+      notifier.toggleTag('tag-1');
+      final tagIds = container.read(photosFilterProvider).tagIds;
+      expect(tagIds == null || tagIds.isEmpty, true);
+    });
+    test('toggle persists null-ness on an empty list', () {
+      final notifier = container.read(photosFilterProvider.notifier);
+      notifier.toggleTag('tag-1');
+      notifier.toggleTag('tag-2');
+      notifier.toggleTag('tag-1');
+      expect(container.read(photosFilterProvider).tagIds, ['tag-2']);
+    });
+  });
 }
