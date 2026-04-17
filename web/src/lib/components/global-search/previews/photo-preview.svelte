@@ -29,7 +29,7 @@
      palette row for height. The image is placed inside a fixed-height flex-centered
      frame so its size is fully definite (no percent-height quirks) and the content
      below is anchored predictably. -->
-<div class="flex flex-col gap-3 p-5">
+<div data-cmdk-preview-photo class="flex flex-col gap-3 p-5">
   <div class="flex h-[200px] w-full items-center justify-center overflow-hidden rounded-md bg-subtle/40">
     <img
       src={thumbUrl}
