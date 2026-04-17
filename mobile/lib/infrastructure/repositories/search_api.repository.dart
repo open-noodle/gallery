@@ -1,12 +1,15 @@
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart' hide AssetVisibility;
 import 'package:immich_mobile/infrastructure/repositories/api.repository.dart';
 import 'package:immich_mobile/models/search/search_filter.model.dart';
+import 'package:immich_mobile/services/api.service.dart';
 import 'package:openapi/api.dart';
 
 class SearchApiRepository extends ApiRepository {
-  final SearchApi _api;
+  final ApiService _apiService;
 
-  const SearchApiRepository(this._api);
+  SearchApiRepository(this._apiService);
+
+  SearchApi get _api => _apiService.searchApi;
 
   Future<SearchResponseDto?> search(SearchFilter filter, int page) {
     AssetTypeEnum? type;

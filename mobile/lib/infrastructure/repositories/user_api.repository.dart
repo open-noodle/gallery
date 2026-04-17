@@ -4,11 +4,14 @@ import 'package:http/http.dart';
 import 'package:immich_mobile/domain/models/user.model.dart';
 import 'package:immich_mobile/infrastructure/repositories/api.repository.dart';
 import 'package:immich_mobile/infrastructure/utils/user.converter.dart';
+import 'package:immich_mobile/services/api.service.dart';
 import 'package:openapi/api.dart';
 
 class UserApiRepository extends ApiRepository {
-  final UsersApi _api;
-  const UserApiRepository(this._api);
+  final ApiService _apiService;
+  UserApiRepository(this._apiService);
+
+  UsersApi get _api => _apiService.usersApi;
 
   Future<UserDto?> getMyUser() async {
     final (adminDto, preferenceDto) = await (_api.getMyUser(), _api.getMyPreferences()).wait;
