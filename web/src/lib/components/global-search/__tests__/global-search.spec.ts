@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Shared hoisted user mock — navigation provider and render-time recent filter both
 // read `get(user)` / `$user`. Must appear above the component import so Vitest hoists
@@ -129,6 +129,15 @@ describe('global-search root', () => {
     mockUser.current = { id: 'test-user', isAdmin: false };
     mockFlags.valueOrUndefined = { search: true, map: true, trash: true };
     user = userEvent.setup({ pointerEventsCheck: 0 });
+  });
+
+  // Drain bits-ui's body-scroll-lock deferred cleanup (setTimeout with 24ms
+  // delay in bits-ui/dist/internal/body-scroll-lock.svelte.js) before happy-dom
+  // tears down the document. Without this, the cleanup fires after teardown
+  // and throws `ReferenceError: document is not defined` as an unhandled error,
+  // which Vitest surfaces as a whole-file failure even though every test passed.
+  afterEach(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 50));
   });
 
   it('renders dialog containing the palette', () => {
