@@ -5,8 +5,15 @@ import 'package:immich_mobile/entities/asset.entity.dart';
 import 'package:immich_mobile/models/search/search_filter.model.dart';
 import 'package:immich_mobile/providers/photos_filter/chip_id.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
+import 'package:mocktail/mocktail.dart';
+
+import '../../test_utils.dart';
 
 void main() {
+  setUpAll(() {
+    registerFallbackValue(SearchFilter.empty());
+  });
+
   late ProviderContainer container;
   setUp(() {
     container = ProviderContainer();
@@ -355,6 +362,36 @@ void main() {
       notifier.setText('paris');
       notifier.removeChip(const TextChipId());
       expect(container.read(photosFilterProvider).context, null);
+    });
+  });
+
+  group('no-op safety', () {
+    test('clearPeople on an already-empty filter does not emit', () {
+      final listener = ListenerMock<SearchFilter>();
+      container.listen<SearchFilter>(photosFilterProvider, listener.call);
+      container.read(photosFilterProvider.notifier).clearPeople();
+      verifyNever(() => listener(any(), any()));
+    });
+
+    test('removeChip(PersonChipId(nonexistent)) does not emit', () {
+      final notifier = container.read(photosFilterProvider.notifier);
+      const alice = PersonDto(id: 'alice', name: 'Alice', isHidden: false, thumbnailPath: '');
+      notifier.togglePerson(alice);
+      final listener = ListenerMock<SearchFilter>();
+      container.listen<SearchFilter>(photosFilterProvider, listener.call);
+      notifier.removeChip(const PersonChipId('ghost'));
+      verifyNever(() => listener(any(), any()));
+    });
+
+    test('togglePerson twice for the same PersonDto is a net no-op', () {
+      final notifier = container.read(photosFilterProvider.notifier);
+      const alice = PersonDto(id: 'alice', name: 'Alice', isHidden: false, thumbnailPath: '');
+      final before = container.read(photosFilterProvider);
+      notifier.togglePerson(alice);
+      notifier.togglePerson(alice);
+      final after = container.read(photosFilterProvider);
+      expect(after, before);
+      expect(after.people, isEmpty);
     });
   });
 }
