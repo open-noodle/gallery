@@ -13,6 +13,10 @@ class PhotosFilterNotifier extends Notifier<SearchFilter> {
   @override
   SearchFilter build() => SearchFilter.empty();
 
+  @override
+  bool updateShouldNotify(SearchFilter previous, SearchFilter next) =>
+      previous != next;
+
   void reset() => state = SearchFilter.empty();
 
   // SearchFilter.copyWith null-coalesces, so use cascade to set nullable fields.
