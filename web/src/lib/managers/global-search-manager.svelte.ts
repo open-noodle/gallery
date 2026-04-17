@@ -26,6 +26,7 @@ import { computeCommandScore } from 'bits-ui';
 import { locale as i18nLocale, t, type Translations } from 'svelte-i18n';
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import { get } from 'svelte/store';
+import { parseScope, type ParsedQuery, type Scope } from './cmdk-prefix';
 import { isAlmostExactNavMatch, NAVIGATION_ITEMS, type NavigationItem } from './navigation-items';
 
 export type SearchMode = 'smart' | 'metadata' | 'description' | 'ocr';
@@ -152,6 +153,9 @@ export class GlobalSearchManager {
   isOpen = $state(false);
   query = $state('');
   mode = $state<SearchMode>(loadSearchQueryType());
+  parsedQuery = $derived<ParsedQuery>(parseScope(this.query));
+  scope = $derived<Scope>(this.parsedQuery.scope);
+  payload = $derived<string>(this.parsedQuery.payload);
   sections = $state<Sections>({
     photos: idle,
     people: idle,

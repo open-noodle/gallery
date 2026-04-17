@@ -3447,3 +3447,37 @@ describe('activateSpace', () => {
     expect(sut.pendingActivation).toBeNull();
   });
 });
+
+describe('prefix scoping — deriveds', () => {
+  it('setQuery(@alice) derives scope=people, payload=alice', () => {
+    const m = new GlobalSearchManager();
+    m.setQuery('@alice');
+    expect(m.scope).toBe('people');
+    expect(m.payload).toBe('alice');
+  });
+
+  it('setQuery(alice) derives scope=all, payload=alice', () => {
+    const m = new GlobalSearchManager();
+    m.setQuery('alice');
+    expect(m.scope).toBe('all');
+    expect(m.payload).toBe('alice');
+  });
+
+  it('scope stable across keystrokes within same prefix', () => {
+    const m = new GlobalSearchManager();
+    m.setQuery('@');
+    m.setQuery('@a');
+    m.setQuery('@al');
+    expect(m.scope).toBe('people');
+    expect(m.payload).toBe('al');
+  });
+
+  it('setQuery(@alice) then setQuery("") returns scope to all', () => {
+    const m = new GlobalSearchManager();
+    m.setQuery('@alice');
+    expect(m.scope).toBe('people');
+    m.setQuery('');
+    expect(m.scope).toBe('all');
+    expect(m.payload).toBe('');
+  });
+});
