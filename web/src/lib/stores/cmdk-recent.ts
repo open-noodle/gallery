@@ -13,7 +13,7 @@ const MAX_ENTRIES = 20;
 export type RecentEntry =
   | { kind: 'query'; id: string; text: string; mode: SearchMode; lastUsed: number }
   | { kind: 'photo'; id: string; assetId: string; label: string; lastUsed: number }
-  | { kind: 'person'; id: string; personId: string; label: string; thumbnailAssetId?: string; lastUsed: number }
+  | { kind: 'person'; id: string; personId: string; label: string; lastUsed: number }
   | { kind: 'place'; id: string; latitude: number; longitude: number; label: string; lastUsed: number }
   | { kind: 'tag'; id: string; tagId: string; label: string; lastUsed: number }
   | {
