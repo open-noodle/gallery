@@ -19,6 +19,7 @@ export interface MapMarkerSearchOptions {
   isFavorite?: boolean;
   fileCreatedBefore?: Date;
   fileCreatedAfter?: Date;
+  timelineSpaceIds?: string[];
 }
 
 export interface GeoPoint {
@@ -89,7 +90,7 @@ export class MapRepository {
     authUserId: string,
     ownerIds: string[],
     albumIds: string[],
-    { isArchived, isFavorite, fileCreatedAfter, fileCreatedBefore }: MapMarkerSearchOptions = {},
+    { isArchived, isFavorite, fileCreatedAfter, fileCreatedBefore, timelineSpaceIds }: MapMarkerSearchOptions = {},
   ) {
     return this.mapMarkersQuery()
       .$if(isArchived === true, (qb) =>
@@ -121,6 +122,29 @@ export class MapRepository {
                 .whereRef('asset.id', '=', 'album_asset.assetId')
                 .where('album_asset.albumId', 'in', albumIds),
             ),
+          );
+        }
+
+        if (timelineSpaceIds && timelineSpaceIds.length > 0) {
+          expression.push(
+            eb.and([
+              eb('asset.visibility', '=', AssetVisibility.Timeline),
+              eb.exists((eb) =>
+                eb
+                  .selectFrom('shared_space_asset')
+                  .whereRef('asset.id', '=', 'shared_space_asset.assetId')
+                  .where('shared_space_asset.spaceId', 'in', timelineSpaceIds),
+              ),
+            ]),
+            eb.and([
+              eb('asset.visibility', '=', AssetVisibility.Timeline),
+              eb.exists((eb) =>
+                eb
+                  .selectFrom('shared_space_library')
+                  .whereRef('asset.libraryId', '=', 'shared_space_library.libraryId')
+                  .where('shared_space_library.spaceId', 'in', timelineSpaceIds),
+              ),
+            ]),
           );
         }
 

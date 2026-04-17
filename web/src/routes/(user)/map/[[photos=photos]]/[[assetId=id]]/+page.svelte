@@ -114,6 +114,7 @@
     fetchTimeout = setTimeout(() => {
       void getFilteredMapMarkers({
         ...(currentSpaceId && { spaceId: currentSpaceId }),
+        ...(!currentSpaceId && { withSharedSpaces: true }),
         ...(personIds.length > 0 && { personIds }),
         ...(make && { make }),
         ...(model && { model }),
