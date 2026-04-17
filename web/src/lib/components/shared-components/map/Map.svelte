@@ -241,6 +241,7 @@
         fileCreatedBefore,
         withPartners: withPartners || undefined,
         withSharedAlbums: withSharedAlbums || undefined,
+        withSharedSpaces: true,
       },
       {
         signal: abortController.signal,
