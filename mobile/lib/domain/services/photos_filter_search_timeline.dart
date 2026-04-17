@@ -43,9 +43,5 @@ TimelineService buildPhotosFilterSearchTimeline({
     }
   }());
 
-  return factory.fromAssetStream(
-    () => List<BaseAsset>.unmodifiable(buffer),
-    countCtrl.stream,
-    TimelineOrigin.search,
-  );
+  return factory.fromAssetStream(() => List<BaseAsset>.unmodifiable(buffer), countCtrl.stream, TimelineOrigin.search);
 }

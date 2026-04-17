@@ -47,10 +47,7 @@ class BrowseContent extends ConsumerWidget {
                   ],
                 ),
               ),
-              const Padding(
-                padding: EdgeInsets.fromLTRB(20, 6, 20, 0),
-                child: FilterSheetSearchBar(),
-              ),
+              const Padding(padding: EdgeInsets.fromLTRB(20, 6, 20, 0), child: FilterSheetSearchBar()),
               const SizedBox(height: 18),
               const PeopleStrip(),
               const PlacesStrip(),

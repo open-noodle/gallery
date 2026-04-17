@@ -96,10 +96,11 @@ List<ActiveChipSpec> activeChipsFromFilter(SearchFilter filter, {FilterSuggestio
   }
 
   // ── location ─────────────────────────────────────────────────────────
-  final locParts = [filter.location.country, filter.location.state, filter.location.city]
-      .where((s) => s != null && s.isNotEmpty)
-      .cast<String>()
-      .toList();
+  final locParts = [
+    filter.location.country,
+    filter.location.state,
+    filter.location.city,
+  ].where((s) => s != null && s.isNotEmpty).cast<String>().toList();
   if (locParts.isNotEmpty) {
     out.add(
       ActiveChipSpec(

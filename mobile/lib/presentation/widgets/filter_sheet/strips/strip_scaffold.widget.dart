@@ -45,7 +45,11 @@ class StripScaffold extends ConsumerWidget {
       body = SizedBox(height: height, child: childBuilder(data ?? const []));
     }
 
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [title, body]);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [title, body],
+    );
   }
 }
 

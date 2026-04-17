@@ -116,7 +116,11 @@ class ActiveFilterChip extends ConsumerWidget {
       case ChipVisual.media:
       case ChipVisual.toggle:
       case ChipVisual.text:
-        return Icon(spec.icon ?? Icons.label_outline_rounded, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant);
+        return Icon(
+          spec.icon ?? Icons.label_outline_rounded,
+          size: 16,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        );
     }
   }
 }

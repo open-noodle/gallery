@@ -44,12 +44,7 @@ class _MainTimelinePageState extends ConsumerState<MainTimelinePage> {
             topSliverWidget: const SliverToBoxAdapter(child: DriftMemoryLane()),
             topSliverWidgetHeight: hasMemories ? 200 : 0,
             showStorageIndicator: true,
-            appBar: const ImmichSliverAppBar(
-              floating: true,
-              pinned: false,
-              snap: false,
-              actions: [FilterIconButton()],
-            ),
+            appBar: const ImmichSliverAppBar(floating: true, pinned: false, snap: false, actions: [FilterIconButton()]),
           ),
           const FilterSheet(),
         ],

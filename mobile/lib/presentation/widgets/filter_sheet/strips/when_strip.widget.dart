@@ -42,12 +42,7 @@ class WhenStrip extends ConsumerWidget {
         start: DateTime(now.year, now.month, 1),
         end: now,
       ),
-      _WhenPreset(
-        key: 'when-pill-year',
-        label: 'filter_sheet_when_year',
-        start: DateTime(now.year, 1, 1),
-        end: now,
-      ),
+      _WhenPreset(key: 'when-pill-year', label: 'filter_sheet_when_year', start: DateTime(now.year, 1, 1), end: now),
     ];
 
     return Column(
@@ -153,10 +148,7 @@ class _CustomPill extends ConsumerWidget {
         },
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          child: Text(
-            'filter_sheet_when_custom'.tr(),
-            style: theme.textTheme.labelLarge,
-          ),
+          child: Text('filter_sheet_when_custom'.tr(), style: theme.textTheme.labelLarge),
         ),
       ),
     );

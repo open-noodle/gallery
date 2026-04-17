@@ -23,10 +23,9 @@ class MatchCountLabel extends ConsumerWidget {
       label: label,
       child: Text(
         label,
-        style: style ??
-            Theme.of(context).textTheme.labelLarge?.copyWith(
-              fontFeatures: const [FontFeature.tabularFigures()],
-            ),
+        style:
+            style ??
+            Theme.of(context).textTheme.labelLarge?.copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
       ),
     );
   }
