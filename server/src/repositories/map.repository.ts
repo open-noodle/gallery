@@ -144,8 +144,6 @@ export class MapRepository {
                   .where('shared_space_asset.spaceId', 'in', timelineSpaceIds),
               ),
             ]),
-          );
-          expression.push(
             eb.and([
               eb('asset.visibility', '=', AssetVisibility.Timeline),
               eb.exists((eb) =>
