@@ -23,6 +23,7 @@ final mapMarkersProvider = FutureProvider.autoDispose<List<MapMarker>>((ref) asy
     isFavorite: isFavorite,
     withArchived: isIncludeArchived,
     withPartners: isWithPartners,
+    withSharedSpaces: true,
     fileCreatedAfter: fileCreatedAfter,
   );
 
