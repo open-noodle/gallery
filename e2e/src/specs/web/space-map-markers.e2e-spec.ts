@@ -1,10 +1,5 @@
-import {
-  removeMember as removeSpaceMember,
-  SharedSpaceRole,
-  updateAssets,
-  updateMemberTimeline,
-} from '@immich/sdk';
 import type { LoginResponseDto } from '@immich/sdk';
+import { removeMember as removeSpaceMember, SharedSpaceRole, updateAssets, updateMemberTimeline } from '@immich/sdk';
 import { expect, test } from '@playwright/test';
 import { asBearerAuth, utils } from 'src/utils';
 
@@ -15,6 +10,16 @@ async function setAssetGeo(accessToken: string, assetId: string, latitude: numbe
     { assetBulkUpdateDto: { ids: [assetId], latitude, longitude } },
     { headers: asBearerAuth(accessToken) },
   );
+}
+
+async function fetchMarkers(page: import('@playwright/test').Page, accessToken: string) {
+  const response = await page.request.get('/api/gallery/map/markers?withSharedSpaces=true', {
+    headers: asBearerAuth(accessToken),
+  });
+  if (!response.ok()) {
+    throw new Error(`Unexpected status ${response.status()}: ${await response.text()}`);
+  }
+  return (await response.json()) as Array<{ id: string }>;
 }
 
 test.describe('Space photos on personal map', () => {
@@ -47,16 +52,6 @@ test.describe('Space photos on personal map', () => {
     await setAssetGeo(admin.accessToken, asset.id, 48.8566, 2.3522); // Paris
     await utils.addSpaceAssets(admin.accessToken, space.id, [asset.id]);
   });
-
-  async function fetchMarkers(page: import('@playwright/test').Page, accessToken: string) {
-    const response = await page.request.get('/api/gallery/map/markers?withSharedSpaces=true', {
-      headers: asBearerAuth(accessToken),
-    });
-    if (!response.ok()) {
-      throw new Error(`Unexpected status ${response.status()}: ${await response.text()}`);
-    }
-    return (await response.json()) as Array<{ id: string }>;
-  }
 
   test('member sees space marker on personal map (matrix row 1)', async ({ page }) => {
     const markers = await fetchMarkers(page, memberLogin.accessToken);
