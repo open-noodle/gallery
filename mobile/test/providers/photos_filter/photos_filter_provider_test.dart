@@ -173,4 +173,17 @@ void main() {
       expect(container.read(photosFilterProvider).display.isNotInAlbum, false);
     });
   });
+
+  group('clearPeople', () {
+    test('empties the people set leaving other dimensions intact', () {
+      final notifier = container.read(photosFilterProvider.notifier);
+      const alice = PersonDto(id: 'alice', name: 'Alice', isHidden: false, thumbnailPath: '');
+      notifier.togglePerson(alice);
+      notifier.toggleTag('t1');
+      notifier.clearPeople();
+      final f = container.read(photosFilterProvider);
+      expect(f.people, isEmpty);
+      expect(f.tagIds, ['t1']); // untouched
+    });
+  });
 }

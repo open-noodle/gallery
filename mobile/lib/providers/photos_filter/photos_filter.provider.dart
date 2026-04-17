@@ -52,4 +52,6 @@ class PhotosFilterNotifier extends Notifier<SearchFilter> {
 
   void setNotInAlbum(bool v) =>
       state = state.copyWith(display: state.display.copyWith(isNotInAlbum: v));
+
+  void clearPeople() => state = state.copyWith(people: const {});
 }
