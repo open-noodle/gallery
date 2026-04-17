@@ -584,7 +584,7 @@ class StripScaffold<T> extends ConsumerWidget {
 
 - Header row: `Text(titleKey.tr(), style: titleSmall)` + optional `isOffline` badge (`Chip(label: Text('filter_sheet_offline'.tr()), avatar: Icon(Icons.wifi_off_rounded))`).
 - Content:
-  - `AsyncLoading` → skeleton row: 3 placeholder rectangles sized per strip (circle for People, 100×64 rounded rect for Places, pill for Tags, pill for When).
+  - `AsyncLoading` → skeleton row: 3 placeholder rectangles sized per strip (52pt circle for People, 104×72 with 14pt radius for Places, 999pt pill for Tags, 14pt-radius rect for When) — see Mockup alignment → Dimensional spec.
   - `AsyncError(e)` → single tap-to-retry tile with `'filter_sheet_load_error_retry'.tr()`; tap calls `onRetry`.
   - `AsyncData([])` → `SizedBox.shrink()` (entire strip collapses).
   - `AsyncData([...])` → horizontal `ListView.builder` calling `childrenBuilder`.
@@ -597,10 +597,10 @@ final suggestionsAsync = ref.watch(photosFilterSuggestionsProvider(filter));
 final itemsAsync = suggestionsAsync.whenData((s) => s.people); // or tags, countries, etc.
 ```
 
-**`PeopleStrip`:**
+**`PeopleStrip`:** (dimensions per Mockup alignment)
 
-- Item: 64pt `CircleAvatar` + caption (name, 12pt, 2-line max with ellipsis).
-- Selected visual: primary-coloured border (3pt) + corner check overlay.
+- Item: 58pt cell, 52pt `CircleAvatar` thumb, 10.5pt caption, single-line ellipsis.
+- Selected visual: thumb scales 1.04, 2pt `primary` ring + 4pt `primary.withOpacity(.14)` halo + soft glow `BoxShadow` (Mockup alignment → Active-state).
 - On tap:
   ```dart
   HapticFeedback.selectionClick();
@@ -613,20 +613,21 @@ final itemsAsync = suggestionsAsync.whenData((s) => s.people); // or tags, count
   }
   ```
 
-**`PlacesStrip`:**
+**`PlacesStrip`:** (dimensions per Mockup alignment)
 
-- Item: 100×64 pt container with gradient (`LinearGradient` over a flag-emoji or glyph placeholder), country text on top.
-- On tap: if selected, `setLocation(null)`; else `setLocation(SearchLocationFilter(country: country))` using cascade for safety: `ref.read(photosFilterProvider.notifier).setLocation(SearchLocationFilter(country: country))`.
+- Item: 104×72pt container, 14pt border radius, with a linear gradient overlay (alpha 0 → 0.75) at the bottom. Country `labelLarge` in paper colour, mono uppercase subtitle.
+- Selected: 2pt `primary` ring + primary glow `BoxShadow`.
+- On tap: if selected, `setLocation(null)`; else `setLocation(SearchLocationFilter(country: country))`.
 
 **`TagsStrip`:**
 
 - Item: Material 3 `FilterChip(label: Text("${tag.value} · ${tag.count ?? ''}"), selected: filter.tagIds?.contains(tag.id) == true, onSelected: (_) => { haptic(); toggleTag(tag.id); })`.
 - The `FilterSuggestionsTagDto` has no `count` field in the generated DTO — check at audit; if absent, drop the count badge in the label.
 
-**`WhenStrip`:**
+**`WhenStrip`:** (dimensions per Mockup alignment — 14pt radius distinct from tag pill's 999pt)
 
-- Static list of 5 pills: Today / This week / This month / This year / Custom…
-- Each `ActionChip(label: Text(key.tr()), onPressed: _apply)`.
+- Static list of 5 rounded rectangles (14pt radius, 9×14pt padding): Today / This week / This month / This year / Custom…
+- Implement as `Material(borderRadius: 14) + InkWell`; NOT `ActionChip` (which would force a 999pt pill shape).
 - `_apply(preset)`: compute `(start, end)` from `DateTime.now()`, call `setDateRange(start: start, end: end)`.
 - Selected pill: the one whose `(start, end)` matches `filter.date.takenAfter` and `filter.date.takenBefore` at day granularity.
 - Custom…: `final range = await showDateRangePicker(context: context, firstDate: DateTime(1970), lastDate: DateTime.now()); if (range != null) setDateRange(start: range.start, end: range.end);`. Cancel → no state change.
