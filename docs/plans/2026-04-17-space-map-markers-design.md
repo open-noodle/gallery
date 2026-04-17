@@ -16,6 +16,8 @@ Photos from shared spaces the user belongs to already appear on `/photos` (the p
 4. **`isArchived=true` keeps space content, but only `visibility=Timeline`** — the `isArchived` map toggle is a union ("also include Archive"), and members should not see owner-archived space content. Achieved with an inner `asset.visibility = Timeline` constraint inside the space EXISTS subqueries on the basic endpoint.
 5. **Space-scoped contexts unchanged** — when `spaceId` is set on the filtered endpoint, `getSpaceIdsForTimeline` is not called (explicit double-scope guard).
 6. **Mobile in scope** — remote API path only. Local Drift DB path already handles space visibility via `viewerVisibilityPredicate` (pre-existing from the 2026-04-12 mobile-timeline-space-visibility design).
+7. **Pref naming drift — flagged for post-merge review.** `showInTimeline` now gates timeline, `/photos`, map, search suggestions, and filter suggestions. A rename to `showInPersonalViews` (or a split of `showOnMap`) gets more expensive as consumers accumulate. Not blocking this PR, but should be reviewed immediately after merge rather than left open-ended.
+8. **Membership is atomic.** `shared_space_member` has no `status`/`pending`/`accepted` column — rows only exist after acceptance (invitation state lives in a separate notification flow). `getSpaceIdsForTimeline` therefore cannot surface pending-invite content, and no additional guard is needed.
 
 ## Non-goals
 
@@ -25,7 +27,7 @@ Photos from shared spaces the user belongs to already appear on `/photos` (the p
 - DB migration.
 - Fixing pre-existing offline-mode inconsistencies in mobile's local Drift predicate (`onlyFavorites` and `includeArchived` aren't applied per-owner in the local path — tracked as a follow-up).
 - Mobile filter-panel parity (no filter panel on mobile today).
-- `utilities/geolocation` tool behavior (intentionally scoped to user's own missing coordinates).
+- `utilities/geolocation` tool behavior (intentionally scoped to the user's own and partners' missing coordinates via `withPartners: true`).
 
 ## Architecture
 
@@ -81,11 +83,15 @@ GalleryMapController → SharedSpaceService.getFilteredMapMarkers(auth, dto)
 
 ### Archive / favorite interaction
 
+Basic endpoint (`GET /map/markers`):
+
 | `isFavorite` | `isArchived`      | Space content included?                                                 | Notes                                                               |
 | ------------ | ----------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------- |
 | undefined    | undefined / false | yes (Timeline visibility only)                                          | default view                                                        |
 | undefined    | true              | yes (Timeline visibility only; owner-archived space assets stay hidden) | inner visibility clause on EXISTS                                   |
 | true         | any               | no                                                                      | `getSpaceIdsForTimeline` not called; space EXISTS clauses not added |
+
+Filtered endpoint (`GET /gallery-map/markers/filtered`): visibility is always `AssetVisibility.Timeline`, so only the `isFavorite` guard applies (`isFavorite=true` → `getSpaceIdsForTimeline` not called).
 
 ### SDK / code-generation
 
@@ -134,25 +140,33 @@ Viewer roles (V), asset states (S), filters (F), endpoints (E). Combinations exe
 
 ### Cross-scope
 
-| #   | Scenario                                                                                              | Expected                                                                                                    |
-| --- | ----------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| 18  | Library L in space A (`showInTimeline=true`) and space B (`showInTimeline=false`) for the same member | Marker visible via A; toggling B doesn't hide L's assets                                                    |
-| 19  | Member of spaces A and B; queries filtered endpoint with `spaceId=B`; asset only in A                 | Marker NOT visible (no cross-space leak)                                                                    |
-| 20  | `dto.spaceId` + `dto.withSharedSpaces=true` on filtered endpoint                                      | `getSpaceIdsForTimeline` is NOT called (unit-level assertion)                                               |
-| 21  | `personIds` filter on filtered endpoint with `withSharedSpaces=true` (no `spaceId`)                   | Resolves as global `personIds`, not `spacePersonIds` (existing branch at `shared-space.service.ts:596-597`) |
+| #   | Scenario                                                                                                    | Expected                                                                                                    |
+| --- | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| 18  | Library L in space A (`showInTimeline=true`) and space B (`showInTimeline=false`) for the same member       | Marker visible via A; toggling B doesn't hide L's assets                                                    |
+| 19  | Member of spaces A and B; queries filtered endpoint with `spaceId=B`; asset only in A                       | Marker NOT visible (no cross-space leak)                                                                    |
+| 20  | `dto.spaceId` + `dto.withSharedSpaces=true` on filtered endpoint                                            | `getSpaceIdsForTimeline` is NOT called (unit-level assertion)                                               |
+| 21  | `personIds` filter on filtered endpoint with `withSharedSpaces=true` (no `spaceId`)                         | Resolves as global `personIds`, not `spacePersonIds` (existing branch at `shared-space.service.ts:596-597`) |
+| 22  | Asset directly in space A (`showInTimeline=true`) AND directly in space B (`showInTimeline=false`)          | Marker visible via A only; B's disabled pref doesn't hide                                                   |
+| 23  | `tagIds` filter on filtered endpoint with `withSharedSpaces=true`; member searches for an owner-applied tag | Tag-filtered space content surfaces (verifies filter×space scoping matches prior PRs #230/#231)             |
+| 24  | `rating` filter on filtered endpoint with `withSharedSpaces=true`                                           | Rating filter resolves against owner-set rating on space assets (per-owner column; documents behavior)      |
 
 ### Test distribution
 
-- **Server unit** (`server/src/services/map.service.spec.ts`, `shared-space.service.spec.ts`): cases 5, 7, 15, 16, 17, 20, 21.
-- **Server medium** (new `server/src/repositories/map.repository.spec.ts`): cases 1, 3, 10, 11, 12, 13, 14, 18.
-- **E2E web** (new spec under `e2e/src/web/specs/`): cases 1, 3, 7, 9 via the full membership lifecycle.
+- **Server unit** (`server/src/services/map.service.spec.ts`, `shared-space.service.spec.ts`): cases 5, 7, 15, 16, 17, 19, 20, 21.
+- **Server medium** (new `server/test/medium/specs/repositories/map.repository.spec.ts` — repository medium specs live under `server/test/medium/specs/repositories/`, not `server/src/repositories/`): cases 1, 3, 4, 10, 11, 12, 13, 14, 18, 22, 23, 24.
+- **E2E web** (new spec under `e2e/src/web/specs/`): cases 1, 3, 7, 8, 9 via the full membership lifecycle.
+  - Case 6 (owner always sees own) is implicitly covered by existing map tests, not re-asserted here.
 - **Flutter unit** (new file under `mobile/test/`): assert `withSharedSpaces: true` reaches `ApiService.mapApi.getMapMarkers`.
+- **Filtered-endpoint pairing** (cases 2 and 4) — folded into the server-medium list above to avoid duplicating the basic-endpoint assertion; one medium test per endpoint for direct and library-linked inclusion.
+- **Flutter coverage disclaimer** — no automated Flutter integration test validates the rendered marker on screen. Manual QA (see Final manual QA) is the only gate for the mobile user-facing outcome.
+- **Perf sanity check** (pre-merge, optional) — run `EXPLAIN ANALYZE` on `MapRepository.getMapMarkers` against a realistic dataset (~100k assets, 3-5 spaces) to confirm the added EXISTS clauses don't regress p95. Not a blocker, but record the result in the PR description.
 
 ## Risks and trade-offs
 
-- **Query cost** — two added EXISTS subqueries on the basic endpoint; both inner tables (`shared_space_asset`, `shared_space_library`) are small and indexed. Same pattern as `searchAssetBuilder` in production. Monitor slow-query logs post-deploy.
+- **Query cost** — two added EXISTS subqueries on the basic endpoint; both inner tables (`shared_space_asset`, `shared_space_library`) are small and indexed. Same pattern as `searchAssetBuilder` in production. Monitor slow-query logs post-deploy; optional pre-merge `EXPLAIN ANALYZE` documented in the test plan.
 - **Marker count inflation** — users in populated spaces see many more markers. Intentional; parity with timeline.
-- **Pref naming drift** — `showInTimeline` now also gates map. Acceptable; rename to `showInPersonalViews` is a trivial follow-up if it causes confusion.
+- **Pref naming drift** — `showInTimeline` now also gates map (see Key decisions #7). Schedule a post-merge review.
+- **TOCTOU on membership revocation** — `timelineSpaceIds` is resolved once before the query runs. If a member is removed from a space between resolution and query, a single stale result may include that space's content. No security impact (IDs were valid at resolution time; no privilege escalation). Typical read-query TOCTOU, accepted.
 
 ## Rollout
 
@@ -163,11 +177,12 @@ Viewer roles (V), asset states (S), filters (F), endpoints (E). Combinations exe
 ## Follow-ups (explicitly out of scope)
 
 - Mobile local Drift path: apply per-owner `onlyFavorites` / `includeArchived` filtering to space content (pre-existing inconsistency from the 2026-04-12 mobile visibility work, not introduced here).
-- Rename `showInTimeline` → `showInPersonalViews` if UX research surfaces confusion.
-- `utilities/geolocation` tool — continues to scope to user's own assets only.
+- Post-merge pref-naming review — rename `showInTimeline` → `showInPersonalViews`, or split into `showInTimeline` + `showOnMap`. Revisit as soon as this ships; cost grows with every new consumer.
+- `utilities/geolocation` tool — continues to scope to the user's own and partners' missing coordinates (it uses `withPartners: true`); no space content included by design.
 - Docs update at `docs/docs/` on the shared-spaces page if user-facing behavior warrants a line.
 
 ## Final manual QA (outside automated tests)
 
 - **Web** — `make dev`; sign in as a space member; confirm markers from a geo-tagged owner asset (direct + library-linked) appear on `/map` and on `/map` with filter panel values set. Toggle `showInTimeline=false` on the space via API; confirm markers disappear on reload.
 - **Mobile** — build and run on a physical device or simulator; open the map screen while signed in as a member; confirm same expected visibility. (The assistant cannot run this from its environment.)
+- **Negative-matrix walkthrough** — seed a dev stack with two users, two spaces, a linked library, and a mix of asset visibility states (Timeline, Archive, Locked, trashed, no-GPS). Walk through the negative rows of the permission matrix (cases 7–17, 19, 22) manually against `/map` — automated tests cover each individually, but a 5-minute manual sweep catches interaction bugs the matrix didn't anticipate.
