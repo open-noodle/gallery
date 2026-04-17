@@ -23,7 +23,7 @@ final userRepositoryProvider = Provider<IsarUserRepository>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef UserRepositoryRef = ProviderRef<IsarUserRepository>;
-String _$userApiRepositoryHash() => r'8a7340ca4544c8c6b20225c65bff2abb9e96baa2';
+String _$userApiRepositoryHash() => r'76330e207186cdfd1b1592b174233b036e760fd0';
 
 /// See also [userApiRepository].
 @ProviderFor(userApiRepository)
