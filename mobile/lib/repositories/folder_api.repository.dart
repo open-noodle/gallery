@@ -3,16 +3,19 @@ import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/extensions/asset_extensions.dart';
 import 'package:immich_mobile/providers/api.provider.dart';
 import 'package:immich_mobile/repositories/api.repository.dart';
+import 'package:immich_mobile/services/api.service.dart';
 import 'package:logging/logging.dart';
 import 'package:openapi/api.dart';
 
-final folderApiRepositoryProvider = Provider((ref) => FolderApiRepository(ref.watch(apiServiceProvider).viewApi));
+final folderApiRepositoryProvider = Provider((ref) => FolderApiRepository(ref.watch(apiServiceProvider)));
 
 class FolderApiRepository extends ApiRepository {
-  final ViewsApi _api;
+  final ApiService _apiService;
   final Logger _log = Logger("FolderApiRepository");
 
-  FolderApiRepository(this._api);
+  FolderApiRepository(this._apiService);
+
+  ViewsApi get _api => _apiService.viewApi;
 
   Future<List<String>> getAllUniquePaths() async {
     try {
