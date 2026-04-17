@@ -80,4 +80,19 @@ void main() {
       expect(container.read(photosFilterProvider).context, null);
     });
   });
+
+  group('setLocation', () {
+    test('assigns a location filter', () {
+      final loc = SearchLocationFilter(country: 'France');
+      final notifier = container.read(photosFilterProvider.notifier);
+      notifier.setLocation(loc);
+      expect(container.read(photosFilterProvider).location.country, 'France');
+    });
+    test('passing null resets to the empty SearchLocationFilter', () {
+      final notifier = container.read(photosFilterProvider.notifier);
+      notifier.setLocation(SearchLocationFilter(country: 'France'));
+      notifier.setLocation(null);
+      expect(container.read(photosFilterProvider).location.country, null);
+    });
+  });
 }

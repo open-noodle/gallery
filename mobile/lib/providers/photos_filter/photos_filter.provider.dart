@@ -30,4 +30,7 @@ class PhotosFilterNotifier extends Notifier<SearchFilter> {
     }
     state = state.copyWith()..tagIds = current.isEmpty ? null : current;
   }
+
+  void setLocation(SearchLocationFilter? location) =>
+      state = state.copyWith(location: location ?? SearchLocationFilter());
 }
