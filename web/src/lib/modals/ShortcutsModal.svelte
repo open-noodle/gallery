@@ -104,6 +104,40 @@
           </div>
         </div>
       {/if}
+      <div class="p-4 md:col-span-2">
+        <h2>{$t('cmdk_shortcut_scope_heading')}</h2>
+        <div class="text-sm">
+          <div class="grid grid-cols-[30%_70%] items-center gap-4 pt-4 text-sm">
+            <div class="flex justify-self-end">
+              <p class="me-1 flex items-center justify-center justify-self-end rounded-lg bg-immich-primary/25 p-2">
+                @
+              </p>
+            </div>
+            <p class="mb-1 mt-1 flex">{$t('cmdk_shortcut_scope_people')}</p>
+
+            <div class="flex justify-self-end">
+              <p class="me-1 flex items-center justify-center justify-self-end rounded-lg bg-immich-primary/25 p-2">
+                #
+              </p>
+            </div>
+            <p class="mb-1 mt-1 flex">{$t('cmdk_shortcut_scope_tags')}</p>
+
+            <div class="flex justify-self-end">
+              <p class="me-1 flex items-center justify-center justify-self-end rounded-lg bg-immich-primary/25 p-2">
+                /
+              </p>
+            </div>
+            <p class="mb-1 mt-1 flex">{$t('cmdk_shortcut_scope_collections')}</p>
+
+            <div class="flex justify-self-end">
+              <p class="me-1 flex items-center justify-center justify-self-end rounded-lg bg-immich-primary/25 p-2">
+                &gt;
+              </p>
+            </div>
+            <p class="mb-1 mt-1 flex">{$t('cmdk_shortcut_scope_nav')}</p>
+          </div>
+        </div>
+      </div>
     </div>
   </ModalBody>
 </Modal>
