@@ -446,7 +446,7 @@ test.describe('global search palette', () => {
   });
 
   test.describe('prefix scoping (cmdk v1.2)', () => {
-    // These 13 tests cover the v1.2 prefix scoping contract. Each test seeds its own
+    // These 14 tests cover the v1.2 prefix scoping contract. Each test seeds its own
     // fixtures inline — the outer beforeAll already handled admin setup + the baseline
     // asset upload + metadata drain. We reuse the outer beforeEach so auth cookies and
     // the /photos landing + cmdk-trigger hydration wait are handled automatically.
@@ -672,6 +672,32 @@ test.describe('global search palette', () => {
       await expect(dialog.getByRole('group', { name: /^albums/i })).toHaveCount(0);
       await expect(dialog.getByRole('group', { name: /^spaces/i })).toHaveCount(0);
       await expect(dialog.getByRole('group', { name: /^places/i })).toHaveCount(0);
+      await expect(dialog.getByRole('group', { name: /^tags/i })).toHaveCount(0);
+    });
+
+    test('bare / renders Albums AND Spaces sections together', async ({ page }) => {
+      // Bare `/` is the only scope that surfaces two sections at once. Seed one
+      // of each so we can assert both headings render in the same palette frame.
+      await utils.cmdkSeedAlbums(admin.accessToken, ['Bare Slash Album']);
+      await utils.cmdkSeedSpaces(admin.accessToken, ['Bare Slash Space']);
+
+      await page.goto('/photos');
+      await page.getByTestId('cmdk-trigger').waitFor({ state: 'visible' });
+      await page.keyboard.press('Control+k');
+      const dialog = page.getByRole('dialog');
+      await dialog.getByRole('combobox').fill('/');
+
+      // Both sections render under scope `collections`.
+      const albumsGroup = dialog.getByRole('group', { name: /^albums/i });
+      const spacesGroup = dialog.getByRole('group', { name: /^spaces/i });
+      await expect(albumsGroup).toBeVisible();
+      await expect(spacesGroup).toBeVisible();
+      await expect(albumsGroup.getByText(/bare slash album/i).first()).toBeVisible();
+      await expect(spacesGroup.getByText(/bare slash space/i).first()).toBeVisible();
+
+      // Other entity sections stay hidden.
+      await expect(dialog.getByRole('group', { name: /^photos/i })).toHaveCount(0);
+      await expect(dialog.getByRole('group', { name: /^people/i })).toHaveCount(0);
       await expect(dialog.getByRole('group', { name: /^tags/i })).toHaveCount(0);
     });
 

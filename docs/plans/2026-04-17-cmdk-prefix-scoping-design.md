@@ -69,9 +69,9 @@ Backspace-out reverts naturally: clearing the `@` returns the parser to `{ scope
 
 Rendered when `payload === '' && scope !== 'all'`. Each scope has its own sort:
 
-- **`@` people** — up to 10 by face count desc. New SDK call `getAllPeople({ size: 10 })`; memoized on `manager.peopleSuggestionsCache` per open session; cache cleared in `close()`.
+- **`@` people** — up to 10 by `updatedAt` desc (name alpha / id stable tie-break). `PersonResponseDto` has no `numberOfAssets` / `faceCount` field, so `updatedAt` is the closest recency proxy. Implemented by `personSuggestionsComparator` in `cmdk-prefix.ts`. New SDK call `getAllPeople({ size: 10 })`; memoized on `manager.peopleSuggestionsCache` per open session; cache cleared in `close()`.
 - **`#` tags** — top 5 from in-memory `tagsCache` sorted by `updatedAt` desc. Honors the existing `tagsDisabled` (`tagsCache > 20k`) branch.
-- **`/` albums + spaces** — **two** sections: top 5 albums by `updatedAt` desc, top 5 spaces by `lastActivityAt ?? createdAt` desc (spaces DTO has no `updatedAt`; `lastActivityAt` is nullable on inactive spaces, `createdAt` is always present).
+- **`/` albums + spaces** — **two** sections: top 5 albums by `endDate ?? ''` desc, top 5 spaces by `lastActivityAt ?? createdAt` desc. `AlbumNameDto` (from `getAlbumNames`) has no `updatedAt` field, so `endDate` — "most recent photo in the album" — is the activity proxy. Albums with no `endDate` sink to the bottom. Spaces DTO has no `updatedAt`; `lastActivityAt` is nullable on inactive spaces, `createdAt` is always present.
 - **`>` navigation** — ALL nav items passing admin + feature-flag filters, alphabetical by translated label. No slice; typically ~36 rows for admins, ~11 for regular users after filtering.
 
 ### Keyboard: `?` opens ShortcutsModal
