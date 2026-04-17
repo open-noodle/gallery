@@ -3740,11 +3740,25 @@ describe('prefix scoping — bare @ suggestions', () => {
   it('bare @ calls getAllPeople once; subsequent bare @ reads cache', async () => {
     const m = new GlobalSearchManager();
     const getAllPeopleSpy = vi.mocked(getAllPeople);
-    getAllPeopleSpy.mockResolvedValue({ people: [mockPerson('p1', 'Alice')], total: 1, hidden: 0, hasNextPage: false });
+    getAllPeopleSpy.mockResolvedValue({
+      people: [
+        mockPerson('older', 'Zack', '2026-01-01T00:00:00Z'),
+        mockPerson('newer', 'Alice', '2026-04-15T00:00:00Z'),
+      ],
+      total: 2,
+      hidden: 0,
+      hasNextPage: false,
+    });
 
     m.setQuery('@');
     await vi.advanceTimersByTimeAsync(150);
     await vi.runAllTimersAsync();
+
+    // Assert comparator was applied (newer updatedAt first).
+    expect(m.sections.people.status).toBe('ok');
+    const items = (m.sections.people as { items: { id: string }[] }).items;
+    expect(items.map((i) => i.id)).toEqual(['newer', 'older']);
+
     m.setQuery('@a');
     await vi.advanceTimersByTimeAsync(150);
     m.setQuery('@');
@@ -3823,7 +3837,7 @@ describe('prefix scoping — bare @ suggestions', () => {
     // provider-level AbortSignal.timeout inside runBatch fires at 5s and the
     // surrounding people.run catch branch writes 'timeout'.
     vi.mocked(getAllPeople).mockImplementation(
-      ({}, opts) =>
+      (_args, opts) =>
         new Promise((_, reject) => {
           opts?.signal?.addEventListener('abort', () => {
             const err = new DOMException('timeout', 'TimeoutError');
