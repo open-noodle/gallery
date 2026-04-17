@@ -5835,6 +5835,94 @@ describe(SharedSpaceService.name, () => {
       expect(result[0].state).toBeNull();
       expect(result[0].country).toBeNull();
     });
+
+    it('should resolve timelineSpaceIds when withSharedSpaces is true and no spaceId', async () => {
+      const auth = factory.auth();
+      const spaceId = newUuid();
+      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId }]);
+      mocks.sharedSpace.getFilteredMapMarkers.mockResolvedValue([]);
+
+      await sut.getFilteredMapMarkers(auth, { withSharedSpaces: true });
+
+      expect(mocks.sharedSpace.getSpaceIdsForTimeline).toHaveBeenCalledWith(auth.user.id);
+      expect(mocks.sharedSpace.getFilteredMapMarkers).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userIds: [auth.user.id],
+          timelineSpaceIds: [spaceId],
+        }),
+      );
+    });
+
+    it('should NOT call getSpaceIdsForTimeline when spaceId is set (even with withSharedSpaces=true)', async () => {
+      const auth = factory.auth();
+      const spaceId = newUuid();
+      mocks.access.sharedSpace.checkMemberAccess.mockResolvedValue(new Set([spaceId]));
+      mocks.sharedSpace.getFilteredMapMarkers.mockResolvedValue([]);
+
+      await sut.getFilteredMapMarkers(auth, { spaceId, withSharedSpaces: true });
+
+      expect(mocks.sharedSpace.getSpaceIdsForTimeline).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.getFilteredMapMarkers).toHaveBeenCalledWith(
+        expect.not.objectContaining({ timelineSpaceIds: expect.anything() }),
+      );
+    });
+
+    it('should not resolve timelineSpaceIds when isFavorite=true', async () => {
+      const auth = factory.auth();
+      mocks.sharedSpace.getFilteredMapMarkers.mockResolvedValue([]);
+
+      await sut.getFilteredMapMarkers(auth, { withSharedSpaces: true, isFavorite: true });
+
+      expect(mocks.sharedSpace.getSpaceIdsForTimeline).not.toHaveBeenCalled();
+    });
+
+    it('should not resolve timelineSpaceIds when withSharedSpaces is omitted', async () => {
+      const auth = factory.auth();
+      mocks.sharedSpace.getFilteredMapMarkers.mockResolvedValue([]);
+
+      await sut.getFilteredMapMarkers(auth, {});
+
+      expect(mocks.sharedSpace.getSpaceIdsForTimeline).not.toHaveBeenCalled();
+    });
+
+    it('should pass personIds as global (not spacePersonIds) when no spaceId + withSharedSpaces=true', async () => {
+      const auth = factory.auth();
+      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId: newUuid() }]);
+      mocks.sharedSpace.getFilteredMapMarkers.mockResolvedValue([]);
+
+      await sut.getFilteredMapMarkers(auth, {
+        withSharedSpaces: true,
+        personIds: ['person-1'],
+      });
+
+      expect(mocks.sharedSpace.getFilteredMapMarkers).toHaveBeenCalledWith(
+        expect.objectContaining({
+          personIds: ['person-1'],
+          spacePersonIds: undefined,
+        }),
+      );
+    });
+
+    it('should NOT leak other-space content when spaceId is set (row 19)', async () => {
+      const auth = factory.auth();
+      const spaceB = newUuid();
+
+      mocks.access.sharedSpace.checkMemberAccess.mockResolvedValue(new Set([spaceB]));
+      mocks.sharedSpace.getFilteredMapMarkers.mockResolvedValue([]);
+
+      await sut.getFilteredMapMarkers(auth, { spaceId: spaceB, withSharedSpaces: true });
+
+      // With spaceId set, the service must scope only to that space — no userIds, no timelineSpaceIds.
+      expect(mocks.sharedSpace.getFilteredMapMarkers).toHaveBeenCalledWith(
+        expect.objectContaining({
+          spaceId: spaceB,
+          userIds: undefined,
+        }),
+      );
+      expect(mocks.sharedSpace.getFilteredMapMarkers).toHaveBeenCalledWith(
+        expect.not.objectContaining({ timelineSpaceIds: expect.anything() }),
+      );
+    });
   });
 
   describe('deduplicateSpacePeople', () => {

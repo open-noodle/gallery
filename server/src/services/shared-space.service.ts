@@ -590,9 +590,18 @@ export class SharedSpaceService extends BaseService {
       await this.requireAccess({ auth, permission: Permission.SharedSpaceRead, ids: [dto.spaceId] });
     }
 
+    let timelineSpaceIds: string[] | undefined;
+    if (!dto.spaceId && dto.withSharedSpaces && dto.isFavorite !== true) {
+      const spaceRows = await this.sharedSpaceRepository.getSpaceIdsForTimeline(auth.user.id);
+      if (spaceRows.length > 0) {
+        timelineSpaceIds = spaceRows.map((row) => row.spaceId);
+      }
+    }
+
     const markers = await this.sharedSpaceRepository.getFilteredMapMarkers({
       userIds: dto.spaceId ? undefined : [auth.user.id],
       spaceId: dto.spaceId,
+      timelineSpaceIds,
       personIds: dto.spaceId ? undefined : dto.personIds,
       spacePersonIds: dto.spaceId ? dto.personIds : undefined,
       tagIds: dto.tagIds,

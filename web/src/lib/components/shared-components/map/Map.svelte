@@ -254,6 +254,7 @@ import { mdiCog, mdiImageMultiple, mdiMap, mdiMapMarker, mdiThemeLightDark } fro
         fileCreatedBefore,
         withPartners: withPartners || undefined,
         withSharedAlbums: withSharedAlbums || undefined,
+        withSharedSpaces: true,
       },
       {
         signal: abortController.signal,
