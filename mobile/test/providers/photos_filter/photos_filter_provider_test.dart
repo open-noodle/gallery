@@ -186,4 +186,17 @@ void main() {
       expect(f.tagIds, ['t1']); // untouched
     });
   });
+
+  group('clearTags', () {
+    test('clears tag list to null leaving other dimensions intact', () {
+      final notifier = container.read(photosFilterProvider.notifier);
+      const alice = PersonDto(id: 'alice', name: 'Alice', isHidden: false, thumbnailPath: '');
+      notifier.togglePerson(alice);
+      notifier.toggleTag('t1');
+      notifier.clearTags();
+      final f = container.read(photosFilterProvider);
+      expect(f.tagIds == null || f.tagIds!.isEmpty, true);
+      expect(f.people, contains(alice)); // untouched
+    });
+  });
 }
