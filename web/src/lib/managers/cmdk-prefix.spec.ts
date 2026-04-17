@@ -1,5 +1,6 @@
+import type { PersonResponseDto } from '@immich/sdk';
 import { describe, expect, it } from 'vitest';
-import { parseScope, type ParsedQuery } from './cmdk-prefix';
+import { parseScope, personSuggestionsComparator, type ParsedQuery } from './cmdk-prefix';
 
 describe('parseScope', () => {
   const cases: Array<{ input: string; expected: ParsedQuery; why: string }> = [
@@ -30,4 +31,47 @@ describe('parseScope', () => {
       expect(parseScope(input)).toEqual(expected);
     });
   }
+});
+
+const p = (o: Partial<PersonResponseDto>): PersonResponseDto =>
+  ({
+    id: '0',
+    name: '',
+    birthDate: null,
+    isHidden: false,
+    thumbnailPath: '',
+    type: 'person',
+    ...o,
+  }) as PersonResponseDto;
+
+describe('personSuggestionsComparator', () => {
+  it('sorts by updatedAt desc when present on both', () => {
+    const a = p({ id: 'a', name: 'Alice', updatedAt: '2026-04-01T00:00:00Z' });
+    const b = p({ id: 'b', name: 'Bob', updatedAt: '2026-04-15T00:00:00Z' });
+    expect([a, b].sort(personSuggestionsComparator)).toEqual([b, a]);
+  });
+
+  it('missing updatedAt treated as oldest', () => {
+    const a = p({ id: 'a', name: 'Alice', updatedAt: '2026-04-10T00:00:00Z' });
+    const b = p({ id: 'b', name: 'Bob' }); // no updatedAt
+    expect([a, b].sort(personSuggestionsComparator)).toEqual([a, b]);
+  });
+
+  it('updatedAt tie → alpha by name', () => {
+    const a = p({ id: 'a', name: 'Zack', updatedAt: '2026-04-10T00:00:00Z' });
+    const b = p({ id: 'b', name: 'Alice', updatedAt: '2026-04-10T00:00:00Z' });
+    expect([a, b].sort(personSuggestionsComparator)).toEqual([b, a]);
+  });
+
+  it('same name tie → stable by id', () => {
+    const a = p({ id: 'b', name: 'Alice', updatedAt: '2026-04-10T00:00:00Z' });
+    const b = p({ id: 'a', name: 'Alice', updatedAt: '2026-04-10T00:00:00Z' });
+    expect([a, b].sort(personSuggestionsComparator)).toEqual([b, a]);
+  });
+
+  it('handles both missing updatedAt → alpha by name then id', () => {
+    const a = p({ id: 'a', name: 'Bob' });
+    const b = p({ id: 'b', name: 'Alice' });
+    expect([a, b].sort(personSuggestionsComparator)).toEqual([b, a]);
+  });
 });
