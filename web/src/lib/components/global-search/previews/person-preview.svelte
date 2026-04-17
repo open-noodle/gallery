@@ -1,10 +1,10 @@
 <script lang="ts">
-  import { getAssetMediaUrl } from '$lib/utils';
+  import { getAssetMediaUrl, getPeopleThumbnailUrl } from '$lib/utils';
   import { AssetMediaSize, searchAssets, type AssetResponseDto, type PersonResponseDto } from '@immich/sdk';
   import { t } from 'svelte-i18n';
 
   interface Props {
-    person: PersonResponseDto & { numberOfAssets?: number; faceAssetId?: string };
+    person: PersonResponseDto & { numberOfAssets?: number };
   }
   let { person }: Props = $props();
 
@@ -12,9 +12,14 @@
   let loaded = $state(false);
   let generation = 0;
 
-  const thumbUrl = $derived(
-    person.faceAssetId ? getAssetMediaUrl({ id: person.faceAssetId, size: AssetMediaSize.Preview }) : '',
-  );
+  const thumbUrl = $derived(getPeopleThumbnailUrl(person));
+  let failed = $state(false);
+  // Reset failure when the person changes (preview is re-used as the user
+  // arrows through the People section).
+  $effect(() => {
+    void person.id;
+    failed = false;
+  });
 
   $effect(() => {
     const gen = ++generation;
@@ -50,8 +55,13 @@
 </script>
 
 <div data-cmdk-preview-person class="flex flex-col items-center gap-3 p-5">
-  {#if thumbUrl}
-    <img src={thumbUrl} alt={person.name ?? ''} class="h-[120px] w-[120px] rounded-full object-cover" />
+  {#if !failed}
+    <img
+      src={thumbUrl}
+      alt={person.name ?? ''}
+      class="h-[120px] w-[120px] rounded-full object-cover"
+      onerror={() => (failed = true)}
+    />
   {:else}
     <div class="h-[120px] w-[120px] rounded-full bg-subtle/40" aria-hidden="true"></div>
   {/if}

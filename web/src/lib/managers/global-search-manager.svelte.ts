@@ -855,7 +855,6 @@ export class GlobalSearchManager {
           data: {
             id: entry.personId,
             name: entry.label,
-            faceAssetId: entry.thumbnailAssetId,
           } as unknown,
         };
       }
@@ -988,13 +987,12 @@ export class GlobalSearchManager {
         break;
       }
       case 'person': {
-        const p = item as { id: string; name?: string; faceAssetId?: string };
+        const p = item as { id: string; name?: string };
         addEntry({
           kind: 'person',
           id: `person:${p.id}`,
           personId: p.id,
           label: p.name ?? '',
-          thumbnailAssetId: p.faceAssetId,
           lastUsed: now,
         });
         void goto(Route.viewPerson({ id: p.id }));
