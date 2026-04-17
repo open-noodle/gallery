@@ -10,8 +10,10 @@ import 'package:immich_mobile/models/search/search_filter.model.dart';
 import 'package:immich_mobile/providers/api.provider.dart';
 import 'package:openapi/api.dart';
 
-final photosFilterSuggestionsProvider =
-    FutureProvider.autoDispose.family<FilterSuggestionsResponseDto, SearchFilter>((ref, filter) async {
+final photosFilterSuggestionsProvider = FutureProvider.autoDispose.family<FilterSuggestionsResponseDto, SearchFilter>((
+  ref,
+  filter,
+) async {
   final api = ref.watch(apiServiceProvider).searchApi;
   final response = await api.getFilterSuggestions(
     city: filter.location.city,

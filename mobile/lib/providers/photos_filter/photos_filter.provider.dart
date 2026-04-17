@@ -4,8 +4,7 @@ import 'package:immich_mobile/entities/asset.entity.dart';
 import 'package:immich_mobile/models/search/search_filter.model.dart';
 import 'package:immich_mobile/providers/photos_filter/chip_id.dart';
 
-final photosFilterProvider =
-    NotifierProvider<PhotosFilterNotifier, SearchFilter>(PhotosFilterNotifier.new);
+final photosFilterProvider = NotifierProvider<PhotosFilterNotifier, SearchFilter>(PhotosFilterNotifier.new);
 
 enum Dimension { people, tags, location, date, camera, rating, mediaType, display, text }
 
@@ -14,14 +13,12 @@ class PhotosFilterNotifier extends Notifier<SearchFilter> {
   SearchFilter build() => SearchFilter.empty();
 
   @override
-  bool updateShouldNotify(SearchFilter previous, SearchFilter next) =>
-      previous != next;
+  bool updateShouldNotify(SearchFilter previous, SearchFilter next) => previous != next;
 
   void reset() => state = SearchFilter.empty();
 
   // SearchFilter.copyWith null-coalesces, so use cascade to set nullable fields.
-  void setText(String text) =>
-      state = state.copyWith()..context = text.isEmpty ? null : text;
+  void setText(String text) => state = state.copyWith()..context = text.isEmpty ? null : text;
 
   void togglePerson(PersonDto person) {
     final next = Set<PersonDto>.from(state.people);
@@ -42,23 +39,19 @@ class PhotosFilterNotifier extends Notifier<SearchFilter> {
   void setLocation(SearchLocationFilter? location) =>
       state = state.copyWith(location: location ?? SearchLocationFilter());
 
-  void setDateRange({DateTime? start, DateTime? end}) =>
-      state = state.copyWith(date: SearchDateFilter(takenAfter: start, takenBefore: end));
+  void setDateRange({DateTime? start, DateTime? end}) => state = state.copyWith(
+    date: SearchDateFilter(takenAfter: start, takenBefore: end),
+  );
 
-  void setRating(int? rating) =>
-      state = state.copyWith(rating: SearchRatingFilter(rating: rating));
+  void setRating(int? rating) => state = state.copyWith(rating: SearchRatingFilter(rating: rating));
 
-  void setMediaType(AssetType? type) =>
-      state = state.copyWith(mediaType: type ?? AssetType.other);
+  void setMediaType(AssetType? type) => state = state.copyWith(mediaType: type ?? AssetType.other);
 
-  void setFavouritesOnly(bool v) =>
-      state = state.copyWith(display: state.display.copyWith(isFavorite: v));
+  void setFavouritesOnly(bool v) => state = state.copyWith(display: state.display.copyWith(isFavorite: v));
 
-  void setArchivedIncluded(bool v) =>
-      state = state.copyWith(display: state.display.copyWith(isArchive: v));
+  void setArchivedIncluded(bool v) => state = state.copyWith(display: state.display.copyWith(isArchive: v));
 
-  void setNotInAlbum(bool v) =>
-      state = state.copyWith(display: state.display.copyWith(isNotInAlbum: v));
+  void setNotInAlbum(bool v) => state = state.copyWith(display: state.display.copyWith(isNotInAlbum: v));
 
   void clearPeople() => state = state.copyWith(people: const {});
 
@@ -81,13 +74,7 @@ class PhotosFilterNotifier extends Notifier<SearchFilter> {
       case Dimension.mediaType:
         setMediaType(null);
       case Dimension.display:
-        state = state.copyWith(
-          display: SearchDisplayFilters(
-            isFavorite: false,
-            isArchive: false,
-            isNotInAlbum: false,
-          ),
-        );
+        state = state.copyWith(display: SearchDisplayFilters(isFavorite: false, isArchive: false, isNotInAlbum: false));
       case Dimension.text:
         setText('');
     }
@@ -96,9 +83,7 @@ class PhotosFilterNotifier extends Notifier<SearchFilter> {
   void removeChip(ChipId id) {
     switch (id) {
       case PersonChipId(:final personId):
-        state = state.copyWith(
-          people: state.people.where((p) => p.id != personId).toSet(),
-        );
+        state = state.copyWith(people: state.people.where((p) => p.id != personId).toSet());
       case TagChipId(:final tagId):
         final next = List<String>.from(state.tagIds ?? const [])..remove(tagId);
         state = state.copyWith()..tagIds = next.isEmpty ? null : next;

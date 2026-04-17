@@ -24,9 +24,7 @@ void main() {
 
   setUp(() {
     mockService = _MockSearchService();
-    container = ProviderContainer(
-      overrides: [searchServiceProvider.overrideWithValue(mockService)],
-    );
+    container = ProviderContainer(overrides: [searchServiceProvider.overrideWithValue(mockService)]);
     addTearDown(container.dispose);
   });
 
@@ -39,12 +37,8 @@ void main() {
   test('returns assets.length for a non-empty filter', () async {
     container.read(photosFilterProvider.notifier).setText('paris');
 
-    final assets = List.generate(
-      42,
-      (i) => TestUtils.createRemoteAsset(id: 'asset-$i'),
-    );
-    when(() => mockService.search(any(), 1))
-        .thenAnswer((_) async => SearchResult(assets: assets));
+    final assets = List.generate(42, (i) => TestUtils.createRemoteAsset(id: 'asset-$i'));
+    when(() => mockService.search(any(), 1)).thenAnswer((_) async => SearchResult(assets: assets));
 
     final count = await container.read(photosFilterCountProvider.future);
     expect(count, 42);

@@ -23,18 +23,13 @@ void main() {
     mockSearchApi = MockSearchApi();
     when(() => mockApiService.searchApi).thenReturn(mockSearchApi);
 
-    container = ProviderContainer(
-      overrides: [apiServiceProvider.overrideWithValue(mockApiService)],
-    );
+    container = ProviderContainer(overrides: [apiServiceProvider.overrideWithValue(mockApiService)]);
     addTearDown(container.dispose);
   });
 
   group('photosFilterSuggestionsProvider', () {
     test('returns the FilterSuggestionsResponseDto returned by the API', () async {
-      final dto = FilterSuggestionsResponseDto(
-        hasUnnamedPeople: false,
-        countries: ['France'],
-      );
+      final dto = FilterSuggestionsResponseDto(hasUnnamedPeople: false, countries: ['France']);
       when(
         () => mockSearchApi.getFilterSuggestions(
           city: any(named: 'city'),
@@ -53,9 +48,7 @@ void main() {
         ),
       ).thenAnswer((_) async => dto);
 
-      final result = await container.read(
-        photosFilterSuggestionsProvider(SearchFilter.empty()).future,
-      );
+      final result = await container.read(photosFilterSuggestionsProvider(SearchFilter.empty()).future);
 
       expect(result, dto);
     });
@@ -79,9 +72,7 @@ void main() {
         ),
       ).thenAnswer((_) async => null);
 
-      final result = await container.read(
-        photosFilterSuggestionsProvider(SearchFilter.empty()).future,
-      );
+      final result = await container.read(photosFilterSuggestionsProvider(SearchFilter.empty()).future);
 
       expect(result.hasUnnamedPeople, false);
     });
@@ -103,9 +94,7 @@ void main() {
           takenBefore: any(named: 'takenBefore'),
           withSharedSpaces: any(named: 'withSharedSpaces'),
         ),
-      ).thenAnswer(
-        (_) async => FilterSuggestionsResponseDto(hasUnnamedPeople: false),
-      );
+      ).thenAnswer((_) async => FilterSuggestionsResponseDto(hasUnnamedPeople: false));
 
       final after = DateTime.utc(2024, 1, 1);
       final before = DateTime.utc(2024, 12, 31);
@@ -154,13 +143,9 @@ void main() {
           takenBefore: any(named: 'takenBefore'),
           withSharedSpaces: any(named: 'withSharedSpaces'),
         ),
-      ).thenAnswer(
-        (_) async => FilterSuggestionsResponseDto(hasUnnamedPeople: false),
-      );
+      ).thenAnswer((_) async => FilterSuggestionsResponseDto(hasUnnamedPeople: false));
 
-      await container.read(
-        photosFilterSuggestionsProvider(SearchFilter.empty()).future,
-      );
+      await container.read(photosFilterSuggestionsProvider(SearchFilter.empty()).future);
 
       final captured = verify(
         () => mockSearchApi.getFilterSuggestions(
@@ -199,13 +184,9 @@ void main() {
           takenBefore: any(named: 'takenBefore'),
           withSharedSpaces: any(named: 'withSharedSpaces'),
         ),
-      ).thenAnswer(
-        (_) async => FilterSuggestionsResponseDto(hasUnnamedPeople: false),
-      );
+      ).thenAnswer((_) async => FilterSuggestionsResponseDto(hasUnnamedPeople: false));
 
-      await container.read(
-        photosFilterSuggestionsProvider(SearchFilter.empty()).future,
-      );
+      await container.read(photosFilterSuggestionsProvider(SearchFilter.empty()).future);
 
       final captured = verify(
         () => mockSearchApi.getFilterSuggestions(
