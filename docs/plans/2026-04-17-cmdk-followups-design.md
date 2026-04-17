@@ -68,9 +68,9 @@ Concretely:
 
 2. **`web/src/lib/components/global-search/previews/person-preview.svelte`**
    - Same change as `person-row`. Use the same `let failed = $state(false)`
-     + `onerror` pattern. `size: AssetMediaSize.Preview` is no longer
-     relevant — `getPeopleThumbnailUrl` returns a single-size face crop,
-     which is what the design already assumed.
+     - `onerror` pattern. `size: AssetMediaSize.Preview` is no longer
+       relevant — `getPeopleThumbnailUrl` returns a single-size face crop,
+       which is what the design already assumed.
 
 3. **`web/src/lib/managers/global-search-manager.svelte.ts`**
    - `activate('person')` (line ~990): drop `thumbnailAssetId: p.faceAssetId`

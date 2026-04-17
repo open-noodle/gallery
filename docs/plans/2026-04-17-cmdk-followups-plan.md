@@ -26,6 +26,7 @@ Use `pnpm test -- --run <file>` to scope test runs.
 ## Task 1: Update person-row test (RED + GREEN)
 
 **Files:**
+
 - Modify: `web/src/lib/components/global-search/__tests__/person-row.spec.ts`
 
 **Step 1: Replace the test file**
@@ -166,6 +167,7 @@ commit happens after Task 4 once the tree is consistent again.
 ## Task 2: Update person-preview test + component (RED + GREEN)
 
 **Files:**
+
 - Modify: `web/src/lib/components/global-search/__tests__/person-preview.spec.ts`
 - Modify: `web/src/lib/components/global-search/previews/person-preview.svelte`
 
@@ -356,6 +358,7 @@ Expected: all 4 tests PASS.
 ## Task 3: Drop `thumbnailAssetId` from `RecentEntry.person`
 
 **Files:**
+
 - Modify: `web/src/lib/stores/cmdk-recent.ts`
 
 **Step 1: Edit the type declaration**
@@ -389,6 +392,7 @@ field and won't typecheck. Fixed in next task.
 ## Task 4: Drop `faceAssetId` plumbing in manager + recent-row
 
 **Files:**
+
 - Modify: `web/src/lib/managers/global-search-manager.svelte.ts`
 - Modify: `web/src/lib/components/global-search/rows/recent-row.svelte`
 - Modify: `web/src/lib/managers/global-search-manager.svelte.spec.ts`
@@ -598,6 +602,7 @@ EOF
 ## Task 6: Update placeholder hint + commit
 
 **Files:**
+
 - Modify: `i18n/en.json`
 
 **Step 1: Edit the placeholder string**
