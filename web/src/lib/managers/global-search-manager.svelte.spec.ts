@@ -3481,3 +3481,107 @@ describe('prefix scoping — deriveds', () => {
     expect(m.payload).toBe('');
   });
 });
+
+describe('prefix scoping — runBatch gating', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    vi.useFakeTimers();
+    installFakeAbortTimeout();
+    vi.mocked(searchSmart).mockResolvedValue({
+      assets: { items: [], nextPage: null },
+    } as unknown as Awaited<ReturnType<typeof searchSmart>>);
+    vi.mocked(searchAssets).mockResolvedValue({
+      assets: { items: [], nextPage: null },
+    } as unknown as Awaited<ReturnType<typeof searchAssets>>);
+    vi.mocked(searchPerson).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof searchPerson>>);
+    vi.mocked(searchPlaces).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof searchPlaces>>);
+    vi.mocked(getAllTags).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof getAllTags>>);
+    vi.mocked(getAlbumNames).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof getAlbumNames>>);
+    vi.mocked(getAllSpaces).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof getAllSpaces>>);
+  });
+
+  afterEach(() => {
+    restoreAbortTimeout();
+    vi.useRealTimers();
+  });
+
+  it('scope people: only people provider invoked, other entity sections idle', async () => {
+    const m = new GlobalSearchManager();
+    // Pre-populate unrelated sections to 'ok' to prove they get force-reset.
+    m.sections.photos = { status: 'ok', items: [{ id: 'p1' } as never], total: 1 };
+    m.sections.albums = { status: 'ok', items: [{ id: 'a1' } as never], total: 1 };
+
+    m.setQuery('@alice');
+    await vi.advanceTimersByTimeAsync(150);
+
+    expect(m.sections.photos.status).toBe('idle');
+    expect(m.sections.albums.status).toBe('idle');
+    expect(m.sections.places.status).toBe('idle');
+    expect(m.sections.tags.status).toBe('idle');
+    expect(m.sections.spaces.status).toBe('idle');
+  });
+
+  it('scope collections: only albums + spaces providers invoked; others idle', async () => {
+    const m = new GlobalSearchManager();
+    m.sections.photos = { status: 'ok', items: [{ id: 'p1' } as never], total: 1 };
+    m.sections.people = { status: 'ok', items: [{ id: 'a1' } as never], total: 1 };
+    m.sections.tags = { status: 'ok', items: [{ id: 't1' } as never], total: 1 };
+
+    m.setQuery('/trip');
+    await vi.advanceTimersByTimeAsync(150);
+
+    expect(m.sections.photos.status).toBe('idle');
+    expect(m.sections.people.status).toBe('idle');
+    expect(m.sections.places.status).toBe('idle');
+    expect(m.sections.tags.status).toBe('idle');
+    // albums + spaces will be ok/empty depending on cache mocks
+  });
+
+  it('scope nav: ENTITY_KEYS_BY_SCOPE.nav === [] — no entity providers invoked', async () => {
+    const m = new GlobalSearchManager();
+    const searchSmartSpy = vi.mocked(searchSmart);
+    const searchPersonSpy = vi.mocked(searchPerson);
+    const searchPlacesSpy = vi.mocked(searchPlaces);
+    const getAllTagsSpy = vi.mocked(getAllTags);
+    const getAlbumNamesSpy = vi.mocked(getAlbumNames);
+    const getAllSpacesSpy = vi.mocked(getAllSpaces);
+    [searchSmartSpy, searchPersonSpy, searchPlacesSpy, getAllTagsSpy, getAlbumNamesSpy, getAllSpacesSpy].forEach((s) =>
+      s.mockClear(),
+    );
+
+    m.setQuery('>theme');
+    await vi.advanceTimersByTimeAsync(150);
+
+    expect(searchSmartSpy).not.toHaveBeenCalled();
+    expect(searchPersonSpy).not.toHaveBeenCalled();
+    expect(searchPlacesSpy).not.toHaveBeenCalled();
+    // Navigation section populated via synchronous runNavigationProvider, not runBatch.
+    expect(m.sections.navigation.status).toBe('ok');
+  });
+
+  it('scope people with bare @ bypasses minQueryLength', async () => {
+    const m = new GlobalSearchManager();
+    const searchPersonSpy = vi.mocked(searchPerson);
+    searchPersonSpy.mockClear();
+
+    m.setQuery('@'); // payload.length = 0, below people.minQueryLength = 2
+    await vi.advanceTimersByTimeAsync(150);
+
+    // people.minQueryLength=2 would normally set section to idle; bypass
+    // dispatches to the provider's bare branch instead (which does NOT call searchPerson).
+    expect(m.sections.people.status).not.toBe('idle');
+    expect(searchPersonSpy).not.toHaveBeenCalled();
+  });
+
+  it('scope people with single-char payload relaxes minQueryLength to 1', async () => {
+    const m = new GlobalSearchManager();
+    const searchPersonSpy = vi.mocked(searchPerson);
+    searchPersonSpy.mockClear();
+
+    m.setQuery('@a');
+    await vi.advanceTimersByTimeAsync(150);
+
+    expect(searchPersonSpy).toHaveBeenCalledWith({ name: 'a', withHidden: false }, expect.anything());
+  });
+});

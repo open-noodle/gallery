@@ -92,6 +92,22 @@ const SPACES_TOP_N = 5;
 // cross-contaminate all five sections.
 const idle = Object.freeze({ status: 'idle' as const });
 
+// Entity-section keys dispatched by runBatch per scope. Navigation is intentionally
+// absent — it flows through the synchronous `runNavigationProvider` off the debounce
+// path. Under a prefix scope, only the matching keys dispatch; all other entity
+// sections force-reset to idle synchronously before dispatch. Narrowing the key type
+// to just the entity sections (dropping `navigation`) keeps `sections[key] = ...`
+// assignments away from the navigation section's `ProviderStatus<NavigationItem>`
+// union, which would otherwise force an awkward cast.
+type EntitySectionKey = 'photos' | 'people' | 'places' | 'tags' | 'albums' | 'spaces';
+const ENTITY_KEYS_BY_SCOPE: Record<Scope, ReadonlyArray<EntitySectionKey>> = {
+  all: ['photos', 'people', 'places', 'tags', 'albums', 'spaces'],
+  people: ['people'],
+  tags: ['tags'],
+  collections: ['albums', 'spaces'],
+  nav: [],
+};
+
 function isValidRecentEntry(e: RecentEntry): boolean {
   switch (e.kind) {
     case 'query': {
@@ -1266,8 +1282,10 @@ export class GlobalSearchManager {
     // Navigation runs synchronously on every keystroke, bypassing the 150ms debounce.
     // It's a pure in-memory scan — no rate-limit or network concern. runBatch does NOT
     // iterate over navigation; its async dispatch tuple is
-    // `photos/people/places/tags/albums/spaces`.
-    this.sections.navigation = this.runNavigationProvider(text);
+    // `photos/people/places/tags/albums/spaces`. Pass `payload` (not raw `text`) so
+    // prefix-scoped queries search against the unprefixed portion — for scope 'all'
+    // the two are identical, so non-scoped queries retain their existing behavior.
+    this.sections.navigation = this.runNavigationProvider(this.payload);
     // The prior cursor may point at a nav/entity item that no longer exists in the new
     // results. Reconcile synchronously so the highlight doesn't lag the displayed list.
     this.reconcileCursor();
@@ -1282,7 +1300,7 @@ export class GlobalSearchManager {
     this.debounceTimer = setTimeout(() => this.runBatch(text, this.mode), 150);
   }
 
-  protected runBatch(text: string, mode: SearchMode) {
+  protected runBatch(_text: string, mode: SearchMode) {
     this.debounceTimer = null;
     this._batchInFlightStartedAt = performance.now();
     const batch = new AbortController();
@@ -1296,13 +1314,34 @@ export class GlobalSearchManager {
     // batchInFlight at true).
     this.inFlightCounter = 0;
 
+    // Force non-scope entity sections to idle synchronously before dispatching. Under
+    // a prefix scope (e.g. `@alice`), only the matching keys dispatch; everything
+    // else gets reset so stale `ok` content from the pre-prefix query doesn't leak.
+    // Navigation is intentionally omitted here — it's owned by `runNavigationProvider`
+    // in setQuery and is NOT an entity section.
+    const scope = this.scope;
+    const payload = this.payload;
+    const inScope = new Set(ENTITY_KEYS_BY_SCOPE[scope]);
+    for (const key of ['photos', 'people', 'places', 'tags', 'albums', 'spaces'] as const) {
+      if (!inScope.has(key)) {
+        this.sections[key] = idle;
+      }
+    }
+
     // Navigation intentionally omitted: it flows through the synchronous
     // runNavigationProvider() call in setQuery and must NOT join the async
     // batch dispatch. Albums / spaces dispatch through their provider.run()
     // which delegates to runAlbums() / runSpaces() — see buildProviders().
-    for (const key of ['photos', 'people', 'places', 'tags', 'albums', 'spaces'] as const) {
+    for (const key of ENTITY_KEYS_BY_SCOPE[scope]) {
       const provider = this.providers[key];
-      if (text.length < provider.minQueryLength) {
+      // minQueryLength gate:
+      //   - scope 'all': payload.length >= provider.minQueryLength (existing rule).
+      //   - scope !== 'all' with payload: relax minRequired to 1.
+      //   - scope !== 'all' with bare prefix (payload === ''): BYPASS entirely so
+      //     the provider's bare-prefix branch renders suggestions.
+      const isBare = scope !== 'all' && payload === '';
+      const minRequired = scope === 'all' ? provider.minQueryLength : 1;
+      if (!isBare && payload.length < minRequired) {
         this.sections[key] = idle;
         continue;
       }
@@ -1326,7 +1365,7 @@ export class GlobalSearchManager {
       // Promise.resolve().then(...) guarantees that a provider which synchronously
       // throws (not just returns a rejected promise) still lands in the .catch handler.
       Promise.resolve()
-        .then(() => provider.run(text, mode, signal))
+        .then(() => provider.run(payload, mode, signal))
         .then((result) => {
           if (batch !== this.batchController) {
             return;
@@ -1553,6 +1592,13 @@ export class GlobalSearchManager {
       topN: 5,
       minQueryLength: 2,
       run: async (query, _mode, signal) => {
+        // Bare-@ branch. Task 6 fills this in with cache-backed suggestions; for now
+        // it is a short-circuit that keeps runBatch's scope-aware dispatch honest by
+        // skipping the `searchPerson('')` round-trip which would just echo
+        // cursor-sorted people the server already returns for us.
+        if (query === '') {
+          return { status: 'empty' };
+        }
         try {
           const results = await searchPerson({ name: query, withHidden: false }, { signal });
           return results.length === 0
