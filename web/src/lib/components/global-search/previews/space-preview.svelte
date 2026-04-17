@@ -49,7 +49,7 @@
   const metadataLine = $derived(`${photoLabel} · ${memberLabel}`);
 </script>
 
-<div class="flex flex-col gap-3 p-5">
+<div data-cmdk-preview-space class="flex flex-col gap-3 p-5">
   <div class="w-full">
     {#if collageAssets.length > 0}
       <SpaceCollage assets={collageAssets} {gradientClass} />

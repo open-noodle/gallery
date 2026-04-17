@@ -42,7 +42,7 @@
   });
 </script>
 
-<div class="p-5">
+<div data-cmdk-preview-tag class="p-5">
   <div class="text-base font-semibold">{tag.name}</div>
   {#if loaded && photos.length === 0}
     <div class="mt-3 text-xs text-gray-500 dark:text-gray-400">{$t('cmdk_no_tagged_photos')}</div>
