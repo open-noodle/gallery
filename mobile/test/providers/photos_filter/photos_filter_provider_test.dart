@@ -95,4 +95,23 @@ void main() {
       expect(container.read(photosFilterProvider).location.country, null);
     });
   });
+
+  group('setDateRange', () {
+    final a = DateTime(2024, 1, 1);
+    final b = DateTime(2024, 12, 31);
+    test('sets both endpoints', () {
+      container.read(photosFilterProvider.notifier).setDateRange(start: a, end: b);
+      final d = container.read(photosFilterProvider).date;
+      expect(d.takenAfter, a);
+      expect(d.takenBefore, b);
+    });
+    test('both null clears the range', () {
+      final notifier = container.read(photosFilterProvider.notifier);
+      notifier.setDateRange(start: a, end: b);
+      notifier.setDateRange(start: null, end: null);
+      final d = container.read(photosFilterProvider).date;
+      expect(d.takenAfter, null);
+      expect(d.takenBefore, null);
+    });
+  });
 }

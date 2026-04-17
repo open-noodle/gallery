@@ -33,4 +33,7 @@ class PhotosFilterNotifier extends Notifier<SearchFilter> {
 
   void setLocation(SearchLocationFilter? location) =>
       state = state.copyWith(location: location ?? SearchLocationFilter());
+
+  void setDateRange({DateTime? start, DateTime? end}) =>
+      state = state.copyWith(date: SearchDateFilter(takenAfter: start, takenBefore: end));
 }
