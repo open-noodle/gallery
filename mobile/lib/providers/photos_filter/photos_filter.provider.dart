@@ -96,7 +96,8 @@ class PhotosFilterNotifier extends Notifier<SearchFilter> {
           people: state.people.where((p) => p.id != personId).toSet(),
         );
       case TagChipId(:final tagId):
-        toggleTag(tagId); // idempotent remove
+        final next = List<String>.from(state.tagIds ?? const [])..remove(tagId);
+        state = state.copyWith()..tagIds = next.isEmpty ? null : next;
       case LocationChipId():
         setLocation(null);
       case DateChipId():

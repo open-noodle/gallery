@@ -293,6 +293,12 @@ void main() {
       notifier.removeChip(const PersonChipId('ghost'));
       expect(container.read(photosFilterProvider).people.map((p) => p.id), ['alice']);
     });
+    test('TagChipId no-op on nonexistent id', () {
+      final notifier = container.read(photosFilterProvider.notifier);
+      notifier.toggleTag('t1');
+      notifier.removeChip(const TagChipId('ghost'));
+      expect(container.read(photosFilterProvider).tagIds, ['t1']);
+    });
     test('TagChipId removes that tag, keeping others', () {
       final notifier = container.read(photosFilterProvider.notifier);
       notifier.toggleTag('t1');
