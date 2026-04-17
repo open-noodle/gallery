@@ -2,9 +2,11 @@
   import { Icon } from '@immich/ui';
   import { t, type Translations } from 'svelte-i18n';
   import type { RecentEntry } from '$lib/stores/cmdk-recent';
+  import AlbumRow from './album-row.svelte';
   import PhotoRow from './photo-row.svelte';
   import PersonRow from './person-row.svelte';
   import PlaceRow from './place-row.svelte';
+  import SpaceRow from './space-row.svelte';
   import TagRow from './tag-row.svelte';
 
   interface Props {
@@ -28,6 +30,31 @@
   <PlaceRow item={{ name: entry.label, latitude: entry.latitude, longitude: entry.longitude } as never} />
 {:else if entry.kind === 'tag'}
   <TagRow item={{ id: entry.tagId, name: entry.label, color: null } as never} />
+{:else if entry.kind === 'album'}
+  <!-- RECENT stores a snapshot — full AlbumNameDto (shared/assetCount) isn't available, synthesize a minimal one. -->
+  <AlbumRow
+    item={{
+      id: entry.albumId,
+      albumName: entry.label,
+      albumThumbnailAssetId: entry.thumbnailAssetId,
+      shared: false,
+      assetCount: 0,
+    } as never}
+    isPending={false}
+  />
+{:else if entry.kind === 'space'}
+  <!-- RECENT stores a snapshot — full SharedSpaceResponseDto isn't available, synthesize a minimal one. -->
+  <SpaceRow
+    item={{
+      id: entry.spaceId,
+      name: entry.label,
+      color: entry.colorHex,
+      memberCount: 0,
+      assetCount: 0,
+      recentAssetIds: [],
+    } as never}
+    isPending={false}
+  />
 {:else if entry.kind === 'navigate'}
   <div
     class="flex h-[52px] items-center gap-3 rounded-lg px-3 py-2 transition-colors duration-[80ms] ease-out group-data-[selected]:bg-primary/10"
