@@ -17,6 +17,15 @@ export type RecentEntry =
   | { kind: 'place'; id: string; latitude: number; longitude: number; label: string; lastUsed: number }
   | { kind: 'tag'; id: string; tagId: string; label: string; lastUsed: number }
   | {
+      kind: 'album';
+      id: string;
+      albumId: string;
+      label: string;
+      thumbnailAssetId: string | null;
+      lastUsed: number;
+    }
+  | { kind: 'space'; id: string; spaceId: string; label: string; colorHex: string | null; lastUsed: number }
+  | {
       kind: 'navigate';
       id: string;
       route: string;
