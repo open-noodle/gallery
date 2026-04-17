@@ -1,5 +1,5 @@
 import { searchAssets } from '@immich/sdk';
-import { render, screen } from '@testing-library/svelte';
+import { fireEvent, render, screen } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import PersonPreview from '../previews/person-preview.svelte';
 
@@ -21,7 +21,7 @@ describe('person-preview', () => {
   it('renders the person name and count', () => {
     render(PersonPreview, {
       props: {
-        person: { id: 'p1', name: 'Alice', faceAssetId: 'face1', numberOfAssets: 42 } as never,
+        person: { id: 'p1', name: 'Alice', numberOfAssets: 42 } as never,
       },
     });
     expect(screen.getByText('Alice')).toBeInTheDocument();
@@ -29,17 +29,30 @@ describe('person-preview', () => {
   });
 
   it('defers searchAssets by 300ms after mount', async () => {
-    render(PersonPreview, { props: { person: { id: 'p1', name: 'Alice', faceAssetId: 'f' } as never } });
+    render(PersonPreview, { props: { person: { id: 'p1', name: 'Alice' } as never } });
     await vi.advanceTimersByTimeAsync(200);
     expect(searchAssets).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(150);
     expect(searchAssets).toHaveBeenCalledOnce();
   });
 
-  it('falls back to placeholder when faceAssetId is missing', () => {
+  it('renders the people thumbnail endpoint url', () => {
     const { container } = render(PersonPreview, {
-      props: { person: { id: 'p1', name: 'NoFace' } as never },
+      props: { person: { id: 'p1', name: 'Alice' } as never },
     });
-    expect(container.querySelector('img')).toBeNull();
+    const img = container.querySelector('[data-cmdk-preview-person] > img');
+    expect(img).not.toBeNull();
+    expect(img?.getAttribute('src')).toMatch(/\/api\/people\/p1\/thumbnail/);
+  });
+
+  it('swaps to placeholder when the thumbnail image fails to load', async () => {
+    const { container } = render(PersonPreview, {
+      props: { person: { id: 'p1', name: 'Alice' } as never },
+    });
+    const img = container.querySelector('[data-cmdk-preview-person] > img');
+    expect(img).not.toBeNull();
+    await fireEvent.error(img!);
+    expect(container.querySelector('[data-cmdk-preview-person] > img')).toBeNull();
+    expect(container.querySelector('[data-cmdk-preview-person] > div[aria-hidden="true"]')).not.toBeNull();
   });
 });
