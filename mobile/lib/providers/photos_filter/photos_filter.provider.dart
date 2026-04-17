@@ -11,8 +11,9 @@ class PhotosFilterNotifier extends Notifier<SearchFilter> {
 
   void reset() => state = SearchFilter.empty();
 
+  // SearchFilter.copyWith null-coalesces, so use cascade to set nullable fields.
   void setText(String text) =>
-      state = state.copyWith(context: text.isEmpty ? null : text);
+      state = state.copyWith()..context = text.isEmpty ? null : text;
 
   void togglePerson(PersonDto person) {
     final next = Set<PersonDto>.from(state.people);
@@ -20,7 +21,6 @@ class PhotosFilterNotifier extends Notifier<SearchFilter> {
     state = state.copyWith(people: next);
   }
 
-  // SearchFilter.copyWith null-coalesces, so use cascade to set nullable fields.
   void toggleTag(String tagId) {
     final current = List<String>.from(state.tagIds ?? const []);
     if (current.contains(tagId)) {

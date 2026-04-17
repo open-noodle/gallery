@@ -71,4 +71,13 @@ void main() {
       expect(container.read(photosFilterProvider).tagIds, ['tag-2']);
     });
   });
+
+  group('setText', () {
+    test('empty string clears context to null', () {
+      final notifier = container.read(photosFilterProvider.notifier);
+      notifier.setText('paris');
+      notifier.setText('');
+      expect(container.read(photosFilterProvider).context, null);
+    });
+  });
 }
