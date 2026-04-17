@@ -228,6 +228,74 @@ describe('removeEntry', () => {
   });
 });
 
+describe('album entry', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    __resetForTests();
+    mockUser.current = { id: 'u1' };
+  });
+
+  it('round-trips an album entry', () => {
+    addEntry({
+      kind: 'album',
+      id: 'album:abc',
+      albumId: 'abc',
+      label: 'Hawaii',
+      thumbnailAssetId: 'asset-1',
+      lastUsed: 1,
+    });
+    expect(getEntries()).toEqual([
+      expect.objectContaining({ kind: 'album', albumId: 'abc', thumbnailAssetId: 'asset-1' }),
+    ]);
+  });
+
+  it('removeEntry clears an album entry', () => {
+    addEntry({
+      kind: 'album',
+      id: 'album:abc',
+      albumId: 'abc',
+      label: 'x',
+      thumbnailAssetId: null,
+      lastUsed: 1,
+    });
+    removeEntry('album:abc');
+    expect(getEntries()).toEqual([]);
+  });
+
+  it('removeEntry is a silent no-op for a missing id', () => {
+    addEntry({
+      kind: 'album',
+      id: 'album:abc',
+      albumId: 'abc',
+      label: 'x',
+      thumbnailAssetId: null,
+      lastUsed: 1,
+    });
+    expect(() => removeEntry('album:nonexistent')).not.toThrow();
+    expect(getEntries()).toHaveLength(1);
+  });
+});
+
+describe('space entry', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    __resetForTests();
+    mockUser.current = { id: 'u1' };
+  });
+
+  it('round-trips a space entry', () => {
+    addEntry({
+      kind: 'space',
+      id: 'space:s1',
+      spaceId: 's1',
+      label: 'Family',
+      colorHex: '#ff00ff',
+      lastUsed: 1,
+    });
+    expect(getEntries()).toEqual([expect.objectContaining({ kind: 'space', spaceId: 's1', colorHex: '#ff00ff' })]);
+  });
+});
+
 describe('makePlaceId precision', () => {
   it('rounds to 4 decimals so near-identical coords collapse', () => {
     expect(makePlaceId(48.856_645_67, 2.352_210_01)).toBe('place:48.8566:2.3522');
