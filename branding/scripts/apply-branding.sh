@@ -429,8 +429,10 @@ patch_ios() {
   # The CFBundleURLSchemes <string>immich</string> entry sits at 4-tab indent inside
   # CFBundleURLTypes; CFBundleName (also <string>${NAME_SLUG}</string>) is at 1-tab indent,
   # so we anchor the idempotency check to the 4-tab prefix to avoid a false-positive when
-  # NAME_SLUG happens to equal DEEP_LINK_SCHEME.
-  if ! grep -qP "^\t\t\t\t<string>${DEEP_LINK_SCHEME}</string>" "$info_plist"; then
+  # NAME_SLUG happens to equal DEEP_LINK_SCHEME. Use $'\t' ANSI-C quoting for literal
+  # tabs — BSD grep (macOS) lacks -P.
+  local indent=$'\t\t\t\t'
+  if ! grep -q "^${indent}<string>${DEEP_LINK_SCHEME}</string>" "$info_plist"; then
     sed -i $'/\t\t\t\t<string>immich<\\/string>/a\\\n\t\t\t\t<string>'"${DEEP_LINK_SCHEME}"$'<\\/string>' "$info_plist"
   fi
 
