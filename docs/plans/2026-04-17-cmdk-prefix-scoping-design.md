@@ -278,7 +278,7 @@ run: async (query, mode, signal) => {
 
 - **Concurrency:** concurrent `@` retypes join the same in-flight `peoplePromise`; `getAllPeople` fires at most once per open session. Without this pattern, typing `@ → @a → @` fast enough to race the first fetch would fire two concurrent calls. Pinned by a concurrency test.
 - **Stale rejection:** the guard above prevents a late-arriving rejection from stomping over fresh non-bare results.
-- **Close lifecycle:** `close()` clears both `peopleSuggestionsCache` and `peoplePromise` so reopening the palette is a clean slate.
+- **Clear lifecycle:** both `peopleSuggestionsCache` and `peoplePromise` are reset in `open()`, mirroring the existing pattern for `albumsPromise` / `spacesPromise` (see `global-search-manager.svelte.ts:355-356`). `close()` only aborts `closeController`; it does not touch the promise/cache fields. This keeps all open-session lazy caches on a single "reset on open" rule.
 - **Rejection stickiness within session:** if the first bare-`@` fetch rejects, `peoplePromise` retains the rejection for the remainder of the open session — subsequent bare-`@` re-types read the same rejected promise. User must close + reopen to retry. **Accepted limitation**, consistent with `ensureAlbumsCache` / `ensureSpacesCache` today.
 - **Sort key:** `personSuggestionsComparator` is applied client-side regardless of server default. **The exact sort key is open** — see §Risks for the `PersonResponseDto` field verification that unblocks this. Comparator is a small pure function exported alongside the manager and covered by a table-driven test.
 
@@ -450,7 +450,7 @@ _SWR / scope transitions:_
 _setMode while scoped:_
 
 - `setMode('metadata')` while `scope === 'people'` persists mode to localStorage but does NOT re-run photos.
-- Clicking a mode pill under scope updates `manager.mode` without dispatching a request — assert `runBatch` spy is not called and `photosController` is not aborted/recreated.
+- Clicking a mode pill under scope updates `manager.mode` without dispatching a request — spy on `searchSmart` / `searchAssets` (SDK-level, stable) and assert neither is called; `photosController` is not aborted/recreated.
 
 _announcementText:_
 
@@ -463,7 +463,7 @@ _Concurrency (new describe block):_
 - Rapid scope thrash (`@` → `#` → `/`): each transition aborts cleanly, counter bookkeeping stays consistent.
 - `/` while `albumsCache` promise is in-flight: both keystrokes await the same promise, last one writes results.
 - **Concurrent bare `@` keystrokes** (`@ → @a → @` racing the first fetch): both callers join the same `peoplePromise`; `getAllPeople` is called **exactly once** (spy assertion).
-- `getAllPeople` cancellation via `closeSignal` on palette close clears both `peopleSuggestionsCache` and `peoplePromise`; reopening and typing `@` re-fires exactly once.
+- `getAllPeople` cancellation via `closeSignal` on palette close; `open()` then resets both `peopleSuggestionsCache` and `peoplePromise` to `undefined` so typing `@` in the next session re-fires exactly once. (Matches `albumsPromise` / `spacesPromise` reset-on-open pattern.)
 - `getAllPeople` 5 s timeout: section transitions to `timeout`.
 - `getAllPeople` network error: section transitions to `error`.
 - **Stale bare-`@` rejection after scope change:** start bare `@` fetch, transition to `@alice` which resolves via `searchPerson` and writes `sections.people = ok`, then reject the original bare-`@` fetch. Assert `sections.people` remains `ok` (the `scope === 'people' && payload === ''` guard skips the error write).
@@ -485,7 +485,7 @@ _Recent replay (defensive):_
   - Carry `opacity-50` class.
   - Do NOT carry `aria-disabled` attribute.
   - Remain focusable via Tab order.
-  - Clicking sets `manager.mode`, persists to localStorage, does NOT call `runBatch`, does NOT recreate `photosController`.
+  - Clicking sets `manager.mode`, persists to localStorage, does NOT call `searchSmart` / `searchAssets` (SDK spy — more stable target than spying on the protected `runBatch` method).
 - ML banner: with `mlHealthy = false`, visible under scope `all`, hidden under any prefixed scope.
 - TopNavigationMatch: present under `all` when label matches, hidden under any prefixed scope.
 - **Preview pane per scope:**
@@ -542,7 +542,18 @@ _Recent replay (defensive):_
 - `web/src/lib/components/global-search/global-search-footer.svelte` — scope chip group + `?` icon button (hidden below `sm`).
 - `web/src/lib/components/global-search/__tests__/global-search-footer.spec.ts` — chip + `?` icon tests.
 - `web/src/lib/modals/ShortcutsModal.svelte` — "Scope prefixes" section with 4 kbd-box rows.
-- `i18n/en.json` — `cmdk_scope_hint_footer`, `cmdk_show_shortcuts`, `cmdk_shortcut_scope_heading`, `cmdk_shortcut_scope_people`, `cmdk_shortcut_scope_tags`, `cmdk_shortcut_scope_collections`, `cmdk_shortcut_scope_nav`, `cmdk_announce_scoped_people`, `cmdk_announce_scoped_tags`, `cmdk_announce_scoped_collections`, `cmdk_announce_scoped_nav`. Sorted via `pnpm --filter=immich-i18n format:fix`.
+- `i18n/en.json` — new keys (English values pinned; sort order applied via `pnpm --filter=immich-i18n format:fix`):
+  - `cmdk_scope_hint_footer` = `"@ # / > scope"`
+  - `cmdk_show_shortcuts` = `"Keyboard shortcuts"`
+  - `cmdk_shortcut_scope_heading` = `"Scope prefixes"`
+  - `cmdk_shortcut_scope_people` = `"Search people"`
+  - `cmdk_shortcut_scope_tags` = `"Search tags"`
+  - `cmdk_shortcut_scope_collections` = `"Search albums & spaces"`
+  - `cmdk_shortcut_scope_nav` = `"Jump to pages"`
+  - `cmdk_announce_scoped_people` = `"Scoped to people."`
+  - `cmdk_announce_scoped_tags` = `"Scoped to tags."`
+  - `cmdk_announce_scoped_collections` = `"Scoped to albums & spaces."` _(NOT "Scoped to collections" — matches the ShortcutsModal copy)_
+  - `cmdk_announce_scoped_nav` = `"Scoped to pages."`
 - `e2e/src/specs/web/global-search.e2e-spec.ts` — new E2E cases per §Tests E2E.
 
 ---
