@@ -80,6 +80,10 @@ describe('prefix scoping — footer chrome', () => {
     const { getByText } = render(GlobalSearchFooter, { props: { manager } });
     expect(getByText('Ctrl+/')).toBeInTheDocument();
     expect(getByText('@ # / >')).toBeInTheDocument();
+    // The label next to the kbd is translated (cmdk_scope_hint_footer_label); beforeAll
+    // loads en-US so it must resolve to "scope" and stay rendered — guards against
+    // silently dropping the label node during future template edits.
+    expect(getByText('scope')).toBeInTheDocument();
   });
 
   it('? icon button hidden below sm breakpoint (carries sm:block class)', () => {

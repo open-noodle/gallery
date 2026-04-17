@@ -94,7 +94,7 @@
     </span>
     <span class="flex items-center gap-1.5">
       <kbd class={kbdClass}>{$t('cmdk_scope_hint_footer')}</kbd>
-      <span>scope</span>
+      <span>{$t('cmdk_scope_hint_footer_label')}</span>
     </span>
     <button
       data-cmdk-shortcuts-trigger
