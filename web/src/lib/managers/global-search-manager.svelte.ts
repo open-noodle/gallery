@@ -1345,6 +1345,11 @@ export class GlobalSearchManager {
     if (!allSettled) {
       return '';
     }
+    // Under a prefix scope (e.g. `@alice`, `#xmas`, `/trip`, `>theme`), screen
+    // readers announce "Scoped to <section>." before the counts so the user
+    // knows the palette is filtered. Scope 'all' stays plain — the cue would
+    // be noise on unscoped queries.
+    const scopeCue = this.scope === 'all' ? '' : get(t)(`cmdk_announce_scoped_${this.scope}` as Translations);
     const parts: string[] = [];
     const count = (st: ProviderStatus) => (st.status === 'ok' ? st.total : 0);
     if (count(s.photos) > 0) {
@@ -1362,7 +1367,11 @@ export class GlobalSearchManager {
     if (count(s.navigation) > 0) {
       parts.push(`${count(s.navigation)} pages`);
     }
-    return parts.join(', ');
+    const counts = parts.join(', ');
+    if (scopeCue && counts) {
+      return `${scopeCue} ${counts}`;
+    }
+    return scopeCue || counts;
   });
 
   setQuery(text: string) {

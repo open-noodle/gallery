@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Shared hoisted mocks — used by navigation tests to flip admin/feature-flag state.
 // Must appear BEFORE the GlobalSearchManager import because the manager binds these
@@ -4206,5 +4206,92 @@ describe('prefix scoping — setMode under scope', () => {
     await vi.advanceTimersByTimeAsync(150);
 
     expect(searchAssetsSpy).toHaveBeenCalled();
+  });
+});
+
+describe('prefix scoping — announcementText', () => {
+  beforeAll(async () => {
+    // Load the real en bundle so `get(t)('cmdk_announce_scoped_*')` resolves to
+    // English copy rather than raw keys. The rest of this suite uses fallbackLocale
+    // 'dev' (raw keys) — the scope-cue assertions here check the translated prefix.
+    const { init, register, waitLocale } = await import('svelte-i18n');
+    register('en-US', () => import('$i18n/en.json'));
+    await init({ fallbackLocale: 'en-US' });
+    await waitLocale('en-US');
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    vi.useFakeTimers();
+    installFakeAbortTimeout();
+    vi.mocked(searchSmart).mockResolvedValue({ assets: { items: [], nextPage: null } } as never);
+    vi.mocked(searchAssets).mockResolvedValue({ assets: { items: [], nextPage: null } } as never);
+    vi.mocked(searchPerson).mockResolvedValue([] as never);
+    vi.mocked(searchPlaces).mockResolvedValue([] as never);
+    vi.mocked(getAllTags).mockResolvedValue([] as never);
+    vi.mocked(getAlbumNames).mockResolvedValue([] as never);
+    vi.mocked(getAllSpaces).mockResolvedValue([] as never);
+    vi.mocked(getAllPeople).mockResolvedValue({ people: [], total: 0, hidden: 0, hasNextPage: false } as never);
+  });
+
+  afterEach(() => {
+    restoreAbortTimeout();
+    vi.useRealTimers();
+  });
+
+  it('scope people announcement prefixed with "Scoped to people."', async () => {
+    const m = new GlobalSearchManager();
+    m.setQuery('@alice');
+    await vi.advanceTimersByTimeAsync(150);
+    await vi.runAllTimersAsync();
+    expect(m.announcementText).toMatch(/Scoped to people/i);
+  });
+
+  it('scope tags announcement prefixed with "Scoped to tags."', async () => {
+    const m = new GlobalSearchManager();
+    m.setQuery('#xmas');
+    await vi.advanceTimersByTimeAsync(150);
+    await vi.runAllTimersAsync();
+    expect(m.announcementText).toMatch(/Scoped to tags/i);
+  });
+
+  it('scope collections announcement prefixed with "Scoped to albums & spaces."', async () => {
+    const m = new GlobalSearchManager();
+    m.setQuery('/trip');
+    await vi.advanceTimersByTimeAsync(150);
+    await vi.runAllTimersAsync();
+    expect(m.announcementText).toMatch(/Scoped to albums & spaces/i);
+  });
+
+  it('scope nav announcement prefixed with "Scoped to pages."', async () => {
+    const m = new GlobalSearchManager();
+    m.setQuery('>theme');
+    await vi.advanceTimersByTimeAsync(150);
+    await vi.runAllTimersAsync();
+    expect(m.announcementText).toMatch(/Scoped to pages/i);
+  });
+
+  it('scope all announcement has no "Scoped to" prefix', async () => {
+    const m = new GlobalSearchManager();
+    m.setQuery('alice');
+    await vi.advanceTimersByTimeAsync(150);
+    await vi.runAllTimersAsync();
+    expect(m.announcementText).not.toMatch(/Scoped to/i);
+  });
+});
+
+describe('prefix scoping — defensive recent replay of scoped query', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
+
+  it('activateRecent({kind:query, text:"@alice"}) re-derives scope=people, payload=alice', () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    m.activateRecent({ kind: 'query', id: 'query:@alice:smart', text: '@alice', mode: 'smart', lastUsed: Date.now() });
+    expect(m.scope).toBe('people');
+    expect(m.payload).toBe('alice');
   });
 });
