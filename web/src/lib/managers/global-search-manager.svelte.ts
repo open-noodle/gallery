@@ -6,18 +6,25 @@ import { Route } from '$lib/route';
 import { addEntry, getEntries, makePlaceId, removeEntry, type RecentEntry } from '$lib/stores/cmdk-recent';
 import { user } from '$lib/stores/user.store';
 import {
+  getAlbumInfo,
+  getAlbumNames,
+  getAllSpaces,
   getAllTags,
   getMlHealth,
+  getSpace,
   searchAssets,
   searchPerson,
   searchPlaces,
   searchSmart,
+  type AlbumNameDto,
   type MetadataSearchDto,
+  type SharedSpaceResponseDto,
   type TagResponseDto,
 } from '@immich/sdk';
+import { toastManager } from '@immich/ui';
 import { computeCommandScore } from 'bits-ui';
 import { locale as i18nLocale, t, type Translations } from 'svelte-i18n';
-import { SvelteMap } from 'svelte/reactivity';
+import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import { get } from 'svelte/store';
 import { isAlmostExactNavMatch, NAVIGATION_ITEMS, type NavigationItem } from './navigation-items';
 
@@ -50,6 +57,8 @@ export type Sections = {
   people: ProviderStatus<EntityItem>;
   places: ProviderStatus<EntityItem>;
   tags: ProviderStatus<EntityItem>;
+  albums: ProviderStatus<EntityItem>;
+  spaces: ProviderStatus<EntityItem>;
   navigation: ProviderStatus<NavigationItem>;
 };
 
@@ -65,9 +74,17 @@ export type ActiveItem =
   | { kind: 'person'; data: unknown }
   | { kind: 'place'; data: unknown }
   | { kind: 'tag'; data: unknown }
+  | { kind: 'album'; data: AlbumNameDto }
+  | { kind: 'space'; data: SharedSpaceResponseDto }
   | { kind: 'nav'; data: NavigationItem };
 
 const VALID_MODES: ReadonlySet<SearchMode> = new Set(['smart', 'metadata', 'description', 'ocr']);
+// Slice size for the albums section. Kept as a named constant so the buildProviders
+// `topN: 5` and the runAlbums slice cannot drift apart silently.
+const ALBUMS_TOP_N = 5;
+// Slice size for the spaces section. Same rationale as ALBUMS_TOP_N — pin the
+// buildProviders `topN` and the runSpaces slice to a single source of truth.
+const SPACES_TOP_N = 5;
 // Narrow literal type so it can be assigned to both `ProviderStatus<unknown>` and
 // `ProviderStatus<NavigationItem>` without the generic T widening fighting the assignment.
 // Frozen so a future engineer cannot accidentally mutate the shared reference and
@@ -90,6 +107,12 @@ function isValidRecentEntry(e: RecentEntry): boolean {
     }
     case 'tag': {
       return typeof e.tagId === 'string' && e.tagId.length > 0;
+    }
+    case 'album': {
+      return typeof e.albumId === 'string' && typeof e.label === 'string';
+    }
+    case 'space': {
+      return typeof e.spaceId === 'string' && typeof e.label === 'string';
     }
     case 'navigate': {
       return (
@@ -129,7 +152,15 @@ export class GlobalSearchManager {
   isOpen = $state(false);
   query = $state('');
   mode = $state<SearchMode>(loadSearchQueryType());
-  sections = $state<Sections>({ photos: idle, people: idle, places: idle, tags: idle, navigation: idle });
+  sections = $state<Sections>({
+    photos: idle,
+    people: idle,
+    places: idle,
+    tags: idle,
+    albums: idle,
+    spaces: idle,
+    navigation: idle,
+  });
   activeItemId = $state<string | null>(null);
   mlHealthy = $state(true);
   /**
@@ -147,11 +178,36 @@ export class GlobalSearchManager {
    * Drives the progress stripe on the palette header.
    */
   batchInFlight = $state(false);
+  /**
+   * Set of row ids whose activation is currently in flight. Prevents double-Enter on
+   * the same row while an async activation handler (e.g. album/space navigate) is
+   * still resolving. Entries added at activation start and removed when the handler
+   * settles (or the palette closes).
+   */
+  activationInFlight: SvelteSet<string> = $state(new SvelteSet());
+  /**
+   * Id of the row currently showing the 200 ms "pending" affordance (subtle spinner
+   * on the row) while its activation handler is resolving. Null when no activation is
+   * pending. Separate from `activationInFlight` because the affordance is delayed —
+   * only shown when the handler takes longer than 200 ms — while the double-Enter
+   * guard is immediate.
+   */
+  pendingActivation: string | null = $state(null);
 
   protected providers: Record<keyof Sections, Provider>;
   protected debounceTimer: ReturnType<typeof setTimeout> | null = null;
   protected batchController: AbortController | null = null;
   protected photosController: AbortController | null = null;
+  /**
+   * Aborted on `close()`, replaced with a fresh controller on `open()`. Scoped to the
+   * open-session lifetime — activation-dispatch and catalog fetches (later tasks) bind
+   * to `closeSignal` so closing the palette cancels their long-lived work without
+   * disrupting the per-keystroke `batchController` fan-out.
+   */
+  private closeController = new AbortController();
+  get closeSignal() {
+    return this.closeController.signal;
+  }
   /**
    * Count of providers currently in flight. runBatch resets this at entry so a stale
    * batch's decrements cannot corrupt the new batch's bookkeeping (onSettle checks
@@ -172,6 +228,17 @@ export class GlobalSearchManager {
   private tagsDisabled = false;
   private storageListener?: (e: StorageEvent) => void;
   private mlProbed = false;
+
+  /**
+   * Catalogs fetched lazily on first provider run and shared for the remainder of the
+   * open session. Bound to `closeSignal` so closing the palette cancels in-flight work;
+   * the promise fields are reset on `open()` so a prior rejected fetch does not
+   * short-circuit the next session's retry.
+   */
+  albumsCache: AlbumNameDto[] | undefined = $state(undefined);
+  spacesCache: SharedSpaceResponseDto[] | undefined = $state(undefined);
+  private albumsPromise: Promise<void> | undefined;
+  private spacesPromise: Promise<void> | undefined;
 
   /**
    * Locale-keyed memo cache for navigation item search strings.
@@ -279,6 +346,14 @@ export class GlobalSearchManager {
 
   open() {
     this.isOpen = true;
+    if (this.closeController.signal.aborted) {
+      this.closeController = new AbortController();
+    }
+    // Clear any stale promise from the previous session. Without this, a rejected
+    // fetch in session N would permanently short-circuit ensureAlbumsCache() in
+    // session N+1 (the rejected promise is still memoized in albumsPromise).
+    this.albumsPromise = undefined;
+    this.spacesPromise = undefined;
     if (!this.mlProbed) {
       this.mlProbed = true;
       void this.probeMlHealth();
@@ -300,8 +375,222 @@ export class GlobalSearchManager {
     }
   }
 
+  /**
+   * Fetch (and memoize) the albums catalog for the current open session. Callers
+   * should `await` this before scoring so the cache is populated. Safe to call
+   * concurrently — all callers join the same in-flight promise.
+   */
+  async ensureAlbumsCache(): Promise<void> {
+    if (this.albumsCache !== undefined) {
+      return;
+    }
+    if (this.albumsPromise === undefined) {
+      this.albumsPromise = this.fetchAlbumsCatalog();
+    }
+    return this.albumsPromise;
+  }
+
+  /**
+   * Fetch `GET /albums/names` and dedupe the concatenated owned+shared response by
+   * album id, preferring the `shared: true` record when both variants are present.
+   * On AbortError (palette closed mid-fetch) the section status stays untouched so
+   * reopening the palette is a clean slate; other errors flip the section to
+   * `'error'` and rethrow so the caller sees the failure.
+   */
+  private async fetchAlbumsCatalog(): Promise<void> {
+    try {
+      const response = await getAlbumNames({ signal: this.closeSignal });
+      // SvelteMap instead of plain Map to satisfy the `svelte/prefer-svelte-reactivity`
+      // ESLint rule — it flags any Map instance inside .svelte.ts files regardless of
+      // whether it's reactive state. This is a local dedupe accumulator; the SvelteMap
+      // reactivity overhead is negligible at this scale.
+      const byId = new SvelteMap<string, AlbumNameDto>();
+      for (const record of response) {
+        const existing = byId.get(record.id);
+        if (existing === undefined || (record.shared && !existing.shared)) {
+          byId.set(record.id, record);
+        }
+      }
+      this.albumsCache = [...byId.values()];
+    } catch (error: unknown) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        return;
+      }
+      this.sections.albums = { status: 'error', message: error instanceof Error ? error.message : 'unknown error' };
+      throw error;
+    }
+  }
+
+  /**
+   * Fetch (and memoize) the shared-spaces catalog for the current open session.
+   * Mirrors `ensureAlbumsCache()` — callers join a shared in-flight promise.
+   */
+  async ensureSpacesCache(): Promise<void> {
+    if (this.spacesCache !== undefined) {
+      return;
+    }
+    if (this.spacesPromise === undefined) {
+      this.spacesPromise = this.fetchSpacesCatalog();
+    }
+    return this.spacesPromise;
+  }
+
+  private async fetchSpacesCatalog(): Promise<void> {
+    try {
+      this.spacesCache = await getAllSpaces({ signal: this.closeSignal });
+    } catch (error: unknown) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        return;
+      }
+      this.sections.spaces = { status: 'error', message: error instanceof Error ? error.message : 'unknown error' };
+      throw error;
+    }
+  }
+
+  /**
+   * Resolve an album id through the SDK, write a fresh RECENT entry, and navigate.
+   * All guards live here so every Enter-on-row path — fresh result, RECENT, almost-
+   * exact nav promotion — routes through a single handler with uniform semantics.
+   *
+   * Guards:
+   *  - Double-Enter: a second call for the same key is a no-op while the first is
+   *    still resolving. Cleared in `finally` so retry after settlement works.
+   *  - Escape-during-resolve: activation binds to `closeSignal`, so `close()` aborts
+   *    the fetch and the post-await `aborted` check short-circuits the navigate.
+   *  - Batch rotation does NOT affect activation. The per-keystroke
+   *    `batchController` owns the fan-out providers; activation survives typing.
+   *  - 400 / 404 / 403: treat as "stale cache" — toast + purge the RECENT (no-op
+   *    if absent) so the next open does not re-show a dead row. Gallery's server
+   *    `requireAccess` middleware returns 400 (BadRequestException) for both
+   *    "row missing" and "no access", so 400 sits alongside the canonical 404/403.
+   *  - 401 and other statuses propagate unchanged to the global SDK auth
+   *    interceptor (redirect-to-login lives there, not here).
+   *  - Pending affordance: the 200 ms `pendingActivation` flag is cleared in
+   *    `finally` regardless of which branch settled the activation.
+   */
+  async activateAlbum(id: string) {
+    const key = `album:${id}`;
+    if (this.activationInFlight.has(key)) {
+      return;
+    }
+    this.activationInFlight.add(key);
+
+    const pendingTimer = setTimeout(() => {
+      this.pendingActivation = key;
+    }, 200);
+
+    try {
+      const album = await getAlbumInfo({ id }, { signal: this.closeSignal });
+      if (this.closeSignal.aborted) {
+        return;
+      }
+      addEntry({
+        kind: 'album',
+        id: key,
+        albumId: id,
+        label: album.albumName,
+        thumbnailAssetId: album.albumThumbnailAssetId,
+        lastUsed: Date.now(),
+      });
+      void goto(Route.viewAlbum({ id }));
+      // Dismiss the palette after handing off to the router. goto is fire-and-forget
+      // so navigation and palette close happen in parallel — matches v1's activate()
+      // pattern for other kinds (photo/person/place/tag/nav all close post-navigate).
+      // Intentionally only on the happy path: the stale-entry (400/403/404) branch
+      // leaves the palette open so the user sees the toast and the purged RECENT.
+      this.close();
+    } catch (error: unknown) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        return;
+      }
+      const status = (error as { status?: number } | null)?.status;
+      if (status === 400 || status === 404 || status === 403) {
+        removeEntry(key);
+        toastManager.warning(get(t)('cmdk_toast_album_unavailable'));
+        return;
+      }
+      throw error;
+    } finally {
+      clearTimeout(pendingTimer);
+      this.activationInFlight.delete(key);
+      if (this.pendingActivation === key) {
+        this.pendingActivation = null;
+      }
+    }
+  }
+
+  /**
+   * Resolve a space id through the SDK, write a fresh RECENT entry, and navigate.
+   * Mirrors `activateAlbum` — same guard set, just swapped for the space-shaped
+   * SDK call, route helper, and recent entry. The design doc explicitly defers
+   * factoring the two into a generic helper until a future YAGNI follow-up.
+   *
+   * Guards:
+   *  - Double-Enter: a second call for the same key is a no-op while the first is
+   *    still resolving. Cleared in `finally` so retry after settlement works.
+   *  - Escape-during-resolve: activation binds to `closeSignal`, so `close()` aborts
+   *    the fetch and the post-await `aborted` check short-circuits the navigate.
+   *  - Batch rotation does NOT affect activation. The per-keystroke
+   *    `batchController` owns the fan-out providers; activation survives typing.
+   *  - 400 / 404 / 403: treat as "stale cache" — toast + purge the RECENT (no-op
+   *    if absent) so the next open does not re-show a dead row. Gallery's server
+   *    `requireAccess` middleware returns 400 (BadRequestException) for both
+   *    "row missing" and "no access", so 400 sits alongside the canonical 404/403.
+   *  - 401 and other statuses propagate unchanged to the global SDK auth
+   *    interceptor (redirect-to-login lives there, not here).
+   *  - Pending affordance: the 200 ms `pendingActivation` flag is cleared in
+   *    `finally` regardless of which branch settled the activation.
+   */
+  async activateSpace(id: string) {
+    const key = `space:${id}`;
+    if (this.activationInFlight.has(key)) {
+      return;
+    }
+    this.activationInFlight.add(key);
+
+    const pendingTimer = setTimeout(() => {
+      this.pendingActivation = key;
+    }, 200);
+
+    try {
+      const space = await getSpace({ id }, { signal: this.closeSignal });
+      if (this.closeSignal.aborted) {
+        return;
+      }
+      addEntry({
+        kind: 'space',
+        id: key,
+        spaceId: id,
+        label: space.name,
+        colorHex: space.color ?? null,
+        lastUsed: Date.now(),
+      });
+      void goto(Route.viewSpace({ id }));
+      // See activateAlbum for rationale — close after goto, happy path only.
+      this.close();
+    } catch (error: unknown) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        return;
+      }
+      const status = (error as { status?: number } | null)?.status;
+      if (status === 400 || status === 404 || status === 403) {
+        removeEntry(key);
+        toastManager.warning(get(t)('cmdk_toast_space_unavailable'));
+        return;
+      }
+      throw error;
+    } finally {
+      clearTimeout(pendingTimer);
+      this.activationInFlight.delete(key);
+      if (this.pendingActivation === key) {
+        this.pendingActivation = null;
+      }
+    }
+  }
+
   close() {
     this.isOpen = false;
+    this.closeController.abort();
     if (this.debounceTimer !== null) {
       clearTimeout(this.debounceTimer);
     }
@@ -310,7 +599,15 @@ export class GlobalSearchManager {
     this.batchController = null;
     this.photosController?.abort();
     this.photosController = null;
-    this.sections = { photos: idle, people: idle, places: idle, tags: idle, navigation: idle };
+    this.sections = {
+      photos: idle,
+      people: idle,
+      places: idle,
+      tags: idle,
+      albums: idle,
+      spaces: idle,
+      navigation: idle,
+    };
     this.activeItemId = null;
     this.tagsCache = null;
     // Clear batch bookkeeping. Without this, closing mid-batch leaves batchInFlight=true
@@ -387,7 +684,15 @@ export class GlobalSearchManager {
     if (!match) {
       return null;
     }
-    return { kind: kind as 'photo' | 'person' | 'place' | 'tag', data: match };
+    // kind is narrowed by sectionForKind — only the entity kinds below can reach
+    // here (nav is handled in the branch above, unknown kinds return null via
+    // `sectionForKind`). Cast is split into an intermediate union so album/space
+    // carry their DTO types through to the ActiveItem union without forcing the
+    // structural entity match through `as unknown`.
+    return {
+      kind: kind as 'photo' | 'person' | 'place' | 'tag' | 'album' | 'space',
+      data: match,
+    } as ActiveItem;
   }
 
   /**
@@ -431,6 +736,8 @@ export class GlobalSearchManager {
         };
       }
       case 'query':
+      case 'album':
+      case 'space':
       case 'navigate': {
         return null;
       }
@@ -451,6 +758,12 @@ export class GlobalSearchManager {
       case 'tag': {
         return this.sections.tags;
       }
+      case 'album': {
+        return this.sections.albums;
+      }
+      case 'space': {
+        return this.sections.spaces;
+      }
       case 'nav': {
         return this.sections.navigation;
       }
@@ -470,6 +783,8 @@ export class GlobalSearchManager {
       people: 'person',
       places: 'place',
       tags: 'tag',
+      albums: 'album',
+      spaces: 'space',
       navigation: 'nav',
     };
     for (const key of order) {
@@ -639,6 +954,24 @@ export class GlobalSearchManager {
         this.close();
         return;
       }
+    }
+    // Album / space entries route through their dedicated activate methods, which
+    // own the SDK round-trip, the addEntry-on-success / removeEntry-on-404,403, the
+    // pending-row affordance, and the navigation. Skipping the unconditional
+    // addEntry below means a stale entry isn't bumped just before the 404 branch
+    // purges it (cleaner store + no flicker) and prevents double-writes on the
+    // happy path. We must NOT call this.close() here — it would abort closeSignal
+    // and cancel the in-flight fetch. The palette dismissal mirrors the fresh-
+    // result activation path (global-search.svelte): rely on the route change to
+    // tear down the modal, and on the 404/403 toast branch to leave the palette
+    // open so the stale row gets removed in place.
+    if (entry.kind === 'album') {
+      void this.activateAlbum(entry.albumId);
+      return;
+    }
+    if (entry.kind === 'space') {
+      void this.activateSpace(entry.spaceId);
+      return;
     }
     const now = Date.now();
     addEntry({ ...entry, lastUsed: now });
@@ -903,7 +1236,15 @@ export class GlobalSearchManager {
     this.photosController = null;
 
     if (text.trim() === '') {
-      this.sections = { photos: idle, people: idle, places: idle, tags: idle, navigation: idle };
+      this.sections = {
+        photos: idle,
+        people: idle,
+        places: idle,
+        tags: idle,
+        albums: idle,
+        spaces: idle,
+        navigation: idle,
+      };
       this.batchInFlight = false;
       this.inFlightCounter = 0;
       this._batchInFlightStartedAt = 0;
@@ -913,14 +1254,15 @@ export class GlobalSearchManager {
     // SWR (stale-while-revalidate): only flip sections that are NOT already 'ok' to
     // loading. Preserving ok content across keystrokes fixes the jitter bug where the
     // palette flashed skeletons between every character.
-    for (const key of ['photos', 'people', 'places', 'tags'] as const) {
+    for (const key of ['photos', 'people', 'places', 'tags', 'albums', 'spaces'] as const) {
       if (this.sections[key].status !== 'ok') {
         this.sections[key] = { status: 'loading' };
       }
     }
     // Navigation runs synchronously on every keystroke, bypassing the 150ms debounce.
     // It's a pure in-memory scan — no rate-limit or network concern. runBatch does NOT
-    // iterate over navigation; its hardcoded tuple is `photos/people/places/tags`.
+    // iterate over navigation; its async dispatch tuple is
+    // `photos/people/places/tags/albums/spaces`.
     this.sections.navigation = this.runNavigationProvider(text);
     // The prior cursor may point at a nav/entity item that no longer exists in the new
     // results. Reconcile synchronously so the highlight doesn't lag the displayed list.
@@ -950,7 +1292,11 @@ export class GlobalSearchManager {
     // batchInFlight at true).
     this.inFlightCounter = 0;
 
-    for (const key of ['photos', 'people', 'places', 'tags'] as const) {
+    // Navigation intentionally omitted: it flows through the synchronous
+    // runNavigationProvider() call in setQuery and must NOT join the async
+    // batch dispatch. Albums / spaces dispatch through their provider.run()
+    // which delegates to runAlbums() / runSpaces() — see buildProviders().
+    for (const key of ['photos', 'people', 'places', 'tags', 'albums', 'spaces'] as const) {
       const provider = this.providers[key];
       if (text.length < provider.minQueryLength) {
         this.sections[key] = idle;
@@ -1025,6 +1371,110 @@ export class GlobalSearchManager {
       clearTimeout(this.debounceTimer);
       this.debounceTimer = null;
     }
+  }
+
+  /**
+   * Filter / rank / slice the in-memory albums catalog for `rawQuery` and write the
+   * result into `sections.albums`. Called by the albums provider entry in
+   * `buildProviders()` — runBatch dispatches the albums key to that provider, which
+   * delegates here, so this is the sole writer for the albums section.
+   *
+   * Scoring rules (all case-insensitive, query is trimmed):
+   *   - name.startsWith(query) → score 2
+   *   - name.includes(query)    → score 1
+   *   - else                    → filtered out
+   * Ties break alphabetically by `albumName`. Slice to top 5; `total` reports the
+   * full pre-slice match count so the palette can render a "+N more" affordance.
+   *
+   * Queries under 2 chars short-circuit back to idle and skip the catalog fetch —
+   * matches the other providers' minQueryLength contract.
+   */
+  async runAlbums(rawQuery: string): Promise<void> {
+    const query = rawQuery.trim().toLowerCase();
+    if (query.length < 2) {
+      this.sections.albums = { status: 'idle' };
+      return;
+    }
+    await this.ensureAlbumsCache();
+    if (this.albumsCache === undefined) {
+      // Catalog fetch failed mid-flight (AbortError) or was rejected and already
+      // transitioned the section to 'error' via fetchAlbumsCatalog. Nothing to do.
+      return;
+    }
+
+    type Scored = { album: AlbumNameDto; score: number };
+    const matches: Scored[] = [];
+    for (const album of this.albumsCache) {
+      const name = album.albumName.toLowerCase();
+      if (name.includes(query)) {
+        matches.push({ album, score: name.startsWith(query) ? 2 : 1 });
+      }
+    }
+    matches.sort((a, b) => b.score - a.score || a.album.albumName.localeCompare(b.album.albumName));
+
+    if (matches.length === 0) {
+      this.sections.albums = { status: 'empty' };
+      return;
+    }
+
+    this.sections.albums = {
+      status: 'ok',
+      items: matches.slice(0, ALBUMS_TOP_N).map((m) => m.album) as unknown as EntityItem[],
+      total: matches.length,
+    };
+  }
+
+  /**
+   * Filter / rank / slice the in-memory shared-spaces catalog for `rawQuery` and
+   * write the result into `sections.spaces`. Mirrors `runAlbums` — matches on
+   * `space.name` (not `albumName`), single source so no owned/shared dedupe. The
+   * spaces provider entry in `buildProviders()` dispatches here; runBatch routes
+   * the spaces key through that provider, so this is the sole writer for the
+   * spaces section.
+   *
+   * Scoring rules (all case-insensitive, query is trimmed):
+   *   - name.startsWith(query) → score 2
+   *   - name.includes(query)    → score 1
+   *   - else                    → filtered out
+   * Ties break alphabetically by `name`. Slice to top 5; `total` reports the full
+   * pre-slice match count so the palette can render a "+N more" affordance.
+   *
+   * Queries under 2 chars short-circuit back to idle and skip the catalog fetch —
+   * matches the other providers' minQueryLength contract.
+   */
+  async runSpaces(rawQuery: string): Promise<void> {
+    const query = rawQuery.trim().toLowerCase();
+    if (query.length < 2) {
+      this.sections.spaces = { status: 'idle' };
+      return;
+    }
+    await this.ensureSpacesCache();
+    if (this.spacesCache === undefined) {
+      // Catalog fetch failed mid-flight (AbortError) or was rejected and already
+      // transitioned the section to 'error' via fetchSpacesCatalog. Nothing to do.
+      return;
+    }
+
+    type Scored = { space: SharedSpaceResponseDto; score: number };
+    const matches: Scored[] = [];
+    for (const space of this.spacesCache) {
+      const name = space.name.toLowerCase();
+      if (name.includes(query)) {
+        matches.push({ space, score: name.startsWith(query) ? 2 : 1 });
+      }
+    }
+    matches.sort((a, b) => b.score - a.score || a.space.name.localeCompare(b.space.name));
+
+    if (matches.length === 0) {
+      this.sections.spaces = { status: 'empty' };
+      return;
+    }
+
+    this.sections.spaces = {
+      status: 'ok',
+      items: matches.slice(0, SPACES_TOP_N).map((m) => m.space) as unknown as EntityItem[],
+      total: matches.length,
+    };
   }
 
   private async runTagsProvider(query: string, signal: AbortSignal): Promise<ProviderStatus<TagResponseDto>> {
@@ -1140,9 +1590,10 @@ export class GlobalSearchManager {
     };
 
     // Navigation provider is a stub. Task 10 wires runNavigationProvider into setQuery
-    // directly (synchronous, bypassing the 150ms debounce). runBatch iterates only over
-    // entity keys, so this stub is never invoked at runtime — it exists to satisfy the
-    // Record<keyof Sections, Provider> contract. Regression test in Task 10 pins this.
+    // directly (synchronous, bypassing the 150ms debounce). runBatch iterates only the
+    // entity + albums + spaces keys — navigation is explicitly excluded — so this stub
+    // is never invoked at runtime. It exists to satisfy the `Record<keyof Sections,
+    // Provider>` contract. Regression test in Task 12 pins this.
     const navigationStub: Provider<NavigationItem> = {
       key: 'navigation',
       topN: 5,
@@ -1150,7 +1601,36 @@ export class GlobalSearchManager {
       run: () => Promise.resolve({ status: 'empty' as const }),
     };
 
-    return { photos, people, places, tags, navigation: navigationStub };
+    // Albums provider dispatches to `runAlbums`, which filters the in-memory catalog
+    // and writes `sections.albums` directly. Task 12 wired the albums key into
+    // runBatch's iteration tuple, so `run()` is now invoked on the batch path. It
+    // delegates to `runAlbums()` and returns the section state that method wrote,
+    // so runBatch's subsequent `this.sections[key] = result` assignment is a no-op
+    // self-assignment.
+    const albums: Provider = {
+      key: 'albums',
+      topN: ALBUMS_TOP_N,
+      minQueryLength: 2,
+      run: async (query) => {
+        await this.runAlbums(query);
+        return this.sections.albums as ProviderStatus<EntityItem>;
+      },
+    };
+    // Spaces provider dispatches to `runSpaces`, which filters the in-memory catalog
+    // and writes `sections.spaces` directly. Same dispatch path as `albums` above —
+    // runBatch iterates the spaces key, calls `run()`, which delegates to
+    // `runSpaces()` and returns the section state that method wrote.
+    const spaces: Provider = {
+      key: 'spaces',
+      topN: SPACES_TOP_N,
+      minQueryLength: 2,
+      run: async (query) => {
+        await this.runSpaces(query);
+        return this.sections.spaces as ProviderStatus<EntityItem>;
+      },
+    };
+
+    return { photos, people, places, tags, albums, spaces, navigation: navigationStub };
   }
 }
 
