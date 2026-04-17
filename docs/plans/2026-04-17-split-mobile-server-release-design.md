@@ -70,6 +70,8 @@ These are deliberate, not accidents:
 1. **Phase 2 builds from the draft's pinned SHA, not from `main`'s HEAD at phase-2 time.** Commits landing on main between phase 1 and phase 2 are excluded from the release and ship in the next cycle. This is the only way to guarantee server / mobile parity.
 2. **Phase 2 has no version override input.** It always reads ground truth from the draft. Override exists in phase 1 only.
 3. **Step ordering invariant in phase 2** — `merge-server && merge-ml && tag && promote-draft && publish-version-endpoint`. Docker images must exist before the version endpoint flips, otherwise users polling the endpoint will try to pull images that don't yet exist. Any reordering is a safety regression.
+4. **Manual edits to the draft's release notes between phases are preserved.** Phase 2 promotes with `gh release edit --draft=false --latest` and never regenerates notes. Maintainers can tweak the notes in the GitHub UI during the 24h wait; those edits survive promotion.
+5. **Releases can only be dispatched from `main`.** Both phase 1 and phase 2 fail fast if `github.ref_name != 'main'`. Prevents accidental releases from feature branches.
 
 ## Failure modes & recovery
 

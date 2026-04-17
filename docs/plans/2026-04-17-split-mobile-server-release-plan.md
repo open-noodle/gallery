@@ -61,12 +61,12 @@ git push origin v0.0.0-pinning-test
 **Step 5: Promote the draft and verify the published release points at SHA_A**
 
 ```bash
-gh release edit v0.0.0-pinning-test --draft=false --latest=false
-gh release view v0.0.0-pinning-test --json tagName,targetCommitish,isDraft
+gh release edit v0.0.0-pinning-test --draft=false --latest
+gh release view v0.0.0-pinning-test --json tagName,targetCommitish,isDraft,isLatest
 git ls-remote origin "refs/tags/v0.0.0-pinning-test"
 ```
 
-Expected: `isDraft: false`. The `git ls-remote` output's SHA must be `SHA_A`. The `targetCommitish` should still read `SHA_A` (or the tag name, which resolves to SHA_A — both acceptable).
+Expected: `isDraft: false`, `isLatest: true`. The `git ls-remote` output's SHA must be `SHA_A`. The `targetCommitish` should still read `SHA_A` (or the tag name, which resolves to SHA_A — both acceptable). The `--latest` flag during the draft → published transition must set `isLatest: true` cleanly; if gh rejects the flag or silently skips it during the transition, the design needs to move `--latest` into a follow-up `gh release edit` call instead.
 
 **Step 6: Cleanup**
 
@@ -76,8 +76,9 @@ gh release delete v0.0.0-pinning-test --cleanup-tag --yes
 
 **Step 7: Decision**
 
-- If the published release's tag points to `SHA_A` → design assumption holds, proceed.
+- If the published release's tag points to `SHA_A` AND `isLatest: true` → design assumptions hold, proceed.
 - If the published release's tag points to `SHA_B` (or any non-`SHA_A` commit) → STOP. The design needs rework. Update the design doc with the actual `gh` behavior and revisit handoff mechanism (e.g., switch to a `pending-release` annotated tag).
+- If `--latest` didn't take effect during the draft → published transition → note it; the plan's `gh release edit --draft=false --latest` will need to be split into two calls (`--draft=false`, then a separate `--latest`). Minor plan edit, not a design break.
 
 **Step 8: Record the result**
 
@@ -200,9 +201,21 @@ jobs:
   guard:
     name: Guard against existing draft
     runs-on: ubuntu-latest
+    # contents: write is REQUIRED so the token can see draft releases.
+    # GitHub returns drafts only to tokens with write permission; contents:
+    # read would silently return no drafts and bypass the dupe check.
     permissions:
-      contents: read
+      contents: write
     steps:
+      - name: Require main branch
+        env:
+          REF: ${{ github.ref_name }}
+        run: |
+          if [[ "$REF" != "main" ]]; then
+            echo "::error::Releases must be triggered from main (got: $REF)"
+            exit 1
+          fi
+
       - name: Fail if a release draft with an APK asset is pending
         env:
           GH_TOKEN: ${{ github.token }}
@@ -212,7 +225,7 @@ jobs:
           # Composite filter: drafts whose tag matches v*.*.* AND have at least
           # one .apk asset. This is the same predicate phase 2 uses for
           # discovery — what passes the guard is what phase 2 will find.
-          pending=$(gh release list --repo "$REPO" --limit 50 \
+          pending=$(gh release list --repo "$REPO" --limit 1000 \
             --json tagName,isDraft \
             --jq '[.[] | select(.isDraft == true and (.tagName | test("^v[0-9]+\\.[0-9]+\\.[0-9]+$")))] | .[].tagName')
           matches=""
@@ -240,7 +253,9 @@ jobs:
       contents: read
     outputs:
       version: ${{ steps.version.outputs.version }}
-      sha: ${{ steps.sha.outputs.sha }}
+      # github.sha is locked at workflow-dispatch time and visible from every
+      # job. Emitting it as an output is purely for downstream-job convenience.
+      sha: ${{ github.sha }}
     steps:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -248,10 +263,6 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
           fetch-tags: true
-
-      - name: Capture commit SHA for handoff
-        id: sha
-        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Compute next version
         id: version
@@ -437,18 +448,17 @@ Expected: no output.
 
 **Step 4: Verify the lifted version-compute logic matches the source**
 
-Diff the version-compute step against the source in `gallery-release.yml` to confirm verbatim transcription except for the intentional changes (no `skip` output, no `major` output, error on no releasable commits instead of skip-graceful):
+Open both files side-by-side and visually compare:
 
-```bash
-diff <(sed -n '36,143p' .github/workflows/gallery-release.yml) <(sed -n '/Compute next version/,/^      [a-z]/p' .github/workflows/gallery-release-mobile.yml | head -120)
-```
+- Source: `.github/workflows/gallery-release.yml` lines 36–143 (the body of the `Compute next version` step in the `version` job).
+- New: `.github/workflows/gallery-release-mobile.yml` — body of the `Compute next version` step.
 
-Review the diff manually. Differences expected:
+Expected differences (intentional):
 
-- The new file outputs `version` and `sha` only; it does NOT output `skip` or `major` (phase 2 doesn't need them, and "no commits to release" is now an error in phase 1, not a graceful skip).
-- The new file's "no commits" path is an `::error::` exit 1, not `skip=true`.
+- New file's `version` job outputs only `version` and `sha` — NOT `skip`, NOT `major` (phase 2 doesn't need them).
+- New file's "no commits to release" path is `::error:: … exit 1` instead of `skip=true`. Manual-only trigger means silently skipping is worse than failing loudly.
 
-If anything else differs, fix it.
+Anything else that differs is a transcription error — fix it.
 
 **Step 5: Commit**
 
@@ -476,13 +486,24 @@ jobs:
   discover:
     name: Discover Pending Release Draft
     runs-on: ubuntu-latest
+    # contents: write is REQUIRED so the token can see draft releases.
+    # GitHub returns drafts only to tokens with write permission.
     permissions:
-      contents: read
+      contents: write
     outputs:
       version: ${{ steps.discover.outputs.version }}
       sha: ${{ steps.discover.outputs.sha }}
       major: ${{ steps.discover.outputs.major }}
     steps:
+      - name: Require main branch
+        env:
+          REF: ${{ github.ref_name }}
+        run: |
+          if [[ "$REF" != "main" ]]; then
+            echo "::error::Releases must be triggered from main (got: $REF)"
+            exit 1
+          fi
+
       - name: Find draft created by phase 1
         id: discover
         env:
@@ -492,7 +513,7 @@ jobs:
           set -euo pipefail
           # Composite filter: drafts whose tag matches v*.*.* AND have at least
           # one .apk asset. Same predicate phase 1's guard uses.
-          candidates=$(gh release list --repo "$REPO" --limit 50 \
+          candidates=$(gh release list --repo "$REPO" --limit 1000 \
             --json tagName,isDraft \
             --jq '[.[] | select(.isDraft == true and (.tagName | test("^v[0-9]+\\.[0-9]+\\.[0-9]+$")))] | .[].tagName')
           matches=""
@@ -732,7 +753,82 @@ Expected: `permissions: {}` line present.
 
 ---
 
-### Task 7: Open PR with the design doc + workflow changes bundled
+### Task 7: Update README `Publishing` section to document the two-phase flow
+
+**Why:** The README's `Docker Images → Publishing` section currently describes the single-workflow release. Update it to reflect phase 1 → manual mobile-approval wait → phase 2.
+
+**Files:**
+
+- Modify: `README.md` — "Publishing" subsection under "Docker Images" (locate via `grep -n "### Publishing" README.md`)
+
+**Step 1: Replace the `Publishing` subsection**
+
+Find the existing block starting with `### Publishing` and ending before the next `##` or `###` heading. Replace its body (keep the `### Publishing` heading) with:
+
+````markdown
+Gallery uses a **two-phase release flow** so mobile app builds are already live on Play Store and App Store before server users see a new version.
+
+**Phase 1 — Release Mobile** (`.github/workflows/gallery-release-mobile.yml`)
+
+1. Maintainer triggers the workflow from the Actions tab. Version is computed automatically from commits since the last tag (same rules as below), or passed explicitly via input.
+2. The mobile app is built and signed. Android AAB uploads to Play Store **internal** track; iOS IPA uploads to TestFlight.
+3. A **draft** GitHub Release is created pinning the version (tag name), commit SHA (`target_commitish`), and APK (asset). The draft is invisible to end users.
+4. The maintainer manually promotes the Play internal build to **production** in Play Console and submits the App Store for review. Once both stores show the new version live to end users, proceed to phase 2. Typically ~24h.
+
+**Phase 2 — Release Gallery** (`.github/workflows/gallery-release.yml`)
+
+1. Maintainer triggers the workflow from the Actions tab. No inputs.
+2. The workflow discovers the pending draft from phase 1, reads the pinned version + SHA, and checks out at that exact SHA — so the server image matches the commit the mobile app was built from.
+3. `gallery-server` and `gallery-ml` images build (amd64 + arm64 matrix) and push to GHCR tagged with the version, the major version (`v4`), and `release`.
+4. Git tags are created: `vX.Y.Z` at the pinned SHA, and the floating `vN` + `release` tags move forward.
+5. The draft release is promoted to published (`--latest`). The APK attached in phase 1 becomes the public sideload download.
+6. `version.json` is uploaded to the S3 version endpoint — self-hosted instances polling this endpoint now show "new version available".
+
+**Version selection** (phase 1)
+
+- `changelog:skip` PR label → commit is excluded from the bump computation
+- `feat:` commit or `changelog:feat` PR label → **minor** bump (e.g. `v4.2.6` → `v4.3.0`)
+- `BREAKING CHANGE` in commit body or `!` in commit prefix (e.g. `feat!:`) → **major** bump
+- Everything else (`fix:`, `docs:`, `chore:`, etc.) → **patch** bump
+
+If every commit since the last tag is `changelog:skip`, phase 1 errors — there is nothing to release.
+
+**Design properties**
+
+- Phase 2 builds from the draft's pinned SHA, not from `main`'s HEAD. Commits landing on main between the two phases are excluded from this release and ship in the next cycle.
+- Manual edits to the draft's release notes during the waiting period are preserved — phase 2 promotes without regenerating notes.
+- Both workflows fail fast if triggered from any branch other than `main`.
+
+**Recovering from mobile rejection**
+
+If a store rejects the mobile build, discard the draft and rerun phase 1 after fixing:
+
+```bash
+gh release delete vX.Y.Z --cleanup-tag --yes
+```
+
+See `docs/plans/2026-04-17-split-mobile-server-release-design.md` for the full design.
+````
+
+**Step 2: Verify markdown is valid**
+
+```bash
+cd /home/pierre/dev/gallery/.worktrees/split-release-cycle
+npx prettier --write README.md 2>&1 | tail -3
+```
+
+Expected: `README.md XXms` (no errors).
+
+**Step 3: Commit**
+
+```bash
+git add README.md
+git commit -m "docs(readme): document two-phase release flow"
+```
+
+---
+
+### Task 8: Open PR with the design doc + workflow changes bundled
 
 **Why:** The design doc landed in commit `2aee2d4bc` on this branch already. The workflow changes follow. Open one PR for the whole bundle.
 
@@ -756,7 +852,7 @@ Splits the single release workflow into two phases so mobile leads server promot
 
 Design doc: `docs/plans/2026-04-17-split-mobile-server-release-design.md`.
 
-Also bundled: `gallery-build-mobile.yml` re-enables Play Store internal-track upload (currently commented while the app was in initial Google review) and adds a `GITHUB_RUN_ATTEMPT` offset to versionCode so phase 1 retries don't collide with already-uploaded versionCodes.
+Also bundled: `gallery-build-mobile.yml` re-enables Play Store internal-track upload (currently commented while the app was in initial Google review), adds a `GITHUB_RUN_ATTEMPT` offset to versionCode so phase 1 retries don't collide with already-uploaded versionCodes, and the README `Publishing` section is updated to document the two-phase flow.
 
 ## Test plan
 
