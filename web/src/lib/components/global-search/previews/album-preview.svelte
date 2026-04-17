@@ -34,7 +34,7 @@
   const metadataLine = $derived(dateRange ? `${countLabel} · ${dateRange}` : countLabel);
 </script>
 
-<div class="flex flex-col gap-3 p-5">
+<div data-cmdk-preview-album class="flex flex-col gap-3 p-5">
   {#if thumbUrl}
     <div class="flex h-[180px] w-full items-center justify-center overflow-hidden rounded-md bg-subtle/40">
       <img src={thumbUrl} alt="" class="max-h-full max-w-full object-contain" loading="lazy" />

@@ -155,10 +155,15 @@ describe('runSpaces provider', () => {
     expect(sut.sections.spaces.status).not.toBe('ok');
   });
 
-  it('does NOT fire for queries < 2 chars', async () => {
+  // NOTE: the old upstream `query.length < 2 -> idle` short-circuit has been moved
+  // into `runBatch`'s minQueryLength gate (see prefix scoping task 4/5). `runSpaces`
+  // is now unconditionally downstream of that gate, and its contract for single-char
+  // queries is the standard scoring path.
+  it('scores single-char queries via the normal match path', async () => {
     seed([{ id: '1', name: 'Anywhere' }]);
     await sut.runSpaces('a');
-    expect(sut.sections.spaces).toEqual({ status: 'idle' });
+    const { items } = expectOk();
+    expect(items.map((s) => s.id)).toEqual(['1']);
   });
 
   it('returns empty when no spaces are cached', async () => {
