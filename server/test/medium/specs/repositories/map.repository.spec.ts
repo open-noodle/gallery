@@ -132,5 +132,20 @@ describe(MapRepository.name, () => {
 
       expect(results.find((r) => r.id === asset.id)).toBeUndefined();
     });
+
+    it('should exclude Locked-visibility space asset', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id });
+      const { asset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Locked });
+      await ctx.database.insertInto('asset_exif').values({ assetId: asset.id, latitude: 4, longitude: 4 }).execute();
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+
+      const results = await sut.getMapMarkers([member.id], [], { timelineSpaceIds: [space.id] });
+
+      expect(results.find((r) => r.id === asset.id)).toBeUndefined();
+    });
   });
 });
