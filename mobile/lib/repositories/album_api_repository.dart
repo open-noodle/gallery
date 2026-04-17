@@ -3,15 +3,18 @@ import 'package:immich_mobile/domain/models/album/album.model.dart';
 import 'package:immich_mobile/domain/models/user.model.dart';
 import 'package:immich_mobile/providers/api.provider.dart';
 import 'package:immich_mobile/repositories/api.repository.dart';
+import 'package:immich_mobile/services/api.service.dart';
 // ignore: import_rule_openapi
 import 'package:openapi/api.dart' hide AlbumUserRole;
 
-final albumApiRepositoryProvider = Provider((ref) => AlbumApiRepository(ref.watch(apiServiceProvider).albumsApi));
+final albumApiRepositoryProvider = Provider((ref) => AlbumApiRepository(ref.watch(apiServiceProvider)));
 
 class AlbumApiRepository extends ApiRepository {
-  final AlbumsApi _api;
+  final ApiService _apiService;
 
-  AlbumApiRepository(this._api);
+  AlbumApiRepository(this._apiService);
+
+  AlbumsApi get _api => _apiService.albumsApi;
 
   Future<RemoteAlbum> createDriftAlbum(
     String name,
