@@ -4,7 +4,7 @@
 
 **Goal:** Ship the two foundational PRs for the mobile filter sheet feature — PR 1.0 (a throw-away keyboard-interaction spike) and PR 1.1 (new Photos-tab filter-state providers with no UI wiring). Design doc: [`2026-04-17-mobile-filter-sheet-design.md`](./2026-04-17-mobile-filter-sheet-design.md).
 
-**Architecture:** PR 1.0 lives on a spike branch that never merges; its outcome decides whether PR 1.2 uses Flutter's stock `DraggableScrollableSheet` or a custom `ModalBottomSheet` wrapper. PR 1.1 lands the Riverpod state layer — `photosFilterProvider` (notifier over the existing `SearchFilter` model), `photosFilterSheetProvider` (snap-state enum), `photosFilterSuggestionsProvider` (wraps existing `getFilterSuggestions()` API), `photosFilterCountProvider` (total match count via search endpoint), and `photosTimelineQueryProvider` (empty-vs-non-empty query switcher). No UI, no navigation changes.
+**Architecture:** PR 1.0 lives on a spike branch that never merges; its outcome decides whether PR 1.2 uses Flutter's stock `DraggableScrollableSheet` or a custom `ModalBottomSheet` wrapper. PR 1.1 lands the Riverpod state layer — `photosFilterProvider` (notifier over the existing `SearchFilter` model), `photosFilterSheetProvider` (snap-state enum), `photosFilterSuggestionsProvider` (wraps existing `getFilterSuggestions()` API), and `photosFilterCountProvider` (placeholder page-1-count pending a true total-count source). The `photosTimelineQueryProvider` (empty-vs-non-empty query switcher) is deferred from PR 1.1 to PR 1.2 so the adapter from `SearchResult` to `RenderList` lands next to its consumer. No UI, no navigation changes in PR 1.1.
 
 **Tech stack:** Flutter, `hooks_riverpod` (mix of `@riverpod` codegen and manual `NotifierProvider`), `flutter_test` + `mocktail` for tests, `SearchFilter` from `mobile/lib/models/search/search_filter.model.dart`, OpenAPI-generated `SearchApi.getFilterSuggestions()`.
 
@@ -193,6 +193,80 @@ git checkout feat/mobile-filter-panel
 ## PR 1.1 — State infrastructure (no UI)
 
 Branch: `feat/mobile-filter-panel`. Tests are `flutter_test`-based, one provider / one method at a time, TDD with frequent commits.
+
+### Task 1.1.0: Pre-work — `SearchFilter.empty()` + test baseline
+
+**Files:**
+- Modify: `mobile/lib/models/search/search_filter.model.dart`
+- Test: `mobile/test/models/search/search_filter_empty_test.dart` (create)
+
+**Step 1:** Capture the current `flutter test` baseline so later tasks can distinguish new regressions from pre-existing flakes.
+
+```bash
+cd /home/pierre/dev/gallery/.worktrees/mobile-filter-panel/mobile
+flutter test --reporter=compact 2>&1 | tee /tmp/pre-pr-test-baseline.txt
+tail -5 /tmp/pre-pr-test-baseline.txt
+```
+
+Record the pass/fail counts. The later Task 1.1.20 diffs against this file.
+
+**Step 2:** Write a failing test for the new factory.
+
+```dart
+// mobile/test/models/search/search_filter_empty_test.dart
+import 'package:flutter_test/flutter_test.dart';
+import 'package:immich_mobile/models/search/search_filter.model.dart';
+
+void main() {
+  group('SearchFilter.empty', () {
+    test('returns a canonical empty filter', () {
+      final f = SearchFilter.empty();
+      expect(f.isEmpty, true);
+      expect(f.people, isEmpty);
+      expect(f.tagIds, anyOf(isNull, isEmpty));
+      expect(f.context, anyOf(isNull, isEmpty));
+    });
+    test('two empty filters compare empty-equivalent', () {
+      expect(SearchFilter.empty().isEmpty, SearchFilter.empty().isEmpty);
+    });
+  });
+}
+```
+
+**Step 3:** Run — FAIL (`SearchFilter.empty` not defined).
+
+```bash
+flutter test test/models/search/search_filter_empty_test.dart
+```
+
+**Step 4:** Add the static factory to the model. Open `mobile/lib/models/search/search_filter.model.dart` and add inside the `SearchFilter` class, alongside the existing constructor:
+
+```dart
+static SearchFilter empty() => SearchFilter(
+  people: const {},
+  location: SearchLocationFilter(),
+  camera: SearchCameraFilter(),
+  date: SearchDateFilter(),
+  display: SearchDisplayFilters(
+    isFavorite: false,
+    isArchive: false,
+    isNotInAlbum: false,
+  ),
+  rating: SearchRatingFilter(),
+  mediaType: AssetType.other,
+);
+```
+
+If any of `SearchLocationFilter`, `SearchCameraFilter`, `SearchDateFilter`, `SearchRatingFilter` don't offer a no-arg constructor (check each), pass explicit `null`s for all their fields.
+
+**Step 5:** Run — PASS.
+
+**Step 6:** Commit.
+
+```bash
+git add mobile/lib/models/search/search_filter.model.dart mobile/test/models/search/search_filter_empty_test.dart
+git commit -m "feat(mobile): add SearchFilter.empty() factory for filter-sheet use"
+```
 
 ### Task 1.1.1: OpenAPI audit — verify `getFilterSuggestions()` is callable and documented
 
@@ -390,7 +464,7 @@ class PhotosFilterNotifier extends Notifier<SearchFilter> {
 }
 ```
 
-**Step 4:** Confirm `SearchFilter.empty()` exists on the model (audit per Task 1.1.1). If it doesn't, add a static constructor to the model file in a separate commit and reference it here.
+**Step 4:** `SearchFilter.empty()` was added in Task 1.1.0 — no action needed here beyond importing the model.
 
 **Step 5:** Run — expect PASS.
 
@@ -652,25 +726,126 @@ enum Dimension { people, tags, location, date, camera, rating, mediaType, displa
 **Files:**
 - Create: `mobile/lib/providers/photos_filter/chip_id.dart` — a sealed class with cases for each chip type.
 
-**Step 1:** Write `ChipId`.
+**Step 1:** Write `ChipId`. Sealed classes in Dart do **not** get free value-equality; every subclass declares `==` and `hashCode` explicitly, otherwise two `PersonChipId('alice')` instances compare unequal and `removeChip` will silently fail to match.
 
 ```dart
 sealed class ChipId {
   const ChipId();
 }
-class PersonChipId extends ChipId { final String personId; const PersonChipId(this.personId); }
-class TagChipId extends ChipId { final String tagId; const TagChipId(this.tagId); }
-class LocationChipId extends ChipId { const LocationChipId(); }
-class DateChipId extends ChipId { const DateChipId(); }
-class RatingChipId extends ChipId { const RatingChipId(); }
-class MediaTypeChipId extends ChipId { const MediaTypeChipId(); }
-class FavouriteChipId extends ChipId { const FavouriteChipId(); }
-class ArchiveChipId extends ChipId { const ArchiveChipId(); }
-class NotInAlbumChipId extends ChipId { const NotInAlbumChipId(); }
-class TextChipId extends ChipId { const TextChipId(); }
+
+class PersonChipId extends ChipId {
+  final String personId;
+  const PersonChipId(this.personId);
+  @override
+  bool operator ==(Object other) => other is PersonChipId && other.personId == personId;
+  @override
+  int get hashCode => Object.hash('PersonChipId', personId);
+}
+
+class TagChipId extends ChipId {
+  final String tagId;
+  const TagChipId(this.tagId);
+  @override
+  bool operator ==(Object other) => other is TagChipId && other.tagId == tagId;
+  @override
+  int get hashCode => Object.hash('TagChipId', tagId);
+}
+
+// Value-less chip ids: singletons via identity; define == as runtimeType match.
+class LocationChipId extends ChipId {
+  const LocationChipId();
+  @override
+  bool operator ==(Object other) => other is LocationChipId;
+  @override
+  int get hashCode => (LocationChipId).hashCode;
+}
+class DateChipId extends ChipId {
+  const DateChipId();
+  @override
+  bool operator ==(Object other) => other is DateChipId;
+  @override
+  int get hashCode => (DateChipId).hashCode;
+}
+class RatingChipId extends ChipId {
+  const RatingChipId();
+  @override
+  bool operator ==(Object other) => other is RatingChipId;
+  @override
+  int get hashCode => (RatingChipId).hashCode;
+}
+class MediaTypeChipId extends ChipId {
+  const MediaTypeChipId();
+  @override
+  bool operator ==(Object other) => other is MediaTypeChipId;
+  @override
+  int get hashCode => (MediaTypeChipId).hashCode;
+}
+class FavouriteChipId extends ChipId {
+  const FavouriteChipId();
+  @override
+  bool operator ==(Object other) => other is FavouriteChipId;
+  @override
+  int get hashCode => (FavouriteChipId).hashCode;
+}
+class ArchiveChipId extends ChipId {
+  const ArchiveChipId();
+  @override
+  bool operator ==(Object other) => other is ArchiveChipId;
+  @override
+  int get hashCode => (ArchiveChipId).hashCode;
+}
+class NotInAlbumChipId extends ChipId {
+  const NotInAlbumChipId();
+  @override
+  bool operator ==(Object other) => other is NotInAlbumChipId;
+  @override
+  int get hashCode => (NotInAlbumChipId).hashCode;
+}
+class TextChipId extends ChipId {
+  const TextChipId();
+  @override
+  bool operator ==(Object other) => other is TextChipId;
+  @override
+  int get hashCode => (TextChipId).hashCode;
+}
 ```
 
-**Step 2:** Failing test — one `expect` per chip type: adding a filter, calling `removeChip(corresponding id)`, asserting that dimension is empty, others untouched.
+**Step 2a:** Write equality tests BEFORE any `removeChip` tests — this is the bug-prevention layer.
+
+```dart
+// mobile/test/providers/photos_filter/chip_id_test.dart
+import 'package:flutter_test/flutter_test.dart';
+import 'package:immich_mobile/providers/photos_filter/chip_id.dart';
+
+void main() {
+  group('ChipId equality', () {
+    test('PersonChipId value equality', () {
+      expect(const PersonChipId('alice'), const PersonChipId('alice'));
+      expect(const PersonChipId('alice').hashCode, const PersonChipId('alice').hashCode);
+      expect(const PersonChipId('alice'), isNot(const PersonChipId('bob')));
+    });
+    test('TagChipId value equality', () {
+      expect(const TagChipId('t1'), const TagChipId('t1'));
+      expect(const TagChipId('t1'), isNot(const TagChipId('t2')));
+    });
+    test('Value-less chip ids are equal across instances', () {
+      expect(const LocationChipId(), const LocationChipId());
+      expect(const DateChipId(), const DateChipId());
+      expect(const RatingChipId(), const RatingChipId());
+      expect(const MediaTypeChipId(), const MediaTypeChipId());
+      expect(const FavouriteChipId(), const FavouriteChipId());
+      expect(const ArchiveChipId(), const ArchiveChipId());
+      expect(const NotInAlbumChipId(), const NotInAlbumChipId());
+      expect(const TextChipId(), const TextChipId());
+    });
+    test('Different value-less chip ids are NOT equal', () {
+      expect(const LocationChipId(), isNot(const DateChipId()));
+    });
+  });
+}
+```
+
+**Step 2b:** Failing test for `removeChip` — one `expect` per chip type: adding a filter, calling `removeChip(corresponding id)`, asserting that dimension is empty, others untouched.
 
 **Step 3:** Implement `removeChip`:
 
@@ -742,36 +917,52 @@ git commit -am "feat(mobile): photos_filter barrel export"
 
 **Step 1:** Failing test — given a mocked `SearchApi` that returns a fixed `FilterSuggestionsResponseDto`, assert the provider returns it when read with a specific `SearchFilter`.
 
-**Step 2:** Implement:
+**Step 2:** Implement. Note `_mapMediaType` converts the local `AssetType` enum (from `immich_mobile/entities/asset.entity.dart`) to the OpenAPI `AssetTypeEnum` — the existing `SearchApiRepository.search()` does this inline using index comparisons; the helper below is the extracted form.
 
 ```dart
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/entities/asset.entity.dart';
 import 'package:immich_mobile/models/search/search_filter.model.dart';
+import 'package:immich_mobile/providers/api.provider.dart';
 import 'package:openapi/api.dart';
-import 'package:immich_mobile/providers/api.provider.dart';  // whatever surfaces ApiService
 
 final photosFilterSuggestionsProvider =
     FutureProvider.autoDispose.family<FilterSuggestionsResponseDto, SearchFilter>(
   (ref, filter) async {
     final api = ref.watch(apiServiceProvider).searchApi;
-    return await api.getFilterSuggestions(
+    final response = await api.getFilterSuggestions(
       city: filter.location.city,
       country: filter.location.country,
-      isFavorite: filter.display.isFavorite,
+      isFavorite: filter.display.isFavorite ? true : null,
       make: filter.camera.make,
       mediaType: _mapMediaType(filter.mediaType),
       model: filter.camera.model,
-      personIds: filter.people.map((p) => p.id).toList(),
+      personIds: filter.people.isEmpty
+          ? null
+          : filter.people.map((p) => p.id).toList(),
       rating: filter.rating.rating,
       tagIds: filter.tagIds,
       takenAfter: filter.date.takenAfter,
       takenBefore: filter.date.takenBefore,
-    ) ?? FilterSuggestionsResponseDto(hasUnnamedPeople: false);
+    );
+    return response ?? FilterSuggestionsResponseDto(hasUnnamedPeople: false);
   },
 );
 
-// _mapMediaType: convert local AssetType → openapi AssetTypeEnum. Pattern exists in the repo; copy it.
+AssetTypeEnum? _mapMediaType(AssetType type) {
+  // Mirrors SearchApiRepository.search() inline conversion. AssetType.other → null
+  // means "no server-side media-type constraint" (match all).
+  if (type.index == AssetType.image.index) return AssetTypeEnum.IMAGE;
+  if (type.index == AssetType.video.index) return AssetTypeEnum.VIDEO;
+  if (type.index == AssetType.audio.index) return AssetTypeEnum.AUDIO;
+  return null;
+}
 ```
+
+Notes baked into the snippet:
+- `isFavorite: filter.display.isFavorite ? true : null` — sending `false` to the server means "non-favourites only"; we want "no constraint" when the toggle is off. Verify this matches `SearchApiRepository.search()`'s pattern; adjust if needed.
+- `personIds: filter.people.isEmpty ? null : [...]` — empty list and null may be treated differently by the server; null is the safer default for "no constraint."
+- `AssetType.other` in the local enum maps to `null` (match all types) — the server interprets omitted `mediaType` as unconstrained.
 
 **Step 3:** Add a debounce — use a simple `Timer(Duration(milliseconds: 250), ...)` wrapper OR lean on `family.autoDispose` + upstream `photosFilterProvider.select` caller throttling. **Keep Phase 1 simple: no built-in debounce in the provider itself. Debouncing moves to the consumer (Timeline / sheet) in PR 1.2.** Document this in a file-level comment.
 
@@ -781,75 +972,52 @@ final photosFilterSuggestionsProvider =
 
 **Files:**
 - Create: `mobile/lib/providers/photos_filter/filter_count.provider.dart`
-- Test: same pattern.
+- Test: `mobile/test/providers/photos_filter/filter_count_provider_test.dart`
 
-**Step 1:** Failing test — mocked `SearchService.search()` returning a `SearchResult` with `assets.length == 42`; provider returns 42 (placeholder strategy).
+> **⚠ `searchServiceProvider` collision.** The codebase has **two providers named `searchServiceProvider`** — the legacy 3-dep version at `mobile/lib/services/search.service.dart:14` and the newer domain-layer 1-dep version at `mobile/lib/providers/infrastructure/search.provider.dart:8`. They expose different `SearchService` classes with different `search()` return shapes. **This plan uses the domain-layer version** (cleaner DI, forward-facing), imported explicitly as shown below. Do not add an ambiguous import.
 
-**Step 2:** Implement — call `searchServiceProvider.search(filter, 1)` and return `result?.assets.length ?? 0` as a **placeholder** total. Add a `// TODO(phase-1.2): replace with a true total-count endpoint if one exists post-audit.` comment.
+**Step 1:** Failing test — mocked domain `SearchService.search()` returning a `SearchResult` with `assets.length == 42`; provider returns 42 (placeholder strategy).
+
+**Step 2:** Implement — call `searchServiceProvider.search(filter, 1)` (domain variant) and return `result?.assets.length ?? 0` as a **placeholder** total. Add a `// TODO(phase-1.2): replace with a true total-count endpoint if one exists post-audit.` comment.
 
 ```dart
+import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/providers/infrastructure/search.provider.dart';  // ← domain variant, NOT services/search.service.dart
+import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
+
 final photosFilterCountProvider = FutureProvider.autoDispose<int>((ref) async {
   final filter = ref.watch(photosFilterProvider);
-  if (filter.isEmpty) return 0;  // placeholder — timeline service will supply total in PR 1.2
+  if (filter.isEmpty) return 0; // placeholder — timeline service will supply total in PR 1.2
   final service = ref.watch(searchServiceProvider);
   final result = await service.search(filter, 1);
-  return result?.assets.length ?? 0;  // placeholder: page-1 count, not total
+  // TODO(phase-1.2): replace with a true total-count endpoint if one exists post-audit.
+  return result?.assets.length ?? 0;
 });
 ```
 
 **Step 3:** PASS. Commit with a message flagging the placeholder.
 
 ```bash
-git commit -am "feat(mobile): photosFilterCountProvider (placeholder count pending total-count audit)"
+git add mobile/lib/providers/photos_filter/filter_count.provider.dart mobile/test/providers/photos_filter/filter_count_provider_test.dart
+git commit -m "feat(mobile): photosFilterCountProvider (placeholder count pending total-count audit)"
 ```
 
-### Task 1.1.18: `photosTimelineQueryProvider` — empty-vs-non-empty switcher
+### Task 1.1.18: ~~`photosTimelineQueryProvider`~~ — **deferred to PR 1.2**
 
-**Files:**
-- Create: `mobile/lib/providers/photos_filter/timeline_query.provider.dart`
-- Test: same pattern.
+This provider was originally planned for PR 1.1 but is deferred to PR 1.2 for two reasons:
 
-**Step 1:** Failing tests.
+1. **No consumer exists until PR 1.2.** PR 1.1 ships state providers only; there is no Timeline wiring yet that would benefit from a unified query provider. Building it now ships dead code.
+2. **The `SearchResult` → `RenderList` adapter is non-trivial** — the two services return different asset shapes (legacy `List<Asset>` vs domain `List<RemoteAsset>` vs `RenderList`). The adapter is the kind of logic that belongs next to its consumer, not orphaned in an infra PR.
 
-```dart
-test('isEmpty filter returns a library-service-backed stream', () { ... });
-test('non-empty filter returns a search-service-backed stream', () { ... });
-test('empty → non-empty transition: cancels prior subscription', () { ... });
-```
+**What PR 1.1 does instead:** stops at `photosFilterCountProvider`. PR 1.2 takes on:
 
-**Step 2:** Implement — watch `photosFilterProvider`, branch on `isEmpty`, return the appropriate stream. Use `ref.listenSelf((_, __) => ref.invalidateSelf())` on the filter to invalidate on change; debounce 500 ms via a `Timer` in a notifier wrapper.
+- `photosTimelineQueryProvider` (empty/non-empty switcher per design §6.4.1).
+- The `SearchResult → RenderList` adapter.
+- `currentUserProvider` null-guard — note the provider returns `UserDto?` (nullable), field is `.id` not `.userId`. PR 1.2 must handle not-logged-in: `ref.watch(currentUserProvider)?.id ?? '<fallback>'`.
+- Wiring the Timeline widget to listen to the new provider.
+- 500 ms debounce on the empty↔non-empty transition.
 
-Example shape:
-
-```dart
-final photosTimelineQueryProvider =
-    AsyncNotifierProvider.autoDispose<_PhotosTimelineQueryNotifier, RenderList>(
-  _PhotosTimelineQueryNotifier.new,
-);
-
-class _PhotosTimelineQueryNotifier extends AutoDisposeAsyncNotifier<RenderList> {
-  Timer? _debounce;
-
-  @override
-  FutureOr<RenderList> build() async {
-    final filter = ref.watch(photosFilterProvider);
-    if (filter.isEmpty) {
-      // library path
-      final userId = ref.watch(currentUserProvider).userId;
-      return ref.watch(timelineServiceProvider).watchHomeTimeline(userId).first;
-    } else {
-      // search path
-      final service = ref.watch(searchServiceProvider);
-      final result = await service.search(filter, 1);
-      return _toRenderList(result);  // adapter TBD in PR 1.2
-    }
-  }
-}
-```
-
-**Step 3:** The `_toRenderList` adapter is not trivial — flag it as TODO. Tests stub both services and assert which was called.
-
-**Step 4:** PASS. Commit.
+This task is kept in the plan as a placeholder so PR 1.2 planning can reference it directly.
 
 ### Task 1.1.19: Final barrel export + tidy
 
@@ -862,10 +1030,36 @@ export 'filter_sheet.provider.dart';
 export 'filter_count.provider.dart';
 export 'filter_suggestions.provider.dart';
 export 'photos_filter.provider.dart';
-export 'timeline_query.provider.dart';
+// timeline_query.provider.dart is exported from this barrel in PR 1.2 (deferred per Task 1.1.18).
+```
+
+Add a one-line test in `mobile/test/providers/photos_filter/barrel_test.dart` that imports only from the barrel path and references each symbol — this catches missing exports at compile time.
+
+```dart
+// mobile/test/providers/photos_filter/barrel_test.dart
+import 'package:flutter_test/flutter_test.dart';
+import 'package:immich_mobile/providers/photos_filter/photos_filter.dart';
+
+void main() {
+  test('barrel exports are resolvable', () {
+    // Compile-time smoke test — if any symbol isn't exported, this file won't build.
+    expect(PhotosFilterNotifier, isNotNull);
+    expect(FilterSheetSnap.values, isNotEmpty);
+    expect(const PersonChipId('x'), isA<ChipId>());
+    expect(photosFilterProvider, isNotNull);
+    expect(photosFilterSheetProvider, isNotNull);
+    expect(photosFilterSuggestionsProvider, isNotNull);
+    expect(photosFilterCountProvider, isNotNull);
+  });
+}
 ```
 
 **Commit.**
+
+```bash
+git add mobile/lib/providers/photos_filter/photos_filter.dart mobile/test/providers/photos_filter/barrel_test.dart
+git commit -m "feat(mobile): photos_filter barrel final exports + smoke test"
+```
 
 ### Task 1.1.20: Full-suite test run + formatter + analyzer
 
@@ -914,19 +1108,20 @@ Part of the mobile filter sheet feature (design: [`docs/plans/2026-04-17-mobile-
 
 ## What
 
-- Five new Riverpod providers under `mobile/lib/providers/photos_filter/`:
-  - `photosFilterProvider` (NotifierProvider over `SearchFilter` with full method surface per §6.3)
-  - `photosFilterSheetProvider` (FilterSheetSnap enum)
-  - `photosFilterSuggestionsProvider` (wraps existing `SearchApi.getFilterSuggestions()`)
-  - `photosFilterCountProvider` (placeholder page-1 count — see audit TODO)
-  - `photosTimelineQueryProvider` (empty/non-empty filter switcher, §6.4.1)
-- `ChipId` sealed type in `chip_id.dart`.
-- Unit tests under `mobile/test/providers/photos_filter/` — every notifier method, clearing semantics, no-op safety, debounce-less suggestions, timeline-path switch.
+- `SearchFilter.empty()` factory added to the existing filter model (enables the rest of this PR and reused by future PR 1.3 Reset button).
+- Four new Riverpod providers under `mobile/lib/providers/photos_filter/`:
+  - `photosFilterProvider` — `NotifierProvider<PhotosFilterNotifier, SearchFilter>` with the full method surface per design §6.3.
+  - `photosFilterSheetProvider` — `FilterSheetSnap` enum state.
+  - `photosFilterSuggestionsProvider` — wraps the existing `SearchApi.getFilterSuggestions()` with filter-state input and `FilterSuggestionsResponseDto` output.
+  - `photosFilterCountProvider` — placeholder returning page-1 length of a search call; to be replaced with a true total-count mechanism in PR 1.2.
+- `ChipId` sealed type in `chip_id.dart` with explicit `==` / `hashCode` overrides per subclass (so `removeChip` matches value-equal ids).
+- Unit tests under `mobile/test/providers/photos_filter/` — every notifier method, clearing semantics, no-op safety, suggestions marshalling, ChipId equality, barrel-smoke.
 
 ## What this PR does NOT ship
 
 - No UI wiring (PR 1.2).
-- No orphan-id reconciliation (deferred to Phase 1.5 per audit; `§7` updated).
+- No `photosTimelineQueryProvider` — deferred to PR 1.2 where the adapter lands next to its consumer (see Task 1.1.18 note).
+- No orphan-id reconciliation — deferred to Phase 1.5 (see §7 update committed in Task 1.1.1).
 - No total-count endpoint — `photosFilterCountProvider` uses page-1 length as a placeholder.
 
 ## Tests
