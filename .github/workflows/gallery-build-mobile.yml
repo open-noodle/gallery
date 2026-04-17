@@ -2,9 +2,10 @@ name: Gallery Build Mobile
 
 # For production releases, trigger via gallery-release-mobile.yml.
 # Manual workflow_dispatch with a non-empty version input here will
-# upload to Play / TestFlight WITHOUT creating a release draft, which
-# breaks the phase-1 → phase-2 handoff. Use only for ad-hoc smoke builds
-# (leave version empty).
+# upload to TestFlight (and Play Store once that fastlane block is
+# re-enabled) WITHOUT creating a release draft, which breaks the
+# phase-1 → phase-2 handoff. Use only for ad-hoc smoke builds (leave
+# version empty).
 
 on:
   workflow_dispatch:

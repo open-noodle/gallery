@@ -41,7 +41,7 @@ Steps:
 
 ### Manual step between phases (no workflow)
 
-Maintainer promotes the Play **internal** build to **production** in Play Console, submits App Store for review. Once both are live, trigger phase 2.
+Maintainer uploads the AAB artifact from phase 1 to Play Store **internal** track (manual while fastlane is disabled; fully automated once re-enabled), promotes to **production** in Play Console, submits App Store for review. Once both stores are live to end users, trigger phase 2.
 
 ### `gallery-release.yml` (phase 2 — modified)
 

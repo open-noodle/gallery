@@ -654,9 +654,11 @@ git commit -m "refactor(release): phase 2 — discover draft, build at pinned SH
 
 ---
 
-### Task 4: Re-enable Play Store fastlane upload + add header warning
+### Task 4: Add header warning to gallery-build-mobile.yml
 
-**Why:** Play Store upload is currently commented out in `gallery-build-mobile.yml`. Phase 1 needs it active for production releases. The `inputs.version != ''` gate stays so PR / push-to-main smoke builds remain upload-free. Also add a comment warning maintainers not to manually trigger this workflow with a version input outside phase 1.
+**Note:** An earlier version of this plan also re-enabled the Play Store fastlane block in the same task. That was reverted — Play Store automation stays disabled until Google finishes reviewing the app. Re-enabling fastlane is a follow-up commit (uncomment the block and update the docs' "upload is disabled" wording). This task now only adds the header warning comment.
+
+**Why:** The reusable `gallery-build-mobile.yml` can be manually dispatched with a `version` input, bypassing the phase-1 handoff. Document the footgun in a header comment so maintainers don't accidentally skip the draft-release step.
 
 **Files:**
 
@@ -669,37 +671,23 @@ After line 1 (`name: Gallery Build Mobile`), add:
 ```yaml
 # For production releases, trigger via gallery-release-mobile.yml.
 # Manual workflow_dispatch with a non-empty version input here will
-# upload to Play / TestFlight WITHOUT creating a release draft, which
-# breaks the phase-1 → phase-2 handoff. Use only for ad-hoc smoke builds
-# (leave version empty).
+# upload to TestFlight (and Play Store once that fastlane block is
+# re-enabled) WITHOUT creating a release draft, which breaks the
+# phase-1 → phase-2 handoff. Use only for ad-hoc smoke builds (leave
+# version empty).
 ```
 
-**Step 2: Uncomment the Play Store fastlane block**
-
-Locate the commented block starting around line 204 (`# Play Store upload temporarily disabled...`) and ending around line 231. Remove the leading `# ` from each line of the actual fastlane steps (Setup Ruby, Write Play Store service account key, Upload to Play Store internal track, Remove Play Store service account key). Keep the `if: inputs.version != ''` gate on each step. Delete the explanatory `# Play Store upload temporarily disabled...` paragraph entirely.
-
-The result should be four uncommented steps:
-
-- `Setup Ruby` (with `if: inputs.version != ''`)
-- `Write Play Store service account key` (with `if: inputs.version != ''`)
-- `Upload to Play Store internal track` (with `if: inputs.version != ''`)
-- `Remove Play Store service account key` (with `if: always()`)
-
-**Step 3: Verify YAML is valid**
+**Step 2: Verify YAML is valid**
 
 ```bash
 python3 -c "import yaml; yaml.safe_load(open('.github/workflows/gallery-build-mobile.yml'))"
 ```
 
-**Step 4: Verify smoke-build path is unchanged**
-
-Read the four uncommented steps and confirm each carries `if: inputs.version != ''` (or `if: always()` for the cleanup). If any step is missing the gate, smoke builds will try to upload and fail.
-
-**Step 5: Commit**
+**Step 3: Commit**
 
 ```bash
 git add .github/workflows/gallery-build-mobile.yml
-git commit -m "feat(mobile): re-enable Play Store internal track upload + header warning"
+git commit -m "docs(mobile): header warning against manual dispatch with version input"
 ```
 
 ---

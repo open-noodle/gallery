@@ -335,8 +335,10 @@ jobs:
         run: |
           major=$(echo "$VERSION" | sed 's/^v//' | cut -d. -f1)
 
-          # Create version tag (e.g. v3.0.1) at the pinned SHA
-          git tag "$VERSION" "$SHA"
+          # Create / update version tag (e.g. v3.0.1) at the pinned SHA.
+          # -f makes phase-2 re-runs idempotent when a prior attempt pushed
+          # the tag before failing downstream.
+          git tag -f "$VERSION" "$SHA"
 
           # Update major version tag (e.g. v3) — floats to latest release
           git tag -f "v${major}" "$SHA"
