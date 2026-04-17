@@ -4,6 +4,8 @@
   import PersonPreview from './previews/person-preview.svelte';
   import PlacePreview from './previews/place-preview.svelte';
   import TagPreview from './previews/tag-preview.svelte';
+  import AlbumPreview from './previews/album-preview.svelte';
+  import SpacePreview from './previews/space-preview.svelte';
   import Logo from '$lib/components/shared-components/Logo.svelte';
   import { fade } from 'svelte/transition';
   import { t } from 'svelte-i18n';
@@ -39,6 +41,10 @@
       <PlacePreview place={activeItem.data as never} />
     {:else if activeItem.kind === 'tag'}
       <TagPreview tag={activeItem.data as never} />
+    {:else if activeItem.kind === 'album'}
+      <AlbumPreview item={activeItem.data as never} />
+    {:else if activeItem.kind === 'space'}
+      <SpacePreview item={activeItem.data as never} />
     {/if}
   </div>
 {/key}
