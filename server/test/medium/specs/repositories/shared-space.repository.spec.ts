@@ -1037,4 +1037,111 @@ describe(SharedSpaceRepository.name, () => {
       expect(result[0].personalThumbnailPath).toBe('/path/to/thumbnail.jpg');
     });
   });
+
+  describe('getFilteredMapMarkers — space filter interaction', () => {
+    it('should include tagged space assets when tagIds filter is applied with timelineSpaceIds', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id });
+      const { asset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
+      await ctx.database.insertInto('asset_exif').values({ assetId: asset.id, latitude: 10, longitude: 10 }).execute();
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+
+      // Create a tag owned by the owner and attach it to the asset
+      const tag = await ctx.database
+        .insertInto('tag')
+        .values({ value: 'landscape', userId: owner.id, parentId: null })
+        .returningAll()
+        .executeTakeFirstOrThrow();
+      await ctx.database.insertInto('tag_closure').values({ id_ancestor: tag.id, id_descendant: tag.id }).execute();
+      await ctx.database.insertInto('tag_asset').values({ tagId: tag.id, assetId: asset.id }).execute();
+
+      const results = await sut.getFilteredMapMarkers({
+        userIds: [member.id],
+        timelineSpaceIds: [space.id],
+        tagIds: [tag.id],
+        tagMatchAny: true,
+        visibility: AssetVisibility.Timeline,
+      });
+
+      expect(results.find((r) => r.id === asset.id)).toBeDefined();
+    });
+
+    it('should filter space assets by owner-set rating', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id });
+      const { asset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
+      await ctx.database
+        .insertInto('asset_exif')
+        .values({ assetId: asset.id, latitude: 11, longitude: 11, rating: 5 })
+        .execute();
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+
+      const matching = await sut.getFilteredMapMarkers({
+        userIds: [member.id],
+        timelineSpaceIds: [space.id],
+        rating: 5,
+        visibility: AssetVisibility.Timeline,
+      });
+      expect(matching.find((r) => r.id === asset.id)).toBeDefined();
+
+      const nonMatching = await sut.getFilteredMapMarkers({
+        userIds: [member.id],
+        timelineSpaceIds: [space.id],
+        rating: 1,
+        visibility: AssetVisibility.Timeline,
+      });
+      expect(nonMatching.find((r) => r.id === asset.id)).toBeUndefined();
+    });
+  });
+
+  describe('getFilteredMapMarkers — space membership inclusion', () => {
+    it('should include a direct shared_space_asset via timelineSpaceIds (row 2)', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id });
+      const { asset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
+      await ctx.database.insertInto('asset_exif').values({ assetId: asset.id, latitude: 20, longitude: 20 }).execute();
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+
+      const results = await sut.getFilteredMapMarkers({
+        userIds: [member.id],
+        timelineSpaceIds: [space.id],
+        visibility: AssetVisibility.Timeline,
+      });
+
+      expect(results.find((r) => r.id === asset.id)).toBeDefined();
+    });
+
+    it('should include a library-linked asset via timelineSpaceIds (row 4)', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id });
+      const { library } = await ctx.newLibrary({ ownerId: owner.id });
+      await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id });
+      const { asset } = await ctx.newAsset({
+        ownerId: owner.id,
+        libraryId: library.id,
+        visibility: AssetVisibility.Timeline,
+      });
+      await ctx.database.insertInto('asset_exif').values({ assetId: asset.id, latitude: 21, longitude: 21 }).execute();
+
+      const results = await sut.getFilteredMapMarkers({
+        userIds: [member.id],
+        timelineSpaceIds: [space.id],
+        visibility: AssetVisibility.Timeline,
+      });
+
+      expect(results.find((r) => r.id === asset.id)).toBeDefined();
+    });
+  });
 });

@@ -59,7 +59,10 @@ class GalleryMapApi {
   ///
   /// * [String] type:
   ///   Filter by media type
-  Future<Response> getFilteredMapMarkersWithHttpInfo({ String? city, String? country, bool? isFavorite, String? make, String? model, List<String>? personIds, num? rating, String? spaceId, List<String>? tagIds, DateTime? takenAfter, DateTime? takenBefore, String? type, }) async {
+  ///
+  /// * [bool] withSharedSpaces:
+  ///   Include shared space assets
+  Future<Response> getFilteredMapMarkersWithHttpInfo({ String? city, String? country, bool? isFavorite, String? make, String? model, List<String>? personIds, num? rating, String? spaceId, List<String>? tagIds, DateTime? takenAfter, DateTime? takenBefore, String? type, bool? withSharedSpaces, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/gallery/map/markers';
 
@@ -105,6 +108,9 @@ class GalleryMapApi {
     }
     if (type != null) {
       queryParams.addAll(_queryParams('', 'type', type));
+    }
+    if (withSharedSpaces != null) {
+      queryParams.addAll(_queryParams('', 'withSharedSpaces', withSharedSpaces));
     }
 
     const contentTypes = <String>[];
@@ -162,8 +168,11 @@ class GalleryMapApi {
   ///
   /// * [String] type:
   ///   Filter by media type
-  Future<List<MapMarkerResponseDto>?> getFilteredMapMarkers({ String? city, String? country, bool? isFavorite, String? make, String? model, List<String>? personIds, num? rating, String? spaceId, List<String>? tagIds, DateTime? takenAfter, DateTime? takenBefore, String? type, }) async {
-    final response = await getFilteredMapMarkersWithHttpInfo( city: city, country: country, isFavorite: isFavorite, make: make, model: model, personIds: personIds, rating: rating, spaceId: spaceId, tagIds: tagIds, takenAfter: takenAfter, takenBefore: takenBefore, type: type, );
+  ///
+  /// * [bool] withSharedSpaces:
+  ///   Include shared space assets
+  Future<List<MapMarkerResponseDto>?> getFilteredMapMarkers({ String? city, String? country, bool? isFavorite, String? make, String? model, List<String>? personIds, num? rating, String? spaceId, List<String>? tagIds, DateTime? takenAfter, DateTime? takenBefore, String? type, bool? withSharedSpaces, }) async {
+    final response = await getFilteredMapMarkersWithHttpInfo( city: city, country: country, isFavorite: isFavorite, make: make, model: model, personIds: personIds, rating: rating, spaceId: spaceId, tagIds: tagIds, takenAfter: takenAfter, takenBefore: takenBefore, type: type, withSharedSpaces: withSharedSpaces, );
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
