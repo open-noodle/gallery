@@ -1,12 +1,16 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:immich_mobile/repositories/shared_space_api.repository.dart';
+import 'package:immich_mobile/services/api.service.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:openapi/api.dart' as api;
 
 class MockSharedSpacesApi extends Mock implements api.SharedSpacesApi {}
 
+class MockApiService extends Mock implements ApiService {}
+
 void main() {
   late MockSharedSpacesApi mockApi;
+  late MockApiService mockApiService;
   late SharedSpaceApiRepository repository;
 
   setUpAll(() {
@@ -20,7 +24,33 @@ void main() {
 
   setUp(() {
     mockApi = MockSharedSpacesApi();
-    repository = SharedSpaceApiRepository(mockApi);
+    mockApiService = MockApiService();
+    when(() => mockApiService.sharedSpacesApi).thenReturn(mockApi);
+    repository = SharedSpaceApiRepository(mockApiService);
+  });
+
+  group('lazy SharedSpacesApi resolution', () {
+    // Regression guard: ApiService.setEndpoint() reassigns the *Api fields to new
+    // instances tied to a new ApiClient (fresh basePath). The repository must
+    // resolve apiService.sharedSpacesApi on each call, not capture it at
+    // construction. Otherwise a cold-start read of sharedSpaceApiRepositoryProvider
+    // (before login) pins the repo to an empty-basePath ApiClient forever.
+    test('routes calls to current ApiService.sharedSpacesApi after endpoint change', () async {
+      final oldApi = MockSharedSpacesApi();
+      final newApi = MockSharedSpacesApi();
+
+      when(() => mockApiService.sharedSpacesApi).thenReturn(oldApi);
+      final repo = SharedSpaceApiRepository(mockApiService);
+
+      // Simulate ApiService.setEndpoint reassigning the field.
+      when(() => mockApiService.sharedSpacesApi).thenReturn(newApi);
+      when(() => newApi.getAllSpaces()).thenAnswer((_) async => []);
+
+      await repo.getAll();
+
+      verify(() => newApi.getAllSpaces()).called(1);
+      verifyNever(() => oldApi.getAllSpaces());
+    });
   });
 
   group('getAll', () {
@@ -303,5 +333,4 @@ void main() {
       ).called(1);
     });
   });
-
 }
