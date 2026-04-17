@@ -2,7 +2,6 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/providers/photos_filter/filter_count.provider.dart';
-import 'package:intl/intl.dart';
 
 /// Live-region label for the current match count.
 ///

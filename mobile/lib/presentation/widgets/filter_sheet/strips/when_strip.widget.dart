@@ -1,8 +1,18 @@
+import 'dart:async';
+
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
+
+Future<void> _openPicker(BuildContext context, WidgetRef ref) async {
+  final now = DateTime.now();
+  final range = await showDateRangePicker(context: context, firstDate: DateTime(1970), lastDate: now);
+  if (range == null) return;
+  unawaited(HapticFeedback.selectionClick());
+  ref.read(photosFilterProvider.notifier).setDateRange(start: range.start, end: range.end);
+}
 
 class WhenStrip extends ConsumerWidget {
   const WhenStrip({super.key});
@@ -138,16 +148,8 @@ class _CustomPill extends ConsumerWidget {
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
-        onTap: () async {
-          final now = DateTime.now();
-          final range = await showDateRangePicker(
-            context: context,
-            firstDate: DateTime(1970),
-            lastDate: now,
-          );
-          if (range == null) return;
-          HapticFeedback.selectionClick();
-          ref.read(photosFilterProvider.notifier).setDateRange(start: range.start, end: range.end);
+        onTap: () {
+          unawaited(_openPicker(context, ref));
         },
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),

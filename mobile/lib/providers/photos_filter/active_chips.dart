@@ -170,8 +170,8 @@ List<ActiveChipSpec> activeChipsFromFilter(SearchFilter filter, {FilterSuggestio
   // ── toggles ──────────────────────────────────────────────────────────
   if (filter.display.isFavorite) {
     out.add(
-      ActiveChipSpec(
-        id: const FavouriteChipId(),
+      const ActiveChipSpec(
+        id: FavouriteChipId(),
         label: 'filter_sheet_favourites',
         visual: ChipVisual.toggle,
         icon: Icons.favorite_rounded,
@@ -180,8 +180,8 @@ List<ActiveChipSpec> activeChipsFromFilter(SearchFilter filter, {FilterSuggestio
   }
   if (filter.display.isArchive) {
     out.add(
-      ActiveChipSpec(
-        id: const ArchiveChipId(),
+      const ActiveChipSpec(
+        id: ArchiveChipId(),
         label: 'filter_sheet_archived',
         visual: ChipVisual.toggle,
         icon: Icons.archive_rounded,
@@ -190,8 +190,8 @@ List<ActiveChipSpec> activeChipsFromFilter(SearchFilter filter, {FilterSuggestio
   }
   if (filter.display.isNotInAlbum) {
     out.add(
-      ActiveChipSpec(
-        id: const NotInAlbumChipId(),
+      const ActiveChipSpec(
+        id: NotInAlbumChipId(),
         label: 'filter_sheet_not_in_album',
         visual: ChipVisual.toggle,
         icon: Icons.folder_off_rounded,

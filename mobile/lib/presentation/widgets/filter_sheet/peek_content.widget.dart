@@ -39,9 +39,9 @@ class PeekContent extends ConsumerWidget {
               children: [
                 Expanded(
                   child: ShaderMask(
-                    shaderCallback: (r) => LinearGradient(
-                      colors: const [Colors.transparent, Colors.black, Colors.black, Colors.transparent],
-                      stops: const [0, 0.05, 0.95, 1],
+                    shaderCallback: (r) => const LinearGradient(
+                      colors: [Colors.transparent, Colors.black, Colors.black, Colors.transparent],
+                      stops: [0, 0.05, 0.95, 1],
                     ).createShader(r),
                     blendMode: BlendMode.dstIn,
                     child: SizedBox(
