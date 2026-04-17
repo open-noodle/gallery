@@ -812,6 +812,124 @@ Part of the mobile filter sheet feature. Design: [§10.3 PR 1.2](./docs/plans/20
 
 ---
 
+## Mockup alignment (Material 3 translation of the darkroom mockup)
+
+The mockup's "darkroom warmth" palette + Fraunces / JetBrains Mono / Plus Jakarta Sans are **aspirational** (design §3 / §9.7). Phase 1 uses Material 3 defaults. This section pins **spatial + typographic + atmospheric** decisions that carry over regardless of palette, so the visuals retain the mockup's character inside the app's design system.
+
+### Palette translation
+
+| Mockup token        | Phase 1 substitute                                                                                                               |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `--ember` accent    | `theme.colorScheme.primary`                                                                                                      |
+| `--ember-soft`      | `theme.colorScheme.primary` (onPrimaryContainer or lighter tone-70)                                                              |
+| `--ember-wash`      | `theme.colorScheme.primary.withOpacity(.14)`                                                                                     |
+| `--ember-glow`      | `BoxShadow(color: theme.colorScheme.primary.withOpacity(.32), blurRadius: 14, spreadRadius: 0)` on active-selected elements only |
+| `--paper`           | `theme.colorScheme.onSurface`                                                                                                    |
+| `--paper-dim`       | `theme.colorScheme.onSurfaceVariant`                                                                                             |
+| `--paper-fade`      | `theme.colorScheme.outline`                                                                                                      |
+| `--ink-raise`       | `theme.colorScheme.surfaceContainer`                                                                                             |
+| `--ink-raise-2`     | `theme.colorScheme.surfaceContainerHigh`                                                                                         |
+| `--ink-frost`       | `theme.colorScheme.surfaceContainerLow`                                                                                          |
+| `--ink-line`        | `theme.colorScheme.outlineVariant`                                                                                               |
+| `--ink-line-strong` | `theme.colorScheme.outline.withOpacity(.5)`                                                                                      |
+| sheet scrim         | `theme.colorScheme.scrim.withOpacity(.32)` (browse / deep)                                                                       |
+
+Film grain + ember radial gradients are **not** ported (§3 aspiration). No hardcoded hex values anywhere.
+
+### Typography translation
+
+Three type roles, one Material 3 target each:
+
+| Mockup role                                  | Phase 1                                                                                                                                                                                                        |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Fraunces** (display numerals / titles)     | `textTheme.displaySmall` (or `headlineLarge` depending on size) with no font override — use the app's default.                                                                                                 |
+| **JetBrains Mono** (labels, counts, kickers) | `textTheme.labelSmall.copyWith(fontFamily: 'monospace', letterSpacing: 2.0, fontFeatures: const [FontFeature.tabularFigures()])` — Flutter resolves `monospace` to the platform mono font (Menlo/Roboto Mono). |
+| **Plus Jakarta Sans** (body / chip labels)   | `textTheme.bodyMedium` / `labelLarge` — default font.                                                                                                                                                          |
+
+**Tabular figures** (`FontFeature.tabularFigures()`) applied to every visible number: peek match count, footer match count, tag-pill count badges, When pill calendar glyph, places-overlay count, chip × badge. This keeps numerals monospaced visually even without a bespoke mono font.
+
+**Uppercase mono labels** (`"PEOPLE"`, `"PHOTOS MATCHED"`) use `.toUpperCase()` + letterSpacing 2.0 on `labelSmall` with `colorScheme.outline`.
+
+### Atmosphere
+
+- **Sheet material.** `Material(type: MaterialType.canvas, elevation: 3, color: theme.colorScheme.surface.withOpacity(.92))` wrapped in a `BackdropFilter(filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18))` for the mockup's blurred sheet feel. Modern iOS + Android render this cheap. **Added to Task 4 FilterSheet spec.**
+- **Scrim.** `ColoredBox(color: theme.colorScheme.scrim.withOpacity(.32))`. Mockup's dark gradient scrim is a stylistic lift — M3 scrim does the same work.
+- **Top-only rounded corners.** `RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28)))` on the sheet — mockup 28pt. Matches M3 ModalBottomSheet default.
+- **Edge-faded horizontal rails.** `ShaderMask` with a horizontal `LinearGradient` that fades the first ~5% and last ~5% to transparent. Applied to peek chip rail, all four browse strips.
+- **Glow on active-selected people/places/year cells.** `BoxShadow(color: primary.withOpacity(.32), blurRadius: 14)` — scaled-down equivalent of the mockup's ember glow. **Only on the `on` visual state**; resting elements have no extra shadow. Keep this tasteful; disable under `AccessibleNavigation` / `MediaQuery.disableAnimations`.
+
+### Dimensional spec (carry from mockup)
+
+| Element                        | Dimension (pt)                                                                                      |
+| ------------------------------ | --------------------------------------------------------------------------------------------------- |
+| Sheet top radius               | 28                                                                                                  |
+| Sheet drag handle              | 44 × 4, 2pt radius, 10pt top padding                                                                |
+| Peek content height            | ~15% of screen (driven by `snapSizes`)                                                              |
+| Peek chip rail padding         | 14pt top, 18pt bottom, 20pt sides                                                                   |
+| Peek chip                      | padding 7 × 12, radius 999, 12.5pt label                                                            |
+| Peek chip × badge              | 16pt circle, 9.5pt mono glyph                                                                       |
+| Peek chip avatar               | 18pt circle, overlap offset −4, 1.5pt surface ring                                                  |
+| Browse sheet height            | 62% of screen                                                                                       |
+| Browse SearchBar               | 42pt tall, 14pt radius, 20pt horizontal margin                                                      |
+| Strip vertical padding         | 18pt top, 0 bottom (between strips)                                                                 |
+| Strip header label             | mono labelSmall + strip title                                                                       |
+| **PeopleStrip** cell           | 58pt wide × 80pt tall, 52pt thumb + 10.5pt caption                                                  |
+| **PeopleStrip** thumb selected | scale 1.04, 2pt primary ring + 4pt primary.14 halo                                                  |
+| **PlacesStrip** tile           | 104 × 72, 14pt radius                                                                               |
+| **PlacesStrip** overlay        | bottom-anchored linear gradient (alpha 0 → 0.75)                                                    |
+| **PlacesStrip** tile selected  | 2pt primary ring + primary glow shadow                                                              |
+| **TagsStrip** pill             | 7 × 13 padding, radius 999, 12.5pt label + mono count badge (if DTO provides count)                 |
+| **WhenStrip** pill             | 9 × 14 padding, **radius 14pt** (distinct from tag pill), 12.5pt label + mono calendar glyph prefix |
+| Footer (browse)                | serif displaySmall count + `labelSmall` uppercase "photos matched" + Done text button right-aligned |
+| Strip horizontal scroll        | ShaderMask gradient, 4% left + 4% right fade                                                        |
+
+### Chip visual leading glyphs (refines Task 3)
+
+| Visual   | Leading                                                                                    |
+| -------- | ------------------------------------------------------------------------------------------ |
+| person   | 1–3 overlapping 18pt `CircleAvatar`s with 1.5pt surface ring; offset −4 each               |
+| tag      | 8pt circle in a seeded accent colour derived from `id.hashCode` modulated toward `primary` |
+| location | `Icons.place_rounded` 16pt                                                                 |
+| when     | none; label uses tabular figures + slight letter-spacing                                   |
+| rating   | `Icons.star_rounded` 16pt                                                                  |
+| media    | `Icons.photo_rounded` / `Icons.play_circle_rounded` / `Icons.audiotrack_rounded`           |
+| toggle   | `Icons.favorite_rounded` / `Icons.archive_rounded` / `Icons.folder_off_rounded`            |
+| text     | `Icons.search_rounded` 16pt                                                                |
+
+### Active-state treatment (refines strip taps)
+
+All strip items, when selected:
+
+- Background: `primary.withOpacity(.14)` (the ember-wash equivalent).
+- Border: `primary.withOpacity(.42)` 1pt.
+- Label: `primary` (or the high-contrast tone for text on primary-container backgrounds — pick during Task 5 based on how `primary.withOpacity(.14)` renders on surface).
+- Optional accent glow shadow: only for People thumbs + Places tiles (NOT for pill chips — pills use the border + background shift and no shadow, to keep the row scrollable without shadow-clip artefacts).
+
+### What's intentionally NOT ported
+
+- Bespoke Fraunces/Plus Jakarta Sans/JetBrains Mono font declarations (design §3 defers).
+- Film grain overlay.
+- Ember radial background gradients on the scaffold.
+- "Darkroom warmth" ember palette — mapped to `primary`.
+- Scroll-triggered or entrance animations — mockup is static; Phase 1 matches M3 motion defaults for sheet snap (280ms easeOutCubic, which aligns with M3's `motion-easing-standard`).
+
+### Deep stub styling
+
+For Phase 1 the Deep state is a single centered `Text`. Style:
+
+- Container: same sheet material as Browse (BackdropFilter blur + surface.92 + 28pt top corners).
+- Drag handle at top, 44×4pt.
+- Text: `headlineSmall` italic if the theme's serif is set; otherwise plain `headlineSmall`.
+- No icon, no illustration — deliberately quiet so the PR 1.3 replacement reads as a promotion, not a regression.
+
+### Accessibility overlays on the visual spec
+
+- **High-contrast mode:** if `MediaQuery.of(context).highContrast` is true, drop the `primary.withOpacity(.14)` active backgrounds in favour of `primary` borders at 2pt and `primary` text.
+- **Disable animations:** if `MediaQuery.disableAnimations` is true, set sheet `animateTo` duration to 0 and drop the `BoxShadow` glow on selected cells.
+- **Reduce-motion respects M3 defaults** — no custom motion to patch.
+
+---
+
 ## Risk register
 
 - **Sync Provider<TimelineService> adapter + fire-and-forget search** — if `SearchService.search` takes > 2 s, the timeline shows a blank grid for the duration. Acceptable; existing Search tab has the same behaviour. Mitigation: surface loading via existing Timeline loading indicator.
