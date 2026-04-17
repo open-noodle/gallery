@@ -2,6 +2,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/entities/asset.entity.dart';
 import 'package:immich_mobile/models/search/search_filter.model.dart';
+import 'package:immich_mobile/providers/photos_filter/chip_id.dart';
 
 final photosFilterProvider =
     NotifierProvider<PhotosFilterNotifier, SearchFilter>(PhotosFilterNotifier.new);
@@ -84,6 +85,33 @@ class PhotosFilterNotifier extends Notifier<SearchFilter> {
           ),
         );
       case Dimension.text:
+        setText('');
+    }
+  }
+
+  void removeChip(ChipId id) {
+    switch (id) {
+      case PersonChipId(:final personId):
+        state = state.copyWith(
+          people: state.people.where((p) => p.id != personId).toSet(),
+        );
+      case TagChipId(:final tagId):
+        toggleTag(tagId); // idempotent remove
+      case LocationChipId():
+        setLocation(null);
+      case DateChipId():
+        setDateRange(start: null, end: null);
+      case RatingChipId():
+        setRating(null);
+      case MediaTypeChipId():
+        setMediaType(null);
+      case FavouriteChipId():
+        setFavouritesOnly(false);
+      case ArchiveChipId():
+        setArchivedIncluded(false);
+      case NotInAlbumChipId():
+        setNotInAlbum(false);
+      case TextChipId():
         setText('');
     }
   }

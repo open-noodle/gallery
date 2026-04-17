@@ -3,6 +3,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/entities/asset.entity.dart';
 import 'package:immich_mobile/models/search/search_filter.model.dart';
+import 'package:immich_mobile/providers/photos_filter/chip_id.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
 
 void main() {
@@ -270,6 +271,83 @@ void main() {
       final notifier = container.read(photosFilterProvider.notifier);
       notifier.setText('paris');
       notifier.clearDimension(Dimension.text);
+      expect(container.read(photosFilterProvider).context, null);
+    });
+  });
+
+  group('removeChip', () {
+    test('PersonChipId removes that person, keeping others', () {
+      final notifier = container.read(photosFilterProvider.notifier);
+      const alice = PersonDto(id: 'alice', name: 'Alice', isHidden: false, thumbnailPath: '');
+      const bob = PersonDto(id: 'bob', name: 'Bob', isHidden: false, thumbnailPath: '');
+      notifier.togglePerson(alice);
+      notifier.togglePerson(bob);
+      notifier.removeChip(const PersonChipId('alice'));
+      final f = container.read(photosFilterProvider);
+      expect(f.people.map((p) => p.id), unorderedEquals(['bob']));
+    });
+    test('PersonChipId no-op on nonexistent id', () {
+      final notifier = container.read(photosFilterProvider.notifier);
+      const alice = PersonDto(id: 'alice', name: 'Alice', isHidden: false, thumbnailPath: '');
+      notifier.togglePerson(alice);
+      notifier.removeChip(const PersonChipId('ghost'));
+      expect(container.read(photosFilterProvider).people.map((p) => p.id), ['alice']);
+    });
+    test('TagChipId removes that tag, keeping others', () {
+      final notifier = container.read(photosFilterProvider.notifier);
+      notifier.toggleTag('t1');
+      notifier.toggleTag('t2');
+      notifier.removeChip(const TagChipId('t1'));
+      expect(container.read(photosFilterProvider).tagIds, ['t2']);
+    });
+    test('LocationChipId clears location', () {
+      final notifier = container.read(photosFilterProvider.notifier);
+      notifier.setLocation(SearchLocationFilter(country: 'France'));
+      notifier.removeChip(const LocationChipId());
+      expect(container.read(photosFilterProvider).location.country, null);
+    });
+    test('DateChipId clears date', () {
+      final notifier = container.read(photosFilterProvider.notifier);
+      notifier.setDateRange(start: DateTime(2024, 1, 1), end: DateTime(2024, 12, 31));
+      notifier.removeChip(const DateChipId());
+      final d = container.read(photosFilterProvider).date;
+      expect(d.takenAfter, null);
+      expect(d.takenBefore, null);
+    });
+    test('RatingChipId clears rating', () {
+      final notifier = container.read(photosFilterProvider.notifier);
+      notifier.setRating(4);
+      notifier.removeChip(const RatingChipId());
+      expect(container.read(photosFilterProvider).rating.rating, null);
+    });
+    test('MediaTypeChipId clears mediaType', () {
+      final notifier = container.read(photosFilterProvider.notifier);
+      notifier.setMediaType(AssetType.image);
+      notifier.removeChip(const MediaTypeChipId());
+      expect(container.read(photosFilterProvider).mediaType, AssetType.other);
+    });
+    test('FavouriteChipId clears favourites', () {
+      final notifier = container.read(photosFilterProvider.notifier);
+      notifier.setFavouritesOnly(true);
+      notifier.removeChip(const FavouriteChipId());
+      expect(container.read(photosFilterProvider).display.isFavorite, false);
+    });
+    test('ArchiveChipId clears archive', () {
+      final notifier = container.read(photosFilterProvider.notifier);
+      notifier.setArchivedIncluded(true);
+      notifier.removeChip(const ArchiveChipId());
+      expect(container.read(photosFilterProvider).display.isArchive, false);
+    });
+    test('NotInAlbumChipId clears not-in-album', () {
+      final notifier = container.read(photosFilterProvider.notifier);
+      notifier.setNotInAlbum(true);
+      notifier.removeChip(const NotInAlbumChipId());
+      expect(container.read(photosFilterProvider).display.isNotInAlbum, false);
+    });
+    test('TextChipId clears text', () {
+      final notifier = container.read(photosFilterProvider.notifier);
+      notifier.setText('paris');
+      notifier.removeChip(const TextChipId());
       expect(container.read(photosFilterProvider).context, null);
     });
   });
