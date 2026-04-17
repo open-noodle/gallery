@@ -1,5 +1,12 @@
 name: Gallery Build Mobile
 
+# For production releases, trigger via gallery-release-mobile.yml.
+# Manual workflow_dispatch with a non-empty version input here will
+# upload to TestFlight (and Play Store once that fastlane block is
+# re-enabled) WITHOUT creating a release draft, which breaks the
+# phase-1 → phase-2 handoff. Use only for ad-hoc smoke builds (leave
+# version empty).
+
 on:
   workflow_dispatch:
     inputs:
@@ -149,13 +156,15 @@ jobs:
         run: |
           version_name=$(awk -F'[ +]' '/^version:/ {print $2}' pubspec.yaml)
           # Monotonic, trigger-independent version code: commit count on the
-          # current ref. Must not depend on GITHUB_RUN_NUMBER because this
-          # workflow is invoked from multiple callers (push, workflow_call
-          # from Release Gallery) whose run numbers aren't comparable.
-          version_code=$(git -C .. rev-list --count HEAD)
+          # current ref, plus an attempt offset so re-runs at the same SHA
+          # don't collide with Play Store / TestFlight versionCodes already
+          # uploaded on a previous attempt. First attempt is unchanged from
+          # the previous behavior; retries get +1, +2, etc.
+          base_count=$(git -C .. rev-list --count HEAD)
+          version_code=$((base_count + GITHUB_RUN_ATTEMPT - 1))
           echo "version_name=$version_name" >> "$GITHUB_OUTPUT"
           echo "version_code=$version_code" >> "$GITHUB_OUTPUT"
-          echo "Building $version_name ($version_code)"
+          echo "Building $version_name ($version_code) attempt=$GITHUB_RUN_ATTEMPT"
 
       - name: Build signed Android App Bundle
         working-directory: ./mobile
