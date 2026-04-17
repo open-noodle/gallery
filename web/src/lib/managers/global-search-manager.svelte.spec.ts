@@ -3585,3 +3585,118 @@ describe('prefix scoping — runBatch gating', () => {
     expect(searchPersonSpy).toHaveBeenCalledWith({ name: 'a', withHidden: false }, expect.anything());
   });
 });
+
+describe('prefix scoping — bare suggestions (tags/albums/spaces)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    vi.useFakeTimers();
+    installFakeAbortTimeout();
+    vi.mocked(searchSmart).mockResolvedValue({
+      assets: { items: [], nextPage: null },
+    } as unknown as Awaited<ReturnType<typeof searchSmart>>);
+    vi.mocked(searchAssets).mockResolvedValue({
+      assets: { items: [], nextPage: null },
+    } as unknown as Awaited<ReturnType<typeof searchAssets>>);
+    vi.mocked(searchPerson).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof searchPerson>>);
+    vi.mocked(searchPlaces).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof searchPlaces>>);
+    vi.mocked(getAllTags).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof getAllTags>>);
+    vi.mocked(getAlbumNames).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof getAlbumNames>>);
+    vi.mocked(getAllSpaces).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof getAllSpaces>>);
+  });
+
+  afterEach(() => {
+    restoreAbortTimeout();
+    vi.useRealTimers();
+  });
+
+  it('# bare returns tagsCache sorted by updatedAt desc, top 5', async () => {
+    const m = new GlobalSearchManager();
+    (m as unknown as { tagsCache: unknown }).tagsCache = [
+      { id: 't1', name: 'old', updatedAt: '2026-01-01T00:00:00Z' },
+      { id: 't2', name: 'new', updatedAt: '2026-04-15T00:00:00Z' },
+      { id: 't3', name: 'mid', updatedAt: '2026-02-15T00:00:00Z' },
+    ] as never;
+
+    m.setQuery('#');
+    await vi.advanceTimersByTimeAsync(150);
+
+    expect(m.sections.tags.status).toBe('ok');
+    const items = (m.sections.tags as { items: { id: string }[] }).items;
+    expect(items.map((i) => i.id)).toEqual(['t2', 't3', 't1']);
+  });
+
+  it('# bare with empty tagsCache returns empty', async () => {
+    const m = new GlobalSearchManager();
+    (m as unknown as { tagsCache: unknown }).tagsCache = [];
+    m.setQuery('#');
+    await vi.advanceTimersByTimeAsync(150);
+    expect(m.sections.tags.status).toBe('empty');
+  });
+
+  it('# bare under tagsDisabled returns error: tag_cache_too_large', async () => {
+    const m = new GlobalSearchManager();
+    (m as unknown as { tagsDisabled: boolean }).tagsDisabled = true;
+    (m as unknown as { tagsCache: unknown }).tagsCache = null;
+    m.setQuery('#');
+    await vi.advanceTimersByTimeAsync(150);
+    expect(m.sections.tags.status).toBe('error');
+    expect((m.sections.tags as { message: string }).message).toBe('tag_cache_too_large');
+  });
+
+  it('/ bare writes albums sorted endDate desc, spaces sorted lastActivityAt??createdAt desc', async () => {
+    const m = new GlobalSearchManager();
+    // AlbumNameDto: sort by endDate ?? '' desc (most recent photo in album as activity proxy).
+    m.albumsCache = [
+      { id: 'a1', albumName: 'Old', endDate: '2026-01-01T00:00:00Z' },
+      { id: 'a2', albumName: 'New', endDate: '2026-04-15T00:00:00Z' },
+      { id: 'a3', albumName: 'Empty' /* endDate missing — sinks */ },
+    ] as never;
+    m.spacesCache = [
+      { id: 's1', name: 'Quiet', createdAt: '2026-01-01T00:00:00Z', lastActivityAt: null },
+      { id: 's2', name: 'Active', createdAt: '2026-02-01T00:00:00Z', lastActivityAt: '2026-04-10T00:00:00Z' },
+    ] as never;
+
+    m.setQuery('/');
+    await vi.advanceTimersByTimeAsync(150);
+
+    expect((m.sections.albums as { items: { id: string }[] }).items.map((i) => i.id)).toEqual(['a2', 'a1', 'a3']);
+    expect((m.sections.spaces as { items: { id: string }[] }).items.map((i) => i.id)).toEqual(['s2', 's1']);
+  });
+
+  it('/ bare with BOTH zero albums AND zero spaces: both sections empty', async () => {
+    const m = new GlobalSearchManager();
+    m.albumsCache = [];
+    m.spacesCache = [];
+
+    m.setQuery('/');
+    await vi.advanceTimersByTimeAsync(150);
+
+    expect(m.sections.albums.status).toBe('empty');
+    expect(m.sections.spaces.status).toBe('empty');
+  });
+
+  it('/ bare mixed empty: albums ok, spaces empty', async () => {
+    const m = new GlobalSearchManager();
+    m.albumsCache = [{ id: 'a1', albumName: 'Only', endDate: '2026-04-15T00:00:00Z' }] as never;
+    m.spacesCache = [];
+
+    m.setQuery('/');
+    await vi.advanceTimersByTimeAsync(150);
+
+    expect(m.sections.albums.status).toBe('ok');
+    expect(m.sections.spaces.status).toBe('empty');
+  });
+
+  it('/ bare mixed empty (symmetric): albums empty, spaces ok', async () => {
+    const m = new GlobalSearchManager();
+    m.albumsCache = [];
+    m.spacesCache = [{ id: 's1', name: 'Only', createdAt: '2026-04-15T00:00:00Z' }] as never;
+
+    m.setQuery('/');
+    await vi.advanceTimersByTimeAsync(150);
+
+    expect(m.sections.albums.status).toBe('empty');
+    expect(m.sections.spaces.status).toBe('ok');
+  });
+});

@@ -1429,19 +1429,30 @@ export class GlobalSearchManager {
    * Ties break alphabetically by `albumName`. Slice to top 5; `total` reports the
    * full pre-slice match count so the palette can render a "+N more" affordance.
    *
-   * Queries under 2 chars short-circuit back to idle and skip the catalog fetch —
-   * matches the other providers' minQueryLength contract.
+   * Bare-prefix branch: `rawQuery === ''` dispatches from runBatch when the user
+   * types a bare `/`. Returns the top `ALBUMS_TOP_N` sorted by `endDate ?? ''`
+   * desc. AlbumNameDto has no `updatedAt`; `endDate` — the most recent photo in
+   * the album — is the closest activity proxy. The minQueryLength gate now lives
+   * upstream in runBatch, so no `query.length < 2` early-return here.
    */
   async runAlbums(rawQuery: string): Promise<void> {
     const query = rawQuery.trim().toLowerCase();
-    if (query.length < 2) {
-      this.sections.albums = { status: 'idle' };
-      return;
-    }
     await this.ensureAlbumsCache();
     if (this.albumsCache === undefined) {
       // Catalog fetch failed mid-flight (AbortError) or was rejected and already
       // transitioned the section to 'error' via fetchAlbumsCatalog. Nothing to do.
+      return;
+    }
+
+    if (query === '') {
+      // Bare `/`: top N by `endDate ?? ''` desc. Albums without an endDate sink to
+      // the bottom — the DTO has no updatedAt so endDate is the best proxy we have.
+      const sorted = [...this.albumsCache].sort((a, b) => (b.endDate ?? '').localeCompare(a.endDate ?? ''));
+      const top = sorted.slice(0, ALBUMS_TOP_N);
+      this.sections.albums =
+        top.length === 0
+          ? { status: 'empty' }
+          : { status: 'ok', items: top as unknown as EntityItem[], total: sorted.length };
       return;
     }
 
@@ -1482,19 +1493,32 @@ export class GlobalSearchManager {
    * Ties break alphabetically by `name`. Slice to top 5; `total` reports the full
    * pre-slice match count so the palette can render a "+N more" affordance.
    *
-   * Queries under 2 chars short-circuit back to idle and skip the catalog fetch —
-   * matches the other providers' minQueryLength contract.
+   * Bare-prefix branch: `rawQuery === ''` dispatches from runBatch when the user
+   * types a bare `/`. Returns the top `SPACES_TOP_N` sorted by
+   * `(lastActivityAt ?? createdAt)` desc — falls back to creation date when the
+   * space has never been touched. The minQueryLength gate now lives upstream in
+   * runBatch, so no `query.length < 2` early-return here.
    */
   async runSpaces(rawQuery: string): Promise<void> {
     const query = rawQuery.trim().toLowerCase();
-    if (query.length < 2) {
-      this.sections.spaces = { status: 'idle' };
-      return;
-    }
     await this.ensureSpacesCache();
     if (this.spacesCache === undefined) {
       // Catalog fetch failed mid-flight (AbortError) or was rejected and already
       // transitioned the section to 'error' via fetchSpacesCatalog. Nothing to do.
+      return;
+    }
+
+    if (query === '') {
+      // Bare `/`: top N by `(lastActivityAt ?? createdAt)` desc. Spaces with no
+      // activity fall back to their creation date so first-time visitors still
+      // see something meaningful.
+      const recency = (s: SharedSpaceResponseDto): string => s.lastActivityAt ?? s.createdAt;
+      const sorted = [...this.spacesCache].sort((a, b) => recency(b).localeCompare(recency(a)));
+      const top = sorted.slice(0, SPACES_TOP_N);
+      this.sections.spaces =
+        top.length === 0
+          ? { status: 'empty' }
+          : { status: 'ok', items: top as unknown as EntityItem[], total: sorted.length };
       return;
     }
 
@@ -1543,6 +1567,14 @@ export class GlobalSearchManager {
         }
         return { status: 'error', message: error instanceof Error ? error.message : 'getAllTags failed' };
       }
+    }
+    if (query === '') {
+      // Bare `#`: top 5 by `updatedAt` desc. TagResponseDto.updatedAt is required,
+      // but the nullish fallback `?? ''` keeps the sort resilient against future
+      // DTO loosening or partial payloads injected via tests.
+      const sorted = [...this.tagsCache].sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''));
+      const matches = sorted.slice(0, 5);
+      return matches.length === 0 ? { status: 'empty' } : { status: 'ok', items: matches, total: matches.length };
     }
     const q = query.toLowerCase();
     const matches = this.tagsCache.filter((t) => t.name.toLowerCase().includes(q)).slice(0, 5);
