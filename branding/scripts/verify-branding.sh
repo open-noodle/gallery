@@ -166,10 +166,12 @@ info_plist="$REPO_ROOT/mobile/ios/Runner/Info.plist"
 if [[ -f "$info_plist" ]]; then
   # CFBundleURLSchemes entries sit at 4-tab indent; anchor to that to avoid matching
   # CFBundleName (<string>${NAME_SLUG}</string>) at 1-tab indent.
-  if ! grep -qP "^\t\t\t\t<string>immich</string>" "$info_plist"; then
+  # Use $'\t' ANSI-C quoting for literal tabs — BSD grep (macOS) lacks -P.
+  indent=$'\t\t\t\t'
+  if ! grep -q "^${indent}<string>immich</string>" "$info_plist"; then
     echo "  FAIL: Info.plist missing <string>immich</string> in CFBundleURLSchemes (legacy scheme must remain)"
     EXIT_CODE=1
-  elif ! grep -qP "^\t\t\t\t<string>${DEEP_LINK_SCHEME}</string>" "$info_plist"; then
+  elif ! grep -q "^${indent}<string>${DEEP_LINK_SCHEME}</string>" "$info_plist"; then
     echo "  FAIL: Info.plist missing <string>${DEEP_LINK_SCHEME}</string> in CFBundleURLSchemes"
     EXIT_CODE=1
   else
