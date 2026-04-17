@@ -15,7 +15,7 @@
 - **No Search-tab retirement** (PR 1.4).
 - **No orphan reconciliation** (Phase 1.5).
 - **Camera strip omitted** (§4.8).
-- **Pagination on the search-backed timeline deferred to PR 1.2.1.** Non-empty filter renders at most one page.
+- **Pagination on the search-backed timeline deferred to PR 1.2.1.** Non-empty filter renders at most one page via the domain-layer `SearchService` → `TimelineFactory.fromAssetStream`. The domain `SearchResult.assets` is `List<BaseAsset>` (confirmed at `mobile/lib/domain/models/search_result.model.dart:4`), so the wiring is direct.
 - **PlacesStrip sets `country` only** on tap (country → city cascade is PR 1.3 Deep).
 - **SearchBar uses plain debounce** — no paste-override fast-path.
 - **Material 3 defaults only** — no bespoke darkroom palette (§3).
