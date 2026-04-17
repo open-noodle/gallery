@@ -1,16 +1,22 @@
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/providers/api.provider.dart';
 import 'package:immich_mobile/repositories/api.repository.dart';
+import 'package:immich_mobile/services/api.service.dart';
 import 'package:openapi/api.dart';
 
-final sharedSpaceApiRepositoryProvider = Provider(
-  (ref) => SharedSpaceApiRepository(ref.watch(apiServiceProvider).sharedSpacesApi),
-);
+final sharedSpaceApiRepositoryProvider = Provider((ref) => SharedSpaceApiRepository(ref.watch(apiServiceProvider)));
 
 class SharedSpaceApiRepository extends ApiRepository {
-  final SharedSpacesApi _api;
+  final ApiService _apiService;
 
-  SharedSpaceApiRepository(this._api);
+  SharedSpaceApiRepository(this._apiService);
+
+  // Resolved lazily on each call. `ApiService.setEndpoint()` reassigns the
+  // `*Api` fields to new instances tied to a fresh ApiClient (and basePath);
+  // capturing `sharedSpacesApi` once would pin this repo to a stale client if
+  // the provider is first read before login (e.g. from the deep-link graph at
+  // cold start).
+  SharedSpacesApi get _api => _apiService.sharedSpacesApi;
 
   Future<List<SharedSpaceResponseDto>> getAll() async {
     final response = await checkNull(_api.getAllSpaces());
