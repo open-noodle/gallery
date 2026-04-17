@@ -27,6 +27,7 @@ Future<List<MapMarker>> mapMarkers(Ref ref) async {
     isFavorite: isFavorite,
     withArchived: isIncludeArchived,
     withPartners: isWithPartners,
+    withSharedSpaces: true,
     fileCreatedAfter: fileCreatedAfter,
   );
 
