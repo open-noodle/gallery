@@ -163,4 +163,14 @@ void main() {
       expect(container.read(photosFilterProvider).display.isArchive, false);
     });
   });
+
+  group('setNotInAlbum', () {
+    test('toggles not-in-album flag', () {
+      final notifier = container.read(photosFilterProvider.notifier);
+      notifier.setNotInAlbum(true);
+      expect(container.read(photosFilterProvider).display.isNotInAlbum, true);
+      notifier.setNotInAlbum(false);
+      expect(container.read(photosFilterProvider).display.isNotInAlbum, false);
+    });
+  });
 }

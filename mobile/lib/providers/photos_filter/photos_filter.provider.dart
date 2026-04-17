@@ -49,4 +49,7 @@ class PhotosFilterNotifier extends Notifier<SearchFilter> {
 
   void setArchivedIncluded(bool v) =>
       state = state.copyWith(display: state.display.copyWith(isArchive: v));
+
+  void setNotInAlbum(bool v) =>
+      state = state.copyWith(display: state.display.copyWith(isNotInAlbum: v));
 }
