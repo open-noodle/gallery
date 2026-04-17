@@ -1103,11 +1103,23 @@ async ensurePeopleSuggestionsCache(): Promise<void> {
 }
 
 private async fetchPeopleSuggestions(): Promise<void> {
+  // 5-second per-request timeout on top of closeSignal. Bare-@ runs through
+  // ensurePeopleSuggestionsCache, which is independent of the per-keystroke
+  // batchController.signal — without this timeout, a stuck fetch would leave
+  // the section in 'loading' forever until the palette closes.
+  const signal = AbortSignal.any([this.closeSignal, AbortSignal.timeout(5000)]);
   try {
-    const response = await getAllPeople({ size: 10 }, { signal: this.closeSignal });
+    const response = await getAllPeople({ size: 10 }, { signal });
     this.peopleSuggestionsCache = [...response.people].sort(personSuggestionsComparator);
   } catch (error: unknown) {
-    if (error instanceof Error && error.name === 'AbortError') return;
+    if (error instanceof Error && error.name === 'AbortError') {
+      // Distinguish timeout from close-driven abort.
+      const isTimeout = signal.reason instanceof DOMException && signal.reason.name === 'TimeoutError';
+      if (isTimeout && this.scope === 'people' && this.payload === '') {
+        this.sections.people = { status: 'timeout' };
+      }
+      return;
+    }
     // Stale-rejection guard: only surface an error if the manager is still in the
     // bare-@ state this fetch was kicked off for. Otherwise the user has typed on
     // and we must not stomp fresh `searchPerson` results.
