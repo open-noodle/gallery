@@ -426,9 +426,10 @@ export class GlobalSearchManager {
     // session N+1 (the rejected promise is still memoized in albumsPromise).
     this.albumsPromise = undefined;
     this.spacesPromise = undefined;
-    // People suggestions follow the same reset-on-open pattern: reset the cache
-    // AND the promise so the next session's fetch actually fires (a rejected prior
-    // promise would otherwise memoize the failure across sessions).
+    // People suggestions: reset both cache AND promise. Unlike albums/spaces where
+    // the cache persists across sessions (low churn, expensive to re-fetch), people
+    // can change frequently (renames, hides, new faces) so a fresh getAllPeople is
+    // worth the round-trip each time the palette opens.
     this.peopleSuggestionsCache = undefined;
     this.peoplePromise = undefined;
     if (!this.mlProbed) {
@@ -1341,6 +1342,8 @@ export class GlobalSearchManager {
       s.people.status !== 'loading' &&
       s.places.status !== 'loading' &&
       s.tags.status !== 'loading' &&
+      s.albums.status !== 'loading' &&
+      s.spaces.status !== 'loading' &&
       s.navigation.status !== 'loading';
     if (!allSettled) {
       return '';
@@ -1363,6 +1366,12 @@ export class GlobalSearchManager {
     }
     if (count(s.tags) > 0) {
       parts.push(`${count(s.tags)} tags`);
+    }
+    if (count(s.albums) > 0) {
+      parts.push(`${count(s.albums)} albums`);
+    }
+    if (count(s.spaces) > 0) {
+      parts.push(`${count(s.spaces)} spaces`);
     }
     if (count(s.navigation) > 0) {
       parts.push(`${count(s.navigation)} pages`);

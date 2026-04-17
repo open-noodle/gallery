@@ -4256,12 +4256,12 @@ describe('prefix scoping — announcementText', () => {
     expect(m.announcementText).toMatch(/Scoped to tags/i);
   });
 
-  it('scope collections announcement prefixed with "Scoped to albums & spaces."', async () => {
+  it('scope collections announcement prefixed with "Scoped to albums and spaces."', async () => {
     const m = new GlobalSearchManager();
     m.setQuery('/trip');
     await vi.advanceTimersByTimeAsync(150);
     await vi.runAllTimersAsync();
-    expect(m.announcementText).toMatch(/Scoped to albums & spaces/i);
+    expect(m.announcementText).toMatch(/Scoped to albums and spaces/i);
   });
 
   it('scope nav announcement prefixed with "Scoped to pages."', async () => {
