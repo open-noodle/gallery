@@ -596,6 +596,15 @@ const newRealRepository = <T extends BaseServiceDeps[number]>(key: T, db: Kysely
       return new key(db, LoggingRepository.create()) as InstanceType<T>;
     }
 
+    case MapRepository: {
+      return new key(
+        new ConfigRepository(),
+        new SystemMetadataRepository(db),
+        LoggingRepository.create(),
+        db,
+      ) as InstanceType<T>;
+    }
+
     case LoggingRepository: {
       return new key(undefined, undefined) as InstanceType<T>;
     }
