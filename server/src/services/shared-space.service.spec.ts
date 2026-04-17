@@ -5902,6 +5902,27 @@ describe(SharedSpaceService.name, () => {
         }),
       );
     });
+
+    it('should NOT leak other-space content when spaceId is set (row 19)', async () => {
+      const auth = factory.auth();
+      const spaceB = newUuid();
+
+      mocks.access.sharedSpace.checkMemberAccess.mockResolvedValue(new Set([spaceB]));
+      mocks.sharedSpace.getFilteredMapMarkers.mockResolvedValue([]);
+
+      await sut.getFilteredMapMarkers(auth, { spaceId: spaceB, withSharedSpaces: true });
+
+      // With spaceId set, the service must scope only to that space — no userIds, no timelineSpaceIds.
+      expect(mocks.sharedSpace.getFilteredMapMarkers).toHaveBeenCalledWith(
+        expect.objectContaining({
+          spaceId: spaceB,
+          userIds: undefined,
+        }),
+      );
+      expect(mocks.sharedSpace.getFilteredMapMarkers).toHaveBeenCalledWith(
+        expect.not.objectContaining({ timelineSpaceIds: expect.anything() }),
+      );
+    });
   });
 
   describe('deduplicateSpacePeople', () => {
