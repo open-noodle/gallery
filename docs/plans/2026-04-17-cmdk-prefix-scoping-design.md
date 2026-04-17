@@ -152,7 +152,10 @@ const ENTITY_KEYS_BY_SCOPE: Record<Scope, readonly Array<keyof Sections>> = {
 
 - Iterate only the scope's keys. Every other section is forced to `idle` synchronously.
 - Providers receive `this.payload`, not raw `query`.
-- The `minQueryLength` check uses `payload.length >= provider.minQueryLength` when `scope === 'all'`, but relaxes to `>= 1` for any prefixed scope — the prefix already declared intent.
+- **minQueryLength gate:**
+  - `scope === 'all'`: `payload.length >= provider.minQueryLength` (existing rule).
+  - `scope !== 'all' && payload.length > 0`: relaxed to `>= 1` (the prefix already declared intent; e.g. `@a` is valid for People's minQueryLength=2).
+  - `scope !== 'all' && payload === ''`: **bypass the gate entirely and dispatch directly** — the provider takes its suggestions branch (bare `@`, `#`, `/` → provider.run(payload='')). Without this bypass, `0 < minQueryLength` would set the section to idle and suggestions would never render.
 
 #### Per-provider suggestions branch
 
@@ -160,7 +163,12 @@ The existing `Provider.run(query, mode, signal)` contract grows a single interna
 
 ```ts
 run: async (query, mode, signal) => {
-  if (query === '' && manager.scope !== 'all') {
+  // `query` here is the payload, not raw user text. runBatch only dispatches this
+  // branch under a prefix scope (the empty-text branch of setQuery short-circuits
+  // before runBatch is invoked), so query === '' uniquely identifies the
+  // bare-prefix case. No need to read `manager.scope` — avoids a mid-async live-
+  // state read that could race with scope transitions.
+  if (query === '') {
     return runSuggestions(signal);
   }
   // existing code
@@ -231,19 +239,47 @@ async ensurePeopleSuggestionsCache(): Promise<void> {
 
 private async fetchPeopleSuggestions(): Promise<void> {
   try {
+    // Response shape is verified at implementation time — see §Risks #1.
+    // Treat `response.people` as the canonical access for this design; swap
+    // to the actual field name during the pre-impl check.
     const response = await getAllPeople({ size: 10 }, { signal: this.closeSignal });
-    // response.people is the list; sort client-side by a resilient recency/popularity key.
     this.peopleSuggestionsCache = [...response.people].sort(personSuggestionsComparator);
   } catch (error: unknown) {
     if (error instanceof Error && error.name === 'AbortError') return;
-    this.sections.people = { status: 'error', message: error instanceof Error ? error.message : 'unknown error' };
+    // Stale-rejection guard: a bare-@ fetch that rejects AFTER the user has
+    // moved to `@alice` (where searchPerson wrote fresh ok results) must not
+    // stomp those results with an error state. Only write the error if the
+    // manager is still in the bare-@ state that kicked off this fetch.
+    if (this.scope === 'people' && this.payload === '') {
+      this.sections.people = { status: 'error', message: error instanceof Error ? error.message : 'unknown error' };
+    }
     throw error;
   }
 }
 ```
 
+The people provider's `run()` wires it in:
+
+```ts
+run: async (query, mode, signal) => {
+  if (query === '') {
+    await this.ensurePeopleSuggestionsCache();
+    if (this.peopleSuggestionsCache === undefined) {
+      // fetchPeopleSuggestions already transitioned the section to 'error' (or
+      // no-op'd via AbortError); return the current section state.
+      return this.sections.people;
+    }
+    const items = this.peopleSuggestionsCache.slice(0, 10);
+    return items.length === 0 ? { status: 'empty' } : { status: 'ok', items, total: items.length };
+  }
+  // existing searchPerson code path for non-empty payload
+};
+```
+
 - **Concurrency:** concurrent `@` retypes join the same in-flight `peoplePromise`; `getAllPeople` fires at most once per open session. Without this pattern, typing `@ → @a → @` fast enough to race the first fetch would fire two concurrent calls. Pinned by a concurrency test.
+- **Stale rejection:** the guard above prevents a late-arriving rejection from stomping over fresh non-bare results.
 - **Close lifecycle:** `close()` clears both `peopleSuggestionsCache` and `peoplePromise` so reopening the palette is a clean slate.
+- **Rejection stickiness within session:** if the first bare-`@` fetch rejects, `peoplePromise` retains the rejection for the remainder of the open session — subsequent bare-`@` re-types read the same rejected promise. User must close + reopen to retry. **Accepted limitation**, consistent with `ensureAlbumsCache` / `ensureSpacesCache` today.
 - **Sort key:** `personSuggestionsComparator` is applied client-side regardless of server default. **The exact sort key is open** — see §Risks for the `PersonResponseDto` field verification that unblocks this. Comparator is a small pure function exported alongside the manager and covered by a table-driven test.
 
 **Tags (`#` bare)** — reuse `tagsCache` (fetched on first `#` or first unscoped tags search). Sort by `updatedAt` desc, slice top 5. `tagsDisabled` branch (`tagsCache.length > 20_000`) returns the same `error: 'tag_cache_too_large'` as unscoped tag search.
@@ -324,6 +360,8 @@ English copy uses "Albums & Spaces", not "Collections" (the internal `Scope` typ
 | `getAllPeople` 5 s timeout on bare `@`                       | section transitions to `{ status: 'timeout' }`; palette shows "Search is slow" hint                           |
 | `getAllPeople` network failure                               | section transitions to `{ status: 'error' }`                                                                  |
 | Concurrent bare `@` retypes racing first fetch               | callers join `peoplePromise`; `getAllPeople` fires exactly once                                               |
+| Stale bare-`@` rejection arrives after `@alice` resolved     | `scope === 'people' && payload === ''` guard skips the error write; fresh `ok` results preserved              |
+| `peoplePromise` rejection within session                     | sticks until close + reopen (accepted, matches `ensureAlbumsCache` / `ensureSpacesCache`)                     |
 | `/` while `albumsCache` / `spacesCache` is mid-fetch         | keystrokes join the in-flight promise; last settled run writes results                                        |
 | Scope transition mid-batch (`al` → `@al`)                    | `batchController.abort()` cancels prior; non-people sections forced idle synchronously                        |
 | Rapid scope thrash (`@`/`#`/`/`)                             | each keystroke re-parses; abort + idle on every transition                                                    |
@@ -334,6 +372,7 @@ English copy uses "Albums & Spaces", not "Collections" (the internal `Scope` typ
 | Bare `#` with empty `tagsCache`                              | section `{ status: 'empty' }`                                                                                 |
 | Bare `#` with `tagsDisabled === true`                        | returns `error: 'tag_cache_too_large'` same as unscoped tag search                                            |
 | Bare `/` with zero albums AND zero spaces                    | both sections `{ status: 'empty' }`                                                                           |
+| Bare `/` with mixed empty (albums ok, spaces empty or vv.)   | one section `ok`, the other `empty` independently                                                             |
 | Bare `>` for non-admin with restrictive flags                | returns `{ status: 'empty' }` not `{ status: 'ok', items: [] }`                                               |
 | Bare `>` for admin (~36 items)                               | all render, `Command.List` scrolls; palette height stays within `max-h-[80vh]`                                |
 | `Ctrl+?` / `Alt+?` in palette input                          | modifier combinations fall through to input; only bare `?` opens ShortcutsModal                               |
@@ -370,6 +409,8 @@ _runBatch gating:_
 - Scope `people`: only `providers.people.run` invoked; photos/albums/spaces/places/tags **forced to idle** even if previously `ok`.
 - Scope `collections`: albums + spaces providers invoked; others idle.
 - Scope `nav`: `runBatch` iteration tuple is empty (`ENTITY_KEYS_BY_SCOPE.nav === []`); nav section populated via synchronous `runNavigationProvider(payload, scope)`.
+- **minQueryLength bypass on bare prefix:** scope `people` with `payload === ''` dispatches the people provider even though payload length `< people.minQueryLength = 2`. Without this bypass the provider would be set to idle and suggestions would never render.
+- **Provider bare-prefix routing:** the people provider's `run('' , mode, signal)` routes into `ensurePeopleSuggestionsCache`, NOT into `searchPerson`. Spy `searchPerson` and assert zero calls in this path.
 
 _Bare-prefix suggestions:_
 
@@ -381,6 +422,7 @@ _Bare-prefix suggestions:_
 - `#` bare with empty `tagsCache` → `{ status: 'empty' }`.
 - `/` bare → albums sort by `updatedAt`; spaces sort by `lastActivityAt ?? createdAt`. Two independent section writes.
 - `/` bare with zero albums AND zero spaces → both sections `{ status: 'empty' }`.
+- `/` bare with **mixed empty** (e.g. 5 albums, 0 spaces) → albums `ok`, spaces `empty`. Symmetric for 0 albums, 5 spaces.
 - `>` bare → admin + feature-flag filtered, alphabetical, all items. No slice; assert the rendered count equals the filtered catalog length.
 - `>` bare for a non-admin with restrictive flags returns `empty`.
 
@@ -388,6 +430,7 @@ _`personSuggestionsComparator` (pure function):_
 
 - Sorts descending by the chosen recency/popularity key (exact key set at implementation time — see §Risks).
 - Stable ordering: ties break by the field that's always present (fallback to `name` alpha).
+- Same-name tie-break: two people with identical names break by `id` for deterministic order (prevents test flakiness on fixtures with duplicate names).
 - Handles missing optional field (returns 0 contribution; no crash).
 
 _Cursor:_
@@ -423,6 +466,7 @@ _Concurrency (new describe block):_
 - `getAllPeople` cancellation via `closeSignal` on palette close clears both `peopleSuggestionsCache` and `peoplePromise`; reopening and typing `@` re-fires exactly once.
 - `getAllPeople` 5 s timeout: section transitions to `timeout`.
 - `getAllPeople` network error: section transitions to `error`.
+- **Stale bare-`@` rejection after scope change:** start bare `@` fetch, transition to `@alice` which resolves via `searchPerson` and writes `sections.people = ok`, then reject the original bare-`@` fetch. Assert `sections.people` remains `ok` (the `scope === 'people' && payload === ''` guard skips the error write).
 
 _Recent replay (defensive):_
 
@@ -435,6 +479,7 @@ _Recent replay (defensive):_
 - Scope `nav`: NavigationSections present; others hidden.
 - Placeholder text is exactly `Search…` (string equality, not `toContain`).
 - `?` keypress on the input calls `modalManager.show(ShortcutsModal, {})` (spy).
+- **`?` keydown reaches our handler** — regression guard against bits-ui `Command.Input` consuming the key. Dispatch a `?` keydown event on the input element and assert the modalManager spy fires. Pins the current bits-ui version's key handling; a future upgrade that starts consuming `?` would fail this test.
 - `?` with modifier (`Ctrl+?` / `Alt+?`) does NOT trigger the modal — falls through to input.
 - **Mode pills under scope (a11y):**
   - Carry `opacity-50` class.
@@ -469,6 +514,7 @@ _Recent replay (defensive):_
 - **`?` opens modal:** palette open → press `?` → ShortcutsModal visible with "Scope prefixes" section; close modal, palette still open with focus on input.
 - **`?` overrides literal:** palette input empty → press `?` → ShortcutsModal opens (not a literal `?` in input).
 - **`>` bare scroll for admin:** type `>` as admin → all ~36 filtered items render → scrolling the list doesn't grow the palette height past its `max-h-[80vh]` cap.
+- **`@` retry after failure:** intercept `getAllPeople` to fail on first call → type `@` → section renders `error` state → close palette → re-intercept to succeed → reopen palette → type `@` → top-10 people render. Validates `close()` resets `peoplePromise` end-to-end.
 - **Stale album under scope:** scoped `/trip`, activate an album that was deleted server-side → 404 toast + RECENT purge (same path as unscoped activation).
 
 ### Manual visual QA
@@ -513,9 +559,11 @@ _Recent replay (defensive):_
 
 ## Risks
 
-1. **`PersonResponseDto` field for sort key is unverified.** The bare-`@` sort needs a "popularity" or "recency" signal. Candidates observed in nearby DTOs: `numberOfAssets`, `faceCount`, `updatedAt`. Exact field must be verified before wiring `personSuggestionsComparator`.
-   - **Pre-implementation check (blocks Task 6 in §Implementation sequence):** grep the SDK `fetch-client.ts` for `PersonResponseDto` and list the available fields. Pick the first of `{ numberOfAssets, faceCount, updatedAt }` that exists; fall back to alphabetical by `name` if none is present.
-   - **Test the chosen comparator** with fixtures that have the field missing (to verify the `?? 0` / fallback path doesn't crash).
+1. **`getAllPeople` response shape + `PersonResponseDto` sort field are unverified.** Two related pre-impl checks:
+   - **Response shape.** The design writes `[...response.people].sort(...)` assuming `{ people: PersonResponseDto[] }`. Nearby SDK shapes vary: `getAllSpaces` returns a bare array, `searchSmart` returns `{ assets: { items } }`. Grep `open-api/typescript-sdk/src/fetch-client.ts` for `getAllPeople`'s return type and swap the field access (`response.people` / `response.items` / `response`) to match.
+   - **Sort field.** The bare-`@` sort needs a "popularity" or "recency" signal. Candidates observed in nearby DTOs: `numberOfAssets`, `faceCount`, `updatedAt`. Pick the first that exists on `PersonResponseDto`; fall back to alphabetical by `name` if none is present.
+   - **Pre-implementation check blocks Task 6 in §Implementation sequence.**
+   - **Test the chosen comparator** with fixtures where the sort field is missing (to verify the `?? 0` / fallback path doesn't crash).
 2. **`GlobalSearchPreview`'s handling of `{ kind: 'nav' }` active items is unverified.** The v1.1 nav design claimed the preview "falls through to the empty state" when the cursor is on a nav item, but the design did not add a new test.
    - **Pre-implementation check (blocks Task 11 in §Implementation sequence):** read `web/src/lib/components/global-search/global-search-preview.svelte`. If the `#if` chain has no `nav` branch and no `{:else}` that renders the empty state for unknown kinds, add a `nav` branch in this PR that renders the empty-state markup. Pin with the component test listed in §Component.
 3. **`getAllPeople` default sort** may not match the chosen sort key on all server versions. Mitigation: `personSuggestionsComparator` runs client-side unconditionally (not just as a fallback) so the order is deterministic regardless of server default. Pinned by test.
@@ -524,6 +572,9 @@ _Recent replay (defensive):_
 6. **`parseScope` runs on every keystroke** as a $derived. Cost is O(1) per keystroke (one trim, one map lookup, one slice) — negligible.
 7. **Pre-existing `reconcileCursor` miss** (albums/spaces absent from the order) gets tangentially fixed. Regression test pins the new order; if someone later re-removes albums/spaces from the order, the test will flag it.
 8. **Concurrent `getAllPeople` fetches** from rapid `@` retypes are prevented by the `ensurePeopleSuggestionsCache` promise-join pattern — not by `??=` on the cache field alone. Pinned by test.
+9. **bits-ui `Command.Input` default key handling** may consume `?` for something unknown at design time.
+   - **Pre-implementation check (blocks Task 11 in §Implementation sequence):** review bits-ui `Command.Input`'s keydown defaults at the pinned version in `web/package.json`. If `?` has any default behavior, either stop propagation at the palette level before bits-ui sees it, or use capture-phase binding. Pinned by a regression component test that dispatches `?` on the input and asserts `modalManager.show` fires.
+10. **`fetchPeopleSuggestions` stale-rejection race** is mitigated by the `scope === 'people' && payload === ''` guard before the error write. If either condition is false, the rejection is silently dropped (AbortError pattern).
 
 ---
 
@@ -550,5 +601,7 @@ Not a plan doc — rough order for `superpowers:writing-plans`:
 
 **Pre-implementation checks** (do these before starting Task 6 / Task 11):
 
-- **§Risks #1 — `PersonResponseDto` field.** Grep `open-api/typescript-sdk/src/fetch-client.ts` for the DTO definition. Pick the first of `{ numberOfAssets, faceCount, updatedAt }` that exists as the sort key for `personSuggestionsComparator`; fall back to `name` alpha if none. Document the chosen field in the Task 6 implementation notes.
+- **§Risks #1a — `getAllPeople` response shape.** Grep `open-api/typescript-sdk/src/fetch-client.ts` for `getAllPeople`'s return type. Swap `response.people` in `fetchPeopleSuggestions` to match the actual field name (or `response` if the response is a bare array).
+- **§Risks #1b — `PersonResponseDto` sort field.** Grep the DTO definition. Pick the first of `{ numberOfAssets, faceCount, updatedAt }` that exists as the sort key for `personSuggestionsComparator`; fall back to `name` alpha if none. Document the chosen field in the Task 6 implementation notes.
 - **§Risks #2 — `GlobalSearchPreview` nav branch.** Read the component's `#if` chain. If a `nav` active-item kind has no branch and no catch-all `{:else}`, add an `{:else if activeItem?.kind === 'nav'}` branch in Task 11 that renders the existing empty-state markup. Test the branch in the component spec.
+- **§Risks #9 — bits-ui `Command.Input` `?` handling.** Inspect bits-ui's Command.Input keydown logic at the pinned version in `web/package.json`. If it consumes `?`, bind our `?` handler at capture phase OR stop propagation before bits-ui's own listener. Pinned by the component-level regression test that dispatches `?` on the input.
