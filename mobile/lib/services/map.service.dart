@@ -23,6 +23,7 @@ class MapService with ErrorLoggerMixin {
     bool? isFavorite,
     bool? withArchived,
     bool? withPartners,
+    bool? withSharedSpaces,
     DateTime? fileCreatedAfter,
     DateTime? fileCreatedBefore,
   }) async {
@@ -32,6 +33,7 @@ class MapService with ErrorLoggerMixin {
           isFavorite: isFavorite,
           isArchived: withArchived,
           withPartners: withPartners,
+          withSharedSpaces: withSharedSpaces,
           fileCreatedAfter: fileCreatedAfter,
           fileCreatedBefore: fileCreatedBefore,
         );
