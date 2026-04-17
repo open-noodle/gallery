@@ -286,7 +286,7 @@ run: async (query, mode, signal) => {
 
 **Albums + Spaces (`/` bare)** — reuse `albumsCache` + `spacesCache`. Each rendered as its own section:
 
-- Albums: `sort by updatedAt desc`, slice 5.
+- Albums: `sort by endDate desc`, slice 5. `AlbumNameDto` (returned by `getAlbumNames`) has no `updatedAt` field; `endDate` is "most recent photo in the album" and is a better activity proxy anyway. Missing `endDate` sinks to the bottom.
 - Spaces: `sort by (lastActivityAt ?? createdAt) desc`, slice 5.
 
 **Navigation (`>` bare)** — runs synchronously off `setQuery`. Apply admin + feature-flag filter; sort alphabetically by translated label. Return every surviving item (no slice). For a typical non-admin user the filtered count is ~11; admin sees ~36.
@@ -420,7 +420,7 @@ _Bare-prefix suggestions:_
 - `#` bare → tagsCache sorted by `updatedAt` desc, top 5.
 - `#` bare under `tagsDisabled` → `error: 'tag_cache_too_large'`.
 - `#` bare with empty `tagsCache` → `{ status: 'empty' }`.
-- `/` bare → albums sort by `updatedAt`; spaces sort by `lastActivityAt ?? createdAt`. Two independent section writes.
+- `/` bare → albums sort by `endDate` desc; spaces sort by `lastActivityAt ?? createdAt`. Two independent section writes.
 - `/` bare with zero albums AND zero spaces → both sections `{ status: 'empty' }`.
 - `/` bare with **mixed empty** (e.g. 5 albums, 0 spaces) → albums `ok`, spaces `empty`. Symmetric for 0 albums, 5 spaces.
 - `>` bare → admin + feature-flag filtered, alphabetical, all items. No slice; assert the rendered count equals the filtered catalog length.
