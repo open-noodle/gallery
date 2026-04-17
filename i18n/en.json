@@ -840,7 +840,7 @@
   "cmdk_open": "Open",
   "cmdk_people_heading": "People",
   "cmdk_photos_heading": "Photos",
-  "cmdk_placeholder": "Search Gallery",
+  "cmdk_placeholder": "Search Gallery — try @ for people, # tags, / albums, > pages",
   "cmdk_places_heading": "Places",
   "cmdk_preview_item_count": "{count, plural, one {# item} other {# items}}",
   "cmdk_preview_member_count": "{count, plural, one {# member} other {# members}}",
