@@ -50,7 +50,7 @@
 {#if status.status === 'ok' && buckets.length > 0}
   <div in:fade={{ duration: 120 }} out:fade={{ duration: 80 }}>
     {#each buckets as bucket (bucket.category)}
-      <Command.Group class="mb-4">
+      <Command.Group class="mb-4" data-cmdk-nav-section>
         <Command.GroupHeading
           class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400"
         >

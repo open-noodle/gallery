@@ -49,7 +49,7 @@
   });
 </script>
 
-<div class="flex flex-col items-center gap-3 p-5">
+<div data-cmdk-preview-person class="flex flex-col items-center gap-3 p-5">
   {#if thumbUrl}
     <img src={thumbUrl} alt={person.name ?? ''} class="h-[120px] w-[120px] rounded-full object-cover" />
   {:else}

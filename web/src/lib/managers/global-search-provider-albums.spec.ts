@@ -156,9 +156,14 @@ describe('runAlbums provider', () => {
     expect(sut.sections.albums.status).not.toBe('ok');
   });
 
-  it('does NOT fire for queries < 2 chars', async () => {
+  // NOTE: the old upstream `query.length < 2 -> idle` short-circuit has been moved
+  // into `runBatch`'s minQueryLength gate (see prefix scoping task 4/5). `runAlbums`
+  // is now unconditionally downstream of that gate, and its contract for single-char
+  // queries is the standard scoring path.
+  it('scores single-char queries via the normal match path', async () => {
     seed([{ id: '1', albumName: 'Anywhere' }]);
     await sut.runAlbums('a');
-    expect(sut.sections.albums).toEqual({ status: 'idle' });
+    const { items } = expectOk();
+    expect(items.map((a) => a.id)).toEqual(['1']);
   });
 });

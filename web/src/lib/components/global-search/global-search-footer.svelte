@@ -1,5 +1,8 @@
 <script lang="ts">
   import type { GlobalSearchManager, SearchMode } from '$lib/managers/global-search-manager.svelte';
+  import ShortcutsModal from '$lib/modals/ShortcutsModal.svelte';
+  import { Icon, modalManager } from '@immich/ui';
+  import { mdiHelpCircleOutline } from '@mdi/js';
   import { t, type Translations } from 'svelte-i18n';
 
   interface Props {
@@ -22,6 +25,19 @@
   let pillWidth = $state(0);
   let pillReady = $state(false);
 
+  // Under a prefix scope the mode pills are informational — setMode is a no-op
+  // (see GlobalSearchManager.setMode's `scope !== 'all'` short-circuit). Visually
+  // communicate this with a 50 % opacity dim. Intentionally NO aria-disabled: the
+  // radios stay focusable and keyboard-reachable so users can still cycle the
+  // pending mode for when they clear the prefix.
+  const isScoped = $derived(manager.scope !== 'all');
+
+  // Shared class for footer kbd chips. Extracted so both kbd tags fit on a
+  // single line — otherwise prettier breaks `</kbd\n>` across lines, which
+  // causes Svelte to merge adjacent text nodes into the kbd. A cosmetic but
+  // test-visible bug.
+  const kbdClass = 'rounded-sm border border-gray-200 bg-subtle/60 px-1.5 py-0.5 dark:border-gray-700';
+
   $effect(() => {
     const idx = options.findIndex((o) => o.value === manager.mode);
     const el = labelRefs[idx];
@@ -37,7 +53,9 @@
   <div
     role="radiogroup"
     aria-label={$t('cmdk_search_mode')}
-    class="relative flex gap-0 rounded-md bg-subtle/40 p-0.5 font-mono text-[11px] font-medium uppercase"
+    class="relative flex gap-0 rounded-md bg-subtle/40 p-0.5 font-mono text-[11px] font-medium uppercase {isScoped
+      ? 'opacity-50'
+      : ''}"
   >
     {#if pillReady}
       <div
@@ -69,8 +87,24 @@
     {/each}
   </div>
 
-  <span class="font-mono text-[11px] text-gray-500 dark:text-gray-400">
-    <kbd class="rounded-sm border border-gray-200 bg-subtle/60 px-1.5 py-0.5 dark:border-gray-700">Ctrl+/</kbd>
-    <span class="ml-1">{$t('cmdk_cycle_mode_hint')}</span>
-  </span>
+  <div class="flex items-center gap-4 font-mono text-[11px] text-gray-500 dark:text-gray-400">
+    <span class="flex items-center gap-1.5">
+      <kbd class={kbdClass}>Ctrl+/</kbd>
+      <span>{$t('cmdk_cycle_mode_hint')}</span>
+    </span>
+    <span class="flex items-center gap-1.5">
+      <kbd class={kbdClass}>{$t('cmdk_scope_hint_footer')}</kbd>
+      <span>{$t('cmdk_scope_hint_footer_label')}</span>
+    </span>
+    <button
+      data-cmdk-shortcuts-trigger
+      type="button"
+      aria-label={$t('cmdk_show_shortcuts')}
+      title={$t('cmdk_show_shortcuts')}
+      onclick={() => void modalManager.show(ShortcutsModal, {})}
+      class="hidden h-5 w-5 items-center justify-center rounded-full text-gray-500 hover:bg-white/5 hover:text-gray-300 sm:flex"
+    >
+      <Icon icon={mdiHelpCircleOutline} size="1em" aria-hidden />
+    </button>
+  </div>
 </div>

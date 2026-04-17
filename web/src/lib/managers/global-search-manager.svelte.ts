@@ -8,6 +8,7 @@ import { user } from '$lib/stores/user.store';
 import {
   getAlbumInfo,
   getAlbumNames,
+  getAllPeople,
   getAllSpaces,
   getAllTags,
   getMlHealth,
@@ -18,6 +19,7 @@ import {
   searchSmart,
   type AlbumNameDto,
   type MetadataSearchDto,
+  type PersonResponseDto,
   type SharedSpaceResponseDto,
   type TagResponseDto,
 } from '@immich/sdk';
@@ -26,6 +28,7 @@ import { computeCommandScore } from 'bits-ui';
 import { locale as i18nLocale, t, type Translations } from 'svelte-i18n';
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import { get } from 'svelte/store';
+import { parseScope, personSuggestionsComparator, type ParsedQuery, type Scope } from './cmdk-prefix';
 import { isAlmostExactNavMatch, NAVIGATION_ITEMS, type NavigationItem } from './navigation-items';
 
 export type SearchMode = 'smart' | 'metadata' | 'description' | 'ocr';
@@ -91,6 +94,40 @@ const SPACES_TOP_N = 5;
 // cross-contaminate all five sections.
 const idle = Object.freeze({ status: 'idle' as const });
 
+// Entity-section keys dispatched by runBatch per scope. Navigation is intentionally
+// absent — it flows through the synchronous `runNavigationProvider` off the debounce
+// path. Under a prefix scope, only the matching keys dispatch; all other entity
+// sections force-reset to idle synchronously before dispatch. Narrowing the key type
+// to just the entity sections (dropping `navigation`) keeps `sections[key] = ...`
+// assignments away from the navigation section's `ProviderStatus<NavigationItem>`
+// union, which would otherwise force an awkward cast.
+type EntitySectionKey = 'photos' | 'people' | 'places' | 'tags' | 'albums' | 'spaces';
+const ENTITY_KEYS_BY_SCOPE: Record<Scope, ReadonlyArray<EntitySectionKey>> = {
+  all: ['photos', 'people', 'places', 'tags', 'albums', 'spaces'],
+  people: ['people'],
+  tags: ['tags'],
+  collections: ['albums', 'spaces'],
+  nav: [],
+};
+
+// Priority order used by `reconcileCursor` to pick a new highlight when the
+// prior active item disappears from all sections. Unlike `ENTITY_KEYS_BY_SCOPE`
+// (which dispatches async providers and intentionally excludes `navigation`),
+// this list INCLUDES `navigation` so scope 'all' can fall through to it when
+// every entity section is empty. Per-scope orders are scoped down to the
+// matching sections so the cursor lands on a row the user's prefix actually
+// surfaces — e.g. under `@` the cursor never jumps to an unrelated photo.
+//
+// The all-scope order matches render order (photos, albums, spaces, people,
+// places, tags, navigation) so the cursor lands on the first visible row.
+const RECONCILE_ORDER_BY_SCOPE: Record<Scope, ReadonlyArray<keyof Sections>> = {
+  all: ['photos', 'albums', 'spaces', 'people', 'places', 'tags', 'navigation'],
+  people: ['people'],
+  tags: ['tags'],
+  collections: ['albums', 'spaces'],
+  nav: ['navigation'],
+};
+
 function isValidRecentEntry(e: RecentEntry): boolean {
   switch (e.kind) {
     case 'query': {
@@ -152,6 +189,9 @@ export class GlobalSearchManager {
   isOpen = $state(false);
   query = $state('');
   mode = $state<SearchMode>(loadSearchQueryType());
+  parsedQuery = $derived<ParsedQuery>(parseScope(this.query));
+  scope = $derived<Scope>(this.parsedQuery.scope);
+  payload = $derived<string>(this.parsedQuery.payload);
   sections = $state<Sections>({
     photos: idle,
     people: idle,
@@ -237,8 +277,10 @@ export class GlobalSearchManager {
    */
   albumsCache: AlbumNameDto[] | undefined = $state(undefined);
   spacesCache: SharedSpaceResponseDto[] | undefined = $state(undefined);
+  peopleSuggestionsCache: PersonResponseDto[] | undefined = $state(undefined);
   private albumsPromise: Promise<void> | undefined;
   private spacesPromise: Promise<void> | undefined;
+  private peoplePromise: Promise<void> | undefined;
 
   /**
    * Locale-keyed memo cache for navigation item search strings.
@@ -305,20 +347,35 @@ export class GlobalSearchManager {
   }
 
   /**
-   * Synchronously filter NAVIGATION_ITEMS for a query. Applies admin + feature-flag gates,
-   * scores via `computeCommandScore`, and returns a flat `ProviderStatus` (no grouping).
-   * Runs on every keystroke off the main path — bypasses the 150 ms debounce.
+   * Synchronously filter NAVIGATION_ITEMS for a payload under a given scope. Applies admin +
+   * feature-flag gates, scores via `computeCommandScore`, and returns a flat `ProviderStatus`
+   * (no grouping). Runs on every keystroke off the main path — bypasses the 150 ms debounce.
+   *
+   * Scope semantics:
+   *   - 'people' | 'tags' | 'collections' — navigation section is hidden entirely (empty).
+   *   - 'all' + empty payload — idle navigation (no results when the palette is bare).
+   *   - 'nav' + empty payload — bare `>`: return ALL eligible items sorted alphabetically
+   *     by translated label (no slice, no scoring).
+   *   - 'all' or 'nav' + non-empty payload — fuzzy search payload over eligible items.
    */
-  private runNavigationProvider(query: string): ProviderStatus<NavigationItem> {
-    if (query.length === 0) {
+  private runNavigationProvider(payload: string, scope: Scope): ProviderStatus<NavigationItem> {
+    // Non-nav entity scopes hide the navigation section entirely.
+    if (scope !== 'all' && scope !== 'nav') {
       return { status: 'empty' };
     }
+
+    // Scope 'all' with empty payload matches today's behavior (no nav results on idle).
+    if (scope === 'all' && payload === '') {
+      return { status: 'empty' };
+    }
+
     const u = get(user);
     const isAdmin = u?.isAdmin ?? false;
     const flags = featureFlagsManager.valueOrUndefined;
     const searchStrings = this.getNavigationSearchStrings();
 
-    const scored: Array<{ item: NavigationItem; score: number }> = [];
+    // Admin + flag filter applied in both branches below.
+    const eligible: NavigationItem[] = [];
     for (const item of NAVIGATION_ITEMS) {
       if (item.adminOnly && !isAdmin) {
         continue;
@@ -326,11 +383,26 @@ export class GlobalSearchManager {
       if (item.featureFlag && !flags?.[item.featureFlag]) {
         continue;
       }
+      eligible.push(item);
+    }
+
+    // Scope 'nav' with bare payload → return all eligible items alphabetical by translated label.
+    if (scope === 'nav' && payload === '') {
+      const translate = get(t);
+      const sorted = [...eligible].sort((a, b) =>
+        translate(a.labelKey as Translations).localeCompare(translate(b.labelKey as Translations)),
+      );
+      return sorted.length === 0 ? { status: 'empty' } : { status: 'ok', items: sorted, total: sorted.length };
+    }
+
+    // Non-empty payload (under 'all' or 'nav'): fuzzy score against payload.
+    const scored: Array<{ item: NavigationItem; score: number }> = [];
+    for (const item of eligible) {
       const corpus = searchStrings.get(item.id);
       if (!corpus) {
         continue;
       }
-      const score = computeCommandScore(corpus, query);
+      const score = computeCommandScore(corpus, payload);
       if (score <= 0) {
         continue;
       }
@@ -354,6 +426,12 @@ export class GlobalSearchManager {
     // session N+1 (the rejected promise is still memoized in albumsPromise).
     this.albumsPromise = undefined;
     this.spacesPromise = undefined;
+    // People suggestions: reset both cache AND promise. Unlike albums/spaces where
+    // the cache persists across sessions (low churn, expensive to re-fetch), people
+    // can change frequently (renames, hides, new faces) so a fresh getAllPeople is
+    // worth the round-trip each time the palette opens.
+    this.peopleSuggestionsCache = undefined;
+    this.peoplePromise = undefined;
     if (!this.mlProbed) {
       this.mlProbed = true;
       void this.probeMlHealth();
@@ -443,6 +521,64 @@ export class GlobalSearchManager {
         return;
       }
       this.sections.spaces = { status: 'error', message: error instanceof Error ? error.message : 'unknown error' };
+      throw error;
+    }
+  }
+
+  /**
+   * Fetch (and memoize) the bare-`@` suggestions list for the current open session.
+   * Mirrors `ensureAlbumsCache()` / `ensureSpacesCache()` — callers join a shared
+   * in-flight promise so rapid retype cycles never start a second fetch.
+   */
+  async ensurePeopleSuggestionsCache(): Promise<void> {
+    if (this.peopleSuggestionsCache !== undefined) {
+      return;
+    }
+    if (this.peoplePromise === undefined) {
+      this.peoplePromise = this.fetchPeopleSuggestions();
+    }
+    return this.peoplePromise;
+  }
+
+  private async fetchPeopleSuggestions(): Promise<void> {
+    // 5-second per-request timeout on top of closeSignal. Bare-@ flows through
+    // ensurePeopleSuggestionsCache, which is independent of the per-keystroke
+    // batchController.signal — without this timeout a stuck fetch would leave
+    // the section in 'loading' forever until the palette closes.
+    const signal = AbortSignal.any([this.closeSignal, AbortSignal.timeout(5000)]);
+    try {
+      const response = await getAllPeople({ size: 10 }, { signal });
+      this.peopleSuggestionsCache = [...response.people].sort(personSuggestionsComparator);
+    } catch (error: unknown) {
+      // Distinguish three rejection modes:
+      //   1. Timeout: the composite signal aborted with a TimeoutError reason. Surface
+      //      'timeout' to the section only if the manager is still at bare-@.
+      //   2. Close: the composite signal aborted because of closeSignal. Silent drop —
+      //      the palette is going away and the next open() resets the cache fields.
+      //   3. Other (network / 5xx / JSON parse): surface 'error' if still at bare-@,
+      //      otherwise silently drop so a late rejection can't stomp a fresh
+      //      searchPerson result that already wrote 'ok'.
+      // Check signal.reason first because fetch() rejections can present as
+      // AbortError (browser fetch), TimeoutError (direct signal-driven reject in tests),
+      // or DOMException either way — signal.reason is the single source of truth.
+      const isTimeout =
+        signal.aborted && signal.reason instanceof DOMException && signal.reason.name === 'TimeoutError';
+      const isClose = signal.aborted && !isTimeout;
+      if (isTimeout) {
+        if (this.scope === 'people' && this.payload === '') {
+          this.sections.people = { status: 'timeout' };
+        }
+        return;
+      }
+      if (isClose) {
+        return;
+      }
+      // Stale-rejection guard: only surface an error if the manager is still in the
+      // bare-@ state this fetch was kicked off for. Otherwise the user has typed on
+      // and a fresh searchPerson result must not be stomped by a late rejection.
+      if (this.scope === 'people' && this.payload === '') {
+        this.sections.people = { status: 'error', message: error instanceof Error ? error.message : 'unknown error' };
+      }
       throw error;
     }
   }
@@ -777,7 +913,10 @@ export class GlobalSearchManager {
     if (this.getActiveItem() !== null) {
       return;
     }
-    const order = ['photos', 'people', 'places', 'tags', 'navigation'] as const;
+    // Scope-aware priority walk. `RECONCILE_ORDER_BY_SCOPE` holds the per-scope
+    // priority so the highlight lands on a row the user's active prefix actually
+    // surfaces (e.g. under `@` the cursor never jumps to an unrelated photo).
+    const order = RECONCILE_ORDER_BY_SCOPE[this.scope];
     const kindOf: Record<keyof Sections, string> = {
       photos: 'photo',
       people: 'person',
@@ -1045,6 +1184,13 @@ export class GlobalSearchManager {
       }
     }
 
+    // Scope short-circuit: photos isn't dispatched under any prefix, so a mode
+    // change under scope has no runtime effect. Mode still persists for next
+    // unscoped search.
+    if (this.scope !== 'all') {
+      return;
+    }
+
     if (this.debounceTimer !== null) {
       this.clearDebounce();
       this.debounceTimer = setTimeout(() => this.runBatch(this.query, this.mode), 150);
@@ -1196,10 +1342,17 @@ export class GlobalSearchManager {
       s.people.status !== 'loading' &&
       s.places.status !== 'loading' &&
       s.tags.status !== 'loading' &&
+      s.albums.status !== 'loading' &&
+      s.spaces.status !== 'loading' &&
       s.navigation.status !== 'loading';
     if (!allSettled) {
       return '';
     }
+    // Under a prefix scope (e.g. `@alice`, `#xmas`, `/trip`, `>theme`), screen
+    // readers announce "Scoped to <section>." before the counts so the user
+    // knows the palette is filtered. Scope 'all' stays plain — the cue would
+    // be noise on unscoped queries.
+    const scopeCue = this.scope === 'all' ? '' : get(t)(`cmdk_announce_scoped_${this.scope}` as Translations);
     const parts: string[] = [];
     const count = (st: ProviderStatus) => (st.status === 'ok' ? st.total : 0);
     if (count(s.photos) > 0) {
@@ -1214,10 +1367,20 @@ export class GlobalSearchManager {
     if (count(s.tags) > 0) {
       parts.push(`${count(s.tags)} tags`);
     }
+    if (count(s.albums) > 0) {
+      parts.push(`${count(s.albums)} albums`);
+    }
+    if (count(s.spaces) > 0) {
+      parts.push(`${count(s.spaces)} spaces`);
+    }
     if (count(s.navigation) > 0) {
       parts.push(`${count(s.navigation)} pages`);
     }
-    return parts.join(', ');
+    const counts = parts.join(', ');
+    if (scopeCue && counts) {
+      return `${scopeCue} ${counts}`;
+    }
+    return scopeCue || counts;
   });
 
   setQuery(text: string) {
@@ -1253,8 +1416,16 @@ export class GlobalSearchManager {
 
     // SWR (stale-while-revalidate): only flip sections that are NOT already 'ok' to
     // loading. Preserving ok content across keystrokes fixes the jitter bug where the
-    // palette flashed skeletons between every character.
+    // palette flashed skeletons between every character. Scope-aware: non-scope
+    // sections reset to idle synchronously so the 150ms debounce window doesn't flash
+    // stale photo results under an @ scope. (`Array.includes` over a tiny tuple — not
+    // a Set — to satisfy svelte/prefer-svelte-reactivity.)
+    const inScope = ENTITY_KEYS_BY_SCOPE[this.scope];
     for (const key of ['photos', 'people', 'places', 'tags', 'albums', 'spaces'] as const) {
+      if (!inScope.includes(key)) {
+        this.sections[key] = idle;
+        continue;
+      }
       if (this.sections[key].status !== 'ok') {
         this.sections[key] = { status: 'loading' };
       }
@@ -1262,8 +1433,11 @@ export class GlobalSearchManager {
     // Navigation runs synchronously on every keystroke, bypassing the 150ms debounce.
     // It's a pure in-memory scan — no rate-limit or network concern. runBatch does NOT
     // iterate over navigation; its async dispatch tuple is
-    // `photos/people/places/tags/albums/spaces`.
-    this.sections.navigation = this.runNavigationProvider(text);
+    // `photos/people/places/tags/albums/spaces`. Pass `(payload, scope)` so the
+    // provider can branch: non-nav entity scopes hide the section entirely, bare
+    // `>` returns the full filtered catalog sorted alphabetically, and fuzzy search
+    // runs when there's a payload under scope 'all' or 'nav'.
+    this.sections.navigation = this.runNavigationProvider(this.payload, this.scope);
     // The prior cursor may point at a nav/entity item that no longer exists in the new
     // results. Reconcile synchronously so the highlight doesn't lag the displayed list.
     this.reconcileCursor();
@@ -1278,7 +1452,7 @@ export class GlobalSearchManager {
     this.debounceTimer = setTimeout(() => this.runBatch(text, this.mode), 150);
   }
 
-  protected runBatch(text: string, mode: SearchMode) {
+  protected runBatch(_text: string, mode: SearchMode) {
     this.debounceTimer = null;
     this._batchInFlightStartedAt = performance.now();
     const batch = new AbortController();
@@ -1292,13 +1466,34 @@ export class GlobalSearchManager {
     // batchInFlight at true).
     this.inFlightCounter = 0;
 
+    // Force non-scope entity sections to idle synchronously before dispatching. Under
+    // a prefix scope (e.g. `@alice`), only the matching keys dispatch; everything
+    // else gets reset so stale `ok` content from the pre-prefix query doesn't leak.
+    // Navigation is intentionally omitted here — it's owned by `runNavigationProvider`
+    // in setQuery and is NOT an entity section.
+    const scope = this.scope;
+    const payload = this.payload;
+    const inScope = ENTITY_KEYS_BY_SCOPE[scope];
+    for (const key of ['photos', 'people', 'places', 'tags', 'albums', 'spaces'] as const) {
+      if (!inScope.includes(key)) {
+        this.sections[key] = idle;
+      }
+    }
+
     // Navigation intentionally omitted: it flows through the synchronous
     // runNavigationProvider() call in setQuery and must NOT join the async
     // batch dispatch. Albums / spaces dispatch through their provider.run()
     // which delegates to runAlbums() / runSpaces() — see buildProviders().
-    for (const key of ['photos', 'people', 'places', 'tags', 'albums', 'spaces'] as const) {
+    for (const key of ENTITY_KEYS_BY_SCOPE[scope]) {
       const provider = this.providers[key];
-      if (text.length < provider.minQueryLength) {
+      // minQueryLength gate:
+      //   - scope 'all': payload.length >= provider.minQueryLength (existing rule).
+      //   - scope !== 'all' with payload: relax minRequired to 1.
+      //   - scope !== 'all' with bare prefix (payload === ''): BYPASS entirely so
+      //     the provider's bare-prefix branch renders suggestions.
+      const isBare = scope !== 'all' && payload === '';
+      const minRequired = scope === 'all' ? provider.minQueryLength : 1;
+      if (!isBare && payload.length < minRequired) {
         this.sections[key] = idle;
         continue;
       }
@@ -1322,7 +1517,7 @@ export class GlobalSearchManager {
       // Promise.resolve().then(...) guarantees that a provider which synchronously
       // throws (not just returns a rejected promise) still lands in the .catch handler.
       Promise.resolve()
-        .then(() => provider.run(text, mode, signal))
+        .then(() => provider.run(payload, mode, signal))
         .then((result) => {
           if (batch !== this.batchController) {
             return;
@@ -1386,19 +1581,30 @@ export class GlobalSearchManager {
    * Ties break alphabetically by `albumName`. Slice to top 5; `total` reports the
    * full pre-slice match count so the palette can render a "+N more" affordance.
    *
-   * Queries under 2 chars short-circuit back to idle and skip the catalog fetch —
-   * matches the other providers' minQueryLength contract.
+   * Bare-prefix branch: `rawQuery === ''` dispatches from runBatch when the user
+   * types a bare `/`. Returns the top `ALBUMS_TOP_N` sorted by `endDate ?? ''`
+   * desc. AlbumNameDto has no `updatedAt`; `endDate` — the most recent photo in
+   * the album — is the closest activity proxy. The minQueryLength gate now lives
+   * upstream in runBatch, so no `query.length < 2` early-return here.
    */
   async runAlbums(rawQuery: string): Promise<void> {
     const query = rawQuery.trim().toLowerCase();
-    if (query.length < 2) {
-      this.sections.albums = { status: 'idle' };
-      return;
-    }
     await this.ensureAlbumsCache();
     if (this.albumsCache === undefined) {
       // Catalog fetch failed mid-flight (AbortError) or was rejected and already
       // transitioned the section to 'error' via fetchAlbumsCatalog. Nothing to do.
+      return;
+    }
+
+    if (query === '') {
+      // Bare `/`: top N by `endDate ?? ''` desc. Albums without an endDate sink to
+      // the bottom — the DTO has no updatedAt so endDate is the best proxy we have.
+      const sorted = [...this.albumsCache].sort((a, b) => (b.endDate ?? '').localeCompare(a.endDate ?? ''));
+      const top = sorted.slice(0, ALBUMS_TOP_N);
+      this.sections.albums =
+        top.length === 0
+          ? { status: 'empty' }
+          : { status: 'ok', items: top as unknown as EntityItem[], total: sorted.length };
       return;
     }
 
@@ -1439,19 +1645,32 @@ export class GlobalSearchManager {
    * Ties break alphabetically by `name`. Slice to top 5; `total` reports the full
    * pre-slice match count so the palette can render a "+N more" affordance.
    *
-   * Queries under 2 chars short-circuit back to idle and skip the catalog fetch —
-   * matches the other providers' minQueryLength contract.
+   * Bare-prefix branch: `rawQuery === ''` dispatches from runBatch when the user
+   * types a bare `/`. Returns the top `SPACES_TOP_N` sorted by
+   * `(lastActivityAt ?? createdAt)` desc — falls back to creation date when the
+   * space has never been touched. The minQueryLength gate now lives upstream in
+   * runBatch, so no `query.length < 2` early-return here.
    */
   async runSpaces(rawQuery: string): Promise<void> {
     const query = rawQuery.trim().toLowerCase();
-    if (query.length < 2) {
-      this.sections.spaces = { status: 'idle' };
-      return;
-    }
     await this.ensureSpacesCache();
     if (this.spacesCache === undefined) {
       // Catalog fetch failed mid-flight (AbortError) or was rejected and already
       // transitioned the section to 'error' via fetchSpacesCatalog. Nothing to do.
+      return;
+    }
+
+    if (query === '') {
+      // Bare `/`: top N by `(lastActivityAt ?? createdAt)` desc. Spaces with no
+      // activity fall back to their creation date so first-time visitors still
+      // see something meaningful.
+      const recency = (s: SharedSpaceResponseDto): string => s.lastActivityAt ?? s.createdAt;
+      const sorted = [...this.spacesCache].sort((a, b) => recency(b).localeCompare(recency(a)));
+      const top = sorted.slice(0, SPACES_TOP_N);
+      this.sections.spaces =
+        top.length === 0
+          ? { status: 'empty' }
+          : { status: 'ok', items: top as unknown as EntityItem[], total: sorted.length };
       return;
     }
 
@@ -1501,6 +1720,14 @@ export class GlobalSearchManager {
         return { status: 'error', message: error instanceof Error ? error.message : 'getAllTags failed' };
       }
     }
+    if (query === '') {
+      // Bare `#`: top 5 by `updatedAt` desc. TagResponseDto.updatedAt is required,
+      // but the nullish fallback `?? ''` keeps the sort resilient against future
+      // DTO loosening or partial payloads injected via tests.
+      const sorted = [...this.tagsCache].sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''));
+      const matches = sorted.slice(0, 5);
+      return matches.length === 0 ? { status: 'empty' } : { status: 'ok', items: matches, total: matches.length };
+    }
     const q = query.toLowerCase();
     const matches = this.tagsCache.filter((t) => t.name.toLowerCase().includes(q)).slice(0, 5);
     return matches.length === 0 ? { status: 'empty' } : { status: 'ok', items: matches, total: matches.length };
@@ -1549,6 +1776,24 @@ export class GlobalSearchManager {
       topN: 5,
       minQueryLength: 2,
       run: async (query, _mode, signal) => {
+        if (query === '') {
+          // Bare-@: suggestions from getAllPeople, sorted via personSuggestionsComparator.
+          try {
+            await this.ensurePeopleSuggestionsCache();
+          } catch {
+            // ensurePeopleSuggestionsCache already transitioned the section (guarded
+            // by scope/payload still being bare-@) or silently dropped an AbortError.
+            // Return the current section state so runBatch's assignment is idempotent.
+            return this.sections.people;
+          }
+          if (this.peopleSuggestionsCache === undefined) {
+            // Mid-flight close (closeSignal abort) drops the cache without transitioning
+            // the section — surface whatever the section currently holds.
+            return this.sections.people;
+          }
+          const items = this.peopleSuggestionsCache.slice(0, 10);
+          return items.length === 0 ? { status: 'empty' } : { status: 'ok', items, total: items.length };
+        }
         try {
           const results = await searchPerson({ name: query, withHidden: false }, { signal });
           return results.length === 0
