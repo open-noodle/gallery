@@ -234,28 +234,61 @@ Pre-built Docker images are published to GitHub Container Registry (GHCR) under 
 
 ### Publishing
 
-Images are built and published by the **Release Gallery** GitHub Actions workflow (`.github/workflows/gallery-release.yml`). The workflow is **manually triggered** via `workflow_dispatch` — it does not run automatically on merges to `main`.
+Gallery uses a **two-phase release flow** so mobile app builds are already live on Play Store and App Store before server users see a new version. Both workflows are **manually triggered** via `workflow_dispatch`.
 
-**How it works:**
+**Phase 1 — Release Mobile** (`.github/workflows/gallery-release-mobile.yml`)
 
-1. A maintainer triggers the workflow from the Actions tab (or via `gh workflow run`), optionally passing an explicit version.
-2. If no version is passed, the next semver is computed from commits since the latest tag:
-   - `changelog:skip` PR label → **no release** (skips build, tag, and push entirely)
-   - `feat:` commit or `changelog:feat` PR label → **minor** bump (e.g. `v4.2.6` → `v4.3.0`)
-   - `BREAKING CHANGE` in commit body → **major** bump (e.g. `v4.3.0` → `v5.0.0`)
-   - Everything else (`fix:`, `docs:`, `chore:`, etc.) → **patch** bump (e.g. `v4.2.6` → `v4.2.7`)
-3. Three jobs run in parallel: server, ML (CPU), and ML (CUDA)
-4. Each image is tagged with the version, the major version (e.g. `v4`), and `release`
-5. Git tags are created after successful builds
-6. Images are pushed to GHCR using the built-in `GITHUB_TOKEN` — no extra secrets needed
+1. Maintainer triggers the workflow from the Actions tab. Version is computed automatically from commits since the last tag (rules below), or passed explicitly via input.
+2. The mobile app is built and signed. Android AAB uploads to Play Store **internal** track; iOS IPA uploads to TestFlight.
+3. A **draft** GitHub Release is created pinning the version (tag name), commit SHA (`target_commitish`), and APK (asset). The draft is invisible to end users.
+4. The maintainer manually promotes the Play internal build to **production** in Play Console and submits the App Store for review. Once both stores show the new version live to end users, proceed to phase 2. Typically ~24h.
 
-**To publish a specific version:**
+**Phase 2 — Release Gallery** (`.github/workflows/gallery-release.yml`)
+
+1. Maintainer triggers the workflow from the Actions tab. No inputs.
+2. The workflow discovers the pending draft from phase 1, reads the pinned version + SHA, and checks out at that exact SHA — so the server image matches the commit the mobile app was built from.
+3. `gallery-server` and `gallery-ml` images build (amd64 + arm64 matrix) and push to GHCR tagged with the version, the major version (`v4`), and `release`.
+4. Git tags are created: `vX.Y.Z` at the pinned SHA, and the floating `vN` + `release` tags move forward.
+5. The draft release is promoted to published (`--latest`). The APK attached in phase 1 becomes the public sideload download.
+6. `version.json` is uploaded to the S3 version endpoint — self-hosted instances polling this endpoint now show "new version available".
+
+**Version selection** (phase 1)
+
+- `changelog:skip` PR label → commit is excluded from the bump computation
+- `feat:` commit or `changelog:feat` PR label → **minor** bump (e.g. `v4.2.6` → `v4.3.0`)
+- `BREAKING CHANGE` in commit body or `!` in commit prefix (e.g. `feat!:`) → **major** bump
+- Everything else (`fix:`, `docs:`, `chore:`, etc.) → **patch** bump
+
+If every commit since the last tag is `changelog:skip`, phase 1 errors — there is nothing to release.
+
+**Design properties**
+
+- Phase 2 builds from the draft's pinned SHA, not from `main`'s HEAD. Commits landing on main between the two phases are excluded from this release and ship in the next cycle.
+- Manual edits to the draft's release notes during the waiting period are preserved — phase 2 promotes without regenerating notes.
+- Both workflows fail fast if triggered from any branch other than `main`.
+
+**Triggering a release**
 
 ```bash
-gh workflow run gallery-release.yml --ref main -f version=v4.2.6
+# Phase 1 — auto-bump version from commit messages
+gh workflow run gallery-release-mobile.yml --ref main
+
+# Phase 1 — explicit version
+gh workflow run gallery-release-mobile.yml --ref main -f version=v4.2.6
+
+# Phase 2 — promote (after mobile is live on both stores)
+gh workflow run gallery-release.yml --ref main
 ```
 
-Or use the GitHub Actions UI: Actions > Release Gallery > Run workflow > enter version (or leave blank for auto-bump) > Run.
+**Recovering from mobile rejection**
+
+If a store rejects the mobile build, discard the draft and rerun phase 1 after fixing:
+
+```bash
+gh release delete vX.Y.Z --cleanup-tag --yes
+```
+
+See `docs/plans/2026-04-17-split-mobile-server-release-design.md` for the full design.
 
 ## Contributing
 
