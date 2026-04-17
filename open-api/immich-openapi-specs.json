@@ -2229,6 +2229,49 @@
         "x-immich-state": "Stable"
       }
     },
+    "/albums/names": {
+      "get": {
+        "description": "Returns a lightweight list of albums available to the authenticated user for quick palette lookups.",
+        "operationId": "getAlbumNames",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AlbumNameDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Retrieve album names",
+        "tags": [
+          "Albums"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v2",
+            "state": "Added"
+          }
+        ]
+      }
+    },
     "/albums/statistics": {
       "get": {
         "description": "Returns statistics about the albums available to the authenticated user.",
@@ -18536,6 +18579,40 @@
         },
         "required": [
           "isOnboarded"
+        ],
+        "type": "object"
+      },
+      "AlbumNameDto": {
+        "properties": {
+          "albumName": {
+            "type": "string"
+          },
+          "albumThumbnailAssetId": {
+            "nullable": true,
+            "type": "string"
+          },
+          "assetCount": {
+            "type": "number"
+          },
+          "endDate": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "shared": {
+            "type": "boolean"
+          },
+          "startDate": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "albumName",
+          "albumThumbnailAssetId",
+          "assetCount",
+          "id",
+          "shared"
         ],
         "type": "object"
       },
