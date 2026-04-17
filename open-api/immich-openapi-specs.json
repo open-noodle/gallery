@@ -6738,6 +6738,15 @@
                 "VIDEO"
               ]
             }
+          },
+          {
+            "name": "withSharedSpaces",
+            "required": false,
+            "in": "query",
+            "description": "Include shared space assets",
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -7520,6 +7529,15 @@
             "required": false,
             "in": "query",
             "description": "Include shared album assets",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "withSharedSpaces",
+            "required": false,
+            "in": "query",
+            "description": "Include shared space assets",
             "schema": {
               "type": "boolean"
             }
