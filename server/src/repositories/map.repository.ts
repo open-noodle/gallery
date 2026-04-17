@@ -20,6 +20,7 @@ export interface MapMarkerSearchOptions {
   isFavorite?: boolean;
   fileCreatedBefore?: Date;
   fileCreatedAfter?: Date;
+  spaceIds?: string[];
 }
 
 export interface GeoPoint {
