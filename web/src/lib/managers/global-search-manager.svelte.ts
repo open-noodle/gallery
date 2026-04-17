@@ -110,6 +110,24 @@ const ENTITY_KEYS_BY_SCOPE: Record<Scope, ReadonlyArray<EntitySectionKey>> = {
   nav: [],
 };
 
+// Priority order used by `reconcileCursor` to pick a new highlight when the
+// prior active item disappears from all sections. Unlike `ENTITY_KEYS_BY_SCOPE`
+// (which dispatches async providers and intentionally excludes `navigation`),
+// this list INCLUDES `navigation` so scope 'all' can fall through to it when
+// every entity section is empty. Per-scope orders are scoped down to the
+// matching sections so the cursor lands on a row the user's prefix actually
+// surfaces — e.g. under `@` the cursor never jumps to an unrelated photo.
+//
+// The all-scope order matches render order (photos, albums, spaces, people,
+// places, tags, navigation) so the cursor lands on the first visible row.
+const RECONCILE_ORDER_BY_SCOPE: Record<Scope, ReadonlyArray<keyof Sections>> = {
+  all: ['photos', 'albums', 'spaces', 'people', 'places', 'tags', 'navigation'],
+  people: ['people'],
+  tags: ['tags'],
+  collections: ['albums', 'spaces'],
+  nav: ['navigation'],
+};
+
 function isValidRecentEntry(e: RecentEntry): boolean {
   switch (e.kind) {
     case 'query': {
@@ -894,7 +912,10 @@ export class GlobalSearchManager {
     if (this.getActiveItem() !== null) {
       return;
     }
-    const order = ['photos', 'people', 'places', 'tags', 'navigation'] as const;
+    // Scope-aware priority walk. `RECONCILE_ORDER_BY_SCOPE` holds the per-scope
+    // priority so the highlight lands on a row the user's active prefix actually
+    // surfaces (e.g. under `@` the cursor never jumps to an unrelated photo).
+    const order = RECONCILE_ORDER_BY_SCOPE[this.scope];
     const kindOf: Record<keyof Sections, string> = {
       photos: 'photo',
       people: 'person',

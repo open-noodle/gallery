@@ -4088,3 +4088,65 @@ describe('prefix scoping — setQuery SWR scope behavior', () => {
     expect(getAlbumNamesSpy).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('prefix scoping — reconcileCursor', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    vi.useFakeTimers();
+    installFakeAbortTimeout();
+    vi.mocked(searchSmart).mockResolvedValue({ assets: { items: [], nextPage: null } } as never);
+    vi.mocked(searchAssets).mockResolvedValue({ assets: { items: [], nextPage: null } } as never);
+    vi.mocked(searchPerson).mockResolvedValue([] as never);
+    vi.mocked(searchPlaces).mockResolvedValue([] as never);
+    vi.mocked(getAllTags).mockResolvedValue([] as never);
+    vi.mocked(getAlbumNames).mockResolvedValue([] as never);
+    vi.mocked(getAllSpaces).mockResolvedValue([] as never);
+    vi.mocked(getAllPeople).mockResolvedValue({ people: [], total: 0, hidden: 0, hasNextPage: false } as never);
+  });
+
+  afterEach(() => {
+    restoreAbortTimeout();
+    vi.useRealTimers();
+  });
+
+  it('all reconcile order is [photos, albums, spaces, people, places, tags, navigation]', () => {
+    const m = new GlobalSearchManager();
+    // All sections empty except albums with one item.
+    m.sections.albums = { status: 'ok', items: [{ id: 'a1' }] as never, total: 1 };
+    m.setActiveItem(null);
+    m.reconcileCursor();
+    expect(m.activeItemId).toBe('album:a1');
+  });
+
+  it('scope transition preserves cursor when target stays in scope', () => {
+    const m = new GlobalSearchManager();
+    m.sections.people = { status: 'ok', items: [{ id: 'alice-id' } as never], total: 1 };
+    m.setActiveItem('person:alice-id');
+
+    m.setQuery('@');
+    // Do not advance — prove cursor is still on Alice through the synchronous scope transition.
+    expect(m.activeItemId).toBe('person:alice-id');
+  });
+
+  it('scope transition reconciles when target exits scope', () => {
+    const m = new GlobalSearchManager();
+    m.sections.photos = { status: 'ok', items: [{ id: 'p1' } as never], total: 1 };
+    m.sections.people = { status: 'ok', items: [{ id: 'alice-id' } as never], total: 1 };
+    m.setActiveItem('photo:p1');
+
+    m.setQuery('@alice');
+    // Photo cursor exits scope; reconcile picks first person.
+    expect(m.activeItemId).toBe('person:alice-id');
+  });
+
+  it('/trip lands cursor on first album (albums before spaces)', async () => {
+    const m = new GlobalSearchManager();
+    m.albumsCache = [{ id: 'a1', albumName: 'Trip 2024', endDate: '2026-04-15T00:00:00Z' }] as never;
+    m.spacesCache = [{ id: 's1', name: 'Trip club', createdAt: '2026-04-15T00:00:00Z' }] as never;
+    m.setQuery('/trip');
+    await vi.advanceTimersByTimeAsync(150);
+    await vi.runAllTimersAsync();
+    expect(m.activeItemId).toBe('album:a1');
+  });
+});
