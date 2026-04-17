@@ -1,0 +1,21 @@
+export type Scope = 'all' | 'people' | 'tags' | 'collections' | 'nav';
+export type ParsedQuery = { scope: Scope; payload: string };
+
+const PREFIX_MAP: Record<string, Scope> = {
+  '@': 'people',
+  '#': 'tags',
+  '/': 'collections',
+  '>': 'nav',
+};
+
+export function parseScope(rawText: string): ParsedQuery {
+  const text = rawText.trim();
+  if (text.length === 0) {
+    return { scope: 'all', payload: '' };
+  }
+  const scope = PREFIX_MAP[text[0]];
+  if (!scope) {
+    return { scope: 'all', payload: text };
+  }
+  return { scope, payload: text.slice(1).trim() };
+}
