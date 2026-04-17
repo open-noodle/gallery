@@ -2,56 +2,69 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Ship the Photos-tab entry point (filter icon in app bar), the `FilterSheet` with peek + browse snaps (deep is a stub), and the `photosTimelineQueryProvider` that switches the Photos timeline between the library service (empty filter) and a page-1 search-backed service (non-empty filter). Design: [`2026-04-17-mobile-filter-sheet-design.md`](./2026-04-17-mobile-filter-sheet-design.md) §10.3 PR 1.2.
+**Goal:** Ship the Photos-tab entry point (filter icon in the app bar), the `FilterSheet` with peek + browse snaps (deep is a stub), a 250 ms-debounced `photosFilterDebouncedProvider` feeding suggestions, and the `photosTimelineQueryProvider` that switches the Photos timeline between the library service (empty filter) and a page-1 search-backed service (non-empty filter). Design: [`2026-04-17-mobile-filter-sheet-design.md`](./2026-04-17-mobile-filter-sheet-design.md) §10.3 PR 1.2. Mockup: [`mockups/2026-04-17-mobile-filter-sheet.html`](./mockups/2026-04-17-mobile-filter-sheet.html).
 
-**Architecture:** Thin reactive composition — UI watches `photosFilterProvider` / `photosFilterSheetProvider` / `photosFilterSuggestionsProvider` / `photosFilterCountProvider` (all shipped in PR 1.1) and calls notifier methods. The sheet is a **single** `DraggableScrollableSheet` conditionally mounted in `MainTimelinePage`'s `Stack` overlay; it owns all three snap states — **peek content lives inside the sheet**, not as a separate rail widget (single source of truth per design §6.2). Snap-state drives visibility + drag constraints through `photosFilterSheetProvider`. `photosTimelineQueryProvider` overrides `timelineServiceProvider` via a `ProviderScope`: empty filter → the existing main library service; non-empty filter → a `TimelineService` built from `TimelineFactory.fromAssets` fed by **page-1-only** `SearchService.search` results (pagination deferred to PR 1.2.1 follow-up).
+**Architecture.** Thin reactive composition — UI watches `photosFilterProvider` / `photosFilterSheetProvider` / a new `photosFilterDebouncedProvider` / `photosFilterSuggestionsProvider` / `photosFilterCountProvider` and calls notifier methods. The sheet is a **single** `DraggableScrollableSheet` owning all three snap states (peek, browse, deep-stub); peek content lives inside the sheet — there is **no** standalone `PeekRail` widget. Provider changes drive both mount/unmount and programmatic snap transitions via `DraggableScrollableController.animateTo`. `photosTimelineQueryProvider` overrides `timelineServiceProvider` via a `ProviderScope` override; it builds a sync `TimelineService` — empty filter → the main-library service; non-empty + logged-in → a `TimelineService` wrapping `TimelineFactory.fromAssetStream` whose buffer is filled by `SearchService.search(filter, 1)` asynchronously and whose `Stream<int>` emits `assets.length` once the future resolves.
 
-**Tech stack:** Flutter, `hooks_riverpod`, Material 3 theme tokens via `Theme.of(context)`, `flutter_test` + `mocktail`, existing `TimelineFactory` / `TimelineService` infrastructure, the domain-layer `searchServiceProvider` at `mobile/lib/providers/infrastructure/search.provider.dart:8` (explicitly **not** the legacy `mobile/lib/services/search.service.dart:14` variant — these two providers collide in name; see PR 1.1 Task 1.1.17 note).
+**Tech stack:** Flutter, `hooks_riverpod`, Material 3 theme tokens via `Theme.of(context)`, `easy_localization` for i18n (ICU plurals supported), `intl` `NumberFormat` for locale-aware counts, `flutter_test` + `mocktail`, `fake_async` for timer-based tests, the **domain-layer** `searchServiceProvider` at `mobile/lib/providers/infrastructure/search.provider.dart:8` (explicitly NOT the legacy `mobile/lib/services/search.service.dart:14` — these two providers collide in name). Existing `TimelineFactory` / `TimelineService` at `mobile/lib/domain/services/timeline.service.dart`.
 
 **Scope guardrails:**
 
-- **Deep state is a stub.** Browse → Deep drag lands on a placeholder panel saying "Full filters coming in the next update"; no sections, no pickers. Design §5.2 Deep content is PR 1.3.
-- **No pickers.** "Search N →" affordances hidden (Phase 1 per §5.3 ships them only in Deep, which is PR 1.3).
-- **No Search-tab retirement.** Bottom nav stays 4 tabs (PR 1.4).
-- **No orphan reconciliation.** Deferred to Phase 1.5 per PR 1.1 §7 audit.
-- **Camera strip omitted.** Phase 1 decision (§4.8).
-- **Aesthetic tokens.** Material 3 defaults only — no darkroom palette (§3).
-- **Pagination on the search-backed timeline is deferred to PR 1.2.1.** Non-empty-filter Timeline shows at most one page (default `SearchApiRepository.search` page size). Flagged in PR body as a known limitation.
-- **PlacesStrip sets `country` only** on tap (no cascade in Browse). The country + city cascade is Deep / PR 1.3.
-- **No `SearchBar` paste-override behaviour.** Uses the standard debounce on every change; explicit paste detection deferred.
+- **Deep state is a stub** (centered "Full filters coming in the next update"). Real Deep ships in PR 1.3.
+- **No pickers.** "Search N →" affordances hidden.
+- **No Search-tab retirement** (PR 1.4).
+- **No orphan reconciliation** (Phase 1.5).
+- **Camera strip omitted** (§4.8).
+- **Pagination on the search-backed timeline deferred to PR 1.2.1.** Non-empty filter renders at most one page.
+- **PlacesStrip sets `country` only** on tap (country → city cascade is PR 1.3 Deep).
+- **SearchBar uses plain debounce** — no paste-override fast-path.
+- **Material 3 defaults only** — no bespoke darkroom palette (§3).
+- **Spillover People-chip tap body is a no-op** in PR 1.2 (the modal is PR 1.3). The × still works.
+- **Zero-matches Timeline overlay** is deferred to PR 1.2.1 — Phase 1 shows whatever the Timeline does on empty input (existing empty-state). The sheet's count still shows 0.
 
 ---
 
-## Landmarks & pre-verified facts
+## Pre-flight audits (done — outputs baked below)
 
-- Worktree: `/home/pierre/dev/gallery/.worktrees/mobile-filter-sheet-ui`. Branch: `feat/mobile-filter-sheet-ui` off `origin/main`.
-- Providers shipped in PR 1.1 (on `main`):
-  - `mobile/lib/providers/photos_filter/photos_filter.provider.dart` — `photosFilterProvider` (`NotifierProvider<PhotosFilterNotifier, SearchFilter>`) with: `togglePerson(PersonDto)`, `toggleTag(String)`, `setLocation(SearchLocationFilter?)`, `setDateRange({start, end})`, `setRating(int?)`, `setMediaType(AssetType?)`, `setFavouritesOnly/Archived/NotInAlbum(bool)`, `setText(String)`, `clearPeople/Tags()`, `clearDimension(Dimension)`, `removeChip(ChipId)`, `reset()`. Also has `updateShouldNotify` structural-equality override (so equal states do not re-emit).
-  - `filter_sheet.provider.dart` — `photosFilterSheetProvider` (`StateProvider<FilterSheetSnap>`, enum `hidden | peek | browse | deep`, default `hidden`).
-  - `filter_suggestions.provider.dart` — `photosFilterSuggestionsProvider` (`FutureProvider.autoDispose.family<FilterSuggestionsResponseDto, SearchFilter>`).
-  - `filter_count.provider.dart` — `photosFilterCountProvider` (`FutureProvider.autoDispose<int>`, **placeholder** = page-1 result length; not a true total).
-  - `chip_id.dart` — `ChipId` sealed type (PersonChipId/TagChipId/LocationChipId/DateChipId/RatingChipId/MediaTypeChipId/FavouriteChipId/ArchiveChipId/NotInAlbumChipId/TextChipId). Each subclass has explicit `==` / `hashCode`.
-  - `photos_filter.dart` — barrel export.
-- Host page: `mobile/lib/presentation/pages/dev/main_timeline.page.dart` — `ConsumerWidget` returning `Timeline(...)`. Will be wrapped in a `Stack` overlay with the sheet.
-- Timeline: `mobile/lib/presentation/widgets/timeline/timeline.widget.dart` builds a nested `ProviderScope` that overrides **only** `timelineArgsProvider` (lines 72-86). It reads `timelineServiceProvider` via `ref.read(timelineServiceProvider)` at line 335 — that read resolves through the parent scope (the inner scope does not override it). **A parent-level `ProviderScope` override on `timelineServiceProvider` therefore propagates into `Timeline` unmodified.** `timelineServiceProvider` declares `dependencies: []` (canonical override pattern — `domain/services/timeline.service.dart:17-28`).
-- `TimelineFactory` methods (`domain/services/timeline.service.dart:40-95`): `.main()`, `.fromAssets(List<BaseAsset>, TimelineOrigin)`, `.fromAssetStream(List<BaseAsset> Function(), Stream<int>, TimelineOrigin)`. **`fromAssetStream` expects a `getAssets` closure returning a pre-accumulated buffer synchronously AND a `Stream<int>` emitting asset count.** Not a `Stream<List<BaseAsset>>`.
-- `SearchResult` (`models/search/search_result.model.dart`) carries `List<Asset>` (legacy Isar `Asset`). Drift domain uses `BaseAsset`. Adapter needs an Isar→Drift conversion, via `assetRepositoryProvider.getAllByRemoteId(ids)` — mirrors existing `SearchService.search`.
-- `SearchService` (`services/search.service.dart:34`) — `Future<SearchResult?> search(SearchFilter, int page)`. `SearchResult.assets` is **already** Drift-converted by `SearchService` via `_assetRepository.getAllByRemoteId(...)`. ✓ No extra conversion step needed in adapter — it's already `List<Asset>`; needs cast/pass-through to `List<BaseAsset>`.
-- `currentUserProvider` returns `UserDto?` (nullable); `photosTimelineQueryProvider` must handle pre-login.
-- i18n: `i18n/en.json` (flat key → string). Existing: `filter`, `reset`, `done`. Sort via `pnpm --filter=immich-i18n format:fix` per memory `feedback_i18n_key_sorting`.
-- App bar component: `mobile/lib/widgets/common/immich_sliver_app_bar.dart:25` — accepts optional `actions`.
-- **Sheet widget choice:** stock `DraggableScrollableSheet` (PR 1.0 spike §11.4 never filled). If keyboard-with-`TextField` breaks during Task 4, stop, document in §11.4, and escalate — do **not** silently ship broken UX.
+- **`SearchFilter`** (`mobile/lib/models/search/search_filter.model.dart:211`): has `empty()` factory, `isEmpty` getter, structural `==` (via PR 1.1), `copyWith` null-coalesces (memory `feedback_searchfilter_copywith_cascade` — use cascade for nullable clears; PR 1.1 notifier already does this).
+- **`PersonDto`** (`mobile/lib/domain/models/person.model.dart:4`): full structural `==` across `id`, `birthDate`, `isHidden`, `name`, `thumbnailPath`, `updatedAt`. **Consequence for PeopleStrip:** building a new `PersonDto` from `FilterSuggestionsPersonDto{id, name}` will mismatch any existing entry with a different thumbnailPath/isHidden/etc. PeopleStrip taps **must** resolve against state by id: if `filter.people.any((p) => p.id == fsPerson.id)`, call `togglePerson(existingPersonDto)`; else build a new minimal `PersonDto(id, name, isHidden: false, thumbnailPath: '')` and call `togglePerson(new)`. The remove path uses the existing instance to hit `Set<PersonDto>.remove` by full equality.
+- **`FilterSuggestionsResponseDto`**: `{cameraMakes, countries, hasUnnamedPeople, mediaTypes, people, ratings, tags}`. `FilterSuggestionsPersonDto{id, name}`. `FilterSuggestionsTagDto{id, value}`. No thumbnail field on person DTO; PeopleStrip resolves thumbnail via `getFaceThumbnailUrl(person.id)` (`mobile/lib/utils/image_url_builder.dart:64`). Existing pattern: `CircleAvatar(backgroundImage: RemoteImageProvider(url: getFaceThumbnailUrl(person.id)))`.
+- **`TimelineOrigin.search`** exists (`mobile/lib/domain/services/timeline.service.dart:34`) — use for non-empty filter.
+- **`TimelineFactory.fromAssetStream(List<BaseAsset> Function() getAssets, Stream<int> assetCount, TimelineOrigin type)`** — `getAssets` returns a synchronous buffer; `assetCount` emits on data-available. Plan Task 1 builds exactly this shape.
+- **`SearchService.search(SearchFilter, int page)`** — already Drift-converts results; `SearchResult.assets` is `List<Asset>`. `Asset extends BaseAsset`, so `List<Asset>` is assignable to `List<BaseAsset>` via `.cast<BaseAsset>()`.
+- **`Timeline` widget** (`mobile/lib/presentation/widgets/timeline/timeline.widget.dart`) builds a nested `ProviderScope` that overrides **only** `timelineArgsProvider` and optionally `readonlyModeProvider`; it does NOT override `timelineServiceProvider`. A parent-scope override on `timelineServiceProvider` therefore propagates into `Timeline` unmodified. `timelineServiceProvider` has `dependencies: []`, the canonical override pattern.
+- **`ImmichSliverAppBar`** (`mobile/lib/widgets/common/immich_sliver_app_bar.dart:26`) accepts `actions: List<Widget>?` — filter icon slots in here.
+- **No `Shimmer` dependency** in mobile/pubspec. Skeleton loaders use plain `Container(color: theme.colorScheme.surfaceContainerHighest)` rectangles.
+- **`photosFilterSuggestionsProvider` has no internal debounce** (PR 1.1 comment: "Debouncing intentionally lives at the consumer"). Plan Task 1.5 adds `photosFilterDebouncedProvider`.
+- **`photosFilterCountProvider`** is a placeholder = page-1 length. Count never exceeds page size. Tests assert the widget binds to whatever the provider exposes, not to a "true total".
 
 ---
 
-## Global decisions (apply to all tasks)
+## Global decisions (apply across tasks)
 
-- **Single sheet ownership.** `FilterSheet` owns peek + browse + deep snaps as internal snap-state views. There is **no** standalone `PeekRail` widget mounted outside the sheet. The sheet is mounted iff `photosFilterSheetProvider != hidden`; at snap `peek` the sheet's content is a compact chiprail + count.
-- **Hidden → peek auto-transition.** When the user adds the first filter from a `hidden` state, the sheet snap should auto-advance to `peek`. Implementation: a `ref.listen(photosFilterProvider, ...)` in a top-level mount-point (the `MainTimelinePage` widget) that observes `SearchFilter.isEmpty` transitioning from `true → false` and, iff the current sheet state is `hidden`, sets it to `peek`. Conversely, when `isEmpty` transitions `false → true` and sheet is `peek`, set to `hidden`. (Browse/Deep snaps are left alone — user explicitly opened those.)
-- **Snap debounce.** `NotificationListener<DraggableScrollableNotification>` observes drag. We write `photosFilterSheetProvider` **only on settle** — i.e., when `(notification.extent - snap).abs() < 0.02` for some `snap ∈ {0.15, 0.62, 0.95}`. No time-based debounce needed; settle is a discrete event.
-- **Scrim.** A `Positioned.fill` `ColoredBox(Colors.black54 or Theme.scrimColor)` rendered behind the sheet for snap ∈ {browse, deep}. Tap: browse → peek if `!isEmpty` else hidden; deep → browse.
-- **Material 3 theme tokens only.** Every widget reads `Theme.of(context)`; no hardcoded colours (memory `feedback_match_gallery_design`).
-- **Test helpers.** Use `TestUtils.createContainer({overrides})` (`mobile/test/test_utils.dart`) for provider-only tests. For widget tests that need a timeline, use `ProviderScope` override on `timelineServiceProvider` with a stub `TimelineService`.
+- **Single-sheet ownership.** `FilterSheet` owns peek + browse + deep snaps internally. No standalone `PeekRail`.
+- **Sheet mount gate.** Mount iff `photosFilterSheetProvider != hidden`. On `hidden`, widget returns `SizedBox.shrink()`.
+- **Programmatic snap transitions.** Inside `FilterSheet`'s `ConsumerStatefulWidget` State, a `DraggableScrollableController` is created in `initState`. A `ref.listen(photosFilterSheetProvider, (prev, next) { … })` in `build` animates the controller to the target extent when the provider changes without user drag:
+  ```dart
+  ref.listen<FilterSheetSnap>(photosFilterSheetProvider, (prev, next) {
+    if (prev == next) return;
+    if (next == FilterSheetSnap.hidden) return; // unmount handled by outer build
+    final target = _snapExtent(next);
+    if ((_controller.size - target).abs() < 0.01) return; // already there (drag-driven)
+    _controller.animateTo(target, duration: const Duration(milliseconds: 280), curve: Curves.easeOutCubic);
+  });
+  ```
+- **Settle-driven sync back to provider.** `NotificationListener<DraggableScrollableNotification>` writes to the provider only on settle (`(extent - snap).abs() < 0.02` for some snap in `{0.15, 0.62, 0.95}`), and only if the resulting enum differs from the current provider value.
+- **Hidden → peek auto-transition** (and peek → hidden on last-chip removal) lives as a `ref.listen(photosFilterProvider.select((f) => f.isEmpty), …)` in `MainTimelinePage`'s State. Fires on `true → false` (set peek iff hidden) and `false → true` (set hidden iff peek). Browse/Deep are left alone.
+- **Scrim.** `Positioned.fill(child: AnimatedOpacity(opacity: scrimOpacity, duration: 150ms, child: ColoredBox(color: theme.colorScheme.scrim.withOpacity(.32))))`. Opacity 0 at peek, 0.32 at browse/deep. Tap: `GestureDetector` behind the sheet — browse→peek if non-empty else hidden, deep→browse.
+- **Debounce layer (250 ms)** for suggestions — see Task 1.5.
+- **Debounce layer (500 ms)** for timeline — see Task 1.
+- **Material 3 theme tokens only** — `Theme.of(context).colorScheme.*`. No hardcoded colours. Dark-mode tests pair any widget with theme-dependent rendering (chips, scrim, shimmers, toggles).
+- **Locale-aware numbers.** Match-count renders via `NumberFormat.decimalPattern(Intl.getCurrentLocale()).format(count)`.
+- **ICU pluralisation.** `filter_sheet_match_count_photos` uses ICU: `"{count, plural, =0{No photos} =1{1 photo} other{{count} photos}}"` (`easy_localization` supports the `.plural(count)` extension — verify during Task 7).
+- **A11y.** Match count wrapped in `Semantics(liveRegion: true, label: ...)`; snap-state transitions announced via `SemanticsService.announce(label, TextDirection.ltr)` when `MediaQuery.accessibleNavigation` is true.
+- **Haptics.** Strip taps call `HapticFeedback.selectionClick()` on successful toggle.
+- **Chip visual taxonomy.** `ActiveChipSpec` carries a `ChipVisual` enum: `person` (1-3 overlapping avatars), `tag` (Material 3 `AssistChip` with a leading coloured dot), `location` (flag glyph — Phase 1 uses `Icons.place_rounded`; a true country-flag component is deferred to PR 2.x), `when` (label only, `ff-monospace` — `TextStyle(fontFeatures: [FontFeature.tabularFigures()], letterSpacing: .4)`), `rating` (leading `★` glyph), `media` (leading icon from type), `toggle` (leading icon: heart/archive/folder), `text` (leading `Icons.search_rounded`). `ActiveFilterChip` switches rendering on `spec.visual`.
 
 ---
 
@@ -60,35 +73,153 @@
 **Files:**
 
 - Create: `mobile/lib/providers/photos_filter/timeline_query.provider.dart`
-- Create: `mobile/lib/domain/services/photos_filter_timeline.service.dart` (thin helper building `List<BaseAsset>` from `SearchService.search(filter, 1)`)
+- Create: `mobile/lib/domain/services/photos_filter_search_timeline.dart` (pure helper: given `SearchService`, `SearchFilter`, `TimelineFactory` → returns a wired `TimelineService`).
 - Test: `mobile/test/providers/photos_filter/timeline_query_provider_test.dart`
+- Test: `mobile/test/domain/services/photos_filter_search_timeline_test.dart`
+
+**Behaviour (synchronous `Provider<TimelineService>`; override-compatible):**
+
+```dart
+final photosTimelineQueryProvider = Provider<TimelineService>(
+  (ref) {
+    final filter = ref.watch(photosFilterProvider);
+    final currentUserId = ref.watch(currentUserProvider.select((u) => u?.id));
+    final timelineUsers = ref.watch(timelineUsersProvider).valueOrNull ?? const [];
+    final factory = ref.watch(timelineFactoryProvider);
+
+    // Pre-login OR empty filter → main library service (keeps baseline behaviour).
+    if (currentUserId == null || filter.isEmpty) {
+      final svc = factory.main(timelineUsers, currentUserId ?? '');
+      ref.onDispose(svc.dispose);
+      return svc;
+    }
+
+    // Non-empty + logged-in → search-backed sync service with async buffer fill.
+    final search = ref.watch(searchServiceProvider);
+    final svc = buildPhotosFilterSearchTimeline(factory: factory, search: search, filter: filter);
+    ref.onDispose(svc.dispose);
+    return svc;
+  },
+  dependencies: const [],
+);
+```
+
+**`buildPhotosFilterSearchTimeline` helper:**
+
+```dart
+TimelineService buildPhotosFilterSearchTimeline({
+  required TimelineFactory factory,
+  required SearchService search,
+  required SearchFilter filter,
+}) {
+  final buffer = <BaseAsset>[];
+  final countCtrl = StreamController<int>.broadcast();
+
+  // Fire-and-forget; cancellation is handled by the broadcast StreamController
+  // which simply has no listeners once the service is disposed.
+  () async {
+    final result = await search.search(filter, 1);
+    buffer
+      ..clear()
+      ..addAll(result?.assets ?? const <BaseAsset>[]);
+    if (!countCtrl.isClosed) countCtrl.add(buffer.length);
+  }();
+
+  // Emit an initial 0 so the TimelineService knows the buffer is empty until the future resolves.
+  scheduleMicrotask(() {
+    if (!countCtrl.isClosed) countCtrl.add(0);
+  });
+
+  final svc = factory.fromAssetStream(() => List<BaseAsset>.unmodifiable(buffer), countCtrl.stream, TimelineOrigin.search);
+  // Close the controller when the wrapping service disposes.
+  // TimelineService exposes dispose(); we chain a close on top.
+  return _DisposingTimelineService(inner: svc, onDispose: () async {
+    if (!countCtrl.isClosed) await countCtrl.close();
+  });
+}
+```
+
+> **`_DisposingTimelineService`** is a thin wrapper that forwards all methods to `inner` and calls `onDispose` before forwarding `dispose()`. Document its signature inline in the helper file.
+
+**Debounce (500 ms on filter-change → service re-creation).** A Riverpod `Provider` re-runs synchronously on its watched dependency change, so a naive implementation churns services on every keystroke/tap. Debouncing is handled in **Task 1.5** via `photosFilterDebouncedProvider` that the strips + this provider both read instead of the raw `photosFilterProvider`. **Inside `photosTimelineQueryProvider`**, we read the **debounced** filter (not raw), so service re-creation is naturally gated by Task 1.5's debounce:
+
+```dart
+// Replace ref.watch(photosFilterProvider) with:
+final filter = ref.watch(photosTimelineFilterProvider); // 500ms-debounced variant exposed in Task 1.5
+```
+
+**Tests (`timeline_query_provider_test.dart`):**
+
+1. Empty filter → `TimelineFactory.main` invoked with the user's id.
+2. Non-empty filter + logged-in → `buildPhotosFilterSearchTimeline` path; `SearchService.search(filter, 1)` called once; `TimelineService` origin is `search`.
+3. Pre-login (`currentUserProvider` override = `null`) + non-empty filter → main-library fallback; no search call.
+4. Empty → non-empty transition disposes previous service, builds new one.
+5. Non-empty → empty transition disposes search service, restores main-library service.
+6. Net-zero change (toggle + untoggle same id inside `updateShouldNotify` window): zero re-creations (PR 1.1 `updateShouldNotify` coalesces).
+7. `SearchService.search` returns `null` → buffer stays empty; `Stream<int>` emits 0 only; no crash.
+8. Disposal: closing the outer ProviderScope disposes the service and closes the inner `StreamController`.
+9. Two rapid filter changes at < 50 ms → see Task 1.5 (timeline watches debounced filter → two changes coalesce into one re-creation after the 500 ms window).
+
+**Tests (`photos_filter_search_timeline_test.dart`, pure):**
+
+1. Buffer fills after `SearchService.search` resolves; `Stream<int>` emits new length.
+2. `getAssets()` returns an immutable view of the current buffer (mutating the returned list does not affect subsequent calls).
+3. `SearchService.search` throws → buffer stays empty; `Stream<int>` emits 0 (error is logged but not rethrown).
+4. `onDispose` closes the `StreamController`.
+
+**Commit:** `feat(mobile): photosTimelineQueryProvider (empty/search switcher)`
+
+---
+
+## Task 1.5 — `photosFilterDebouncedProvider` + `photosTimelineFilterProvider`
+
+**Files:**
+
+- Create: `mobile/lib/providers/photos_filter/filter_debounce.provider.dart`
+- Test: `mobile/test/providers/photos_filter/filter_debounce_provider_test.dart`
 
 **Behaviour:**
 
-- A `Provider<TimelineService>` named `photosTimelineQueryProvider` with `dependencies: []` (used as a `ProviderScope` override for `timelineServiceProvider`).
-- Reads `photosFilterProvider`:
-  - If `state.isEmpty` **or** `currentUserProvider` returns `null`: returns the same `TimelineService` the current main-library wiring produces. Reuse `timelineServiceProvider`'s body via `ref.watch(timelineFactoryProvider).main(timelineUsers, currentUserId)` where `timelineUsers` and `currentUserId` are resolved the same way `timelineServiceProvider` resolves them.
-  - If non-empty and logged-in: calls `ref.watch(searchServiceProvider).search(filter, 1)` once, awaits; builds a `TimelineService` via `ref.watch(timelineFactoryProvider).fromAssets(result?.assets ?? [], TimelineOrigin.search)`. Page-1 only; no streaming pagination (deferred).
-- **Debounce.** A 500 ms debounce gate around service re-creation. Implementation: wrap the non-empty branch in a `Future.delayed(500ms)` + cancellation-on-filter-change via a local `_currentToken` incremented each rebuild. During the debounce window return the previous `TimelineService` (keep the scrim-behind-sheet stable).
-- **Disposal.** `ref.onDispose(previousService.dispose)` on every re-creation; `ref.onDispose` on the provider itself disposes the final service.
-- **Empty → non-empty → empty net-zero.** Because `photosFilterProvider` has `updateShouldNotify` structural equality, the provider won't fire. Test this explicitly.
-- **Pre-login handling.** If `currentUserProvider` is `null`, always return the library service (defensive; matches existing `timelineServiceProvider` fallback `.id ?? ''`).
+Two derived providers, both sync `Provider<SearchFilter>`:
 
-**TimelineOrigin.** Pick the closest existing origin or add a new `search` variant if the enum is extensible — audit `domain/models/timeline.model.dart` for the `TimelineOrigin` definition and use an existing value if possible (e.g., `remote` or similar). Document the choice inline.
+```dart
+final photosFilterDebouncedProvider = Provider<SearchFilter>((ref) {
+  return _debounced(ref, source: photosFilterProvider, ms: 250);
+}, dependencies: [photosFilterProvider]);
 
-**Tests (one test per case; all in `timeline_query_provider_test.dart`):**
+final photosTimelineFilterProvider = Provider<SearchFilter>((ref) {
+  return _debounced(ref, source: photosFilterProvider, ms: 500);
+}, dependencies: [photosFilterProvider]);
 
-1. Empty filter → provider delegates to main-library service (mocked `TimelineFactory.main` called with correct args).
-2. Non-empty filter → `searchServiceProvider.search(filter, 1)` is called; `fromAssets` called with returned asset list.
-3. Pre-login (`currentUserProvider` override = `null`) + non-empty filter → delegates to main-library service (fallback); no search call.
-4. Filter change while non-empty: within 500 ms, rapid `togglePerson` × 3 on different ids coalesces into **one** search call (fake-time via `FakeAsync`).
-5. Empty → non-empty transition cancels library subscription, starts search subscription (assert previous service's `dispose()` called).
-6. Non-empty → empty transition reverses (search service `dispose()` called, main service restored).
-7. Net-zero change within 500 ms (toggle + untoggle same id): **zero** search calls.
-8. Tab-switch simulation: disposing + rebuilding the provider preserves the filter (driven by `photosFilterProvider`, not local state).
-9. `SearchService.search` returns `null` → `fromAssets([], …)` path; no crash.
+SearchFilter _debounced(Ref ref, {required NotifierProvider<PhotosFilterNotifier, SearchFilter> source, required int ms}) {
+  // Emission pattern: synchronously return current state on first read; schedule a Timer on changes; re-expose the latest value after Timer fires via ref.invalidateSelf().
+  // Implementation uses ref.listen(source, (prev, next) { _timer?.cancel(); _timer = Timer(…, () => ref.invalidateSelf()); });
+  // and a local state-in-closure latest-value cache.
+}
+```
 
-**Commit:** `feat(mobile): photosTimelineQueryProvider with debounced empty/search switcher`
+**Alternative (simpler):** hand-rolled `StateNotifier<SearchFilter>` that listens to `photosFilterProvider` and writes through after a timer. Pick whichever compiles cleanly — both satisfy the contract.
+
+**Consumers:**
+
+- Strips (Task 5) watch `photosFilterDebouncedProvider` and pass it into `photosFilterSuggestionsProvider(debounced)`.
+- `photosTimelineQueryProvider` (Task 1) watches `photosTimelineFilterProvider`.
+- `PeekContent` and `MatchCountFooter` (Task 4) watch `photosFilterProvider` **directly** (chips update instantly; count debounces because the count provider itself reads the debounced filter — see below).
+
+**Update `photosFilterCountProvider`** to watch `photosFilterDebouncedProvider` instead of `photosFilterProvider`. This is the only modification to a PR 1.1 file; confirmed minimal and safe (PR 1.1 count provider was already flagged as placeholder). One extra commit.
+
+**Tests:**
+
+1. Initial read synchronously returns current filter state.
+2. Source change → debounced provider still returns prior value during the window (FakeAsync).
+3. After `ms` elapses → debounced provider returns new value.
+4. Two rapid changes within the window coalesce into one new-value emit.
+5. `dispose` cancels pending timer.
+
+**Commits:**
+
+- `feat(mobile): photosFilterDebouncedProvider + photosTimelineFilterProvider`
+- `refactor(mobile): photosFilterCountProvider reads debounced filter`
 
 ---
 
@@ -101,266 +232,434 @@
 
 **Behaviour:**
 
-- `ConsumerWidget` rendering `IconButton(icon: Icon(Icons.tune_rounded))`.
-- Active dot: `Stack` + `Positioned(top: 8, right: 8)` rendering a 6pt circle in `colorScheme.primary` iff `!ref.watch(photosFilterProvider).isEmpty`.
-- `onPressed`: `ref.read(photosFilterSheetProvider.notifier).state = FilterSheetSnap.browse` — idempotent across current snap value (always `browse` per design §7 "Filter icon tap when Peek rail is already visible").
-- Semantics: `Semantics(label: filter.isEmpty ? t('filter') : t('filter_button_active'))`.
+- `ConsumerWidget`. Icon: `Icons.tune_rounded`.
+- Active indicator: `Stack` with a `Positioned(top: 8, right: 8, child: Container(w: 8, h: 8, decoration: BoxDecoration(color: theme.colorScheme.primary, shape: BoxShape.circle, border: Border.all(color: theme.colorScheme.surface, width: 1.5))))` — the 1.5pt border gives a halo against the app-bar icon at any theme.
+- `onPressed` → `ref.read(photosFilterSheetProvider.notifier).state = FilterSheetSnap.browse` (always browse).
+- Semantics: `Semantics(button: true, label: filter.isEmpty ? 'filter'.tr() : 'filter_button_active'.tr(), child: IconButton(...))`.
 
-**Tests:**
+**Tests (light + dark variants where visual):**
 
-1. Empty filter → no dot rendered (find by `Key('filter-active-dot')` → not found).
-2. Non-empty filter (parameterised group — one sub-test per dimension: person / tag / location / date / rating / mediaType / fav / archive / notInAlbum / text) → dot rendered.
+1. Empty filter → no dot (find `Key('filter-active-dot')` returns 0).
+2. Parameterised `group` over 10 dimensions (person / tag / location / date / rating / mediaType / fav / archive / notInAlbum / text) → dot rendered.
 3. Tap with sheet `hidden` → sheet becomes `browse`.
 4. Tap with sheet `peek` → sheet becomes `browse`.
-5. Tap with sheet `browse` → stays `browse` (no state churn assertion via listener mock).
-6. Tap with sheet `deep` → sheet becomes `browse` (covers §7 edge case).
-7. Semantics label reflects state.
+5. Tap with sheet `browse` → stays `browse` (assert no additional writes via a listener counter).
+6. Tap with sheet `deep` → sheet becomes `browse` (§7 edge case).
+7. Semantics label reflects state (empty ↔ non-empty).
+8. Dark mode variant: dot is still visible (foregroundDot vs background contrast ≥ 3:1 — spot check via pixel).
 
 **Commit:** `feat(mobile): FilterIconButton with active-indicator dot`
 
 ---
 
-## Task 3 — `activeChipsFromFilter` helper + `ActiveFilterChip`
+## Task 3 — `ActiveChipSpec` + `activeChipsFromFilter` + `ActiveFilterChip`
 
 **Files:**
 
-- Create: `mobile/lib/providers/photos_filter/active_chips.dart` — pure dart, no Riverpod.
+- Create: `mobile/lib/providers/photos_filter/active_chips.dart` — pure dart.
 - Create: `mobile/lib/presentation/widgets/filter_sheet/active_filter_chip.widget.dart`
 - Test: `mobile/test/providers/photos_filter/active_chips_test.dart`
 - Test: `mobile/test/presentation/widgets/filter_sheet/active_filter_chip_test.dart`
 
-**`activeChipsFromFilter` contract:**
+**Spec:**
 
 ```dart
+enum ChipVisual { person, tag, location, when, rating, media, toggle, text }
+
 class ActiveChipSpec {
   final ChipId id;
   final String label;
-  final List<String>? avatarUrls; // 1-3 for People; null for others
-  final IconData? icon;           // for non-person chips
-  const ActiveChipSpec({required this.id, required this.label, this.avatarUrls, this.icon});
+  final ChipVisual visual;
+  /// For person: up to 3 ids for leading overlapping avatars (collapsed chip has 3+).
+  final List<String>? avatarPersonIds;
+  /// For tag: Material swatch seed colour (derived from tag id hash).
+  final int? tagDotSeed;
+  /// For media/toggle: leading icon.
+  final IconData? icon;
+  const ActiveChipSpec({
+    required this.id,
+    required this.label,
+    required this.visual,
+    this.avatarPersonIds,
+    this.tagDotSeed,
+    this.icon,
+  });
 }
 
-/// Pure. Order is stable: people → tags → location → date → rating → media → favourite → archive → notInAlbum → text.
+/// Pure. Order: people → tags → location → date → rating → media → favourite → archive → notInAlbum → text.
 List<ActiveChipSpec> activeChipsFromFilter(
   SearchFilter filter, {
-  FilterSuggestionsResponseDto? suggestions, // for tag-name resolution
+  FilterSuggestionsResponseDto? suggestions, // for tag name resolution only
 });
 ```
 
-**Rules:**
+**Rules (explicit + exhaustive):**
 
-- People: one chip per person (first 3 get individual chips); for >3, collapse the trailing people into a single `PersonChipId(firstCollapsedId)` chip labeled `"${firstName} +${remaining}"`. (The spillover modal is PR 1.3 — removing this chip removes only that id; the rest persist in state.)
-- Tags: one per id; label resolved from `suggestions?.tags` by id; fallback `t('filter_sheet_tag_fallback')` (`"Tag"`).
-- Location: single chip iff any of `country/state/city` non-null; label = non-null fields joined `" · "`.
-- Date: single chip iff `takenAfter != null || takenBefore != null`; label = formatted using the existing mobile date formatter (short month-year range, single month if same month).
-- Rating: single chip iff `rating != null && rating > 0`; label `"★ $rating+"`.
-- MediaType: single chip iff `mediaType != null && mediaType != AssetType.other`; label = `Photos | Videos | Audio` via i18n.
-- Favourites / Archived / NotInAlbum / Text: as in design §5.5; skip text chip when `context == null || context.trim().isEmpty`.
+- **People.** `filter.people` is `Set<PersonDto>`. Order by insertion (use `Set.toList()`). First 2 → individual chips with a single-avatar spec. If size > 2, emit **one combined spillover chip** labeled `"${p0.name}, ${p1.name} +${size-2}"` with `avatarPersonIds = [p0.id, p1.id, p2.id]` (first three) and `ChipId = PersonChipId(p2.id)` (the first collapsed id — tapping × removes only p2). Chip body tap is a no-op in PR 1.2 (modal is 1.3). The "Emma, Lars +1" pattern matches design §5.5. **Edge:** exactly 2 people → 2 individual chips (no spillover). Exactly 3 people → 2 individual chips + 1 spillover labeled "Alice, Bob +1" with 3 avatars.
+- **Tags.** Per `filter.tagIds ?? const []`: one `TagChipId(id)` per id; label resolved from `suggestions?.tags.firstWhereOrNull((t) => t.id == id)?.value ?? 'filter_sheet_tag_fallback'.tr()`. `tagDotSeed = id.hashCode`; the widget maps this to a deterministic Material 3 accent via `Color((seed & 0xFFFFFF) | 0xFF000000)` modulated by `colorScheme.primary` lightness.
+- **Location.** Single chip iff `country != null || state != null || city != null`. Label = non-null fields joined `" · "` (e.g., `"France · Paris"`). Visual = `location`. **Defensive:** all-null location returns **no chip** (regression test).
+- **Date.** Single chip iff `takenAfter != null || takenBefore != null`. Label uses `DateFormat.yMMM(Intl.getCurrentLocale())`:
+  - Both set + same month: `"Apr 2024"`.
+  - Both set + different months: `"Apr 2024 – Dec 2024"`.
+  - Only `takenAfter`: `"After Apr 2024"`.
+  - Only `takenBefore`: `"Before Dec 2024"`.
+- **Rating.** Single chip iff `rating != null && rating > 0`. Label `"★ $rating+"`.
+- **MediaType.** Single chip iff `mediaType != AssetType.other`. Label = i18n keyed by enum.
+- **Favourites / Archived / NotInAlbum.** One chip each when the flag is true.
+- **Text.** Chip iff `context?.trim().isNotEmpty == true`. Label = `'"${context!.trim()}"'` truncated to 24 chars + `…` if longer.
 
-**Tests (table-driven, all in `active_chips_test.dart`):**
+**Tests (`active_chips_test.dart`, table-driven):**
 
 1. Empty filter → `[]`.
-2. One chip per dimension (10 parameterised cases).
-3. People ≤ 3 → individual chips in insertion order.
-4. People = 5 → three person chips + one "Alice +2" chip with `PersonChipId(alice.id)` as its id.
-5. Location with only `country` set → single chip with country text.
-6. Location with all fields null → no chip (regression test — defensive).
-7. Text chip with whitespace-only context → no chip.
-8. Rating = 0 → no chip.
-9. MediaType = `other` → no chip.
-10. Tag id not present in suggestions → fallback label.
-11. Tag id present in suggestions → resolved label.
-12. Combined filter (people + tag + location + date) → 4 chips in the documented order.
-13. Person in filter state but absent from current suggestions (top-N slice) → chip still rendered with fallback "Unnamed" (regression for §7 C2).
+2. Parameterised per-dimension: one chip emitted per dimension set (10 cases).
+3. 2 people → 2 individual chips, no spillover.
+4. 3 people → 2 individual chips + 1 spillover "Alice, Bob +1" with 3 avatars.
+5. 5 people → 2 individual + 1 spillover "Alice, Bob +3" with 3 avatars (first three ids).
+6. Location with only `country` set → single chip "France".
+7. Location with all fields null → no chip.
+8. Text chip with `"   "` (whitespace) → no chip.
+9. Text chip with 30-char string → label truncated to 24 chars + `…`.
+10. Rating = 0 → no chip. Rating = null → no chip. Rating = 4 → chip.
+11. MediaType = `other` → no chip. `image` → chip with `Icons.photo_rounded`, i18n label "Photos".
+12. Tag id in suggestions → resolved label. Tag id NOT in suggestions → fallback "Tag" (regression for §7 C2).
+13. Person id in state but NOT in suggestions → chip still rendered (spec's label is `person.name` from state, not from suggestions).
+14. Date both-set same month → "Apr 2024".
+15. Date only-after → "After Apr 2024".
+16. Date only-before → "Before Apr 2024".
+17. Chip order on full filter: people → tags → location → date → rating → media → fav → archive → notInAlbum → text.
 
 **`ActiveFilterChip` widget:**
 
 - Input: `ActiveChipSpec`.
-- Renders leading avatars (for People, overlapping circles; use existing `getPeopleThumbnailUrl` per memory `feedback_people_thumbnail_url`) or `icon`, label, trailing `×` (`IconButton` with tap target ≥ 32×32; the containing chip row enforces ≥ 44pt total per §9.6).
-- `×` tap calls `ref.read(photosFilterProvider.notifier).removeChip(spec.id)`.
-- Semantics label: `"${spec.label}, remove filter"`.
+- Renders a Material 3 `InputChip` (or a custom `Material` + `InkWell` if `InputChip` doesn't support our leading variants cleanly).
+- Leading:
+  - `person`: `SizedBox(width: 24 * overlapCount, child: Stack(children: avatars))` — overlapping `CircleAvatar(radius: 12, backgroundImage: RemoteImageProvider(url: getFaceThumbnailUrl(id)))` widgets offset by 12pt each.
+  - `tag`: `Container(width: 8, height: 8, decoration: BoxDecoration(shape: circle, color: seedColor))`.
+  - `location`: `Icon(Icons.place_rounded, size: 16)`.
+  - `when`: no leading; label uses tabular-figures text style.
+  - `rating`, `media`, `toggle`, `text`: `Icon(spec.icon, size: 16)`.
+- Label: `Text(spec.label, maxLines: 1, overflow: TextOverflow.ellipsis)`.
+- Trailing: `IconButton(icon: Icon(Icons.close_rounded, size: 18), onPressed: _remove, tooltip: 'remove_filter'.tr())` with a minimum 32×32 pt tap target, wrapped in a row that pads the chip to ≥ 44 pt total (§9.6).
+- `_remove`: `HapticFeedback.selectionClick(); ref.read(photosFilterProvider.notifier).removeChip(spec.id);`.
+- Semantics: `Semantics(label: '${spec.label}, ${'remove_filter'.tr()}', button: true, child: …)`.
 
-**Widget tests:**
+**Widget tests (light + dark):**
 
 1. Renders label + × button.
-2. Person spec → renders avatars (mock image loader via `TestImage`).
-3. Icon spec → renders icon.
-4. × tap calls `removeChip` with matching `ChipId` (verified via a tiny `Notifier` stub).
+2. `person` spec with 3 avatarPersonIds → 3 overlapping `CircleAvatar`s (mock image via `TestImage.load` pattern; don't fetch real URL).
+3. `tag` spec → coloured dot.
+4. `location` spec → `Icons.place_rounded`.
+5. `when` spec → label uses `FontFeature.tabularFigures`.
+6. `rating`/`media`/`toggle`/`text` → icon from spec.
+7. × tap calls `photosFilterProvider.notifier.removeChip(spec.id)` — verified via a stub notifier.
+8. Label with ellipsis truncation: long label → truncated with `…`.
+9. Haptic feedback is triggered on × tap (verify via `ServicesBinding.instance.defaultBinaryMessenger` spy on `HapticFeedback` channel).
+10. Dark mode pair: leading tag-dot colour adjusts for contrast.
 
 **Commits:**
 
-- `feat(mobile): activeChipsFromFilter helper`
-- `feat(mobile): ActiveFilterChip widget`
+- `feat(mobile): activeChipsFromFilter helper + ActiveChipSpec`
+- `feat(mobile): ActiveFilterChip widget with per-visual rendering`
 
 ---
 
-## Task 4 — `FilterSheet` scaffold (owns all three snaps)
+## Task 4 — `FilterSheet` + snap contents
 
 **Files:**
 
 - Create: `mobile/lib/presentation/widgets/filter_sheet/filter_sheet.widget.dart`
-- Create: `mobile/lib/presentation/widgets/filter_sheet/peek_content.widget.dart` (internal peek-snap content; chiprail + count)
+- Create: `mobile/lib/presentation/widgets/filter_sheet/peek_content.widget.dart`
 - Create: `mobile/lib/presentation/widgets/filter_sheet/browse_content.widget.dart`
 - Create: `mobile/lib/presentation/widgets/filter_sheet/deep_stub_content.widget.dart`
 - Create: `mobile/lib/presentation/widgets/filter_sheet/search_bar.widget.dart`
 - Create: `mobile/lib/presentation/widgets/filter_sheet/match_count_footer.widget.dart`
-- Tests: one per widget file, under `mobile/test/presentation/widgets/filter_sheet/`.
+- Create: `mobile/lib/presentation/widgets/filter_sheet/drag_handle.widget.dart` (shared pill)
+- Create: `mobile/lib/presentation/widgets/filter_sheet/match_count_label.widget.dart` (shared; used by peek + footer)
+- Tests: one per widget under `mobile/test/presentation/widgets/filter_sheet/`.
 
-**`FilterSheet` behaviour:**
+**`FilterSheet` (ConsumerStatefulWidget):**
 
-- `ConsumerWidget`. Watches `photosFilterSheetProvider`.
-- If snap is `hidden`: returns `SizedBox.shrink()`.
-- Otherwise renders:
-  - A `Stack`:
-    - `Positioned.fill(child: scrim)` — scrim opacity 0.32 when snap ∈ {browse, deep}, 0.0 when peek. Animated via `AnimatedOpacity` (150ms).
-    - `DraggableScrollableSheet` with:
-      - `controller` = a `DraggableScrollableController` kept in widget state (not via `HookConsumerWidget`; use a `StatefulWidget` or `HookWidget` with `useState` — simpler to use `ConsumerStatefulWidget`).
-      - `initialChildSize`: `{peek: 0.15, browse: 0.62, deep: 0.95}[snap]`.
-      - `minChildSize: 0.15, maxChildSize: 0.95, snap: true, snapSizes: const [0.15, 0.62, 0.95]`.
-      - `builder: (ctx, scrollController)` → content-selection widget wrapping `PeekContent | BrowseContent | DeepStubContent` based on current snap, all receiving `scrollController`.
-- A `NotificationListener<DraggableScrollableNotification>` wraps the sheet. On notification, check if `(extent - 0.15).abs() < 0.02 || (extent - 0.62).abs() < 0.02 || (extent - 0.95).abs() < 0.02` — if so, map to `FilterSheetSnap` and write to provider (iff different from current).
-- Scrim tap: browse → `peek` (if `!isEmpty`) else `hidden`; deep → `browse`.
-- Dispose: controller dispose in `dispose()`.
+- State fields: `late final DraggableScrollableController _controller = DraggableScrollableController()`.
+- In `initState`: nothing else.
+- In `dispose`: `_controller.dispose()`.
+- `build`:
+
+  ```dart
+  final snap = ref.watch(photosFilterSheetProvider);
+  if (snap == FilterSheetSnap.hidden) return const SizedBox.shrink();
+
+  ref.listen<FilterSheetSnap>(photosFilterSheetProvider, (prev, next) {
+    if (next == FilterSheetSnap.hidden) return;
+    final target = _snapExtent(next);
+    if ((_controller.size - target).abs() < 0.01) return;
+    _controller.animateTo(target, duration: const Duration(milliseconds: 280), curve: Curves.easeOutCubic);
+    if (MediaQuery.of(context).accessibleNavigation) {
+      SemanticsService.announce(_snapAnnouncement(next), TextDirection.ltr);
+    }
+  });
+
+  return Stack(children: [
+    Positioned.fill(child: _Scrim(visible: snap != FilterSheetSnap.peek)),
+    NotificationListener<DraggableScrollableNotification>(
+      onNotification: _onSettle,
+      child: DraggableScrollableSheet(
+        controller: _controller,
+        initialChildSize: _snapExtent(snap),
+        minChildSize: 0.15,
+        maxChildSize: 0.95,
+        snap: true,
+        snapSizes: const [0.15, 0.62, 0.95],
+        builder: (ctx, scrollController) => _snapChild(snap, scrollController),
+      ),
+    ),
+  ]);
+  ```
+
+- `_onSettle(notification)`: if `(notification.extent - snap).abs() < 0.02` for some snap in `{0.15, 0.62, 0.95}`, map to `FilterSheetSnap` and `ref.read(photosFilterSheetProvider.notifier).state = value;` iff differs. Return `false` (don't consume — other listeners may care).
+- `_Scrim` is a tap-absorbing overlay rendered opacity 0.32 when snap ∈ {browse, deep}, 0 when peek. Taps route: browse→peek if `!isEmpty` else hidden; deep→browse.
+- `_snapChild`:
+  - `FilterSheetSnap.peek` → `PeekContent(scrollController)`.
+  - `FilterSheetSnap.browse` → `BrowseContent(scrollController)`.
+  - `FilterSheetSnap.deep` → `DeepStubContent(scrollController)`.
 
 **`PeekContent`:**
 
-- `Material` with elevation 8, rounded top corners.
-- Column: drag handle (centred, 32×4 pt) → horizontal `ListView` of `ActiveFilterChip`s from `activeChipsFromFilter(filter, suggestions)` → trailing `MatchCountLabel` (inline count; shows `—` on error/loading).
-- Watches `photosFilterSuggestionsProvider(filter)` and passes its `valueOrNull` into the helper.
-- Watches `photosFilterCountProvider`.
-- Tap on the handle / row body (outside chips) → snap = `browse`.
+- `Material(elevation: 8, color: theme.colorScheme.surface, borderRadius: vertical(top: 16))`.
+- `Column(children: [DragHandle(onTap: _toBrowse), Padding(child: Row(children: [Expanded(horizontal chip ListView), MatchCountLabel()]))])`.
+- Horizontal `ListView.separated(scrollDirection: Axis.horizontal)` of `ActiveFilterChip`s built from `activeChipsFromFilter(filter, suggestions)` where `filter = ref.watch(photosFilterProvider)` and `suggestions = ref.watch(photosFilterSuggestionsProvider(ref.watch(photosFilterDebouncedProvider))).valueOrNull`.
+- Fading edges: overlay `ShaderMask` with a horizontal gradient to fade both ends (taper chip rail into the scroll direction).
+- Tap on drag handle → sheet = browse.
+- **Cannot show when isEmpty + hidden** per sheet mount gate (the sheet is already unmounted when snap == hidden).
 
 **`BrowseContent`:**
 
-- `ListView` (using the sheet's `scrollController`):
-  1. Drag handle.
-  2. `SearchBar`.
-  3. `SizedBox(height: 12)`.
-  4. Four strips (Task 5): `PeopleStrip`, `PlacesStrip`, `TagsStrip`, `WhenStrip`.
-  5. `MatchCountFooter` (pinned visually at bottom; in Phase 1 it's inline at list bottom — pinning is a PR 1.3 enhancement).
-- Reset button in the header row next to the drag handle — tapping calls `photosFilterProvider.notifier.reset()`.
+- The sheet's builder gives us a `scrollController`; we use it on a `CustomScrollView` with slivers:
+  1. `SliverPersistentHeader(pinned: true)` — header with drag handle + title ("filter_sheet_title") + Reset (`TextButton(onPressed: _reset, child: Text('filter_sheet_reset'.tr()))` iff `!isEmpty`).
+  2. `SliverToBoxAdapter(child: Padding(child: SearchBar()))`.
+  3. `SliverToBoxAdapter(child: PeopleStrip())`.
+  4. `SliverToBoxAdapter(child: PlacesStrip())`.
+  5. `SliverToBoxAdapter(child: TagsStrip())`.
+  6. `SliverToBoxAdapter(child: WhenStrip())`.
+  7. `SliverPadding` with bottom inset for the footer.
+- A `Positioned(bottom: 0, left: 0, right: 0, child: MatchCountFooter())` — NOT inside the scroll view, so it stays pinned. The footer's height is reserved by the sliver padding above.
+- Reset button tap → `HapticFeedback.mediumImpact(); ref.read(photosFilterProvider.notifier).reset();`.
 
-**`DeepStubContent`:** drag handle + centred Text via i18n key `filter_sheet_deep_stub`.
+**`DeepStubContent`:**
 
-**`SearchBar` behaviour:**
+- `Material` + rounded top corners, drag handle, centred `Text('filter_sheet_deep_stub'.tr(), textAlign: center)`.
 
-- `ConsumerStatefulWidget` (or hook widget) with a `TextEditingController`.
-- Init: `_controller = TextEditingController(text: ref.read(photosFilterProvider).context ?? '')`.
-- On `_controller`.onChange: launch a 250ms debounce Timer that calls `setText(_controller.text)`.
-- Clear `×` icon visible when `_controller.text.isNotEmpty`; tap sets controller to empty and calls `setText('')` immediately (cancels debounce).
-- Hint text from i18n `filter_sheet_search_hint`.
+**`SearchBar` (ConsumerStatefulWidget):**
+
+- `TextEditingController _controller`. `FocusNode _focus`. `Timer? _debounce`.
+- `initState`: `_controller = TextEditingController(text: ref.read(photosFilterProvider).context ?? '')`.
+- `build`:
+  ```dart
+  ref.listen<String?>(photosFilterProvider.select((f) => f.context), (prev, next) {
+    final v = next ?? '';
+    if (_controller.text == v) return;
+    _controller.text = v;
+    _controller.selection = TextSelection.collapsed(offset: v.length);
+  });
+  ```
+- `onChanged`: cancel debounce, schedule `Timer(250 ms, () => notifier.setText(_controller.text))`.
+- Trailing × visible when `_controller.text.isNotEmpty`. Tap: cancel debounce, `_controller.clear()`, `notifier.setText('')`.
+- `onSubmitted`: no-op beyond `_focus.unfocus()` (Return-key dismisses keyboard; filter is live).
+- Hint: `'filter_sheet_search_hint'.tr()`.
+- `dispose`: debounce cancel, controller dispose, focus dispose.
+
+**`MatchCountLabel` (shared, a11y live region):**
+
+```dart
+final count = ref.watch(photosFilterCountProvider);
+final label = count.when(
+  data: (c) => 'filter_sheet_match_count_photos'.plural(c),
+  loading: () => 'filter_sheet_match_count_loading'.tr(),
+  error: (_, __) => 'filter_sheet_match_count_loading'.tr(),
+);
+return Semantics(liveRegion: true, label: label, child: Text(label));
+```
 
 **`MatchCountFooter`:**
 
-- Row: `Text("${count} photos")` (via i18n plural) on the left; `TextButton(onPressed: _done, child: Text(t('filter_sheet_done')))` on the right.
-- `_done`: sets sheet to `hidden` if `!isEmpty` ? `peek` : `hidden` (actually: per design §5.2 "Done button closes the sheet" — set to `hidden`; the listener on filter emptiness will not re-open peek because isEmpty is still false; user explicitly closed). **Wait — re-read design:** §7 "If the user explicitly closes the sheet to `hidden` before leaving, it stays `hidden` on return." So Done → `hidden`, and the `hidden→peek` auto-transition in `MainTimelinePage` must only fire on `isEmpty: true → false`, not on `isEmpty: false` with a newly-hidden sheet. Implementation matches (listener watches the isEmpty transition, not the sheet state).
-- Count shows `—` on loading/error (watch `photosFilterCountProvider`).
+- `Material(elevation: 3, color: theme.colorScheme.surface)` pinned bottom.
+- `Row(children: [MatchCountLabel(), Spacer(), TextButton.filled(onPressed: _done, child: Text('filter_sheet_done'.tr()))])`.
+- `_done`: `ref.read(photosFilterSheetProvider.notifier).state = FilterSheetSnap.hidden;`.
 
-**Tests (sheet scaffolding):**
+**`DragHandle`:** shared widget; 32×4 pt pill, `theme.colorScheme.onSurfaceVariant`, centred, `GestureDetector.onTap` → caller-provided callback.
 
-1. Snap = `hidden` → `FilterSheet` renders empty (`find.byType(DraggableScrollableSheet)` = 0).
-2. Snap ∈ {peek, browse, deep} → `DraggableScrollableSheet` present with correct `initialChildSize`.
-3. Drag-settle to 0.62 extent → provider becomes `browse` (simulate via `DraggableScrollableController.jumpTo(0.62)` + pump).
-4. Drag-settle with `0.62 ± 0.015` tolerance → provider becomes `browse`.
-5. Drag-settle with `0.62 ± 0.05` (off-snap intermediate) → provider unchanged.
-6. Scrim tap at browse, `!isEmpty` → peek.
-7. Scrim tap at browse, `isEmpty` → hidden.
-8. Scrim tap at deep → browse.
-9. Cold-start: `photosFilterSheetProvider` defaults `hidden` (verify provider initial state); `FilterSheet` widget renders empty before any interaction (regression for §7 "Cold-start policy").
+**Tests — `FilterSheet`:**
 
-**Tests (`PeekContent`):**
+1. Snap = hidden → `find.byType(DraggableScrollableSheet)` evaluates to 0.
+2. Snap = peek / browse / deep → present with correct `initialChildSize` (introspection via widget tree traversal or use Keys).
+3. Drag-up from peek → browse: `await tester.drag(find.byType(DraggableScrollableSheet), Offset(0, -screenH * .5)); await tester.pumpAndSettle();` → provider becomes `browse`.
+4. Drag-up from browse → deep (same idiom, larger delta).
+5. Drag-down from deep → browse.
+6. Drag-down from browse → peek (when `!isEmpty`).
+7. Drag-down from browse → hidden (when `isEmpty` — sheet fully dismisses).
+8. Drag-down from peek (swipe) → hidden.
+9. Programmatic transition via provider write (e.g., set state = browse from peek) → `_controller.animateTo(0.62)` invoked (verify via fake controller spy or observe final extent after settle).
+10. Settle tolerance: extent = 0.615 → provider updated to `browse`. Extent = 0.60 → unchanged (0.02 floor).
+11. Scrim tap at browse, `!isEmpty` → peek.
+12. Scrim tap at browse, `isEmpty` → hidden.
+13. Scrim tap at deep → browse.
+14. Cold-start: provider defaults `hidden`; widget renders empty; no DraggableScrollableSheet mounted (§7 cold-start policy).
+15. a11y announcement: with `MediaQuery(accessibleNavigation: true)`, provider change to `deep` calls `SemanticsService.announce` — verify via `SemanticsHandler` spy (or assert the call happens via a test hook).
 
-1. Renders chips for a populated filter.
-2. Match count label updates on `photosFilterCountProvider` change; shows `—` on `AsyncError`.
-3. Tap on handle → snap = `browse`.
-4. Empty suggestions → chips still render (person/tag labels use fallbacks); no crash.
+**Tests — `PeekContent`:**
 
-**Tests (`BrowseContent`):**
+1. Renders chips (one per active-filter dimension).
+2. Horizontal scroll: inject 30 chips (5 people + 25 tags via state), verify the listview is scrollable (`tester.drag(find.byType(ListView), Offset(-500, 0))`, verify first chip is off-screen).
+3. Fading edge ShaderMask is present (find by Key).
+4. Match count label updates on provider change.
+5. Tap on drag handle → sheet = browse.
 
-1. Renders drag handle + SearchBar + 4 strips + footer in order.
-2. Reset button calls `notifier.reset()`.
+**Tests — `BrowseContent`:**
 
-**Tests (`SearchBar`):**
+1. Renders header + SearchBar + 4 strips + footer in order.
+2. Reset button visible only when `!isEmpty`.
+3. Reset tap calls `notifier.reset()`.
 
-1. Initial controller value matches `photosFilterProvider.context`.
-2. Typing fires `setText(input)` after 250 ms (FakeAsync).
-3. Multiple rapid chars within 250 ms → one `setText` call with final text.
-4. Clear × tap calls `setText('')` immediately (no 250ms wait), hides ×.
+**Tests — `SearchBar`:**
 
-**Tests (`MatchCountFooter`):**
+1. Initial controller text matches `filter.context`.
+2. Typing "p" + "a" + "r" + "i" + "s" inside 250 ms → exactly one `setText('paris')` call after the timer fires (FakeAsync).
+3. After initial `setText('paris')`, Reset externally clears filter.context → `_controller.text` is ''; cursor at 0.
+4. Clear × tap calls `setText('')` immediately; no debounce wait.
+5. Return-key: `onSubmitted` triggers `_focus.unfocus()` and does NOT call `setText` again.
+6. **Integration with footer count**: sheet-handle count updates 250 ms after typing (driven by the upstream debounced filter → count provider).
+7. Paste via long-press → onChanged fires with pasted text; 250 ms debounce applies (no special fast-path).
+8. Focus-lost during sheet drag: verify text is preserved in state after the drag settles (just a pump-through test).
 
-1. Count = 42 renders "42 photos".
-2. Count loading → `—`.
-3. Count error → `—`.
-4. Done tap → sheet becomes `hidden`.
+**Tests — `MatchCountLabel`:**
 
-**Tests (`DeepStubContent`):**
+1. Count = 0 renders "No photos" (ICU zero).
+2. Count = 1 renders "1 photo".
+3. Count = 42 renders "42 photos".
+4. Count = 1247 with en_US locale renders "1,247 photos".
+5. Loading renders `—`.
+6. Error renders `—`.
+7. `Semantics.liveRegion` is true (verified by `find.bySemanticsLabel` + `tester.getSemantics`).
 
-1. Renders the stub message.
-2. Drag-down from deep → browse (covered in sheet-scaffold tests; redundant here — skip).
+**Tests — `MatchCountFooter`:**
+
+1. Renders label + Done.
+2. Done tap → sheet hidden.
+
+**Tests — `DeepStubContent`:**
+
+1. Renders stub message.
 
 **Commits (one per widget):**
 
-- `feat(mobile): FilterSheet scaffold with settle-driven snap sync`
-- `feat(mobile): PeekContent`
-- `feat(mobile): BrowseContent`
+- `feat(mobile): FilterSheet scaffold with settle-driven + programmatic snap sync`
+- `feat(mobile): PeekContent with chip rail and fading edges`
+- `feat(mobile): BrowseContent with sliver layout + Reset`
 - `feat(mobile): DeepStubContent`
-- `feat(mobile): SearchBar with debounced setText`
-- `feat(mobile): MatchCountFooter`
+- `feat(mobile): SearchBar with external-clear sync and a11y`
+- `feat(mobile): MatchCountLabel (shared) + MatchCountFooter`
 
 ---
 
-## Task 5 — Browse strips (People / Places / Tags / When)
+## Task 5 — Browse strips
 
 **Files:**
 
-- Create: `mobile/lib/presentation/widgets/filter_sheet/strips/people_strip.widget.dart`
-- Create: `mobile/lib/presentation/widgets/filter_sheet/strips/places_strip.widget.dart`
-- Create: `mobile/lib/presentation/widgets/filter_sheet/strips/tags_strip.widget.dart`
-- Create: `mobile/lib/presentation/widgets/filter_sheet/strips/when_strip.widget.dart`
-- Tests: one per strip under `mobile/test/presentation/widgets/filter_sheet/strips/`.
+- Create: `mobile/lib/presentation/widgets/filter_sheet/strips/strip_scaffold.widget.dart` (shared shell with title, loading/error/empty handling).
+- Create: `people_strip.widget.dart`, `places_strip.widget.dart`, `tags_strip.widget.dart`, `when_strip.widget.dart`.
+- Tests: one per strip.
 
-**Shared pattern:**
+**`StripScaffold`:**
 
-Each strip is a `ConsumerWidget`:
+```dart
+class StripScaffold<T> extends ConsumerWidget {
+  final String titleKey;
+  final AsyncValue<List<T>> items;
+  final double height;
+  final Widget Function(BuildContext, WidgetRef, List<T>) childrenBuilder;
+  final VoidCallback onRetry;
+  final bool? isOffline;
+  // …
+}
+```
 
-1. `final filter = ref.watch(photosFilterProvider);`
-2. `final suggestionsAsync = ref.watch(photosFilterSuggestionsProvider(filter));`
-3. Renders:
-   - `AsyncLoading` → shimmer row (3 placeholder tiles).
-   - `AsyncError` → single tile with `t('filter_sheet_load_error_retry')`; tap calls `ref.refresh(photosFilterSuggestionsProvider(filter).future)`.
-   - `AsyncData` with empty list → `SizedBox.shrink()` (strip hidden).
-   - `AsyncData` with items → `SizedBox(height: stripHeight, child: ListView.builder(scrollDirection: Axis.horizontal, ...))`.
-4. Strip title above (small text, secondary colour).
+- Header row: `Text(titleKey.tr(), style: titleSmall)` + optional `isOffline` badge (`Chip(label: Text('filter_sheet_offline'.tr()), avatar: Icon(Icons.wifi_off_rounded))`).
+- Content:
+  - `AsyncLoading` → skeleton row: 3 placeholder rectangles sized per strip (circle for People, 100×64 rounded rect for Places, pill for Tags, pill for When).
+  - `AsyncError(e)` → single tap-to-retry tile with `'filter_sheet_load_error_retry'.tr()`; tap calls `onRetry`.
+  - `AsyncData([])` → `SizedBox.shrink()` (entire strip collapses).
+  - `AsyncData([...])` → horizontal `ListView.builder` calling `childrenBuilder`.
 
-**PeopleStrip:** 64pt circular thumbs, 20-item cap. Thumb URL via `getPeopleThumbnailUrl(...)` (memory `feedback_people_thumbnail_url`). Tap toggles via `togglePerson(_buildPersonDto(fsPerson))`. Build the `PersonDto` using the full constructor available (id + name + thumbnail path / or whatever the DTO requires). **Audit `PersonDto.==` during Task 5 start**: if equality is id-only, minimal construction is safe; if structural, a round-trip toggle against a differently-constructed `PersonDto` could duplicate entries. Document what's found.
+**All four strips pass `photosFilterDebouncedProvider` into the suggestions lookup:**
 
-Selected state: border + checkmark overlay rendered when `filter.people.any((p) => p.id == fsPerson.id)` (id compare, not full equality — insulates from `PersonDto.==` differences).
+```dart
+final filter = ref.watch(photosFilterDebouncedProvider);
+final suggestionsAsync = ref.watch(photosFilterSuggestionsProvider(filter));
+final itemsAsync = suggestionsAsync.whenData((s) => s.people); // or tags, countries, etc.
+```
 
-**PlacesStrip:** 100×64 pt rounded tiles with gradient overlay + country text. Uses `response.countries`. Tap sets `setLocation(SearchLocationFilter(country: c))` (country only — PlacesCascade is PR 1.3). Selected when `filter.location.country == c`.
+**`PeopleStrip`:**
 
-**TagsStrip:** pill chips with count badge `"${name} · ${count}"`. Tap toggles via `toggleTag(tagId)`. Selected when `filter.tagIds?.contains(tagId) == true`.
+- Item: 64pt `CircleAvatar` + caption (name, 12pt, 2-line max with ellipsis).
+- Selected visual: primary-coloured border (3pt) + corner check overlay.
+- On tap:
+  ```dart
+  HapticFeedback.selectionClick();
+  final existing = ref.read(photosFilterProvider).people.firstWhereOrNull((p) => p.id == fsPerson.id);
+  if (existing != null) {
+    ref.read(photosFilterProvider.notifier).togglePerson(existing); // remove via full equality
+  } else {
+    final minimal = PersonDto(id: fsPerson.id, name: fsPerson.name, isHidden: false, thumbnailPath: '');
+    ref.read(photosFilterProvider.notifier).togglePerson(minimal); // add
+  }
+  ```
 
-**WhenStrip:** 5 quick-pick pills: Today / This week / This month / This year / Custom…. Each computes `(start, end)` via `DateTime.now()` and calls `setDateRange(start: start, end: end)`. "Custom…" opens `showDateRangePicker`; returned range passed to `setDateRange`. Selected pill = the one whose `(start, end)` matches `filter.date` exactly (compare by day-level truncation).
+**`PlacesStrip`:**
 
-**Tests per strip (9 tests × 4 strips):**
+- Item: 100×64 pt container with gradient (`LinearGradient` over a flag-emoji or glyph placeholder), country text on top.
+- On tap: if selected, `setLocation(null)`; else `setLocation(SearchLocationFilter(country: country))` using cascade for safety: `ref.read(photosFilterProvider.notifier).setLocation(SearchLocationFilter(country: country))`.
 
-1. Loading state renders shimmer.
-2. Error state renders retry tile; tap invokes `ref.refresh`.
-3. Empty data → widget returns `SizedBox.shrink()`.
-4. Data renders items in order.
-5. Tap on item calls correct notifier method with correct args.
-6. Selected state renders for id in filter.
-7. Hidden when data list empty.
-8. Empty-library regression: widget doesn't fire a suggestions call when filter is empty AND `suggestions.people/tags/countries == []` (this is the library-empty case — the provider still fires, but the strip renders no UI and doesn't drive secondary calls).
-9. Strip with exactly 1 item renders (no padding / hiding applied).
+**`TagsStrip`:**
 
-**PlacesStrip extra:** untap restores country to null (via `setLocation(null)` when re-tapping selected country).
+- Item: Material 3 `FilterChip(label: Text("${tag.value} · ${tag.count ?? ''}"), selected: filter.tagIds?.contains(tag.id) == true, onSelected: (_) => { haptic(); toggleTag(tag.id); })`.
+- The `FilterSuggestionsTagDto` has no `count` field in the generated DTO — check at audit; if absent, drop the count badge in the label.
 
-**WhenStrip extra:** Custom range picker cancel → no state change.
+**`WhenStrip`:**
 
-**Commits (one per strip):**
+- Static list of 5 pills: Today / This week / This month / This year / Custom…
+- Each `ActionChip(label: Text(key.tr()), onPressed: _apply)`.
+- `_apply(preset)`: compute `(start, end)` from `DateTime.now()`, call `setDateRange(start: start, end: end)`.
+- Selected pill: the one whose `(start, end)` matches `filter.date.takenAfter` and `filter.date.takenBefore` at day granularity.
+- Custom…: `final range = await showDateRangePicker(context: context, firstDate: DateTime(1970), lastDate: DateTime.now()); if (range != null) setDateRange(start: range.start, end: range.end);`. Cancel → no state change.
 
+**Tests per strip (9 tests × 4 strips, all in light + dark where visual):**
+
+1. `AsyncLoading` → 3 skeleton placeholders.
+2. `AsyncError` → retry tile with i18n key; tap calls `ref.refresh(photosFilterSuggestionsProvider(filter).future)`.
+3. `AsyncData([])` → entire strip returns `SizedBox.shrink()`.
+4. `AsyncData([item])` → renders 1 item (exactly-one regression).
+5. `AsyncData([multiple])` → items in order.
+6. Tap on unselected item → correct notifier call with correct args.
+7. Tap on selected item → correct un-select call (PlacesStrip: `setLocation(null)`; others: toggle).
+8. Selected visual: asserts find-by-Key for `selected` border.
+9. Haptic feedback fires on tap (spy on platform channel).
+
+**PeopleStrip extras:**
+
+- Toggling a person already in `filter.people` with a different `birthDate` does not duplicate entries (regression for `PersonDto` structural equality).
+
+**PlacesStrip extras:**
+
+- Untap → sets filter.location to empty (all fields null).
+
+**WhenStrip extras:**
+
+- Custom range picker cancel → no state change (verified by a fake picker that returns null).
+- Custom range picker with a valid range → `setDateRange` called with those values.
+- Preset selection matching computed "This month" is the selected pill (boundary test at month-start).
+
+**Commits (one per strip + scaffold):**
+
+- `feat(mobile): StripScaffold (loading/error/empty + offline badge)`
 - `feat(mobile): PeopleStrip`
 - `feat(mobile): PlacesStrip`
 - `feat(mobile): TagsStrip`
@@ -372,47 +671,29 @@ Selected state: border + checkmark overlay rendered when `filter.people.any((p) 
 
 **Files:**
 
-- Modify: `mobile/lib/presentation/pages/dev/main_timeline.page.dart`
-- Test: `mobile/test/presentation/pages/dev/main_timeline_page_test.dart`
+- Modify: `mobile/lib/presentation/pages/dev/main_timeline.page.dart` → `ConsumerStatefulWidget`.
+- Test: `mobile/test/presentation/pages/dev/main_timeline_page_test.dart`.
 
 **Changes:**
 
-- `MainTimelinePage` becomes a `ConsumerStatefulWidget` (needs `ref.listen` for the auto-peek listener).
-- Structure:
-  ```dart
-  ProviderScope(
-    overrides: [
-      timelineServiceProvider.overrideWith((ref) => ref.watch(photosTimelineQueryProvider)),
-    ],
-    child: Stack(
-      children: [
-        Timeline(
-          topSliverWidget: DriftMemoryLane,
-          topSliverWidgetHeight: ...,
-          showStorageIndicator: true,
-          appBar: ImmichSliverAppBar(actions: [FilterIconButton()], ...),
-        ),
-        FilterSheet(),
-      ],
-    ),
-  );
-  ```
-- `ref.listen(photosFilterProvider.select((f) => f.isEmpty), (prev, next) { ... })`:
-  - `prev == true && next == false` → if sheet state is `hidden`, set to `peek` (auto-peek on first filter).
-  - `prev == false && next == true` → if sheet state is `peek`, set to `hidden` (last-chip auto-collapse).
-- Dispose listener via `ConsumerStatefulWidget` idiom (no manual cleanup needed for `ref.listen`).
-- `Timeline.appBar` parameter accepts a `Widget?`. Confirm by reading `Timeline`'s constructor (landmarks §line 42 default = `ImmichSliverAppBar(...)`). Pass a custom `ImmichSliverAppBar(actions: [FilterIconButton()])`.
+- `ProviderScope(overrides: [timelineServiceProvider.overrideWith((ref) => ref.watch(photosTimelineQueryProvider))], child: _Body(...))`.
+  - Riverpod 2 syntax: `overrideWith` on a `Provider<T>` accepts a new create fn returning `T`. Since `photosTimelineQueryProvider` is `Provider<TimelineService>` with `dependencies: []`, reading it via `ref.watch` inside the override create fn is correct and propagates disposals.
+- Inside `_Body` state: `ref.listen<bool>(photosFilterProvider.select((f) => f.isEmpty), (prev, next) { … })` with the auto-peek logic.
+- Stack:
+  - Layer 0: `Timeline(appBar: ImmichSliverAppBar(actions: [FilterIconButton()]), topSliverWidget: DriftMemoryLane, topSliverWidgetHeight: hasMemories ? 200 : 0, showStorageIndicator: true)`.
+  - Layer 1: `FilterSheet()`.
 
 **Tests:**
 
-1. Renders `Timeline`, `FilterSheet`, `FilterIconButton` in app-bar actions.
-2. `ProviderScope` override propagates into `Timeline`: inside `Timeline`, `ref.read(timelineServiceProvider)` returns the value `photosTimelineQueryProvider` exposes. Verify by setting an override-within-override in the test that stubs `photosTimelineQueryProvider` and asserting a `Timeline` internal read hits the stub.
-3. Filter empty → `timelineServiceProvider` returns library service (mocked factory verified).
-4. Filter non-empty → `timelineServiceProvider` returns search-backed service.
-5. **Auto-peek on first filter:** start with `hidden` + empty filter. Add a filter via notifier. Pump. Assert sheet state = `peek`.
-6. **Auto-collapse on last chip:** start with `peek` + one filter. Remove chip. Pump. Assert sheet state = `hidden`.
-7. **Explicit close persists:** from `browse`, call Done → `hidden`. Then add a filter. Assert sheet stays `hidden` (listener only fires on `isEmpty` transition; isEmpty was already false). **Caveat:** actually, on Done, isEmpty is still `false` (user is just closing). Later filter additions don't re-trigger the `true → false` transition. ✓ Behaviour correct.
-8. **Tab-switch preservation:** simulate tab switch by disposing + remounting `MainTimelinePage`. Assert `photosFilterProvider` + `photosFilterSheetProvider` (top-level, not page-scoped) retain state.
+1. Renders `Timeline`, `FilterSheet`, `FilterIconButton`.
+2. **Override propagation:** inside a `testWidgets` that mounts `MainTimelinePage`, read `timelineServiceProvider` via `ProviderScope.containerOf(context)` and assert it equals the value `photosTimelineQueryProvider` exposes.
+3. Filter empty → `timelineServiceProvider` resolves to main-library service (verified via stub `TimelineFactory.main`).
+4. Filter non-empty → `timelineServiceProvider` resolves to search-backed service (with `origin: TimelineOrigin.search`).
+5. Auto-peek: start `hidden` + empty filter → add filter → sheet state becomes `peek`.
+6. Auto-collapse: start `peek` + 1 filter → remove last chip → sheet state becomes `hidden`.
+7. Explicit-close persistence: from `browse`, Done → `hidden`. Subsequent filter add while still non-empty: no state change (isEmpty transition never fires).
+8. Tab-switch preservation: dispose + remount `MainTimelinePage` → `photosFilterProvider` and `photosFilterSheetProvider` values are preserved (top-level providers outlive the page).
+9. Pre-login: `currentUserProvider = null` + non-empty filter → timeline falls back to main-library service (no search call — verified via `SearchService` stub call counter = 0).
 
 **Commit:** `feat(mobile): mount FilterSheet + FilterIconButton in MainTimelinePage`
 
@@ -420,11 +701,7 @@ Selected state: border + checkmark overlay rendered when `filter.people.any((p) 
 
 ## Task 7 — i18n strings (`i18n/en.json`)
 
-**Files:**
-
-- Modify: `i18n/en.json`.
-
-**Keys (only English; translators handle other locales after merge; insert alphabetically then run formatter):**
+**Keys to add (English only; ICU where needed):**
 
 - `filter_button_active`: `"Filter, active"`
 - `filter_sheet_archived`: `"Archived"`
@@ -434,7 +711,7 @@ Selected state: border + checkmark overlay rendered when `filter.people.any((p) 
 - `filter_sheet_favourites`: `"Favourites"`
 - `filter_sheet_load_error_retry`: `"Couldn't load — tap to retry"`
 - `filter_sheet_match_count_loading`: `"—"`
-- `filter_sheet_match_count_photos`: `"{count} photos"`
+- `filter_sheet_match_count_photos`: ICU plural — `"{count, plural, =0{No photos} =1{1 photo} other{{count} photos}}"`. **Note:** `easy_localization` uses `.plural(count)` with a map — alternative representation: split into `filter_sheet_match_count_photos_zero` / `_one` / `_other` keys; confirm at Task 7 which form the existing i18n pipeline supports. Fallback: render plain `"$count photos"` formatted via `NumberFormat.decimalPattern`.
 - `filter_sheet_media_audio`: `"Audio"`
 - `filter_sheet_media_photos`: `"Photos"`
 - `filter_sheet_media_videos`: `"Videos"`
@@ -446,6 +723,7 @@ Selected state: border + checkmark overlay rendered when `filter.people.any((p) 
 - `filter_sheet_search_hint`: `"Search photos, faces, text"`
 - `filter_sheet_tag_fallback`: `"Tag"`
 - `filter_sheet_tags`: `"Tags"`
+- `filter_sheet_title`: `"Filters"`
 - `filter_sheet_unnamed_person`: `"Unnamed"`
 - `filter_sheet_when`: `"When"`
 - `filter_sheet_when_custom`: `"Custom…"`
@@ -454,8 +732,9 @@ Selected state: border + checkmark overlay rendered when `filter.people.any((p) 
 - `filter_sheet_when_week`: `"This week"`
 - `filter_sheet_when_year`: `"This year"`
 - `filter_sheet_zero_results`: `"No photos match this filter"`
+- `remove_filter`: `"Remove filter"` (semantics hint, reused across chips).
 
-Run `pnpm --filter=immich-i18n format:fix` (memory `feedback_i18n_key_sorting`). If the CLI isn't wired, fall back to `pnpm prettier --write i18n/en.json` from the `i18n/` dir.
+Run `pnpm --filter=immich-i18n format:fix`; fall back to `npx prettier --write i18n/en.json` inside `i18n/`.
 
 **Commit:** `feat(mobile): i18n strings for filter sheet`
 
@@ -464,9 +743,20 @@ Run `pnpm --filter=immich-i18n format:fix` (memory `feedback_i18n_key_sorting`).
 ## Task 8 — Analyzer + full-suite test pass
 
 1. `cd mobile && flutter analyze lib test` → 0 warnings.
-2. `cd mobile && flutter test` → all pass. Per memory `feedback_no_flake_allowance`, any flaky test is a root-cause bug — fix, do not retry.
-3. `dart format lib/presentation/widgets/filter_sheet lib/providers/photos_filter lib/domain/services/photos_filter_timeline.service.dart test/presentation/widgets/filter_sheet test/providers/photos_filter test/presentation/pages/dev` — verify no unexpected diffs elsewhere.
-4. Check for new untranslated strings: `grep -nE '(Text|text:)\s*["\x27][A-Z]' mobile/lib/presentation/widgets/filter_sheet | grep -v l10n` — zero matches (memory §9.5 "no English-only string literals").
+2. `cd mobile && flutter test` → all pass. Per memory `feedback_no_flake_allowance`: any flake is a root-cause bug. Fix, do not retry.
+3. `dart format` target directories:
+   - `lib/presentation/widgets/filter_sheet`
+   - `lib/providers/photos_filter`
+   - `lib/domain/services/photos_filter_search_timeline.dart`
+   - `test/presentation/widgets/filter_sheet`
+   - `test/providers/photos_filter`
+   - `test/presentation/pages/dev`
+   - `test/domain/services`
+4. Scan for untranslated strings in new widgets:
+   ```bash
+   grep -nE '(Text|text:)\s*["\x27][A-Z]' mobile/lib/presentation/widgets/filter_sheet | grep -v '\.tr()' | grep -v '//'
+   ```
+   Zero matches required (memory §9.5).
 
 **Commit (only if format diff exists):** `chore(mobile): dart format filter_sheet`
 
@@ -474,53 +764,63 @@ Run `pnpm --filter=immich-i18n format:fix` (memory `feedback_i18n_key_sorting`).
 
 ## Task 9 — Open draft PR + babysit
 
-1. Push: `git push -u origin feat/mobile-filter-sheet-ui`.
-2. `gh pr create --draft --title "feat(mobile): photos filter sheet UI (PR 1.2)"` with body below.
-3. Run the `babysit` skill on the PR. Fix any failures at root cause. **Do not merge.**
+1. `git push -u origin feat/mobile-filter-sheet-ui`.
+2. `gh pr create --draft --title "feat(mobile): photos filter sheet UI (PR 1.2)" --body "$(cat <<'EOF' … EOF)"` — body below.
+3. Invoke `babysit` skill; fix every failure at root cause. **Do not merge.**
 
-**PR body template:**
+**PR body:**
 
 ```markdown
-Part of the mobile filter sheet feature. Design: [`docs/plans/2026-04-17-mobile-filter-sheet-design.md`](./docs/plans/2026-04-17-mobile-filter-sheet-design.md) §10.3 PR 1.2. Plan: [`docs/plans/2026-04-17-mobile-filter-sheet-pr1-2-plan.md`](./docs/plans/2026-04-17-mobile-filter-sheet-pr1-2-plan.md).
+Part of the mobile filter sheet feature. Design: [§10.3 PR 1.2](./docs/plans/2026-04-17-mobile-filter-sheet-design.md). Plan: [PR 1.2 plan](./docs/plans/2026-04-17-mobile-filter-sheet-pr1-2-plan.md).
 
 ## What
 
 - Filter icon in the Photos app bar with an active-indicator dot.
-- `FilterSheet` — single `DraggableScrollableSheet` owning peek / browse / deep-stub snaps.
-- Peek snap: chiprail built from `activeChipsFromFilter`, match count, tap-to-expand.
-- Browse snap: `SearchBar`, four suggestion strips (People / Places / Tags / When), Reset, Done, match count.
-- Deep snap: placeholder stub; real Deep lands in PR 1.3.
-- `photosTimelineQueryProvider` + `timelineServiceProvider` override in `MainTimelinePage`: empty filter → existing library service; non-empty → page-1 search-backed `TimelineService`. Debounced 500 ms.
-- Auto-peek on first filter, auto-collapse on last-chip removal (listener in `MainTimelinePage`).
-- i18n strings added.
+- `FilterSheet` — a single `DraggableScrollableSheet` owning peek / browse / deep-stub snaps. Programmatic snap transitions (via the sheet's `DraggableScrollableController.animateTo`) + settle-driven sync back to `photosFilterSheetProvider`.
+- Peek: active-filter chiprail + live match count.
+- Browse: SearchBar + four suggestion strips (People / Places / Tags / When) + Reset + Done + match count.
+- Deep: placeholder stub (real Deep is PR 1.3).
+- `photosFilterDebouncedProvider` (250 ms) feeding the suggestions provider.
+- `photosTimelineFilterProvider` (500 ms) feeding the new `photosTimelineQueryProvider` that overrides `timelineServiceProvider` in `MainTimelinePage`: empty filter → main-library service; non-empty + logged-in → page-1 search-backed `TimelineService` via `TimelineFactory.fromAssetStream`.
+- Auto-peek on first filter, auto-collapse on last-chip removal.
+- i18n strings; ICU pluralisation on match count; locale-aware number grouping.
+- A11y: live region on match count; snap-state announcement under `accessibleNavigation`.
+- Haptics on chip removal, strip tap, and reset.
 
-## Known limitations
+## Known limitations (flagged for follow-up)
 
-- **Search-backed Timeline is page-1 only.** Pagination deferred to PR 1.2.1 follow-up.
-- **PlacesStrip is single-level (country only).** Country → city cascade lands in PR 1.3 Deep.
-- **SearchBar uses plain debounce** — no paste-override fast path.
-- **PR 1.0 spike (§11.4) was never run.** If the DraggableScrollableSheet + keyboard interaction shows problems in manual QA, flag for a custom `ModalBottomSheet` rewrite.
+- **Search-backed Timeline is page-1 only** — pagination → PR 1.2.1.
+- **PlacesStrip is country-only**; cascade → PR 1.3 Deep.
+- **Spillover people-chip body tap is a no-op**; modal → PR 1.3.
+- **Zero-matches Timeline empty-state** — whatever the library timeline renders; custom overlay → PR 1.2.1.
+- **SearchBar paste fast-path** deferred; 250 ms debounce applies.
+- **PR 1.0 keyboard-sheet spike was never run**; if manual QA exposes keyboard regressions, escalate to custom sheet wrapper.
 
 ## Tests
 
-- Unit tests for `photosTimelineQueryProvider` (9 cases) and `activeChipsFromFilter` (13 cases).
-- Widget tests for every new widget; see plan §Task 1-6 for per-widget coverage.
+- Unit: `photosTimelineQueryProvider` (9), `photos_filter_search_timeline` helper (4), `photosFilterDebouncedProvider` (5), `activeChipsFromFilter` (17).
+- Widget: `FilterIconButton` (8), `ActiveFilterChip` (10 incl. dark), `FilterSheet` (15), `PeekContent` (5), `BrowseContent` (3), `SearchBar` (8), `MatchCountLabel` (7), `MatchCountFooter` (2), `DeepStubContent` (1), 4 strips × 9 tests + extras.
+- Integration: `MainTimelinePage` override propagation + auto-peek + tab preservation + pre-login.
 
 ## Checklist
 
 - [ ] `flutter analyze lib test` clean.
 - [ ] `flutter test` all pass.
-- [ ] No new English-only string literals.
-- [ ] Manual QA: filter icon visible + dotted; sheet drag smooth; tab-switch preserves state; landscape renders; keyboard interaction acceptable.
+- [ ] No new English-only Text literals.
+- [ ] Manual QA — iOS + Android, light + dark, landscape, keyboard interaction, tab switch, cold start.
 ```
 
 ---
 
-## Risk register (supersedes prior §11.1 for this PR)
+## Risk register
 
-- **Timeline override propagation.** Landmarks §note confirms `Timeline`'s inner `ProviderScope` does not override `timelineServiceProvider` — outer override propagates. Test 6.2 covers this but regression risk remains if upstream changes the inner scope. Mitigation: the test explicitly asserts override-visibility through `Timeline`.
-- **`TimelineFactory.fromAssets` stream semantics.** `fromAssets` takes a static `List<BaseAsset>`; the `TimelineService` wrapping it won't live-update when search results change — each filter edit rebuilds the service entirely. Acceptable for page-1-only MVP. Pagination requires `fromAssetStream` and is out-of-scope.
-- **`PersonDto` equality quirks.** Audited during Task 5 start; if structural equality is used, selected-state comparisons must compare by `id` (documented in PeopleStrip). Round-trip `togglePerson(sameId-differentDto)` could create duplicates in the `Set<PersonDto>` — add a regression unit test to `photos_filter.provider.dart` tests in PR 1.1 follow-up if confirmed.
-- **Keyboard + `DraggableScrollableSheet`.** PR 1.0 spike outcome never filled. Stop execution and document in §11.4 if broken during Task 4 manual pump.
-- **Drag-settle write storm.** Settle-extent tolerance of 0.02 should fire once per snap settle; verify via widget tests 4.3-4.5.
-- **`photosFilterCountProvider` is a placeholder** showing page-1 length (PR 1.1 comment). Tests assert "count renders whatever provider exposes", not "count == true total". Document in PR body.
+- **Sync Provider<TimelineService> adapter + fire-and-forget search** — if `SearchService.search` takes > 2 s, the timeline shows a blank grid for the duration. Acceptable; existing Search tab has the same behaviour. Mitigation: surface loading via existing Timeline loading indicator.
+- **`_DisposingTimelineService` wrapper** — if `TimelineService` grows abstract methods, the wrapper drifts. Mitigation: extend concrete `TimelineService` via composition and only override `dispose`; Dart's `noSuchMethod` is NOT used.
+- **Debounce provider lifecycle** — two debounced providers sharing a timer implementation must not cross-contaminate state. Each is a separate `Provider`; no shared mutable state.
+- **`DraggableScrollableController.animateTo` during drag** — if the user drags while we animate, the animation is cancelled by the user gesture. Flutter handles this natively; no extra code needed, but verify test 4.9.
+- **ICU pluralisation via `easy_localization`** — the ICU `{count, plural, …}` form needs `easy_localization` support with `"locale_keys": ["match_count.zero", ".one", ".other"]` or a flat plural key. Audit during Task 7.
+- **Haptic feedback spy in tests** — requires `ServicesBinding.instance.defaultBinaryMessenger` setMockMethodCallHandler. Standard pattern.
+- **`jumpTo` vs `tester.drag`** — all snap-transition widget tests use `tester.drag` + `pumpAndSettle` (not `jumpTo`); `jumpTo` bypasses the notification stream we rely on for settle sync.
+- **`photosFilterCountProvider` is a placeholder** (page-1 length). UI truthfully reflects whatever the provider returns; a future total-count endpoint is out-of-scope.
+- **PR 1.0 keyboard-sheet spike outcome never filled** — stop execution and document in §11.4 if Task 4 manual pump shows broken keyboard UX.
+- **`FilterSuggestionsTagDto.count` not in the generated DTO** — label drops the count; verify during Task 5 audit. If present, add back.
