@@ -51,6 +51,7 @@ Expected: `spike/mobile-filter-keyboard`.
 ### Task 0.2: Scaffold a dev-only spike page
 
 **Files:**
+
 - Create: `mobile/lib/presentation/pages/dev/spike_filter_keyboard.page.dart`
 
 **Step 1:** Write the spike page — minimal content, focus is the sheet + TextField.
@@ -111,6 +112,7 @@ class SpikeFilterKeyboardPage extends StatelessWidget {
 ### Task 0.3: Wire the spike route
 
 **Files:**
+
 - Modify: `mobile/lib/routing/router.dart` — add the spike route declaration.
 
 **Step 1:** Locate the routes list in `router.dart`. Add the new route alongside other dev routes (search for existing `@RoutePage`-decorated pages to find the pattern; typical entry is `AutoRoute(page: SomePageRoute.page, path: '/some-path')`).
@@ -149,6 +151,7 @@ Test cases — observe and record for each:
 ### Task 0.5: Write the spike decision note
 
 **Files:**
+
 - Modify: `docs/plans/2026-04-17-mobile-filter-sheet-design.md` — fill in §11.4.
 
 **Step 1:** Check out the feature branch (not the spike branch) to edit the design doc.
@@ -197,6 +200,7 @@ Branch: `feat/mobile-filter-panel`. Tests are `flutter_test`-based, one provider
 ### Task 1.1.0: Pre-work — `SearchFilter.empty()` + test baseline
 
 **Files:**
+
 - Modify: `mobile/lib/models/search/search_filter.model.dart`
 - Test: `mobile/test/models/search/search_filter_empty_test.dart` (create)
 
@@ -295,7 +299,7 @@ Expected: no changes, or only whitespace/comment-level changes.
 Use Grep on mobile/openapi/lib/model/filter_suggestions_* for "stillExists|exists|selected|echo"
 ```
 
-Expected: **no match.** This confirms orphan reconciliation needs either a separate server endpoint or a deferred strategy. **Decision for Phase 1:** defer proactive orphan reconciliation to Phase 1.5. Phase 1 ships *without* auto-removal of deleted-id chips; timeline returning zero matches is the user's cue. Update §7 of the design doc in a separate commit if this decision lands.
+Expected: **no match.** This confirms orphan reconciliation needs either a separate server endpoint or a deferred strategy. **Decision for Phase 1:** defer proactive orphan reconciliation to Phase 1.5. Phase 1 ships _without_ auto-removal of deleted-id chips; timeline returning zero matches is the user's cue. Update §7 of the design doc in a separate commit if this decision lands.
 
 **Step 4:** Commit the audit finding as a tiny design-doc update.
 
@@ -308,6 +312,7 @@ git commit -m "docs: mark orphan reconciliation as deferred to Phase 1.5 post-au
 ### Task 1.1.2: Create the provider directory with a placeholder barrel file
 
 **Files:**
+
 - Create: `mobile/lib/providers/photos_filter/photos_filter.dart` (barrel export file)
 
 **Step 1:** Write an empty barrel:
@@ -326,6 +331,7 @@ git commit -m "feat(mobile): scaffold photos_filter provider directory"
 ### Task 1.1.3: Define `FilterSheetSnap` enum
 
 **Files:**
+
 - Create: `mobile/lib/providers/photos_filter/filter_sheet.provider.dart`
 - Test: `mobile/test/providers/photos_filter/filter_sheet_provider_test.dart`
 
@@ -399,6 +405,7 @@ git commit -m "feat(mobile): add FilterSheetSnap enum + photosFilterSheetProvide
 ### Task 1.1.4: Skeleton `PhotosFilterNotifier` with `reset()`
 
 **Files:**
+
 - Create: `mobile/lib/providers/photos_filter/photos_filter.provider.dart`
 - Test: `mobile/test/providers/photos_filter/photos_filter_provider_test.dart`
 
@@ -482,6 +489,7 @@ git commit -m "feat(mobile): photosFilterProvider skeleton with reset()"
 ### Task 1.1.5: `togglePerson(PersonDto)` — idempotent add/remove
 
 **Files:**
+
 - Modify: `mobile/lib/providers/photos_filter/photos_filter.provider.dart`
 - Modify: `mobile/test/providers/photos_filter/photos_filter_provider_test.dart`
 
@@ -724,6 +732,7 @@ enum Dimension { people, tags, location, date, camera, rating, mediaType, displa
 ### Task 1.1.13: `removeChip(ChipId id)` + `ChipId` type
 
 **Files:**
+
 - Create: `mobile/lib/providers/photos_filter/chip_id.dart` — a sealed class with cases for each chip type.
 
 **Step 1:** Write `ChipId`. Sealed classes in Dart do **not** get free value-equality; every subclass declares `==` and `hashCode` explicitly, otherwise two `PersonChipId('alice')` instances compare unequal and `removeChip` will silently fail to match.
@@ -893,6 +902,7 @@ Use `Listener` from `mocktail` (per `mobile/test/test_utils.dart` `ListenerMock<
 ### Task 1.1.15: Export the provider from the barrel
 
 **Files:**
+
 - Modify: `mobile/lib/providers/photos_filter/photos_filter.dart`
 
 **Step 1:**
@@ -912,6 +922,7 @@ git commit -am "feat(mobile): photos_filter barrel export"
 ### Task 1.1.16: `photosFilterSuggestionsProvider`
 
 **Files:**
+
 - Create: `mobile/lib/providers/photos_filter/filter_suggestions.provider.dart`
 - Test: `mobile/test/providers/photos_filter/filter_suggestions_provider_test.dart`
 
@@ -960,6 +971,7 @@ AssetTypeEnum? _mapMediaType(AssetType type) {
 ```
 
 Notes baked into the snippet:
+
 - `isFavorite: filter.display.isFavorite ? true : null` — sending `false` to the server means "non-favourites only"; we want "no constraint" when the toggle is off. Verify this matches `SearchApiRepository.search()`'s pattern; adjust if needed.
 - `personIds: filter.people.isEmpty ? null : [...]` — empty list and null may be treated differently by the server; null is the safer default for "no constraint."
 - `AssetType.other` in the local enum maps to `null` (match all types) — the server interprets omitted `mediaType` as unconstrained.
@@ -971,6 +983,7 @@ Notes baked into the snippet:
 ### Task 1.1.17: `photosFilterCountProvider`
 
 **Files:**
+
 - Create: `mobile/lib/providers/photos_filter/filter_count.provider.dart`
 - Test: `mobile/test/providers/photos_filter/filter_count_provider_test.dart`
 
@@ -1022,6 +1035,7 @@ This task is kept in the plan as a placeholder so PR 1.2 planning can reference 
 ### Task 1.1.19: Final barrel export + tidy
 
 **Files:**
+
 - Modify: `mobile/lib/providers/photos_filter/photos_filter.dart`
 
 ```dart
@@ -1085,7 +1099,7 @@ Expected: no warnings, no errors.
 flutter test
 ```
 
-Expected: pre-existing failures stay the same number (record the baseline before the PR); no new failures. If the baseline has flakes, retry twice.
+Expected: all tests pass. If a test fails (whether or not it appears related to this PR), investigate the root cause and fix it — do not retry, do not tolerate flakes. A test that "passes alone but fails in the full suite" is leaked state between test files; fix the leak.
 
 **Step 4:** Commit any formatter-only changes separately.
 
