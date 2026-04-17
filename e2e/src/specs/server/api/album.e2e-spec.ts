@@ -482,6 +482,27 @@ describe('/albums', () => {
     });
   });
 
+  describe('GET /albums/names', () => {
+    it('returns lightweight album list without triggering thumbnail update', async () => {
+      const album = await utils.createAlbum(admin.accessToken, { albumName: 'Test' });
+
+      const { status, body } = await request(app)
+        .get('/albums/names')
+        .set('Authorization', `Bearer ${admin.accessToken}`);
+
+      expect(status).toBe(200);
+      expect(body).toContainEqual(
+        expect.objectContaining({
+          id: album.id,
+          albumName: 'Test',
+          albumThumbnailAssetId: null,
+          assetCount: 0,
+          shared: false,
+        }),
+      );
+    });
+  });
+
   describe('POST /albums', () => {
     it('should create an album', async () => {
       const { status, body } = await request(app)
