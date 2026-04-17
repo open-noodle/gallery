@@ -22,6 +22,13 @@
   let pillWidth = $state(0);
   let pillReady = $state(false);
 
+  // Under a prefix scope the mode pills are informational — setMode is a no-op
+  // (see GlobalSearchManager.setMode's `scope !== 'all'` short-circuit). Visually
+  // communicate this with a 50 % opacity dim. Intentionally NO aria-disabled: the
+  // radios stay focusable and keyboard-reachable so users can still cycle the
+  // pending mode for when they clear the prefix.
+  const isScoped = $derived(manager.scope !== 'all');
+
   $effect(() => {
     const idx = options.findIndex((o) => o.value === manager.mode);
     const el = labelRefs[idx];
@@ -37,7 +44,9 @@
   <div
     role="radiogroup"
     aria-label={$t('cmdk_search_mode')}
-    class="relative flex gap-0 rounded-md bg-subtle/40 p-0.5 font-mono text-[11px] font-medium uppercase"
+    class="relative flex gap-0 rounded-md bg-subtle/40 p-0.5 font-mono text-[11px] font-medium uppercase {isScoped
+      ? 'opacity-50'
+      : ''}"
   >
     {#if pillReady}
       <div
