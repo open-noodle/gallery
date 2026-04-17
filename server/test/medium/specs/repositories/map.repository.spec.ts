@@ -83,5 +83,20 @@ describe(MapRepository.name, () => {
 
       expect(results.find((r) => r.id === asset.id)).toBeUndefined();
     });
+
+    it('should NOT include owner-archived space asset even when isArchived=true (member archive toggle does not leak owner archive)', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id });
+      const { asset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Archive });
+      await ctx.database.insertInto('asset_exif').values({ assetId: asset.id, latitude: 2, longitude: 2 }).execute();
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+
+      const results = await sut.getMapMarkers([member.id], [], { timelineSpaceIds: [space.id], isArchived: true });
+
+      expect(results.find((r) => r.id === asset.id)).toBeUndefined();
+    });
   });
 });
