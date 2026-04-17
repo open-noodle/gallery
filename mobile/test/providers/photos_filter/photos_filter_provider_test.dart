@@ -143,4 +143,14 @@ void main() {
       expect(container.read(photosFilterProvider).mediaType, AssetType.other);
     });
   });
+
+  group('setFavouritesOnly', () {
+    test('toggles favourites flag', () {
+      final notifier = container.read(photosFilterProvider.notifier);
+      notifier.setFavouritesOnly(true);
+      expect(container.read(photosFilterProvider).display.isFavorite, true);
+      notifier.setFavouritesOnly(false);
+      expect(container.read(photosFilterProvider).display.isFavorite, false);
+    });
+  });
 }

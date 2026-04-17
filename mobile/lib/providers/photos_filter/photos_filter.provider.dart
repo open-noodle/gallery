@@ -43,4 +43,7 @@ class PhotosFilterNotifier extends Notifier<SearchFilter> {
 
   void setMediaType(AssetType? type) =>
       state = state.copyWith(mediaType: type ?? AssetType.other);
+
+  void setFavouritesOnly(bool v) =>
+      state = state.copyWith(display: state.display.copyWith(isFavorite: v));
 }
