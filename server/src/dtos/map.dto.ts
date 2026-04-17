@@ -39,7 +39,49 @@ const MapMarkerResponseSchema = z
   })
   .meta({ id: 'MapMarkerResponseDto' });
 
-export class MapReverseGeocodeDto extends createZodDto(MapReverseGeocodeSchema) {}
-export class MapReverseGeocodeResponseDto extends createZodDto(MapReverseGeocodeResponseSchema) {}
-export class MapMarkerDto extends createZodDto(MapMarkerSchema) {}
-export class MapMarkerResponseDto extends createZodDto(MapMarkerResponseSchema) {}
+  @ApiProperty({ description: 'Country name' })
+  country!: string | null;
+}
+
+export class MapMarkerDto {
+  @ValidateBoolean({ optional: true, description: 'Filter by archived status' })
+  isArchived?: boolean;
+
+  @ValidateBoolean({ optional: true, description: 'Filter by favorite status' })
+  isFavorite?: boolean;
+
+  @ValidateDate({ optional: true, description: 'Filter assets created after this date' })
+  fileCreatedAfter?: Date;
+
+  @ValidateDate({ optional: true, description: 'Filter assets created before this date' })
+  fileCreatedBefore?: Date;
+
+  @ValidateBoolean({ optional: true, description: 'Include partner assets' })
+  withPartners?: boolean;
+
+  @ValidateBoolean({ optional: true, description: 'Include shared album assets' })
+  withSharedAlbums?: boolean;
+
+  @ValidateBoolean({ optional: true, description: 'Include shared space assets' })
+  withSharedSpaces?: boolean;
+}
+
+export class MapMarkerResponseDto {
+  @ApiProperty({ description: 'Asset ID' })
+  id!: string;
+
+  @ApiProperty({ format: 'double', description: 'Latitude' })
+  lat!: number;
+
+  @ApiProperty({ format: 'double', description: 'Longitude' })
+  lon!: number;
+
+  @ApiProperty({ description: 'City name' })
+  city!: string | null;
+
+  @ApiProperty({ description: 'State/Province name' })
+  state!: string | null;
+
+  @ApiProperty({ description: 'Country name' })
+  country!: string | null;
+}

@@ -60,4 +60,7 @@ export class FilteredMapMarkerDto {
   @ApiProperty({ type: String, required: false, description: 'Filter by country' })
   @Optional()
   country?: string;
+
+  @ValidateBoolean({ optional: true, description: 'Include shared space assets' })
+  withSharedSpaces?: boolean;
 }
