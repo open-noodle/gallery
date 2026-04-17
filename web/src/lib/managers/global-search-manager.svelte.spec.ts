@@ -815,10 +815,10 @@ describe('activate()', () => {
   it('activate("person", item) navigates to /people/:id and records recent entry', () => {
     const m = new GlobalSearchManager();
     m.open();
-    m.activate('person', { id: 'p1', name: 'Alice', faceAssetId: 'face1' });
+    m.activate('person', { id: 'p1', name: 'Alice' });
     expect(goto).toHaveBeenCalledWith('/people/p1');
     const entries = getEntries();
-    expect(entries[0]).toMatchObject({ kind: 'person', personId: 'p1', label: 'Alice', thumbnailAssetId: 'face1' });
+    expect(entries[0]).toMatchObject({ kind: 'person', personId: 'p1', label: 'Alice' });
   });
 
   it('activate("place", item) navigates to /map with hash and records recent entry', () => {
@@ -2553,7 +2553,6 @@ describe('getActiveItem recent-entry preview lookup (cold open)', () => {
       id: 'person:p1',
       personId: 'p1',
       label: 'Alice',
-      thumbnailAssetId: 'face-1',
       lastUsed: 1,
     });
     const m = new GlobalSearchManager();
@@ -2562,10 +2561,9 @@ describe('getActiveItem recent-entry preview lookup (cold open)', () => {
     const active = m.getActiveItem();
     expect(active?.kind).toBe('person');
     if (active?.kind === 'person') {
-      const data = active.data as { id: string; name: string; faceAssetId: string };
+      const data = active.data as { id: string; name: string };
       expect(data.id).toBe('p1');
       expect(data.name).toBe('Alice');
-      expect(data.faceAssetId).toBe('face-1');
     }
   });
 

@@ -1,23 +1,34 @@
 <script lang="ts">
-  import { getAssetMediaUrl } from '$lib/utils';
-  import { AssetMediaSize, type PersonResponseDto } from '@immich/sdk';
+  import { getPeopleThumbnailUrl } from '$lib/utils';
+  import { type PersonResponseDto } from '@immich/sdk';
   import { t } from 'svelte-i18n';
 
   interface Props {
-    item: PersonResponseDto & { numberOfAssets?: number; faceAssetId?: string };
+    item: PersonResponseDto & { numberOfAssets?: number };
   }
   let { item }: Props = $props();
 
-  const thumbUrl = $derived(
-    item.faceAssetId ? getAssetMediaUrl({ id: item.faceAssetId, size: AssetMediaSize.Thumbnail }) : '',
-  );
+  const thumbUrl = $derived(getPeopleThumbnailUrl(item));
+  let failed = $state(false);
+  // Reset the failure flag whenever the row swaps to a different person — the
+  // component instance is re-used by bits-ui as the user scrolls the list.
+  $effect(() => {
+    void item.id;
+    failed = false;
+  });
 </script>
 
 <div
   class="flex h-[52px] items-center gap-3 rounded-lg px-3 py-2 transition-colors duration-[80ms] ease-out group-data-[selected]:bg-primary/10"
 >
-  {#if thumbUrl}
-    <img src={thumbUrl} alt="" class="h-10 w-10 rounded-full object-cover" loading="lazy" />
+  {#if !failed}
+    <img
+      src={thumbUrl}
+      alt=""
+      class="h-10 w-10 rounded-full object-cover"
+      loading="lazy"
+      onerror={() => (failed = true)}
+    />
   {:else}
     <div class="h-10 w-10 rounded-full bg-subtle/40" aria-hidden="true"></div>
   {/if}
