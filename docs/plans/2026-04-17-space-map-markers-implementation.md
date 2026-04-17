@@ -103,13 +103,13 @@ git add server/src/dtos/gallery-map.dto.ts
 git commit -m "feat(server): add withSharedSpaces to FilteredMapMarkerDto"
 ```
 
-### Task 1.3: Add `spaceIds` to `MapMarkerSearchOptions`
+### Task 1.3: Add `timelineSpaceIds` to `MapMarkerSearchOptions`
 
 **Files:**
 
 - Modify: `server/src/repositories/map.repository.ts`
 
-**Step 1:** Locate the `MapMarkerSearchOptions` interface near the top (lines 18-23). Add `spaceIds?: string[]` at the end:
+**Step 1:** Locate the `MapMarkerSearchOptions` interface near the top (lines 18-23). Add `timelineSpaceIds?: string[]` at the end:
 
 ```ts
 export interface MapMarkerSearchOptions {
@@ -117,7 +117,7 @@ export interface MapMarkerSearchOptions {
   isFavorite?: boolean;
   fileCreatedBefore?: Date;
   fileCreatedAfter?: Date;
-  spaceIds?: string[];
+  timelineSpaceIds?: string[];
 }
 ```
 
@@ -131,7 +131,7 @@ cd server && pnpm check && cd ..
 
 ```bash
 git add server/src/repositories/map.repository.ts
-git commit -m "refactor(server): add spaceIds to MapMarkerSearchOptions"
+git commit -m "refactor(server): add timelineSpaceIds to MapMarkerSearchOptions"
 ```
 
 ---
@@ -140,7 +140,7 @@ git commit -m "refactor(server): add spaceIds to MapMarkerSearchOptions"
 
 Every test in this phase lives in `server/src/services/map.service.spec.ts`. The existing `describe('getMapMarkers', ...)` block starts at line 18; add new `it(...)` blocks inside it.
 
-### Task 2.1: Test — passes `spaceIds` when `withSharedSpaces=true` and user has enabled spaces (matrix row 5)
+### Task 2.1: Test — passes `timelineSpaceIds` when `withSharedSpaces=true` and user has enabled spaces (matrix row 5)
 
 **Files:**
 
@@ -162,7 +162,7 @@ it('should pass space IDs when withSharedSpaces is true and user has enabled spa
   expect(mocks.map.getMapMarkers).toHaveBeenCalledWith(
     [auth.user.id],
     expect.anything(),
-    expect.objectContaining({ spaceIds: [spaceId] }),
+    expect.objectContaining({ timelineSpaceIds: [spaceId] }),
   );
 });
 ```
@@ -174,12 +174,12 @@ cd server && pnpm test -- --run src/services/map.service.spec.ts && cd ..
 # Expected: the new test FAILS with "expected mock to have been called"
 ```
 
-### Task 2.2: Test — no `spaceIds` when user has no enabled spaces (matrix supports row 7)
+### Task 2.2: Test — no `timelineSpaceIds` when user has no enabled spaces (matrix supports row 7)
 
 **Step 1:** Add next to the previous test:
 
 ```ts
-it('should not pass spaceIds when user has no enabled spaces', async () => {
+it('should not pass timelineSpaceIds when user has no enabled spaces', async () => {
   const auth = AuthFactory.create();
   mocks.partner.getAll.mockResolvedValue([]);
   mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
@@ -190,7 +190,7 @@ it('should not pass spaceIds when user has no enabled spaces', async () => {
   expect(mocks.map.getMapMarkers).toHaveBeenCalledWith(
     [auth.user.id],
     expect.anything(),
-    expect.not.objectContaining({ spaceIds: expect.anything() }),
+    expect.not.objectContaining({ timelineSpaceIds: expect.anything() }),
   );
 });
 ```
@@ -217,7 +217,7 @@ it('should not resolve space IDs when isFavorite=true', async () => {
   expect(mocks.map.getMapMarkers).toHaveBeenCalledWith(
     [auth.user.id],
     expect.anything(),
-    expect.not.objectContaining({ spaceIds: expect.anything() }),
+    expect.not.objectContaining({ timelineSpaceIds: expect.anything() }),
   );
 });
 ```
@@ -242,7 +242,7 @@ it('should resolve space IDs when isArchived=true (archive toggle is additive)',
   expect(mocks.map.getMapMarkers).toHaveBeenCalledWith(
     [auth.user.id],
     expect.anything(),
-    expect.objectContaining({ spaceIds: [spaceId], isArchived: true }),
+    expect.objectContaining({ timelineSpaceIds: [spaceId], isArchived: true }),
   );
 });
 ```
@@ -311,7 +311,7 @@ export class MapService extends BaseService {
     if (options.withSharedSpaces && options.isFavorite !== true) {
       const spaceRows = await this.sharedSpaceRepository.getSpaceIdsForTimeline(auth.user.id);
       if (spaceRows.length > 0) {
-        searchOptions.spaceIds = spaceRows.map((row) => row.spaceId);
+        searchOptions.timelineSpaceIds = spaceRows.map((row) => row.spaceId);
       }
     }
 
@@ -326,7 +326,7 @@ export class MapService extends BaseService {
 }
 ```
 
-Note: the existing `getMapMarkers` passed the DTO directly as the third arg. The new version builds an explicit `MapMarkerSearchOptions` so `spaceIds` can be attached without leaking the DTO's `withSharedSpaces` / `withPartners` / `withSharedAlbums` into the repo layer.
+Note: the existing `getMapMarkers` passed the DTO directly as the third arg. The new version builds an explicit `MapMarkerSearchOptions` so `timelineSpaceIds` can be attached without leaking the DTO's `withSharedSpaces` / `withPartners` / `withSharedAlbums` into the repo layer.
 
 **Step 2:** The existing tests that assert the third arg (lines 61-65, 90-94) expect specific shapes. Check them — they use `{ withPartners: true }` directly. Update those assertions so they still pass with the new shape. In `map.service.spec.ts`:
 
@@ -643,7 +643,7 @@ This is the critical SQL change for the basic endpoint. It has a subtle semantic
     );
   }
 
-  if (spaceIds && spaceIds.length > 0) {
+  if (timelineSpaceIds && timelineSpaceIds.length > 0) {
     expression.push(
       eb.and([
         eb('asset.visibility', '=', AssetVisibility.Timeline),
@@ -651,7 +651,7 @@ This is the critical SQL change for the basic endpoint. It has a subtle semantic
           eb
             .selectFrom('shared_space_asset')
             .whereRef('asset.id', '=', 'shared_space_asset.assetId')
-            .where('shared_space_asset.spaceId', 'in', spaceIds),
+            .where('shared_space_asset.spaceId', 'in', timelineSpaceIds),
         ),
       ]),
     );
@@ -662,7 +662,7 @@ This is the critical SQL change for the basic endpoint. It has a subtle semantic
           eb
             .selectFrom('shared_space_library')
             .whereRef('asset.libraryId', '=', 'shared_space_library.libraryId')
-            .where('shared_space_library.spaceId', 'in', spaceIds),
+            .where('shared_space_library.spaceId', 'in', timelineSpaceIds),
         ),
       ]),
     );
@@ -672,13 +672,13 @@ This is the critical SQL change for the basic endpoint. It has a subtle semantic
 })
 ```
 
-`spaceIds` comes from the `options` param; destructure it from the existing `options` destructure at the top of the method (line 83):
+`timelineSpaceIds` comes from the `options` param; destructure it from the existing `options` destructure at the top of the method (line 83):
 
 ```ts
 getMapMarkers(
   ownerIds: string[],
   albumIds: string[],
-  { isArchived, isFavorite, fileCreatedAfter, fileCreatedBefore, spaceIds }: MapMarkerSearchOptions = {},
+  { isArchived, isFavorite, fileCreatedAfter, fileCreatedBefore, timelineSpaceIds }: MapMarkerSearchOptions = {},
 ) {
 ```
 
@@ -721,7 +721,7 @@ git diff server/src/queries/map.repository.sql | head -80
 
 ```bash
 git add server/src/queries/map.repository.sql
-git commit -m "chore(server): regenerate map.repository.sql for spaceIds"
+git commit -m "chore(server): regenerate map.repository.sql for timelineSpaceIds"
 ```
 
 ---
@@ -849,7 +849,7 @@ it('should include a direct shared_space_asset for a member with showInTimeline=
     .execute();
   await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
 
-  const results = await sut.getMapMarkers([member.id], [], { spaceIds: [space.id] });
+  const results = await sut.getMapMarkers([member.id], [], { timelineSpaceIds: [space.id] });
 
   expect(results).toHaveLength(1);
   expect(results[0]).toMatchObject({ id: asset.id, lat: 48.8566, lon: 2.3522 });
@@ -894,7 +894,7 @@ it('should include a library-linked asset via shared_space_library for a member'
     .values({ assetId: asset.id, latitude: 40.7128, longitude: -74.006 })
     .execute();
 
-  const results = await sut.getMapMarkers([member.id], [], { spaceIds: [space.id] });
+  const results = await sut.getMapMarkers([member.id], [], { timelineSpaceIds: [space.id] });
 
   expect(results).toHaveLength(1);
   expect(results[0].id).toBe(asset.id);
@@ -922,7 +922,7 @@ it('should NOT include space asset when owner visibility=Archive and isArchived=
   await ctx.database.insertInto('asset_exif').values({ assetId: asset.id, latitude: 1, longitude: 1 }).execute();
   await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
 
-  const results = await sut.getMapMarkers([member.id], [], { spaceIds: [space.id] });
+  const results = await sut.getMapMarkers([member.id], [], { timelineSpaceIds: [space.id] });
 
   expect(results.find((r) => r.id === asset.id)).toBeUndefined();
 });
@@ -943,7 +943,7 @@ it('should NOT include owner-archived space asset even when isArchived=true (mem
   await ctx.database.insertInto('asset_exif').values({ assetId: asset.id, latitude: 2, longitude: 2 }).execute();
   await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
 
-  const results = await sut.getMapMarkers([member.id], [], { spaceIds: [space.id], isArchived: true });
+  const results = await sut.getMapMarkers([member.id], [], { timelineSpaceIds: [space.id], isArchived: true });
 
   expect(results.find((r) => r.id === asset.id)).toBeUndefined();
 });
@@ -964,7 +964,7 @@ it('should exclude space asset without GPS coordinates', async () => {
   // no asset_exif row — asset has no GPS
   await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
 
-  const results = await sut.getMapMarkers([member.id], [], { spaceIds: [space.id] });
+  const results = await sut.getMapMarkers([member.id], [], { timelineSpaceIds: [space.id] });
 
   expect(results.find((r) => r.id === asset.id)).toBeUndefined();
 });
@@ -989,7 +989,7 @@ it('should exclude trashed space asset', async () => {
   await ctx.database.insertInto('asset_exif').values({ assetId: asset.id, latitude: 3, longitude: 3 }).execute();
   await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
 
-  const results = await sut.getMapMarkers([member.id], [], { spaceIds: [space.id] });
+  const results = await sut.getMapMarkers([member.id], [], { timelineSpaceIds: [space.id] });
 
   expect(results.find((r) => r.id === asset.id)).toBeUndefined();
 });
@@ -1012,7 +1012,7 @@ it('should exclude Locked-visibility space asset', async () => {
   await ctx.database.insertInto('asset_exif').values({ assetId: asset.id, latitude: 4, longitude: 4 }).execute();
   await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
 
-  const results = await sut.getMapMarkers([member.id], [], { spaceIds: [space.id] });
+  const results = await sut.getMapMarkers([member.id], [], { timelineSpaceIds: [space.id] });
 
   expect(results.find((r) => r.id === asset.id)).toBeUndefined();
 });
@@ -1025,7 +1025,7 @@ Run; commit.
 This is a service-level scenario but the repo test verifies the SQL: with only space A's ID passed, the asset shows via A; passing no space IDs hides it.
 
 ```ts
-it('should include library-linked asset when at least one containing space is passed in spaceIds', async () => {
+it('should include library-linked asset when at least one containing space is passed in timelineSpaceIds', async () => {
   const { ctx, sut } = setup();
   const { user: owner } = await ctx.newUser();
   const { user: member } = await ctx.newUser();
@@ -1043,10 +1043,10 @@ it('should include library-linked asset when at least one containing space is pa
   });
   await ctx.database.insertInto('asset_exif').values({ assetId: asset.id, latitude: 5, longitude: 5 }).execute();
 
-  const viaA = await sut.getMapMarkers([member.id], [], { spaceIds: [spaceA.id] });
+  const viaA = await sut.getMapMarkers([member.id], [], { timelineSpaceIds: [spaceA.id] });
   expect(viaA.find((r) => r.id === asset.id)).toBeDefined();
 
-  const none = await sut.getMapMarkers([member.id], [], { spaceIds: [] });
+  const none = await sut.getMapMarkers([member.id], [], { timelineSpaceIds: [] });
   expect(none.find((r) => r.id === asset.id)).toBeUndefined();
 });
 ```
@@ -1056,7 +1056,7 @@ Run; commit.
 ### Task 6.10: Test — direct asset in two spaces, mixed `showInTimeline` (matrix row 22)
 
 ```ts
-it('should include direct space asset when at least one containing space is in spaceIds', async () => {
+it('should include direct space asset when at least one containing space is in timelineSpaceIds', async () => {
   const { ctx, sut } = setup();
   const { user: owner } = await ctx.newUser();
   const { user: member } = await ctx.newUser();
@@ -1069,7 +1069,7 @@ it('should include direct space asset when at least one containing space is in s
   await ctx.newSharedSpaceAsset({ spaceId: spaceA.id, assetId: asset.id });
   await ctx.newSharedSpaceAsset({ spaceId: spaceB.id, assetId: asset.id });
 
-  const viaA = await sut.getMapMarkers([member.id], [], { spaceIds: [spaceA.id] });
+  const viaA = await sut.getMapMarkers([member.id], [], { timelineSpaceIds: [spaceA.id] });
   expect(viaA.find((r) => r.id === asset.id)).toBeDefined();
 });
 ```
