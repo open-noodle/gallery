@@ -3986,3 +3986,106 @@ describe('prefix scoping — runNavigationProvider', () => {
     expect((m.sections.navigation as { items?: unknown }).items).toBeUndefined();
   });
 });
+
+describe('prefix scoping — setQuery SWR scope behavior', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    vi.useFakeTimers();
+    installFakeAbortTimeout();
+    vi.mocked(searchSmart).mockResolvedValue({ assets: { items: [], nextPage: null } } as never);
+    vi.mocked(searchAssets).mockResolvedValue({ assets: { items: [], nextPage: null } } as never);
+    vi.mocked(searchPerson).mockResolvedValue([] as never);
+    vi.mocked(searchPlaces).mockResolvedValue([] as never);
+    vi.mocked(getAllTags).mockResolvedValue([] as never);
+    vi.mocked(getAlbumNames).mockResolvedValue([] as never);
+    vi.mocked(getAllSpaces).mockResolvedValue([] as never);
+    vi.mocked(getAllPeople).mockResolvedValue({ people: [], total: 0, hidden: 0, hasNextPage: false } as never);
+  });
+
+  afterEach(() => {
+    restoreAbortTimeout();
+    vi.useRealTimers();
+  });
+
+  it('scope transition from all to people force-idles non-people sections BEFORE debounce fires', () => {
+    const m = new GlobalSearchManager();
+    m.sections.photos = { status: 'ok', items: [{ id: 'p1' }] as never, total: 1 };
+    m.sections.albums = { status: 'ok', items: [{ id: 'a1' }] as never, total: 1 };
+
+    m.setQuery('@alice');
+    // Do NOT advance timers — assert state IMMEDIATELY (pre-debounce).
+    expect(m.sections.photos.status).toBe('idle');
+    expect(m.sections.albums.status).toBe('idle');
+    expect(m.sections.people.status).toBe('loading');
+  });
+
+  it('scope away (people → all) clears SWR-stale state on non-photo sections', async () => {
+    const m = new GlobalSearchManager();
+    m.setQuery('@alice');
+    await vi.advanceTimersByTimeAsync(150);
+    m.setQuery('alice');
+    // All entity sections should be loading (they were idle under @, now scope all dispatches)
+    expect(m.sections.photos.status).toBe('loading');
+  });
+
+  it('within-scope payload change preserves ok sections (existing SWR)', async () => {
+    const m = new GlobalSearchManager();
+    vi.mocked(searchPerson).mockResolvedValue([mockPerson('p1', 'Alice')] as never);
+    m.setQuery('@al');
+    await vi.advanceTimersByTimeAsync(150);
+    await vi.runAllTimersAsync();
+    expect(m.sections.people.status).toBe('ok');
+
+    // Adding a char — scope and provider stay the same. people section should NOT
+    // flip to loading; ok is SWR-preserved.
+    m.setQuery('@ali');
+    expect(m.sections.people.status).toBe('ok');
+  });
+
+  it('scope transition aborts the prior batchController', async () => {
+    const m = new GlobalSearchManager();
+    m.setQuery('alice');
+    await vi.advanceTimersByTimeAsync(150);
+    const priorBatch = m['batchController'];
+    expect(priorBatch).not.toBeNull();
+    expect(priorBatch?.signal.aborted).toBe(false);
+
+    m.setQuery('@alice');
+    expect(priorBatch?.signal.aborted).toBe(true);
+    expect(m['batchController']).not.toBe(priorBatch); // fresh controller
+  });
+
+  it('rapid scope thrash (@ → # → /) aborts cleanly and inFlightCounter stays consistent', async () => {
+    const m = new GlobalSearchManager();
+    m.setQuery('@alice');
+    m.setQuery('#xmas');
+    m.setQuery('/trip');
+    await vi.advanceTimersByTimeAsync(150);
+    await vi.runAllTimersAsync();
+
+    // After all transitions settle, batchInFlight must drop to false (no stranded counter).
+    expect(m.batchInFlight).toBe(false);
+    // Only the final scope's sections should be non-idle (collections).
+    expect(m.sections.photos.status).toBe('idle');
+    expect(m.sections.people.status).toBe('idle');
+    expect(m.sections.tags.status).toBe('idle');
+  });
+
+  it('/ while albumsCache promise is in-flight: callers join the same promise', async () => {
+    const m = new GlobalSearchManager();
+    const getAlbumNamesSpy = vi.mocked(getAlbumNames);
+    let resolve: (v: unknown) => void;
+    getAlbumNamesSpy.mockImplementation(() => new Promise((r) => (resolve = r as (v: unknown) => void)));
+
+    m.setQuery('/tr');
+    await vi.advanceTimersByTimeAsync(150);
+    m.setQuery('/tri');
+    await vi.advanceTimersByTimeAsync(150);
+    // Both dispatches await the same albumsPromise.
+    resolve!([{ id: 'a1', albumName: 'Trip' }] as never);
+    await vi.runAllTimersAsync();
+
+    expect(getAlbumNamesSpy).toHaveBeenCalledTimes(1);
+  });
+});

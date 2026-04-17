@@ -1370,8 +1370,16 @@ export class GlobalSearchManager {
 
     // SWR (stale-while-revalidate): only flip sections that are NOT already 'ok' to
     // loading. Preserving ok content across keystrokes fixes the jitter bug where the
-    // palette flashed skeletons between every character.
+    // palette flashed skeletons between every character. Scope-aware: non-scope
+    // sections reset to idle synchronously so the 150ms debounce window doesn't flash
+    // stale photo results under an @ scope. (`Array.includes` over a tiny tuple — not
+    // a Set — to satisfy svelte/prefer-svelte-reactivity.)
+    const inScope = ENTITY_KEYS_BY_SCOPE[this.scope];
     for (const key of ['photos', 'people', 'places', 'tags', 'albums', 'spaces'] as const) {
+      if (!inScope.includes(key)) {
+        this.sections[key] = idle;
+        continue;
+      }
       if (this.sections[key].status !== 'ok') {
         this.sections[key] = { status: 'loading' };
       }
