@@ -3,16 +3,17 @@ import 'package:immich_mobile/infrastructure/utils/user.converter.dart';
 import 'package:immich_mobile/models/activities/activity.model.dart';
 import 'package:immich_mobile/providers/api.provider.dart';
 import 'package:immich_mobile/repositories/api.repository.dart';
+import 'package:immich_mobile/services/api.service.dart';
 import 'package:openapi/api.dart';
 
-final activityApiRepositoryProvider = Provider(
-  (ref) => ActivityApiRepository(ref.watch(apiServiceProvider).activitiesApi),
-);
+final activityApiRepositoryProvider = Provider((ref) => ActivityApiRepository(ref.watch(apiServiceProvider)));
 
 class ActivityApiRepository extends ApiRepository {
-  final ActivitiesApi _api;
+  final ApiService _apiService;
 
-  ActivityApiRepository(this._api);
+  ActivityApiRepository(this._apiService);
+
+  ActivitiesApi get _api => _apiService.activitiesApi;
 
   Future<List<Activity>> getAll(String albumId, {String? assetId}) async {
     final response = await checkNull(_api.getActivities(albumId, assetId: assetId));
