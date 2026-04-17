@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Icon, IconButton, Modal, ModalBody } from '@immich/ui';
+  import { Icon, IconButton, Modal, modalManager, ModalBody } from '@immich/ui';
   import { mdiClose } from '@mdi/js';
   import { Command } from 'bits-ui';
   import { t } from 'svelte-i18n';
@@ -16,6 +16,7 @@
   import NavigationRow from './rows/navigation-row.svelte';
   import GlobalSearchFooter from './global-search-footer.svelte';
   import GlobalSearchPreview from './global-search-preview.svelte';
+  import ShortcutsModal from '$lib/modals/ShortcutsModal.svelte';
   import { mediaQueryManager } from '$lib/stores/media-query-manager.svelte';
   import { getEntries, type RecentEntry } from '$lib/stores/cmdk-recent';
   import { user } from '$lib/stores/user.store';
@@ -204,6 +205,14 @@
   }
 
   function onKeyDown(e: KeyboardEvent) {
+    // Bare `?` opens the app-wide keyboard shortcuts modal. No modifiers — Ctrl/Alt/Meta
+    // fall through so browser chords (e.g. a custom user-agent binding) still work.
+    // Must sit above every other key branch so a stale handler doesn't swallow the key.
+    if (e.key === '?' && !e.ctrlKey && !e.altKey && !e.metaKey) {
+      void modalManager.show(ShortcutsModal, {});
+      e.preventDefault();
+      return;
+    }
     if (e.key === 'Escape') {
       clearOrClose();
       e.preventDefault();
@@ -320,7 +329,7 @@
             ? 'border-e border-gray-200 dark:border-gray-700'
             : ''}"
         >
-          {#if manager.mode === 'smart' && !manager.mlHealthy && inputValue.trim() !== ''}
+          {#if manager.mode === 'smart' && !manager.mlHealthy && inputValue.trim() !== '' && manager.scope === 'all'}
             <div class="mx-3 mt-3 rounded-md bg-subtle/60 px-3 py-2 text-xs">
               {$t('cmdk_smart_unavailable')}
               <button
@@ -391,7 +400,7 @@
                   {$t('cmdk_helper')}
                 </div>
               {/if}
-            {:else}
+            {:else if manager.scope === 'all'}
               {#if manager.topNavigationMatch}
                 <Command.Group class="mb-4">
                   <Command.GroupHeading
@@ -421,10 +430,10 @@
                 {/snippet}
               </GlobalSearchSection>
               <!-- Albums + Spaces sit between Photos and People per the v1.1 plan's
-                   declared section sequence. Headings use `cmdk_section_albums` /
-                   `cmdk_section_spaces` (Task 24). `isPending` wiring reads
-                   `manager.pendingActivation` so the row spinner affordance appears for
-                   the exact key being activated. -->
+                     declared section sequence. Headings use `cmdk_section_albums` /
+                     `cmdk_section_spaces` (Task 24). `isPending` wiring reads
+                     `manager.pendingActivation` so the row spinner affordance appears for
+                     the exact key being activated. -->
               <GlobalSearchSection
                 heading={$t('cmdk_section_albums')}
                 status={manager.sections.albums}
@@ -483,6 +492,70 @@
               </GlobalSearchSection>
               <GlobalSearchNavigationSections
                 status={dedupedNavigationStatus}
+                onActivate={(item) => manager.activate('nav', item)}
+              />
+            {:else if manager.scope === 'people'}
+              <!-- Scope `@` — only the People section. Other sections force-idled in
+                   runBatch so they wouldn't render anyway, but gating the render
+                   branch keeps the DOM free of other sections' headings and gives
+                   a11y a single contiguous result set. -->
+              <GlobalSearchSection
+                heading={$t('cmdk_people_heading')}
+                status={manager.sections.people}
+                idPrefix="person"
+                onActivate={(item) => manager.activate('person', item)}
+              >
+                {#snippet renderRow(item)}
+                  <PersonRow item={item as never} />
+                {/snippet}
+              </GlobalSearchSection>
+            {:else if manager.scope === 'tags'}
+              <!-- Scope `#` — only the Tags section. -->
+              <GlobalSearchSection
+                heading={$t('cmdk_tags_heading')}
+                status={manager.sections.tags}
+                idPrefix="tag"
+                onActivate={(item) => manager.activate('tag', item)}
+              >
+                {#snippet renderRow(item)}
+                  <TagRow item={item as never} />
+                {/snippet}
+              </GlobalSearchSection>
+            {:else if manager.scope === 'collections'}
+              <!-- Scope `/` — Albums + Spaces. Matches the `ENTITY_KEYS_BY_SCOPE.collections`
+                   tuple order so the cursor-reconcile order stays aligned with DOM order. -->
+              <GlobalSearchSection
+                heading={$t('cmdk_section_albums')}
+                status={manager.sections.albums}
+                idPrefix="album"
+                onActivate={(item) => void manager.activateAlbum((item as { id: string }).id)}
+              >
+                {#snippet renderRow(item)}
+                  <AlbumRow
+                    item={item as never}
+                    isPending={manager.pendingActivation === `album:${(item as { id: string }).id}`}
+                  />
+                {/snippet}
+              </GlobalSearchSection>
+              <GlobalSearchSection
+                heading={$t('cmdk_section_spaces')}
+                status={manager.sections.spaces}
+                idPrefix="space"
+                onActivate={(item) => void manager.activateSpace((item as { id: string }).id)}
+              >
+                {#snippet renderRow(item)}
+                  <SpaceRow
+                    item={item as never}
+                    isPending={manager.pendingActivation === `space:${(item as { id: string }).id}`}
+                  />
+                {/snippet}
+              </GlobalSearchSection>
+            {:else if manager.scope === 'nav'}
+              <!-- Scope `>` — only NavigationSections. The navigation provider runs
+                   synchronously in setQuery (no debounce); under `>` it surfaces the
+                   whole catalog for bare `>` or filtered matches for `>foo`. -->
+              <GlobalSearchNavigationSections
+                status={manager.sections.navigation}
                 onActivate={(item) => manager.activate('nav', item)}
               />
             {/if}
