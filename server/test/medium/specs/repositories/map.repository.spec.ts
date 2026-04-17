@@ -98,5 +98,20 @@ describe(MapRepository.name, () => {
 
       expect(results.find((r) => r.id === asset.id)).toBeUndefined();
     });
+
+    it('should exclude space asset without GPS coordinates', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id });
+      const { asset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
+      // no asset_exif row — asset has no GPS
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+
+      const results = await sut.getMapMarkers([member.id], [], { timelineSpaceIds: [space.id] });
+
+      expect(results.find((r) => r.id === asset.id)).toBeUndefined();
+    });
   });
 });
