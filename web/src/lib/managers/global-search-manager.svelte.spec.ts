@@ -4150,3 +4150,61 @@ describe('prefix scoping — reconcileCursor', () => {
     expect(m.activeItemId).toBe('album:a1');
   });
 });
+
+describe('prefix scoping — setMode under scope', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    vi.useFakeTimers();
+    installFakeAbortTimeout();
+    vi.mocked(searchSmart).mockResolvedValue({ assets: { items: [], nextPage: null } } as never);
+    vi.mocked(searchAssets).mockResolvedValue({ assets: { items: [], nextPage: null } } as never);
+    vi.mocked(searchPerson).mockResolvedValue([] as never);
+    vi.mocked(searchPlaces).mockResolvedValue([] as never);
+    vi.mocked(getAllTags).mockResolvedValue([] as never);
+    vi.mocked(getAlbumNames).mockResolvedValue([] as never);
+    vi.mocked(getAllSpaces).mockResolvedValue([] as never);
+    vi.mocked(getAllPeople).mockResolvedValue({ people: [], total: 0, hidden: 0, hasNextPage: false } as never);
+  });
+
+  afterEach(() => {
+    restoreAbortTimeout();
+    vi.useRealTimers();
+  });
+
+  it('setMode under scope persists mode but does NOT dispatch request', async () => {
+    const m = new GlobalSearchManager();
+    const searchSmartSpy = vi.mocked(searchSmart);
+    const searchAssetsSpy = vi.mocked(searchAssets);
+    searchSmartSpy.mockClear();
+    searchAssetsSpy.mockClear();
+
+    m.setQuery('@alice');
+    await vi.advanceTimersByTimeAsync(150);
+    searchSmartSpy.mockClear(); // ignore any prior dispatches
+    const priorPhotosController = m['photosController'];
+
+    m.setMode('metadata');
+    await vi.advanceTimersByTimeAsync(150);
+
+    expect(m.mode).toBe('metadata');
+    expect(localStorage.getItem('searchQueryType')).toBe('metadata');
+    expect(searchSmartSpy).not.toHaveBeenCalled();
+    expect(searchAssetsSpy).not.toHaveBeenCalled();
+    // photosController must NOT have been recreated under scope — same reference.
+    expect(m['photosController']).toBe(priorPhotosController);
+  });
+
+  it('setMode under scope all still dispatches photos re-run', async () => {
+    const m = new GlobalSearchManager();
+    m.setQuery('alice');
+    await vi.advanceTimersByTimeAsync(150);
+    const searchAssetsSpy = vi.mocked(searchAssets);
+    searchAssetsSpy.mockClear();
+
+    m.setMode('metadata');
+    await vi.advanceTimersByTimeAsync(150);
+
+    expect(searchAssetsSpy).toHaveBeenCalled();
+  });
+});

@@ -1183,6 +1183,13 @@ export class GlobalSearchManager {
       }
     }
 
+    // Scope short-circuit: photos isn't dispatched under any prefix, so a mode
+    // change under scope has no runtime effect. Mode still persists for next
+    // unscoped search.
+    if (this.scope !== 'all') {
+      return;
+    }
+
     if (this.debounceTimer !== null) {
       this.clearDebounce();
       this.debounceTimer = setTimeout(() => this.runBatch(this.query, this.mode), 150);
