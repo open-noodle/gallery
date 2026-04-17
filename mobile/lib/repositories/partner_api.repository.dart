@@ -3,16 +3,19 @@ import 'package:immich_mobile/domain/models/user.model.dart';
 import 'package:immich_mobile/infrastructure/utils/user.converter.dart';
 import 'package:immich_mobile/providers/api.provider.dart';
 import 'package:immich_mobile/repositories/api.repository.dart';
+import 'package:immich_mobile/services/api.service.dart';
 import 'package:openapi/api.dart';
 
 enum Direction { sharedWithMe, sharedByMe }
 
-final partnerApiRepositoryProvider = Provider((ref) => PartnerApiRepository(ref.watch(apiServiceProvider).partnersApi));
+final partnerApiRepositoryProvider = Provider((ref) => PartnerApiRepository(ref.watch(apiServiceProvider)));
 
 class PartnerApiRepository extends ApiRepository {
-  final PartnersApi _api;
+  final ApiService _apiService;
 
-  PartnerApiRepository(this._api);
+  PartnerApiRepository(this._apiService);
+
+  PartnersApi get _api => _apiService.partnersApi;
 
   Future<List<UserDto>> getAll(Direction direction) async {
     final response = await checkNull(

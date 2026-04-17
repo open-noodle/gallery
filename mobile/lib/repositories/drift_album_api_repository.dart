@@ -2,17 +2,18 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/album/album.model.dart';
 import 'package:immich_mobile/providers/api.provider.dart';
 import 'package:immich_mobile/repositories/api.repository.dart';
+import 'package:immich_mobile/services/api.service.dart';
 // ignore: import_rule_openapi
 import 'package:openapi/api.dart';
 
-final driftAlbumApiRepositoryProvider = Provider(
-  (ref) => DriftAlbumApiRepository(ref.watch(apiServiceProvider).albumsApi),
-);
+final driftAlbumApiRepositoryProvider = Provider((ref) => DriftAlbumApiRepository(ref.watch(apiServiceProvider)));
 
 class DriftAlbumApiRepository extends ApiRepository {
-  final AlbumsApi _api;
+  final ApiService _apiService;
 
-  DriftAlbumApiRepository(this._api);
+  DriftAlbumApiRepository(this._apiService);
+
+  AlbumsApi get _api => _apiService.albumsApi;
 
   Future<RemoteAlbum> createDriftAlbum(String name, {required Iterable<String> assetIds, String? description}) async {
     final responseDto = await checkNull(

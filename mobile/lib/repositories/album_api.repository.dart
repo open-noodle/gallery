@@ -7,14 +7,17 @@ import 'package:immich_mobile/infrastructure/entities/user.entity.dart' as entit
 import 'package:immich_mobile/infrastructure/utils/user.converter.dart';
 import 'package:immich_mobile/providers/api.provider.dart';
 import 'package:immich_mobile/repositories/api.repository.dart';
+import 'package:immich_mobile/services/api.service.dart';
 import 'package:openapi/api.dart';
 
-final albumApiRepositoryProvider = Provider((ref) => AlbumApiRepository(ref.watch(apiServiceProvider).albumsApi));
+final albumApiRepositoryProvider = Provider((ref) => AlbumApiRepository(ref.watch(apiServiceProvider)));
 
 class AlbumApiRepository extends ApiRepository {
-  final AlbumsApi _api;
+  final ApiService _apiService;
 
-  AlbumApiRepository(this._api);
+  AlbumApiRepository(this._apiService);
+
+  AlbumsApi get _api => _apiService.albumsApi;
 
   Future<Album> get(String id) async {
     final dto = await checkNull(_api.getAlbumInfo(id));

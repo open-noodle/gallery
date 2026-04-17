@@ -2,14 +2,17 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/providers/api.provider.dart';
 import 'package:immich_mobile/repositories/api.repository.dart';
+import 'package:immich_mobile/services/api.service.dart';
 import 'package:openapi/api.dart';
 
-final personApiRepositoryProvider = Provider((ref) => PersonApiRepository(ref.watch(apiServiceProvider).peopleApi));
+final personApiRepositoryProvider = Provider((ref) => PersonApiRepository(ref.watch(apiServiceProvider)));
 
 class PersonApiRepository extends ApiRepository {
-  final PeopleApi _api;
+  final ApiService _apiService;
 
-  PersonApiRepository(this._api);
+  PersonApiRepository(this._apiService);
+
+  PeopleApi get _api => _apiService.peopleApi;
 
   Future<List<PersonDto>> getAll() async {
     final dto = await checkNull(_api.getAllPeople());
