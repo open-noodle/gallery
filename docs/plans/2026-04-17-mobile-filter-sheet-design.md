@@ -6,7 +6,7 @@
 
 ## 1. Summary
 
-Replace the dedicated Search tab with a three-snap bottom sheet summoned from the Photos tab. The sheet supports every filter dimension the web FilterPanel supports *except Camera* — people, places, tags, temporal, rating, media type, favourites, archived, not-in-album, text search — with live context-aware counts. Long-tail discovery (10,000+ people, 26+ years, thousands of places) is handled by dedicated full-screen overflow pickers pushed over the sheet. Camera re-joins in Phase 2.
+Replace the dedicated Search tab with a three-snap bottom sheet summoned from the Photos tab. The sheet supports every filter dimension the web FilterPanel supports _except Camera_ — people, places, tags, temporal, rating, media type, favourites, archived, not-in-album, text search — with live context-aware counts. Long-tail discovery (10,000+ people, 26+ years, thousands of places) is handled by dedicated full-screen overflow pickers pushed over the sheet. Camera re-joins in Phase 2.
 
 The design ships in two phases:
 
@@ -15,7 +15,7 @@ The design ships in two phases:
 
 ## 2. Goals
 
-- Feature parity with the web FilterPanel on Photos *by the end of Phase 2*. Phase 1 is parity-minus-Camera (§4.8).
+- Feature parity with the web FilterPanel on Photos _by the end of Phase 2_. Phase 1 is parity-minus-Camera (§4.8).
 - Scale gracefully to libraries with 10,000+ people and 25+ years of photos.
 - Keep the Photos timeline as the primary visual — the filter sheet layers over it, not replaces it.
 - Minimise upstream-rebase conflict exposure (Gallery's mobile search is already fork-divergent; replacing it outright keeps the rebase story clean).
@@ -40,7 +40,7 @@ Decisions confirmed during brainstorming:
 5. **Dynamic (context-aware) counts are in Phase 1** — mobile calls the unified filter-suggestions endpoint already shipped for web (PRs #250/#251). No new server endpoints needed.
 6. **Phase 1 overflow pickers: People and When only** — Tags and Places ship in Phase 2 and reuse the same picker component.
 7. **Filter semantics are live, not staged.** Every selection immediately updates suggestions, counts, and the timeline behind the scrim (debounced — see §6.5). There is no "Apply" button; the sheet close is dismissal, not commit. The mockup's bottom-of-Deep CTA is a **Done** button that closes the sheet.
-8. **Camera filter deferred to Phase 2** *(accepted 2026-04-17).* Current mobile search supports Camera (make/model cascade) but the mockup doesn't show it. Phase 1 ships without Camera to match the mockup and keep MVP lean; Phase 2 re-introduces it as a Deep-only section matching the Places cascade shape. This is a time-boxed, acknowledged regression from today's Search tab behaviour.
+8. **Camera filter deferred to Phase 2** _(accepted 2026-04-17)._ Current mobile search supports Camera (make/model cascade) but the mockup doesn't show it. Phase 1 ships without Camera to match the mockup and keep MVP lean; Phase 2 re-introduces it as a Deep-only section matching the Places cascade shape. This is a time-boxed, acknowledged regression from today's Search tab behaviour.
 9. **Phase 1 text-search is single-mode** — no user-visible toggle between smart-context / filename / OCR / description modes. Phase 1 routes the query through the existing smart (CLIP) endpoint only; lexical-mode fallbacks are a follow-up. The existing `SearchFilter.context`-style field is used; other text-mode fields on the model remain untouched. If QA finds smart-only coverage insufficient (e.g., users searching by filename like "IMG_2847"), a mode toggle is added in Phase 1.5.
 
 ## 5. UX
@@ -255,6 +255,7 @@ User taps "Search 10,247 →" in People section
 - **Filter references something deleted.** A person merged into another, a tag deleted by the user, a location whose last photo was removed, or a legacy person id the server no longer recognises. Reconciliation **cannot** rely on "id is absent from the suggestions response" as a deletion signal — the suggestions endpoint returns a bounded top-N slice (§8), so a legitimately selected person outside the top-N would be absent for pagination reasons, not deletion, and dropping their id would spuriously remove a valid filter.
   - **Strategy:** the unified filter-suggestions endpoint echoes back the status of every currently-selected id (web FilterPanel's reconciliation behaviour — verify during PR 1.1 OpenAPI audit). If the field is already present, mobile consumes it. If it is not, add a small `/search/validate-selection` server endpoint (accepts ids by dimension, returns the subset that still exists) — this is a pre-Phase-1 design-blocker called out in §11.1.
   - **Timing:** reconciliation happens inline with each suggestions fetch (no separate call). The notifier filters dropped ids out of `SearchFilter`, counts them, and surfaces one SnackBar per reconcile event ("2 filters no longer match — removed") via `mobile/lib/providers/snackbar.provider.dart` (verify the exact provider name in PR 1.1). No error state; the filter continues with the remaining valid ids.
+  - **Phase 1 deferral (post-audit, 2026-04-17).** The PR 1.1 OpenAPI audit confirmed `FilterSuggestionsResponseDto` has no `stillExists` / selected-id echo field, and `FilterSuggestionsPersonDto` / `FilterSuggestionsTagDto` carry only `id` + `name`/`value`. Phase 1 therefore **defers proactive orphan reconciliation to Phase 1.5** — it ships without auto-removal of deleted-id chips; a timeline returning zero matches is the user's cue to clear. Revisit Phase 1.5 pending a server `stillExists` echo on the suggestions endpoint or a new `/search/validate-selection` endpoint.
 - **Offline / airplane mode.** Suggestions and count providers fail fast; the sheet shows the "Offline" badge described above. The **Done bar** remains tappable because it is a dismissal, not a network call. The timeline behind continues to display cached results (existing behaviour). Filter chips still add/remove locally — no server round-trip is required to manipulate state — but the impact on the timeline is deferred until connectivity returns. Orphan reconciliation is skipped while offline; runs on the next successful suggestions fetch.
 - **Shared-space-only photos.** Phase 1 scopes the sheet to the Photos tab, which already excludes shared-space-only content via the existing timeline query. No additional scoping logic is needed. The design is explicitly main-library-only; Spaces filtering is Phase 3.
 - **Very small library (e.g., 1 named person, 3 tags, 12 photos).** Strips render whatever they have; a strip with 1 thumb is not padded or hidden. Section headers show real small numbers (e.g., "Search 3 →"). The overflow-picker affordance is **always shown** regardless of cardinality — even for 3 people a user may want to type-search rather than scroll, and the picker handles tiny lists gracefully (§5.3, §5.4). If a dimension has zero items (e.g., 0 tags), the Browse strip is hidden entirely for that dimension; the Deep section shows a one-line empty state ("No tags yet — tap a photo to add one").
@@ -302,7 +303,7 @@ Patrol-based e2e is out-of-scope (memory `project_play_store_publishing.md` — 
 
 **Suggestions layer:**
 
-- Debounce coalesces: 10 rapid `togglePerson` calls on 10 *different* ids in <250 ms result in exactly one suggestions fetch with all 10 ids applied.
+- Debounce coalesces: 10 rapid `togglePerson` calls on 10 _different_ ids in <250 ms result in exactly one suggestions fetch with all 10 ids applied.
 - Cancellation: a new filter change cancels the in-flight suggestions request (Riverpod `autoDispose` + request-id guard).
 - Rapid double-tap on the **same id**: `togglePerson(id)` then `togglePerson(id)` within <250 ms ends in net-zero state change and issues **zero** suggestions calls (the notifier's state-equality check suppresses the emit).
 
