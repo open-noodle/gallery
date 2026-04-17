@@ -172,5 +172,22 @@ describe(MapRepository.name, () => {
       const none = await sut.getMapMarkers([member.id], [], { timelineSpaceIds: [] });
       expect(none.find((r) => r.id === asset.id)).toBeUndefined();
     });
+
+    it('should include direct space asset when at least one containing space is in timelineSpaceIds', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+      const { space: spaceA } = await ctx.newSharedSpace({ createdById: owner.id, name: 'A' });
+      const { space: spaceB } = await ctx.newSharedSpace({ createdById: owner.id, name: 'B' });
+      await ctx.newSharedSpaceMember({ spaceId: spaceA.id, userId: member.id });
+      await ctx.newSharedSpaceMember({ spaceId: spaceB.id, userId: member.id });
+      const { asset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
+      await ctx.database.insertInto('asset_exif').values({ assetId: asset.id, latitude: 6, longitude: 6 }).execute();
+      await ctx.newSharedSpaceAsset({ spaceId: spaceA.id, assetId: asset.id });
+      await ctx.newSharedSpaceAsset({ spaceId: spaceB.id, assetId: asset.id });
+
+      const viaA = await sut.getMapMarkers([member.id], [], { timelineSpaceIds: [spaceA.id] });
+      expect(viaA.find((r) => r.id === asset.id)).toBeDefined();
+    });
   });
 });
