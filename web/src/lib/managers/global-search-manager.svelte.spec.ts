@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Shared hoisted mocks — used by navigation tests to flip admin/feature-flag state.
 // Must appear BEFORE the GlobalSearchManager import because the manager binds these
@@ -33,6 +33,7 @@ import { addEntry, getEntries, __resetForTests as resetRecentStore } from '$lib/
 import {
   getAlbumInfo,
   getAlbumNames,
+  getAllPeople,
   getAllSpaces,
   getAllTags,
   getMlHealth,
@@ -41,6 +42,7 @@ import {
   searchPerson,
   searchPlaces,
   searchSmart,
+  type PersonResponseDto,
 } from '@immich/sdk';
 import { toastManager } from '@immich/ui';
 import { computeCommandScore } from 'bits-ui';
@@ -52,6 +54,7 @@ import {
   type SearchMode,
   type Sections,
 } from './global-search-manager.svelte';
+import { NAVIGATION_ITEMS } from './navigation-items';
 
 // File-level reset so mock state cannot leak between describe blocks. Tests that
 // mutate these should still set what they want in their own beforeEach, but this
@@ -74,6 +77,10 @@ vi.mock('@immich/sdk', async () => ({
   getAllSpaces: vi.fn(),
   getAlbumInfo: vi.fn(),
   getSpace: vi.fn(),
+  // Default bare-@ tests in prior suites rely on an empty-people baseline so the
+  // people section lands at `empty` (not `ok`) when a test doesn't set its own mock.
+  // The Task 6 suite overrides this with vi.mocked(getAllPeople).mockResolvedValue(...).
+  getAllPeople: vi.fn().mockResolvedValue({ people: [], total: 0, hidden: 0, hasNextPage: false }),
 }));
 
 vi.mock('$app/navigation', () => ({
@@ -1627,10 +1634,15 @@ describe('runNavigationProvider', () => {
     mockI18nLocale.current = 'en';
   });
 
+  // Calls the private runNavigationProvider. The original signature was `(query)`;
+  // Task 7 changed it to `(payload, scope)`. All tests in this block exercise the
+  // scope='all' + non-empty-payload branch (or the empty-payload → empty branch),
+  // both of which still behave identically to the old `(query)` signature. Pass
+  // 'all' as the default so the suite keeps pinning fuzzy search behavior.
   function runNav(m: GlobalSearchManager, query: string): ProviderStatus<unknown> {
-    return (m as unknown as { runNavigationProvider: (q: string) => ProviderStatus<unknown> }).runNavigationProvider(
-      query,
-    );
+    return (
+      m as unknown as { runNavigationProvider: (p: string, s: 'all' | 'nav') => ProviderStatus<unknown> }
+    ).runNavigationProvider(query, 'all');
   }
 
   it('returns empty only for an empty query; fires on a single character', () => {
@@ -1802,7 +1814,10 @@ describe('setQuery synchronous navigation', () => {
 
   it('runBatch does NOT re-invoke runNavigationProvider after the debounce', () => {
     const m = new GlobalSearchManager();
-    const spy = vi.spyOn(m as unknown as { runNavigationProvider: (q: string) => unknown }, 'runNavigationProvider');
+    const spy = vi.spyOn(
+      m as unknown as { runNavigationProvider: (p: string, s: 'all' | 'nav') => unknown },
+      'runNavigationProvider',
+    );
     m.open();
     m.setQuery('classific');
     expect(spy).toHaveBeenCalledTimes(1);
@@ -3445,5 +3460,838 @@ describe('activateSpace', () => {
     await vi.advanceTimersByTimeAsync(300);
 
     expect(sut.pendingActivation).toBeNull();
+  });
+});
+
+describe('prefix scoping — deriveds', () => {
+  it('setQuery(@alice) derives scope=people, payload=alice', () => {
+    const m = new GlobalSearchManager();
+    m.setQuery('@alice');
+    expect(m.scope).toBe('people');
+    expect(m.payload).toBe('alice');
+  });
+
+  it('setQuery(alice) derives scope=all, payload=alice', () => {
+    const m = new GlobalSearchManager();
+    m.setQuery('alice');
+    expect(m.scope).toBe('all');
+    expect(m.payload).toBe('alice');
+  });
+
+  it('scope stable across keystrokes within same prefix', () => {
+    const m = new GlobalSearchManager();
+    m.setQuery('@');
+    m.setQuery('@a');
+    m.setQuery('@al');
+    expect(m.scope).toBe('people');
+    expect(m.payload).toBe('al');
+  });
+
+  it('setQuery(@alice) then setQuery("") returns scope to all', () => {
+    const m = new GlobalSearchManager();
+    m.setQuery('@alice');
+    expect(m.scope).toBe('people');
+    m.setQuery('');
+    expect(m.scope).toBe('all');
+    expect(m.payload).toBe('');
+  });
+});
+
+describe('prefix scoping — runBatch gating', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    vi.useFakeTimers();
+    installFakeAbortTimeout();
+    vi.mocked(searchSmart).mockResolvedValue({
+      assets: { items: [], nextPage: null },
+    } as unknown as Awaited<ReturnType<typeof searchSmart>>);
+    vi.mocked(searchAssets).mockResolvedValue({
+      assets: { items: [], nextPage: null },
+    } as unknown as Awaited<ReturnType<typeof searchAssets>>);
+    vi.mocked(searchPerson).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof searchPerson>>);
+    vi.mocked(searchPlaces).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof searchPlaces>>);
+    vi.mocked(getAllTags).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof getAllTags>>);
+    vi.mocked(getAlbumNames).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof getAlbumNames>>);
+    vi.mocked(getAllSpaces).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof getAllSpaces>>);
+  });
+
+  afterEach(() => {
+    restoreAbortTimeout();
+    vi.useRealTimers();
+  });
+
+  it('scope people: only people provider invoked, other entity sections idle', async () => {
+    const m = new GlobalSearchManager();
+    // Pre-populate unrelated sections to 'ok' to prove they get force-reset.
+    m.sections.photos = { status: 'ok', items: [{ id: 'p1' } as never], total: 1 };
+    m.sections.albums = { status: 'ok', items: [{ id: 'a1' } as never], total: 1 };
+
+    m.setQuery('@alice');
+    await vi.advanceTimersByTimeAsync(150);
+
+    expect(m.sections.photos.status).toBe('idle');
+    expect(m.sections.albums.status).toBe('idle');
+    expect(m.sections.places.status).toBe('idle');
+    expect(m.sections.tags.status).toBe('idle');
+    expect(m.sections.spaces.status).toBe('idle');
+  });
+
+  it('scope collections: only albums + spaces providers invoked; others idle', async () => {
+    const m = new GlobalSearchManager();
+    m.sections.photos = { status: 'ok', items: [{ id: 'p1' } as never], total: 1 };
+    m.sections.people = { status: 'ok', items: [{ id: 'a1' } as never], total: 1 };
+    m.sections.tags = { status: 'ok', items: [{ id: 't1' } as never], total: 1 };
+
+    m.setQuery('/trip');
+    await vi.advanceTimersByTimeAsync(150);
+
+    expect(m.sections.photos.status).toBe('idle');
+    expect(m.sections.people.status).toBe('idle');
+    expect(m.sections.places.status).toBe('idle');
+    expect(m.sections.tags.status).toBe('idle');
+    // albums + spaces will be ok/empty depending on cache mocks
+  });
+
+  it('scope nav: ENTITY_KEYS_BY_SCOPE.nav === [] — no entity providers invoked', async () => {
+    const m = new GlobalSearchManager();
+    const searchSmartSpy = vi.mocked(searchSmart);
+    const searchPersonSpy = vi.mocked(searchPerson);
+    const searchPlacesSpy = vi.mocked(searchPlaces);
+    const getAllTagsSpy = vi.mocked(getAllTags);
+    const getAlbumNamesSpy = vi.mocked(getAlbumNames);
+    const getAllSpacesSpy = vi.mocked(getAllSpaces);
+    for (const s of [
+      searchSmartSpy,
+      searchPersonSpy,
+      searchPlacesSpy,
+      getAllTagsSpy,
+      getAlbumNamesSpy,
+      getAllSpacesSpy,
+    ]) {
+      s.mockClear();
+    }
+
+    m.setQuery('>theme');
+    await vi.advanceTimersByTimeAsync(150);
+
+    expect(searchSmartSpy).not.toHaveBeenCalled();
+    expect(searchPersonSpy).not.toHaveBeenCalled();
+    expect(searchPlacesSpy).not.toHaveBeenCalled();
+    // Navigation section populated via synchronous runNavigationProvider, not runBatch.
+    expect(m.sections.navigation.status).toBe('ok');
+  });
+
+  it('scope people with bare @ bypasses minQueryLength', async () => {
+    const m = new GlobalSearchManager();
+    const searchPersonSpy = vi.mocked(searchPerson);
+    searchPersonSpy.mockClear();
+
+    m.setQuery('@'); // payload.length = 0, below people.minQueryLength = 2
+    await vi.advanceTimersByTimeAsync(150);
+
+    // people.minQueryLength=2 would normally set section to idle; bypass
+    // dispatches to the provider's bare branch instead (which does NOT call searchPerson).
+    expect(m.sections.people.status).not.toBe('idle');
+    expect(searchPersonSpy).not.toHaveBeenCalled();
+  });
+
+  it('scope people with single-char payload relaxes minQueryLength to 1', async () => {
+    const m = new GlobalSearchManager();
+    const searchPersonSpy = vi.mocked(searchPerson);
+    searchPersonSpy.mockClear();
+
+    m.setQuery('@a');
+    await vi.advanceTimersByTimeAsync(150);
+
+    expect(searchPersonSpy).toHaveBeenCalledWith({ name: 'a', withHidden: false }, expect.anything());
+  });
+});
+
+describe('prefix scoping — bare suggestions (tags/albums/spaces)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    vi.useFakeTimers();
+    installFakeAbortTimeout();
+    vi.mocked(searchSmart).mockResolvedValue({
+      assets: { items: [], nextPage: null },
+    } as unknown as Awaited<ReturnType<typeof searchSmart>>);
+    vi.mocked(searchAssets).mockResolvedValue({
+      assets: { items: [], nextPage: null },
+    } as unknown as Awaited<ReturnType<typeof searchAssets>>);
+    vi.mocked(searchPerson).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof searchPerson>>);
+    vi.mocked(searchPlaces).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof searchPlaces>>);
+    vi.mocked(getAllTags).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof getAllTags>>);
+    vi.mocked(getAlbumNames).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof getAlbumNames>>);
+    vi.mocked(getAllSpaces).mockResolvedValue([] as unknown as Awaited<ReturnType<typeof getAllSpaces>>);
+  });
+
+  afterEach(() => {
+    restoreAbortTimeout();
+    vi.useRealTimers();
+  });
+
+  it('# bare returns tagsCache sorted by updatedAt desc, top 5', async () => {
+    const m = new GlobalSearchManager();
+    (m as unknown as { tagsCache: unknown }).tagsCache = [
+      { id: 't1', name: 'old', updatedAt: '2026-01-01T00:00:00Z' },
+      { id: 't2', name: 'new', updatedAt: '2026-04-15T00:00:00Z' },
+      { id: 't3', name: 'mid', updatedAt: '2026-02-15T00:00:00Z' },
+    ] as never;
+
+    m.setQuery('#');
+    await vi.advanceTimersByTimeAsync(150);
+
+    expect(m.sections.tags.status).toBe('ok');
+    const items = (m.sections.tags as { items: { id: string }[] }).items;
+    expect(items.map((i) => i.id)).toEqual(['t2', 't3', 't1']);
+  });
+
+  it('# bare with empty tagsCache returns empty', async () => {
+    const m = new GlobalSearchManager();
+    (m as unknown as { tagsCache: unknown }).tagsCache = [];
+    m.setQuery('#');
+    await vi.advanceTimersByTimeAsync(150);
+    expect(m.sections.tags.status).toBe('empty');
+  });
+
+  it('# bare under tagsDisabled returns error: tag_cache_too_large', async () => {
+    const m = new GlobalSearchManager();
+    (m as unknown as { tagsDisabled: boolean }).tagsDisabled = true;
+    (m as unknown as { tagsCache: unknown }).tagsCache = null;
+    m.setQuery('#');
+    await vi.advanceTimersByTimeAsync(150);
+    expect(m.sections.tags.status).toBe('error');
+    expect((m.sections.tags as { message: string }).message).toBe('tag_cache_too_large');
+  });
+
+  it('/ bare writes albums sorted endDate desc, spaces sorted lastActivityAt??createdAt desc', async () => {
+    const m = new GlobalSearchManager();
+    // AlbumNameDto: sort by endDate ?? '' desc (most recent photo in album as activity proxy).
+    m.albumsCache = [
+      { id: 'a1', albumName: 'Old', endDate: '2026-01-01T00:00:00Z' },
+      { id: 'a2', albumName: 'New', endDate: '2026-04-15T00:00:00Z' },
+      { id: 'a3', albumName: 'Empty' /* endDate missing — sinks */ },
+    ] as never;
+    m.spacesCache = [
+      { id: 's1', name: 'Quiet', createdAt: '2026-01-01T00:00:00Z', lastActivityAt: null },
+      { id: 's2', name: 'Active', createdAt: '2026-02-01T00:00:00Z', lastActivityAt: '2026-04-10T00:00:00Z' },
+    ] as never;
+
+    m.setQuery('/');
+    await vi.advanceTimersByTimeAsync(150);
+
+    expect((m.sections.albums as { items: { id: string }[] }).items.map((i) => i.id)).toEqual(['a2', 'a1', 'a3']);
+    expect((m.sections.spaces as { items: { id: string }[] }).items.map((i) => i.id)).toEqual(['s2', 's1']);
+  });
+
+  it('/ bare with BOTH zero albums AND zero spaces: both sections empty', async () => {
+    const m = new GlobalSearchManager();
+    m.albumsCache = [];
+    m.spacesCache = [];
+
+    m.setQuery('/');
+    await vi.advanceTimersByTimeAsync(150);
+
+    expect(m.sections.albums.status).toBe('empty');
+    expect(m.sections.spaces.status).toBe('empty');
+  });
+
+  it('/ bare mixed empty: albums ok, spaces empty', async () => {
+    const m = new GlobalSearchManager();
+    m.albumsCache = [{ id: 'a1', albumName: 'Only', endDate: '2026-04-15T00:00:00Z' }] as never;
+    m.spacesCache = [];
+
+    m.setQuery('/');
+    await vi.advanceTimersByTimeAsync(150);
+
+    expect(m.sections.albums.status).toBe('ok');
+    expect(m.sections.spaces.status).toBe('empty');
+  });
+
+  it('/ bare mixed empty (symmetric): albums empty, spaces ok', async () => {
+    const m = new GlobalSearchManager();
+    m.albumsCache = [];
+    m.spacesCache = [{ id: 's1', name: 'Only', createdAt: '2026-04-15T00:00:00Z' }] as never;
+
+    m.setQuery('/');
+    await vi.advanceTimersByTimeAsync(150);
+
+    expect(m.sections.albums.status).toBe('empty');
+    expect(m.sections.spaces.status).toBe('ok');
+  });
+});
+
+const mockPerson = (id: string, name: string, updatedAt?: string): PersonResponseDto => ({
+  id,
+  name,
+  birthDate: null,
+  isHidden: false,
+  thumbnailPath: '',
+  type: 'person',
+  updatedAt,
+});
+
+describe('prefix scoping — bare @ suggestions', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    vi.useFakeTimers();
+    installFakeAbortTimeout();
+    // Quiet the other providers so only people drives state.
+    vi.mocked(searchSmart).mockResolvedValue({ assets: { items: [], nextPage: null } } as never);
+    vi.mocked(searchAssets).mockResolvedValue({ assets: { items: [], nextPage: null } } as never);
+    vi.mocked(searchPlaces).mockResolvedValue([] as never);
+    vi.mocked(getAllTags).mockResolvedValue([] as never);
+    vi.mocked(getAlbumNames).mockResolvedValue([] as never);
+    vi.mocked(getAllSpaces).mockResolvedValue([] as never);
+  });
+
+  afterEach(() => {
+    restoreAbortTimeout();
+    vi.useRealTimers();
+  });
+
+  it('bare @ calls getAllPeople once; subsequent bare @ reads cache', async () => {
+    const m = new GlobalSearchManager();
+    const getAllPeopleSpy = vi.mocked(getAllPeople);
+    getAllPeopleSpy.mockResolvedValue({
+      people: [
+        mockPerson('older', 'Zack', '2026-01-01T00:00:00Z'),
+        mockPerson('newer', 'Alice', '2026-04-15T00:00:00Z'),
+      ],
+      total: 2,
+      hidden: 0,
+      hasNextPage: false,
+    });
+
+    m.setQuery('@');
+    await vi.advanceTimersByTimeAsync(150);
+    await vi.runAllTimersAsync();
+
+    // Assert comparator was applied (newer updatedAt first).
+    expect(m.sections.people.status).toBe('ok');
+    const items = (m.sections.people as { items: { id: string }[] }).items;
+    expect(items.map((i) => i.id)).toEqual(['newer', 'older']);
+
+    m.setQuery('@a');
+    await vi.advanceTimersByTimeAsync(150);
+    m.setQuery('@');
+    await vi.advanceTimersByTimeAsync(150);
+
+    expect(getAllPeopleSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('concurrent bare @ joins same peoplePromise (getAllPeople fires once)', async () => {
+    const m = new GlobalSearchManager();
+    const getAllPeopleSpy = vi.mocked(getAllPeople);
+    let resolve: (v: unknown) => void;
+    getAllPeopleSpy.mockImplementation(() => new Promise((r) => (resolve = r as (v: unknown) => void)) as never);
+
+    m.setQuery('@');
+    await vi.advanceTimersByTimeAsync(150);
+    m.setQuery('@a'); // would fire searchPerson
+    m.setQuery('@'); // back to bare — should NOT start a second getAllPeople
+    await vi.advanceTimersByTimeAsync(150);
+
+    resolve!({ people: [mockPerson('p1', 'Alice')], total: 1, hidden: 0, hasNextPage: false });
+    await vi.runAllTimersAsync();
+
+    expect(getAllPeopleSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('stale bare-@ rejection after @alice resolves does NOT stomp ok results', async () => {
+    const m = new GlobalSearchManager();
+    const getAllPeopleSpy = vi.mocked(getAllPeople);
+    let rejectFn: (e: Error) => void;
+    getAllPeopleSpy.mockImplementation(() => new Promise((_, r) => (rejectFn = r as (e: Error) => void)) as never);
+    vi.mocked(searchPerson).mockResolvedValue([mockPerson('p1', 'Alice')] as never);
+
+    m.setQuery('@'); // bare, starts getAllPeople fetch
+    await vi.advanceTimersByTimeAsync(150);
+    m.setQuery('@alice'); // now non-bare; searchPerson resolves
+    await vi.advanceTimersByTimeAsync(150);
+    await vi.runAllTimersAsync();
+
+    expect(m.sections.people.status).toBe('ok');
+
+    rejectFn!(new Error('network'));
+    // Flush microtasks so the catch branch runs.
+    await vi.runAllTimersAsync();
+    await Promise.resolve();
+
+    expect(m.sections.people.status).toBe('ok'); // not stomped to error
+  });
+
+  it('bare @ network error while still at bare @ writes error to section', async () => {
+    const m = new GlobalSearchManager();
+    vi.mocked(getAllPeople).mockRejectedValue(new Error('network down'));
+
+    m.setQuery('@');
+    await vi.advanceTimersByTimeAsync(150);
+    await vi.runAllTimersAsync();
+    await Promise.resolve();
+
+    expect(m.sections.people.status).toBe('error');
+    expect((m.sections.people as { message: string }).message).toBe('network down');
+  });
+
+  it('bare @ with zero named people returns empty', async () => {
+    const m = new GlobalSearchManager();
+    vi.mocked(getAllPeople).mockResolvedValue({ people: [], total: 0, hidden: 0, hasNextPage: false });
+    m.setQuery('@');
+    await vi.advanceTimersByTimeAsync(150);
+    await vi.runAllTimersAsync();
+    expect(m.sections.people.status).toBe('empty');
+  });
+
+  it('getAllPeople 5-second timeout transitions section to timeout', async () => {
+    const m = new GlobalSearchManager();
+    // getAllPeople binds to closeSignal (not per-keystroke AbortSignal.timeout(5000)),
+    // so this test simulates a fetch that never resolves within the 5s window; the
+    // provider-level AbortSignal.timeout inside runBatch fires at 5s and the
+    // surrounding people.run catch branch writes 'timeout'.
+    vi.mocked(getAllPeople).mockImplementation(
+      (_args, opts) =>
+        new Promise((_, reject) => {
+          opts?.signal?.addEventListener('abort', () => {
+            const err = new DOMException('timeout', 'TimeoutError');
+            reject(err);
+          });
+        }) as never,
+    );
+
+    m.setQuery('@');
+    await vi.advanceTimersByTimeAsync(150); // debounce fires
+    await vi.advanceTimersByTimeAsync(5000); // AbortSignal.timeout fires
+    await vi.runAllTimersAsync();
+
+    expect(m.sections.people.status).toBe('timeout');
+  });
+
+  it('close + reopen resets peopleSuggestionsCache and peoplePromise', async () => {
+    const m = new GlobalSearchManager();
+    const getAllPeopleSpy = vi.mocked(getAllPeople);
+    getAllPeopleSpy.mockResolvedValue({ people: [mockPerson('p1', 'Alice')], total: 1, hidden: 0, hasNextPage: false });
+
+    m.open();
+    m.setQuery('@');
+    await vi.advanceTimersByTimeAsync(150);
+    await vi.runAllTimersAsync();
+    m.close();
+    m.open();
+    m.setQuery('@');
+    await vi.advanceTimersByTimeAsync(150);
+    await vi.runAllTimersAsync();
+
+    expect(getAllPeopleSpy).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('prefix scoping — runNavigationProvider', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    vi.useFakeTimers();
+    installFakeAbortTimeout();
+    mockUser.current = { id: 'test-user', isAdmin: true };
+    mockFlags.valueOrUndefined = { search: true, map: true, trash: true };
+    mockI18nLocale.current = 'en';
+    vi.mocked(searchSmart).mockResolvedValue({ assets: { items: [], nextPage: null } } as never);
+    vi.mocked(searchAssets).mockResolvedValue({ assets: { items: [], nextPage: null } } as never);
+    vi.mocked(searchPerson).mockResolvedValue([] as never);
+    vi.mocked(searchPlaces).mockResolvedValue([] as never);
+    vi.mocked(getAllTags).mockResolvedValue([] as never);
+    vi.mocked(getAlbumNames).mockResolvedValue([] as never);
+    vi.mocked(getAllSpaces).mockResolvedValue([] as never);
+    vi.mocked(getAllPeople).mockResolvedValue({ people: [], total: 0, hidden: 0, hasNextPage: false } as never);
+  });
+
+  afterEach(() => {
+    restoreAbortTimeout();
+    vi.useRealTimers();
+  });
+
+  it('scope nav bare: count equals the filtered catalog length (no slice)', async () => {
+    mockUser.current = { id: 'admin', isAdmin: true };
+    const m = new GlobalSearchManager();
+    m.setQuery('>');
+    await vi.advanceTimersByTimeAsync(150);
+
+    // Filtered catalog: iterate NAVIGATION_ITEMS with the same admin + flag gate.
+    // User is admin here, so adminOnly is never restrictive — filter only on flags.
+    const flags = mockFlags.valueOrUndefined;
+    const expected = NAVIGATION_ITEMS.filter((i) => !i.featureFlag || flags?.[i.featureFlag]).length;
+
+    expect(m.sections.navigation.status).toBe('ok');
+    const items = (m.sections.navigation as { items: { id: string }[] }).items;
+    expect(items.length).toBe(expected); // strict equality — no slice
+  });
+
+  it('scope nav bare: items sorted alphabetically by translated label', async () => {
+    mockUser.current = { id: 'admin', isAdmin: true };
+    const m = new GlobalSearchManager();
+    m.setQuery('>');
+    await vi.advanceTimersByTimeAsync(150);
+    const items = (m.sections.navigation as { items: { id: string; labelKey: string }[] }).items;
+    const translate = (k: string) => k; // stub: identity (tests exercise sort stability, not full i18n)
+    const labels = items.map((i) => translate(i.labelKey));
+    const sorted = [...labels].sort((a, b) => a.localeCompare(b));
+    expect(labels).toEqual(sorted);
+  });
+
+  it('scope nav with payload: fuzzy search payload over filtered items', async () => {
+    mockUser.current = { id: 'admin', isAdmin: true };
+    const m = new GlobalSearchManager();
+    m.setQuery('>theme');
+    await vi.advanceTimersByTimeAsync(150);
+    expect(m.sections.navigation.status).toBe('ok');
+    const items = (m.sections.navigation as { items: { id: string }[] }).items;
+    expect(items.some((i) => i.id === 'nav:theme')).toBe(true);
+  });
+
+  it('scope people (any payload): navigation section is empty', async () => {
+    const m = new GlobalSearchManager();
+    m.setQuery('@alice');
+    await vi.advanceTimersByTimeAsync(150);
+    expect(m.sections.navigation.status).toBe('empty');
+  });
+
+  it('scope all with payload: existing fuzzy behavior preserved', async () => {
+    mockUser.current = { id: 'admin', isAdmin: true };
+    const m = new GlobalSearchManager();
+    m.setQuery('classification');
+    await vi.advanceTimersByTimeAsync(150);
+    expect(m.sections.navigation.status).toBe('ok');
+  });
+
+  it('scope nav for non-admin with restrictive flags: returns empty (not ok:[])', async () => {
+    // The provider's empty-guard branch returns { status: 'empty' } when the
+    // scored/sorted list is empty — NOT { status: 'ok', items: [] }. This test
+    // pins that invariant via the fuzzy-match path (an unmatchable payload
+    // under scope 'nav' also hits the empty-guard), because the bare-`>` path
+    // can only yield empty when NAVIGATION_ITEMS itself has zero eligible
+    // rows — unreachable with the current catalog, which contains user pages
+    // without adminOnly or featureFlag gates.
+    mockUser.current = { id: 'user', isAdmin: false };
+    mockFlags.valueOrUndefined = {};
+    const m = new GlobalSearchManager();
+    m.setQuery('>xyz-no-match-at-all-zzz');
+    await vi.advanceTimersByTimeAsync(150);
+    expect(m.sections.navigation.status).toBe('empty');
+    // Crucially, not `{ status: 'ok', items: [] }` — the branch guard
+    // short-circuits to 'empty' so the section is hidden in the palette.
+    expect((m.sections.navigation as { items?: unknown }).items).toBeUndefined();
+  });
+});
+
+describe('prefix scoping — setQuery SWR scope behavior', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    vi.useFakeTimers();
+    installFakeAbortTimeout();
+    vi.mocked(searchSmart).mockResolvedValue({ assets: { items: [], nextPage: null } } as never);
+    vi.mocked(searchAssets).mockResolvedValue({ assets: { items: [], nextPage: null } } as never);
+    vi.mocked(searchPerson).mockResolvedValue([] as never);
+    vi.mocked(searchPlaces).mockResolvedValue([] as never);
+    vi.mocked(getAllTags).mockResolvedValue([] as never);
+    vi.mocked(getAlbumNames).mockResolvedValue([] as never);
+    vi.mocked(getAllSpaces).mockResolvedValue([] as never);
+    vi.mocked(getAllPeople).mockResolvedValue({ people: [], total: 0, hidden: 0, hasNextPage: false } as never);
+  });
+
+  afterEach(() => {
+    restoreAbortTimeout();
+    vi.useRealTimers();
+  });
+
+  it('scope transition from all to people force-idles non-people sections BEFORE debounce fires', () => {
+    const m = new GlobalSearchManager();
+    m.sections.photos = { status: 'ok', items: [{ id: 'p1' }] as never, total: 1 };
+    m.sections.albums = { status: 'ok', items: [{ id: 'a1' }] as never, total: 1 };
+
+    m.setQuery('@alice');
+    // Do NOT advance timers — assert state IMMEDIATELY (pre-debounce).
+    expect(m.sections.photos.status).toBe('idle');
+    expect(m.sections.albums.status).toBe('idle');
+    expect(m.sections.people.status).toBe('loading');
+  });
+
+  it('scope away (people → all) clears SWR-stale state on non-photo sections', async () => {
+    const m = new GlobalSearchManager();
+    m.setQuery('@alice');
+    await vi.advanceTimersByTimeAsync(150);
+    m.setQuery('alice');
+    // All entity sections should be loading (they were idle under @, now scope all dispatches)
+    expect(m.sections.photos.status).toBe('loading');
+  });
+
+  it('within-scope payload change preserves ok sections (existing SWR)', async () => {
+    const m = new GlobalSearchManager();
+    vi.mocked(searchPerson).mockResolvedValue([mockPerson('p1', 'Alice')] as never);
+    m.setQuery('@al');
+    await vi.advanceTimersByTimeAsync(150);
+    await vi.runAllTimersAsync();
+    expect(m.sections.people.status).toBe('ok');
+
+    // Adding a char — scope and provider stay the same. people section should NOT
+    // flip to loading; ok is SWR-preserved.
+    m.setQuery('@ali');
+    expect(m.sections.people.status).toBe('ok');
+  });
+
+  it('scope transition aborts the prior batchController', async () => {
+    const m = new GlobalSearchManager();
+    m.setQuery('alice');
+    await vi.advanceTimersByTimeAsync(150);
+    const priorBatch = m['batchController'];
+    expect(priorBatch).not.toBeNull();
+    expect(priorBatch?.signal.aborted).toBe(false);
+
+    m.setQuery('@alice');
+    expect(priorBatch?.signal.aborted).toBe(true);
+    expect(m['batchController']).not.toBe(priorBatch); // fresh controller
+  });
+
+  it('rapid scope thrash (@ → # → /) aborts cleanly and inFlightCounter stays consistent', async () => {
+    const m = new GlobalSearchManager();
+    m.setQuery('@alice');
+    m.setQuery('#xmas');
+    m.setQuery('/trip');
+    await vi.advanceTimersByTimeAsync(150);
+    await vi.runAllTimersAsync();
+
+    // After all transitions settle, batchInFlight must drop to false (no stranded counter).
+    expect(m.batchInFlight).toBe(false);
+    // Only the final scope's sections should be non-idle (collections).
+    expect(m.sections.photos.status).toBe('idle');
+    expect(m.sections.people.status).toBe('idle');
+    expect(m.sections.tags.status).toBe('idle');
+  });
+
+  it('/ while albumsCache promise is in-flight: callers join the same promise', async () => {
+    const m = new GlobalSearchManager();
+    const getAlbumNamesSpy = vi.mocked(getAlbumNames);
+    let resolve: (v: unknown) => void;
+    getAlbumNamesSpy.mockImplementation(() => new Promise((r) => (resolve = r as (v: unknown) => void)));
+
+    m.setQuery('/tr');
+    await vi.advanceTimersByTimeAsync(150);
+    m.setQuery('/tri');
+    await vi.advanceTimersByTimeAsync(150);
+    // Both dispatches await the same albumsPromise.
+    resolve!([{ id: 'a1', albumName: 'Trip' }] as never);
+    await vi.runAllTimersAsync();
+
+    expect(getAlbumNamesSpy).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('prefix scoping — reconcileCursor', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    vi.useFakeTimers();
+    installFakeAbortTimeout();
+    vi.mocked(searchSmart).mockResolvedValue({ assets: { items: [], nextPage: null } } as never);
+    vi.mocked(searchAssets).mockResolvedValue({ assets: { items: [], nextPage: null } } as never);
+    vi.mocked(searchPerson).mockResolvedValue([] as never);
+    vi.mocked(searchPlaces).mockResolvedValue([] as never);
+    vi.mocked(getAllTags).mockResolvedValue([] as never);
+    vi.mocked(getAlbumNames).mockResolvedValue([] as never);
+    vi.mocked(getAllSpaces).mockResolvedValue([] as never);
+    vi.mocked(getAllPeople).mockResolvedValue({ people: [], total: 0, hidden: 0, hasNextPage: false } as never);
+  });
+
+  afterEach(() => {
+    restoreAbortTimeout();
+    vi.useRealTimers();
+  });
+
+  it('all reconcile order is [photos, albums, spaces, people, places, tags, navigation]', () => {
+    const m = new GlobalSearchManager();
+    // All sections empty except albums with one item.
+    m.sections.albums = { status: 'ok', items: [{ id: 'a1' }] as never, total: 1 };
+    m.setActiveItem(null);
+    m.reconcileCursor();
+    expect(m.activeItemId).toBe('album:a1');
+  });
+
+  it('scope transition preserves cursor when target stays in scope', () => {
+    const m = new GlobalSearchManager();
+    m.sections.people = { status: 'ok', items: [{ id: 'alice-id' } as never], total: 1 };
+    m.setActiveItem('person:alice-id');
+
+    m.setQuery('@');
+    // Do not advance — prove cursor is still on Alice through the synchronous scope transition.
+    expect(m.activeItemId).toBe('person:alice-id');
+  });
+
+  it('scope transition reconciles when target exits scope', () => {
+    const m = new GlobalSearchManager();
+    m.sections.photos = { status: 'ok', items: [{ id: 'p1' } as never], total: 1 };
+    m.sections.people = { status: 'ok', items: [{ id: 'alice-id' } as never], total: 1 };
+    m.setActiveItem('photo:p1');
+
+    m.setQuery('@alice');
+    // Photo cursor exits scope; reconcile picks first person.
+    expect(m.activeItemId).toBe('person:alice-id');
+  });
+
+  it('/trip lands cursor on first album (albums before spaces)', async () => {
+    const m = new GlobalSearchManager();
+    m.albumsCache = [{ id: 'a1', albumName: 'Trip 2024', endDate: '2026-04-15T00:00:00Z' }] as never;
+    m.spacesCache = [{ id: 's1', name: 'Trip club', createdAt: '2026-04-15T00:00:00Z' }] as never;
+    m.setQuery('/trip');
+    await vi.advanceTimersByTimeAsync(150);
+    await vi.runAllTimersAsync();
+    expect(m.activeItemId).toBe('album:a1');
+  });
+});
+
+describe('prefix scoping — setMode under scope', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    vi.useFakeTimers();
+    installFakeAbortTimeout();
+    vi.mocked(searchSmart).mockResolvedValue({ assets: { items: [], nextPage: null } } as never);
+    vi.mocked(searchAssets).mockResolvedValue({ assets: { items: [], nextPage: null } } as never);
+    vi.mocked(searchPerson).mockResolvedValue([] as never);
+    vi.mocked(searchPlaces).mockResolvedValue([] as never);
+    vi.mocked(getAllTags).mockResolvedValue([] as never);
+    vi.mocked(getAlbumNames).mockResolvedValue([] as never);
+    vi.mocked(getAllSpaces).mockResolvedValue([] as never);
+    vi.mocked(getAllPeople).mockResolvedValue({ people: [], total: 0, hidden: 0, hasNextPage: false } as never);
+  });
+
+  afterEach(() => {
+    restoreAbortTimeout();
+    vi.useRealTimers();
+  });
+
+  it('setMode under scope persists mode but does NOT dispatch request', async () => {
+    const m = new GlobalSearchManager();
+    const searchSmartSpy = vi.mocked(searchSmart);
+    const searchAssetsSpy = vi.mocked(searchAssets);
+    searchSmartSpy.mockClear();
+    searchAssetsSpy.mockClear();
+
+    m.setQuery('@alice');
+    await vi.advanceTimersByTimeAsync(150);
+    searchSmartSpy.mockClear(); // ignore any prior dispatches
+    const priorPhotosController = m['photosController'];
+
+    m.setMode('metadata');
+    await vi.advanceTimersByTimeAsync(150);
+
+    expect(m.mode).toBe('metadata');
+    expect(localStorage.getItem('searchQueryType')).toBe('metadata');
+    expect(searchSmartSpy).not.toHaveBeenCalled();
+    expect(searchAssetsSpy).not.toHaveBeenCalled();
+    // photosController must NOT have been recreated under scope — same reference.
+    expect(m['photosController']).toBe(priorPhotosController);
+  });
+
+  it('setMode under scope all still dispatches photos re-run', async () => {
+    const m = new GlobalSearchManager();
+    m.setQuery('alice');
+    await vi.advanceTimersByTimeAsync(150);
+    const searchAssetsSpy = vi.mocked(searchAssets);
+    searchAssetsSpy.mockClear();
+
+    m.setMode('metadata');
+    await vi.advanceTimersByTimeAsync(150);
+
+    expect(searchAssetsSpy).toHaveBeenCalled();
+  });
+});
+
+describe('prefix scoping — announcementText', () => {
+  beforeAll(async () => {
+    // Load the real en bundle so `get(t)('cmdk_announce_scoped_*')` resolves to
+    // English copy rather than raw keys. The rest of this suite uses fallbackLocale
+    // 'dev' (raw keys) — the scope-cue assertions here check the translated prefix.
+    const { init, register, waitLocale } = await import('svelte-i18n');
+    register('en-US', () => import('$i18n/en.json'));
+    await init({ fallbackLocale: 'en-US' });
+    await waitLocale('en-US');
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    vi.useFakeTimers();
+    installFakeAbortTimeout();
+    vi.mocked(searchSmart).mockResolvedValue({ assets: { items: [], nextPage: null } } as never);
+    vi.mocked(searchAssets).mockResolvedValue({ assets: { items: [], nextPage: null } } as never);
+    vi.mocked(searchPerson).mockResolvedValue([] as never);
+    vi.mocked(searchPlaces).mockResolvedValue([] as never);
+    vi.mocked(getAllTags).mockResolvedValue([] as never);
+    vi.mocked(getAlbumNames).mockResolvedValue([] as never);
+    vi.mocked(getAllSpaces).mockResolvedValue([] as never);
+    vi.mocked(getAllPeople).mockResolvedValue({ people: [], total: 0, hidden: 0, hasNextPage: false } as never);
+  });
+
+  afterEach(() => {
+    restoreAbortTimeout();
+    vi.useRealTimers();
+  });
+
+  it('scope people announcement prefixed with "Scoped to people."', async () => {
+    const m = new GlobalSearchManager();
+    m.setQuery('@alice');
+    await vi.advanceTimersByTimeAsync(150);
+    await vi.runAllTimersAsync();
+    expect(m.announcementText).toMatch(/Scoped to people/i);
+  });
+
+  it('scope tags announcement prefixed with "Scoped to tags."', async () => {
+    const m = new GlobalSearchManager();
+    m.setQuery('#xmas');
+    await vi.advanceTimersByTimeAsync(150);
+    await vi.runAllTimersAsync();
+    expect(m.announcementText).toMatch(/Scoped to tags/i);
+  });
+
+  it('scope collections announcement prefixed with "Scoped to albums and spaces."', async () => {
+    const m = new GlobalSearchManager();
+    m.setQuery('/trip');
+    await vi.advanceTimersByTimeAsync(150);
+    await vi.runAllTimersAsync();
+    expect(m.announcementText).toMatch(/Scoped to albums and spaces/i);
+  });
+
+  it('scope nav announcement prefixed with "Scoped to pages."', async () => {
+    const m = new GlobalSearchManager();
+    m.setQuery('>theme');
+    await vi.advanceTimersByTimeAsync(150);
+    await vi.runAllTimersAsync();
+    expect(m.announcementText).toMatch(/Scoped to pages/i);
+  });
+
+  it('scope all announcement has no "Scoped to" prefix', async () => {
+    const m = new GlobalSearchManager();
+    m.setQuery('alice');
+    await vi.advanceTimersByTimeAsync(150);
+    await vi.runAllTimersAsync();
+    expect(m.announcementText).not.toMatch(/Scoped to/i);
+  });
+});
+
+describe('prefix scoping — defensive recent replay of scoped query', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
+
+  it('activateRecent({kind:query, text:"@alice"}) re-derives scope=people, payload=alice', () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    m.activateRecent({ kind: 'query', id: 'query:@alice:smart', text: '@alice', mode: 'smart', lastUsed: Date.now() });
+    expect(m.scope).toBe('people');
+    expect(m.payload).toBe('alice');
   });
 });
