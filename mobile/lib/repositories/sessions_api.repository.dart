@@ -2,16 +2,17 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/models/sessions/session_create_response.model.dart';
 import 'package:immich_mobile/providers/api.provider.dart';
 import 'package:immich_mobile/repositories/api.repository.dart';
+import 'package:immich_mobile/services/api.service.dart';
 import 'package:openapi/api.dart';
 
-final sessionsAPIRepositoryProvider = Provider(
-  (ref) => SessionsAPIRepository(ref.watch(apiServiceProvider).sessionsApi),
-);
+final sessionsAPIRepositoryProvider = Provider((ref) => SessionsAPIRepository(ref.watch(apiServiceProvider)));
 
 class SessionsAPIRepository extends ApiRepository {
-  final SessionsApi _api;
+  final ApiService _apiService;
 
-  SessionsAPIRepository(this._api);
+  SessionsAPIRepository(this._apiService);
+
+  SessionsApi get _api => _apiService.sessionsApi;
 
   Future<SessionCreateResponse> createSession(String deviceType, String deviceOS, {int? duration}) async {
     final dto = await checkNull(

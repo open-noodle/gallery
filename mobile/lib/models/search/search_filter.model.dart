@@ -135,6 +135,16 @@ abstract class SearchFilter with _$SearchFilter {
     required AssetType mediaType,
   }) = _SearchFilter;
 
+  static SearchFilter empty() => SearchFilter(
+    people: const {},
+    location: SearchLocationFilter(),
+    camera: SearchCameraFilter(),
+    date: SearchDateFilter(),
+    display: SearchDisplayFilters(isFavorite: false, isArchive: false, isNotInAlbum: false),
+    rating: SearchRatingFilter(),
+    mediaType: AssetType.other,
+  );
+
   bool get isEmpty {
     return (context == null || (context != null && context!.isEmpty)) &&
         (filename == null || (filename!.isEmpty)) &&
