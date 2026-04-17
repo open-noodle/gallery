@@ -6,6 +6,8 @@ import 'package:immich_mobile/models/search/search_filter.model.dart';
 final photosFilterProvider =
     NotifierProvider<PhotosFilterNotifier, SearchFilter>(PhotosFilterNotifier.new);
 
+enum Dimension { people, tags, location, date, camera, rating, mediaType, display, text }
+
 class PhotosFilterNotifier extends Notifier<SearchFilter> {
   @override
   SearchFilter build() => SearchFilter.empty();
@@ -56,4 +58,33 @@ class PhotosFilterNotifier extends Notifier<SearchFilter> {
   void clearPeople() => state = state.copyWith(people: const {});
 
   void clearTags() => state = state.copyWith()..tagIds = null;
+
+  void clearDimension(Dimension d) {
+    switch (d) {
+      case Dimension.people:
+        clearPeople();
+      case Dimension.tags:
+        clearTags();
+      case Dimension.location:
+        setLocation(null);
+      case Dimension.date:
+        setDateRange(start: null, end: null);
+      case Dimension.camera:
+        state = state.copyWith(camera: SearchCameraFilter());
+      case Dimension.rating:
+        setRating(null);
+      case Dimension.mediaType:
+        setMediaType(null);
+      case Dimension.display:
+        state = state.copyWith(
+          display: SearchDisplayFilters(
+            isFavorite: false,
+            isArchive: false,
+            isNotInAlbum: false,
+          ),
+        );
+      case Dimension.text:
+        setText('');
+    }
+  }
 }

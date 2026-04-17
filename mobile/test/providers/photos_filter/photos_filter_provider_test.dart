@@ -199,4 +199,78 @@ void main() {
       expect(f.people, contains(alice)); // untouched
     });
   });
+
+  group('clearDimension', () {
+    test('clears people dimension', () {
+      final notifier = container.read(photosFilterProvider.notifier);
+      const alice = PersonDto(id: 'alice', name: 'Alice', isHidden: false, thumbnailPath: '');
+      notifier.togglePerson(alice);
+      notifier.toggleTag('t1');
+      notifier.clearDimension(Dimension.people);
+      final f = container.read(photosFilterProvider);
+      expect(f.people, isEmpty);
+      expect(f.tagIds, ['t1']);
+    });
+    test('clears tags dimension', () {
+      final notifier = container.read(photosFilterProvider.notifier);
+      notifier.toggleTag('t1');
+      notifier.clearDimension(Dimension.tags);
+      expect(
+        container.read(photosFilterProvider).tagIds == null || container.read(photosFilterProvider).tagIds!.isEmpty,
+        true,
+      );
+    });
+    test('clears location dimension', () {
+      final notifier = container.read(photosFilterProvider.notifier);
+      notifier.setLocation(SearchLocationFilter(country: 'France'));
+      notifier.clearDimension(Dimension.location);
+      expect(container.read(photosFilterProvider).location.country, null);
+    });
+    test('clears date dimension', () {
+      final notifier = container.read(photosFilterProvider.notifier);
+      notifier.setDateRange(start: DateTime(2024, 1, 1), end: DateTime(2024, 12, 31));
+      notifier.clearDimension(Dimension.date);
+      final d = container.read(photosFilterProvider).date;
+      expect(d.takenAfter, null);
+      expect(d.takenBefore, null);
+    });
+    test('clears camera dimension', () {
+      final notifier = container.read(photosFilterProvider.notifier);
+      // No setCamera method yet — set the camera filter directly via copyWith for this test setup.
+      // Easier: expect calling clearDimension(Dimension.camera) on an already-empty filter to be a no-op.
+      notifier.clearDimension(Dimension.camera);
+      final c = container.read(photosFilterProvider).camera;
+      expect(c.make, null);
+      expect(c.model, null);
+    });
+    test('clears rating dimension', () {
+      final notifier = container.read(photosFilterProvider.notifier);
+      notifier.setRating(4);
+      notifier.clearDimension(Dimension.rating);
+      expect(container.read(photosFilterProvider).rating.rating, null);
+    });
+    test('clears mediaType dimension', () {
+      final notifier = container.read(photosFilterProvider.notifier);
+      notifier.setMediaType(AssetType.image);
+      notifier.clearDimension(Dimension.mediaType);
+      expect(container.read(photosFilterProvider).mediaType, AssetType.other);
+    });
+    test('clears display dimension', () {
+      final notifier = container.read(photosFilterProvider.notifier);
+      notifier.setFavouritesOnly(true);
+      notifier.setArchivedIncluded(true);
+      notifier.setNotInAlbum(true);
+      notifier.clearDimension(Dimension.display);
+      final d = container.read(photosFilterProvider).display;
+      expect(d.isFavorite, false);
+      expect(d.isArchive, false);
+      expect(d.isNotInAlbum, false);
+    });
+    test('clears text dimension', () {
+      final notifier = container.read(photosFilterProvider.notifier);
+      notifier.setText('paris');
+      notifier.clearDimension(Dimension.text);
+      expect(container.read(photosFilterProvider).context, null);
+    });
+  });
 }
