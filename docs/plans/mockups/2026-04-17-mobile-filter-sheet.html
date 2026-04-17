@@ -1,0 +1,3631 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Gallery · Mobile Filter Sheet · Mockup</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,300;1,9..144,400;1,9..144,500&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+
+    <style>
+      /* ───────────────────────────── palette · darkroom warmth */
+      :root {
+        --obsidian: #0a0907;
+        --ink-deep: #141110;
+        --ink-raise: #1c1815;
+        --ink-raise-2: #27211c;
+        --ink-frost: rgba(245, 241, 232, 0.06);
+        --ink-line: rgba(245, 241, 232, 0.08);
+        --ink-line-strong: rgba(245, 241, 232, 0.14);
+
+        --paper: #f5f1e8;
+        --paper-dim: #c8c0af;
+        --paper-fade: #8a8170;
+        --paper-quiet: #5a5349;
+        --paper-ghost: #3b352d;
+
+        --ember: #e8935c; /* warm accent */
+        --ember-soft: #ffb07a;
+        --ember-deep: #c46f3a;
+        --ember-wash: rgba(232, 147, 92, 0.14);
+        --ember-glow: rgba(232, 147, 92, 0.32);
+
+        --crimson: #d46a5c;
+        --jade: #7bb38d;
+
+        --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+        --shadow-2: 0 10px 30px -12px rgba(0, 0, 0, 0.6);
+        --shadow-hi: 0 30px 60px -20px rgba(0, 0, 0, 0.75);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        min-height: 100vh;
+        background:
+          radial-gradient(1100px 600px at 80% -10%, #1f1710 0%, transparent 55%),
+          radial-gradient(900px 700px at 10% 110%, #150f0b 0%, transparent 60%), var(--obsidian);
+        color: var(--paper);
+        font-family:
+          'Plus Jakarta Sans',
+          system-ui,
+          -apple-system,
+          Segoe UI,
+          Roboto,
+          'Helvetica Neue',
+          Arial,
+          sans-serif;
+        font-size: 14px;
+        line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
+        letter-spacing: -0.003em;
+      }
+
+      /* film grain, very subtle */
+      body::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 99;
+        opacity: 0.09;
+        mix-blend-mode: overlay;
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.96  0 0 0 0 0.93  0 0 0 0 0.86  0 0 0 0.6 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+      }
+
+      /* ───────────────────────────── layout shell */
+      .deck {
+        max-width: 1480px;
+        margin: 0 auto;
+        padding: 80px 48px 120px;
+      }
+
+      header.masthead {
+        display: grid;
+        grid-template-columns: 1.4fr 1fr;
+        gap: 80px;
+        margin-bottom: 88px;
+        align-items: end;
+      }
+
+      .kicker {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 11px;
+        font-weight: 500;
+        letter-spacing: 0.32em;
+        text-transform: uppercase;
+        color: var(--ember);
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .kicker::before {
+        content: '';
+        width: 24px;
+        height: 1px;
+        background: var(--ember);
+      }
+
+      h1.display {
+        font-family: 'Fraunces', serif;
+        font-variation-settings:
+          'opsz' 144,
+          'SOFT' 100;
+        font-weight: 300;
+        font-size: clamp(56px, 7vw, 96px);
+        line-height: 0.96;
+        letter-spacing: -0.035em;
+        margin: 20px 0 0;
+        color: var(--paper);
+      }
+      h1.display em {
+        font-style: italic;
+        font-weight: 400;
+        color: var(--ember);
+      }
+
+      header .lede {
+        color: var(--paper-dim);
+        font-size: 16px;
+        line-height: 1.55;
+        max-width: 44ch;
+      }
+      header .lede strong {
+        color: var(--paper);
+        font-weight: 500;
+      }
+
+      .masthead-meta {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 28px;
+        border-top: 1px solid var(--ink-line);
+        padding-top: 22px;
+        margin-top: 32px;
+      }
+      .masthead-meta dt {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 10px;
+        letter-spacing: 0.28em;
+        text-transform: uppercase;
+        color: var(--paper-fade);
+        margin-bottom: 6px;
+      }
+      .masthead-meta dd {
+        margin: 0;
+        font-size: 13px;
+        color: var(--paper);
+      }
+
+      /* ───────────────────────────── stages */
+      .stages {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 48px;
+        align-items: start;
+      }
+
+      .stage {
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .stage-caption {
+        width: 100%;
+        margin-bottom: 24px;
+        text-align: left;
+      }
+      .stage-caption .tag {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 10px;
+        letter-spacing: 0.28em;
+        text-transform: uppercase;
+        color: var(--ember);
+        display: inline-flex;
+        gap: 8px;
+        align-items: baseline;
+      }
+      .stage-caption .tag span {
+        color: var(--paper-fade);
+      }
+      .stage-caption h2 {
+        font-family: 'Fraunces', serif;
+        font-variation-settings: 'opsz' 48;
+        font-weight: 400;
+        font-size: 30px;
+        line-height: 1.05;
+        letter-spacing: -0.02em;
+        margin: 10px 0 10px;
+      }
+      .stage-caption p {
+        color: var(--paper-dim);
+        margin: 0;
+        font-size: 13.5px;
+        line-height: 1.55;
+        max-width: 36ch;
+      }
+
+      /* ───────────────────────────── phone frame */
+      .phone {
+        --w: 360px;
+        --h: 760px;
+        width: var(--w);
+        height: var(--h);
+        position: relative;
+        border-radius: 52px;
+        padding: 9px;
+        background: linear-gradient(180deg, #2a2520, #0f0d0b), #0f0d0b;
+        box-shadow:
+          0 0 0 1px rgba(245, 241, 232, 0.06),
+          inset 0 1px 0 rgba(245, 241, 232, 0.08),
+          var(--shadow-hi);
+      }
+      .phone::before {
+        /* notch pill */
+        content: '';
+        position: absolute;
+        top: 18px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 108px;
+        height: 28px;
+        background: #000;
+        border-radius: 16px;
+        z-index: 30;
+      }
+
+      .screen {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        border-radius: 44px;
+        overflow: hidden;
+        background: var(--obsidian);
+        isolation: isolate;
+      }
+
+      /* status bar */
+      .statusbar {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 44px;
+        padding: 0 32px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--paper);
+        z-index: 20;
+      }
+      .statusbar .dots {
+        display: flex;
+        gap: 4px;
+        align-items: center;
+      }
+      .statusbar .dots i {
+        display: block;
+        width: 14px;
+        height: 9px;
+        border-radius: 2px;
+        background: var(--paper);
+        opacity: 0.9;
+      }
+      .statusbar .dots i:nth-child(1) {
+        opacity: 0.4;
+      }
+      .statusbar .dots i:nth-child(2) {
+        opacity: 0.7;
+      }
+      .statusbar .battery {
+        width: 22px;
+        height: 11px;
+        border: 1px solid var(--paper);
+        border-radius: 3px;
+        position: relative;
+        opacity: 0.9;
+      }
+      .statusbar .battery::after {
+        content: '';
+        position: absolute;
+        right: -3px;
+        top: 3px;
+        width: 2px;
+        height: 5px;
+        background: var(--paper);
+        border-radius: 1px;
+      }
+      .statusbar .battery::before {
+        content: '';
+        position: absolute;
+        inset: 1px;
+        width: 70%;
+        background: var(--paper);
+        border-radius: 1px;
+      }
+
+      /* app bar */
+      .appbar {
+        position: absolute;
+        top: 48px;
+        left: 0;
+        right: 0;
+        padding: 8px 24px 14px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        z-index: 15;
+      }
+      .appbar h3 {
+        margin: 0;
+        font-family: 'Fraunces', serif;
+        font-variation-settings: 'opsz' 72;
+        font-weight: 300;
+        font-size: 30px;
+        letter-spacing: -0.02em;
+        color: var(--paper);
+      }
+      .appbar h3 small {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-weight: 500;
+        font-size: 10px;
+        letter-spacing: 0.24em;
+        text-transform: uppercase;
+        display: block;
+        color: var(--paper-fade);
+        margin-bottom: 2px;
+      }
+      .appbar .avatar {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        background: radial-gradient(circle at 30% 30%, #f5c49a, #7a3a1e 80%);
+        box-shadow: 0 0 0 1.5px var(--ink-line-strong);
+      }
+      .appbar .ico {
+        width: 28px;
+        height: 28px;
+        display: grid;
+        place-items: center;
+        color: var(--paper-dim);
+      }
+
+      /* photo grid backdrop */
+      .grid {
+        position: absolute;
+        top: 108px;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        grid-auto-rows: 108px;
+        gap: 2px;
+        padding: 0 2px 2px;
+      }
+      .tile {
+        position: relative;
+        overflow: hidden;
+        background: var(--ink-raise);
+      }
+      .tile img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+        filter: saturate(0.92) contrast(1.02);
+      }
+      .tile.t-tall {
+        grid-row: span 2;
+      }
+      .tile.t-wide {
+        grid-column: span 2;
+      }
+      .tile.t-big {
+        grid-column: span 2;
+        grid-row: span 2;
+      }
+      /* warm cast */
+      .tile::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(180deg, rgba(232, 147, 92, 0.04), rgba(10, 9, 7, 0.25));
+        pointer-events: none;
+      }
+
+      /* scrim for Browse/Deep states */
+      .scrim {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(180deg, rgba(10, 9, 7, 0) 30%, rgba(10, 9, 7, 0.62) 72%, rgba(10, 9, 7, 0.9) 100%);
+        z-index: 10;
+        pointer-events: none;
+      }
+      .scrim.full {
+        background: rgba(10, 9, 7, 0.85);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+      }
+
+      /* sheet ─ base */
+      .sheet {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(180deg, rgba(28, 24, 21, 0.92), rgba(20, 17, 16, 0.98)), var(--ink-deep);
+        border-top: 1px solid var(--ink-line-strong);
+        border-radius: 28px 28px 0 0;
+        box-shadow: var(--shadow-2);
+        z-index: 20;
+        color: var(--paper);
+        backdrop-filter: blur(18px) saturate(1.1);
+        -webkit-backdrop-filter: blur(18px) saturate(1.1);
+      }
+      .sheet-handle {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 10px 0 4px;
+      }
+      .sheet-handle .grip {
+        width: 44px;
+        height: 4px;
+        border-radius: 2px;
+        background: rgba(245, 241, 232, 0.22);
+      }
+      .sheet-handle .grip.amber {
+        background: linear-gradient(90deg, var(--ember-soft), var(--ember-deep));
+        box-shadow: 0 0 12px var(--ember-glow);
+      }
+
+      .sheet-count {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 10px;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        color: var(--paper-fade);
+        margin-top: 8px;
+      }
+      .sheet-count b {
+        color: var(--paper);
+        font-weight: 600;
+        letter-spacing: 0;
+      }
+
+      /* ─── chip rail (active filters, peek) */
+      .chiprail {
+        display: flex;
+        gap: 8px;
+        padding: 14px 20px 18px;
+        overflow-x: auto;
+        scrollbar-width: none;
+        -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+        mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+      }
+      .chiprail::-webkit-scrollbar {
+        display: none;
+      }
+
+      .chip {
+        flex: 0 0 auto;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 7px 12px;
+        border-radius: 999px;
+        font-size: 12.5px;
+        font-weight: 500;
+        letter-spacing: -0.005em;
+        white-space: nowrap;
+        background: var(--ink-frost);
+        border: 1px solid var(--ink-line-strong);
+        color: var(--paper);
+        transition:
+          background 0.2s,
+          border-color 0.2s;
+      }
+      .chip.on {
+        background: var(--ember-wash);
+        border-color: rgba(232, 147, 92, 0.4);
+        color: var(--ember-soft);
+        box-shadow:
+          0 0 0 1px rgba(232, 147, 92, 0.18) inset,
+          0 2px 14px -4px var(--ember-glow);
+      }
+      .chip .x {
+        display: inline-grid;
+        place-items: center;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: rgba(232, 147, 92, 0.22);
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 9.5px;
+        line-height: 1;
+        color: var(--ember-soft);
+      }
+      .chip .dot {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: var(--ember);
+      }
+      .chip-thumb {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        object-fit: cover;
+        margin-left: -4px;
+        box-shadow: 0 0 0 1.5px var(--ink-deep);
+      }
+      .chip-thumb-group {
+        display: inline-flex;
+        align-items: center;
+      }
+
+      /* ─── bottom nav */
+      .nav {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 76px;
+        padding: 0 32px 18px;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        background: linear-gradient(180deg, rgba(10, 9, 7, 0) 0%, rgba(10, 9, 7, 0.95) 40%);
+        border-top: 1px solid var(--ink-line);
+        z-index: 25;
+        align-items: end;
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+      }
+      .nav .item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-size: 10px;
+        font-weight: 500;
+        letter-spacing: 0.04em;
+        color: var(--paper-fade);
+      }
+      .nav .item .ico {
+        width: 24px;
+        height: 24px;
+        display: grid;
+        place-items: center;
+      }
+      .nav .item.active {
+        color: var(--ember);
+      }
+      .nav .item.active .ico::after {
+        content: '';
+        position: absolute;
+        bottom: -22px;
+        width: 4px;
+        height: 4px;
+        border-radius: 50%;
+        background: var(--ember);
+        box-shadow: 0 0 8px var(--ember-glow);
+      }
+      .nav .item .ico {
+        position: relative;
+      }
+
+      /* ─── browse-state sheet */
+      .sheet.browse {
+        height: 62%;
+        padding-bottom: 24px;
+        overflow: hidden;
+      }
+      .sheet.browse .search {
+        margin: 14px 20px 0;
+        height: 42px;
+        border-radius: 14px;
+        background: var(--ink-raise);
+        border: 1px solid var(--ink-line);
+        padding: 0 14px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--paper-fade);
+        font-size: 13px;
+      }
+      .sheet.browse .search .glyph {
+        color: var(--paper-dim);
+      }
+
+      .strip {
+        padding: 18px 20px 0;
+      }
+      .strip-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        margin-bottom: 12px;
+      }
+      .strip-head .label {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.28em;
+        text-transform: uppercase;
+        color: var(--paper-fade);
+      }
+      .strip-head .more {
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--ember);
+        letter-spacing: 0.04em;
+      }
+      .strip-row {
+        display: flex;
+        gap: 10px;
+        overflow-x: auto;
+        scrollbar-width: none;
+        padding-bottom: 4px;
+        -webkit-mask-image: linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent);
+        mask-image: linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent);
+      }
+      .strip-row::-webkit-scrollbar {
+        display: none;
+      }
+
+      /* people thumbs */
+      .peep {
+        flex: 0 0 auto;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        width: 58px;
+      }
+      .peep .img {
+        width: 52px;
+        height: 52px;
+        border-radius: 50%;
+        background-size: cover;
+        background-position: center;
+        position: relative;
+        transition: transform 0.2s;
+      }
+      .peep .name {
+        font-size: 10.5px;
+        color: var(--paper-dim);
+        font-weight: 500;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        letter-spacing: -0.005em;
+      }
+      .peep.on .img {
+        transform: scale(1.04);
+        box-shadow:
+          0 0 0 2px var(--ember),
+          0 0 0 4px rgba(232, 147, 92, 0.22),
+          0 0 22px var(--ember-glow);
+      }
+      .peep.on .name {
+        color: var(--ember-soft);
+      }
+
+      /* places thumbs */
+      .place {
+        flex: 0 0 auto;
+        width: 104px;
+        height: 72px;
+        border-radius: 14px;
+        overflow: hidden;
+        position: relative;
+        background: var(--ink-raise-2);
+      }
+      .place img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+      .place .overlay {
+        position: absolute;
+        inset: auto 0 0 0;
+        padding: 8px 10px;
+        background: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.75) 100%);
+        color: var(--paper);
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+      }
+      .place .overlay b {
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: -0.005em;
+      }
+      .place .overlay em {
+        font-style: normal;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 9px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--paper-dim);
+      }
+      .place.on {
+        box-shadow:
+          0 0 0 2px var(--ember),
+          0 0 22px var(--ember-glow);
+      }
+
+      /* tag pills */
+      .tag-pill {
+        flex: 0 0 auto;
+        padding: 7px 13px;
+        border-radius: 999px;
+        background: var(--ink-raise);
+        border: 1px solid var(--ink-line-strong);
+        font-size: 12.5px;
+        color: var(--paper);
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .tag-pill.on {
+        background: var(--ember-wash);
+        border-color: rgba(232, 147, 92, 0.42);
+        color: var(--ember-soft);
+      }
+      .tag-pill .count {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 10px;
+        color: var(--paper-fade);
+      }
+      .tag-pill.on .count {
+        color: var(--ember);
+      }
+
+      /* when pills */
+      .when-pill {
+        flex: 0 0 auto;
+        padding: 9px 14px;
+        border-radius: 14px;
+        background: var(--ink-raise);
+        border: 1px solid var(--ink-line-strong);
+        font-size: 12.5px;
+        color: var(--paper);
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .when-pill .cal {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--paper-fade);
+      }
+      .when-pill.on {
+        background: var(--ember-wash);
+        border-color: rgba(232, 147, 92, 0.42);
+        color: var(--ember-soft);
+      }
+      .when-pill.on .cal {
+        color: var(--ember);
+      }
+
+      /* sheet footer match count */
+      .sheet-footer {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        padding: 14px 20px 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: linear-gradient(180deg, rgba(20, 17, 16, 0) 0%, rgba(20, 17, 16, 0.98) 40%);
+        font-family: 'Plus Jakarta Sans', sans-serif;
+      }
+      .sheet-footer .count {
+        font-family: 'Fraunces', serif;
+        font-weight: 400;
+        font-size: 28px;
+        line-height: 1;
+        color: var(--paper);
+      }
+      .sheet-footer .count span {
+        color: var(--paper-fade);
+        font-size: 12px;
+        font-family: 'Plus Jakarta Sans';
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        font-weight: 500;
+        display: block;
+        margin-top: 4px;
+      }
+      .sheet-footer .reset {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 11px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--paper-dim);
+        background: transparent;
+        border: none;
+        padding: 10px 14px;
+        cursor: pointer;
+      }
+
+      /* ─── deep-state sheet ─────────────────── */
+      .sheet.deep {
+        top: 44px;
+        height: auto;
+        bottom: 0;
+        border-radius: 28px 28px 0 0;
+        display: flex;
+        flex-direction: column;
+        padding-bottom: 78px;
+      }
+      .deep-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 22px 10px;
+        border-bottom: 1px solid var(--ink-line);
+      }
+      .deep-head .close {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        background: var(--ink-frost);
+        color: var(--paper);
+        border: 1px solid var(--ink-line);
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 13px;
+      }
+      .deep-head h4 {
+        margin: 0;
+        font-family: 'Fraunces', serif;
+        font-weight: 400;
+        font-size: 18px;
+        letter-spacing: -0.01em;
+      }
+      .deep-head .reset {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 10px;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--ember);
+        background: none;
+        border: none;
+        padding: 6px 0;
+        cursor: pointer;
+      }
+
+      .deep-body {
+        flex: 1 1 auto;
+        overflow-y: auto;
+        padding: 8px 0 18px;
+      }
+
+      /* section */
+      .section {
+        padding: 18px 22px 4px;
+      }
+      .section h5 {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        margin: 0 0 14px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 10px;
+        letter-spacing: 0.28em;
+        text-transform: uppercase;
+        color: var(--paper-fade);
+        font-weight: 600;
+      }
+      .section h5 b {
+        color: var(--paper);
+        font-weight: 500;
+      }
+
+      /* people grid */
+      .people-grid {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 14px 10px;
+      }
+      .people-grid .peep {
+        width: auto;
+      }
+
+      /* cascading rows (country → city) */
+      .cascade {
+        display: grid;
+        grid-template-columns: 1fr 1.15fr;
+        gap: 10px;
+        border: 1px solid var(--ink-line);
+        border-radius: 14px;
+        overflow: hidden;
+        background: var(--ink-raise);
+      }
+      .cascade-col {
+        padding: 6px;
+      }
+      .cascade-col h6 {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 9px;
+        letter-spacing: 0.28em;
+        text-transform: uppercase;
+        color: var(--paper-fade);
+        font-weight: 600;
+        margin: 8px 10px 10px;
+      }
+      .cascade .row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 9px 10px;
+        border-radius: 8px;
+        font-size: 13px;
+        color: var(--paper-dim);
+        cursor: pointer;
+      }
+      .cascade .row .n {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 10px;
+        color: var(--paper-fade);
+      }
+      .cascade .row.on {
+        background: var(--ember-wash);
+        color: var(--ember-soft);
+      }
+      .cascade .row.on .n {
+        color: var(--ember);
+      }
+      .cascade .row.current {
+        color: var(--paper);
+      }
+      .cascade .col-right {
+        border-left: 1px solid var(--ink-line);
+      }
+
+      /* tag wrap */
+      .tag-wrap {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      /* year grid */
+      .year-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 8px;
+      }
+      .year {
+        aspect-ratio: 1.25 / 1;
+        border-radius: 12px;
+        background: var(--ink-raise);
+        border: 1px solid var(--ink-line);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+      }
+      .year b {
+        font-family: 'Fraunces', serif;
+        font-weight: 400;
+        font-size: 22px;
+        letter-spacing: -0.02em;
+        color: var(--paper);
+      }
+      .year span {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 9px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--paper-fade);
+      }
+      .year.on {
+        background: linear-gradient(180deg, rgba(232, 147, 92, 0.16), rgba(232, 147, 92, 0.05));
+        border-color: rgba(232, 147, 92, 0.5);
+      }
+      .year.on b {
+        color: var(--ember-soft);
+      }
+      .year.on span {
+        color: var(--ember);
+      }
+      .year.empty b {
+        color: var(--paper-ghost);
+      }
+      .year.empty span {
+        color: var(--paper-ghost);
+      }
+
+      /* stars */
+      .stars {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+      }
+      .stars .s {
+        width: 26px;
+        height: 26px;
+        display: grid;
+        place-items: center;
+        color: var(--paper-ghost);
+        font-size: 20px;
+      }
+      .stars .s.on {
+        color: var(--ember);
+        filter: drop-shadow(0 0 8px var(--ember-glow));
+      }
+      .stars .s.half {
+        color: var(--ember);
+        opacity: 0.5;
+      }
+
+      /* toggle rows */
+      .toggle-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 0;
+        border-bottom: 1px solid var(--ink-line);
+      }
+      .toggle-row:last-child {
+        border-bottom: 0;
+      }
+      .toggle-row .label {
+        font-size: 13.5px;
+        color: var(--paper);
+        font-weight: 500;
+      }
+      .toggle-row .sub {
+        font-size: 11.5px;
+        color: var(--paper-fade);
+        margin-top: 2px;
+      }
+      .switch {
+        width: 36px;
+        height: 22px;
+        border-radius: 11px;
+        background: var(--ink-raise-2);
+        position: relative;
+        border: 1px solid var(--ink-line);
+        flex: 0 0 auto;
+      }
+      .switch::after {
+        content: '';
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: var(--paper-fade);
+        transition:
+          left 0.25s,
+          background 0.2s;
+      }
+      .switch.on {
+        background: var(--ember);
+        border-color: var(--ember-deep);
+      }
+      .switch.on::after {
+        left: 16px;
+        background: var(--paper);
+      }
+
+      /* media type seg */
+      .seg {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        border-radius: 12px;
+        overflow: hidden;
+        background: var(--ink-raise);
+        border: 1px solid var(--ink-line);
+      }
+      .seg div {
+        text-align: center;
+        padding: 10px 0;
+        font-size: 12.5px;
+        font-weight: 500;
+        color: var(--paper-dim);
+        border-right: 1px solid var(--ink-line);
+      }
+      .seg div:last-child {
+        border-right: none;
+      }
+      .seg div.on {
+        background: var(--ember-wash);
+        color: var(--ember-soft);
+        box-shadow: inset 0 -2px 0 0 var(--ember);
+      }
+
+      /* apply CTA */
+      .apply-bar {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        padding: 14px 22px 22px;
+        background: linear-gradient(180deg, rgba(20, 17, 16, 0) 0%, rgba(10, 9, 7, 0.95) 50%);
+        display: flex;
+        gap: 12px;
+        align-items: stretch;
+        z-index: 30;
+      }
+      .apply-bar .apply {
+        flex: 1 1 auto;
+        background: var(--ember);
+        color: #1a0e05;
+        border: 0;
+        border-radius: 18px;
+        padding: 14px 18px;
+        font-family: 'Plus Jakarta Sans';
+        font-size: 14.5px;
+        font-weight: 700;
+        letter-spacing: -0.005em;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        box-shadow: 0 12px 32px -8px var(--ember-glow);
+      }
+      .apply-bar .apply .n {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        font-weight: 600;
+        background: rgba(26, 14, 5, 0.14);
+        padding: 4px 10px;
+        border-radius: 999px;
+      }
+
+      /* ─── annotation callouts */
+      .stage-notes {
+        margin-top: 28px;
+        width: 100%;
+        display: grid;
+        gap: 14px;
+      }
+      .note {
+        display: grid;
+        grid-template-columns: 32px 1fr;
+        gap: 12px;
+        padding: 14px 16px;
+        border-left: 1px solid var(--ember);
+        background: linear-gradient(90deg, rgba(232, 147, 92, 0.04), transparent 80%);
+        border-radius: 0 10px 10px 0;
+      }
+      .note .n {
+        font-family: 'Fraunces', serif;
+        font-style: italic;
+        font-weight: 400;
+        font-size: 18px;
+        color: var(--ember);
+        line-height: 1;
+      }
+      .note h6 {
+        margin: 0 0 4px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 10px;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        color: var(--paper-dim);
+      }
+      .note p {
+        margin: 0;
+        color: var(--paper-dim);
+        font-size: 13px;
+        line-height: 1.5;
+      }
+
+      /* ───────────────────────────── footer */
+      .outro {
+        margin-top: 120px;
+        padding-top: 48px;
+        border-top: 1px solid var(--ink-line);
+        display: grid;
+        grid-template-columns: 1.2fr 1fr;
+        gap: 80px;
+      }
+      .outro h2 {
+        font-family: 'Fraunces', serif;
+        font-weight: 300;
+        font-style: italic;
+        font-size: 42px;
+        line-height: 1.05;
+        letter-spacing: -0.02em;
+        margin: 10px 0 0;
+        color: var(--paper);
+      }
+      .swatches {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 14px;
+        margin-top: 28px;
+      }
+      .swatch {
+        border-radius: 12px;
+        height: 88px;
+        padding: 10px 12px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        border: 1px solid var(--ink-line);
+      }
+      .swatch .hex {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 10px;
+        letter-spacing: 0.1em;
+        color: var(--paper);
+      }
+      .swatch .name {
+        font-size: 11px;
+        color: var(--paper-dim);
+        font-weight: 500;
+      }
+
+      .typeset {
+        display: grid;
+        gap: 16px;
+        margin-top: 12px;
+      }
+      .type-row {
+        display: grid;
+        grid-template-columns: 150px 1fr;
+        gap: 20px;
+        align-items: baseline;
+        padding: 14px 0;
+        border-top: 1px solid var(--ink-line);
+      }
+      .type-row:last-child {
+        border-bottom: 1px solid var(--ink-line);
+      }
+      .type-row .lbl {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 10px;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        color: var(--paper-fade);
+      }
+      .type-row .sam.display {
+        font-family: 'Fraunces', serif;
+        font-style: italic;
+        font-weight: 400;
+        font-size: 28px;
+        letter-spacing: -0.02em;
+      }
+      .type-row .sam.body {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-weight: 500;
+        font-size: 15px;
+      }
+      .type-row .sam.mono {
+        font-family: 'JetBrains Mono', monospace;
+        font-weight: 500;
+        font-size: 13px;
+        letter-spacing: 0.04em;
+      }
+
+      /* ─── year accordion (scales to 25+ years) */
+      .year-list {
+        display: flex;
+        flex-direction: column;
+        border: 1px solid var(--ink-line);
+        border-radius: 14px;
+        background: var(--ink-raise);
+        overflow: hidden;
+      }
+      .year-row {
+        display: grid;
+        grid-template-columns: 1fr auto 16px;
+        gap: 12px;
+        align-items: center;
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--ink-line);
+        cursor: pointer;
+      }
+      .year-row:last-child {
+        border-bottom: 0;
+      }
+      .year-row .y {
+        font-family: 'Fraunces', serif;
+        font-weight: 400;
+        font-size: 18px;
+        letter-spacing: -0.01em;
+        color: var(--paper);
+      }
+      .year-row .c {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 10.5px;
+        color: var(--paper-fade);
+        letter-spacing: 0.08em;
+        font-weight: 500;
+      }
+      .year-row .chev {
+        color: var(--paper-fade);
+        font-size: 10px;
+        line-height: 1;
+      }
+      .year-row.on {
+        background: linear-gradient(90deg, rgba(232, 147, 92, 0.12), rgba(232, 147, 92, 0.02));
+      }
+      .year-row.on .y {
+        color: var(--ember-soft);
+      }
+      .year-row.on .c {
+        color: var(--ember);
+      }
+      .year-row.on .chev {
+        color: var(--ember);
+      }
+
+      .month-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 6px;
+        padding: 4px 14px 14px;
+        background: var(--ink-deep);
+        border-bottom: 1px solid var(--ink-line);
+      }
+      .month {
+        padding: 9px 0;
+        text-align: center;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 9.5px;
+        letter-spacing: 0.18em;
+        font-weight: 600;
+        text-transform: uppercase;
+        color: var(--paper-dim);
+        background: var(--ink-raise-2);
+        border-radius: 8px;
+        border: 1px solid var(--ink-line);
+      }
+      .month.on {
+        background: var(--ember-wash);
+        color: var(--ember-soft);
+        border-color: rgba(232, 147, 92, 0.42);
+        box-shadow: 0 0 14px var(--ember-glow);
+      }
+      .month.empty {
+        color: var(--paper-ghost);
+        background: transparent;
+        border-color: transparent;
+      }
+
+      .depth-hint {
+        margin-top: 10px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 10px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--paper-fade);
+      }
+
+      /* ─── inline section actions (search affordance in h5) */
+      .h5-action {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        color: var(--ember);
+        font-weight: 500;
+        letter-spacing: -0.005em;
+        text-transform: none;
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-size: 11.5px;
+      }
+      .h5-action .glyph {
+        opacity: 0.85;
+      }
+
+      /* ─── scale principles block */
+      .scale-block {
+        margin: 112px 0 80px;
+        padding: 56px 60px;
+        border: 1px solid var(--ink-line);
+        border-radius: 28px;
+        background:
+          radial-gradient(700px 300px at 80% 0%, rgba(232, 147, 92, 0.06), transparent 60%),
+          linear-gradient(180deg, #14110e 0%, #0a0907 100%);
+        display: grid;
+        grid-template-columns: 1fr 1.2fr;
+        gap: 72px;
+        align-items: start;
+        position: relative;
+        overflow: hidden;
+      }
+      .scale-block::before {
+        content: '';
+        position: absolute;
+        top: -40px;
+        right: -40px;
+        width: 240px;
+        height: 240px;
+        border: 1px solid rgba(232, 147, 92, 0.1);
+        border-radius: 50%;
+      }
+      .scale-block::after {
+        content: '';
+        position: absolute;
+        top: -80px;
+        right: -80px;
+        width: 320px;
+        height: 320px;
+        border: 1px solid rgba(232, 147, 92, 0.05);
+        border-radius: 50%;
+      }
+      .scale-block h2 {
+        font-family: 'Fraunces', serif;
+        font-weight: 300;
+        font-size: 52px;
+        line-height: 1;
+        letter-spacing: -0.028em;
+        margin: 16px 0 0;
+        color: var(--paper);
+      }
+      .scale-block h2 em {
+        font-style: italic;
+        color: var(--ember);
+      }
+      .scale-block p {
+        color: var(--paper-dim);
+        font-size: 14.5px;
+        line-height: 1.6;
+        max-width: 50ch;
+      }
+      .scale-numbers {
+        margin-top: 32px;
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 18px;
+      }
+      .scale-num {
+        border-top: 1px solid var(--ink-line);
+        padding-top: 14px;
+      }
+      .scale-num b {
+        font-family: 'Fraunces', serif;
+        font-style: italic;
+        font-weight: 400;
+        font-size: 32px;
+        letter-spacing: -0.02em;
+        color: var(--paper);
+        display: block;
+        line-height: 1.05;
+      }
+      .scale-num span {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 10px;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        color: var(--paper-fade);
+        font-weight: 500;
+      }
+
+      .principles {
+        display: grid;
+        gap: 18px;
+      }
+      .principle {
+        display: grid;
+        grid-template-columns: 42px 1fr;
+        gap: 18px;
+        padding: 20px 22px;
+        background: rgba(20, 17, 16, 0.55);
+        border: 1px solid var(--ink-line);
+        border-radius: 14px;
+        backdrop-filter: blur(12px);
+      }
+      .principle .num {
+        font-family: 'Fraunces', serif;
+        font-style: italic;
+        font-weight: 400;
+        font-size: 26px;
+        color: var(--ember);
+        line-height: 1;
+      }
+      .principle h4 {
+        margin: 0 0 6px;
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--paper);
+        letter-spacing: -0.005em;
+      }
+      .principle p {
+        margin: 0;
+        font-size: 13px;
+        color: var(--paper-dim);
+        line-height: 1.55;
+        max-width: none;
+      }
+
+      /* ─── overflow picker stage layout (2×2 grid) */
+      .pickers-intro {
+        max-width: 900px;
+        margin: 0 auto 56px;
+        text-align: center;
+      }
+      .pickers-intro h3 {
+        font-family: 'Fraunces', serif;
+        font-weight: 300;
+        font-size: 44px;
+        line-height: 1.03;
+        letter-spacing: -0.025em;
+        margin: 14px 0 14px;
+        color: var(--paper);
+      }
+      .pickers-intro h3 em {
+        font-style: italic;
+        color: var(--ember);
+      }
+      .pickers-intro p {
+        color: var(--paper-dim);
+        font-size: 15px;
+        line-height: 1.6;
+        max-width: 56ch;
+        margin: 0 auto;
+      }
+
+      .pickers-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 96px 72px;
+        justify-items: center;
+        max-width: 1040px;
+        margin-left: auto;
+        margin-right: auto;
+      }
+
+      /* tag / place list rows */
+      .tag-row {
+        display: grid;
+        grid-template-columns: 40px 1fr auto;
+        gap: 12px;
+        align-items: center;
+        padding: 11px 4px;
+        border-bottom: 1px solid var(--ink-line);
+      }
+      .tag-row .swatch {
+        width: 14px;
+        height: 14px;
+        border-radius: 4px;
+        justify-self: center;
+      }
+      .tag-row.on .swatch {
+        box-shadow:
+          0 0 0 2px rgba(232, 147, 92, 0.3),
+          0 0 10px currentColor;
+      }
+      .tag-row .flag {
+        justify-self: center;
+        width: 28px;
+        height: 28px;
+        display: grid;
+        place-items: center;
+        font-size: 22px;
+        line-height: 1;
+        filter: saturate(0.9);
+      }
+      .tag-row .nm {
+        font-size: 13.5px;
+        font-weight: 500;
+        color: var(--paper);
+        letter-spacing: -0.005em;
+      }
+      .tag-row.on .nm {
+        color: var(--ember-soft);
+      }
+      .tag-row .nm small {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 10px;
+        color: var(--paper-fade);
+        font-weight: 400;
+        letter-spacing: 0.08em;
+        display: block;
+        margin-top: 3px;
+      }
+      .tag-row .check {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        border: 1.5px solid var(--ink-line-strong);
+        display: grid;
+        place-items: center;
+        color: transparent;
+      }
+      .tag-row.on .check {
+        background: var(--ember);
+        border-color: var(--ember);
+        color: #1a0e05;
+      }
+
+      /* when picker specifics */
+      .quickpills-row {
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        scrollbar-width: none;
+        padding-bottom: 4px;
+      }
+      .quickpills-row::-webkit-scrollbar {
+        display: none;
+      }
+      .decade-strip {
+        display: flex;
+        gap: 6px;
+        padding: 0 18px 6px;
+        overflow-x: auto;
+        scrollbar-width: none;
+      }
+      .decade-strip::-webkit-scrollbar {
+        display: none;
+      }
+      .decade {
+        flex: 0 0 auto;
+        padding: 7px 14px;
+        border-radius: 999px;
+        background: var(--ink-raise);
+        border: 1px solid var(--ink-line-strong);
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 10.5px;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        color: var(--paper-dim);
+      }
+      .decade.on {
+        background: var(--ember-wash);
+        border-color: rgba(232, 147, 92, 0.5);
+        color: var(--ember-soft);
+      }
+      .when-scroll {
+        flex: 1 1 auto;
+        overflow-y: auto;
+        padding: 0 16px 80px;
+      }
+      .when-scroll .year-list {
+        border: none;
+        border-radius: 0;
+        background: transparent;
+      }
+      .when-scroll .year-row {
+        border-bottom: 1px solid var(--ink-line);
+      }
+      .when-scroll .month-grid {
+        background: var(--ink-deep);
+        border-radius: 10px;
+        margin: 4px 0 4px;
+        padding: 10px;
+      }
+      .when-footer {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        padding: 14px 18px 20px;
+        background: linear-gradient(180deg, rgba(10, 9, 7, 0) 0%, rgba(10, 9, 7, 0.96) 40%);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        z-index: 5;
+      }
+      .when-footer .selection {
+        font-family: 'Fraunces', serif;
+        font-weight: 400;
+        font-size: 20px;
+        letter-spacing: -0.01em;
+        color: var(--paper);
+      }
+      .when-footer .selection small {
+        display: block;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 9.5px;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        color: var(--paper-fade);
+        font-weight: 500;
+        margin-top: 3px;
+      }
+      .when-footer .apply-small {
+        background: var(--ember);
+        color: #1a0e05;
+        border: 0;
+        border-radius: 14px;
+        padding: 11px 16px;
+        font-weight: 700;
+        font-size: 13px;
+        font-family: 'Plus Jakarta Sans';
+        box-shadow: 0 8px 22px -6px var(--ember-glow);
+      }
+
+      /* segmented for places */
+      .place-seg {
+        margin: 4px 16px 0;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        border-radius: 10px;
+        overflow: hidden;
+        background: var(--ink-raise);
+        border: 1px solid var(--ink-line);
+      }
+      .place-seg div {
+        text-align: center;
+        padding: 8px 0;
+        font-family: 'Plus Jakarta Sans';
+        font-size: 11.5px;
+        font-weight: 500;
+        color: var(--paper-dim);
+        border-right: 1px solid var(--ink-line);
+      }
+      .place-seg div:last-child {
+        border-right: 0;
+      }
+      .place-seg div.on {
+        background: var(--ember-wash);
+        color: var(--ember-soft);
+        box-shadow: inset 0 -2px 0 0 var(--ember);
+      }
+
+      /* ─── full-screen overflow picker */
+      .picker-route {
+        position: absolute;
+        inset: 0;
+        background: var(--obsidian);
+        display: flex;
+        flex-direction: column;
+        z-index: 40;
+        overflow: hidden;
+      }
+      .picker-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 56px 18px 14px;
+        border-bottom: 1px solid var(--ink-line);
+      }
+      .picker-head .back {
+        width: 34px;
+        height: 34px;
+        display: grid;
+        place-items: center;
+        color: var(--paper);
+      }
+      .picker-head h5 {
+        margin: 0;
+        font-family: 'Fraunces', serif;
+        font-weight: 400;
+        font-size: 20px;
+        letter-spacing: -0.01em;
+        color: var(--paper);
+      }
+      .picker-head .done {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 10.5px;
+        font-weight: 600;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        color: var(--ember);
+        background: none;
+        border: none;
+        padding: 6px 4px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .picker-head .done b {
+        background: var(--ember-wash);
+        border: 1px solid rgba(232, 147, 92, 0.4);
+        padding: 3px 8px;
+        border-radius: 999px;
+        color: var(--ember-soft);
+        letter-spacing: 0.04em;
+      }
+
+      .picker-search {
+        margin: 14px 16px 0;
+        height: 44px;
+        border-radius: 14px;
+        background: var(--ink-raise);
+        border: 1px solid var(--ink-line-strong);
+        padding: 0 14px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--paper);
+        font-size: 13.5px;
+      }
+      .picker-search .typed {
+        color: var(--paper);
+        font-weight: 500;
+      }
+      .picker-search .cursor {
+        width: 1.5px;
+        height: 18px;
+        background: var(--ember);
+        animation: blink 1s steps(1) infinite;
+        margin-left: -2px;
+      }
+      .picker-search .match {
+        margin-left: auto;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 10.5px;
+        color: var(--paper-fade);
+        letter-spacing: 0.1em;
+      }
+      @keyframes blink {
+        50% {
+          opacity: 0;
+        }
+      }
+
+      .selected-row {
+        display: flex;
+        gap: 6px;
+        padding: 12px 16px 4px;
+        overflow-x: auto;
+        scrollbar-width: none;
+      }
+      .selected-row::-webkit-scrollbar {
+        display: none;
+      }
+      .sel-chip {
+        flex: 0 0 auto;
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 4px 10px 4px 4px;
+        border-radius: 999px;
+        background: var(--ember-wash);
+        border: 1px solid rgba(232, 147, 92, 0.4);
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--ember-soft);
+      }
+      .sel-chip img {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        object-fit: cover;
+      }
+      .sel-chip .x {
+        color: var(--ember);
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 11px;
+        margin-left: 2px;
+        opacity: 0.85;
+      }
+
+      .picker-section {
+        padding: 16px 18px 8px;
+      }
+      .picker-section-label {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 10px;
+        letter-spacing: 0.28em;
+        text-transform: uppercase;
+        color: var(--paper-fade);
+        font-weight: 600;
+        margin-bottom: 10px;
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+      }
+      .picker-section-label em {
+        font-style: normal;
+        color: var(--ember);
+        letter-spacing: 0.1em;
+      }
+
+      .recent-row {
+        display: flex;
+        gap: 12px;
+        overflow-x: auto;
+        scrollbar-width: none;
+        padding-bottom: 4px;
+      }
+      .recent-row::-webkit-scrollbar {
+        display: none;
+      }
+
+      /* alpha-grouped list */
+      .people-list {
+        flex: 1 1 auto;
+        overflow-y: auto;
+        padding: 6px 40px 0 18px;
+        position: relative;
+      }
+      .alpha-label {
+        position: sticky;
+        top: 0;
+        background: linear-gradient(180deg, var(--obsidian) 75%, rgba(10, 9, 7, 0.7));
+        padding: 10px 4px 6px;
+        font-family: 'Fraunces', serif;
+        font-size: 15px;
+        font-weight: 500;
+        color: var(--ember);
+        border-bottom: 1px solid var(--ink-line);
+        letter-spacing: -0.01em;
+        z-index: 2;
+      }
+      .alpha-label span {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 9px;
+        font-weight: 500;
+        letter-spacing: 0.22em;
+        color: var(--paper-fade);
+        margin-left: 8px;
+        text-transform: uppercase;
+      }
+
+      .people-row {
+        display: grid;
+        grid-template-columns: 40px 1fr auto;
+        gap: 12px;
+        align-items: center;
+        padding: 10px 4px;
+        border-bottom: 1px solid var(--ink-line);
+      }
+      .people-row .img {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background-size: cover;
+        background-position: center;
+      }
+      .people-row.on .img {
+        box-shadow:
+          0 0 0 2px var(--ember),
+          0 0 12px var(--ember-glow);
+      }
+      .people-row .nm {
+        font-size: 13.5px;
+        font-weight: 500;
+        color: var(--paper);
+        letter-spacing: -0.005em;
+      }
+      .people-row.on .nm {
+        color: var(--ember-soft);
+      }
+      .people-row .nm small {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 10px;
+        color: var(--paper-fade);
+        font-weight: 400;
+        letter-spacing: 0.08em;
+        display: block;
+        margin-top: 3px;
+      }
+      .people-row .check {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        border: 1.5px solid var(--ink-line-strong);
+        display: grid;
+        place-items: center;
+        color: transparent;
+      }
+      .people-row.on .check {
+        background: var(--ember);
+        border-color: var(--ember);
+        color: #1a0e05;
+      }
+
+      .scrubber {
+        position: absolute;
+        right: 6px;
+        top: 50%;
+        transform: translateY(-46%);
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 8.5px;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        color: var(--paper-fade);
+        padding: 10px 3px;
+        background: rgba(20, 17, 16, 0.7);
+        border-radius: 999px;
+        border: 1px solid var(--ink-line);
+        z-index: 10;
+        backdrop-filter: blur(8px);
+      }
+      .scrubber i {
+        font-style: normal;
+        padding: 1px 4px;
+        border-radius: 4px;
+        line-height: 1.35;
+      }
+      .scrubber i.on {
+        background: var(--ember);
+        color: #1a0e05;
+        box-shadow: 0 0 10px var(--ember-glow);
+      }
+      .scrubber i.muted {
+        color: var(--paper-ghost);
+      }
+
+      /* ─── state indicator underneath each phone */
+      .state-card {
+        margin-top: 20px;
+        padding: 14px 18px;
+        background: var(--ink-deep);
+        border: 1px solid var(--ink-line);
+        border-radius: 14px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        color: var(--paper-dim);
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        width: 100%;
+      }
+      .state-card b {
+        color: var(--paper);
+        letter-spacing: 0.08em;
+        font-weight: 500;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="deck">
+      <header class="masthead">
+        <div>
+          <span class="kicker">Gallery · Mobile · Design Mockup</span>
+          <h1 class="display">Filter <em>sheet</em>.<br />Three snap states.</h1>
+        </div>
+        <div>
+          <p class="lede">
+            <strong>Option B, designed.</strong> The Search tab is retired. Filtering becomes a bottom sheet summoned
+            from the Photos tab — content-first, layered over the timeline, with live results as you sculpt.
+          </p>
+          <dl class="masthead-meta">
+            <div>
+              <dt>Direction</dt>
+              <dd>Darkroom warmth · ember accent</dd>
+            </div>
+            <div>
+              <dt>Typography</dt>
+              <dd>Fraunces · Plus Jakarta Sans · JetBrains Mono</dd>
+            </div>
+            <div>
+              <dt>Scope</dt>
+              <dd>Photos tab · main library only</dd>
+            </div>
+          </dl>
+        </div>
+      </header>
+
+      <section class="stages">
+        <!-- ─────────────────────── SNAP 01 · PEEK ─────────────────────── -->
+        <figure class="stage">
+          <div class="stage-caption">
+            <div class="tag">Snap 01 <span>· Peek</span></div>
+            <h2>Always-visible active filters</h2>
+            <p>
+              Sheet sits flush above the nav. The photo grid stays dominant. Tap a chip's × to drop a filter and the
+              grid reflows instantly.
+            </p>
+          </div>
+
+          <div class="phone">
+            <div class="screen">
+              <!-- status bar -->
+              <div class="statusbar">
+                <span>9:41</span>
+                <div class="dots">
+                  <i></i><i></i><i></i>
+                  <span style="margin-left: 8px">
+                    <span class="battery"></span>
+                  </span>
+                </div>
+              </div>
+
+              <!-- app bar -->
+              <div class="appbar">
+                <h3><small>Your library</small>Photos</h3>
+                <div style="display: flex; gap: 10px; align-items: center">
+                  <div class="ico" aria-hidden="true">
+                    <!-- sort -->
+                    <svg
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.6"
+                      stroke-linecap="round"
+                    >
+                      <path d="M6 8h12M8 12h8M10 16h4" />
+                    </svg>
+                  </div>
+                  <div class="avatar"></div>
+                </div>
+              </div>
+
+              <!-- grid backdrop -->
+              <div class="grid">
+                <div class="tile t-big"><img src="https://picsum.photos/seed/gallery11/320/320" alt="" /></div>
+                <div class="tile"><img src="https://picsum.photos/seed/gallery12/200/200" alt="" /></div>
+                <div class="tile"><img src="https://picsum.photos/seed/gallery13/200/200" alt="" /></div>
+                <div class="tile t-wide"><img src="https://picsum.photos/seed/gallery14/320/160" alt="" /></div>
+                <div class="tile"><img src="https://picsum.photos/seed/gallery15/200/200" alt="" /></div>
+                <div class="tile"><img src="https://picsum.photos/seed/gallery16/200/200" alt="" /></div>
+                <div class="tile t-tall"><img src="https://picsum.photos/seed/gallery17/200/320" alt="" /></div>
+                <div class="tile"><img src="https://picsum.photos/seed/gallery18/200/200" alt="" /></div>
+                <div class="tile"><img src="https://picsum.photos/seed/gallery19/200/200" alt="" /></div>
+                <div class="tile"><img src="https://picsum.photos/seed/gallery20/200/200" alt="" /></div>
+              </div>
+
+              <!-- peek sheet -->
+              <div class="sheet" style="padding-bottom: 94px">
+                <div class="sheet-handle">
+                  <div class="grip amber"></div>
+                  <div class="sheet-count"><b>1,247</b> photos matched · 4 filters</div>
+                </div>
+                <div class="chiprail">
+                  <div class="chip on">
+                    <span class="chip-thumb-group">
+                      <img class="chip-thumb" src="https://i.pravatar.cc/64?img=1" />
+                      <img class="chip-thumb" src="https://i.pravatar.cc/64?img=32" />
+                      <img class="chip-thumb" src="https://i.pravatar.cc/64?img=48" />
+                    </span>
+                    Emma, Lars +1
+                    <span class="x">×</span>
+                  </div>
+                  <div class="chip on">
+                    <span class="dot"></span>
+                    Paris
+                    <span class="x">×</span>
+                  </div>
+                  <div class="chip on">
+                    ★ 4 & up
+                    <span class="x">×</span>
+                  </div>
+                  <div class="chip on">
+                    <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.14em"
+                      >NOV 2024</span
+                    >
+                    <span class="x">×</span>
+                  </div>
+                  <div class="chip">
+                    <span style="color: var(--paper-fade)">+ Add filter</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- nav -->
+              <div class="nav">
+                <div class="item active">
+                  <div class="ico">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                      <path
+                        d="M4 5a2 2 0 012-2h12a2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm14 0H6v11l3.4-3.4a1 1 0 011.4 0l2 2 3.2-4a1 1 0 011.6 0L18 13.4V5zm-5 3a2 2 0 114 0 2 2 0 01-4 0z"
+                      />
+                    </svg>
+                  </div>
+                  <span>Photos</span>
+                </div>
+                <div class="item">
+                  <div class="ico">
+                    <svg
+                      width="22"
+                      height="22"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.6"
+                    >
+                      <rect x="3" y="5" width="8" height="7" rx="2" />
+                      <rect x="13" y="5" width="8" height="14" rx="2" />
+                      <rect x="3" y="14" width="8" height="5" rx="2" />
+                    </svg>
+                  </div>
+                  <span>Spaces</span>
+                </div>
+                <div class="item">
+                  <div class="ico">
+                    <svg
+                      width="22"
+                      height="22"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.6"
+                    >
+                      <path d="M4 6h16M4 12h16M4 18h10" />
+                    </svg>
+                  </div>
+                  <span>Library</span>
+                </div>
+              </div>
+
+              <div
+                class="scrim"
+                style="
+                  background: linear-gradient(
+                    180deg,
+                    rgba(10, 9, 7, 0) 60%,
+                    rgba(10, 9, 7, 0.55) 85%,
+                    rgba(10, 9, 7, 0.92) 100%
+                  );
+                "
+              ></div>
+            </div>
+          </div>
+
+          <div class="state-card">
+            <span>HEIGHT <b>~ 15% screen</b></span>
+            <span>VISIBLE <b>Grid + active chips + nav</b></span>
+            <span>ENTRY <b>Appears automatically if any filter is active</b></span>
+          </div>
+
+          <div class="stage-notes">
+            <div class="note">
+              <div class="n">a</div>
+              <div>
+                <h6>Amber sheet-handle</h6>
+                <p>Single-surface accent. Doubles as tap-target to expand. Glow-shadow hints at "live".</p>
+              </div>
+            </div>
+            <div class="note">
+              <div class="n">b</div>
+              <div>
+                <h6>Match count, always on</h6>
+                <p>Monospaced numerals. Users always know what their filter is doing before they expand.</p>
+              </div>
+            </div>
+            <div class="note">
+              <div class="n">c</div>
+              <div>
+                <h6>Nav reduced to three</h6>
+                <p>Search tab retired. Photos · Spaces · Library. The filter pill <em>is</em> the search.</p>
+              </div>
+            </div>
+          </div>
+        </figure>
+
+        <!-- ─────────────────────── SNAP 02 · BROWSE ─────────────────────── -->
+        <figure class="stage">
+          <div class="stage-caption">
+            <div class="tag">Snap 02 <span>· Browse</span></div>
+            <h2>Thumb-first filter strips</h2>
+            <p>
+              People and places are photographs, not names. Horizontal scroll feels native. ~80% of queries complete in
+              this snap.
+            </p>
+          </div>
+
+          <div class="phone">
+            <div class="screen">
+              <div class="statusbar">
+                <span>9:41</span>
+                <div class="dots">
+                  <i></i><i></i><i></i>
+                  <span style="margin-left: 8px"><span class="battery"></span></span>
+                </div>
+              </div>
+
+              <!-- grid backdrop (behind scrim) -->
+              <div class="grid" style="filter: blur(2px) brightness(0.5)">
+                <div class="tile t-big"><img src="https://picsum.photos/seed/gallery21/320/320" alt="" /></div>
+                <div class="tile"><img src="https://picsum.photos/seed/gallery22/200/200" alt="" /></div>
+                <div class="tile"><img src="https://picsum.photos/seed/gallery23/200/200" alt="" /></div>
+                <div class="tile t-wide"><img src="https://picsum.photos/seed/gallery24/320/160" alt="" /></div>
+                <div class="tile"><img src="https://picsum.photos/seed/gallery25/200/200" alt="" /></div>
+                <div class="tile"><img src="https://picsum.photos/seed/gallery26/200/200" alt="" /></div>
+              </div>
+
+              <div class="scrim"></div>
+
+              <div class="sheet browse">
+                <div class="sheet-handle">
+                  <div class="grip amber"></div>
+                  <div class="sheet-count"><b>1,247</b> photos matched · drag to expand</div>
+                </div>
+
+                <div class="search">
+                  <svg
+                    class="glyph"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                  >
+                    <circle cx="11" cy="11" r="6" />
+                    <path d="M20 20l-3.5-3.5" />
+                  </svg>
+                  <span>Search photos, faces, text…</span>
+                </div>
+
+                <!-- people strip -->
+                <div class="strip">
+                  <div class="strip-head">
+                    <span class="label"
+                      >People <b style="color: var(--ember); letter-spacing: 0.1em; margin-left: 4px">· 3</b></span
+                    >
+                    <span class="more">See all 84 →</span>
+                  </div>
+                  <div class="strip-row">
+                    <div class="peep on">
+                      <div class="img" style="background-image: url('https://i.pravatar.cc/100?img=1')"></div>
+                      <span class="name">Emma</span>
+                    </div>
+                    <div class="peep on">
+                      <div class="img" style="background-image: url('https://i.pravatar.cc/100?img=32')"></div>
+                      <span class="name">Lars</span>
+                    </div>
+                    <div class="peep on">
+                      <div class="img" style="background-image: url('https://i.pravatar.cc/100?img=48')"></div>
+                      <span class="name">Kai</span>
+                    </div>
+                    <div class="peep">
+                      <div class="img" style="background-image: url('https://i.pravatar.cc/100?img=9')"></div>
+                      <span class="name">Inge</span>
+                    </div>
+                    <div class="peep">
+                      <div class="img" style="background-image: url('https://i.pravatar.cc/100?img=12')"></div>
+                      <span class="name">Nils</span>
+                    </div>
+                    <div class="peep">
+                      <div class="img" style="background-image: url('https://i.pravatar.cc/100?img=20')"></div>
+                      <span class="name">Sofie</span>
+                    </div>
+                    <div class="peep">
+                      <div class="img" style="background-image: url('https://i.pravatar.cc/100?img=44')"></div>
+                      <span class="name">Jonas</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- places strip -->
+                <div class="strip">
+                  <div class="strip-head">
+                    <span class="label"
+                      >Places <b style="color: var(--ember); letter-spacing: 0.1em; margin-left: 4px">· 1</b></span
+                    >
+                    <span class="more">All countries →</span>
+                  </div>
+                  <div class="strip-row">
+                    <div class="place on">
+                      <img src="https://picsum.photos/seed/paris/240/160" />
+                      <div class="overlay"><b>Paris</b><em>France · 412</em></div>
+                    </div>
+                    <div class="place">
+                      <img src="https://picsum.photos/seed/oslo/240/160" />
+                      <div class="overlay"><b>Oslo</b><em>Norway · 288</em></div>
+                    </div>
+                    <div class="place">
+                      <img src="https://picsum.photos/seed/nyc/240/160" />
+                      <div class="overlay"><b>New York</b><em>USA · 176</em></div>
+                    </div>
+                    <div class="place">
+                      <img src="https://picsum.photos/seed/tokyo/240/160" />
+                      <div class="overlay"><b>Tokyo</b><em>Japan · 98</em></div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- tags -->
+                <div class="strip">
+                  <div class="strip-head">
+                    <span class="label">Tags</span>
+                    <span class="more">Browse →</span>
+                  </div>
+                  <div class="strip-row">
+                    <div class="tag-pill">sunset <span class="count">312</span></div>
+                    <div class="tag-pill on">candid <span class="count">186</span></div>
+                    <div class="tag-pill">portrait <span class="count">144</span></div>
+                    <div class="tag-pill">beach <span class="count">92</span></div>
+                    <div class="tag-pill">travel <span class="count">88</span></div>
+                    <div class="tag-pill">architecture <span class="count">60</span></div>
+                  </div>
+                </div>
+
+                <!-- when -->
+                <div class="strip">
+                  <div class="strip-head">
+                    <span class="label"
+                      >When <b style="color: var(--ember); letter-spacing: 0.1em; margin-left: 4px">· Nov 2024</b></span
+                    >
+                  </div>
+                  <div class="strip-row">
+                    <div class="when-pill"><span class="cal">TODAY</span></div>
+                    <div class="when-pill"><span class="cal">THIS WEEK</span></div>
+                    <div class="when-pill"><span class="cal">2026</span></div>
+                    <div class="when-pill on"><span class="cal">NOV · 2024</span></div>
+                    <div class="when-pill">Custom…</div>
+                  </div>
+                </div>
+
+                <div class="sheet-footer">
+                  <div class="count">1,247<span>photos</span></div>
+                  <button class="reset">Reset all</button>
+                </div>
+              </div>
+
+              <!-- nav -->
+              <div class="nav" style="opacity: 0.35">
+                <div class="item active">
+                  <div class="ico">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                      <path
+                        d="M4 5a2 2 0 012-2h12a2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm14 0H6v11l3.4-3.4a1 1 0 011.4 0l2 2 3.2-4a1 1 0 011.6 0L18 13.4V5z"
+                      />
+                    </svg>
+                  </div>
+                  <span>Photos</span>
+                </div>
+                <div class="item">
+                  <div class="ico">
+                    <svg
+                      width="22"
+                      height="22"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.6"
+                    >
+                      <rect x="3" y="5" width="8" height="7" rx="2" />
+                      <rect x="13" y="5" width="8" height="14" rx="2" />
+                      <rect x="3" y="14" width="8" height="5" rx="2" />
+                    </svg>
+                  </div>
+                  <span>Spaces</span>
+                </div>
+                <div class="item">
+                  <div class="ico">
+                    <svg
+                      width="22"
+                      height="22"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.6"
+                    >
+                      <path d="M4 6h16M4 12h16M4 18h10" />
+                    </svg>
+                  </div>
+                  <span>Library</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="state-card">
+            <span>HEIGHT <b>~ 62% screen</b></span>
+            <span>VISIBLE <b>Text input · 4 thumb strips · live count</b></span>
+            <span>DYNAMIC <b>Counts narrow as filters compose (faceted)</b></span>
+          </div>
+
+          <div class="stage-notes">
+            <div class="note">
+              <div class="n">a</div>
+              <div>
+                <h6>Thumbnail-first strips</h6>
+                <p>
+                  People = circular thumbs. Places = rectangular tiles with country overlay. Names as caption, never
+                  hero.
+                </p>
+              </div>
+            </div>
+            <div class="note">
+              <div class="n">b</div>
+              <div>
+                <h6>Live faceted counts</h6>
+                <p>
+                  Per-item counts reflect the current filter composition, not library totals. From the unified
+                  suggestions endpoint.
+                </p>
+              </div>
+            </div>
+            <div class="note">
+              <div class="n">c</div>
+              <div>
+                <h6>"See all →" escape hatches</h6>
+                <p>Each strip links to the Deep state, focused on that section. No dead-ends in the shallow pass.</p>
+              </div>
+            </div>
+          </div>
+        </figure>
+
+        <!-- ─────────────────────── SNAP 03 · DEEP ─────────────────────── -->
+        <figure class="stage">
+          <div class="stage-caption">
+            <div class="tag">Snap 03 <span>· Deep</span></div>
+            <h2>Every control, full screen</h2>
+            <p>
+              Full-screen sheet for power queries. Custom year/month picker, cascading places, searchable tags, rating,
+              media type.
+            </p>
+          </div>
+
+          <div class="phone">
+            <div class="screen">
+              <div class="statusbar">
+                <span>9:41</span>
+                <div class="dots">
+                  <i></i><i></i><i></i>
+                  <span style="margin-left: 8px"><span class="battery"></span></span>
+                </div>
+              </div>
+
+              <div class="sheet deep">
+                <div class="deep-head">
+                  <div class="close">×</div>
+                  <h4>Filter photos</h4>
+                  <button class="reset">Reset</button>
+                </div>
+
+                <div class="deep-body">
+                  <div class="section">
+                    <div class="search" style="margin: 0 0 2px; background: var(--ink-raise-2)">
+                      <svg
+                        class="glyph"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.8"
+                        stroke-linecap="round"
+                      >
+                        <circle cx="11" cy="11" r="6" />
+                        <path d="M20 20l-3.5-3.5" />
+                      </svg>
+                      <span>Search photos, faces, text…</span>
+                    </div>
+                  </div>
+
+                  <div class="section">
+                    <h5>
+                      <span>People <b>3 selected</b></span>
+                      <span class="h5-action">
+                        <svg
+                          class="glyph"
+                          width="12"
+                          height="12"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                        >
+                          <circle cx="11" cy="11" r="6" />
+                          <path d="M20 20l-3.5-3.5" />
+                        </svg>
+                        Search 10,247 →
+                      </span>
+                    </h5>
+                    <div class="people-grid">
+                      <div class="peep on">
+                        <div class="img" style="background-image: url('https://i.pravatar.cc/100?img=1')"></div>
+                        <span class="name">Emma</span>
+                      </div>
+                      <div class="peep on">
+                        <div class="img" style="background-image: url('https://i.pravatar.cc/100?img=32')"></div>
+                        <span class="name">Lars</span>
+                      </div>
+                      <div class="peep on">
+                        <div class="img" style="background-image: url('https://i.pravatar.cc/100?img=48')"></div>
+                        <span class="name">Kai</span>
+                      </div>
+                      <div class="peep">
+                        <div class="img" style="background-image: url('https://i.pravatar.cc/100?img=9')"></div>
+                        <span class="name">Inge</span>
+                      </div>
+                      <div class="peep">
+                        <div class="img" style="background-image: url('https://i.pravatar.cc/100?img=12')"></div>
+                        <span class="name">Nils</span>
+                      </div>
+                      <div class="peep">
+                        <div class="img" style="background-image: url('https://i.pravatar.cc/100?img=20')"></div>
+                        <span class="name">Sofie</span>
+                      </div>
+                      <div class="peep">
+                        <div class="img" style="background-image: url('https://i.pravatar.cc/100?img=44')"></div>
+                        <span class="name">Jonas</span>
+                      </div>
+                      <div class="peep">
+                        <div class="img" style="background-image: url('https://i.pravatar.cc/100?img=50')"></div>
+                        <span class="name">Pelle</span>
+                      </div>
+                      <div class="peep">
+                        <div class="img" style="background-image: url('https://i.pravatar.cc/100?img=7')"></div>
+                        <span class="name">Ida</span>
+                      </div>
+                      <div class="peep">
+                        <div class="img" style="background-image: url('https://i.pravatar.cc/100?img=16')"></div>
+                        <span class="name">Eva</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="section">
+                    <h5>
+                      <span>Places <b>Paris</b></span>
+                      <span class="h5-action">
+                        <svg
+                          class="glyph"
+                          width="12"
+                          height="12"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                        >
+                          <circle cx="11" cy="11" r="6" />
+                          <path d="M20 20l-3.5-3.5" />
+                        </svg>
+                        Search 2,840 →
+                      </span>
+                    </h5>
+                    <div class="cascade">
+                      <div class="cascade-col col-left">
+                        <h6>Country</h6>
+                        <div class="row current">France <span class="n">412</span></div>
+                        <div class="row">Norway <span class="n">288</span></div>
+                        <div class="row">USA <span class="n">176</span></div>
+                        <div class="row">Japan <span class="n">98</span></div>
+                      </div>
+                      <div class="cascade-col col-right">
+                        <h6>City</h6>
+                        <div class="row on">Paris <span class="n">412</span></div>
+                        <div class="row">Marseille <span class="n">84</span></div>
+                        <div class="row">Lyon <span class="n">46</span></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="section">
+                    <h5>
+                      <span>When <b>Nov 2024</b></span>
+                      <span class="h5-action">
+                        <svg
+                          class="glyph"
+                          width="12"
+                          height="12"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                        >
+                          <path d="M4 7h16M4 12h16M4 17h10" />
+                        </svg>
+                        26 years →
+                      </span>
+                    </h5>
+                    <div class="year-list">
+                      <div class="year-row">
+                        <span class="y">2026</span><span class="c">124 photos</span><span class="chev">▸</span>
+                      </div>
+                      <div class="year-row">
+                        <span class="y">2025</span><span class="c">1,402 photos</span><span class="chev">▸</span>
+                      </div>
+                      <div class="year-row on">
+                        <span class="y">2024</span><span class="c">2,188 photos</span><span class="chev">▾</span>
+                      </div>
+                      <div class="month-grid">
+                        <span class="month empty">Jan</span>
+                        <span class="month">Feb</span>
+                        <span class="month">Mar</span>
+                        <span class="month">Apr</span>
+                        <span class="month">May</span>
+                        <span class="month">Jun</span>
+                        <span class="month">Jul</span>
+                        <span class="month">Aug</span>
+                        <span class="month">Sep</span>
+                        <span class="month">Oct</span>
+                        <span class="month on">Nov</span>
+                        <span class="month">Dec</span>
+                      </div>
+                      <div class="year-row">
+                        <span class="y">2023</span><span class="c">1,640 photos</span><span class="chev">▸</span>
+                      </div>
+                      <div class="year-row">
+                        <span class="y">2022</span><span class="c">980 photos</span><span class="chev">▸</span>
+                      </div>
+                      <div class="year-row">
+                        <span class="y">2021</span><span class="c">712 photos</span><span class="chev">▸</span>
+                      </div>
+                    </div>
+                    <div class="depth-hint">+ 20 more years · scroll or tap "26 years →"</div>
+                  </div>
+
+                  <div class="section">
+                    <h5>
+                      <span>Tags <b>candid</b></span>
+                      <span class="h5-action">
+                        <svg
+                          class="glyph"
+                          width="12"
+                          height="12"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                        >
+                          <circle cx="11" cy="11" r="6" />
+                          <path d="M20 20l-3.5-3.5" />
+                        </svg>
+                        All 346 →
+                      </span>
+                    </h5>
+                    <div class="tag-wrap">
+                      <div class="tag-pill">sunset <span class="count">312</span></div>
+                      <div class="tag-pill on">candid <span class="count">186</span></div>
+                      <div class="tag-pill">portrait <span class="count">144</span></div>
+                      <div class="tag-pill">beach <span class="count">92</span></div>
+                      <div class="tag-pill">travel <span class="count">88</span></div>
+                      <div class="tag-pill">architecture <span class="count">60</span></div>
+                      <div class="tag-pill">food <span class="count">52</span></div>
+                      <div class="tag-pill">concert <span class="count">40</span></div>
+                    </div>
+                  </div>
+
+                  <div class="section">
+                    <h5>Rating <b>4 & up</b></h5>
+                    <div class="stars">
+                      <span class="s on">★</span>
+                      <span class="s on">★</span>
+                      <span class="s on">★</span>
+                      <span class="s on">★</span>
+                      <span class="s">★</span>
+                    </div>
+                  </div>
+
+                  <div class="section">
+                    <h5>Media</h5>
+                    <div class="seg">
+                      <div class="on">Photos</div>
+                      <div>Videos</div>
+                      <div>Live</div>
+                    </div>
+                  </div>
+
+                  <div class="section">
+                    <div class="toggle-row">
+                      <div>
+                        <div class="label">Favourites only</div>
+                        <div class="sub">Starred by you</div>
+                      </div>
+                      <div class="switch"></div>
+                    </div>
+                    <div class="toggle-row">
+                      <div>
+                        <div class="label">Not in any album</div>
+                        <div class="sub">Orphaned photos</div>
+                      </div>
+                      <div class="switch"></div>
+                    </div>
+                    <div class="toggle-row">
+                      <div>
+                        <div class="label">Include archived</div>
+                        <div class="sub">Hidden by default</div>
+                      </div>
+                      <div class="switch on"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="apply-bar">
+                  <button class="apply">
+                    <span>Apply filters</span>
+                    <span class="n">1,247 photos</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="state-card">
+            <span>HEIGHT <b>Full screen (under status bar)</b></span>
+            <span>VISIBLE <b>All sections expanded · scroll</b></span>
+            <span>CTA <b>Large amber Apply with live count</b></span>
+          </div>
+
+          <div class="stage-notes">
+            <div class="note">
+              <div class="n">a</div>
+              <div>
+                <h6>Custom year grid · not Material date picker</h6>
+                <p>Each year cell shows its photo count. Empty years ghosted. Tap opens a month grid inline.</p>
+              </div>
+            </div>
+            <div class="note">
+              <div class="n">b</div>
+              <div>
+                <h6>Cascading places, side-by-side</h6>
+                <p>Country column drives city column, iOS-style. No modal-within-modal navigation.</p>
+              </div>
+            </div>
+            <div class="note">
+              <div class="n">c</div>
+              <div>
+                <h6>Persistent Apply bar</h6>
+                <p>
+                  Amber CTA pinned to bottom. Count updates in real time so the user sees the impact of their last
+                  toggle before committing.
+                </p>
+              </div>
+            </div>
+          </div>
+        </figure>
+      </section>
+
+      <!-- ─── scale principles ─────────────────────── -->
+      <section class="scale-block">
+        <div>
+          <span class="kicker">Scale</span>
+          <h2>For libraries <em>decades</em> deep.</h2>
+          <p style="margin-top: 22px">
+            Ten thousand people. Thousands of cities. A quarter-century of photographs. The sheet has to stay honest for
+            a hundred-photo library <em>and</em> a four-hundred-thousand-photo archive. It does that by splitting
+            discovery into two shapes — <strong style="color: var(--paper); font-weight: 500">shallow</strong> in the
+            sheet, <strong style="color: var(--paper); font-weight: 500">deep</strong> in the picker.
+          </p>
+          <div class="scale-numbers">
+            <div class="scale-num"><span>People</span><b>10,247</b></div>
+            <div class="scale-num"><span>Places</span><b>2,840</b></div>
+            <div class="scale-num"><span>Tags</span><b>346</b></div>
+            <div class="scale-num"><span>Years</span><b>26</b></div>
+          </div>
+        </div>
+        <div class="principles">
+          <div class="principle">
+            <div class="num">01</div>
+            <div>
+              <h4>Top-in-sheet · long-tail-in-picker</h4>
+              <p>
+                The sheet strips show the top-N items per dimension — most-photographed faces, most-visited cities,
+                most-used tags, recent years. Anything past that lives in a dedicated full-screen overflow picker,
+                reached via "Search &nbsp;→" or "All N &nbsp;→" on every section. Shallow layer stays fast; deep layer
+                stays thorough.
+              </p>
+            </div>
+          </div>
+          <div class="principle">
+            <div class="num">02</div>
+            <div>
+              <h4>Always-on search · never a dropdown</h4>
+              <p>
+                Overflow pickers lead with a sticky search bar and live match count. Muscle memory is the same for Tags,
+                Places, and People. No nested modals, no "click to reveal" accordions in the picker — the filter answers
+                the keyboard.
+              </p>
+            </div>
+          </div>
+          <div class="principle">
+            <div class="num">03</div>
+            <div>
+              <h4>A–Z scrubber for the thousands</h4>
+              <p>
+                iOS-style alphabetical scrubber pinned on the right edge of the People and Tags pickers. Drag jumps by
+                letter; letters with matches glow ember. For a 10,000-name list, jumping beats scrolling by an order of
+                magnitude.
+              </p>
+            </div>
+          </div>
+          <div class="principle">
+            <div class="num">04</div>
+            <div>
+              <h4>Temporal as accordion, not grid</h4>
+              <p>
+                The Deep sheet's "When" section is a vertical year list with inline month grids. Empty months are
+                ghosted. Scales gracefully from 1 year to 100. Jumping to a specific year also works from the overflow
+                "26 years" route, where every year is reachable in two taps.
+              </p>
+            </div>
+          </div>
+          <div class="principle">
+            <div class="num">05</div>
+            <div>
+              <h4>Context-aware results</h4>
+              <p>
+                Every picker respects the rest of the filter state. Paris is selected ⇒ the People picker only surfaces
+                people with photos in Paris. Same unified-suggestions endpoint the web FilterPanel already uses.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─── overflow picker stage ─────────────────────── -->
+      <section class="stages-overflow">
+        <div class="pickers-intro">
+          <span class="kicker">Overflow pattern</span>
+          <h3>One picker shape.<br /><em>Four data sources.</em></h3>
+          <p>
+            When the long tail is needed, every filter section pushes a dedicated full-screen picker over the sheet.
+            Same search-first, chip-pinned, scrubber-indexed pattern — only the row template and the top section change
+            per dimension.
+          </p>
+        </div>
+
+        <div class="pickers-grid">
+          <!-- ··· People picker ··· -->
+          <figure class="stage">
+            <div class="stage-caption">
+              <div class="tag">Overflow <span>· People</span></div>
+              <h2>10,247 people,<br />one pass</h2>
+              <p>
+                Sticky search with live match count. Selected chips pinned below. Recent strip, then alpha-grouped
+                virtualized list with A–Z scrubber.
+              </p>
+            </div>
+
+            <div class="phone">
+              <div class="screen">
+                <div class="statusbar">
+                  <span>9:41</span>
+                  <div class="dots">
+                    <i></i><i></i><i></i>
+                    <span style="margin-left: 8px"><span class="battery"></span></span>
+                  </div>
+                </div>
+
+                <div class="picker-route">
+                  <div class="picker-head">
+                    <div class="back">
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.8"
+                        stroke-linecap="round"
+                      >
+                        <path d="M15 18l-6-6 6-6" />
+                      </svg>
+                    </div>
+                    <h5>Choose people</h5>
+                    <button class="done">Done <b>3</b></button>
+                  </div>
+
+                  <div class="picker-search">
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="var(--paper-dim)"
+                      stroke-width="1.8"
+                      stroke-linecap="round"
+                    >
+                      <circle cx="11" cy="11" r="6" />
+                      <path d="M20 20l-3.5-3.5" />
+                    </svg>
+                    <span class="typed">Em</span><span class="cursor"></span>
+                    <span class="match">147 match</span>
+                  </div>
+
+                  <div class="selected-row">
+                    <span class="sel-chip"
+                      ><img src="https://i.pravatar.cc/44?img=1" />Emma <span class="x">×</span></span
+                    >
+                    <span class="sel-chip"
+                      ><img src="https://i.pravatar.cc/44?img=32" />Lars <span class="x">×</span></span
+                    >
+                    <span class="sel-chip"
+                      ><img src="https://i.pravatar.cc/44?img=48" />Kai <span class="x">×</span></span
+                    >
+                  </div>
+
+                  <div class="picker-section" style="padding-top: 8px; padding-bottom: 2px">
+                    <div class="picker-section-label">
+                      <span>Recent · last 7 days</span>
+                      <em>◉ tap to add</em>
+                    </div>
+                    <div class="recent-row">
+                      <div class="peep on">
+                        <div class="img" style="background-image: url('https://i.pravatar.cc/100?img=1')"></div>
+                        <span class="name">Emma</span>
+                      </div>
+                      <div class="peep on">
+                        <div class="img" style="background-image: url('https://i.pravatar.cc/100?img=32')"></div>
+                        <span class="name">Lars</span>
+                      </div>
+                      <div class="peep">
+                        <div class="img" style="background-image: url('https://i.pravatar.cc/100?img=12')"></div>
+                        <span class="name">Nils</span>
+                      </div>
+                      <div class="peep">
+                        <div class="img" style="background-image: url('https://i.pravatar.cc/100?img=20')"></div>
+                        <span class="name">Sofie</span>
+                      </div>
+                      <div class="peep">
+                        <div class="img" style="background-image: url('https://i.pravatar.cc/100?img=9')"></div>
+                        <span class="name">Inge</span>
+                      </div>
+                      <div class="peep">
+                        <div class="img" style="background-image: url('https://i.pravatar.cc/100?img=7')"></div>
+                        <span class="name">Ida</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="people-list">
+                    <div class="alpha-label">E<span>14 matches</span></div>
+                    <div class="people-row on">
+                      <div class="img" style="background-image: url('https://i.pravatar.cc/100?img=16')"></div>
+                      <div class="nm">Eva Bergström<small>412 PHOTOS · LAST SEEN YESTERDAY</small></div>
+                      <div class="check">
+                        <svg
+                          width="11"
+                          height="11"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="3"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        >
+                          <path d="M5 12l5 5 10-12" />
+                        </svg>
+                      </div>
+                    </div>
+                    <div class="people-row on">
+                      <div class="img" style="background-image: url('https://i.pravatar.cc/100?img=1')"></div>
+                      <div class="nm">Emma Lindqvist<small>1,184 PHOTOS · 11 SHARED SPACES</small></div>
+                      <div class="check">
+                        <svg
+                          width="11"
+                          height="11"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="3"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        >
+                          <path d="M5 12l5 5 10-12" />
+                        </svg>
+                      </div>
+                    </div>
+                    <div class="people-row">
+                      <div class="img" style="background-image: url('https://i.pravatar.cc/100?img=7')"></div>
+                      <div class="nm">Emil Bjärke<small>68 PHOTOS · 3 SHARED SPACES</small></div>
+                      <div class="check"></div>
+                    </div>
+                    <div class="people-row">
+                      <div class="img" style="background-image: url('https://i.pravatar.cc/100?img=11')"></div>
+                      <div class="nm">Emil Nord<small>41 PHOTOS · LAST SEEN 2022</small></div>
+                      <div class="check"></div>
+                    </div>
+                    <div class="people-row">
+                      <div class="img" style="background-image: url('https://i.pravatar.cc/100?img=25')"></div>
+                      <div class="nm">Emmelie H.<small>23 PHOTOS</small></div>
+                      <div class="check"></div>
+                    </div>
+                    <div class="people-row">
+                      <div class="img" style="background-image: url('https://i.pravatar.cc/100?img=38')"></div>
+                      <div class="nm">Erik Qvist<small>190 PHOTOS</small></div>
+                      <div class="check"></div>
+                    </div>
+                  </div>
+
+                  <div class="scrubber">
+                    <i class="muted">A</i><i class="muted">B</i><i>C</i><i>D</i><i class="on">E</i><i>F</i><i>G</i
+                    ><i>H</i><i>I</i><i class="muted">J</i><i>K</i><i>L</i><i>M</i><i>N</i><i>O</i><i>P</i
+                    ><i class="muted">Q</i><i>R</i><i>S</i><i>T</i><i class="muted">U</i><i class="muted">V</i><i>W</i
+                    ><i class="muted">X</i><i class="muted">Y</i><i class="muted">Z</i>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="state-card">
+              <span>SCALE &nbsp; <b>10,000+ people</b></span>
+              <span>TOP &nbsp; <b>Recent strip · last 7 days</b></span>
+              <span>INDEX &nbsp; <b>A–Z scrubber · muted letters = no matches</b></span>
+            </div>
+          </figure>
+
+          <!-- ··· Tags picker ··· -->
+          <figure class="stage">
+            <div class="stage-caption">
+              <div class="tag">Overflow <span>· Tags</span></div>
+              <h2>346 tags,<br />grouped</h2>
+              <p>
+                Auto-classified categories pinned at the top as chips. Below them, an alpha-sorted virtualized list with
+                coloured swatches for user-defined tags.
+              </p>
+            </div>
+
+            <div class="phone">
+              <div class="screen">
+                <div class="statusbar">
+                  <span>9:41</span>
+                  <div class="dots">
+                    <i></i><i></i><i></i>
+                    <span style="margin-left: 8px"><span class="battery"></span></span>
+                  </div>
+                </div>
+
+                <div class="picker-route">
+                  <div class="picker-head">
+                    <div class="back">
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.8"
+                        stroke-linecap="round"
+                      >
+                        <path d="M15 18l-6-6 6-6" />
+                      </svg>
+                    </div>
+                    <h5>Choose tags</h5>
+                    <button class="done">Done <b>2</b></button>
+                  </div>
+
+                  <div class="picker-search">
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="var(--paper-dim)"
+                      stroke-width="1.8"
+                      stroke-linecap="round"
+                    >
+                      <circle cx="11" cy="11" r="6" />
+                      <path d="M20 20l-3.5-3.5" />
+                    </svg>
+                    <span class="typed">ca</span><span class="cursor"></span>
+                    <span class="match">12 match</span>
+                  </div>
+
+                  <div class="selected-row">
+                    <span class="sel-chip" style="padding-left: 10px"
+                      ><span style="width: 8px; height: 8px; background: var(--ember); border-radius: 2px"></span>candid
+                      <span class="x">×</span></span
+                    >
+                    <span class="sel-chip" style="padding-left: 10px"
+                      ><span style="width: 8px; height: 8px; background: #7bb38d; border-radius: 2px"></span>portrait
+                      <span class="x">×</span></span
+                    >
+                  </div>
+
+                  <div class="picker-section" style="padding-top: 10px; padding-bottom: 2px">
+                    <div class="picker-section-label">
+                      <span>Auto-classified · 12 categories</span>
+                      <em>CLIP</em>
+                    </div>
+                    <div class="quickpills-row" style="padding: 0 0 4px">
+                      <div class="tag-pill">Portraits <span class="count">144</span></div>
+                      <div class="tag-pill">Sunsets <span class="count">312</span></div>
+                      <div class="tag-pill">Food <span class="count">52</span></div>
+                      <div class="tag-pill">Events <span class="count">180</span></div>
+                      <div class="tag-pill">Nature <span class="count">420</span></div>
+                    </div>
+                  </div>
+
+                  <div class="people-list">
+                    <div class="alpha-label">C<span>8 matches</span></div>
+                    <div class="tag-row on">
+                      <div class="swatch" style="background: #e8935c"></div>
+                      <div class="nm">candid<small>186 PHOTOS · USER TAG</small></div>
+                      <div class="check">
+                        <svg
+                          width="11"
+                          height="11"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="3"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        >
+                          <path d="M5 12l5 5 10-12" />
+                        </svg>
+                      </div>
+                    </div>
+                    <div class="tag-row">
+                      <div class="swatch" style="background: #7bb38d"></div>
+                      <div class="nm">camping<small>24 PHOTOS · USER TAG</small></div>
+                      <div class="check"></div>
+                    </div>
+                    <div class="tag-row">
+                      <div class="swatch" style="background: #d46a5c"></div>
+                      <div class="nm">concert<small>40 PHOTOS · USER TAG</small></div>
+                      <div class="check"></div>
+                    </div>
+                    <div class="tag-row">
+                      <div class="swatch" style="background: #b8a060"></div>
+                      <div class="nm">coffee<small>88 PHOTOS · AUTO</small></div>
+                      <div class="check"></div>
+                    </div>
+                    <div class="tag-row">
+                      <div class="swatch" style="background: #6788c4"></div>
+                      <div class="nm">christmas<small>124 PHOTOS · YEARLY</small></div>
+                      <div class="check"></div>
+                    </div>
+                    <div class="tag-row">
+                      <div class="swatch" style="background: #a47cc8"></div>
+                      <div class="nm">cinema<small>18 PHOTOS</small></div>
+                      <div class="check"></div>
+                    </div>
+                    <div class="tag-row">
+                      <div class="swatch" style="background: #6db09f"></div>
+                      <div class="nm">cat<small>240 PHOTOS · PET</small></div>
+                      <div class="check"></div>
+                    </div>
+                  </div>
+
+                  <div class="scrubber">
+                    <i>A</i><i>B</i><i class="on">C</i><i>D</i><i>E</i><i>F</i><i class="muted">G</i><i>H</i
+                    ><i class="muted">I</i><i class="muted">J</i><i class="muted">K</i><i>L</i><i>M</i
+                    ><i class="muted">N</i><i class="muted">O</i><i>P</i><i class="muted">Q</i><i>R</i><i>S</i><i>T</i
+                    ><i class="muted">U</i><i>V</i><i>W</i><i class="muted">X</i><i class="muted">Y</i
+                    ><i class="muted">Z</i>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="state-card">
+              <span>TOP &nbsp; <b>Auto-classified categories · CLIP</b></span>
+              <span>ROWS &nbsp; <b>Colored swatch · name · count · source</b></span>
+              <span>SOURCE &nbsp; <b>USER · AUTO · YEARLY · PET</b></span>
+            </div>
+          </figure>
+
+          <!-- ··· Places picker ··· -->
+          <figure class="stage">
+            <div class="stage-caption">
+              <div class="tag">Overflow <span>· Places</span></div>
+              <h2>2,840 places,<br />by city or country</h2>
+              <p>
+                Segmented control swaps between the <em>city</em> list, the <em>country</em> list, or everything mixed.
+                "Most photographed" strip pins the obvious wins up top.
+              </p>
+            </div>
+
+            <div class="phone">
+              <div class="screen">
+                <div class="statusbar">
+                  <span>9:41</span>
+                  <div class="dots">
+                    <i></i><i></i><i></i>
+                    <span style="margin-left: 8px"><span class="battery"></span></span>
+                  </div>
+                </div>
+
+                <div class="picker-route">
+                  <div class="picker-head">
+                    <div class="back">
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.8"
+                        stroke-linecap="round"
+                      >
+                        <path d="M15 18l-6-6 6-6" />
+                      </svg>
+                    </div>
+                    <h5>Choose places</h5>
+                    <button class="done">Done <b>1</b></button>
+                  </div>
+
+                  <div class="picker-search">
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="var(--paper-dim)"
+                      stroke-width="1.8"
+                      stroke-linecap="round"
+                    >
+                      <circle cx="11" cy="11" r="6" />
+                      <path d="M20 20l-3.5-3.5" />
+                    </svg>
+                    <span class="typed">par</span><span class="cursor"></span>
+                    <span class="match">12 match</span>
+                  </div>
+
+                  <div class="selected-row">
+                    <span class="sel-chip" style="padding: 4px 10px 4px 10px">
+                      <span style="font-size: 13px">🇫🇷</span>
+                      Paris <span style="color: var(--ember); opacity: 0.7">· France</span>
+                      <span class="x">×</span>
+                    </span>
+                  </div>
+
+                  <div class="place-seg">
+                    <div>Countries</div>
+                    <div class="on">Cities</div>
+                    <div>All</div>
+                  </div>
+
+                  <div class="picker-section" style="padding-top: 16px; padding-bottom: 2px">
+                    <div class="picker-section-label">
+                      <span>Most photographed</span>
+                      <em>◉</em>
+                    </div>
+                    <div class="recent-row">
+                      <div class="place on" style="width: 96px; height: 68px">
+                        <img src="https://picsum.photos/seed/paris3/240/160" />
+                        <div class="overlay"><b>Paris</b><em>FR · 412</em></div>
+                      </div>
+                      <div class="place" style="width: 96px; height: 68px">
+                        <img src="https://picsum.photos/seed/oslo3/240/160" />
+                        <div class="overlay"><b>Oslo</b><em>NO · 288</em></div>
+                      </div>
+                      <div class="place" style="width: 96px; height: 68px">
+                        <img src="https://picsum.photos/seed/nyc3/240/160" />
+                        <div class="overlay"><b>NYC</b><em>US · 176</em></div>
+                      </div>
+                      <div class="place" style="width: 96px; height: 68px">
+                        <img src="https://picsum.photos/seed/tok3/240/160" />
+                        <div class="overlay"><b>Tokyo</b><em>JP · 98</em></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="people-list">
+                    <div class="alpha-label">P<span>12 matches</span></div>
+                    <div class="tag-row on">
+                      <div class="flag">🇫🇷</div>
+                      <div class="nm">Paris<small>FRANCE · 412 PHOTOS · 11 SPACES</small></div>
+                      <div class="check">
+                        <svg
+                          width="11"
+                          height="11"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="3"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        >
+                          <path d="M5 12l5 5 10-12" />
+                        </svg>
+                      </div>
+                    </div>
+                    <div class="tag-row">
+                      <div class="flag">🇮🇹</div>
+                      <div class="nm">Parma<small>ITALY · 84 PHOTOS</small></div>
+                      <div class="check"></div>
+                    </div>
+                    <div class="tag-row">
+                      <div class="flag">🇵🇹</div>
+                      <div class="nm">Parede<small>PORTUGAL · 42 PHOTOS</small></div>
+                      <div class="check"></div>
+                    </div>
+                    <div class="tag-row">
+                      <div class="flag">🇫🇷</div>
+                      <div class="nm">Parigné<small>FRANCE · 8 PHOTOS</small></div>
+                      <div class="check"></div>
+                    </div>
+                    <div class="tag-row">
+                      <div class="flag">🇦🇲</div>
+                      <div class="nm">Parghadzor<small>ARMENIA · 18 PHOTOS</small></div>
+                      <div class="check"></div>
+                    </div>
+                    <div class="tag-row">
+                      <div class="flag">🇮🇹</div>
+                      <div class="nm">Partinico<small>ITALY · 12 PHOTOS</small></div>
+                      <div class="check"></div>
+                    </div>
+                  </div>
+
+                  <div class="scrubber">
+                    <i>A</i><i>B</i><i>C</i><i>D</i><i>E</i><i>F</i><i>G</i><i>H</i><i>I</i><i class="muted">J</i
+                    ><i>K</i><i>L</i><i>M</i><i>N</i><i>O</i><i class="on">P</i><i class="muted">Q</i><i>R</i><i>S</i
+                    ><i>T</i><i>U</i><i>V</i><i>W</i><i class="muted">X</i><i class="muted">Y</i><i>Z</i>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="state-card">
+              <span>SEG &nbsp; <b>Countries · Cities · All</b></span>
+              <span>ROWS &nbsp; <b>Flag · city · country · count</b></span>
+              <span>TOP &nbsp; <b>"Most photographed" strip replaces Recent</b></span>
+            </div>
+          </figure>
+
+          <!-- ··· When picker ··· -->
+          <figure class="stage">
+            <div class="stage-caption">
+              <div class="tag">Overflow <span>· When</span></div>
+              <h2>26 years at<br />a glance</h2>
+              <p>
+                Type a year, month, or decade to jump. Quick ranges at top for the obvious cases. A decade strip anchors
+                the accordion so long histories don't feel infinite.
+              </p>
+            </div>
+
+            <div class="phone">
+              <div class="screen">
+                <div class="statusbar">
+                  <span>9:41</span>
+                  <div class="dots">
+                    <i></i><i></i><i></i>
+                    <span style="margin-left: 8px"><span class="battery"></span></span>
+                  </div>
+                </div>
+
+                <div class="picker-route">
+                  <div class="picker-head">
+                    <div class="back">
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.8"
+                        stroke-linecap="round"
+                      >
+                        <path d="M15 18l-6-6 6-6" />
+                      </svg>
+                    </div>
+                    <h5>When</h5>
+                    <button class="done">Done <b>Nov 2024</b></button>
+                  </div>
+
+                  <div class="picker-search">
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="var(--paper-dim)"
+                      stroke-width="1.8"
+                      stroke-linecap="round"
+                    >
+                      <circle cx="11" cy="11" r="6" />
+                      <path d="M20 20l-3.5-3.5" />
+                    </svg>
+                    <span style="color: var(--paper-fade)">Type a year, month, or decade…</span>
+                    <span
+                      class="match"
+                      style="
+                        font-family: 'JetBrains Mono', monospace;
+                        font-size: 10px;
+                        text-transform: uppercase;
+                        letter-spacing: 0.14em;
+                      "
+                      >2000–2026</span
+                    >
+                  </div>
+
+                  <div class="picker-section" style="padding-top: 12px; padding-bottom: 4px">
+                    <div class="picker-section-label">
+                      <span>Quick ranges</span>
+                    </div>
+                    <div class="quickpills-row" style="padding: 0 0 4px">
+                      <div class="when-pill"><span class="cal">TODAY</span></div>
+                      <div class="when-pill"><span class="cal">THIS WEEK</span></div>
+                      <div class="when-pill"><span class="cal">THIS MONTH</span></div>
+                      <div class="when-pill"><span class="cal">THIS YEAR</span></div>
+                      <div class="when-pill">Custom range…</div>
+                    </div>
+                  </div>
+
+                  <div class="picker-section" style="padding-top: 10px; padding-bottom: 0">
+                    <div class="picker-section-label">
+                      <span>Decades</span>
+                      <em>3</em>
+                    </div>
+                  </div>
+                  <div class="decade-strip">
+                    <div class="decade">2000s</div>
+                    <div class="decade">2010s</div>
+                    <div class="decade on">2020s</div>
+                  </div>
+
+                  <div class="when-scroll">
+                    <div class="year-list">
+                      <div class="year-row">
+                        <span class="y">2026</span><span class="c">124 photos</span><span class="chev">▸</span>
+                      </div>
+                      <div class="year-row">
+                        <span class="y">2025</span><span class="c">1,402 photos</span><span class="chev">▸</span>
+                      </div>
+                      <div class="year-row on">
+                        <span class="y">2024</span><span class="c">2,188 photos</span><span class="chev">▾</span>
+                      </div>
+                      <div class="month-grid">
+                        <span class="month empty">Jan</span>
+                        <span class="month">Feb</span>
+                        <span class="month">Mar</span>
+                        <span class="month">Apr</span>
+                        <span class="month">May</span>
+                        <span class="month">Jun</span>
+                        <span class="month">Jul</span>
+                        <span class="month">Aug</span>
+                        <span class="month">Sep</span>
+                        <span class="month">Oct</span>
+                        <span class="month on">Nov</span>
+                        <span class="month">Dec</span>
+                      </div>
+                      <div class="year-row">
+                        <span class="y">2023</span><span class="c">1,640 photos</span><span class="chev">▸</span>
+                      </div>
+                      <div class="year-row">
+                        <span class="y">2022</span><span class="c">980 photos</span><span class="chev">▸</span>
+                      </div>
+                      <div class="year-row">
+                        <span class="y">2021</span><span class="c">712 photos</span><span class="chev">▸</span>
+                      </div>
+                      <div class="year-row">
+                        <span class="y">2020</span><span class="c">544 photos</span><span class="chev">▸</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="when-footer">
+                    <div class="selection">
+                      Nov 2024
+                      <small>2,188 photos that month</small>
+                    </div>
+                    <button class="apply-small">Apply</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="state-card">
+              <span>RANGES &nbsp; <b>Today · Week · Month · Year · Custom</b></span>
+              <span>ANCHOR &nbsp; <b>Decade strip · 3 for this library</b></span>
+              <span>DRILL &nbsp; <b>Tap year → inline month grid</b></span>
+            </div>
+          </figure>
+        </div>
+        <!-- /pickers-grid -->
+      </section>
+
+      <!-- ─── system notes ─────────────────────── -->
+      <footer class="outro">
+        <div>
+          <span class="kicker">Design system</span>
+          <h2>Photography is the decoration.</h2>
+          <p style="color: var(--paper-dim); font-size: 15px; line-height: 1.6; max-width: 48ch; margin-top: 14px">
+            Chrome recedes. The ember accent appears only where it matters — on the sheet handle, on selected filters,
+            on the live count. Everything else is paper ink on obsidian. The mockup uses photography in every strip,
+            because a library search that shows you faces you recognise is faster than one that reads names.
+          </p>
+          <div class="swatches">
+            <div class="swatch" style="background: linear-gradient(180deg, #0a0907, #0a0907)">
+              <span class="name">Obsidian</span>
+              <span class="hex">0A0907</span>
+            </div>
+            <div class="swatch" style="background: linear-gradient(180deg, #1c1815, #141110)">
+              <span class="name">Ink raised</span>
+              <span class="hex">1C1815</span>
+            </div>
+            <div class="swatch" style="background: linear-gradient(180deg, #f5c49a, #e8935c); color: #1a0e05">
+              <span class="name" style="color: #3b1c0c">Ember</span>
+              <span class="hex" style="color: #1a0e05">E8935C</span>
+            </div>
+            <div class="swatch" style="background: linear-gradient(180deg, #f5f1e8, #c8c0af); color: #1a0e05">
+              <span class="name" style="color: #3b2d20">Paper</span>
+              <span class="hex" style="color: #1a0e05">F5F1E8</span>
+            </div>
+          </div>
+        </div>
+        <div>
+          <span class="kicker">Typography</span>
+          <div class="typeset">
+            <div class="type-row">
+              <div class="lbl">Display</div>
+              <div class="sam display">Your library, <em>sculpted</em>.</div>
+            </div>
+            <div class="type-row">
+              <div class="lbl">Body · sans</div>
+              <div class="sam body">Photos that felt impossible to find are now a pull-and-poke away.</div>
+            </div>
+            <div class="type-row">
+              <div class="lbl">Numerals · mono</div>
+              <div class="sam mono">1,247 · NOV 2024 · ★ 4+ · FRANCE 412</div>
+            </div>
+          </div>
+        </div>
+      </footer>
+    </div>
+  </body>
+</html>
