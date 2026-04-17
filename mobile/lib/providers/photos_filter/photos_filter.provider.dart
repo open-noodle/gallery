@@ -46,4 +46,7 @@ class PhotosFilterNotifier extends Notifier<SearchFilter> {
 
   void setFavouritesOnly(bool v) =>
       state = state.copyWith(display: state.display.copyWith(isFavorite: v));
+
+  void setArchivedIncluded(bool v) =>
+      state = state.copyWith(display: state.display.copyWith(isArchive: v));
 }

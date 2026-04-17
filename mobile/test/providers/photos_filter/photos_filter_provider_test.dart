@@ -153,4 +153,14 @@ void main() {
       expect(container.read(photosFilterProvider).display.isFavorite, false);
     });
   });
+
+  group('setArchivedIncluded', () {
+    test('toggles archive flag', () {
+      final notifier = container.read(photosFilterProvider.notifier);
+      notifier.setArchivedIncluded(true);
+      expect(container.read(photosFilterProvider).display.isArchive, true);
+      notifier.setArchivedIncluded(false);
+      expect(container.read(photosFilterProvider).display.isArchive, false);
+    });
+  });
 }
