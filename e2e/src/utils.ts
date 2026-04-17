@@ -1,4 +1,7 @@
 import {
+  AddUsersDto,
+  AlbumResponseDto,
+  AlbumUserRole,
   AssetMediaCreateDto,
   AssetMediaResponseDto,
   AssetResponseDto,
@@ -17,12 +20,16 @@ import {
   SharedLinkCreateDto,
   SharedSpaceCreateDto,
   SharedSpaceMemberCreateDto,
+  SharedSpaceResponseDto,
+  TagResponseDto,
   UpdateLibraryDto,
   UserAdminCreateDto,
   UserPreferencesUpdateDto,
   ValidateLibraryDto,
   addAssets as addSpaceAssets,
   addMember as addSpaceMember,
+  addUsersToAlbum,
+  checkExistingAssets,
   createAlbum,
   createApiKey,
   createJob,
@@ -59,10 +66,10 @@ import {
   upsertTags,
   validate,
 } from '@immich/sdk';
-import { BrowserContext } from '@playwright/test';
+import { BrowserContext, Page } from '@playwright/test';
 import { exec, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { createWriteStream, existsSync, mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { createWriteStream, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -781,6 +788,133 @@ export const utils = {
         // no-op
       }
     }
+  },
+
+  // ---------------------------------------------------------------------------
+  // cmdk palette helpers (Tasks 25–30 of the cmdk v1.1 plan)
+  //
+  // These compose the granular utils.* wrappers above to set up multi-section
+  // palette fixtures (albums, spaces, people, places, tags) without each
+  // E2E spec re-deriving the same setup. The "all section types" helper has
+  // a few caveats called out inline.
+  // ---------------------------------------------------------------------------
+
+  cmdkSeedAlbums: (accessToken: string, names: string[]): Promise<AlbumResponseDto[]> =>
+    Promise.all(names.map((albumName) => utils.createAlbum(accessToken, { albumName }))),
+
+  cmdkSeedSpaces: (
+    accessToken: string,
+    names: string[],
+    dto?: Omit<SharedSpaceCreateDto, 'name'>,
+  ): Promise<SharedSpaceResponseDto[]> =>
+    Promise.all(names.map((name) => utils.createSpace(accessToken, { name, ...dto }))),
+
+  // Compound fixture: an admin (caller-supplied) seeds 2 albums + 2 spaces,
+  // both with "Hawaii" prefixes so a single 'hawaii' query in the palette
+  // exercises the mixed-section path (Task 25).
+  cmdkSetupAlbumsAndSpaces: async (
+    accessToken: string,
+  ): Promise<{ albums: AlbumResponseDto[]; spaces: SharedSpaceResponseDto[] }> => {
+    const albums = await utils.cmdkSeedAlbums(accessToken, ['Hawaii Beach', 'Hawaii Mountains']);
+    const spaces = await utils.cmdkSeedSpaces(accessToken, ['Hawaii Family', 'Hawaii Friends']);
+    return { albums, spaces };
+  },
+
+  // Inject a recent entry pointing at a space id that doesn't exist server-side,
+  // so activation triggers the stale-cache → toast → removal path (Task 28).
+  // The localStorage key matches cmdk-recent.ts's STORAGE_KEY_PREFIX scheme.
+  // Use a well-formed-but-unallocated UUID so the server's UUIDParamDto accepts
+  // the param and the controller actually reaches `requireAccess` — Gallery's
+  // requireAccess middleware raises BadRequestException (HTTP 400) for both
+  // "row missing" and "user lacks access", which the activate handler treats
+  // identically to 404/403. A literal 'nonexistent' string would also 400, but
+  // earlier (UUID validation), bypassing the access check we want to exercise.
+  cmdkSeedRecentWithNonexistentSpace: async (page: Page, userId: string): Promise<void> => {
+    await page.evaluate(
+      ({ userId }) => {
+        const ghostSpaceId = '00000000-0000-0000-0000-000000000000';
+        const entry = {
+          kind: 'space',
+          id: `space:${ghostSpaceId}`,
+          spaceId: ghostSpaceId,
+          label: 'Ghost Space',
+          colorHex: null,
+          lastUsed: Date.now(),
+        };
+        localStorage.setItem(`cmdk.recent:${userId}`, JSON.stringify([entry]));
+      },
+      { userId },
+    );
+  },
+
+  // Seed at least one match in every entity section the palette renders.
+  //
+  // Coverage notes:
+  // - photos: a real upload, named with the query so filename mode hits.
+  // - albums + spaces + tags: pure SDK creates, query is in the name.
+  // - places: relies on reverse geocoding of GPS exif from thompson-springs.jpg
+  //   (the same fixture used by metadata/gps-position tests). The geocoded
+  //   country/city is fixed (Utah, US), so the caller's query won't generally
+  //   match the place name — Task 29's order assertion treats places as best-
+  //   effort. If the caller needs a guaranteed place match, they can fall back
+  //   to checking that the photo upload populated *some* place rather than
+  //   one whose label contains `query`.
+  // - people: createPerson works without ML (face detection skipped), but the
+  //   palette filters on faceCount > 0, so a bare API-created person won't
+  //   surface in search results. We seed via createPerson for consistency, but
+  //   Task 29 should treat people as best-effort the same way places are.
+  cmdkSeedAllSectionTypes: async (
+    accessToken: string,
+    query: string = 'testmatch',
+  ): Promise<{
+    photo: AssetMediaResponseDto;
+    albums: AlbumResponseDto[];
+    spaces: SharedSpaceResponseDto[];
+    person: { id: string };
+    tags: TagResponseDto[];
+  }> => {
+    // Upload a GPS-tagged photo. The filename embeds the query so filename mode
+    // matches; metadata extraction populates exif (city/country) for places.
+    const gpsImagePath = `${testAssetDir}/metadata/gps-position/thompson-springs.jpg`;
+    const photo = await utils.createAsset(accessToken, {
+      assetData: {
+        bytes: readFileSync(gpsImagePath),
+        filename: `${query}-photo.jpg`,
+      },
+    });
+    // Drain metadataExtraction so EXIF (and reverse-geocoded place) is committed
+    // before the test queries the palette. Per feedback_e2e_tag_suggestions_arm_flake,
+    // tag/rating mutations race the queue otherwise. Caller token must have queue
+    // read access (admin); for non-admin callers, switch to expect.poll.
+    await utils.waitForQueueFinish(accessToken, 'metadataExtraction');
+
+    const albums = await utils.cmdkSeedAlbums(accessToken, [`${query} Album`]);
+    const spaces = await utils.cmdkSeedSpaces(accessToken, [`${query} Space`]);
+
+    // People: API-created without a face will be filtered out by the palette's
+    // faceCount > 0 gate. We seed it for ordering completeness; tests that
+    // assert a People row should call utils.createSpacePerson or build a face
+    // chain themselves (see feedback_e2e_space_person_face_chain).
+    const person = await utils.createPerson(accessToken, { name: `${query} Person` });
+
+    const tags = await utils.upsertTags(accessToken, [`${query}-tag`]);
+
+    return { photo, albums, spaces, person, tags };
+  },
+
+  // Owner creates an album + invites buddy as viewer. Used by Task 30 to assert
+  // that the same album doesn't duplicate-render across owned and shared lists.
+  cmdkCreateAndShareAlbum: async (
+    ownerAccessToken: string,
+    buddyUserId: string,
+    albumName: string,
+  ): Promise<AlbumResponseDto> => {
+    const album = await utils.createAlbum(ownerAccessToken, { albumName });
+    const addUsersDto: AddUsersDto = {
+      albumUsers: [{ userId: buddyUserId, role: AlbumUserRole.Viewer }],
+    };
+    await addUsersToAlbum({ id: album.id, addUsersDto }, { headers: asBearerAuth(ownerAccessToken) });
+    return album;
   },
 };
 
