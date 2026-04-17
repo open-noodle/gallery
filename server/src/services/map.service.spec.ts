@@ -61,7 +61,12 @@ describe(MapService.name, () => {
       expect(mocks.map.getMapMarkers).toHaveBeenCalledWith(
         [auth.user.id, partner.sharedById],
         expect.arrayContaining([]),
-        { withPartners: true },
+        expect.objectContaining({
+          isArchived: undefined,
+          isFavorite: undefined,
+          fileCreatedAfter: undefined,
+          fileCreatedBefore: undefined,
+        }),
       );
       expect(markers).toHaveLength(1);
       expect(markers[0]).toEqual(marker);
@@ -91,6 +96,80 @@ describe(MapService.name, () => {
 
       expect(markers).toHaveLength(1);
       expect(markers[0]).toEqual(marker);
+    });
+
+    it('should pass space IDs when withSharedSpaces is true and user has enabled spaces', async () => {
+      const auth = AuthFactory.create();
+      const spaceId = '00000000-0000-4000-8000-000000000001';
+      mocks.partner.getAll.mockResolvedValue([]);
+      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId }]);
+      mocks.map.getMapMarkers.mockResolvedValue([]);
+
+      await sut.getMapMarkers(auth, { withSharedSpaces: true });
+
+      expect(mocks.sharedSpace.getSpaceIdsForTimeline).toHaveBeenCalledWith(auth.user.id);
+      expect(mocks.map.getMapMarkers).toHaveBeenCalledWith(
+        [auth.user.id],
+        expect.anything(),
+        expect.objectContaining({ timelineSpaceIds: [spaceId] }),
+      );
+    });
+
+    it('should not pass timelineSpaceIds when user has no enabled spaces', async () => {
+      const auth = AuthFactory.create();
+      mocks.partner.getAll.mockResolvedValue([]);
+      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
+      mocks.map.getMapMarkers.mockResolvedValue([]);
+
+      await sut.getMapMarkers(auth, { withSharedSpaces: true });
+
+      expect(mocks.map.getMapMarkers).toHaveBeenCalledWith(
+        [auth.user.id],
+        expect.anything(),
+        expect.not.objectContaining({ timelineSpaceIds: expect.anything() }),
+      );
+    });
+
+    it('should not resolve space IDs when isFavorite=true', async () => {
+      const auth = AuthFactory.create();
+      mocks.partner.getAll.mockResolvedValue([]);
+      mocks.map.getMapMarkers.mockResolvedValue([]);
+
+      await sut.getMapMarkers(auth, { withSharedSpaces: true, isFavorite: true });
+
+      expect(mocks.sharedSpace.getSpaceIdsForTimeline).not.toHaveBeenCalled();
+      expect(mocks.map.getMapMarkers).toHaveBeenCalledWith(
+        [auth.user.id],
+        expect.anything(),
+        expect.not.objectContaining({ timelineSpaceIds: expect.anything() }),
+      );
+    });
+
+    it('should resolve space IDs when isArchived=true (archive toggle is additive)', async () => {
+      const auth = AuthFactory.create();
+      const spaceId = '00000000-0000-4000-8000-000000000002';
+      mocks.partner.getAll.mockResolvedValue([]);
+      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId }]);
+      mocks.map.getMapMarkers.mockResolvedValue([]);
+
+      await sut.getMapMarkers(auth, { withSharedSpaces: true, isArchived: true });
+
+      expect(mocks.sharedSpace.getSpaceIdsForTimeline).toHaveBeenCalledWith(auth.user.id);
+      expect(mocks.map.getMapMarkers).toHaveBeenCalledWith(
+        [auth.user.id],
+        expect.anything(),
+        expect.objectContaining({ timelineSpaceIds: [spaceId], isArchived: true }),
+      );
+    });
+
+    it('should not resolve space IDs when withSharedSpaces is omitted', async () => {
+      const auth = AuthFactory.create();
+      mocks.partner.getAll.mockResolvedValue([]);
+      mocks.map.getMapMarkers.mockResolvedValue([]);
+
+      await sut.getMapMarkers(auth, {});
+
+      expect(mocks.sharedSpace.getSpaceIdsForTimeline).not.toHaveBeenCalled();
     });
   });
 
