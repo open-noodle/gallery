@@ -360,7 +360,10 @@ test.describe('global search palette', () => {
       const initialDark = await page.evaluate(() => document.documentElement.classList.contains('dark'));
       await page.keyboard.press('Control+k');
       await page.getByRole('dialog').getByRole('combobox').fill('theme');
-      await page.getByText(/^theme$/i).first().click();
+      await page
+        .getByText(/^theme$/i)
+        .first()
+        .click();
       await expect
         .poll(async () => page.evaluate(() => document.documentElement.classList.contains('dark')))
         .toBe(!initialDark);
@@ -503,7 +506,11 @@ test.describe('global search palette', () => {
       await expect(dialog.getByRole('group', { name: /^photos/i })).toHaveCount(0);
       await expect(dialog.getByRole('group', { name: /^people/i })).toHaveCount(0);
 
-      await dialog.locator('[data-cmdk-commands-section]').getByText(/^theme$/i).first().click();
+      await dialog
+        .locator('[data-cmdk-commands-section]')
+        .getByText(/^theme$/i)
+        .first()
+        .click();
       await expect
         .poll(async () => page.evaluate(() => document.documentElement.classList.contains('dark')))
         .toBe(!initialDark);
