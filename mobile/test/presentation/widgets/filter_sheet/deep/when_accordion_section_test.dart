@@ -116,6 +116,19 @@ void main() {
       expect(opened, isTrue);
     });
 
+    testWidgets('null onOpenPicker does NOT show a SnackBar when "N years →" tapped', (tester) async {
+      await tester.pumpConsumerWidget(
+        const Material(child: WhenAccordionSection()),
+        overrides: [timeBucketsProvider.overrideWith((ref, filter) => Future.value(_seed()))],
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('when-section-search-more')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SnackBar), findsNothing);
+    });
+
     testWidgets('server error → DeepSectionScaffold retry button, tapping invalidates provider', (tester) async {
       await tester.pumpConsumerWidget(
         const Material(child: WhenAccordionSection(onOpenPicker: null)),

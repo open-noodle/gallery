@@ -63,13 +63,7 @@ class _WhenAccordionSectionState extends ConsumerState<WhenAccordionSection> {
               key: const Key('when-section-search-more'),
               onPressed: () {
                 HapticFeedback.selectionClick();
-                if (widget.onOpenPicker != null) {
-                  widget.onOpenPicker!();
-                } else {
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(const SnackBar(content: Text('Full when picker coming soon')));
-                }
+                widget.onOpenPicker?.call();
               },
               child: Text(_yearsLabel(count)),
             )

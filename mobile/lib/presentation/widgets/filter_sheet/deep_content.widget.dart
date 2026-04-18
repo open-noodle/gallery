@@ -47,7 +47,13 @@ class DeepContent extends ConsumerWidget {
               ),
               const PlacesCascadeSection(key: Key('deep-section-places')),
               const TagsSectionDeep(key: Key('deep-section-tags')),
-              const WhenAccordionSection(key: Key('deep-section-when')),
+              Builder(
+                key: const Key('deep-section-when-wrapper'),
+                builder: (context) => WhenAccordionSection(
+                  key: const Key('deep-section-when'),
+                  onOpenPicker: () => context.pushRoute(const WhenPickerRoute()),
+                ),
+              ),
               const RatingStarsSection(key: Key('deep-section-rating')),
               const MediaTypeSection(key: Key('deep-section-media')),
               const TogglesSection(key: Key('deep-section-toggles')),
