@@ -63,6 +63,8 @@ import 'package:immich_mobile/presentation/pages/memory_list.page.dart';
 import 'package:immich_mobile/presentation/pages/partner_detail.page.dart';
 import 'package:immich_mobile/presentation/pages/people_collection.page.dart';
 import 'package:immich_mobile/presentation/pages/person.page.dart';
+import 'package:immich_mobile/presentation/pages/photos_filter/person_picker.page.dart';
+import 'package:immich_mobile/presentation/pages/photos_filter/when_picker.page.dart';
 import 'package:immich_mobile/presentation/pages/place.page.dart';
 import 'package:immich_mobile/presentation/pages/place_detail.page.dart';
 import 'package:immich_mobile/presentation/pages/profile/profile_picture_crop.page.dart';
@@ -198,6 +200,8 @@ class AppRouter extends RootStackRouter {
     AutoRoute(page: UploadDetailRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: SyncStatusRoute.page, guards: [_duplicateGuard]),
     AutoRoute(page: PeopleCollectionRoute.page, guards: [_authGuard, _duplicateGuard]),
+    AutoRoute(page: PersonPickerRoute.page, guards: [_authGuard, _duplicateGuard]),
+    AutoRoute(page: WhenPickerRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: PersonRoute.page, guards: [_authGuard]),
     AutoRoute(page: BackupOptionsRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: AlbumOptionsRoute.page, guards: [_authGuard, _duplicateGuard]),
