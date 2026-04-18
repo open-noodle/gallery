@@ -56,17 +56,13 @@ class PeopleSectionDeep extends ConsumerWidget {
   }
 }
 
-/// Plural helper — easy_localization's `.plural()` reads a late-initialized
-/// locale field and throws [LateInitializationError] if the app never called
-/// `EasyLocalization.ensureInitialized()` (the case in widget tests). We fall
-/// back to the i18n key so tests pass without booting the localization stack;
-/// the real app always has it initialized.
+/// Plural helper — nested-leaf lookup avoids `.plural()`, which reads a
+/// late-initialized locale field and throws in widget tests without an
+/// `EasyLocalization` ancestor. Matches the pattern in
+/// `match_count_label.widget.dart`.
 String _searchMoreLabel(int count) {
-  try {
-    return 'filter_sheet_deep_search_n_people'.plural(count, namedArgs: {'count': '$count'});
-  } on Error {
-    return 'filter_sheet_deep_search_n_people';
-  }
+  final variant = count == 1 ? 'one' : 'other';
+  return 'filter_sheet_deep_search_n_people.$variant'.tr(namedArgs: {'count': '$count'});
 }
 
 class _PeopleGridTile extends ConsumerWidget {
