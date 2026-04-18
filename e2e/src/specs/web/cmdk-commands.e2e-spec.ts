@@ -92,15 +92,14 @@ test.describe('cmdk commands (v1.3.0)', () => {
     await expect(dialog).toBeVisible();
     await dialog.getByRole('combobox').fill('upload');
 
-    // Commands section should render even without the > prefix, because an
-    // unscoped near-exact match promotes the command row. The selected row is
-    // marked via bits-ui's data-selected attribute on Command.Item.
-    await expect(dialog.locator('[data-cmdk-commands-section]')).toBeVisible();
-    const uploadRow = dialog
-      .locator('[data-cmdk-commands-section]')
-      .getByText(/^upload$/i)
-      .first();
-    await expect(uploadRow).toBeVisible();
+    // Under unscoped 'all', a near-exact command match is promoted to the
+    // Top Result slot (rendered with heading `cmdk_top_result`), AND deduped
+    // out of the Commands section — so assert on the Top Result group, not
+    // on `[data-cmdk-commands-section]`. Pressing Enter on the promoted row
+    // activates the command.
+    const topResultGroup = dialog.getByRole('group', { name: /top result/i });
+    await expect(topResultGroup).toBeVisible();
+    await expect(topResultGroup.getByText(/^upload$/i).first()).toBeVisible();
 
     const fileChooserPromise = page.waitForEvent('filechooser', { timeout: 5000 });
     await page.keyboard.press('Enter');

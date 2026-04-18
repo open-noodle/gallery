@@ -1448,6 +1448,13 @@ export class GlobalSearchManager {
    * unfiltered catalog is still safe.
    */
   topNavigationMatch = $derived.by<NavigationItem | null>(() => {
+    // Top-result promotion is an unscoped feature only — the render path in
+    // global-search.svelte gates on `scope === 'all'`. Computing a match under
+    // `>` / `@` / `#` / `/` serves no purpose and (for commands) would dedup
+    // the promoted item out of its own section, leaving nothing visible.
+    if (this.scope !== 'all') {
+      return null;
+    }
     const q = this.query.trim();
     if (q.length === 0) {
       return null;
@@ -1483,6 +1490,12 @@ export class GlobalSearchManager {
    * command like "theme" wins over a same-name nav destination.
    */
   topCommandMatch = $derived.by<CommandItem | null>(() => {
+    // See the scope gate in topNavigationMatch. Under `>` scope the command
+    // section itself lists matching commands — promoting + deduping here would
+    // make the section render empty, so only promote under unscoped 'all'.
+    if (this.scope !== 'all') {
+      return null;
+    }
     const q = this.query.trim();
     if (q.length === 0) {
       return null;
