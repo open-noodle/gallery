@@ -1,8 +1,9 @@
 import { isAlmostExactWordMatch } from '$lib/managers/cmdk-match';
 import { themeManager } from '$lib/managers/theme-manager.svelte';
+import { createAlbumAndRedirect } from '$lib/utils/album-utils';
 import { openFileUploadDialog } from '$lib/utils/file-uploader';
 import type { ServerFeaturesDto } from '@immich/sdk';
-import { mdiCloudUploadOutline, mdiThemeLightDark } from '@mdi/js';
+import { mdiCloudUploadOutline, mdiPlaylistPlus, mdiThemeLightDark } from '@mdi/js';
 
 const MIN_MATCH_LENGTH = 3;
 
@@ -32,6 +33,13 @@ export const COMMAND_ITEMS: readonly CommandItem[] = [
     descriptionKey: 'cmdk_cmd_upload_description',
     icon: mdiCloudUploadOutline,
     handler: () => openFileUploadDialog(),
+  },
+  {
+    id: 'cmd:new_album',
+    labelKey: 'new_album',
+    descriptionKey: 'cmdk_cmd_new_album_description',
+    icon: mdiPlaylistPlus,
+    handler: () => createAlbumAndRedirect(),
   },
 ];
 

@@ -811,6 +811,7 @@
   "cmdk_announce_scoped_nav": "Scoped to pages.",
   "cmdk_announce_scoped_people": "Scoped to people.",
   "cmdk_announce_scoped_tags": "Scoped to tags.",
+  "cmdk_cmd_new_album_description": "Start a new album",
   "cmdk_cmd_theme_description": "Switch between light and dark themes",
   "cmdk_cmd_upload_description": "Upload photos or videos from your device",
   "cmdk_couldnt_load": "Couldn't load {entity} — retry",

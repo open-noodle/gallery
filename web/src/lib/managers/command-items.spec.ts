@@ -1,3 +1,4 @@
+import * as albumUtils from '$lib/utils/album-utils';
 import * as fileUploader from '$lib/utils/file-uploader';
 import { describe, expect, it, vi } from 'vitest';
 import { COMMAND_ITEMS, isAlmostExactCommandMatch } from './command-items';
@@ -29,6 +30,16 @@ describe('cmd:upload', () => {
   it('invokes openFileUploadDialog', async () => {
     const spy = vi.spyOn(fileUploader, 'openFileUploadDialog').mockResolvedValue(undefined as never);
     const cmd = COMMAND_ITEMS.find((c) => c.id === 'cmd:upload')!;
+    await cmd.handler();
+    expect(spy).toHaveBeenCalledOnce();
+    spy.mockRestore();
+  });
+});
+
+describe('cmd:new_album', () => {
+  it('invokes createAlbumAndRedirect', async () => {
+    const spy = vi.spyOn(albumUtils, 'createAlbumAndRedirect').mockResolvedValue(undefined as never);
+    const cmd = COMMAND_ITEMS.find((c) => c.id === 'cmd:new_album')!;
     await cmd.handler();
     expect(spy).toHaveBeenCalledOnce();
     spy.mockRestore();
