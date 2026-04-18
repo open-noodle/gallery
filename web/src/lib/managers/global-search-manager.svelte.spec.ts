@@ -313,7 +313,7 @@ describe('setQuery', () => {
       });
     manager.setQuery('hang');
     await vi.advanceTimersByTimeAsync(200);
-    await vi.advanceTimersByTimeAsync(5100);
+    await vi.advanceTimersByTimeAsync(15_100);
     expect(manager.sections.photos.status).toBe('timeout');
   });
 
@@ -775,7 +775,7 @@ describe('ML health retroactive promotion', () => {
       });
     m.setQuery('beach');
     await vi.advanceTimersByTimeAsync(200);
-    await vi.advanceTimersByTimeAsync(5100);
+    await vi.advanceTimersByTimeAsync(15_100);
     expect(m.mlHealthy).toBe(false);
   });
 
@@ -789,7 +789,7 @@ describe('ML health retroactive promotion', () => {
       });
     m.setQuery('beach');
     await vi.advanceTimersByTimeAsync(200);
-    await vi.advanceTimersByTimeAsync(5100);
+    await vi.advanceTimersByTimeAsync(15_100);
     expect(m.mlHealthy).toBe(true);
   });
 });
@@ -3844,11 +3844,11 @@ describe('prefix scoping — bare @ suggestions', () => {
     expect(m.sections.people.status).toBe('empty');
   });
 
-  it('getAllPeople 5-second timeout transitions section to timeout', async () => {
+  it('getAllPeople provider timeout transitions section to timeout', async () => {
     const m = new GlobalSearchManager();
-    // getAllPeople binds to closeSignal (not per-keystroke AbortSignal.timeout(5000)),
-    // so this test simulates a fetch that never resolves within the 5s window; the
-    // provider-level AbortSignal.timeout inside runBatch fires at 5s and the
+    // getAllPeople binds to closeSignal (not per-keystroke AbortSignal.timeout),
+    // so this test simulates a fetch that never resolves within the window; the
+    // provider-level AbortSignal.timeout inside runBatch fires and the
     // surrounding people.run catch branch writes 'timeout'.
     vi.mocked(getAllPeople).mockImplementation(
       (_args, opts) =>
@@ -3862,7 +3862,7 @@ describe('prefix scoping — bare @ suggestions', () => {
 
     m.setQuery('@');
     await vi.advanceTimersByTimeAsync(150); // debounce fires
-    await vi.advanceTimersByTimeAsync(5000); // AbortSignal.timeout fires
+    await vi.advanceTimersByTimeAsync(15_000); // AbortSignal.timeout fires
     await vi.runAllTimersAsync();
 
     expect(m.sections.people.status).toBe('timeout');

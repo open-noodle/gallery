@@ -88,6 +88,10 @@ const ALBUMS_TOP_N = 5;
 // Slice size for the spaces section. Same rationale as ALBUMS_TOP_N — pin the
 // buildProviders `topN` and the runSpaces slice to a single source of truth.
 const SPACES_TOP_N = 5;
+// Per-provider fetch timeout. Smart search on CPU-only ML (e.g. Mac mini M1) can
+// take 6–8s for text encode; 15s gives cold-cache runs headroom without stranding
+// a stuck fetch indefinitely.
+const PROVIDER_TIMEOUT_MS = 15_000;
 // Narrow literal type so it can be assigned to both `ProviderStatus<unknown>` and
 // `ProviderStatus<NavigationItem>` without the generic T widening fighting the assignment.
 // Frozen so a future engineer cannot accidentally mutate the shared reference and
@@ -541,11 +545,11 @@ export class GlobalSearchManager {
   }
 
   private async fetchPeopleSuggestions(): Promise<void> {
-    // 5-second per-request timeout on top of closeSignal. Bare-@ flows through
+    // Per-request timeout on top of closeSignal. Bare-@ flows through
     // ensurePeopleSuggestionsCache, which is independent of the per-keystroke
     // batchController.signal — without this timeout a stuck fetch would leave
     // the section in 'loading' forever until the palette closes.
-    const signal = AbortSignal.any([this.closeSignal, AbortSignal.timeout(5000)]);
+    const signal = AbortSignal.any([this.closeSignal, AbortSignal.timeout(PROVIDER_TIMEOUT_MS)]);
     try {
       const response = await getAllPeople({ size: 10 }, { signal });
       this.peopleSuggestionsCache = [...response.people].sort(personSuggestionsComparator);
@@ -1224,7 +1228,7 @@ export class GlobalSearchManager {
     const signal = AbortSignal.any([
       ...(setModeBatch ? [setModeBatch.signal] : []),
       photos.signal,
-      AbortSignal.timeout(5000),
+      AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
     ]);
 
     const onSetModeSettle = () => {
@@ -1497,7 +1501,7 @@ export class GlobalSearchManager {
       }
       this.inFlightCounter++;
       const controllers = key === 'photos' ? [batch.signal, photosLocal.signal] : [batch.signal];
-      const signal = AbortSignal.any([...controllers, AbortSignal.timeout(5000)]);
+      const signal = AbortSignal.any([...controllers, AbortSignal.timeout(PROVIDER_TIMEOUT_MS)]);
 
       const onSettle = () => {
         // Stale-batch guard: if a new batch has taken over the batchController, this
