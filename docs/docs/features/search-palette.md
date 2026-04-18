@@ -6,7 +6,7 @@ The classic search bar in the navbar still works exactly as before. The palette 
 
 ## What you can search
 
-Each query runs in parallel against five providers and groups the results into named sections:
+Each query runs in parallel against the configured providers and groups the results into named sections:
 
 | Section        | What it returns                                                              |
 | -------------- | ---------------------------------------------------------------------------- |
@@ -14,6 +14,7 @@ Each query runs in parallel against five providers and groups the results into n
 | **People**     | Named faces from your library and any shared spaces you can access.          |
 | **Places**     | Cities, regions, and countries from your reverse-geocoded photos.            |
 | **Tags**       | Tags assigned to your assets, plus inherited tags from parent tags.          |
+| **Commands**   | Stateless verbs — upload files, create things, sign out, toggle theme, etc.  |
 | **Navigation** | Admin and settings pages — fuzzy-matched against the live page catalog.      |
 
 Empty sections collapse silently so the result list stays tight. If smart search is unhealthy (the ML server is unreachable), a banner appears at the top of the palette and offers a one-tap switch to filename mode.
@@ -27,13 +28,37 @@ The footer shows the current matching mode for the **Photos** section. Press <kb
 - **Description** — Substring match against your photo descriptions
 - **OCR** — Substring match against text extracted from your photos
 
-The other four sections (People, Places, Tags, Navigation) are unaffected by the mode — they always run their own provider.
+The other sections (People, Places, Tags, Commands, Navigation) are unaffected by the mode — they always run their own provider.
+
+## Commands
+
+Commands are stateless verbs you can fire from the palette without leaving your current page. They live in their own section above **Go to…** and ship out of the box with these seven entries:
+
+| Command                   | What it does                                          |
+| ------------------------- | ----------------------------------------------------- |
+| **Upload files**          | Opens the file picker so you can add photos or videos |
+| **Create album**          | Creates a new album and jumps you straight into it    |
+| **Create shared space**   | Opens the **Create shared space** modal               |
+| **Sign out**              | Logs you out and returns to the login screen          |
+| **Keyboard shortcuts**    | Opens the keyboard-shortcuts cheatsheet               |
+| **Toggle theme**          | Flips between light and dark mode                     |
+| **Clear palette recents** | Empties your **Recent** list in the palette           |
+
+### Scoping with `>`
+
+Type `>` at the start of the query to restrict results to commands only — useful when you know you want a verb and don't want photos or pages competing for the top result. The `>` itself is treated as a section filter, not part of the query, so `>up` matches **Upload files**.
+
+### Unscoped: command-first tie-break
+
+You don't have to type `>`. When a command and a navigation entry score similarly against an unscoped query, the command wins the **Top result** slot. So plain `album` activates **Create album** on <kbd>Enter</kbd>, and plain `upload` activates **Upload files** — even though the Albums and Library pages also match.
+
+Commands never appear in the **Recent** list — they're verbs, not destinations, and re-firing them belongs in the muscle-memory of the palette itself.
 
 ## Top result band
 
-When your query closely matches a single navigation entry, that entry is promoted to a **Top result** band at the top of the list. Hitting <kbd>Enter</kbd> activates it immediately, no arrow keys needed.
+When your query closely matches a single command or navigation entry, that entry is promoted to a **Top result** band at the top of the list. Hitting <kbd>Enter</kbd> activates it immediately, no arrow keys needed.
 
-Promotion is based on a fuzzy score against the page title, description, and search keywords. A short query like `peo` will surface **People** as the top result; `tags` will surface **Tags**; `users` will surface **Administration → User Management**.
+Promotion is based on a fuzzy score against the title, description, and search keywords. Commands win tie-breaks against navigation entries, so unscoped verbs like `upload` or `album` surface their command first. A short query like `peo` will surface **People** as the top result; `users` will surface **Administration → User Management**.
 
 ## Recents
 
@@ -71,7 +96,7 @@ The preview updates as you arrow up and down through the list. On smaller screen
 
 ## How it stays responsive
 
-- Each provider runs on its own **150 ms debounce** with a **5 s timeout** via `AbortSignal.timeout`. A slow people query never blocks photos from rendering.
+- Each provider runs on its own **150 ms debounce** with a **15 s timeout** via `AbortSignal.timeout`. A slow people query never blocks photos from rendering.
 - The palette uses a **stale-while-revalidate** rule: when a query is being re-run, the previous successful results stay visible until new ones arrive. No skeleton flash between keystrokes.
 - A thin **progress stripe** appears across the top after a 200 ms grace window if any provider is still in flight, so you know work is happening when results are slow.
 - The navigation provider runs **synchronously** against an in-memory catalog of admin/settings pages, so you see jumps from the very first keystroke even before the network comes back.
