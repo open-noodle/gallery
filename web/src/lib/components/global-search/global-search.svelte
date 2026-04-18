@@ -6,6 +6,7 @@
   import type { GlobalSearchManager, SearchMode } from '$lib/managers/global-search-manager.svelte';
   import GlobalSearchSection from './global-search-section.svelte';
   import GlobalSearchNavigationSections from './global-search-navigation-sections.svelte';
+  import GlobalSearchCommandsSection from './global-search-commands-section.svelte';
   import PhotoRow from './rows/photo-row.svelte';
   import PersonRow from './rows/person-row.svelte';
   import PlaceRow from './rows/place-row.svelte';
@@ -490,6 +491,10 @@
                   <TagRow item={item as never} />
                 {/snippet}
               </GlobalSearchSection>
+              <GlobalSearchCommandsSection
+                status={manager.sections.commands}
+                onActivate={(item) => manager.activate('command', item)}
+              />
               <GlobalSearchNavigationSections
                 status={dedupedNavigationStatus}
                 onActivate={(item) => manager.activate('nav', item)}
@@ -554,6 +559,10 @@
               <!-- Scope `>` — only NavigationSections. The navigation provider runs
                    synchronously in setQuery (no debounce); under `>` it surfaces the
                    whole catalog for bare `>` or filtered matches for `>foo`. -->
+              <GlobalSearchCommandsSection
+                status={manager.sections.commands}
+                onActivate={(item) => manager.activate('command', item)}
+              />
               <GlobalSearchNavigationSections
                 status={manager.sections.navigation}
                 onActivate={(item) => manager.activate('nav', item)}
