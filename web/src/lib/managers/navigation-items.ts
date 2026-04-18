@@ -27,14 +27,14 @@ import {
   mdiShareVariantOutline,
   mdiSync,
   mdiTagMultipleOutline,
-  mdiThemeLightDark,
   mdiTrashCanOutline,
   mdiUpdate,
   mdiVideoOutline,
   mdiViewAgenda,
 } from '@mdi/js';
+import { isAlmostExactWordMatch } from './cmdk-match';
 
-export type NavigationCategory = 'systemSettings' | 'admin' | 'userPages' | 'actions';
+export type NavigationCategory = 'systemSettings' | 'admin' | 'userPages';
 
 export interface NavigationItem {
   id: string;
@@ -42,7 +42,8 @@ export interface NavigationItem {
   labelKey: string;
   descriptionKey: string;
   icon: string;
-  /** Empty string for command-kind items (e.g. theme toggle). */
+  /** Non-empty route. All navigation items lead to a real page; stateless side-effects
+   * live in the commands registry (command-items.ts) instead. */
   route: string;
   adminOnly: boolean;
   /**
@@ -242,27 +243,9 @@ const USER_PAGES: readonly NavigationItem[] = [
   },
 ];
 
-const ACTIONS: readonly NavigationItem[] = [
-  {
-    id: 'nav:theme',
-    category: 'actions',
-    labelKey: 'theme',
-    descriptionKey: 'toggle_theme_description',
-    icon: mdiThemeLightDark,
-    route: '',
-    adminOnly: false,
-  },
-];
-
-export const NAVIGATION_ITEMS: readonly NavigationItem[] = [
-  ...SYSTEM_SETTINGS,
-  ...ADMIN_PAGES,
-  ...USER_PAGES,
-  ...ACTIONS,
-];
+export const NAVIGATION_ITEMS: readonly NavigationItem[] = [...SYSTEM_SETTINGS, ...ADMIN_PAGES, ...USER_PAGES];
 
 const MIN_MATCH_LENGTH = 3;
-const NON_ALNUM = /[^a-z0-9]+/;
 
 /**
  * "Almost exact" match — used to promote a navigation item to the palette's
@@ -280,21 +263,5 @@ const NON_ALNUM = /[^a-z0-9]+/;
  * richer and would promote items the user did not visually intend to pick.
  */
 export function isAlmostExactNavMatch(query: string, label: string): boolean {
-  const q = query.trim().toLowerCase();
-  if (q.length < MIN_MATCH_LENGTH) {
-    return false;
-  }
-  const qWords = q.split(NON_ALNUM).filter((w) => w.length >= MIN_MATCH_LENGTH);
-  if (qWords.length === 0) {
-    return false;
-  }
-  const labelWords = label.toLowerCase().split(NON_ALNUM).filter(Boolean);
-  for (const qw of qWords) {
-    for (const lw of labelWords) {
-      if (lw.startsWith(qw)) {
-        return true;
-      }
-    }
-  }
-  return false;
+  return isAlmostExactWordMatch(query, label, MIN_MATCH_LENGTH);
 }
