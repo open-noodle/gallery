@@ -7,7 +7,7 @@
 > - **rev 1 (2026-04-18 initial)** — first-pass TDD plan.
 > - **rev 2 (2026-04-18 after first /review)** — folded in 3 blockers, 4 highs, 8 mediums, 3 lows. Key structural shifts: side effects moved from `GalleryTabShellPage` listener to `GalleryBottomNav._onTabTap`; `GalleryNavPill` gains `disabledTabs` prop; `GalleryBottomNav` gets a fade-and-slide hide animation with `onEnd`-gated height publish; `openGallerySearch` takes a `ProviderReader` closure; added D0 guard-verification task; fleshed out C5 test scaffolding.
 > - **rev 3 (2026-04-18 after second /review)** — folded in 3 mediums + 5 lows. Key shifts: hide animation uses `TweenAnimationBuilder` for pixel-exact 12 pt slide (was `AnimatedSlide` with fractional offset that drifted with parent size); `searchInputFocusProvider` override wired into the negative-assertion test (was a false-green); pill-height-locked-across-text-scales test added; C5 harness overrides `currentUserProvider` + `serverInfoProvider` so `_authGuard`/`_duplicateGuard` don't redirect out of the shell; rapid-multi-select-toggle test added for interrupted-animation orphan-write coverage; P.6 hoists `FakeTabsRouter` to a shared helper; P.7 adds a provider-shape pre-check for negative-assertion overrides.
-> - **rev 4 (2026-04-18 after `/frontend-design` review)** — folded in 2 aesthetic regressions. F1: icon transition is now a variable-font morph via a new `AnimatedNavIcon` widget (Task A5) that tweens the Material Symbols Rounded `fill` (0→1) and `weight` (400→500) axes over 220 ms — rather than the rev-3 hard outlined/filled swap. F2: Archivo variable font is now bundled in `pubspec.yaml` + referenced on label `TextStyle.fontFamily`; previously labels silently fell back to Roboto. C1 updated to consume both (icon slot animates via `AnimatedAlign.widthFactor` + `AnimatedOpacity` + `AnimatedNavIcon`, label uses `fontFamily: 'Archivo'`). Tests updated for the new visibility semantics (icon always in tree, collapsed when idle) and a font-family assertion added.
+> - **rev 4 (2026-04-18 after `/frontend-design` review)** — folded in 2 aesthetic regressions. F1: icon transition is smoothed via a new `AnimatedNavIcon` widget (Task A5) that crossfades outlined ↔ filled icons over 220 ms — rather than the rev-3 hard swap. F2 _rejected as overengineering_ (Archivo font bundle dropped); labels stay on the app's existing theme font. A5 is a lightweight widget task with no font-asset dependencies. C1 updated to consume `AnimatedNavIcon` wrapped in `AnimatedAlign.widthFactor` + `AnimatedOpacity` for the idle→active icon reveal.
 
 **Goal:** Ship a Google-Photos-inspired floating pill bottom nav (Photos · Albums · Library) plus an outboard Search blob that opens the FilterSheet from PR 1.3. Retires the Search and Spaces tabs from the bottom nav. Upstream `tab_shell.page.dart` and `tab.provider.dart` stay bit-identical.
 
@@ -641,51 +641,16 @@ git commit -m "feat(mobile): peek content reads bottomNavHeightProvider for pill
 
 ---
 
-### Task A5: Variable fonts (Archivo + Material Symbols Rounded) + `AnimatedNavIcon`
+### Task A5: `AnimatedNavIcon` — crossfade between outlined and filled icons
 
-**Why this task exists:** the design doc (§5.4–§5.5) commits to Archivo for label typography and to Material Symbols Rounded's variable-font `FILL` + `wght` axes for the outlined→filled icon morph when a tab becomes active. Without these fonts bundled, labels fall back to Roboto (F2) and icon-state changes snap instead of interpolating (F1). This task lands the fonts in the app bundle and a tiny `AnimatedNavIcon` that tweens `fill: 0→1` + `weight: 400→500` in sync with the `fill/weight` axes of Material Symbols Rounded.
+**Why this task exists:** §5.4 + the mockup show the icon morphing from outlined (idle) to filled (active) when a segment becomes active. A small `AnimatedCrossFade` between two `Icon` widgets (outlined / filled variants of the same Material glyph) is all that's needed — no variable-font asset bundle, no new fontFamily declarations. Takes ~220 ms and matches the mockup's perceived smoothness without the aesthetic over-engineering.
 
 **Files:**
 
-- Add assets: `mobile/assets/fonts/Archivo-VariableFont_wdth,wght.ttf`
-- Add assets: `mobile/assets/fonts/MaterialSymbolsRounded-VariableFont_FILL,GRAD,opsz,wght.ttf`
-- Modify: `mobile/pubspec.yaml` — register both font families under `flutter: fonts:`
 - Create: `mobile/lib/presentation/widgets/gallery_nav/animated_nav_icon.widget.dart`
 - Create: `mobile/test/presentation/widgets/gallery_nav/animated_nav_icon_test.dart`
 
-**Step 1: Download the variable font TTFs**
-
-Both fonts ship from Google Fonts as OFL-licensed variable fonts:
-
-- Archivo — https://fonts.google.com/specimen/Archivo (click "Get font" → "Download all" → unzip → take the `Archivo-VariableFont_wdth,wght.ttf`).
-- Material Symbols Rounded — https://fonts.google.com/icons?icon.style=Rounded&icon.set=Material+Symbols (click the "Download this icon" menu's "Variable Font" option, or grab the full variable TTF from https://github.com/google/material-design-icons/tree/master/variablefont).
-
-Place both files at `mobile/assets/fonts/` (create the directory if absent).
-
-**Step 2: Declare in `mobile/pubspec.yaml`**
-
-Under the existing `flutter:` section, merge the following. If `fonts:` already exists, append; if `assets:` already lists `assets/`, no change needed.
-
-```yaml
-flutter:
-  fonts:
-    - family: Archivo
-      fonts:
-        - asset: assets/fonts/Archivo-VariableFont_wdth,wght.ttf
-    - family: MaterialSymbolsRounded
-      fonts:
-        - asset: assets/fonts/MaterialSymbolsRounded-VariableFont_FILL,GRAD,opsz,wght.ttf
-  assets:
-    - assets/fonts/
-```
-
-Run:
-
-```bash
-cd mobile && flutter pub get
-```
-
-**Step 3: Failing unit tests for `AnimatedNavIcon`**
+**Step 1: Failing widget tests**
 
 ```dart
 // mobile/test/presentation/widgets/gallery_nav/animated_nav_icon_test.dart
@@ -694,11 +659,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:immich_mobile/presentation/widgets/gallery_nav/animated_nav_icon.widget.dart';
 
 void main() {
-  testWidgets('idle: fill 0.0, weight 400', (tester) async {
+  testWidgets('idle: only the outlined icon is visible', (tester) async {
     await tester.pumpWidget(MaterialApp(
       home: Material(
         child: AnimatedNavIcon(
-          icon: Icons.photo_library,
+          idleIcon: Icons.photo_library_outlined,
+          activeIcon: Icons.photo_library,
           active: false,
           size: 22,
           color: Colors.black,
@@ -707,16 +673,17 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    final icon = tester.widget<Icon>(find.byType(Icon));
-    expect(icon.fill, closeTo(0.0, 0.001));
-    expect(icon.weight, closeTo(400.0, 0.5));
+    final crossFade = tester.widget<AnimatedCrossFade>(find.byType(AnimatedCrossFade));
+    expect(crossFade.crossFadeState, CrossFadeState.showFirst);
+    expect(find.byIcon(Icons.photo_library_outlined), findsOneWidget);
   });
 
-  testWidgets('active: fill 1.0, weight 500', (tester) async {
+  testWidgets('active: only the filled icon is visible', (tester) async {
     await tester.pumpWidget(MaterialApp(
       home: Material(
         child: AnimatedNavIcon(
-          icon: Icons.photo_library,
+          idleIcon: Icons.photo_library_outlined,
+          activeIcon: Icons.photo_library,
           active: true,
           size: 22,
           color: Colors.black,
@@ -725,20 +692,21 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    final icon = tester.widget<Icon>(find.byType(Icon));
-    expect(icon.fill, closeTo(1.0, 0.001));
-    expect(icon.weight, closeTo(500.0, 0.5));
+    final crossFade = tester.widget<AnimatedCrossFade>(find.byType(AnimatedCrossFade));
+    expect(crossFade.crossFadeState, CrossFadeState.showSecond);
+    expect(find.byIcon(Icons.photo_library), findsOneWidget);
   });
 
-  testWidgets('transition: fill tweens 0→1 around mid-animation', (tester) async {
-    final activeNotifier = ValueNotifier(false);
+  testWidgets('transition: both icons are in the tree mid-crossfade', (tester) async {
+    final active = ValueNotifier<bool>(false);
     await tester.pumpWidget(MaterialApp(
       home: Material(
         child: ValueListenableBuilder<bool>(
-          valueListenable: activeNotifier,
-          builder: (_, active, __) => AnimatedNavIcon(
-            icon: Icons.photo_library,
-            active: active,
+          valueListenable: active,
+          builder: (_, v, __) => AnimatedNavIcon(
+            idleIcon: Icons.photo_library_outlined,
+            activeIcon: Icons.photo_library,
+            active: v,
             size: 22,
             color: Colors.black,
           ),
@@ -747,56 +715,49 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    activeNotifier.value = true;
-    await tester.pump(const Duration(milliseconds: 110)); // ~half of 220ms
-
-    final icon = tester.widget<Icon>(find.byType(Icon));
-    expect(icon.fill!, greaterThan(0.2));
-    expect(icon.fill!, lessThan(0.8));
-    expect(icon.weight!, greaterThan(400));
-    expect(icon.weight!, lessThan(500));
+    active.value = true;
+    await tester.pump(const Duration(milliseconds: 110)); // halfway
+    // AnimatedCrossFade keeps both children layered during the fade.
+    expect(find.byIcon(Icons.photo_library_outlined), findsOneWidget);
+    expect(find.byIcon(Icons.photo_library), findsOneWidget);
   });
 
-  testWidgets('uses MaterialSymbolsRounded font family', (tester) async {
+  testWidgets('duration is 220ms', (tester) async {
     await tester.pumpWidget(MaterialApp(
       home: Material(
         child: AnimatedNavIcon(
-          icon: Icons.photo_library,
-          active: true,
+          idleIcon: Icons.photo_library_outlined,
+          activeIcon: Icons.photo_library,
+          active: false,
           size: 22,
           color: Colors.black,
         ),
       ),
     ));
-    await tester.pumpAndSettle();
-    final icon = tester.widget<Icon>(find.byType(Icon));
-    // Icon's font family is resolved from IconData in Flutter's default flow.
-    // We construct a specific IconData in step 4 that targets
-    // MaterialSymbolsRounded; assert it's carried through.
-    expect(icon.icon!.fontFamily, 'MaterialSymbolsRounded');
+    final crossFade = tester.widget<AnimatedCrossFade>(find.byType(AnimatedCrossFade));
+    expect(crossFade.duration, const Duration(milliseconds: 220));
   });
 }
 ```
 
-**Step 4: Implement `AnimatedNavIcon`**
+**Step 2: Run, expect fail.**
+
+**Step 3: Implement `AnimatedNavIcon`**
 
 ```dart
 // mobile/lib/presentation/widgets/gallery_nav/animated_nav_icon.widget.dart
 import 'package:flutter/material.dart';
 
-/// Icon with smooth Material Symbols Rounded variable-axis interpolation
-/// between idle (fill 0, wght 400) and active (fill 1, wght 500).
+/// Crossfade between an outlined `idleIcon` and a filled `activeIcon` over
+/// 220 ms. Matches the pill's `Cubic(0.3, 0.6, 0.2, 1)` motion signature on
+/// the size curve so the icon reveal is synchronized with the surrounding
+/// `AnimatedAlign` width collapse in GalleryNavSegment.
 ///
-/// Requires the `MaterialSymbolsRounded` variable font to be loaded via
-/// `pubspec.yaml` (Task A5 Step 2). The passed `IconData` must carry a
-/// `fontFamily: 'MaterialSymbolsRounded'` — we re-wrap any incoming
-/// material `IconData` to use that font family so the variable axes apply.
-///
-/// Duration 220ms + `Cubic(0.3, 0.6, 0.2, 1)` matches the pill underlay
-/// motion signature (§6.3) — icon morph + underlay slide share the same
-/// snap-and-settle feel.
+/// Uses `AnimatedCrossFade` (no variable-font dependency) — keeps the nav
+/// asset footprint flat and the rebase surface uncluttered.
 class AnimatedNavIcon extends StatelessWidget {
-  final IconData icon;
+  final IconData idleIcon;
+  final IconData activeIcon;
   final bool active;
   final double size;
   final Color color;
@@ -806,53 +767,35 @@ class AnimatedNavIcon extends StatelessWidget {
 
   const AnimatedNavIcon({
     super.key,
-    required this.icon,
+    required this.idleIcon,
+    required this.activeIcon,
     required this.active,
     this.size = 22,
     required this.color,
   });
 
-  /// Rewrap a plain `IconData` to target the variable Material Symbols
-  /// Rounded font. This is the same codepoint; just a different fontFamily
-  /// so the `fill`/`weight` axes on the Icon widget actually take effect.
-  IconData get _variable => IconData(
-        icon.codePoint,
-        fontFamily: 'MaterialSymbolsRounded',
-        matchTextDirection: icon.matchTextDirection,
-      );
-
   @override
   Widget build(BuildContext context) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween<double>(end: active ? 1.0 : 0.0),
+    return AnimatedCrossFade(
       duration: _duration,
-      curve: _curve,
-      builder: (_, t, __) => Icon(
-        _variable,
-        size: size,
-        color: color,
-        fill: t,
-        weight: 400 + t * 100,
-      ),
+      sizeCurve: _curve,
+      firstCurve: _curve,
+      secondCurve: _curve,
+      crossFadeState: active ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+      firstChild: Icon(idleIcon, size: size, color: color),
+      secondChild: Icon(activeIcon, size: size, color: color),
     );
   }
 }
 ```
 
-**Step 5: Run**
+**Step 4: Run + commit**
 
 ```bash
 cd mobile && flutter test test/presentation/widgets/gallery_nav/animated_nav_icon_test.dart
-```
-
-Expected: all 4 tests pass. If the `fill`/`weight` parameters are silently ignored by the Icon widget (older Flutter version), the test harness still passes the numeric assertions but the rendered glyph won't reflect the fill — verify visually at C1 integration time.
-
-**Step 6: Commit**
-
-```bash
 cd mobile && dart format lib/presentation/widgets/gallery_nav/animated_nav_icon.widget.dart test/presentation/widgets/gallery_nav/animated_nav_icon_test.dart
-git add mobile/assets/fonts/ mobile/pubspec.yaml mobile/lib/presentation/widgets/gallery_nav/animated_nav_icon.widget.dart mobile/test/presentation/widgets/gallery_nav/animated_nav_icon_test.dart
-git commit -m "feat(mobile): Archivo + MaterialSymbolsRounded variable fonts + AnimatedNavIcon"
+git add mobile/lib/presentation/widgets/gallery_nav/animated_nav_icon.widget.dart mobile/test/presentation/widgets/gallery_nav/animated_nav_icon_test.dart
+git commit -m "feat(mobile): AnimatedNavIcon (220ms crossfade outlined↔filled)"
 ```
 
 ---
@@ -1433,13 +1376,6 @@ void main() {
     expectTapTargetMin(tester, find.byType(GalleryNavSegment), min: 44);
   });
 
-  testWidgets('label uses Archivo font family (F2 regression guard)', (tester) async {
-    await tester.pumpConsumerWidget(
-      GalleryNavSegment(tab: GalleryTabEnum.photos, active: false, onTap: () {}),
-    );
-    final text = tester.widget<Text>(find.text('nav.photos'.tr()));
-    expect(text.style!.fontFamily, 'Archivo');
-  });
 }
 ```
 
@@ -1505,7 +1441,8 @@ class GalleryNavSegment extends StatelessWidget {
                         duration: _opacityAnimDuration,
                         curve: _easing,
                         child: AnimatedNavIcon(
-                          icon: destination.activeIcon,
+                          idleIcon: destination.idleIcon,
+                          activeIcon: destination.activeIcon,
                           active: active,
                           size: 22,
                           color: color,
@@ -1517,11 +1454,6 @@ class GalleryNavSegment extends StatelessWidget {
                 Text(
                   destination.labelKey.tr(),
                   style: TextStyle(
-                    // F2 fix: pulls Archivo from the pubspec.yaml font
-                    // registration (Task A5). Falls back gracefully to the
-                    // theme's default if the asset is missing — verify via
-                    // the font-family test below.
-                    fontFamily: 'Archivo',
                     color: color,
                     fontSize: 13.5,
                     fontWeight: FontWeight.w500,
