@@ -2,7 +2,11 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 >
-> **Revision log:** rev 1 (initial) → **rev 2 (2026-04-18)** — folded in 3 blockers, 4 highs, 8 mediums, 3 lows from post-plan /review. Key structural shifts: side effects moved from `GalleryTabShellPage` listener to `GalleryBottomNav._onTabTap` (re-tap invalidations); `GalleryNavPill` gains `disabledTabs` prop for readonly mode; `GalleryBottomNav` gets `AnimatedSlide` + `AnimatedOpacity` fade-and-slide hide animation with `onEnd`-gated height publish; `openGallerySearch` takes a `ProviderReader` closure instead of `Ref` (works from widgets + tests uniformly); added D0 guard-verification task; fleshed out C5 test scaffolding.
+> **Revision log:**
+>
+> - **rev 1 (2026-04-18 initial)** — first-pass TDD plan.
+> - **rev 2 (2026-04-18 after first /review)** — folded in 3 blockers, 4 highs, 8 mediums, 3 lows. Key structural shifts: side effects moved from `GalleryTabShellPage` listener to `GalleryBottomNav._onTabTap`; `GalleryNavPill` gains `disabledTabs` prop; `GalleryBottomNav` gets a fade-and-slide hide animation with `onEnd`-gated height publish; `openGallerySearch` takes a `ProviderReader` closure; added D0 guard-verification task; fleshed out C5 test scaffolding.
+> - **rev 3 (2026-04-18 after second /review)** — folded in 3 mediums + 5 lows. Key shifts: hide animation uses `TweenAnimationBuilder` for pixel-exact 12 pt slide (was `AnimatedSlide` with fractional offset that drifted with parent size); `searchInputFocusProvider` override wired into the negative-assertion test (was a false-green); pill-height-locked-across-text-scales test added; C5 harness overrides `currentUserProvider` + `serverInfoProvider` so `_authGuard`/`_duplicateGuard` don't redirect out of the shell; rapid-multi-select-toggle test added for interrupted-animation orphan-write coverage; P.6 hoists `FakeTabsRouter` to a shared helper; P.7 adds a provider-shape pre-check for negative-assertion overrides.
 
 **Goal:** Ship a Google-Photos-inspired floating pill bottom nav (Photos · Albums · Library) plus an outboard Search blob that opens the FilterSheet from PR 1.3. Retires the Search and Spaces tabs from the bottom nav. Upstream `tab_shell.page.dart` and `tab.provider.dart` stay bit-identical.
 
@@ -70,6 +74,49 @@ grep -E 'fake_async|mocktail' mobile/pubspec.yaml
 ```
 
 If either is missing, add it before starting tasks (single pubspec edit + `flutter pub get`). The mobile test suite already uses `mocktail` in other tests, so it's likely present; `fake_async` is less common.
+
+**P.6 Shared test helper — `_FakeTabsRouter`**
+
+Several later tasks (B3, C4, C5) use a `Fake TabsRouter` for driving active-index + recording `setActiveIndex` calls. Hoist to a shared file so the shape doesn't drift between test files:
+
+- Create: `mobile/test/test_helpers/fake_tabs_router.dart`
+
+```dart
+// mobile/test/test_helpers/fake_tabs_router.dart
+import 'package:auto_route/auto_route.dart';
+import 'package:mocktail/mocktail.dart';
+
+/// Minimal TabsRouter fake used by the gallery-nav tests. Records
+/// setActiveIndex calls and exposes a mutable activeIndex.
+class FakeTabsRouter extends Fake implements TabsRouter {
+  int _active;
+  final List<int> setCalls = [];
+
+  FakeTabsRouter({int initialIndex = 0}) : _active = initialIndex;
+
+  @override
+  int get activeIndex => _active;
+
+  @override
+  void setActiveIndex(int index, {bool notify = true}) {
+    setCalls.add(index);
+    _active = index;
+  }
+}
+```
+
+All later tasks that reference `_FakeTabsRouter` locally should import from this helper. No commit from this step alone; the file is created in the first task that needs it (B3).
+
+**P.7 Provider-shape verification for negative-assertion tests**
+
+The C4 negative-assertion test needs to override three providers that must NOT be touched by `_onTabTap`. Before writing C4, run the following one-liner to confirm their shapes so the overrides compile:
+
+```bash
+grep -nE '^(final|class) (sharedSpacesProvider|searchPreFilterProvider|searchInputFocusProvider|tabProvider|readonlyModeProvider)' \
+  mobile/lib/providers/ mobile/lib/presentation/pages/search/paginated_search.provider.dart -R 2>&1 | head -20
+```
+
+Record the declaration shape (`StateProvider` vs `NotifierProvider` vs `FutureProvider`, generic type) for each. If any shape doesn't match the plan's override example, adjust the override in C4's Step 1 tests.
 
 ---
 
@@ -843,21 +890,10 @@ import 'package:immich_mobile/providers/photos_filter/filter_sheet.provider.dart
 import 'package:immich_mobile/providers/photos_filter/search_focus.provider.dart';
 import 'package:mocktail/mocktail.dart';
 
-// Fake TabsRouter that records setActiveIndex calls.
-class _FakeTabsRouter extends Fake implements TabsRouter {
-  int activeIndexInternal;
-  final List<int> setCalls = [];
-  _FakeTabsRouter(this.activeIndexInternal);
-
-  @override
-  int get activeIndex => activeIndexInternal;
-
-  @override
-  void setActiveIndex(int index, {bool notify = true}) {
-    setCalls.add(index);
-    activeIndexInternal = index;
-  }
-}
+// Use the shared FakeTabsRouter (P.6); aliased locally for backwards compat
+// with the test file names below.
+// import '../../test_helpers/fake_tabs_router.dart';
+// typedef _FakeTabsRouter = FakeTabsRouter;  // (only needed if inlined below)
 
 class _HapticSpy extends ValueNotifier<int> implements HapticFeedbackNotifier {
   _HapticSpy() : super(0);
@@ -2071,12 +2107,16 @@ void main() {
   testWidgets('Negative: sharedSpacesProvider / searchPreFilterProvider / searchInputFocusProvider / upstream tabProvider NOT touched', (tester) async {
     // Spy providers that record any invocation. If any of these is ever
     // touched by a tap handler, the counter rises and the test fails.
+    //
+    // Per P.7: the overrideWith shapes below assume the provider types
+    // documented there. Adjust to match the actual declarations in the repo
+    // if they differ (grep confirms shape before this task starts).
     int spacesTouched = 0;
     int searchPreTouched = 0;
     int searchFocusTouched = 0;
     int upstreamTabTouched = 0;
 
-    final router = _FakeTabsRouter();
+    final router = FakeTabsRouter();
     final container = ProviderContainer(overrides: [
       sharedSpacesProvider.overrideWith((_) {
         spacesTouched++;
@@ -2086,8 +2126,13 @@ void main() {
         searchPreTouched++;
         return _NoOpPreFilter();
       }),
-      // searchInputFocusProvider — read shape is a .notifier; use the existing
-      // shape from upstream. Verify via a state spy.
+      // searchInputFocusProvider spy — override actually exercises the
+      // assertion (R3-1 fix: without this override, searchFocusTouched stays
+      // at 0 regardless of code behaviour → false green).
+      searchInputFocusProvider.overrideWith((_) {
+        searchFocusTouched++;
+        return FocusNode(debugLabel: 'searchInputFocusSpy');
+      }),
       tabProvider.overrideWith((ref) {
         upstreamTabTouched++;
         return TabEnum.home;
@@ -2114,6 +2159,58 @@ void main() {
     expect(searchPreTouched, pBase, reason: 'searchPreFilterProvider must NOT be cleared');
     expect(searchFocusTouched, fBase, reason: 'searchInputFocusProvider must NOT be focused');
     expect(upstreamTabTouched, tBase, reason: 'upstream tabProvider must NOT be written');
+  });
+
+  testWidgets('pill height is locked to 58pt across text scales (R3-2)', (tester) async {
+    // Regression: GalleryNavPill's outer Container fixes height to 58pt. Text
+    // scale changes must not change the rendered pill height. Published
+    // bottomNavHeightProvider value depends on this.
+    final router = FakeTabsRouter();
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    for (final scaler in [1.0, 1.5, 2.0]) {
+      await tester.pumpWidget(UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          home: MediaQuery(
+            data: MediaQueryData(textScaler: TextScaler.linear(scaler)),
+            child: Material(child: GalleryBottomNav(tabsRouter: router)),
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      final pillSize = tester.getSize(find.byType(GalleryNavPill));
+      expect(pillSize.height, closeTo(58, 0.5),
+          reason: 'pill height must stay 58pt at textScaler=$scaler');
+    }
+  });
+
+  testWidgets('rapid multi-select toggle does not orphan the height publish (R3-8)', (tester) async {
+    final router = FakeTabsRouter();
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    await tester.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp(home: Material(child: GalleryBottomNav(tabsRouter: router))),
+    ));
+    await tester.pumpAndSettle();
+    final shownHeight = container.read(bottomNavHeightProvider);
+    expect(shownHeight, greaterThan(0));
+
+    // Hide animation starts...
+    EventStream.shared.emit(const MultiSelectToggleEvent(true));
+    await tester.pump(const Duration(milliseconds: 80)); // mid-hide
+
+    // ...interrupt by showing again before hide-onEnd fires
+    EventStream.shared.emit(const MultiSelectToggleEvent(false));
+    await tester.pumpAndSettle();
+
+    // After all animations settle, published height must match the visible
+    // state — not 0 from a stale hide-onEnd write.
+    expect(container.read(bottomNavHeightProvider), shownHeight,
+        reason: 'interrupted hide must not orphan height=0 after re-show');
   });
 
   testWidgets('readonly: blob disabled, pill dims Albums+Library, Photos tappable', (tester) async {
@@ -2246,23 +2343,33 @@ class _GalleryBottomNavState extends ConsumerState<GalleryBottomNav> {
     final pillVisibleHeight = _bottomFloat + _pillHeight + mq.padding.bottom;
 
     // When showing, write the measured height on the next frame; when hiding,
-    // the AnimatedSlide.onEnd callback writes 0 at the END of the animation so
-    // the peek rail doesn't jump down early (§5.6 Hide/show animation sync).
+    // the TweenAnimationBuilder.onEnd callback writes 0 at the END of the
+    // animation so the peek rail doesn't jump down early (§5.6 Hide/show sync).
     if (!hiding) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _writeHeight(pillVisibleHeight));
     }
 
-    // LayoutBuilder pin: wrapping the full width pinned to bottom. Inside,
-    // AnimatedSlide (offset vertically on hide) + AnimatedOpacity compose
-    // the fade+12pt slide promised by §5.3. onEnd fires on hide completion.
-    return AnimatedSlide(
+    // Pixel-exact 12pt slide via TweenAnimationBuilder (R3-4 fix). AnimatedSlide's
+    // fractional Offset would scale with parent height and drift from the 12pt
+    // the design spec promises. The tween animates from the current value to the
+    // new `end`, so rapid show/hide toggles transition smoothly (no jump).
+    //
+    // onEnd fires when the tween settles to its target value. If `hiding` is
+    // still true at settle time, publish height=0 to let the peek rail drop.
+    // If the user interrupted the hide mid-animation with a show, `hiding`
+    // will be false at settle time → no height=0 write → rail stays lifted.
+    return TweenAnimationBuilder<double>(
       key: const Key('gallery-bottom-nav-slide'),
+      tween: Tween<double>(end: hiding ? 12.0 : 0.0),
       duration: _hideAnimation,
       curve: Curves.easeOutCubic,
-      offset: hiding ? const Offset(0, 0.25) : Offset.zero, // ~12pt of 48pt parent height
       onEnd: () {
         if (hiding) _writeHeight(0);
       },
+      builder: (_, slide, child) => Transform.translate(
+        offset: Offset(0, slide),
+        child: child,
+      ),
       child: AnimatedOpacity(
         duration: _hideAnimation,
         opacity: hiding ? 0 : 1,
@@ -2390,8 +2497,25 @@ import 'package:immich_mobile/routing/router.dart';
 
 // Helper that boots a minimal MaterialApp.router with the real auto_route
 // config, starts at GalleryTabShellRoute, and returns the ProviderContainer.
+//
+// R3-3 FIX: real router guards (_authGuard, _duplicateGuard) would redirect
+// away from the shell in a test environment with no logged-in fixture. Two
+// ways to defeat them:
+//   1. Override the providers the guards read (currentUserProvider,
+//      serverInfoProvider) with a fixture that passes auth.
+//   2. Inject a `_PassthroughGuard` into AppRouter and bypass guard classes.
+//
+// Option 1 is less invasive. Confirm the guard's inputs before this task
+// runs (grep mobile/lib/routing/auth_guard.dart for its provider reads),
+// then list each here.
 Future<_HarnessHandle> _bootShell(WidgetTester tester) async {
-  final container = ProviderContainer();
+  final container = ProviderContainer(overrides: [
+    // Minimal logged-in fixture — adjust fields to match the real shape.
+    currentUserProvider.overrideWith((_) => _fakeLoggedInUser()),
+    // _duplicateGuard typically checks a pairing/server-info provider:
+    serverInfoProvider.overrideWith((_) => _fakeServerInfo()),
+    // Add any other provider _authGuard / _duplicateGuard read (see P.7).
+  ]);
   addTearDown(container.dispose);
 
   final appRouter = AppRouter();
@@ -2414,11 +2538,17 @@ class _HarnessHandle {
   final AppRouter appRouter;
   _HarnessHandle(this.container, this.appRouter);
   TabsRouter get tabsRouter {
-    // Walk the nested router until we reach the inner TabsRouter.
-    // The actual API is `appRouter.innerRouterOf<TabsRouter>(GalleryTabShellRoute.name)`.
+    // R3-7 NOTE: `innerRouterOf<TabsRouter>` exists in auto_route >=7.x. If
+    // the installed version is older / differs, fall back to walking the
+    // StackRouter stack: `appRouter.topMostRouter()` → cast chain. Verify
+    // during implementation.
     return appRouter.innerRouterOf<TabsRouter>(GalleryTabShellRoute.name)!;
   }
 }
+
+// Fixture placeholders — real shapes adopted from mobile/lib/providers/.
+dynamic _fakeLoggedInUser() => /* shape from currentUserProvider's return type */;
+dynamic _fakeServerInfo() => /* shape from serverInfoProvider's return type */;
 
 void main() {
   testWidgets('default: galleryTabProvider == photos', (tester) async {
