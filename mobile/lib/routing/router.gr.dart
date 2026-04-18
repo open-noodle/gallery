@@ -1794,6 +1794,22 @@ class FolderRouteArgs {
 }
 
 /// generated route for
+/// [GalleryTabShellPage]
+class GalleryTabShellRoute extends PageRouteInfo<void> {
+  const GalleryTabShellRoute({List<PageRouteInfo>? children})
+    : super(GalleryTabShellRoute.name, initialChildren: children);
+
+  static const String name = 'GalleryTabShellRoute';
+
+  static PageInfo page = PageInfo(
+    name,
+    builder: (data) {
+      return const GalleryTabShellPage();
+    },
+  );
+}
+
+/// generated route for
 /// [GalleryViewerPage]
 class GalleryViewerRoute extends PageRouteInfo<GalleryViewerRouteArgs> {
   GalleryViewerRoute({
