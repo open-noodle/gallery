@@ -196,3 +196,46 @@ it('cmd:run_thumbnail_gen: SDK rejection fires handleError (danger toast), no su
   // handleError calls toastManager.danger — see web/src/lib/utils/handle-error.ts:44.
   expect(toastManager.danger).toHaveBeenCalled();
 });
+
+describe.each([
+  ['cmd:pause_all_queues', QueueCommand.Pause, 'cmdk_cmd_all_paused'],
+  ['cmd:resume_all_queues', QueueCommand.Resume, 'cmdk_cmd_all_resumed'],
+])('%s', (id, expectedCommand, successKey) => {
+  it('dispatches to every admin-visible queue (not all QueueName values)', async () => {
+    const spy = vi.spyOn(sdk, 'runQueueCommandLegacy').mockResolvedValue({} as never);
+    const cmd = COMMAND_ITEMS.find((c) => c.id === id)!;
+    await cmd.handler();
+    expect(spy).toHaveBeenCalledTimes(ADMIN_VISIBLE_QUEUES.length);
+    for (const name of ADMIN_VISIBLE_QUEUES) {
+      expect(spy).toHaveBeenCalledWith({ name, queueCommandDto: { command: expectedCommand } });
+    }
+    // Explicit negative: a system queue excluded from ADMIN_VISIBLE_QUEUES must NOT be touched.
+    expect(spy).not.toHaveBeenCalledWith(expect.objectContaining({ name: QueueName.Notifications }));
+    expect(toastManager.primary).toHaveBeenCalledWith(expect.stringContaining(successKey));
+  });
+
+  it('partial failure: some reject → warning toast fires, no success toast', async () => {
+    const spy = vi.spyOn(sdk, 'runQueueCommandLegacy').mockImplementation(({ name }) =>
+      name === QueueName.ThumbnailGeneration
+        ? (Promise.reject(new Error('boom')) as never)
+        : (Promise.resolve({}) as never),
+    );
+    const cmd = COMMAND_ITEMS.find((c) => c.id === id)!;
+    await cmd.handler();
+    expect(spy).toHaveBeenCalledTimes(ADMIN_VISIBLE_QUEUES.length);
+    // Toast assertion is key-only: svelte-i18n with no catalog loaded returns the
+    // raw key AND skips ICU substitution, so interpolated {failed}/{total} values
+    // can't be asserted. The reject-selection above proves the 1/14 breakdown.
+    expect(toastManager.warning).toHaveBeenCalledWith(expect.stringContaining('cmdk_cmd_bulk_partial'));
+    expect(toastManager.primary).not.toHaveBeenCalled();
+  });
+
+  it('total failure: all reject → warning toast fires, no success toast', async () => {
+    const spy = vi.spyOn(sdk, 'runQueueCommandLegacy').mockRejectedValue(new Error('boom') as never);
+    const cmd = COMMAND_ITEMS.find((c) => c.id === id)!;
+    await cmd.handler();
+    expect(spy).toHaveBeenCalledTimes(ADMIN_VISIBLE_QUEUES.length);
+    expect(toastManager.warning).toHaveBeenCalledWith(expect.stringContaining('cmdk_cmd_bulk_partial'));
+    expect(toastManager.primary).not.toHaveBeenCalled();
+  });
+});
