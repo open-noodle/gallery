@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/deep_header.widget.dart';
+import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/people_section.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/match_count_footer.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/search_bar.widget.dart';
 
@@ -29,7 +30,7 @@ class DeepContent extends ConsumerWidget {
                 padding: EdgeInsets.fromLTRB(20, 4, 20, 4),
                 child: KeyedSubtree(key: Key('deep-search'), child: FilterSheetSearchBar()),
               ),
-              SizedBox(height: 8, key: Key('deep-section-people')),
+              PeopleSectionDeep(key: Key('deep-section-people')),
               SizedBox(height: 8, key: Key('deep-section-places')),
               SizedBox(height: 8, key: Key('deep-section-tags')),
               SizedBox(height: 8, key: Key('deep-section-when')),
