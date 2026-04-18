@@ -1,10 +1,6 @@
-import 'package:easy_localization/easy_localization.dart';
-import 'package:easy_localization/src/localization.dart';
-import 'package:easy_localization/src/translations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:immich_mobile/generated/codegen_loader.g.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/deep_header.widget.dart';
 import 'package:immich_mobile/providers/photos_filter/filter_sheet.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
@@ -12,14 +8,6 @@ import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dar
 import '../../../../widget_tester_extensions.dart';
 
 void main() {
-  setUpAll(() async {
-    TestWidgetsFlutterBinding.ensureInitialized();
-    EasyLocalization.logger.enableBuildModes = [];
-    const loader = CodegenLoader();
-    final data = await loader.load('', const Locale('en'));
-    Localization.load(const Locale('en'), translations: Translations(data));
-  });
-
   group('DeepHeader', () {
     testWidgets('renders Close icon, title, and Reset button when filter non-empty', (tester) async {
       await tester.pumpConsumerWidget(const Material(child: DeepHeader()));
@@ -28,7 +16,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('deep-header-close')), findsOneWidget);
-      expect(find.text('Filters'), findsOneWidget);
+      expect(find.text('filter_sheet_title'), findsOneWidget);
       expect(find.byKey(const Key('deep-header-reset')), findsOneWidget);
     });
 
