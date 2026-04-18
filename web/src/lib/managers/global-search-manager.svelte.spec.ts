@@ -29,6 +29,7 @@ vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({
 
 import { goto } from '$app/navigation';
 import { themeManager } from '$lib/managers/theme-manager.svelte';
+import * as recentModule from '$lib/stores/cmdk-recent';
 import { addEntry, getEntries, __resetForTests as resetRecentStore } from '$lib/stores/cmdk-recent';
 import {
   getAlbumInfo,
@@ -47,6 +48,7 @@ import {
 import { toastManager } from '@immich/ui';
 import { computeCommandScore } from 'bits-ui';
 import { installFakeAbortTimeout, restoreAbortTimeout } from './__tests__/fake-abort-timeout';
+import type { CommandItem } from './command-items';
 import {
   GlobalSearchManager,
   type Provider,
@@ -127,6 +129,8 @@ vi.mock('svelte-i18n', async (orig) => {
     },
   };
 });
+
+const flushMicrotasks = () => new Promise((resolve) => queueMicrotask(() => resolve(undefined)));
 
 describe('GlobalSearchManager (skeleton)', () => {
   let manager: GlobalSearchManager;
@@ -841,6 +845,84 @@ describe('activate()', () => {
     expect(decodeURIComponent(firstCall)).toContain('"tagIds":["t1"]');
     const entries = getEntries();
     expect(entries[0]).toMatchObject({ kind: 'tag', id: 'tag:t1', tagId: 't1', label: 'beach' });
+  });
+});
+
+describe('activate("command")', () => {
+  let manager: GlobalSearchManager;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    resetRecentStore();
+    manager = new GlobalSearchManager();
+    manager.open();
+  });
+
+  it('calls the handler exactly once and does not write RECENT', async () => {
+    const handler = vi.fn().mockResolvedValue(undefined);
+    const cmd: CommandItem = { id: 'cmd:test', labelKey: 'x', descriptionKey: 'x', icon: '', handler };
+    const addEntrySpy = vi.spyOn(recentModule, 'addEntry');
+    manager.activate('command', cmd);
+    await flushMicrotasks();
+    expect(handler).toHaveBeenCalledOnce();
+    expect(addEntrySpy).not.toHaveBeenCalled();
+    expect(getEntries()).toHaveLength(0);
+  });
+
+  it('is a no-op while same command is in flight', async () => {
+    let resolve!: () => void;
+    const handler = vi.fn().mockReturnValue(
+      new Promise<void>((r) => {
+        resolve = r;
+      }),
+    );
+    const cmd: CommandItem = { id: 'cmd:test', labelKey: 'x', descriptionKey: 'x', icon: '', handler };
+    manager.activate('command', cmd);
+    manager.activate('command', cmd);
+    await flushMicrotasks();
+    expect(handler).toHaveBeenCalledOnce();
+    resolve();
+  });
+
+  it('clears the in-flight key after the handler settles', async () => {
+    const handler = vi.fn().mockResolvedValue(undefined);
+    const cmd: CommandItem = { id: 'cmd:test', labelKey: 'x', descriptionKey: 'x', icon: '', handler };
+    manager.activate('command', cmd);
+    await flushMicrotasks();
+    await flushMicrotasks(); // one for the handler, one for .finally
+    manager.activate('command', cmd);
+    await flushMicrotasks();
+    expect(handler).toHaveBeenCalledTimes(2);
+  });
+
+  it('swallows handler rejections via console.error', async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const handler = vi.fn().mockRejectedValue(new Error('boom'));
+    const cmd: CommandItem = { id: 'cmd:test', labelKey: 'x', descriptionKey: 'x', icon: '', handler };
+    manager.activate('command', cmd);
+    await flushMicrotasks();
+    await flushMicrotasks();
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      '[cmdk] command handler failed',
+      expect.objectContaining({ id: 'cmd:test' }),
+    );
+    consoleErrorSpy.mockRestore();
+  });
+
+  it('closes the palette before the handler runs', async () => {
+    const order: string[] = [];
+    const closeSpy = vi.spyOn(manager, 'close').mockImplementation(() => {
+      order.push('close');
+    });
+    const handler = vi.fn().mockImplementation(() => {
+      order.push('handler');
+    });
+    const cmd: CommandItem = { id: 'cmd:test', labelKey: 'x', descriptionKey: 'x', icon: '', handler };
+    manager.activate('command', cmd);
+    await flushMicrotasks();
+    expect(order).toEqual(['close', 'handler']);
+    closeSpy.mockRestore();
   });
 });
 

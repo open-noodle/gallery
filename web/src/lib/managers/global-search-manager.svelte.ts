@@ -126,11 +126,11 @@ const ENTITY_KEYS_BY_SCOPE: Record<Scope, ReadonlyArray<EntitySectionKey>> = {
 // The all-scope order matches render order (photos, albums, spaces, people,
 // places, tags, navigation) so the cursor lands on the first visible row.
 const RECONCILE_ORDER_BY_SCOPE: Record<Scope, ReadonlyArray<keyof Sections>> = {
-  all: ['photos', 'albums', 'spaces', 'people', 'places', 'tags', 'navigation'],
+  all: ['commands', 'photos', 'albums', 'spaces', 'people', 'places', 'tags', 'navigation'],
   people: ['people'],
   tags: ['tags'],
   collections: ['albums', 'spaces'],
-  nav: ['navigation'],
+  nav: ['commands', 'navigation'],
 };
 
 function isValidRecentEntry(e: RecentEntry): boolean {
@@ -231,6 +231,16 @@ export class GlobalSearchManager {
    * settles (or the palette closes).
    */
   activationInFlight: SvelteSet<string> = $state(new SvelteSet());
+  /**
+   * Per-command single-flight guard. Independent of `activationInFlight` (which
+   * tracks entity row activations). Prevents a rapid double-Enter from firing
+   * Upload's file picker twice or opening two Create-Album modals.
+   *
+   * Plain `Set` (not `SvelteSet`) because no UI subscribes to this — it's read
+   * only inside `activate('command')` for the synchronous has/add check.
+   */
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity
+  private commandInFlight: Set<string> = new Set();
   /**
    * Id of the row currently showing the 200 ms "pending" affordance (subtle spinner
    * on the row) while its activation handler is resolving. Null when no activation is
@@ -883,6 +893,10 @@ export class GlobalSearchManager {
       case 'navigate': {
         return null;
       }
+      // No 'command' case: commands are verbs, not destinations. activate('command')
+      // does not call addEntry, so no RecentEntry with a cmd:* id can exist. If one
+      // ever appears, isValidRecentEntry's kind-specific field checks discard it
+      // silently on read.
     }
   }
 
@@ -908,6 +922,9 @@ export class GlobalSearchManager {
       }
       case 'nav': {
         return this.sections.navigation;
+      }
+      case 'command': {
+        return this.sections.commands;
       }
       default: {
         return null;
@@ -1057,9 +1074,19 @@ export class GlobalSearchManager {
         break;
       }
       case 'command': {
-        // Placeholder — implemented fully in Task 3.
+        const cmd = item as CommandItem;
+        if (this.commandInFlight.has(cmd.id)) {
+          return;
+        }
+        this.commandInFlight.add(cmd.id);
         this.close();
-        break;
+        queueMicrotask(() => {
+          void Promise.resolve()
+            .then(() => cmd.handler())
+            .catch((error) => console.error('[cmdk] command handler failed', { id: cmd.id, error }))
+            .finally(() => this.commandInFlight.delete(cmd.id));
+        });
+        return; // no RECENT write
       }
     }
     this.close();
