@@ -1,6 +1,7 @@
+import { authManager } from '$lib/managers/auth-manager.svelte';
 import * as albumUtils from '$lib/utils/album-utils';
 import * as fileUploader from '$lib/utils/file-uploader';
-import { modalManager } from '@immich/ui';
+import { modalManager, toastManager } from '@immich/ui';
 import { describe, expect, it, vi } from 'vitest';
 import SpaceCreateModal from '../modals/SpaceCreateModal.svelte';
 import { COMMAND_ITEMS, isAlmostExactCommandMatch } from './command-items';
@@ -10,8 +11,13 @@ vi.mock('@immich/ui', async (orig) => {
   return {
     ...actual,
     modalManager: { show: vi.fn().mockResolvedValue(undefined) },
+    toastManager: { info: vi.fn(), primary: vi.fn(), success: vi.fn(), warning: vi.fn(), danger: vi.fn() },
   };
 });
+
+vi.mock('$lib/managers/auth-manager.svelte', () => ({
+  authManager: { logout: vi.fn().mockResolvedValue(undefined) },
+}));
 
 describe('COMMAND_ITEMS', () => {
   it('has no duplicate ids', () => {
@@ -63,6 +69,19 @@ describe('cmd:create_space', () => {
     const cmd = COMMAND_ITEMS.find((c) => c.id === 'cmd:create_space')!;
     await cmd.handler();
     expect(spy).toHaveBeenCalledWith(SpaceCreateModal, {});
+  });
+});
+
+describe('cmd:signout', () => {
+  it('shows signing-out toast and logs the user out', async () => {
+    const infoSpy = vi.mocked(toastManager.info);
+    const logoutSpy = vi.mocked(authManager.logout);
+    infoSpy.mockClear();
+    logoutSpy.mockClear();
+    const cmd = COMMAND_ITEMS.find((c) => c.id === 'cmd:signout')!;
+    await cmd.handler();
+    expect(infoSpy).toHaveBeenCalledOnce();
+    expect(logoutSpy).toHaveBeenCalledOnce();
   });
 });
 

@@ -1,11 +1,20 @@
+import { authManager } from '$lib/managers/auth-manager.svelte';
 import { isAlmostExactWordMatch } from '$lib/managers/cmdk-match';
 import { themeManager } from '$lib/managers/theme-manager.svelte';
 import SpaceCreateModal from '$lib/modals/SpaceCreateModal.svelte';
 import { createAlbumAndRedirect } from '$lib/utils/album-utils';
 import { openFileUploadDialog } from '$lib/utils/file-uploader';
 import type { ServerFeaturesDto } from '@immich/sdk';
-import { modalManager } from '@immich/ui';
-import { mdiAccountMultiplePlus, mdiCloudUploadOutline, mdiPlaylistPlus, mdiThemeLightDark } from '@mdi/js';
+import { modalManager, toastManager } from '@immich/ui';
+import {
+  mdiAccountMultiplePlus,
+  mdiCloudUploadOutline,
+  mdiLogoutVariant,
+  mdiPlaylistPlus,
+  mdiThemeLightDark,
+} from '@mdi/js';
+import { t } from 'svelte-i18n';
+import { get } from 'svelte/store';
 
 const MIN_MATCH_LENGTH = 3;
 
@@ -49,6 +58,16 @@ export const COMMAND_ITEMS: readonly CommandItem[] = [
     descriptionKey: 'cmdk_cmd_create_space_description',
     icon: mdiAccountMultiplePlus,
     handler: () => modalManager.show(SpaceCreateModal, {}),
+  },
+  {
+    id: 'cmd:signout',
+    labelKey: 'sign_out',
+    descriptionKey: 'cmdk_cmd_sign_out_description',
+    icon: mdiLogoutVariant,
+    handler: () => {
+      toastManager.info(get(t)('signing_out'));
+      return authManager.logout();
+    },
   },
 ];
 
