@@ -180,6 +180,7 @@ describe('GlobalSearchManager (skeleton)', () => {
     const providers = (manager as unknown as { providers: Record<string, unknown> }).providers;
     expect(Object.keys(providers).sort()).toEqual([
       'albums',
+      'commands',
       'navigation',
       'people',
       'photos',
@@ -257,6 +258,7 @@ describe('setQuery', () => {
       albums: makeStub('albums', 2),
       spaces: makeStub('spaces', 2),
       navigation: makeStub('navigation', 2),
+      commands: makeStub('commands', 2),
     };
   });
 
@@ -1177,6 +1179,7 @@ describe('announcementText', () => {
       albums: { status: 'empty' },
       spaces: { status: 'empty' },
       navigation: { status: 'empty' },
+      commands: { status: 'empty' },
     };
     expect(m.announcementText).toBe('');
   });
@@ -1191,6 +1194,7 @@ describe('announcementText', () => {
       albums: { status: 'empty' },
       spaces: { status: 'empty' },
       navigation: { status: 'empty' },
+      commands: { status: 'empty' },
     };
     expect(m.announcementText).toBe('42 photos, 5 people, 3 tags');
   });
@@ -1205,6 +1209,7 @@ describe('announcementText', () => {
       albums: { status: 'empty' },
       spaces: { status: 'empty' },
       navigation: { status: 'empty' },
+      commands: { status: 'empty' },
     };
     expect(m.announcementText).toBe('');
   });
@@ -1230,6 +1235,7 @@ describe('reconcileCursor fallback + getActiveItem edge cases', () => {
       albums: { status: 'empty' },
       spaces: { status: 'empty' },
       navigation: { status: 'empty' },
+      commands: { status: 'empty' },
     };
     m.reconcileCursor();
     expect(m.activeItemId).toBe(null);
@@ -1246,6 +1252,7 @@ describe('reconcileCursor fallback + getActiveItem edge cases', () => {
       albums: { status: 'idle' },
       spaces: { status: 'idle' },
       navigation: { status: 'idle' },
+      commands: { status: 'idle' },
     };
     expect(m.getActiveItem()).toBe(null);
   });
@@ -1492,6 +1499,7 @@ describe('navigation section scaffolding', () => {
       albums: { status: 'empty' },
       spaces: { status: 'empty' },
       navigation: { status: 'ok', items: [{ id: 'nav:theme' }] as never[], total: 5 },
+      commands: { status: 'empty' },
     };
     expect(m.announcementText).toBe('5 pages');
   });
@@ -1506,6 +1514,7 @@ describe('navigation section scaffolding', () => {
       albums: { status: 'empty' },
       spaces: { status: 'empty' },
       navigation: { status: 'ok', items: [{ id: 'nav:theme' }] as never[], total: 1 },
+      commands: { status: 'empty' },
     };
     m.activeItemId = null;
     m.reconcileCursor();
@@ -1595,6 +1604,7 @@ describe('getActiveItem nav branch', () => {
         ] as never[],
         total: 1,
       },
+      commands: { status: 'empty' },
     };
     m.activeItemId = 'nav:theme';
     const active = m.getActiveItem();
@@ -1619,6 +1629,7 @@ describe('getActiveItem nav branch', () => {
         items: [{ id: 'nav:theme' } as never],
         total: 1,
       },
+      commands: { status: 'empty' },
     };
     m.activeItemId = 'nav:userPages:map'; // not in the section
     expect(m.getActiveItem()).toBeNull();
@@ -2715,6 +2726,7 @@ describe('getActiveItem recent-entry preview lookup (cold open)', () => {
       albums: { status: 'empty' },
       spaces: { status: 'empty' },
       navigation: { status: 'empty' },
+      commands: { status: 'empty' },
     };
     // query is empty but no recent matches — fall-through to section.
     const active = m.getActiveItem();

@@ -29,6 +29,7 @@ import { locale as i18nLocale, t, type Translations } from 'svelte-i18n';
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import { get } from 'svelte/store';
 import { parseScope, personSuggestionsComparator, type ParsedQuery, type Scope } from './cmdk-prefix';
+import type { CommandItem } from './command-items';
 import { isAlmostExactNavMatch, NAVIGATION_ITEMS, type NavigationItem } from './navigation-items';
 
 export type SearchMode = 'smart' | 'metadata' | 'description' | 'ocr';
@@ -63,6 +64,7 @@ export type Sections = {
   albums: ProviderStatus<EntityItem>;
   spaces: ProviderStatus<EntityItem>;
   navigation: ProviderStatus<NavigationItem>;
+  commands: ProviderStatus<CommandItem>;
 };
 
 export interface Provider<T = unknown> {
@@ -79,7 +81,8 @@ export type ActiveItem =
   | { kind: 'tag'; data: unknown }
   | { kind: 'album'; data: AlbumNameDto }
   | { kind: 'space'; data: SharedSpaceResponseDto }
-  | { kind: 'nav'; data: NavigationItem };
+  | { kind: 'nav'; data: NavigationItem }
+  | { kind: 'command'; data: CommandItem };
 
 const VALID_MODES: ReadonlySet<SearchMode> = new Set(['smart', 'metadata', 'description', 'ocr']);
 // Slice size for the albums section. Kept as a named constant so the buildProviders
@@ -101,6 +104,8 @@ const idle = Object.freeze({ status: 'idle' as const });
 // to just the entity sections (dropping `navigation`) keeps `sections[key] = ...`
 // assignments away from the navigation section's `ProviderStatus<NavigationItem>`
 // union, which would otherwise force an awkward cast.
+// Commands, like navigation, use a distinct `ProviderStatus<CommandItem>` generic
+// and are intentionally also excluded from this key set.
 type EntitySectionKey = 'photos' | 'people' | 'places' | 'tags' | 'albums' | 'spaces';
 const ENTITY_KEYS_BY_SCOPE: Record<Scope, ReadonlyArray<EntitySectionKey>> = {
   all: ['photos', 'people', 'places', 'tags', 'albums', 'spaces'],
@@ -200,6 +205,7 @@ export class GlobalSearchManager {
     albums: idle,
     spaces: idle,
     navigation: idle,
+    commands: idle,
   });
   activeItemId = $state<string | null>(null);
   mlHealthy = $state(true);
@@ -743,6 +749,7 @@ export class GlobalSearchManager {
       albums: idle,
       spaces: idle,
       navigation: idle,
+      commands: idle,
     };
     this.activeItemId = null;
     this.tagsCache = null;
@@ -924,6 +931,7 @@ export class GlobalSearchManager {
       albums: 'album',
       spaces: 'space',
       navigation: 'nav',
+      commands: 'command',
     };
     for (const key of order) {
       const s = this.sections[key];
@@ -971,7 +979,7 @@ export class GlobalSearchManager {
     void goto(route);
   }
 
-  activate(kind: 'photo' | 'person' | 'place' | 'tag' | 'nav', item: unknown) {
+  activate(kind: 'photo' | 'person' | 'place' | 'tag' | 'nav' | 'command', item: unknown) {
     const now = Date.now();
     switch (kind) {
       case 'photo': {
@@ -1046,6 +1054,11 @@ export class GlobalSearchManager {
           });
           this.navigateNav(n.route);
         }
+        break;
+      }
+      case 'command': {
+        // Placeholder — implemented fully in Task 3.
+        this.close();
         break;
       }
     }
@@ -1405,6 +1418,7 @@ export class GlobalSearchManager {
         albums: idle,
         spaces: idle,
         navigation: idle,
+        commands: idle,
       };
       this.batchInFlight = false;
       this.inFlightCounter = 0;
@@ -1844,6 +1858,16 @@ export class GlobalSearchManager {
       run: () => Promise.resolve({ status: 'empty' as const }),
     };
 
+    // Commands, like navigation, do not dispatch through the runBatch async pipeline.
+    // Task 3 will wire a synchronous command provider; for now this stub satisfies
+    // the `Record<keyof Sections, Provider>` contract and is never invoked at runtime.
+    const commandsStub: Provider<CommandItem> = {
+      key: 'commands',
+      topN: 5,
+      minQueryLength: 2,
+      run: () => Promise.resolve({ status: 'empty' as const }),
+    };
+
     // Albums provider dispatches to `runAlbums`, which filters the in-memory catalog
     // and writes `sections.albums` directly. Task 12 wired the albums key into
     // runBatch's iteration tuple, so `run()` is now invoked on the batch path. It
@@ -1873,7 +1897,7 @@ export class GlobalSearchManager {
       },
     };
 
-    return { photos, people, places, tags, albums, spaces, navigation: navigationStub };
+    return { photos, people, places, tags, albums, spaces, navigation: navigationStub, commands: commandsStub };
   }
 }
 
