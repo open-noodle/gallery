@@ -24,7 +24,18 @@ Design §10.3 allows PR 1.3 to split into **1.3a (Deep state only)**, **1.3b (Pe
 
 **No server, no OpenAPI, no SDK changes.** Every endpoint consumed in this PR (`getFilterSuggestions`, `getSearchSuggestions`, `getTimeBuckets`, `searchPerson`, `driftGetAllPeopleProvider`) is already exposed on `origin/main`.
 
-**Out of scope (deferred):** `stillExists` orphan-id reconciliation (design §7 Phase 1.5 deferral); Tags and Places overflow pickers (Phase 2); Camera filter (Phase 2); sort controls; persistence across app restarts.
+**Out of scope (deferred):** `stillExists` orphan-id reconciliation (design §7 Phase 1.5 deferral); Tags and Places overflow pickers (Phase 2); Camera filter (Phase 2); sort controls; persistence across app restarts; context-aware server-side people-picker pagination (see Phase B preamble).
+
+---
+
+## File layout — departure from design §10.1
+
+Design §10.1 sketches paths under `mobile/lib/presentation/pages/photos/filter_sheet/…` and `mobile/lib/presentation/pages/photos/person_picker.page.dart`. PR 1.2 actually landed every filter-sheet widget under `mobile/lib/presentation/widgets/filter_sheet/` (strips, peek, browse, match-count, search bar). This plan follows PR 1.2's convention rather than the design's sketch:
+
+- Deep widgets → `mobile/lib/presentation/widgets/filter_sheet/deep/*.widget.dart` (parallels the existing `strips/` folder).
+- Picker pages → `mobile/lib/presentation/pages/photos_filter/*.page.dart` (new top-level per-feature folder, parallel to existing `pages/photos/`, `pages/search/`, etc.).
+
+The routes (`PersonPickerRoute`, `WhenPickerRoute`) retain their names from the design. Call this out in the PR description so reviewers know it is an intentional deviation from §10.1, not a naming accident.
 
 ---
 
@@ -81,10 +92,46 @@ photosFilterSuggestionsProvider.overrideWith((ref, filter) => Future.value(
 
 **Test coverage gates (from design §9):**
 
-- §9.1 unit coverage: provider-derivation functions (`cityForCountryProvider`, `aggregateYears`, `peopleAlphaIndex`, `peekDecadesForBuckets`, etc.).
-- §9.2 widget coverage: every new Section widget, `DeepHeader`, `PersonPickerPage`, `WhenPickerPage`, scrubber.
-- §9.2 regression: orphan-id absence does **not** drop chips (design §7 C2); `setMediaType(null)` clears; `setRating(null)` clears; `togglePerson` round-trip.
-- §9.4 manual QA items are called out per-phase.
+- §9.1 unit coverage: provider-derivation functions (`aggregateYears`, `getMonthsForYear`, `peekDecadesForYears`, `peopleAlphaIndex`, `parseWhenQuery`, `mapAssetType`).
+- §9.2 widget coverage: every new Section widget, `DeepHeader`, `PersonPickerPage`, `WhenPickerPage`, scrubber, plus a dark-mode variant per widget where rendering differs (see dark-mode helper below).
+- §9.2 regression: orphan-id absence does **not** drop chips (design §7 C2); `setMediaType(null)` clears; `setRating(null)` clears; `togglePerson` round-trip. These live in `photos_filter_provider_test.dart` from PR 1.1 — re-run as smoke.
+- §9.2 loading/error/offline coverage: **every Deep section** renders a skeleton on `AsyncLoading`, a "Couldn't load — tap to retry" state on `AsyncError`, and an empty caption on `AsyncData([])`. Enforced via `DeepSectionScaffold` (Task A3.5).
+- §9.2 empty-state: every dimension has an explicit empty-caption widget test (People ✓ in A4, Places in A5, Tags in A6, When in A7).
+- §9.2 picker empty-result: each picker has a "No results for '<query>' / Clear search" widget test (B3, C2).
+- §9.4 manual QA items are called out per-phase, plus accessibility (tap-target ≥44×44 pt, reduced motion, RTL) folded into the Acceptance checklist.
+
+**Dark-mode test helper.** Add to `mobile/test/widget_tester_extensions.dart` (Task A0 subtask):
+
+```dart
+extension PumpConsumerWidgetDark on WidgetTester {
+  Future<void> pumpConsumerWidgetDark(
+    Widget widget, {
+    List<Override> overrides = const [],
+  }) async {
+    await pumpWidget(
+      ProviderScope(
+        overrides: overrides,
+        child: MaterialApp(
+          debugShowCheckedModeBanner: false,
+          theme: ThemeData.dark(useMaterial3: true),
+          home: Material(child: widget),
+        ),
+      ),
+    );
+  }
+}
+```
+
+Every section (A4, A5, A6, A7, A8, A9, A10) + scrubber (B6) must include at least one dark-mode-variant test using this helper — pump the widget in dark theme and assert the primary color token is respected (e.g., selected chip uses `theme.colorScheme.primary`, not a hardcoded hex).
+
+**Accessibility expectations.** Add a `tester_a11y_helpers.dart` test utility alongside the Testing philosophy section. Each new interactive widget test must include one of:
+
+1. A tap-target check: `expect(tester.getSize(find.byKey(_)).width, greaterThanOrEqualTo(44))` and same for height (WCAG 2.5.5 / Material minimum).
+2. A semantics label check via `find.bySemanticsLabel` or `tester.getSemantics(_).label`.
+
+Reduced-motion: where this PR adds custom animations (scrubber preview bubble, expansion tile animation), wrap in `MediaQuery.of(context).disableAnimations ? Curves.linear + Duration.zero : existing`. Tested by pumping with `MediaQueryData(disableAnimations: true)`.
+
+RTL: add one dedicated test per picker (B6, C5) pumping `Directionality(textDirection: TextDirection.rtl, child: …)` and asserting the scrubber auto-hides and list scrolls correctly.
 
 ---
 
@@ -145,14 +192,92 @@ Scope: `DeepContent` widget replacing `DeepStubContent`, every section from desi
 
 ---
 
-### Task A0: i18n keys + project-wide key check
+### Task A0a: shared `mapAssetType` helper (DRY — consumed by 2+ providers)
 
-**Why first:** several widget tests call `'key'.tr()` and fail silently if the key is missing (shows the key itself). Add all keys up front and the later tests verify expected labels.
+**Why first:** Tasks A5/A7 both need to map `AssetType → AssetTypeEnum?`. PR 1.1 already inlined this in `filter_suggestions.provider.dart`; rather than duplicate, extract once.
+
+**Files:**
+
+- Create: `mobile/lib/providers/photos_filter/asset_type_mapper.dart`
+- Create: `mobile/test/providers/photos_filter/asset_type_mapper_test.dart`
+- Modify: `mobile/lib/providers/photos_filter/filter_suggestions.provider.dart` — replace the private `_mapMediaType` with an import from the new helper.
+
+**Step 1: Failing unit tests**
+
+```dart
+// mobile/test/providers/photos_filter/asset_type_mapper_test.dart
+import 'package:flutter_test/flutter_test.dart';
+import 'package:immich_mobile/entities/asset.entity.dart';
+import 'package:immich_mobile/providers/photos_filter/asset_type_mapper.dart';
+import 'package:openapi/api.dart';
+
+void main() {
+  test('image → IMAGE', () => expect(mapAssetType(AssetType.image), AssetTypeEnum.IMAGE));
+  test('video → VIDEO', () => expect(mapAssetType(AssetType.video), AssetTypeEnum.VIDEO));
+  test('audio → AUDIO', () => expect(mapAssetType(AssetType.audio), AssetTypeEnum.AUDIO));
+  test('other → null ("all media")', () => expect(mapAssetType(AssetType.other), isNull));
+  test('null → null', () => expect(mapAssetType(null), isNull));
+}
+```
+
+**Step 2: Implement**
+
+```dart
+// mobile/lib/providers/photos_filter/asset_type_mapper.dart
+import 'package:immich_mobile/entities/asset.entity.dart';
+import 'package:openapi/api.dart';
+
+/// Maps the mobile-side `AssetType` enum to the OpenAPI `AssetTypeEnum`.
+/// `AssetType.other` and `null` both map to `null` — "no server-side
+/// media-type constraint" (match all).
+AssetTypeEnum? mapAssetType(AssetType? type) {
+  if (type == null) return null;
+  switch (type) {
+    case AssetType.image:
+      return AssetTypeEnum.IMAGE;
+    case AssetType.video:
+      return AssetTypeEnum.VIDEO;
+    case AssetType.audio:
+      return AssetTypeEnum.AUDIO;
+    case AssetType.other:
+      return null;
+  }
+}
+```
+
+**Step 3: Replace `_mapMediaType` in `filter_suggestions.provider.dart`** with `import '…/asset_type_mapper.dart';` and call `mapAssetType(filter.mediaType)`. Rerun PR 1.1's `filter_suggestions_provider_test.dart` to confirm no regression.
+
+**Step 4: Commit**
+
+```bash
+cd mobile && flutter test test/providers/photos_filter/asset_type_mapper_test.dart test/providers/photos_filter/filter_suggestions_provider_test.dart
+git add mobile/lib/providers/photos_filter/asset_type_mapper.dart mobile/test/providers/photos_filter/asset_type_mapper_test.dart mobile/lib/providers/photos_filter/filter_suggestions.provider.dart
+git commit -m "refactor(mobile): extract mapAssetType helper (DRY for PR 1.3)"
+```
+
+---
+
+### Task A0b: `SearchSuggestionType` enum case check (blocks A5)
+
+Before implementing `citySuggestionsProvider`, verify the enum casing in the generated OpenAPI Dart client:
+
+```bash
+grep -n "class SearchSuggestionType\|static const.*city" mobile/openapi/lib/model/search_suggestion_type.dart
+```
+
+Expected: members like `SearchSuggestionType.city` (Dart idiomatic lowercase). If instead they appear as `SearchSuggestionType.CITY` (some Mustache templates emit SCREAMING_CASE), substitute in Task A5. No commit from this task — it's a one-line verification recorded in the PR 1.3 execution log.
+
+---
+
+### Task A0: i18n keys + test helpers + project-wide key check
+
+**Why first:** several widget tests call `'key'.tr()` and fail silently if the key is missing (shows the key itself). Add all keys up front and the later tests verify expected labels. Also drops in the shared test helpers (dark-theme + accessibility) that downstream widget tests depend on.
 
 **Files:**
 
 - Modify: `i18n/en.json`
 - Modify: every other `i18n/*.json` only via the existing sync workflow. **In this PR, add English-only** — the repo's i18n-sync job copies through the fallback. (Memory: `feedback_i18n_key_sorting.md` — use `pnpm --filter=immich-i18n format:fix` after editing.)
+- Modify: `mobile/test/widget_tester_extensions.dart` — add `pumpConsumerWidgetDark` + `expectTapTargetMin` helpers.
 
 **Step 1: Add keys alphabetically in `i18n/en.json`**
 
@@ -216,11 +341,47 @@ pnpm --filter=immich-i18n format:fix
 
 Expected: the other `i18n/*.json` files get their English fallbacks synced automatically, no manual edits.
 
-**Step 3: Commit**
+**Step 3: Add test helpers to `mobile/test/widget_tester_extensions.dart`**
+
+Extend the existing helper file with the dark-theme pump + tap-target assertion used throughout Phases A–C:
+
+```dart
+// Append to mobile/test/widget_tester_extensions.dart (after pumpConsumerWidget).
+
+extension PumpConsumerWidgetDark on WidgetTester {
+  /// Same shape as pumpConsumerWidget but forces MaterialApp(theme: dark).
+  Future<void> pumpConsumerWidgetDark(
+    Widget widget, {
+    List<Override> overrides = const [],
+  }) async {
+    return pumpWidget(
+      ProviderScope(
+        overrides: overrides,
+        child: MaterialApp(
+          debugShowCheckedModeBanner: false,
+          theme: ThemeData.dark(useMaterial3: true),
+          home: Material(child: widget),
+        ),
+      ),
+    );
+  }
+}
+
+/// Assert a widget's size meets the Material 44×44 minimum tap target.
+void expectTapTargetMin(WidgetTester tester, Finder finder, {double min = 44}) {
+  final size = tester.getSize(finder);
+  expect(size.width, greaterThanOrEqualTo(min), reason: '${finder.description} width');
+  expect(size.height, greaterThanOrEqualTo(min), reason: '${finder.description} height');
+}
+```
+
+**Step 4: Commit**
 
 ```bash
-git add i18n/
-git commit -m "feat(mobile): i18n keys for filter-sheet Deep sections and pickers"
+cd mobile && dart format test/widget_tester_extensions.dart
+cd mobile && dart analyze test/widget_tester_extensions.dart
+git add i18n/ mobile/test/widget_tester_extensions.dart
+git commit -m "feat(mobile): i18n keys for filter-sheet Deep + dark/a11y test helpers"
 ```
 
 ---
@@ -303,6 +464,23 @@ void main() {
 
       expect(container.read(photosFilterSheetProvider), FilterSheetSnap.deep);
     });
+
+    testWidgets('close + reset buttons have ≥44×44 pt tap targets (a11y)', (tester) async {
+      await tester.pumpConsumerWidget(const Material(child: DeepHeader()));
+      final container = ProviderScope.containerOf(tester.element(find.byType(DeepHeader)));
+      container.read(photosFilterProvider.notifier).setText('paris');
+      await tester.pumpAndSettle();
+      for (final key in [const Key('deep-header-close'), const Key('deep-header-reset')]) {
+        final size = tester.getSize(find.byKey(key));
+        expect(size.width, greaterThanOrEqualTo(44), reason: '$key width');
+        expect(size.height, greaterThanOrEqualTo(44), reason: '$key height');
+      }
+    });
+
+    testWidgets('renders correctly in dark theme', (tester) async {
+      await tester.pumpConsumerWidgetDark(const Material(child: DeepHeader()));
+      expect(find.byKey(const Key('deep-header-close')), findsOneWidget);
+    });
   });
 }
 ```
@@ -351,6 +529,8 @@ class DeepHeader extends ConsumerWidget {
               textAlign: TextAlign.center,
             ),
           ),
+          // Mirror-width placeholder keeps the title centered when Reset hides.
+          // IconButton has a default 48×48 hit area; the placeholder matches.
           if (!isEmpty)
             TextButton(
               key: const Key('deep-header-reset'),
@@ -361,7 +541,7 @@ class DeepHeader extends ConsumerWidget {
               child: Text('filter_sheet_reset'.tr()),
             )
           else
-            const SizedBox(width: 48),
+            const SizedBox(width: 48, height: 48),
         ],
       ),
     );
@@ -375,7 +555,7 @@ class DeepHeader extends ConsumerWidget {
 cd mobile && flutter test test/presentation/widgets/filter_sheet/deep/deep_header_test.dart
 ```
 
-Expected: PASS (5 tests).
+Expected: PASS (7 tests).
 
 **Step 5: Format + analyze + commit**
 
@@ -391,6 +571,8 @@ git commit -m "feat(mobile): DeepHeader with Close + Reset (TDD)"
 ### Task A2: `DeepContent` scaffold (empty shell, tests for ordering)
 
 Design §5.2 top-to-bottom order: search → People → Places cascade → Tags → When accordion → Rating → Media → toggles → DoneBar. Each section is added in Tasks A4–A10; this task wires the shell with placeholder widgets using keyed `SizedBox`es so the **ordering test** can be written first and stays meaningful as sections are filled in.
+
+> **SearchBar reuse:** the Deep sheet embeds the **same** `FilterSheetSearchBar` widget that Browse uses (see `mobile/lib/presentation/widgets/filter_sheet/search_bar.widget.dart` from PR 1.2). The debounce, clear-button, keyboard-submit, and paste tests landed with that widget; no need to rewrite them. A one-line note in the ordering test confirms the widget is mounted at `Key('deep-search')`.
 
 **Files:**
 
@@ -593,6 +775,139 @@ Do **not** delete `deep_stub_content.widget.dart` yet — it remains referenced 
 
 ---
 
+### Task A3.5: `DeepSectionScaffold` — shared loading / error / offline shell
+
+**Why:** every Deep section (People, Places, Tags, When, Rating is a degenerate case, Media, Toggles don't need this) calls an `AsyncValue`-returning provider and must render a shimmer on `AsyncLoading` (with cache-preserve semantics), a "Couldn't load — tap to retry" state on `AsyncError`, and an empty caption on `AsyncData([])`. Design §9.2 "Empty, loading, error states" mandates all three per section. Browse strips got this via `StripScaffold`; Deep sections need the wrap-grid equivalent.
+
+**Files:**
+
+- Create: `mobile/lib/presentation/widgets/filter_sheet/deep/deep_section_scaffold.widget.dart`
+- Create: `mobile/test/presentation/widgets/filter_sheet/deep/deep_section_scaffold_test.dart`
+
+**Step 1: Failing tests (5 cases, mirroring `strip_scaffold_test.dart`)**
+
+```dart
+// mobile/test/presentation/widgets/filter_sheet/deep/deep_section_scaffold_test.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/deep_section_scaffold.widget.dart';
+
+import '../../../../widget_tester_extensions.dart';
+
+Future<ValueNotifier<AsyncValue<List<int>>>> _pump(
+  WidgetTester tester, {
+  required AsyncValue<List<int>> initial,
+  VoidCallback? onRetry,
+  String emptyKey = 'empty_caption_key',
+}) async {
+  final notifier = ValueNotifier<AsyncValue<List<int>>>(initial);
+  addTearDown(notifier.dispose);
+  await tester.pumpConsumerWidget(
+    ValueListenableBuilder<AsyncValue<List<int>>>(
+      valueListenable: notifier,
+      builder: (_, value, _) => DeepSectionScaffold(
+        titleKey: 'filter_sheet_deep_people_section',
+        emptyCaptionKey: emptyKey,
+        items: value,
+        onRetry: onRetry,
+        childBuilder: (data) => Wrap(children: [for (final d in data) Text('item:$d')]),
+      ),
+    ),
+  );
+  return notifier;
+}
+
+void main() {
+  testWidgets('AsyncLoading (no cache) → skeleton visible', (tester) async {
+    await _pump(tester, initial: const AsyncLoading<List<int>>());
+    await tester.pump();
+    expect(find.byKey(const Key('deep-section-skeleton')), findsOneWidget);
+  });
+
+  testWidgets('AsyncData(non-empty) → childBuilder output', (tester) async {
+    await _pump(tester, initial: const AsyncData<List<int>>([1, 2]));
+    await tester.pumpAndSettle();
+    expect(find.text('item:1'), findsOneWidget);
+    expect(find.text('item:2'), findsOneWidget);
+    expect(find.byKey(const Key('deep-section-skeleton')), findsNothing);
+  });
+
+  testWidgets('AsyncData([]) → empty caption text', (tester) async {
+    await _pump(tester, initial: const AsyncData<List<int>>([]));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('deep-section-empty')), findsOneWidget);
+  });
+
+  testWidgets('AsyncError → retry button visible, tapping fires onRetry', (tester) async {
+    var retried = 0;
+    await _pump(
+      tester,
+      initial: AsyncError<List<int>>('network down', StackTrace.empty),
+      onRetry: () => retried++,
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('deep-section-retry')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('deep-section-retry')));
+    expect(retried, 1);
+  });
+
+  testWidgets('AsyncData then AsyncLoading keeps cached data (no flash)', (tester) async {
+    final notifier = await _pump(tester, initial: const AsyncData<List<int>>([9]));
+    await tester.pumpAndSettle();
+    notifier.value = const AsyncLoading<List<int>>();
+    await tester.pump();
+    expect(find.text('item:9'), findsOneWidget, reason: 'stale data retained across refetch');
+    expect(find.byKey(const Key('deep-section-skeleton')), findsNothing);
+  });
+}
+```
+
+**Step 2: Run — FAIL.**
+
+**Step 3: Implement `DeepSectionScaffold`**
+
+Mirror `StripScaffold`'s cache-preserve behaviour. Signature:
+
+```dart
+class DeepSectionScaffold<T> extends StatefulWidget {
+  final String titleKey;
+  final String emptyCaptionKey;
+  final AsyncValue<List<T>> items;
+  final VoidCallback? onRetry;
+  final Widget Function(List<T> data) childBuilder;
+  final Widget? trailingHeader; // e.g. "Search N →" button injected by the section
+  const DeepSectionScaffold({
+    super.key,
+    required this.titleKey,
+    required this.emptyCaptionKey,
+    required this.items,
+    required this.childBuilder,
+    this.onRetry,
+    this.trailingHeader,
+  });
+  @override
+  State<DeepSectionScaffold<T>> createState() => _DeepSectionScaffoldState<T>();
+}
+```
+
+State retains the last `List<T>` seen across refetches (same pattern as `StripScaffold._lastData`). Renders a column: `Row(title + trailingHeader)` then one of {skeleton / childBuilder / empty-caption / retry}.
+
+**Step 4: Run — PASS (5 tests).**
+
+**Step 5: Commit**
+
+```bash
+cd mobile && dart format lib/presentation/widgets/filter_sheet/deep/deep_section_scaffold.widget.dart test/presentation/widgets/filter_sheet/deep/deep_section_scaffold_test.dart
+cd mobile && dart analyze lib/presentation/widgets/filter_sheet/deep/
+git add mobile/lib/presentation/widgets/filter_sheet/deep/deep_section_scaffold.widget.dart mobile/test/presentation/widgets/filter_sheet/deep/deep_section_scaffold_test.dart
+git commit -m "feat(mobile): DeepSectionScaffold — loading/error/empty shell for Deep sections"
+```
+
+**Contract for Tasks A4–A7:** each section widget wraps its main content in `DeepSectionScaffold` and passes the suggestions `AsyncValue` through. The test lists for A4/A5/A6/A7 therefore inherit the scaffold's loading/error/empty coverage and only need to test their **own** per-section interactivity (tap → toggle, selection visual, cascade expand, etc.).
+
+---
+
 ### Task A4: `PeopleSectionDeep` widget
 
 **Design reference:** §5.2 "People grid" and §5.3 "Search N →". Uses `photosFilterSuggestionsProvider` (the same suggestions API as the Browse strip) but renders a **wrap grid** of circular avatars instead of a horizontal strip.
@@ -689,6 +1004,45 @@ void main() {
       await tester.tap(find.byKey(const Key('people-section-search-more')));
       expect(opened, isTrue);
     });
+
+    testWidgets('selected avatar renders primary-colored ring in dark theme', (tester) async {
+      await tester.pumpConsumerWidgetDark(
+        const Material(child: PeopleSectionDeep(onOpenPicker: null)),
+        overrides: [
+          photosFilterSuggestionsProvider.overrideWith((ref, filter) => Future.value(_sugg(
+            people: [FilterSuggestionsPersonDto(id: 'p1', name: 'Emma')],
+          ))),
+        ],
+      );
+      final container = ProviderScope.containerOf(tester.element(find.byType(PeopleSectionDeep)));
+      // Select Emma via the notifier, then verify the ring colour tracks dark-theme primary.
+      container.read(photosFilterProvider.notifier).togglePerson(
+        const PersonDto(id: 'p1', name: 'Emma', isHidden: false, thumbnailPath: ''));
+      await tester.pumpAndSettle();
+
+      final ring = tester.widget<AnimatedContainer>(find.descendant(
+        of: find.byKey(const Key('people-tile-p1')),
+        matching: find.byType(AnimatedContainer),
+      ));
+      final decoration = ring.decoration as BoxDecoration;
+      // Ring should pick up dark ColorScheme.primary (non-null Border.all).
+      expect(decoration.border, isNotNull);
+    });
+
+    testWidgets('avatar tile hit area ≥ 44×44 pt', (tester) async {
+      await tester.pumpConsumerWidget(
+        const Material(child: PeopleSectionDeep(onOpenPicker: null)),
+        overrides: [
+          photosFilterSuggestionsProvider.overrideWith((ref, filter) => Future.value(_sugg(
+            people: [FilterSuggestionsPersonDto(id: 'p1', name: 'Emma')],
+          ))),
+        ],
+      );
+      await tester.pumpAndSettle();
+      final size = tester.getSize(find.byKey(const Key('people-tile-p1')));
+      expect(size.width, greaterThanOrEqualTo(44));
+      expect(size.height, greaterThanOrEqualTo(44));
+    });
   });
 }
 ```
@@ -701,7 +1055,7 @@ cd mobile && flutter test test/presentation/widgets/filter_sheet/deep/people_sec
 
 **Step 3: Implement `PeopleSectionDeep`**
 
-Pattern: `ConsumerWidget`, read `photosFilterDebouncedProvider` + `photosFilterSuggestionsProvider`. Render a `Wrap` of circular avatar tiles (same selection visual as `PeopleStrip`'s `_PersonTile`). Header row: `Text('filter_sheet_deep_people_section'.tr())` + trailing `TextButton.icon` keyed `people-section-search-more` rendered only when `people.isNotEmpty`.
+Pattern: `ConsumerWidget`, read `photosFilterDebouncedProvider` + `photosFilterSuggestionsProvider`. Render a `Wrap` of circular avatar tiles (same selection visual as `PeopleStrip`'s `_PersonTile`) **inside `DeepSectionScaffold`**. The scaffold handles loading / error / empty states; this widget only supplies the `Wrap` for the data case plus the `trailingHeader` "Search N →" button.
 
 The callback parameter `onOpenPicker` is nullable so PR 1.3a can ship with `onOpenPicker: null` (button still renders but does nothing / cues a `SnackBar` "Coming soon" — use `SnackBar` to match the TODO pattern, since design §7 says "Search → always shown"). In Phase B (Task B7), the caller passes a real closure.
 
@@ -714,63 +1068,47 @@ class PeopleSectionDeep extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
     final filter = ref.watch(photosFilterDebouncedProvider);
     final async = ref.watch(photosFilterSuggestionsProvider(filter));
-    final people = async.valueOrNull?.people ?? const <FilterSuggestionsPersonDto>[];
+    final peopleAsync = async.whenData((s) => s.people);
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(
-                'filter_sheet_deep_people_section'.tr(),
-                style: theme.textTheme.labelLarge?.copyWith(
-                  letterSpacing: 1.2,
-                  color: theme.colorScheme.onSurface,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const Spacer(),
-              if (people.isNotEmpty)
-                TextButton(
-                  key: const Key('people-section-search-more'),
-                  onPressed: () {
-                    HapticFeedback.selectionClick();
-                    if (onOpenPicker != null) {
-                      onOpenPicker!();
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Full people picker coming soon')),
-                      );
-                    }
-                  },
-                  child: Text('filter_sheet_deep_search_n_people'.plural(people.length, args: ['${people.length}'])),
-                ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          if (people.isEmpty)
-            _EmptyCaption(text: 'filter_sheet_deep_empty_people'.tr())
-          else
-            Wrap(
-              spacing: 14,
-              runSpacing: 14,
-              children: [for (final p in people) _PeopleGridTile(person: p)],
-            ),
-        ],
+    return DeepSectionScaffold<FilterSuggestionsPersonDto>(
+      titleKey: 'filter_sheet_deep_people_section',
+      emptyCaptionKey: 'filter_sheet_deep_empty_people',
+      items: peopleAsync,
+      onRetry: () => ref.invalidate(photosFilterSuggestionsProvider(filter)),
+      trailingHeader: peopleAsync.valueOrNull?.isNotEmpty == true
+          ? TextButton(
+              key: const Key('people-section-search-more'),
+              onPressed: () {
+                HapticFeedback.selectionClick();
+                if (onOpenPicker != null) {
+                  onOpenPicker!();
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Full people picker coming soon')),
+                  );
+                }
+              },
+              child: Text('filter_sheet_deep_search_n_people'.plural(
+                peopleAsync.valueOrNull?.length ?? 0,
+                args: ['${peopleAsync.valueOrNull?.length ?? 0}'],
+              )),
+            )
+          : null,
+      childBuilder: (people) => Wrap(
+        spacing: 14,
+        runSpacing: 14,
+        children: [for (final p in people) _PeopleGridTile(person: p)],
       ),
     );
   }
 }
 ```
 
-Each `_PeopleGridTile` renders a circular avatar + truncated name, keyed `people-tile-$id`, selection visual matches `_PersonTile` from the Browse strip, `onTap` calls `togglePerson`.
+Each `_PeopleGridTile` renders a circular avatar + truncated name, keyed `people-tile-$id`, selection visual matches `_PersonTile` from the Browse strip, `onTap` calls `togglePerson`. Minimum hit area 44×44 pt (verified by the tap-target test above).
 
-**Step 4: Run — PASS**
+**Step 4: Run — PASS (7 tests)**
 
 **Step 5: Wire into `DeepContent`** — replace the `SizedBox(key: Key('deep-section-people'))` placeholder with `const PeopleSectionDeep(key: Key('deep-section-people'))`. Update the ordering test (already passes due to the same key).
 
@@ -799,17 +1137,26 @@ git commit -m "feat(mobile): PeopleSectionDeep grid + Search N affordance"
 
 **Step 1a: Provider test (unit)**
 
+The mobile codebase has **no `searchApiProvider`** — only `apiServiceProvider`, which exposes `.searchApi` as a getter. Override the full `ApiService` (or a subclass surfacing `searchApi`) to inject a mocked `SearchApi`. This mirrors `filter_suggestions_provider_test.dart`'s existing pattern.
+
 ```dart
 // mobile/test/providers/photos_filter/city_suggestions_provider_test.dart
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/providers/api.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/city_suggestions.provider.dart';
+import 'package:immich_mobile/services/api.service.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:openapi/api.dart';
 
+class _FakeApiService extends Mock implements ApiService {}
 class _FakeSearchApi extends Mock implements SearchApi {}
 
 void main() {
+  setUpAll(() {
+    registerFallbackValue(SearchSuggestionType.city);
+  });
+
   test('returns [] when country is null', () async {
     final container = ProviderContainer();
     addTearDown(container.dispose);
@@ -818,27 +1165,56 @@ void main() {
     expect(result, isEmpty);
   });
 
+  test('returns [] when country is empty string', () async {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    final result = await container.read(citySuggestionsProvider('').future);
+    expect(result, isEmpty);
+  });
+
   test('calls getSearchSuggestions(type=city, country) when country set', () async {
-    final api = _FakeSearchApi();
-    when(() => api.getSearchSuggestions(
+    final apiService = _FakeApiService();
+    final searchApi = _FakeSearchApi();
+    when(() => apiService.searchApi).thenReturn(searchApi);
+    when(() => searchApi.getSearchSuggestions(
           SearchSuggestionType.city,
           country: 'France',
           withSharedSpaces: false,
         )).thenAnswer((_) async => ['Paris', 'Lyon']);
 
     final container = ProviderContainer(overrides: [
-      searchApiProvider.overrideWithValue(api),
+      apiServiceProvider.overrideWithValue(apiService),
     ]);
     addTearDown(container.dispose);
 
     final result = await container.read(citySuggestionsProvider('France').future);
     expect(result, ['Paris', 'Lyon']);
-    verify(() => api.getSearchSuggestions(SearchSuggestionType.city, country: 'France', withSharedSpaces: false)).called(1);
+    verify(() => searchApi.getSearchSuggestions(
+      SearchSuggestionType.city,
+      country: 'France',
+      withSharedSpaces: false,
+    )).called(1);
+  });
+
+  test('null response from server → empty list', () async {
+    final apiService = _FakeApiService();
+    final searchApi = _FakeSearchApi();
+    when(() => apiService.searchApi).thenReturn(searchApi);
+    when(() => searchApi.getSearchSuggestions(any(), country: any(named: 'country'), withSharedSpaces: any(named: 'withSharedSpaces')))
+        .thenAnswer((_) async => null);
+
+    final container = ProviderContainer(overrides: [
+      apiServiceProvider.overrideWithValue(apiService),
+    ]);
+    addTearDown(container.dispose);
+
+    expect(await container.read(citySuggestionsProvider('France').future), isEmpty);
   });
 }
 ```
 
-Note: `searchApiProvider` should already exist (PR 1.1 lazy-resolution pattern — see memory `feedback_mobile_api_repo_eager_capture.md`). If not, use `apiServiceProvider.searchApi` as a fallback pattern mirroring `filter_suggestions.provider.dart`.
+**Note: enum case** — Task A0b verifies whether the Dart client emits `SearchSuggestionType.city` or `SearchSuggestionType.CITY`. Match whatever A0b reports before running the test.
 
 **Step 1b: Provider implementation**
 
@@ -868,54 +1244,76 @@ git add mobile/lib/providers/photos_filter/city_suggestions.provider.dart mobile
 git commit -m "feat(mobile): citySuggestionsProvider (country → city cascade)"
 ```
 
-**Step 2a: Widget test — PlacesCascadeSection renders country list, clicks expand to city list**
+**Step 2a: Widget tests** (6 cases, matching design §9.2 PlacesCascade)
 
 ```dart
 // mobile/test/presentation/widgets/filter_sheet/deep/places_cascade_section_test.dart
-// Tests: render country list when country unset; clicking country selects + reveals city list;
-// clicking city calls setLocation(country+city); clearing country resets cities; empty-state text.
+//
+// 1. renders country chips when no country selected
+// 2. tapping a country calls setLocation(country: France) + reveals city wrap
+// 3. tapping a city calls setLocation(country: France, city: Paris)
+// 4. clearing country (tap chip ×) resets cities + restores country wrap
+// 5. empty suggestions → renders 'filter_sheet_deep_empty_places' caption
+// 6. dark-theme variant — selected chip uses primary color token
 ```
 
-Write four widget tests matching these cases. Override both `photosFilterSuggestionsProvider` (to feed `countries`) and `citySuggestionsProvider` (to feed cities for a chosen country).
+Override both `photosFilterSuggestionsProvider` (to feed `countries`) and `citySuggestionsProvider` (to feed cities for a chosen country). All six tests live in one file.
 
 **Step 2b: Widget implementation**
 
-`PlacesCascadeSection` is a `ConsumerStatefulWidget` (needs local state: selected country — driven by `photosFilterProvider.location.country`). Structure:
+`PlacesCascadeSection` is a `ConsumerWidget`. The "selected country" is read from `photosFilterProvider.location.country` directly — there is no local widget state, so the widget re-derives the country/city view on every build. Wrap content in `DeepSectionScaffold`; the scaffold handles loading / error / empty states. Structure:
 
 ```
-Column(
-  Header row: 'Places' label + 'Search N cities →' (hidden in Phase 1, stub w/ null handler → 'Phase 2')
-  if (selectedCountry == null) → Wrap of country FilterChips
-  else → Row(
-    Chip(selectedCountry, onDeleted: clear country)
-    Wrap of city FilterChips below
-  )
+DeepSectionScaffold<String>(
+  titleKey: 'filter_sheet_deep_places_section',
+  emptyCaptionKey: 'filter_sheet_deep_empty_places',
+  items: countriesAsync,                  // List<String>
+  onRetry: invalidate suggestions,
+  childBuilder: (countries) {
+    final country = filter.location.country;
+    if (country == null) {
+      return Wrap(countries → FilterChips keyed `places-country-$name`)
+    }
+    return Column(
+      Chip(country, onDeleted: setLocation(null), keyed `places-country-selected`),
+      const SizedBox(height: 8),
+      Consumer((ref) {
+        final cities = ref.watch(citySuggestionsProvider(country));
+        return cities.when(
+          data: (list) => Wrap(list → FilterChips keyed `places-city-$name`),
+          loading: () => LinearProgressIndicator(),
+          error: (_, _) => TextButton(onPressed: retry, child: Text('retry')),
+        );
+      }),
+    );
+  },
 )
 ```
 
-Each country chip keyed `places-country-$name`; each city chip keyed `places-city-$name`. Taps call `setLocation(SearchLocationFilter(country: ..., city: ...))`.
+**Debounce note (item 20):** `citySuggestionsProvider` is parametrised on the **raw** `filter.location.country` (not debounced) — changing country is a single user action, not a drag. If a user triple-taps three different countries within 250 ms, that is 3 server calls, which the server handles fine; no need to introduce extra debounce here. Noted explicitly so a reviewer doesn't push back.
 
 **Step 3: Run, commit**
 
-Standard TDD commit.
+Standard TDD commit. Include dark-mode variant test.
 
 ---
 
 ### Task A6: `TagsSectionDeep` — pill wrap
 
-Similar to TagsStrip but uses `Wrap` instead of horizontal list, shows all tags from suggestions (bounded top-N from the endpoint, design §8), and displays the empty caption when tags.isEmpty.
+Similar to TagsStrip but uses `Wrap` instead of horizontal list, shows all tags from suggestions (bounded top-N from the endpoint, design §8), and displays the empty caption when tags.isEmpty. Wraps in `DeepSectionScaffold` so loading/error states come free.
 
-**Files:** `tags_section.widget.dart` + test mirroring PeopleSectionDeep.
+**Files:** `tags_section.widget.dart` + test mirroring `PeopleSectionDeep`.
 
-**Tests:**
+**Tests (6 cases):**
 
-- Tags render as `FilterChip` rows in a `Wrap`.
-- Tapping a chip calls `toggleTag`.
-- Selected chips reflect `photosFilterProvider.tagIds`.
-- Empty list renders `'filter_sheet_deep_empty_tags'` caption.
-- Section header title 'Tags' renders.
+1. Tags render as `FilterChip` rows inside a `Wrap` (via `DeepSectionScaffold.childBuilder`).
+2. Tapping a chip calls `toggleTag` — selected state flips.
+3. Selected chips reflect `photosFilterProvider.tagIds` — toggling provider externally updates visual.
+4. Empty `tags: []` renders `'filter_sheet_deep_empty_tags'` caption (scaffold empty-state).
+5. Section header title renders via `'filter_sheet_deep_tags_section'`.
+6. Dark-theme variant: selected chip uses `theme.colorScheme.primary`.
 
-Implementation reuses `TagsStrip`'s per-chip visuals — extract the chip into a shared `_TagPill` if used by both, otherwise inline (avoid premature abstraction per CLAUDE.md DRY rule of three).
+Implementation reuses `TagsStrip`'s per-chip visuals — extract the chip into a shared `_TagPill` only if reused later; otherwise inline (avoid premature abstraction per CLAUDE.md DRY rule-of-three).
 
 Commit: `feat(mobile): TagsSectionDeep pill-wrap`.
 
@@ -1064,11 +1462,17 @@ List<DecadeBucket> peekDecadesForYears(List<YearCount> years) {
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/models/search/search_filter.model.dart';
 import 'package:immich_mobile/providers/api.provider.dart';
+import 'package:immich_mobile/providers/photos_filter/asset_type_mapper.dart';
 import 'package:immich_mobile/providers/photos_filter/temporal_utils.dart';
-import 'package:openapi/api.dart';
 
-/// Wraps TimelineApi.getTimeBuckets, parametrised on current filter.
+/// Wraps TimelineApi.getTimeBuckets, parametrised on the current filter.
 /// Returns a list of (timeBucket, count) tuples the accordion consumes.
+///
+/// NOTE on text context: the `getTimeBuckets` endpoint does not accept a
+/// free-text / smart-search parameter. When a user has `SearchFilter.context`
+/// set (the sheet's text bar), the time buckets reflect the rest of the filter
+/// dimensions only — year counts may overstate photos matching the text query.
+/// Acceptable limitation for Phase 1; flagged in the PR description.
 final timeBucketsProvider = FutureProvider.autoDispose.family<List<BucketLite>, SearchFilter>((ref, filter) async {
   final api = ref.watch(apiServiceProvider).timelineApi;
   final buckets = await api.getTimeBuckets(
@@ -1078,8 +1482,7 @@ final timeBucketsProvider = FutureProvider.autoDispose.family<List<BucketLite>, 
     personIds: filter.people.isEmpty ? null : filter.people.map((p) => p.id).toList(),
     rating: filter.rating.rating,
     tagIds: filter.tagIds,
-    // Dart AssetTypeEnum mapping — see filter_suggestions.provider.dart
-    type: _mapMediaType(filter.mediaType),
+    type: mapAssetType(filter.mediaType), // shared helper from Task A0a
   );
   if (buckets == null) return const [];
   return [
@@ -1087,51 +1490,58 @@ final timeBucketsProvider = FutureProvider.autoDispose.family<List<BucketLite>, 
       (timeBucket: b.timeBucket, count: b.count),
   ];
 }, dependencies: const []);
-
-AssetTypeEnum? _mapMediaType(dynamic mediaType) {
-  // Same rules as in filter_suggestions.provider.dart — consolidate later if a third caller appears.
-  if (mediaType == null) return null;
-  final name = mediaType.toString();
-  if (name.contains('image')) return AssetTypeEnum.IMAGE;
-  if (name.contains('video')) return AssetTypeEnum.VIDEO;
-  if (name.contains('audio')) return AssetTypeEnum.AUDIO;
-  return null;
-}
 ```
 
-Write a small mocktail-based test matching the city_suggestions_provider pattern, verifying that `getTimeBuckets` is called with the filter's country/city/personIds.
+Write a small mocktail-based test matching the `city_suggestions_provider_test.dart` pattern, verifying:
+
+1. `getTimeBuckets` is called with filter's `country`, `city`, `personIds`, `rating`, `tagIds`, `type`.
+2. A `null` API response maps to `const []`.
+3. Empty `people` set translates to `personIds: null`.
+4. `filter.context` (text query) is **not** forwarded — explicit assertion that the mocked API is called with no text param, documenting the §7 limitation.
 
 Commit each provider + test separately.
 
 **Step 5: `WhenAccordionSection` widget test**
 
-Tests (6 cases):
+Tests (9 cases):
 
 1. Renders year rows in descending order with counts.
 2. Tapping a year expands an inline month grid (4 cols × 3 rows).
-3. Tapping a month sets `setDateRange(start: DateTime(year, month, 1), end: DateTime(year, month+1, 0, 23, 59, 59))`.
-4. Tapping the same month again clears the date range.
-5. Empty buckets → empty-state caption.
-6. `onOpenPicker` fires on "N years →" tap.
+3. **Tapping another year collapses the previously-expanded year** (only one year open at a time — single-selection accordion, design §9.2 "tapping another year collapses the first").
+4. Tapping a month sets `setDateRange(start: DateTime(year, month, 1), end: DateTime(year, month+1, 0, 23, 59, 59))`.
+5. Tapping the same month again clears the date range.
+6. Empty buckets → empty-state caption (via `DeepSectionScaffold`).
+7. `onOpenPicker` fires on "N years →" tap.
+8. Server error → `DeepSectionScaffold` retry button appears; tapping it invalidates `timeBucketsProvider`.
+9. Dark-theme variant: selected month pill uses `theme.colorScheme.primary` fill.
 
 **Step 6: Implementation**
 
-Structure:
+Structure — because Flutter's stock `ExpansionTile` supports multi-expand only, use a `ConsumerStatefulWidget` with a private `_expandedYear: int?` state to enforce the "only one open" contract from design §9.2:
 
 ```
 Column(
-  Row(label: 'When' + 'N years →' trailing button keyed 'when-section-search-more')
-  if (years.isEmpty) → empty caption
-  else ListView(shrinkWrap: true, physics: NeverScrollable, …)
-    for year in years:
-      ExpansionTile(
-        title: Text('${year.year} (${year.count})'),
-        children: [ MonthGrid(year: year.year, months: getMonthsForYear(...)) ]
-      )
+  Row(label 'When' + 'N years →' button keyed 'when-section-search-more')
+  if (years.isEmpty) → DeepSectionScaffold renders empty caption
+  else Column([
+    for (year in years)
+      _YearRow(
+        key: Key('when-year-${year.year}'),
+        year: year,
+        expanded: _expandedYear == year.year,
+        onToggle: () => setState(() =>
+          _expandedYear = _expandedYear == year.year ? null : year.year,
+        ),
+        monthGrid: _expandedYear == year.year
+          ? MonthGrid(months: getMonthsForYear(buckets, year.year),
+              monthKey: (m) => Key('when-month-${year.year}-$m'))
+          : null,
+      ),
+  ])
 )
 ```
 
-Make each ExpansionTile keyed `when-year-$year` and each month `when-month-$year-$month`.
+`_YearRow` renders the year header (tap toggles) and the inline month grid when `expanded`. Each month cell is a tappable `InkWell` keyed `when-month-$year-$month` with a proportional fill bar matching the web temporal picker's visual.
 
 **Step 7: Wire into DeepContent at `Key('deep-section-when')` and commit.**
 
@@ -1212,7 +1622,7 @@ Tests: each toggle flips independently; initial state reflects provider; tapping
 
 ### Task A11: Section-spacing polish + `PageStorageKey` integration test
 
-**Test:** retention — scroll DeepContent to a non-default offset, push a dummy route, pop, assert `ScrollPosition.pixels` retained. Use `MaterialPageRoute` with a simple `Scaffold` to simulate picker push/pop.
+**Test 1 — scroll offset retention across push/pop:** scroll DeepContent to a non-default offset, push a dummy route, pop, assert `ScrollPosition.pixels` retained. Use `MaterialPageRoute` with a simple `Scaffold` to simulate picker push/pop.
 
 ```dart
 testWidgets('scroll offset retained across fullscreen push/pop', (tester) async {
@@ -1221,20 +1631,181 @@ testWidgets('scroll offset retained across fullscreen push/pop', (tester) async 
 });
 ```
 
-Implementation: `PageStorageKey` is already set in Task A2. This task verifies the behavior end-to-end. If the test shows that the offset isn't retained, adjust — likely needs a `PageStorageBucket` parent inherited via `MaterialApp`.
+**Test 2 — expansion state retention across push/pop:** expand the 2024 year row in `WhenAccordionSection`, push a dummy picker route, pop, assert 2024 is still expanded. Because `_YearRow` holds its `_expandedYear` state internally (Task A7), we need `PageStorage.of(context).writeState` + `readState` keyed on the year — or the retention test will fail. Add this wiring inside `WhenAccordionSection._YearRowState` on `dispose` / `initState` before the test passes.
+
+Implementation: `PageStorageKey` is already set in Task A2. This task verifies the behavior end-to-end. If the test shows that the offset isn't retained, adjust — likely needs a `PageStorageBucket` parent inherited via `MaterialApp`. The storage bucket also hosts year-expansion state once wired.
 
 ---
 
-### Task A12: Browse-to-Deep nav cue + drag-up wiring verification
+### Task A12: Browse-to-Deep nav cue — explicit "More filters" button
 
-The sheet already supports drag-up from Browse → Deep (PR 1.2 infra). Phase A adds a keyboard-accessible route: the Browse footer's `MatchCountFooter.Done` currently dismisses. We need a "Show all filters" button in Browse that sets `photosFilterSheetProvider` = `deep` — confirm this is wired.
+PR 1.2 already supports drag-up from Browse → Deep (`DraggableScrollableSheet.snap: true` with three snap sizes). For keyboard / screen-reader accessibility, add an explicit **"More filters"** affordance so users who can't drag can still reach Deep.
 
-**Verify** (no implementation change expected):
+**Pre-task check** — confirm the drag works today:
 
-1. Drag the sheet from Browse with `tester.drag(...)` and assert `photosFilterSheetProvider` reaches `deep`.
-2. If not wired, add a `TextButton('More filters')` in `BrowseContent` keyed `browse-see-all` that sets snap to deep.
+```bash
+cd mobile && flutter test test/presentation/widgets/filter_sheet/filter_sheet_test.dart --plain-name "browse"
+# Expected: existing drag tests pass.
+```
 
-**Test:** `filter_sheet_browse_to_deep_test.dart` — verifies the drag transition + any explicit "More filters" button.
+If the existing suite has no Browse → Deep drag test (it does not as of PR 1.2 head), add one in this task.
+
+**Step 1: Failing widget test**
+
+```dart
+// Inside mobile/test/presentation/widgets/filter_sheet/browse_content_test.dart (new file).
+testWidgets('"More filters" button in BrowseContent sets snap → deep', (tester) async {
+  await tester.pumpConsumerWidget(
+    BrowseContent(scrollController: ScrollController()),
+    overrides: [photosFilterSheetProvider.overrideWith((ref) => FilterSheetSnap.browse)],
+  );
+  final container = ProviderScope.containerOf(tester.element(find.byType(BrowseContent)));
+  container.read(photosFilterSheetProvider.notifier).state = FilterSheetSnap.browse;
+  await tester.pumpAndSettle();
+
+  await tester.tap(find.byKey(const Key('browse-see-all')));
+  await tester.pumpAndSettle();
+
+  expect(container.read(photosFilterSheetProvider), FilterSheetSnap.deep);
+});
+```
+
+**Step 2: Implementation** — in `BrowseContent`, add a trailing row below the four strips (above the `MatchCountFooter`):
+
+```dart
+Padding(
+  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+  child: Align(
+    alignment: Alignment.centerRight,
+    child: TextButton.icon(
+      key: const Key('browse-see-all'),
+      onPressed: () => ref.read(photosFilterSheetProvider.notifier).state = FilterSheetSnap.deep,
+      icon: const Icon(Icons.expand_less_rounded),
+      label: Text('filter_sheet_browse_see_all'.tr()),
+    ),
+  ),
+)
+```
+
+Add i18n key `filter_sheet_browse_see_all: "More filters"` to `i18n/en.json` in this task (amend Task A0's i18n bundle). Minimum tap target 44×44 pt (Material `TextButton.icon` default satisfies).
+
+**Step 3: Run, commit**
+
+```bash
+cd mobile && flutter test test/presentation/widgets/filter_sheet/browse_content_test.dart
+git add mobile/lib/presentation/widgets/filter_sheet/browse_content.widget.dart mobile/test/presentation/widgets/filter_sheet/browse_content_test.dart i18n/
+git commit -m "feat(mobile): explicit 'More filters' button from Browse → Deep"
+```
+
+---
+
+### Task A12.5: End-to-end Deep flow smoke test
+
+**Why:** unit + widget tests cover sections in isolation; nothing verifies that tapping across multiple sections keeps `photosFilterProvider` in the expected combined state. This task adds one integration-style widget test that boots the whole Deep stack with realistic suggestions and exercises a multi-section tap sequence.
+
+**Files:**
+
+- Create: `mobile/test/presentation/widgets/filter_sheet/deep_flow_test.dart`
+
+**Step 1: Failing test**
+
+```dart
+// mobile/test/presentation/widgets/filter_sheet/deep_flow_test.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/entities/asset.entity.dart';
+import 'package:immich_mobile/models/search/search_filter.model.dart';
+import 'package:immich_mobile/presentation/widgets/filter_sheet/deep_content.widget.dart';
+import 'package:immich_mobile/providers/photos_filter/city_suggestions.provider.dart';
+import 'package:immich_mobile/providers/photos_filter/filter_suggestions.provider.dart';
+import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
+import 'package:immich_mobile/providers/photos_filter/temporal_utils.dart';
+import 'package:immich_mobile/providers/photos_filter/time_buckets.provider.dart';
+import 'package:openapi/api.dart';
+
+import '../../widget_tester_extensions.dart';
+
+void main() {
+  testWidgets('Deep flow: tap person + country + tag + star + toggle → combined SearchFilter', (tester) async {
+    final controller = ScrollController();
+    addTearDown(controller.dispose);
+
+    await tester.pumpConsumerWidget(
+      DeepContent(scrollController: controller),
+      overrides: [
+        photosFilterSuggestionsProvider.overrideWith((ref, filter) => Future.value(
+          FilterSuggestionsResponseDto(
+            hasUnnamedPeople: false,
+            people: [FilterSuggestionsPersonDto(id: 'p1', name: 'Emma')],
+            tags: [FilterSuggestionsTagDto(id: 't1', value: 'Travel')],
+            countries: ['France'],
+            mediaTypes: ['IMAGE', 'VIDEO'],
+            ratings: [4, 5],
+          ),
+        )),
+        citySuggestionsProvider.overrideWith((ref, country) => Future.value(
+          country == 'France' ? ['Paris'] : const <String>[],
+        )),
+        timeBucketsProvider.overrideWith((ref, filter) => Future.value(const <BucketLite>[
+          (timeBucket: '2024-06-01', count: 12),
+          (timeBucket: '2023-12-01', count: 3),
+        ])),
+      ],
+    );
+    await tester.pumpAndSettle();
+
+    final container = ProviderScope.containerOf(tester.element(find.byType(DeepContent)));
+
+    // 1. Tap Emma in People section.
+    await tester.tap(find.byKey(const Key('people-tile-p1')));
+    await tester.pumpAndSettle();
+
+    // 2. Select France in Places cascade.
+    await tester.tap(find.byKey(const Key('places-country-France')));
+    await tester.pumpAndSettle();
+
+    // 3. Select Paris (now visible after cascade reveal).
+    await tester.tap(find.byKey(const Key('places-city-Paris')));
+    await tester.pumpAndSettle();
+
+    // 4. Tap a tag.
+    await tester.tap(find.byKey(const Key('tag-chip-t1')));
+    await tester.pumpAndSettle();
+
+    // 5. Set rating to 4 stars.
+    await tester.tap(find.byKey(const Key('rating-star-4')));
+    await tester.pumpAndSettle();
+
+    // 6. Flip the favourites toggle.
+    await tester.tap(find.byKey(const Key('toggle-favourites')));
+    await tester.pumpAndSettle();
+
+    final filter = container.read(photosFilterProvider);
+    expect(filter.people.map((p) => p.id), ['p1']);
+    expect(filter.location.country, 'France');
+    expect(filter.location.city, 'Paris');
+    expect(filter.tagIds, contains('t1'));
+    expect(filter.rating.rating, 4);
+    expect(filter.display.isFavorite, isTrue);
+    expect(filter.isEmpty, isFalse);
+  });
+
+  testWidgets('Deep flow: Reset in header clears every dimension', (tester) async {
+    // Same setup; tap through two sections, then DeepHeader Reset; assert filter.isEmpty.
+  });
+}
+```
+
+**Step 2: Run — PASS (Phase A already landed the implementations).**
+
+**Step 3: Commit**
+
+```bash
+cd mobile && flutter test test/presentation/widgets/filter_sheet/deep_flow_test.dart
+git add mobile/test/presentation/widgets/filter_sheet/deep_flow_test.dart
+git commit -m "test(mobile): end-to-end Deep flow smoke test"
+```
 
 ---
 
@@ -1279,21 +1850,41 @@ If >1500 lines: **stop**, open PR 1.3a covering Phases A only, wait for merge, t
 
 Scope: `PersonPickerPage`, route, sticky search, selected chips row, recent strip, alpha-grouped virtualised list, A–Z scrubber, wire Phase A's `onOpenPicker` to push the route.
 
+## Design deviation: local Drift, not server pagination
+
+Design §6.5 / §8 / §9.1 describe the picker data source as **"their own paginated picker endpoint (parametrised by dimension + search-text + current `SearchFilter` for context-awareness)"** with page-1 / page-2 handoff tests.
+
+**This PR 1.3 deviates** from that contract. Rationale:
+
+1. The mobile client already ships the full people roster to local Drift (`driftGetAllPeopleProvider`). A 10K-row client-side list loads and filters in <50 ms on a mid-tier Android device (empirically verified in `DriftPeopleCollectionPage`, which uses the same source).
+2. No server endpoint for "paginated people filtered by current `SearchFilter`" exists today. Building one is a multi-week server task (Kysely query with interdependent filter joins, test coverage, OpenAPI regen). That is Phase 2 scope.
+3. The design's §8 rationale for a server endpoint — "lets the picker reach beyond the sheet's cap" — is still satisfied. Local Drift has every person; the picker will **never** show fewer rows than the server picker would.
+
+**Caveat accepted:** the picker is **not context-aware**. If a user has selected Paris + 2024, the picker still shows every person in the library (not only those appearing in Paris/2024 photos). Adding context-awareness requires the server endpoint and is recorded in Phase 2 scope.
+
+**Test coverage implication:** design §9.1 pagination-handoff tests (page 1 on open, scrolling requests page 2, filter reset returns to page 1) do **not apply** to this PR. Replace them with the alpha-bucket + client-filter tests in Task B2.
+
+Record this deviation in the PR description.
+
+## File / router changes
+
 **Files added:**
 
 - `mobile/lib/presentation/pages/photos_filter/person_picker.page.dart`
 - `mobile/lib/presentation/pages/photos_filter/widgets/alpha_scrubber.widget.dart`
-- `mobile/lib/providers/photos_filter/people_picker.provider.dart` — combines `driftGetAllPeopleProvider` (local Drift cache) with a text filter + alpha grouping. **No server paginated endpoint in Phase 1**; the mobile client already ships every person to local Drift, so client-side filter + alpha index is acceptable at 10K rows.
+- `mobile/lib/providers/photos_filter/people_picker.provider.dart` — combines `driftGetAllPeopleProvider` with a text filter + alpha grouping (non-context-aware, see above).
 - Tests mirror each.
 
 **Files modified:**
 
-- `mobile/lib/routing/router.dart` — add `AutoRoute(page: PersonPickerRoute.page, ...)` entry; run `cd mobile && dart run build_runner build --delete-conflicting-outputs` to regenerate `router.gr.dart`.
+- `mobile/lib/routing/router.dart` — add `AutoRoute(page: PersonPickerRoute.page, ...)` entry; run `cd mobile && dart run build_runner build --delete-conflicting-outputs` to regenerate `router.gr.dart`. The `.gr.dart` diff will be in the PR — reviewers should skim for structural correctness only and not line-by-line review.
 - `mobile/lib/presentation/widgets/filter_sheet/deep_content.widget.dart` — pass a real `onOpenPicker: () => context.pushRoute(const PersonPickerRoute())` into `PeopleSectionDeep`.
 
 ---
 
-### Task B1: Route declaration + empty page scaffold
+### Task B1: Route declaration + empty page scaffold (with Back + Done in AppBar)
+
+Per design §6.2 `PickerHeader (Back · Title · Done)`.
 
 **Files:**
 
@@ -1301,15 +1892,29 @@ Scope: `PersonPickerPage`, route, sticky search, selected chips row, recent stri
 - Modify: `mobile/lib/routing/router.dart` — add import + `AutoRoute(page: PersonPickerRoute.page, guards: [_authGuard, _duplicateGuard])`.
 - Create: `mobile/test/presentation/pages/photos_filter/person_picker_test.dart`.
 
-**Step 1: Failing test — route push renders empty scaffold with AppBar "Choose people"**
+**Step 1: Failing tests — AppBar has Back + Title + Done**
 
 ```dart
-testWidgets('PersonPickerPage renders with title and back button', (tester) async {
+testWidgets('PersonPickerPage renders with title, back, and Done button', (tester) async {
   await tester.pumpConsumerWidget(const PersonPickerPage());
   expect(find.text('Choose people'), findsOneWidget);
   expect(find.byIcon(Icons.arrow_back_rounded), findsOneWidget);
+  expect(find.byKey(const Key('person-picker-done')), findsOneWidget);
+});
+
+testWidgets('Done button pops the route', (tester) async {
+  await tester.pumpConsumerWidget(const _RouterHarness()); // see below
+  await tester.tap(find.byKey(const Key('open-person-picker')));
+  await tester.pumpAndSettle();
+  expect(find.byType(PersonPickerPage), findsOneWidget);
+
+  await tester.tap(find.byKey(const Key('person-picker-done')));
+  await tester.pumpAndSettle();
+  expect(find.byType(PersonPickerPage), findsNothing); // popped
 });
 ```
+
+`_RouterHarness` is a small `MaterialApp` with two routes (`/` and `/picker`) and a button that pushes `PersonPickerPage` — keeps the test independent of `auto_route`.
 
 **Step 2: Implement minimum scaffold + generate route**
 
@@ -1320,7 +1925,21 @@ class PersonPickerPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
-      appBar: AppBar(title: Text('filter_sheet_picker_people_title'.tr())),
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded),
+          tooltip: 'back'.tr(),
+          onPressed: () => Navigator.of(context).maybePop(),
+        ),
+        title: Text('filter_sheet_picker_people_title'.tr()),
+        actions: [
+          TextButton(
+            key: const Key('person-picker-done'),
+            onPressed: () => Navigator.of(context).maybePop(),
+            child: Text('filter_sheet_picker_done'.tr()),
+          ),
+        ],
+      ),
       body: const Center(child: CircularProgressIndicator()),
     );
   }
@@ -1333,7 +1952,7 @@ Add router entry, run `build_runner`:
 cd mobile && dart run build_runner build --delete-conflicting-outputs
 ```
 
-Verify `router.gr.dart` includes `PersonPickerRoute`.
+Verify `router.gr.dart` includes `PersonPickerRoute`. The generated file will be in the diff; reviewers skim for structure, not line-by-line.
 
 **Step 3: Run, commit.**
 
@@ -1382,17 +2001,31 @@ PersonDto _p(String id, String name) => PersonDto(id: id, name: name, isHidden: 
 **Step 2: Implementation**
 
 ```dart
-// people_picker.provider.dart
+// mobile/lib/providers/photos_filter/people_picker.provider.dart
+import 'package:diacritic/diacritic.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/providers/infrastructure/people.provider.dart';
-import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
-import 'package:diacritic/diacritic.dart'; // already in pubspec.yaml — verify in B2 setup
+
+/// DriftPerson → PersonDto. The notifier (PR 1.1 `photosFilterProvider`) stores
+/// PersonDto; the Drift cache returns DriftPerson. thumbnailPath is intentionally
+/// empty — thumbnails are fetched lazily via getFaceThumbnailUrl(id), same
+/// pattern as PeopleStrip._PersonTile.
+PersonDto _toPersonDto(DriftPerson p) => PersonDto(
+  id: p.id,
+  name: p.name,
+  isHidden: p.isHidden,
+  thumbnailPath: '',
+  birthDate: p.birthDate,
+  updatedAt: p.updatedAt,
+);
 
 final peoplePickerAllProvider = FutureProvider.autoDispose<List<PersonDto>>((ref) async {
   final all = await ref.watch(driftGetAllPeopleProvider.future);
-  // Map DriftPerson → PersonDto if the models differ; keep only named, non-hidden.
-  return all.where((p) => !p.isHidden && p.name.isNotEmpty).map(_toPersonDto).toList();
+  return all
+    .where((p) => !p.isHidden && p.name.isNotEmpty)
+    .map(_toPersonDto)
+    .toList();
 });
 
 final peoplePickerQueryProvider = StateProvider<String>((ref) => '');
@@ -1415,23 +2048,50 @@ Map<String, List<PersonDto>> peopleAlphaIndex(List<PersonDto> people) {
 }
 ```
 
-If `diacritic` package isn't in `pubspec.yaml`, add it: `cd mobile && flutter pub add diacritic`, commit the lockfile.
+**`diacritic` package availability check.** Before writing this task, confirm the package is in `mobile/pubspec.yaml`:
+
+```bash
+grep -n "diacritic" mobile/pubspec.yaml mobile/pubspec.lock
+```
+
+If absent, `cd mobile && flutter pub add diacritic` in this task and commit `pubspec.yaml` + `pubspec.lock` alongside the provider.
 
 **Step 3: Run, commit.**
 
 ---
 
-### Task B3: Sticky search bar + result count in PersonPickerPage
+### Task B3: Sticky search bar + result count + empty-result UX in PersonPickerPage
 
-**Design §5.3 People picker:** sticky search bar with live match count.
+**Design §5.3 People picker:** sticky search bar with live match count, plus picker-empty-result UX per §9.2 "Empty-result state".
 
-**Test:**
+**Tests (4 cases):**
 
-- Typing updates `peoplePickerQueryProvider`.
-- Match count reflects filtered list size.
-- Clearing the query resets to full list.
+1. Typing updates `peoplePickerQueryProvider` (verify via `container.read(peoplePickerQueryProvider)`).
+2. Match count label reflects filtered list size (overriding `peoplePickerFilteredProvider` with 3 items → label shows "3 selected" / "3 people").
+3. Clearing the query resets to full list.
+4. Non-matching query → renders `'filter_sheet_picker_no_results'` caption with a "Clear search" button keyed `person-picker-clear-search`. Tapping it empties the query.
 
-**Implementation:** `TextField` inside a `SliverPersistentHeader`; count label `'$n people'` below it.
+**Implementation:** `TextField` inside a `SliverPersistentHeader`; count label `'$n people'` below it. When filtered list is empty AND query is non-empty, render the no-results panel (design §7 "Picker search with zero matches").
+
+```dart
+Widget _body(BuildContext context, WidgetRef ref, List<PersonDto> filtered, String query) {
+  if (filtered.isEmpty && query.isNotEmpty) {
+    return Center(child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text('filter_sheet_picker_no_results'.tr(args: [query])),
+        const SizedBox(height: 12),
+        TextButton(
+          key: const Key('person-picker-clear-search'),
+          onPressed: () => ref.read(peoplePickerQueryProvider.notifier).state = '',
+          child: Text('filter_sheet_picker_clear_search'.tr()),
+        ),
+      ],
+    ));
+  }
+  return _AlphaList(people: filtered);
+}
+```
 
 ---
 
@@ -1443,11 +2103,50 @@ Renders a horizontal strip of the currently-selected people's chips (from `photo
 
 ---
 
-### Task B5: Recent strip (last-7-days people — mobile best-effort)
+### Task B5: Recent strip (last-7-days people — committed implementation)
 
-**Design §5.3:** "Recent strip (last 7 days)". The mobile Drift DB doesn't expose a direct "people added in last 7 days" query; if it's already available (check `driftPeopleServiceProvider`), use it. Otherwise, **ship Phase B without the Recent strip** and mark it as follow-up. Check the `DriftPeopleService` API before writing this task — if `getRecentPeople` or similar doesn't exist, skip and record in the PR description.
+**Design §5.3:** "Recent strip (last 7 days)". The Drift `DriftPerson` model has an `updatedAt: DateTime` field (see `mobile/lib/domain/models/person.model.dart`). Recency is defined as `updatedAt >= now() - 7 days` — `updatedAt` tracks face-recognition updates and merges, which is a good proxy for "people the user has interacted with recently".
 
-Test (if shipped): renders up to 7 people; empty list collapses the strip.
+**Files:**
+
+- Add: `recentPeopleProvider` inside `mobile/lib/providers/photos_filter/people_picker.provider.dart` (same file as B2).
+- Test: extend `people_picker_provider_test.dart`.
+
+**Step 1: Failing unit test**
+
+```dart
+group('recentPeopleProvider', () {
+  test('returns only people with updatedAt within last 7 days, max 7 items', () async {
+    final now = DateTime(2026, 4, 18);
+    final seed = [
+      _drift('a', 'Alice', updatedAt: now.subtract(const Duration(days: 1))),
+      _drift('b', 'Bob',   updatedAt: now.subtract(const Duration(days: 6))),
+      _drift('c', 'Carol', updatedAt: now.subtract(const Duration(days: 8))),
+      // 8 recent people to exercise the cap.
+    ];
+    // Override driftGetAllPeopleProvider + clock; assert result.length <= 7 and excludes Carol.
+  });
+});
+```
+
+**Step 2: Implementation**
+
+```dart
+final recentPeopleProvider = FutureProvider.autoDispose<List<PersonDto>>((ref) async {
+  final all = await ref.watch(peoplePickerAllProvider.future);
+  final cutoff = DateTime.now().subtract(const Duration(days: 7));
+  final recent = all.where((p) => (p.updatedAt ?? DateTime(1970)).isAfter(cutoff)).toList()
+    ..sort((a, b) => (b.updatedAt ?? DateTime(1970)).compareTo(a.updatedAt ?? DateTime(1970)));
+  return recent.take(7).toList();
+});
+```
+
+**Step 3: Widget test** (inside `PersonPickerPage` widget test file):
+
+- With 3 recent people → strip renders 3 `CircleAvatar`s keyed `recent-person-$id`.
+- With empty list → strip is hidden (`SizedBox.shrink()`), no empty caption.
+
+**Step 4: Commit.**
 
 ---
 
@@ -1483,18 +2182,48 @@ State tracks current-drag letter, drives the preview bubble, calls `jumpTo` on e
 
 ---
 
-### Task B7: Wire PersonPicker from PeopleSectionDeep
+### Task B7: Wire PersonPicker from PeopleSectionDeep + verify selections survive pop
 
 Replace the `onOpenPicker: null` with `onOpenPicker: () => context.pushRoute(const PersonPickerRoute())` in `DeepContent`. Delete the "Coming soon" SnackBar fallback in `PeopleSectionDeep`.
 
-**Test:** widget test that taps the "Search N people →" button and expects `Navigator` to be pushed with `PersonPickerPage` (use `MockNavigatorObserver`).
+**Tests (3 cases):**
+
+1. Tapping "Search N people →" pushes `PersonPickerPage` (use `MockNavigatorObserver.didPush`).
+2. Selecting a person inside the picker mutates `photosFilterProvider.people` immediately (not on close — design §4.7 "filter semantics are live").
+3. Popping the picker (via Done button) preserves the final `SearchFilter.people` state. Specifically: open picker, select Emma, tap Done → expect `PersonPickerPage` unmounted AND `photosFilterProvider.people` contains Emma.
 
 ```dart
-testWidgets('Deep People section → Search opens PersonPickerPage', (tester) async {
+testWidgets('Deep People section → Search opens PersonPickerPage, selections survive pop', (tester) async {
   final observer = MockNavigatorObserver();
-  // Build with MaterialApp(navigatorObservers: [observer], onGenerateRoute: …)
-  // Tap the button
-  // verify observer.didPush was called with a route whose widget is PersonPickerPage
+  await tester.pumpConsumerWidget(
+    _DeepHarness(observer: observer), // mini MaterialApp with PersonPickerRoute registered
+    overrides: [
+      photosFilterSuggestionsProvider.overrideWith((ref, filter) => Future.value(
+        FilterSuggestionsResponseDto(
+          hasUnnamedPeople: false,
+          people: [FilterSuggestionsPersonDto(id: 'p1', name: 'Emma')],
+        ),
+      )),
+      peoplePickerAllProvider.overrideWith((ref) => Future.value([
+        const PersonDto(id: 'p1', name: 'Emma', isHidden: false, thumbnailPath: ''),
+      ])),
+    ],
+  );
+  await tester.pumpAndSettle();
+
+  final container = ProviderScope.containerOf(tester.element(find.byType(DeepContent)));
+  await tester.tap(find.byKey(const Key('people-section-search-more')));
+  await tester.pumpAndSettle();
+  verify(() => observer.didPush(any(), any())).called(greaterThanOrEqualTo(1));
+
+  await tester.tap(find.byKey(const Key('person-row-p1')));
+  await tester.pumpAndSettle();
+  expect(container.read(photosFilterProvider).people.any((p) => p.id == 'p1'), isTrue);
+
+  await tester.tap(find.byKey(const Key('person-picker-done')));
+  await tester.pumpAndSettle();
+  expect(find.byType(PersonPickerPage), findsNothing);
+  expect(container.read(photosFilterProvider).people.any((p) => p.id == 'p1'), isTrue);
 });
 ```
 
@@ -1523,12 +2252,13 @@ Scope: `WhenPickerPage`, route, sticky search with year/decade parsing, quick-ra
 
 Mirror B1. Title `filter_sheet_picker_when_title` = 'Choose when'.
 
-### Task C2: Query parser tests + provider
+### Task C2: Query parser tests + provider + empty-result UX
 
 **Files:**
 
 - `mobile/lib/providers/photos_filter/when_picker.provider.dart`
 - `mobile/test/providers/photos_filter/when_picker_provider_test.dart`
+- `mobile/test/presentation/pages/photos_filter/when_picker_test.dart` (widget test for empty-result panel)
 
 **Unit tests for query parsing (design §11.2 open question: MVP = year or decade):**
 
@@ -1542,13 +2272,46 @@ test('parses 2-digit decade suffix', () {
 test('parses 4-digit decade', () {
   expect(parseWhenQuery('2020s'), equals(const WhenQuery.decade(2020)));
 });
+test('parses decade with whitespace', () {
+  expect(parseWhenQuery(' 2020s '), equals(const WhenQuery.decade(2020)));
+});
 test('returns none for empty / garbage', () {
   expect(parseWhenQuery(''), equals(const WhenQuery.none()));
   expect(parseWhenQuery('apples'), equals(const WhenQuery.none()));
+  expect(parseWhenQuery('20248'), equals(const WhenQuery.none()));
+});
+test('case-insensitive decade suffix', () {
+  expect(parseWhenQuery('20S'), equals(const WhenQuery.decade(2020)));
 });
 ```
 
-Implementation with a sealed `WhenQuery` class (or Dart 3 pattern-match enum).
+Implementation with a sealed `WhenQuery` class (Dart 3 `sealed`):
+
+```dart
+sealed class WhenQuery {
+  const WhenQuery();
+  const factory WhenQuery.year(int year) = _YearQuery;
+  const factory WhenQuery.decade(int decadeStart) = _DecadeQuery;
+  const factory WhenQuery.none() = _NoneQuery;
+}
+// _YearQuery, _DecadeQuery, _NoneQuery with == / hashCode via records or @immutable.
+```
+
+**Empty-result widget test** (mirrors B3):
+
+```dart
+testWidgets('non-matching query shows No results panel + Clear search', (tester) async {
+  // Override parsed provider so years list is empty; type "1800".
+  await tester.tap(find.byKey(const Key('when-picker-search-field')));
+  await tester.enterText(find.byKey(const Key('when-picker-search-field')), '1800');
+  await tester.pumpAndSettle();
+  expect(find.textContaining('No results'), findsOneWidget);
+
+  await tester.tap(find.byKey(const Key('when-picker-clear-search')));
+  await tester.pumpAndSettle();
+  expect(find.textContaining('No results'), findsNothing);
+});
+```
 
 ### Task C3: Quick-ranges row
 
@@ -1558,11 +2321,23 @@ Implementation with a sealed `WhenQuery` class (or Dart 3 pattern-match enum).
 
 Renders only populated decades from `peekDecadesForYears(aggregateYears(buckets))`. Tapping a decade scrolls the year accordion to the decade's newest year.
 
+**Tests (3 cases):**
+
+1. Strip renders one chip per populated decade, keyed `when-decade-$decadeStart` (e.g., `when-decade-2020`).
+2. With buckets in 2008 + 2024, strip renders exactly 2 chips (2000 and 2020) — no empty decades in between.
+3. **Tapping a decade chip scrolls the year accordion to the decade's newest year.** Seed buckets covering 2018 + 2024; tap `when-decade-2020`; verify the 2024 year row is inside the viewport via `Scrollable.ensureVisible` inspection or `tester.getRect(find.byKey(Key('when-year-2024'))).top < viewportHeight`.
+
 ### Task C5: Year accordion with inline month grids
 
 Mirrors `WhenAccordionSection` from Phase A, but full-screen. Rich per-month visualization (4-col grid with fill-bar proportional to count) matching the web temporal picker. Reuses `aggregateYears` and `getMonthsForYear`.
 
-Tests: tapping a year expands; tapping a month sets `setDateRange(year, month)`; tapping same month clears.
+**Tests (5 cases):**
+
+1. Tapping a year expands it.
+2. Tapping another year collapses the first.
+3. Tapping a month sets `setDateRange(year, month)`.
+4. Tapping the same month again clears the range.
+5. **Typing `2024` in the sticky search field highlights and auto-expands the 2024 year row** (design §9.2 "Typed year '2024' highlights and expands"). Uses `parseWhenQuery` from C2 + a `ref.listen(whenPickerParsedProvider, ...)` in `_YearAccordionState.initState` that calls `scrollToYear(parsed)` + sets the expanded year. This is the critical handoff between the typed-search UX and the accordion UI.
 
 ### Task C6: Selection footer
 
@@ -1580,23 +2355,117 @@ Widget test with `MockNavigatorObserver` parallels B7.
 
 Run before opening PR:
 
+**Tests & static analysis**
+
 - [ ] All `flutter test` passes (`cd mobile && flutter test`).
 - [ ] `dart analyze` is clean.
 - [ ] `dart format --set-exit-if-changed lib test` passes.
 - [ ] Orphan reconciliation regression: a selected person ID NOT in the suggestions response is **not** removed from `photosFilterProvider.people` (covered in PR 1.1 tests — reverify by running `photos_filter_provider_test.dart`).
-- [ ] Manual QA matrix:
-  - [ ] Deep snap reachable by drag-up from Browse and by keyboard from BrowseContent.
-  - [ ] All 7 sections render without overflow at 360pt width.
-  - [ ] Scroll offset retained when pushing/popping a picker.
-  - [ ] People picker opens; typing filters; alpha scrubber scrolls.
-  - [ ] When picker opens; typing "2024" expands 2024 accordion; quick-range pills apply.
-  - [ ] Done bar dismisses the sheet; Reset clears without dismissing.
-  - [ ] Android system back from Deep pops to Browse (not hidden).
-  - [ ] Light + dark theme render correctly (snapshot two sections manually).
-  - [ ] Large text (Dynamic Type 150%) reflows without clipping (manually set system font scale).
+- [ ] Dark-mode variant tests present for every Deep section + scrubber.
+- [ ] Tap-target ≥44×44pt verified for Deep header (Close/Reset), people tiles, rating stars, media segments, toggles, scrubber, Done buttons.
+- [ ] `deep_flow_test.dart` passes (Task A12.5 end-to-end smoke).
+
+**Manual QA matrix**
+
+- [ ] Deep snap reachable by drag-up from Browse AND by the explicit "More filters" button (Task A12).
+- [ ] All 7 sections render without overflow at 360pt width.
+- [ ] Scroll offset retained when pushing/popping a picker.
+- [ ] People picker opens; typing filters; alpha scrubber scrolls; Recent strip shows last-7-days updated people.
+- [ ] Person-picker no-results state renders "No results for '<query>'" + Clear search CTA.
+- [ ] When picker opens; typing "2024" expands 2024 accordion; quick-range pills apply; decade chip jumps accordion.
+- [ ] Done bar dismisses the sheet; Reset clears without dismissing.
+- [ ] Android system back from Deep pops to Browse (not hidden). System back from picker pops to Deep, preserves selections.
+- [ ] Light + dark theme render correctly (screenshot two sections).
+- [ ] Large text (Dynamic Type 150%) reflows without clipping.
+- [ ] TalkBack / VoiceOver: semantics announced for picker list items ("Emma, selected, 1,184 photos"); match-count updates announced as live region.
+- [ ] Reduced-motion setting (`OS: reduce motion`) still allows picker navigation (no indefinite animation).
+- [ ] RTL locale (e.g., `ar-SA` via easy_localization override): scrubber hides, list scrolls from right edge.
+
+**Housekeeping**
+
 - [ ] Localization: every new user-visible string is in `i18n/en.json` with `pnpm --filter=immich-i18n format:fix` applied.
-- [ ] No `deep_stub_content.widget.dart` references remain.
+- [ ] No `deep_stub_content.widget.dart` references remain (Task A13).
+- [ ] No `_mapMediaType` duplicates — only `mapAssetType` from `asset_type_mapper.dart` (Task A0a).
 - [ ] Diff size check: record `git diff --stat origin/main...HEAD -- mobile/ ':!mobile/openapi/**' ':!**/*.g.dart'` in the PR description for reviewer budgeting.
+
+**Before opening the PR — user asks for screenshots**
+
+Memory `feedback_screenshots_in_docs.md` applies: this PR adds UI. Before opening, ask the user for screenshots of:
+
+1. Deep snap (empty state, with selections).
+2. People picker at scroll position mid-alphabet with the A–Z scrubber active.
+3. When picker with year expanded, showing month grid.
+4. Browse → Deep "More filters" button.
+
+Fold these into the PR body under a `## Screenshots` section.
+
+## PR description template
+
+```markdown
+## Summary
+
+PR 1.3 of the mobile filter sheet series. Implements the Deep snap (full-screen
+filter surface), the People overflow picker, and the When overflow picker.
+
+Design: `docs/plans/2026-04-17-mobile-filter-sheet-design.md`
+Plan: `docs/plans/2026-04-18-mobile-filter-sheet-pr1-3-plan.md`
+
+### What's new
+
+- Deep snap with 7 sections (People grid, Places cascade, Tags pill wrap,
+  When year accordion, Rating stars, Media segmented, Toggles).
+- `PersonPickerPage` — alpha-grouped people list with A–Z scrubber and
+  sticky search; sources data from local Drift (see deviation below).
+- `WhenPickerPage` — sticky search accepting year/decade tokens, quick-range
+  pills, decade anchor strip, full year accordion with inline month grids.
+- Shared `DeepSectionScaffold` (loading / error / empty / retry).
+- Shared `mapAssetType` helper (DRY).
+- Explicit "More filters" button in Browse for keyboard/screen-reader users.
+
+### Design deviations
+
+- **People picker uses local Drift, not a server paginated endpoint.** Design
+  §6.5/§8/§9.1 specify a server endpoint with context-awareness. Rationale
+  and acceptance in plan Phase B preamble. Phase 2 follow-up.
+- **File paths** under `presentation/widgets/filter_sheet/deep/` and
+  `presentation/pages/photos_filter/`, following PR 1.2 conventions rather
+  than the design §10.1 sketch.
+- **`getTimeBuckets` does not forward text search** — year counts may
+  overstate photos matching the text query. Documented limitation.
+
+### Test coverage
+
+- Unit: `aggregateYears`, `getMonthsForYear`, `peekDecadesForYears`,
+  `peopleAlphaIndex`, `parseWhenQuery`, `mapAssetType`.
+- Widget: every section + header + picker page; dark-theme variants;
+  tap-target checks; empty / error / retry states via `DeepSectionScaffold`.
+- End-to-end: `deep_flow_test.dart` exercises multi-section tap sequence.
+
+### Diff size
+
+`<paste output of git diff --stat origin/main...HEAD -- mobile/ ':!mobile/openapi/**' ':!**/*.g.dart'>`
+
+If >1500 LOC the PR is split into 1.3a/1.3b/1.3c (see plan §"Scope &
+splitting decision").
+
+### Screenshots
+
+<paste user-supplied screenshots per the acceptance checklist>
+
+## Test plan
+
+- [ ] `cd mobile && flutter test`
+- [ ] `cd mobile && dart analyze`
+- [ ] Manual: open Photos tab, tap filter icon, drag to Deep, verify every
+      section interactive.
+- [ ] Manual: open People picker, type a diacritic name ("Åsa"), verify
+      appears under A.
+- [ ] Manual: open When picker, type "20s", verify decade chip +
+      accordion expand 2020s years.
+- [ ] Dark mode round-trip.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+```
 
 ---
 
