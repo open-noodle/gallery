@@ -63,6 +63,12 @@ These environment variables are used by the `docker-compose.yml` file and do **N
 Information on the current workers can be found [here](/administration/jobs-workers).
 :::
 
+## Diagnostics
+
+| Variable                | Description                                                                                                                                                                                                                                                                                             | Default | Containers          |
+| :---------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | :-----: | :------------------ |
+| `GALLERY_SEARCH_TIMING` | When `true`, emits one `log`-level line per smart search with per-phase timing (setup / embedding / space lookup / DB), plus a line per ML `/predict` call (fetch + JSON parse). Useful for diagnosing slow smart search — tells you whether ML encode or DB is dominating. Restart required to toggle. |         | server (api worker) |
+
 ## Ports
 
 | Variable      | Description    |                  Default                   | Containers               |

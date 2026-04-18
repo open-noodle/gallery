@@ -113,6 +113,11 @@ export class MachineLearningRepository {
     return this._config;
   }
 
+  // Matched to SearchService's GALLERY_SEARCH_TIMING flag — enabling it surfaces
+  // per-predict fetch/json durations for text encoding (the smart-search hot
+  // path). Captured once at module load; restart to toggle.
+  private readonly timingEnabled = process.env.GALLERY_SEARCH_TIMING === 'true';
+
   constructor(private logger: LoggingRepository) {
     this.logger.setContext(MachineLearningRepository.name);
   }
@@ -204,7 +209,11 @@ export class MachineLearningRepository {
           this.setHealthy(url, true);
           const tJson = performance.now();
           const body = (await response.json()) as T;
-          this.logger.verbose(`ml predict url=${url} fetch=${fetchMs.toFixed(0)}ms json=${(performance.now() - tJson).toFixed(0)}ms`);
+          if (this.timingEnabled) {
+            this.logger.log(
+              `ml predict url=${url} fetch=${fetchMs.toFixed(0)}ms json=${(performance.now() - tJson).toFixed(0)}ms`,
+            );
+          }
           return body;
         }
 
@@ -251,9 +260,11 @@ export class MachineLearningRepository {
     const request = { [ModelTask.SEARCH]: { [ModelType.TEXTUAL]: { modelName, options: { language } } } };
     const t0 = performance.now();
     const response = await this.predict<ClipTextualResponse>({ text }, request, { timeoutMs: 15_000 });
-    this.logger.debug(
-      `encodeText model=${modelName} lang=${language ?? 'default'} len=${text.length} total=${(performance.now() - t0).toFixed(0)}ms`,
-    );
+    if (this.timingEnabled) {
+      this.logger.log(
+        `encodeText model=${modelName} lang=${language ?? 'default'} len=${text.length} total=${(performance.now() - t0).toFixed(0)}ms`,
+      );
+    }
     return response[ModelTask.SEARCH];
   }
 

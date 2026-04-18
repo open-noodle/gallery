@@ -28,6 +28,13 @@ import { requireElevatedPermission } from 'src/utils/access';
 import { getMyPartnerIds } from 'src/utils/asset.util';
 import { isSmartSearchEnabled } from 'src/utils/misc';
 
+// Opt-in env flag for per-phase smart-search timing logs. Set
+// GALLERY_SEARCH_TIMING=true to emit one `log`-level line per smart search
+// breaking down setup / embedding / spaces / db duration. Captured once at
+// module load so toggling requires a server restart (keeps the hot path free
+// of env reads).
+const searchTimingEnabled = process.env.GALLERY_SEARCH_TIMING === 'true';
+
 @Injectable()
 export class SearchService extends BaseService {
   private embeddingCache = new LRUMap<string, string>(100);
@@ -197,14 +204,16 @@ export class SearchService extends BaseService {
     );
     const tDb = performance.now();
 
-    this.logger.debug(
-      `searchSmart total=${(tDb - t0).toFixed(0)}ms ` +
-        `setup=${(tSetup - t0).toFixed(0)}ms ` +
-        `embedding=${(tEmbedding - tSetup).toFixed(0)}ms(src=${embeddingSource}${embeddingSource === 'ml' ? `,encode=${encodeMs.toFixed(0)}ms` : ''}) ` +
-        `spaces=${(tSpaces - tEmbedding).toFixed(0)}ms(count=${timelineSpaceIds?.length ?? 0}) ` +
-        `db=${(tDb - tSpaces).toFixed(0)}ms(rows=${items.length}) ` +
-        `query="${dto.query?.slice(0, 60) ?? ''}" size=${size}`,
-    );
+    if (searchTimingEnabled) {
+      this.logger.log(
+        `searchSmart total=${(tDb - t0).toFixed(0)}ms ` +
+          `setup=${(tSetup - t0).toFixed(0)}ms ` +
+          `embedding=${(tEmbedding - tSetup).toFixed(0)}ms(src=${embeddingSource}${embeddingSource === 'ml' ? `,encode=${encodeMs.toFixed(0)}ms` : ''}) ` +
+          `spaces=${(tSpaces - tEmbedding).toFixed(0)}ms(count=${timelineSpaceIds?.length ?? 0}) ` +
+          `db=${(tDb - tSpaces).toFixed(0)}ms(rows=${items.length}) ` +
+          `query="${dto.query?.slice(0, 60) ?? ''}" size=${size}`,
+      );
+    }
 
     return this.mapResponse(items, hasNextPage ? (page + 1).toString() : null, { auth });
   }
