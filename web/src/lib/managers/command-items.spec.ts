@@ -72,6 +72,28 @@ describe('COMMAND_ITEMS', () => {
   it('includes cmd:theme for Phase 1', () => {
     expect(COMMAND_ITEMS.find((c) => c.id === 'cmd:theme')).toBeDefined();
   });
+
+  it('has 15 entries (7 v1.3.0 + 8 v1.3.1)', () => {
+    expect(COMMAND_ITEMS).toHaveLength(15);
+  });
+
+  it('all 8 v1.3.1 commands are adminOnly', () => {
+    const v131Ids = [
+      'cmd:run_thumbnail_gen',
+      'cmd:run_metadata_extraction',
+      'cmd:run_smart_search',
+      'cmd:run_face_detection',
+      'cmd:run_face_recognition',
+      'cmd:pause_all_queues',
+      'cmd:resume_all_queues',
+      'cmd:clear_failed_jobs',
+    ];
+    for (const id of v131Ids) {
+      const cmd = COMMAND_ITEMS.find((c) => c.id === id);
+      expect(cmd, `expected ${id} in COMMAND_ITEMS`).toBeDefined();
+      expect(cmd!.adminOnly, `expected ${id} to be adminOnly`).toBe(true);
+    }
+  });
 });
 
 describe('cmd:upload', () => {
