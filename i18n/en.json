@@ -1379,6 +1379,10 @@
   "filter_sheet_picker_clear_search": "Clear search",
   "filter_sheet_picker_done": "Done",
   "filter_sheet_picker_no_results": "No results for '{query}'",
+  "filter_sheet_picker_people_count": {
+    "one": "{count} person",
+    "other": "{count} people"
+  },
   "filter_sheet_picker_people_title": "Choose people",
   "filter_sheet_picker_recent": "Recent",
   "filter_sheet_picker_search_people_hint": "Search people",
