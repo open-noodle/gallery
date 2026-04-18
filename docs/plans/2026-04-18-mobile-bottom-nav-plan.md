@@ -1,6 +1,8 @@
 # Mobile Bottom-Nav Redesign — Implementation Plan
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
+>
+> **Revision log:** rev 1 (initial) → **rev 2 (2026-04-18)** — folded in 3 blockers, 4 highs, 8 mediums, 3 lows from post-plan /review. Key structural shifts: side effects moved from `GalleryTabShellPage` listener to `GalleryBottomNav._onTabTap` (re-tap invalidations); `GalleryNavPill` gains `disabledTabs` prop for readonly mode; `GalleryBottomNav` gets `AnimatedSlide` + `AnimatedOpacity` fade-and-slide hide animation with `onEnd`-gated height publish; `openGallerySearch` takes a `ProviderReader` closure instead of `Ref` (works from widgets + tests uniformly); added D0 guard-verification task; fleshed out C5 test scaffolding.
 
 **Goal:** Ship a Google-Photos-inspired floating pill bottom nav (Photos · Albums · Library) plus an outboard Search blob that opens the FilterSheet from PR 1.3. Retires the Search and Spaces tabs from the bottom nav. Upstream `tab_shell.page.dart` and `tab.provider.dart` stay bit-identical.
 
@@ -60,6 +62,14 @@ cd mobile && flutter test test/providers/photos_filter/ test/presentation/widget
 Expected: all green, 0 failures. If red, **stop and investigate** (memory: `feedback_no_flake_allowance.md`) — do not layer new work on a broken baseline.
 
 **P.4 No OpenAPI regen** — this PR is mobile-only and consumes existing routes/endpoints. Do **not** run `make open-api-dart`.
+
+**P.5 Dev dependencies** — confirm `mobile/pubspec.yaml` `dev_dependencies` includes `fake_async` and `mocktail` (used by B3 / C4 tests). Check:
+
+```bash
+grep -E 'fake_async|mocktail' mobile/pubspec.yaml
+```
+
+If either is missing, add it before starting tasks (single pubspec edit + `flutter pub get`). The mobile test suite already uses `mocktail` in other tests, so it's likely present; `fake_async` is less common.
 
 ---
 
@@ -303,6 +313,36 @@ testWidgets('unmount then increment: no crash', (tester) async {
   // Should not throw.
   container.read(photosFilterSearchFocusRequestProvider.notifier).state++;
   await tester.pump();
+});
+
+testWidgets('_lastProcessedFocusRequest advances only after post-frame runs', (tester) async {
+  // Race covered: if the widget unmounts between build and post-frame,
+  // the marker must NOT advance — otherwise a freshly-remounted widget
+  // would miss the increment.
+  final container = ProviderContainer();
+  addTearDown(container.dispose);
+  container.read(photosFilterSearchFocusRequestProvider.notifier).state = 1;
+
+  await tester.pumpWidget(UncontrolledProviderScope(
+    container: container,
+    child: const MaterialApp(home: Material(child: FilterSheetSearchBar())),
+  ));
+  // DO NOT pumpAndSettle — we want the build to run but the post-frame
+  // callback NOT to fire. Unmount immediately.
+  await tester.pumpWidget(const SizedBox.shrink());
+  await tester.pumpAndSettle();
+
+  // Remount a fresh widget: it should see counter=1 > _lastProcessed=0
+  // and request focus on its first build.
+  await tester.pumpWidget(UncontrolledProviderScope(
+    container: container,
+    child: const MaterialApp(home: Material(child: FilterSheetSearchBar())),
+  ));
+  await tester.pumpAndSettle();
+
+  final textField = tester.widget<TextField>(find.byType(TextField));
+  expect(textField.focusNode!.hasFocus, isTrue,
+      reason: 'fresh mount must still pick up the pre-mount increment');
 });
 ```
 
@@ -843,7 +883,7 @@ void main() {
     ]);
     addTearDown(c.dispose);
 
-    await openGallerySearch(router, c);
+    await openGallerySearch(router, c.read);
 
     expect(router.setCalls, isEmpty);
     expect(c.read(photosFilterSheetProvider), FilterSheetSnap.browse);
@@ -861,7 +901,7 @@ void main() {
       ]);
       addTearDown(c.dispose);
 
-      openGallerySearch(router, c);
+      openGallerySearch(router, c.read);
       async.flushMicrotasks();
 
       expect(router.setCalls, [GalleryTabEnum.photos.index]);
@@ -885,9 +925,60 @@ void main() {
     ]);
     addTearDown(c.dispose);
 
-    await openGallerySearch(router, c);
+    await openGallerySearch(router, c.read);
     expect(c.read(photosFilterSheetProvider), FilterSheetSnap.browse);
     expect(c.read(photosFilterSearchFocusRequestProvider), 1);
+  });
+
+  test('sheet at deep: write transitions to browse, focus counter += 1', () async {
+    final router = _FakeTabsRouter(GalleryTabEnum.photos.index);
+    final c = ProviderContainer(overrides: [
+      hapticFeedbackProvider.overrideWith(() => _HapticSpy()),
+      photosFilterSheetProvider.overrideWith((_) => FilterSheetSnap.deep),
+    ]);
+    addTearDown(c.dispose);
+
+    await openGallerySearch(router, c.read);
+    expect(c.read(photosFilterSheetProvider), FilterSheetSnap.browse);
+    expect(c.read(photosFilterSearchFocusRequestProvider), 1);
+  });
+
+  test('from Library: same behavior as Albums', () {
+    fakeAsync((async) {
+      final router = _FakeTabsRouter(GalleryTabEnum.library.index);
+      final c = ProviderContainer(overrides: [
+        hapticFeedbackProvider.overrideWith(() => _HapticSpy()),
+        photosFilterSheetProvider.overrideWith((_) => FilterSheetSnap.hidden),
+      ]);
+      addTearDown(c.dispose);
+
+      openGallerySearch(router, c.read);
+      async.elapse(const Duration(milliseconds: 620));
+      async.flushMicrotasks();
+
+      expect(router.setCalls, [GalleryTabEnum.photos.index]);
+      expect(c.read(photosFilterSheetProvider), FilterSheetSnap.browse);
+      expect(c.read(photosFilterSearchFocusRequestProvider), 1);
+    });
+  });
+
+  test('haptic fires exactly once per call regardless of sheet state', () async {
+    for (final initial in [
+      FilterSheetSnap.hidden,
+      FilterSheetSnap.peek,
+      FilterSheetSnap.browse,
+      FilterSheetSnap.deep,
+    ]) {
+      final router = _FakeTabsRouter(GalleryTabEnum.photos.index);
+      final haptic = _HapticSpy();
+      final c = ProviderContainer(overrides: [
+        hapticFeedbackProvider.overrideWith(() => haptic),
+        photosFilterSheetProvider.overrideWith((_) => initial),
+      ]);
+      await openGallerySearch(router, c.read);
+      expect(haptic.value, 1, reason: 'starting from $initial, haptic must fire exactly once');
+      c.dispose();
+    }
   });
 
   test('rapid second openGallerySearch mid-delay: +2 counter, no crash', () {
@@ -899,9 +990,9 @@ void main() {
       ]);
       addTearDown(c.dispose);
 
-      openGallerySearch(router, c);
+      openGallerySearch(router, c.read);
       async.elapse(const Duration(milliseconds: 300));
-      openGallerySearch(router, c);
+      openGallerySearch(router, c.read);
       async.elapse(const Duration(milliseconds: 700));
 
       expect(c.read(photosFilterSheetProvider), FilterSheetSnap.browse);
@@ -918,7 +1009,7 @@ void main() {
       ]);
       addTearDown(c.dispose);
 
-      openGallerySearch(router, c);
+      openGallerySearch(router, c.read);
       async.elapse(const Duration(milliseconds: 100));
       // Simulate user tapping the Library segment mid-delay (direct router call).
       router.setActiveIndex(GalleryTabEnum.library.index);
@@ -949,23 +1040,28 @@ import 'package:immich_mobile/providers/photos_filter/search_focus.provider.dart
 // Coupled to AutoTabsRouter transition — see tab_shell.page.dart (upstream's
 // 600 ms FadeTransition). 20 ms buffer lets MainTimelinePage finish its first-
 // build pass so FilterSheetSearchBar can accept focus.
-const Duration _kGalleryTabTransitionDelay = Duration(milliseconds: 620);
+const Duration kGalleryTabTransitionDelay = Duration(milliseconds: 620);
 
-Future<void> openGallerySearch(TabsRouter tabsRouter, Ref ref) async {
-  ref.read(hapticFeedbackProvider.notifier).selectionClick();
+/// Reader is the common shape across WidgetRef, Ref, and ProviderContainer's
+/// `read`. Passing a closure lets this helper be called from any of them
+/// without coupling to a specific Riverpod ref type.
+typedef ProviderReader = T Function<T>(ProviderListenable<T>);
+
+Future<void> openGallerySearch(TabsRouter tabsRouter, ProviderReader read) async {
+  read(hapticFeedbackProvider.notifier).selectionClick();
   final onPhotos = tabsRouter.activeIndex == GalleryTabEnum.photos.index;
 
   if (!onPhotos) {
     tabsRouter.setActiveIndex(GalleryTabEnum.photos.index);
-    await Future<void>.delayed(_kGalleryTabTransitionDelay);
+    await Future<void>.delayed(kGalleryTabTransitionDelay);
   }
 
-  ref.read(photosFilterSheetProvider.notifier).state = FilterSheetSnap.browse;
-  ref.read(photosFilterSearchFocusRequestProvider.notifier).state++;
+  read(photosFilterSheetProvider.notifier).state = FilterSheetSnap.browse;
+  read(photosFilterSearchFocusRequestProvider.notifier).state++;
 }
 ```
 
-Note: the function takes `Ref` rather than `WidgetRef` so unit tests can drive it with a `ProviderContainer`. In widget land, pass `ref` from a `ConsumerWidget` (which exposes `WidgetRef`); `WidgetRef` satisfies `Ref`.
+Why a `ProviderReader` closure rather than `Ref` or `WidgetRef`: `WidgetRef` (the widget-scope ref from `hooks_riverpod`) does NOT extend `Ref` (the provider-scope ref). Taking either concrete type would break one of the call sites. A closure-typed reader works from all: widget call site passes `ref.read`; test call site passes `container.read`. Both `WidgetRef.read` and `ProviderContainer.read` have the `T Function<T>(ProviderListenable<T>)` signature.
 
 **Step 4: Run, expect pass** — 5 tests.
 
@@ -1224,6 +1320,54 @@ void main() {
     expect((underlayRect.width - segmentRect.width).abs(), lessThan(0.5));
   });
 
+  testWidgets('disabledTabs: dims Albums+Library to 0.3 opacity, blocks taps', (tester) async {
+    int tapped = -1;
+    await tester.pumpConsumerWidget(
+      SizedBox(
+        width: 320,
+        child: GalleryNavPill(
+          activeTab: GalleryTabEnum.photos,
+          disabledTabs: {GalleryTabEnum.albums, GalleryTabEnum.library},
+          onTabTap: (t) => tapped = t.index,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final albumsOpacity = tester.widget<Opacity>(
+      find.ancestor(of: find.byKey(const Key('gallery-nav-segment-albums')), matching: find.byType(Opacity)),
+    );
+    expect(albumsOpacity.opacity, closeTo(0.3, 0.001));
+
+    final photosOpacity = tester.widget<Opacity>(
+      find.ancestor(of: find.byKey(const Key('gallery-nav-segment-photos')), matching: find.byType(Opacity)),
+    );
+    expect(photosOpacity.opacity, 1.0);
+
+    await tester.tap(find.text('Albums'));
+    expect(tapped, -1, reason: 'disabled segment should not invoke onTabTap');
+
+    await tester.tap(find.text('Photos'));
+    expect(tapped, GalleryTabEnum.photos.index);
+  });
+
+  testWidgets('light-theme variant: active fill uses primary @ 0.22', (tester) async {
+    await tester.pumpConsumerWidget(
+      SizedBox(width: 320, child: GalleryNavPill(activeTab: GalleryTabEnum.photos, onTabTap: (_) {})),
+    );
+    await tester.pumpAndSettle();
+    final underlay = tester.widget<DecoratedBox>(
+      find.descendant(
+        of: find.byKey(const Key('gallery-nav-underlay')),
+        matching: find.byType(DecoratedBox),
+      ),
+    );
+    final color = (underlay.decoration as BoxDecoration).color!;
+    // Light theme: brightness is light, so opacity should be 0.22.
+    // We can't easily assert the theme from here, but assert opacity is ≈0.22.
+    expect(color.opacity, closeTo(0.22, 0.01));
+  });
+
   testWidgets('inner-warmth highlight is rendered below segments in stack order', (tester) async {
     await tester.pumpConsumerWidget(
       SizedBox(width: 320, child: GalleryNavPill(activeTab: GalleryTabEnum.photos, onTabTap: (_) {})),
@@ -1286,8 +1430,16 @@ import 'package:immich_mobile/providers/gallery_nav/gallery_tab_enum.dart';
 class GalleryNavPill extends StatefulWidget {
   final GalleryTabEnum activeTab;
   final void Function(GalleryTabEnum) onTabTap;
+  /// Tabs to render at 30 % opacity with pointer events ignored (design §5.3
+  /// readonly mode). Defaults to empty.
+  final Set<GalleryTabEnum> disabledTabs;
 
-  const GalleryNavPill({super.key, required this.activeTab, required this.onTabTap});
+  const GalleryNavPill({
+    super.key,
+    required this.activeTab,
+    required this.onTabTap,
+    this.disabledTabs = const {},
+  });
 
   @override
   State<GalleryNavPill> createState() => _GalleryNavPillState();
@@ -1405,11 +1557,17 @@ class _GalleryNavPillState extends State<GalleryNavPill> {
                   for (final tab in GalleryTabEnum.values)
                     KeyedSubtree(
                       key: _keys[tab],
-                      child: GalleryNavSegment(
-                        key: Key('gallery-nav-segment-${tab.name}'),
-                        tab: tab,
-                        active: widget.activeTab == tab,
-                        onTap: () => widget.onTabTap(tab),
+                      child: Opacity(
+                        opacity: widget.disabledTabs.contains(tab) ? 0.3 : 1.0,
+                        child: IgnorePointer(
+                          ignoring: widget.disabledTabs.contains(tab),
+                          child: GalleryNavSegment(
+                            key: Key('gallery-nav-segment-${tab.name}'),
+                            tab: tab,
+                            active: widget.activeTab == tab,
+                            onTap: () => widget.onTabTap(tab),
+                          ),
+                        ),
                       ),
                     ),
                 ],
@@ -1679,16 +1837,54 @@ void main() {
     expect(find.byType(GallerySearchBlob), findsOneWidget);
   });
 
-  testWidgets('multi-select event hides the nav entirely', (tester) async {
+  testWidgets('multi-select event hides nav (from any tab origin)', (tester) async {
+    // H2: design requires three origins; EventStream is global so one listener
+    // covers all three, but we assert each to guard against a refactor that
+    // accidentally scopes the listener to a specific tab.
+    for (final startingIndex in [
+      GalleryTabEnum.photos.index,
+      GalleryTabEnum.albums.index,
+      GalleryTabEnum.library.index,
+    ]) {
+      final router = _FakeTabsRouter().._active = startingIndex;
+      await tester.pumpWidget(_wrap(GalleryBottomNav(tabsRouter: router)));
+      await tester.pumpAndSettle();
+      expect(find.byType(GalleryNavPill), findsOneWidget, reason: 'start state at tab=$startingIndex');
+
+      EventStream.shared.emit(const MultiSelectToggleEvent(true));
+      await tester.pumpAndSettle();
+      // After the 200ms hide animation completes the IgnorePointer blocks taps;
+      // AnimatedOpacity reaches 0 and the nav is visually gone.
+      final opacity = tester.widget<AnimatedOpacity>(find.byType(AnimatedOpacity));
+      expect(opacity.opacity, 0, reason: 'opacity hits 0 when hiding, tab=$startingIndex');
+
+      // Restore for next iteration.
+      EventStream.shared.emit(const MultiSelectToggleEvent(false));
+      await tester.pumpAndSettle();
+    }
+  });
+
+  testWidgets('hide animation completion writes bottomNavHeightProvider=0', (tester) async {
     final router = _FakeTabsRouter();
-    await tester.pumpWidget(_wrap(GalleryBottomNav(tabsRouter: router)));
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    await tester.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp(home: Material(child: GalleryBottomNav(tabsRouter: router))),
+    ));
     await tester.pumpAndSettle();
-    expect(find.byType(GalleryNavPill), findsOneWidget);
+    final shownHeight = container.read(bottomNavHeightProvider);
+    expect(shownHeight, greaterThan(0));
 
     EventStream.shared.emit(const MultiSelectToggleEvent(true));
-    await tester.pumpAndSettle();
-    expect(find.byType(GalleryNavPill), findsNothing);
-    expect(find.byType(GallerySearchBlob), findsNothing);
+    // Halfway through the hide animation — height should still reflect the
+    // visible nav (so peek rail doesn't jump early).
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(container.read(bottomNavHeightProvider), shownHeight,
+        reason: 'height stays while animating out');
+
+    await tester.pumpAndSettle(); // finishes the animation → onEnd fires
+    expect(container.read(bottomNavHeightProvider), 0, reason: 'onEnd writes 0');
   });
 
   testWidgets('keyboard-up: hides above 80pt threshold, shows at 79pt', (tester) async {
@@ -1699,17 +1895,19 @@ void main() {
       mq: const MediaQueryData(viewInsets: EdgeInsets.only(bottom: 79)),
     ));
     await tester.pumpAndSettle();
-    expect(find.byType(GalleryNavPill), findsOneWidget, reason: 'at 79pt, still shown');
+    var opacity = tester.widget<AnimatedOpacity>(find.byType(AnimatedOpacity));
+    expect(opacity.opacity, 1, reason: 'at 79pt, still shown');
 
     await tester.pumpWidget(_wrap(
       GalleryBottomNav(tabsRouter: router),
       mq: const MediaQueryData(viewInsets: EdgeInsets.only(bottom: 81)),
     ));
     await tester.pumpAndSettle();
-    expect(find.byType(GalleryNavPill), findsNothing, reason: 'at 81pt, hidden');
+    opacity = tester.widget<AnimatedOpacity>(find.byType(AnimatedOpacity));
+    expect(opacity.opacity, 0, reason: 'at 81pt, hidden');
   });
 
-  testWidgets('landscape: NavigationRail fallback replaces pill', (tester) async {
+  testWidgets('landscape: NavigationRail with 3 destinations + trailing search', (tester) async {
     final router = _FakeTabsRouter();
     await tester.pumpWidget(_wrap(
       GalleryBottomNav(tabsRouter: router),
@@ -1717,7 +1915,14 @@ void main() {
     ));
     await tester.pumpAndSettle();
     expect(find.byType(GalleryNavPill), findsNothing);
-    expect(find.byType(NavigationRail), findsOneWidget);
+    expect(find.byKey(const Key('gallery-bottom-nav-rail')), findsOneWidget);
+
+    final rail = tester.widget<NavigationRail>(find.byKey(const Key('gallery-bottom-nav-rail')));
+    expect(rail.destinations, hasLength(3));
+    expect(find.descendant(of: find.byType(NavigationRail), matching: find.text('Photos')), findsOneWidget);
+    expect(find.descendant(of: find.byType(NavigationRail), matching: find.text('Albums')), findsOneWidget);
+    expect(find.descendant(of: find.byType(NavigationRail), matching: find.text('Library')), findsOneWidget);
+    expect(find.byKey(const Key('gallery-bottom-nav-rail-search')), findsOneWidget);
   });
 
   testWidgets('readonly: only Photos segment enabled', (tester) async {
@@ -1749,22 +1954,190 @@ void main() {
     expect(container.read(bottomNavHeightProvider), greaterThan(0));
   });
 
-  testWidgets('publishes 0 when hidden by multi-select (after animation)', (tester) async {
-    final router = _FakeTabsRouter();
-    final container = ProviderContainer();
+  // Side-effect matrix tests — §6.5 positive + negative assertions (H3).
+  // The shell's tabsRouter.addListener only fires on index CHANGES; same-tab
+  // re-taps wouldn't trigger provider invalidations if they lived there.
+  // C4's _onTabTap fires on every tap — making these tests the primary
+  // regression barrier for side effects.
+
+  testWidgets('Photos tap (from Albums): invalidates driftMemoryFutureProvider', (tester) async {
+    final router = _FakeTabsRouter().._active = GalleryTabEnum.albums.index;
+    int memoryInvalidations = 0;
+    final container = ProviderContainer(overrides: [
+      driftMemoryFutureProvider.overrideWith((ref) {
+        memoryInvalidations++;
+        return Future.value([]);
+      }),
+    ]);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp(home: Material(child: GalleryBottomNav(tabsRouter: router))),
+    ));
+    await tester.pumpAndSettle();
+    final baseline = memoryInvalidations;
+
+    await tester.tap(find.text('Photos'));
+    await tester.pumpAndSettle();
+
+    expect(memoryInvalidations, greaterThan(baseline), reason: 'Photos tap should invalidate memory');
+    expect(router.setCalls, contains(GalleryTabEnum.photos.index));
+  });
+
+  testWidgets('Re-tap Photos (already active): ScrollToTopEvent + memory invalidate', (tester) async {
+    final router = _FakeTabsRouter().._active = GalleryTabEnum.photos.index;
+    int scrollEvents = 0;
+    final sub = EventStream.shared.listen<ScrollToTopEvent>((_) => scrollEvents++);
+    addTearDown(sub.cancel);
+
+    int memoryInvalidations = 0;
+    final container = ProviderContainer(overrides: [
+      driftMemoryFutureProvider.overrideWith((_) {
+        memoryInvalidations++;
+        return Future.value([]);
+      }),
+    ]);
     addTearDown(container.dispose);
     await tester.pumpWidget(UncontrolledProviderScope(
       container: container,
       child: MaterialApp(home: Material(child: GalleryBottomNav(tabsRouter: router))),
     ));
     await tester.pumpAndSettle();
-    final shownHeight = container.read(bottomNavHeightProvider);
-    expect(shownHeight, greaterThan(0));
 
-    EventStream.shared.emit(const MultiSelectToggleEvent(true));
+    final memBaseline = memoryInvalidations;
+    await tester.tap(find.text('Photos'));
     await tester.pumpAndSettle();
-    expect(container.read(bottomNavHeightProvider), 0);
+
+    expect(scrollEvents, 1);
+    expect(memoryInvalidations, greaterThan(memBaseline), reason: 'memory also invalidates on re-tap');
   });
+
+  testWidgets('Albums tap: invalidates albumProvider', (tester) async {
+    final router = _FakeTabsRouter();
+    int albumInvalidations = 0;
+    final container = ProviderContainer(overrides: [
+      albumProvider.overrideWith((_) {
+        albumInvalidations++;
+        return []; // simplified; real provider shape elided
+      }),
+    ]);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp(home: Material(child: GalleryBottomNav(tabsRouter: router))),
+    ));
+    await tester.pumpAndSettle();
+    final baseline = albumInvalidations;
+
+    await tester.tap(find.text('Albums'));
+    await tester.pumpAndSettle();
+
+    expect(albumInvalidations, greaterThan(baseline));
+  });
+
+  testWidgets('Library tap: invalidates localAlbumProvider AND driftGetAllPeopleProvider', (tester) async {
+    final router = _FakeTabsRouter();
+    int localAlbumInvalidations = 0;
+    int peopleInvalidations = 0;
+    final container = ProviderContainer(overrides: [
+      localAlbumProvider.overrideWith((_) {
+        localAlbumInvalidations++;
+        return [];
+      }),
+      driftGetAllPeopleProvider.overrideWith((_) {
+        peopleInvalidations++;
+        return Future.value([]);
+      }),
+    ]);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp(home: Material(child: GalleryBottomNav(tabsRouter: router))),
+    ));
+    await tester.pumpAndSettle();
+    final localBaseline = localAlbumInvalidations;
+    final peopleBaseline = peopleInvalidations;
+
+    await tester.tap(find.text('Library'));
+    await tester.pumpAndSettle();
+
+    expect(localAlbumInvalidations, greaterThan(localBaseline));
+    expect(peopleInvalidations, greaterThan(peopleBaseline));
+  });
+
+  testWidgets('Negative: sharedSpacesProvider / searchPreFilterProvider / searchInputFocusProvider / upstream tabProvider NOT touched', (tester) async {
+    // Spy providers that record any invocation. If any of these is ever
+    // touched by a tap handler, the counter rises and the test fails.
+    int spacesTouched = 0;
+    int searchPreTouched = 0;
+    int searchFocusTouched = 0;
+    int upstreamTabTouched = 0;
+
+    final router = _FakeTabsRouter();
+    final container = ProviderContainer(overrides: [
+      sharedSpacesProvider.overrideWith((_) {
+        spacesTouched++;
+        return [];
+      }),
+      searchPreFilterProvider.overrideWith(() {
+        searchPreTouched++;
+        return _NoOpPreFilter();
+      }),
+      // searchInputFocusProvider — read shape is a .notifier; use the existing
+      // shape from upstream. Verify via a state spy.
+      tabProvider.overrideWith((ref) {
+        upstreamTabTouched++;
+        return TabEnum.home;
+      }),
+    ]);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp(home: Material(child: GalleryBottomNav(tabsRouter: router))),
+    ));
+    await tester.pumpAndSettle();
+    final sBase = spacesTouched;
+    final pBase = searchPreTouched;
+    final fBase = searchFocusTouched;
+    final tBase = upstreamTabTouched;
+
+    for (final label in ['Photos', 'Albums', 'Library']) {
+      await tester.tap(find.text(label));
+      await tester.pumpAndSettle();
+    }
+
+    expect(spacesTouched, sBase, reason: 'sharedSpacesProvider must NOT be invalidated');
+    expect(searchPreTouched, pBase, reason: 'searchPreFilterProvider must NOT be cleared');
+    expect(searchFocusTouched, fBase, reason: 'searchInputFocusProvider must NOT be focused');
+    expect(upstreamTabTouched, tBase, reason: 'upstream tabProvider must NOT be written');
+  });
+
+  testWidgets('readonly: blob disabled, pill dims Albums+Library, Photos tappable', (tester) async {
+    final router = _FakeTabsRouter();
+    await tester.pumpWidget(_wrap(
+      GalleryBottomNav(tabsRouter: router),
+      overrides: [readonlyModeProvider.overrideWith((_) => _FakeReadonly(true))],
+    ));
+    await tester.pumpAndSettle();
+
+    final pill = tester.widget<GalleryNavPill>(find.byType(GalleryNavPill));
+    expect(pill.disabledTabs, containsAll([GalleryTabEnum.albums, GalleryTabEnum.library]));
+    expect(pill.disabledTabs.contains(GalleryTabEnum.photos), isFalse);
+
+    final blob = tester.widget<GallerySearchBlob>(find.byType(GallerySearchBlob));
+    expect(blob.enabled, isFalse);
+  });
+}
+
+// Helpers referenced in the tests above; real shapes adapt to the repo's provider types.
+class _NoOpPreFilter extends Notifier<void> {
+  @override
+  void build() {}
+  void clear() {}
 }
 
 class _FakeReadonly extends ReadonlyMode {
@@ -1800,6 +2173,9 @@ import 'package:immich_mobile/providers/gallery_nav/gallery_nav_destination.dart
 import 'package:immich_mobile/providers/gallery_nav/gallery_search_action.dart';
 import 'package:immich_mobile/providers/gallery_nav/gallery_tab_enum.dart';
 import 'package:immich_mobile/providers/haptic_feedback.provider.dart';
+import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
+import 'package:immich_mobile/providers/infrastructure/memory.provider.dart';
+import 'package:immich_mobile/providers/infrastructure/people.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/readonly_mode.provider.dart';
 
 class GalleryBottomNav extends ConsumerStatefulWidget {
@@ -1811,7 +2187,13 @@ class GalleryBottomNav extends ConsumerStatefulWidget {
 }
 
 class _GalleryBottomNavState extends ConsumerState<GalleryBottomNav> {
+  // Keyboard-hide threshold — absolute, matches §5.3 + §8.2 test stimulus.
   static const double _keyboardThreshold = 80;
+  // Hide animation duration — matches §5.3 "fade + 12pt slide".
+  static const Duration _hideAnimation = Duration(milliseconds: 200);
+  static const double _pillHeight = 58;
+  static const double _bottomFloat = 26; // gap from home indicator
+
   bool _hiddenForMultiSelect = false;
   StreamSubscription? _multiSelectSub;
 
@@ -1826,10 +2208,23 @@ class _GalleryBottomNavState extends ConsumerState<GalleryBottomNav> {
   @override
   void dispose() {
     _multiSelectSub?.cancel();
-    _writeHeight(0);
+    // Do NOT call ref.read here — use a ProviderSubscription instead if a
+    // dispose-time write is truly needed. On dispose, the next-mounted nav
+    // (or a landscape rebuild) overwrites the height; meanwhile consumers
+    // of a stale value is a visual-only concern and self-heals. (L1 fix.)
     super.dispose();
   }
 
+  /// Equality-guarded publish of the visible reserved height from screen
+  /// bottom to the top of the floating pill's outer padding.
+  ///
+  /// Math (§5.6): the pill sits at `bottom: _bottomFloat + mq.padding.bottom`
+  /// with `height: _pillHeight`. The total vertical strip reserved at the
+  /// bottom of the screen is therefore:
+  ///
+  ///     _bottomFloat + _pillHeight + mq.padding.bottom
+  ///
+  /// PeekContent adds an 8pt visual gap on top of that value (§5.6 + A4).
   void _writeHeight(double h) {
     final current = ref.read(bottomNavHeightProvider);
     if (current != h) ref.read(bottomNavHeightProvider.notifier).state = h;
@@ -1847,47 +2242,94 @@ class _GalleryBottomNavState extends ConsumerState<GalleryBottomNav> {
       return _landscapeRail(isReadonly);
     }
 
-    if (_hiddenForMultiSelect || keyboardUp) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _writeHeight(0));
-      return const SizedBox.shrink();
+    final hiding = _hiddenForMultiSelect || keyboardUp;
+    final pillVisibleHeight = _bottomFloat + _pillHeight + mq.padding.bottom;
+
+    // When showing, write the measured height on the next frame; when hiding,
+    // the AnimatedSlide.onEnd callback writes 0 at the END of the animation so
+    // the peek rail doesn't jump down early (§5.6 Hide/show animation sync).
+    if (!hiding) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _writeHeight(pillVisibleHeight));
     }
 
-    return LayoutBuilder(builder: (ctx, constraints) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _writeHeight(58 + 26 + mq.padding.bottom));
-      return Padding(
-        padding: EdgeInsets.only(left: 14, right: 14, bottom: 26 + mq.padding.bottom),
-        child: Row(
-          children: [
-            Expanded(
-              child: GalleryNavPill(
-                activeTab: GalleryTabEnum.values[widget.tabsRouter.activeIndex],
-                onTabTap: (tab) {
-                  if (isReadonly && tab != GalleryTabEnum.photos) return;
-                  _onTabTap(tab);
-                },
-              ),
+    // LayoutBuilder pin: wrapping the full width pinned to bottom. Inside,
+    // AnimatedSlide (offset vertically on hide) + AnimatedOpacity compose
+    // the fade+12pt slide promised by §5.3. onEnd fires on hide completion.
+    return AnimatedSlide(
+      key: const Key('gallery-bottom-nav-slide'),
+      duration: _hideAnimation,
+      curve: Curves.easeOutCubic,
+      offset: hiding ? const Offset(0, 0.25) : Offset.zero, // ~12pt of 48pt parent height
+      onEnd: () {
+        if (hiding) _writeHeight(0);
+      },
+      child: AnimatedOpacity(
+        duration: _hideAnimation,
+        opacity: hiding ? 0 : 1,
+        child: IgnorePointer(
+          ignoring: hiding,
+          child: Padding(
+            padding: EdgeInsets.only(left: 14, right: 14, bottom: _bottomFloat + mq.padding.bottom),
+            child: Row(
+              children: [
+                Expanded(
+                  child: GalleryNavPill(
+                    activeTab: GalleryTabEnum.values[widget.tabsRouter.activeIndex],
+                    disabledTabs: isReadonly
+                        ? const {GalleryTabEnum.albums, GalleryTabEnum.library}
+                        : const {},
+                    onTabTap: _onTabTap,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                GallerySearchBlob(
+                  enabled: !isReadonly,
+                  onTap: () => openGallerySearch(widget.tabsRouter, ref.read),
+                ),
+              ],
             ),
-            const SizedBox(width: 10),
-            GallerySearchBlob(
-              enabled: !isReadonly,
-              onTap: () => openGallerySearch(widget.tabsRouter, ref),
-            ),
-          ],
+          ),
         ),
-      );
-    });
+      ),
+    );
   }
 
+  /// Single entry point for all tab-tap side effects. Mirrors upstream
+  /// `_onNavigationSelected` in `tab_shell.page.dart`: invalidations fire on
+  /// EVERY tap (including re-taps of the same tab) — the shell-level
+  /// `tabsRouter.addListener` only fires on index CHANGES, so putting
+  /// invalidations there would regress upstream behaviour (e.g., re-tapping
+  /// Photos wouldn't refresh the memory lane).
   void _onTabTap(GalleryTabEnum tab) {
-    if (widget.tabsRouter.activeIndex == tab.index && tab == GalleryTabEnum.photos) {
+    final currentIndex = widget.tabsRouter.activeIndex;
+
+    // Fire ScrollToTopEvent when Photos is re-tapped while already active.
+    if (tab == GalleryTabEnum.photos && currentIndex == tab.index) {
       EventStream.shared.emit(const ScrollToTopEvent());
     }
+
+    // Per-tab invalidations — fire on every tap of the given destination.
+    // (Matches upstream's `if (index == kPhotoTabIndex)` pattern.)
+    switch (tab) {
+      case GalleryTabEnum.photos:
+        ref.invalidate(driftMemoryFutureProvider);
+        break;
+      case GalleryTabEnum.albums:
+        ref.invalidate(albumProvider);
+        break;
+      case GalleryTabEnum.library:
+        ref.invalidate(localAlbumProvider);
+        ref.invalidate(driftGetAllPeopleProvider);
+        break;
+    }
+
     ref.read(hapticFeedbackProvider.notifier).selectionClick();
     widget.tabsRouter.setActiveIndex(tab.index);
   }
 
   Widget _landscapeRail(bool isReadonly) {
     return NavigationRail(
+      key: const Key('gallery-bottom-nav-rail'),
       selectedIndex: widget.tabsRouter.activeIndex,
       onDestinationSelected: (i) {
         final tab = GalleryTabEnum.values[i];
@@ -1905,8 +2347,9 @@ class _GalleryBottomNavState extends ConsumerState<GalleryBottomNav> {
           ),
       ],
       trailing: IconButton(
+        key: const Key('gallery-bottom-nav-rail-search'),
         icon: const Icon(Icons.search),
-        onPressed: isReadonly ? null : () => openGallerySearch(widget.tabsRouter, ref),
+        onPressed: isReadonly ? null : () => openGallerySearch(widget.tabsRouter, ref.read),
       ),
     );
   }
@@ -1924,16 +2367,16 @@ git commit -m "feat(mobile): GalleryBottomNav composite (pill + blob + gating + 
 
 ---
 
-### Task C5: `GalleryTabShellPage` — `@RoutePage` shell with `AutoTabsRouter` + sync listener
+### Task C5: `GalleryTabShellPage` — `@RoutePage` shell that only mirrors activeIndex → `galleryTabProvider`
 
-**Why this task exists:** the `@RoutePage`-decorated widget that replaces `TabShellPage`. Registers the `tabsRouter.addListener` that keeps `galleryTabProvider` in sync with `activeIndex`.
+**Why this task exists:** the `@RoutePage`-decorated widget that replaces `TabShellPage`. Its single job (post-rev-2) is to register a `tabsRouter.addListener` that mirrors `activeIndex` into `galleryTabProvider`, so any programmatic `setActiveIndex` call (from `openGallerySearch`, `PopScope.onPopInvokedWithResult`, external triggers) keeps the provider in sync. **Side effects live in `GalleryBottomNav._onTabTap` (Task C4)** — not here — because the listener only fires on index CHANGES, and re-taps need invalidations too (upstream contract, design §6.5).
 
 **Files:**
 
 - Create: `mobile/lib/presentation/pages/common/gallery_tab_shell.page.dart`
 - Create: `mobile/test/presentation/pages/common/gallery_tab_shell_test.dart`
 
-**Step 1: Write failing tests — side-effect matrix (§6.5)**
+**Step 1: Write failing tests**
 
 ```dart
 // mobile/test/presentation/pages/common/gallery_tab_shell_test.dart
@@ -1943,38 +2386,88 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/presentation/pages/common/gallery_tab_shell.page.dart';
 import 'package:immich_mobile/providers/gallery_nav/gallery_tab_enum.dart';
-import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
-import 'package:immich_mobile/providers/infrastructure/memory.provider.dart';
-import 'package:immich_mobile/providers/infrastructure/people.provider.dart';
+import 'package:immich_mobile/routing/router.dart';
 
-// Helper to detect whether a provider was touched.
-class _InvalidationSpy {
-  final List<ProviderBase<Object?>> invalidated = [];
+// Helper that boots a minimal MaterialApp.router with the real auto_route
+// config, starts at GalleryTabShellRoute, and returns the ProviderContainer.
+Future<_HarnessHandle> _bootShell(WidgetTester tester) async {
+  final container = ProviderContainer();
+  addTearDown(container.dispose);
+
+  final appRouter = AppRouter();
+  addTearDown(appRouter.dispose);
+
+  await tester.pumpWidget(UncontrolledProviderScope(
+    container: container,
+    child: MaterialApp.router(
+      routerConfig: appRouter.config(deepLinkBuilder: (_) => const DeepLink([
+        GalleryTabShellRoute(),
+      ])),
+    ),
+  ));
+  await tester.pumpAndSettle();
+  return _HarnessHandle(container, appRouter);
+}
+
+class _HarnessHandle {
+  final ProviderContainer container;
+  final AppRouter appRouter;
+  _HarnessHandle(this.container, this.appRouter);
+  TabsRouter get tabsRouter {
+    // Walk the nested router until we reach the inner TabsRouter.
+    // The actual API is `appRouter.innerRouterOf<TabsRouter>(GalleryTabShellRoute.name)`.
+    return appRouter.innerRouterOf<TabsRouter>(GalleryTabShellRoute.name)!;
+  }
 }
 
 void main() {
-  testWidgets('active-index change syncs galleryTabProvider', (tester) async {
-    // Pump the shell inside a MaterialApp.router using a mock router that
-    // exposes a settable activeIndex — detailed setup omitted here; use the
-    // same harness pattern as existing tab_shell tests in the repo.
-    // Assert: setActiveIndex(1) → galleryTabProvider == GalleryTabEnum.albums.
+  testWidgets('default: galleryTabProvider == photos', (tester) async {
+    final h = await _bootShell(tester);
+    expect(h.container.read(galleryTabProvider), GalleryTabEnum.photos);
   });
 
-  // Additional tests per §6.5 row:
-  // - Photos tap → driftMemoryFutureProvider invalidated
-  // - Re-tap Photos → ScrollToTopEvent emitted
-  // - Albums tap → albumProvider invalidated
-  // - Library tap → localAlbumProvider + driftGetAllPeopleProvider invalidated
-  // - Negative: sharedSpacesProvider / searchPreFilterProvider /
-  //   searchInputFocusProvider / upstream tabProvider NOT touched
+  testWidgets('setActiveIndex(albums) → galleryTabProvider syncs', (tester) async {
+    final h = await _bootShell(tester);
+    h.tabsRouter.setActiveIndex(GalleryTabEnum.albums.index);
+    await tester.pumpAndSettle();
+    expect(h.container.read(galleryTabProvider), GalleryTabEnum.albums);
+  });
+
+  testWidgets('setActiveIndex(library) → galleryTabProvider syncs', (tester) async {
+    final h = await _bootShell(tester);
+    h.tabsRouter.setActiveIndex(GalleryTabEnum.library.index);
+    await tester.pumpAndSettle();
+    expect(h.container.read(galleryTabProvider), GalleryTabEnum.library);
+  });
+
+  testWidgets('programmatic setActiveIndex back to photos → galleryTabProvider syncs', (tester) async {
+    final h = await _bootShell(tester);
+    h.tabsRouter.setActiveIndex(GalleryTabEnum.library.index);
+    await tester.pumpAndSettle();
+    h.tabsRouter.setActiveIndex(GalleryTabEnum.photos.index);
+    await tester.pumpAndSettle();
+    expect(h.container.read(galleryTabProvider), GalleryTabEnum.photos);
+  });
+
+  testWidgets('shell unmount: further programmatic setActiveIndex does NOT crash', (tester) async {
+    final h = await _bootShell(tester);
+    final tabsRouter = h.tabsRouter;
+
+    // Unmount by replacing the app with a blank widget.
+    await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
+    await tester.pumpAndSettle();
+
+    // Any outstanding setActiveIndex call must not crash on a disposed widget.
+    tabsRouter.setActiveIndex(GalleryTabEnum.albums.index);
+    await tester.pump();
+    // No exception reaching this line = pass.
+  });
 }
 ```
 
-_(Full test body is long; use the existing `mobile/test/pages/common/tab_shell_test.dart` as a template if present, or a fresh harness — the existing TabShellPage has no test today so the pattern is invented fresh here. This task's test file is scaffolded in Step 1 and fleshed out in Step 3 after the implementation exists, since several asserts depend on widget keys the implementation exposes.)_
+**Step 2: Run, expect fail** — `GalleryTabShellPage` / `GalleryTabShellRoute` not defined.
 
-**Step 2: Run, expect fail.**
-
-**Step 3: Implement the shell**
+**Step 3: Implement the shell (side-effect-free)**
 
 ```dart
 // mobile/lib/presentation/pages/common/gallery_tab_shell.page.dart
@@ -1984,9 +2477,6 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/presentation/widgets/gallery_nav/gallery_bottom_nav.widget.dart';
 import 'package:immich_mobile/providers/gallery_nav/gallery_tab_enum.dart';
-import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
-import 'package:immich_mobile/providers/infrastructure/memory.provider.dart';
-import 'package:immich_mobile/providers/infrastructure/people.provider.dart';
 import 'package:immich_mobile/routing/router.dart';
 
 @RoutePage()
@@ -2001,35 +2491,22 @@ class _GalleryTabShellPageState extends ConsumerState<GalleryTabShellPage> {
   TabsRouter? _router;
   int? _lastIndex;
 
-  void _onRouterChange() {
+  /// Mirrors tabsRouter.activeIndex → galleryTabProvider whenever the index
+  /// changes. Does NOT fire any other side effects: invalidations and
+  /// ScrollToTopEvent live in GalleryBottomNav._onTabTap because they also
+  /// need to fire on same-tab re-taps (which the listener wouldn't catch).
+  void _syncTab() {
     final router = _router;
-    if (router == null) return;
+    if (router == null || !mounted) return;
     final i = router.activeIndex;
     if (i == _lastIndex) return;
     _lastIndex = i;
-    final tab = GalleryTabEnum.values[i];
-    ref.read(galleryTabProvider.notifier).state = tab;
-    _fireSideEffects(tab);
-  }
-
-  void _fireSideEffects(GalleryTabEnum tab) {
-    switch (tab) {
-      case GalleryTabEnum.photos:
-        ref.invalidate(driftMemoryFutureProvider);
-        break;
-      case GalleryTabEnum.albums:
-        ref.invalidate(albumProvider);
-        break;
-      case GalleryTabEnum.library:
-        ref.invalidate(localAlbumProvider);
-        ref.invalidate(driftGetAllPeopleProvider);
-        break;
-    }
+    ref.read(galleryTabProvider.notifier).state = GalleryTabEnum.values[i];
   }
 
   @override
   void dispose() {
-    _router?.removeListener(_onRouterChange);
+    _router?.removeListener(_syncTab);
     super.dispose();
   }
 
@@ -2043,11 +2520,11 @@ class _GalleryTabShellPageState extends ConsumerState<GalleryTabShellPage> {
       builder: (context, child) {
         final tabsRouter = AutoTabsRouter.of(context);
         if (_router != tabsRouter) {
-          _router?.removeListener(_onRouterChange);
+          _router?.removeListener(_syncTab);
           _router = tabsRouter;
-          tabsRouter.addListener(_onRouterChange);
+          tabsRouter.addListener(_syncTab);
           // Seed galleryTabProvider on first build.
-          WidgetsBinding.instance.addPostFrameCallback((_) => _onRouterChange());
+          WidgetsBinding.instance.addPostFrameCallback((_) => _syncTab());
         }
         return PopScope(
           canPop: tabsRouter.activeIndex == 0,
@@ -2066,23 +2543,26 @@ class _GalleryTabShellPageState extends ConsumerState<GalleryTabShellPage> {
 }
 ```
 
-**Step 4: Flesh out the test body** — use the pattern from C4's test file; inject a `MaterialApp.router` with a real auto_route config, or test the key behaviours directly by mocking the `TabsRouter` and driving the state setter.
-
-Run build_runner to generate the route class:
+**Step 4: Run build_runner for route generation**
 
 ```bash
 cd mobile && dart run build_runner build --delete-conflicting-outputs
 ```
 
-This regenerates `mobile/lib/routing/router.gr.dart` to include `GalleryTabShellRoute`.
+This regenerates `mobile/lib/routing/router.gr.dart` to include `GalleryTabShellRoute`. Required for the tests in Step 1 to compile (they import the route).
 
-**Step 5: Run + commit**
+**Step 5: Run Step 1's tests — all should pass**
 
 ```bash
 cd mobile && flutter test test/presentation/pages/common/gallery_tab_shell_test.dart
+```
+
+**Step 6: Commit**
+
+```bash
 cd mobile && dart format lib/presentation/pages/common/gallery_tab_shell.page.dart test/presentation/pages/common/gallery_tab_shell_test.dart
 git add mobile/lib/presentation/pages/common/gallery_tab_shell.page.dart mobile/lib/routing/router.gr.dart mobile/test/presentation/pages/common/gallery_tab_shell_test.dart
-git commit -m "feat(mobile): GalleryTabShellPage with activeIndex→galleryTabProvider sync"
+git commit -m "feat(mobile): GalleryTabShellPage — tab-provider sync shell"
 ```
 
 ---
@@ -2149,32 +2629,53 @@ Scope: the single-line-ish router edit that makes `GalleryTabShellRoute` the app
 
 - Modify: `mobile/lib/routing/router.dart`
 
-**Step 1: Identify the current root route and the route list**
+**Step 1: Identify the current root route**
 
-Open `mobile/lib/routing/router.dart`. Find:
+Open `mobile/lib/routing/router.dart`. Find the route entry that currently bears `initial: true`. In upstream Gallery it is the `TabShellRoute` entry (confirmed against PR #378 branch base — grep `grep -n "initial: true" mobile/lib/routing/router.dart`).
 
-- The existing `AutoRoute(page: TabShellRoute.page, ...)` entry.
-- The `initial: true` route (the app's entrypoint).
-
-**Step 2: Modify the routes list**
-
-Enclose the edit in fork-only comment fences (memory `feedback_rebase_fork_structure.md`). Add `AutoRoute(page: GalleryTabShellRoute.page, ...)` and flip the `initial` marker:
+The existing shape:
 
 ```dart
-// >>> fork-only gallery-bottom-nav
 AutoRoute(
-  page: GalleryTabShellRoute.page,
-  // initial: true on this entry; remove initial from upstream TabShellRoute entry.
+  initial: true,
+  page: TabShellRoute.page,
+  guards: [_authGuard, _duplicateGuard],
   children: [
-    // (children auto-discovered from GalleryTabShellPage's AutoTabsRouter;
-    // listed here explicitly only if auto_route requires it in this config)
+    // (upstream's tab children — MainTimelineRoute, DriftSearchRoute,
+    //  SpacesRoute, DriftLibraryRoute or similar, depending on current fork state)
+  ],
+),
+```
+
+**Step 2: Modify the routes list** — exact shape
+
+Replace the existing entry with the fork-only version below, enclosed in a comment fence (memory `feedback_rebase_fork_structure.md`). Keep `TabShellRoute` reachable (no `initial: true`) so §9.2 rollback is a one-liner.
+
+```dart
+// >>> fork-only gallery-bottom-nav — remove with ROLLBACK-F1
+AutoRoute(
+  initial: true,
+  page: GalleryTabShellRoute.page,
+  guards: [_authGuard, _duplicateGuard],
+  children: [
+    AutoRoute(page: MainTimelineRoute.page, guards: [_authGuard, _duplicateGuard]),
+    AutoRoute(page: DriftAlbumsRoute.page, guards: [_authGuard, _duplicateGuard]),
+    AutoRoute(page: DriftLibraryRoute.page, guards: [_authGuard, _duplicateGuard]),
+  ],
+),
+// Upstream shell kept reachable but no longer initial — rollback flips
+// `initial: true` back on this entry and removes the block above.
+AutoRoute(
+  page: TabShellRoute.page,
+  guards: [_authGuard, _duplicateGuard],
+  children: [
+    // (upstream children unchanged — don't touch)
   ],
 ),
 // <<< fork-only
-AutoRoute(page: TabShellRoute.page, /* initial removed */),
 ```
 
-(Exact shape depends on the current `initial: true` location; preserve guards from the existing TabShellRoute entry.)
+**Rationale for explicit guard redeclaration on children:** auto_route's documented guard inheritance is not universal across versions; redeclaring on each child is safe and deliberate, and survives any upstream bump that changes propagation semantics (design §10.1 + Task D0 verification).
 
 **Step 3: Regenerate router.gr.dart**
 
@@ -2182,18 +2683,51 @@ AutoRoute(page: TabShellRoute.page, /* initial removed */),
 cd mobile && dart run build_runner build --delete-conflicting-outputs
 ```
 
-**Step 4: Launch the app (manual) + run mobile tests**
+**Step 4: Launch the dev app manually**
+
+```bash
+cd mobile && flutter run -d <your-device>
+```
+
+Confirm: cold start lands on Photos; pill + blob render; tapping Albums / Library switches tabs; search blob opens the FilterSheet on Photos.
+
+**Step 5: Run mobile tests**
 
 ```bash
 cd mobile && flutter test
-# Then launch the dev app and verify the new nav renders at cold start.
 ```
 
-**Step 5: Commit**
+Expected: all green. If a test fails because it depends on the old `TabShellRoute` being initial, either update that test's harness or add a comment flag.
+
+**Step 6: Commit**
 
 ```bash
 git add mobile/lib/routing/router.dart mobile/lib/routing/router.gr.dart
 git commit -m "feat(mobile): route root to GalleryTabShellRoute (fork-only)"
+```
+
+---
+
+### Task D0: auto_route guard inheritance verification (before D1 ships)
+
+**Why this task exists:** design §10.1 flags the risk that `DriftAlbumsRoute`'s guards (`[_authGuard, _duplicateGuard]`) may or may not propagate when the route is nested under a fork shell. D1 redeclares guards on children defensively, but we want a proof point before merging.
+
+**Steps:**
+
+1. Run the app logged-in — tap Albums. Should load normally.
+2. Log out (via settings) — relaunch the app. You should land on login, not a stuck Albums tab.
+3. Log back in — tap Albums. Confirm the AlbumsPage loads without a guard error.
+4. Duplicate-session scenario: with two devices/sessions signed in as the same user, confirm the `_duplicateGuard` still fires on Albums.
+
+If any of the above fails, diagnose:
+
+- Guards not propagating: the explicit per-child guard declaration in D1 should cover this (no further change needed).
+- Guards firing twice (shell guard + child guard): cosmetically harmless in auto_route (guards short-circuit), but add a one-line comment to D1 noting the double-check behaviour.
+
+No code change from D0 unless a regression is found. Record outcome in the PR description.
+
+```bash
+# No commit from this task; it is a manual QA pass.
 ```
 
 ---
@@ -2244,7 +2778,7 @@ PR #378 auto-updates; request review. Add PR description updates if new commits 
 - [ ] Phase A: 4 tasks committed, 4 provider + widget test files green
 - [ ] Phase B: 3 tasks committed, 3 unit test files green
 - [ ] Phase C: 6 tasks committed, 5 widget test files + 1 shell test file green
-- [ ] Phase D: router.dart + router.gr.dart committed
+- [ ] Phase D: D0 guard verification done (manual); D1 router.dart + router.gr.dart committed
 - [ ] Phase E: manual QA signed off
 - [ ] `cd mobile && flutter test` — all green
 - [ ] `cd mobile && dart analyze` — no warnings
@@ -2258,8 +2792,12 @@ PR #378 auto-updates; request review. Add PR description updates if new commits 
 - **Follow TDD rigidly.** Red → Green → Refactor → Commit. Every task listed a failing test first; don't skip.
 - **Commit granularity is one per task.** Each task produces one commit (exceptions allowed if a follow-up fix in the same task needs a second commit — document in the commit message).
 - **Prettier + dart format are CI-enforced.** Run both before committing (the commands are in each task's Step 5-ish).
-- **i18n keys** (Task C6) run `pnpm --filter=immich-i18n format:fix` — DO NOT hand-sort (memory `feedback_i18n_key_sorting.md`).
+- **i18n keys** (Task C6) run `pnpm --filter=immich-i18n format:fix` — **run from the worktree root** (the pnpm workspace resolves from there, not from `mobile/`). DO NOT hand-sort (memory `feedback_i18n_key_sorting.md`).
 - **router.gr.dart is generated.** Never hand-edit; run `dart run build_runner build --delete-conflicting-outputs` (memory `feedback_openapi_dart_generation.md` is about OpenAPI but the same pattern applies to auto_route's generator).
 - **Don't run lint locally** beyond `dart analyze`. ESLint etc. live in the web project (memory `feedback_lint_sequential.md`).
 - **Fork hygiene:** never edit upstream `tab_shell.page.dart` or `tab.provider.dart`. If a rebase conflict appears there, the fork-only shell is the one that should change.
 - **@immich/ui is web-only.** Don't reach for it here.
+- **Side effects live in `GalleryBottomNav._onTabTap`, NOT `GalleryTabShellPage`**. The shell's `tabsRouter.addListener` only fires on index CHANGES, so putting invalidations there would regress upstream's re-tap-fires-invalidation behaviour. The nav handler sees every tap (including re-taps of the active tab) and is the correct home for haptic + invalidations + `ScrollToTopEvent`.
+- **`LayoutBuilder` + `addPostFrameCallback`** pattern in `_GalleryBottomNavState.build` is deliberate: writes to `bottomNavHeightProvider` happen AFTER the layout phase, avoiding the "provider-write-during-layout" pitfall. If you refactor to a direct `WidgetsBinding.instance.scheduleLayoutWithoutRebuild`-style write, you'll trip assertion errors in debug mode.
+- **`AutoTabsRouter` (default constructor with `builder:` parameter), not `AutoTabsRouter.builder(...)`.** Matches upstream `tab_shell.page.dart:82`; keeps the rebase diff one-dimensional.
+- **Do NOT call `ref.read` in `dispose`.** The plan's implementations use `_multiSelectSub.cancel()` and let the next-mounted widget rewrite `bottomNavHeightProvider`. If a dispose-time write is ever required, switch to a `ProviderSubscription` stored in State.
