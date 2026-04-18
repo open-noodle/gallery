@@ -2993,3 +2993,19 @@ class TrashRoute extends PageRouteInfo<void> {
     },
   );
 }
+
+/// generated route for
+/// [WhenPickerPage]
+class WhenPickerRoute extends PageRouteInfo<void> {
+  const WhenPickerRoute({List<PageRouteInfo>? children})
+    : super(WhenPickerRoute.name, initialChildren: children);
+
+  static const String name = 'WhenPickerRoute';
+
+  static PageInfo page = PageInfo(
+    name,
+    builder: (data) {
+      return const WhenPickerPage();
+    },
+  );
+}
