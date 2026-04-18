@@ -6,6 +6,7 @@
   import type { GlobalSearchManager, SearchMode } from '$lib/managers/global-search-manager.svelte';
   import GlobalSearchSection from './global-search-section.svelte';
   import GlobalSearchNavigationSections from './global-search-navigation-sections.svelte';
+  import GlobalSearchCommandsSection from './global-search-commands-section.svelte';
   import PhotoRow from './rows/photo-row.svelte';
   import PersonRow from './rows/person-row.svelte';
   import PlaceRow from './rows/place-row.svelte';
@@ -14,6 +15,7 @@
   import SpaceRow from './rows/space-row.svelte';
   import RecentRow from './rows/recent-row.svelte';
   import NavigationRow from './rows/navigation-row.svelte';
+  import CommandRow from './rows/command-row.svelte';
   import GlobalSearchFooter from './global-search-footer.svelte';
   import GlobalSearchPreview from './global-search-preview.svelte';
   import ShortcutsModal from '$lib/modals/ShortcutsModal.svelte';
@@ -401,7 +403,24 @@
                 </div>
               {/if}
             {:else if manager.scope === 'all'}
-              {#if manager.topNavigationMatch}
+              {#if manager.topCommandMatch}
+                <Command.Group class="mb-4" data-cmdk-top-result-commands>
+                  <Command.GroupHeading
+                    class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400"
+                  >
+                    {$t('cmdk_top_result')}
+                  </Command.GroupHeading>
+                  <Command.GroupItems>
+                    <Command.Item
+                      value={manager.topCommandMatch.id}
+                      onSelect={() => manager.topCommandMatch && manager.activate('command', manager.topCommandMatch)}
+                      class="group"
+                    >
+                      <CommandRow item={manager.topCommandMatch} />
+                    </Command.Item>
+                  </Command.GroupItems>
+                </Command.Group>
+              {:else if manager.topNavigationMatch}
                 <Command.Group class="mb-4">
                   <Command.GroupHeading
                     class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400"
@@ -490,6 +509,10 @@
                   <TagRow item={item as never} />
                 {/snippet}
               </GlobalSearchSection>
+              <GlobalSearchCommandsSection
+                status={manager.sections.commands}
+                onActivate={(item) => manager.activate('command', item)}
+              />
               <GlobalSearchNavigationSections
                 status={dedupedNavigationStatus}
                 onActivate={(item) => manager.activate('nav', item)}
@@ -554,6 +577,10 @@
               <!-- Scope `>` — only NavigationSections. The navigation provider runs
                    synchronously in setQuery (no debounce); under `>` it surfaces the
                    whole catalog for bare `>` or filtered matches for `>foo`. -->
+              <GlobalSearchCommandsSection
+                status={manager.sections.commands}
+                onActivate={(item) => manager.activate('command', item)}
+              />
               <GlobalSearchNavigationSections
                 status={manager.sections.navigation}
                 onActivate={(item) => manager.activate('nav', item)}
