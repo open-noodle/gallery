@@ -1,15 +1,15 @@
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { NAVIGATION_ITEMS, isAlmostExactNavMatch } from './navigation-items';
+import { isAlmostExactNavMatch, NAVIGATION_ITEMS } from './navigation-items';
 
 // __dirname is not defined in ESM (vitest default). Derive it from import.meta.url.
 const here = dirname(fileURLToPath(import.meta.url));
 
 describe('NAVIGATION_ITEMS schema', () => {
-  it('has exactly 36 items', () => {
-    expect(NAVIGATION_ITEMS).toHaveLength(36);
+  it('has exactly 35 items', () => {
+    expect(NAVIGATION_ITEMS).toHaveLength(35);
   });
 
   it('every item has non-empty required fields', () => {
@@ -18,11 +18,22 @@ describe('NAVIGATION_ITEMS schema', () => {
       expect(item.labelKey.length).toBeGreaterThan(0);
       expect(item.descriptionKey.length).toBeGreaterThan(0);
       expect(item.icon.length).toBeGreaterThan(0);
-      if (item.category === 'actions') {
-        expect(item.route).toBe('');
-      } else {
-        expect(item.route.length).toBeGreaterThan(0);
-      }
+      expect(item.route.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('does not include any item with category "actions" (migrated to command-items)', () => {
+    for (const item of NAVIGATION_ITEMS) {
+      // Drift-guard: 'actions' was removed from NavigationCategory when
+      // nav:theme migrated to cmd:theme. Widen the compare to string so tsc
+      // doesn't flag a never-type comparison.
+      expect(item.category as string).not.toBe('actions');
+    }
+  });
+
+  it('every navigation item has a non-empty route', () => {
+    for (const item of NAVIGATION_ITEMS) {
+      expect(item.route.length).toBeGreaterThan(0);
     }
   });
 
@@ -57,11 +68,27 @@ describe('NAVIGATION_ITEMS schema', () => {
     }
   });
 
-  it('actions category has exactly the theme toggle', () => {
-    const items = NAVIGATION_ITEMS.filter((i) => i.category === 'actions');
-    expect(items).toHaveLength(1);
-    expect(items[0].id).toBe('nav:theme');
-    expect(items[0].route).toBe('');
+  it("no source file references the migrated 'nav:theme' literal", () => {
+    // Pinned invariant: after Task 6, the theme toggle lives as cmd:theme in
+    // the commands registry. If this assertion trips, a stale 'nav:theme'
+    // reference slipped back in — check navigation-items, global-search-manager,
+    // or test fixtures. This drift-guard is what keeps dual rendering from
+    // regressing. The spec file itself is excluded via the suffix check.
+    function walk(dir: string, acc: string[] = []): string[] {
+      for (const entry of readdirSync(dir)) {
+        const full = join(dir, entry);
+        if (statSync(full).isDirectory()) {
+          walk(full, acc);
+        } else if (!full.endsWith('.spec.ts') && /\.(ts|svelte|js)$/.test(full)) {
+          acc.push(full);
+        }
+      }
+      return acc;
+    }
+    const srcRoot = resolve(here, '..', '..');
+    const files = walk(srcRoot);
+    const offenders = files.filter((f) => readFileSync(f, 'utf8').includes('nav:theme'));
+    expect(offenders).toEqual([]);
   });
 
   it('drift guard: every systemSettings isOpen key exists in the accordion source', () => {
