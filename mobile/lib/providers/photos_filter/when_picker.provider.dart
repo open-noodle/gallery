@@ -85,6 +85,26 @@ WhenQuery parseWhenQuery(String raw) {
   return const WhenQuery.none();
 }
 
+/// Public read-access to the private [WhenQuery] subtypes.
+///
+/// External consumers (e.g. page state that reacts to parsed queries) cannot
+/// pattern-match on [_YearQuery] / [_DecadeQuery] since those are private to
+/// this file. This extension exposes the underlying values through nullable
+/// getters so callers can branch with `if (next.yearValue case final int y)`.
+extension WhenQueryAccess on WhenQuery {
+  /// Returns the year if this is a [WhenQuery.year], else null.
+  int? get yearValue => switch (this) {
+    _YearQuery(:final year) => year,
+    _ => null,
+  };
+
+  /// Returns the decade start year if this is a [WhenQuery.decade], else null.
+  int? get decadeStartValue => switch (this) {
+    _DecadeQuery(:final decadeStart) => decadeStart,
+    _ => null,
+  };
+}
+
 /// Live query string. `StateProvider` so the TextField can write and the
 /// parser/filter providers can react.
 final whenPickerQueryProvider = StateProvider<String>((ref) => '');

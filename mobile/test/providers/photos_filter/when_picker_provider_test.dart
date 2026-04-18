@@ -62,6 +62,22 @@ void main() {
     });
   });
 
+  group('WhenQueryAccess extension', () {
+    test('yearValue returns int for year query, null otherwise', () {
+      expect(const WhenQuery.year(2024).yearValue, 2024);
+      expect(const WhenQuery.year(1999).yearValue, 1999);
+      expect(const WhenQuery.decade(2020).yearValue, isNull);
+      expect(const WhenQuery.none().yearValue, isNull);
+    });
+
+    test('decadeStartValue returns int for decade query, null otherwise', () {
+      expect(const WhenQuery.decade(2020).decadeStartValue, 2020);
+      expect(const WhenQuery.decade(1990).decadeStartValue, 1990);
+      expect(const WhenQuery.year(2024).decadeStartValue, isNull);
+      expect(const WhenQuery.none().decadeStartValue, isNull);
+    });
+  });
+
   group('whenPickerParsedProvider', () {
     test('reacts to whenPickerQueryProvider', () {
       final c = ProviderContainer();

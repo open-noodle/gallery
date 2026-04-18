@@ -5,6 +5,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/widgets/decade_anchor_strip.widget.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/widgets/quick_ranges_row.widget.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/widgets/when_picker_search_header.widget.dart';
+import 'package:immich_mobile/presentation/pages/photos_filter/widgets/when_picker_year_accordion.widget.dart';
 import 'package:immich_mobile/providers/photos_filter/temporal_utils.dart';
 import 'package:immich_mobile/providers/photos_filter/when_picker.provider.dart';
 
@@ -18,6 +19,11 @@ class WhenPickerPage extends ConsumerStatefulWidget {
 
 class _WhenPickerPageState extends ConsumerState<WhenPickerPage> {
   late final TextEditingController _controller;
+  final ScrollController _scrollController = ScrollController();
+  final Map<int, GlobalKey> _yearKeys = <int, GlobalKey>{};
+  int? _expandedYear;
+
+  GlobalKey _yearKeyFor(int year) => _yearKeys.putIfAbsent(year, () => GlobalKey());
 
   @override
   void initState() {
@@ -27,8 +33,25 @@ class _WhenPickerPageState extends ConsumerState<WhenPickerPage> {
 
   @override
   void dispose() {
+    _scrollController.dispose();
     _controller.dispose();
     super.dispose();
+  }
+
+  Future<void> _scrollToYear(int year) async {
+    final key = _yearKeys[year];
+    final ctx = key?.currentContext;
+    if (ctx == null) return;
+    await Scrollable.ensureVisible(ctx, alignment: 0.1, duration: const Duration(milliseconds: 300));
+  }
+
+  Future<void> _scrollToDecade(int decadeStart) async {
+    final years = await ref.read(whenPickerFilteredYearsProvider.future);
+    final inDecade = years.where((y) => y.year >= decadeStart && y.year < decadeStart + 10).toList();
+    if (inDecade.isEmpty) return;
+    // aggregateYears returns years sorted descending, so first = newest.
+    final newest = inDecade.first.year;
+    await _scrollToYear(newest);
   }
 
   @override
@@ -40,6 +63,18 @@ class _WhenPickerPageState extends ConsumerState<WhenPickerPage> {
         _controller.text = next;
         _controller.selection = TextSelection.collapsed(offset: next.length);
       }
+    });
+
+    // Auto-expand + scroll to a typed year query.
+    ref.listen<WhenQuery>(whenPickerParsedProvider, (prev, next) {
+      if (prev == next) return;
+      final year = next.yearValue;
+      if (year == null) return;
+      setState(() => _expandedYear = year);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _scrollToYear(year);
+      });
     });
 
     final filteredAsync = ref.watch(whenPickerFilteredYearsProvider);
@@ -62,6 +97,7 @@ class _WhenPickerPageState extends ConsumerState<WhenPickerPage> {
         ],
       ),
       body: CustomScrollView(
+        controller: _scrollController,
         slivers: [
           WhenPickerSearchHeader(
             controller: _controller,
@@ -71,9 +107,8 @@ class _WhenPickerPageState extends ConsumerState<WhenPickerPage> {
           const SliverToBoxAdapter(child: SizedBox(height: 8)),
           const SliverToBoxAdapter(child: QuickRangesRow()),
           const SliverToBoxAdapter(child: SizedBox(height: 8)),
-          SliverToBoxAdapter(
-            child: DecadeAnchorStrip(onDecade: (_) {}), // wired to year accordion in C5
-          ),
+          SliverToBoxAdapter(child: DecadeAnchorStrip(onDecade: _scrollToDecade)),
+          const SliverToBoxAdapter(child: SizedBox(height: 12)),
           ..._bodySlivers(filteredAsync, query),
         ],
       ),
@@ -96,7 +131,18 @@ class _WhenPickerPageState extends ConsumerState<WhenPickerPage> {
             ),
           ];
         }
-        return const [SliverToBoxAdapter(child: SizedBox.shrink())];
+        if (filtered.isEmpty) {
+          return const [SliverToBoxAdapter(child: SizedBox.shrink())];
+        }
+        return [
+          SliverToBoxAdapter(
+            child: WhenPickerYearAccordion(
+              yearKeyFor: _yearKeyFor,
+              expandedYear: _expandedYear,
+              onExpandYear: (y) => setState(() => _expandedYear = y),
+            ),
+          ),
+        ];
       },
     );
   }
