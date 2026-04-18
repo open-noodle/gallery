@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/when_picker.page.dart';
+import 'package:immich_mobile/providers/photos_filter/temporal_utils.dart';
+import 'package:immich_mobile/providers/photos_filter/when_picker.provider.dart';
+
 import '../../../widget_tester_extensions.dart';
 
 void main() {
@@ -43,6 +47,46 @@ void main() {
     testWidgets('renders correctly in dark theme', (tester) async {
       await tester.pumpConsumerWidgetDark(const WhenPickerPage());
       expect(find.byType(WhenPickerPage), findsOneWidget);
+    });
+  });
+
+  group('WhenPickerPage search', () {
+    testWidgets('typing updates whenPickerQueryProvider', (tester) async {
+      await tester.pumpConsumerWidget(
+        const WhenPickerPage(),
+        overrides: [
+          whenPickerFilteredYearsProvider.overrideWith(
+            (ref) async => const <YearCount>[YearCount(year: 2024, count: 12)],
+          ),
+        ],
+      );
+      await tester.pumpAndSettle();
+
+      final container = ProviderScope.containerOf(tester.element(find.byType(WhenPickerPage)));
+      await tester.enterText(find.byKey(const Key('when-picker-search-field')), '2024');
+      await tester.pump();
+
+      expect(container.read(whenPickerQueryProvider), '2024');
+    });
+
+    testWidgets('non-matching query renders No results panel + Clear search, tapping clears', (tester) async {
+      await tester.pumpConsumerWidget(
+        const WhenPickerPage(),
+        overrides: [whenPickerFilteredYearsProvider.overrideWith((ref) async => const <YearCount>[])],
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byKey(const Key('when-picker-search-field')), '1800');
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('when-picker-clear-search')), findsOneWidget);
+
+      final container = ProviderScope.containerOf(tester.element(find.byType(WhenPickerPage)));
+      await tester.tap(find.byKey(const Key('when-picker-clear-search')));
+      await tester.pumpAndSettle();
+
+      expect(container.read(whenPickerQueryProvider), '');
+      expect(find.byKey(const Key('when-picker-clear-search')), findsNothing);
     });
   });
 }
