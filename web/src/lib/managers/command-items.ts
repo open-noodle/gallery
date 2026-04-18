@@ -1,6 +1,7 @@
 import { authManager } from '$lib/managers/auth-manager.svelte';
 import { isAlmostExactWordMatch } from '$lib/managers/cmdk-match';
 import { themeManager } from '$lib/managers/theme-manager.svelte';
+import ShortcutsModal from '$lib/modals/ShortcutsModal.svelte';
 import SpaceCreateModal from '$lib/modals/SpaceCreateModal.svelte';
 import { createAlbumAndRedirect } from '$lib/utils/album-utils';
 import { openFileUploadDialog } from '$lib/utils/file-uploader';
@@ -9,6 +10,7 @@ import { modalManager, toastManager } from '@immich/ui';
 import {
   mdiAccountMultiplePlus,
   mdiCloudUploadOutline,
+  mdiKeyboardOutline,
   mdiLogoutVariant,
   mdiPlaylistPlus,
   mdiThemeLightDark,
@@ -68,6 +70,13 @@ export const COMMAND_ITEMS: readonly CommandItem[] = [
       toastManager.info(get(t)('signing_out'));
       return authManager.logout();
     },
+  },
+  {
+    id: 'cmd:shortcuts',
+    labelKey: 'keyboard_shortcuts',
+    descriptionKey: 'cmdk_cmd_keyboard_shortcuts_description',
+    icon: mdiKeyboardOutline,
+    handler: () => modalManager.show(ShortcutsModal, {}),
   },
 ];
 

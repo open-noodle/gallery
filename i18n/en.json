@@ -812,6 +812,7 @@
   "cmdk_announce_scoped_people": "Scoped to people.",
   "cmdk_announce_scoped_tags": "Scoped to tags.",
   "cmdk_cmd_create_space_description": "Start a new shared space",
+  "cmdk_cmd_keyboard_shortcuts_description": "Show keyboard shortcuts",
   "cmdk_cmd_new_album_description": "Start a new album",
   "cmdk_cmd_sign_out_description": "End your session",
   "cmdk_cmd_theme_description": "Switch between light and dark themes",

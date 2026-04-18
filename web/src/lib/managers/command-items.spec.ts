@@ -3,6 +3,7 @@ import * as albumUtils from '$lib/utils/album-utils';
 import * as fileUploader from '$lib/utils/file-uploader';
 import { modalManager, toastManager } from '@immich/ui';
 import { describe, expect, it, vi } from 'vitest';
+import ShortcutsModal from '../modals/ShortcutsModal.svelte';
 import SpaceCreateModal from '../modals/SpaceCreateModal.svelte';
 import { COMMAND_ITEMS, isAlmostExactCommandMatch } from './command-items';
 
@@ -82,6 +83,16 @@ describe('cmd:signout', () => {
     await cmd.handler();
     expect(infoSpy).toHaveBeenCalledOnce();
     expect(logoutSpy).toHaveBeenCalledOnce();
+  });
+});
+
+describe('cmd:shortcuts', () => {
+  it('opens ShortcutsModal via modalManager', async () => {
+    const spy = vi.mocked(modalManager.show);
+    spy.mockClear();
+    const cmd = COMMAND_ITEMS.find((c) => c.id === 'cmd:shortcuts')!;
+    await cmd.handler();
+    expect(spy).toHaveBeenCalledWith(ShortcutsModal, {});
   });
 });
 
