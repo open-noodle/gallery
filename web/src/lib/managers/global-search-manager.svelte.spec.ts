@@ -926,6 +926,42 @@ describe('activate("command")', () => {
     expect(order).toEqual(['close', 'handler']);
     closeSpy.mockRestore();
   });
+
+  it('two different commands in rapid Enter each fire (independent in-flight keys)', async () => {
+    const handlerA = vi.fn().mockResolvedValue(undefined);
+    const handlerB = vi.fn().mockResolvedValue(undefined);
+    const cmdA: CommandItem = { id: 'cmd:testA', labelKey: 'x', descriptionKey: 'x', icon: '', handler: handlerA };
+    const cmdB: CommandItem = { id: 'cmd:testB', labelKey: 'y', descriptionKey: 'y', icon: '', handler: handlerB };
+    manager.activate('command', cmdA);
+    manager.activate('command', cmdB);
+    await flushMicrotasks();
+    expect(handlerA).toHaveBeenCalledOnce();
+    expect(handlerB).toHaveBeenCalledOnce();
+  });
+
+  it('handler runs to completion even if palette is closed immediately after activate', async () => {
+    const handler = vi.fn().mockResolvedValue(undefined);
+    const cmd: CommandItem = { id: 'cmd:test', labelKey: 'x', descriptionKey: 'x', icon: '', handler };
+    manager.activate('command', cmd);
+    manager.close(); // immediate close in the same sync tick
+    await expect(flushMicrotasks()).resolves.toBeUndefined();
+    expect(handler).toHaveBeenCalledOnce();
+  });
+
+  it('cmd:clear_recents activated through the manager empties RECENT across open/close/open', async () => {
+    addEntry({ kind: 'query', id: 'q:hello', text: 'hello', mode: 'smart', lastUsed: Date.now() });
+    expect(getEntries().length).toBeGreaterThan(0);
+
+    const cmd = COMMAND_ITEMS.find((c) => c.id === 'cmd:clear_recents')!;
+    manager.activate('command', cmd);
+    await flushMicrotasks();
+    await flushMicrotasks(); // let .finally settle
+
+    // Reopen — RECENT should be empty.
+    manager.close();
+    manager.open();
+    expect(getEntries()).toEqual([]);
+  });
 });
 
 describe('activateRecent()', () => {
