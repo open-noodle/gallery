@@ -26,6 +26,8 @@ class MockNetworkService extends Mock implements NetworkService {}
 
 class MockSearchApi extends Mock implements SearchApi {}
 
+class MockTimelineApi extends Mock implements TimelineApi {}
+
 class MockAppSettingService extends Mock implements AppSettingsService {}
 
 class MockBackgroundService extends Mock implements BackgroundService {}
