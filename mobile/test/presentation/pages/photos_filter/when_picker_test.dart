@@ -168,5 +168,41 @@ void main() {
       expect(find.byKey(const Key('when-month-grid-2024')), findsNothing);
       expect(find.byKey(const Key('when-month-grid-2020')), findsNothing);
     });
+
+    // Plan §C4 test 3: "Tapping a decade chip scrolls the year accordion to
+    // the decade's newest year." Integration test — lives here because the
+    // accordion (C5) + page scroll plumbing is required.
+    testWidgets('tapping a decade chip scrolls the accordion to that decade\'s newest year', (tester) async {
+      _setSize(tester, width: 400, height: 800);
+      await tester.pumpConsumerWidget(
+        const WhenPickerPage(),
+        overrides: [
+          timeBucketsProvider.overrideWith(
+            (ref, filter) => Future.value(const <BucketLite>[
+              // Recent decade first (2020s) — ends up near the top.
+              (timeBucket: '2024-06-01', count: 10),
+              (timeBucket: '2022-01-01', count: 5),
+              // Older decade (2000s) — without scroll, lives past the fold.
+              (timeBucket: '2008-06-01', count: 3),
+              (timeBucket: '2003-01-01', count: 1),
+            ]),
+          ),
+        ],
+      );
+      await tester.pumpAndSettle();
+
+      // 2008 should exist in the tree (mounted), but may be below the
+      // viewport before we tap the decade chip.
+      expect(find.byKey(const Key('when-year-2008')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('when-decade-2000')));
+      await tester.pumpAndSettle();
+
+      // The newest year in the 2000s decade is 2008 — assert its row is
+      // now inside the viewport (near the top).
+      final rect = tester.getRect(find.byKey(const Key('when-year-2008')));
+      expect(rect.top, lessThan(800));
+      expect(rect.bottom, greaterThan(0));
+    });
   });
 }

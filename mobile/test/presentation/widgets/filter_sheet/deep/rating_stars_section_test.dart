@@ -62,5 +62,13 @@ void main() {
         expect(find.byKey(Key('rating-star-$i')), findsOneWidget);
       }
     });
+
+    testWidgets('each star meets 44pt tap target (a11y)', (tester) async {
+      await tester.pumpConsumerWidget(const Material(child: RatingStarsSection()));
+      await tester.pumpAndSettle();
+      for (var i = 1; i <= 5; i++) {
+        expectTapTargetMin(tester, find.byKey(Key('rating-star-$i')), min: 44);
+      }
+    });
   });
 }

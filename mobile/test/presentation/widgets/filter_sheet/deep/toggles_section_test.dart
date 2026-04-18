@@ -59,5 +59,21 @@ void main() {
       final favSwitch = tester.widget<SwitchListTile>(find.byKey(const Key('toggle-favourites')));
       expect(favSwitch.value, isTrue);
     });
+
+    testWidgets('each switch tile meets 48pt tap target', (tester) async {
+      await tester.pumpConsumerWidget(const Material(child: TogglesSection()));
+      await tester.pumpAndSettle();
+      expectTapTargetMin(tester, find.byKey(const Key('toggle-favourites')));
+      expectTapTargetMin(tester, find.byKey(const Key('toggle-archived')));
+      expectTapTargetMin(tester, find.byKey(const Key('toggle-not-in-album')));
+    });
+
+    testWidgets('renders correctly in dark theme', (tester) async {
+      await tester.pumpConsumerWidgetDark(const Material(child: TogglesSection()));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('toggle-favourites')), findsOneWidget);
+      expect(find.byKey(const Key('toggle-archived')), findsOneWidget);
+      expect(find.byKey(const Key('toggle-not-in-album')), findsOneWidget);
+    });
   });
 }

@@ -105,5 +105,20 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('alpha-scrubber-A')), findsOneWidget);
     });
+
+    testWidgets('person row meets 44pt tap target', (tester) async {
+      _setLogicalSize(tester, const Size(400, 800));
+      await tester.pumpConsumerWidget(PersonPickerList(people: [person('a', 'Alice')]));
+      await tester.pumpAndSettle();
+      expectTapTargetMin(tester, find.byKey(const Key('person-row-a')), min: 44);
+    });
+
+    testWidgets('renders correctly in dark theme', (tester) async {
+      _setLogicalSize(tester, const Size(400, 800));
+      await tester.pumpConsumerWidgetDark(PersonPickerList(people: [person('a', 'Alice')]));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('person-row-a')), findsOneWidget);
+      expect(find.byKey(const Key('alpha-bucket-header-A')), findsOneWidget);
+    });
   });
 }

@@ -50,5 +50,20 @@ void main() {
       final segmented = tester.widget<SegmentedButton<AssetType>>(find.byType(SegmentedButton<AssetType>));
       expect(segmented.selected, {AssetType.video});
     });
+
+    testWidgets('segmented button meets kMinInteractiveDimension (48pt)', (tester) async {
+      await tester.pumpConsumerWidget(const SizedBox(width: 400, child: Material(child: MediaTypeSection())));
+      await tester.pumpAndSettle();
+      expectTapTargetMin(tester, find.byType(SegmentedButton<AssetType>));
+    });
+
+    testWidgets('renders correctly in dark theme', (tester) async {
+      await tester.pumpConsumerWidgetDark(const Material(child: MediaTypeSection()));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('media-segment-all')), findsOneWidget);
+      expect(find.byKey(const Key('media-segment-image')), findsOneWidget);
+      expect(find.byKey(const Key('media-segment-video')), findsOneWidget);
+      expect(find.byKey(const Key('media-segment-audio')), findsOneWidget);
+    });
   });
 }
