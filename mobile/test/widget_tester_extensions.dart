@@ -42,9 +42,10 @@ extension PumpConsumerWidgetDark on WidgetTester {
   }
 }
 
-/// Assert a widget's size meets the Material 44×44 minimum tap target.
-void expectTapTargetMin(WidgetTester tester, Finder finder, {double min = 44}) {
+/// Assert a widget's size meets the Material 48×48 minimum tap target (kMinInteractiveDimension).
+void expectTapTargetMin(WidgetTester tester, Finder finder, {double min = 48}) {
   final size = tester.getSize(finder);
-  expect(size.width, greaterThanOrEqualTo(min), reason: '${finder.description} width');
-  expect(size.height, greaterThanOrEqualTo(min), reason: '${finder.description} height');
+  final desc = finder.describeMatch(Plurality.one);
+  expect(size.width, greaterThanOrEqualTo(min), reason: '$desc width');
+  expect(size.height, greaterThanOrEqualTo(min), reason: '$desc height');
 }
