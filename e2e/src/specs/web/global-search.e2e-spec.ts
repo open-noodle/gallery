@@ -359,11 +359,12 @@ test.describe('global search palette', () => {
       // fires themeManager.toggleTheme() via the manager's command activation.
       const initialDark = await page.evaluate(() => document.documentElement.classList.contains('dark'));
       await page.keyboard.press('Control+k');
-      await page.getByRole('dialog').getByRole('combobox').fill('theme');
-      await page
-        .getByText(/^theme$/i)
-        .first()
-        .click();
+      const dialog = page.getByRole('dialog');
+      await dialog.getByRole('combobox').fill('theme');
+      // `theme` is promoted to the Top Result slot (data-cmdk-top-result-commands).
+      // Scope the click to that group to avoid colliding with other "Theme" text
+      // that may appear elsewhere in the dialog (e.g. nav descriptions).
+      await dialog.locator('[data-cmdk-top-result-commands]').getByText(/^theme$/i).first().click();
       await expect
         .poll(async () => page.evaluate(() => document.documentElement.classList.contains('dark')))
         .toBe(!initialDark);

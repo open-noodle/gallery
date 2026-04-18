@@ -93,11 +93,10 @@ test.describe('cmdk commands (v1.3.0)', () => {
     await dialog.getByRole('combobox').fill('upload');
 
     // Under unscoped 'all', a near-exact command match is promoted to the
-    // Top Result slot (rendered with heading `cmdk_top_result`), AND deduped
-    // out of the Commands section — so assert on the Top Result group, not
-    // on `[data-cmdk-commands-section]`. Pressing Enter on the promoted row
-    // activates the command.
-    const topResultGroup = dialog.getByRole('group', { name: /top result/i });
+    // Top Result slot (rendered as Command.Group with
+    // data-cmdk-top-result-commands) AND deduped out of the Commands
+    // section. Pressing Enter on the promoted row activates the command.
+    const topResultGroup = dialog.locator('[data-cmdk-top-result-commands]');
     await expect(topResultGroup).toBeVisible();
     await expect(topResultGroup.getByText(/^upload$/i).first()).toBeVisible();
 
@@ -135,9 +134,9 @@ test.describe('cmdk commands (v1.3.0)', () => {
     await expect(dialog.getByText(/clear recent/i).first()).toBeVisible();
     await page.keyboard.press('Enter');
 
-    // Close + reopen; RECENT section should be absent (empty groups don't render).
-    await dialog.getByRole('combobox').focus();
-    await page.keyboard.press('Escape');
+    // Command activation auto-closes the palette (activate('command') calls
+    // manager.close). Wait for the dialog to disappear, then reopen; the RECENT
+    // section should be gone because empty groups don't render.
     await expect(page.getByRole('dialog')).toBeHidden();
     await page.keyboard.press('Control+k');
     dialog = page.getByRole('dialog');
