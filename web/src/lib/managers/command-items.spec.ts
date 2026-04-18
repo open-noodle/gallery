@@ -279,11 +279,13 @@ describe('cmd:clear_failed_jobs', () => {
   });
 
   it('partial failure: warning toast fires, no success toast', async () => {
-    const spy = vi.spyOn(sdk, 'emptyQueue').mockImplementation(({ name }) =>
-      name === QueueName.FaceDetection
-        ? (Promise.reject(new Error('boom')) as never)
-        : (Promise.resolve({}) as never),
-    );
+    const spy = vi
+      .spyOn(sdk, 'emptyQueue')
+      .mockImplementation(({ name }) =>
+        name === QueueName.FaceDetection
+          ? (Promise.reject(new Error('boom')) as never)
+          : (Promise.resolve({}) as never),
+      );
     const cmd = COMMAND_ITEMS.find((c) => c.id === 'cmd:clear_failed_jobs')!;
     await cmd.handler();
     expect(spy).toHaveBeenCalledTimes(ADMIN_VISIBLE_QUEUES.length);

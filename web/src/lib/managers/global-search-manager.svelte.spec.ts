@@ -2032,7 +2032,10 @@ describe('commands provider', () => {
     expect(nonAdminSection.status).toBe('ok');
     if (nonAdminSection.status === 'ok') {
       for (const id of v131Ids) {
-        expect(nonAdminSection.items.some((c) => c.id === id), `${id} must be hidden for non-admin`).toBe(false);
+        expect(
+          nonAdminSection.items.some((c) => c.id === id),
+          `${id} must be hidden for non-admin`,
+        ).toBe(false);
       }
     }
 
@@ -2045,7 +2048,10 @@ describe('commands provider', () => {
     expect(adminSection.status).toBe('ok');
     if (adminSection.status === 'ok') {
       for (const id of v131Ids) {
-        expect(adminSection.items.some((c) => c.id === id), `${id} must be visible for admin`).toBe(true);
+        expect(
+          adminSection.items.some((c) => c.id === id),
+          `${id} must be visible for admin`,
+        ).toBe(true);
       }
     }
   });
@@ -2056,7 +2062,12 @@ describe('commands provider', () => {
     // mock just for this is overkill — swap the handler directly on the live item.
     const realCmd = commandItemsMut.find((c) => c.id === 'cmd:run_thumbnail_gen');
     expect(realCmd).toBeDefined();
-    const handlerSpy = vi.fn(() => new Promise(() => { /* never resolves */ }));
+    const handlerSpy = vi.fn(
+      () =>
+        new Promise(() => {
+          /* never resolves */
+        }),
+    );
     const originalHandler = realCmd!.handler;
     realCmd!.handler = handlerSpy;
     try {
@@ -2067,7 +2078,9 @@ describe('commands provider', () => {
       await flushMicrotasks();
       const section = manager.sections.commands;
       expect(section.status).toBe('ok');
-      if (section.status !== 'ok') { return; }
+      if (section.status !== 'ok') {
+        return;
+      }
       const item = section.items.find((i) => i.id === 'cmd:run_thumbnail_gen')!;
 
       // Two rapid activations; the guard should block the second.
