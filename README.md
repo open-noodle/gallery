@@ -49,6 +49,10 @@ Create named, color-coded groups of users (e.g., "Family", "Close Friends") that
 
 Store your photos and videos in any S3-compatible object storage — AWS S3, MinIO, Cloudflare R2, Backblaze B2, Wasabi, and more. Configure it with a few environment variables and new uploads go straight to your bucket. Choose between `redirect` mode (clients download directly from S3 via presigned URLs) or `proxy` mode (server streams the files). Both disk and S3 backends run simultaneously, so existing files on disk continue to work. A built-in [Storage Migration](https://docs.opennoodle.de/features/storage-migration) tool lets you migrate existing files between disk and S3 in either direction, with resume, rollback, and configurable concurrency. [Feature page](https://opennoodle.de/features/s3-storage) · [Documentation](https://docs.opennoodle.de/features/s3-storage)
 
+### [Search Palette](https://opennoodle.de/features/search-palette)
+
+A keyboard-driven command palette — press <kbd>Cmd</kbd>/<kbd>Ctrl</kbd>+<kbd>K</kbd> from anywhere to search photos, people, places, and tags, and jump to any admin or settings page from one input. Five providers run in parallel and group into named sections; the Photos section toggles between Smart (CLIP), Filename, Description, and OCR matching modes via <kbd>Ctrl</kbd>+<kbd>/</kbd>. Empty sections collapse, navigation results fuzzy-match the live page catalog, and an unhealthy ML server triggers a one-tap fall back to filename mode. [Feature page](https://opennoodle.de/features/search-palette) · [Documentation](https://docs.opennoodle.de/features/search-palette)
+
 ### [Auto-Classification](https://opennoodle.de/features/auto-classification)
 
 Define categories like "Screenshots", "Memes", or "Receipts" with text prompts, and Gallery uses CLIP AI to automatically tag and optionally archive matching photos. Each category has a tunable similarity threshold and can either tag-only or tag-and-archive. Runs on the same CLIP pipeline as smart search — no extra processing. Scan your entire existing library in seconds or let it classify new uploads automatically. Per-user categories so everyone can define their own clutter rules. [Feature page](https://opennoodle.de/features/auto-classification)
@@ -198,6 +202,7 @@ That's it. To switch back to upstream Immich later, flip the two image names bac
 | Folder View                                  | Yes    | Yes |
 | **Shared Spaces**                            | Yes    | Yes |
 | **Smart Search & Filters**                   | No     | Yes |
+| **Search Palette (Cmd+K)**                   | No     | Yes |
 | **User Groups**                              | No     | Yes |
 | **Auto-Classification**                      | No     | Yes |
 | **Video Duplicate Detection**                | No     | Yes |
