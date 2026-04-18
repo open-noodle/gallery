@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/browse_content.widget.dart';
-import 'package:immich_mobile/presentation/widgets/filter_sheet/deep_stub_content.widget.dart';
+import 'package:immich_mobile/presentation/widgets/filter_sheet/deep_content.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/peek_content.widget.dart';
 import 'package:immich_mobile/providers/photos_filter/filter_sheet.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
@@ -128,7 +128,7 @@ class _FilterSheetState extends ConsumerState<FilterSheet> {
       case FilterSheetSnap.browse:
         return BrowseContent(scrollController: scrollController);
       case FilterSheetSnap.deep:
-        return DeepStubContent(scrollController: scrollController);
+        return DeepContent(scrollController: scrollController);
       case FilterSheetSnap.hidden:
         return const SizedBox.shrink();
     }
