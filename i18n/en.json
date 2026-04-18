@@ -1327,6 +1327,7 @@
   "filter_sheet_deep_empty_people": "Filters appear as you upload photos",
   "filter_sheet_deep_empty_places": "Locations will appear when photos have them",
   "filter_sheet_deep_empty_tags": "No tags yet — tap a photo to add one",
+  "filter_sheet_deep_empty_when": "When will appear once photos exist",
   "filter_sheet_deep_media_any": "All",
   "filter_sheet_deep_media_section": "Media",
   "filter_sheet_deep_people_section": "People",
