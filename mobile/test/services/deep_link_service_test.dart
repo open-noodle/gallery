@@ -146,13 +146,13 @@ void main() {
       verify(() => sharedSpaceApiRepository.get(spaceId)).called(1);
     });
 
-    test('cold start prepends TabShellRoute alongside the resolved space', () async {
+    test('cold start prepends GalleryTabShellRoute alongside the resolved space', () async {
       when(() => sharedSpaceApiRepository.get(spaceId)).thenAnswer((_) async => SharedSpaceStub.space1);
 
       final result = await sut.handleScheme(_deepLinkFor('immich://space?id=$spaceId'), ref, true);
 
       final routes = _routesOf(result);
-      expect(routes.map((r) => r.routeName), [TabShellRoute.name, SpaceDetailRoute.name]);
+      expect(routes.map((r) => r.routeName), [GalleryTabShellRoute.name, SpaceDetailRoute.name]);
     });
 
     test('falls back to defaultPath on cold start when space lookup fails', () async {
