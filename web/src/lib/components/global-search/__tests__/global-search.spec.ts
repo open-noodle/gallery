@@ -136,8 +136,11 @@ describe('global-search root', () => {
   // tears down the document. Without this, the cleanup fires after teardown
   // and throws `ReferenceError: document is not defined` as an unhandled error,
   // which Vitest surfaces as a whole-file failure even though every test passed.
+  // 500ms is 20× the bits-ui delay — deliberately generous so CI scheduler jitter
+  // under load can never race the drain. Shorter values (50ms, 100ms) have been
+  // observed to flake when sibling spec timings shift.
   afterEach(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await new Promise((resolve) => setTimeout(resolve, 500));
   });
 
   it('renders dialog containing the palette', () => {
