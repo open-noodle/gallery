@@ -28,7 +28,7 @@ import {
   mdiRestore,
   mdiThemeLightDark,
 } from '@mdi/js';
-import { t, type Translations } from 'svelte-i18n';
+import { t } from 'svelte-i18n';
 import { get } from 'svelte/store';
 
 const MIN_MATCH_LENGTH = 3;
@@ -53,7 +53,7 @@ async function runQueue(name: QueueName) {
       name,
       queueCommandDto: { command: QueueCommand.Start, force: false },
     });
-    toastManager.primary($t('cmdk_cmd_job_started' as Translations, { values: { job: item.title } }));
+    toastManager.primary($t('cmdk_cmd_job_started', { values: { job: item.title } }));
   } catch (error) {
     handleError(error, $t('errors.something_went_wrong'));
   }
@@ -66,12 +66,10 @@ async function bulkQueueCommand(command: QueueCommand.Pause | QueueCommand.Resum
   const failed = results.filter((r) => r.status === 'rejected').length;
   const $t = get(t);
   if (failed > 0) {
-    toastManager.warning($t('cmdk_cmd_bulk_partial' as Translations, { values: { failed, total: results.length } }));
+    toastManager.warning($t('cmdk_cmd_bulk_partial', { values: { failed, total: results.length } }));
     return;
   }
-  toastManager.primary(
-    $t((command === QueueCommand.Pause ? 'cmdk_cmd_all_paused' : 'cmdk_cmd_all_resumed') as Translations),
-  );
+  toastManager.primary($t(command === QueueCommand.Pause ? 'cmdk_cmd_all_paused' : 'cmdk_cmd_all_resumed'));
 }
 
 async function clearAllFailedJobs() {
@@ -81,10 +79,10 @@ async function clearAllFailedJobs() {
   const failed = results.filter((r) => r.status === 'rejected').length;
   const $t = get(t);
   if (failed > 0) {
-    toastManager.warning($t('cmdk_cmd_bulk_partial' as Translations, { values: { failed, total: results.length } }));
+    toastManager.warning($t('cmdk_cmd_bulk_partial', { values: { failed, total: results.length } }));
     return;
   }
-  toastManager.primary($t('cmdk_cmd_failed_cleared' as Translations));
+  toastManager.primary($t('cmdk_cmd_failed_cleared'));
 }
 
 export const COMMAND_ITEMS: readonly CommandItem[] = [
