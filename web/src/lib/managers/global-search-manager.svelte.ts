@@ -1,7 +1,6 @@
 import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
 import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
-import { themeManager } from '$lib/managers/theme-manager.svelte';
 import { Route } from '$lib/route';
 import { addEntry, getEntries, makePlaceId, removeEntry, type RecentEntry } from '$lib/stores/cmdk-recent';
 import { user } from '$lib/stores/user.store';
@@ -29,6 +28,7 @@ import { locale as i18nLocale, t, type Translations } from 'svelte-i18n';
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import { get } from 'svelte/store';
 import { parseScope, personSuggestionsComparator, type ParsedQuery, type Scope } from './cmdk-prefix';
+import { COMMAND_ITEMS, isAlmostExactCommandMatch, type CommandItem } from './command-items';
 import { isAlmostExactNavMatch, NAVIGATION_ITEMS, type NavigationItem } from './navigation-items';
 
 export type SearchMode = 'smart' | 'metadata' | 'description' | 'ocr';
@@ -63,6 +63,7 @@ export type Sections = {
   albums: ProviderStatus<EntityItem>;
   spaces: ProviderStatus<EntityItem>;
   navigation: ProviderStatus<NavigationItem>;
+  commands: ProviderStatus<CommandItem>;
 };
 
 export interface Provider<T = unknown> {
@@ -79,7 +80,8 @@ export type ActiveItem =
   | { kind: 'tag'; data: unknown }
   | { kind: 'album'; data: AlbumNameDto }
   | { kind: 'space'; data: SharedSpaceResponseDto }
-  | { kind: 'nav'; data: NavigationItem };
+  | { kind: 'nav'; data: NavigationItem }
+  | { kind: 'command'; data: CommandItem };
 
 const VALID_MODES: ReadonlySet<SearchMode> = new Set(['smart', 'metadata', 'description', 'ocr']);
 // Slice size for the albums section. Kept as a named constant so the buildProviders
@@ -101,6 +103,8 @@ const idle = Object.freeze({ status: 'idle' as const });
 // to just the entity sections (dropping `navigation`) keeps `sections[key] = ...`
 // assignments away from the navigation section's `ProviderStatus<NavigationItem>`
 // union, which would otherwise force an awkward cast.
+// Commands, like navigation, use a distinct `ProviderStatus<CommandItem>` generic
+// and are intentionally also excluded from this key set.
 type EntitySectionKey = 'photos' | 'people' | 'places' | 'tags' | 'albums' | 'spaces';
 const ENTITY_KEYS_BY_SCOPE: Record<Scope, ReadonlyArray<EntitySectionKey>> = {
   all: ['photos', 'people', 'places', 'tags', 'albums', 'spaces'],
@@ -120,12 +124,12 @@ const ENTITY_KEYS_BY_SCOPE: Record<Scope, ReadonlyArray<EntitySectionKey>> = {
 //
 // The all-scope order matches render order (photos, albums, spaces, people,
 // places, tags, navigation) so the cursor lands on the first visible row.
-const RECONCILE_ORDER_BY_SCOPE: Record<Scope, ReadonlyArray<keyof Sections>> = {
-  all: ['photos', 'albums', 'spaces', 'people', 'places', 'tags', 'navigation'],
+export const RECONCILE_ORDER_BY_SCOPE: Record<Scope, ReadonlyArray<keyof Sections>> = {
+  all: ['commands', 'photos', 'albums', 'spaces', 'people', 'places', 'tags', 'navigation'],
   people: ['people'],
   tags: ['tags'],
   collections: ['albums', 'spaces'],
-  nav: ['navigation'],
+  nav: ['commands', 'navigation'],
 };
 
 function isValidRecentEntry(e: RecentEntry): boolean {
@@ -151,6 +155,10 @@ function isValidRecentEntry(e: RecentEntry): boolean {
     case 'space': {
       return typeof e.spaceId === 'string' && typeof e.label === 'string';
     }
+    // The route.length > 0 invariant is what filters any stale pre-v1.3.0
+    // theme-action entry (id `nav` + `:theme`, joined) — it had route: '' and
+    // migrated to the commands registry (which doesn't write RECENT at all).
+    // Don't relax this check without auditing the cmdk-recent migration story.
     case 'navigate': {
       return (
         typeof e.route === 'string' &&
@@ -200,6 +208,7 @@ export class GlobalSearchManager {
     albums: idle,
     spaces: idle,
     navigation: idle,
+    commands: idle,
   });
   activeItemId = $state<string | null>(null);
   mlHealthy = $state(true);
@@ -225,6 +234,16 @@ export class GlobalSearchManager {
    * settles (or the palette closes).
    */
   activationInFlight: SvelteSet<string> = $state(new SvelteSet());
+  /**
+   * Per-command single-flight guard. Independent of `activationInFlight` (which
+   * tracks entity row activations). Prevents a rapid double-Enter from firing
+   * Upload's file picker twice or opening two Create-Album modals.
+   *
+   * Plain `Set` (not `SvelteSet`) because no UI subscribes to this — it's read
+   * only inside `activate('command')` for the synchronous has/add check.
+   */
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity
+  private commandInFlight: Set<string> = new Set();
   /**
    * Id of the row currently showing the 200 ms "pending" affordance (subtle spinner
    * on the row) while its activation handler is resolving. Null when no activation is
@@ -291,6 +310,12 @@ export class GlobalSearchManager {
   // non-reactive memoization cache — the reactivity machinery isn't needed here, but
   // using the Svelte-aware type keeps the rule happy and has negligible overhead.
   private navigationSearchCache: SvelteMap<string, SvelteMap<string, string>> = new SvelteMap();
+  /**
+   * Locale-keyed memo cache for command item search strings. Mirrors
+   * `navigationSearchCache` — rebuilt on locale change, invalidated via the
+   * locale subscribe in the constructor.
+   */
+  private commandSearchCache: SvelteMap<string, SvelteMap<string, string>> = new SvelteMap();
   private localeUnsubscribe?: () => void;
 
   constructor() {
@@ -308,6 +333,7 @@ export class GlobalSearchManager {
       // In production it is never called — the singleton lives for the tab's lifetime.
       this.localeUnsubscribe = i18nLocale.subscribe(() => {
         this.navigationSearchCache.clear();
+        this.commandSearchCache.clear();
       });
     }
   }
@@ -347,35 +373,56 @@ export class GlobalSearchManager {
   }
 
   /**
-   * Synchronously filter NAVIGATION_ITEMS for a payload under a given scope. Applies admin +
-   * feature-flag gates, scores via `computeCommandScore`, and returns a flat `ProviderStatus`
-   * (no grouping). Runs on every keystroke off the main path — bypasses the 150 ms debounce.
+   * Build or fetch the memoized search-string table for command items in the
+   * current locale. Mirrors `getNavigationSearchStrings` — O(1) cache hit,
+   * O(COMMAND_ITEMS.length) rebuild on locale change or first call.
+   */
+  private getCommandSearchStrings(): SvelteMap<string, string> {
+    const currentLocale = (get(i18nLocale) ?? 'en') as string;
+    const cached = this.commandSearchCache.get(currentLocale);
+    if (cached) {
+      return cached;
+    }
+    const translate = get(t);
+    const table = new SvelteMap<string, string>();
+    for (const item of COMMAND_ITEMS) {
+      const label = translate(item.labelKey as Translations);
+      const description = translate(item.descriptionKey as Translations);
+      table.set(item.id, `${label} ${description}`);
+    }
+    this.commandSearchCache.set(currentLocale, table);
+    return table;
+  }
+
+  /**
+   * Shared admin/feature-flag filter + fuzzy-score pass for navigation AND command items.
+   * Two thin wrappers (`runNavigationProvider` / `runCommandsProvider`) slice the result
+   * into their respective sections. Keeps the scoring pass and the scope semantics in a
+   * single place so the two providers cannot drift.
    *
-   * Scope semantics:
-   *   - 'people' | 'tags' | 'collections' — navigation section is hidden entirely (empty).
-   *   - 'all' + empty payload — idle navigation (no results when the palette is bare).
+   * Scope semantics (identical for both output arrays):
+   *   - 'people' | 'tags' | 'collections' — both arrays empty.
+   *   - 'all' + empty payload — both arrays empty (no results on bare palette).
    *   - 'nav' + empty payload — bare `>`: return ALL eligible items sorted alphabetically
    *     by translated label (no slice, no scoring).
    *   - 'all' or 'nav' + non-empty payload — fuzzy search payload over eligible items.
    */
-  private runNavigationProvider(payload: string, scope: Scope): ProviderStatus<NavigationItem> {
-    // Non-nav entity scopes hide the navigation section entirely.
+  private filterNavAndCommands(
+    payload: string,
+    scope: Scope,
+  ): { commands: CommandItem[]; navigation: NavigationItem[] } {
     if (scope !== 'all' && scope !== 'nav') {
-      return { status: 'empty' };
+      return { commands: [], navigation: [] };
     }
-
-    // Scope 'all' with empty payload matches today's behavior (no nav results on idle).
     if (scope === 'all' && payload === '') {
-      return { status: 'empty' };
+      return { commands: [], navigation: [] };
     }
 
     const u = get(user);
     const isAdmin = u?.isAdmin ?? false;
     const flags = featureFlagsManager.valueOrUndefined;
-    const searchStrings = this.getNavigationSearchStrings();
 
-    // Admin + flag filter applied in both branches below.
-    const eligible: NavigationItem[] = [];
+    const eligibleNav: NavigationItem[] = [];
     for (const item of NAVIGATION_ITEMS) {
       if (item.adminOnly && !isAdmin) {
         continue;
@@ -383,22 +430,38 @@ export class GlobalSearchManager {
       if (item.featureFlag && !flags?.[item.featureFlag]) {
         continue;
       }
-      eligible.push(item);
+      eligibleNav.push(item);
     }
 
-    // Scope 'nav' with bare payload → return all eligible items alphabetical by translated label.
+    const eligibleCmd: CommandItem[] = [];
+    for (const item of COMMAND_ITEMS) {
+      if (item.adminOnly && !isAdmin) {
+        continue;
+      }
+      if (item.featureFlag && !flags?.[item.featureFlag]) {
+        continue;
+      }
+      eligibleCmd.push(item);
+    }
+
+    const translate = get(t);
+
+    // Bare `>` (scope 'nav', empty payload): return both arrays sorted alphabetically
+    // by translated label. Commands section gets its own slice below.
     if (scope === 'nav' && payload === '') {
-      const translate = get(t);
-      const sorted = [...eligible].sort((a, b) =>
-        translate(a.labelKey as Translations).localeCompare(translate(b.labelKey as Translations)),
-      );
-      return sorted.length === 0 ? { status: 'empty' } : { status: 'ok', items: sorted, total: sorted.length };
+      const sortByLabel = <T extends { labelKey: string }>(a: T, b: T) =>
+        translate(a.labelKey as Translations).localeCompare(translate(b.labelKey as Translations));
+      return {
+        commands: [...eligibleCmd].sort(sortByLabel),
+        navigation: [...eligibleNav].sort(sortByLabel),
+      };
     }
 
-    // Non-empty payload (under 'all' or 'nav'): fuzzy score against payload.
-    const scored: Array<{ item: NavigationItem; score: number }> = [];
-    for (const item of eligible) {
-      const corpus = searchStrings.get(item.id);
+    // Non-empty payload under 'all' or 'nav': fuzzy score both arrays.
+    const navSearch = this.getNavigationSearchStrings();
+    const scoredNav: Array<{ item: NavigationItem; score: number }> = [];
+    for (const item of eligibleNav) {
+      const corpus = navSearch.get(item.id);
       if (!corpus) {
         continue;
       }
@@ -406,14 +469,75 @@ export class GlobalSearchManager {
       if (score <= 0) {
         continue;
       }
-      scored.push({ item, score });
+      scoredNav.push({ item, score });
     }
-    if (scored.length === 0) {
+    scoredNav.sort((a, b) => b.score - a.score);
+
+    const cmdSearch = this.getCommandSearchStrings();
+    const scoredCmd: Array<{ item: CommandItem; score: number }> = [];
+    for (const item of eligibleCmd) {
+      const corpus = cmdSearch.get(item.id);
+      if (!corpus) {
+        continue;
+      }
+      const score = computeCommandScore(corpus, payload);
+      if (score <= 0) {
+        continue;
+      }
+      scoredCmd.push({ item, score });
+    }
+    scoredCmd.sort((a, b) => b.score - a.score);
+
+    return {
+      commands: scoredCmd.map((s) => s.item),
+      navigation: scoredNav.map((s) => s.item),
+    };
+  }
+
+  /**
+   * Synchronously filter NAVIGATION_ITEMS for a payload under a given scope. Thin wrapper
+   * around `filterNavAndCommands` that slices the navigation array to `providers.navigation.topN`.
+   * Runs on every keystroke off the main path — bypasses the 150 ms debounce.
+   */
+  private runNavigationProvider(payload: string, scope: Scope): ProviderStatus<NavigationItem> {
+    const { navigation } = this.filterNavAndCommands(payload, scope);
+    if (navigation.length === 0) {
       return { status: 'empty' };
     }
-    scored.sort((a, b) => b.score - a.score);
-    const items = scored.map((s) => s.item);
-    return { status: 'ok', items, total: items.length };
+    // Bare `>` returns the full filtered catalog unsliced — the design treats the
+    // prefix as "open the full nav index". Only the fuzzy-score branch (non-empty
+    // payload under scope 'all' / 'nav') slices to topN to keep the section bounded.
+    if (scope === 'nav' && payload === '') {
+      return { status: 'ok', items: navigation, total: navigation.length };
+    }
+    const topN = this.providers.navigation.topN;
+    return { status: 'ok', items: navigation.slice(0, topN), total: navigation.length };
+  }
+
+  /**
+   * Synchronously filter COMMAND_ITEMS for a payload under a given scope. Thin wrapper
+   * around `filterNavAndCommands` that slices to `providers.commands.topN` and omits
+   * any command that has already been promoted to the top-result slot so the row does
+   * not render in both places (same dedup the component applies for nav).
+   */
+  private runCommandsProvider(
+    payload: string,
+    scope: Scope,
+    promotedCommandId: string | null,
+  ): ProviderStatus<CommandItem> {
+    const { commands } = this.filterNavAndCommands(payload, scope);
+    const filtered = promotedCommandId === null ? commands : commands.filter((c) => c.id !== promotedCommandId);
+    if (filtered.length === 0) {
+      return { status: 'empty' };
+    }
+    // Bare `>` returns the full filtered catalog unsliced — mirrors navigation's
+    // treatment of the prefix as "open the full command index". Only the fuzzy
+    // branch (non-empty payload) slices to topN.
+    if (scope === 'nav' && payload === '') {
+      return { status: 'ok', items: filtered, total: filtered.length };
+    }
+    const topN = this.providers.commands.topN;
+    return { status: 'ok', items: filtered.slice(0, topN), total: filtered.length };
   }
 
   open() {
@@ -743,6 +867,7 @@ export class GlobalSearchManager {
       albums: idle,
       spaces: idle,
       navigation: idle,
+      commands: idle,
     };
     this.activeItemId = null;
     this.tagsCache = null;
@@ -801,7 +926,7 @@ export class GlobalSearchManager {
 
     if (kind === 'nav') {
       // For navigation items, the activeItemId IS the full NavigationItem.id (e.g.
-      // `nav:theme`, `nav:systemSettings:classification`). Match on the full id.
+      // `nav:userPages:photos`, `nav:systemSettings:classification`). Match on the full id.
       const navItems = section.items as NavigationItem[];
       const navMatch = navItems.find((n) => n.id === id);
       return navMatch ? { kind: 'nav', data: navMatch } : null;
@@ -876,6 +1001,10 @@ export class GlobalSearchManager {
       case 'navigate': {
         return null;
       }
+      // No 'command' case: commands are verbs, not destinations. activate('command')
+      // does not call addEntry, so no RecentEntry with a cmd:* id can exist. If one
+      // ever appears, isValidRecentEntry's kind-specific field checks discard it
+      // silently on read.
     }
   }
 
@@ -902,6 +1031,9 @@ export class GlobalSearchManager {
       case 'nav': {
         return this.sections.navigation;
       }
+      case 'command': {
+        return this.sections.commands;
+      }
       default: {
         return null;
       }
@@ -924,6 +1056,7 @@ export class GlobalSearchManager {
       albums: 'album',
       spaces: 'space',
       navigation: 'nav',
+      commands: 'command',
     };
     for (const key of order) {
       const s = this.sections[key];
@@ -971,7 +1104,7 @@ export class GlobalSearchManager {
     void goto(route);
   }
 
-  activate(kind: 'photo' | 'person' | 'place' | 'tag' | 'nav', item: unknown) {
+  activate(kind: 'photo' | 'person' | 'place' | 'tag' | 'nav' | 'command', item: unknown) {
     const now = Date.now();
     switch (kind) {
       case 'photo': {
@@ -1025,28 +1158,32 @@ export class GlobalSearchManager {
       }
       case 'nav': {
         const n = item as NavigationItem;
-        if (n.category === 'actions') {
-          // Actions are stateless side-effect handlers. Dispatch by id so future
-          // actions can be added without falling through to the goto path (which
-          // would navigate to `route: ''` and persist a broken recent).
-          if (n.id === 'nav:theme') {
-            themeManager.toggleTheme();
-          } else {
-            console.warn('[cmdk] unknown action navigation item', n.id);
-          }
-        } else {
-          addEntry({
-            kind: 'navigate',
-            id: n.id,
-            route: n.route,
-            labelKey: n.labelKey,
-            icon: n.icon,
-            adminOnly: n.adminOnly,
-            lastUsed: now,
-          });
-          this.navigateNav(n.route);
-        }
+        addEntry({
+          kind: 'navigate',
+          id: n.id,
+          route: n.route,
+          labelKey: n.labelKey,
+          icon: n.icon,
+          adminOnly: n.adminOnly,
+          lastUsed: now,
+        });
+        this.navigateNav(n.route);
         break;
+      }
+      case 'command': {
+        const cmd = item as CommandItem;
+        if (this.commandInFlight.has(cmd.id)) {
+          return;
+        }
+        this.commandInFlight.add(cmd.id);
+        this.close();
+        queueMicrotask(() => {
+          void Promise.resolve()
+            .then(() => cmd.handler())
+            .catch((error) => console.error('[cmdk] command handler failed', { id: cmd.id, error }))
+            .finally(() => this.commandInFlight.delete(cmd.id));
+        });
+        return; // no RECENT write
       }
     }
     this.close();
@@ -1311,8 +1448,21 @@ export class GlobalSearchManager {
    * unfiltered catalog is still safe.
    */
   topNavigationMatch = $derived.by<NavigationItem | null>(() => {
+    // Top-result promotion is an unscoped feature only — the render path in
+    // global-search.svelte gates on `scope === 'all'`. Computing a match under
+    // `>` / `@` / `#` / `/` serves no purpose and (for commands) would dedup
+    // the promoted item out of its own section, leaving nothing visible.
+    if (this.scope !== 'all') {
+      return null;
+    }
     const q = this.query.trim();
     if (q.length === 0) {
+      return null;
+    }
+    // Command-wins tie-break: if a command is promoted to the top-result slot, nav
+    // stays empty for that slot so the two never fight. Commands are high-intent
+    // verbs and we want "theme" to fire the toggle, not jump to the settings page.
+    if (this.topCommandMatch !== null) {
       return null;
     }
     const isAdmin = get(user)?.isAdmin ?? false;
@@ -1327,6 +1477,41 @@ export class GlobalSearchManager {
       }
       const label = translate(item.labelKey as Translations);
       if (isAlmostExactNavMatch(q, label)) {
+        return item;
+      }
+    }
+    return null;
+  });
+
+  /**
+   * Top command result — the single most confident command-item promotion for
+   * the current query. Null when the query is empty or when no command's label
+   * passes the almost-exact gate. Checked BEFORE `topNavigationMatch` so a
+   * command like "theme" wins over a same-name nav destination.
+   */
+  topCommandMatch = $derived.by<CommandItem | null>(() => {
+    // See the scope gate in topNavigationMatch. Under `>` scope the command
+    // section itself lists matching commands — promoting + deduping here would
+    // make the section render empty, so only promote under unscoped 'all'.
+    if (this.scope !== 'all') {
+      return null;
+    }
+    const q = this.query.trim();
+    if (q.length === 0) {
+      return null;
+    }
+    const isAdmin = get(user)?.isAdmin ?? false;
+    const flags = featureFlagsManager.valueOrUndefined;
+    const translate = get(t);
+    for (const item of COMMAND_ITEMS) {
+      if (item.adminOnly && !isAdmin) {
+        continue;
+      }
+      if (item.featureFlag && !flags?.[item.featureFlag]) {
+        continue;
+      }
+      const label = translate(item.labelKey as Translations);
+      if (isAlmostExactCommandMatch(q, label)) {
         return item;
       }
     }
@@ -1405,6 +1590,7 @@ export class GlobalSearchManager {
         albums: idle,
         spaces: idle,
         navigation: idle,
+        commands: idle,
       };
       this.batchInFlight = false;
       this.inFlightCounter = 0;
@@ -1436,6 +1622,11 @@ export class GlobalSearchManager {
     // `>` returns the full filtered catalog sorted alphabetically, and fuzzy search
     // runs when there's a payload under scope 'all' or 'nav'.
     this.sections.navigation = this.runNavigationProvider(this.payload, this.scope);
+    // Commands mirror navigation: synchronous on every keystroke, bypasses the debounce.
+    // Pass the current `topCommandMatch.id` so a command that is promoted to the top-
+    // result slot doesn't also render inside its own section (same dedup shape the
+    // component applies for nav).
+    this.sections.commands = this.runCommandsProvider(this.payload, this.scope, this.topCommandMatch?.id ?? null);
     // The prior cursor may point at a nav/entity item that no longer exists in the new
     // results. Reconcile synchronously so the highlight doesn't lag the displayed list.
     this.reconcileCursor();
@@ -1844,6 +2035,18 @@ export class GlobalSearchManager {
       run: () => Promise.resolve({ status: 'empty' as const }),
     };
 
+    // Commands, like navigation, do NOT dispatch through the runBatch async pipeline.
+    // `runCommandsProvider` is called synchronously from setQuery alongside
+    // `runNavigationProvider`. This entry's `run` is never invoked at runtime — it
+    // exists only to satisfy the `Record<keyof Sections, Provider>` contract and to
+    // publish the shared `topN` constant that `runCommandsProvider` reads.
+    const commandsStub: Provider<CommandItem> = {
+      key: 'commands',
+      topN: 5,
+      minQueryLength: 0,
+      run: () => Promise.resolve({ status: 'empty' as const }),
+    };
+
     // Albums provider dispatches to `runAlbums`, which filters the in-memory catalog
     // and writes `sections.albums` directly. Task 12 wired the albums key into
     // runBatch's iteration tuple, so `run()` is now invoked on the batch path. It
@@ -1873,7 +2076,7 @@ export class GlobalSearchManager {
       },
     };
 
-    return { photos, people, places, tags, albums, spaces, navigation: navigationStub };
+    return { photos, people, places, tags, albums, spaces, navigation: navigationStub, commands: commandsStub };
   }
 }
 

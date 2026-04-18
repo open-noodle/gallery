@@ -28,7 +28,7 @@ vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({
 }));
 
 import { goto } from '$app/navigation';
-import { themeManager } from '$lib/managers/theme-manager.svelte';
+import * as recentModule from '$lib/stores/cmdk-recent';
 import { addEntry, getEntries, __resetForTests as resetRecentStore } from '$lib/stores/cmdk-recent';
 import {
   getAlbumInfo,
@@ -47,8 +47,10 @@ import {
 import { toastManager } from '@immich/ui';
 import { computeCommandScore } from 'bits-ui';
 import { installFakeAbortTimeout, restoreAbortTimeout } from './__tests__/fake-abort-timeout';
+import { COMMAND_ITEMS, type CommandItem } from './command-items';
 import {
   GlobalSearchManager,
+  RECONCILE_ORDER_BY_SCOPE,
   type Provider,
   type ProviderStatus,
   type SearchMode,
@@ -128,6 +130,8 @@ vi.mock('svelte-i18n', async (orig) => {
   };
 });
 
+const flushMicrotasks = () => new Promise((resolve) => queueMicrotask(() => resolve(undefined)));
+
 describe('GlobalSearchManager (skeleton)', () => {
   let manager: GlobalSearchManager;
 
@@ -180,6 +184,7 @@ describe('GlobalSearchManager (skeleton)', () => {
     const providers = (manager as unknown as { providers: Record<string, unknown> }).providers;
     expect(Object.keys(providers).sort()).toEqual([
       'albums',
+      'commands',
       'navigation',
       'people',
       'photos',
@@ -257,6 +262,7 @@ describe('setQuery', () => {
       albums: makeStub('albums', 2),
       spaces: makeStub('spaces', 2),
       navigation: makeStub('navigation', 2),
+      commands: makeStub('commands', 2),
     };
   });
 
@@ -699,7 +705,9 @@ describe('cursor identity', () => {
     await vi.advanceTimersByTimeAsync(200);
     m.setActiveItem('photo:a1');
     providers.photos.run = () => Promise.resolve({ status: 'ok' as const, items: [{ id: 'a9' }], total: 1 });
-    m.setQuery('sunset');
+    // Use a query whose characters don't fuzzy-score against any command corpus,
+    // so the commands section stays empty and cursor fallback lands on photos.
+    m.setQuery('whale');
     await vi.advanceTimersByTimeAsync(200);
     expect(m.activeItemId).toBe('photo:a9');
   });
@@ -839,6 +847,120 @@ describe('activate()', () => {
     expect(decodeURIComponent(firstCall)).toContain('"tagIds":["t1"]');
     const entries = getEntries();
     expect(entries[0]).toMatchObject({ kind: 'tag', id: 'tag:t1', tagId: 't1', label: 'beach' });
+  });
+});
+
+describe('activate("command")', () => {
+  let manager: GlobalSearchManager;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    resetRecentStore();
+    manager = new GlobalSearchManager();
+    manager.open();
+  });
+
+  it('calls the handler exactly once and does not write RECENT', async () => {
+    const handler = vi.fn().mockResolvedValue(undefined);
+    const cmd: CommandItem = { id: 'cmd:test', labelKey: 'x', descriptionKey: 'x', icon: '', handler };
+    const addEntrySpy = vi.spyOn(recentModule, 'addEntry');
+    manager.activate('command', cmd);
+    await flushMicrotasks();
+    expect(handler).toHaveBeenCalledOnce();
+    expect(addEntrySpy).not.toHaveBeenCalled();
+    expect(getEntries()).toHaveLength(0);
+  });
+
+  it('is a no-op while same command is in flight', async () => {
+    let resolve!: () => void;
+    const handler = vi.fn().mockReturnValue(
+      new Promise<void>((r) => {
+        resolve = r;
+      }),
+    );
+    const cmd: CommandItem = { id: 'cmd:test', labelKey: 'x', descriptionKey: 'x', icon: '', handler };
+    manager.activate('command', cmd);
+    manager.activate('command', cmd);
+    await flushMicrotasks();
+    expect(handler).toHaveBeenCalledOnce();
+    resolve();
+  });
+
+  it('clears the in-flight key after the handler settles', async () => {
+    const handler = vi.fn().mockResolvedValue(undefined);
+    const cmd: CommandItem = { id: 'cmd:test', labelKey: 'x', descriptionKey: 'x', icon: '', handler };
+    manager.activate('command', cmd);
+    await flushMicrotasks();
+    await flushMicrotasks(); // one for the handler, one for .finally
+    manager.activate('command', cmd);
+    await flushMicrotasks();
+    expect(handler).toHaveBeenCalledTimes(2);
+  });
+
+  it('swallows handler rejections via console.error', async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const handler = vi.fn().mockRejectedValue(new Error('boom'));
+    const cmd: CommandItem = { id: 'cmd:test', labelKey: 'x', descriptionKey: 'x', icon: '', handler };
+    manager.activate('command', cmd);
+    await flushMicrotasks();
+    await flushMicrotasks();
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      '[cmdk] command handler failed',
+      expect.objectContaining({ id: 'cmd:test' }),
+    );
+    consoleErrorSpy.mockRestore();
+  });
+
+  it('closes the palette before the handler runs', async () => {
+    const order: string[] = [];
+    const closeSpy = vi.spyOn(manager, 'close').mockImplementation(() => {
+      order.push('close');
+    });
+    const handler = vi.fn().mockImplementation(() => {
+      order.push('handler');
+    });
+    const cmd: CommandItem = { id: 'cmd:test', labelKey: 'x', descriptionKey: 'x', icon: '', handler };
+    manager.activate('command', cmd);
+    await flushMicrotasks();
+    expect(order).toEqual(['close', 'handler']);
+    closeSpy.mockRestore();
+  });
+
+  it('two different commands in rapid Enter each fire (independent in-flight keys)', async () => {
+    const handlerA = vi.fn().mockResolvedValue(undefined);
+    const handlerB = vi.fn().mockResolvedValue(undefined);
+    const cmdA: CommandItem = { id: 'cmd:testA', labelKey: 'x', descriptionKey: 'x', icon: '', handler: handlerA };
+    const cmdB: CommandItem = { id: 'cmd:testB', labelKey: 'y', descriptionKey: 'y', icon: '', handler: handlerB };
+    manager.activate('command', cmdA);
+    manager.activate('command', cmdB);
+    await flushMicrotasks();
+    expect(handlerA).toHaveBeenCalledOnce();
+    expect(handlerB).toHaveBeenCalledOnce();
+  });
+
+  it('handler runs to completion even if palette is closed immediately after activate', async () => {
+    const handler = vi.fn().mockResolvedValue(undefined);
+    const cmd: CommandItem = { id: 'cmd:test', labelKey: 'x', descriptionKey: 'x', icon: '', handler };
+    manager.activate('command', cmd);
+    manager.close(); // immediate close in the same sync tick
+    await expect(flushMicrotasks()).resolves.toBeUndefined();
+    expect(handler).toHaveBeenCalledOnce();
+  });
+
+  it('cmd:clear_recents activated through the manager empties RECENT across open/close/open', async () => {
+    addEntry({ kind: 'query', id: 'q:hello', text: 'hello', mode: 'smart', lastUsed: Date.now() });
+    expect(getEntries().length).toBeGreaterThan(0);
+
+    const cmd = COMMAND_ITEMS.find((c) => c.id === 'cmd:clear_recents')!;
+    manager.activate('command', cmd);
+    await flushMicrotasks();
+    await flushMicrotasks(); // let .finally settle
+
+    // Reopen — RECENT should be empty.
+    manager.close();
+    manager.open();
+    expect(getEntries()).toEqual([]);
   });
 });
 
@@ -1081,11 +1203,13 @@ describe('topNavigationMatch', () => {
     expect(m.topNavigationMatch?.id).toBe('nav:userPages:people');
   });
 
-  it('promotes Albums when the user types "album" (prefix match)', () => {
+  it('promotes Favorites when the user types "favorites" (prefix match)', () => {
+    // Query chosen so it does NOT also match any command label — `album` now
+    // trips `cmd:new_album` which (correctly) suppresses the nav promotion.
     const m = new GlobalSearchManager();
     m.open();
-    m.setQuery('album');
-    expect(m.topNavigationMatch?.id).toBe('nav:userPages:albums');
+    m.setQuery('favorites');
+    expect(m.topNavigationMatch?.id).toBe('nav:userPages:favorites');
   });
 
   it('promotes Classification Settings for "auto-classification" (compound query)', () => {
@@ -1177,6 +1301,7 @@ describe('announcementText', () => {
       albums: { status: 'empty' },
       spaces: { status: 'empty' },
       navigation: { status: 'empty' },
+      commands: { status: 'empty' },
     };
     expect(m.announcementText).toBe('');
   });
@@ -1191,6 +1316,7 @@ describe('announcementText', () => {
       albums: { status: 'empty' },
       spaces: { status: 'empty' },
       navigation: { status: 'empty' },
+      commands: { status: 'empty' },
     };
     expect(m.announcementText).toBe('42 photos, 5 people, 3 tags');
   });
@@ -1205,6 +1331,7 @@ describe('announcementText', () => {
       albums: { status: 'empty' },
       spaces: { status: 'empty' },
       navigation: { status: 'empty' },
+      commands: { status: 'empty' },
     };
     expect(m.announcementText).toBe('');
   });
@@ -1230,6 +1357,7 @@ describe('reconcileCursor fallback + getActiveItem edge cases', () => {
       albums: { status: 'empty' },
       spaces: { status: 'empty' },
       navigation: { status: 'empty' },
+      commands: { status: 'empty' },
     };
     m.reconcileCursor();
     expect(m.activeItemId).toBe(null);
@@ -1246,6 +1374,7 @@ describe('reconcileCursor fallback + getActiveItem edge cases', () => {
       albums: { status: 'idle' },
       spaces: { status: 'idle' },
       navigation: { status: 'idle' },
+      commands: { status: 'idle' },
     };
     expect(m.getActiveItem()).toBe(null);
   });
@@ -1474,10 +1603,10 @@ describe('navigation section scaffolding', () => {
     const m = new GlobalSearchManager();
     m.sections.navigation = {
       status: 'ok',
-      items: [{ id: 'nav:theme' }] as never[],
+      items: [{ id: 'nav:userPages:photos' }] as never[],
       total: 1,
     };
-    m.activeItemId = 'nav:theme';
+    m.activeItemId = 'nav:userPages:photos';
     const active = m.getActiveItem();
     expect(active?.kind).toBe('nav');
   });
@@ -1491,7 +1620,8 @@ describe('navigation section scaffolding', () => {
       tags: { status: 'empty' },
       albums: { status: 'empty' },
       spaces: { status: 'empty' },
-      navigation: { status: 'ok', items: [{ id: 'nav:theme' }] as never[], total: 5 },
+      navigation: { status: 'ok', items: [{ id: 'nav:userPages:photos' }] as never[], total: 5 },
+      commands: { status: 'empty' },
     };
     expect(m.announcementText).toBe('5 pages');
   });
@@ -1505,11 +1635,12 @@ describe('navigation section scaffolding', () => {
       tags: { status: 'empty' },
       albums: { status: 'empty' },
       spaces: { status: 'empty' },
-      navigation: { status: 'ok', items: [{ id: 'nav:theme' }] as never[], total: 1 },
+      navigation: { status: 'ok', items: [{ id: 'nav:userPages:photos' }] as never[], total: 1 },
+      commands: { status: 'empty' },
     };
     m.activeItemId = null;
     m.reconcileCursor();
-    expect(m.activeItemId).toBe('nav:theme');
+    expect(m.activeItemId).toBe('nav:userPages:photos');
   });
 });
 
@@ -1525,7 +1656,7 @@ describe('navigation memo cache', () => {
     const cache = (
       m as unknown as { getNavigationSearchStrings: () => Map<string, string> }
     ).getNavigationSearchStrings();
-    expect(cache.size).toBe(36);
+    expect(cache.size).toBe(35);
     for (const [id, str] of cache) {
       expect(id.startsWith('nav:')).toBe(true);
       expect(str.length).toBeGreaterThan(0);
@@ -1545,7 +1676,7 @@ describe('navigation memo cache', () => {
     const cache = (
       m as unknown as { getNavigationSearchStrings: () => Map<string, string> }
     ).getNavigationSearchStrings();
-    expect(cache.size).toBe(36);
+    expect(cache.size).toBe(35);
   });
 
   it('clears the cached table when the locale subscription fires with a new value', () => {
@@ -1561,7 +1692,7 @@ describe('navigation memo cache', () => {
       m as unknown as { getNavigationSearchStrings: () => Map<string, string> }
     ).getNavigationSearchStrings();
     expect(second).not.toBe(first);
-    expect(second.size).toBe(36);
+    expect(second.size).toBe(35);
   });
 });
 
@@ -1584,24 +1715,25 @@ describe('getActiveItem nav branch', () => {
         status: 'ok',
         items: [
           {
-            id: 'nav:theme',
-            category: 'actions',
-            labelKey: 'theme',
-            descriptionKey: 'toggle_theme_description',
+            id: 'nav:userPages:photos',
+            category: 'userPages',
+            labelKey: 'photos',
+            descriptionKey: 'cmdk_nav_photos_description',
             icon: 'x',
-            route: '',
+            route: '/photos',
             adminOnly: false,
           },
         ] as never[],
         total: 1,
       },
+      commands: { status: 'empty' },
     };
-    m.activeItemId = 'nav:theme';
+    m.activeItemId = 'nav:userPages:photos';
     const active = m.getActiveItem();
     expect(active).not.toBeNull();
     expect(active?.kind).toBe('nav');
     if (active?.kind === 'nav') {
-      expect(active.data.id).toBe('nav:theme');
+      expect(active.data.id).toBe('nav:userPages:photos');
     }
   });
 
@@ -1616,9 +1748,10 @@ describe('getActiveItem nav branch', () => {
       spaces: { status: 'empty' },
       navigation: {
         status: 'ok',
-        items: [{ id: 'nav:theme' } as never],
+        items: [{ id: 'nav:userPages:photos' } as never],
         total: 1,
       },
+      commands: { status: 'empty' },
     };
     m.activeItemId = 'nav:userPages:map'; // not in the section
     expect(m.getActiveItem()).toBeNull();
@@ -1664,19 +1797,19 @@ describe('runNavigationProvider', () => {
   });
 
   it('filters admin-only items for non-admin users', () => {
-    // Query 'theme' DEFINITELY matches:
-    //   - nav:theme                     (adminOnly:false, labelKey='theme')
-    //   - nav:systemSettings:theme      (adminOnly:true,  labelKey='admin.theme_settings')
-    // Under non-admin this yields status='ok' with exactly nav:theme, so the
-    // assertion is forced to run (no vacuous-loop path).
+    // Query 'trash' matches both:
+    //   - nav:userPages:trash           (adminOnly:false, labelKey='trash')
+    //   - nav:systemSettings:trash      (adminOnly:true,  labelKey='admin.trash_settings')
+    // Under non-admin this yields status='ok' with only the user-pages entry,
+    // so the assertion is forced to run (no vacuous-loop path).
     mockUser.current = { id: 'test-user', isAdmin: false };
     const m = new GlobalSearchManager();
-    const result = runNav(m, 'theme');
+    const result = runNav(m, 'trash');
     expect(result.status).toBe('ok');
     if (result.status === 'ok') {
       const ids = result.items.map((i) => (i as { id: string }).id);
-      expect(ids).toContain('nav:theme');
-      expect(ids).not.toContain('nav:systemSettings:theme');
+      expect(ids).toContain('nav:userPages:trash');
+      expect(ids).not.toContain('nav:systemSettings:trash');
       expect(result.items.every((i) => (i as { adminOnly: boolean }).adminOnly === false)).toBe(true);
     }
   });
@@ -1684,12 +1817,12 @@ describe('runNavigationProvider', () => {
   it('admin users see both admin and non-admin matches (baseline for the admin filter test)', () => {
     mockUser.current = { id: 'test-user', isAdmin: true };
     const m = new GlobalSearchManager();
-    const result = runNav(m, 'theme');
+    const result = runNav(m, 'trash');
     expect(result.status).toBe('ok');
     if (result.status === 'ok') {
       const ids = result.items.map((i) => (i as { id: string }).id);
-      expect(ids).toContain('nav:theme');
-      expect(ids).toContain('nav:systemSettings:theme');
+      expect(ids).toContain('nav:userPages:trash');
+      expect(ids).toContain('nav:systemSettings:trash');
     }
   });
 
@@ -1775,6 +1908,149 @@ describe('runNavigationProvider', () => {
     if (result.status === 'ok') {
       const labels = result.items.map((i) => (i as { labelKey: string }).labelKey);
       expect(labels).toContain('admin.classification_settings');
+    }
+  });
+});
+
+describe('commands provider', () => {
+  let manager: GlobalSearchManager;
+
+  // Mutable handle to the live COMMAND_ITEMS runtime array. Declared `readonly` at
+  // the type level but plain `Array` at runtime, so the gating tests inject a
+  // fabricated item via push/pop around the test body. Pushing onto the real array
+  // mirrors what a new command registration would look like in production.
+  const commandItemsMut = COMMAND_ITEMS as unknown as CommandItem[];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    mockUser.current = { id: 'test-user', isAdmin: true };
+    mockFlags.valueOrUndefined = { search: true, map: true, trash: true };
+    mockI18nLocale.current = 'en';
+    manager = new GlobalSearchManager();
+    manager.open();
+  });
+
+  it('bare `>` populates commands section with all items alphabetical by label', async () => {
+    manager.setQuery('>');
+    await flushMicrotasks();
+    const section = manager.sections.commands;
+    expect(section.status).toBe('ok');
+    if (section.status === 'ok') {
+      const labels = section.items.map((c) => c.labelKey);
+      expect(labels).toEqual([...labels].sort());
+      // Sanity: the seed item from Task 1 is present under bare `>`.
+      expect(labels).toContain('theme');
+    }
+  });
+
+  it('under `@alice`, commands section is empty', async () => {
+    manager.setQuery('@alice');
+    await flushMicrotasks();
+    expect(manager.sections.commands.status).toBe('empty');
+  });
+
+  it('under `#tag`, commands section is empty', async () => {
+    manager.setQuery('#tag');
+    await flushMicrotasks();
+    expect(manager.sections.commands.status).toBe('empty');
+  });
+
+  it('under `/album`, commands section is empty', async () => {
+    manager.setQuery('/album');
+    await flushMicrotasks();
+    expect(manager.sections.commands.status).toBe('empty');
+  });
+
+  it('render order invariant: RECONCILE_ORDER_BY_SCOPE.all and .nav both start with "commands"', () => {
+    expect(RECONCILE_ORDER_BY_SCOPE.all[0]).toBe('commands');
+    expect(RECONCILE_ORDER_BY_SCOPE.nav[0]).toBe('commands');
+  });
+
+  it('defensive gating: fabricated adminOnly command is filtered for non-admin user', async () => {
+    const adminCmd: CommandItem = {
+      id: 'cmd:test-admin-only',
+      labelKey: 'test_admin_only_label',
+      descriptionKey: 'test_admin_only_description',
+      icon: '',
+      handler: () => undefined,
+      adminOnly: true,
+    };
+    commandItemsMut.push(adminCmd);
+    try {
+      // Non-admin user: fabricated command must NOT appear under bare `>`.
+      mockUser.current = { id: 'test-user', isAdmin: false };
+      const nonAdmin = new GlobalSearchManager();
+      nonAdmin.open();
+      nonAdmin.setQuery('>');
+      await flushMicrotasks();
+      const nonAdminSection = nonAdmin.sections.commands;
+      expect(nonAdminSection.status).toBe('ok');
+      if (nonAdminSection.status === 'ok') {
+        expect(nonAdminSection.items.some((c) => c.id === adminCmd.id)).toBe(false);
+      }
+
+      // Admin user: same fabricated command MUST appear.
+      mockUser.current = { id: 'test-user', isAdmin: true };
+      const admin = new GlobalSearchManager();
+      admin.open();
+      admin.setQuery('>');
+      await flushMicrotasks();
+      const adminSection = admin.sections.commands;
+      expect(adminSection.status).toBe('ok');
+      if (adminSection.status === 'ok') {
+        expect(adminSection.items.some((c) => c.id === adminCmd.id)).toBe(true);
+      }
+    } finally {
+      // Remove the fabricated item regardless of assertion outcome so later
+      // describe blocks see a clean COMMAND_ITEMS.
+      const idx = commandItemsMut.findIndex((c) => c.id === adminCmd.id);
+      if (idx !== -1) {
+        commandItemsMut.splice(idx, 1);
+      }
+    }
+  });
+
+  it('defensive gating: fabricated featureFlag command is filtered when flag is off', async () => {
+    const flaggedCmd: CommandItem = {
+      id: 'cmd:test-flagged',
+      labelKey: 'test_flagged_label',
+      descriptionKey: 'test_flagged_description',
+      icon: '',
+      handler: () => undefined,
+      // 'map' is one of the flags the test harness already exposes via mockFlags.
+      featureFlag: 'map',
+    };
+    commandItemsMut.push(flaggedCmd);
+    try {
+      // Flag off: fabricated command must NOT appear.
+      mockFlags.valueOrUndefined = { search: true, map: false, trash: true };
+      const off = new GlobalSearchManager();
+      off.open();
+      off.setQuery('>');
+      await flushMicrotasks();
+      const offSection = off.sections.commands;
+      expect(offSection.status).toBe('ok');
+      if (offSection.status === 'ok') {
+        expect(offSection.items.some((c) => c.id === flaggedCmd.id)).toBe(false);
+      }
+
+      // Flag on: fabricated command MUST appear.
+      mockFlags.valueOrUndefined = { search: true, map: true, trash: true };
+      const on = new GlobalSearchManager();
+      on.open();
+      on.setQuery('>');
+      await flushMicrotasks();
+      const onSection = on.sections.commands;
+      expect(onSection.status).toBe('ok');
+      if (onSection.status === 'ok') {
+        expect(onSection.items.some((c) => c.id === flaggedCmd.id)).toBe(true);
+      }
+    } finally {
+      const idx = commandItemsMut.findIndex((c) => c.id === flaggedCmd.id);
+      if (idx !== -1) {
+        commandItemsMut.splice(idx, 1);
+      }
     }
   });
 });
@@ -2015,16 +2291,6 @@ describe('activate navigation', () => {
     mockFlags.valueOrUndefined = { search: true, map: true, trash: true };
   });
 
-  const themeItem = {
-    id: 'nav:theme',
-    category: 'actions' as const,
-    labelKey: 'theme',
-    descriptionKey: 'toggle_theme_description',
-    icon: 'x',
-    route: '',
-    adminOnly: false,
-  };
-
   const classificationItem = {
     id: 'nav:systemSettings:classification',
     category: 'systemSettings' as const,
@@ -2034,25 +2300,6 @@ describe('activate navigation', () => {
     route: '/admin/system-settings?isOpen=classification',
     adminOnly: true,
   };
-
-  it('theme toggle: calls toggleTheme and does NOT persist a recent', () => {
-    const toggleSpy = vi.spyOn(themeManager, 'toggleTheme').mockImplementation(() => {});
-    const m = new GlobalSearchManager();
-    m.open();
-    m.activate('nav', themeItem);
-    expect(toggleSpy).toHaveBeenCalled();
-    expect(getEntries().find((e) => e.id === 'nav:theme')).toBeUndefined();
-    toggleSpy.mockRestore();
-  });
-
-  it('theme toggle closes the palette', () => {
-    const toggleSpy = vi.spyOn(themeManager, 'toggleTheme').mockImplementation(() => {});
-    const m = new GlobalSearchManager();
-    m.open();
-    m.activate('nav', themeItem);
-    expect(m.isOpen).toBe(false);
-    toggleSpy.mockRestore();
-  });
 
   it('system-settings item: goto + persist navigate recent', () => {
     const m = new GlobalSearchManager();
@@ -2253,35 +2500,6 @@ describe('batch lifecycle: close, empty-query, grace window (review fixes)', () 
     // After setQuery, reconcileCursor must have replaced the stale id with something
     // that exists in the current navigation section (or null).
     expect(m.activeItemId).not.toBe('nav:nonexistent-item');
-  });
-});
-
-describe('activate non-theme action (review fix U1)', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    localStorage.clear();
-    resetRecentStore();
-    mockUser.current = { id: 'test-user', isAdmin: true };
-  });
-
-  it('warns and does NOT navigate when activate("nav") receives a non-theme actions item', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const m = new GlobalSearchManager();
-    m.open();
-    m.activate('nav', {
-      id: 'nav:futureAction',
-      category: 'actions' as const,
-      labelKey: 'x',
-      descriptionKey: 'x',
-      icon: 'x',
-      route: '',
-      adminOnly: false,
-    });
-    expect(warnSpy).toHaveBeenCalled();
-    expect(goto).not.toHaveBeenCalled();
-    expect(getEntries().find((e) => e.id === 'nav:futureAction')).toBeUndefined();
-    expect(m.isOpen).toBe(false);
-    warnSpy.mockRestore();
   });
 });
 
@@ -2715,6 +2933,7 @@ describe('getActiveItem recent-entry preview lookup (cold open)', () => {
       albums: { status: 'empty' },
       spaces: { status: 'empty' },
       navigation: { status: 'empty' },
+      commands: { status: 'empty' },
     };
     // query is empty but no recent matches — fall-through to section.
     const active = m.getActiveItem();
@@ -3946,7 +4165,8 @@ describe('prefix scoping — runNavigationProvider', () => {
     await vi.advanceTimersByTimeAsync(150);
     expect(m.sections.navigation.status).toBe('ok');
     const items = (m.sections.navigation as { items: { id: string }[] }).items;
-    expect(items.some((i) => i.id === 'nav:theme')).toBe(true);
+    // 'theme' matches nav:systemSettings:theme (labelKey='admin.theme_settings').
+    expect(items.some((i) => i.id === 'nav:systemSettings:theme')).toBe(true);
   });
 
   it('scope people (any payload): navigation section is empty', async () => {
