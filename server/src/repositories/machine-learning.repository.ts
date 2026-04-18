@@ -197,10 +197,15 @@ export class MachineLearningRepository {
       ...this.config.urls.filter((url) => !this.isHealthy(url)),
     ]) {
       try {
+        const tFetch = performance.now();
         const response = await fetch(new URL('/predict', url), { method: 'POST', body: formData, signal });
+        const fetchMs = performance.now() - tFetch;
         if (response.ok) {
           this.setHealthy(url, true);
-          return response.json();
+          const tJson = performance.now();
+          const body = (await response.json()) as T;
+          this.logger.verbose(`ml predict url=${url} fetch=${fetchMs.toFixed(0)}ms json=${(performance.now() - tJson).toFixed(0)}ms`);
+          return body;
         }
 
         this.logger.warn(
@@ -244,7 +249,11 @@ export class MachineLearningRepository {
 
   async encodeText(text: string, { language, modelName }: TextEncodingOptions) {
     const request = { [ModelTask.SEARCH]: { [ModelType.TEXTUAL]: { modelName, options: { language } } } };
+    const t0 = performance.now();
     const response = await this.predict<ClipTextualResponse>({ text }, request, { timeoutMs: 15_000 });
+    this.logger.debug(
+      `encodeText model=${modelName} lang=${language ?? 'default'} len=${text.length} total=${(performance.now() - t0).toFixed(0)}ms`,
+    );
     return response[ModelTask.SEARCH];
   }
 
