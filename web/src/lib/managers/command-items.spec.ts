@@ -1,0 +1,41 @@
+import { describe, expect, it } from 'vitest';
+import { COMMAND_ITEMS, isAlmostExactCommandMatch } from './command-items';
+
+describe('COMMAND_ITEMS', () => {
+  it('has no duplicate ids', () => {
+    const ids = new Set(COMMAND_ITEMS.map((c) => c.id));
+    expect(ids.size).toBe(COMMAND_ITEMS.length);
+  });
+  it('all ids follow cmd:<slug> pattern', () => {
+    for (const cmd of COMMAND_ITEMS) {
+      expect(cmd.id).toMatch(/^cmd:[a-z][a-z0-9_]*$/);
+    }
+  });
+  it('all entries have non-empty labelKey, descriptionKey, icon, handler', () => {
+    for (const cmd of COMMAND_ITEMS) {
+      expect(cmd.labelKey.length).toBeGreaterThan(0);
+      expect(cmd.descriptionKey.length).toBeGreaterThan(0);
+      expect(cmd.icon.length).toBeGreaterThan(0);
+      expect(typeof cmd.handler).toBe('function');
+    }
+  });
+  it('includes cmd:theme for Phase 1', () => {
+    expect(COMMAND_ITEMS.find((c) => c.id === 'cmd:theme')).toBeDefined();
+  });
+});
+
+describe('isAlmostExactCommandMatch', () => {
+  it('returns false for queries shorter than 3 chars', () => {
+    expect(isAlmostExactCommandMatch('up', 'Upload files')).toBe(false);
+  });
+  it('matches when a query word is a prefix of a label word', () => {
+    expect(isAlmostExactCommandMatch('upload', 'Upload files')).toBe(true);
+    expect(isAlmostExactCommandMatch('upl', 'Upload files')).toBe(true);
+  });
+  it('is case-insensitive', () => {
+    expect(isAlmostExactCommandMatch('UPLOAD', 'Upload files')).toBe(true);
+  });
+  it('splits on non-alphanumerics', () => {
+    expect(isAlmostExactCommandMatch('create-album', 'Create album')).toBe(true);
+  });
+});

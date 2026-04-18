@@ -1,0 +1,32 @@
+import { isAlmostExactWordMatch } from '$lib/managers/cmdk-match';
+import { themeManager } from '$lib/managers/theme-manager.svelte';
+import type { ServerFeaturesDto } from '@immich/sdk';
+import { mdiThemeLightDark } from '@mdi/js';
+
+const MIN_MATCH_LENGTH = 3;
+
+export interface CommandItem {
+  id: `cmd:${string}`;
+  labelKey: string;
+  descriptionKey: string;
+  icon: string;
+  handler: () => void | Promise<unknown>;
+  /** Reserved for v1.3.1 admin verbs. Not used by any v1.3.0 item. */
+  adminOnly?: boolean;
+  /** Reserved for future feature-flag gating. Not used in v1.3.0. */
+  featureFlag?: keyof ServerFeaturesDto;
+}
+
+export const COMMAND_ITEMS: readonly CommandItem[] = [
+  {
+    id: 'cmd:theme',
+    labelKey: 'theme',
+    descriptionKey: 'cmdk_cmd_theme_description',
+    icon: mdiThemeLightDark,
+    handler: () => themeManager.toggleTheme(),
+  },
+];
+
+export function isAlmostExactCommandMatch(query: string, label: string): boolean {
+  return isAlmostExactWordMatch(query, label, MIN_MATCH_LENGTH);
+}

@@ -811,6 +811,7 @@
   "cmdk_announce_scoped_nav": "Scoped to pages.",
   "cmdk_announce_scoped_people": "Scoped to people.",
   "cmdk_announce_scoped_tags": "Scoped to tags.",
+  "cmdk_cmd_theme_description": "Switch between light and dark themes",
   "cmdk_couldnt_load": "Couldn't load {entity} — retry",
   "cmdk_cycle_mode_hint": "cycle mode",
   "cmdk_helper": "Start typing — photos, people, places, tags.",
