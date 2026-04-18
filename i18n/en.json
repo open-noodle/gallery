@@ -1376,6 +1376,7 @@
   "filter_sheet_not_in_album": "Not in album",
   "filter_sheet_offline": "Offline",
   "filter_sheet_people": "People",
+  "filter_sheet_picker_all_time": "All time",
   "filter_sheet_picker_clear_search": "Clear search",
   "filter_sheet_picker_done": "Done",
   "filter_sheet_picker_no_results": "No results for '{query}'",

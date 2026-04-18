@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/widgets/decade_anchor_strip.widget.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/widgets/quick_ranges_row.widget.dart';
+import 'package:immich_mobile/presentation/pages/photos_filter/widgets/when_picker_footer.widget.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/widgets/when_picker_search_header.widget.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/widgets/when_picker_year_accordion.widget.dart';
 import 'package:immich_mobile/providers/photos_filter/temporal_utils.dart';
@@ -96,20 +97,27 @@ class _WhenPickerPageState extends ConsumerState<WhenPickerPage> {
           ),
         ],
       ),
-      body: CustomScrollView(
-        controller: _scrollController,
-        slivers: [
-          WhenPickerSearchHeader(
-            controller: _controller,
-            value: _controller.text,
-            onChanged: (v) => ref.read(whenPickerQueryProvider.notifier).state = v,
+      body: Column(
+        children: [
+          Expanded(
+            child: CustomScrollView(
+              controller: _scrollController,
+              slivers: [
+                WhenPickerSearchHeader(
+                  controller: _controller,
+                  value: _controller.text,
+                  onChanged: (v) => ref.read(whenPickerQueryProvider.notifier).state = v,
+                ),
+                const SliverToBoxAdapter(child: SizedBox(height: 8)),
+                const SliverToBoxAdapter(child: QuickRangesRow()),
+                const SliverToBoxAdapter(child: SizedBox(height: 8)),
+                SliverToBoxAdapter(child: DecadeAnchorStrip(onDecade: _scrollToDecade)),
+                const SliverToBoxAdapter(child: SizedBox(height: 12)),
+                ..._bodySlivers(filteredAsync, query),
+              ],
+            ),
           ),
-          const SliverToBoxAdapter(child: SizedBox(height: 8)),
-          const SliverToBoxAdapter(child: QuickRangesRow()),
-          const SliverToBoxAdapter(child: SizedBox(height: 8)),
-          SliverToBoxAdapter(child: DecadeAnchorStrip(onDecade: _scrollToDecade)),
-          const SliverToBoxAdapter(child: SizedBox(height: 12)),
-          ..._bodySlivers(filteredAsync, query),
+          const WhenPickerFooter(),
         ],
       ),
     );
