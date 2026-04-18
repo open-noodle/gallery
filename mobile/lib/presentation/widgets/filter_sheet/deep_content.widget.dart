@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/deep_header.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/people_section.widget.dart';
+import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/media_type_section.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/places_cascade_section.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/rating_stars_section.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/tags_section.widget.dart';
@@ -39,7 +40,7 @@ class DeepContent extends ConsumerWidget {
               TagsSectionDeep(key: Key('deep-section-tags')),
               WhenAccordionSection(key: Key('deep-section-when')),
               RatingStarsSection(key: Key('deep-section-rating')),
-              SizedBox(height: 8, key: Key('deep-section-media')),
+              MediaTypeSection(key: Key('deep-section-media')),
               SizedBox(height: 8, key: Key('deep-section-toggles')),
             ],
           ),
