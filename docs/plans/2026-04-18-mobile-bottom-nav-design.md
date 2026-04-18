@@ -85,12 +85,13 @@ Icons use `font-variation-settings: "wght" 400, "FILL" 0` when inactive and `"wg
 The mockup's amber palette is illustrative. The Flutter widget reads:
 
 - **Pill surface:** `theme.colorScheme.surfaceContainerHighest.withOpacity(0.68)` + `BackdropFilter(blur: 28)`.
+- **Inner-warmth highlight.** A subtle top-down linear gradient layered inside the pill (`LinearGradient(begin: topCenter, end: center, colors: [onSurface @ 0.04, transparent])`) sells the "glass" read — mirrors the `.pill::before` highlight in the mockup that would otherwise be lost in the Flutter port. Implemented as a `Positioned.fill` child on the pill's internal `Stack`, behind the segments and above the backdrop blur.
 - **Pill border:** 1 pt `theme.colorScheme.outlineVariant.withOpacity(0.55)`.
 - **Pill shadow:** elevation-6-equivalent (`0 20 44 -14 shadow @ 0.7` + `0 4 8 shadow @ 0.4`).
 - **Idle label / icon:** `theme.colorScheme.onSurface.withOpacity(0.55)`.
 - **Active fill:** `theme.colorScheme.primary.withOpacity(0.16)`.
 - **Active label / icon:** `theme.colorScheme.primary`.
-- **Search blob:** same surface treatment as pill; idle icon `onSurface @ 0.85`, hover `primary @ 1.0`.
+- **Search blob:** same surface treatment as pill; idle icon `onSurface @ 0.85`, **pressed** icon `primary @ 1.0` (mobile has no hover state; pressed via `Listener.onPointerDown`/`onPointerUp` toggling an `AnimatedDefaultTextStyle`-equivalent for the icon color).
 
 In light themes the same roles resolve to lighter surface + higher-contrast fill (`primary.withOpacity(0.22)`).
 
@@ -167,29 +168,52 @@ GalleryTabShellPage (fork-only, @RoutePage)
 
 A single `AnimatedPositioned` underlay slides behind the active segment; the active segment's icon uses `AnimatedSize` + `AnimatedOpacity` to fade + slide in from the left edge of the segment.
 
+**Segments use organic widths, not `Expanded`.** The mockup's active pill hugs icon + label while idle segments hug label only — giving the pill an elastic, variable-width character. `Expanded` would flatten every segment to 1/3 uniform width and destroy that read. Instead, each `GalleryNavSegment` sizes to its intrinsic content via a `Row` of natural-width `Padding` children; the parent pill wraps them in a constrained `Row` that distributes any spare pill-width as a leading/trailing `Flexible(child: SizedBox.shrink())` so the segment trio is centred inside the pill.
+
 ```dart
 Stack(
   children: [
+    // Inner-warmth highlight — §5.5
+    Positioned.fill(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(28),
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.center,
+            colors: [
+              theme.colorScheme.onSurface.withOpacity(0.04),
+              Colors.transparent,
+            ],
+          ),
+        ),
+      ),
+    ),
+    // Amber underlay — slides between segments
     AnimatedPositioned(
       duration: const Duration(milliseconds: 280),
-      curve: Curves.easeOutCubic,
+      curve: const Cubic(0.3, 0.6, 0.2, 1), // matches mockup's emphasised decelerate — not Curves.easeOutCubic
       left: _leftFor(activeIndex),
       width: _widthFor(activeIndex),
       top: 6,
       height: 46,
       child: _ActiveUnderlay(color: theme.colorScheme.primary.withOpacity(0.16)),
     ),
+    // Segments — organic widths, not Expanded
     Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
         for (final destination in GalleryTabEnum.values)
-          Expanded(child: GalleryNavSegment(destination: destination, active: ...)),
+          GalleryNavSegment(destination: destination, active: activeIndex == destination.index),
       ],
     ),
   ],
 );
 ```
 
-Segment widths are computed once per layout: idle segments = label width + 28 pt horizontal padding; active segment = label width + icon (22 pt) + 6 pt gap + 32 pt horizontal padding. A `GlobalKey`-based post-frame size measurement primes the `_leftFor` / `_widthFor` lookup map; rebuilds on font-scale change. The first frame is rendered with the measured map seeded to `photos`' geometry so the underlay lands correctly under the default-active segment — tested (§8.2 M1).
+Segment widths are computed per layout and stored in a `_widthForIndex: Map<int, double>` primed by a post-frame measurement pass: idle segment = label width + 28 pt horizontal padding; active segment = label width + icon (22 pt) + 6 pt gap + 32 pt horizontal padding. A `GlobalKey` per segment exposes its rendered size to the measurement pass; the map rebuilds on font-scale change (`MediaQueryData.textScaleFactor` listener) and on locale change (label widths differ in non-English). The first frame is rendered with the map seeded to the default-active (Photos) geometry so the underlay lands correctly under Photos on mount — tested (§8.2 M1).
+
+The distinction between stock `Curves.easeOutCubic` `(0.215, 0.61, 0.355, 1)` and the chosen custom `Cubic(0.3, 0.6, 0.2, 1)` is intentional — the custom curve has a sharper start and a lingering decelerate, which matches the mockup's "snap-and-settle" feel rather than Flutter's default "soft-and-even" read. This is the motion-signature detail of the nav.
 
 `MediaQuery.of(context).disableAnimations` short-circuits the animation — the underlay jumps in one frame, the icon appears without the fade.
 
@@ -346,12 +370,16 @@ All tests use a fake `TabsRouter` (records `setActiveIndex` calls and driven-by-
 - Dark-theme variant test: active fill color = `primary @ 0.16`.
 - Light-theme variant test: active fill color = `primary @ 0.22`.
 - **First-paint correctness (M1):** after first `pump()`, the `AnimatedPositioned` underlay's rect is within 0.5 pt of the Photos segment's rect (no off-by-measurement flicker). Same test at font-scale 1.5 and 2.0.
+- **Organic segment widths.** Under a constrained pill of 320 pt, active Photos segment width > idle Albums segment width by the expected icon-plus-gap delta (~28 pt). Active Albums width > idle Photos width. Confirms `Expanded` was NOT used (`Expanded` would give equal 1/3 widths).
+- **Custom easing curve.** Drive a tap from Photos → Albums; sample the `AnimatedPositioned.left` at 40 %, 70 %, and 100 % of the 280 ms duration. The shape must match `Cubic(0.3, 0.6, 0.2, 1)` within 1 pt — distinguishably different from `Curves.easeOutCubic` at the same sample points. Regression against an accidental stock-curve substitution.
+- **Inner-warmth highlight.** Dark theme: the gradient's top color token resolves to `onSurface @ 0.04`. Light theme: same token resolves correctly (lighter). Verify the gradient's `DecoratedBox` is rendered behind the segments (widget order in the `Stack`), not above.
 - Semantics: active segment has `liveRegion: true`; switching active announces the new tab's label (via `semanticsOwner.performAction` or equivalent tester harness).
 
 **`GallerySearchBlob`**
 
 - Renders the search icon at 24 pt.
 - Tapping calls `openGallerySearch` with the injected `TabsRouter` (constructor arg, not `AutoTabsRouter.of`).
+- Pressed state (pointer-down → pointer-up) swaps the icon color from `onSurface @ 0.85` to `primary @ 1.0` and back; no hover state (mobile).
 - Disabled state (readonly) dims to 30 % opacity and is non-tappable (`ignorePointer: true` + reduced opacity).
 - Semantics label resolves from `nav.search_photos_hint` ("Search photos").
 
@@ -470,3 +498,4 @@ See [`docs/plans/mockups/2026-04-18-mobile-bottom-nav.html`](./mockups/2026-04-1
 - **rev 1 (2026-04-18 initial):** first pass, two open questions resolved during brainstorm.
 - **rev 2 (2026-04-18 after `/review`):** folded in 3 blockers, 4 high, 6 medium, 3 low from review. Substantive changes: fork-only `galleryTabProvider` (was conflating with upstream `TabEnum`); new counter-based focus plumbing (was vaporware); 620 ms delay tied to upstream transition (was one-frame wait); peek-rail coexistence pulled into scope (was follow-up); side-effect matrix now exhaustively tested including negative assertions; keyboard threshold unified to 80 pt absolute; live-region a11y covered; auto_route guard inheritance flagged.
 - **rev 3 (2026-04-18 after second `/review`):** folded in 2 high, 4 medium, 4 low. Substantive changes: focus plumbing switched from `ref.listen` to `ref.watch + _lastProcessedFocusRequest` (catches the mount-after-increment race that `ref.listen` silently drops); `galleryTabProvider` now auto-synced via `tabsRouter.addListener` at shell level (was hand-written per-tap, out of sync with `openGallerySearch`); `AutoTabsRouter` constructor form aligned with upstream's default+builder-param pattern (was `.builder` named constructor — not known to exist); `bottomNavHeightProvider` writes gated on inequality + hide/show animation-synced; live-region debounce removed (contradicted §5.2 "drags do nothing"); SpacesRoute cross-navigation clarified in §7; new tests: mount-after-increment focus race, user-tap mid-delay, no-op height write rebuild, shell listener sync, live-region on active segment.
+- **rev 4 (2026-04-18 after `/frontend-design:frontend-design` review):** folded in 4 aesthetic gaps mockup ↔ Flutter. Substantive changes: easing curve changed from `Curves.easeOutCubic` to `const Cubic(0.3, 0.6, 0.2, 1)` (stock-curve would have erased the motion signature); segments sized organically rather than with `Expanded` (preserves the mockup's elastic active-vs-idle widths); added inner-warmth top-gradient `DecoratedBox` to sell the glass read; search blob's "hover" state renamed to "pressed" (mobile has no hover). New tests cover organic widths, custom-curve shape sampling, gradient layer order, and pressed-state icon color swap.
