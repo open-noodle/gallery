@@ -19,7 +19,7 @@ function makeItem(category: NavigationItem['category'], id: string): NavigationI
     labelKey: `label-${id}`,
     descriptionKey: `desc-${id}`,
     icon: 'M0 0',
-    route: category === 'actions' ? '' : `/${id}`,
+    route: `/${id}`,
     adminOnly: category === 'systemSettings' || category === 'admin',
   };
 }
@@ -53,9 +53,8 @@ describe('global-search-navigation-sections', () => {
     expect(container.querySelector('[data-command-group]')).toBeNull();
   });
 
-  it('renders four sub-sections in fixed order when all categories have items', () => {
+  it('renders three sub-sections in fixed order when all categories have items', () => {
     const items = [
-      makeItem('actions', 'nav:theme'),
       makeItem('admin', 'nav:admin:users'),
       makeItem('userPages', 'nav:userPages:photos'),
       makeItem('systemSettings', 'nav:systemSettings:authentication'),
@@ -66,17 +65,17 @@ describe('global-search-navigation-sections', () => {
     const headings = [...container.querySelectorAll('[data-command-group-heading]')];
     const order = headings.map((h) => (h as HTMLElement).textContent?.trim());
     // With the en bundle loaded in beforeAll, $t(key) renders the English string.
-    expect(order).toEqual(['System Settings', 'Admin', 'Navigation', 'Actions']);
+    expect(order).toEqual(['System Settings', 'Admin', 'Navigation']);
   });
 
   it('omits empty categories entirely (no heading, no group)', () => {
-    const items = [makeItem('actions', 'nav:theme')];
+    const items = [makeItem('admin', 'nav:admin:users')];
     const { container } = render(CommandRootWrapper, {
       props: { status: { status: 'ok', items, total: 1 } },
     });
     const headings = [...container.querySelectorAll('[data-command-group-heading]')];
     expect(headings).toHaveLength(1);
-    expect(headings[0].textContent?.trim()).toBe('Actions');
+    expect(headings[0].textContent?.trim()).toBe('Admin');
   });
 
   it('slices each category to topN=5', () => {
