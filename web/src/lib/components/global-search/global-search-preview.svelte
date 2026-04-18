@@ -55,6 +55,17 @@
           {$t('cmdk_nothing_to_preview')}
         </span>
       </div>
+    {:else if activeItem.kind === 'command'}
+      <!-- Commands are verbs, not destinations — there's nothing richer than the row
+           itself to show. Render the same empty-state placeholder so the pane stays
+           the same width and doesn't flash a blank frame when the user cursors over
+           a command result. -->
+      <div class="flex h-full min-h-[360px] flex-col items-center justify-center gap-3 px-8 text-center">
+        <Logo variant="icon" size="giant" class="opacity-10" />
+        <span class="text-sm text-gray-500 opacity-50 dark:text-gray-400">
+          {$t('cmdk_nothing_to_preview')}
+        </span>
+      </div>
     {/if}
   </div>
 {/key}
