@@ -27,7 +27,6 @@ import {
   mdiShareVariantOutline,
   mdiSync,
   mdiTagMultipleOutline,
-  mdiThemeLightDark,
   mdiTrashCanOutline,
   mdiUpdate,
   mdiVideoOutline,
@@ -35,7 +34,7 @@ import {
 } from '@mdi/js';
 import { isAlmostExactWordMatch } from './cmdk-match';
 
-export type NavigationCategory = 'systemSettings' | 'admin' | 'userPages' | 'actions';
+export type NavigationCategory = 'systemSettings' | 'admin' | 'userPages';
 
 export interface NavigationItem {
   id: string;
@@ -43,7 +42,8 @@ export interface NavigationItem {
   labelKey: string;
   descriptionKey: string;
   icon: string;
-  /** Empty string for command-kind items (e.g. theme toggle). */
+  /** Non-empty route. All navigation items lead to a real page; stateless side-effects
+   * live in the commands registry (command-items.ts) instead. */
   route: string;
   adminOnly: boolean;
   /**
@@ -243,24 +243,7 @@ const USER_PAGES: readonly NavigationItem[] = [
   },
 ];
 
-const ACTIONS: readonly NavigationItem[] = [
-  {
-    id: 'nav:theme',
-    category: 'actions',
-    labelKey: 'theme',
-    descriptionKey: 'toggle_theme_description',
-    icon: mdiThemeLightDark,
-    route: '',
-    adminOnly: false,
-  },
-];
-
-export const NAVIGATION_ITEMS: readonly NavigationItem[] = [
-  ...SYSTEM_SETTINGS,
-  ...ADMIN_PAGES,
-  ...USER_PAGES,
-  ...ACTIONS,
-];
+export const NAVIGATION_ITEMS: readonly NavigationItem[] = [...SYSTEM_SETTINGS, ...ADMIN_PAGES, ...USER_PAGES];
 
 const MIN_MATCH_LENGTH = 3;
 

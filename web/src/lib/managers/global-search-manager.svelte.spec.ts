@@ -28,7 +28,6 @@ vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({
 }));
 
 import { goto } from '$app/navigation';
-import { themeManager } from '$lib/managers/theme-manager.svelte';
 import * as recentModule from '$lib/stores/cmdk-recent';
 import { addEntry, getEntries, __resetForTests as resetRecentStore } from '$lib/stores/cmdk-recent';
 import {
@@ -1564,10 +1563,10 @@ describe('navigation section scaffolding', () => {
     const m = new GlobalSearchManager();
     m.sections.navigation = {
       status: 'ok',
-      items: [{ id: 'nav:theme' }] as never[],
+      items: [{ id: 'nav:userPages:photos' }] as never[],
       total: 1,
     };
-    m.activeItemId = 'nav:theme';
+    m.activeItemId = 'nav:userPages:photos';
     const active = m.getActiveItem();
     expect(active?.kind).toBe('nav');
   });
@@ -1581,7 +1580,7 @@ describe('navigation section scaffolding', () => {
       tags: { status: 'empty' },
       albums: { status: 'empty' },
       spaces: { status: 'empty' },
-      navigation: { status: 'ok', items: [{ id: 'nav:theme' }] as never[], total: 5 },
+      navigation: { status: 'ok', items: [{ id: 'nav:userPages:photos' }] as never[], total: 5 },
       commands: { status: 'empty' },
     };
     expect(m.announcementText).toBe('5 pages');
@@ -1596,12 +1595,12 @@ describe('navigation section scaffolding', () => {
       tags: { status: 'empty' },
       albums: { status: 'empty' },
       spaces: { status: 'empty' },
-      navigation: { status: 'ok', items: [{ id: 'nav:theme' }] as never[], total: 1 },
+      navigation: { status: 'ok', items: [{ id: 'nav:userPages:photos' }] as never[], total: 1 },
       commands: { status: 'empty' },
     };
     m.activeItemId = null;
     m.reconcileCursor();
-    expect(m.activeItemId).toBe('nav:theme');
+    expect(m.activeItemId).toBe('nav:userPages:photos');
   });
 });
 
@@ -1617,7 +1616,7 @@ describe('navigation memo cache', () => {
     const cache = (
       m as unknown as { getNavigationSearchStrings: () => Map<string, string> }
     ).getNavigationSearchStrings();
-    expect(cache.size).toBe(36);
+    expect(cache.size).toBe(35);
     for (const [id, str] of cache) {
       expect(id.startsWith('nav:')).toBe(true);
       expect(str.length).toBeGreaterThan(0);
@@ -1637,7 +1636,7 @@ describe('navigation memo cache', () => {
     const cache = (
       m as unknown as { getNavigationSearchStrings: () => Map<string, string> }
     ).getNavigationSearchStrings();
-    expect(cache.size).toBe(36);
+    expect(cache.size).toBe(35);
   });
 
   it('clears the cached table when the locale subscription fires with a new value', () => {
@@ -1653,7 +1652,7 @@ describe('navigation memo cache', () => {
       m as unknown as { getNavigationSearchStrings: () => Map<string, string> }
     ).getNavigationSearchStrings();
     expect(second).not.toBe(first);
-    expect(second.size).toBe(36);
+    expect(second.size).toBe(35);
   });
 });
 
@@ -1676,12 +1675,12 @@ describe('getActiveItem nav branch', () => {
         status: 'ok',
         items: [
           {
-            id: 'nav:theme',
-            category: 'actions',
-            labelKey: 'theme',
-            descriptionKey: 'toggle_theme_description',
+            id: 'nav:userPages:photos',
+            category: 'userPages',
+            labelKey: 'photos',
+            descriptionKey: 'cmdk_nav_photos_description',
             icon: 'x',
-            route: '',
+            route: '/photos',
             adminOnly: false,
           },
         ] as never[],
@@ -1689,12 +1688,12 @@ describe('getActiveItem nav branch', () => {
       },
       commands: { status: 'empty' },
     };
-    m.activeItemId = 'nav:theme';
+    m.activeItemId = 'nav:userPages:photos';
     const active = m.getActiveItem();
     expect(active).not.toBeNull();
     expect(active?.kind).toBe('nav');
     if (active?.kind === 'nav') {
-      expect(active.data.id).toBe('nav:theme');
+      expect(active.data.id).toBe('nav:userPages:photos');
     }
   });
 
@@ -1709,7 +1708,7 @@ describe('getActiveItem nav branch', () => {
       spaces: { status: 'empty' },
       navigation: {
         status: 'ok',
-        items: [{ id: 'nav:theme' } as never],
+        items: [{ id: 'nav:userPages:photos' } as never],
         total: 1,
       },
       commands: { status: 'empty' },
@@ -1758,19 +1757,19 @@ describe('runNavigationProvider', () => {
   });
 
   it('filters admin-only items for non-admin users', () => {
-    // Query 'theme' DEFINITELY matches:
-    //   - nav:theme                     (adminOnly:false, labelKey='theme')
-    //   - nav:systemSettings:theme      (adminOnly:true,  labelKey='admin.theme_settings')
-    // Under non-admin this yields status='ok' with exactly nav:theme, so the
-    // assertion is forced to run (no vacuous-loop path).
+    // Query 'trash' matches both:
+    //   - nav:userPages:trash           (adminOnly:false, labelKey='trash')
+    //   - nav:systemSettings:trash      (adminOnly:true,  labelKey='admin.trash_settings')
+    // Under non-admin this yields status='ok' with only the user-pages entry,
+    // so the assertion is forced to run (no vacuous-loop path).
     mockUser.current = { id: 'test-user', isAdmin: false };
     const m = new GlobalSearchManager();
-    const result = runNav(m, 'theme');
+    const result = runNav(m, 'trash');
     expect(result.status).toBe('ok');
     if (result.status === 'ok') {
       const ids = result.items.map((i) => (i as { id: string }).id);
-      expect(ids).toContain('nav:theme');
-      expect(ids).not.toContain('nav:systemSettings:theme');
+      expect(ids).toContain('nav:userPages:trash');
+      expect(ids).not.toContain('nav:systemSettings:trash');
       expect(result.items.every((i) => (i as { adminOnly: boolean }).adminOnly === false)).toBe(true);
     }
   });
@@ -1778,12 +1777,12 @@ describe('runNavigationProvider', () => {
   it('admin users see both admin and non-admin matches (baseline for the admin filter test)', () => {
     mockUser.current = { id: 'test-user', isAdmin: true };
     const m = new GlobalSearchManager();
-    const result = runNav(m, 'theme');
+    const result = runNav(m, 'trash');
     expect(result.status).toBe('ok');
     if (result.status === 'ok') {
       const ids = result.items.map((i) => (i as { id: string }).id);
-      expect(ids).toContain('nav:theme');
-      expect(ids).toContain('nav:systemSettings:theme');
+      expect(ids).toContain('nav:userPages:trash');
+      expect(ids).toContain('nav:systemSettings:trash');
     }
   });
 
@@ -2252,16 +2251,6 @@ describe('activate navigation', () => {
     mockFlags.valueOrUndefined = { search: true, map: true, trash: true };
   });
 
-  const themeItem = {
-    id: 'nav:theme',
-    category: 'actions' as const,
-    labelKey: 'theme',
-    descriptionKey: 'toggle_theme_description',
-    icon: 'x',
-    route: '',
-    adminOnly: false,
-  };
-
   const classificationItem = {
     id: 'nav:systemSettings:classification',
     category: 'systemSettings' as const,
@@ -2271,25 +2260,6 @@ describe('activate navigation', () => {
     route: '/admin/system-settings?isOpen=classification',
     adminOnly: true,
   };
-
-  it('theme toggle: calls toggleTheme and does NOT persist a recent', () => {
-    const toggleSpy = vi.spyOn(themeManager, 'toggleTheme').mockImplementation(() => {});
-    const m = new GlobalSearchManager();
-    m.open();
-    m.activate('nav', themeItem);
-    expect(toggleSpy).toHaveBeenCalled();
-    expect(getEntries().find((e) => e.id === 'nav:theme')).toBeUndefined();
-    toggleSpy.mockRestore();
-  });
-
-  it('theme toggle closes the palette', () => {
-    const toggleSpy = vi.spyOn(themeManager, 'toggleTheme').mockImplementation(() => {});
-    const m = new GlobalSearchManager();
-    m.open();
-    m.activate('nav', themeItem);
-    expect(m.isOpen).toBe(false);
-    toggleSpy.mockRestore();
-  });
 
   it('system-settings item: goto + persist navigate recent', () => {
     const m = new GlobalSearchManager();
@@ -2490,35 +2460,6 @@ describe('batch lifecycle: close, empty-query, grace window (review fixes)', () 
     // After setQuery, reconcileCursor must have replaced the stale id with something
     // that exists in the current navigation section (or null).
     expect(m.activeItemId).not.toBe('nav:nonexistent-item');
-  });
-});
-
-describe('activate non-theme action (review fix U1)', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    localStorage.clear();
-    resetRecentStore();
-    mockUser.current = { id: 'test-user', isAdmin: true };
-  });
-
-  it('warns and does NOT navigate when activate("nav") receives a non-theme actions item', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const m = new GlobalSearchManager();
-    m.open();
-    m.activate('nav', {
-      id: 'nav:futureAction',
-      category: 'actions' as const,
-      labelKey: 'x',
-      descriptionKey: 'x',
-      icon: 'x',
-      route: '',
-      adminOnly: false,
-    });
-    expect(warnSpy).toHaveBeenCalled();
-    expect(goto).not.toHaveBeenCalled();
-    expect(getEntries().find((e) => e.id === 'nav:futureAction')).toBeUndefined();
-    expect(m.isOpen).toBe(false);
-    warnSpy.mockRestore();
   });
 });
 
@@ -4184,7 +4125,8 @@ describe('prefix scoping — runNavigationProvider', () => {
     await vi.advanceTimersByTimeAsync(150);
     expect(m.sections.navigation.status).toBe('ok');
     const items = (m.sections.navigation as { items: { id: string }[] }).items;
-    expect(items.some((i) => i.id === 'nav:theme')).toBe(true);
+    // 'theme' matches nav:systemSettings:theme (labelKey='admin.theme_settings').
+    expect(items.some((i) => i.id === 'nav:systemSettings:theme')).toBe(true);
   });
 
   it('scope people (any payload): navigation section is empty', async () => {

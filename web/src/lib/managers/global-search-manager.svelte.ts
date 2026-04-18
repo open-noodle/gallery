@@ -1,7 +1,6 @@
 import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
 import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
-import { themeManager } from '$lib/managers/theme-manager.svelte';
 import { Route } from '$lib/route';
 import { addEntry, getEntries, makePlaceId, removeEntry, type RecentEntry } from '$lib/stores/cmdk-recent';
 import { user } from '$lib/stores/user.store';
@@ -156,6 +155,10 @@ function isValidRecentEntry(e: RecentEntry): boolean {
     case 'space': {
       return typeof e.spaceId === 'string' && typeof e.label === 'string';
     }
+    // The route.length > 0 invariant is what filters any stale pre-v1.3.0
+    // theme-action entry (id `nav` + `:theme`, joined) — it had route: '' and
+    // migrated to the commands registry (which doesn't write RECENT at all).
+    // Don't relax this check without auditing the cmdk-recent migration story.
     case 'navigate': {
       return (
         typeof e.route === 'string' &&
@@ -923,7 +926,7 @@ export class GlobalSearchManager {
 
     if (kind === 'nav') {
       // For navigation items, the activeItemId IS the full NavigationItem.id (e.g.
-      // `nav:theme`, `nav:systemSettings:classification`). Match on the full id.
+      // `nav:userPages:photos`, `nav:systemSettings:classification`). Match on the full id.
       const navItems = section.items as NavigationItem[];
       const navMatch = navItems.find((n) => n.id === id);
       return navMatch ? { kind: 'nav', data: navMatch } : null;
@@ -1155,27 +1158,16 @@ export class GlobalSearchManager {
       }
       case 'nav': {
         const n = item as NavigationItem;
-        if (n.category === 'actions') {
-          // Actions are stateless side-effect handlers. Dispatch by id so future
-          // actions can be added without falling through to the goto path (which
-          // would navigate to `route: ''` and persist a broken recent).
-          if (n.id === 'nav:theme') {
-            themeManager.toggleTheme();
-          } else {
-            console.warn('[cmdk] unknown action navigation item', n.id);
-          }
-        } else {
-          addEntry({
-            kind: 'navigate',
-            id: n.id,
-            route: n.route,
-            labelKey: n.labelKey,
-            icon: n.icon,
-            adminOnly: n.adminOnly,
-            lastUsed: now,
-          });
-          this.navigateNav(n.route);
-        }
+        addEntry({
+          kind: 'navigate',
+          id: n.id,
+          route: n.route,
+          labelKey: n.labelKey,
+          icon: n.icon,
+          adminOnly: n.adminOnly,
+          lastUsed: now,
+        });
+        this.navigateNav(n.route);
         break;
       }
       case 'command': {
