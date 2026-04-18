@@ -13,7 +13,7 @@ void main() {
     await tester.pumpAndSettle();
     final align = tester.widget<AnimatedAlign>(find.byType(AnimatedAlign));
     expect(align.widthFactor, 0.0, reason: 'idle icon slot has 0 width');
-    expect(find.text('nav.photos'.tr()), findsOneWidget);
+    expect(find.text('nav_photos'.tr()), findsOneWidget);
     expect(find.byType(AnimatedNavIcon), findsOneWidget);
   });
 
@@ -23,7 +23,7 @@ void main() {
     final align = tester.widget<AnimatedAlign>(find.byType(AnimatedAlign));
     expect(align.widthFactor, 1.0);
     expect(find.byType(AnimatedNavIcon), findsOneWidget);
-    expect(find.text('nav.photos'.tr()), findsOneWidget);
+    expect(find.text('nav_photos'.tr()), findsOneWidget);
   });
 
   testWidgets('active→idle transition: icon-slot collapses after settle', (tester) async {
@@ -64,7 +64,7 @@ void main() {
 
   testWidgets('dark theme: active label is non-null and has w500', (tester) async {
     await tester.pumpConsumerWidgetDark(GalleryNavSegment(tab: GalleryTabEnum.photos, active: true, onTap: () {}));
-    final text = tester.widget<Text>(find.text('nav.photos'.tr()));
+    final text = tester.widget<Text>(find.text('nav_photos'.tr()));
     expect(text.style!.color, isNotNull);
     expect(text.style!.fontWeight, FontWeight.w500);
   });

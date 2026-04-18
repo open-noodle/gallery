@@ -7,7 +7,7 @@ import 'package:immich_mobile/routing/router.dart';
 void main() {
   test('photos destination', () {
     final d = GalleryNavDestination.forTab(GalleryTabEnum.photos);
-    expect(d.labelKey, 'nav.photos');
+    expect(d.labelKey, 'nav_photos');
     expect(d.idleIcon, Icons.photo_library_outlined);
     expect(d.activeIcon, Icons.photo_library);
     expect(d.routeBuilder(), isA<MainTimelineRoute>());
@@ -15,7 +15,7 @@ void main() {
 
   test('albums destination', () {
     final d = GalleryNavDestination.forTab(GalleryTabEnum.albums);
-    expect(d.labelKey, 'nav.albums');
+    expect(d.labelKey, 'nav_albums');
     expect(d.idleIcon, Icons.photo_album_outlined);
     expect(d.activeIcon, Icons.photo_album);
     expect(d.routeBuilder(), isA<DriftAlbumsRoute>());
@@ -23,7 +23,7 @@ void main() {
 
   test('library destination', () {
     final d = GalleryNavDestination.forTab(GalleryTabEnum.library);
-    expect(d.labelKey, 'nav.library');
+    expect(d.labelKey, 'nav_library');
     expect(d.idleIcon, Icons.space_dashboard_outlined);
     expect(d.activeIcon, Icons.space_dashboard_rounded);
     expect(d.routeBuilder(), isA<DriftLibraryRoute>());

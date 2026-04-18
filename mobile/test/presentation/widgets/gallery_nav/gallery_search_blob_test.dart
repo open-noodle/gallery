@@ -32,7 +32,7 @@ void main() {
   testWidgets('semantics label resolves from nav.search_photos_hint', (tester) async {
     await tester.pumpConsumerWidget(GallerySearchBlob(enabled: true, onTap: () {}));
     final semantics = tester.getSemantics(find.byType(GallerySearchBlob));
-    expect(semantics.label, 'nav.search_photos_hint'.tr());
+    expect(semantics.label, 'nav_search_photos_hint'.tr());
   });
 
   testWidgets('tap target ≥ 44×44 pt', (tester) async {

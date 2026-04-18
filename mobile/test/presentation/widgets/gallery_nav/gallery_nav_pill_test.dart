@@ -27,9 +27,9 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('nav.photos'.tr()), findsOneWidget);
-    expect(find.text('nav.albums'.tr()), findsOneWidget);
-    expect(find.text('nav.library'.tr()), findsOneWidget);
+    expect(find.text('nav_photos'.tr()), findsOneWidget);
+    expect(find.text('nav_albums'.tr()), findsOneWidget);
+    expect(find.text('nav_library'.tr()), findsOneWidget);
   });
 
   testWidgets('tap on a segment invokes onTabTap with its enum', (tester) async {
@@ -41,7 +41,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('nav.albums'.tr()));
+    await tester.tap(find.text('nav_albums'.tr()));
     expect(tapped, GalleryTabEnum.albums);
   });
 
@@ -113,11 +113,11 @@ void main() {
     );
     expect(photosOpacity.opacity, 1.0);
 
-    await tester.tap(find.text('nav.albums'.tr()));
+    await tester.tap(find.text('nav_albums'.tr()));
     await tester.pumpAndSettle();
     expect(tapped, -1, reason: 'disabled segment should not invoke onTabTap');
 
-    await tester.tap(find.text('nav.photos'.tr()));
+    await tester.tap(find.text('nav_photos'.tr()));
     await tester.pumpAndSettle();
     expect(tapped, GalleryTabEnum.photos.index);
   });

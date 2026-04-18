@@ -26,7 +26,7 @@ class _GallerySearchBlobState extends State<GallerySearchBlob> {
       container: true,
       button: true,
       enabled: widget.enabled,
-      label: 'nav.search_photos_hint'.tr(),
+      label: 'nav_search_photos_hint'.tr(),
       child: Opacity(
         opacity: widget.enabled ? 1.0 : 0.3,
         child: IgnorePointer(

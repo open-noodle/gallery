@@ -215,7 +215,7 @@ void main() {
     await tester.pumpWidget(_wrap(GalleryBottomNav(tabsRouter: router)));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('nav.photos'.tr()));
+    await tester.tap(find.text('nav_photos'.tr()));
     await tester.pumpAndSettle();
 
     expect(scrollEvents, 1);
@@ -226,7 +226,7 @@ void main() {
     await tester.pumpWidget(_wrap(GalleryBottomNav(tabsRouter: router)));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('nav.albums'.tr()));
+    await tester.tap(find.text('nav_albums'.tr()));
     await tester.pumpAndSettle();
 
     expect(router.setCalls, contains(GalleryTabEnum.albums.index));

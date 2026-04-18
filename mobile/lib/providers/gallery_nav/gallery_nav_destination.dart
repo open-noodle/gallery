@@ -23,7 +23,7 @@ class GalleryNavDestination {
       case GalleryTabEnum.photos:
         return const GalleryNavDestination._(
           tab: GalleryTabEnum.photos,
-          labelKey: 'nav.photos',
+          labelKey: 'nav_photos',
           idleIcon: Icons.photo_library_outlined,
           activeIcon: Icons.photo_library,
           routeBuilder: _photosRoute,
@@ -31,7 +31,7 @@ class GalleryNavDestination {
       case GalleryTabEnum.albums:
         return const GalleryNavDestination._(
           tab: GalleryTabEnum.albums,
-          labelKey: 'nav.albums',
+          labelKey: 'nav_albums',
           idleIcon: Icons.photo_album_outlined,
           activeIcon: Icons.photo_album,
           routeBuilder: _albumsRoute,
@@ -39,7 +39,7 @@ class GalleryNavDestination {
       case GalleryTabEnum.library:
         return const GalleryNavDestination._(
           tab: GalleryTabEnum.library,
-          labelKey: 'nav.library',
+          labelKey: 'nav_library',
           idleIcon: Icons.space_dashboard_outlined,
           activeIcon: Icons.space_dashboard_rounded,
           routeBuilder: _libraryRoute,
