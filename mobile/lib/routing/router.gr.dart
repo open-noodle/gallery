@@ -2292,6 +2292,22 @@ class PermissionOnboardingRoute extends PageRouteInfo<void> {
 }
 
 /// generated route for
+/// [PersonPickerPage]
+class PersonPickerRoute extends PageRouteInfo<void> {
+  const PersonPickerRoute({List<PageRouteInfo>? children})
+    : super(PersonPickerRoute.name, initialChildren: children);
+
+  static const String name = 'PersonPickerRoute';
+
+  static PageInfo page = PageInfo(
+    name,
+    builder: (data) {
+      return const PersonPickerPage();
+    },
+  );
+}
+
+/// generated route for
 /// [PersonResultPage]
 class PersonResultRoute extends PageRouteInfo<PersonResultRouteArgs> {
   PersonResultRoute({
