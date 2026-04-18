@@ -48,9 +48,10 @@ import {
 import { toastManager } from '@immich/ui';
 import { computeCommandScore } from 'bits-ui';
 import { installFakeAbortTimeout, restoreAbortTimeout } from './__tests__/fake-abort-timeout';
-import type { CommandItem } from './command-items';
+import { COMMAND_ITEMS, type CommandItem } from './command-items';
 import {
   GlobalSearchManager,
+  RECONCILE_ORDER_BY_SCOPE,
   type Provider,
   type ProviderStatus,
   type SearchMode,
@@ -1868,6 +1869,149 @@ describe('runNavigationProvider', () => {
     if (result.status === 'ok') {
       const labels = result.items.map((i) => (i as { labelKey: string }).labelKey);
       expect(labels).toContain('admin.classification_settings');
+    }
+  });
+});
+
+describe('commands provider', () => {
+  let manager: GlobalSearchManager;
+
+  // Mutable handle to the live COMMAND_ITEMS runtime array. Declared `readonly` at
+  // the type level but plain `Array` at runtime, so the gating tests inject a
+  // fabricated item via push/pop around the test body. Pushing onto the real array
+  // mirrors what a new command registration would look like in production.
+  const commandItemsMut = COMMAND_ITEMS as unknown as CommandItem[];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    mockUser.current = { id: 'test-user', isAdmin: true };
+    mockFlags.valueOrUndefined = { search: true, map: true, trash: true };
+    mockI18nLocale.current = 'en';
+    manager = new GlobalSearchManager();
+    manager.open();
+  });
+
+  it('bare `>` populates commands section with all items alphabetical by label', async () => {
+    manager.setQuery('>');
+    await flushMicrotasks();
+    const section = manager.sections.commands;
+    expect(section.status).toBe('ok');
+    if (section.status === 'ok') {
+      const labels = section.items.map((c) => c.labelKey);
+      expect(labels).toEqual([...labels].sort());
+      // Sanity: the seed item from Task 1 is present under bare `>`.
+      expect(labels).toContain('theme');
+    }
+  });
+
+  it('under `@alice`, commands section is empty', async () => {
+    manager.setQuery('@alice');
+    await flushMicrotasks();
+    expect(manager.sections.commands.status).toBe('empty');
+  });
+
+  it('under `#tag`, commands section is empty', async () => {
+    manager.setQuery('#tag');
+    await flushMicrotasks();
+    expect(manager.sections.commands.status).toBe('empty');
+  });
+
+  it('under `/album`, commands section is empty', async () => {
+    manager.setQuery('/album');
+    await flushMicrotasks();
+    expect(manager.sections.commands.status).toBe('empty');
+  });
+
+  it('render order invariant: RECONCILE_ORDER_BY_SCOPE.all and .nav both start with "commands"', () => {
+    expect(RECONCILE_ORDER_BY_SCOPE.all[0]).toBe('commands');
+    expect(RECONCILE_ORDER_BY_SCOPE.nav[0]).toBe('commands');
+  });
+
+  it('defensive gating: fabricated adminOnly command is filtered for non-admin user', async () => {
+    const adminCmd: CommandItem = {
+      id: 'cmd:test-admin-only',
+      labelKey: 'test_admin_only_label',
+      descriptionKey: 'test_admin_only_description',
+      icon: '',
+      handler: () => undefined,
+      adminOnly: true,
+    };
+    commandItemsMut.push(adminCmd);
+    try {
+      // Non-admin user: fabricated command must NOT appear under bare `>`.
+      mockUser.current = { id: 'test-user', isAdmin: false };
+      const nonAdmin = new GlobalSearchManager();
+      nonAdmin.open();
+      nonAdmin.setQuery('>');
+      await flushMicrotasks();
+      const nonAdminSection = nonAdmin.sections.commands;
+      expect(nonAdminSection.status).toBe('ok');
+      if (nonAdminSection.status === 'ok') {
+        expect(nonAdminSection.items.some((c) => c.id === adminCmd.id)).toBe(false);
+      }
+
+      // Admin user: same fabricated command MUST appear.
+      mockUser.current = { id: 'test-user', isAdmin: true };
+      const admin = new GlobalSearchManager();
+      admin.open();
+      admin.setQuery('>');
+      await flushMicrotasks();
+      const adminSection = admin.sections.commands;
+      expect(adminSection.status).toBe('ok');
+      if (adminSection.status === 'ok') {
+        expect(adminSection.items.some((c) => c.id === adminCmd.id)).toBe(true);
+      }
+    } finally {
+      // Remove the fabricated item regardless of assertion outcome so later
+      // describe blocks see a clean COMMAND_ITEMS.
+      const idx = commandItemsMut.findIndex((c) => c.id === adminCmd.id);
+      if (idx !== -1) {
+        commandItemsMut.splice(idx, 1);
+      }
+    }
+  });
+
+  it('defensive gating: fabricated featureFlag command is filtered when flag is off', async () => {
+    const flaggedCmd: CommandItem = {
+      id: 'cmd:test-flagged',
+      labelKey: 'test_flagged_label',
+      descriptionKey: 'test_flagged_description',
+      icon: '',
+      handler: () => undefined,
+      // 'map' is one of the flags the test harness already exposes via mockFlags.
+      featureFlag: 'map',
+    };
+    commandItemsMut.push(flaggedCmd);
+    try {
+      // Flag off: fabricated command must NOT appear.
+      mockFlags.valueOrUndefined = { search: true, map: false, trash: true };
+      const off = new GlobalSearchManager();
+      off.open();
+      off.setQuery('>');
+      await flushMicrotasks();
+      const offSection = off.sections.commands;
+      expect(offSection.status).toBe('ok');
+      if (offSection.status === 'ok') {
+        expect(offSection.items.some((c) => c.id === flaggedCmd.id)).toBe(false);
+      }
+
+      // Flag on: fabricated command MUST appear.
+      mockFlags.valueOrUndefined = { search: true, map: true, trash: true };
+      const on = new GlobalSearchManager();
+      on.open();
+      on.setQuery('>');
+      await flushMicrotasks();
+      const onSection = on.sections.commands;
+      expect(onSection.status).toBe('ok');
+      if (onSection.status === 'ok') {
+        expect(onSection.items.some((c) => c.id === flaggedCmd.id)).toBe(true);
+      }
+    } finally {
+      const idx = commandItemsMut.findIndex((c) => c.id === flaggedCmd.id);
+      if (idx !== -1) {
+        commandItemsMut.splice(idx, 1);
+      }
     }
   });
 });
