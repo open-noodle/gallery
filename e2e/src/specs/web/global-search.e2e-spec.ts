@@ -352,21 +352,23 @@ test.describe('global search palette', () => {
       await expect(page).toHaveURL(/\/admin\/system-settings\?isOpen=classification/);
     });
 
-    test('type "toggle theme" → click Theme action → theme toggles', async ({ page }) => {
-      // Click the row directly rather than relying on Enter + auto-select.
-      // The palette's navigation section renders categories in a fixed order
-      // (systemSettings → admin → userPages → actions), so any query that
-      // weakly fuzzy-matches a systemSettings item will auto-select that
-      // item ahead of the ACTIONS entry regardless of score. 'toggle' and
-      // 'toggle theme' both fuzzy-match 'Storage Template' via
-      // computeCommandScore's greedy subsequence matcher, so Enter on this
-      // query lands on a settings panel rather than nav:theme. A real UX
-      // fix would order sections by best item score; until then, click the
-      // exact row.
+    test('type "theme" → click Theme command → theme toggles', async ({ page }) => {
+      // Post-v1.3.0: theme toggling lives as `cmd:theme` in the commands
+      // registry (migrated from the old `nav:theme` action). An unscoped
+      // "theme" query promotes the command to the top-result slot; clicking
+      // fires themeManager.toggleTheme() via the manager's command activation.
       const initialDark = await page.evaluate(() => document.documentElement.classList.contains('dark'));
       await page.keyboard.press('Control+k');
-      await page.getByRole('dialog').getByRole('combobox').fill('toggle theme');
-      await page.getByText(/toggle theme/i).click();
+      const dialog = page.getByRole('dialog');
+      await dialog.getByRole('combobox').fill('theme');
+      // `theme` is promoted to the Top Result slot (data-cmdk-top-result-commands).
+      // Scope the click to that group to avoid colliding with other "Theme" text
+      // that may appear elsewhere in the dialog (e.g. nav descriptions).
+      await dialog
+        .locator('[data-cmdk-top-result-commands]')
+        .getByText(/^theme$/i)
+        .first()
+        .click();
       await expect
         .poll(async () => page.evaluate(() => document.documentElement.classList.contains('dark')))
         .toBe(!initialDark);
@@ -496,17 +498,22 @@ test.describe('global search palette', () => {
     });
 
     test('scope > toggles theme', async ({ page }) => {
+      // Post-v1.3.0: theme lives in commands registry. Under `>` scope both
+      // the Commands section (verbs) and the Navigation section (pages)
+      // render; the theme row now sits in Commands, not under an "actions"
+      // nav category.
       const initialDark = await page.evaluate(() => document.documentElement.classList.contains('dark'));
       await page.keyboard.press('Control+k');
       const dialog = page.getByRole('dialog');
-      await dialog.getByRole('combobox').fill('>toggle theme');
+      await dialog.getByRole('combobox').fill('>theme');
 
       // Entity sections are hidden under nav scope.
       await expect(dialog.getByRole('group', { name: /^photos/i })).toHaveCount(0);
       await expect(dialog.getByRole('group', { name: /^people/i })).toHaveCount(0);
 
       await dialog
-        .getByText(/toggle theme/i)
+        .locator('[data-cmdk-commands-section]')
+        .getByText(/^theme$/i)
         .first()
         .click();
       await expect
@@ -652,9 +659,10 @@ test.describe('global search palette', () => {
       const dialog = page.getByRole('dialog');
       await dialog.getByRole('combobox').fill('>');
 
-      // Navigation rows render under their categorical headings (System Settings,
-      // Admin, Navigation, Actions). The Theme toggle is an 'actions' entry.
-      await expect(dialog.getByText(/toggle theme/i).first()).toBeVisible();
+      // Post-v1.3.0: `>` shows a Commands section (verbs) above the
+      // navigation pages. The Theme row lives in Commands.
+      await expect(dialog.locator('[data-cmdk-commands-section]')).toBeVisible();
+      await expect(dialog.locator('[data-cmdk-commands-section]').getByText(/^theme$/i)).toBeVisible();
       // No entity section headings under nav scope.
       await expect(dialog.getByRole('group', { name: /^photos/i })).toHaveCount(0);
       await expect(dialog.getByRole('group', { name: /^people/i })).toHaveCount(0);
