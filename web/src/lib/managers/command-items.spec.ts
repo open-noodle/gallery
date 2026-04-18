@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import * as fileUploader from '$lib/utils/file-uploader';
+import { describe, expect, it, vi } from 'vitest';
 import { COMMAND_ITEMS, isAlmostExactCommandMatch } from './command-items';
 
 describe('COMMAND_ITEMS', () => {
@@ -21,6 +22,16 @@ describe('COMMAND_ITEMS', () => {
   });
   it('includes cmd:theme for Phase 1', () => {
     expect(COMMAND_ITEMS.find((c) => c.id === 'cmd:theme')).toBeDefined();
+  });
+});
+
+describe('cmd:upload', () => {
+  it('invokes openFileUploadDialog', async () => {
+    const spy = vi.spyOn(fileUploader, 'openFileUploadDialog').mockResolvedValue(undefined as never);
+    const cmd = COMMAND_ITEMS.find((c) => c.id === 'cmd:upload')!;
+    await cmd.handler();
+    expect(spy).toHaveBeenCalledOnce();
+    spy.mockRestore();
   });
 });
 

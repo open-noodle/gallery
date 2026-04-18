@@ -1,7 +1,8 @@
 import { isAlmostExactWordMatch } from '$lib/managers/cmdk-match';
 import { themeManager } from '$lib/managers/theme-manager.svelte';
+import { openFileUploadDialog } from '$lib/utils/file-uploader';
 import type { ServerFeaturesDto } from '@immich/sdk';
-import { mdiThemeLightDark } from '@mdi/js';
+import { mdiCloudUploadOutline, mdiThemeLightDark } from '@mdi/js';
 
 const MIN_MATCH_LENGTH = 3;
 
@@ -24,6 +25,13 @@ export const COMMAND_ITEMS: readonly CommandItem[] = [
     descriptionKey: 'cmdk_cmd_theme_description',
     icon: mdiThemeLightDark,
     handler: () => themeManager.toggleTheme(),
+  },
+  {
+    id: 'cmd:upload',
+    labelKey: 'upload',
+    descriptionKey: 'cmdk_cmd_upload_description',
+    icon: mdiCloudUploadOutline,
+    handler: () => openFileUploadDialog(),
   },
 ];
 
