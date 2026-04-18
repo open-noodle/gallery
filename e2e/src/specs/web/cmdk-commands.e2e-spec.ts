@@ -96,7 +96,10 @@ test.describe('cmdk commands (v1.3.0)', () => {
     // unscoped near-exact match promotes the command row. The selected row is
     // marked via bits-ui's data-selected attribute on Command.Item.
     await expect(dialog.locator('[data-cmdk-commands-section]')).toBeVisible();
-    const uploadRow = dialog.locator('[data-cmdk-commands-section]').getByText(/^upload$/i).first();
+    const uploadRow = dialog
+      .locator('[data-cmdk-commands-section]')
+      .getByText(/^upload$/i)
+      .first();
     await expect(uploadRow).toBeVisible();
 
     const fileChooserPromise = page.waitForEvent('filechooser', { timeout: 5000 });
