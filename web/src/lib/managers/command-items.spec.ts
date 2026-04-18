@@ -47,6 +47,7 @@ beforeEach(() => {
   vi.mocked(toastManager.info).mockClear();
   vi.mocked(toastManager.danger).mockClear();
   vi.mocked(sdk.runQueueCommandLegacy).mockClear();
+  vi.mocked(sdk.emptyQueue).mockClear();
   vi.restoreAllMocks();
 });
 
@@ -240,5 +241,39 @@ describe.each([
     expect(spy).toHaveBeenCalledTimes(ADMIN_VISIBLE_QUEUES.length);
     expect(toastManager.warning).toHaveBeenCalledWith(expect.stringContaining('cmdk_cmd_bulk_partial'));
     expect(toastManager.primary).not.toHaveBeenCalled();
+  });
+});
+
+describe('cmd:clear_failed_jobs', () => {
+  it('calls emptyQueue with failed:true for every admin-visible queue', async () => {
+    const spy = vi.spyOn(sdk, 'emptyQueue').mockResolvedValue({} as never);
+    const cmd = COMMAND_ITEMS.find((c) => c.id === 'cmd:clear_failed_jobs')!;
+    await cmd.handler();
+    expect(spy).toHaveBeenCalledTimes(ADMIN_VISIBLE_QUEUES.length);
+    for (const name of ADMIN_VISIBLE_QUEUES) {
+      expect(spy).toHaveBeenCalledWith({ name, queueDeleteDto: { failed: true } });
+    }
+    expect(toastManager.primary).toHaveBeenCalledWith(expect.stringContaining('cmdk_cmd_failed_cleared'));
+  });
+
+  it('partial failure: warning toast fires, no success toast', async () => {
+    const spy = vi.spyOn(sdk, 'emptyQueue').mockImplementation(({ name }) =>
+      name === QueueName.FaceDetection
+        ? (Promise.reject(new Error('boom')) as never)
+        : (Promise.resolve({}) as never),
+    );
+    const cmd = COMMAND_ITEMS.find((c) => c.id === 'cmd:clear_failed_jobs')!;
+    await cmd.handler();
+    expect(spy).toHaveBeenCalledTimes(ADMIN_VISIBLE_QUEUES.length);
+    expect(toastManager.warning).toHaveBeenCalledWith(expect.stringContaining('cmdk_cmd_bulk_partial'));
+    expect(toastManager.primary).not.toHaveBeenCalled();
+  });
+
+  it('total failure: warning toast fires', async () => {
+    const spy = vi.spyOn(sdk, 'emptyQueue').mockRejectedValue(new Error('boom') as never);
+    const cmd = COMMAND_ITEMS.find((c) => c.id === 'cmd:clear_failed_jobs')!;
+    await cmd.handler();
+    expect(spy).toHaveBeenCalledTimes(ADMIN_VISIBLE_QUEUES.length);
+    expect(toastManager.warning).toHaveBeenCalledWith(expect.stringContaining('cmdk_cmd_bulk_partial'));
   });
 });
