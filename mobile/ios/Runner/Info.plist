@@ -147,9 +147,9 @@
 	<key>NSMicrophoneUsageDescription</key>
 	<string>We need to access the microphone to let you take beautiful video using this app</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>We need to manage backup your photos album</string>
+	<string>Noodle Gallery needs access to your photo library to save photos and videos to your device. For example, when you download an asset from your Gallery server, it is added to your device's Photos app.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>We need to manage backup your photos album</string>
+	<string>Noodle Gallery needs access to your photo library to back up your photos and videos to your Gallery server. For example, selected albums are uploaded in the background so your memories are preserved and viewable across your devices.</string>
 	<key>NSUserActivityTypes</key>
 	<array>
 		<string>INSendMessageIntent</string>
