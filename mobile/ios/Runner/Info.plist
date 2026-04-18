@@ -133,19 +133,19 @@
 		<string>_CC1AD845._googlecast._tcp</string>
 	</array>
 	<key>NSCameraUsageDescription</key>
-	<string>We need to access the camera to let you take beautiful video using this app</string>
+	<string>Noodle Gallery needs access to your camera so you can capture photos and videos directly from the app. For example, you can take a new photo and have it uploaded to your Gallery server alongside your existing library.</string>
 	<key>NSFaceIDUsageDescription</key>
-	<string>We need to use FaceID to allow access to your locked folder</string>
+	<string>Noodle Gallery uses Face ID to protect your private content. For example, Face ID is required to unlock the locked folder where you have hidden sensitive photos and videos.</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>We need local network permission to connect to the local server using IP address and allow the casting feature to work</string>
+	<string>Noodle Gallery needs local network access to communicate with your self-hosted Gallery server on your home network. For example, this allows the app to connect to your server by its local IP address and cast photos to a TV on the same network.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>We require this permission to access the local WiFi name for background upload mechanism</string>
+	<string>Noodle Gallery uses your location in the background to detect which Wi-Fi network you are connected to, so that automatic backups only run on networks you trust. For example, you can configure the app to upload your photos only when connected to your home Wi-Fi and pause uploads on cellular or public networks.</string>
 	<key>NSLocationUsageDescription</key>
-	<string>We require this permission to access the local WiFi name</string>
+	<string>Noodle Gallery uses your location to detect which Wi-Fi network you are connected to, so that automatic backups only run on networks you trust. For example, you can configure the app to upload your photos only when connected to your home Wi-Fi.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>We require this permission to access the local WiFi name</string>
+	<string>Noodle Gallery uses your location to detect which Wi-Fi network you are connected to, so that automatic backups only run on networks you trust. For example, you can configure the app to upload your photos only when connected to your home Wi-Fi.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>We need to access the microphone to let you take beautiful video using this app</string>
+	<string>Noodle Gallery needs access to your microphone so that videos you record with the in-app camera include audio. For example, when you capture a video from within the app, the microphone records sound alongside the footage before it is uploaded to your Gallery server.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Noodle Gallery needs access to your photo library to save photos and videos to your device. For example, when you download an asset from your Gallery server, it is added to your device's Photos app.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
