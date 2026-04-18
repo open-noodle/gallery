@@ -1,6 +1,7 @@
 <script lang="ts">
   import QueueCard from '$lib/components/QueueCard.svelte';
   import QueueStorageMigrationDescription from '$lib/components/QueueStorageMigrationDescription.svelte';
+  import { ADMIN_VISIBLE_QUEUES, type AdminVisibleQueue } from '$lib/constants/admin-queues';
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
   import { queueManager } from '$lib/managers/queue-manager.svelte';
   import { asQueueItem } from '$lib/services/queue.service';
@@ -32,7 +33,7 @@
     handleCommand?: (jobId: QueueName, jobCommand: QueueCommandDto) => Promise<void>;
   };
 
-  const queueDetails: Partial<Record<QueueName, QueueDetails>> = {
+  const queueDetails: Record<AdminVisibleQueue, QueueDetails> = {
     [QueueName.ThumbnailGeneration]: {
       allText: $t('all'),
       missingText: $t('missing'),
@@ -96,7 +97,7 @@
     },
   };
 
-  let queueList = Object.entries(queueDetails) as [QueueName, QueueDetails][];
+  let queueList = ADMIN_VISIBLE_QUEUES.map((name) => [name, queueDetails[name]] as const);
 
   const handleCommand = async (name: QueueName, dto: QueueCommandDto) => {
     const item = asQueueItem($t, { name });
