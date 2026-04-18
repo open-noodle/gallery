@@ -122,7 +122,7 @@ describe('cmd:clear_recents', () => {
     expect(localStorage.getItem(key)).toBe(JSON.stringify([]));
   });
 
-  it('is a no-op when user is logged out (no crash, localStorage unchanged)', async () => {
+  it('is a no-op when user is logged out (no crash, localStorage unchanged)', () => {
     mockUser.current = null;
     localStorage.setItem('some-other-key', 'untouched');
     const cmd = COMMAND_ITEMS.find((c) => c.id === 'cmd:clear_recents')!;

@@ -705,7 +705,9 @@ describe('cursor identity', () => {
     await vi.advanceTimersByTimeAsync(200);
     m.setActiveItem('photo:a1');
     providers.photos.run = () => Promise.resolve({ status: 'ok' as const, items: [{ id: 'a9' }], total: 1 });
-    m.setQuery('sunset');
+    // Use a query whose characters don't fuzzy-score against any command corpus,
+    // so the commands section stays empty and cursor fallback lands on photos.
+    m.setQuery('whale');
     await vi.advanceTimersByTimeAsync(200);
     expect(m.activeItemId).toBe('photo:a9');
   });
@@ -1165,11 +1167,13 @@ describe('topNavigationMatch', () => {
     expect(m.topNavigationMatch?.id).toBe('nav:userPages:people');
   });
 
-  it('promotes Albums when the user types "album" (prefix match)', () => {
+  it('promotes Favorites when the user types "favorites" (prefix match)', () => {
+    // Query chosen so it does NOT also match any command label — `album` now
+    // trips `cmd:new_album` which (correctly) suppresses the nav promotion.
     const m = new GlobalSearchManager();
     m.open();
-    m.setQuery('album');
-    expect(m.topNavigationMatch?.id).toBe('nav:userPages:albums');
+    m.setQuery('favorites');
+    expect(m.topNavigationMatch?.id).toBe('nav:userPages:favorites');
   });
 
   it('promotes Classification Settings for "auto-classification" (compound query)', () => {
