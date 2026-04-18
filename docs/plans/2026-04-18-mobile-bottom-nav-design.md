@@ -1,22 +1,22 @@
 # Mobile Bottom-Nav Redesign — Design
 
-**Status:** Draft · 2026-04-18
+**Status:** Draft · 2026-04-18 (rev 2 — review fixes folded in)
 **Mockup:** [`docs/plans/mockups/2026-04-18-mobile-bottom-nav.html`](./mockups/2026-04-18-mobile-bottom-nav.html)
-**Scope:** Flutter mobile app (`mobile/`). Replaces the bottom navigation for Gallery without touching the upstream `tab_shell.page.dart`.
+**Scope:** Flutter mobile app (`mobile/`). Replaces the bottom navigation for Gallery without touching the upstream `tab_shell.page.dart` or `tab.provider.dart`.
 
 ## 1. Summary
 
-Replace the current four-tab `NavigationBar` (Photos · Search · Spaces · Library) with a floating pill inspired by Google Photos: three destinations (Photos · Albums · Library) inside a rounded-full translucent pill, plus a sibling circular **Search** blob outside the pill on the trailing edge. The current Search tab retires from the nav; Spaces retires from the nav (existing routes remain reachable). Tapping the Search blob routes to the Photos timeline (if the user is elsewhere) and opens the FilterSheet shipped in PR 1.3 with the text-search pill focused.
+Replace the current four-tab `NavigationBar` (Photos · Search · Spaces · Library) with a floating pill inspired by Google Photos: three destinations (Photos · Albums · Library) inside a rounded-full translucent pill, plus a sibling circular **Search** blob outside the pill on the trailing edge. The current Search tab retires from the nav; Spaces retires from the nav (existing routes remain reachable). Tapping the Search blob routes to the Photos timeline (if the user is elsewhere), waits for the tab transition to settle, opens the FilterSheet shipped in PR 1.3, and requests focus on its text-search input.
 
-The new shell ships as a **parallel fork-only widget set** — upstream's `mobile/lib/pages/common/tab_shell.page.dart` stays untouched so upstream rebases remain mechanical.
+The new shell ships as a **parallel fork-only widget set** — upstream's `mobile/lib/pages/common/tab_shell.page.dart` and `mobile/lib/providers/tab.provider.dart` both stay untouched so upstream rebases remain mechanical.
 
 ## 2. Goals
 
 - Match the Google-Photos floating-pill pattern with a Gallery-distinct aesthetic (darkroom warmth, amber accent) theming off `theme.colorScheme.primary`.
 - Re-link Immich's existing Albums page to the bottom nav (it was de-linked in PR #116, not deleted).
 - Retire the dedicated Search tab; route search intent through the FilterSheet that already covers the web parity surface.
-- Preserve fork maintainability by keeping upstream `tab_shell.page.dart` bit-identical to the upstream copy. New widget files are sibling, fork-only.
-- Preserve every existing side-effect the current nav already carries: invalidation of memory/album/people/spaces providers on tab switch, multi-select hide, haptic feedback, readonly-mode gating, landscape `NavigationRail` fallback.
+- Preserve fork maintainability by keeping upstream `tab_shell.page.dart` and `tab.provider.dart` bit-identical to their upstream copies.
+- Preserve every existing side-effect the current nav already carries: invalidation of memory/album/people providers on tab switch, multi-select hide, haptic feedback, readonly-mode gating, landscape `NavigationRail` fallback.
 
 ## 3. Non-goals
 
@@ -29,16 +29,17 @@ The new shell ships as a **parallel fork-only widget set** — upstream's `mobil
 
 ## 4. Design decisions (locked)
 
-Captured during brainstorm 2026-04-18:
+Captured during brainstorm 2026-04-18 and tightened after review rev 2:
 
 1. **Three visible destinations + one outside affordance.** Photos · Albums · Library in the pill; Search as a peer blob outside. No fourth tab.
 2. **Albums is the existing Immich albums page** — it was de-linked from the bottom nav in PR #116 but not deleted. Target route: `DriftAlbumsRoute` (Drift-based, matches the tab shell's other routes). Legacy `AlbumsRoute` (Isar) stays in the repo as a fallback if Drift parity isn't reached at ship time.
 3. **Spaces leaves the bottom nav.** `SpacesRoute` and its pages remain reachable via the existing app surfaces (notifications, deep links, in-app navigation). Surfacing Spaces inside Library as a collection card + quick-access list item is explicitly a follow-up, not part of this PR.
-4. **Search blob target is deterministic.** Tap always routes to `MainTimelineRoute` (if not already there) then opens the FilterSheet at its Browse snap with the text-search pill focused and keyboard requested.
+4. **Search blob target is deterministic.** Tap always routes to `MainTimelineRoute` (if not already there), waits for the upstream 600 ms `FadeTransition` to complete, then opens the FilterSheet at its Browse snap and requests focus on the text-search input.
 5. **`DriftSearchPage` stays in the repo.** It is no longer a bottom-nav tab but remains a reachable route for any in-app deep-links that already point at it.
-6. **Upstream `tab_shell.page.dart` stays bit-identical.** A new `GalleryTabShellPage` lives at a fork-only path and the router's root is flipped to point at it. One-line edit in `router.dart` is the only touched upstream-aligned file.
+6. **Upstream `tab_shell.page.dart` and `tab.provider.dart` stay bit-identical.** A new `GalleryTabShellPage` lives at a fork-only path and the router's root is flipped to point at it. The new shell writes a **fork-only** `galleryTabProvider` (distinct from upstream's `tabProvider`) — the two providers coexist, and the fork's code reads `galleryTabProvider` where it needs to branch on active tab.
 7. **Aesthetic: Darkroom Warmth.** Amber demo palette in the mockup; the Flutter widget resolves its accent from `theme.colorScheme.primary`, so the user's `ImmichColorPreset` continues to drive the color in production.
-8. **Nav label casing follows upstream convention** (sentence case: "Photos", "Albums", "Library") — i18n keys `nav.photos`, `nav.albums`, `nav.library`.
+8. **Nav label casing follows upstream convention** (sentence case: "Photos", "Albums", "Library") — i18n keys `nav.photos`, `nav.albums`, `nav.library`; search blob semantics key `nav.search_photos_hint` ("Search photos").
+9. **Focus plumbing for the FilterSheet search input.** The sheet's current `FilterSheetSearchBar` has no `FocusNode`. A fork-only `FocusNode` is added to its State, and an external request-focus signal travels via a **counter provider** (`photosFilterSearchFocusRequestProvider: StateProvider<int>`) — callers increment, the search bar listens and calls `requestFocus()`. A counter (not a shared `FocusNode`) avoids use-after-dispose crashes when the search bar widget is remounted.
 
 ## 5. UX
 
@@ -53,7 +54,7 @@ See the [HTML mockup](./mockups/2026-04-18-mobile-bottom-nav.html) for interacti
 ### 5.2 Interaction
 
 - **Tap a segment** → `tabsRouter.setActiveIndex(i)`. The active-pill underlay animates between segments over 280 ms (`cubic-bezier(0.3, 0.6, 0.2, 1)`), the icon fades in over 220 ms with a 60 ms delay, and a `selectionClick` haptic fires.
-- **Tap the search blob** → if current tab ≠ Photos, switch to Photos first, then open the FilterSheet. The FilterSheet opens at the Browse snap; the text-search pill inside the sheet requests focus (keyboard opens). Haptic `selectionClick` fires on tap.
+- **Tap the search blob** → if current tab ≠ Photos, switch to Photos first, wait for the 600 ms `FadeTransition` to complete (plus a ~20 ms buffer for the target page's first build pass), then set the FilterSheet snap to `browse` and increment the focus-request counter. On Photos already, skip the wait. Haptic `selectionClick` fires on tap.
 - **Drag / swipe** inside the pill has no effect — only taps change tabs. (Avoids gesture collisions with the drag-to-dismiss FilterSheet peek when present.)
 - **System back** from a non-Photos tab returns to Photos (inherits upstream's `canPop` contract).
 
@@ -61,19 +62,21 @@ See the [HTML mockup](./mockups/2026-04-18-mobile-bottom-nav.html) for interacti
 
 The nav is not always on-screen. It hides when:
 
-- **Multi-select is active.** Listens to `MultiSelectToggleEvent` on `EventStream.shared`. Identical contract to the upstream `_BottomNavigationBar`. A fade + 12 pt slide is used.
-- **Keyboard is up.** When the soft keyboard covers ≥ 20 % of the viewport height, the nav fades + slides out. Returns on keyboard dismiss. This is a new behaviour not in the upstream nav (upstream uses `resizeToAvoidBottomInset: false` and lets the nav get covered).
+- **Multi-select is active.** Listens to `MultiSelectToggleEvent` on `EventStream.shared`. `EventStream` broadcasts globally — the event lands regardless of which tab (Photos, Albums, or Library) invoked multi-select. Identical contract to the upstream `_BottomNavigationBar`. A fade + 12 pt slide is used.
+- **Keyboard is up.** When `MediaQuery.of(context).viewInsets.bottom > 80` (absolute, device-independent), the nav fades + slides out. Returns on keyboard dismiss. This is a new behaviour not in the upstream nav (upstream uses `resizeToAvoidBottomInset: false` and lets the nav get covered). The absolute 80 pt threshold keeps the test stimulus and production threshold aligned.
 - **Landscape.** The whole bottom-nav structure disappears and a `NavigationRail` takes its place on the leading edge with the same three destinations plus the search entry as a rail item. Identical to the upstream landscape path — the rail stays on upstream visuals, no amber styling.
 - **Readonly mode** (`readonlyModeProvider == true`). Only Photos is enabled; Albums, Library, and Search dim to 30 % opacity and refuse taps. Identical contract to the upstream `.enabled` handling.
 
+A `Semantics(liveRegion: true)` wrapper announces active-tab changes for screen readers ("Albums, selected" → "Library, selected"). Debounced (150 ms) to avoid chatter on rapid drags past segments.
+
 ### 5.4 Labels and icons
 
-| Destination | Label     | Icon (Material Symbols Rounded)     | Route                     |
-| ----------- | --------- | ----------------------------------- | ------------------------- |
-| Photos      | `Photos`  | `photo_library` (outlined / filled) | `MainTimelineRoute`       |
-| Albums      | `Albums`  | `photo_album` (outlined / filled)   | `DriftAlbumsRoute`        |
-| Library     | `Library` | `space_dashboard`                   | `DriftLibraryRoute`       |
-| Search blob | (aria)    | `search`                            | (action — see §6.4 below) |
+| Destination | Label                                                 | Icon (Material Symbols Rounded)     | Route                     |
+| ----------- | ----------------------------------------------------- | ----------------------------------- | ------------------------- |
+| Photos      | `Photos` (`nav.photos`)                               | `photo_library` (outlined / filled) | `MainTimelineRoute`       |
+| Albums      | `Albums` (`nav.albums`)                               | `photo_album` (outlined / filled)   | `DriftAlbumsRoute`        |
+| Library     | `Library` (`nav.library`)                             | `space_dashboard`                   | `DriftLibraryRoute`       |
+| Search blob | Semantics: `Search photos` (`nav.search_photos_hint`) | `search`                            | (action — see §6.4 below) |
 
 Icons use `font-variation-settings: "wght" 400, "FILL" 0` when inactive and `"wght" 500, "FILL" 1` when active. Sentence-case labels.
 
@@ -91,6 +94,15 @@ The mockup's amber palette is illustrative. The Flutter widget reads:
 
 In light themes the same roles resolve to lighter surface + higher-contrast fill (`primary.withOpacity(0.22)`).
 
+### 5.6 Peek-rail coexistence
+
+When the FilterSheet is at the `peek` snap (filters applied on Photos), its chip rail sits at the bottom of the screen — in direct conflict with the pill's placement. The design resolves this by **stacking** rather than hiding either surface:
+
+- The pill keeps its fixed float offset (26 pt above the home indicator).
+- The peek rail's bottom is re-anchored to **above the pill**: `peek_content.widget.dart` reads a new `bottomNavHeightProvider` (fork-only) and adds that height + an 8 pt visual gap to its own bottom padding. The pill publishes its measured height to the provider via a `LayoutBuilder` post-frame callback.
+- On tabs where the pill is hidden (landscape, multi-select, keyboard-up), `bottomNavHeightProvider` reads 0 and the peek rail falls back to its original placement.
+- No-filters state: peek is hidden (`SearchFilter.isEmpty` collapses it per PR 1.2); pill floats alone. Unchanged from the mockup.
+
 ## 6. Architecture
 
 ### 6.1 File layout
@@ -98,49 +110,56 @@ In light themes the same roles resolve to lighter surface + higher-contrast fill
 **New (fork-only):**
 
 - `mobile/lib/presentation/pages/common/gallery_tab_shell.page.dart` — `@RoutePage()` parallel to `TabShellPage`, hosts the new bottom nav.
-- `mobile/lib/presentation/widgets/gallery_nav/gallery_bottom_nav.widget.dart` — the composite widget: pill + blob + landscape rail fallback.
+- `mobile/lib/presentation/widgets/gallery_nav/gallery_bottom_nav.widget.dart` — the composite widget: pill + blob + landscape rail fallback. Takes `TabsRouter` as a constructor argument (sourced from `AutoTabsRouter.builder`'s callback; avoids `AutoTabsRouter.of(context)` lookups from outside the router subtree — see §6.4.1).
 - `mobile/lib/presentation/widgets/gallery_nav/gallery_nav_pill.widget.dart` — the rounded-full pill with the 3 segments + animated active underlay.
 - `mobile/lib/presentation/widgets/gallery_nav/gallery_nav_segment.widget.dart` — a single segment (active / idle rendering).
-- `mobile/lib/presentation/widgets/gallery_nav/gallery_search_blob.widget.dart` — the circular search affordance.
-- `mobile/lib/providers/gallery_nav/gallery_nav_destination.dart` — `enum GalleryNavDestination { photos, albums, library }` with `label`, `icon`, `selectedIcon`, `route` mappers.
-- `mobile/lib/providers/gallery_nav/gallery_search_action.dart` — `Future<void> openGallerySearch(BuildContext, WidgetRef)` helper that encodes the "switch to Photos, open sheet, focus text pill" sequence.
-- `mobile/test/presentation/widgets/gallery_nav/*_test.dart` — one mirror test file per widget.
+- `mobile/lib/presentation/widgets/gallery_nav/gallery_search_blob.widget.dart` — the circular search affordance. Also takes `TabsRouter` as a constructor argument.
+- `mobile/lib/providers/gallery_nav/gallery_tab_enum.dart` — fork-only `enum GalleryTabEnum { photos, albums, library }` and `galleryTabProvider: StateProvider<GalleryTabEnum>((_) => GalleryTabEnum.photos)`. Distinct from upstream's `TabEnum` / `tabProvider` — no shared state.
+- `mobile/lib/providers/gallery_nav/gallery_nav_destination.dart` — mapping helpers: label i18n key, icon, selected icon, target route per `GalleryTabEnum` value.
+- `mobile/lib/providers/gallery_nav/gallery_search_action.dart` — `Future<void> openGallerySearch(TabsRouter, WidgetRef)` helper that encodes the "switch to Photos if needed, wait for transition, open sheet, bump focus counter" sequence.
+- `mobile/lib/providers/gallery_nav/bottom_nav_height.provider.dart` — `bottomNavHeightProvider: StateProvider<double>((_) => 0)` consumed by the FilterSheet peek rail to stack above the pill (§5.6).
+- `mobile/lib/providers/photos_filter/search_focus.provider.dart` — `photosFilterSearchFocusRequestProvider: StateProvider<int>((_) => 0)`. External callers increment; `FilterSheetSearchBar` watches and calls `focusNode.requestFocus()` on each rise (counter pattern; not a shared `FocusNode`).
+- `mobile/test/presentation/widgets/gallery_nav/*_test.dart` + `mobile/test/providers/gallery_nav/*_test.dart` — mirror tests per widget / provider.
 
 **Touched (fork-only lines within upstream-aligned files):**
 
-- `mobile/lib/routing/router.dart` — add the new `GalleryTabShellRoute` to the route list, flip the root to point at it. Two lines of change, enclosed in a fork-only comment to simplify rebases.
-- `i18n/en.json` — add `nav.photos`, `nav.albums`, `nav.library` keys (Photos + Library already exist under different keys; reuse where possible).
-- `mobile/lib/providers/tab.provider.dart` — extend `TabEnum` enum to accommodate the 3-tab shape. (Current `TabEnum` has 4 values; after the redesign it needs values for `photos`, `albums`, `library` — if upstream, this is upstream-aligned code we audit.)
+- `mobile/lib/routing/router.dart` — add `AutoRoute(page: GalleryTabShellRoute.page, children: [MainTimelineRoute, DriftAlbumsRoute, DriftLibraryRoute])` to the route list and flip the root's initial route. Approximately 8 lines of fork-only addition, enclosed in a `// >>> fork-only gallery-bottom-nav` / `// <<< fork-only` comment fence to flag the diff on rebases. Verify that inheriting the `[_authGuard, _duplicateGuard]` guards from the top-level `DriftAlbumsRoute` still applies when it's used as a tab child; re-declare on the child if auto_route doesn't propagate.
+- `mobile/lib/presentation/widgets/filter_sheet/search_bar.widget.dart` — add a `FocusNode` owned by `_FilterSheetSearchBarState` (init in `initState`, dispose in `dispose`); add a `ref.listen<int>(photosFilterSearchFocusRequestProvider, ...)` in `build` that calls `_focusNode.requestFocus()` on each increment. Pass the node to the underlying `TextField(focusNode: _focusNode, ...)`. ~10 lines of fork-only addition; if upstream rewrites the search bar the fork re-applies mechanically.
+- `mobile/lib/presentation/widgets/filter_sheet/peek_content.widget.dart` — read `bottomNavHeightProvider` and pad its bottom by (height + 8 pt) when the pill is active (§5.6). ~5 lines.
+- `i18n/en.json` — add `nav.photos`, `nav.albums`, `nav.library`, `nav.search_photos_hint`. Keys sorted via `pnpm --filter=immich-i18n format:fix` (memory `feedback_i18n_key_sorting.md`).
 
 **Untouched (critical — upstream rebase surface):**
 
 - `mobile/lib/pages/common/tab_shell.page.dart` — upstream copy stays bit-identical.
-- `mobile/lib/constants/constants.dart` — existing `kPhotoTabIndex` / `kSearchTabIndex` / `kSpacesTabIndex` / `kLibraryTabIndex` constants remain (they're referenced by upstream + fork code paths). The new shell uses its own indexes.
+- `mobile/lib/providers/tab.provider.dart` — upstream `TabEnum` and `tabProvider` remain unchanged (the new shell writes `galleryTabProvider` instead).
+- `mobile/lib/constants/constants.dart` — existing `kPhotoTabIndex` / `kSearchTabIndex` / `kSpacesTabIndex` / `kLibraryTabIndex` constants remain (they're referenced by upstream + fork code paths). The new shell uses its own index scheme.
 
 ### 6.2 Widget hierarchy
 
 ```
 GalleryTabShellPage (fork-only, @RoutePage)
-├── AutoTabsRouter
+├── AutoTabsRouter.builder
 │   ├── routes: [MainTimelineRoute, DriftAlbumsRoute, DriftLibraryRoute]
-│   └── transitionBuilder: FadeTransition (same as upstream)
+│   └── transitionBuilder: FadeTransition (same as upstream — 600ms)
 └── Scaffold
     ├── body: AutoTabsRouter child
     │   (landscape: Row(rail, body); portrait: body only)
-    └── bottomNavigationBar: GalleryBottomNav(tabsRouter)
+    └── bottomNavigationBar: GalleryBottomNav(tabsRouter: <from builder callback>)
         ├── (portrait, multi-select off, keyboard down, !readonly)
-        │   ├── GalleryNavPill
+        │   ├── GalleryNavPill(tabsRouter, destinations)
         │   │   ├── AnimatedPositioned (amber underlay)
-        │   │   ├── GalleryNavSegment.photos
-        │   │   ├── GalleryNavSegment.albums
-        │   │   └── GalleryNavSegment.library
-        │   └── GallerySearchBlob
-        │       → onTap → openGallerySearch(context, ref)
+        │   │   ├── GalleryNavSegment(photos)
+        │   │   ├── GalleryNavSegment(albums)
+        │   │   └── GalleryNavSegment(library)
+        │   └── GallerySearchBlob(tabsRouter)
+        │       → onTap → openGallerySearch(tabsRouter, ref)
         ├── (portrait, multi-select on) → SizedBox.shrink()
         ├── (portrait, keyboard up)     → AnimatedSlide/AnimatedOpacity hidden
         ├── (landscape)                 → NavigationRail (upstream-style)
         └── (readonly) → segments rendered with .enabled = false except photos
 ```
+
+`GalleryBottomNav` publishes its measured portrait height to `bottomNavHeightProvider` in a `LayoutBuilder` post-frame callback; resets to 0 when hidden. The FilterSheet's peek content reads it (§5.6).
 
 ### 6.3 Active-pill animation
 
@@ -160,7 +179,7 @@ Stack(
     ),
     Row(
       children: [
-        for (final destination in GalleryNavDestination.values)
+        for (final destination in GalleryTabEnum.values)
           Expanded(child: GalleryNavSegment(destination: destination, active: ...)),
       ],
     ),
@@ -168,69 +187,103 @@ Stack(
 );
 ```
 
-Segment widths are computed once per layout: idle segments = label width + 28 pt horizontal padding; active segment = label width + icon (22 pt) + 6 pt gap + 32 pt horizontal padding. A `GlobalKey`-based post-frame size measurement primes the `_leftFor` / `_widthFor` lookup map; rebuilds on font-scale change.
+Segment widths are computed once per layout: idle segments = label width + 28 pt horizontal padding; active segment = label width + icon (22 pt) + 6 pt gap + 32 pt horizontal padding. A `GlobalKey`-based post-frame size measurement primes the `_leftFor` / `_widthFor` lookup map; rebuilds on font-scale change. The first frame is rendered with the measured map seeded to `photos`' geometry so the underlay lands correctly under the default-active segment — tested (§8.2 M1).
 
 `MediaQuery.of(context).disableAnimations` short-circuits the animation — the underlay jumps in one frame, the icon appears without the fade.
 
 ### 6.4 Search action — `openGallerySearch`
 
 ```dart
-Future<void> openGallerySearch(BuildContext context, WidgetRef ref) async {
-  final tabsRouter = AutoTabsRouter.of(context);
-  if (tabsRouter.activeIndex != GalleryNavDestination.photos.index) {
-    ref.read(hapticFeedbackProvider.notifier).selectionClick();
-    tabsRouter.setActiveIndex(GalleryNavDestination.photos.index);
-    await WidgetsBinding.instance.endOfFrame;
+Future<void> openGallerySearch(TabsRouter tabsRouter, WidgetRef ref) async {
+  ref.read(hapticFeedbackProvider.notifier).selectionClick();
+  final onPhotos = tabsRouter.activeIndex == GalleryTabEnum.photos.index;
+
+  if (!onPhotos) {
+    tabsRouter.setActiveIndex(GalleryTabEnum.photos.index);
+    // Upstream AutoTabsRouter uses a 600 ms FadeTransition (tab_shell.page.dart:83).
+    // Wait for the transition plus ~20 ms buffer so MainTimelinePage has completed
+    // its first-build pass — required because FilterSheetSearchBar must be mounted
+    // before its FocusNode can accept a focus request.
+    await Future<void>.delayed(const Duration(milliseconds: 620));
   }
+
   ref.read(photosFilterSheetProvider.notifier).state = FilterSheetSnap.browse;
-  ref.read(photosFilterSearchFocusProvider.notifier).requestFocus();
+  ref.read(photosFilterSearchFocusRequestProvider.notifier).state++;
 }
 ```
 
-- The existing `photosFilterSheetProvider` already drives the FilterSheet snap. Setting it to `browse` triggers its mount + slide-in animation.
-- `photosFilterSearchFocusProvider` is a **new** provider wired for this action — PR 1.3's sheet already has a `FocusNode` for the text pill; expose it via a provider so external actors (the search blob) can request focus without tight coupling.
-- The `endOfFrame` await lets the tab transition settle before the sheet animation kicks off, avoiding a visible stutter.
+- Caller must pass `tabsRouter` explicitly — `AutoTabsRouter.of(context)` does not work from inside `Scaffold.bottomNavigationBar` because that subtree sits OUTSIDE the router's descendants. `AutoTabsRouter.builder` exposes the router in its builder callback; `GalleryBottomNav` captures it there and forwards it to `GallerySearchBlob`.
+- The 620 ms delay is coupled to upstream's 600 ms `FadeTransition`. If upstream shortens or lengthens that duration during a rebase, update the constant in a single place (`gallery_search_action.dart`). Document in a `// coupled to AutoTabsRouter transition — see tab_shell.page.dart` comment for the rebase heads-up.
+- `photosFilterSheetProvider` setting is idempotent — re-setting to `browse` when already at `browse` is a no-op in Riverpod `StateProvider`. No animation flicker.
+- `photosFilterSearchFocusRequestProvider` is a `StateProvider<int>` counter — callers do `state++`. `FilterSheetSearchBar` reads with `ref.listen` in `build` and only reacts to rises (`next > prev`). Using a counter (rather than a shared `FocusNode` in a provider) is deliberate: providers outlive widgets, and a disposed `FocusNode` in a provider would crash later consumers.
+
+#### 6.4.1 Passing `TabsRouter` through `AutoTabsRouter.builder`
+
+`AutoTabsRouter` has two forms. The upstream shell uses the non-builder form. The new shell uses `AutoTabsRouter.builder` so the `TabsRouter` instance can be passed down to `GalleryBottomNav` (and then to `GallerySearchBlob`):
+
+```dart
+AutoTabsRouter.builder(
+  routes: const [MainTimelineRoute(), DriftAlbumsRoute(), DriftLibraryRoute()],
+  duration: const Duration(milliseconds: 600),
+  transitionBuilder: (context, child, animation) =>
+      FadeTransition(opacity: animation, child: child),
+  builder: (context, child) {
+    final tabsRouter = AutoTabsRouter.of(context);
+    return PopScope(
+      canPop: tabsRouter.activeIndex == 0,
+      onPopInvokedWithResult: (didPop, _) =>
+          didPop ? null : tabsRouter.setActiveIndex(0),
+      child: Scaffold(
+        body: child,
+        bottomNavigationBar: GalleryBottomNav(tabsRouter: tabsRouter),
+      ),
+    );
+  },
+);
+```
 
 ### 6.5 State & side effects
 
-The new shell preserves every side effect the upstream nav triggers on tab switch. The switch-callback moves from the upstream `_onNavigationSelected` to a fork-only equivalent keyed on `GalleryNavDestination`:
+The new shell preserves every side effect the upstream nav triggers on tab switch. The switch-callback moves from the upstream `_onNavigationSelected` to a fork-only equivalent keyed on `GalleryTabEnum`:
 
-| Destination | Provider invalidations / actions (on tap)                                   |
-| ----------- | --------------------------------------------------------------------------- |
-| Photos      | `driftMemoryFutureProvider` invalidate; `ScrollToTopEvent` if already there |
-| Albums      | `albumProvider` invalidate (Drift); view-mode state stays stable            |
-| Library     | `localAlbumProvider`, `driftGetAllPeopleProvider` invalidate                |
-| Search blob | nothing invalidated; the FilterSheet owns its own state                     |
+| Destination | Provider invalidations / actions (on tap)                                                |
+| ----------- | ---------------------------------------------------------------------------------------- |
+| Photos      | `driftMemoryFutureProvider` invalidate; `ScrollToTopEvent` emitted if already on Photos  |
+| Albums      | `albumProvider` invalidate (Drift); view-mode state stays stable                         |
+| Library     | `localAlbumProvider`, `driftGetAllPeopleProvider` invalidate                             |
+| Search blob | nothing invalidated by the tap itself; the FilterSheet and focus counter own their state |
 
-Every tap also writes `tabProvider` with the corresponding `TabEnum` value and fires `hapticFeedbackProvider.selectionClick()`.
+Every tap also writes `galleryTabProvider` (fork-only, §4 decision 6) with the corresponding `GalleryTabEnum` value and fires `hapticFeedbackProvider.selectionClick()`.
 
-Removed (because the destination is gone):
+**Explicitly NOT fired** by the new shell (verified in negative test assertions — §8.2):
 
-- `sharedSpacesProvider` invalidation on Spaces-tab entry — the tap no longer exists.
-- `searchPreFilterProvider.clear()` on Search-tab entry — the tap no longer exists.
-- `searchInputFocusProvider.requestFocus()` on Search-tab re-tap — the tap no longer exists.
+- `tabProvider` (upstream) — untouched; remains at whatever upstream code sets it to elsewhere.
+- `sharedSpacesProvider.invalidate` — Spaces-tab entry no longer exists.
+- `searchPreFilterProvider.clear()` — Search-tab entry no longer exists.
+- `searchInputFocusProvider.requestFocus()` — Search-tab re-tap no longer exists.
 
 ### 6.6 Tab index numbering
 
-The new shell uses a fork-only index scheme:
+The new shell uses a fork-only index scheme via `GalleryTabEnum`:
 
 ```dart
-enum GalleryNavDestination { photos, albums, library }
+enum GalleryTabEnum { photos, albums, library }
 // photos=0, albums=1, library=2
 ```
 
-The upstream constants (`kPhotoTabIndex = 0`, `kSearchTabIndex = 1`, `kSpacesTabIndex = 2`, `kLibraryTabIndex = 3`) are **kept untouched**. They're referenced by upstream code paths that the fork still consumes; renaming or reindexing them would blow rebase scope. The new shell defines its own `kGalleryPhotoIndex = 0`, `kGalleryAlbumsIndex = 1`, `kGalleryLibraryIndex = 2` constants in a fork-only file.
+The upstream `TabEnum` (`home`, `search`, `spaces`, `library`) and the upstream constants (`kPhotoTabIndex = 0`, `kSearchTabIndex = 1`, `kSpacesTabIndex = 2`, `kLibraryTabIndex = 3`) are **kept untouched**. They're referenced by upstream code paths that the fork still consumes; renaming or reindexing them would blow rebase scope. The new shell defines its own `kGalleryPhotosIndex = 0`, `kGalleryAlbumsIndex = 1`, `kGalleryLibraryIndex = 2` constants in `gallery_tab_enum.dart`.
 
 ## 7. Error handling & edge cases
 
-- **FilterSheet is mid-animation when Search blob is tapped.** `openGallerySearch` always sets the sheet to `browse`. If the sheet was already opening from another source, this is idempotent — setting the state to the same value is a no-op. Focus request is queued.
+- **FilterSheet is mid-animation when Search blob is tapped.** `openGallerySearch` always sets the sheet to `browse`. If the sheet was already opening from another source, this is idempotent — setting the state to the same value is a no-op. The focus-counter increment still fires, which is safe: `FilterSheetSearchBar`'s `ref.listen` requests focus on the next frame regardless of sheet transition progress.
 - **FilterSheet is open at Deep when Search blob is tapped.** `openGallerySearch` sets the sheet to `browse`; the sheet's own snap controller animates back to Browse. Focus goes to the text pill.
 - **User taps Search blob from Albums/Library tab while sheet was previously open on Photos with chips applied.** The chips remain (the sheet's state is preserved across tab switches per PR 1.2 decisions). The sheet opens at Browse with the existing chips visible and the text pill focused.
-- **Readonly mode and Search blob.** Search blob is disabled in readonly mode. It dims with the nav and refuses taps. Consistent with how the upstream Search tab behaved.
-- **No FilterSheet (degraded).** If `photosFilterSheetProvider` is unreachable (shouldn't happen — it's top-level), the search blob falls back to pushing `DriftSearchRoute` as a full-screen route. This is defensive code, not a common path.
+- **Readonly mode and Search blob.** Search blob is disabled in readonly mode; it dims with the nav and refuses taps. `openGallerySearch` is therefore never invoked in readonly mode — no in-function readonly check needed. Consistent with how the upstream Search tab behaved.
 - **Landscape with readonly mode.** Only the Photos rail entry is enabled; Albums / Library / Search disabled with the rail's built-in disabled style.
 - **App lifecycle — foregrounding with keyboard was open.** The keyboard-hide detection runs off `MediaQuery.viewInsets.bottom`; when the app foregrounds with no keyboard, the nav re-renders at full opacity.
 - **Accessibility-font-scale 200 %.** Segment widths reflow; if the active segment no longer fits, labels truncate with ellipsis and the full label is exposed via `Semantics`. The idle segment's label-only render truncates with ellipsis too; tooltip shows on long-press.
+- **User taps Search blob, then rapidly taps a tab before the 620 ms delay completes.** `openGallerySearch` returns a `Future` but the tab-tap handler doesn't await it. The in-flight delay still resolves and writes the sheet state to `browse` + increments the focus counter — even though the user is now on Albums/Library. Result: on return to Photos (later), sheet is at Browse. Acceptable; the mockup doesn't promise otherwise. A future refinement could cancel the pending write via a `Completer` and a "latest-cancel" flag, but YAGNI until a QA signal demands it.
+- **Multi-select toggled on while the FilterSheet text input is focused.** `MultiSelectToggleEvent` hides the nav; the sheet stays up (independent of the nav). The keyboard stays up as long as the text input retains focus. When multi-select concludes, the nav returns — no additional state to reconcile.
 
 ## 8. Testing
 
@@ -238,13 +291,33 @@ Patrol-based e2e is out-of-scope (memory `project_play_store_publishing.md`). Co
 
 ### 8.1 Unit tests
 
-- `GalleryNavDestination` — exhaustive mapping test: each enum value returns the expected label / icon / selectedIcon / route.
-- `openGallerySearch` — behaviour matrix:
-  - Already on Photos → no tab switch, sheet → browse, focus requested.
-  - On Albums → tab switch to Photos, sheet → browse, focus requested (order checked via fake clock / mockito).
-  - Sheet already at browse → no redundant state write; focus requested.
-  - Sheet at deep → state write to browse; focus requested.
-  - Readonly mode → action is a no-op (covered by widget test).
+**`GalleryTabEnum` / `galleryTabProvider`**
+
+- Default value is `GalleryTabEnum.photos`.
+- Setter persists across reads.
+- `.index` matches the fork-only `kGalleryPhotosIndex` / `kGalleryAlbumsIndex` / `kGalleryLibraryIndex` constants.
+
+**`GalleryNavDestination` mapping helpers**
+
+- Exhaustive: each `GalleryTabEnum` value returns the expected label i18n key / idle icon / active icon / target route.
+
+**`openGallerySearch` — behaviour matrix**
+
+All tests use a fake `TabsRouter` (records `setActiveIndex` calls and driven-by-test `activeIndex`) and a `ProviderContainer` with overrides for `hapticFeedbackProvider`, `photosFilterSheetProvider`, `photosFilterSearchFocusRequestProvider`.
+
+- Already on Photos → no `setActiveIndex` call; no delay awaited; sheet → `browse`; focus counter += 1.
+- From Albums → `setActiveIndex(0)` called; 620 ms delay elapses (use `fakeAsync`); sheet → `browse`; focus counter += 1 in that order.
+- From Library → same as Albums.
+- Sheet already at `browse` → state write is idempotent (provider unchanged); focus counter still += 1.
+- Sheet at `deep` → state write to `browse`; focus counter += 1.
+- Rapid second call mid-delay → both increments of the focus counter land (+2 total); last tab target wins (second call's tab switch supersedes).
+- Haptic fires once per call regardless of the sheet's prior state.
+
+**`photosFilterSearchFocusRequestProvider` plumbing**
+
+- A widget wrapping `FilterSheetSearchBar` under `ProviderScope`: incrementing the counter triggers `FocusNode.hasFocus == true` on the text field after one frame.
+- Disposing the widget then incrementing the counter does NOT crash (the provider's listener is gone with the widget).
+- Two consecutive increments within one frame collapse into a single focus request (no double-request; Flutter focus system handles this, but we assert no exceptions).
 
 ### 8.2 Widget tests
 
@@ -256,68 +329,98 @@ Patrol-based e2e is out-of-scope (memory `project_play_store_publishing.md`). Co
 - Respects `MediaQuery.disableAnimations` (animation skipped in one frame).
 - Dark-theme variant test: active fill color = `primary @ 0.16`.
 - Light-theme variant test: active fill color = `primary @ 0.22`.
+- **First-paint correctness (M1):** after first `pump()`, the `AnimatedPositioned` underlay's rect is within 0.5 pt of the Photos segment's rect (no off-by-measurement flicker). Same test at font-scale 1.5 and 2.0.
+- Semantics: active segment has `liveRegion: true`; switching active announces the new tab's label (via `semanticsOwner.performAction` or equivalent tester harness).
 
 **`GallerySearchBlob`**
 
 - Renders the search icon at 24 pt.
-- Tapping calls `openGallerySearch`.
-- Disabled state (readonly) dims to 30 % opacity and is non-tappable.
-- Semantics label is "Search photos" (i18n key `nav.search_photos_hint`).
+- Tapping calls `openGallerySearch` with the injected `TabsRouter` (constructor arg, not `AutoTabsRouter.of`).
+- Disabled state (readonly) dims to 30 % opacity and is non-tappable (`ignorePointer: true` + reduced opacity).
+- Semantics label resolves from `nav.search_photos_hint` ("Search photos").
 
 **`GalleryBottomNav` composite**
 
-- Hides entirely on `MultiSelectToggleEvent(enabled: true)`.
-- Hides on keyboard-up (simulated via `MediaQuery(viewInsets: EdgeInsets.only(bottom: 400))`).
+- Hides entirely on `MultiSelectToggleEvent(enabled: true)` — three variants, one per originating tab (Photos, Albums, Library) to confirm global broadcast.
+- Hides on keyboard-up: `MediaQuery(viewInsets: EdgeInsets.only(bottom: 81))` → hidden; `= 79` → visible (boundary test for the 80 pt threshold).
+- Publishes height to `bottomNavHeightProvider` when shown; resets to 0 when hidden (pair of asserts per state transition).
 - Falls back to `NavigationRail` in landscape with the four entries (Photos · Albums · Library · Search).
 - Readonly: only Photos is enabled (tap-target blocked on others).
 
-**`GalleryTabShellPage`**
+**`GalleryTabShellPage`** — side-effect matrix (§6.5 per row + negatives)
 
-- Three routes mounted under `AutoTabsRouter`; default active = Photos.
-- Tap on Albums switches `tabsRouter.activeIndex` to 1.
-- `hapticFeedbackProvider.selectionClick` fires on every tap.
-- `tabProvider` written on every tap.
-- Tap on Photos twice invokes `ScrollToTopEvent`.
+Each tap is driven by `tester.tap(find.byKey(...))`; assertions use `ProviderContainer.read` + `Listener` spy providers where necessary.
+
+- Tap on Photos (from a non-Photos tab) → invalidates `driftMemoryFutureProvider`; writes `galleryTabProvider = photos`; fires `hapticFeedbackProvider.selectionClick()`.
+- Re-tap on Photos (already active) → emits `ScrollToTopEvent` on `EventStream.shared`; invalidates `driftMemoryFutureProvider`.
+- Tap on Albums → switches `tabsRouter.activeIndex` to 1; invalidates `albumProvider`; writes `galleryTabProvider = albums`; fires haptic.
+- Tap on Library → invalidates `localAlbumProvider` AND `driftGetAllPeopleProvider`; writes `galleryTabProvider = library`; fires haptic.
+- **Negative assertions (H1 coverage):** across all three tab taps, none of `sharedSpacesProvider`, `searchPreFilterProvider`, `searchInputFocusProvider`, or upstream `tabProvider` are touched. (Spy providers record invocations; assertion checks the invocation list is empty for these.)
+
+**`FilterSheetSearchBar` focus plumbing (touched file)**
+
+- Mount the widget; increment `photosFilterSearchFocusRequestProvider`; pump one frame; `FocusNode.hasFocus` is `true`.
+- Re-increment → focus re-requested (asserted via a second blur/focus cycle).
+- Unmount then increment — no exception.
+
+**`PeekContent` layering**
+
+- With `bottomNavHeightProvider` set to 64, the peek rail's bottom padding is 64 + 8 = 72.
+- With the provider at 0 (nav hidden), the peek rail's bottom padding is 0.
 
 ### 8.3 Integration / golden
 
-Portrait + landscape goldens of the nav at each active state (dark + light) — 6 goldens total. Opt-in per project convention (`project_flaky_e2e_fix_pr152.md` documents flake policy).
+Goldens of the nav at each active state (dark + light):
+
+- Portrait, Photos active, no filters (2 goldens — dark + light).
+- Portrait, Albums active (2).
+- Portrait, Library active (2).
+- Portrait, Photos active, filters applied, peek rail visible, nav stacked above (2) — the M6 coverage for §5.6 layering.
+- Landscape rail with all three destinations + Search entry (2).
+
+Total: 10 goldens. Opt-in per project convention (`project_flaky_e2e_fix_pr152.md` documents flake policy).
 
 ### 8.4 Manual QA
 
 - Gesture smoothness on older (iOS 15 / Android 11) and newer devices.
 - Font-scale 120–200 % renders nav without clipping.
 - Contrast AA in both themes on active + idle labels.
-- Keyboard hide smoothness (no jump when keyboard opens during FilterSheet focus).
+- Keyboard-hide smoothness (no jump when keyboard opens during FilterSheet focus).
 - Tap targets ≥ 44 × 44 pt verified on smallest supported phone (~360 pt viewport).
 - Reduced-motion setting respected.
 - RTL: pill segment order flips; search blob stays on the trailing edge per platform norm.
+- **Search blob from Albums/Library** — confirm no visible stutter; sheet opens cleanly after the transition; keyboard rises reliably.
+- **Peek rail + pill** — with filters applied, peek rail and pill stack without overlap at multiple viewport sizes.
 
 ## 9. Migration
 
 ### 9.1 Release sequencing
 
-Single PR. The bottom-nav change is small and reviewable as one unit: ~7 new files, 1 upstream-aligned file touched (router), i18n keys added. Widget tests cover the new surfaces; the existing `TabShellPage` stays compilable in case of rollback.
+Single PR. The bottom-nav change is reviewable as one unit: ~9 new fork-only files, ~3 upstream-aligned files touched with fork-only comment fences (router, FilterSheetSearchBar, PeekContent), i18n keys added. Widget tests cover the new surfaces; the existing `TabShellPage` stays compilable in case of rollback.
 
 ### 9.2 Rollback
 
-If the new shell misbehaves in production, flip the router root back to `TabShellRoute` — one-line revert. The upstream `TabShellPage` remains fully functional (it's untouched).
+If the new shell misbehaves in production, flip the router root back to `TabShellRoute` — one-line revert (the comment-fenced router addition keeps the old entry alive). The upstream `TabShellPage` and `tab.provider.dart` remain fully functional (they're untouched).
 
 ### 9.3 Upstream rebase exposure
 
-- `tab_shell.page.dart` is bit-identical to upstream — zero rebase friction.
-- `router.dart` has a 2-line fork-only edit enclosed in a fork-only comment; conflicts here are mechanical (one-liner re-add if upstream reshapes the root).
-- `tab.provider.dart` — if upstream evolves `TabEnum`, resolve by picking upstream's shape and mapping the fork's 3-tab layout onto it.
+- `tab_shell.page.dart` — bit-identical to upstream, zero rebase friction.
+- `tab.provider.dart` — bit-identical to upstream, zero rebase friction (the fork uses `galleryTabProvider`, not `tabProvider`).
+- `router.dart` — ~8 lines of fork-only addition inside a comment fence. Mechanical re-add if upstream reshapes the root.
+- `search_bar.widget.dart` — ~10 lines of fork-only FocusNode + listener. Mechanical re-apply if upstream rewrites the search bar.
+- `peek_content.widget.dart` — ~5 lines of fork-only `bottomNavHeightProvider` padding. Mechanical re-apply.
 
-The new fork-only files have zero upstream exposure.
+All other fork files have zero upstream exposure.
 
 ## 10. Risks & open questions
 
 ### 10.1 Risks
 
 - **Keyboard-hide detection UX.** Fading the nav on keyboard-up is new behaviour (upstream lets the nav be covered). If QA finds users scrolling past the nav when typing in the FilterSheet, we simplify to "no hide; rely on `resizeToAvoidBottomInset: false` + visual overlap" — same as upstream.
-- **Active-pill animation layout measurement.** `AnimatedPositioned` needs accurate segment widths before first paint. If the first paint misplaces the underlay, add a one-frame post-frame re-measure. The mockup demonstrates the intent; the real Flutter implementation is where layout reality bites.
+- **Active-pill animation layout measurement.** `AnimatedPositioned` needs accurate segment widths before first paint. Seeding the measurement map with Photos geometry pre-first-frame (§6.3) plus the §8.2 M1 test should catch flicker in CI. Font-scale changes trigger a re-measure; the test covers 1.5× and 2.0×.
 - **Landscape rail parity.** The new shell uses the upstream `NavigationRail` visuals in landscape; ensure the rail's destination list is updated to the new 3 + search shape. Regression test: rail destinations match the pill destinations.
+- **620 ms delay coupling.** `openGallerySearch` hardcodes a 620 ms delay tied to upstream's 600 ms `FadeTransition`. A single-line constant, documented with a coupling comment; rebase cost is checking that `tab_shell.page.dart:83` still reads 600 ms.
+- **auto_route guard inheritance.** `DriftAlbumsRoute` declares `[_authGuard, _duplicateGuard]` at the top-level route. When used as a child of `GalleryTabShellRoute`, auto_route's guard inheritance must preserve this. Verify during implementation; if not propagated, redeclare on the child inside the fork-only router edit.
 
 ### 10.2 Open questions
 
@@ -340,5 +443,10 @@ See [`docs/plans/mockups/2026-04-18-mobile-bottom-nav.html`](./mockups/2026-04-1
 ### 11.3 Follow-ups (not in scope)
 
 - **Spaces-inside-Library** design — separate topic, separate PR. Expected shape: add a Spaces action button + quick-access list item to `DriftLibraryPage`, matching the pre-PR-#116 surface.
-- **FilterSheet text-search-pill focus plumbing** — exposing the text pill's focus node via a provider is a small enabler; may ship in the same PR or as a prerequisite.
-- **Photos-tab peek rail + new nav coexistence** — FilterSheet peek rail renders above the nav when filters are active (PR 1.2 design §5.1). Sanity-check its visual layering with the new floating pill (they should stack cleanly; peek rail uses the same safe-area-aware offset).
+- **Focus plumbing reuse.** The `photosFilterSearchFocusRequestProvider` counter pattern is a template for any future "request focus on a specific input from elsewhere" plumbing — e.g., tag-picker search, person-picker search — without leaking `FocusNode` references into providers.
+- **Peek-rail → pill merge** (further-out). A more elegant endgame is moving the peek rail's active-filter chips INTO the pill (a fourth visual state of the nav), eliminating the stack entirely. Significant scope; parked until Phase 2.
+
+### 11.4 Review log
+
+- **rev 1 (2026-04-18 initial):** first pass, two open questions resolved during brainstorm.
+- **rev 2 (2026-04-18 after `/review`):** folded in 3 blockers, 4 high, 6 medium, 3 low from review. Substantive changes: fork-only `galleryTabProvider` (was conflating with upstream `TabEnum`); new counter-based focus plumbing (was vaporware); 620 ms delay tied to upstream transition (was one-frame wait); peek-rail coexistence pulled into scope (was follow-up); side-effect matrix now exhaustively tested including negative assertions; keyboard threshold unified to 80 pt absolute; live-region a11y covered; auto_route guard inheritance flagged.
