@@ -46,6 +46,7 @@ beforeEach(() => {
   vi.mocked(toastManager.warning).mockClear();
   vi.mocked(toastManager.info).mockClear();
   vi.mocked(toastManager.danger).mockClear();
+  vi.mocked(sdk.runQueueCommandLegacy).mockClear();
   vi.restoreAllMocks();
 });
 
@@ -215,11 +216,13 @@ describe.each([
   });
 
   it('partial failure: some reject → warning toast fires, no success toast', async () => {
-    const spy = vi.spyOn(sdk, 'runQueueCommandLegacy').mockImplementation(({ name }) =>
-      name === QueueName.ThumbnailGeneration
-        ? (Promise.reject(new Error('boom')) as never)
-        : (Promise.resolve({}) as never),
-    );
+    const spy = vi
+      .spyOn(sdk, 'runQueueCommandLegacy')
+      .mockImplementation(({ name }) =>
+        name === QueueName.ThumbnailGeneration
+          ? (Promise.reject(new Error('boom')) as never)
+          : (Promise.resolve({}) as never),
+      );
     const cmd = COMMAND_ITEMS.find((c) => c.id === id)!;
     await cmd.handler();
     expect(spy).toHaveBeenCalledTimes(ADMIN_VISIBLE_QUEUES.length);

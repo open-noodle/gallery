@@ -59,6 +59,21 @@ async function runQueue(name: QueueName) {
   }
 }
 
+async function bulkQueueCommand(command: QueueCommand.Pause | QueueCommand.Resume) {
+  const results = await Promise.allSettled(
+    ADMIN_VISIBLE_QUEUES.map((name) => runQueueCommandLegacy({ name, queueCommandDto: { command } })),
+  );
+  const failed = results.filter((r) => r.status === 'rejected').length;
+  const $t = get(t);
+  if (failed > 0) {
+    toastManager.warning($t('cmdk_cmd_bulk_partial' as Translations, { values: { failed, total: results.length } }));
+    return;
+  }
+  toastManager.primary(
+    $t((command === QueueCommand.Pause ? 'cmdk_cmd_all_paused' : 'cmdk_cmd_all_resumed') as Translations),
+  );
+}
+
 export const COMMAND_ITEMS: readonly CommandItem[] = [
   {
     id: 'cmd:theme',
@@ -151,6 +166,22 @@ export const COMMAND_ITEMS: readonly CommandItem[] = [
     icon: mdiAccountSearchOutline,
     adminOnly: true,
     handler: () => runQueue(QueueName.FacialRecognition),
+  },
+  {
+    id: 'cmd:pause_all_queues',
+    labelKey: 'cmdk_cmd_pause_all_queues_label',
+    descriptionKey: 'cmdk_cmd_pause_all_queues_description',
+    icon: mdiPauseCircleOutline,
+    adminOnly: true,
+    handler: () => bulkQueueCommand(QueueCommand.Pause),
+  },
+  {
+    id: 'cmd:resume_all_queues',
+    labelKey: 'cmdk_cmd_resume_all_queues_label',
+    descriptionKey: 'cmdk_cmd_resume_all_queues_description',
+    icon: mdiPlayCircleOutline,
+    adminOnly: true,
+    handler: () => bulkQueueCommand(QueueCommand.Resume),
   },
 ];
 
