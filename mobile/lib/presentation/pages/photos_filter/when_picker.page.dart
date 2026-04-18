@@ -2,6 +2,7 @@ import 'package:auto_route/auto_route.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/presentation/pages/photos_filter/widgets/decade_anchor_strip.widget.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/widgets/quick_ranges_row.widget.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/widgets/when_picker_search_header.widget.dart';
 import 'package:immich_mobile/providers/photos_filter/temporal_utils.dart';
@@ -69,6 +70,10 @@ class _WhenPickerPageState extends ConsumerState<WhenPickerPage> {
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 8)),
           const SliverToBoxAdapter(child: QuickRangesRow()),
+          const SliverToBoxAdapter(child: SizedBox(height: 8)),
+          SliverToBoxAdapter(
+            child: DecadeAnchorStrip(onDecade: (_) {}), // wired to year accordion in C5
+          ),
           ..._bodySlivers(filteredAsync, query),
         ],
       ),
