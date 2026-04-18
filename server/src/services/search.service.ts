@@ -28,6 +28,13 @@ import { requireElevatedPermission } from 'src/utils/access';
 import { getMyPartnerIds } from 'src/utils/asset.util';
 import { isSmartSearchEnabled } from 'src/utils/misc';
 
+// Opt-in env flag for per-phase smart-search timing logs. Set
+// GALLERY_SEARCH_TIMING=true to emit one `log`-level line per smart search
+// breaking down setup / embedding / spaces / db duration. Captured once at
+// module load so toggling requires a server restart (keeps the hot path free
+// of env reads).
+const searchTimingEnabled = process.env.GALLERY_SEARCH_TIMING === 'true';
+
 @Injectable()
 export class SearchService extends BaseService {
   private embeddingCache = new LRUMap<string, string>(100);
@@ -135,6 +142,7 @@ export class SearchService extends BaseService {
   }
 
   async searchSmart(auth: AuthDto, dto: SmartSearchDto): Promise<SearchResponseDto> {
+    const t0 = performance.now();
     if (dto.visibility === AssetVisibility.Locked) {
       requireElevatedPermission(auth);
     }
@@ -157,18 +165,26 @@ export class SearchService extends BaseService {
     }
 
     const userIds = this.getUserIdsToSearch(auth);
+    const tSetup = performance.now();
+
     let embedding;
+    let encodeMs = 0;
+    let embeddingSource: 'cache' | 'ml' | 'asset' = 'cache';
     if (dto.query) {
       const key = machineLearning.clip.modelName + dto.query + dto.language;
       embedding = this.embeddingCache.get(key);
       if (!embedding) {
+        embeddingSource = 'ml';
+        const tEncodeStart = performance.now();
         embedding = await this.machineLearningRepository.encodeText(dto.query, {
           modelName: machineLearning.clip.modelName,
           language: dto.language,
         });
+        encodeMs = performance.now() - tEncodeStart;
         this.embeddingCache.set(key, embedding);
       }
     } else if (dto.queryAssetId) {
+      embeddingSource = 'asset';
       await this.requireAccess({ auth, permission: Permission.AssetRead, ids: [dto.queryAssetId] });
       const assetEmbedding = await this.searchRepository.getEmbedding(dto.queryAssetId);
       if (!assetEmbedding) {
@@ -178,6 +194,7 @@ export class SearchService extends BaseService {
     } else {
       throw new BadRequestException('Either `query` or `queryAssetId` must be set');
     }
+    const tEmbedding = performance.now();
     const page = dto.page ?? 1;
     const size = dto.size || 100;
 
@@ -188,6 +205,7 @@ export class SearchService extends BaseService {
         timelineSpaceIds = spaceRows.map((row) => row.spaceId);
       }
     }
+    const tSpaces = performance.now();
 
     const { hasNextPage, items } = await this.searchRepository.searchSmart(
       { page, size },
@@ -200,6 +218,18 @@ export class SearchService extends BaseService {
         maxDistance: machineLearning.clip.maxDistance,
       },
     );
+    const tDb = performance.now();
+
+    if (searchTimingEnabled) {
+      this.logger.log(
+        `searchSmart total=${(tDb - t0).toFixed(0)}ms ` +
+          `setup=${(tSetup - t0).toFixed(0)}ms ` +
+          `embedding=${(tEmbedding - tSetup).toFixed(0)}ms(src=${embeddingSource}${embeddingSource === 'ml' ? `,encode=${encodeMs.toFixed(0)}ms` : ''}) ` +
+          `spaces=${(tSpaces - tEmbedding).toFixed(0)}ms(count=${timelineSpaceIds?.length ?? 0}) ` +
+          `db=${(tDb - tSpaces).toFixed(0)}ms(rows=${items.length}) ` +
+          `query="${dto.query?.slice(0, 60) ?? ''}" size=${size}`,
+      );
+    }
 
     return this.mapResponse(items, hasNextPage ? (page + 1).toString() : null, { auth });
   }
