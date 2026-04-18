@@ -1,6 +1,9 @@
+import { ADMIN_VISIBLE_QUEUES } from '$lib/constants';
 import { authManager } from '$lib/managers/auth-manager.svelte';
 import * as albumUtils from '$lib/utils/album-utils';
 import * as fileUploader from '$lib/utils/file-uploader';
+import * as sdk from '@immich/sdk';
+import { QueueCommand, QueueName } from '@immich/sdk';
 import { modalManager, toastManager } from '@immich/ui';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ShortcutsModal from '../modals/ShortcutsModal.svelte';
@@ -28,9 +31,23 @@ vi.mock('@immich/ui', async (orig) => {
   };
 });
 
+vi.mock('@immich/sdk', async (orig) => ({
+  ...(await orig<typeof import('@immich/sdk')>()),
+  runQueueCommandLegacy: vi.fn(),
+  emptyQueue: vi.fn(),
+}));
+
 vi.mock('$lib/managers/auth-manager.svelte', () => ({
   authManager: { logout: vi.fn().mockResolvedValue(undefined) },
 }));
+
+beforeEach(() => {
+  vi.mocked(toastManager.primary).mockClear();
+  vi.mocked(toastManager.warning).mockClear();
+  vi.mocked(toastManager.info).mockClear();
+  vi.mocked(toastManager.danger).mockClear();
+  vi.restoreAllMocks();
+});
 
 describe('COMMAND_ITEMS', () => {
   it('has no duplicate ids', () => {
@@ -145,4 +162,37 @@ describe('isAlmostExactCommandMatch', () => {
   it('splits on non-alphanumerics', () => {
     expect(isAlmostExactCommandMatch('create-album', 'Create album')).toBe(true);
   });
+});
+
+describe.each([
+  ['cmd:run_thumbnail_gen', QueueName.ThumbnailGeneration],
+  ['cmd:run_metadata_extraction', QueueName.MetadataExtraction],
+  ['cmd:run_smart_search', QueueName.SmartSearch],
+  ['cmd:run_face_detection', QueueName.FaceDetection],
+  ['cmd:run_face_recognition', QueueName.FacialRecognition],
+])('%s', (id, expectedQueue) => {
+  it('dispatches Start + force:false against the expected queue, shows success toast', async () => {
+    const spy = vi.spyOn(sdk, 'runQueueCommandLegacy').mockResolvedValue({} as never);
+    const cmd = COMMAND_ITEMS.find((c) => c.id === id)!;
+    await cmd.handler();
+    expect(spy).toHaveBeenCalledWith({
+      name: expectedQueue,
+      queueCommandDto: { command: QueueCommand.Start, force: false },
+    });
+    // Toast content assertion: svelte-i18n returns the raw key when no catalog
+    // is loaded (setup uses fallbackLocale 'dev'), so the key IS the rendered
+    // string. Catches a copy-paste firing the wrong i18n key.
+    expect(toastManager.primary).toHaveBeenCalledWith(expect.stringContaining('cmdk_cmd_job_started'));
+  });
+});
+
+// Shared helper — one rejection test covers the error branch for all 5 Run-X
+// commands since they dispatch through `runQueue`.
+it('cmd:run_thumbnail_gen: SDK rejection fires handleError (danger toast), no success toast', async () => {
+  vi.spyOn(sdk, 'runQueueCommandLegacy').mockRejectedValue(new Error('boom') as never);
+  const cmd = COMMAND_ITEMS.find((c) => c.id === 'cmd:run_thumbnail_gen')!;
+  await cmd.handler();
+  expect(toastManager.primary).not.toHaveBeenCalled();
+  // handleError calls toastManager.danger — see web/src/lib/utils/handle-error.ts:44.
+  expect(toastManager.danger).toHaveBeenCalled();
 });
