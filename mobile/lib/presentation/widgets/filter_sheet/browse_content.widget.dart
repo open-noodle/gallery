@@ -9,6 +9,7 @@ import 'package:immich_mobile/presentation/widgets/filter_sheet/strips/people_st
 import 'package:immich_mobile/presentation/widgets/filter_sheet/strips/places_strip.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/strips/tags_strip.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/strips/when_strip.widget.dart';
+import 'package:immich_mobile/providers/photos_filter/filter_sheet.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
 
 class BrowseContent extends ConsumerWidget {
@@ -53,6 +54,18 @@ class BrowseContent extends ConsumerWidget {
               const PlacesStrip(),
               const TagsStrip(),
               const WhenStrip(),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    key: const Key('browse-see-all'),
+                    onPressed: () => ref.read(photosFilterSheetProvider.notifier).state = FilterSheetSnap.deep,
+                    icon: const Icon(Icons.expand_less_rounded),
+                    label: Text('filter_sheet_browse_see_all'.tr()),
+                  ),
+                ),
+              ),
               const SizedBox(height: 88),
             ],
           ),
