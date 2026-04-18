@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/presentation/widgets/filter_sheet/deep_content.widget.dart';
+import 'package:immich_mobile/presentation/widgets/filter_sheet/deep_stub_content.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/filter_sheet.widget.dart';
 import 'package:immich_mobile/providers/photos_filter/filter_sheet.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
@@ -77,6 +79,12 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(container.read(photosFilterSheetProvider), FilterSheetSnap.browse);
+    });
+
+    testWidgets('deep → DeepContent mounted (replaces stub)', (tester) async {
+      await _pump(tester, snap: FilterSheetSnap.deep);
+      expect(find.byType(DeepContent), findsOneWidget);
+      expect(find.byType(DeepStubContent), findsNothing);
     });
   });
 }
