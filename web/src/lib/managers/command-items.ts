@@ -1,23 +1,34 @@
+import { ADMIN_VISIBLE_QUEUES } from '$lib/constants';
 import { authManager } from '$lib/managers/auth-manager.svelte';
 import { isAlmostExactWordMatch } from '$lib/managers/cmdk-match';
 import { themeManager } from '$lib/managers/theme-manager.svelte';
 import ShortcutsModal from '$lib/modals/ShortcutsModal.svelte';
 import SpaceCreateModal from '$lib/modals/SpaceCreateModal.svelte';
+import { asQueueItem } from '$lib/services/queue.service';
 import { clearEntries } from '$lib/stores/cmdk-recent';
 import { createAlbumAndRedirect } from '$lib/utils/album-utils';
 import { openFileUploadDialog } from '$lib/utils/file-uploader';
-import type { ServerFeaturesDto } from '@immich/sdk';
+import { handleError } from '$lib/utils/handle-error';
+import { emptyQueue, QueueCommand, QueueName, runQueueCommandLegacy, type ServerFeaturesDto } from '@immich/sdk';
 import { modalManager, toastManager } from '@immich/ui';
 import {
   mdiAccountMultiplePlus,
+  mdiAccountSearchOutline,
+  mdiBrain,
+  mdiBroom,
   mdiCloudUploadOutline,
+  mdiFaceRecognition,
+  mdiImageOutline,
+  mdiInformationOutline,
   mdiKeyboardOutline,
   mdiLogoutVariant,
+  mdiPauseCircleOutline,
+  mdiPlayCircleOutline,
   mdiPlaylistPlus,
   mdiRestore,
   mdiThemeLightDark,
 } from '@mdi/js';
-import { t } from 'svelte-i18n';
+import { t, type Translations } from 'svelte-i18n';
 import { get } from 'svelte/store';
 
 const MIN_MATCH_LENGTH = 3;
@@ -32,6 +43,20 @@ export interface CommandItem {
   adminOnly?: boolean;
   /** Reserved for future feature-flag gating. Not used in v1.3.0. */
   featureFlag?: keyof ServerFeaturesDto;
+}
+
+async function runQueue(name: QueueName) {
+  const $t = get(t);
+  const item = asQueueItem($t, { name });
+  try {
+    await runQueueCommandLegacy({
+      name,
+      queueCommandDto: { command: QueueCommand.Start, force: false },
+    });
+    toastManager.primary($t('cmdk_cmd_job_started' as Translations, { values: { job: item.title } }));
+  } catch (error) {
+    handleError(error, $t('errors.something_went_wrong'));
+  }
 }
 
 export const COMMAND_ITEMS: readonly CommandItem[] = [
@@ -86,6 +111,46 @@ export const COMMAND_ITEMS: readonly CommandItem[] = [
     descriptionKey: 'cmdk_cmd_clear_recents_description',
     icon: mdiRestore,
     handler: () => clearEntries(),
+  },
+  {
+    id: 'cmd:run_thumbnail_gen',
+    labelKey: 'cmdk_cmd_run_thumbnail_gen_label',
+    descriptionKey: 'cmdk_cmd_run_thumbnail_gen_description',
+    icon: mdiImageOutline,
+    adminOnly: true,
+    handler: () => runQueue(QueueName.ThumbnailGeneration),
+  },
+  {
+    id: 'cmd:run_metadata_extraction',
+    labelKey: 'cmdk_cmd_run_metadata_extraction_label',
+    descriptionKey: 'cmdk_cmd_run_metadata_extraction_description',
+    icon: mdiInformationOutline,
+    adminOnly: true,
+    handler: () => runQueue(QueueName.MetadataExtraction),
+  },
+  {
+    id: 'cmd:run_smart_search',
+    labelKey: 'cmdk_cmd_run_smart_search_label',
+    descriptionKey: 'cmdk_cmd_run_smart_search_description',
+    icon: mdiBrain,
+    adminOnly: true,
+    handler: () => runQueue(QueueName.SmartSearch),
+  },
+  {
+    id: 'cmd:run_face_detection',
+    labelKey: 'cmdk_cmd_run_face_detection_label',
+    descriptionKey: 'cmdk_cmd_run_face_detection_description',
+    icon: mdiFaceRecognition,
+    adminOnly: true,
+    handler: () => runQueue(QueueName.FaceDetection),
+  },
+  {
+    id: 'cmd:run_face_recognition',
+    labelKey: 'cmdk_cmd_run_face_recognition_label',
+    descriptionKey: 'cmdk_cmd_run_face_recognition_description',
+    icon: mdiAccountSearchOutline,
+    adminOnly: true,
+    handler: () => runQueue(QueueName.FacialRecognition),
   },
 ];
 
