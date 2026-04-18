@@ -1,3 +1,4 @@
+import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/deep_header.widget.dart';
@@ -10,6 +11,7 @@ import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/toggles_sec
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/when_accordion_section.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/match_count_footer.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/search_bar.widget.dart';
+import 'package:immich_mobile/routing/router.dart';
 
 /// The Deep snap body. Owns the scroll view, the sticky Done bar, and the
 /// PageStorageKey that retains scroll offset across picker pushes (design §6.5).
@@ -30,19 +32,25 @@ class DeepContent extends ConsumerWidget {
             key: const PageStorageKey('filter-sheet-deep-scroll'),
             controller: scrollController,
             padding: const EdgeInsets.only(bottom: 88),
-            children: const [
-              KeyedSubtree(key: Key('deep-header'), child: DeepHeader()),
-              Padding(
+            children: [
+              const KeyedSubtree(key: Key('deep-header'), child: DeepHeader()),
+              const Padding(
                 padding: EdgeInsets.fromLTRB(20, 4, 20, 4),
                 child: KeyedSubtree(key: Key('deep-search'), child: FilterSheetSearchBar()),
               ),
-              PeopleSectionDeep(key: Key('deep-section-people')),
-              PlacesCascadeSection(key: Key('deep-section-places')),
-              TagsSectionDeep(key: Key('deep-section-tags')),
-              WhenAccordionSection(key: Key('deep-section-when')),
-              RatingStarsSection(key: Key('deep-section-rating')),
-              MediaTypeSection(key: Key('deep-section-media')),
-              TogglesSection(key: Key('deep-section-toggles')),
+              Builder(
+                key: const Key('deep-section-people-wrapper'),
+                builder: (context) => PeopleSectionDeep(
+                  key: const Key('deep-section-people'),
+                  onOpenPicker: () => context.pushRoute(const PersonPickerRoute()),
+                ),
+              ),
+              const PlacesCascadeSection(key: Key('deep-section-places')),
+              const TagsSectionDeep(key: Key('deep-section-tags')),
+              const WhenAccordionSection(key: Key('deep-section-when')),
+              const RatingStarsSection(key: Key('deep-section-rating')),
+              const MediaTypeSection(key: Key('deep-section-media')),
+              const TogglesSection(key: Key('deep-section-toggles')),
             ],
           ),
           const Positioned(

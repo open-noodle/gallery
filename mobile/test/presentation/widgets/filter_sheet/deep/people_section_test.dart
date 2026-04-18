@@ -113,6 +113,26 @@ void main() {
       expect(opened, isTrue);
     });
 
+    testWidgets('null onOpenPicker does NOT show a SnackBar when "Search N →" tapped', (tester) async {
+      await tester.pumpConsumerWidget(
+        const Material(child: PeopleSectionDeep(onOpenPicker: null)),
+        overrides: [
+          photosFilterSuggestionsProvider.overrideWith(
+            (ref, filter) => Future.value(
+              _sugg(
+                people: [FilterSuggestionsPersonDto(id: 'p1', name: 'Emma')],
+              ),
+            ),
+          ),
+        ],
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('people-section-search-more')));
+      await tester.pumpAndSettle();
+      expect(find.byType(SnackBar), findsNothing);
+    });
+
     testWidgets('selected avatar renders primary-colored ring in dark theme', (tester) async {
       await tester.pumpConsumerWidgetDark(
         const Material(child: PeopleSectionDeep(onOpenPicker: null)),

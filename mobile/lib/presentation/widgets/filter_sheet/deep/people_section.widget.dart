@@ -39,13 +39,7 @@ class PeopleSectionDeep extends ConsumerWidget {
               key: const Key('people-section-search-more'),
               onPressed: () {
                 HapticFeedback.selectionClick();
-                if (onOpenPicker != null) {
-                  onOpenPicker!();
-                } else {
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(const SnackBar(content: Text('Full people picker coming soon')));
-                }
+                onOpenPicker?.call();
               },
               child: Text(_searchMoreLabel(count)),
             )
