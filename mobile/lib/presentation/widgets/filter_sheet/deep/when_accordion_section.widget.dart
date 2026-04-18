@@ -26,7 +26,25 @@ class WhenAccordionSection extends ConsumerStatefulWidget {
 }
 
 class _WhenAccordionSectionState extends ConsumerState<WhenAccordionSection> {
+  static const _storageId = 'when-accordion-expanded-year';
   int? _expandedYear;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final stored = PageStorage.of(context).readState(context, identifier: _storageId);
+      if (stored is int && stored != _expandedYear) {
+        setState(() => _expandedYear = stored);
+      }
+    });
+  }
+
+  void _setExpandedYear(int? year) {
+    setState(() => _expandedYear = year);
+    PageStorage.of(context).writeState(context, year, identifier: _storageId);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -65,9 +83,7 @@ class _WhenAccordionSectionState extends ConsumerState<WhenAccordionSection> {
               year: year,
               buckets: bucketsAsync.valueOrNull ?? const [],
               expanded: _expandedYear == year.year,
-              onToggle: () => setState(() {
-                _expandedYear = _expandedYear == year.year ? null : year.year;
-              }),
+              onToggle: () => _setExpandedYear(_expandedYear == year.year ? null : year.year),
             ),
         ],
       ),
