@@ -364,7 +364,11 @@ test.describe('global search palette', () => {
       // `theme` is promoted to the Top Result slot (data-cmdk-top-result-commands).
       // Scope the click to that group to avoid colliding with other "Theme" text
       // that may appear elsewhere in the dialog (e.g. nav descriptions).
-      await dialog.locator('[data-cmdk-top-result-commands]').getByText(/^theme$/i).first().click();
+      await dialog
+        .locator('[data-cmdk-top-result-commands]')
+        .getByText(/^theme$/i)
+        .first()
+        .click();
       await expect
         .poll(async () => page.evaluate(() => document.documentElement.classList.contains('dark')))
         .toBe(!initialDark);
