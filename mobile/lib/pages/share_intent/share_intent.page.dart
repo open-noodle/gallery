@@ -66,7 +66,7 @@ class ShareIntentPage extends ConsumerWidget {
         ),
         leading: IconButton(
           onPressed: () {
-            context.navigateTo(Store.isBetaTimelineEnabled ? const TabShellRoute() : const TabControllerRoute());
+            context.navigateTo(Store.isBetaTimelineEnabled ? const GalleryTabShellRoute() : const TabControllerRoute());
           },
           icon: const Icon(Icons.arrow_back),
         ),

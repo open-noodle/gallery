@@ -195,6 +195,18 @@ class AppRouter extends RootStackRouter {
         AutoRoute(page: DriftLibraryRoute.page, guards: [_authGuard, _duplicateGuard]),
       ],
     ),
+    // >>> fork-only gallery-bottom-nav — rollback: remove this block and
+    // point the 5 callsites of GalleryTabShellRoute() back at TabShellRoute().
+    AutoRoute(
+      page: GalleryTabShellRoute.page,
+      guards: [_authGuard, _duplicateGuard],
+      children: [
+        AutoRoute(page: MainTimelineRoute.page, guards: [_authGuard, _duplicateGuard]),
+        AutoRoute(page: DriftAlbumsRoute.page, guards: [_authGuard, _duplicateGuard]),
+        AutoRoute(page: DriftLibraryRoute.page, guards: [_authGuard, _duplicateGuard]),
+      ],
+    ),
+    // <<< fork-only gallery-bottom-nav
     CustomRoute(
       page: GalleryViewerRoute.page,
       guards: [_authGuard, _galleryGuard],

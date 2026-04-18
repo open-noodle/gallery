@@ -409,7 +409,9 @@ class SplashScreenPageState extends ConsumerState<SplashScreenPage> {
         }
       }
 
-      unawaited(context.replaceRoute(Store.isBetaTimelineEnabled ? const TabShellRoute() : const TabControllerRoute()));
+      unawaited(
+        context.replaceRoute(Store.isBetaTimelineEnabled ? const GalleryTabShellRoute() : const TabControllerRoute()),
+      );
     }
 
     if (Store.isBetaTimelineEnabled) {
