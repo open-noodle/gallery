@@ -6,6 +6,7 @@ import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/media_type_
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/places_cascade_section.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/rating_stars_section.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/tags_section.widget.dart';
+import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/toggles_section.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/when_accordion_section.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/match_count_footer.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/search_bar.widget.dart';
@@ -41,7 +42,7 @@ class DeepContent extends ConsumerWidget {
               WhenAccordionSection(key: Key('deep-section-when')),
               RatingStarsSection(key: Key('deep-section-rating')),
               MediaTypeSection(key: Key('deep-section-media')),
-              SizedBox(height: 8, key: Key('deep-section-toggles')),
+              TogglesSection(key: Key('deep-section-toggles')),
             ],
           ),
           const Positioned(
