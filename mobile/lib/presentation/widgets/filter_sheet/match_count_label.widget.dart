@@ -23,6 +23,8 @@ class MatchCountLabel extends ConsumerWidget {
       label: label,
       child: Text(
         label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
         style:
             style ??
             Theme.of(context).textTheme.labelLarge?.copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
@@ -31,7 +33,11 @@ class MatchCountLabel extends ConsumerWidget {
   }
 
   String _formatPlural(int count) {
-    if (count == 0) return 'filter_sheet_match_count_photos'.tr(args: ['0']);
+    // Pick the zero variant directly for count == 0. `.tr()` on a plural root
+    // key returns the variant Map; `.plural()` hits Localization._locale which
+    // is a late field that isn't set without an EasyLocalization ancestor
+    // (e.g. in unit tests). Looking up the nested `.zero` leaf sidesteps both.
+    if (count == 0) return 'filter_sheet_match_count_photos.zero'.tr();
     final formatted = NumberFormat.decimalPattern(Intl.getCurrentLocale()).format(count);
     return 'filter_sheet_match_count_photos'.plural(count, args: [formatted]);
   }

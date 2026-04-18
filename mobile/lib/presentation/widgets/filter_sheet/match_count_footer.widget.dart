@@ -17,8 +17,7 @@ class MatchCountFooter extends ConsumerWidget {
         padding: const EdgeInsets.fromLTRB(20, 12, 12, 20),
         child: Row(
           children: [
-            const MatchCountLabel(),
-            const Spacer(),
+            const Expanded(child: MatchCountLabel()),
             FilledButton.tonal(
               onPressed: () => ref.read(photosFilterSheetProvider.notifier).state = FilterSheetSnap.hidden,
               child: Text('filter_sheet_done'.tr()),

@@ -3,7 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 /// Shared shell for Browse strips — title + loading skeleton + error + empty.
-class StripScaffold extends ConsumerWidget {
+///
+/// Caches the last-seen data list so that when the upstream family provider
+/// is swapped out (filter changed → new provider instance → fresh AsyncLoading),
+/// we keep rendering stale data instead of flashing a skeleton. Skeleton only
+/// shows on true first-load.
+class StripScaffold extends ConsumerStatefulWidget {
   final String titleKey;
   final AsyncValue<List<dynamic>> items;
   final double height;
@@ -20,10 +25,21 @@ class StripScaffold extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    // Empty-data → entire strip collapses.
+  ConsumerState<StripScaffold> createState() => _StripScaffoldState();
+}
+
+class _StripScaffoldState extends ConsumerState<StripScaffold> {
+  List<dynamic>? _lastData;
+
+  @override
+  Widget build(BuildContext context) {
+    final items = widget.items;
     final data = items.valueOrNull;
-    if (items is AsyncData && data != null && data.isEmpty) {
+    if (data != null) _lastData = data;
+
+    // Cached-empty → stay collapsed, including through subsequent refetches.
+    // Avoids the skeleton briefly pushing content down only to snap back up.
+    if (_lastData != null && _lastData!.isEmpty) {
       return const SizedBox.shrink();
     }
 
@@ -31,21 +47,22 @@ class StripScaffold extends ConsumerWidget {
     final title = Padding(
       padding: const EdgeInsets.fromLTRB(20, 18, 20, 12),
       child: Text(
-        titleKey.tr().toUpperCase(),
+        widget.titleKey.tr().toUpperCase(),
         style: theme.textTheme.labelSmall?.copyWith(letterSpacing: 2, color: theme.colorScheme.outline),
       ),
     );
 
     Widget body;
-    if (items is AsyncLoading) {
-      body = _Skeleton(height: height);
+    if (_lastData != null) {
+      body = SizedBox(height: widget.height, child: widget.childBuilder(_lastData!));
     } else if (items is AsyncError) {
-      body = _Retry(height: height, onRetry: onRetry);
+      body = _Retry(height: widget.height, onRetry: widget.onRetry);
     } else {
-      body = SizedBox(height: height, child: childBuilder(data ?? const []));
+      body = _Skeleton(height: widget.height);
     }
 
     return Column(
+      key: const Key('strip-scaffold'),
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [title, body],
@@ -60,6 +77,7 @@ class _Skeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
+      key: const Key('strip-skeleton'),
       height: height,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
@@ -86,6 +104,7 @@ class _Retry extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
+      key: const Key('strip-retry'),
       height: height,
       child: Center(
         child: TextButton.icon(

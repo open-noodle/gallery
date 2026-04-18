@@ -16,6 +16,7 @@ class TagsStrip extends ConsumerWidget {
     final async = ref.watch(photosFilterSuggestionsProvider(filter));
     final items = async.whenData((s) => s.tags);
 
+    final theme = Theme.of(context);
     return StripScaffold(
       titleKey: 'filter_sheet_tags',
       items: items,
@@ -34,6 +35,17 @@ class TagsStrip extends ConsumerWidget {
               return FilterChip(
                 label: Text(tag.value),
                 selected: selected,
+                showCheckmark: false,
+                backgroundColor: theme.colorScheme.surfaceContainerHigh,
+                selectedColor: theme.colorScheme.secondaryContainer,
+                side: BorderSide(
+                  color: selected ? theme.colorScheme.primary : theme.colorScheme.outlineVariant,
+                  width: selected ? 1.5 : 1,
+                ),
+                labelStyle: theme.textTheme.labelLarge?.copyWith(
+                  color: selected ? theme.colorScheme.onSecondaryContainer : theme.colorScheme.onSurface,
+                  fontWeight: FontWeight.w500,
+                ),
                 onSelected: (_) {
                   HapticFeedback.selectionClick();
                   ref.read(photosFilterProvider.notifier).toggleTag(tag.id);
