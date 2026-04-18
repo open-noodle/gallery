@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/widgets/person_picker_search_header.widget.dart';
+import 'package:immich_mobile/presentation/pages/photos_filter/widgets/recent_people_strip.widget.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/widgets/selected_people_strip.widget.dart';
 import 'package:immich_mobile/providers/photos_filter/people_picker.provider.dart';
 
@@ -70,6 +71,7 @@ class _PersonPickerPageState extends ConsumerState<PersonPickerPage> {
             onChanged: (v) => ref.read(peoplePickerQueryProvider.notifier).state = v,
           ),
           const SliverToBoxAdapter(child: SelectedPeopleStrip()),
+          const SliverToBoxAdapter(child: RecentPeopleStrip()),
           ..._bodySlivers(filteredAsync, query),
         ],
       ),

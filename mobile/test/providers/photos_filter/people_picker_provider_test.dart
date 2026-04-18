@@ -116,4 +116,46 @@ void main() {
       expect(index['A']!.map((p) => p.id), ['p1', 'p2', 'p3']);
     });
   });
+
+  group('recentPeopleProvider', () {
+    test('returns only people with updatedAt within last 7 days', () async {
+      final now = DateTime.now();
+      final c = _containerWith([
+        _d('a', 'Alice').copyWith(updatedAt: now.subtract(const Duration(days: 1))),
+        _d('b', 'Bob').copyWith(updatedAt: now.subtract(const Duration(days: 6))),
+        _d('c', 'Carol').copyWith(updatedAt: now.subtract(const Duration(days: 8))),
+      ]);
+      addTearDown(c.dispose);
+      final recent = await c.read(recentPeopleProvider.future);
+      expect(recent.map((p) => p.id), ['a', 'b']);
+    });
+
+    test('caps result at 7 items, newest first', () async {
+      final now = DateTime.now();
+      final c = _containerWith([
+        for (var i = 0; i < 10; i++) _d('p$i', 'P$i').copyWith(updatedAt: now.subtract(Duration(hours: i + 1))),
+      ]);
+      addTearDown(c.dispose);
+      final recent = await c.read(recentPeopleProvider.future);
+      expect(recent, hasLength(7));
+      // p0 is newest, then p1, ..., p6.
+      expect(recent.map((p) => p.id), ['p0', 'p1', 'p2', 'p3', 'p4', 'p5', 'p6']);
+    });
+
+    test('empty when no people updated in last 7 days', () async {
+      final now = DateTime.now();
+      final c = _containerWith([_d('a', 'Alice').copyWith(updatedAt: now.subtract(const Duration(days: 30)))]);
+      addTearDown(c.dispose);
+      expect(await c.read(recentPeopleProvider.future), isEmpty);
+    });
+
+    test('excludes hidden people via peoplePickerAllProvider', () async {
+      final now = DateTime.now();
+      final c = _containerWith([
+        _d('a', 'Alice', isHidden: true).copyWith(updatedAt: now.subtract(const Duration(days: 1))),
+      ]);
+      addTearDown(c.dispose);
+      expect(await c.read(recentPeopleProvider.future), isEmpty);
+    });
+  });
 }

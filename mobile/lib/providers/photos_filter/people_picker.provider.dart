@@ -45,3 +45,13 @@ Map<String, List<PersonDto>> peopleAlphaIndex(List<PersonDto> people) {
   }
   return map;
 }
+
+/// Last-7-days-updated people, max 7 items, newest-updated first. Used by the
+/// picker's "Recent" strip. Reads `updatedAt` from Drift (non-null).
+final recentPeopleProvider = FutureProvider.autoDispose<List<PersonDto>>((ref) async {
+  final all = await ref.watch(peoplePickerAllProvider.future);
+  final cutoff = DateTime.now().subtract(const Duration(days: 7));
+  final recent = all.where((p) => (p.updatedAt ?? DateTime(1970)).isAfter(cutoff)).toList()
+    ..sort((a, b) => (b.updatedAt ?? DateTime(1970)).compareTo(a.updatedAt ?? DateTime(1970)));
+  return recent.take(7).toList();
+});
