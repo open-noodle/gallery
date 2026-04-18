@@ -63,16 +63,13 @@ void main() {
       expect(container.read(photosFilterSheetProvider), FilterSheetSnap.deep);
     });
 
-    testWidgets('close + reset buttons have ≥44×44 pt tap targets (a11y)', (tester) async {
+    testWidgets('close + reset buttons meet kMinInteractiveDimension tap targets (a11y)', (tester) async {
       await tester.pumpConsumerWidget(const Material(child: DeepHeader()));
       final container = ProviderScope.containerOf(tester.element(find.byType(DeepHeader)));
       container.read(photosFilterProvider.notifier).setText('paris');
       await tester.pumpAndSettle();
-      for (final key in [const Key('deep-header-close'), const Key('deep-header-reset')]) {
-        final size = tester.getSize(find.byKey(key));
-        expect(size.width, greaterThanOrEqualTo(44), reason: '$key width');
-        expect(size.height, greaterThanOrEqualTo(44), reason: '$key height');
-      }
+      expectTapTargetMin(tester, find.byKey(const Key('deep-header-close')));
+      expectTapTargetMin(tester, find.byKey(const Key('deep-header-reset')));
     });
 
     testWidgets('renders correctly in dark theme', (tester) async {
