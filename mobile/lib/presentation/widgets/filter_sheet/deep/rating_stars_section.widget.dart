@@ -17,11 +17,13 @@ class RatingStarsSection extends ConsumerWidget {
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
       child: Row(
         children: [
-          Text(
-            'filter_sheet_deep_rating_section'.tr().toUpperCase(),
-            style: theme.textTheme.labelSmall?.copyWith(letterSpacing: 2, color: theme.colorScheme.outline),
+          Expanded(
+            child: Text(
+              'filter_sheet_deep_rating_section'.tr().toUpperCase(),
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelSmall?.copyWith(letterSpacing: 2, color: theme.colorScheme.outline),
+            ),
           ),
-          const Spacer(),
           for (var i = 1; i <= 5; i++)
             IconButton(
               key: Key('rating-star-$i'),

@@ -14,6 +14,11 @@ void main() {
       final controller = ScrollController();
       addTearDown(controller.dispose);
 
+      // Expand the test viewport so every ListView child is built — otherwise
+      // lazy rendering leaves bottom sections (toggles) off-screen.
+      await tester.binding.setSurfaceSize(const Size(400, 2400));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
       await tester.pumpConsumerWidget(
         DeepContent(scrollController: controller),
         overrides: [
