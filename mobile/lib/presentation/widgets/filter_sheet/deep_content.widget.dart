@@ -3,6 +3,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/deep_header.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/people_section.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/places_cascade_section.widget.dart';
+import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/tags_section.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/match_count_footer.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/search_bar.widget.dart';
 
@@ -33,7 +34,7 @@ class DeepContent extends ConsumerWidget {
               ),
               PeopleSectionDeep(key: Key('deep-section-people')),
               PlacesCascadeSection(key: Key('deep-section-places')),
-              SizedBox(height: 8, key: Key('deep-section-tags')),
+              TagsSectionDeep(key: Key('deep-section-tags')),
               SizedBox(height: 8, key: Key('deep-section-when')),
               SizedBox(height: 8, key: Key('deep-section-rating')),
               SizedBox(height: 8, key: Key('deep-section-media')),
