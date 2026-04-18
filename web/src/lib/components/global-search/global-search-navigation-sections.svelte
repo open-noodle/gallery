@@ -19,7 +19,6 @@
     { category: 'systemSettings', headingKey: 'cmdk_section_system_settings' as Translations },
     { category: 'admin', headingKey: 'cmdk_section_admin' as Translations },
     { category: 'userPages', headingKey: 'cmdk_section_user_pages' as Translations },
-    { category: 'actions', headingKey: 'cmdk_section_actions' as Translations },
   ];
 
   const buckets = $derived.by(() => {

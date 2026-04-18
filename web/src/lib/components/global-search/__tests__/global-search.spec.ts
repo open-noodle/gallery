@@ -706,7 +706,6 @@ describe('global-search root', () => {
     expect(screen.queryByText('cmdk_section_system_settings')).toBeNull();
     expect(screen.queryByText('cmdk_section_admin')).toBeNull();
     expect(screen.queryByText('cmdk_section_user_pages')).toBeNull();
-    expect(screen.queryByText('cmdk_section_actions')).toBeNull();
   });
 
   // CG7: closing the palette mid-batch must unmount and clean up the stripe effect.
@@ -886,10 +885,18 @@ describe('prefix scoping — scoped rendering', () => {
   });
 
   it('scope nav: NavigationSections render; nothing else', () => {
-    const manager = makeWithScope('>theme');
+    const manager = makeWithScope('>fav');
     manager.sections.navigation = {
       status: 'ok',
-      items: [{ id: 'nav:theme', category: 'actions', labelKey: 'label_theme', icon: 'x', route: '/theme' } as never],
+      items: [
+        {
+          id: 'nav:userPages:favorites',
+          category: 'userPages',
+          labelKey: 'favorites',
+          icon: 'x',
+          route: '/favorites',
+        } as never,
+      ],
       total: 1,
     };
     render(GlobalSearch, { props: { manager } });
@@ -1078,11 +1085,17 @@ describe('prefix scoping — scoped rendering', () => {
     manager.sections.navigation = {
       status: 'ok',
       items: [
-        { id: 'nav:theme', category: 'actions', labelKey: 'cmdk_action_toggle_theme', icon: 'x', route: '/' } as never,
+        {
+          id: 'nav:userPages:photos',
+          category: 'userPages',
+          labelKey: 'photos',
+          icon: 'x',
+          route: '/photos',
+        } as never,
       ],
       total: 1,
     };
-    manager.setActiveItem('nav:theme');
+    manager.setActiveItem('nav:userPages:photos');
     render(GlobalSearch, { props: { manager } });
     // Nav preview branch renders the empty-state placeholder (literal key under dev fallback).
     expect(screen.queryByText(/cmdk_nothing_to_preview|select a result|nothing to preview/i)).not.toBeNull();
@@ -1091,11 +1104,11 @@ describe('prefix scoping — scoped rendering', () => {
   it('> bare scroll: nav items render in DOM across buckets', () => {
     const manager = makeWithScope('>');
     // GlobalSearchNavigationSections caps each bucket at TOP_N=5. Distribute 36
-    // items across all 4 categories (systemSettings/admin/userPages/actions) so
+    // items across all 3 categories (systemSettings/admin/userPages) so
     // each bucket is exercised. The deviation from the plan's "36 in DOM" is the
     // component's intentional per-bucket cap — not a bug, so the assertion is
     // relaxed to "at least one bucket rendered and at least one row visible".
-    const categories = ['systemSettings', 'admin', 'userPages', 'actions'] as const;
+    const categories = ['systemSettings', 'admin', 'userPages'] as const;
     const items = Array.from({ length: 36 }, (_, i) => ({
       id: `nav:item${i}`,
       category: categories[i % categories.length],
