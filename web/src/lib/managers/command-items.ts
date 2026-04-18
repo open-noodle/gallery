@@ -74,6 +74,19 @@ async function bulkQueueCommand(command: QueueCommand.Pause | QueueCommand.Resum
   );
 }
 
+async function clearAllFailedJobs() {
+  const results = await Promise.allSettled(
+    ADMIN_VISIBLE_QUEUES.map((name) => emptyQueue({ name, queueDeleteDto: { failed: true } })),
+  );
+  const failed = results.filter((r) => r.status === 'rejected').length;
+  const $t = get(t);
+  if (failed > 0) {
+    toastManager.warning($t('cmdk_cmd_bulk_partial' as Translations, { values: { failed, total: results.length } }));
+    return;
+  }
+  toastManager.primary($t('cmdk_cmd_failed_cleared' as Translations));
+}
+
 export const COMMAND_ITEMS: readonly CommandItem[] = [
   {
     id: 'cmd:theme',
@@ -182,6 +195,14 @@ export const COMMAND_ITEMS: readonly CommandItem[] = [
     icon: mdiPlayCircleOutline,
     adminOnly: true,
     handler: () => bulkQueueCommand(QueueCommand.Resume),
+  },
+  {
+    id: 'cmd:clear_failed_jobs',
+    labelKey: 'cmdk_cmd_clear_failed_jobs_label',
+    descriptionKey: 'cmdk_cmd_clear_failed_jobs_description',
+    icon: mdiBroom,
+    adminOnly: true,
+    handler: () => clearAllFailedJobs(),
   },
 ];
 
