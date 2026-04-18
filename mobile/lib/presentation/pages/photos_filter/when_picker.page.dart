@@ -2,6 +2,7 @@ import 'package:auto_route/auto_route.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/presentation/pages/photos_filter/widgets/quick_ranges_row.widget.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/widgets/when_picker_search_header.widget.dart';
 import 'package:immich_mobile/providers/photos_filter/temporal_utils.dart';
 import 'package:immich_mobile/providers/photos_filter/when_picker.provider.dart';
@@ -66,6 +67,8 @@ class _WhenPickerPageState extends ConsumerState<WhenPickerPage> {
             value: _controller.text,
             onChanged: (v) => ref.read(whenPickerQueryProvider.notifier).state = v,
           ),
+          const SliverToBoxAdapter(child: SizedBox(height: 8)),
+          const SliverToBoxAdapter(child: QuickRangesRow()),
           ..._bodySlivers(filteredAsync, query),
         ],
       ),
