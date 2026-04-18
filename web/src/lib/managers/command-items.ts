@@ -1,9 +1,11 @@
 import { isAlmostExactWordMatch } from '$lib/managers/cmdk-match';
 import { themeManager } from '$lib/managers/theme-manager.svelte';
+import SpaceCreateModal from '$lib/modals/SpaceCreateModal.svelte';
 import { createAlbumAndRedirect } from '$lib/utils/album-utils';
 import { openFileUploadDialog } from '$lib/utils/file-uploader';
 import type { ServerFeaturesDto } from '@immich/sdk';
-import { mdiCloudUploadOutline, mdiPlaylistPlus, mdiThemeLightDark } from '@mdi/js';
+import { modalManager } from '@immich/ui';
+import { mdiAccountMultiplePlus, mdiCloudUploadOutline, mdiPlaylistPlus, mdiThemeLightDark } from '@mdi/js';
 
 const MIN_MATCH_LENGTH = 3;
 
@@ -40,6 +42,13 @@ export const COMMAND_ITEMS: readonly CommandItem[] = [
     descriptionKey: 'cmdk_cmd_new_album_description',
     icon: mdiPlaylistPlus,
     handler: () => createAlbumAndRedirect(),
+  },
+  {
+    id: 'cmd:create_space',
+    labelKey: 'create_space',
+    descriptionKey: 'cmdk_cmd_create_space_description',
+    icon: mdiAccountMultiplePlus,
+    handler: () => modalManager.show(SpaceCreateModal, {}),
   },
 ];
 

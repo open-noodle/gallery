@@ -1,7 +1,17 @@
 import * as albumUtils from '$lib/utils/album-utils';
 import * as fileUploader from '$lib/utils/file-uploader';
+import { modalManager } from '@immich/ui';
 import { describe, expect, it, vi } from 'vitest';
+import SpaceCreateModal from '../modals/SpaceCreateModal.svelte';
 import { COMMAND_ITEMS, isAlmostExactCommandMatch } from './command-items';
+
+vi.mock('@immich/ui', async (orig) => {
+  const actual = await orig<typeof import('@immich/ui')>();
+  return {
+    ...actual,
+    modalManager: { show: vi.fn().mockResolvedValue(undefined) },
+  };
+});
 
 describe('COMMAND_ITEMS', () => {
   it('has no duplicate ids', () => {
@@ -43,6 +53,16 @@ describe('cmd:new_album', () => {
     await cmd.handler();
     expect(spy).toHaveBeenCalledOnce();
     spy.mockRestore();
+  });
+});
+
+describe('cmd:create_space', () => {
+  it('opens SpaceCreateModal via modalManager', async () => {
+    const spy = vi.mocked(modalManager.show).mockResolvedValue(undefined as never);
+    spy.mockClear();
+    const cmd = COMMAND_ITEMS.find((c) => c.id === 'cmd:create_space')!;
+    await cmd.handler();
+    expect(spy).toHaveBeenCalledWith(SpaceCreateModal, {});
   });
 });
 
