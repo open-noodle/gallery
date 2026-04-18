@@ -4,6 +4,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
+import 'package:immich_mobile/providers/photos_filter/search_focus.provider.dart';
 
 /// Debounced search field (250 ms). Writes to `photosFilterProvider.context`.
 class FilterSheetSearchBar extends ConsumerStatefulWidget {
@@ -15,6 +16,8 @@ class FilterSheetSearchBar extends ConsumerStatefulWidget {
 
 class _FilterSheetSearchBarState extends ConsumerState<FilterSheetSearchBar> {
   late final TextEditingController _controller;
+  late final FocusNode _focusNode;
+  int _lastProcessedFocusRequest = 0;
   Timer? _debounce;
 
   static const _debounceMs = Duration(milliseconds: 250);
@@ -22,6 +25,7 @@ class _FilterSheetSearchBarState extends ConsumerState<FilterSheetSearchBar> {
   @override
   void initState() {
     super.initState();
+    _focusNode = FocusNode(debugLabel: 'FilterSheetSearchBar');
     _controller = TextEditingController(text: ref.read(photosFilterProvider).context ?? '');
     _controller.addListener(_onChanged);
   }
@@ -49,11 +53,25 @@ class _FilterSheetSearchBarState extends ConsumerState<FilterSheetSearchBar> {
     _debounce?.cancel();
     _controller.removeListener(_onChanged);
     _controller.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    // Watch the counter: when it rises above our last-processed value, schedule
+    // a post-frame requestFocus. `ref.watch` (not `ref.listen`) is deliberate —
+    // it survives the race where the increment lands BEFORE this widget mounts
+    // (e.g., `openGallerySearch` triggers sheet open from a non-Photos tab).
+    final focusRequest = ref.watch(photosFilterSearchFocusRequestProvider);
+    if (focusRequest > _lastProcessedFocusRequest) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _focusNode.requestFocus();
+        setState(() => _lastProcessedFocusRequest = focusRequest);
+      });
+    }
+
     ref.listen<String?>(photosFilterProvider.select((f) => f.context), (prev, next) {
       final v = next ?? '';
       if (_controller.text == v) return;
@@ -67,6 +85,7 @@ class _FilterSheetSearchBarState extends ConsumerState<FilterSheetSearchBar> {
     final hasText = _controller.text.isNotEmpty;
     return TextField(
       controller: _controller,
+      focusNode: _focusNode,
       decoration: InputDecoration(
         isDense: true,
         hintText: 'filter_sheet_search_hint'.tr(),
