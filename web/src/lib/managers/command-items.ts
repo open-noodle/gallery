@@ -3,6 +3,7 @@ import { isAlmostExactWordMatch } from '$lib/managers/cmdk-match';
 import { themeManager } from '$lib/managers/theme-manager.svelte';
 import ShortcutsModal from '$lib/modals/ShortcutsModal.svelte';
 import SpaceCreateModal from '$lib/modals/SpaceCreateModal.svelte';
+import { clearEntries } from '$lib/stores/cmdk-recent';
 import { createAlbumAndRedirect } from '$lib/utils/album-utils';
 import { openFileUploadDialog } from '$lib/utils/file-uploader';
 import type { ServerFeaturesDto } from '@immich/sdk';
@@ -13,6 +14,7 @@ import {
   mdiKeyboardOutline,
   mdiLogoutVariant,
   mdiPlaylistPlus,
+  mdiRestore,
   mdiThemeLightDark,
 } from '@mdi/js';
 import { t } from 'svelte-i18n';
@@ -77,6 +79,13 @@ export const COMMAND_ITEMS: readonly CommandItem[] = [
     descriptionKey: 'cmdk_cmd_keyboard_shortcuts_description',
     icon: mdiKeyboardOutline,
     handler: () => modalManager.show(ShortcutsModal, {}),
+  },
+  {
+    id: 'cmd:clear_recents',
+    labelKey: 'cmdk_clear_recents',
+    descriptionKey: 'cmdk_cmd_clear_recents_description',
+    icon: mdiRestore,
+    handler: () => clearEntries(),
   },
 ];
 

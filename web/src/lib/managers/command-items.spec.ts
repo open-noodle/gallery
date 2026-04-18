@@ -2,10 +2,22 @@ import { authManager } from '$lib/managers/auth-manager.svelte';
 import * as albumUtils from '$lib/utils/album-utils';
 import * as fileUploader from '$lib/utils/file-uploader';
 import { modalManager, toastManager } from '@immich/ui';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ShortcutsModal from '../modals/ShortcutsModal.svelte';
 import SpaceCreateModal from '../modals/SpaceCreateModal.svelte';
 import { COMMAND_ITEMS, isAlmostExactCommandMatch } from './command-items';
+
+const { mockUser } = vi.hoisted(() => ({
+  mockUser: { current: { id: 'test-user' } as { id: string } | null },
+}));
+vi.mock('$lib/stores/user.store', () => ({
+  user: {
+    subscribe: (run: (v: { id: string } | null) => void) => {
+      run(mockUser.current);
+      return () => {};
+    },
+  },
+}));
 
 vi.mock('@immich/ui', async (orig) => {
   const actual = await orig<typeof import('@immich/ui')>();
@@ -93,6 +105,29 @@ describe('cmd:shortcuts', () => {
     const cmd = COMMAND_ITEMS.find((c) => c.id === 'cmd:shortcuts')!;
     await cmd.handler();
     expect(spy).toHaveBeenCalledWith(ShortcutsModal, {});
+  });
+});
+
+describe('cmd:clear_recents', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    mockUser.current = { id: 'test-user' };
+  });
+
+  it('clears recents when user is logged in', async () => {
+    const key = 'cmdk.recent:test-user';
+    localStorage.setItem(key, JSON.stringify([{ kind: 'query', id: 'q:a', text: 'a', mode: 'smart', lastUsed: 1 }]));
+    const cmd = COMMAND_ITEMS.find((c) => c.id === 'cmd:clear_recents')!;
+    await cmd.handler();
+    expect(localStorage.getItem(key)).toBe(JSON.stringify([]));
+  });
+
+  it('is a no-op when user is logged out (no crash, localStorage unchanged)', async () => {
+    mockUser.current = null;
+    localStorage.setItem('some-other-key', 'untouched');
+    const cmd = COMMAND_ITEMS.find((c) => c.id === 'cmd:clear_recents')!;
+    expect(() => cmd.handler()).not.toThrow();
+    expect(localStorage.getItem('some-other-key')).toBe('untouched');
   });
 });
 

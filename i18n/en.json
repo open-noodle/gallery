@@ -811,6 +811,8 @@
   "cmdk_announce_scoped_nav": "Scoped to pages.",
   "cmdk_announce_scoped_people": "Scoped to people.",
   "cmdk_announce_scoped_tags": "Scoped to tags.",
+  "cmdk_clear_recents": "Clear recent palette entries",
+  "cmdk_cmd_clear_recents_description": "Remove saved palette history",
   "cmdk_cmd_create_space_description": "Start a new shared space",
   "cmdk_cmd_keyboard_shortcuts_description": "Show keyboard shortcuts",
   "cmdk_cmd_new_album_description": "Start a new album",
