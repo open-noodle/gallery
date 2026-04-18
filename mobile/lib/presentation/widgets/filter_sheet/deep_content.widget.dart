@@ -3,6 +3,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/deep_header.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/people_section.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/places_cascade_section.widget.dart';
+import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/rating_stars_section.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/tags_section.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/when_accordion_section.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/match_count_footer.widget.dart';
@@ -37,7 +38,7 @@ class DeepContent extends ConsumerWidget {
               PlacesCascadeSection(key: Key('deep-section-places')),
               TagsSectionDeep(key: Key('deep-section-tags')),
               WhenAccordionSection(key: Key('deep-section-when')),
-              SizedBox(height: 8, key: Key('deep-section-rating')),
+              RatingStarsSection(key: Key('deep-section-rating')),
               SizedBox(height: 8, key: Key('deep-section-media')),
               SizedBox(height: 8, key: Key('deep-section-toggles')),
             ],
