@@ -47,6 +47,7 @@ class _DeepSectionScaffoldState<T> extends State<DeepSectionScaffold<T>> {
     final theme = Theme.of(context);
     final title = Text(
       widget.titleKey.tr().toUpperCase(),
+      overflow: TextOverflow.ellipsis,
       style: theme.textTheme.labelSmall?.copyWith(letterSpacing: 2, color: theme.colorScheme.outline),
     );
 
@@ -55,7 +56,7 @@ class _DeepSectionScaffoldState<T> extends State<DeepSectionScaffold<T>> {
       child: Row(
         children: [
           Expanded(child: title),
-          if (widget.trailingHeader != null) widget.trailingHeader!,
+          if (widget.trailingHeader != null) Flexible(child: widget.trailingHeader!),
         ],
       ),
     );
