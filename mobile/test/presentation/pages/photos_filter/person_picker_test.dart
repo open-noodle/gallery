@@ -1,7 +1,14 @@
+import 'package:drift/drift.dart' as drift;
+import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/person.model.dart';
+import 'package:immich_mobile/domain/models/store.model.dart';
+import 'package:immich_mobile/domain/services/store.service.dart';
+import 'package:immich_mobile/entities/store.entity.dart';
+import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
+import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/person_picker.page.dart';
 import 'package:immich_mobile/providers/infrastructure/people.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/people_picker.provider.dart';
@@ -20,6 +27,20 @@ DriftPerson _d(String id, String name) => DriftPerson(
 );
 
 void main() {
+  // Rendering a populated list needs a Store-backed server endpoint (via
+  // `getFaceThumbnailUrl`). Set it up once for all tests in this file.
+  late Drift db;
+  setUpAll(() async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    db = Drift(drift.DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true));
+    await StoreService.init(storeRepository: DriftStoreRepository(db));
+    await Store.put(StoreKey.serverEndpoint, 'http://localhost:0');
+  });
+  tearDownAll(() async {
+    await Store.clear();
+    await db.close();
+  });
+
   group('PersonPickerPage', () {
     testWidgets('renders AppBar with back icon, title key, and Done button', (tester) async {
       await tester.pumpConsumerWidget(const PersonPickerPage());

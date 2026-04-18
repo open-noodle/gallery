@@ -3,6 +3,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/person.model.dart';
+import 'package:immich_mobile/presentation/pages/photos_filter/widgets/person_picker_list.widget.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/widgets/person_picker_search_header.widget.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/widgets/recent_people_strip.widget.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/widgets/selected_people_strip.widget.dart';
@@ -94,8 +95,10 @@ class _PersonPickerPageState extends ConsumerState<PersonPickerPage> {
             ),
           ];
         }
-        // Placeholder until B4–B6 (chips / recent strip / alpha list) land.
-        return const [SliverToBoxAdapter(child: SizedBox.shrink())];
+        if (filtered.isEmpty) {
+          return const [SliverToBoxAdapter(child: SizedBox.shrink())];
+        }
+        return [SliverFillRemaining(hasScrollBody: true, child: PersonPickerList(people: filtered))];
       },
     );
   }
