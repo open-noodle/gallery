@@ -4,6 +4,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
+import 'package:immich_mobile/providers/photos_filter/search_focus.provider.dart';
 
 /// Debounced search field (250 ms). Writes to `photosFilterProvider.context`.
 class FilterSheetSearchBar extends ConsumerStatefulWidget {
@@ -15,6 +16,7 @@ class FilterSheetSearchBar extends ConsumerStatefulWidget {
 
 class _FilterSheetSearchBarState extends ConsumerState<FilterSheetSearchBar> {
   late final TextEditingController _controller;
+  late final FocusNode _focusNode;
   Timer? _debounce;
 
   static const _debounceMs = Duration(milliseconds: 250);
@@ -22,6 +24,7 @@ class _FilterSheetSearchBarState extends ConsumerState<FilterSheetSearchBar> {
   @override
   void initState() {
     super.initState();
+    _focusNode = FocusNode(debugLabel: 'FilterSheetSearchBar');
     _controller = TextEditingController(text: ref.read(photosFilterProvider).context ?? '');
     _controller.addListener(_onChanged);
   }
@@ -49,11 +52,27 @@ class _FilterSheetSearchBarState extends ConsumerState<FilterSheetSearchBar> {
     _debounce?.cancel();
     _controller.removeListener(_onChanged);
     _controller.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    // Watch the request counter and compare against the consumed-counter
+    // provider. If request > consumed, schedule a post-frame requestFocus and
+    // bump consumed. Storing the consumed counter in a provider (not a State
+    // field) means snap transitions — which unmount+remount this widget —
+    // don't retrigger focus on the already-processed request.
+    final focusRequest = ref.watch(photosFilterSearchFocusRequestProvider);
+    final focusConsumed = ref.read(photosFilterSearchFocusConsumedProvider);
+    if (focusRequest > focusConsumed) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _focusNode.requestFocus();
+        ref.read(photosFilterSearchFocusConsumedProvider.notifier).state = focusRequest;
+      });
+    }
+
     ref.listen<String?>(photosFilterProvider.select((f) => f.context), (prev, next) {
       final v = next ?? '';
       if (_controller.text == v) return;
@@ -67,6 +86,7 @@ class _FilterSheetSearchBarState extends ConsumerState<FilterSheetSearchBar> {
     final hasText = _controller.text.isNotEmpty;
     return TextField(
       controller: _controller,
+      focusNode: _focusNode,
       decoration: InputDecoration(
         isDense: true,
         hintText: 'filter_sheet_search_hint'.tr(),
