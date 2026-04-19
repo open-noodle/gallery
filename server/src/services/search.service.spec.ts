@@ -5,6 +5,7 @@ import { SearchSuggestionType } from 'src/dtos/search.dto.js';
 import { AssetOrder, AssetType, AssetVisibility } from 'src/enum.js';
 import { isActiveDistanceThreshold } from 'src/repositories/search.repository.js';
 import { SearchService } from 'src/services/search.service.js';
+import { clearConfigCache } from 'src/utils/config.js';
 import { AssetFactory } from 'test/factories/asset.factory.js';
 import { AuthFactory } from 'test/factories/auth.factory.js';
 import { authStub } from 'test/fixtures/auth.stub.js';
@@ -659,6 +660,7 @@ describe(SearchService.name, () => {
     beforeEach(() => {
       mocks.search.searchSmart.mockResolvedValue({ hasNextPage: false, items: [] });
       mocks.machineLearning.encodeText.mockResolvedValue('[1, 2, 3]');
+      clearConfigCache();
     });
 
     it('should raise a BadRequestException if machine learning is disabled', async () => {
@@ -749,6 +751,17 @@ describe(SearchService.name, () => {
       await sut.searchSmart(authStub.user1, { query: 'test2' });
 
       expect(mocks.machineLearning.encodeText).toHaveBeenCalledTimes(2);
+    });
+
+    // Regression guard: searchSmart must read config from cache, not rebuild it per
+    // request. The uncached path runs class-transformer + class-validator over the
+    // full nested SystemConfigDto and adds ~1-3s per call on slower CPUs.
+    it('should read system config from cache across requests', async () => {
+      await sut.searchSmart(authStub.user1, { query: 'test1' });
+      await sut.searchSmart(authStub.user1, { query: 'test2' });
+      await sut.searchSmart(authStub.user1, { query: 'test3' });
+
+      expect(mocks.systemMetadata.get).toHaveBeenCalledTimes(1);
     });
 
     it('should search by queryAssetId instead of query', async () => {
