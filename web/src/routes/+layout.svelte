@@ -4,12 +4,13 @@
   import { shortcut, shortcuts } from '#lib/actions/shortcut.ts';
   import GlobalSearch from '#lib/components/global-search/global-search.svelte';
   import { featureFlagsManager } from '#lib/managers/feature-flags-manager.svelte.ts';
+  import { closePaletteOnNavigate } from '#lib/managers/close-palette-on-navigate.ts';
   import { globalSearchManager, type SearchMode } from '#lib/managers/global-search-manager.svelte.ts';
   import DownloadPanel from './DownloadPanel.svelte';
   import ErrorLayout from './ErrorLayout.svelte';
   import OnEvents from '#lib/components/OnEvents.svelte';
   import NavigationLoadingBar from './NavigationLoadingBar.svelte';
-  import OpenInAppBanner from '$lib/components/shared-components/open-in-app-banner.svelte';
+  import OpenInAppBanner from '#lib/components/shared-components/open-in-app-banner.svelte';
   import UploadPanel from './UploadPanel.svelte';
   import VersionAnnouncement from './VersionAnnouncement.svelte';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
@@ -202,6 +203,8 @@
 
     showNavigationLoadingBar = false;
   });
+
+  afterNavigate(closePaletteOnNavigate);
 
   const { serverRestarting } = websocketStore;
 
