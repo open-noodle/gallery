@@ -116,9 +116,9 @@ export class SharedSpaceService extends BaseService {
         memberCount: members.length,
         assetCount,
         recentAssetIds: recentAssets.map((a) => a.id),
-        recentAssetThumbhashes: recentAssets.map((a) =>
-          a.thumbhash ? Buffer.from(a.thumbhash).toString('base64') : null,
-        ),
+        recentAssetThumbhashes: recentAssets
+          .map((a) => (a.thumbhash ? Buffer.from(a.thumbhash).toString('base64') : null))
+          .filter((h): h is string => h !== null),
         members: members.map((m) => this.mapMember(m)),
         newAssetCount,
         lastContributor,
@@ -182,9 +182,9 @@ export class SharedSpaceService extends BaseService {
       memberCount: members.length,
       assetCount,
       recentAssetIds: recentAssets.map((a) => a.id),
-      recentAssetThumbhashes: recentAssets.map((a) =>
-        a.thumbhash ? Buffer.from(a.thumbhash).toString('base64') : null,
-      ),
+      recentAssetThumbhashes: recentAssets
+        .map((a) => (a.thumbhash ? Buffer.from(a.thumbhash).toString('base64') : null))
+        .filter((h): h is string => h !== null),
       members: members.map((m) => this.mapMember(m)),
       newAssetCount,
       lastViewedAt: membership.lastViewedAt ? (membership.lastViewedAt as unknown as Date).toISOString() : null,

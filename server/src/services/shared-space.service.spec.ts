@@ -555,7 +555,7 @@ describe(SharedSpaceService.name, () => {
       const member = makeMemberResult({ spaceId: space.id, userId: auth.user.id, role: SharedSpaceRole.Viewer });
       const recentAssets = [
         { id: newUuid(), thumbhash: Buffer.from('thumb1') },
-        { id: newUuid(), thumbhash: null },
+        { id: newUuid(), thumbhash: Buffer.from('thumb2') },
         { id: newUuid(), thumbhash: Buffer.from('thumb3') },
       ];
 
@@ -569,7 +569,7 @@ describe(SharedSpaceService.name, () => {
       const result = await sut.get(auth, space.id);
 
       expect(result.recentAssetIds).toEqual([recentAssets[0].id, recentAssets[1].id, recentAssets[2].id]);
-      expect(result.recentAssetThumbhashes).toEqual(['dGh1bWIx', null, 'dGh1bWIz']);
+      expect(result.recentAssetThumbhashes).toEqual(['dGh1bWIx', 'dGh1bWIy', 'dGh1bWIz']);
     });
 
     it('should include lastActivityAt in response', async () => {
