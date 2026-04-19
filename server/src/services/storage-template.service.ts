@@ -210,7 +210,9 @@ export class StorageTemplateService extends BaseService {
 
     this.logger.debug('Cleaning up empty directories...');
     const libraryFolder = StorageCore.getBaseFolder(StorageFolder.Library);
-    await this.storageRepository.removeEmptyDirs(libraryFolder);
+    if (await this.storageRepository.checkFileExists(libraryFolder)) {
+      await this.storageRepository.removeEmptyDirs(libraryFolder);
+    }
 
     this.logger.log('Finished storage template migration');
 
@@ -227,6 +229,12 @@ export class StorageTemplateService extends BaseService {
     if (asset.isExternal || StorageCore.isAndroidMotionPath(asset.originalPath)) {
       // External assets are not affected by storage template
       // TODO: shouldn't this only apply to external assets?
+      return;
+    }
+
+    if (!path.isAbsolute(asset.originalPath)) {
+      // S3 relative keys cannot be moved through fs.rename — S3 has its own placement rules.
+      this.logger.debug(`Skipping storage template migration for S3 asset ${asset.id}`);
       return;
     }
 
