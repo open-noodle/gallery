@@ -242,7 +242,7 @@ describe('setQuery', () => {
   let calls: Array<{ key: string; query: string; mode: SearchMode }>;
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
@@ -354,7 +354,7 @@ describe('setQuery', () => {
 
 describe('real providers', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
@@ -496,7 +496,7 @@ describe('real providers', () => {
 
 describe('tag provider', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
@@ -593,7 +593,7 @@ describe('tag provider', () => {
 
 describe('setMode', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
@@ -667,7 +667,7 @@ describe('setMode', () => {
 
 describe('cursor identity', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
@@ -721,7 +721,7 @@ describe('cursor identity', () => {
 
 describe('Enter race', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
@@ -761,7 +761,7 @@ describe('Enter race', () => {
 
 describe('ML health retroactive promotion', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
@@ -810,7 +810,7 @@ describe('ML health retroactive promotion', () => {
 
 describe('activate()', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     resetRecentStore();
   });
@@ -860,7 +860,7 @@ describe('activate("command")', () => {
   let manager: GlobalSearchManager;
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     resetRecentStore();
     manager = new GlobalSearchManager();
@@ -1160,7 +1160,7 @@ describe('activate("command")', () => {
 
 describe('activateRecent()', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     resetRecentStore();
     vi.useFakeTimers();
@@ -1361,7 +1361,7 @@ describe('topNavigationMatch', () => {
   // `sections.navigation` currently holds — the nav provider runs synchronously
   // so these tests drive it via the full setQuery/debounce flow.
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     mockUser.current = { id: 'test-user', isAdmin: true };
     mockFlags.valueOrUndefined = { search: true, map: true, trash: true };
@@ -1433,7 +1433,7 @@ describe('topNavigationMatch', () => {
 
 describe('removeRecent()', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     resetRecentStore();
   });
@@ -1481,7 +1481,7 @@ describe('removeRecent()', () => {
 
 describe('announcementText', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
   });
 
@@ -1533,7 +1533,7 @@ describe('announcementText', () => {
 
 describe('reconcileCursor fallback + getActiveItem edge cases', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     // getActiveItem now consults recents when the query is empty, so stale entries
     // from prior describes would mask the section-based edge cases this block tests.
@@ -1582,7 +1582,7 @@ describe('reconcileCursor fallback + getActiveItem edge cases', () => {
 
 describe('edge-case guards', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
@@ -1697,7 +1697,7 @@ describe('edge-case guards', () => {
 
 describe('ML health probe on open', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
@@ -1737,7 +1737,7 @@ describe('ML health probe on open', () => {
 
 describe('tagsDisabled persists across close/reopen', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
@@ -1784,7 +1784,7 @@ describe('tagsDisabled persists across close/reopen', () => {
 
 describe('navigation section scaffolding', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
   });
 
@@ -1840,7 +1840,7 @@ describe('navigation section scaffolding', () => {
 
 describe('navigation memo cache', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     mockI18nLocale.current = 'en';
   });
@@ -1892,7 +1892,7 @@ describe('navigation memo cache', () => {
 
 describe('getActiveItem nav branch', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
   });
 
@@ -1954,7 +1954,7 @@ describe('getActiveItem nav branch', () => {
 
 describe('runNavigationProvider', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     mockUser.current = { id: 'test-user', isAdmin: true };
     mockFlags.valueOrUndefined = { search: true, map: true, trash: true };
@@ -2116,7 +2116,7 @@ describe('commands provider', () => {
   const commandItemsMut = COMMAND_ITEMS as unknown as CommandItem[];
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     mockUser.current = { id: 'test-user', isAdmin: true };
     mockFlags.valueOrUndefined = { search: true, map: true, trash: true };
@@ -2417,7 +2417,7 @@ describe('commands provider', () => {
 
 describe('setQuery synchronous navigation', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
@@ -2649,7 +2649,7 @@ describe('SWR loading rules', () => {
 
 describe('activate navigation', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     resetRecentStore();
     mockUser.current = { id: 'test-user', isAdmin: true };
@@ -2706,7 +2706,7 @@ describe('activate navigation', () => {
 
 describe('activateRecent stale admin purge', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     resetRecentStore();
   });
@@ -2767,7 +2767,7 @@ describe('activateRecent stale admin purge', () => {
 
 describe('batch lifecycle: close, empty-query, grace window (review fixes)', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
@@ -2870,7 +2870,7 @@ describe('batch lifecycle: close, empty-query, grace window (review fixes)', () 
 
 describe('activateRecent stale-state purge (review fix U2)', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     resetRecentStore();
     mockUser.current = { id: 'test-user', isAdmin: true };
@@ -2947,7 +2947,7 @@ describe('activateRecent stale-state purge (review fix U2)', () => {
 
 describe('setMode stale photos race (review fix U3)', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
@@ -3012,7 +3012,7 @@ describe('setMode stale photos race (review fix U3)', () => {
 
 describe('Batch 4 post-review: route consistency, SWR cursor, debounce-window close (NF1/CG2/UE1/UE2)', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     resetRecentStore();
     vi.useFakeTimers();
@@ -3110,7 +3110,7 @@ describe('Batch 4 post-review: route consistency, SWR cursor, debounce-window cl
 
 describe('getActiveItem recent-entry preview lookup (cold open)', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     resetRecentStore();
   });
@@ -3324,7 +3324,7 @@ describe('closeSignal lifecycle', () => {
 
 describe('album catalog fetch', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
   });
 
@@ -3426,7 +3426,7 @@ describe('album catalog fetch', () => {
 
 describe('spaces catalog fetch', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
   });
 
@@ -3485,7 +3485,7 @@ describe('runBatch dispatches albums and spaces providers', () => {
   // minQueryLength. runBatch is protected and driven from `setQuery` in every
   // other suite — use the same entry point here.
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
@@ -3565,7 +3565,7 @@ describe('activateAlbum', () => {
   } as unknown as Awaited<ReturnType<typeof getAlbumInfo>>;
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     resetRecentStore();
   });
@@ -3812,7 +3812,7 @@ describe('activateSpace', () => {
   } as unknown as Awaited<ReturnType<typeof getSpace>>;
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     resetRecentStore();
   });
@@ -4081,7 +4081,7 @@ describe('prefix scoping — deriveds', () => {
 
 describe('prefix scoping — runBatch gating', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
@@ -4192,7 +4192,7 @@ describe('prefix scoping — runBatch gating', () => {
 
 describe('prefix scoping — bare suggestions (tags/albums/spaces)', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
@@ -4317,7 +4317,7 @@ const mockPerson = (id: string, name: string, updatedAt?: string): PersonRespons
 
 describe('prefix scoping — bare @ suggestions', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
@@ -4473,7 +4473,7 @@ describe('prefix scoping — bare @ suggestions', () => {
 
 describe('prefix scoping — runNavigationProvider', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
@@ -4571,7 +4571,7 @@ describe('prefix scoping — runNavigationProvider', () => {
 
 describe('prefix scoping — setQuery SWR scope behavior', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
@@ -4674,7 +4674,7 @@ describe('prefix scoping — setQuery SWR scope behavior', () => {
 
 describe('prefix scoping — reconcileCursor', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
@@ -4736,7 +4736,7 @@ describe('prefix scoping — reconcileCursor', () => {
 
 describe('prefix scoping — setMode under scope', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
@@ -4804,7 +4804,7 @@ describe('prefix scoping — announcementText', () => {
   });
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
@@ -4866,7 +4866,7 @@ describe('prefix scoping — announcementText', () => {
 
 describe('prefix scoping — defensive recent replay of scoped query', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
   });
 
