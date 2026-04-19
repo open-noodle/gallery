@@ -1,0 +1,1566 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Gallery · bottom-nav · darkroom warmth v0.1</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/icon?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        /* Darkroom Warmth — core tokens */
+        --ink-0: #08080a;
+        --ink-1: #0f0e12;
+        --ink-2: #17161b;
+        --ink-3: #1f1d23;
+        --ink-4: #29262e;
+        --hair-d: rgba(255, 240, 220, 0.08);
+        --hair-d-strong: rgba(255, 240, 220, 0.14);
+        --fog-40: rgba(255, 250, 245, 0.4);
+        --fog-55: rgba(255, 250, 245, 0.55);
+        --fog-70: rgba(255, 250, 245, 0.7);
+        --fog-85: rgba(255, 250, 245, 0.85);
+        --fog-95: rgba(255, 250, 245, 0.95);
+
+        --pearl-0: #fdfbf5;
+        --pearl-1: #f4f0e4;
+        --pearl-2: #e9e3d2;
+        --hair-l: rgba(24, 18, 8, 0.1);
+        --hair-l-strong: rgba(24, 18, 8, 0.18);
+        --ink-55: rgba(12, 10, 8, 0.55);
+        --ink-70: rgba(12, 10, 8, 0.72);
+        --ink-95: rgba(12, 10, 8, 0.95);
+
+        --amber-200: #fdd99b;
+        --amber-300: #f7c474;
+        --amber-400: #f1a33b;
+        --amber-500: #e88b1a;
+        --amber-600: #c66e0a;
+        --amber-glow: rgba(241, 163, 59, 0.16);
+        --amber-glow-strong: rgba(241, 163, 59, 0.26);
+        --amber-ring: rgba(241, 163, 59, 0.42);
+
+        --font-body: 'Archivo', system-ui, -apple-system, sans-serif;
+        --font-display: 'Fraunces', 'Georgia', serif;
+        --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        background: var(--ink-0);
+        color: var(--fog-85);
+        font-family: var(--font-body);
+        font-weight: 400;
+        line-height: 1.55;
+        min-height: 100vh;
+        overflow-x: hidden;
+      }
+
+      body::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 0;
+        background:
+          radial-gradient(1200px 600px at 15% 10%, rgba(241, 163, 59, 0.1), transparent 60%),
+          radial-gradient(1000px 800px at 85% 80%, rgba(241, 163, 59, 0.06), transparent 60%),
+          url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.96 0 0 0 0 0.88 0 0 0 0 0.72 0 0 0 0.035 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+        background-size:
+          cover,
+          cover,
+          200px 200px;
+      }
+
+      .wrap {
+        position: relative;
+        z-index: 1;
+        max-width: 1320px;
+        margin: 0 auto;
+        padding: 72px 40px 160px;
+      }
+
+      /* —— masthead —————————————————————————— */
+      .masthead {
+        display: grid;
+        grid-template-columns: 1.2fr 1fr;
+        gap: 72px;
+        align-items: end;
+        padding-bottom: 48px;
+        border-bottom: 1px solid var(--hair-d);
+      }
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--amber-400);
+      }
+      .tag::before {
+        content: '';
+        width: 6px;
+        height: 6px;
+        border-radius: 999px;
+        background: var(--amber-400);
+        box-shadow: 0 0 12px var(--amber-ring);
+      }
+      h1 {
+        font-family: var(--font-display);
+        font-optical-sizing: auto;
+        font-variation-settings: 'opsz' 96;
+        font-weight: 360;
+        font-size: clamp(42px, 6vw, 84px);
+        line-height: 0.96;
+        letter-spacing: -0.01em;
+        margin: 18px 0 0;
+        color: var(--fog-95);
+      }
+      h1 em {
+        font-style: italic;
+        font-variation-settings: 'opsz' 144;
+        color: var(--amber-300);
+        font-weight: 320;
+      }
+      .lede {
+        margin-top: 24px;
+        max-width: 44ch;
+        color: var(--fog-70);
+        font-size: 17px;
+        line-height: 1.6;
+      }
+      .meta {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: var(--fog-55);
+        display: grid;
+        grid-template-columns: auto 1fr;
+        column-gap: 24px;
+        row-gap: 6px;
+      }
+      .meta dt {
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--amber-400);
+      }
+      .meta dd {
+        margin: 0;
+      }
+
+      /* —— section scaffolding ————————————————— */
+      section {
+        margin-top: 88px;
+      }
+      .eyebrow {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--amber-400);
+      }
+      h2 {
+        font-family: var(--font-display);
+        font-variation-settings: 'opsz' 72;
+        font-weight: 420;
+        font-size: clamp(26px, 3vw, 38px);
+        letter-spacing: -0.005em;
+        color: var(--fog-95);
+        margin: 10px 0 6px;
+      }
+      h2 em {
+        font-style: italic;
+        color: var(--amber-300);
+        font-weight: 380;
+      }
+      .section-lede {
+        color: var(--fog-55);
+        max-width: 60ch;
+        margin: 0 0 40px;
+      }
+
+      /* —— phone stage ————————————————————————— */
+      .stage {
+        display: grid;
+        grid-template-columns: minmax(340px, 420px) 1fr;
+        gap: 64px;
+        align-items: start;
+      }
+
+      .phone {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 390 / 844;
+        border-radius: 52px;
+        background: linear-gradient(180deg, #1a1a1a 0%, #0a0a0a 100%);
+        padding: 14px;
+        box-shadow:
+          0 0 0 1.5px #363636,
+          0 0 0 2.5px #000,
+          0 48px 80px -20px rgba(0, 0, 0, 0.9),
+          0 16px 40px -8px rgba(0, 0, 0, 0.6);
+      }
+      .phone-screen {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        border-radius: 40px;
+        overflow: hidden;
+        background: var(--ink-1);
+        isolation: isolate;
+      }
+      .phone-screen::after {
+        content: '';
+        position: absolute;
+        top: 8px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 118px;
+        height: 28px;
+        background: #000;
+        border-radius: 999px;
+        z-index: 10;
+      }
+
+      /* photo-grid backdrop */
+      .backdrop {
+        position: absolute;
+        inset: 0;
+        padding: 48px 6px 120px;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        grid-auto-rows: 1fr;
+        gap: 3px;
+      }
+      .backdrop .tile {
+        position: relative;
+        border-radius: 2px;
+        overflow: hidden;
+      }
+      .tile.a {
+        background: linear-gradient(135deg, #2a201a 0%, #16100a 100%);
+      }
+      .tile.b {
+        background: linear-gradient(135deg, #3a2a18 0%, #1a1208 100%);
+      }
+      .tile.c {
+        background: linear-gradient(135deg, #4a3522 0%, #241a10 100%);
+      }
+      .tile.d {
+        background: linear-gradient(135deg, #2d2520 0%, #181410 100%);
+      }
+      .tile.e {
+        background: linear-gradient(135deg, #1e1b18 0%, #0e0c0a 100%);
+      }
+      .tile.f {
+        background: linear-gradient(135deg, #382814 0%, #1c140a 100%);
+      }
+      .tile::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(circle at 30% 30%, rgba(241, 163, 59, 0.08), transparent 60%);
+      }
+
+      /* top chrome — faux app bar */
+      .appbar {
+        position: absolute;
+        top: 52px;
+        left: 0;
+        right: 0;
+        padding: 0 22px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        z-index: 5;
+      }
+      .appbar-title {
+        font-family: var(--font-display);
+        font-variation-settings: 'opsz' 36;
+        font-weight: 400;
+        font-size: 22px;
+        color: var(--fog-95);
+      }
+      .appbar-dots {
+        display: flex;
+        gap: 16px;
+        color: var(--fog-70);
+      }
+      .appbar .material-symbols-rounded {
+        font-size: 22px;
+      }
+
+      /* —— the bottom nav — the hero —— */
+      .nav {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 26px;
+        padding: 0 14px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        z-index: 20;
+      }
+
+      .pill {
+        flex: 1;
+        height: 58px;
+        padding: 6px;
+        border-radius: 999px;
+        background: rgba(18, 16, 14, 0.68);
+        backdrop-filter: blur(28px) saturate(170%);
+        -webkit-backdrop-filter: blur(28px) saturate(170%);
+        border: 1px solid var(--hair-d-strong);
+        box-shadow:
+          0 1px 0 rgba(255, 240, 220, 0.04) inset,
+          0 20px 44px -14px rgba(0, 0, 0, 0.7),
+          0 4px 8px rgba(0, 0, 0, 0.4);
+        display: flex;
+        align-items: center;
+        justify-content: space-evenly;
+        position: relative;
+        overflow: hidden;
+      }
+      .pill::before {
+        /* subtle top-inner warmth */
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(180deg, rgba(255, 220, 170, 0.04) 0%, transparent 60%);
+        border-radius: inherit;
+        pointer-events: none;
+      }
+
+      .seg {
+        position: relative;
+        height: 46px;
+        border-radius: 999px;
+        padding: 0 14px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        font-family: var(--font-body);
+        font-weight: 500;
+        font-size: 13.5px;
+        letter-spacing: 0.002em;
+        color: var(--fog-55);
+        white-space: nowrap;
+        transition:
+          background 280ms cubic-bezier(0.3, 0.6, 0.2, 1),
+          color 220ms cubic-bezier(0.3, 0.6, 0.2, 1),
+          padding 260ms cubic-bezier(0.3, 0.6, 0.2, 1);
+      }
+      .seg .material-symbols-rounded {
+        font-size: 22px;
+        font-variation-settings:
+          'wght' 400,
+          'FILL' 0;
+        color: var(--amber-400);
+        width: 0;
+        opacity: 0;
+        overflow: hidden;
+        transition:
+          width 260ms cubic-bezier(0.3, 0.6, 0.2, 1),
+          opacity 220ms cubic-bezier(0.3, 0.6, 0.2, 1) 60ms,
+          font-variation-settings 220ms;
+      }
+      .seg:hover {
+        color: var(--fog-85);
+      }
+      .seg:active {
+        transform: scale(0.97);
+      }
+      .seg.active {
+        background: var(--amber-glow);
+        color: var(--amber-300);
+        padding: 0 18px 0 14px;
+      }
+      .seg.active .material-symbols-rounded {
+        width: 22px;
+        opacity: 1;
+        font-variation-settings:
+          'wght' 500,
+          'FILL' 1;
+      }
+
+      .search-blob {
+        flex: 0 0 auto;
+        width: 54px;
+        height: 54px;
+        border-radius: 999px;
+        background: rgba(18, 16, 14, 0.68);
+        backdrop-filter: blur(28px) saturate(170%);
+        -webkit-backdrop-filter: blur(28px) saturate(170%);
+        border: 1px solid var(--hair-d-strong);
+        box-shadow:
+          0 1px 0 rgba(255, 240, 220, 0.04) inset,
+          0 20px 44px -14px rgba(0, 0, 0, 0.7),
+          0 4px 8px rgba(0, 0, 0, 0.4);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--fog-85);
+        cursor: pointer;
+        transition:
+          transform 120ms ease,
+          color 180ms ease;
+      }
+      .search-blob:hover {
+        color: var(--amber-300);
+      }
+      .search-blob:active {
+        transform: scale(0.94);
+      }
+      .search-blob .material-symbols-rounded {
+        font-size: 24px;
+      }
+
+      /* —— notes panel —————————————————————————— */
+      .notes {
+        display: grid;
+        gap: 28px;
+        align-content: start;
+      }
+      .note {
+        border: 1px solid var(--hair-d);
+        border-radius: 18px;
+        padding: 22px 24px;
+        background: linear-gradient(180deg, rgba(255, 240, 220, 0.02), transparent);
+      }
+      .note h3 {
+        font-family: var(--font-body);
+        font-weight: 600;
+        font-size: 13px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--amber-400);
+        margin: 0 0 10px;
+      }
+      .note p,
+      .note li {
+        margin: 0;
+        color: var(--fog-70);
+        font-size: 14.5px;
+      }
+      .note ul {
+        margin: 0;
+        padding: 0 0 0 18px;
+        display: grid;
+        gap: 6px;
+      }
+      .note b {
+        color: var(--fog-95);
+        font-weight: 600;
+      }
+      .switcher {
+        display: inline-flex;
+        gap: 8px;
+        margin-top: 14px;
+        padding: 4px;
+        border-radius: 999px;
+        border: 1px solid var(--hair-d);
+        background: var(--ink-2);
+      }
+      .switcher button {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding: 6px 12px;
+        border-radius: 999px;
+        background: transparent;
+        border: none;
+        color: var(--fog-55);
+        cursor: pointer;
+        transition:
+          background 200ms ease,
+          color 200ms ease;
+      }
+      .switcher button.on {
+        background: var(--amber-glow-strong);
+        color: var(--amber-300);
+      }
+
+      /* —— variant strip ————————————————————————— */
+      .strip {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 32px;
+      }
+      .card {
+        border: 1px solid var(--hair-d);
+        border-radius: 22px;
+        padding: 24px;
+        background: linear-gradient(180deg, var(--ink-2), var(--ink-1));
+      }
+      .card .framelet {
+        position: relative;
+        border-radius: 26px;
+        overflow: hidden;
+        padding: 30px 12px;
+        background:
+          radial-gradient(ellipse at 50% 0%, rgba(241, 163, 59, 0.08), transparent 60%),
+          linear-gradient(180deg, #1a1610 0%, #0e0c0a 100%);
+        border: 1px solid var(--hair-d);
+      }
+      .card .framelet .mini-nav {
+        transform: scale(0.95);
+        transform-origin: bottom center;
+      }
+      .card-label {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        margin-top: 18px;
+      }
+      .card-label h4 {
+        margin: 0;
+        font-family: var(--font-display);
+        font-variation-settings: 'opsz' 24;
+        font-weight: 460;
+        font-size: 22px;
+        color: var(--fog-95);
+      }
+      .card-label span {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--fog-55);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      /* —— theme variant (light) ———————————————— */
+      .light .pill,
+      .light .search-blob {
+        background: rgba(253, 251, 245, 0.74);
+        border-color: var(--hair-l-strong);
+        box-shadow:
+          0 1px 0 rgba(255, 255, 255, 0.7) inset,
+          0 20px 44px -14px rgba(32, 24, 12, 0.3),
+          0 4px 8px rgba(32, 24, 12, 0.14);
+      }
+      .light .pill::before {
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.6) 0%, transparent 60%);
+      }
+      .light .seg {
+        color: var(--ink-55);
+      }
+      .light .seg:hover {
+        color: var(--ink-95);
+      }
+      .light .seg.active {
+        color: var(--amber-600);
+        background: rgba(241, 163, 59, 0.22);
+      }
+      .light .seg .material-symbols-rounded {
+        color: var(--amber-600);
+      }
+      .light .search-blob {
+        color: var(--ink-70);
+      }
+      .light .framelet {
+        background:
+          radial-gradient(ellipse at 50% 0%, rgba(241, 163, 59, 0.12), transparent 60%),
+          linear-gradient(180deg, var(--pearl-0), var(--pearl-1));
+        border-color: var(--hair-l);
+      }
+
+      /* —— spec tables ————————————————————————— */
+      .specs {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 32px;
+      }
+      .spec {
+        border: 1px solid var(--hair-d);
+        border-radius: 20px;
+        padding: 22px 24px;
+        background: var(--ink-1);
+      }
+      .spec h3 {
+        margin: 0 0 14px;
+        font-family: var(--font-display);
+        font-variation-settings: 'opsz' 36;
+        font-weight: 440;
+        font-size: 20px;
+        color: var(--fog-95);
+      }
+      .kv {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        column-gap: 20px;
+        row-gap: 10px;
+        font-family: var(--font-mono);
+        font-size: 12.5px;
+      }
+      .kv dt {
+        color: var(--amber-400);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .kv dd {
+        margin: 0;
+        color: var(--fog-85);
+      }
+
+      .swatches {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+        margin-top: 8px;
+      }
+      .sw {
+        height: 58px;
+        border-radius: 12px;
+        border: 1px solid var(--hair-d);
+        position: relative;
+        display: flex;
+        align-items: flex-end;
+        padding: 8px;
+        font-family: var(--font-mono);
+        font-size: 10.5px;
+        color: var(--fog-85);
+      }
+      .sw.ink0 {
+        background: var(--ink-0);
+      }
+      .sw.ink1 {
+        background: var(--ink-1);
+      }
+      .sw.ink2 {
+        background: var(--ink-2);
+      }
+      .sw.ink3 {
+        background: var(--ink-3);
+      }
+      .sw.amb4 {
+        background: var(--amber-400);
+        color: var(--ink-0);
+      }
+      .sw.amb5 {
+        background: var(--amber-500);
+        color: var(--ink-0);
+      }
+      .sw.amb-glow {
+        background: var(--amber-glow);
+      }
+      .sw.pearl {
+        background: var(--pearl-0);
+        color: var(--ink-70);
+      }
+
+      /* —— states gallery ————————————————————— */
+      .states {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 28px;
+      }
+      .state-card {
+        border: 1px solid var(--hair-d);
+        border-radius: 22px;
+        padding: 26px;
+        background: linear-gradient(180deg, var(--ink-2), var(--ink-1));
+      }
+      .state-card h4 {
+        margin: 0 0 4px;
+        font-family: var(--font-display);
+        font-variation-settings: 'opsz' 36;
+        font-weight: 440;
+        font-size: 20px;
+        color: var(--fog-95);
+      }
+      .state-card p {
+        margin: 0 0 18px;
+        color: var(--fog-55);
+        font-size: 14px;
+      }
+      .state-card .framelet {
+        min-height: 140px;
+      }
+
+      /* —— Flutter translation ————————————————— */
+      .xlate {
+        border: 1px solid var(--hair-d);
+        border-radius: 22px;
+        padding: 34px;
+        background: linear-gradient(180deg, rgba(241, 163, 59, 0.05), transparent 40%);
+      }
+      .xlate h3 {
+        margin: 0 0 6px;
+        font-family: var(--font-display);
+        font-variation-settings: 'opsz' 60;
+        font-weight: 460;
+        font-size: 28px;
+        color: var(--fog-95);
+      }
+      .xlate h3 em {
+        font-style: italic;
+        color: var(--amber-300);
+        font-weight: 380;
+      }
+      .xlate > p {
+        margin: 0 0 26px;
+        color: var(--fog-55);
+        max-width: 68ch;
+      }
+      .xlate-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 24px;
+      }
+      .xlate-grid .block {
+        border: 1px solid var(--hair-d);
+        border-radius: 16px;
+        padding: 22px;
+        background: var(--ink-1);
+      }
+      .xlate-grid h5 {
+        margin: 0 0 12px;
+        font-size: 13px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--amber-400);
+        font-weight: 600;
+      }
+      .xlate code,
+      .xlate pre {
+        font-family: var(--font-mono);
+        font-size: 12.5px;
+        color: var(--fog-85);
+      }
+      .xlate pre {
+        margin: 0;
+        padding: 14px;
+        background: var(--ink-0);
+        border: 1px solid var(--hair-d);
+        border-radius: 10px;
+        overflow-x: auto;
+        line-height: 1.65;
+      }
+      .xlate ul {
+        padding: 0 0 0 18px;
+        margin: 0;
+        display: grid;
+        gap: 6px;
+        color: var(--fog-70);
+        font-size: 14px;
+      }
+
+      /* —— open qs ———————————————————————————— */
+      .open-qs {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 24px;
+      }
+      .qq {
+        border: 1px dashed var(--amber-ring);
+        border-radius: 18px;
+        padding: 24px;
+        background: linear-gradient(180deg, rgba(241, 163, 59, 0.06), transparent);
+      }
+      .qq h4 {
+        margin: 0 0 8px;
+        font-family: var(--font-display);
+        font-variation-settings: 'opsz' 36;
+        font-style: italic;
+        font-weight: 400;
+        font-size: 22px;
+        color: var(--amber-200);
+      }
+      .qq p {
+        margin: 0 0 12px;
+        color: var(--fog-85);
+        font-size: 14.5px;
+      }
+      .qq ol {
+        padding: 0 0 0 20px;
+        margin: 0;
+        color: var(--fog-70);
+        font-size: 14px;
+        display: grid;
+        gap: 8px;
+      }
+      .qq b {
+        color: var(--fog-95);
+        font-weight: 600;
+      }
+
+      footer {
+        margin-top: 120px;
+        padding-top: 32px;
+        border-top: 1px solid var(--hair-d);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        color: var(--fog-55);
+        font-family: var(--font-mono);
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      @media (max-width: 920px) {
+        .stage,
+        .strip,
+        .specs,
+        .states,
+        .xlate-grid,
+        .open-qs {
+          grid-template-columns: 1fr;
+        }
+        .masthead {
+          grid-template-columns: 1fr;
+          gap: 32px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="masthead">
+        <div>
+          <span class="tag">Design spec · v0.1</span>
+          <h1>Bottom nav,<br /><em>re-loomed</em> in warm ink.</h1>
+          <p class="lede">
+            A floating three-stop nav plus an outboard search bloom — Google Photos' clarity, Gallery's darkroom temper.
+            Three destinations: Photos, Albums, Library. Search steps outside the pill; tapping it always lands on
+            Photos and opens the FilterSheet shipped in PR 1.3.
+          </p>
+        </div>
+        <dl class="meta">
+          <dt>File</dt>
+          <dd>docs/plans/mockups/2026-04-18-mobile-bottom-nav.html</dd>
+          <dt>Scope</dt>
+          <dd>Flutter mobile — new widget, upstream tab_shell untouched</dd>
+          <dt>Status</dt>
+          <dd>Approved · 2026-04-18 · ready for design doc + impl plan</dd>
+          <dt>Theme</dt>
+          <dd>Respects user ImmichColorPreset; amber shown as aesthetic demo</dd>
+        </dl>
+      </header>
+
+      <section id="stage">
+        <span class="eyebrow">01 — Primary state</span>
+        <h2>Dark surface, <em>amber</em> glow.</h2>
+        <p class="section-lede">
+          The pill floats 26 pt above the home indicator; the search bubble rides the same baseline. Tap a tab and the
+          amber glow slides with a 280 ms spring, icon fades in, label shifts to the accent hue. Inactive tabs keep
+          their label (no icon) — the primary row stays readable at a glance.
+        </p>
+
+        <div class="stage">
+          <div class="phone" id="liveStage">
+            <div class="phone-screen">
+              <div class="backdrop">
+                <div class="tile a"></div>
+                <div class="tile b"></div>
+                <div class="tile c"></div>
+                <div class="tile d"></div>
+                <div class="tile e"></div>
+                <div class="tile f"></div>
+                <div class="tile b"></div>
+                <div class="tile a"></div>
+                <div class="tile c"></div>
+                <div class="tile f"></div>
+                <div class="tile d"></div>
+                <div class="tile e"></div>
+              </div>
+              <div class="appbar">
+                <div class="appbar-title">Gallery</div>
+                <div class="appbar-dots">
+                  <span class="material-symbols-rounded">add</span>
+                  <span class="material-symbols-rounded">notifications</span>
+                  <span class="material-symbols-rounded">account_circle</span>
+                </div>
+              </div>
+              <div class="nav" id="liveNav">
+                <div class="pill">
+                  <button class="seg active" data-tab="photos">
+                    <span class="material-symbols-rounded">photo_library</span>
+                    <span class="label">Photos</span>
+                  </button>
+                  <button class="seg" data-tab="albums">
+                    <span class="material-symbols-rounded">photo_album</span>
+                    <span class="label">Albums</span>
+                  </button>
+                  <button class="seg" data-tab="library">
+                    <span class="material-symbols-rounded">space_dashboard</span>
+                    <span class="label">Library</span>
+                  </button>
+                </div>
+                <button class="search-blob" aria-label="Search">
+                  <span class="material-symbols-rounded">search</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="notes">
+            <div class="note">
+              <h3>Try it</h3>
+              <p>
+                Tap any label in the frame to switch active state. The pill slides, the icon fades in, and haptic
+                feedback fires in the Flutter build.
+              </p>
+              <div class="switcher" id="switcher">
+                <button class="on" data-target="photos">Photos</button>
+                <button data-target="albums">Albums</button>
+                <button data-target="library">Library</button>
+              </div>
+            </div>
+            <div class="note">
+              <h3>Why amber, not blue</h3>
+              <p>
+                Google Photos leans on clinical tech-blue. Gallery is forked for a warmer, photography-first audience,
+                and the nav is its most-seen surface. Sodium-lamp amber ties the nav to the brand's darkroom lineage and
+                gives the active state a glow that reads as <b>warm</b>, not flat.
+              </p>
+              <p style="margin-top: 10px">
+                In production the color resolves from
+                <code>theme.colorScheme.primary</code> — whatever preset the user picked in settings. Amber is the demo
+                swatch.
+              </p>
+            </div>
+            <div class="note">
+              <h3>Three visible stops</h3>
+              <ul>
+                <li><b>Photos</b> — main timeline (unchanged)</li>
+                <li>
+                  <b>Albums</b> — existing Immich albums page re-linked from the bottom nav (default target
+                  <code>DriftAlbumsRoute</code>)
+                </li>
+                <li>
+                  <b>Library</b> — existing Gallery library page (<code>DriftLibraryRoute</code>); replaces today's
+                  Spaces tab. Spaces surfacing inside Library is a follow-up design, out of scope here.
+                </li>
+                <li>
+                  <b>Search</b> — not a tab; a peer blob. Tap routes to Photos (if elsewhere) and opens the FilterSheet
+                  at Browse with the text-pill focused.
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="variants">
+        <span class="eyebrow">02 — All three states</span>
+        <h2>Each destination, <em>centered</em>.</h2>
+        <p class="section-lede">
+          Segment widths breathe with the active label. The pill keeps a fixed shell; inactive stops collapse to their
+          label, leaving room for the active stop to carry both icon and text.
+        </p>
+
+        <div class="strip">
+          <div class="card">
+            <div class="framelet">
+              <div class="nav mini-nav">
+                <div class="pill">
+                  <button class="seg active">
+                    <span class="material-symbols-rounded">photo_library</span>
+                    <span class="label">Photos</span>
+                  </button>
+                  <button class="seg"><span class="label">Albums</span></button>
+                  <button class="seg"><span class="label">Library</span></button>
+                </div>
+                <button class="search-blob" aria-label="Search">
+                  <span class="material-symbols-rounded">search</span>
+                </button>
+              </div>
+            </div>
+            <div class="card-label">
+              <h4>Photos</h4>
+              <span>default landing</span>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="framelet">
+              <div class="nav mini-nav">
+                <div class="pill">
+                  <button class="seg"><span class="label">Photos</span></button>
+                  <button class="seg active">
+                    <span class="material-symbols-rounded">photo_album</span>
+                    <span class="label">Albums</span>
+                  </button>
+                  <button class="seg"><span class="label">Library</span></button>
+                </div>
+                <button class="search-blob" aria-label="Search">
+                  <span class="material-symbols-rounded">search</span>
+                </button>
+              </div>
+            </div>
+            <div class="card-label">
+              <h4>Albums</h4>
+              <span>destination B</span>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="framelet">
+              <div class="nav mini-nav">
+                <div class="pill">
+                  <button class="seg"><span class="label">Photos</span></button>
+                  <button class="seg"><span class="label">Albums</span></button>
+                  <button class="seg active">
+                    <span class="material-symbols-rounded">space_dashboard</span>
+                    <span class="label">Library</span>
+                  </button>
+                </div>
+                <button class="search-blob" aria-label="Search">
+                  <span class="material-symbols-rounded">search</span>
+                </button>
+              </div>
+            </div>
+            <div class="card-label">
+              <h4>Library</h4>
+              <span>collections + shortcuts</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="light">
+        <span class="eyebrow">03 — Light theme</span>
+        <h2>Pearl and warm <em>ink</em>.</h2>
+        <p class="section-lede">
+          The same glass-pill treatment carries across themes — pearl surface, ink text, amber fill at 22% for higher
+          contrast on light backdrops. Backdrop blur remains the binder; depth from shadow gets dialled down to match
+          the softer ambient.
+        </p>
+
+        <div class="strip light">
+          <div class="card" style="background: var(--pearl-0); border-color: var(--hair-l)">
+            <div class="framelet">
+              <div class="nav mini-nav">
+                <div class="pill">
+                  <button class="seg active">
+                    <span class="material-symbols-rounded">photo_library</span>
+                    <span class="label">Photos</span>
+                  </button>
+                  <button class="seg"><span class="label">Albums</span></button>
+                  <button class="seg"><span class="label">Library</span></button>
+                </div>
+                <button class="search-blob" aria-label="Search">
+                  <span class="material-symbols-rounded">search</span>
+                </button>
+              </div>
+            </div>
+            <div class="card-label">
+              <h4 style="color: var(--ink-95)">Photos · light</h4>
+              <span style="color: var(--ink-55)">default landing</span>
+            </div>
+          </div>
+          <div class="card" style="background: var(--pearl-0); border-color: var(--hair-l)">
+            <div class="framelet">
+              <div class="nav mini-nav">
+                <div class="pill">
+                  <button class="seg"><span class="label">Photos</span></button>
+                  <button class="seg active">
+                    <span class="material-symbols-rounded">photo_album</span>
+                    <span class="label">Albums</span>
+                  </button>
+                  <button class="seg"><span class="label">Library</span></button>
+                </div>
+                <button class="search-blob" aria-label="Search">
+                  <span class="material-symbols-rounded">search</span>
+                </button>
+              </div>
+            </div>
+            <div class="card-label">
+              <h4 style="color: var(--ink-95)">Albums · light</h4>
+              <span style="color: var(--ink-55)">destination B</span>
+            </div>
+          </div>
+          <div class="card" style="background: var(--pearl-0); border-color: var(--hair-l)">
+            <div class="framelet">
+              <div class="nav mini-nav">
+                <div class="pill">
+                  <button class="seg"><span class="label">Photos</span></button>
+                  <button class="seg"><span class="label">Albums</span></button>
+                  <button class="seg active">
+                    <span class="material-symbols-rounded">space_dashboard</span>
+                    <span class="label">Library</span>
+                  </button>
+                </div>
+                <button class="search-blob" aria-label="Search">
+                  <span class="material-symbols-rounded">search</span>
+                </button>
+              </div>
+            </div>
+            <div class="card-label">
+              <h4 style="color: var(--ink-95)">Library · light</h4>
+              <span style="color: var(--ink-55)">fork-only</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="specs">
+        <span class="eyebrow">04 — Tokens &amp; geometry</span>
+        <h2>The grammar, <em>written down</em>.</h2>
+        <p class="section-lede">
+          Dimensions are expressed in Flutter logical pixels (pt). Colours show the demo palette; the Flutter widget
+          reads the same roles from <code>theme.colorScheme</code>.
+        </p>
+
+        <div class="specs">
+          <div class="spec">
+            <h3>Geometry</h3>
+            <dl class="kv">
+              <dt>pill h</dt>
+              <dd>58 pt</dd>
+              <dt>pill r</dt>
+              <dd>999 (full round)</dd>
+              <dt>pill pad</dt>
+              <dd>6 pt</dd>
+              <dt>seg h</dt>
+              <dd>46 pt</dd>
+              <dt>seg r</dt>
+              <dd>999 (full round)</dd>
+              <dt>seg pad idle</dt>
+              <dd>0 14 pt</dd>
+              <dt>seg pad active</dt>
+              <dd>0 18 0 14 pt</dd>
+              <dt>seg gap</dt>
+              <dd>6 pt (icon ↔ label)</dd>
+              <dt>blob Ø</dt>
+              <dd>54 pt</dd>
+              <dt>blob gap</dt>
+              <dd>10 pt from pill</dd>
+              <dt>nav margin</dt>
+              <dd>14 pt side · 26 pt bottom + safe area</dd>
+              <dt>hit target</dt>
+              <dd>≥ 44×44 pt per WCAG 2.5.5</dd>
+            </dl>
+          </div>
+
+          <div class="spec">
+            <h3>Motion</h3>
+            <dl class="kv">
+              <dt>tab swap</dt>
+              <dd>280 ms cubic(0.3, 0.6, 0.2, 1)</dd>
+              <dt>icon fade</dt>
+              <dd>220 ms, 60 ms start delay</dd>
+              <dt>press scale</dt>
+              <dd>0.97 · 100 ms ease-out</dd>
+              <dt>search scale</dt>
+              <dd>0.94 on press · 120 ms</dd>
+              <dt>haptic</dt>
+              <dd>selectionClick on tap</dd>
+              <dt>reduced motion</dt>
+              <dd>skip position tween; swap in 1 frame</dd>
+              <dt>show/hide</dt>
+              <dd>fade + 12 pt slide (keyboard / multi-select)</dd>
+            </dl>
+          </div>
+
+          <div class="spec">
+            <h3>Type</h3>
+            <dl class="kv">
+              <dt>label fam</dt>
+              <dd>Archivo (Google) · weight 500</dd>
+              <dt>label sz</dt>
+              <dd>13.5 pt · tracking 0.002 em</dd>
+              <dt>label case</dt>
+              <dd>sentence (Photos, Albums, Library)</dd>
+              <dt>mockup disp</dt>
+              <dd>Fraunces — not shipped, for doc chrome only</dd>
+              <dt>icon fam</dt>
+              <dd>Material Symbols Rounded (already bundled)</dd>
+              <dt>icon wght</dt>
+              <dd>400 idle → 500 active</dd>
+              <dt>icon FILL</dt>
+              <dd>0 idle → 1 active</dd>
+            </dl>
+          </div>
+
+          <div class="spec">
+            <h3>Dark palette</h3>
+            <div class="swatches">
+              <div class="sw ink0">ink-0</div>
+              <div class="sw ink1">ink-1</div>
+              <div class="sw ink2">ink-2</div>
+              <div class="sw ink3">ink-3</div>
+              <div class="sw amb5">amb-500</div>
+              <div class="sw amb4">amb-400</div>
+              <div class="sw amb-glow">glow 16%</div>
+              <div class="sw pearl">pearl-0</div>
+            </div>
+          </div>
+
+          <div class="spec">
+            <h3>Surface</h3>
+            <dl class="kv">
+              <dt>pill bg</dt>
+              <dd>rgba(18,16,14,0.68) + blur 28 sat 170%</dd>
+              <dt>pill border</dt>
+              <dd>1 pt rgba(255,240,220,0.14)</dd>
+              <dt>pill shadow</dt>
+              <dd>0 20 44 -14 #000a · 0 4 8 #0006</dd>
+              <dt>active fill</dt>
+              <dd>primary @ 16% opacity</dd>
+              <dt>active fg</dt>
+              <dd>primary @ 100%</dd>
+              <dt>idle fg</dt>
+              <dd>on-surface @ 55%</dd>
+              <dt>blob bg</dt>
+              <dd>same as pill</dd>
+              <dt>blob icon</dt>
+              <dd>on-surface @ 85% (amber on hover)</dd>
+            </dl>
+          </div>
+
+          <div class="spec">
+            <h3>Accessibility</h3>
+            <ul style="margin: 0; padding: 0 0 0 18px; display: grid; gap: 8px; font-size: 14px; color: var(--fog-70)">
+              <li>Semantics labels: <code>Photos, selected</code> / <code>Albums</code> / …</li>
+              <li>TalkBack announces switch as live region</li>
+              <li>Tap targets ≥ 44×44 pt — seg width minimum 66 pt</li>
+              <li>Contrast AA on label vs surface in both themes</li>
+              <li>Disable animations when <code>MediaQuery.disableAnimations</code></li>
+              <li>RTL: pill flip; search blob stays right (per platform norm)</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="states">
+        <span class="eyebrow">05 — Edge states</span>
+        <h2>What happens when <em>reality</em> intrudes.</h2>
+        <p class="section-lede">
+          The nav is not always on-screen. It hides for multi-select, hides when the keyboard is up, and folds into a
+          rail in landscape — inheriting today's tab_shell behaviour, not inventing new rules.
+        </p>
+
+        <div class="states">
+          <div class="state-card">
+            <h4>Keyboard open</h4>
+            <p>Slide out 12 pt + fade. The nav is decorative while the user types; re-emerges on focus loss.</p>
+            <div class="framelet" style="min-height: 120px; opacity: 0.25; filter: blur(1px)">
+              <div class="nav mini-nav">
+                <div class="pill">
+                  <button class="seg active">
+                    <span class="material-symbols-rounded">photo_library</span>
+                    <span class="label">Photos</span>
+                  </button>
+                  <button class="seg"><span class="label">Albums</span></button>
+                  <button class="seg"><span class="label">Library</span></button>
+                </div>
+                <button class="search-blob" aria-label="Search">
+                  <span class="material-symbols-rounded">search</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="state-card">
+            <h4>Multi-select active</h4>
+            <p>
+              Listens to <code>MultiSelectToggleEvent</code> and hides — identical behaviour to upstream
+              <code>_BottomNavigationBar</code>. The existing contextual action bar takes over.
+            </p>
+            <div
+              class="framelet"
+              style="
+                min-height: 120px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: var(--fog-40);
+                font-family: var(--font-mono);
+                font-size: 12px;
+              "
+            >
+              (nav hidden · selection bar owns the bottom)
+            </div>
+          </div>
+
+          <div class="state-card">
+            <h4>Landscape</h4>
+            <p>
+              Fall back to a vertical <code>NavigationRail</code> on the leading edge — same as today. The pill
+              aesthetic is portrait-first; rail keeps the fork's existing landscape contract intact.
+            </p>
+            <div class="framelet" style="min-height: 120px">
+              <div style="display: flex; align-items: stretch; gap: 14px; height: 120px">
+                <div
+                  style="
+                    width: 76px;
+                    background: var(--ink-2);
+                    border-radius: 14px;
+                    border: 1px solid var(--hair-d);
+                    padding: 10px 0;
+                    display: grid;
+                    grid-auto-rows: 1fr;
+                    gap: 8px;
+                    align-items: center;
+                    justify-items: center;
+                    color: var(--fog-55);
+                    font-family: var(--font-body);
+                    font-size: 10px;
+                  "
+                >
+                  <div style="color: var(--amber-400); display: grid; justify-items: center; gap: 4px">
+                    <span class="material-symbols-rounded" style="font-size: 20px">photo_library</span
+                    ><span>Photos</span>
+                  </div>
+                  <div style="display: grid; justify-items: center; gap: 4px">
+                    <span class="material-symbols-rounded" style="font-size: 20px">photo_album</span><span>Albums</span>
+                  </div>
+                  <div style="display: grid; justify-items: center; gap: 4px">
+                    <span class="material-symbols-rounded" style="font-size: 20px">space_dashboard</span
+                    ><span>Library</span>
+                  </div>
+                  <div style="display: grid; justify-items: center; gap: 4px">
+                    <span class="material-symbols-rounded" style="font-size: 20px">search</span><span>Search</span>
+                  </div>
+                </div>
+                <div
+                  style="
+                    flex: 1;
+                    border-radius: 14px;
+                    background: linear-gradient(135deg, #1a1410, #0c0a08);
+                    border: 1px solid var(--hair-d);
+                  "
+                ></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="state-card">
+            <h4>Readonly mode</h4>
+            <p>
+              Disabled tabs dim to 30% and refuse taps, matching the existing
+              <code>isReadonlyModeEnabled</code> contract. Only Photos stays live when readonly.
+            </p>
+            <div class="framelet" style="min-height: 120px">
+              <div class="nav mini-nav">
+                <div class="pill">
+                  <button class="seg active">
+                    <span class="material-symbols-rounded">photo_library</span>
+                    <span class="label">Photos</span>
+                  </button>
+                  <button class="seg" style="opacity: 0.3; pointer-events: none">
+                    <span class="label">Albums</span>
+                  </button>
+                  <button class="seg" style="opacity: 0.3; pointer-events: none">
+                    <span class="label">Library</span>
+                  </button>
+                </div>
+                <button class="search-blob" aria-label="Search" style="opacity: 0.3; pointer-events: none">
+                  <span class="material-symbols-rounded">search</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="flutter">
+        <span class="eyebrow">06 — Flutter translation</span>
+        <h2>How it <em>lands</em> in the codebase.</h2>
+        <div class="xlate">
+          <h3>Parallel shell, <em>untouched</em> upstream.</h3>
+          <p>
+            <code>mobile/lib/pages/common/tab_shell.page.dart</code> stays exactly as upstream ships it. A fork-only
+            <code>GalleryTabShellPage</code> lives at a sibling path, and the router flips its root to the new shell. A
+            single line changes in <code>router.dart</code> — the kind of edit that survives
+            <code>git rebase --onto</code> cleanly.
+          </p>
+          <div class="xlate-grid">
+            <div class="block">
+              <h5>New files (fork-only)</h5>
+              <ul>
+                <li><code>presentation/pages/common/gallery_tab_shell.page.dart</code></li>
+                <li><code>presentation/widgets/gallery_nav/gallery_bottom_nav.widget.dart</code></li>
+                <li><code>presentation/widgets/gallery_nav/gallery_nav_pill.widget.dart</code></li>
+                <li><code>presentation/widgets/gallery_nav/gallery_nav_segment.widget.dart</code></li>
+                <li><code>presentation/widgets/gallery_nav/gallery_search_blob.widget.dart</code></li>
+                <li><code>providers/gallery_nav/gallery_nav_destination.dart</code> (enum)</li>
+              </ul>
+            </div>
+            <div class="block">
+              <h5>Touched (minimal)</h5>
+              <ul>
+                <li>
+                  <code>routing/router.dart</code> — swap root from <code>TabShellRoute</code> to
+                  <code>GalleryTabShellRoute</code>. One-liner under a fork-only comment.
+                </li>
+                <li>
+                  <code>i18n/en.json</code> — 3 new keys (<code>nav.photos</code>, <code>nav.albums</code>,
+                  <code>nav.library</code>).
+                </li>
+              </ul>
+            </div>
+            <div class="block">
+              <h5>Widget shape</h5>
+              <pre>
+GalleryTabShellPage
+└─ AutoTabsRouter
+   ├─ routes: [MainTimeline, DriftAlbums, DriftLibrary]
+   └─ Scaffold
+      ├─ body: child
+      └─ GalleryBottomNav(tabsRouter)
+         ├─ GalleryNavPill
+         │   ├─ NavSegment (Photos)
+         │   ├─ NavSegment (Albums)
+         │   └─ NavSegment (Library)
+         └─ GallerySearchBlob
+            → onTap → openSearch(context, ref)</pre
+              >
+            </div>
+            <div class="block">
+              <h5>Active-pill animation</h5>
+              <p style="color: var(--fog-70); font-size: 14px; margin: 0 0 10px">
+                A single <code>AnimatedPositioned</code> underlay slides behind the active segment; icon uses
+                <code>AnimatedSize</code> + <code>AnimatedOpacity</code>. No stateful custom painters.
+              </p>
+              <pre>
+Stack(children: [
+  AnimatedPositioned(           // amber-glow underlay
+    duration: 280ms,
+    curve: emphasisedDecelerate,
+    left: activeLeft,
+    width: activeWidth,
+    child: AmberGlow(),
+  ),
+  Row(children: segments),
+])</pre
+              >
+            </div>
+            <div class="block">
+              <h5>Shared behaviour with upstream</h5>
+              <ul>
+                <li>Hides on <code>MultiSelectToggleEvent</code></li>
+                <li>Falls back to <code>NavigationRail</code> landscape</li>
+                <li>Respects <code>readonlyModeProvider</code> — only Photos enabled</li>
+                <li>
+                  Fires <code>hapticFeedbackProvider.selectionClick</code>
+                  on switch
+                </li>
+                <li>
+                  Writes <code>tabProvider</code> (only Photos index survives — Albums/Library add new enum cases)
+                </li>
+              </ul>
+            </div>
+            <div class="block">
+              <h5>Testing</h5>
+              <ul>
+                <li>Widget test per state (Photos/Albums/Library active)</li>
+                <li>Tap swap updates <code>tabsRouter.activeIndex</code></li>
+                <li>Search blob tap opens target (see open Q2)</li>
+                <li>Hides on <code>MultiSelectToggleEvent.enabled</code></li>
+                <li>Respects <code>MediaQuery.disableAnimations</code></li>
+                <li>Golden in dark + light</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="open">
+        <span class="eyebrow">07 — Decisions locked</span>
+        <h2>What the nav <em>actually does</em>.</h2>
+        <p class="section-lede">
+          Two questions surfaced during brainstorm; both resolved with the smallest-change-that-works instinct the fork
+          has been running on.
+        </p>
+
+        <div class="open-qs">
+          <div class="qq" style="border-style: solid; border-color: var(--hair-d-strong)">
+            <h4>Albums → existing Immich page</h4>
+            <p>
+              The Immich albums page was de-linked from the bottom nav in PR #116 but never deleted. The new nav
+              re-links it — no new landing page, no rename.
+            </p>
+            <ul style="padding-left: 18px; color: var(--fog-70); font-size: 14px; display: grid; gap: 6px; margin: 0">
+              <li>Target route: <code>DriftAlbumsRoute</code> (Drift-based, aligns with the rest of the tab shell).</li>
+              <li>
+                Legacy <code>AlbumsRoute</code> (Isar) remains as a fallback option if Drift parity isn't reached at
+                ship time — call out at PR-draft.
+              </li>
+              <li>
+                <b>Spaces</b> (ex-tab in the current shell) steps out of the bottom nav. Surfacing Spaces inside
+                <code>DriftLibraryPage</code> is out-of-scope for this work and tracked as a follow-up.
+              </li>
+            </ul>
+          </div>
+
+          <div class="qq" style="border-style: solid; border-color: var(--hair-d-strong)">
+            <h4>Search blob → Photos + FilterSheet</h4>
+            <p>Tap behaviour is deterministic regardless of the current tab:</p>
+            <ul style="padding-left: 18px; color: var(--fog-70); font-size: 14px; display: grid; gap: 6px; margin: 0">
+              <li>
+                If not on Photos: navigate to
+                <code>MainTimelineRoute</code>.
+              </li>
+              <li>Open the FilterSheet at the Browse snap (shipped in PR 1.3).</li>
+              <li>
+                Focus the text-search pill inside the sheet; request keyboard. The sheet's existing debounce handles
+                input.
+              </li>
+              <li>
+                <code>DriftSearchPage</code> is no longer a tab; it remains a reachable route for anything in-app that
+                deep-links to it.
+              </li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <footer>
+        <span>Gallery · Darkroom Warmth · 2026-04-18 draft</span>
+        <span>press P · A · S to preview the switch</span>
+      </footer>
+    </div>
+
+    <script>
+      const labels = document.querySelectorAll('#liveNav .seg');
+      const switcher = document.querySelectorAll('#switcher button');
+
+      function setActive(tab) {
+        labels.forEach((el) => {
+          const on = el.dataset.tab === tab;
+          el.classList.toggle('active', on);
+        });
+        switcher.forEach((b) => {
+          b.classList.toggle('on', b.dataset.target === tab);
+        });
+      }
+
+      labels.forEach((el) => {
+        el.addEventListener('click', () => setActive(el.dataset.tab));
+      });
+      switcher.forEach((b) => {
+        b.addEventListener('click', () => setActive(b.dataset.target));
+      });
+
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'p' || e.key === 'P') setActive('photos');
+        if (e.key === 'a' || e.key === 'A') setActive('albums');
+        if (e.key === 'l' || e.key === 'L') setActive('library');
+      });
+    </script>
+  </body>
+</html>
