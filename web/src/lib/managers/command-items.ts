@@ -243,7 +243,9 @@ export const COMMAND_ITEMS: readonly CommandItem[] = [
     icon: mdiRenameOutline,
     isAvailable: (ctx) => ctx.album !== null && ctx.album.isOwner,
     handler: (ctx) => {
-      if (!ctx?.album) return;
+      if (!ctx?.album) {
+        return;
+      }
       return modalManager.show(AlbumEditModal, { album: ctx.album.raw });
     },
   },
@@ -254,7 +256,9 @@ export const COMMAND_ITEMS: readonly CommandItem[] = [
     icon: mdiShareVariantOutline,
     isAvailable: (ctx) => ctx.album !== null && ctx.album.isOwner,
     handler: (ctx) => {
-      if (!ctx?.album) return;
+      if (!ctx?.album) {
+        return;
+      }
       return modalManager.show(AlbumOptionsModal, { album: ctx.album.raw });
     },
   },
@@ -265,7 +269,9 @@ export const COMMAND_ITEMS: readonly CommandItem[] = [
     icon: mdiDownload,
     isAvailable: (ctx) => ctx.album !== null,
     handler: (ctx) => {
-      if (!ctx?.album) return;
+      if (!ctx?.album) {
+        return;
+      }
       return handleDownloadAlbum(ctx.album.raw);
     },
   },
@@ -277,7 +283,9 @@ export const COMMAND_ITEMS: readonly CommandItem[] = [
     destructive: true,
     isAvailable: (ctx) => ctx.album !== null && !ctx.album.isOwner && ctx.album.isMember,
     handler: async (ctx) => {
-      if (!ctx?.album) return;
+      if (!ctx?.album) {
+        return;
+      }
       if (!ctx.userId) {
         console.warn('[cmdk] cmd:album_leave missing userId — context misconfigured');
         return;
@@ -299,7 +307,9 @@ export const COMMAND_ITEMS: readonly CommandItem[] = [
     destructive: true,
     isAvailable: (ctx) => ctx.album !== null && ctx.album.isOwner,
     handler: async (ctx) => {
-      if (!ctx?.album) return;
+      if (!ctx?.album) {
+        return;
+      }
       const ok = await handleDeleteAlbum(ctx.album.raw, { prompt: false });
       if (ok) {
         await goto(Route.albums());
@@ -316,7 +326,9 @@ export const COMMAND_ITEMS: readonly CommandItem[] = [
     icon: mdiAccountGroupOutline,
     isAvailable: (ctx) => ctx.space !== null && ctx.space.isOwner,
     handler: (ctx) => {
-      if (!ctx?.space) return;
+      if (!ctx?.space) {
+        return;
+      }
       return modalManager.show(SpaceMembersModal, {
         spaceId: ctx.space.id,
         members: ctx.space.members,
@@ -332,7 +344,9 @@ export const COMMAND_ITEMS: readonly CommandItem[] = [
     icon: mdiAccountPlus,
     isAvailable: (ctx) => ctx.space !== null && ctx.space.isOwner,
     handler: (ctx) => {
-      if (!ctx?.space) return;
+      if (!ctx?.space) {
+        return;
+      }
       return modalManager.show(SpaceAddMemberModal, {
         spaceId: ctx.space.id,
         existingMemberIds: ctx.space.members.map((m) => m.userId),
@@ -347,7 +361,9 @@ export const COMMAND_ITEMS: readonly CommandItem[] = [
     destructive: true,
     isAvailable: (ctx) => ctx.space !== null && ctx.space.canWrite,
     handler: async (ctx) => {
-      if (!ctx?.space) return;
+      if (!ctx?.space) {
+        return;
+      }
       const $t = get(t);
       try {
         await bulkAddAssets({ id: ctx.space.id });
@@ -365,7 +381,9 @@ export const COMMAND_ITEMS: readonly CommandItem[] = [
     destructive: true,
     isAvailable: (ctx) => ctx.space !== null && !ctx.space.isOwner && ctx.space.isMember,
     handler: async (ctx) => {
-      if (!ctx?.space) return;
+      if (!ctx?.space) {
+        return;
+      }
       if (!ctx.userId) {
         console.warn('[cmdk] cmd:space_leave missing userId — context misconfigured');
         return;
@@ -387,7 +405,9 @@ export const COMMAND_ITEMS: readonly CommandItem[] = [
     destructive: true,
     isAvailable: (ctx) => ctx.space !== null && ctx.space.isOwner,
     handler: async (ctx) => {
-      if (!ctx?.space) return;
+      if (!ctx?.space) {
+        return;
+      }
       const $t = get(t);
       try {
         await removeSpace({ id: ctx.space.id });

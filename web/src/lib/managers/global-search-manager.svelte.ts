@@ -457,7 +457,9 @@ export class GlobalSearchManager {
       }
       if (item.isAvailable) {
         try {
-          if (!item.isAvailable(ctx)) continue;
+          if (!item.isAvailable(ctx)) {
+            continue;
+          }
         } catch (error) {
           console.error('[cmdk] isAvailable threw', { id: item.id, error });
           continue;
@@ -1589,7 +1591,9 @@ export class GlobalSearchManager {
       }
       if (item.isAvailable) {
         try {
-          if (!item.isAvailable(ctx)) continue;
+          if (!item.isAvailable(ctx)) {
+            continue;
+          }
         } catch (error) {
           console.error('[cmdk] isAvailable threw', { id: item.id, error });
           continue;

@@ -1086,7 +1086,7 @@ describe('activate("command")', () => {
       expect(cmd.handler).toHaveBeenCalledOnce();
     });
 
-    it('entity-row activation while pending cancels confirm via close()', async () => {
+    it('entity-row activation while pending cancels confirm via close()', () => {
       const cmd = makeDestructive('cmd:destruct');
       manager.activate('command', cmd);
       expect(manager.pendingConfirmId).toBe('cmd:destruct');
@@ -2225,7 +2225,7 @@ describe('commands provider', () => {
       }
     } finally {
       const idx = commandItemsMut.findIndex((c) => c.id === gated.id);
-      if (idx !== -1) commandItemsMut.splice(idx, 1);
+      if (idx !== -1) {commandItemsMut.splice(idx, 1);}
     }
   });
 
@@ -2249,7 +2249,7 @@ describe('commands provider', () => {
       }
     } finally {
       const idx = commandItemsMut.findIndex((c) => c.id === allowed.id);
-      if (idx !== -1) commandItemsMut.splice(idx, 1);
+      if (idx !== -1) {commandItemsMut.splice(idx, 1);}
     }
   });
 
@@ -2277,7 +2277,7 @@ describe('commands provider', () => {
       expect(errorSpy).toHaveBeenCalledWith('[cmdk] isAvailable threw', expect.objectContaining({ id: throwing.id }));
     } finally {
       const idx = commandItemsMut.findIndex((c) => c.id === throwing.id);
-      if (idx !== -1) commandItemsMut.splice(idx, 1);
+      if (idx !== -1) {commandItemsMut.splice(idx, 1);}
       errorSpy.mockRestore();
     }
   });
