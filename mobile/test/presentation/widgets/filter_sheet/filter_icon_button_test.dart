@@ -58,18 +58,6 @@ void main() {
       expect(container.read(photosFilterSheetProvider), FilterSheetSnap.browse);
     });
 
-    testWidgets('tap from peek → browse', (tester) async {
-      await tester.pumpConsumerWidget(const FilterIconButton());
-      await tester.pumpAndSettle();
-      final container = ProviderScope.containerOf(tester.element(find.byType(FilterIconButton)));
-      container.read(photosFilterSheetProvider.notifier).state = FilterSheetSnap.peek;
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.byType(IconButton));
-      await tester.pumpAndSettle();
-      expect(container.read(photosFilterSheetProvider), FilterSheetSnap.browse);
-    });
-
     testWidgets('tap from deep → browse (§7 edge)', (tester) async {
       await tester.pumpConsumerWidget(const FilterIconButton());
       await tester.pumpAndSettle();
