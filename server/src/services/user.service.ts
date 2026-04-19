@@ -33,7 +33,10 @@ import { StorageService } from 'src/services/storage.service.js';
 @Injectable()
 export class UserService extends BaseService {
   async search(auth: AuthDto): Promise<UserResponseDto[]> {
-    const config = await this.getConfig({ withCache: false });
+    // Cached read — see search.service.ts for rationale. The uncached path's
+    // class-validator pass over SystemConfigDto dominates per-request latency
+    // on slower CPUs.
+    const config = await this.getConfig({ withCache: true });
 
     let users;
     if (auth.user.isAdmin || config.server.publicUsers) {
@@ -124,18 +127,16 @@ export class UserService extends BaseService {
       throw new BadRequestException('Unable to process profile image', { cause: error });
     }
 
-    let profileImagePath = file.path;
     const writeBackend = StorageService.getWriteBackend();
 
     if (!(writeBackend instanceof DiskStorageBackend)) {
-      const filename = basename(file.path);
+      const filename = basename(profileImagePath);
       const relativeKey = StorageCore.getRelativeProfileImagePath(auth.user.id, filename);
-      const stream = createReadStream(file.path);
-      await writeBackend.put(relativeKey, stream, { contentType: mimeTypes.lookup(file.path) });
+      const stream = createReadStream(profileImagePath);
+      await writeBackend.put(relativeKey, stream, { contentType: mimeTypes.lookup(profileImagePath) });
+      // After S3 upload, drop the local generated file and store the relative key.
+      await this.jobRepository.queue({ name: JobName.FileDelete, data: { files: [profileImagePath] } });
       profileImagePath = relativeKey;
-
-      // Delete the local temp file
-      await this.jobRepository.queue({ name: JobName.FileDelete, data: { files: [file.path] } });
     }
 
     const user = await this.userRepository.update(auth.user.id, {
