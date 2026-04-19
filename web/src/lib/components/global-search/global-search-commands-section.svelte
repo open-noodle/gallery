@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { CommandItem } from '$lib/managers/command-items';
-  import type { ProviderStatus } from '$lib/managers/global-search-manager.svelte';
+  import { globalSearchManager as manager, type ProviderStatus } from '$lib/managers/global-search-manager.svelte';
   import { Command } from 'bits-ui';
   import { t } from 'svelte-i18n';
   import { fade } from 'svelte/transition';
@@ -24,7 +24,7 @@
       <Command.GroupItems>
         {#each status.items as item (item.id)}
           <Command.Item value={item.id} onSelect={() => onActivate(item)} class="group">
-            <CommandRow {item} />
+            <CommandRow {item} pending={item.id === manager.pendingConfirmId} />
           </Command.Item>
         {/each}
       </Command.GroupItems>
