@@ -1,5 +1,6 @@
 import { StorageCore } from 'src/cores/storage.core';
-import { AssetFileType, ImageFormat, StorageFolder } from 'src/enum';
+import { AssetFileType, AssetPathType, ImageFormat, StorageFolder } from 'src/enum';
+import { getMocks } from 'test/utils';
 import { vitest } from 'vitest';
 
 vitest.mock('src/constants', () => ({
@@ -44,6 +45,10 @@ describe('StorageCore', () => {
     it('should return false for paths outside the APP_MEDIA_LOCATION', () => {
       const nonImmichPath = '/some/other/path';
       expect(StorageCore.isImmichPath(nonImmichPath)).toBe(false);
+    });
+
+    it('should return false for S3 relative keys', () => {
+      expect(StorageCore.isImmichPath('upload/uuid/4e/e6/file.jpg')).toBe(false);
     });
   });
 
@@ -214,6 +219,40 @@ describe('StorageCore', () => {
         const result = StorageCore.getPersonThumbnailPath({ id: 'person-1', ownerId: 'user-1' });
         expect(result.startsWith('/data/')).toBe(true);
       });
+    });
+  });
+
+  describe('moveFile', () => {
+    let core: StorageCore;
+    let mocks: ReturnType<typeof getMocks>;
+
+    beforeEach(() => {
+      StorageCore.reset();
+      StorageCore.setMediaLocation('/data');
+      mocks = getMocks();
+      core = StorageCore.create(
+        mocks.asset as any,
+        mocks.config as any,
+        mocks.crypto as any,
+        mocks.move as any,
+        mocks.person as any,
+        mocks.storage as any,
+        mocks.systemMetadata as any,
+        mocks.logger as any,
+      );
+    });
+
+    it('should skip when oldPath is a relative S3 key', async () => {
+      await core.moveFile({
+        entityId: 'asset-1',
+        pathType: AssetPathType.Original,
+        oldPath: 'upload/user/ab/cd/file.jpg',
+        newPath: '/data/library/user/2021/file.jpg',
+      });
+      expect(mocks.storage.mkdirSync).not.toHaveBeenCalled();
+      expect(mocks.move.getByEntity).not.toHaveBeenCalled();
+      expect(mocks.move.create).not.toHaveBeenCalled();
+      expect(mocks.storage.rename).not.toHaveBeenCalled();
     });
   });
 });
