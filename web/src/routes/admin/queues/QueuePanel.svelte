@@ -1,5 +1,4 @@
 <script lang="ts">
-<<<<<<< HEAD:web/src/routes/admin/queues/QueuePanel.svelte
   import QueueCard from './QueueCard.svelte';
   import QueueStorageMigrationDescription from './QueueStorageMigrationDescription.svelte';
   import QueueCard from '$lib/components/QueueCard.svelte';

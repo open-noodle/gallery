@@ -27,7 +27,10 @@ import { generateProfileImage } from 'src/utils/profile-image';
 @Injectable()
 export class UserService extends BaseService {
   async search(auth: AuthDto): Promise<UserResponseDto[]> {
-    const config = await this.getConfig({ withCache: false });
+    // Cached read — see search.service.ts for rationale. The uncached path's
+    // class-validator pass over SystemConfigDto dominates per-request latency
+    // on slower CPUs.
+    const config = await this.getConfig({ withCache: true });
 
     let users;
     if (auth.user.isAdmin || config.server.publicUsers) {

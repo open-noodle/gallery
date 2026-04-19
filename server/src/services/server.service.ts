@@ -115,8 +115,11 @@ export class ServerService extends BaseService {
   }
 
   async getFeatures(): Promise<ServerFeaturesDto> {
+    // Cached read — see search.service.ts for rationale. This endpoint is hit on
+    // every web-app page load; the uncached buildConfig dominates latency on
+    // slower CPUs. Cache invalidates on ConfigUpdate.
     const { reverseGeocoding, metadata, map, machineLearning, trash, oauth, passwordLogin, notifications } =
-      await this.getConfig({ withCache: false });
+      await this.getConfig({ withCache: true });
     const { configFile } = this.configRepository.getEnv();
 
     return {
@@ -138,9 +141,14 @@ export class ServerService extends BaseService {
     };
   }
 
+  async getTheme() {
+    const { theme } = await this.getConfig({ withCache: true });
+    return theme;
+  }
+
   async getSystemConfig(): Promise<ServerConfigDto> {
     const { setup } = this.configRepository.getEnv();
-    const config = await this.getConfig({ withCache: false });
+    const config = await this.getConfig({ withCache: true });
     const isInitialized = !setup.allow || (await this.userRepository.hasAdmin());
     const onboarding = await this.systemMetadataRepository.get(SystemMetadataKey.AdminOnboarding);
 
