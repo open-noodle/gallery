@@ -272,6 +272,16 @@ checkFileExists before removeEmptyDirs. Wrapper StorageCore.removeEmptyDirs
 deleted (single caller inlined)."
 ```
 
+**Step 7: Full-suite sanity check after the deletion**
+
+Removing the `StorageCore.removeEmptyDirs` wrapper could break any test that referenced it. Grep already confirmed no callers, but run the full server suite once to catch any latent reference:
+
+```bash
+cd server && pnpm test -- --run
+```
+
+Expected: all tests pass. If anything fails unexpectedly, inspect the failure before proceeding to E2E work.
+
 ---
 
 ## Task 5: Shared E2E helpers
@@ -807,8 +817,16 @@ async function phaseTemplateDiskBaseline(): Promise<void> {
 
   // Set a predictable storageLabel on admin so library paths are stable.
   // Note: upload paths use userId (UUID), NOT storageLabel — only library paths use it.
+  //
+  // `PUT /users/me` does NOT accept storageLabel (UserUpdateMeDto omits it).
+  // Use the admin endpoint `PUT /admin/users/:id` (UserAdminUpdateDto accepts storageLabel).
+  // Admin users can update themselves via this endpoint.
+  //
+  // This write is idempotent — if a prior run on the same DB already set
+  // storageLabel='admin', the re-update is a no-op from the asset path's
+  // perspective. No teardown needed (last phase in the workflow).
   const me = await api('GET', '/users/me', { token });
-  await api('PUT', '/users/me', { body: { storageLabel: 'admin', name: me.name, email: me.email }, token });
+  await api('PUT', `/admin/users/${me.id}`, { body: { storageLabel: 'admin' }, token });
 
   const preCount = await countMoveHistory();
   const preState = await captureState();
