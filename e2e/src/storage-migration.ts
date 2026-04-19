@@ -1586,6 +1586,54 @@ async function phaseTemplateS3UploadSkipped(): Promise<void> {
   console.log('=== Phase: template-s3-upload-skipped complete ===');
 }
 
+async function phaseTemplateS3LivePhotoSkipped(): Promise<void> {
+  console.log('=== Phase: template-s3-live-photo-skipped ===');
+  const token = await loginAdmin();
+  await setStorageTemplate(token, { enabled: false });
+  const startMs = Date.now();
+
+  try {
+    // Upload motion video first; then still with livePhotoVideoId linking to motion.
+    // A valid video payload is required for a ffprobe-driven asset flow, but in e2e
+    // the upload path only stores the bytes — metadata extraction handles the rest
+    // and tolerates minimal MP4 headers. A 1x1 PNG stands in fine for the still.
+    const motionBytes = Buffer.from([
+      0x00, 0x00, 0x00, 0x20, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6f, 0x6d, 0x00, 0x00, 0x02, 0x00, 0x69, 0x73, 0x6f,
+      0x6d, 0x69, 0x73, 0x6f, 0x32, 0x61, 0x76, 0x63, 0x31, 0x6d, 0x70, 0x34, 0x31,
+    ]);
+    const { id: motionId } = await uploadAsset(token, 'lp-motion.mp4', motionBytes);
+    const { id: stillId } = await uploadAsset(token, 'lp-still.png', createPng(), undefined, {
+      livePhotoVideoId: motionId,
+    });
+
+    await setStorageTemplate(token, { enabled: true, template: '{{y}}/{{MM}}/{{filename}}' });
+    await waitForProcessing(token);
+
+    const rows = await queryDb<{ id: string; originalPath: string }>(
+      'SELECT id, "originalPath" FROM asset WHERE id = ANY($1)',
+      [[motionId, stillId]],
+    );
+    assert.equal(rows.length, 2, `Expected 2 assets, got ${rows.length}`);
+    for (const r of rows) {
+      assert.ok(!r.originalPath.startsWith('/'), `Expected relative path for ${r.id}, got ${r.originalPath}`);
+      assert.ok(r.originalPath.startsWith('upload/'), `Expected upload/ prefix for ${r.id}`);
+    }
+
+    for (const id of [motionId, stillId]) {
+      const c = await countMoveHistory(id);
+      assert.equal(c, 0, `Asset ${id} has ${c} move_history rows, expected 0`);
+    }
+
+    const logs = captureContainerLogsSince('immich-server', startMs);
+    assertNoMoveEnoent(logs, 'template-s3-live-photo-skipped');
+
+    console.log(`  Live photo pair (still=${stillId}, motion=${motionId}) skipped template migration.`);
+  } finally {
+    await setStorageTemplate(token, { enabled: false });
+  }
+  console.log('=== Phase: template-s3-live-photo-skipped complete ===');
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -1655,9 +1703,13 @@ async function main() {
         await phaseTemplateS3UploadSkipped();
         break;
       }
+      case 'template-s3-live-photo-skipped': {
+        await phaseTemplateS3LivePhotoSkipped();
+        break;
+      }
       default: {
         throw new Error(
-          `Unknown phase: ${phase}. Valid phases: setup, estimate, migrate-to-s3, migrate-to-disk, rollback, no-files, concurrent-rejection, selective-to-s3, selective-cleanup, delete-source-false, content-verify, sidecar-verify, template-s3-bulk-skipped, template-s3-upload-skipped`,
+          `Unknown phase: ${phase}. Valid phases: setup, estimate, migrate-to-s3, migrate-to-disk, rollback, no-files, concurrent-rejection, selective-to-s3, selective-cleanup, delete-source-false, content-verify, sidecar-verify, template-s3-bulk-skipped, template-s3-upload-skipped, template-s3-live-photo-skipped`,
         );
       }
     }
