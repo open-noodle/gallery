@@ -1,3 +1,5 @@
+import { QueueName } from '@immich/sdk';
+
 export const UUID_REGEX = /^[\dA-Fa-f]{8}(?:\b-[\dA-Fa-f]{4}){3}\b-[\dA-Fa-f]{12}$/;
 
 export enum AssetAction {
@@ -306,3 +308,27 @@ export const assetViewerFadeDuration: number = 150;
 
 export const IOS_APP_STORE_URL = 'https://apps.apple.com/app/id6761776289';
 export const ANDROID_INSTALL_URL = '/install';
+
+/**
+ * Queues rendered by the admin Jobs page and driven from the command palette's
+ * bulk verbs. Omits system queues (BackgroundTask, Search, Notifications,
+ * BackupDatabase, Workflow, Editor, StorageBackendMigration).
+ */
+export const ADMIN_VISIBLE_QUEUES = [
+  QueueName.ThumbnailGeneration,
+  QueueName.MetadataExtraction,
+  QueueName.Library,
+  QueueName.Sidecar,
+  QueueName.SmartSearch,
+  QueueName.DuplicateDetection,
+  QueueName.FaceDetection,
+  QueueName.FacialRecognition,
+  QueueName.Ocr,
+  QueueName.PetDetection,
+  QueueName.Classification,
+  QueueName.VideoConversion,
+  QueueName.StorageTemplateMigration,
+  QueueName.Migration,
+] as const satisfies readonly QueueName[];
+
+export type AdminVisibleQueue = (typeof ADMIN_VISIBLE_QUEUES)[number];
