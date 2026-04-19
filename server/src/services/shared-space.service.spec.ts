@@ -257,6 +257,27 @@ describe(SharedSpaceService.name, () => {
       expect(result[0].recentAssetThumbhashes).toEqual(['YWJjMTIz', 'ZGVmNDU2']);
     });
 
+    it('should drop both id and thumbhash when thumbhash is null (parallel-array contract)', async () => {
+      const auth = factory.auth();
+      const space = factory.sharedSpace();
+      const recentAssets = [
+        { id: newUuid(), thumbhash: Buffer.from('abc123') },
+        { id: newUuid(), thumbhash: null },
+        { id: newUuid(), thumbhash: Buffer.from('def456') },
+      ];
+
+      mocks.sharedSpace.getAllByUserId.mockResolvedValue([space]);
+      mocks.sharedSpace.getMembers.mockResolvedValue([]);
+      mocks.sharedSpace.getAssetCount.mockResolvedValue(5);
+      mocks.sharedSpace.getRecentAssets.mockResolvedValue(recentAssets);
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ lastViewedAt: null }));
+
+      const result = await sut.getAll(auth);
+
+      expect(result[0].recentAssetIds).toEqual([recentAssets[0].id, recentAssets[2].id]);
+      expect(result[0].recentAssetThumbhashes).toEqual(['YWJjMTIz', 'ZGVmNDU2']);
+    });
+
     it('should return empty arrays for spaces with no assets', async () => {
       const auth = factory.auth();
       const space = factory.sharedSpace();
@@ -555,7 +576,7 @@ describe(SharedSpaceService.name, () => {
       const member = makeMemberResult({ spaceId: space.id, userId: auth.user.id, role: SharedSpaceRole.Viewer });
       const recentAssets = [
         { id: newUuid(), thumbhash: Buffer.from('thumb1') },
-        { id: newUuid(), thumbhash: null },
+        { id: newUuid(), thumbhash: Buffer.from('thumb2') },
         { id: newUuid(), thumbhash: Buffer.from('thumb3') },
       ];
 
@@ -569,7 +590,29 @@ describe(SharedSpaceService.name, () => {
       const result = await sut.get(auth, space.id);
 
       expect(result.recentAssetIds).toEqual([recentAssets[0].id, recentAssets[1].id, recentAssets[2].id]);
-      expect(result.recentAssetThumbhashes).toEqual(['dGh1bWIx', null, 'dGh1bWIz']);
+      expect(result.recentAssetThumbhashes).toEqual(['dGh1bWIx', 'dGh1bWIy', 'dGh1bWIz']);
+    });
+
+    it('should drop both id and thumbhash when thumbhash is null (parallel-array contract)', async () => {
+      const auth = factory.auth();
+      const space = factory.sharedSpace();
+      const member = makeMemberResult({ spaceId: space.id, userId: auth.user.id, role: SharedSpaceRole.Viewer });
+      const recentAssets = [
+        { id: newUuid(), thumbhash: Buffer.from('thumb1') },
+        { id: newUuid(), thumbhash: null },
+        { id: newUuid(), thumbhash: Buffer.from('thumb3') },
+      ];
+
+      mocks.sharedSpace.getMember.mockResolvedValue(member);
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.getMembers.mockResolvedValue([member]);
+      mocks.sharedSpace.getAssetCount.mockResolvedValue(10);
+      mocks.sharedSpace.getRecentAssets.mockResolvedValue(recentAssets);
+
+      const result = await sut.get(auth, space.id);
+
+      expect(result.recentAssetIds).toEqual([recentAssets[0].id, recentAssets[2].id]);
+      expect(result.recentAssetThumbhashes).toEqual(['dGh1bWIx', 'dGh1bWIz']);
     });
 
     it('should include lastActivityAt in response', async () => {
