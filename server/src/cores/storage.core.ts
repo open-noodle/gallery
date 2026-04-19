@@ -1,4 +1,5 @@
-import { dirname, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
+import type { VideoInterfaces } from 'src/types.js';
 import { StorageAsset } from 'src/database.js';
 import {
   AssetFileType,
@@ -18,7 +19,6 @@ import { MoveRepository } from 'src/repositories/move.repository.js';
 import { PersonRepository } from 'src/repositories/person.repository.js';
 import { StorageRepository } from 'src/repositories/storage.repository.js';
 import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository.js';
-import type { VideoInterfaces } from 'src/types.js';
 import { getAssetFile } from 'src/utils/asset.util.js';
 import { getConfig } from 'src/utils/config.js';
 
@@ -150,6 +150,9 @@ export class StorageCore {
   }
 
   static isImmichPath(path: string) {
+    if (!isAbsolute(path)) {
+      return false;
+    }
     const resolvedPath = resolve(path);
     const resolvedAppMediaLocation = StorageCore.getMediaLocation();
     const normalizedPath = resolvedPath.endsWith('/') ? resolvedPath : resolvedPath + '/';
@@ -198,6 +201,10 @@ export class StorageCore {
   async moveFile(request: MoveRequest) {
     const { entityId, ownerId, pathType, oldPath, newPath, assetInfo } = request;
     if (!oldPath || oldPath === newPath) {
+      return;
+    }
+
+    if (!isAbsolute(oldPath)) {
       return;
     }
 
@@ -311,10 +318,6 @@ export class StorageCore {
 
   ensureFolders(input: string) {
     this.storageRepository.mkdirSync(dirname(input));
-  }
-
-  removeEmptyDirs(folder: StorageFolder) {
-    return this.storageRepository.removeEmptyDirs(StorageCore.getBaseFolder(folder));
   }
 
   async getVideoInterfaces(): Promise<VideoInterfaces> {
