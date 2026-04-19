@@ -2467,7 +2467,12 @@ describe('setQuery synchronous navigation', () => {
 
 describe('SWR loading rules', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    // resetAllMocks (not clearAllMocks) so any stray mockResolvedValueOnce /
+    // mockImplementationOnce queued by a prior test is fully dropped. clear
+    // only wipes call history, not implementation queues — which lets a prior
+    // Once leak into the next test and consume the mockResolvedValueOnce we
+    // set up here, returning the default empty payload instead.
+    vi.resetAllMocks();
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
