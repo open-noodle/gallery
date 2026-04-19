@@ -1497,6 +1497,58 @@ async function phaseSidecarVerify(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Phase: Template bulk migration skips S3 assets (regression for #383)
+// Precondition: S3 backend, assets already on S3
+// ---------------------------------------------------------------------------
+async function phaseTemplateS3BulkSkipped(): Promise<void> {
+  console.log('=== Phase: template-s3-bulk-skipped ===');
+  const token = await loginAdmin();
+  await setStorageTemplate(token, { enabled: false }); // invariant reset
+  const startMs = Date.now();
+  const preCount = await countMoveHistory();
+  const preState = await captureState();
+
+  // Precondition: every asset has a relative S3 path
+  for (const a of preState.assets) {
+    assert.ok(!a.originalPath.startsWith('/'), `Precondition failed: asset ${a.id} path is absolute`);
+  }
+
+  try {
+    await setStorageTemplate(token, { enabled: true, template: '{{y}}/{{MM}}/{{filename}}' });
+    await triggerQueueCommand(token, 'storageTemplateMigration');
+    await waitForProcessing(token);
+
+    const postState = await captureState();
+
+    // Every asset path unchanged
+    for (const pre of preState.assets) {
+      const post = postState.assets.find((a) => a.id === pre.id);
+      assert.ok(post, `Asset ${pre.id} disappeared`);
+      assert.equal(post.originalPath, pre.originalPath, `Path changed for asset ${pre.id}`);
+    }
+
+    // MinIO keys still exist
+    minioSetupAlias();
+    for (const a of postState.assets) {
+      assert.ok(minioFileExists(a.originalPath), `MinIO key missing: ${a.originalPath}`);
+    }
+
+    // No new move_history rows
+    const postCount = await countMoveHistory();
+    assert.equal(postCount, preCount, `move_history grew from ${preCount} to ${postCount}`);
+
+    // Log-scrape (secondary)
+    const logs = captureContainerLogsSince('immich-server', startMs);
+    assertNoMoveEnoent(logs, 'template-s3-bulk-skipped');
+
+    console.log('  Bulk template migration skipped S3 assets cleanly.');
+  } finally {
+    await setStorageTemplate(token, { enabled: false });
+  }
+  console.log('=== Phase: template-s3-bulk-skipped complete ===');
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 async function main() {
@@ -1557,9 +1609,13 @@ async function main() {
         await phaseSidecarVerify();
         break;
       }
+      case 'template-s3-bulk-skipped': {
+        await phaseTemplateS3BulkSkipped();
+        break;
+      }
       default: {
         throw new Error(
-          `Unknown phase: ${phase}. Valid phases: setup, estimate, migrate-to-s3, migrate-to-disk, rollback, no-files, concurrent-rejection, selective-to-s3, selective-cleanup, delete-source-false, content-verify, sidecar-verify`,
+          `Unknown phase: ${phase}. Valid phases: setup, estimate, migrate-to-s3, migrate-to-disk, rollback, no-files, concurrent-rejection, selective-to-s3, selective-cleanup, delete-source-false, content-verify, sidecar-verify, template-s3-bulk-skipped`,
         );
       }
     }
