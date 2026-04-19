@@ -967,6 +967,155 @@ describe('activate("command")', () => {
     commandContextManager.setAlbum(null);
   });
 
+  it('startConfirm sets pendingConfirmId, cancelConfirm clears it', () => {
+    type WithPrivateStart = { startConfirm: (id: string) => void };
+    (manager as unknown as WithPrivateStart).startConfirm('cmd:test');
+    expect(manager.pendingConfirmId).toBe('cmd:test');
+    manager.cancelConfirm();
+    expect(manager.pendingConfirmId).toBeNull();
+  });
+
+  it('3s timeout auto-clears pendingConfirmId', () => {
+    vi.useFakeTimers();
+    type WithPrivateStart = { startConfirm: (id: string) => void };
+    (manager as unknown as WithPrivateStart).startConfirm('cmd:test');
+    vi.advanceTimersByTime(3000);
+    expect(manager.pendingConfirmId).toBeNull();
+    vi.useRealTimers();
+  });
+
+  it('stale-timer guard: new confirm during window does not clear new id', () => {
+    vi.useFakeTimers();
+    type WithPrivateStart = { startConfirm: (id: string) => void };
+    const start = (manager as unknown as WithPrivateStart).startConfirm.bind(manager);
+    start('cmd:a');
+    vi.advanceTimersByTime(1000);
+    start('cmd:b');
+    vi.advanceTimersByTime(2000);
+    expect(manager.pendingConfirmId).toBe('cmd:b');
+    vi.advanceTimersByTime(1000);
+    expect(manager.pendingConfirmId).toBeNull();
+    vi.useRealTimers();
+  });
+
+  it('close() clears pendingConfirmId', () => {
+    type WithPrivateStart = { startConfirm: (id: string) => void };
+    (manager as unknown as WithPrivateStart).startConfirm('cmd:test');
+    manager.close();
+    expect(manager.pendingConfirmId).toBeNull();
+  });
+
+  describe('destructive activate', () => {
+    const makeDestructive = (id: string, handler = vi.fn().mockResolvedValue(undefined)): CommandItem => ({
+      id: id as `cmd:${string}`,
+      labelKey: 'x',
+      descriptionKey: 'y',
+      icon: 'z',
+      destructive: true,
+      handler,
+    });
+
+    it('first Enter on destructive: palette stays open, handler NOT called, pending set', async () => {
+      const cmd = makeDestructive('cmd:destruct');
+      manager.activate('command', cmd);
+      await flushMicrotasks();
+      expect(manager.isOpen).toBe(true);
+      expect(cmd.handler).not.toHaveBeenCalled();
+      expect(manager.pendingConfirmId).toBe('cmd:destruct');
+    });
+
+    it('second Enter within window: palette closes, handler called, pending cleared', async () => {
+      const cmd = makeDestructive('cmd:destruct');
+      manager.activate('command', cmd);
+      manager.activate('command', cmd);
+      await flushMicrotasks();
+      await flushMicrotasks();
+      expect(cmd.handler).toHaveBeenCalledOnce();
+      expect(manager.isOpen).toBe(false);
+      expect(manager.pendingConfirmId).toBeNull();
+    });
+
+    it('destructive A then destructive B: pending flips, only B fires on confirm', async () => {
+      const a = makeDestructive('cmd:destruct_a');
+      const b = makeDestructive('cmd:destruct_b');
+      manager.activate('command', a);
+      expect(manager.pendingConfirmId).toBe('cmd:destruct_a');
+      manager.activate('command', b);
+      expect(manager.pendingConfirmId).toBe('cmd:destruct_b');
+      manager.activate('command', b);
+      await flushMicrotasks();
+      await flushMicrotasks();
+      expect(b.handler).toHaveBeenCalledOnce();
+      expect(a.handler).not.toHaveBeenCalled();
+    });
+
+    it('destructive A then non-destructive C: pending cleared, C fires, A never', async () => {
+      const a = makeDestructive('cmd:destruct_a');
+      const handlerC = vi.fn().mockResolvedValue(undefined);
+      const c: CommandItem = { id: 'cmd:safe_c', labelKey: 'x', descriptionKey: 'y', icon: 'z', handler: handlerC };
+      manager.activate('command', a);
+      manager.activate('command', c);
+      await flushMicrotasks();
+      await flushMicrotasks();
+      expect(handlerC).toHaveBeenCalledOnce();
+      expect(a.handler).not.toHaveBeenCalled();
+      expect(manager.pendingConfirmId).toBeNull();
+    });
+
+    it('held-Enter guard: three sync activates on destructive → handler called at most once', async () => {
+      const cmd = makeDestructive('cmd:destruct');
+      manager.activate('command', cmd);
+      manager.activate('command', cmd);
+      manager.activate('command', cmd);
+      await flushMicrotasks();
+      await flushMicrotasks();
+      expect(cmd.handler).toHaveBeenCalledTimes(1);
+    });
+
+    it('rapid mouse double-click: two sync activates fire exactly once', async () => {
+      const cmd = makeDestructive('cmd:destruct');
+      manager.activate('command', cmd);
+      manager.activate('command', cmd);
+      await flushMicrotasks();
+      await flushMicrotasks();
+      expect(cmd.handler).toHaveBeenCalledOnce();
+    });
+
+    it('entity-row activation while pending cancels confirm via close()', async () => {
+      const cmd = makeDestructive('cmd:destruct');
+      manager.activate('command', cmd);
+      expect(manager.pendingConfirmId).toBe('cmd:destruct');
+      // Activate a nav row — its branch runs `this.close()` which calls `cancelConfirm`.
+      const navItem = NAVIGATION_ITEMS[0];
+      manager.activate('nav', navItem);
+      expect(manager.pendingConfirmId).toBeNull();
+    });
+
+    it('setQuery while pending cancels confirm', () => {
+      const cmd = makeDestructive('cmd:destruct');
+      manager.activate('command', cmd);
+      expect(manager.pendingConfirmId).not.toBeNull();
+      manager.setQuery('x');
+      expect(manager.pendingConfirmId).toBeNull();
+    });
+
+    it('setActiveItem to different id while pending cancels confirm', () => {
+      const cmd = makeDestructive('cmd:destruct');
+      manager.activate('command', cmd);
+      expect(manager.pendingConfirmId).not.toBeNull();
+      manager.setActiveItem('cmd:other');
+      expect(manager.pendingConfirmId).toBeNull();
+    });
+
+    it('setActiveItem back to pending id keeps confirm alive', () => {
+      const cmd = makeDestructive('cmd:destruct');
+      manager.activate('command', cmd);
+      expect(manager.pendingConfirmId).toBe('cmd:destruct');
+      manager.setActiveItem('cmd:destruct');
+      expect(manager.pendingConfirmId).toBe('cmd:destruct');
+    });
+  });
+
   it('two different commands in rapid Enter each fire (independent in-flight keys)', async () => {
     const handlerA = vi.fn().mockResolvedValue(undefined);
     const handlerB = vi.fn().mockResolvedValue(undefined);

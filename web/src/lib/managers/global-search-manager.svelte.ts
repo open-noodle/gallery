@@ -257,6 +257,14 @@ export class GlobalSearchManager {
    * guard is immediate.
    */
   pendingActivation: string | null = $state(null);
+  /**
+   * Id of the command currently awaiting second-Enter confirmation (v1.4 destructive
+   * commands). Null otherwise. Cleared by `cancelConfirm` (query change, selection
+   * change, Escape, palette close, 3s timeout) or by the second Enter that fires the
+   * command.
+   */
+  pendingConfirmId: string | null = $state(null);
+  private confirmTimer: ReturnType<typeof setTimeout> | null = null;
 
   protected providers: Record<keyof Sections, Provider>;
   protected debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -862,7 +870,38 @@ export class GlobalSearchManager {
     }
   }
 
+  /**
+   * Arm the destructive-confirm state machine. Private — only `activate('command')`
+   * calls this when a command with `destructive: true` is fired the first time.
+   * Sets pending and schedules a 3s auto-cancel guarded against stale timers.
+   */
+  private startConfirm(cmdId: string) {
+    this.pendingConfirmId = cmdId;
+    if (this.confirmTimer !== null) {
+      clearTimeout(this.confirmTimer);
+    }
+    this.confirmTimer = setTimeout(() => {
+      if (this.pendingConfirmId === cmdId) {
+        this.pendingConfirmId = null;
+      }
+      this.confirmTimer = null;
+    }, 3000);
+  }
+
+  /**
+   * Clear any armed destructive-confirm. Public — called from setQuery, setActiveItem,
+   * `close()`, and the Escape handler in `global-search.svelte`.
+   */
+  cancelConfirm() {
+    if (this.confirmTimer !== null) {
+      clearTimeout(this.confirmTimer);
+      this.confirmTimer = null;
+    }
+    this.pendingConfirmId = null;
+  }
+
   close() {
+    this.cancelConfirm();
     this.isOpen = false;
     this.closeController.abort();
     if (this.debounceTimer !== null) {
@@ -905,6 +944,11 @@ export class GlobalSearchManager {
   }
 
   setActiveItem(id: string | null) {
+    if (this.pendingConfirmId !== null && id !== this.pendingConfirmId) {
+      // Arrowing away from a pending destructive row reverts the red state. Arrowing
+      // back (id === pendingConfirmId) leaves pending intact.
+      this.cancelConfirm();
+    }
     this.activeItemId = id;
   }
 
@@ -1186,6 +1230,23 @@ export class GlobalSearchManager {
       }
       case 'command': {
         const cmd = item as CommandItem;
+
+        if (cmd.destructive) {
+          if (this.pendingConfirmId === cmd.id) {
+            // Second Enter on the armed destructive command — clear pending and fall
+            // through to the fire path.
+            this.cancelConfirm();
+          } else {
+            // First Enter (or a different destructive replacing the current pending).
+            this.startConfirm(cmd.id);
+            return; // do NOT close, do NOT fire
+          }
+        } else if (this.pendingConfirmId !== null) {
+          // User picked a non-destructive row while a destructive was pending.
+          // Clear pending and fire the picked command.
+          this.cancelConfirm();
+        }
+
         if (this.commandInFlight.has(cmd.id)) {
           return;
         }
@@ -1588,6 +1649,9 @@ export class GlobalSearchManager {
     // considered an implementation detail of the component, not a public entry point.
     if (this.query === text) {
       return;
+    }
+    if (this.pendingConfirmId !== null) {
+      this.cancelConfirm();
     }
     this.query = text;
     this.clearDebounce();
