@@ -1,5 +1,5 @@
 // Pure-dart helper that renders the current SearchFilter as an ordered list
-// of chip specs for the peek rail.
+// of chip specs for the active-filters subheader and the sheet header.
 //
 // Order (design §5.5):
 //   people → tags → location → date → rating → media → favourite → archive

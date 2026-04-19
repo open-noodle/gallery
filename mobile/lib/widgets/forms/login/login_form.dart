@@ -21,7 +21,6 @@ import 'package:immich_mobile/providers/feature_message.provider.dart';
 import 'package:immich_mobile/providers/gallery_permission.provider.dart';
 import 'package:immich_mobile/providers/oauth.provider.dart';
 import 'package:immich_mobile/providers/server_info.provider.dart';
-import 'package:immich_mobile/providers/view_intent/view_intent_handler.provider.dart';
 import 'package:immich_mobile/providers/websocket.provider.dart';
 import 'package:immich_mobile/repositories/permission.repository.dart';
 import 'package:immich_mobile/routing/router.dart';
@@ -184,11 +183,9 @@ class LoginForm extends HookConsumerWidget {
 
     Future<void> handleSyncFlow() async {
       final backgroundManager = ref.read(backgroundSyncProvider);
-      final viewIntentHandler = ref.read(viewIntentHandlerProvider);
 
       await backgroundManager.syncLocal(full: true);
       await backgroundManager.syncRemote();
-      await viewIntentHandler.flushDeferredViewIntent();
       await backgroundManager.hashAssets();
 
       if (SettingsRepository.instance.appConfig.backup.syncAlbums) {
@@ -265,9 +262,16 @@ class LoginForm extends HookConsumerWidget {
         if (result.shouldChangePassword && !result.isAdmin) {
           unawaited(context.pushRoute(const ChangePasswordRoute()));
         } else {
-          await ref.read(galleryPermissionNotifier.notifier).requestGalleryPermission();
-          if (isSyncRemoteDeletionsMode()) {
-            await getManageMediaPermission();
+          final isBeta = Store.isBetaTimelineEnabled;
+          if (isBeta) {
+            await ref.read(galleryPermissionNotifier.notifier).requestGalleryPermission();
+            if (isSyncRemoteDeletionsMode()) {
+              await getManageMediaPermission();
+            }
+            unawaited(handleSyncFlow());
+            ref.read(websocketProvider.notifier).connect();
+            unawaited(context.replaceRoute(const GalleryTabShellRoute()));
+            return;
           }
           unawaited(handleSyncFlow());
           if (!context.mounted) {
@@ -280,7 +284,7 @@ class LoginForm extends HookConsumerWidget {
             return;
           }
 
-          unawaited(context.router.replaceAll([const TabShellRoute()]));
+          unawaited(context.replaceRoute(const TabShellRoute()));
           return;
         }
       } catch (error) {
@@ -375,6 +379,14 @@ class LoginForm extends HookConsumerWidget {
               await getManageMediaPermission();
             }
             unawaited(handleSyncFlow());
+            // #378: beta-timeline users get the fork's bottom-nav shell. Mirrors the
+            // password-login path above; the permission calls already ran unconditionally
+            // just above, so they are not repeated here.
+            final isBeta = Store.isBetaTimelineEnabled;
+            if (isBeta) {
+              unawaited(context.replaceRoute(const GalleryTabShellRoute()));
+              return;
+            }
             if (!context.mounted) {
               return;
             }
