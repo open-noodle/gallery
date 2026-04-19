@@ -10,24 +10,20 @@ import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart' hide Store;
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:immich_mobile/data/store/passkey.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
-import 'package:immich_mobile/models/auth/login_response.model.dart';
 import 'package:immich_mobile/providers/auth.provider.dart';
 import 'package:immich_mobile/providers/background_sync.provider.dart';
 import 'package:immich_mobile/providers/feature_message.provider.dart';
 import 'package:immich_mobile/providers/gallery_permission.provider.dart';
 import 'package:immich_mobile/providers/oauth.provider.dart';
 import 'package:immich_mobile/providers/server_info.provider.dart';
-import 'package:immich_mobile/providers/view_intent/view_intent_handler.provider.dart';
 import 'package:immich_mobile/providers/websocket.provider.dart';
 import 'package:immich_mobile/repositories/permission.repository.dart';
 import 'package:immich_mobile/routing/router.dart';
-import 'package:immich_mobile/utils/error_handler.dart';
 import 'package:immich_mobile/utils/provider_utils.dart';
 import 'package:immich_mobile/utils/semver.dart';
 import 'package:immich_mobile/utils/url_helper.dart';
@@ -72,7 +68,6 @@ class LoginForm extends HookConsumerWidget {
     final passwordFocusNode = useFocusNode();
     final isOauthEnable = useState<bool>(false);
     final isPasswordLoginEnable = useState<bool>(false);
-    final isPasskeyEnable = useState<bool>(false);
     final oAuthButtonLabel = useState<String>('OAuth');
     final logoAnimationController = useAnimationController(duration: const Duration(seconds: 60));
     unawaited(logoAnimationController.repeat());
@@ -116,17 +111,11 @@ class LoginForm extends HookConsumerWidget {
         }
 
         final serverInfo = ref.read(serverInfoProvider);
-        final passkeyEnabled = await ref.read(PasskeyStore.instance.enabled().future);
-        if (!context.mounted) {
-          return;
-        }
-
         final features = serverInfo.serverFeatures;
         final config = serverInfo.serverConfig;
 
         isOauthEnable.value = features.oauthEnabled;
         isPasswordLoginEnable.value = features.passwordLogin;
-        isPasskeyEnable.value = passkeyEnabled;
         oAuthButtonLabel.value = config.oauthButtonText.isNotEmpty ? config.oauthButtonText : 'OAuth';
 
         serverEndpoint.value = endpoint;
@@ -194,11 +183,9 @@ class LoginForm extends HookConsumerWidget {
 
     Future<void> handleSyncFlow() async {
       final backgroundManager = ref.read(backgroundSyncProvider);
-      final viewIntentHandler = ref.read(viewIntentHandlerProvider);
 
       await backgroundManager.syncLocal(full: true);
       await backgroundManager.syncRemote();
-      await viewIntentHandler.flushDeferredViewIntent();
       await backgroundManager.hashAssets();
 
       if (SettingsRepository.instance.appConfig.backup.syncAlbums) {
@@ -259,31 +246,6 @@ class LoginForm extends HookConsumerWidget {
 
     bool isSyncRemoteDeletionsMode() => Platform.isAndroid && Store.get(StoreKey.manageLocalMediaAndroid, false);
 
-    Future<void> finishLogin() async {
-      await ref.read(galleryPermissionNotifier.notifier).requestGalleryPermission();
-      if (isSyncRemoteDeletionsMode()) {
-        await getManageMediaPermission();
-      }
-      unawaited(handleSyncFlow());
-      if (!context.mounted) {
-        return;
-      }
-
-      ref.read(websocketProvider.notifier).connect();
-      unawaited(ref.read(featureMessageServiceProvider).markSeen());
-      unawaited(context.router.replaceAll([const TabShellRoute()]));
-    }
-
-    Future<void> onLogin(LoginResponse result) async {
-      if (result.shouldChangePassword && !result.isAdmin && isPasswordLoginEnable.value) {
-        unawaited(context.pushRoute(const ChangePasswordRoute()));
-        passwordController.clear();
-        return;
-      }
-
-      await finishLogin();
-    }
-
     Future<void> login() async {
       TextInput.finishAutofillContext();
 
@@ -297,7 +259,35 @@ class LoginForm extends HookConsumerWidget {
           return;
         }
 
-        await onLogin(result);
+        if (result.shouldChangePassword && !result.isAdmin) {
+          unawaited(context.pushRoute(const ChangePasswordRoute()));
+          passwordController.clear();
+        } else {
+          final isBeta = Store.isBetaTimelineEnabled;
+          if (isBeta) {
+            await ref.read(galleryPermissionNotifier.notifier).requestGalleryPermission();
+            if (isSyncRemoteDeletionsMode()) {
+              await getManageMediaPermission();
+            }
+            unawaited(handleSyncFlow());
+            ref.read(websocketProvider.notifier).connect();
+            unawaited(context.replaceRoute(const GalleryTabShellRoute()));
+            return;
+          }
+          unawaited(handleSyncFlow());
+          if (!context.mounted) {
+            return;
+          }
+
+          ref.read(websocketProvider.notifier).connect();
+          unawaited(ref.read(featureMessageServiceProvider).markSeen());
+          if (!context.mounted) {
+            return;
+          }
+
+          unawaited(context.replaceRoute(const TabShellRoute()));
+          return;
+        }
       } catch (error) {
         if (!context.mounted) {
           return;
@@ -385,7 +375,25 @@ class LoginForm extends HookConsumerWidget {
               .saveAuthInfo(accessToken: loginResponseDto.accessToken);
 
           if (isSuccess && context.mounted) {
-            await finishLogin();
+            await ref.read(galleryPermissionNotifier.notifier).requestGalleryPermission();
+            if (isSyncRemoteDeletionsMode()) {
+              await getManageMediaPermission();
+            }
+            unawaited(handleSyncFlow());
+            // #378: beta-timeline users get the fork's bottom-nav shell. Mirrors the
+            // password-login path above; the permission calls already ran unconditionally
+            // just above, so they are not repeated here.
+            final isBeta = Store.isBetaTimelineEnabled;
+            if (isBeta) {
+              unawaited(context.replaceRoute(const GalleryTabShellRoute()));
+              return;
+            }
+            if (!context.mounted) {
+              return;
+            }
+
+            unawaited(ref.read(featureMessageServiceProvider).markSeen());
+            unawaited(context.router.replaceAll([const TabShellRoute()]));
             return;
           }
         } catch (error, stack) {
@@ -414,30 +422,6 @@ class LoginForm extends HookConsumerWidget {
           gravity: ToastGravity.TOP,
         );
         return;
-      }
-    }
-
-    Future<void> passkeyLogin() async {
-      invalidateAllApiRepositoryProviders(ref);
-
-      try {
-        final result = await ref.read(authProvider.notifier).passkeyLogin();
-        if (result != null && context.mounted) {
-          await onLogin(result);
-        }
-      } catch (error, stack) {
-        log.severe('Error logging in with passkey', error, stack);
-
-        if (!context.mounted) {
-          return;
-        }
-
-        ImmichToast.show(
-          context: context,
-          msg: serverErrorMessage(error) ?? context.t.errors.something_went_wrong,
-          toastType: ToastType.error,
-          gravity: ToastGravity.TOP,
-        );
       }
     }
 
@@ -553,20 +537,7 @@ class LoginForm extends HookConsumerWidget {
                           )
                         : const SizedBox.shrink(),
                   ),
-                if (isPasskeyEnable.value)
-                  ImmichForm(
-                    onSubmit: passkeyLogin,
-                    submitText: context.t.login_with_passkey,
-                    submitIcon: Icons.key_outlined,
-                    builder: (context, _) => isPasswordLoginEnable.value || isOauthEnable.value
-                        ? Padding(
-                            padding: const EdgeInsets.only(left: 18.0, right: 18.0, top: 12.0),
-                            child: Divider(color: context.colorScheme.onSurface, height: 5),
-                          )
-                        : const SizedBox.shrink(),
-                  ),
-                if (!isOauthEnable.value && !isPasswordLoginEnable.value && !isPasskeyEnable.value)
-                  Center(child: Text(context.t.login_disabled)),
+                if (!isOauthEnable.value && !isPasswordLoginEnable.value) Center(child: Text(context.t.login_disabled)),
                 ImmichTextButton(
                   labelText: context.t.back,
                   icon: Icons.arrow_back,
