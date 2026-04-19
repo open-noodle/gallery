@@ -104,7 +104,7 @@ export class AssetJobRepository {
   getForMigrationJob(id: string) {
     return this.db
       .selectFrom('asset')
-      .select(['asset.id', 'asset.ownerId'])
+      .select(['asset.id', 'asset.ownerId', 'asset.originalPath'])
       .select(withFiles)
       .where('asset.id', '=', id)
       .executeTakeFirst();

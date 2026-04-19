@@ -307,6 +307,20 @@ describe(MediaService.name, () => {
       expect(mocks.move.getByEntity).not.toHaveBeenCalled();
     });
 
+    it('should skip S3 assets with relative paths', async () => {
+      const asset = AssetFactory.from({ originalPath: 'upload/user/ab/cd/file.jpg' })
+        .files([AssetFileType.FullSize, AssetFileType.Preview, AssetFileType.Thumbnail])
+        .build();
+      mocks.assetJob.getForMigrationJob.mockResolvedValue(asset);
+
+      await expect(sut.handleAssetMigration({ id: asset.id })).resolves.toBe(JobStatus.Skipped);
+
+      expect(mocks.move.create).not.toHaveBeenCalled();
+      expect(mocks.move.getByEntity).not.toHaveBeenCalled();
+      expect(mocks.storage.rename).not.toHaveBeenCalled();
+      expect(mocks.storage.copyFile).not.toHaveBeenCalled();
+    });
+
     it('should move asset files', async () => {
       const asset = AssetFactory.from()
         .files([AssetFileType.FullSize, AssetFileType.Preview, AssetFileType.Thumbnail])
