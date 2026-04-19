@@ -12,16 +12,16 @@ Issue [#383](https://github.com/open-noodle/gallery/issues/383) reported ENOENT 
 
 Already on `fix/s3-storage-move` (+81/−10):
 
-| Location                          | Change                                                                                                 |
-| --------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `storage.core.ts:136`             | `isImmichPath` returns `false` for relative paths (fixes CWD-based `resolve()` false positive)         |
-| `storage.core.ts:189`             | `moveFile` returns early for relative `oldPath` before `ensureFolders`, `move_history`, or any fs call |
-| `storage-template.service.ts:229` | `moveAsset` skips relative paths + external assets + android-motion paths                              |
-| `storage-template.service.ts:154` | `handleMigrationSingle` skips S3 assets before live-photo fan-out                                      |
-| `storage-template.service.ts:213` | `handleMigration` bulk job guards `removeEmptyDirs(libraryFolder)` with a `checkFileExists` pre-check  |
-| `media.service.ts:204`            | `handleAssetMigration` returns `JobStatus.Skipped` for relative `originalPath`                         |
-| `person.service.ts:595`           | `handlePersonMigration` returns `JobStatus.Skipped` for relative or empty `thumbnailPath`              |
-| `asset-job.repository.ts`         | `getForMigrationJob` now selects `originalPath` (required for the new guard)                           |
+| Location                          | Change                                                                                                                                                                                                                                |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `storage.core.ts:136`             | `isImmichPath` returns `false` for relative paths (fixes CWD-based `resolve()` false positive)                                                                                                                                        |
+| `storage.core.ts:189`             | `moveFile` returns early for relative `oldPath` before `ensureFolders`, `move_history`, or any fs call                                                                                                                                |
+| `storage-template.service.ts:229` | `moveAsset` skips relative paths + external assets + android-motion paths                                                                                                                                                             |
+| `storage-template.service.ts:154` | `handleMigrationSingle` skips S3 still assets before the live-photo fan-out (still-is-S3 case). Mixed-backend cases (still disk / motion S3) are handled by the inner `moveAsset` guard composing correctly; see test addition below. |
+| `storage-template.service.ts:213` | `handleMigration` bulk job guards `removeEmptyDirs(libraryFolder)` with a `checkFileExists` pre-check                                                                                                                                 |
+| `media.service.ts:204`            | `handleAssetMigration` returns `JobStatus.Skipped` for relative `originalPath`                                                                                                                                                        |
+| `person.service.ts:595`           | `handlePersonMigration` returns `JobStatus.Skipped` for relative or empty `thumbnailPath`                                                                                                                                             |
+| `asset-job.repository.ts`         | `getForMigrationJob` now selects `originalPath` (required for the new guard)                                                                                                                                                          |
 
 All guards are covered by unit tests in the same diff.
 
@@ -86,6 +86,35 @@ Add negative assertions that prove `moveAsset` short-circuits before entering `m
 ```ts
 expect(mocks.move.create).not.toHaveBeenCalled();
 expect(mocks.storage.stat).not.toHaveBeenCalled();
+```
+
+**`storage-template.service.spec.ts` — add mixed-backend live-photo test (new).**
+
+Close the one untested composition: still asset absolute (disk), motion video relative (S3). The still should be migrated; the motion's own `moveAsset` guard should skip it. Asserts the inner guard does the work when the outer `handleMigrationSingle` guard doesn't catch the mixed case:
+
+```ts
+it('should migrate a disk still and skip an S3 motion video', async () => {
+  const motion = AssetFactory.from({
+    type: AssetType.Video,
+    originalPath: 'upload/user/ab/cd/motion.mp4', // relative — on S3
+  })
+    .exif()
+    .build();
+  const still = AssetFactory.from({
+    livePhotoVideoId: motion.id,
+    originalPath: '/data/upload/user/ab/cd/still.jpg', // absolute — on disk
+  })
+    .exif()
+    .build();
+
+  mocks.user.get.mockResolvedValue(userStub.user1);
+  mocks.assetJob.getForStorageTemplateJob.mockResolvedValueOnce(getForStorageTemplate(still));
+  mocks.assetJob.getForStorageTemplateJob.mockResolvedValueOnce(getForStorageTemplate(motion));
+
+  await expect(sut.handleMigrationSingle({ id: still.id })).resolves.toBe(JobStatus.Success);
+  expect(mocks.storage.rename).toHaveBeenCalledWith(still.originalPath, expect.any(String));
+  expect(mocks.storage.rename).toHaveBeenCalledTimes(1); // motion skipped
+});
 ```
 
 **`media.service.spec.ts:285` — update `handleQueueMigration` tests for the new guard.**
@@ -197,12 +226,14 @@ Each phase follows the pattern:
 
 - Regression guard that the template feature still works end-to-end on disk.
 - Reuses the post-rollback disk restart added below.
-- Set `storageLabel='admin'` on the admin user via `PUT /users/me` or direct DB update so the library path component is predictable (`admin` has no storageLabel by default; path would otherwise contain the user UUID).
+- **Upload path format for reference:** uploads land at `<mediaLocation>/upload/<userUuid>/<uuid0..2>/<uuid2..4>/<uuid>.<ext>` (see `AssetMediaService.getUploadFolder` → `StorageCore.getNestedFolder(StorageFolder.Upload, user.id, file.uuid)`). The path uses `userId` (UUID), NOT `storageLabel`. Only the _library_ path (template destination) uses `storageLabel`.
+- Set `storageLabel='admin'` on the admin user via `PUT /users/me` or direct DB update so the _library_ path component is predictable — without this, the library path contains the admin UUID (unstable across runs).
+- Before migration: capture pre-state via `captureState()` so pre-migration paths are known for delta assertions; capture `preMoveHistoryCount = countMoveHistory()`.
 - Enable template with `{{y}}/{{y}}-{{MM}}-{{dd}}/{{filename}}`, trigger bulk migration, wait.
-- Assert admin asset `originalPath` matches `/usr/src/app/upload/library/admin/YYYY/YYYY-MM-DD/…`.
-- Assert old `upload/admin/…` paths no longer exist on disk, new paths exist.
-- Assert sidecar followed to `newPath.xmp`.
-- `countMoveHistory() === 0` after success (assets are now at their template-derived destinations; `cleanMoveHistory` ran at job start).
+- Assert admin asset new `originalPath` matches `/usr/src/app/upload/library/admin/YYYY/YYYY-MM-DD/…` (library folder + storageLabel + template).
+- Assert each captured pre-migration upload path no longer exists on disk, and the corresponding new path does exist. Do not hardcode `upload/admin/…` — pre-state paths contain the user UUID.
+- Assert sidecar followed to `${newPath}.xmp`.
+- Assert `countMoveHistory()` equals `preMoveHistoryCount` (each successful move deletes its own row via `moveRepository.delete` at `storage.core.ts:262`; count should return to baseline even if prior phases left legitimate rows).
 - No teardown needed — last phase.
 
 ### 4. Workflow wiring
@@ -242,6 +273,7 @@ Raise `timeout-minutes` from 30 → 45.
 
 - **`template-mixed-disk-then-s3`** and **`template-s3-rollback-preserves-templated-paths`** — backend-swap phases excluded per the scope decision. They test downstream S3-migration behavior not directly affected by this fix. Candidate for a follow-up spec.
 - **Stale `move_history` cleanup.** Pre-existing: failed pre-fix bulk runs left `move_history` rows with relative `oldPath` that now masquerade as "incomplete move" and block legitimate future migrations. Separate design if pursued; workaround today is `DELETE FROM move_history WHERE "oldPath" NOT LIKE '/%'`.
+- **`AssetService.copySidecar` on S3 targets** (`asset.service.ts:345`). Adjacent concern surfaced during the code-path audit: `storageRepository.copyFile(src, '${targetAsset.originalPath}.xmp')` will create a file relative to CWD if `targetAsset.originalPath` is a relative S3 key. Different trigger path (asset duplication/stack creation, not storage template). Not addressed here; flagged for a follow-up audit.
 - **Helper extraction into `storage-harness.ts`** (Approaches 2/3 from brainstorming).
 - **Per-PR workflow trigger.** Retains existing nightly + `workflow_dispatch`.
 - **API endpoint for manually triggering single-asset template migration.** Not needed; `AssetMetadataExtracted` is the trigger in production, and uploads exercise it.
@@ -287,17 +319,20 @@ FileMigrationQueueAll (format change, S3)
 
 ## Testing strategy and coverage matrix
 
-| Path                                               | Unit (now)   | Unit (new) | E2E (new)                |
-| -------------------------------------------------- | ------------ | ---------- | ------------------------ |
-| Bulk template migration S3 skip                    | ✓            | —          | ✓                        |
-| Single template migration S3 skip                  | ✓            | —          | ✓                        |
-| Live-photo fan-out S3 skip                         | ✓ (indirect) | —          | ✓                        |
-| Sidecar file S3 skip                               | —            | —          | ✓                        |
-| Asset file migration format-change S3 skip         | ✓            | —          | ✓                        |
-| Person file migration S3 skip                      | ✓            | —          | — (nightly cost skipped) |
-| `moveFile` direct guard                            | indirect     | ✓          | —                        |
-| `handleQueueMigration` `checkFileExists` pre-check | —            | ✓          | ✓                        |
-| Template feature still works on disk (regression)  | ✓            | —          | ✓                        |
+| Path                                                         | Unit (now)   | Unit (new) | E2E (new)                |
+| ------------------------------------------------------------ | ------------ | ---------- | ------------------------ |
+| Bulk template migration S3 skip                              | ✓            | —          | ✓                        |
+| Single template migration S3 skip                            | ✓            | —          | ✓                        |
+| Live-photo fan-out S3 skip (both on S3)                      | ✓ (indirect) | —          | ✓                        |
+| Live-photo mixed-backend (still disk / motion S3)            | —            | ✓ (new)    | —                        |
+| Sidecar file S3 skip                                         | —            | —          | ✓                        |
+| Asset file migration format-change S3 skip                   | ✓            | —          | ✓                        |
+| Person file migration S3 skip                                | ✓            | —          | — (nightly cost skipped) |
+| `moveFile` direct guard                                      | indirect     | ✓          | —                        |
+| `handleQueueMigration` `checkFileExists` pre-check           | —            | ✓          | ✓                        |
+| Template feature still works on disk (regression)            | ✓            | —          | ✓                        |
+| Template rendering error recovery (`getTemplatePath` throws) | ✓ (:540)     | —          | —                        |
+| `moveFile` EXDEV cross-filesystem copy fallback              | ✓ (:723)     | —          | —                        |
 
 ## Risk & cost
 
@@ -322,8 +357,17 @@ Applied from code-reviewer subagent feedback on the draft:
 
 - `docker compose logs --since` takes a relative duration or ISO timestamp, NOT raw epoch seconds — helper rewritten.
 - Existing `handleQueueMigration` unit test at `media.service.spec.ts:286` will break with the new pre-check — update it, plus add a negative test where `checkFileExists` returns `false`.
-- `template-disk-baseline` path component is the user UUID by default (no `storageLabel` on admin); phase sets `storageLabel='admin'` explicitly for predictable assertions.
-- `countMoveHistory` assertions use pre/post delta instead of `=== 0` (prior phases may leave legitimate rows that `cleanMoveHistory` doesn't purge).
+- `template-disk-baseline` path component is the user UUID by default (no `storageLabel` on admin); phase sets `storageLabel='admin'` explicitly for predictable _library_ assertions. Upload paths remain `upload/<userUuid>/…` regardless of `storageLabel` — documented inline in the phase.
+- `countMoveHistory` assertions use pre/post delta instead of `=== 0` (prior phases may leave legitimate rows that `cleanMoveHistory` doesn't purge). Applied to `template-disk-baseline` too.
 - `template-s3-queue-migration-skipped` expectation explicitly documented: DB path stays on pre-flip extension — intended skip behavior, not a latent bug.
 - Dropped `template-s3-config-change-logs-clean` — cannot catch any bug in this fix's scope.
 - Crash-resilience: every phase starts with an invariant-reset step rather than relying solely on `finally`.
+
+Applied from post-commit review pass:
+
+- Path assertion in `template-disk-baseline` originally read "Assert old `upload/admin/…` paths no longer exist on disk" — fixed. Upload paths use `userId` (UUID), not `storageLabel`. Corrected to "capture pre-migration paths, assert those specific strings no longer exist."
+- Added unit test for mixed-backend live photo (still disk / motion S3) — closes the only untested composition in the guard graph. The outer `handleMigrationSingle` guard handles the still-S3/motion-disk case; the new test covers the reverse.
+- Added `AssetService.copySidecar` (asset.service.ts:345) as a flagged follow-up in "Out of scope" — adjacent S3-relative-path concern surfaced during the code-path audit, different trigger path (asset duplication), not storage-template.
+- Added existing-coverage rows to the matrix (template-render error recovery, EXDEV fallback) for completeness.
+- Verified `QueueName.StorageTemplateMigration = 'storageTemplateMigration'` and `QueueName.Migration = 'migration'` — design's `triggerQueueCommand` strings match the enum exactly.
+- Verified `AssetMediaService.getUploadFolder` produces `upload/<userId>/<uuid0..2>/<uuid2..4>/<uuid>.<ext>` — documented inline.
