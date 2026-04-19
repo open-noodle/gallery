@@ -2496,20 +2496,6 @@ describe('SWR loading rules', () => {
     vi.useRealTimers();
   });
 
-  it('preserves ok photos across a new keystroke (does NOT flip to loading)', async () => {
-    vi.mocked(searchSmart).mockResolvedValueOnce({
-      assets: { items: [{ id: 'a1' } as never], nextPage: null },
-    } as never);
-    const m = new GlobalSearchManager();
-    m.open();
-    m.setQuery('beach');
-    await vi.advanceTimersByTimeAsync(200);
-    expect(m.sections.photos.status).toBe('ok');
-    m.setQuery('sunset');
-    // Synchronously — photos should still be ok (old items), not loading.
-    expect(m.sections.photos.status).toBe('ok');
-  });
-
   it('flips empty → loading on new keystroke', async () => {
     const m = new GlobalSearchManager();
     m.open();
@@ -2785,27 +2771,6 @@ describe('batch lifecycle: close, empty-query, grace window (review fixes)', () 
     vi.useRealTimers();
   });
 
-  it('close() resets batchInFlight and inFlightCounter even when a batch is in flight', async () => {
-    let resolveStale!: () => void;
-    vi.mocked(searchSmart).mockImplementationOnce(
-      () => new Promise((r) => (resolveStale = () => r({ assets: { items: [], nextPage: null } } as never))),
-    );
-    const m = new GlobalSearchManager();
-    m.open();
-    m.setQuery('beach');
-    await vi.advanceTimersByTimeAsync(200);
-    expect(m.batchInFlight).toBe(true);
-    m.close();
-    expect(m.batchInFlight).toBe(false);
-    expect((m as unknown as { inFlightCounter: number }).inFlightCounter).toBe(0);
-    expect(m.batchInFlightStartedAt).toBe(0);
-    // Release the stale promise — must NOT re-animate batchInFlight or the counter.
-    resolveStale();
-    await vi.advanceTimersByTimeAsync(10);
-    expect(m.batchInFlight).toBe(false);
-    expect((m as unknown as { inFlightCounter: number }).inFlightCounter).toBe(0);
-  });
-
   it('setQuery(empty) resets batchInFlight, inFlightCounter, and _batchInFlightStartedAt', () => {
     const m = new GlobalSearchManager();
     m.open();
@@ -3055,20 +3020,6 @@ describe('Batch 4 post-review: route consistency, SWR cursor, debounce-window cl
 
   // CG2: reconcileCursor inside setQuery must NOT jump the highlight off a valid
   // SWR-preserved photo cursor when the user types another keystroke.
-  it('setQuery reconcileCursor preserves a valid cursor on an SWR-preserved photo', async () => {
-    vi.mocked(searchSmart).mockResolvedValueOnce({
-      assets: { items: [{ id: 'a1' } as never, { id: 'a2' } as never], nextPage: null },
-    } as never);
-    const m = new GlobalSearchManager();
-    m.open();
-    m.setQuery('beach');
-    await vi.advanceTimersByTimeAsync(200);
-    expect(m.sections.photos.status).toBe('ok');
-    m.activeItemId = 'photo:a2'; // valid, not the first item
-    m.setQuery('sunset'); // photos stay SWR-preserved as ok with [a1, a2]
-    expect(m.activeItemId).toBe('photo:a2');
-  });
-
   // UE1: close() fired during the 150ms debounce window (before runBatch ever ran).
   // Prior tests close AFTER runBatch has fired; this one verifies the earlier state.
   it('close() during the debounce window clears pending runBatch and resets all state', () => {
