@@ -135,6 +135,7 @@ export async function uploadAsset(
   filename: string,
   data: Buffer,
   sidecar?: Buffer,
+  extraFields?: Record<string, string>,
 ): Promise<{ id: string; status: number }> {
   const form = new FormData();
   form.append('assetData', new Blob([new Uint8Array(data)]), filename);
@@ -145,6 +146,12 @@ export async function uploadAsset(
 
   if (sidecar) {
     form.append('sidecarData', new Blob([new Uint8Array(sidecar)]), `${filename}.xmp`);
+  }
+
+  if (extraFields) {
+    for (const [k, v] of Object.entries(extraFields)) {
+      form.append(k, v);
+    }
   }
 
   const url = `${BASE_URL}/assets`;
@@ -304,6 +311,46 @@ export async function waitForMigration(token: string, timeoutMs = 120_000): Prom
   }
 
   throw new Error(`waitForMigration timed out after ${timeoutMs}ms`);
+}
+
+export async function setStorageTemplate(token: string, opts: { enabled?: boolean; template?: string }): Promise<void> {
+  const config = await api('GET', '/system-config', { token });
+  if (opts.enabled !== undefined) {
+    config.storageTemplate.enabled = opts.enabled;
+  }
+  if (opts.template !== undefined) {
+    config.storageTemplate.template = opts.template;
+  }
+  await api('PUT', '/system-config', { body: config, token });
+}
+
+export async function triggerQueueCommand(token: string, queueName: string): Promise<void> {
+  await api('PUT', `/jobs/${queueName}`, { body: { command: 'start' }, token });
+}
+
+export async function countMoveHistory(assetId?: string): Promise<number> {
+  const rows = assetId
+    ? await queryDb<{ c: string }>('SELECT COUNT(*)::text c FROM move_history WHERE "entityId" = $1', [assetId])
+    : await queryDb<{ c: string }>('SELECT COUNT(*)::text c FROM move_history');
+  return Number(rows[0].c);
+}
+
+export function captureContainerLogsSince(service: string, sinceMs: number): string {
+  // docker compose --since accepts ISO-8601 OR a relative duration (e.g. "42s").
+  // Bare epoch seconds are NOT accepted — compute elapsed seconds.
+  // Substring matches work regardless of JSON vs plaintext logger mode;
+  // the warning text appears verbatim in either.
+  const elapsedSec = Math.max(1, Math.ceil((Date.now() - sinceMs) / 1000));
+  return execSync(`${COMPOSE} logs --since ${elapsedSec}s --no-color ${service}`, {
+    cwd: E2E_DIR,
+    timeout: 30_000,
+    encoding: 'utf8',
+  });
+}
+
+export function assertNoMoveEnoent(logs: string, phaseTag: string): void {
+  const bad = logs.split('\n').filter((l) => l.includes('Unable to complete move') || /ENOENT.*rename/.test(l));
+  assert.equal(bad.length, 0, `[${phaseTag}] unexpected ENOENT/move warnings:\n${bad.join('\n')}`);
 }
 
 // ---------------------------------------------------------------------------
