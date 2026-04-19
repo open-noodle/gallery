@@ -1,4 +1,4 @@
-import { AlbumUserRole, SharedSpaceRole, type LoginResponseDto } from '@immich/sdk';
+import { SharedSpaceRole, type LoginResponseDto } from '@immich/sdk';
 import { expect, test } from '@playwright/test';
 import { createUserDto } from 'src/fixtures';
 import { utils } from 'src/utils';
@@ -91,11 +91,11 @@ test.describe('cmdk context commands (v1.4)', () => {
     // Second Enter fires the delete + redirect.
     await page.keyboard.press('Enter');
     await expect(page).toHaveURL(/\/albums$/);
-    // Deleted album is absent from the list.
-    await expect.poll(async () => {
-      const names = await page.locator('[data-testid="album-card-name"]').allInnerTexts();
-      return names.some((n) => n.includes(albumName));
-    }, { timeout: 5000 }).toBe(false);
+    // Deleted album is absent from the list. Poll because the albums page
+    // re-fetches after the redirect; the SWR render may show stale data briefly.
+    await expect.poll(async () => page.locator('[data-testid="album-name"]').filter({ hasText: albumName }).count(), {
+      timeout: 5000,
+    }).toBe(0);
   });
 
   test('Case 5 — destructive Esc cancels: palette stays open, album survives', async ({
@@ -135,9 +135,10 @@ test.describe('cmdk context commands (v1.4)', () => {
       window.history.pushState({}, '', '/albums');
       window.dispatchEvent(new PopStateEvent('popstate'));
     });
-    // Whether the palette closes via the nav-row close() path, via afterNavigate,
-    // or via page-reload fallback, the user-visible outcome is identical: dialog
-    // is not in the DOM after the route change settles.
+    // Belt-and-braces: confirm the SPA nav actually landed, then assert the
+    // dialog is gone. Without the URL check a dialog closing for an unrelated
+    // reason would still pass.
+    await expect(page).toHaveURL(/\/albums$/);
     await expect(page.getByRole('dialog')).toBeHidden({ timeout: 5000 });
   });
 
@@ -172,5 +173,3 @@ test.describe('cmdk context commands (v1.4)', () => {
     await expect(page).toHaveURL(/\/spaces$/);
   });
 });
-// AlbumUserRole import ensures the generated type is available if a future case needs role variants.
-void AlbumUserRole;
