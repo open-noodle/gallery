@@ -73,7 +73,11 @@ void main() {
     await tester.pump();
   });
 
-  testWidgets('_lastProcessedFocusRequest advances only after post-frame runs', (tester) async {
+  testWidgets('remount with unchanged counter does not re-focus (snap-transition regression)', (tester) async {
+    // User opens sheet via search blob → counter bumped, search bar mounts and
+    // focuses. User dismisses keyboard. User taps More filters → browse snap
+    // unmounts, deep snap mounts a FRESH search bar. Because the counter
+    // hasn't changed (same request), the new mount must NOT auto-focus.
     final container = ProviderContainer();
     addTearDown(container.dispose);
     container.read(photosFilterSearchFocusRequestProvider.notifier).state = 1;
@@ -84,11 +88,16 @@ void main() {
         child: const MaterialApp(home: Material(child: FilterSheetSearchBar())),
       ),
     );
-    // Unmount before post-frame runs.
-    await tester.pumpWidget(const SizedBox.shrink());
     await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(find.byType(TextField)).focusNode!.hasFocus, isTrue);
 
-    // Remount fresh. counter=1 > _lastProcessed=0 → should still fire.
+    // Simulate user dismissing keyboard.
+    tester.widget<TextField>(find.byType(TextField)).focusNode!.unfocus();
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(find.byType(TextField)).focusNode!.hasFocus, isFalse);
+
+    // Remount a fresh instance (same container = same providers), counter unchanged.
+    await tester.pumpWidget(const SizedBox.shrink());
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
@@ -97,7 +106,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final textField = tester.widget<TextField>(find.byType(TextField));
-    expect(textField.focusNode!.hasFocus, isTrue, reason: 'fresh mount must still pick up the pre-mount increment');
+    expect(
+      tester.widget<TextField>(find.byType(TextField)).focusNode!.hasFocus,
+      isFalse,
+      reason: 'remount without a new request must not re-focus — the original request was already consumed',
+    );
   });
 }

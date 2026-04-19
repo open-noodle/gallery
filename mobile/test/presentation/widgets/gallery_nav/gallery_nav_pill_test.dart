@@ -55,7 +55,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byIcon(Icons.photo_album), findsOneWidget);
     // Photos is idle — outlined icon is in the tree (AnimatedCrossFade keeps
-    // both layered) but the AnimatedAlign collapses it to 0 width.
+    // both layered) but the Align collapses it to 0 width.
   });
 
   testWidgets('organic widths: active segment wider than idle sibling', (tester) async {
@@ -87,6 +87,39 @@ void main() {
     final underlayRect = tester.getRect(find.byKey(const Key('gallery-nav-underlay')));
     expect((underlayRect.left - segmentRect.left).abs(), lessThan(0.5));
     expect((underlayRect.width - segmentRect.width).abs(), lessThan(0.5));
+  });
+
+  testWidgets('underlay tracks newly-active segment after tab change (Photos→Albums→Library)', (tester) async {
+    // Regression: the rect-diff guard used Map.toString for equality, which
+    // collapses to "Instance of 'Rect'" in profile mode — so _segmentRects
+    // never updated after the initial mount and the underlay stayed pinned
+    // to the default-active segment's rect.
+    await tester.pumpConsumerWidget(SizedBox(width: 360, child: _Harness()));
+    await tester.pumpAndSettle();
+
+    final harness = tester.state<_HarnessState>(find.byType(_Harness));
+
+    harness.switchTo(GalleryTabEnum.albums);
+    await tester.pumpAndSettle();
+    final albumsSeg = tester.getRect(find.byKey(const Key('gallery-nav-segment-albums')));
+    final underlayAfterAlbums = tester.getRect(find.byKey(const Key('gallery-nav-underlay')));
+    expect(
+      (underlayAfterAlbums.left - albumsSeg.left).abs(),
+      lessThan(0.5),
+      reason: 'underlay left should match albums segment left after switching',
+    );
+    expect(
+      (underlayAfterAlbums.width - albumsSeg.width).abs(),
+      lessThan(0.5),
+      reason: 'underlay width should match albums segment width — prevents icon rendering outside',
+    );
+
+    harness.switchTo(GalleryTabEnum.library);
+    await tester.pumpAndSettle();
+    final librarySeg = tester.getRect(find.byKey(const Key('gallery-nav-segment-library')));
+    final underlayAfterLibrary = tester.getRect(find.byKey(const Key('gallery-nav-underlay')));
+    expect((underlayAfterLibrary.left - librarySeg.left).abs(), lessThan(0.5));
+    expect((underlayAfterLibrary.width - librarySeg.width).abs(), lessThan(0.5));
   });
 
   testWidgets('disabledTabs: dims Albums+Library to 0.3 opacity, blocks taps', (tester) async {

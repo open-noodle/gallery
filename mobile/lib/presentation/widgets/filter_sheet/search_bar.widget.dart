@@ -17,7 +17,6 @@ class FilterSheetSearchBar extends ConsumerStatefulWidget {
 class _FilterSheetSearchBarState extends ConsumerState<FilterSheetSearchBar> {
   late final TextEditingController _controller;
   late final FocusNode _focusNode;
-  int _lastProcessedFocusRequest = 0;
   Timer? _debounce;
 
   static const _debounceMs = Duration(milliseconds: 250);
@@ -59,16 +58,18 @@ class _FilterSheetSearchBarState extends ConsumerState<FilterSheetSearchBar> {
 
   @override
   Widget build(BuildContext context) {
-    // Watch the counter: when it rises above our last-processed value, schedule
-    // a post-frame requestFocus. `ref.watch` (not `ref.listen`) is deliberate —
-    // it survives the race where the increment lands BEFORE this widget mounts
-    // (e.g., `openGallerySearch` triggers sheet open from a non-Photos tab).
+    // Watch the request counter and compare against the consumed-counter
+    // provider. If request > consumed, schedule a post-frame requestFocus and
+    // bump consumed. Storing the consumed counter in a provider (not a State
+    // field) means snap transitions — which unmount+remount this widget —
+    // don't retrigger focus on the already-processed request.
     final focusRequest = ref.watch(photosFilterSearchFocusRequestProvider);
-    if (focusRequest > _lastProcessedFocusRequest) {
+    final focusConsumed = ref.read(photosFilterSearchFocusConsumedProvider);
+    if (focusRequest > focusConsumed) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         _focusNode.requestFocus();
-        setState(() => _lastProcessedFocusRequest = focusRequest);
+        ref.read(photosFilterSearchFocusConsumedProvider.notifier).state = focusRequest;
       });
     }
 

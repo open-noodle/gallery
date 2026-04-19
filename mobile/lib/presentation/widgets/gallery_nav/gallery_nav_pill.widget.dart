@@ -28,8 +28,10 @@ class _GalleryNavPillState extends State<GalleryNavPill> {
   final Map<GalleryTabEnum, GlobalKey> _keys = {
     for (final t in GalleryTabEnum.values) t: GlobalKey(debugLabel: 'gallery-nav-segment-${t.name}'),
   };
-  final GlobalKey _rowKey = GlobalKey(debugLabel: 'gallery-nav-row');
+  final GlobalKey _pillKey = GlobalKey(debugLabel: 'gallery-nav-pill');
   Map<GalleryTabEnum, Rect> _segmentRects = const {};
+
+  static const double _edgeInset = 6.0;
 
   @override
   void initState() {
@@ -45,9 +47,9 @@ class _GalleryNavPillState extends State<GalleryNavPill> {
 
   void _measure() {
     if (!mounted) return;
-    final rowBox = _rowKey.currentContext?.findRenderObject() as RenderBox?;
-    if (rowBox == null) return;
-    final rowOrigin = rowBox.localToGlobal(Offset.zero);
+    final pillBox = _pillKey.currentContext?.findRenderObject() as RenderBox?;
+    if (pillBox == null) return;
+    final pillOrigin = pillBox.localToGlobal(Offset.zero);
 
     final rects = <GalleryTabEnum, Rect>{};
     for (final entry in _keys.entries) {
@@ -55,12 +57,20 @@ class _GalleryNavPillState extends State<GalleryNavPill> {
       if (ctx == null) continue;
       final box = ctx.findRenderObject() as RenderBox?;
       if (box == null) continue;
-      final origin = box.localToGlobal(Offset.zero) - rowOrigin;
+      final origin = box.localToGlobal(Offset.zero) - pillOrigin;
       rects[entry.key] = origin & box.size;
     }
-    if (rects.length == _keys.length && rects.toString() != _segmentRects.toString()) {
+    if (rects.length == _keys.length && !_rectsEqual(rects, _segmentRects)) {
       setState(() => _segmentRects = rects);
     }
+  }
+
+  bool _rectsEqual(Map<GalleryTabEnum, Rect> a, Map<GalleryTabEnum, Rect> b) {
+    if (a.length != b.length) return false;
+    for (final entry in a.entries) {
+      if (b[entry.key] != entry.value) return false;
+    }
+    return true;
   }
 
   @override
@@ -78,10 +88,16 @@ class _GalleryNavPillState extends State<GalleryNavPill> {
       child: BackdropFilter(
         filter: ui.ImageFilter.blur(sigmaX: 28, sigmaY: 28),
         child: Container(
+          key: _pillKey,
           height: _pillHeight,
-          padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.68),
+            // Dark theme: translucent elevated surface reads as subtle pill on black.
+            // Light theme: the same approach goes mushy gray over white — go
+            // brighter by stacking a high-alpha `surface` (white/near-white) over
+            // the blur so the pill reads as a crisp light slab.
+            color: theme.brightness == Brightness.dark
+                ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.68)
+                : theme.colorScheme.surface.withValues(alpha: 0.9),
             borderRadius: BorderRadius.circular(_pillRadius),
             border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.55), width: 1),
             boxShadow: [
@@ -96,12 +112,13 @@ class _GalleryNavPillState extends State<GalleryNavPill> {
           ),
           child: Stack(
             clipBehavior: Clip.none,
+            alignment: Alignment.center,
             children: [
               Positioned.fill(
                 key: const Key('gallery-nav-inner-warmth'),
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(_pillRadius - 6),
+                    borderRadius: BorderRadius.circular(_pillRadius),
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.center,
@@ -127,27 +144,29 @@ class _GalleryNavPillState extends State<GalleryNavPill> {
                   ),
                 ),
               ),
-              Row(
-                key: _rowKey,
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  for (final tab in GalleryTabEnum.values)
-                    KeyedSubtree(
-                      key: _keys[tab],
-                      child: Opacity(
-                        opacity: widget.disabledTabs.contains(tab) ? 0.3 : 1.0,
-                        child: IgnorePointer(
-                          ignoring: widget.disabledTabs.contains(tab),
-                          child: GalleryNavSegment(
-                            key: Key('gallery-nav-segment-${tab.name}'),
-                            tab: tab,
-                            active: widget.activeTab == tab,
-                            onTap: () => widget.onTabTap(tab),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: _edgeInset),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    for (final tab in GalleryTabEnum.values)
+                      KeyedSubtree(
+                        key: _keys[tab],
+                        child: Opacity(
+                          opacity: widget.disabledTabs.contains(tab) ? 0.3 : 1.0,
+                          child: IgnorePointer(
+                            ignoring: widget.disabledTabs.contains(tab),
+                            child: GalleryNavSegment(
+                              key: Key('gallery-nav-segment-${tab.name}'),
+                              tab: tab,
+                              active: widget.activeTab == tab,
+                              onTap: () => widget.onTabTap(tab),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
             ],
           ),

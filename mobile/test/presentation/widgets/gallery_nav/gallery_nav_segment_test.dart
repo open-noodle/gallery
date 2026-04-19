@@ -11,7 +11,7 @@ void main() {
   testWidgets('idle: icon slot collapsed (widthFactor 0), label shown', (tester) async {
     await tester.pumpConsumerWidget(GalleryNavSegment(tab: GalleryTabEnum.photos, active: false, onTap: () {}));
     await tester.pumpAndSettle();
-    final align = tester.widget<AnimatedAlign>(find.byType(AnimatedAlign));
+    final align = tester.widget<Align>(find.byKey(const Key('gallery-nav-segment-icon-slot')));
     expect(align.widthFactor, 0.0, reason: 'idle icon slot has 0 width');
     expect(find.text('nav_photos'.tr()), findsOneWidget);
     expect(find.byType(AnimatedNavIcon), findsOneWidget);
@@ -20,7 +20,7 @@ void main() {
   testWidgets('active: icon slot expanded (widthFactor 1), icon + label rendered', (tester) async {
     await tester.pumpConsumerWidget(GalleryNavSegment(tab: GalleryTabEnum.photos, active: true, onTap: () {}));
     await tester.pumpAndSettle();
-    final align = tester.widget<AnimatedAlign>(find.byType(AnimatedAlign));
+    final align = tester.widget<Align>(find.byKey(const Key('gallery-nav-segment-icon-slot')));
     expect(align.widthFactor, 1.0);
     expect(find.byType(AnimatedNavIcon), findsOneWidget);
     expect(find.text('nav_photos'.tr()), findsOneWidget);
@@ -35,11 +35,11 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    final sizeActive = tester.getSize(find.byType(AnimatedAlign));
+    final sizeActive = tester.getSize(find.byKey(const Key('gallery-nav-segment-icon-slot')));
 
     active.value = false;
     await tester.pumpAndSettle();
-    final sizeIdle = tester.getSize(find.byType(AnimatedAlign));
+    final sizeIdle = tester.getSize(find.byKey(const Key('gallery-nav-segment-icon-slot')));
 
     expect(sizeIdle.width, lessThan(sizeActive.width), reason: 'idle icon slot collapses smaller than active');
   });

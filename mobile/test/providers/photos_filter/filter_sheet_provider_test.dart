@@ -4,13 +4,8 @@ import 'package:immich_mobile/providers/photos_filter/filter_sheet.provider.dart
 
 void main() {
   group('FilterSheetSnap', () {
-    test('has exactly four states: hidden, peek, browse, deep', () {
-      expect(FilterSheetSnap.values, [
-        FilterSheetSnap.hidden,
-        FilterSheetSnap.peek,
-        FilterSheetSnap.browse,
-        FilterSheetSnap.deep,
-      ]);
+    test('has exactly three states: hidden, browse, deep', () {
+      expect(FilterSheetSnap.values, [FilterSheetSnap.hidden, FilterSheetSnap.browse, FilterSheetSnap.deep]);
     });
 
     test('photosFilterSheetProvider defaults to hidden', () {

@@ -46,7 +46,9 @@ class _GallerySearchBlobState extends State<GallerySearchBlob> {
                     width: _diameter,
                     height: _diameter,
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.68),
+                      color: theme.brightness == Brightness.dark
+                          ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.68)
+                          : theme.colorScheme.surface.withValues(alpha: 0.9),
                       shape: BoxShape.circle,
                       border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.55), width: 1),
                       boxShadow: [

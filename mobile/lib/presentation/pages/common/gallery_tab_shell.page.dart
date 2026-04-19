@@ -59,6 +59,7 @@ class _GalleryTabShellPageState extends ConsumerState<GalleryTabShellPage> {
           },
           child: Scaffold(
             resizeToAvoidBottomInset: false,
+            extendBody: true,
             body: isLandscape
                 ? Row(
                     children: [

@@ -42,7 +42,7 @@ void main() {
     await openGallerySearch(router, c.read);
 
     expect(router.setCalls, isEmpty);
-    expect(c.read(photosFilterSheetProvider), FilterSheetSnap.browse);
+    expect(c.read(photosFilterSheetProvider), FilterSheetSnap.deep);
     expect(c.read(photosFilterSearchFocusRequestProvider), 1);
     expect(haptic.selectionClicks, 1);
   });
@@ -64,28 +64,28 @@ void main() {
       expect(c.read(photosFilterSheetProvider), FilterSheetSnap.hidden, reason: 'still under 620ms');
 
       async.elapse(const Duration(milliseconds: 2));
-      expect(c.read(photosFilterSheetProvider), FilterSheetSnap.browse);
+      expect(c.read(photosFilterSheetProvider), FilterSheetSnap.deep);
       expect(c.read(photosFilterSearchFocusRequestProvider), 1);
     });
   });
 
-  test('sheet already at browse: write is no-op, focus still increments', () async {
-    final router = FakeTabsRouter(initialIndex: GalleryTabEnum.photos.index);
-    final c = _container(sheet: FilterSheetSnap.browse);
-    addTearDown(c.dispose);
-
-    await openGallerySearch(router, c.read);
-    expect(c.read(photosFilterSheetProvider), FilterSheetSnap.browse);
-    expect(c.read(photosFilterSearchFocusRequestProvider), 1);
-  });
-
-  test('sheet at deep: write transitions to browse, focus counter += 1', () async {
+  test('sheet already at deep: write is no-op, focus still increments', () async {
     final router = FakeTabsRouter(initialIndex: GalleryTabEnum.photos.index);
     final c = _container(sheet: FilterSheetSnap.deep);
     addTearDown(c.dispose);
 
     await openGallerySearch(router, c.read);
-    expect(c.read(photosFilterSheetProvider), FilterSheetSnap.browse);
+    expect(c.read(photosFilterSheetProvider), FilterSheetSnap.deep);
+    expect(c.read(photosFilterSearchFocusRequestProvider), 1);
+  });
+
+  test('sheet at browse: write transitions to deep, focus counter += 1', () async {
+    final router = FakeTabsRouter(initialIndex: GalleryTabEnum.photos.index);
+    final c = _container(sheet: FilterSheetSnap.browse);
+    addTearDown(c.dispose);
+
+    await openGallerySearch(router, c.read);
+    expect(c.read(photosFilterSheetProvider), FilterSheetSnap.deep);
     expect(c.read(photosFilterSearchFocusRequestProvider), 1);
   });
 
@@ -100,18 +100,13 @@ void main() {
       async.flushMicrotasks();
 
       expect(router.setCalls, [GalleryTabEnum.photos.index]);
-      expect(c.read(photosFilterSheetProvider), FilterSheetSnap.browse);
+      expect(c.read(photosFilterSheetProvider), FilterSheetSnap.deep);
       expect(c.read(photosFilterSearchFocusRequestProvider), 1);
     });
   });
 
   test('haptic fires exactly once per call regardless of sheet state', () async {
-    for (final initial in [
-      FilterSheetSnap.hidden,
-      FilterSheetSnap.peek,
-      FilterSheetSnap.browse,
-      FilterSheetSnap.deep,
-    ]) {
+    for (final initial in [FilterSheetSnap.hidden, FilterSheetSnap.deep, FilterSheetSnap.deep]) {
       final router = FakeTabsRouter(initialIndex: GalleryTabEnum.photos.index);
       final c = _container(sheet: initial);
       final haptic = c.read(hapticFeedbackProvider.notifier) as _HapticSpy;
@@ -133,7 +128,7 @@ void main() {
       openGallerySearch(router, c.read);
       async.elapse(const Duration(milliseconds: 700));
 
-      expect(c.read(photosFilterSheetProvider), FilterSheetSnap.browse);
+      expect(c.read(photosFilterSheetProvider), FilterSheetSnap.deep);
       expect(c.read(photosFilterSearchFocusRequestProvider), 2);
     });
   });
@@ -149,7 +144,7 @@ void main() {
       router.setActiveIndex(GalleryTabEnum.library.index);
       async.elapse(const Duration(milliseconds: 700));
 
-      expect(c.read(photosFilterSheetProvider), FilterSheetSnap.browse);
+      expect(c.read(photosFilterSheetProvider), FilterSheetSnap.deep);
       expect(c.read(photosFilterSearchFocusRequestProvider), 1);
       expect(router.activeIndex, GalleryTabEnum.library.index);
     });

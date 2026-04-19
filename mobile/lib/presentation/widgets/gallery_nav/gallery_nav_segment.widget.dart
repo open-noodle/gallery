@@ -5,7 +5,6 @@ import 'package:immich_mobile/providers/gallery_nav/gallery_nav_destination.dart
 import 'package:immich_mobile/providers/gallery_nav/gallery_tab_enum.dart';
 
 class GalleryNavSegment extends StatelessWidget {
-  static const Duration _sizeAnimDuration = Duration(milliseconds: 260);
   static const Duration _opacityAnimDuration = Duration(milliseconds: 220);
   static const Cubic _easing = Cubic(0.3, 0.6, 0.2, 1);
 
@@ -38,11 +37,10 @@ class GalleryNavSegment extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 ClipRect(
-                  child: AnimatedAlign(
+                  child: Align(
+                    key: const Key('gallery-nav-segment-icon-slot'),
                     alignment: AlignmentDirectional.centerStart,
                     widthFactor: active ? 1.0 : 0.0,
-                    duration: _sizeAnimDuration,
-                    curve: _easing,
                     child: Padding(
                       padding: const EdgeInsetsDirectional.only(end: 6),
                       child: AnimatedOpacity(

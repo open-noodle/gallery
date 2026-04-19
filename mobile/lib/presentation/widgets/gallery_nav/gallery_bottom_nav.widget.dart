@@ -19,6 +19,7 @@ import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/memory.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/people.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/readonly_mode.provider.dart';
+import 'package:immich_mobile/providers/photos_filter/filter_sheet.provider.dart';
 
 class GalleryBottomNav extends ConsumerStatefulWidget {
   final TabsRouter tabsRouter;
@@ -71,7 +72,10 @@ class _GalleryBottomNavState extends ConsumerState<GalleryBottomNav> {
       return _landscapeRail(isReadonly);
     }
 
-    final hiding = _hiddenForMultiSelect || keyboardUp;
+    // Hide the pill while the FilterSheet is visible — it would otherwise
+    // overlap the sheet's bottom content (e.g. the Done button at Deep snap).
+    final sheetVisible = ref.watch(photosFilterSheetProvider) != FilterSheetSnap.hidden;
+    final hiding = _hiddenForMultiSelect || keyboardUp || sheetVisible;
     final pillVisibleHeight = _bottomFloat + _pillHeight + mq.padding.bottom;
 
     if (!hiding) {
