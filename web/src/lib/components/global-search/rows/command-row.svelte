@@ -6,8 +6,10 @@
 
   interface Props {
     item: CommandItem;
+    /** True while this row is awaiting the second Enter of a destructive confirm. */
+    pending?: boolean;
   }
-  let { item }: Props = $props();
+  let { item, pending = false }: Props = $props();
 </script>
 
 <div
@@ -18,8 +20,12 @@
   </div>
   <div class="min-w-0 flex-1">
     <div class="truncate text-sm font-medium">{$t(item.labelKey as Translations)}</div>
-    <div class="truncate text-xs text-gray-500 dark:text-gray-400">
-      {$t(item.descriptionKey as Translations)}
-    </div>
+    {#if pending}
+      <div class="truncate text-xs text-danger">{$t('cmdk_cmd_confirm_hint')}</div>
+    {:else}
+      <div class="truncate text-xs text-gray-500 dark:text-gray-400">
+        {$t(item.descriptionKey as Translations)}
+      </div>
+    {/if}
   </div>
 </div>

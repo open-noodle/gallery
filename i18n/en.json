@@ -818,6 +818,7 @@
   "cmdk_cmd_clear_failed_jobs_description": "Remove failed jobs from every queue",
   "cmdk_cmd_clear_failed_jobs_label": "Clear failed jobs",
   "cmdk_cmd_clear_recents_description": "Remove saved palette history",
+  "cmdk_cmd_confirm_hint": "Press Enter again to confirm · Esc to cancel",
   "cmdk_cmd_create_space_description": "Start a new shared space",
   "cmdk_cmd_failed_cleared": "Cleared failed jobs",
   "cmdk_cmd_job_started": "Started: {job}",
