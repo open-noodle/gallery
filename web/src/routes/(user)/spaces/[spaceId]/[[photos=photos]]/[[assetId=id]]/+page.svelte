@@ -41,6 +41,7 @@
   import AssetSelectControlBar from '$lib/components/timeline/AssetSelectControlBar.svelte';
   import Timeline from '$lib/components/timeline/Timeline.svelte';
   import { TimelineManager } from '$lib/managers/timeline-manager/timeline-manager.svelte';
+  import { registerSpaceContext } from '$lib/managers/command-context-manager.svelte';
   import { eventManager } from '$lib/managers/event-manager.svelte';
   import { Route } from '$lib/route';
   import { assetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
@@ -102,6 +103,11 @@
   let { data }: Props = $props();
   let space: SharedSpaceResponseDto = $state(data.space);
   let members: SharedSpaceMemberResponseDto[] = $state(data.members);
+
+  registerSpaceContext(
+    () => space,
+    () => members,
+  );
 
   // Sync when navigating between spaces (component persists, data updates)
   $effect(() => {
