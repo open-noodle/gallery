@@ -308,6 +308,7 @@ export class SharedSpaceRepository {
           .where('asset.deletedAt', 'is', null)
           .where('asset.isOffline', '=', false)
           .where('asset.type', '=', AssetType.Image)
+          .where('asset.thumbhash', 'is not', null)
           .union(
             this.db
               .selectFrom('shared_space_library')
@@ -316,7 +317,8 @@ export class SharedSpaceRepository {
               .where('shared_space_library.spaceId', '=', spaceId)
               .where('asset.deletedAt', 'is', null)
               .where('asset.isOffline', '=', false)
-              .where('asset.type', '=', AssetType.Image),
+              .where('asset.type', '=', AssetType.Image)
+              .where('asset.thumbhash', 'is not', null),
           )
           .as('combined'),
       )
