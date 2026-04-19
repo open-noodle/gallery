@@ -31,7 +31,7 @@
   import { activityManager } from '$lib/managers/activity-manager.svelte';
   import { assetMultiSelectManager, AssetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
   import { assetViewerManager } from '$lib/managers/asset-viewer-manager.svelte';
-  import { authManager } from '$lib/managers/auth-manager.svelte';
+  import { registerAlbumContext } from '$lib/managers/command-context-manager.svelte';
   import { eventManager } from '$lib/managers/event-manager.svelte';
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
   import { TimelineManager } from '$lib/managers/timeline-manager/timeline-manager.svelte';
@@ -212,6 +212,8 @@
 
   let album = $derived(data.album);
   let albumId = $derived(album.id);
+
+  registerAlbumContext(() => data.album);
 
   const containsEditors = $derived(album?.shared && album.albumUsers.some(({ role }) => role === AlbumUserRole.Editor));
   const albumUsers = $derived(showAlbumUsers && containsEditors ? album.albumUsers.map(({ user }) => user) : []);
