@@ -283,7 +283,20 @@ describe(MediaService.name, () => {
   });
 
   describe('handleQueueMigration', () => {
+    it('should skip removeEmptyDirs when storage folders do not exist (pure-S3 deployment)', async () => {
+      mocks.job.getJobCounts.mockResolvedValue({ active: 1, waiting: 0 } as JobCounts);
+      mocks.storage.checkFileExists.mockResolvedValue(false);
+      mocks.assetJob.streamForMigrationJob.mockReturnValue(makeStream([]));
+      mocks.person.getAll.mockReturnValue(makeStream([]));
+
+      await expect(sut.handleQueueMigration()).resolves.toBe(JobStatus.Success);
+
+      expect(mocks.storage.checkFileExists).toHaveBeenCalledTimes(2);
+      expect(mocks.storage.removeEmptyDirs).not.toHaveBeenCalled();
+    });
+
     it('should remove empty directories and queue jobs', async () => {
+      mocks.storage.checkFileExists.mockResolvedValue(true);
       const asset = AssetFactory.create();
       const person = PersonFactory.create();
 
@@ -305,6 +318,20 @@ describe(MediaService.name, () => {
       await expect(sut.handleAssetMigration({ id: 'non-existent' })).resolves.toBe(JobStatus.Failed);
 
       expect(mocks.move.getByEntity).not.toHaveBeenCalled();
+    });
+
+    it('should skip S3 assets with relative paths', async () => {
+      const asset = AssetFactory.from({ originalPath: 'upload/user/ab/cd/file.jpg' })
+        .files([AssetFileType.FullSize, AssetFileType.Preview, AssetFileType.Thumbnail])
+        .build();
+      mocks.assetJob.getForMigrationJob.mockResolvedValue(asset);
+
+      await expect(sut.handleAssetMigration({ id: asset.id })).resolves.toBe(JobStatus.Skipped);
+
+      expect(mocks.move.create).not.toHaveBeenCalled();
+      expect(mocks.move.getByEntity).not.toHaveBeenCalled();
+      expect(mocks.storage.rename).not.toHaveBeenCalled();
+      expect(mocks.storage.copyFile).not.toHaveBeenCalled();
     });
 
     it('should move asset files', async () => {

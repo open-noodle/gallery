@@ -369,6 +369,28 @@ describe(PersonService.name, () => {
     it('should not move person files', async () => {
       await expect(sut.handlePersonMigration(PersonFactory.create())).resolves.toBe(JobStatus.Failed);
     });
+
+    it('should skip persons with relative S3 thumbnail paths', async () => {
+      const person = PersonFactory.create({ thumbnailPath: 'thumbs/user/ab/cd/person.jpeg' });
+      mocks.person.getById.mockResolvedValue(person);
+
+      await expect(sut.handlePersonMigration({ id: person.id })).resolves.toBe(JobStatus.Skipped);
+
+      expect(mocks.move.create).not.toHaveBeenCalled();
+      expect(mocks.move.getByEntity).not.toHaveBeenCalled();
+      expect(mocks.storage.rename).not.toHaveBeenCalled();
+    });
+
+    it('should skip persons with empty thumbnail paths', async () => {
+      const person = PersonFactory.create({ thumbnailPath: '' });
+      mocks.person.getById.mockResolvedValue(person);
+
+      await expect(sut.handlePersonMigration({ id: person.id })).resolves.toBe(JobStatus.Skipped);
+
+      expect(mocks.move.create).not.toHaveBeenCalled();
+      expect(mocks.move.getByEntity).not.toHaveBeenCalled();
+      expect(mocks.storage.rename).not.toHaveBeenCalled();
+    });
   });
 
   describe('getFacesById', () => {
