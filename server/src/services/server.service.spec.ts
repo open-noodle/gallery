@@ -2,6 +2,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { serverVersion } from 'src/constants';
 import { SystemMetadataKey } from 'src/enum';
 import { ServerService } from 'src/services/server.service';
+import { clearConfigCache } from 'src/utils/config';
 import { mimeTypes } from 'src/utils/mime-types';
 import { mockEnvData } from 'test/repositories/config.repository.mock';
 import { newTestService, ServiceMocks } from 'test/utils';
@@ -156,6 +157,18 @@ describe(ServerService.name, () => {
       });
       expect(mocks.systemMetadata.get).toHaveBeenCalled();
     });
+
+    // Regression guard: getFeatures is called on every web-app page load; must
+    // read config from cache rather than rebuilding SystemConfigDto per request.
+    it('should read system config from cache across requests', async () => {
+      clearConfigCache();
+
+      await sut.getFeatures();
+      await sut.getFeatures();
+      await sut.getFeatures();
+
+      expect(mocks.systemMetadata.get).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('getSystemConfig', () => {
@@ -189,6 +202,23 @@ describe(ServerService.name, () => {
       mocks.user.hasAdmin.mockResolvedValue(false);
 
       await expect(sut.getSystemConfig()).resolves.toMatchObject({ isInitialized: true });
+    });
+
+    // Regression guard: getSystemConfig is hit on every page load; must read from cache.
+    it('should read system config from cache across requests', async () => {
+      clearConfigCache();
+
+      await sut.getSystemConfig();
+      await sut.getSystemConfig();
+      await sut.getSystemConfig();
+
+      // Two metadata keys are read per request (SystemConfig + AdminOnboarding),
+      // so the cache-miss path reads both once on the first call; the remaining
+      // calls should hit only AdminOnboarding (not SystemConfig).
+      const systemConfigCalls = mocks.systemMetadata.get.mock.calls.filter(
+        ([key]) => key === SystemMetadataKey.SystemConfig,
+      );
+      expect(systemConfigCalls).toHaveLength(1);
     });
   });
 
@@ -375,6 +405,17 @@ describe(ServerService.name, () => {
     it('should return the theme config', async () => {
       const result = await sut.getTheme();
       expect(result).toEqual({ customCss: '' });
+    });
+
+    // Regression guard: getTheme is hit on every page load; must read from cache.
+    it('should read system config from cache across requests', async () => {
+      clearConfigCache();
+
+      await sut.getTheme();
+      await sut.getTheme();
+      await sut.getTheme();
+
+      expect(mocks.systemMetadata.get).toHaveBeenCalledTimes(1);
     });
   });
 
