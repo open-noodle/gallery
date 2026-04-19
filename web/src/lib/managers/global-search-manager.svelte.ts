@@ -28,6 +28,7 @@ import { locale as i18nLocale, t, type Translations } from 'svelte-i18n';
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import { get } from 'svelte/store';
 import { parseScope, personSuggestionsComparator, type ParsedQuery, type Scope } from './cmdk-prefix';
+import { commandContextManager } from './command-context-manager.svelte';
 import { COMMAND_ITEMS, isAlmostExactCommandMatch, type CommandItem } from './command-items';
 import { isAlmostExactNavMatch, NAVIGATION_ITEMS, type NavigationItem } from './navigation-items';
 
@@ -437,6 +438,7 @@ export class GlobalSearchManager {
       eligibleNav.push(item);
     }
 
+    const ctx = commandContextManager.getContext();
     const eligibleCmd: CommandItem[] = [];
     for (const item of COMMAND_ITEMS) {
       if (item.adminOnly && !isAdmin) {
@@ -444,6 +446,14 @@ export class GlobalSearchManager {
       }
       if (item.featureFlag && !flags?.[item.featureFlag]) {
         continue;
+      }
+      if (item.isAvailable) {
+        try {
+          if (!item.isAvailable(ctx)) continue;
+        } catch (error) {
+          console.error('[cmdk] isAvailable threw', { id: item.id, error });
+          continue;
+        }
       }
       eligibleCmd.push(item);
     }

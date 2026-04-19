@@ -2011,6 +2011,86 @@ describe('commands provider', () => {
     }
   });
 
+  it('isAvailable=false excludes command from provider output', async () => {
+    const gated: CommandItem = {
+      id: 'cmd:test-gated-off',
+      labelKey: 'test_gated_off_label',
+      descriptionKey: 'test_gated_off_description',
+      icon: '',
+      handler: () => undefined,
+      isAvailable: () => false,
+    };
+    commandItemsMut.push(gated);
+    try {
+      manager.setQuery('>');
+      await flushMicrotasks();
+      const section = manager.sections.commands;
+      expect(section.status).toBe('ok');
+      if (section.status === 'ok') {
+        expect(section.items.some((c) => c.id === gated.id)).toBe(false);
+      }
+    } finally {
+      const idx = commandItemsMut.findIndex((c) => c.id === gated.id);
+      if (idx !== -1) commandItemsMut.splice(idx, 1);
+    }
+  });
+
+  it('isAvailable=true includes the command', async () => {
+    const allowed: CommandItem = {
+      id: 'cmd:test-gated-on',
+      labelKey: 'test_gated_on_label',
+      descriptionKey: 'test_gated_on_description',
+      icon: '',
+      handler: () => undefined,
+      isAvailable: () => true,
+    };
+    commandItemsMut.push(allowed);
+    try {
+      manager.setQuery('>');
+      await flushMicrotasks();
+      const section = manager.sections.commands;
+      expect(section.status).toBe('ok');
+      if (section.status === 'ok') {
+        expect(section.items.some((c) => c.id === allowed.id)).toBe(true);
+      }
+    } finally {
+      const idx = commandItemsMut.findIndex((c) => c.id === allowed.id);
+      if (idx !== -1) commandItemsMut.splice(idx, 1);
+    }
+  });
+
+  it('isAvailable throwing excludes the command and logs', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const throwing: CommandItem = {
+      id: 'cmd:test-gated-throw',
+      labelKey: 'test_gated_throw_label',
+      descriptionKey: 'test_gated_throw_description',
+      icon: '',
+      handler: () => undefined,
+      isAvailable: () => {
+        throw new Error('boom');
+      },
+    };
+    commandItemsMut.push(throwing);
+    try {
+      manager.setQuery('>');
+      await flushMicrotasks();
+      const section = manager.sections.commands;
+      expect(section.status).toBe('ok');
+      if (section.status === 'ok') {
+        expect(section.items.some((c) => c.id === throwing.id)).toBe(false);
+      }
+      expect(errorSpy).toHaveBeenCalledWith(
+        '[cmdk] isAvailable threw',
+        expect.objectContaining({ id: throwing.id }),
+      );
+    } finally {
+      const idx = commandItemsMut.findIndex((c) => c.id === throwing.id);
+      if (idx !== -1) commandItemsMut.splice(idx, 1);
+      errorSpy.mockRestore();
+    }
+  });
+
   it('admin gating applies to all 8 v1.3.1 commands', async () => {
     const v131Ids = [
       'cmd:run_thumbnail_gen',
