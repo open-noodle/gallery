@@ -8,10 +8,12 @@ import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/extensions/translate_extensions.dart';
 import 'package:immich_mobile/presentation/widgets/images/local_album_thumbnail.widget.dart';
 import 'package:immich_mobile/presentation/widgets/people/partner_user_avatar.widget.dart';
+import 'package:immich_mobile/providers/gallery_nav/bottom_nav_height.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/partner.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/people.provider.dart';
 import 'package:immich_mobile/providers/server_info.provider.dart';
+import 'package:immich_mobile/providers/shared_space.provider.dart';
 import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
 import 'package:immich_mobile/routing/router.dart';
 import 'package:immich_mobile/utils/image_url_builder.dart';
@@ -25,13 +27,17 @@ class DriftLibraryPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return const Scaffold(
+    final navHeight = ref.watch(bottomNavHeightProvider);
+    return Scaffold(
       body: CustomScrollView(
         slivers: [
-          ImmichSliverAppBar(snap: false, floating: false, pinned: true, showUploadButton: false),
-          _ActionButtonGrid(),
-          _CollectionCards(),
-          _QuickAccessButtonList(),
+          const ImmichSliverAppBar(snap: false, floating: false, pinned: true, showUploadButton: false),
+          const _ActionButtonGrid(),
+          const _CollectionCards(),
+          const _QuickAccessButtonList(),
+          // Bottom clearance for the floating nav pill so the last list item
+          // isn't obscured when scrolled to the end.
+          SliverToBoxAdapter(child: SizedBox(height: navHeight + 16)),
         ],
       ),
     );
@@ -134,6 +140,7 @@ class _CollectionCards extends StatelessWidget {
           spacing: 8,
           runSpacing: 8,
           children: [
+            _SpacesCollectionCard(),
             _PeopleCollectionCard(),
             _PlacesCollectionCard(),
             _LocalAlbumsCollectionCard(),
@@ -141,6 +148,92 @@ class _CollectionCards extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _SpacesCollectionCard extends ConsumerWidget {
+  const _SpacesCollectionCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final spacesAsync = ref.watch(sharedSpacesProvider);
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isTablet = constraints.maxWidth > 600;
+        final widthFactor = isTablet ? 0.25 : 0.5;
+        final size = context.width * widthFactor - 20.0;
+
+        return GestureDetector(
+          onTap: () => context.pushRoute(const SpacesRoute()),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                height: size,
+                width: size,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: const BorderRadius.all(Radius.circular(20)),
+                    gradient: LinearGradient(
+                      colors: [context.colorScheme.primary.withAlpha(30), context.colorScheme.primary.withAlpha(25)],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
+                  ),
+                  child: spacesAsync.widgetWhen(
+                    onLoading: () => const Center(child: CircularProgressIndicator()),
+                    onData: (spaces) {
+                      if (spaces.isEmpty) {
+                        return Center(
+                          child: Icon(Icons.workspaces_outlined, size: 48, color: context.colorScheme.primary),
+                        );
+                      }
+                      return GridView.count(
+                        crossAxisCount: 2,
+                        padding: const EdgeInsets.all(12),
+                        crossAxisSpacing: 8,
+                        mainAxisSpacing: 8,
+                        physics: const NeverScrollableScrollPhysics(),
+                        children: spaces.take(4).map((space) {
+                          final thumbnailId = space.thumbnailAssetId;
+                          if (thumbnailId == null) {
+                            return Container(
+                              decoration: BoxDecoration(
+                                color: context.colorScheme.surfaceContainerHigh,
+                                borderRadius: const BorderRadius.all(Radius.circular(10)),
+                              ),
+                              child: Icon(Icons.workspaces_outlined, color: context.colorScheme.primary),
+                            );
+                          }
+                          return ClipRRect(
+                            borderRadius: const BorderRadius.all(Radius.circular(10)),
+                            child: Image(
+                              image: RemoteImageProvider(url: getThumbnailUrlForRemoteId(thumbnailId)),
+                              fit: BoxFit.cover,
+                            ),
+                          );
+                        }).toList(),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Text(
+                  'spaces'.t(context: context),
+                  style: context.textTheme.titleSmall?.copyWith(
+                    color: context.colorScheme.onSurface,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -440,14 +533,17 @@ class _QuickAccessButtonList extends ConsumerWidget {
             physics: const NeverScrollableScrollPhysics(),
             children: [
               ListTile(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.only(
-                    topLeft: const Radius.circular(20),
-                    topRight: const Radius.circular(20),
-                    bottomLeft: Radius.circular(partners.isEmpty ? 20 : 0),
-                    bottomRight: Radius.circular(partners.isEmpty ? 20 : 0),
-                  ),
+                shape: const RoundedRectangleBorder(
+                  borderRadius: BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)),
                 ),
+                leading: const Icon(Icons.workspaces_outlined, size: 26),
+                title: Text(
+                  'spaces'.t(context: context),
+                  style: context.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w500),
+                ),
+                onTap: () => context.pushRoute(const SpacesRoute()),
+              ),
+              ListTile(
                 leading: const Icon(Icons.folder_outlined, size: 26),
                 title: Text(
                   'folders'.t(context: context),

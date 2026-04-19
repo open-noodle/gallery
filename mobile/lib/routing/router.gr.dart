@@ -1228,6 +1228,81 @@ class FolderRouteArgs {
   String toString() {
     return 'FolderRouteArgs{key: $key, folder: $folder}';
   }
+}
+
+/// generated route for
+/// [GalleryTabShellPage]
+class GalleryTabShellRoute extends PageRouteInfo<void> {
+  const GalleryTabShellRoute({List<PageRouteInfo>? children})
+    : super(GalleryTabShellRoute.name, initialChildren: children);
+
+  static const String name = 'GalleryTabShellRoute';
+
+  static PageInfo page = PageInfo(
+    name,
+    builder: (data) {
+      return const GalleryTabShellPage();
+    },
+  );
+}
+
+/// generated route for
+/// [GalleryViewerPage]
+class GalleryViewerRoute extends PageRouteInfo<GalleryViewerRouteArgs> {
+  GalleryViewerRoute({
+    Key? key,
+    required RenderList renderList,
+    int initialIndex = 0,
+    int heroOffset = 0,
+    bool showStack = false,
+    List<PageRouteInfo>? children,
+  }) : super(
+         GalleryViewerRoute.name,
+         args: GalleryViewerRouteArgs(
+           key: key,
+           renderList: renderList,
+           initialIndex: initialIndex,
+           heroOffset: heroOffset,
+           showStack: showStack,
+         ),
+         initialChildren: children,
+       );
+
+  static const String name = 'GalleryViewerRoute';
+
+  static PageInfo page = PageInfo(
+    name,
+    builder: (data) {
+      final args = data.argsAs<GalleryViewerRouteArgs>();
+      return GalleryViewerPage(
+        key: args.key,
+        renderList: args.renderList,
+        initialIndex: args.initialIndex,
+        heroOffset: args.heroOffset,
+        showStack: args.showStack,
+      );
+    },
+  );
+}
+
+class GalleryViewerRouteArgs {
+  const GalleryViewerRouteArgs({
+    this.key,
+    required this.renderList,
+    this.initialIndex = 0,
+    this.heroOffset = 0,
+    this.showStack = false,
+  });
+
+  final Key? key;
+
+  final RenderList renderList;
+
+  final int initialIndex;
+
+  final int heroOffset;
+
+  final bool showStack;
 
   @override
   bool operator ==(Object other) {

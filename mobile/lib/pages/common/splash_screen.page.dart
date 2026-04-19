@@ -364,7 +364,60 @@ class SplashScreenPageState extends ConsumerState<SplashScreenPage> {
     // clean install - change the default of the flag
     // current install not using beta timeline
     if (context.router.current.name == SplashScreenRoute.name) {
-      unawaited(context.replaceRoute(const TabShellRoute()));
+      final needBetaMigration = Store.get(StoreKey.needBetaMigration, false);
+      if (needBetaMigration) {
+        bool migrate =
+            (await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: const Text("New Timeline Experience"),
+                content: const Text(
+                  "The old timeline has been deprecated and will be removed in an upcoming release. Would you like to switch to the new timeline now?",
+                ),
+                actions: [
+                  TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text("No")),
+                  ElevatedButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text("Yes")),
+                ],
+              ),
+            )) ??
+            false;
+        if (migrate != true) {
+          migrate =
+              (await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text("Are you sure?"),
+                  content: const Text(
+                    "If you choose to remain on the old timeline, you will be automatically migrated to the new timeline in an upcoming release. Would you like to switch now?",
+                  ),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text("No")),
+                    ElevatedButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text("Yes")),
+                  ],
+                ),
+              )) ??
+              false;
+        }
+        await Store.put(StoreKey.needBetaMigration, false);
+        if (migrate) {
+          unawaited(context.router.replaceAll([ChangeExperienceRoute(switchingToBeta: true)]));
+          return;
+        }
+      }
+
+      unawaited(
+        context.replaceRoute(Store.isBetaTimelineEnabled ? const GalleryTabShellRoute() : const TabControllerRoute()),
+      );
+    }
+
+    if (Store.isBetaTimelineEnabled) {
+      return;
+    }
+
+    final hasPermission = await ref.read(galleryPermissionNotifier.notifier).hasPermission;
+    if (hasPermission) {
+      // Resume backup (if enable) then navigate
+      await ref.watch(backupProvider.notifier).resumeBackup();
     }
   }
 
