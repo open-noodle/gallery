@@ -1,9 +1,6 @@
 <script lang="ts">
-<<<<<<< HEAD:web/src/routes/admin/queues/QueuePanel.svelte
   import QueueCard from './QueueCard.svelte';
   import QueueStorageMigrationDescription from './QueueStorageMigrationDescription.svelte';
-  import QueueCard from '$lib/components/QueueCard.svelte';
-  import QueueStorageMigrationDescription from '$lib/components/QueueStorageMigrationDescription.svelte';
   import { ADMIN_VISIBLE_QUEUES, type AdminVisibleQueue } from '$lib/constants';
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
   import { queueManager } from '$lib/managers/queue-manager.svelte';

@@ -7,7 +7,7 @@ import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dar
 import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
 import 'package:immich_mobile/utils/image_url_builder.dart';
 
-/// Renders a single active-filter chip for the peek rail.
+/// Renders a single active-filter chip for the timeline subheader.
 ///
 /// Leading widget switches on [ChipVisual]:
 ///   * person  — up to 3 overlapping avatars.
