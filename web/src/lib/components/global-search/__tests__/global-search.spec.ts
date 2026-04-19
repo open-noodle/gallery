@@ -115,6 +115,18 @@ function stubAllEntitySections(m: GlobalSearchManager) {
     Promise.resolve({ status: 'ok' as const, items: [{ id: 't1', name: 'beach' } as never], total: 1 });
 }
 
+// Drain bits-ui's body-scroll-lock deferred cleanup (setTimeout with 24ms delay
+// in bits-ui/dist/internal/body-scroll-lock.svelte.js) before happy-dom tears
+// down the document. Without this, the cleanup fires after teardown and throws
+// `ReferenceError: document is not defined` as an unhandled error, which Vitest
+// surfaces as a whole-file failure even though every test passed. 500ms is 20×
+// the bits-ui delay — deliberately generous so CI scheduler jitter under load
+// can never race the drain. Module-scoped so every describe block in this file
+// gets the drain (not just `global-search root`).
+afterEach(async () => {
+  await new Promise((resolve) => setTimeout(resolve, 500));
+});
+
 describe('global-search root', () => {
   let user: ReturnType<typeof userEvent.setup>;
 
@@ -129,18 +141,6 @@ describe('global-search root', () => {
     mockUser.current = { id: 'test-user', isAdmin: false };
     mockFlags.valueOrUndefined = { search: true, map: true, trash: true };
     user = userEvent.setup({ pointerEventsCheck: 0 });
-  });
-
-  // Drain bits-ui's body-scroll-lock deferred cleanup (setTimeout with 24ms
-  // delay in bits-ui/dist/internal/body-scroll-lock.svelte.js) before happy-dom
-  // tears down the document. Without this, the cleanup fires after teardown
-  // and throws `ReferenceError: document is not defined` as an unhandled error,
-  // which Vitest surfaces as a whole-file failure even though every test passed.
-  // 500ms is 20× the bits-ui delay — deliberately generous so CI scheduler jitter
-  // under load can never race the drain. Shorter values (50ms, 100ms) have been
-  // observed to flake when sibling spec timings shift.
-  afterEach(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 500));
   });
 
   it('renders dialog containing the palette', () => {
