@@ -738,7 +738,7 @@ describe('space-context commands', () => {
   describe('route-helper drift guard', () => {
     it('command-items.ts uses Route.albums() + Route.spaces() helpers (no raw literals)', async () => {
       const { readFile } = await import('node:fs/promises');
-      const src = await readFile('src/lib/managers/command-items.ts', 'utf-8');
+      const src = await readFile('src/lib/managers/command-items.ts', 'utf8');
       expect(src).not.toMatch(/goto\(['"]\/(albums|spaces)['"]\)/);
       expect(src).toMatch(/Route\.albums\(\)/);
       expect(src).toMatch(/Route\.spaces\(\)/);
