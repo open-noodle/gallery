@@ -48,7 +48,7 @@ describe('command-row', () => {
 
   it('pending=true applies the text-danger token to the hint', () => {
     const { container } = render(CommandRow, { props: { item: baseItem, pending: true } });
-    const hint = container.querySelector('.text-danger');
+    const hint = container.querySelector('.text-xs.text-danger');
     expect(hint).not.toBeNull();
     expect(hint?.textContent).toContain('cmdk_cmd_confirm_hint');
   });
