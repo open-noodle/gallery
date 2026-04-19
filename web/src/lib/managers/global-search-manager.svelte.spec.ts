@@ -47,6 +47,7 @@ import {
 import { toastManager } from '@immich/ui';
 import { computeCommandScore } from 'bits-ui';
 import { installFakeAbortTimeout, restoreAbortTimeout } from './__tests__/fake-abort-timeout';
+import { commandContextManager } from './command-context-manager.svelte';
 import { COMMAND_ITEMS, type CommandItem } from './command-items';
 import {
   GlobalSearchManager,
@@ -925,6 +926,45 @@ describe('activate("command")', () => {
     await flushMicrotasks();
     expect(order).toEqual(['close', 'handler']);
     closeSpy.mockRestore();
+  });
+
+  it('passes CommandContext to the handler at activate time', async () => {
+    commandContextManager.setAlbum({
+      id: 'a1',
+      albumName: 'X',
+      ownerId: 'u',
+      isOwner: true,
+      isMember: false,
+      raw: { id: 'a1' } as unknown as import('@immich/sdk').AlbumResponseDto,
+    });
+    const handler = vi.fn().mockResolvedValue(undefined);
+    const cmd: CommandItem = { id: 'cmd:ctx_probe', labelKey: 'x', descriptionKey: 'x', icon: '', handler };
+    manager.activate('command', cmd);
+    await flushMicrotasks();
+    expect(handler).toHaveBeenCalledOnce();
+    expect(handler).toHaveBeenCalledWith(
+      expect.objectContaining({ album: expect.objectContaining({ id: 'a1' }) }),
+    );
+    commandContextManager.setAlbum(null);
+  });
+
+  it('drift guard: zero-arg v1.3 command still fires while album context registered', async () => {
+    commandContextManager.setAlbum({
+      id: 'a1',
+      albumName: 'X',
+      ownerId: 'u',
+      isOwner: true,
+      isMember: false,
+      raw: { id: 'a1' } as unknown as import('@immich/sdk').AlbumResponseDto,
+    });
+    const themeCmd = COMMAND_ITEMS.find((c) => c.id === 'cmd:theme')!;
+    const { themeManager } = await import('$lib/managers/theme-manager.svelte');
+    const toggleSpy = vi.spyOn(themeManager, 'toggleTheme').mockImplementation(() => undefined);
+    manager.activate('command', themeCmd);
+    await flushMicrotasks();
+    expect(toggleSpy).toHaveBeenCalledOnce();
+    toggleSpy.mockRestore();
+    commandContextManager.setAlbum(null);
   });
 
   it('two different commands in rapid Enter each fire (independent in-flight keys)', async () => {

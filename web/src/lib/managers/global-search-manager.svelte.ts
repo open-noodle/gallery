@@ -1190,10 +1190,11 @@ export class GlobalSearchManager {
           return;
         }
         this.commandInFlight.add(cmd.id);
+        const ctx = commandContextManager.getContext();
         this.close();
         queueMicrotask(() => {
           void Promise.resolve()
-            .then(() => cmd.handler())
+            .then(() => cmd.handler(ctx))
             .catch((error) => console.error('[cmdk] command handler failed', { id: cmd.id, error }))
             .finally(() => this.commandInFlight.delete(cmd.id));
         });
