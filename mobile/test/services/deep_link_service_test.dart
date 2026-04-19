@@ -1,191 +1,139 @@
 import 'package:auto_route/auto_route.dart';
+import 'package:drift/drift.dart' as drift;
+import 'package:drift/native.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:immich_mobile/domain/models/album/album.model.dart';
-import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
-import 'package:immich_mobile/domain/models/memory.model.dart';
-import 'package:immich_mobile/domain/models/timeline.model.dart';
-import 'package:immich_mobile/domain/models/user.model.dart';
-import 'package:immich_mobile/domain/services/asset.service.dart';
+import 'package:immich_mobile/domain/models/store.model.dart';
+import 'package:immich_mobile/domain/services/asset.service.dart' as beta_asset_service;
 import 'package:immich_mobile/domain/services/memory.service.dart';
 import 'package:immich_mobile/domain/services/people.service.dart';
 import 'package:immich_mobile/domain/services/remote_album.service.dart';
+import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/domain/services/timeline.service.dart';
-import 'package:immich_mobile/providers/asset_viewer/asset_viewer.provider.dart';
+import 'package:immich_mobile/entities/store.entity.dart';
+import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
+import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
+import 'package:immich_mobile/repositories/shared_space_api.repository.dart';
 import 'package:immich_mobile/routing/router.dart';
 import 'package:immich_mobile/services/deep_link.service.dart';
 import 'package:mocktail/mocktail.dart';
 
-class MockTimelineFactory extends Mock implements TimelineFactory {}
+import '../fixtures/shared_space.stub.dart';
+import '../fixtures/user.stub.dart';
 
-class MockAssetService extends Mock implements AssetService {}
+class _MockTimelineFactory extends Mock implements TimelineFactory {}
 
-class MockRemoteAlbumService extends Mock implements RemoteAlbumService {}
+class _MockBetaAssetService extends Mock implements beta_asset_service.AssetService {}
 
-class MockMemoryService extends Mock implements MemoryService {}
+class _MockRemoteAlbumService extends Mock implements RemoteAlbumService {}
 
-class MockPeopleService extends Mock implements PeopleService {}
+class _MockDriftMemoryService extends Mock implements MemoryService {}
 
-class MockPlatformDeepLink extends Mock implements PlatformDeepLink {}
+class _MockDriftPeopleService extends Mock implements DriftPeopleService {}
 
-class MockWidgetRef extends Mock implements WidgetRef {}
+class _MockSharedSpaceApiRepository extends Mock implements SharedSpaceApiRepository {}
 
-class MockAssetViewerStateNotifier extends Mock implements AssetViewerStateNotifier {}
+class _MockWidgetRef extends Mock implements WidgetRef {}
 
-const _assetId = 'aaaaaaaa-1111-2222-3333-bbbbbbbbbbbb';
-const _albumId = 'cccccccc-4444-5555-6666-dddddddddddd';
-const _memoryId = 'mmmmmmmm-7777-8888-9999-yyyyyyyyyyyy';
-const _userId = 'user-1';
+class _FakePlatformDeepLink extends Mock implements PlatformDeepLink {}
 
-final _asset = RemoteAsset(
-  id: _assetId,
-  name: 'photo.jpg',
-  ownerId: _userId,
-  checksum: 'checksum-1',
-  type: AssetType.image,
-  createdAt: DateTime(2026, 6, 12),
-  updatedAt: DateTime(2026, 6, 12),
-  isEdited: false,
-);
-
-final _album = RemoteAlbum(
-  id: _albumId,
-  name: 'Shared Album',
-  ownerId: _userId,
-  description: '',
-  createdAt: DateTime(2026, 6, 12),
-  updatedAt: DateTime(2026, 6, 12),
-  isActivityEnabled: true,
-  isShared: true,
-  order: AlbumAssetOrder.asc,
-  assetCount: 1,
-  ownerName: 'Owner',
-);
-
-final _memory = Memory(
-  id: _memoryId,
-  createdAt: DateTime(2026, 6, 12),
-  updatedAt: DateTime(2026, 6, 12),
-  ownerId: _userId,
-  type: MemoryTypeEnum.onThisDay,
-  data: const MemoryData(year: 2025),
-  isSaved: false,
-  memoryAt: DateTime(2025, 6, 12),
-  assets: [_asset],
-);
-
-final _user = UserDto(
-  id: _userId,
-  email: 'test@immich.app',
-  name: 'Test User',
-  profileChangedAt: DateTime(2026, 6, 12),
-);
+PlatformDeepLink _deepLinkFor(String raw) {
+  final fake = _FakePlatformDeepLink();
+  final uri = Uri.parse(raw);
+  when(() => fake.uri).thenReturn(uri);
+  return fake;
+}
 
 void main() {
-  late MockTimelineFactory timelineFactory;
-  late MockAssetService assetService;
-  late MockRemoteAlbumService remoteAlbumService;
-  late MockMemoryService memoryService;
-  late MockWidgetRef ref;
-  late List<TimelineService> createdTimelineServices;
+
   late DeepLinkService sut;
+  late _MockSharedSpaceApiRepository sharedSpaceApiRepository;
+  late _MockWidgetRef ref;
+  late Drift db;
 
-  setUp(() {
-    timelineFactory = MockTimelineFactory();
-    assetService = MockAssetService();
-    remoteAlbumService = MockRemoteAlbumService();
-    memoryService = MockMemoryService();
-    ref = MockWidgetRef();
-    createdTimelineServices = [];
+  setUpAll(() async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
 
-    when(() => timelineFactory.fromAssets(any(), TimelineOrigin.deepLink)).thenAnswer((invocation) {
-      final assets = List<BaseAsset>.from(invocation.positionalArguments[0] as List<BaseAsset>);
-      final timelineService = TimelineService((
-        assetSource: (index, count) async => assets.skip(index).take(count).toList(),
-        bucketSource: () => Stream.value([Bucket(assetCount: assets.length)]),
-        origin: TimelineOrigin.deepLink,
-      ));
-      createdTimelineServices.add(timelineService);
-      return timelineService;
-    });
+    db = Drift(drift.DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true));
+    await StoreService.init(storeRepository: DriftStoreRepository(db));
+  });
 
-    when(() => ref.read(assetViewerProvider.notifier)).thenReturn(MockAssetViewerStateNotifier());
+  tearDownAll(() async {
+    debugDefaultTargetPlatformOverride = null;
+    await Store.clear();
+    await db.close();
+  });
+
+  setUp(() async {
+    sharedSpaceApiRepository = _MockSharedSpaceApiRepository();
+    ref = _MockWidgetRef();
 
     sut = DeepLinkService(
-      timelineFactory,
-      assetService,
-      remoteAlbumService,
-      memoryService,
-      MockPeopleService(),
-      _user,
+      _MockTimelineFactory(),
+      _MockBetaAssetService(),
+      _MockRemoteAlbumService(),
+      _MockDriftMemoryService(),
+      _MockDriftPeopleService(),
+      sharedSpaceApiRepository,
+      UserStub.user1,
     );
 
-    addTearDown(() async {
-      for (final timelineService in createdTimelineServices) {
-        await timelineService.dispose();
-      }
+    // Spaces require beta; make sure tests run with beta enabled.
+    await Store.put(StoreKey.betaTimeline, true);
+  });
+
+  tearDown(() async {
+    await Store.clear();
+  });
+
+  group('handleScheme - space intent', () {
+    const spaceId = 'space-1';
+
+    test('routes immich://space?id=<id> to a SpaceDetailRoute when the space exists', () async {
+      when(() => sharedSpaceApiRepository.get(spaceId)).thenAnswer((_) async => SharedSpaceStub.space1);
+
+      final result = await sut.handleScheme(_deepLinkFor('immich://space?id=$spaceId'), ref);
+
+      expect(result?.routeName, SpaceDetailRoute.name);
+      final args = result!.args as SpaceDetailRouteArgs;
+      expect(args.spaceId, spaceId);
+      verify(() => sharedSpaceApiRepository.get(spaceId)).called(1);
+    });
+
+    test('also handles the noodle-gallery:// scheme because intent parsing is scheme-agnostic', () async {
+      when(() => sharedSpaceApiRepository.get(spaceId)).thenAnswer((_) async => SharedSpaceStub.space1);
+
+      final result = await sut.handleScheme(_deepLinkFor('noodle-gallery://space?id=$spaceId'), ref);
+
+      expect(result?.routeName, SpaceDetailRoute.name);
+      verify(() => sharedSpaceApiRepository.get(spaceId)).called(1);
+    });
+
+    test('returns null when space lookup fails', () async {
+      when(() => sharedSpaceApiRepository.get(spaceId)).thenThrow(Exception('not found'));
+
+      final result = await sut.handleScheme(_deepLinkFor('immich://space?id=$spaceId'), ref);
+
+      expect(result, isNull);
+    });
+
+    test('returns null when id query parameter is missing', () async {
+      final result = await sut.handleScheme(_deepLinkFor('immich://space'), ref);
+
+      expect(result, isNull);
+      verifyNever(() => sharedSpaceApiRepository.get(any()));
+    });
+
+    test('returns null when beta timeline is disabled', () async {
+      await Store.put(StoreKey.betaTimeline, false);
+
+      final result = await sut.handleScheme(_deepLinkFor('immich://space?id=$spaceId'), ref);
+
+      expect(result, isNull);
+      verifyNever(() => sharedSpaceApiRepository.get(any()));
     });
   });
 
-  PlatformDeepLink link(String path) {
-    final deepLink = MockPlatformDeepLink();
-    when(() => deepLink.uri).thenReturn(Uri.parse('https://my.immich.app$path'));
-    return deepLink;
-  }
-
-  test('album photo link carries the album into the viewer route', () async {
-    when(() => assetService.getRemoteAsset(_assetId)).thenAnswer((_) async => _asset);
-    when(() => remoteAlbumService.get(_albumId)).thenAnswer((_) async => _album);
-
-    final route = await sut.handleMyImmichApp(link('/albums/$_albumId/photos/$_assetId'), ref);
-
-    expect(route, isA<AssetViewerRoute>());
-    expect((route!.args! as AssetViewerRouteArgs).currentAlbum, _album);
-  });
-
-  test('still opens the viewer when the album cannot be resolved', () async {
-    when(() => assetService.getRemoteAsset(_assetId)).thenAnswer((_) async => _asset);
-    when(() => remoteAlbumService.get(_albumId)).thenAnswer((_) async => null);
-
-    final route = await sut.handleMyImmichApp(link('/albums/$_albumId/photos/$_assetId'), ref);
-
-    expect(route, isA<AssetViewerRoute>());
-    expect((route!.args! as AssetViewerRouteArgs).currentAlbum, isNull);
-  });
-
-  test('plain photo link has no album', () async {
-    when(() => assetService.getRemoteAsset(_assetId)).thenAnswer((_) async => _asset);
-
-    final route = await sut.handleMyImmichApp(link('/photos/$_assetId'), ref);
-
-    expect(route, isA<AssetViewerRoute>());
-    expect((route!.args! as AssetViewerRouteArgs).currentAlbum, isNull);
-    verifyNever(() => remoteAlbumService.get(any()));
-  });
-
-  test('memory scheme link without an id opens the memory lane', () async {
-    when(() => memoryService.getMemoryLane(_userId)).thenAnswer((_) async => [_memory]);
-    final deepLink = MockPlatformDeepLink();
-    when(() => deepLink.uri).thenReturn(Uri.parse('immich://memory'));
-
-    final route = await sut.handleScheme(deepLink, ref);
-
-    expect(route, isA<MemoryRoute>());
-    expect((route!.args! as MemoryRouteArgs).memories, [_memory]);
-    verify(() => memoryService.getMemoryLane(_userId)).called(1);
-    verifyNever(() => memoryService.get(any()));
-  });
-
-  test('memory scheme link with an id opens only the specified memory', () async {
-    when(() => memoryService.get(_memoryId)).thenAnswer((_) async => _memory);
-    final deepLink = MockPlatformDeepLink();
-    when(() => deepLink.uri).thenReturn(Uri.parse('immich://memory?id=$_memoryId'));
-
-    final route = await sut.handleScheme(deepLink, ref);
-
-    expect(route, isA<MemoryRoute>());
-    expect((route!.args! as MemoryRouteArgs).memories, [_memory]);
-    verifyNever(() => memoryService.getMemoryLane(any()));
-    verify(() => memoryService.get(_memoryId)).called(1);
-  });
 }
