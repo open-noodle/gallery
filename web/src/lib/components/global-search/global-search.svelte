@@ -215,6 +215,14 @@
       e.preventDefault();
       return;
     }
+    // Escape while a destructive-confirm is armed reverts the red row without
+    // closing the palette. Second Escape (pending cleared) falls through to
+    // clearOrClose below.
+    if (e.key === 'Escape' && manager.pendingConfirmId !== null) {
+      manager.cancelConfirm();
+      e.preventDefault();
+      return;
+    }
     if (e.key === 'Escape') {
       clearOrClose();
       e.preventDefault();
