@@ -534,10 +534,7 @@ class _QuickAccessButtonList extends ConsumerWidget {
             children: [
               ListTile(
                 shape: const RoundedRectangleBorder(
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(20),
-                    topRight: Radius.circular(20),
-                  ),
+                  borderRadius: BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)),
                 ),
                 leading: const Icon(Icons.workspaces_outlined, size: 26),
                 title: Text(

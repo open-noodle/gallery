@@ -29,7 +29,10 @@ class _MainTimelinePageState extends ConsumerState<MainTimelinePage> {
         children: [
           Timeline(
             topSliverWidget: const SliverMainAxisGroup(
-              slivers: [PhotosFilterSubheader(), SliverToBoxAdapter(child: DriftMemoryLane())],
+              slivers: [
+                PhotosFilterSubheader(),
+                SliverToBoxAdapter(child: DriftMemoryLane()),
+              ],
             ),
             topSliverWidgetHeight: hasMemories ? 200 : 0,
             showStorageIndicator: true,

@@ -50,10 +50,7 @@ class _FilterSheetState extends ConsumerState<FilterSheet> {
       }
       return false;
     }
-    final mapping = <double, FilterSheetSnap>{
-      _snapBrowse: FilterSheetSnap.browse,
-      _snapDeep: FilterSheetSnap.deep,
-    };
+    final mapping = <double, FilterSheetSnap>{_snapBrowse: FilterSheetSnap.browse, _snapDeep: FilterSheetSnap.deep};
     for (final entry in mapping.entries) {
       if ((n.extent - entry.key).abs() < _snapTolerance) {
         final current = ref.read(photosFilterSheetProvider);

@@ -89,10 +89,7 @@ class _ClearAllChip extends StatelessWidget {
               children: [
                 Icon(Icons.close_rounded, size: 16, color: theme.colorScheme.primary),
                 const SizedBox(width: 4),
-                Text(
-                  'clear_all'.tr(),
-                  style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.primary),
-                ),
+                Text('clear_all'.tr(), style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.primary)),
               ],
             ),
           ),

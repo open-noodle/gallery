@@ -88,7 +88,6 @@ class _GalleryNavPillState extends State<GalleryNavPill> {
       child: BackdropFilter(
         filter: ui.ImageFilter.blur(sigmaX: 28, sigmaY: 28),
         child: Container(
-          key: _pillKey,
           height: _pillHeight,
           decoration: BoxDecoration(
             // Dark theme: translucent elevated surface reads as subtle pill on black.
@@ -111,6 +110,7 @@ class _GalleryNavPillState extends State<GalleryNavPill> {
             ],
           ),
           child: Stack(
+            key: _pillKey,
             clipBehavior: Clip.none,
             alignment: Alignment.center,
             children: [
