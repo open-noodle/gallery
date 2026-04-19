@@ -8,14 +8,16 @@ The classic search bar in the navbar still works exactly as before. The palette 
 
 Each query runs in parallel against the configured providers and groups the results into named sections:
 
-| Section        | What it returns                                                              |
-| -------------- | ---------------------------------------------------------------------------- |
-| **Photos**     | Top smart-search matches with thumbnails. Activate to open the asset viewer. |
-| **People**     | Named faces from your library and any shared spaces you can access.          |
-| **Places**     | Cities, regions, and countries from your reverse-geocoded photos.            |
-| **Tags**       | Tags assigned to your assets, plus inherited tags from parent tags.          |
-| **Commands**   | Stateless verbs — upload files, create things, sign out, toggle theme, etc.  |
-| **Navigation** | Admin and settings pages — fuzzy-matched against the live page catalog.      |
+| Section           | What it returns                                                              |
+| ----------------- | ---------------------------------------------------------------------------- |
+| **Photos**        | Top smart-search matches with thumbnails. Activate to open the asset viewer. |
+| **People**        | Named faces from your library and any shared spaces you can access.          |
+| **Places**        | Cities, regions, and countries from your reverse-geocoded photos.            |
+| **Tags**          | Tags assigned to your assets, plus inherited tags from parent tags.          |
+| **Albums**        | Your albums, matched on album name.                                          |
+| **Shared spaces** | Spaces you own or belong to, matched on space name.                          |
+| **Commands**      | Stateless verbs — upload files, create things, sign out, toggle theme, etc.  |
+| **Navigation**    | Admin and settings pages — fuzzy-matched against the live page catalog.      |
 
 Empty sections collapse silently so the result list stays tight. If smart search is unhealthy (the ML server is unreachable), a banner appears at the top of the palette and offers a one-tap switch to filename mode.
 
@@ -61,15 +63,35 @@ Administrators see an extra group of commands for driving the job queues without
 
 Each **Run…** command confirms with a toast like **Started: Thumbnail generation**. The bulk commands (**Pause all queues**, **Resume all queues**, **Clear failed jobs**) fire a parallel request per admin-visible queue. If every request succeeds you get a single green confirmation; if any fail, a yellow warning toast reports **"N of M queue operations failed"** and the others still take effect. These commands target the same set of queues shown on **Administration → Jobs**, so the Jobs page is still the right place to watch per-queue progress in detail.
 
-### Scoping with `>`
-
-Type `>` at the start of the query to restrict results to commands only — useful when you know you want a verb and don't want photos or pages competing for the top result. The `>` itself is treated as a section filter, not part of the query, so `>up` matches **Upload files**.
-
 ### Unscoped: command-first tie-break
 
-You don't have to type `>`. When a command and a navigation entry score similarly against an unscoped query, the command wins the **Top result** slot. So plain `album` activates **Create album** on <kbd>Enter</kbd>, and plain `upload` activates **Upload files** — even though the Albums and Library pages also match.
+When a command and a navigation entry score similarly against an unscoped query, the command wins the **Top result** slot. So plain `album` activates **Create album** on <kbd>Enter</kbd>, and plain `upload` activates **Upload files** — even though the Albums and Library pages also match.
 
 Commands never appear in the **Recent** list — they're verbs, not destinations, and re-firing them belongs in the muscle-memory of the palette itself.
+
+## Prefix shortcuts
+
+Start a query with a prefix character to restrict results to a single scope. The prefix is consumed by the palette and is not part of the query text, so `@alice`, `#xmas`, `/trip`, and `>theme` search the relevant scope for `alice`, `xmas`, `trip`, and `theme` respectively.
+
+| Prefix | Scope                      | What it searches                           |
+| ------ | -------------------------- | ------------------------------------------ |
+| `@`    | **People**                 | Named faces only                           |
+| `#`    | **Tags**                   | Your tags only                             |
+| `/`    | **Albums + shared spaces** | Both collection types at once              |
+| `>`    | **Commands + navigation**  | Stateless verbs and admin / settings pages |
+
+When a prefix is active, all other sections (Photos, Places, and the two you didn't pick) are hidden for the duration of that query. Prefixes are handy when a bare query is dominated by photos and you want a single section to come through cleanly, or when you know exactly which kind of thing you're after.
+
+### Bare-prefix browsing
+
+Typing just the prefix character with nothing after it opens the full index for that scope, so the palette doubles as a lightweight browser for recent people, tags, collections, and admin pages:
+
+- `@` — your people, most-recently-updated first
+- `#` — your tags, most-recently-updated first
+- `/` — your most-recently-active albums and shared spaces
+- `>` — every command and navigation entry you have access to, alphabetical
+
+This is faster than reaching for a sidebar when you just want to glance at recent activity.
 
 ## Top result band
 
