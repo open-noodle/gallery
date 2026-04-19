@@ -104,7 +104,7 @@ export function registerSpaceContext(
     const space = getSpace();
     if (!space) {
       commandContextManager.setSpace(null);
-      return () => commandContextManager.setSpace(null);
+      return;
     }
     const members = getMembers() ?? [];
     const self = members.find((m) => m.userId === currentUserId);
