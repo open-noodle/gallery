@@ -32,7 +32,7 @@ The other sections (People, Places, Tags, Commands, Navigation) are unaffected b
 
 ## Commands
 
-Commands are stateless verbs you can fire from the palette without leaving your current page. They live in their own section above **Go to…** and ship out of the box with these seven entries:
+Commands are stateless verbs you can fire from the palette without leaving your current page. They live in their own section above **Go to…** and ship out of the box with these entries:
 
 | Command                   | What it does                                          |
 | ------------------------- | ----------------------------------------------------- |
@@ -43,6 +43,23 @@ Commands are stateless verbs you can fire from the palette without leaving your 
 | **Keyboard shortcuts**    | Opens the keyboard-shortcuts cheatsheet               |
 | **Toggle theme**          | Flips between light and dark mode                     |
 | **Clear palette recents** | Empties your **Recent** list in the palette           |
+
+### Admin queue commands
+
+Administrators see an extra group of commands for driving the job queues without leaving whatever page they're on. They are hidden from non-admin users and never appear in the result list for them.
+
+| Command                      | What it does                                                                              |
+| ---------------------------- | ----------------------------------------------------------------------------------------- |
+| **Run thumbnail generation** | Starts the thumbnail-generation job (equivalent to the **Start** button on the Jobs page) |
+| **Run metadata extraction**  | Starts the metadata-extraction job                                                        |
+| **Run smart search**         | Starts the smart-search indexing job                                                      |
+| **Run face detection**       | Starts the face-detection job                                                             |
+| **Run face recognition**     | Starts the facial-recognition job                                                         |
+| **Pause all queues**         | Pauses every processing queue in one shot                                                 |
+| **Resume all queues**        | Resumes every paused queue                                                                |
+| **Clear failed jobs**        | Removes failed jobs from every queue (safe to fire even when none have failed)            |
+
+Each **Run…** command confirms with a toast like **Started: Thumbnail generation**. The bulk commands (**Pause all queues**, **Resume all queues**, **Clear failed jobs**) fire a parallel request per admin-visible queue. If every request succeeds you get a single green confirmation; if any fail, a yellow warning toast reports **"N of M queue operations failed"** and the others still take effect. These commands target the same set of queues shown on **Administration → Jobs**, so the Jobs page is still the right place to watch per-queue progress in detail.
 
 ### Scoping with `>`
 
