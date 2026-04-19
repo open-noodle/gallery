@@ -111,14 +111,21 @@ export class SharedSpaceService extends BaseService {
         }
       }
 
+      const recentAssetIds: string[] = [];
+      const recentAssetThumbhashes: string[] = [];
+      for (const asset of recentAssets) {
+        if (asset.thumbhash) {
+          recentAssetIds.push(asset.id);
+          recentAssetThumbhashes.push(Buffer.from(asset.thumbhash).toString('base64'));
+        }
+      }
+
       results.push({
         ...this.mapSpace(space),
         memberCount: members.length,
         assetCount,
-        recentAssetIds: recentAssets.map((a) => a.id),
-        recentAssetThumbhashes: recentAssets.map((a) =>
-          a.thumbhash ? Buffer.from(a.thumbhash).toString('base64') : null,
-        ),
+        recentAssetIds,
+        recentAssetThumbhashes,
         members: members.map((m) => this.mapMember(m)),
         newAssetCount,
         lastContributor,
@@ -176,15 +183,22 @@ export class SharedSpaceService extends BaseService {
       }
     }
 
+    const recentAssetIds: string[] = [];
+    const recentAssetThumbhashes: string[] = [];
+    for (const asset of recentAssets) {
+      if (asset.thumbhash) {
+        recentAssetIds.push(asset.id);
+        recentAssetThumbhashes.push(Buffer.from(asset.thumbhash).toString('base64'));
+      }
+    }
+
     return {
       ...this.mapSpace(space),
       thumbnailAssetId,
       memberCount: members.length,
       assetCount,
-      recentAssetIds: recentAssets.map((a) => a.id),
-      recentAssetThumbhashes: recentAssets.map((a) =>
-        a.thumbhash ? Buffer.from(a.thumbhash).toString('base64') : null,
-      ),
+      recentAssetIds,
+      recentAssetThumbhashes,
       members: members.map((m) => this.mapMember(m)),
       newAssetCount,
       lastViewedAt: membership.lastViewedAt ? (membership.lastViewedAt as unknown as Date).toISOString() : null,
