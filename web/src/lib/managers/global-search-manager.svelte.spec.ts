@@ -2011,6 +2011,89 @@ describe('commands provider', () => {
     }
   });
 
+  it('admin gating applies to all 8 v1.3.1 commands', async () => {
+    const v131Ids = [
+      'cmd:run_thumbnail_gen',
+      'cmd:run_metadata_extraction',
+      'cmd:run_smart_search',
+      'cmd:run_face_detection',
+      'cmd:run_face_recognition',
+      'cmd:pause_all_queues',
+      'cmd:resume_all_queues',
+      'cmd:clear_failed_jobs',
+    ];
+
+    mockUser.current = { id: 'test-user', isAdmin: false };
+    const nonAdmin = new GlobalSearchManager();
+    nonAdmin.open();
+    nonAdmin.setQuery('>');
+    await flushMicrotasks();
+    const nonAdminSection = nonAdmin.sections.commands;
+    expect(nonAdminSection.status).toBe('ok');
+    if (nonAdminSection.status === 'ok') {
+      for (const id of v131Ids) {
+        expect(
+          nonAdminSection.items.some((c) => c.id === id),
+          `${id} must be hidden for non-admin`,
+        ).toBe(false);
+      }
+    }
+
+    mockUser.current = { id: 'test-user', isAdmin: true };
+    const admin = new GlobalSearchManager();
+    admin.open();
+    admin.setQuery('>');
+    await flushMicrotasks();
+    const adminSection = admin.sections.commands;
+    expect(adminSection.status).toBe('ok');
+    if (adminSection.status === 'ok') {
+      for (const id of v131Ids) {
+        expect(
+          adminSection.items.some((c) => c.id === id),
+          `${id} must be visible for admin`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it('commandInFlight guard blocks rapid double-activation of cmd:run_thumbnail_gen', async () => {
+    // Replace the real handler with a never-resolving promise so the in-flight
+    // marker stays set for the duration of this test. Pulling in the full SDK
+    // mock just for this is overkill — swap the handler directly on the live item.
+    const realCmd = commandItemsMut.find((c) => c.id === 'cmd:run_thumbnail_gen');
+    expect(realCmd).toBeDefined();
+    const handlerSpy = vi.fn(
+      () =>
+        new Promise(() => {
+          /* never resolves */
+        }),
+    );
+    const originalHandler = realCmd!.handler;
+    realCmd!.handler = handlerSpy;
+    try {
+      mockUser.current = { id: 'test-user', isAdmin: true };
+      const manager = new GlobalSearchManager();
+      manager.open();
+      manager.setQuery('>');
+      await flushMicrotasks();
+      const section = manager.sections.commands;
+      expect(section.status).toBe('ok');
+      if (section.status !== 'ok') {
+        return;
+      }
+      const item = section.items.find((i) => i.id === 'cmd:run_thumbnail_gen')!;
+
+      // Two rapid activations; the guard should block the second.
+      manager.activate('command', item);
+      manager.activate('command', item);
+      await flushMicrotasks();
+
+      expect(handlerSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      realCmd!.handler = originalHandler;
+    }
+  });
+
   it('defensive gating: fabricated featureFlag command is filtered when flag is off', async () => {
     const flaggedCmd: CommandItem = {
       id: 'cmd:test-flagged',
