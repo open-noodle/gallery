@@ -154,8 +154,12 @@ export class MediaService extends BaseService {
   async handleQueueMigration(): Promise<JobStatus> {
     const { active, waiting } = await this.jobRepository.getJobCounts(QueueName.Migration);
     if (active === 1 && waiting === 0) {
-      await this.storageCore.removeEmptyDirs(StorageFolder.Thumbnails);
-      await this.storageCore.removeEmptyDirs(StorageFolder.EncodedVideo);
+      for (const folder of [StorageFolder.Thumbnails, StorageFolder.EncodedVideo]) {
+        const path = StorageCore.getBaseFolder(folder);
+        if (await this.storageRepository.checkFileExists(path)) {
+          await this.storageRepository.removeEmptyDirs(path);
+        }
+      }
     }
 
     for await (const assets of batched(this.assetJobRepository.streamForMigrationJob())) {
@@ -182,6 +186,12 @@ export class MediaService extends BaseService {
     const asset = await this.assetJobRepository.getForMigrationJob(id);
     if (!asset) {
       return JobStatus.Failed;
+    }
+
+    if (!asset.originalPath || !isAbsolute(asset.originalPath)) {
+      // S3 assets live under relative keys and are managed by the S3 backend, not fs.rename.
+      this.logger.debug(`Skipping asset file migration for S3 asset ${id}`);
+      return JobStatus.Skipped;
     }
 
     await this.storageCore.moveAssetImage(asset, AssetFileType.FullSize, image.fullsize.format);
