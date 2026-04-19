@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    timeout-minutes: 30
+    timeout-minutes: 45
     defaults:
       run:
         working-directory: ./e2e
@@ -68,6 +68,21 @@ jobs:
 
       - name: 'Phase: migrate-to-s3'
         run: pnpm tsx src/storage-migration.ts migrate-to-s3
+
+      - name: 'Phase: template-s3-bulk-skipped'
+        run: pnpm tsx src/storage-migration.ts template-s3-bulk-skipped
+
+      - name: 'Phase: template-s3-upload-skipped'
+        run: pnpm tsx src/storage-migration.ts template-s3-upload-skipped
+
+      - name: 'Phase: template-s3-live-photo-skipped'
+        run: pnpm tsx src/storage-migration.ts template-s3-live-photo-skipped
+
+      - name: 'Phase: template-s3-sidecar-skipped'
+        run: pnpm tsx src/storage-migration.ts template-s3-sidecar-skipped
+
+      - name: 'Phase: template-s3-queue-migration-skipped'
+        run: pnpm tsx src/storage-migration.ts template-s3-queue-migration-skipped
 
       - name: 'Phase: no-files'
         run: pnpm tsx src/storage-migration.ts no-files
@@ -130,6 +145,18 @@ jobs:
 
       - name: 'Phase: rollback'
         run: pnpm tsx src/storage-migration.ts rollback
+
+      # ---------------------------------------------------------------
+      # Phase group 7: backend=disk — template-disk-baseline regression guard
+      # Runs last; no further phases after this.
+      # ---------------------------------------------------------------
+      - name: Restart server (backend=disk, post-rollback)
+        run: |
+          IMMICH_STORAGE_BACKEND=disk \
+          docker compose up -d --no-deps --force-recreate --wait --wait-timeout 120 immich-server
+
+      - name: 'Phase: template-disk-baseline'
+        run: pnpm tsx src/storage-migration.ts template-disk-baseline
 
       # ---------------------------------------------------------------
       # Cleanup and logs
