@@ -8,7 +8,8 @@ import { modalManager, toastManager } from '@immich/ui';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ShortcutsModal from '../modals/ShortcutsModal.svelte';
 import SpaceCreateModal from '../modals/SpaceCreateModal.svelte';
-import { COMMAND_ITEMS, isAlmostExactCommandMatch } from './command-items';
+import type { CommandContext } from './command-context-manager.svelte';
+import { COMMAND_ITEMS, isAlmostExactCommandMatch, type CommandItem } from './command-items';
 
 const { mockUser } = vi.hoisted(() => ({
   mockUser: { current: { id: 'test-user' } as { id: string } | null },
@@ -75,6 +76,19 @@ describe('COMMAND_ITEMS', () => {
 
   it('has 15 entries (7 v1.3.0 + 8 v1.3.1)', () => {
     expect(COMMAND_ITEMS).toHaveLength(15);
+  });
+
+  it('CommandItem type allows isAvailable and destructive', () => {
+    const shape: CommandItem = {
+      id: 'cmd:test',
+      labelKey: 'x',
+      descriptionKey: 'y',
+      icon: 'z',
+      handler: (ctx?: CommandContext) => void ctx?.album,
+      isAvailable: (ctx: CommandContext) => ctx.album !== null,
+      destructive: true,
+    };
+    expect(shape.destructive).toBe(true);
   });
 
   it('all 8 v1.3.1 commands are adminOnly', () => {
