@@ -1,16 +1,28 @@
+import { goto } from '$app/navigation';
 import { ADMIN_VISIBLE_QUEUES } from '$lib/constants';
 import { authManager } from '$lib/managers/auth-manager.svelte';
 import { isAlmostExactWordMatch } from '$lib/managers/cmdk-match';
 import type { CommandContext } from '$lib/managers/command-context-manager.svelte';
 import { themeManager } from '$lib/managers/theme-manager.svelte';
+import AlbumEditModal from '$lib/modals/AlbumEditModal.svelte';
+import AlbumOptionsModal from '$lib/modals/AlbumOptionsModal.svelte';
 import ShortcutsModal from '$lib/modals/ShortcutsModal.svelte';
 import SpaceCreateModal from '$lib/modals/SpaceCreateModal.svelte';
+import { Route } from '$lib/route';
+import { handleDeleteAlbum, handleDownloadAlbum } from '$lib/services/album.service';
 import { asQueueItem } from '$lib/services/queue.service';
 import { clearEntries } from '$lib/stores/cmdk-recent';
 import { createAlbumAndRedirect } from '$lib/utils/album-utils';
 import { openFileUploadDialog } from '$lib/utils/file-uploader';
 import { handleError } from '$lib/utils/handle-error';
-import { emptyQueue, QueueCommand, QueueName, runQueueCommandLegacy, type ServerFeaturesDto } from '@immich/sdk';
+import {
+  emptyQueue,
+  QueueCommand,
+  QueueName,
+  removeUserFromAlbum,
+  runQueueCommandLegacy,
+  type ServerFeaturesDto,
+} from '@immich/sdk';
 import { modalManager, toastManager } from '@immich/ui';
 import {
   mdiAccountMultiplePlus,
@@ -18,15 +30,20 @@ import {
   mdiBrain,
   mdiBroom,
   mdiCloudUploadOutline,
+  mdiDeleteOutline,
+  mdiDownloadOutline,
+  mdiExitRun,
   mdiFaceRecognition,
   mdiImageOutline,
   mdiInformationOutline,
   mdiKeyboardOutline,
   mdiLogoutVariant,
   mdiPauseCircleOutline,
+  mdiPencilOutline,
   mdiPlayCircleOutline,
   mdiPlaylistPlus,
   mdiRestore,
+  mdiShareVariantOutline,
   mdiThemeLightDark,
 } from '@mdi/js';
 import { t } from 'svelte-i18n';
@@ -206,6 +223,76 @@ export const COMMAND_ITEMS: readonly CommandItem[] = [
     icon: mdiBroom,
     adminOnly: true,
     handler: () => clearAllFailedJobs(),
+  },
+
+  // v1.4 — album-context commands. Visible only on /albums/[albumId]/… routes
+  // with a registered AlbumContext. Availability further narrowed by ownership
+  // / membership flags computed in registerAlbumContext.
+  {
+    id: 'cmd:album_rename',
+    labelKey: 'cmdk_cmd_album_rename_label',
+    descriptionKey: 'cmdk_cmd_album_rename_description',
+    icon: mdiPencilOutline,
+    isAvailable: (ctx) => ctx.album !== null && ctx.album.isOwner,
+    handler: (ctx) => {
+      if (!ctx?.album) return;
+      return modalManager.show(AlbumEditModal, { album: ctx.album.raw });
+    },
+  },
+  {
+    id: 'cmd:album_share',
+    labelKey: 'cmdk_cmd_album_share_label',
+    descriptionKey: 'cmdk_cmd_album_share_description',
+    icon: mdiShareVariantOutline,
+    isAvailable: (ctx) => ctx.album !== null && ctx.album.isOwner,
+    handler: (ctx) => {
+      if (!ctx?.album) return;
+      return modalManager.show(AlbumOptionsModal, { album: ctx.album.raw });
+    },
+  },
+  {
+    id: 'cmd:album_download',
+    labelKey: 'cmdk_cmd_album_download_label',
+    descriptionKey: 'cmdk_cmd_album_download_description',
+    icon: mdiDownloadOutline,
+    isAvailable: (ctx) => ctx.album !== null,
+    handler: (ctx) => {
+      if (!ctx?.album) return;
+      return handleDownloadAlbum(ctx.album.raw);
+    },
+  },
+  {
+    id: 'cmd:album_leave',
+    labelKey: 'cmdk_cmd_album_leave_label',
+    descriptionKey: 'cmdk_cmd_album_leave_description',
+    icon: mdiExitRun,
+    destructive: true,
+    isAvailable: (ctx) => ctx.album !== null && !ctx.album.isOwner && ctx.album.isMember,
+    handler: async (ctx) => {
+      if (!ctx?.album || !ctx.userId) return;
+      const $t = get(t);
+      try {
+        await removeUserFromAlbum({ id: ctx.album.id, userId: ctx.userId });
+        await goto(Route.albums());
+      } catch (error) {
+        handleError(error, $t('errors.something_went_wrong'));
+      }
+    },
+  },
+  {
+    id: 'cmd:album_delete',
+    labelKey: 'cmdk_cmd_album_delete_label',
+    descriptionKey: 'cmdk_cmd_album_delete_description',
+    icon: mdiDeleteOutline,
+    destructive: true,
+    isAvailable: (ctx) => ctx.album !== null && ctx.album.isOwner,
+    handler: async (ctx) => {
+      if (!ctx?.album) return;
+      const ok = await handleDeleteAlbum(ctx.album.raw, { prompt: false });
+      if (ok) {
+        await goto(Route.albums());
+      }
+    },
   },
 ];
 
