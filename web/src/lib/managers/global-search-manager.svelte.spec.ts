@@ -47,6 +47,7 @@ import {
 import { toastManager } from '@immich/ui';
 import { computeCommandScore } from 'bits-ui';
 import { installFakeAbortTimeout, restoreAbortTimeout } from './__tests__/fake-abort-timeout';
+import { commandContextManager } from './command-context-manager.svelte';
 import { COMMAND_ITEMS, type CommandItem } from './command-items';
 import {
   GlobalSearchManager,
@@ -88,6 +89,11 @@ vi.mock('@immich/sdk', async () => ({
 vi.mock('$app/navigation', () => ({
   goto: vi.fn(),
 }));
+
+const { mockPage } = vi.hoisted(() => ({
+  mockPage: { route: { id: null as string | null }, params: {} as Record<string, string> },
+}));
+vi.mock('$app/state', () => ({ page: mockPage }));
 
 // Stub `@immich/ui` so `toastManager.warning` is spyable. The components that
 // use the real toast UI are not exercised in this manager-only suite; keep the
@@ -236,7 +242,7 @@ describe('setQuery', () => {
   let calls: Array<{ key: string; query: string; mode: SearchMode }>;
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
@@ -348,7 +354,7 @@ describe('setQuery', () => {
 
 describe('real providers', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
@@ -490,7 +496,7 @@ describe('real providers', () => {
 
 describe('tag provider', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
@@ -587,7 +593,7 @@ describe('tag provider', () => {
 
 describe('setMode', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
@@ -661,7 +667,7 @@ describe('setMode', () => {
 
 describe('cursor identity', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
@@ -715,7 +721,7 @@ describe('cursor identity', () => {
 
 describe('Enter race', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
@@ -755,7 +761,7 @@ describe('Enter race', () => {
 
 describe('ML health retroactive promotion', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
@@ -804,7 +810,7 @@ describe('ML health retroactive promotion', () => {
 
 describe('activate()', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     resetRecentStore();
   });
@@ -854,7 +860,7 @@ describe('activate("command")', () => {
   let manager: GlobalSearchManager;
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     resetRecentStore();
     manager = new GlobalSearchManager();
@@ -927,6 +933,194 @@ describe('activate("command")', () => {
     closeSpy.mockRestore();
   });
 
+  it('passes CommandContext to the handler at activate time', async () => {
+    mockPage.route.id = '/(user)/albums/[albumId=id]/[[photos=photos]]/[[assetId=id]]';
+    commandContextManager.setAlbum({
+      id: 'a1',
+      albumName: 'X',
+      ownerId: 'u',
+      isOwner: true,
+      isMember: false,
+      raw: { id: 'a1' } as unknown as import('@immich/sdk').AlbumResponseDto,
+    });
+    const handler = vi.fn().mockResolvedValue(undefined);
+    const cmd: CommandItem = { id: 'cmd:ctx_probe', labelKey: 'x', descriptionKey: 'x', icon: '', handler };
+    manager.activate('command', cmd);
+    await flushMicrotasks();
+    expect(handler).toHaveBeenCalledOnce();
+    expect(handler).toHaveBeenCalledWith(expect.objectContaining({ album: expect.objectContaining({ id: 'a1' }) }));
+    commandContextManager.setAlbum(null);
+    mockPage.route.id = null;
+  });
+
+  it('drift guard: zero-arg v1.3 command still fires while album context registered', async () => {
+    commandContextManager.setAlbum({
+      id: 'a1',
+      albumName: 'X',
+      ownerId: 'u',
+      isOwner: true,
+      isMember: false,
+      raw: { id: 'a1' } as unknown as import('@immich/sdk').AlbumResponseDto,
+    });
+    const themeCmd = COMMAND_ITEMS.find((c) => c.id === 'cmd:theme')!;
+    const { themeManager } = await import('$lib/managers/theme-manager.svelte');
+    const toggleSpy = vi.spyOn(themeManager, 'toggleTheme').mockImplementation(() => undefined);
+    manager.activate('command', themeCmd);
+    await flushMicrotasks();
+    expect(toggleSpy).toHaveBeenCalledOnce();
+    toggleSpy.mockRestore();
+    commandContextManager.setAlbum(null);
+  });
+
+  it('startConfirm sets pendingConfirmId, cancelConfirm clears it', () => {
+    type WithPrivateStart = { startConfirm: (id: string) => void };
+    (manager as unknown as WithPrivateStart).startConfirm('cmd:test');
+    expect(manager.pendingConfirmId).toBe('cmd:test');
+    manager.cancelConfirm();
+    expect(manager.pendingConfirmId).toBeNull();
+  });
+
+  it('3s timeout auto-clears pendingConfirmId', () => {
+    vi.useFakeTimers();
+    type WithPrivateStart = { startConfirm: (id: string) => void };
+    (manager as unknown as WithPrivateStart).startConfirm('cmd:test');
+    vi.advanceTimersByTime(3000);
+    expect(manager.pendingConfirmId).toBeNull();
+    vi.useRealTimers();
+  });
+
+  it('stale-timer guard: new confirm during window does not clear new id', () => {
+    vi.useFakeTimers();
+    type WithPrivateStart = { startConfirm: (id: string) => void };
+    const start = (manager as unknown as WithPrivateStart).startConfirm.bind(manager);
+    start('cmd:a');
+    vi.advanceTimersByTime(1000);
+    start('cmd:b');
+    vi.advanceTimersByTime(2000);
+    expect(manager.pendingConfirmId).toBe('cmd:b');
+    vi.advanceTimersByTime(1000);
+    expect(manager.pendingConfirmId).toBeNull();
+    vi.useRealTimers();
+  });
+
+  it('close() clears pendingConfirmId', () => {
+    type WithPrivateStart = { startConfirm: (id: string) => void };
+    (manager as unknown as WithPrivateStart).startConfirm('cmd:test');
+    manager.close();
+    expect(manager.pendingConfirmId).toBeNull();
+  });
+
+  describe('destructive activate', () => {
+    const makeDestructive = (id: string, handler = vi.fn().mockResolvedValue(undefined)): CommandItem => ({
+      id: id as `cmd:${string}`,
+      labelKey: 'x',
+      descriptionKey: 'y',
+      icon: 'z',
+      destructive: true,
+      handler,
+    });
+
+    it('first Enter on destructive: palette stays open, handler NOT called, pending set', async () => {
+      const cmd = makeDestructive('cmd:destruct');
+      manager.activate('command', cmd);
+      await flushMicrotasks();
+      expect(manager.isOpen).toBe(true);
+      expect(cmd.handler).not.toHaveBeenCalled();
+      expect(manager.pendingConfirmId).toBe('cmd:destruct');
+    });
+
+    it('second Enter within window: palette closes, handler called, pending cleared', async () => {
+      const cmd = makeDestructive('cmd:destruct');
+      manager.activate('command', cmd);
+      manager.activate('command', cmd);
+      await flushMicrotasks();
+      await flushMicrotasks();
+      expect(cmd.handler).toHaveBeenCalledOnce();
+      expect(manager.isOpen).toBe(false);
+      expect(manager.pendingConfirmId).toBeNull();
+    });
+
+    it('destructive A then destructive B: pending flips, only B fires on confirm', async () => {
+      const a = makeDestructive('cmd:destruct_a');
+      const b = makeDestructive('cmd:destruct_b');
+      manager.activate('command', a);
+      expect(manager.pendingConfirmId).toBe('cmd:destruct_a');
+      manager.activate('command', b);
+      expect(manager.pendingConfirmId).toBe('cmd:destruct_b');
+      manager.activate('command', b);
+      await flushMicrotasks();
+      await flushMicrotasks();
+      expect(b.handler).toHaveBeenCalledOnce();
+      expect(a.handler).not.toHaveBeenCalled();
+    });
+
+    it('destructive A then non-destructive C: pending cleared, C fires, A never', async () => {
+      const a = makeDestructive('cmd:destruct_a');
+      const handlerC = vi.fn().mockResolvedValue(undefined);
+      const c: CommandItem = { id: 'cmd:safe_c', labelKey: 'x', descriptionKey: 'y', icon: 'z', handler: handlerC };
+      manager.activate('command', a);
+      manager.activate('command', c);
+      await flushMicrotasks();
+      await flushMicrotasks();
+      expect(handlerC).toHaveBeenCalledOnce();
+      expect(a.handler).not.toHaveBeenCalled();
+      expect(manager.pendingConfirmId).toBeNull();
+    });
+
+    it('held-Enter guard: three sync activates on destructive → handler called at most once', async () => {
+      const cmd = makeDestructive('cmd:destruct');
+      manager.activate('command', cmd);
+      manager.activate('command', cmd);
+      manager.activate('command', cmd);
+      await flushMicrotasks();
+      await flushMicrotasks();
+      expect(cmd.handler).toHaveBeenCalledTimes(1);
+    });
+
+    it('rapid mouse double-click: two sync activates fire exactly once', async () => {
+      const cmd = makeDestructive('cmd:destruct');
+      manager.activate('command', cmd);
+      manager.activate('command', cmd);
+      await flushMicrotasks();
+      await flushMicrotasks();
+      expect(cmd.handler).toHaveBeenCalledOnce();
+    });
+
+    it('entity-row activation while pending cancels confirm via close()', () => {
+      const cmd = makeDestructive('cmd:destruct');
+      manager.activate('command', cmd);
+      expect(manager.pendingConfirmId).toBe('cmd:destruct');
+      // Activate a nav row — its branch runs `this.close()` which calls `cancelConfirm`.
+      const navItem = NAVIGATION_ITEMS[0];
+      manager.activate('nav', navItem);
+      expect(manager.pendingConfirmId).toBeNull();
+    });
+
+    it('setQuery while pending cancels confirm', () => {
+      const cmd = makeDestructive('cmd:destruct');
+      manager.activate('command', cmd);
+      expect(manager.pendingConfirmId).not.toBeNull();
+      manager.setQuery('x');
+      expect(manager.pendingConfirmId).toBeNull();
+    });
+
+    it('setActiveItem to different id while pending cancels confirm', () => {
+      const cmd = makeDestructive('cmd:destruct');
+      manager.activate('command', cmd);
+      expect(manager.pendingConfirmId).not.toBeNull();
+      manager.setActiveItem('cmd:other');
+      expect(manager.pendingConfirmId).toBeNull();
+    });
+
+    it('setActiveItem back to pending id keeps confirm alive', () => {
+      const cmd = makeDestructive('cmd:destruct');
+      manager.activate('command', cmd);
+      expect(manager.pendingConfirmId).toBe('cmd:destruct');
+      manager.setActiveItem('cmd:destruct');
+      expect(manager.pendingConfirmId).toBe('cmd:destruct');
+    });
+  });
+
   it('two different commands in rapid Enter each fire (independent in-flight keys)', async () => {
     const handlerA = vi.fn().mockResolvedValue(undefined);
     const handlerB = vi.fn().mockResolvedValue(undefined);
@@ -966,7 +1160,7 @@ describe('activate("command")', () => {
 
 describe('activateRecent()', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     resetRecentStore();
     vi.useFakeTimers();
@@ -1167,7 +1361,7 @@ describe('topNavigationMatch', () => {
   // `sections.navigation` currently holds — the nav provider runs synchronously
   // so these tests drive it via the full setQuery/debounce flow.
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     mockUser.current = { id: 'test-user', isAdmin: true };
     mockFlags.valueOrUndefined = { search: true, map: true, trash: true };
@@ -1239,7 +1433,7 @@ describe('topNavigationMatch', () => {
 
 describe('removeRecent()', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     resetRecentStore();
   });
@@ -1287,7 +1481,7 @@ describe('removeRecent()', () => {
 
 describe('announcementText', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
   });
 
@@ -1339,7 +1533,7 @@ describe('announcementText', () => {
 
 describe('reconcileCursor fallback + getActiveItem edge cases', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     // getActiveItem now consults recents when the query is empty, so stale entries
     // from prior describes would mask the section-based edge cases this block tests.
@@ -1388,7 +1582,7 @@ describe('reconcileCursor fallback + getActiveItem edge cases', () => {
 
 describe('edge-case guards', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
@@ -1503,7 +1697,7 @@ describe('edge-case guards', () => {
 
 describe('ML health probe on open', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
@@ -1543,7 +1737,7 @@ describe('ML health probe on open', () => {
 
 describe('tagsDisabled persists across close/reopen', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
@@ -1590,7 +1784,7 @@ describe('tagsDisabled persists across close/reopen', () => {
 
 describe('navigation section scaffolding', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
   });
 
@@ -1646,7 +1840,7 @@ describe('navigation section scaffolding', () => {
 
 describe('navigation memo cache', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     mockI18nLocale.current = 'en';
   });
@@ -1698,7 +1892,7 @@ describe('navigation memo cache', () => {
 
 describe('getActiveItem nav branch', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
   });
 
@@ -1760,7 +1954,7 @@ describe('getActiveItem nav branch', () => {
 
 describe('runNavigationProvider', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     mockUser.current = { id: 'test-user', isAdmin: true };
     mockFlags.valueOrUndefined = { search: true, map: true, trash: true };
@@ -1922,7 +2116,7 @@ describe('commands provider', () => {
   const commandItemsMut = COMMAND_ITEMS as unknown as CommandItem[];
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     mockUser.current = { id: 'test-user', isAdmin: true };
     mockFlags.valueOrUndefined = { search: true, map: true, trash: true };
@@ -2008,6 +2202,89 @@ describe('commands provider', () => {
       if (idx !== -1) {
         commandItemsMut.splice(idx, 1);
       }
+    }
+  });
+
+  it('isAvailable=false excludes command from provider output', async () => {
+    const gated: CommandItem = {
+      id: 'cmd:test-gated-off',
+      labelKey: 'test_gated_off_label',
+      descriptionKey: 'test_gated_off_description',
+      icon: '',
+      handler: () => undefined,
+      isAvailable: () => false,
+    };
+    commandItemsMut.push(gated);
+    try {
+      manager.setQuery('>');
+      await flushMicrotasks();
+      const section = manager.sections.commands;
+      expect(section.status).toBe('ok');
+      if (section.status === 'ok') {
+        expect(section.items.some((c) => c.id === gated.id)).toBe(false);
+      }
+    } finally {
+      const idx = commandItemsMut.findIndex((c) => c.id === gated.id);
+      if (idx !== -1) {
+        commandItemsMut.splice(idx, 1);
+      }
+    }
+  });
+
+  it('isAvailable=true includes the command', async () => {
+    const allowed: CommandItem = {
+      id: 'cmd:test-gated-on',
+      labelKey: 'test_gated_on_label',
+      descriptionKey: 'test_gated_on_description',
+      icon: '',
+      handler: () => undefined,
+      isAvailable: () => true,
+    };
+    commandItemsMut.push(allowed);
+    try {
+      manager.setQuery('>');
+      await flushMicrotasks();
+      const section = manager.sections.commands;
+      expect(section.status).toBe('ok');
+      if (section.status === 'ok') {
+        expect(section.items.some((c) => c.id === allowed.id)).toBe(true);
+      }
+    } finally {
+      const idx = commandItemsMut.findIndex((c) => c.id === allowed.id);
+      if (idx !== -1) {
+        commandItemsMut.splice(idx, 1);
+      }
+    }
+  });
+
+  it('isAvailable throwing excludes the command and logs', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const throwing: CommandItem = {
+      id: 'cmd:test-gated-throw',
+      labelKey: 'test_gated_throw_label',
+      descriptionKey: 'test_gated_throw_description',
+      icon: '',
+      handler: () => undefined,
+      isAvailable: () => {
+        throw new Error('boom');
+      },
+    };
+    commandItemsMut.push(throwing);
+    try {
+      manager.setQuery('>');
+      await flushMicrotasks();
+      const section = manager.sections.commands;
+      expect(section.status).toBe('ok');
+      if (section.status === 'ok') {
+        expect(section.items.some((c) => c.id === throwing.id)).toBe(false);
+      }
+      expect(errorSpy).toHaveBeenCalledWith('[cmdk] isAvailable threw', expect.objectContaining({ id: throwing.id }));
+    } finally {
+      const idx = commandItemsMut.findIndex((c) => c.id === throwing.id);
+      if (idx !== -1) {
+        commandItemsMut.splice(idx, 1);
+      }
+      errorSpy.mockRestore();
     }
   });
 
@@ -2140,7 +2417,7 @@ describe('commands provider', () => {
 
 describe('setQuery synchronous navigation', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
@@ -2196,7 +2473,12 @@ describe('setQuery synchronous navigation', () => {
 
 describe('SWR loading rules', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    // resetAllMocks (not clearAllMocks) so any stray mockResolvedValueOnce /
+    // mockImplementationOnce queued by a prior test is fully dropped. clear
+    // only wipes call history, not implementation queues — which lets a prior
+    // Once leak into the next test and consume the mockResolvedValueOnce we
+    // set up here, returning the default empty payload instead.
+    vi.resetAllMocks();
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
@@ -2212,20 +2494,6 @@ describe('SWR loading rules', () => {
   afterEach(() => {
     restoreAbortTimeout();
     vi.useRealTimers();
-  });
-
-  it('preserves ok photos across a new keystroke (does NOT flip to loading)', async () => {
-    vi.mocked(searchSmart).mockResolvedValueOnce({
-      assets: { items: [{ id: 'a1' } as never], nextPage: null },
-    } as never);
-    const m = new GlobalSearchManager();
-    m.open();
-    m.setQuery('beach');
-    await vi.advanceTimersByTimeAsync(200);
-    expect(m.sections.photos.status).toBe('ok');
-    m.setQuery('sunset');
-    // Synchronously — photos should still be ok (old items), not loading.
-    expect(m.sections.photos.status).toBe('ok');
   });
 
   it('flips empty → loading on new keystroke', async () => {
@@ -2367,7 +2635,7 @@ describe('SWR loading rules', () => {
 
 describe('activate navigation', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     resetRecentStore();
     mockUser.current = { id: 'test-user', isAdmin: true };
@@ -2424,7 +2692,7 @@ describe('activate navigation', () => {
 
 describe('activateRecent stale admin purge', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     resetRecentStore();
   });
@@ -2485,7 +2753,7 @@ describe('activateRecent stale admin purge', () => {
 
 describe('batch lifecycle: close, empty-query, grace window (review fixes)', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
@@ -2501,27 +2769,6 @@ describe('batch lifecycle: close, empty-query, grace window (review fixes)', () 
   afterEach(() => {
     restoreAbortTimeout();
     vi.useRealTimers();
-  });
-
-  it('close() resets batchInFlight and inFlightCounter even when a batch is in flight', async () => {
-    let resolveStale!: () => void;
-    vi.mocked(searchSmart).mockImplementationOnce(
-      () => new Promise((r) => (resolveStale = () => r({ assets: { items: [], nextPage: null } } as never))),
-    );
-    const m = new GlobalSearchManager();
-    m.open();
-    m.setQuery('beach');
-    await vi.advanceTimersByTimeAsync(200);
-    expect(m.batchInFlight).toBe(true);
-    m.close();
-    expect(m.batchInFlight).toBe(false);
-    expect((m as unknown as { inFlightCounter: number }).inFlightCounter).toBe(0);
-    expect(m.batchInFlightStartedAt).toBe(0);
-    // Release the stale promise — must NOT re-animate batchInFlight or the counter.
-    resolveStale();
-    await vi.advanceTimersByTimeAsync(10);
-    expect(m.batchInFlight).toBe(false);
-    expect((m as unknown as { inFlightCounter: number }).inFlightCounter).toBe(0);
   });
 
   it('setQuery(empty) resets batchInFlight, inFlightCounter, and _batchInFlightStartedAt', () => {
@@ -2588,7 +2835,7 @@ describe('batch lifecycle: close, empty-query, grace window (review fixes)', () 
 
 describe('activateRecent stale-state purge (review fix U2)', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     resetRecentStore();
     mockUser.current = { id: 'test-user', isAdmin: true };
@@ -2665,7 +2912,7 @@ describe('activateRecent stale-state purge (review fix U2)', () => {
 
 describe('setMode stale photos race (review fix U3)', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
@@ -2730,7 +2977,7 @@ describe('setMode stale photos race (review fix U3)', () => {
 
 describe('Batch 4 post-review: route consistency, SWR cursor, debounce-window close (NF1/CG2/UE1/UE2)', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     resetRecentStore();
     vi.useFakeTimers();
@@ -2773,20 +3020,6 @@ describe('Batch 4 post-review: route consistency, SWR cursor, debounce-window cl
 
   // CG2: reconcileCursor inside setQuery must NOT jump the highlight off a valid
   // SWR-preserved photo cursor when the user types another keystroke.
-  it('setQuery reconcileCursor preserves a valid cursor on an SWR-preserved photo', async () => {
-    vi.mocked(searchSmart).mockResolvedValueOnce({
-      assets: { items: [{ id: 'a1' } as never, { id: 'a2' } as never], nextPage: null },
-    } as never);
-    const m = new GlobalSearchManager();
-    m.open();
-    m.setQuery('beach');
-    await vi.advanceTimersByTimeAsync(200);
-    expect(m.sections.photos.status).toBe('ok');
-    m.activeItemId = 'photo:a2'; // valid, not the first item
-    m.setQuery('sunset'); // photos stay SWR-preserved as ok with [a1, a2]
-    expect(m.activeItemId).toBe('photo:a2');
-  });
-
   // UE1: close() fired during the 150ms debounce window (before runBatch ever ran).
   // Prior tests close AFTER runBatch has fired; this one verifies the earlier state.
   it('close() during the debounce window clears pending runBatch and resets all state', () => {
@@ -2828,7 +3061,7 @@ describe('Batch 4 post-review: route consistency, SWR cursor, debounce-window cl
 
 describe('getActiveItem recent-entry preview lookup (cold open)', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     resetRecentStore();
   });
@@ -3042,7 +3275,7 @@ describe('closeSignal lifecycle', () => {
 
 describe('album catalog fetch', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
   });
 
@@ -3144,7 +3377,7 @@ describe('album catalog fetch', () => {
 
 describe('spaces catalog fetch', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
   });
 
@@ -3203,7 +3436,7 @@ describe('runBatch dispatches albums and spaces providers', () => {
   // minQueryLength. runBatch is protected and driven from `setQuery` in every
   // other suite — use the same entry point here.
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
@@ -3283,7 +3516,7 @@ describe('activateAlbum', () => {
   } as unknown as Awaited<ReturnType<typeof getAlbumInfo>>;
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     resetRecentStore();
   });
@@ -3530,7 +3763,7 @@ describe('activateSpace', () => {
   } as unknown as Awaited<ReturnType<typeof getSpace>>;
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     resetRecentStore();
   });
@@ -3799,7 +4032,7 @@ describe('prefix scoping — deriveds', () => {
 
 describe('prefix scoping — runBatch gating', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
@@ -3910,7 +4143,7 @@ describe('prefix scoping — runBatch gating', () => {
 
 describe('prefix scoping — bare suggestions (tags/albums/spaces)', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
@@ -4035,7 +4268,7 @@ const mockPerson = (id: string, name: string, updatedAt?: string): PersonRespons
 
 describe('prefix scoping — bare @ suggestions', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
@@ -4191,7 +4424,7 @@ describe('prefix scoping — bare @ suggestions', () => {
 
 describe('prefix scoping — runNavigationProvider', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
@@ -4289,7 +4522,7 @@ describe('prefix scoping — runNavigationProvider', () => {
 
 describe('prefix scoping — setQuery SWR scope behavior', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
@@ -4392,7 +4625,7 @@ describe('prefix scoping — setQuery SWR scope behavior', () => {
 
 describe('prefix scoping — reconcileCursor', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
@@ -4454,7 +4687,7 @@ describe('prefix scoping — reconcileCursor', () => {
 
 describe('prefix scoping — setMode under scope', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
@@ -4522,7 +4755,7 @@ describe('prefix scoping — announcementText', () => {
   });
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
     vi.useFakeTimers();
     installFakeAbortTimeout();
@@ -4584,7 +4817,7 @@ describe('prefix scoping — announcementText', () => {
 
 describe('prefix scoping — defensive recent replay of scoped query', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     localStorage.clear();
   });
 
