@@ -757,6 +757,24 @@ export const utils = {
     });
   },
 
+  waitForQueuePaused: (accessToken: string, queue: keyof QueuesResponseLegacyDto, ms?: number) => {
+    // eslint-disable-next-line no-async-promise-executor
+    return new Promise<void>(async (resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error('Timed out waiting for queue to pause')), ms || 10_000);
+
+      while (true) {
+        const queues = await getQueuesLegacy({ headers: asBearerAuth(accessToken) });
+        if (queues[queue].queueStatus.isPaused) {
+          break;
+        }
+        await setAsyncTimeout(200);
+      }
+
+      clearTimeout(timeout);
+      resolve();
+    });
+  },
+
   cliLogin: async (accessToken: string) => {
     const key = await utils.createApiKey(accessToken, [Permission.All]);
     await immichCli(['login', app, `${key.secret}`]);
