@@ -1781,10 +1781,13 @@ async function phaseTemplateDiskBaseline(): Promise<void> {
 
   const postState = await captureState();
 
+  // All assets land under library/<storageLabel-or-userUuid>/YYYY/YYYY-MM-DD/filename.
+  // Per-user storageLabel: admin got 'admin'; other users keep their UUID in the path.
+  const libraryTemplatePath = /\/usr\/src\/app\/upload\/library\/[^/]+\/\d{4}\/\d{4}-\d{2}-\d{2}\//;
   for (const a of postState.assets) {
     assert.ok(
-      a.originalPath.startsWith('/usr/src/app/upload/library/admin/'),
-      `Expected library/admin/ path, got ${a.originalPath}`,
+      libraryTemplatePath.test(a.originalPath),
+      `Expected library/<label>/YYYY/YYYY-MM-DD/ path, got ${a.originalPath}`,
     );
     assert.ok(diskFileExists(a.originalPath), `New disk path missing: ${a.originalPath}`);
 
@@ -1795,6 +1798,12 @@ async function phaseTemplateDiskBaseline(): Promise<void> {
       assert.ok(!diskFileExists(prePath), `Old disk path still exists: ${prePath}`);
     }
   }
+
+  // Admin's storageLabel must have taken effect — at least one asset under library/admin/.
+  assert.ok(
+    postState.assets.some((a) => a.originalPath.startsWith('/usr/src/app/upload/library/admin/')),
+    'No asset landed under library/admin/ — storageLabel=admin was not applied',
+  );
 
   // Sidecar followed the asset
   const saved = loadState();
