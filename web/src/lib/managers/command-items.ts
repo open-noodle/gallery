@@ -1,23 +1,47 @@
+import { goto } from '$app/navigation';
 import { ADMIN_VISIBLE_QUEUES } from '$lib/constants';
 import { authManager } from '$lib/managers/auth-manager.svelte';
 import { isAlmostExactWordMatch } from '$lib/managers/cmdk-match';
+import type { CommandContext } from '$lib/managers/command-context-manager.svelte';
 import { themeManager } from '$lib/managers/theme-manager.svelte';
+import AlbumEditModal from '$lib/modals/AlbumEditModal.svelte';
+import AlbumOptionsModal from '$lib/modals/AlbumOptionsModal.svelte';
 import ShortcutsModal from '$lib/modals/ShortcutsModal.svelte';
+import SpaceAddMemberModal from '$lib/modals/SpaceAddMemberModal.svelte';
 import SpaceCreateModal from '$lib/modals/SpaceCreateModal.svelte';
+import SpaceMembersModal from '$lib/modals/SpaceMembersModal.svelte';
+import { Route } from '$lib/route';
+import { handleDeleteAlbum, handleDownloadAlbum } from '$lib/services/album.service';
 import { asQueueItem } from '$lib/services/queue.service';
 import { clearEntries } from '$lib/stores/cmdk-recent';
 import { createAlbumAndRedirect } from '$lib/utils/album-utils';
 import { openFileUploadDialog } from '$lib/utils/file-uploader';
 import { handleError } from '$lib/utils/handle-error';
-import { emptyQueue, QueueCommand, QueueName, runQueueCommandLegacy, type ServerFeaturesDto } from '@immich/sdk';
+import {
+  bulkAddAssets,
+  emptyQueue,
+  QueueCommand,
+  QueueName,
+  removeMember,
+  removeSpace,
+  removeUserFromAlbum,
+  runQueueCommandLegacy,
+  type ServerFeaturesDto,
+} from '@immich/sdk';
 import { modalManager, toastManager } from '@immich/ui';
 import {
+  mdiAccountGroupOutline,
   mdiAccountMultiplePlus,
+  mdiAccountPlus,
   mdiAccountSearchOutline,
   mdiBrain,
   mdiBroom,
   mdiCloudUploadOutline,
+  mdiDeleteOutline,
+  mdiDownload,
+  mdiExitRun,
   mdiFaceRecognition,
+  mdiImageMultipleOutline,
   mdiImageOutline,
   mdiInformationOutline,
   mdiKeyboardOutline,
@@ -25,7 +49,9 @@ import {
   mdiPauseCircleOutline,
   mdiPlayCircleOutline,
   mdiPlaylistPlus,
+  mdiRenameOutline,
   mdiRestore,
+  mdiShareVariantOutline,
   mdiThemeLightDark,
 } from '@mdi/js';
 import { t } from 'svelte-i18n';
@@ -38,11 +64,15 @@ export interface CommandItem {
   labelKey: string;
   descriptionKey: string;
   icon: string;
-  handler: () => void | Promise<unknown>;
+  handler: (ctx?: CommandContext) => void | Promise<unknown>;
   /** Reserved for v1.3.1 admin verbs. Not used by any v1.3.0 item. */
   adminOnly?: boolean;
   /** Reserved for future feature-flag gating. Not used in v1.3.0. */
   featureFlag?: keyof ServerFeaturesDto;
+  /** Sync predicate gating appearance. Omit for always-available commands. Throwing excludes. */
+  isAvailable?: (ctx: CommandContext) => boolean;
+  /** Requires inline two-step Enter confirmation. */
+  destructive?: boolean;
 }
 
 async function runQueue(name: QueueName) {
@@ -201,6 +231,191 @@ export const COMMAND_ITEMS: readonly CommandItem[] = [
     icon: mdiBroom,
     adminOnly: true,
     handler: () => clearAllFailedJobs(),
+  },
+
+  // v1.4 — album-context commands. Visible only on /albums/[albumId]/… routes
+  // with a registered AlbumContext. Availability further narrowed by ownership
+  // / membership flags computed in registerAlbumContext.
+  {
+    id: 'cmd:album_rename',
+    labelKey: 'cmdk_cmd_album_rename_label',
+    descriptionKey: 'cmdk_cmd_album_rename_description',
+    icon: mdiRenameOutline,
+    isAvailable: (ctx) => ctx.album !== null && ctx.album.isOwner,
+    handler: (ctx) => {
+      if (!ctx?.album) {
+        return;
+      }
+      return modalManager.show(AlbumEditModal, { album: ctx.album.raw });
+    },
+  },
+  {
+    id: 'cmd:album_share',
+    labelKey: 'cmdk_cmd_album_share_label',
+    descriptionKey: 'cmdk_cmd_album_share_description',
+    icon: mdiShareVariantOutline,
+    isAvailable: (ctx) => ctx.album !== null && ctx.album.isOwner,
+    handler: (ctx) => {
+      if (!ctx?.album) {
+        return;
+      }
+      return modalManager.show(AlbumOptionsModal, { album: ctx.album.raw });
+    },
+  },
+  {
+    id: 'cmd:album_download',
+    labelKey: 'cmdk_cmd_album_download_label',
+    descriptionKey: 'cmdk_cmd_album_download_description',
+    icon: mdiDownload,
+    isAvailable: (ctx) => ctx.album !== null,
+    handler: (ctx) => {
+      if (!ctx?.album) {
+        return;
+      }
+      return handleDownloadAlbum(ctx.album.raw);
+    },
+  },
+  {
+    id: 'cmd:album_leave',
+    labelKey: 'cmdk_cmd_album_leave_label',
+    descriptionKey: 'cmdk_cmd_album_leave_description',
+    icon: mdiExitRun,
+    destructive: true,
+    isAvailable: (ctx) => ctx.album !== null && !ctx.album.isOwner && ctx.album.isMember,
+    handler: async (ctx) => {
+      if (!ctx?.album) {
+        return;
+      }
+      if (!ctx.userId) {
+        console.warn('[cmdk] cmd:album_leave missing userId — context misconfigured');
+        return;
+      }
+      const $t = get(t);
+      try {
+        await removeUserFromAlbum({ id: ctx.album.id, userId: ctx.userId });
+        await goto(Route.albums());
+      } catch (error) {
+        handleError(error, $t('errors.something_went_wrong'));
+      }
+    },
+  },
+  {
+    id: 'cmd:album_delete',
+    labelKey: 'cmdk_cmd_album_delete_label',
+    descriptionKey: 'cmdk_cmd_album_delete_description',
+    icon: mdiDeleteOutline,
+    destructive: true,
+    isAvailable: (ctx) => ctx.album !== null && ctx.album.isOwner,
+    handler: async (ctx) => {
+      if (!ctx?.album) {
+        return;
+      }
+      const ok = await handleDeleteAlbum(ctx.album.raw, { prompt: false });
+      if (ok) {
+        await goto(Route.albums());
+      }
+    },
+  },
+
+  // v1.4 — space-context commands. Visible only on /spaces/[spaceId]/… routes
+  // with a registered SpaceContext.
+  {
+    id: 'cmd:space_manage_members',
+    labelKey: 'cmdk_cmd_space_manage_members_label',
+    descriptionKey: 'cmdk_cmd_space_manage_members_description',
+    icon: mdiAccountGroupOutline,
+    isAvailable: (ctx) => ctx.space !== null && ctx.space.isOwner,
+    handler: (ctx) => {
+      if (!ctx?.space) {
+        return;
+      }
+      return modalManager.show(SpaceMembersModal, {
+        spaceId: ctx.space.id,
+        members: ctx.space.members,
+        isOwner: true,
+        spaceColor: ctx.space.raw.color ?? 'primary',
+      });
+    },
+  },
+  {
+    id: 'cmd:space_add_member',
+    labelKey: 'cmdk_cmd_space_add_member_label',
+    descriptionKey: 'cmdk_cmd_space_add_member_description',
+    icon: mdiAccountPlus,
+    isAvailable: (ctx) => ctx.space !== null && ctx.space.isOwner,
+    handler: (ctx) => {
+      if (!ctx?.space) {
+        return;
+      }
+      return modalManager.show(SpaceAddMemberModal, {
+        spaceId: ctx.space.id,
+        existingMemberIds: ctx.space.members.map((m) => m.userId),
+      });
+    },
+  },
+  {
+    id: 'cmd:space_bulk_add',
+    labelKey: 'cmdk_cmd_space_bulk_add_label',
+    descriptionKey: 'cmdk_cmd_space_bulk_add_description',
+    icon: mdiImageMultipleOutline,
+    destructive: true,
+    isAvailable: (ctx) => ctx.space !== null && ctx.space.canWrite,
+    handler: async (ctx) => {
+      if (!ctx?.space) {
+        return;
+      }
+      const $t = get(t);
+      try {
+        await bulkAddAssets({ id: ctx.space.id });
+        toastManager.primary($t('bulk_add_started'));
+      } catch (error) {
+        handleError(error, $t('errors.something_went_wrong'));
+      }
+    },
+  },
+  {
+    id: 'cmd:space_leave',
+    labelKey: 'cmdk_cmd_space_leave_label',
+    descriptionKey: 'cmdk_cmd_space_leave_description',
+    icon: mdiExitRun,
+    destructive: true,
+    isAvailable: (ctx) => ctx.space !== null && !ctx.space.isOwner && ctx.space.isMember,
+    handler: async (ctx) => {
+      if (!ctx?.space) {
+        return;
+      }
+      if (!ctx.userId) {
+        console.warn('[cmdk] cmd:space_leave missing userId — context misconfigured');
+        return;
+      }
+      const $t = get(t);
+      try {
+        await removeMember({ id: ctx.space.id, userId: ctx.userId });
+        await goto(Route.spaces());
+      } catch (error) {
+        handleError(error, $t('errors.something_went_wrong'));
+      }
+    },
+  },
+  {
+    id: 'cmd:space_delete',
+    labelKey: 'cmdk_cmd_space_delete_label',
+    descriptionKey: 'cmdk_cmd_space_delete_description',
+    icon: mdiDeleteOutline,
+    destructive: true,
+    isAvailable: (ctx) => ctx.space !== null && ctx.space.isOwner,
+    handler: async (ctx) => {
+      if (!ctx?.space) {
+        return;
+      }
+      const $t = get(t);
+      try {
+        await removeSpace({ id: ctx.space.id });
+        await goto(Route.spaces());
+      } catch (error) {
+        handleError(error, $t('errors.something_went_wrong'));
+      }
+    },
   },
 ];
 
