@@ -1,18 +1,19 @@
 import { BadRequestException, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { Readable } from 'node:stream';
+import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
+import { StorageCore } from 'src/cores/storage.core.js';
 import { UserAdmin } from 'src/database.js';
 import { CacheControl, JobName, UserMetadataKey, JobStatus } from 'src/enum.js';
+import { StorageService } from 'src/services/storage.service.js';
 import { UserService } from 'src/services/user.service.js';
+import { clearConfigCache } from 'src/utils/config.js';
 import { ImmichFileResponse } from 'src/utils/file.js';
 import { AuthFactory } from 'test/factories/auth.factory.js';
 import { UserFactory } from 'test/factories/user.factory.js';
 import { authStub } from 'test/fixtures/auth.stub.js';
 import { systemConfigStub } from 'test/fixtures/system-config.stub.js';
 import { userStub } from 'test/fixtures/user.stub.js';
-import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
-import { StorageService } from 'src/services/storage.service.js';
 import { factory, newUuid } from 'test/small.factory.js';
-import { Readable } from 'node:stream';
-import { StorageCore } from 'src/cores/storage.core.js';
 import { ServiceMocks, newTestService } from 'test/utils.js';
 
 vi.mock('node:fs', async (importOriginal) => {
@@ -101,6 +102,22 @@ describe(UserService.name, () => {
       ]);
 
       expect(mocks.user.getList).toHaveBeenCalledWith({ withDeleted: false });
+    });
+
+    // Regression guard: userService.search must read config from cache, not rebuild
+    // it per request. The uncached path runs class-transformer + class-validator over
+    // the full nested SystemConfigDto and adds ~1-3s per call on slower CPUs.
+    it('should read system config from cache across requests', async () => {
+      clearConfigCache();
+      const user = UserFactory.create();
+      const auth = AuthFactory.create(user);
+      mocks.user.getList.mockResolvedValue([user]);
+
+      await sut.search(auth);
+      await sut.search(auth);
+      await sut.search(auth);
+
+      expect(mocks.systemMetadata.get).toHaveBeenCalledTimes(1);
     });
   });
 
