@@ -29,10 +29,7 @@ test.describe('cmdk context commands (v1.4)', () => {
     member = await utils.userSetup(admin.accessToken, createUserDto.user2);
   });
 
-  test('Case 1 — album context: owner sees rename/share/download/delete, not leave', async ({
-    context,
-    page,
-  }) => {
+  test('Case 1 — album context: owner sees rename/share/download/delete, not leave', async ({ context, page }) => {
     const album = await utils.createAlbum(owner.accessToken, { albumName: 'Case1 Album' });
     await utils.setAuthCookies(context, owner.accessToken);
     await page.goto(`/albums/${album.id}`);
@@ -70,10 +67,7 @@ test.describe('cmdk context commands (v1.4)', () => {
     await expect(dialog.getByText(/Share this album/i)).toHaveCount(0);
   });
 
-  test('Case 4 — destructive happy path: first Enter arms, second Enter deletes', async ({
-    context,
-    page,
-  }) => {
+  test('Case 4 — destructive happy path: first Enter arms, second Enter deletes', async ({ context, page }) => {
     const albumName = 'Case4 Doomed Album';
     const album = await utils.createAlbum(owner.accessToken, { albumName });
     await utils.setAuthCookies(context, owner.accessToken);
@@ -93,15 +87,14 @@ test.describe('cmdk context commands (v1.4)', () => {
     await expect(page).toHaveURL(/\/albums$/);
     // Deleted album is absent from the list. Poll because the albums page
     // re-fetches after the redirect; the SWR render may show stale data briefly.
-    await expect.poll(async () => page.locator('[data-testid="album-name"]').filter({ hasText: albumName }).count(), {
-      timeout: 5000,
-    }).toBe(0);
+    await expect
+      .poll(async () => page.locator('[data-testid="album-name"]').filter({ hasText: albumName }).count(), {
+        timeout: 5000,
+      })
+      .toBe(0);
   });
 
-  test('Case 5 — destructive Esc cancels: palette stays open, album survives', async ({
-    context,
-    page,
-  }) => {
+  test('Case 5 — destructive Esc cancels: palette stays open, album survives', async ({ context, page }) => {
     const albumName = 'Case5 Survivor Album';
     const album = await utils.createAlbum(owner.accessToken, { albumName });
     await utils.setAuthCookies(context, owner.accessToken);
@@ -153,10 +146,7 @@ test.describe('cmdk context commands (v1.4)', () => {
     await expect(dialog.getByText(/Manage space members/i)).toBeVisible();
   });
 
-  test('Case 9 — space leave: member leaves shared space, redirects to /spaces', async ({
-    context,
-    page,
-  }) => {
+  test('Case 9 — space leave: member leaves shared space, redirects to /spaces', async ({ context, page }) => {
     const space = await utils.createSpace(owner.accessToken, { name: 'Case9 Space' });
     await utils.addSpaceMember(owner.accessToken, space.id, {
       userId: member.userId,
