@@ -538,9 +538,9 @@ describe(SharedSpaceRepository.name, () => {
       const { ctx, sut } = setup();
       const { user } = await ctx.newUser();
       const { space } = await ctx.newSharedSpace({ createdById: user.id });
-      const { asset: asset1 } = await ctx.newAsset({ ownerId: user.id });
-      const { asset: asset2 } = await ctx.newAsset({ ownerId: user.id });
-      const { asset: asset3 } = await ctx.newAsset({ ownerId: user.id });
+      const { asset: asset1 } = await ctx.newAsset({ ownerId: user.id, thumbhash: Buffer.from('thumb1') });
+      const { asset: asset2 } = await ctx.newAsset({ ownerId: user.id, thumbhash: Buffer.from('thumb2') });
+      const { asset: asset3 } = await ctx.newAsset({ ownerId: user.id, thumbhash: Buffer.from('thumb3') });
 
       // Add assets with slight delay to ensure ordering
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset1.id });
@@ -554,6 +554,22 @@ describe(SharedSpaceRepository.name, () => {
       expect(result[0].id).toBe(asset3.id);
       expect(result[1].id).toBe(asset2.id);
       expect(result[0]).toHaveProperty('thumbhash');
+    });
+
+    it('should exclude assets without a thumbhash', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: user.id });
+      const { asset: withThumb } = await ctx.newAsset({ ownerId: user.id, thumbhash: Buffer.from('thumb1') });
+      const { asset: withoutThumb } = await ctx.newAsset({ ownerId: user.id, thumbhash: null });
+
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: withoutThumb.id });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: withThumb.id });
+
+      const result = await sut.getRecentAssets(space.id, 4);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe(withThumb.id);
     });
   });
 
