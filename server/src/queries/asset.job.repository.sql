@@ -176,6 +176,7 @@ where
 select
   "asset"."id",
   "asset"."ownerId",
+  "asset"."originalPath",
   (
     select
       coalesce(json_agg(agg), '[]')
