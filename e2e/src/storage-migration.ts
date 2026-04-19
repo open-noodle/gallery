@@ -135,6 +135,7 @@ export async function uploadAsset(
   filename: string,
   data: Buffer,
   sidecar?: Buffer,
+  extraFields?: Record<string, string>,
 ): Promise<{ id: string; status: number }> {
   const form = new FormData();
   form.append('assetData', new Blob([new Uint8Array(data)]), filename);
@@ -145,6 +146,12 @@ export async function uploadAsset(
 
   if (sidecar) {
     form.append('sidecarData', new Blob([new Uint8Array(sidecar)]), `${filename}.xmp`);
+  }
+
+  if (extraFields) {
+    for (const [k, v] of Object.entries(extraFields)) {
+      form.append(k, v);
+    }
   }
 
   const url = `${BASE_URL}/assets`;
@@ -304,6 +311,46 @@ export async function waitForMigration(token: string, timeoutMs = 120_000): Prom
   }
 
   throw new Error(`waitForMigration timed out after ${timeoutMs}ms`);
+}
+
+export async function setStorageTemplate(token: string, opts: { enabled?: boolean; template?: string }): Promise<void> {
+  const config = await api('GET', '/system-config', { token });
+  if (opts.enabled !== undefined) {
+    config.storageTemplate.enabled = opts.enabled;
+  }
+  if (opts.template !== undefined) {
+    config.storageTemplate.template = opts.template;
+  }
+  await api('PUT', '/system-config', { body: config, token });
+}
+
+export async function triggerQueueCommand(token: string, queueName: string): Promise<void> {
+  await api('PUT', `/jobs/${queueName}`, { body: { command: 'start' }, token });
+}
+
+export async function countMoveHistory(assetId?: string): Promise<number> {
+  const rows = assetId
+    ? await queryDb<{ c: string }>('SELECT COUNT(*)::text c FROM move_history WHERE "entityId" = $1', [assetId])
+    : await queryDb<{ c: string }>('SELECT COUNT(*)::text c FROM move_history');
+  return Number(rows[0].c);
+}
+
+export function captureContainerLogsSince(service: string, sinceMs: number): string {
+  // docker compose --since accepts ISO-8601 OR a relative duration (e.g. "42s").
+  // Bare epoch seconds are NOT accepted — compute elapsed seconds.
+  // Substring matches work regardless of JSON vs plaintext logger mode;
+  // the warning text appears verbatim in either.
+  const elapsedSec = Math.max(1, Math.ceil((Date.now() - sinceMs) / 1000));
+  return execSync(`${COMPOSE} logs --since ${elapsedSec}s --no-color ${service}`, {
+    cwd: E2E_DIR,
+    timeout: 30_000,
+    encoding: 'utf8',
+  });
+}
+
+export function assertNoMoveEnoent(logs: string, phaseTag: string): void {
+  const bad = logs.split('\n').filter((l) => l.includes('Unable to complete move') || /ENOENT.*rename/.test(l));
+  assert.equal(bad.length, 0, `[${phaseTag}] unexpected ENOENT/move warnings:\n${bad.join('\n')}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -1450,6 +1497,351 @@ async function phaseSidecarVerify(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Phase: Template bulk migration skips S3 assets (regression for #383)
+// Precondition: S3 backend, assets already on S3
+// ---------------------------------------------------------------------------
+async function phaseTemplateS3BulkSkipped(): Promise<void> {
+  console.log('=== Phase: template-s3-bulk-skipped ===');
+  const token = await loginAdmin();
+  await setStorageTemplate(token, { enabled: false }); // invariant reset
+  const startMs = Date.now();
+  const preCount = await countMoveHistory();
+  const preState = await captureState();
+
+  // Precondition: every asset has a relative S3 path
+  for (const a of preState.assets) {
+    assert.ok(!a.originalPath.startsWith('/'), `Precondition failed: asset ${a.id} path is absolute`);
+  }
+
+  try {
+    await setStorageTemplate(token, { enabled: true, template: '{{y}}/{{MM}}/{{filename}}' });
+    await triggerQueueCommand(token, 'storageTemplateMigration');
+    await waitForProcessing(token);
+
+    const postState = await captureState();
+
+    // Every asset path unchanged
+    for (const pre of preState.assets) {
+      const post = postState.assets.find((a) => a.id === pre.id);
+      assert.ok(post, `Asset ${pre.id} disappeared`);
+      assert.equal(post.originalPath, pre.originalPath, `Path changed for asset ${pre.id}`);
+    }
+
+    // MinIO keys still exist
+    minioSetupAlias();
+    for (const a of postState.assets) {
+      assert.ok(minioFileExists(a.originalPath), `MinIO key missing: ${a.originalPath}`);
+    }
+
+    // No new move_history rows
+    const postCount = await countMoveHistory();
+    assert.equal(postCount, preCount, `move_history grew from ${preCount} to ${postCount}`);
+
+    // Log-scrape (secondary)
+    const logs = captureContainerLogsSince('immich-server', startMs);
+    assertNoMoveEnoent(logs, 'template-s3-bulk-skipped');
+
+    console.log('  Bulk template migration skipped S3 assets cleanly.');
+  } finally {
+    await setStorageTemplate(token, { enabled: false });
+  }
+  console.log('=== Phase: template-s3-bulk-skipped complete ===');
+}
+
+async function phaseTemplateS3UploadSkipped(): Promise<void> {
+  console.log('=== Phase: template-s3-upload-skipped ===');
+  const token = await loginAdmin();
+  await setStorageTemplate(token, { enabled: false });
+  const startMs = Date.now();
+
+  try {
+    await setStorageTemplate(token, { enabled: true, template: '{{y}}/{{MMMM}}/{{filename}}' });
+
+    const png = createPng();
+    const { id: newAssetId } = await uploadAsset(token, 'template-upload-skip.png', png);
+    await waitForProcessing(token);
+
+    const rows = await queryDb<{ originalPath: string }>('SELECT "originalPath" FROM asset WHERE id = $1', [
+      newAssetId,
+    ]);
+    assert.ok(rows[0], `Asset ${newAssetId} not found`);
+    const { originalPath } = rows[0];
+
+    assert.ok(!originalPath.startsWith('/'), `Expected relative path, got ${originalPath}`);
+    assert.ok(originalPath.startsWith('upload/'), `Expected upload/ prefix, got ${originalPath}`);
+
+    minioSetupAlias();
+    assert.ok(minioFileExists(originalPath), `MinIO key missing: ${originalPath}`);
+
+    const count = await countMoveHistory(newAssetId);
+    assert.equal(count, 0, `Expected 0 move_history rows for new asset, got ${count}`);
+
+    const logs = captureContainerLogsSince('immich-server', startMs);
+    assertNoMoveEnoent(logs, 'template-s3-upload-skipped');
+
+    console.log(`  New S3 upload ${newAssetId} stayed at ${originalPath}.`);
+  } finally {
+    await setStorageTemplate(token, { enabled: false });
+  }
+  console.log('=== Phase: template-s3-upload-skipped complete ===');
+}
+
+async function phaseTemplateS3LivePhotoSkipped(): Promise<void> {
+  console.log('=== Phase: template-s3-live-photo-skipped ===');
+  const token = await loginAdmin();
+  await setStorageTemplate(token, { enabled: false });
+  const startMs = Date.now();
+
+  try {
+    // Upload motion video first; then still with livePhotoVideoId linking to motion.
+    // A valid video payload is required for a ffprobe-driven asset flow, but in e2e
+    // the upload path only stores the bytes — metadata extraction handles the rest
+    // and tolerates minimal MP4 headers. A 1x1 PNG stands in fine for the still.
+    const motionBytes = Buffer.from([
+      0x00, 0x00, 0x00, 0x20, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6f, 0x6d, 0x00, 0x00, 0x02, 0x00, 0x69, 0x73, 0x6f,
+      0x6d, 0x69, 0x73, 0x6f, 0x32, 0x61, 0x76, 0x63, 0x31, 0x6d, 0x70, 0x34, 0x31,
+    ]);
+    const { id: motionId } = await uploadAsset(token, 'lp-motion.mp4', motionBytes);
+    const { id: stillId } = await uploadAsset(token, 'lp-still.png', createPng(), undefined, {
+      livePhotoVideoId: motionId,
+    });
+
+    await setStorageTemplate(token, { enabled: true, template: '{{y}}/{{MM}}/{{filename}}' });
+    await waitForProcessing(token);
+
+    const rows = await queryDb<{ id: string; originalPath: string }>(
+      'SELECT id, "originalPath" FROM asset WHERE id = ANY($1)',
+      [[motionId, stillId]],
+    );
+    assert.equal(rows.length, 2, `Expected 2 assets, got ${rows.length}`);
+    for (const r of rows) {
+      assert.ok(!r.originalPath.startsWith('/'), `Expected relative path for ${r.id}, got ${r.originalPath}`);
+      assert.ok(r.originalPath.startsWith('upload/'), `Expected upload/ prefix for ${r.id}`);
+    }
+
+    for (const id of [motionId, stillId]) {
+      const c = await countMoveHistory(id);
+      assert.equal(c, 0, `Asset ${id} has ${c} move_history rows, expected 0`);
+    }
+
+    const logs = captureContainerLogsSince('immich-server', startMs);
+    assertNoMoveEnoent(logs, 'template-s3-live-photo-skipped');
+
+    console.log(`  Live photo pair (still=${stillId}, motion=${motionId}) skipped template migration.`);
+  } finally {
+    await setStorageTemplate(token, { enabled: false });
+  }
+  console.log('=== Phase: template-s3-live-photo-skipped complete ===');
+}
+
+async function phaseTemplateS3SidecarSkipped(): Promise<void> {
+  console.log('=== Phase: template-s3-sidecar-skipped ===');
+  const token = await loginAdmin();
+  const saved = loadState();
+  assert.ok(saved.sidecarAssetId, 'No sidecarAssetId — run `setup` and `migrate-to-s3` first');
+  const sidecarAssetId: string = saved.sidecarAssetId;
+
+  await setStorageTemplate(token, { enabled: false });
+  const startMs = Date.now();
+  const preCount = await countMoveHistory(sidecarAssetId);
+
+  const preRows = await queryDb<{ id: string; path: string }>(
+    `SELECT af.id, af.path FROM asset_file af WHERE af."assetId" = $1 AND af.type = 'sidecar'`,
+    [sidecarAssetId],
+  );
+  assert.equal(preRows.length, 1, `Expected 1 sidecar row, got ${preRows.length}`);
+  const preSidecarPath = preRows[0].path;
+
+  const preAssetRows = await queryDb<{ originalPath: string }>('SELECT "originalPath" FROM asset WHERE id = $1', [
+    sidecarAssetId,
+  ]);
+  const preOriginalPath = preAssetRows[0].originalPath;
+
+  try {
+    await setStorageTemplate(token, { enabled: true, template: '{{y}}/{{MMMM}}/{{filename}}' });
+    await triggerQueueCommand(token, 'storageTemplateMigration');
+    await waitForProcessing(token);
+
+    const postRows = await queryDb<{ path: string }>(`SELECT path FROM asset_file WHERE id = $1`, [preRows[0].id]);
+    assert.equal(postRows[0].path, preSidecarPath, `Sidecar path changed`);
+
+    const postAssetRows = await queryDb<{ originalPath: string }>('SELECT "originalPath" FROM asset WHERE id = $1', [
+      sidecarAssetId,
+    ]);
+    assert.equal(postAssetRows[0].originalPath, preOriginalPath, `Original path changed`);
+
+    const postCount = await countMoveHistory(sidecarAssetId);
+    assert.equal(postCount, preCount, `move_history grew for ${sidecarAssetId}: ${preCount} → ${postCount}`);
+
+    const logs = captureContainerLogsSince('immich-server', startMs);
+    assertNoMoveEnoent(logs, 'template-s3-sidecar-skipped');
+
+    console.log(`  Sidecar asset ${sidecarAssetId} and its .xmp row both unchanged.`);
+  } finally {
+    await setStorageTemplate(token, { enabled: false });
+  }
+  console.log('=== Phase: template-s3-sidecar-skipped complete ===');
+}
+
+async function phaseTemplateS3QueueMigrationSkipped(): Promise<void> {
+  console.log('=== Phase: template-s3-queue-migration-skipped ===');
+  const token = await loginAdmin();
+  await setStorageTemplate(token, { enabled: false });
+  const startMs = Date.now();
+
+  const config = await api('GET', '/system-config', { token });
+  const originalFormat: string = config.image.thumbnail.format;
+  const flippedFormat = originalFormat === 'webp' ? 'jpeg' : 'webp';
+
+  const preThumbs = await queryDb<{ id: string; path: string }>(
+    `SELECT id, path FROM asset_file WHERE type = 'thumbnail'`,
+  );
+  const prePersons = await queryDb<{ id: string; thumbnailPath: string }>(
+    `SELECT id, "thumbnailPath" FROM person WHERE "thumbnailPath" != ''`,
+  );
+
+  try {
+    // Flip thumbnail format
+    const flipped = {
+      ...config,
+      image: { ...config.image, thumbnail: { ...config.image.thumbnail, format: flippedFormat } },
+    };
+    await api('PUT', '/system-config', { body: flipped, token });
+
+    // Trigger FileMigrationQueueAll (fans out AssetFileMigration + PersonFileMigration)
+    await triggerQueueCommand(token, 'migration');
+    await waitForProcessing(token);
+
+    // Thumbnails unchanged (still point at pre-flip extension — intended skip behavior)
+    const postThumbs = await queryDb<{ id: string; path: string }>(
+      `SELECT id, path FROM asset_file WHERE type = 'thumbnail'`,
+    );
+    assert.equal(postThumbs.length, preThumbs.length, `thumbnail row count changed`);
+    for (const pre of preThumbs) {
+      const post = postThumbs.find((r) => r.id === pre.id);
+      assert.ok(post, `thumbnail row ${pre.id} disappeared`);
+      assert.equal(post.path, pre.path, `thumbnail path changed for ${pre.id}`);
+    }
+
+    // Person thumbnails unchanged
+    const postPersons = await queryDb<{ id: string; thumbnailPath: string }>(
+      `SELECT id, "thumbnailPath" FROM person WHERE "thumbnailPath" != ''`,
+    );
+    for (const pre of prePersons) {
+      const post = postPersons.find((r) => r.id === pre.id);
+      assert.ok(post, `person ${pre.id} thumbnailPath disappeared`);
+      assert.equal(post.thumbnailPath, pre.thumbnailPath, `person ${pre.id} thumbnailPath changed`);
+    }
+
+    // Primary catch: no ENOENT from handleQueueMigration removeEmptyDirs on pure-S3
+    const logs = captureContainerLogsSince('immich-server', startMs);
+    assertNoMoveEnoent(logs, 'template-s3-queue-migration-skipped');
+
+    console.log(`  Format flipped ${originalFormat}→${flippedFormat}; DB paths stable; no ENOENT.`);
+  } finally {
+    // Restore original thumbnail format
+    const restore = await api('GET', '/system-config', { token });
+    restore.image.thumbnail.format = originalFormat;
+    await api('PUT', '/system-config', { body: restore, token });
+  }
+  console.log('=== Phase: template-s3-queue-migration-skipped complete ===');
+}
+
+async function phaseTemplateDiskBaseline(): Promise<void> {
+  console.log('=== Phase: template-disk-baseline ===');
+  const token = await loginAdmin();
+  await setStorageTemplate(token, { enabled: false });
+  const startMs = Date.now();
+
+  // Set a predictable storageLabel on admin so library paths are stable.
+  // Note: upload paths use userId (UUID), NOT storageLabel — only library paths use it.
+  //
+  // `PUT /users/me` does NOT accept storageLabel (UserUpdateMeDto omits it).
+  // Use the admin endpoint `PUT /admin/users/:id` (UserAdminUpdateDto accepts storageLabel).
+  // Admin users can update themselves via this endpoint.
+  //
+  // This write is idempotent — if a prior run on the same DB already set
+  // storageLabel='admin', the re-update is a no-op from the asset path's
+  // perspective. No teardown needed (last phase in the workflow).
+  const me = await api('GET', '/users/me', { token });
+  await api('PUT', `/admin/users/${me.id}`, { body: { storageLabel: 'admin' }, token });
+
+  // Only assert against assets created in phaseSetup — later phases
+  // (template-s3-upload-skipped, template-s3-live-photo-skipped) upload
+  // additional test assets directly to S3 that end up with non-library
+  // disk paths after migrate-to-disk, which is not the regression we're
+  // guarding here.
+  const saved = loadState();
+  const seededIds: string[] = [...(saved.adminAssetIds ?? []), ...(saved.user2AssetIds ?? [])];
+  assert.ok(seededIds.length > 0, 'No seeded asset IDs found — run `setup` first');
+
+  const preCount = await countMoveHistory();
+  const preState = await captureState();
+  const preSeeded = preState.assets.filter((a) => seededIds.includes(a.id));
+  assert.equal(
+    preSeeded.length,
+    seededIds.length,
+    `Missing seeded assets in pre-state: expected ${seededIds.length}, got ${preSeeded.length}`,
+  );
+
+  // Every seeded asset is on disk (absolute) post-rollback
+  for (const a of preSeeded) {
+    assert.ok(a.originalPath.startsWith('/'), `Pre-baseline: seeded asset ${a.id} not absolute`);
+  }
+  const preAssetPaths = new Map(preSeeded.map((a) => [a.id, a.originalPath]));
+
+  await setStorageTemplate(token, { enabled: true, template: '{{y}}/{{y}}-{{MM}}-{{dd}}/{{filename}}' });
+  await triggerQueueCommand(token, 'storageTemplateMigration');
+  await waitForProcessing(token);
+
+  const postState = await captureState();
+  const postSeeded = postState.assets.filter((a) => seededIds.includes(a.id));
+
+  // Seeded assets land under library/<storageLabel-or-userUuid>/YYYY/YYYY-MM-DD/filename.
+  // Per-user storageLabel: admin got 'admin'; user2 keeps their UUID in the path.
+  const libraryTemplatePath = /\/usr\/src\/app\/upload\/library\/[^/]+\/\d{4}\/\d{4}-\d{2}-\d{2}\//;
+  for (const a of postSeeded) {
+    assert.ok(
+      libraryTemplatePath.test(a.originalPath),
+      `Expected library/<label>/YYYY/YYYY-MM-DD/ path, got ${a.originalPath}`,
+    );
+    assert.ok(diskFileExists(a.originalPath), `New disk path missing: ${a.originalPath}`);
+
+    // Old path gone
+    const prePath = preAssetPaths.get(a.id);
+    assert.ok(prePath, `Seeded asset ${a.id} missing from pre-state`);
+    if (prePath !== a.originalPath) {
+      assert.ok(!diskFileExists(prePath), `Old disk path still exists: ${prePath}`);
+    }
+  }
+
+  // Admin's storageLabel must have taken effect — at least one seeded asset under library/admin/.
+  assert.ok(
+    postSeeded.some((a) => a.originalPath.startsWith('/usr/src/app/upload/library/admin/')),
+    'No seeded asset landed under library/admin/ — storageLabel=admin was not applied',
+  );
+
+  // Sidecar followed the asset
+  if (saved.sidecarAssetId) {
+    const sidecarAssetId: string = saved.sidecarAssetId;
+    const asset = postSeeded.find((a) => a.id === sidecarAssetId);
+    assert.ok(asset, 'Sidecar asset missing from post-state');
+    const sidecar = postState.assetFiles.find((f) => f.type === 'sidecar' && f.path.startsWith(asset.originalPath));
+    assert.ok(sidecar, `Sidecar .xmp did not follow asset to ${asset.originalPath}`);
+  }
+
+  // move_history returns to baseline (each successful move deletes its own row)
+  const postCount = await countMoveHistory();
+  assert.equal(postCount, preCount, `move_history delta: ${preCount} → ${postCount}`);
+
+  const logs = captureContainerLogsSince('immich-server', startMs);
+  assertNoMoveEnoent(logs, 'template-disk-baseline');
+
+  console.log(`  Disk template migration moved ${postSeeded.length} seeded assets to library/…`);
+  console.log('=== Phase: template-disk-baseline complete ===');
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 async function main() {
@@ -1510,9 +1902,33 @@ async function main() {
         await phaseSidecarVerify();
         break;
       }
+      case 'template-s3-bulk-skipped': {
+        await phaseTemplateS3BulkSkipped();
+        break;
+      }
+      case 'template-s3-upload-skipped': {
+        await phaseTemplateS3UploadSkipped();
+        break;
+      }
+      case 'template-s3-live-photo-skipped': {
+        await phaseTemplateS3LivePhotoSkipped();
+        break;
+      }
+      case 'template-s3-sidecar-skipped': {
+        await phaseTemplateS3SidecarSkipped();
+        break;
+      }
+      case 'template-s3-queue-migration-skipped': {
+        await phaseTemplateS3QueueMigrationSkipped();
+        break;
+      }
+      case 'template-disk-baseline': {
+        await phaseTemplateDiskBaseline();
+        break;
+      }
       default: {
         throw new Error(
-          `Unknown phase: ${phase}. Valid phases: setup, estimate, migrate-to-s3, migrate-to-disk, rollback, no-files, concurrent-rejection, selective-to-s3, selective-cleanup, delete-source-false, content-verify, sidecar-verify`,
+          `Unknown phase: ${phase}. Valid phases: setup, estimate, migrate-to-s3, migrate-to-disk, rollback, no-files, concurrent-rejection, selective-to-s3, selective-cleanup, delete-source-false, content-verify, sidecar-verify, template-s3-bulk-skipped, template-s3-upload-skipped, template-s3-live-photo-skipped, template-s3-sidecar-skipped, template-s3-queue-migration-skipped, template-disk-baseline`,
         );
       }
     }
