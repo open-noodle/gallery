@@ -31,7 +31,7 @@ import {
   mdiBroom,
   mdiCloudUploadOutline,
   mdiDeleteOutline,
-  mdiDownloadOutline,
+  mdiDownload,
   mdiExitRun,
   mdiFaceRecognition,
   mdiImageOutline,
@@ -39,9 +39,9 @@ import {
   mdiKeyboardOutline,
   mdiLogoutVariant,
   mdiPauseCircleOutline,
-  mdiPencilOutline,
   mdiPlayCircleOutline,
   mdiPlaylistPlus,
+  mdiRenameOutline,
   mdiRestore,
   mdiShareVariantOutline,
   mdiThemeLightDark,
@@ -232,7 +232,7 @@ export const COMMAND_ITEMS: readonly CommandItem[] = [
     id: 'cmd:album_rename',
     labelKey: 'cmdk_cmd_album_rename_label',
     descriptionKey: 'cmdk_cmd_album_rename_description',
-    icon: mdiPencilOutline,
+    icon: mdiRenameOutline,
     isAvailable: (ctx) => ctx.album !== null && ctx.album.isOwner,
     handler: (ctx) => {
       if (!ctx?.album) return;
@@ -254,7 +254,7 @@ export const COMMAND_ITEMS: readonly CommandItem[] = [
     id: 'cmd:album_download',
     labelKey: 'cmdk_cmd_album_download_label',
     descriptionKey: 'cmdk_cmd_album_download_description',
-    icon: mdiDownloadOutline,
+    icon: mdiDownload,
     isAvailable: (ctx) => ctx.album !== null,
     handler: (ctx) => {
       if (!ctx?.album) return;
@@ -269,7 +269,11 @@ export const COMMAND_ITEMS: readonly CommandItem[] = [
     destructive: true,
     isAvailable: (ctx) => ctx.album !== null && !ctx.album.isOwner && ctx.album.isMember,
     handler: async (ctx) => {
-      if (!ctx?.album || !ctx.userId) return;
+      if (!ctx?.album) return;
+      if (!ctx.userId) {
+        console.warn('[cmdk] cmd:album_leave missing userId — context misconfigured');
+        return;
+      }
       const $t = get(t);
       try {
         await removeUserFromAlbum({ id: ctx.album.id, userId: ctx.userId });
