@@ -31,6 +31,7 @@ class DeepContent extends ConsumerWidget {
           ListView(
             key: const PageStorageKey('filter-sheet-deep-scroll'),
             controller: scrollController,
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             padding: const EdgeInsets.only(bottom: 88),
             children: [
               const KeyedSubtree(key: Key('deep-header'), child: DeepHeader()),

@@ -15,6 +15,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/constants/constants.dart';
 import 'package:immich_mobile/constants/locales.dart';
 import 'package:immich_mobile/domain/services/background_worker.service.dart';
+import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/generated/codegen_loader.g.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
@@ -203,7 +204,10 @@ class ImmichAppState extends ConsumerState<ImmichApp> with WidgetsBindingObserve
 
     return DeepLink([
       // we need something to segue back to if the app was cold started
-      if (isColdStart) const TabShellRoute(children: [MainTimelineRoute()]),
+      if (isColdStart)
+        Store.isBetaTimelineEnabled
+            ? const GalleryTabShellRoute()
+            : const TabShellRoute(children: [MainTimelineRoute()]),
       route,
     ]);
   }
