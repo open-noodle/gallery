@@ -29,6 +29,7 @@ class BrowseContent extends ConsumerWidget {
         children: [
           ListView(
             controller: scrollController,
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             children: [
               const DragHandle(),
               Padding(
