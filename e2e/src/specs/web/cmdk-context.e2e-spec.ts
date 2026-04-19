@@ -3,8 +3,20 @@ import { expect, test, type Page } from '@playwright/test';
 import { createUserDto } from 'src/fixtures';
 import { utils } from 'src/utils';
 
-const openPalette = async (page: Page) => {
+// Navigate to /photos first so the SvelteKit layout hydrates and the
+// cmdk-trigger in the navbar is attached, then to the target route.
+// Direct navigation to /albums/:id or /spaces/:id doesn't reliably hit the
+// hydration point within the 60s test timeout under CI worker load.
+const gotoWithHydration = async (page: Page, target: string) => {
+  await page.goto('/photos');
   await page.getByTestId('cmdk-trigger').waitFor({ state: 'visible' });
+  if (target !== '/photos') {
+    await page.goto(target);
+    await page.getByTestId('cmdk-trigger').waitFor({ state: 'visible' });
+  }
+};
+
+const openPalette = async (page: Page) => {
   await page.keyboard.press('Control+k');
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
@@ -32,7 +44,7 @@ test.describe('cmdk context commands (v1.4)', () => {
   test('Case 1 — album context: owner sees rename/share/download/delete, not leave', async ({ context, page }) => {
     const album = await utils.createAlbum(owner.accessToken, { albumName: 'Case1 Album' });
     await utils.setAuthCookies(context, owner.accessToken);
-    await page.goto(`/albums/${album.id}`);
+    await gotoWithHydration(page, `/albums/${album.id}`);
     const dialog = await openPalette(page);
     await dialog.getByRole('combobox').fill('>');
     await expect(dialog.locator('[data-cmdk-commands-section]')).toBeVisible();
@@ -46,7 +58,7 @@ test.describe('cmdk context commands (v1.4)', () => {
 
   test('Case 2 — context hidden off-route: no album/space verbs on /photos', async ({ context, page }) => {
     await utils.setAuthCookies(context, owner.accessToken);
-    await page.goto('/photos');
+    await gotoWithHydration(page, '/photos');
     const dialog = await openPalette(page);
     await dialog.getByRole('combobox').fill('>');
     await expect(dialog.locator('[data-cmdk-commands-section]')).toBeVisible();
@@ -57,7 +69,7 @@ test.describe('cmdk context commands (v1.4)', () => {
   test('Case 3 — ownership gating: member sees leave, not delete/rename/share', async ({ context, page }) => {
     const album = await utils.cmdkCreateAndShareAlbum(owner.accessToken, member.userId, 'Case3 Album');
     await utils.setAuthCookies(context, member.accessToken);
-    await page.goto(`/albums/${album.id}`);
+    await gotoWithHydration(page, `/albums/${album.id}`);
     const dialog = await openPalette(page);
     await dialog.getByRole('combobox').fill('>');
     await expect(dialog.locator('[data-cmdk-commands-section]')).toBeVisible();
@@ -71,7 +83,7 @@ test.describe('cmdk context commands (v1.4)', () => {
     const albumName = 'Case4 Doomed Album';
     const album = await utils.createAlbum(owner.accessToken, { albumName });
     await utils.setAuthCookies(context, owner.accessToken);
-    await page.goto(`/albums/${album.id}`);
+    await gotoWithHydration(page, `/albums/${album.id}`);
     const dialog = await openPalette(page);
     await dialog.getByRole('combobox').fill('>delete');
     await expect(dialog.locator('[data-cmdk-commands-section]')).toBeVisible();
@@ -98,7 +110,7 @@ test.describe('cmdk context commands (v1.4)', () => {
     const albumName = 'Case5 Survivor Album';
     const album = await utils.createAlbum(owner.accessToken, { albumName });
     await utils.setAuthCookies(context, owner.accessToken);
-    await page.goto(`/albums/${album.id}`);
+    await gotoWithHydration(page, `/albums/${album.id}`);
     const dialog = await openPalette(page);
     await dialog.getByRole('combobox').fill('>delete');
     await expect(dialog.getByText(/Delete this album/i)).toBeVisible();
@@ -119,7 +131,7 @@ test.describe('cmdk context commands (v1.4)', () => {
 
   test('Case 7 — close-on-navigate: palette is gone after a route change', async ({ context, page }) => {
     await utils.setAuthCookies(context, owner.accessToken);
-    await page.goto('/photos');
+    await gotoWithHydration(page, '/photos');
     const dialog = await openPalette(page);
     await expect(dialog).toBeVisible();
     // SPA-level navigation via the browser history API (dispatched inside the page
@@ -138,7 +150,7 @@ test.describe('cmdk context commands (v1.4)', () => {
   test('Case 8 — sub-route context: space verbs show on /spaces/[id]/people', async ({ context, page }) => {
     const space = await utils.createSpace(owner.accessToken, { name: 'Case8 Space' });
     await utils.setAuthCookies(context, owner.accessToken);
-    await page.goto(`/spaces/${space.id}/people`);
+    await gotoWithHydration(page, `/spaces/${space.id}/people`);
     const dialog = await openPalette(page);
     await dialog.getByRole('combobox').fill('>');
     await expect(dialog.locator('[data-cmdk-commands-section]')).toBeVisible();
@@ -153,7 +165,7 @@ test.describe('cmdk context commands (v1.4)', () => {
       role: SharedSpaceRole.Editor,
     });
     await utils.setAuthCookies(context, member.accessToken);
-    await page.goto(`/spaces/${space.id}`);
+    await gotoWithHydration(page, `/spaces/${space.id}`);
     const dialog = await openPalette(page);
     await dialog.getByRole('combobox').fill('>leave');
     await expect(dialog.getByText(/Leave this space/i)).toBeVisible();
