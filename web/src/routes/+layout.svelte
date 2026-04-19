@@ -4,6 +4,7 @@
   import { shortcut, shortcuts } from '$lib/actions/shortcut';
   import GlobalSearch from '$lib/components/global-search/global-search.svelte';
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
+  import { closePaletteOnNavigate } from '$lib/managers/close-palette-on-navigate';
   import { globalSearchManager, type SearchMode } from '$lib/managers/global-search-manager.svelte';
   import DownloadPanel from './DownloadPanel.svelte';
   import ErrorLayout from './ErrorLayout.svelte';
@@ -197,6 +198,8 @@
   afterNavigate(() => {
     showNavigationLoadingBar = false;
   });
+
+  afterNavigate(closePaletteOnNavigate);
 
   const { serverRestarting } = websocketStore;
 
