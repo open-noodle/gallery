@@ -1766,25 +1766,41 @@ async function phaseTemplateDiskBaseline(): Promise<void> {
   const me = await api('GET', '/users/me', { token });
   await api('PUT', `/admin/users/${me.id}`, { body: { storageLabel: 'admin' }, token });
 
+  // Only assert against assets created in phaseSetup — later phases
+  // (template-s3-upload-skipped, template-s3-live-photo-skipped) upload
+  // additional test assets directly to S3 that end up with non-library
+  // disk paths after migrate-to-disk, which is not the regression we're
+  // guarding here.
+  const saved = loadState();
+  const seededIds: string[] = [...(saved.adminAssetIds ?? []), ...(saved.user2AssetIds ?? [])];
+  assert.ok(seededIds.length > 0, 'No seeded asset IDs found — run `setup` first');
+
   const preCount = await countMoveHistory();
   const preState = await captureState();
+  const preSeeded = preState.assets.filter((a) => seededIds.includes(a.id));
+  assert.equal(
+    preSeeded.length,
+    seededIds.length,
+    `Missing seeded assets in pre-state: expected ${seededIds.length}, got ${preSeeded.length}`,
+  );
 
-  // Every asset is on disk (absolute) post-rollback
-  for (const a of preState.assets) {
-    assert.ok(a.originalPath.startsWith('/'), `Pre-baseline: asset ${a.id} not absolute`);
+  // Every seeded asset is on disk (absolute) post-rollback
+  for (const a of preSeeded) {
+    assert.ok(a.originalPath.startsWith('/'), `Pre-baseline: seeded asset ${a.id} not absolute`);
   }
-  const preAssetPaths = new Map(preState.assets.map((a) => [a.id, a.originalPath]));
+  const preAssetPaths = new Map(preSeeded.map((a) => [a.id, a.originalPath]));
 
   await setStorageTemplate(token, { enabled: true, template: '{{y}}/{{y}}-{{MM}}-{{dd}}/{{filename}}' });
   await triggerQueueCommand(token, 'storageTemplateMigration');
   await waitForProcessing(token);
 
   const postState = await captureState();
+  const postSeeded = postState.assets.filter((a) => seededIds.includes(a.id));
 
-  // All assets land under library/<storageLabel-or-userUuid>/YYYY/YYYY-MM-DD/filename.
-  // Per-user storageLabel: admin got 'admin'; other users keep their UUID in the path.
+  // Seeded assets land under library/<storageLabel-or-userUuid>/YYYY/YYYY-MM-DD/filename.
+  // Per-user storageLabel: admin got 'admin'; user2 keeps their UUID in the path.
   const libraryTemplatePath = /\/usr\/src\/app\/upload\/library\/[^/]+\/\d{4}\/\d{4}-\d{2}-\d{2}\//;
-  for (const a of postState.assets) {
+  for (const a of postSeeded) {
     assert.ok(
       libraryTemplatePath.test(a.originalPath),
       `Expected library/<label>/YYYY/YYYY-MM-DD/ path, got ${a.originalPath}`,
@@ -1793,23 +1809,22 @@ async function phaseTemplateDiskBaseline(): Promise<void> {
 
     // Old path gone
     const prePath = preAssetPaths.get(a.id);
-    assert.ok(prePath, `Asset ${a.id} missing from pre-state`);
+    assert.ok(prePath, `Seeded asset ${a.id} missing from pre-state`);
     if (prePath !== a.originalPath) {
       assert.ok(!diskFileExists(prePath), `Old disk path still exists: ${prePath}`);
     }
   }
 
-  // Admin's storageLabel must have taken effect — at least one asset under library/admin/.
+  // Admin's storageLabel must have taken effect — at least one seeded asset under library/admin/.
   assert.ok(
-    postState.assets.some((a) => a.originalPath.startsWith('/usr/src/app/upload/library/admin/')),
-    'No asset landed under library/admin/ — storageLabel=admin was not applied',
+    postSeeded.some((a) => a.originalPath.startsWith('/usr/src/app/upload/library/admin/')),
+    'No seeded asset landed under library/admin/ — storageLabel=admin was not applied',
   );
 
   // Sidecar followed the asset
-  const saved = loadState();
   if (saved.sidecarAssetId) {
     const sidecarAssetId: string = saved.sidecarAssetId;
-    const asset = postState.assets.find((a) => a.id === sidecarAssetId);
+    const asset = postSeeded.find((a) => a.id === sidecarAssetId);
     assert.ok(asset, 'Sidecar asset missing from post-state');
     const sidecar = postState.assetFiles.find((f) => f.type === 'sidecar' && f.path.startsWith(asset.originalPath));
     assert.ok(sidecar, `Sidecar .xmp did not follow asset to ${asset.originalPath}`);
@@ -1822,7 +1837,7 @@ async function phaseTemplateDiskBaseline(): Promise<void> {
   const logs = captureContainerLogsSince('immich-server', startMs);
   assertNoMoveEnoent(logs, 'template-disk-baseline');
 
-  console.log(`  Disk template migration moved ${postState.assets.length} assets to library/admin/…`);
+  console.log(`  Disk template migration moved ${postSeeded.length} seeded assets to library/…`);
   console.log('=== Phase: template-disk-baseline complete ===');
 }
 
