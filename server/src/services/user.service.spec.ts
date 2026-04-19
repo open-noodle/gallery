@@ -6,6 +6,7 @@ import { UserAdmin } from 'src/database';
 import { CacheControl, JobName, JobStatus, UserMetadataKey } from 'src/enum';
 import { StorageService } from 'src/services/storage.service';
 import { UserService } from 'src/services/user.service';
+import { clearConfigCache } from 'src/utils/config';
 import { ImmichFileResponse } from 'src/utils/file';
 import { AuthFactory } from 'test/factories/auth.factory';
 import { UserFactory } from 'test/factories/user.factory';
@@ -101,6 +102,22 @@ describe(UserService.name, () => {
       ]);
 
       expect(mocks.user.getList).toHaveBeenCalledWith({ withDeleted: false });
+    });
+
+    // Regression guard: userService.search must read config from cache, not rebuild
+    // it per request. The uncached path runs class-transformer + class-validator over
+    // the full nested SystemConfigDto and adds ~1-3s per call on slower CPUs.
+    it('should read system config from cache across requests', async () => {
+      clearConfigCache();
+      const user = UserFactory.create();
+      const auth = AuthFactory.create(user);
+      mocks.user.getList.mockResolvedValue([user]);
+
+      await sut.search(auth);
+      await sut.search(auth);
+      await sut.search(auth);
+
+      expect(mocks.systemMetadata.get).toHaveBeenCalledTimes(1);
     });
   });
 
