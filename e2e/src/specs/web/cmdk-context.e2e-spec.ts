@@ -1,7 +1,15 @@
 import { SharedSpaceRole, type LoginResponseDto } from '@immich/sdk';
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { createUserDto } from 'src/fixtures';
 import { utils } from 'src/utils';
+
+const openPalette = async (page: Page) => {
+  await page.getByTestId('cmdk-trigger').waitFor({ state: 'visible' });
+  await page.keyboard.press('Control+k');
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  return dialog;
+};
 
 // Task 30 — cmdk v1.4 context commands + destructive confirm E2E.
 //
@@ -20,14 +28,6 @@ test.describe('cmdk context commands (v1.4)', () => {
     owner = await utils.userSetup(admin.accessToken, createUserDto.user1);
     member = await utils.userSetup(admin.accessToken, createUserDto.user2);
   });
-
-  const openPalette = async (page: import('@playwright/test').Page) => {
-    await page.getByTestId('cmdk-trigger').waitFor({ state: 'visible' });
-    await page.keyboard.press('Control+k');
-    const dialog = page.getByRole('dialog');
-    await expect(dialog).toBeVisible();
-    return dialog;
-  };
 
   test('Case 1 — album context: owner sees rename/share/download/delete, not leave', async ({
     context,
@@ -132,8 +132,8 @@ test.describe('cmdk context commands (v1.4)', () => {
     // SPA-level navigation via the browser history API (dispatched inside the page
     // context so SvelteKit's client-side router handles it and afterNavigate fires).
     await page.evaluate(() => {
-      window.history.pushState({}, '', '/albums');
-      window.dispatchEvent(new PopStateEvent('popstate'));
+      globalThis.history.pushState({}, '', '/albums');
+      globalThis.dispatchEvent(new PopStateEvent('popstate'));
     });
     // Belt-and-braces: confirm the SPA nav actually landed, then assert the
     // dialog is gone. Without the URL check a dialog closing for an unrelated
