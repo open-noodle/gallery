@@ -199,6 +199,7 @@ from
       and "asset"."deletedAt" is null
       and "asset"."isOffline" = $2
       and "asset"."type" = $3
+      and "asset"."thumbhash" is not null
     union
     select
       "asset"."id",
@@ -212,6 +213,7 @@ from
       and "asset"."deletedAt" is null
       and "asset"."isOffline" = $5
       and "asset"."type" = $6
+      and "asset"."thumbhash" is not null
   ) as "combined"
 order by
   "combined"."fileCreatedAt" desc

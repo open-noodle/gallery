@@ -176,6 +176,8 @@ describe('/shared-spaces', () => {
       });
       const imageAsset = await utils.createAsset(user3.accessToken);
       await utils.addSpaceAssets(user3.accessToken, space.id, [videoAsset.id, imageAsset.id]);
+      // recent assets are filtered to those with a thumbhash; wait for thumbnail generation
+      await utils.waitForQueueFinish(admin.accessToken, 'thumbnailGeneration');
 
       const { body } = await request(app)
         .get(`/shared-spaces/${space.id}`)
