@@ -1634,6 +1634,55 @@ async function phaseTemplateS3LivePhotoSkipped(): Promise<void> {
   console.log('=== Phase: template-s3-live-photo-skipped complete ===');
 }
 
+async function phaseTemplateS3SidecarSkipped(): Promise<void> {
+  console.log('=== Phase: template-s3-sidecar-skipped ===');
+  const token = await loginAdmin();
+  const saved = loadState();
+  assert.ok(saved.sidecarAssetId, 'No sidecarAssetId — run `setup` and `migrate-to-s3` first');
+  const sidecarAssetId: string = saved.sidecarAssetId;
+
+  await setStorageTemplate(token, { enabled: false });
+  const startMs = Date.now();
+  const preCount = await countMoveHistory(sidecarAssetId);
+
+  const preRows = await queryDb<{ id: string; path: string }>(
+    `SELECT af.id, af.path FROM asset_file af WHERE af."assetId" = $1 AND af.type = 'sidecar'`,
+    [sidecarAssetId],
+  );
+  assert.equal(preRows.length, 1, `Expected 1 sidecar row, got ${preRows.length}`);
+  const preSidecarPath = preRows[0].path;
+
+  const preAssetRows = await queryDb<{ originalPath: string }>('SELECT "originalPath" FROM asset WHERE id = $1', [
+    sidecarAssetId,
+  ]);
+  const preOriginalPath = preAssetRows[0].originalPath;
+
+  try {
+    await setStorageTemplate(token, { enabled: true, template: '{{y}}/{{MMMM}}/{{filename}}' });
+    await triggerQueueCommand(token, 'storageTemplateMigration');
+    await waitForProcessing(token);
+
+    const postRows = await queryDb<{ path: string }>(`SELECT path FROM asset_file WHERE id = $1`, [preRows[0].id]);
+    assert.equal(postRows[0].path, preSidecarPath, `Sidecar path changed`);
+
+    const postAssetRows = await queryDb<{ originalPath: string }>('SELECT "originalPath" FROM asset WHERE id = $1', [
+      sidecarAssetId,
+    ]);
+    assert.equal(postAssetRows[0].originalPath, preOriginalPath, `Original path changed`);
+
+    const postCount = await countMoveHistory(sidecarAssetId);
+    assert.equal(postCount, preCount, `move_history grew for ${sidecarAssetId}: ${preCount} → ${postCount}`);
+
+    const logs = captureContainerLogsSince('immich-server', startMs);
+    assertNoMoveEnoent(logs, 'template-s3-sidecar-skipped');
+
+    console.log(`  Sidecar asset ${sidecarAssetId} and its .xmp row both unchanged.`);
+  } finally {
+    await setStorageTemplate(token, { enabled: false });
+  }
+  console.log('=== Phase: template-s3-sidecar-skipped complete ===');
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -1707,9 +1756,13 @@ async function main() {
         await phaseTemplateS3LivePhotoSkipped();
         break;
       }
+      case 'template-s3-sidecar-skipped': {
+        await phaseTemplateS3SidecarSkipped();
+        break;
+      }
       default: {
         throw new Error(
-          `Unknown phase: ${phase}. Valid phases: setup, estimate, migrate-to-s3, migrate-to-disk, rollback, no-files, concurrent-rejection, selective-to-s3, selective-cleanup, delete-source-false, content-verify, sidecar-verify, template-s3-bulk-skipped, template-s3-upload-skipped, template-s3-live-photo-skipped`,
+          `Unknown phase: ${phase}. Valid phases: setup, estimate, migrate-to-s3, migrate-to-disk, rollback, no-files, concurrent-rejection, selective-to-s3, selective-cleanup, delete-source-false, content-verify, sidecar-verify, template-s3-bulk-skipped, template-s3-upload-skipped, template-s3-live-photo-skipped, template-s3-sidecar-skipped`,
         );
       }
     }
