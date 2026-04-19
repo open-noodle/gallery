@@ -121,6 +121,39 @@ describe(StorageTemplateService.name, () => {
       expect(mocks.asset.update).not.toHaveBeenCalled();
     });
 
+    it('should migrate a disk still photo and skip its S3 motion video', async () => {
+      const motion = AssetFactory.from({
+        type: AssetType.Video,
+        originalPath: 'upload/user/ab/cd/motion.mp4', // relative — on S3
+        fileCreatedAt: new Date('2022-06-19T23:41:36.910Z'),
+      })
+        .exif()
+        .build();
+      const still = AssetFactory.from({
+        livePhotoVideoId: motion.id,
+        originalPath: '/data/upload/user/ab/cd/still.jpg', // absolute — on disk
+        fileCreatedAt: new Date('2022-06-19T23:41:36.910Z'),
+      })
+        .exif()
+        .build();
+
+      mocks.user.get.mockResolvedValue(userStub.user1);
+      mocks.assetJob.getForStorageTemplateJob.mockResolvedValueOnce(getForStorageTemplate(still));
+      mocks.assetJob.getForStorageTemplateJob.mockResolvedValueOnce(getForStorageTemplate(motion));
+      mocks.move.create.mockResolvedValueOnce({
+        id: 'move-1',
+        entityId: still.id,
+        pathType: AssetPathType.Original,
+        oldPath: still.originalPath,
+        newPath: `/data/library/${still.ownerId}/2022/2022-06-19/${still.originalFileName}`,
+      });
+
+      await expect(sut.handleMigrationSingle({ id: still.id })).resolves.toBe(JobStatus.Success);
+      expect(mocks.storage.rename).toHaveBeenCalledTimes(1); // only the still
+      expect(mocks.storage.rename).toHaveBeenCalledWith(still.originalPath, expect.any(String));
+      expect(mocks.move.create).toHaveBeenCalledTimes(1);
+    });
+
     it('should migrate single moving picture', async () => {
       const motionAsset = AssetFactory.from({
         type: AssetType.Video,
@@ -622,6 +655,16 @@ describe(StorageTemplateService.name, () => {
       expect(mocks.assetJob.streamForStorageTemplateJob).toHaveBeenCalled();
     });
 
+    it('should not throw when library folder does not exist on S3 deployments', async () => {
+      mocks.assetJob.streamForStorageTemplateJob.mockReturnValue(makeStream([]));
+      mocks.user.getList.mockResolvedValue([]);
+      mocks.storage.checkFileExists.mockResolvedValue(false);
+
+      await expect(sut.handleMigration()).resolves.toBe(JobStatus.Success);
+
+      expect(mocks.storage.removeEmptyDirs).not.toHaveBeenCalled();
+    });
+
     it('should handle an asset with a duplicate destination', async () => {
       const asset = AssetFactory.from({
         fileCreatedAt: new Date('2022-06-19T23:41:36.910Z'),
@@ -649,7 +692,7 @@ describe(StorageTemplateService.name, () => {
       await sut.handleMigration();
 
       expect(mocks.assetJob.streamForStorageTemplateJob).toHaveBeenCalled();
-      expect(mocks.storage.checkFileExists).toHaveBeenCalledTimes(2);
+      expect(mocks.storage.checkFileExists).toHaveBeenCalledTimes(3); // 2 for duplicate detection + 1 for library folder pre-check
       expect(mocks.asset.update).toHaveBeenCalledWith({ id: asset.id, originalPath: newPath2 });
       expect(mocks.user.getList).toHaveBeenCalled();
     });
@@ -669,7 +712,6 @@ describe(StorageTemplateService.name, () => {
       expect(mocks.assetJob.streamForStorageTemplateJob).toHaveBeenCalled();
       expect(mocks.storage.rename).not.toHaveBeenCalled();
       expect(mocks.storage.copyFile).not.toHaveBeenCalled();
-      expect(mocks.storage.checkFileExists).not.toHaveBeenCalledTimes(2);
       expect(mocks.asset.update).not.toHaveBeenCalled();
     });
 
@@ -688,8 +730,22 @@ describe(StorageTemplateService.name, () => {
       expect(mocks.assetJob.streamForStorageTemplateJob).toHaveBeenCalled();
       expect(mocks.storage.rename).not.toHaveBeenCalled();
       expect(mocks.storage.copyFile).not.toHaveBeenCalled();
-      expect(mocks.storage.checkFileExists).not.toHaveBeenCalledTimes(2);
       expect(mocks.asset.update).not.toHaveBeenCalled();
+    });
+
+    it('should skip S3 assets with relative paths during bulk migration', async () => {
+      const asset = AssetFactory.from({ originalPath: 'upload/user/ab/cd/file.jpg' }).exif().build();
+
+      mocks.assetJob.streamForStorageTemplateJob.mockReturnValue(makeStream([getForStorageTemplate(asset)]));
+      mocks.user.getList.mockResolvedValue([userStub.user1]);
+
+      await sut.handleMigration();
+
+      expect(mocks.storage.rename).not.toHaveBeenCalled();
+      expect(mocks.storage.copyFile).not.toHaveBeenCalled();
+      expect(mocks.asset.update).not.toHaveBeenCalled();
+      expect(mocks.move.create).not.toHaveBeenCalled();
+      expect(mocks.storage.stat).not.toHaveBeenCalled();
     });
 
     it('should move an asset', async () => {
@@ -917,7 +973,7 @@ describe(StorageTemplateService.name, () => {
       await sut.handleMigration();
 
       expect(mocks.assetJob.streamForStorageTemplateJob).toHaveBeenCalled();
-      expect(mocks.storage.checkFileExists).toHaveBeenCalledTimes(2);
+      expect(mocks.storage.checkFileExists).toHaveBeenCalledTimes(3); // 2 for path lookups + 1 for library folder pre-check
       expect(mocks.asset.update).toHaveBeenCalledWith({ id: stillAsset.id, originalPath: newStillPicturePath });
       expect(mocks.asset.update).toHaveBeenCalledWith({ id: motionAsset.id, originalPath: newMotionPicturePath });
     });
