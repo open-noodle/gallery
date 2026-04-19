@@ -187,7 +187,7 @@ export class SharedSpaceResponseDto {
   recentAssetIds?: string[];
 
   @ApiPropertyOptional({ description: 'Thumbhashes for recent assets (parallel array)', type: [String] })
-  recentAssetThumbhashes?: (string | null)[];
+  recentAssetThumbhashes?: string[];
 
   @ApiPropertyOptional({ description: 'Space members (summary)', type: [SharedSpaceMemberResponseDto] })
   members?: SharedSpaceMemberResponseDto[];
