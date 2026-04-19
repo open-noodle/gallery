@@ -1683,6 +1683,70 @@ async function phaseTemplateS3SidecarSkipped(): Promise<void> {
   console.log('=== Phase: template-s3-sidecar-skipped complete ===');
 }
 
+async function phaseTemplateS3QueueMigrationSkipped(): Promise<void> {
+  console.log('=== Phase: template-s3-queue-migration-skipped ===');
+  const token = await loginAdmin();
+  await setStorageTemplate(token, { enabled: false });
+  const startMs = Date.now();
+
+  const config = await api('GET', '/system-config', { token });
+  const originalFormat: string = config.image.thumbnail.format;
+  const flippedFormat = originalFormat === 'webp' ? 'jpeg' : 'webp';
+
+  const preThumbs = await queryDb<{ id: string; path: string }>(
+    `SELECT id, path FROM asset_file WHERE type = 'thumbnail'`,
+  );
+  const prePersons = await queryDb<{ id: string; thumbnailPath: string }>(
+    `SELECT id, "thumbnailPath" FROM person WHERE "thumbnailPath" != ''`,
+  );
+
+  try {
+    // Flip thumbnail format
+    const flipped = {
+      ...config,
+      image: { ...config.image, thumbnail: { ...config.image.thumbnail, format: flippedFormat } },
+    };
+    await api('PUT', '/system-config', { body: flipped, token });
+
+    // Trigger FileMigrationQueueAll (fans out AssetFileMigration + PersonFileMigration)
+    await triggerQueueCommand(token, 'migration');
+    await waitForProcessing(token);
+
+    // Thumbnails unchanged (still point at pre-flip extension — intended skip behavior)
+    const postThumbs = await queryDb<{ id: string; path: string }>(
+      `SELECT id, path FROM asset_file WHERE type = 'thumbnail'`,
+    );
+    assert.equal(postThumbs.length, preThumbs.length, `thumbnail row count changed`);
+    for (const pre of preThumbs) {
+      const post = postThumbs.find((r) => r.id === pre.id);
+      assert.ok(post, `thumbnail row ${pre.id} disappeared`);
+      assert.equal(post.path, pre.path, `thumbnail path changed for ${pre.id}`);
+    }
+
+    // Person thumbnails unchanged
+    const postPersons = await queryDb<{ id: string; thumbnailPath: string }>(
+      `SELECT id, "thumbnailPath" FROM person WHERE "thumbnailPath" != ''`,
+    );
+    for (const pre of prePersons) {
+      const post = postPersons.find((r) => r.id === pre.id);
+      assert.ok(post, `person ${pre.id} thumbnailPath disappeared`);
+      assert.equal(post.thumbnailPath, pre.thumbnailPath, `person ${pre.id} thumbnailPath changed`);
+    }
+
+    // Primary catch: no ENOENT from handleQueueMigration removeEmptyDirs on pure-S3
+    const logs = captureContainerLogsSince('immich-server', startMs);
+    assertNoMoveEnoent(logs, 'template-s3-queue-migration-skipped');
+
+    console.log(`  Format flipped ${originalFormat}→${flippedFormat}; DB paths stable; no ENOENT.`);
+  } finally {
+    // Restore original thumbnail format
+    const restore = await api('GET', '/system-config', { token });
+    restore.image.thumbnail.format = originalFormat;
+    await api('PUT', '/system-config', { body: restore, token });
+  }
+  console.log('=== Phase: template-s3-queue-migration-skipped complete ===');
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -1760,9 +1824,13 @@ async function main() {
         await phaseTemplateS3SidecarSkipped();
         break;
       }
+      case 'template-s3-queue-migration-skipped': {
+        await phaseTemplateS3QueueMigrationSkipped();
+        break;
+      }
       default: {
         throw new Error(
-          `Unknown phase: ${phase}. Valid phases: setup, estimate, migrate-to-s3, migrate-to-disk, rollback, no-files, concurrent-rejection, selective-to-s3, selective-cleanup, delete-source-false, content-verify, sidecar-verify, template-s3-bulk-skipped, template-s3-upload-skipped, template-s3-live-photo-skipped, template-s3-sidecar-skipped`,
+          `Unknown phase: ${phase}. Valid phases: setup, estimate, migrate-to-s3, migrate-to-disk, rollback, no-files, concurrent-rejection, selective-to-s3, selective-cleanup, delete-source-false, content-verify, sidecar-verify, template-s3-bulk-skipped, template-s3-upload-skipped, template-s3-live-photo-skipped, template-s3-sidecar-skipped, template-s3-queue-migration-skipped`,
         );
       }
     }
