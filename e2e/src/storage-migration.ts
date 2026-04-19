@@ -1747,6 +1747,76 @@ async function phaseTemplateS3QueueMigrationSkipped(): Promise<void> {
   console.log('=== Phase: template-s3-queue-migration-skipped complete ===');
 }
 
+async function phaseTemplateDiskBaseline(): Promise<void> {
+  console.log('=== Phase: template-disk-baseline ===');
+  const token = await loginAdmin();
+  await setStorageTemplate(token, { enabled: false });
+  const startMs = Date.now();
+
+  // Set a predictable storageLabel on admin so library paths are stable.
+  // Note: upload paths use userId (UUID), NOT storageLabel — only library paths use it.
+  //
+  // `PUT /users/me` does NOT accept storageLabel (UserUpdateMeDto omits it).
+  // Use the admin endpoint `PUT /admin/users/:id` (UserAdminUpdateDto accepts storageLabel).
+  // Admin users can update themselves via this endpoint.
+  //
+  // This write is idempotent — if a prior run on the same DB already set
+  // storageLabel='admin', the re-update is a no-op from the asset path's
+  // perspective. No teardown needed (last phase in the workflow).
+  const me = await api('GET', '/users/me', { token });
+  await api('PUT', `/admin/users/${me.id}`, { body: { storageLabel: 'admin' }, token });
+
+  const preCount = await countMoveHistory();
+  const preState = await captureState();
+
+  // Every asset is on disk (absolute) post-rollback
+  for (const a of preState.assets) {
+    assert.ok(a.originalPath.startsWith('/'), `Pre-baseline: asset ${a.id} not absolute`);
+  }
+  const preAssetPaths = new Map(preState.assets.map((a) => [a.id, a.originalPath]));
+
+  await setStorageTemplate(token, { enabled: true, template: '{{y}}/{{y}}-{{MM}}-{{dd}}/{{filename}}' });
+  await triggerQueueCommand(token, 'storageTemplateMigration');
+  await waitForProcessing(token);
+
+  const postState = await captureState();
+
+  for (const a of postState.assets) {
+    assert.ok(
+      a.originalPath.startsWith('/usr/src/app/upload/library/admin/'),
+      `Expected library/admin/ path, got ${a.originalPath}`,
+    );
+    assert.ok(diskFileExists(a.originalPath), `New disk path missing: ${a.originalPath}`);
+
+    // Old path gone
+    const prePath = preAssetPaths.get(a.id);
+    assert.ok(prePath, `Asset ${a.id} missing from pre-state`);
+    if (prePath !== a.originalPath) {
+      assert.ok(!diskFileExists(prePath), `Old disk path still exists: ${prePath}`);
+    }
+  }
+
+  // Sidecar followed the asset
+  const saved = loadState();
+  if (saved.sidecarAssetId) {
+    const sidecarAssetId: string = saved.sidecarAssetId;
+    const asset = postState.assets.find((a) => a.id === sidecarAssetId);
+    assert.ok(asset, 'Sidecar asset missing from post-state');
+    const sidecar = postState.assetFiles.find((f) => f.type === 'sidecar' && f.path.startsWith(asset.originalPath));
+    assert.ok(sidecar, `Sidecar .xmp did not follow asset to ${asset.originalPath}`);
+  }
+
+  // move_history returns to baseline (each successful move deletes its own row)
+  const postCount = await countMoveHistory();
+  assert.equal(postCount, preCount, `move_history delta: ${preCount} → ${postCount}`);
+
+  const logs = captureContainerLogsSince('immich-server', startMs);
+  assertNoMoveEnoent(logs, 'template-disk-baseline');
+
+  console.log(`  Disk template migration moved ${postState.assets.length} assets to library/admin/…`);
+  console.log('=== Phase: template-disk-baseline complete ===');
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -1828,9 +1898,13 @@ async function main() {
         await phaseTemplateS3QueueMigrationSkipped();
         break;
       }
+      case 'template-disk-baseline': {
+        await phaseTemplateDiskBaseline();
+        break;
+      }
       default: {
         throw new Error(
-          `Unknown phase: ${phase}. Valid phases: setup, estimate, migrate-to-s3, migrate-to-disk, rollback, no-files, concurrent-rejection, selective-to-s3, selective-cleanup, delete-source-false, content-verify, sidecar-verify, template-s3-bulk-skipped, template-s3-upload-skipped, template-s3-live-photo-skipped, template-s3-sidecar-skipped, template-s3-queue-migration-skipped`,
+          `Unknown phase: ${phase}. Valid phases: setup, estimate, migrate-to-s3, migrate-to-disk, rollback, no-files, concurrent-rejection, selective-to-s3, selective-cleanup, delete-source-false, content-verify, sidecar-verify, template-s3-bulk-skipped, template-s3-upload-skipped, template-s3-live-photo-skipped, template-s3-sidecar-skipped, template-s3-queue-migration-skipped, template-disk-baseline`,
         );
       }
     }
