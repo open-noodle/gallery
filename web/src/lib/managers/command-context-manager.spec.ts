@@ -3,11 +3,11 @@ import { Role, SharedSpaceRole } from '@immich/sdk';
 import { render } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('$app/state', () => ({ page: { route: { id: null }, params: {} } }));
-
-const { mockUser } = vi.hoisted(() => ({
+const { mockPage, mockUser } = vi.hoisted(() => ({
+  mockPage: { route: { id: null as string | null }, params: {} as Record<string, string> },
   mockUser: { current: null as { id: string; isAdmin: boolean } | null },
 }));
+vi.mock('$app/state', () => ({ page: mockPage }));
 vi.mock('$lib/stores/user.store', () => ({
   user: {
     subscribe: (fn: (v: { id: string; isAdmin: boolean } | null) => void) => {
@@ -21,10 +21,15 @@ import { commandContextManager } from '$lib/managers/command-context-manager.sve
 import RegisterAlbumContextHarness from './__tests__/register-album-context-harness.svelte';
 import RegisterSpaceContextHarness from './__tests__/register-space-context-harness.svelte';
 
+const ALBUM_ROUTE = '/(user)/albums/[albumId=id]/[[photos=photos]]/[[assetId=id]]';
+const SPACE_ROUTE = '/(user)/spaces/[spaceId]/[[photos=photos]]/[[assetId=id]]';
+
 beforeEach(() => {
   commandContextManager.setAlbum(null);
   commandContextManager.setSpace(null);
   mockUser.current = null;
+  mockPage.route.id = null;
+  mockPage.params = {};
 });
 
 describe('CommandContextManager', () => {
@@ -35,6 +40,7 @@ describe('CommandContextManager', () => {
   });
 
   it('round-trips setAlbum / setSpace', () => {
+    mockPage.route.id = ALBUM_ROUTE;
     commandContextManager.setAlbum({
       id: 'a1',
       albumName: 'Test',
@@ -44,6 +50,38 @@ describe('CommandContextManager', () => {
       raw: { id: 'a1', albumName: 'Test', ownerId: 'u1' } as unknown as AlbumResponseDto,
     });
     expect(commandContextManager.getContext().album?.id).toBe('a1');
+  });
+
+  it('getContext gates album by route — stored album is hidden on non-album routes', () => {
+    commandContextManager.setAlbum({
+      id: 'a1',
+      albumName: 'Test',
+      ownerId: 'u1',
+      isOwner: true,
+      isMember: false,
+      raw: { id: 'a1' } as unknown as AlbumResponseDto,
+    });
+    mockPage.route.id = SPACE_ROUTE;
+    expect(commandContextManager.getContext().album).toBeNull();
+    mockPage.route.id = ALBUM_ROUTE;
+    expect(commandContextManager.getContext().album?.id).toBe('a1');
+  });
+
+  it('getContext gates space by route — stored space is hidden on non-space routes', () => {
+    commandContextManager.setSpace({
+      id: 's1',
+      name: 'Shared',
+      createdById: 'u1',
+      isOwner: true,
+      isMember: true,
+      canWrite: true,
+      raw: { id: 's1' } as unknown as SharedSpaceResponseDto,
+      members: [],
+    });
+    mockPage.route.id = ALBUM_ROUTE;
+    expect(commandContextManager.getContext().space).toBeNull();
+    mockPage.route.id = SPACE_ROUTE;
+    expect(commandContextManager.getContext().space?.id).toBe('s1');
   });
 
   it('params is a snapshot — mutation does not leak into next read', () => {
@@ -71,6 +109,10 @@ const makeAlbum = (overrides: Partial<AlbumResponseDto> = {}): AlbumResponseDto 
   }) as unknown as AlbumResponseDto;
 
 describe('registerAlbumContext', () => {
+  beforeEach(() => {
+    mockPage.route.id = ALBUM_ROUTE;
+  });
+
   it('sets album on mount, clears on unmount', () => {
     mockUser.current = { id: 'u-owner', isAdmin: false };
     const album = makeAlbum();
@@ -145,6 +187,10 @@ const makeMember = (overrides: Partial<SharedSpaceMemberResponseDto> = {}): Shar
   }) as unknown as SharedSpaceMemberResponseDto;
 
 describe('registerSpaceContext', () => {
+  beforeEach(() => {
+    mockPage.route.id = SPACE_ROUTE;
+  });
+
   it('sets isOwner=true when user is createdById', () => {
     mockUser.current = { id: 'u-owner', isAdmin: false };
     const space = makeSpace();

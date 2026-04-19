@@ -17,6 +17,7 @@ export const isSharedLinkRoute = (route?: string | null) =>
   !!route?.startsWith('/(user)/share/[key]') || !!route?.startsWith('/(user)/s/[slug]');
 export const isSearchRoute = (route?: string | null) => !!route?.startsWith('/(user)/search');
 export const isAlbumsRoute = (route?: string | null) => !!route?.startsWith('/(user)/albums/[albumId=id]');
+export const isSpacesRoute = (route?: string | null) => !!route?.startsWith('/(user)/spaces/[spaceId]');
 export const isPeopleRoute = (route?: string | null) => !!route?.startsWith('/(user)/people/[personId]');
 export const isLockedFolderRoute = (route?: string | null) => !!route?.startsWith('/(user)/locked');
 

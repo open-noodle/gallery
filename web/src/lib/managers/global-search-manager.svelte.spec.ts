@@ -90,6 +90,11 @@ vi.mock('$app/navigation', () => ({
   goto: vi.fn(),
 }));
 
+const { mockPage } = vi.hoisted(() => ({
+  mockPage: { route: { id: null as string | null }, params: {} as Record<string, string> },
+}));
+vi.mock('$app/state', () => ({ page: mockPage }));
+
 // Stub `@immich/ui` so `toastManager.warning` is spyable. The components that
 // use the real toast UI are not exercised in this manager-only suite; keep the
 // stub minimal (just the members the manager actually touches).
@@ -929,6 +934,7 @@ describe('activate("command")', () => {
   });
 
   it('passes CommandContext to the handler at activate time', async () => {
+    mockPage.route.id = '/(user)/albums/[albumId=id]/[[photos=photos]]/[[assetId=id]]';
     commandContextManager.setAlbum({
       id: 'a1',
       albumName: 'X',
@@ -944,6 +950,7 @@ describe('activate("command")', () => {
     expect(handler).toHaveBeenCalledOnce();
     expect(handler).toHaveBeenCalledWith(expect.objectContaining({ album: expect.objectContaining({ id: 'a1' }) }));
     commandContextManager.setAlbum(null);
+    mockPage.route.id = null;
   });
 
   it('drift guard: zero-arg v1.3 command still fires while album context registered', async () => {

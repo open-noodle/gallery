@@ -1,5 +1,6 @@
 import { page } from '$app/state';
 import { user } from '$lib/stores/user.store';
+import { isAlbumsRoute, isSpacesRoute } from '$lib/utils/navigation';
 import {
   SharedSpaceRole,
   type AlbumResponseDto,
@@ -52,14 +53,21 @@ class CommandContextManager {
     this._space = space;
   }
 
-  /** Snapshot read at provider-run time. Pure; no side effects. */
+  /**
+   * Snapshot read at provider-run time. Pure; no side effects.
+   *
+   * Album/space are gated by the current route id so a stale context left
+   * behind by a page unmount race can't leak verbs onto an unrelated page
+   * (e.g. album commands appearing while on a space).
+   */
   getContext(): CommandContext {
     const u = get(user);
+    const routeId = page.route.id;
     return {
-      routeId: page.route.id,
+      routeId,
       params: { ...page.params },
-      album: this._album,
-      space: this._space,
+      album: isAlbumsRoute(routeId) ? this._album : null,
+      space: isSpacesRoute(routeId) ? this._space : null,
       userId: u?.id ?? null,
       isAdmin: u?.isAdmin ?? false,
     };
