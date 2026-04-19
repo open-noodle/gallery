@@ -75,6 +75,13 @@ describe('/search/suggestions/filters', () => {
       await updateAsset({ id: assets[i].id, updateAssetDto: { rating } }, { headers: asBearerAuth(admin.accessToken) });
     }
 
+    // Drain again before applying tags. updateAsset() calls for coordinates and
+    // ratings above enqueue sidecar-write jobs which re-run metadata extraction.
+    // A late extraction lands after tagAssets() and calls replaceAssetTags() with
+    // the file's XMP keywords (usually empty), wiping the tags the test just set.
+    // Reliably flakes on ubuntu-24.04-arm where metadata extraction is slower.
+    await utils.waitForQueueFinish(admin.accessToken, 'metadataExtraction');
+
     // Create and apply tags using utils helpers
     const tags = await utils.upsertTags(admin.accessToken, ['nature', 'travel']);
     tagNatureId = tags[0].id;
