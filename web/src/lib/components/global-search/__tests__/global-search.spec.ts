@@ -246,6 +246,28 @@ describe('global-search root', () => {
     expect(m.isOpen).toBe(false);
   });
 
+  it('Esc while pending confirm cancels confirm but does NOT close palette', async () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    render(GlobalSearch, { props: { manager: m } });
+    const input = screen.getByRole('combobox') as HTMLInputElement;
+    // Type something so the two-stage Escape path would not close even without the
+    // pending-guard. Isolates the assertion to "pending cleared" — if the palette
+    // stays open because inputValue was non-empty, we still see pendingConfirmId
+    // cleared by the new intercept.
+    await user.type(input, 'x');
+    input.focus();
+    type WithPrivateStart = { startConfirm: (id: string) => void };
+    (m as unknown as WithPrivateStart).startConfirm('cmd:destruct_x');
+    expect(m.pendingConfirmId).toBe('cmd:destruct_x');
+    await user.keyboard('{Escape}');
+    expect(m.pendingConfirmId).toBeNull();
+    expect(m.isOpen).toBe(true);
+    // The pending-intercept path returns early, so inputValue should NOT be cleared.
+    // (In the existing two-stage Escape, non-empty input clears on Escape.)
+    expect(input.value).toBe('x');
+  });
+
   it('Ctrl+K inside the palette closes (not captured by vimBindings)', async () => {
     const m = new GlobalSearchManager();
     m.open();
