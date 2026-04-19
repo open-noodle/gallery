@@ -1548,6 +1548,44 @@ async function phaseTemplateS3BulkSkipped(): Promise<void> {
   console.log('=== Phase: template-s3-bulk-skipped complete ===');
 }
 
+async function phaseTemplateS3UploadSkipped(): Promise<void> {
+  console.log('=== Phase: template-s3-upload-skipped ===');
+  const token = await loginAdmin();
+  await setStorageTemplate(token, { enabled: false });
+  const startMs = Date.now();
+
+  try {
+    await setStorageTemplate(token, { enabled: true, template: '{{y}}/{{MMMM}}/{{filename}}' });
+
+    const png = createPng();
+    const { id: newAssetId } = await uploadAsset(token, 'template-upload-skip.png', png);
+    await waitForProcessing(token);
+
+    const rows = await queryDb<{ originalPath: string }>('SELECT "originalPath" FROM asset WHERE id = $1', [
+      newAssetId,
+    ]);
+    assert.ok(rows[0], `Asset ${newAssetId} not found`);
+    const { originalPath } = rows[0];
+
+    assert.ok(!originalPath.startsWith('/'), `Expected relative path, got ${originalPath}`);
+    assert.ok(originalPath.startsWith('upload/'), `Expected upload/ prefix, got ${originalPath}`);
+
+    minioSetupAlias();
+    assert.ok(minioFileExists(originalPath), `MinIO key missing: ${originalPath}`);
+
+    const count = await countMoveHistory(newAssetId);
+    assert.equal(count, 0, `Expected 0 move_history rows for new asset, got ${count}`);
+
+    const logs = captureContainerLogsSince('immich-server', startMs);
+    assertNoMoveEnoent(logs, 'template-s3-upload-skipped');
+
+    console.log(`  New S3 upload ${newAssetId} stayed at ${originalPath}.`);
+  } finally {
+    await setStorageTemplate(token, { enabled: false });
+  }
+  console.log('=== Phase: template-s3-upload-skipped complete ===');
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -1613,9 +1651,13 @@ async function main() {
         await phaseTemplateS3BulkSkipped();
         break;
       }
+      case 'template-s3-upload-skipped': {
+        await phaseTemplateS3UploadSkipped();
+        break;
+      }
       default: {
         throw new Error(
-          `Unknown phase: ${phase}. Valid phases: setup, estimate, migrate-to-s3, migrate-to-disk, rollback, no-files, concurrent-rejection, selective-to-s3, selective-cleanup, delete-source-false, content-verify, sidecar-verify, template-s3-bulk-skipped`,
+          `Unknown phase: ${phase}. Valid phases: setup, estimate, migrate-to-s3, migrate-to-disk, rollback, no-files, concurrent-rejection, selective-to-s3, selective-cleanup, delete-source-false, content-verify, sidecar-verify, template-s3-bulk-skipped, template-s3-upload-skipped`,
         );
       }
     }
