@@ -942,9 +942,7 @@ describe('activate("command")', () => {
     manager.activate('command', cmd);
     await flushMicrotasks();
     expect(handler).toHaveBeenCalledOnce();
-    expect(handler).toHaveBeenCalledWith(
-      expect.objectContaining({ album: expect.objectContaining({ id: 'a1' }) }),
-    );
+    expect(handler).toHaveBeenCalledWith(expect.objectContaining({ album: expect.objectContaining({ id: 'a1' }) }));
     commandContextManager.setAlbum(null);
   });
 
@@ -2269,10 +2267,7 @@ describe('commands provider', () => {
       if (section.status === 'ok') {
         expect(section.items.some((c) => c.id === throwing.id)).toBe(false);
       }
-      expect(errorSpy).toHaveBeenCalledWith(
-        '[cmdk] isAvailable threw',
-        expect.objectContaining({ id: throwing.id }),
-      );
+      expect(errorSpy).toHaveBeenCalledWith('[cmdk] isAvailable threw', expect.objectContaining({ id: throwing.id }));
     } finally {
       const idx = commandItemsMut.findIndex((c) => c.id === throwing.id);
       if (idx !== -1) commandItemsMut.splice(idx, 1);

@@ -17,14 +17,8 @@
     ? 'bg-danger/10 ring-1 ring-inset ring-danger/40'
     : 'group-data-[selected]:bg-primary/10'}"
 >
-  <div
-    class="flex h-8 w-8 items-center justify-center rounded-md {pending ? 'bg-danger/15' : 'bg-subtle/40'}"
-  >
-    <Icon
-      icon={item.icon}
-      size="1.125em"
-      class={pending ? 'text-danger' : 'text-gray-500 dark:text-gray-400'}
-    />
+  <div class="flex h-8 w-8 items-center justify-center rounded-md {pending ? 'bg-danger/15' : 'bg-subtle/40'}">
+    <Icon icon={item.icon} size="1.125em" class={pending ? 'text-danger' : 'text-gray-500 dark:text-gray-400'} />
   </div>
   <div class="min-w-0 flex-1">
     <div class="truncate text-sm font-medium">{$t(item.labelKey as Translations)}</div>

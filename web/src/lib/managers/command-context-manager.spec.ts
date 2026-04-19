@@ -134,9 +134,7 @@ const makeSpace = (overrides: Partial<SharedSpaceResponseDto> = {}): SharedSpace
     ...overrides,
   }) as unknown as SharedSpaceResponseDto;
 
-const makeMember = (
-  overrides: Partial<SharedSpaceMemberResponseDto> = {},
-): SharedSpaceMemberResponseDto =>
+const makeMember = (overrides: Partial<SharedSpaceMemberResponseDto> = {}): SharedSpaceMemberResponseDto =>
   ({
     userId: 'u-me',
     email: 'me@test.com',

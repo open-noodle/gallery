@@ -6,14 +6,9 @@ import * as albumService from '$lib/services/album.service';
 import * as albumUtils from '$lib/utils/album-utils';
 import * as fileUploader from '$lib/utils/file-uploader';
 import * as handleErrorModule from '$lib/utils/handle-error';
-import type {
-  AlbumResponseDto,
-  SharedSpaceMemberResponseDto,
-  SharedSpaceResponseDto,
-} from '@immich/sdk';
-import { Role } from '@immich/sdk';
+import type { AlbumResponseDto, SharedSpaceMemberResponseDto, SharedSpaceResponseDto } from '@immich/sdk';
 import * as sdk from '@immich/sdk';
-import { QueueCommand, QueueName } from '@immich/sdk';
+import { QueueCommand, QueueName, Role } from '@immich/sdk';
 import { modalManager, toastManager } from '@immich/ui';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import AlbumEditModal from '../modals/AlbumEditModal.svelte';
@@ -382,7 +377,9 @@ describe('album-context commands', () => {
     vi.mocked(modalManager.show).mockClear();
     vi.mocked(albumService.handleDeleteAlbum).mockReset().mockResolvedValue(true);
     vi.mocked(albumService.handleDownloadAlbum).mockReset().mockResolvedValue(undefined);
-    vi.mocked(sdk.removeUserFromAlbum).mockReset().mockResolvedValue(undefined as never);
+    vi.mocked(sdk.removeUserFromAlbum)
+      .mockReset()
+      .mockResolvedValue(undefined as never);
     vi.mocked(goto).mockReset().mockResolvedValue(undefined);
     handleErrorSpy = vi.spyOn(handleErrorModule, 'handleError').mockImplementation(() => {});
   });
@@ -519,9 +516,7 @@ describe('space-context commands', () => {
     color: 'primary',
   } as unknown as SharedSpaceResponseDto;
 
-  const makeMember = (
-    overrides: Partial<SharedSpaceMemberResponseDto> = {},
-  ): SharedSpaceMemberResponseDto =>
+  const makeMember = (overrides: Partial<SharedSpaceMemberResponseDto> = {}): SharedSpaceMemberResponseDto =>
     ({
       userId: 'u-me',
       email: 'me@test.com',
@@ -575,9 +570,15 @@ describe('space-context commands', () => {
   let handleErrorSpy: ReturnType<typeof vi.spyOn>;
   beforeEach(() => {
     vi.mocked(modalManager.show).mockClear();
-    vi.mocked(sdk.bulkAddAssets).mockReset().mockResolvedValue(undefined as never);
-    vi.mocked(sdk.removeMember).mockReset().mockResolvedValue(undefined as never);
-    vi.mocked(sdk.removeSpace).mockReset().mockResolvedValue(undefined as never);
+    vi.mocked(sdk.bulkAddAssets)
+      .mockReset()
+      .mockResolvedValue(undefined as never);
+    vi.mocked(sdk.removeMember)
+      .mockReset()
+      .mockResolvedValue(undefined as never);
+    vi.mocked(sdk.removeSpace)
+      .mockReset()
+      .mockResolvedValue(undefined as never);
     vi.mocked(goto).mockReset().mockResolvedValue(undefined);
     vi.mocked(toastManager.primary).mockClear();
     handleErrorSpy = vi.spyOn(handleErrorModule, 'handleError').mockImplementation(() => {});
@@ -620,10 +621,10 @@ describe('space-context commands', () => {
       const members = [makeMember({ userId: 'u-a' }), makeMember({ userId: 'u-b' })];
       const ctx = makeCtx({ space: { ...makeCtx().space!, members } });
       await cmd().handler(ctx);
-      expect(modalManager.show).toHaveBeenCalledWith(
-        SpaceAddMemberModal,
-        { spaceId: 's1', existingMemberIds: ['u-a', 'u-b'] },
-      );
+      expect(modalManager.show).toHaveBeenCalledWith(SpaceAddMemberModal, {
+        spaceId: 's1',
+        existingMemberIds: ['u-a', 'u-b'],
+      });
     });
   });
 
