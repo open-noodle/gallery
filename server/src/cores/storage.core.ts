@@ -302,10 +302,6 @@ export class StorageCore {
     this.storageRepository.mkdirSync(dirname(input));
   }
 
-  removeEmptyDirs(folder: StorageFolder) {
-    return this.storageRepository.removeEmptyDirs(StorageCore.getBaseFolder(folder));
-  }
-
   private savePath(pathType: PathType, id: string, newPath: string) {
     switch (pathType) {
       case AssetPathType.Original: {

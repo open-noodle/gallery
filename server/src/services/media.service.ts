@@ -162,8 +162,12 @@ export class MediaService extends BaseService {
   async handleQueueMigration(): Promise<JobStatus> {
     const { active, waiting } = await this.jobRepository.getJobCounts(QueueName.Migration);
     if (active === 1 && waiting === 0) {
-      await this.storageCore.removeEmptyDirs(StorageFolder.Thumbnails);
-      await this.storageCore.removeEmptyDirs(StorageFolder.EncodedVideo);
+      for (const folder of [StorageFolder.Thumbnails, StorageFolder.EncodedVideo]) {
+        const path = StorageCore.getBaseFolder(folder);
+        if (await this.storageRepository.checkFileExists(path)) {
+          await this.storageRepository.removeEmptyDirs(path);
+        }
+      }
     }
 
     let jobs: JobItem[] = [];

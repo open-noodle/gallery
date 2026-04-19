@@ -283,7 +283,20 @@ describe(MediaService.name, () => {
   });
 
   describe('handleQueueMigration', () => {
+    it('should skip removeEmptyDirs when storage folders do not exist (pure-S3 deployment)', async () => {
+      mocks.job.getJobCounts.mockResolvedValue({ active: 1, waiting: 0 } as JobCounts);
+      mocks.storage.checkFileExists.mockResolvedValue(false);
+      mocks.assetJob.streamForMigrationJob.mockReturnValue(makeStream([]));
+      mocks.person.getAll.mockReturnValue(makeStream([]));
+
+      await expect(sut.handleQueueMigration()).resolves.toBe(JobStatus.Success);
+
+      expect(mocks.storage.checkFileExists).toHaveBeenCalledTimes(2);
+      expect(mocks.storage.removeEmptyDirs).not.toHaveBeenCalled();
+    });
+
     it('should remove empty directories and queue jobs', async () => {
+      mocks.storage.checkFileExists.mockResolvedValue(true);
       const asset = AssetFactory.create();
       const person = PersonFactory.create();
 
