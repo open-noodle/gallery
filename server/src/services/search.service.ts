@@ -143,7 +143,10 @@ export class SearchService extends BaseService {
       throw new BadRequestException('spacePersonIds requires spaceId');
     }
 
-    const { machineLearning } = await this.getConfig({ withCache: false });
+    // Cached read — the uncached path runs class-transformer + class-validator over
+    // the full nested SystemConfigDto, which is ~1-3s per call on slower CPUs and
+    // dominates smart-search latency. Cache invalidates on ConfigUpdate.
+    const { machineLearning } = await this.getConfig({ withCache: true });
     if (!isSmartSearchEnabled(machineLearning)) {
       throw new BadRequestException('Smart search is not enabled');
     }
