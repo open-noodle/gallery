@@ -64,6 +64,12 @@ describe('/jobs', () => {
         force: false,
       });
 
+      // Wait for the pause to actually take effect before uploading. Otherwise a
+      // race between Pause propagation and the upload's metadata-job enqueue can
+      // land the job in `waiting` (instead of `paused`), which never drains —
+      // causing the subsequent waitForQueueFinish to time out on slow CI.
+      await utils.waitForQueuePaused(admin.accessToken, 'metadataExtraction');
+
       const { id } = await utils.createAsset(admin.accessToken, {
         assetData: { bytes: await readFile(path), filename: basename(path) },
       });
