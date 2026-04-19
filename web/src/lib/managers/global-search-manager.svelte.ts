@@ -1579,12 +1579,21 @@ export class GlobalSearchManager {
     const isAdmin = get(user)?.isAdmin ?? false;
     const flags = featureFlagsManager.valueOrUndefined;
     const translate = get(t);
+    const ctx = commandContextManager.getContext();
     for (const item of COMMAND_ITEMS) {
       if (item.adminOnly && !isAdmin) {
         continue;
       }
       if (item.featureFlag && !flags?.[item.featureFlag]) {
         continue;
+      }
+      if (item.isAvailable) {
+        try {
+          if (!item.isAvailable(ctx)) continue;
+        } catch (error) {
+          console.error('[cmdk] isAvailable threw', { id: item.id, error });
+          continue;
+        }
       }
       const label = translate(item.labelKey as Translations);
       if (isAlmostExactCommandMatch(q, label)) {
