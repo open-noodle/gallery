@@ -19,6 +19,7 @@ import 'package:immich_mobile/services/server_info.service.dart';
 import 'package:immich_mobile/services/toast.service.dart';
 import 'package:immich_mobile/services/widget.service.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:openapi/api.dart';
 
 class MockApiService extends Mock implements ApiService {}
 
