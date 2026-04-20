@@ -37,7 +37,6 @@ describe('/search/suggestions/filters', () => {
       const bytes = await readFile(join(testAssetDir, filename));
       assets.push(
         await utils.createAsset(admin.accessToken, {
-          deviceAssetId: `filter-test-${filename}`,
           assetData: { bytes, filename },
         }),
       );
