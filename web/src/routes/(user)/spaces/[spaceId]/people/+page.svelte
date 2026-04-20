@@ -6,12 +6,12 @@
   import ManageSpacePeopleVisibility from '$lib/components/spaces/manage-space-people-visibility.svelte';
   import ButtonContextMenu from '$lib/components/shared-components/context-menu/button-context-menu.svelte';
   import MenuOption from '$lib/components/shared-components/context-menu/menu-option.svelte';
-  import { user } from '$lib/stores/user.store';
+  import { authManager } from '$lib/managers/auth-manager.svelte';
   import { createUrl } from '$lib/utils';
   import { handleError } from '$lib/utils/handle-error';
   import {
     getSpacePeople,
-    Role,
+    SharedSpaceRole,
     updateSpacePerson,
     type SharedSpaceMemberResponseDto,
     type SharedSpacePersonResponseDto,
@@ -67,9 +67,9 @@
   // Hover state for context menus
   let hoveredPersonId = $state<string | null>(null);
 
-  const currentMember = $derived(members.find((m) => m.userId === $user.id));
-  const isOwner = $derived(currentMember?.role === Role.Owner);
-  const isEditor = $derived(isOwner || currentMember?.role === Role.Editor);
+  const currentMember = $derived(members.find((m) => m.userId === authManager.user.id));
+  const isOwner = $derived(currentMember?.role === SharedSpaceRole.Owner);
+  const isEditor = $derived(isOwner || currentMember?.role === SharedSpaceRole.Editor);
 
   const getThumbUrl = (person: SharedSpacePersonResponseDto): string => {
     return createUrl(`/shared-spaces/${space.id}/people/${person.id}/thumbnail`, { updatedAt: person.updatedAt });

@@ -21,7 +21,7 @@
   import ShortcutsModal from '$lib/modals/ShortcutsModal.svelte';
   import { mediaQueryManager } from '$lib/stores/media-query-manager.svelte';
   import { getEntries, type RecentEntry } from '$lib/stores/cmdk-recent';
-  import { user } from '$lib/stores/user.store';
+  import { authManager } from '$lib/managers/auth-manager.svelte';
   import { NAVIGATION_ITEMS, type NavigationItem } from '$lib/managers/navigation-items';
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
 
@@ -113,7 +113,7 @@
         return [];
       }
       void manager.recentsRevision;
-      const isAdmin = $user?.isAdmin ?? false;
+      const isAdmin = (authManager.authenticated ? authManager.user : undefined)?.isAdmin ?? false;
       const flags = featureFlagsManager.valueOrUndefined;
       return getEntries().filter((e) => {
         if (e.kind !== 'navigate') {

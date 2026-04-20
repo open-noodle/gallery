@@ -1,7 +1,7 @@
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
-import { preferences as preferencesStore, user as userStore } from '$lib/stores/user.store';
+import { authManager } from '$lib/managers/auth-manager.svelte';
 import {
-  Role,
+  SharedSpaceRole,
   type SharedSpaceMemberResponseDto,
   type SharedSpacePersonResponseDto,
   type SharedSpaceResponseDto,
@@ -33,7 +33,7 @@ function makeMember(overrides: Partial<SharedSpaceMemberResponseDto> = {}): Shar
     userId: 'current-user-id',
     email: 'user@example.com',
     name: 'Current User',
-    role: Role.Editor,
+    role: SharedSpaceRole.Editor,
     showInTimeline: false,
     joinedAt: '2026-01-01T00:00:00.000Z',
     ...overrides,
@@ -68,8 +68,8 @@ function renderPage({
   userId?: string;
 } = {}) {
   const currentUser = userAdminFactory.build({ id: userId });
-  userStore.set(currentUser);
-  preferencesStore.set(preferencesFactory.build());
+  authManager.setUser(currentUser);
+  authManager.setPreferences(preferencesFactory.build());
 
   return render(SpacePeoplePage, {
     props: {
@@ -101,7 +101,7 @@ describe('Spaces people page', () => {
 
   it('shows inline name input for editors', () => {
     const people = [makePerson({ id: 'p1', name: 'Alice' })];
-    renderPage({ people, members: [makeMember({ role: Role.Editor })] });
+    renderPage({ people, members: [makeMember({ role: SharedSpaceRole.Editor })] });
 
     const nameInput = screen.getByDisplayValue('Alice');
     expect(nameInput).toBeInTheDocument();
@@ -111,7 +111,7 @@ describe('Spaces people page', () => {
 
   it('does NOT show name input for viewers', () => {
     const people = [makePerson({ id: 'p1', name: 'Alice' })];
-    renderPage({ people, members: [makeMember({ role: Role.Viewer })] });
+    renderPage({ people, members: [makeMember({ role: SharedSpaceRole.Viewer })] });
 
     const nameInput = screen.queryByDisplayValue('Alice');
     expect(nameInput).toBeNull();
@@ -121,7 +121,7 @@ describe('Spaces people page', () => {
 
   it('shows context menu button on hover for editors', async () => {
     const people = [makePerson({ id: 'p1', name: 'Alice' })];
-    const { baseElement } = renderPage({ people, members: [makeMember({ role: Role.Editor })] });
+    const { baseElement } = renderPage({ people, members: [makeMember({ role: SharedSpaceRole.Editor })] });
 
     const card = baseElement.querySelector('[role="group"]')!;
     expect(card).toBeTruthy();
@@ -134,7 +134,7 @@ describe('Spaces people page', () => {
 
   it('does NOT show context menu for viewers', async () => {
     const people = [makePerson({ id: 'p1', name: 'Alice' })];
-    const { baseElement } = renderPage({ people, members: [makeMember({ role: Role.Viewer })] });
+    const { baseElement } = renderPage({ people, members: [makeMember({ role: SharedSpaceRole.Viewer })] });
 
     const card = baseElement.querySelector('[role="group"]')!;
     await fireEvent.mouseEnter(card);
@@ -144,7 +144,7 @@ describe('Spaces people page', () => {
 
   it('context menu has "Merge" option', async () => {
     const people = [makePerson({ id: 'p1', name: 'Alice' })];
-    const { baseElement } = renderPage({ people, members: [makeMember({ role: Role.Editor })] });
+    const { baseElement } = renderPage({ people, members: [makeMember({ role: SharedSpaceRole.Editor })] });
 
     const card = baseElement.querySelector('[role="group"]')!;
     await fireEvent.mouseEnter(card);
@@ -161,7 +161,7 @@ describe('Spaces people page', () => {
     sdkMock.updateSpacePerson.mockResolvedValue(person);
     sdkMock.getSpacePeople.mockResolvedValue([person]);
 
-    renderPage({ people: [person], members: [makeMember({ role: Role.Editor })] });
+    renderPage({ people: [person], members: [makeMember({ role: SharedSpaceRole.Editor })] });
 
     const nameInput = screen.getByDisplayValue('Alice');
     const user = userEvent.setup();
@@ -184,7 +184,7 @@ describe('Spaces people page', () => {
 
   it('does not call API when name is unchanged', async () => {
     const person = makePerson({ id: 'p1', name: 'Alice' });
-    renderPage({ people: [person], members: [makeMember({ role: Role.Editor })] });
+    renderPage({ people: [person], members: [makeMember({ role: SharedSpaceRole.Editor })] });
 
     const nameInput = screen.getByDisplayValue('Alice');
     await fireEvent.focusIn(nameInput);
@@ -213,7 +213,7 @@ describe('Spaces people page', () => {
       makePerson({ id: 'p2', name: 'Bob' }),
       makePerson({ id: 'p3', name: 'Charlie' }),
     ];
-    renderPage({ people, members: [makeMember({ role: Role.Editor })] });
+    renderPage({ people, members: [makeMember({ role: SharedSpaceRole.Editor })] });
 
     expect(screen.getByDisplayValue('Alice')).toBeInTheDocument();
     expect(screen.getByDisplayValue('Bob')).toBeInTheDocument();
