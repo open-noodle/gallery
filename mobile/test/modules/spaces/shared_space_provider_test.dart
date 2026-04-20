@@ -1,5 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/user.model.dart';
+import 'package:immich_mobile/domain/services/user.service.dart';
 import 'package:immich_mobile/pages/library/spaces/space_member_selection.page.dart';
 import 'package:immich_mobile/providers/infrastructure/user.provider.dart';
 import 'package:immich_mobile/providers/shared_space.provider.dart';
@@ -8,11 +10,25 @@ import 'package:immich_mobile/repositories/shared_space_api.repository.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:openapi/api.dart' as api;
 
-import '../../test_utils.dart';
 import '../../infrastructure/repository.mock.dart';
-import '../shared/shared_mocks.dart';
 
 class MockSharedSpaceApiRepository extends Mock implements SharedSpaceApiRepository {}
+
+/// Test-local stand-in for the real [CurrentUserProvider]. Lets us seed a
+/// user (or null) without wiring up a full UserService.
+class MockCurrentUserProvider extends CurrentUserProvider with Mock {
+  MockCurrentUserProvider([UserDto? initial]) : super(_NoopUserService()) {
+    state = initial;
+  }
+}
+
+class _NoopUserService extends Mock implements UserService {}
+
+ProviderContainer _container({required List<Override> overrides}) {
+  final container = ProviderContainer(overrides: overrides);
+  addTearDown(container.dispose);
+  return container;
+}
 
 void main() {
   late MockSharedSpaceApiRepository mockRepo;
@@ -41,7 +57,7 @@ void main() {
       ];
       when(() => mockRepo.getAll()).thenAnswer((_) async => spaces);
 
-      final container = TestUtils.createContainer(
+      final container = _container(
         overrides: [
           sharedSpaceApiRepositoryProvider.overrideWithValue(mockRepo),
           currentUserProvider.overrideWith((ref) => MockCurrentUserProvider()),
@@ -58,7 +74,7 @@ void main() {
     test('propagates errors from repository', () async {
       when(() => mockRepo.getAll()).thenThrow(Exception('Network error'));
 
-      final container = TestUtils.createContainer(
+      final container = _container(
         overrides: [
           sharedSpaceApiRepositoryProvider.overrideWithValue(mockRepo),
           currentUserProvider.overrideWith((ref) => MockCurrentUserProvider()),
@@ -80,7 +96,7 @@ void main() {
       );
       when(() => mockRepo.get('space-1')).thenAnswer((_) async => space);
 
-      final container = TestUtils.createContainer(
+      final container = _container(
         overrides: [sharedSpaceApiRepositoryProvider.overrideWithValue(mockRepo)],
       );
 
@@ -113,7 +129,7 @@ void main() {
       ];
       when(() => mockRepo.getMembers('space-1')).thenAnswer((_) async => members);
 
-      final container = TestUtils.createContainer(
+      final container = _container(
         overrides: [sharedSpaceApiRepositoryProvider.overrideWithValue(mockRepo)],
       );
 
@@ -159,7 +175,7 @@ void main() {
         return callCount == 1 ? initialSpaces : updatedSpaces;
       });
 
-      final container = TestUtils.createContainer(
+      final container = _container(
         overrides: [
           sharedSpaceApiRepositoryProvider.overrideWithValue(mockRepo),
           currentUserProvider.overrideWith((ref) => MockCurrentUserProvider()),
@@ -184,13 +200,14 @@ void main() {
   group('spaceMemberCandidatesProvider', () {
     test('fetches users from API and excludes current user', () async {
       final mockUserApiRepo = MockUserApiRepository();
-      final mockCurrentUser = MockCurrentUserProvider();
-      mockCurrentUser.state = UserDto(
-        id: 'user-1',
-        name: 'Alice',
-        email: 'alice@test.com',
-        isAdmin: false,
-        profileChangedAt: DateTime(2024),
+      final mockCurrentUser = MockCurrentUserProvider(
+        UserDto(
+          id: 'user-1',
+          name: 'Alice',
+          email: 'alice@test.com',
+          isAdmin: false,
+          profileChangedAt: DateTime(2024),
+        ),
       );
 
       final allUsers = [
@@ -206,7 +223,7 @@ void main() {
       ];
       when(() => mockUserApiRepo.getAll()).thenAnswer((_) async => List.from(allUsers));
 
-      final container = TestUtils.createContainer(
+      final container = _container(
         overrides: [
           userApiRepositoryProvider.overrideWithValue(mockUserApiRepo),
           currentUserProvider.overrideWith((ref) => mockCurrentUser),
@@ -230,7 +247,7 @@ void main() {
       ];
       when(() => mockUserApiRepo.getAll()).thenAnswer((_) async => List.from(allUsers));
 
-      final container = TestUtils.createContainer(
+      final container = _container(
         overrides: [
           userApiRepositoryProvider.overrideWithValue(mockUserApiRepo),
           currentUserProvider.overrideWith((ref) => MockCurrentUserProvider()),
