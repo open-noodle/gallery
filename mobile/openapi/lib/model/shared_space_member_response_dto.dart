@@ -78,8 +78,7 @@ class SharedSpaceMemberResponseDto {
   /// Most recently added asset ID by this member
   String? recentAssetId;
 
-  /// Member role
-  SharedSpaceMemberResponseDtoRoleEnum role;
+  SharedSpaceRole role;
 
   /// Show space assets in timeline
   bool showInTimeline;
@@ -182,7 +181,7 @@ class SharedSpaceMemberResponseDto {
         profileChangedAt: mapValueOfType<String>(json, r'profileChangedAt'),
         profileImagePath: mapValueOfType<String>(json, r'profileImagePath'),
         recentAssetId: mapValueOfType<String>(json, r'recentAssetId'),
-        role: SharedSpaceMemberResponseDtoRoleEnum.fromJson(json[r'role'])!,
+        role: SharedSpaceRole.fromJson(json[r'role'])!,
         showInTimeline: mapValueOfType<bool>(json, r'showInTimeline')!,
         userId: mapValueOfType<String>(json, r'userId')!,
       );
@@ -240,81 +239,4 @@ class SharedSpaceMemberResponseDto {
     'userId',
   };
 }
-
-/// Member role
-class SharedSpaceMemberResponseDtoRoleEnum {
-  /// Instantiate a new enum with the provided [value].
-  const SharedSpaceMemberResponseDtoRoleEnum._(this.value);
-
-  /// The underlying value of this enum member.
-  final String value;
-
-  @override
-  String toString() => value;
-
-  String toJson() => value;
-
-  static const owner = SharedSpaceMemberResponseDtoRoleEnum._(r'owner');
-  static const editor = SharedSpaceMemberResponseDtoRoleEnum._(r'editor');
-  static const viewer = SharedSpaceMemberResponseDtoRoleEnum._(r'viewer');
-
-  /// List of all possible values in this [enum][SharedSpaceMemberResponseDtoRoleEnum].
-  static const values = <SharedSpaceMemberResponseDtoRoleEnum>[
-    owner,
-    editor,
-    viewer,
-  ];
-
-  static SharedSpaceMemberResponseDtoRoleEnum? fromJson(dynamic value) => SharedSpaceMemberResponseDtoRoleEnumTypeTransformer().decode(value);
-
-  static List<SharedSpaceMemberResponseDtoRoleEnum> listFromJson(dynamic json, {bool growable = false,}) {
-    final result = <SharedSpaceMemberResponseDtoRoleEnum>[];
-    if (json is List && json.isNotEmpty) {
-      for (final row in json) {
-        final value = SharedSpaceMemberResponseDtoRoleEnum.fromJson(row);
-        if (value != null) {
-          result.add(value);
-        }
-      }
-    }
-    return result.toList(growable: growable);
-  }
-}
-
-/// Transformation class that can [encode] an instance of [SharedSpaceMemberResponseDtoRoleEnum] to String,
-/// and [decode] dynamic data back to [SharedSpaceMemberResponseDtoRoleEnum].
-class SharedSpaceMemberResponseDtoRoleEnumTypeTransformer {
-  factory SharedSpaceMemberResponseDtoRoleEnumTypeTransformer() => _instance ??= const SharedSpaceMemberResponseDtoRoleEnumTypeTransformer._();
-
-  const SharedSpaceMemberResponseDtoRoleEnumTypeTransformer._();
-
-  String encode(SharedSpaceMemberResponseDtoRoleEnum data) => data.value;
-
-  /// Decodes a [dynamic value][data] to a SharedSpaceMemberResponseDtoRoleEnum.
-  ///
-  /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
-  /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
-  /// cannot be decoded successfully, then an [UnimplementedError] is thrown.
-  ///
-  /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
-  /// and users are still using an old app with the old code.
-  SharedSpaceMemberResponseDtoRoleEnum? decode(dynamic data, {bool allowNull = true}) {
-    if (data != null) {
-      switch (data) {
-        case r'owner': return SharedSpaceMemberResponseDtoRoleEnum.owner;
-        case r'editor': return SharedSpaceMemberResponseDtoRoleEnum.editor;
-        case r'viewer': return SharedSpaceMemberResponseDtoRoleEnum.viewer;
-        default:
-          if (!allowNull) {
-            throw ArgumentError('Unknown enum value to decode: $data');
-          }
-      }
-    }
-    return null;
-  }
-
-  /// Singleton [SharedSpaceMemberResponseDtoRoleEnumTypeTransformer] instance.
-  static SharedSpaceMemberResponseDtoRoleEnumTypeTransformer? _instance;
-}
-
 
