@@ -24,7 +24,13 @@
   import { buildMapFilterConfig } from '#lib/utils/map-filter-config.ts';
   import { navigate } from '#lib/utils/navigation.ts';
   import { mapSettings } from '#lib/stores/preferences.store.ts';
-  import { AssetVisibility, getFilteredMapMarkers, getTimeBuckets, type MapMarkerResponseDto } from '@immich/sdk';
+  import {
+    AssetVisibility,
+    getFilteredMapMarkers,
+    getTimeBuckets,
+    MapMediaType,
+    type MapMarkerResponseDto,
+  } from '@immich/sdk';
   import { Icon, IconButton } from '@immich/ui';
   import { SvelteMap } from 'svelte/reactivity';
   import { mdiArrowLeft, mdiFilterVariant } from '@mdi/js';
@@ -120,7 +126,7 @@
         ...(model && { model }),
         ...(tagIds.length > 0 && { tagIds }),
         ...(rating !== undefined && { rating }),
-        ...(mediaType !== 'all' && { $type: mediaType === 'image' ? 'IMAGE' : 'VIDEO' }),
+        ...(mediaType !== 'all' && { $type: mediaType === 'image' ? MapMediaType.Image : MapMediaType.Video }),
         ...(isFavorite !== undefined && { isFavorite }),
         ...(city && { city }),
         ...(country && { country }),
