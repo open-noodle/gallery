@@ -63,7 +63,9 @@ describe('uploadTakeoutItem', () => {
 
     // Default: checkBulkUpload accepts the asset (no duplicate)
     vi.mocked(sdkMock.checkBulkUpload).mockResolvedValue({
-      results: [{ id: 'IMG_001.jpg', action: AssetUploadAction.Accept, reason: undefined as unknown as AssetRejectReason }],
+      results: [
+        { id: 'IMG_001.jpg', action: AssetUploadAction.Accept, reason: undefined as unknown as AssetRejectReason },
+      ],
     });
   });
 
@@ -206,7 +208,14 @@ describe('uploadTakeoutItem', () => {
 
   it('returns duplicate status when dedup check rejects', async () => {
     vi.mocked(sdkMock.checkBulkUpload).mockResolvedValue({
-      results: [{ id: 'IMG_001.jpg', assetId: 'existing-asset-1', action: AssetUploadAction.Reject, reason: AssetRejectReason.Duplicate }],
+      results: [
+        {
+          id: 'IMG_001.jpg',
+          assetId: 'existing-asset-1',
+          action: AssetUploadAction.Reject,
+          reason: AssetRejectReason.Duplicate,
+        },
+      ],
     });
 
     const item = makeItem();
