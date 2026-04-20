@@ -1,113 +1,69 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
-import { IsInt, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
-import { Optional, ValidateBoolean, ValidateDate, ValidateUUID } from 'src/validation';
+import { createZodDto } from 'nestjs-zod';
+import { emptyStringToNull, isoDatetimeToDate, stringToBool } from 'src/validation';
+import z from 'zod';
 
-export class SpacePeopleQueryDto {
-  @ValidateDate({ optional: true })
-  takenAfter?: Date;
-
-  @ValidateDate({ optional: true })
-  takenBefore?: Date;
-
-  @ValidateBoolean({ optional: true })
-  withHidden?: boolean;
-
-  @ApiPropertyOptional({
-    description: 'Maximum number of people to return (sorted by asset count)',
-    minimum: 1,
-    maximum: 100,
+const SpacePeopleQuerySchema = z
+  .object({
+    takenAfter: isoDatetimeToDate.optional(),
+    takenBefore: isoDatetimeToDate.optional(),
+    withHidden: stringToBool.optional(),
+    limit: z
+      .coerce
+      .number()
+      .int()
+      .min(1)
+      .max(100)
+      .optional()
+      .describe('Maximum number of people to return (sorted by asset count)'),
+    offset: z.coerce.number().int().min(0).optional().describe('Number of people to skip'),
+    named: stringToBool.optional(),
   })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(100)
-  limit?: number;
+  .meta({ id: 'SpacePeopleQueryDto' });
 
-  @ApiPropertyOptional({
-    description: 'Number of people to skip',
-    minimum: 0,
+const SharedSpacePersonUpdateSchema = z
+  .object({
+    name: z.string().max(100).optional().describe('Person name'),
+    isHidden: z.boolean().optional().describe('Person visibility (hidden)'),
+    birthDate: emptyStringToNull(z.string().nullable())
+      .optional()
+      .describe('Person date of birth')
+      .meta({ format: 'date' }),
+    representativeFaceId: z.uuidv4().nullable().optional().describe('Representative face ID'),
   })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  offset?: number;
+  .meta({ id: 'SharedSpacePersonUpdateDto' });
 
-  @ValidateBoolean({ optional: true })
-  named?: boolean;
-}
+const SharedSpacePersonAliasSchema = z
+  .object({
+    alias: z.string().trim().min(1).max(100).describe('Alias name for this person'),
+  })
+  .meta({ id: 'SharedSpacePersonAliasDto' });
 
-export class SharedSpacePersonUpdateDto {
-  @ApiPropertyOptional({ description: 'Person name' })
-  @Optional()
-  @IsString()
-  @MaxLength(100)
-  name?: string;
+const SharedSpacePersonMergeSchema = z
+  .object({
+    ids: z.array(z.uuidv4()).describe('Person IDs to merge into target'),
+  })
+  .meta({ id: 'SharedSpacePersonMergeDto' });
 
-  @ValidateBoolean({ optional: true, description: 'Person visibility (hidden)' })
-  isHidden?: boolean;
+const SharedSpacePersonResponseSchema = z
+  .object({
+    id: z.string().describe('Person ID'),
+    spaceId: z.string().describe('Space ID'),
+    name: z.string().describe('Person name'),
+    thumbnailPath: z.string().describe('Thumbnail path'),
+    isHidden: z.boolean().describe('Is hidden'),
+    birthDate: z.string().nullable().optional().describe('Person date of birth').meta({ format: 'date' }),
+    representativeFaceId: z.string().nullable().optional().describe('Representative face ID'),
+    faceCount: z.number().describe('Number of faces assigned to this person'),
+    assetCount: z.number().describe('Number of unique assets with this person'),
+    alias: z.string().nullable().optional().describe('User-specific alias for this person'),
+    createdAt: z.string().describe('Creation date'),
+    updatedAt: z.string().describe('Last update date'),
+    type: z.string().optional().describe('Person type (person or pet)'),
+  })
+  .meta({ id: 'SharedSpacePersonResponseDto' });
 
-  @ApiPropertyOptional({ format: 'date', description: 'Person date of birth' })
-  @Optional({ nullable: true, emptyToNull: true })
-  @IsString()
-  birthDate?: string | null;
-
-  @ValidateUUID({ optional: true, nullable: true, description: 'Representative face ID' })
-  representativeFaceId?: string | null;
-}
-
-export class SharedSpacePersonAliasDto {
-  @ApiProperty({ description: 'Alias name for this person' })
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(100)
-  alias!: string;
-}
-
-export class SharedSpacePersonMergeDto {
-  @ValidateUUID({ each: true, description: 'Person IDs to merge into target' })
-  ids!: string[];
-}
-
-export class SharedSpacePersonResponseDto {
-  @ApiProperty({ description: 'Person ID' })
-  id!: string;
-
-  @ApiProperty({ description: 'Space ID' })
-  spaceId!: string;
-
-  @ApiProperty({ description: 'Person name' })
-  name!: string;
-
-  @ApiProperty({ description: 'Thumbnail path' })
-  thumbnailPath!: string;
-
-  @ApiProperty({ description: 'Is hidden' })
-  isHidden!: boolean;
-
-  @ApiPropertyOptional({ format: 'date', description: 'Person date of birth' })
-  birthDate?: string | null;
-
-  @ApiPropertyOptional({ description: 'Representative face ID' })
-  representativeFaceId?: string | null;
-
-  @ApiProperty({ description: 'Number of faces assigned to this person' })
-  faceCount!: number;
-
-  @ApiProperty({ description: 'Number of unique assets with this person' })
-  assetCount!: number;
-
-  @ApiPropertyOptional({ description: 'User-specific alias for this person' })
-  alias?: string | null;
-
-  @ApiProperty({ description: 'Creation date' })
-  createdAt!: string;
-
-  @ApiProperty({ description: 'Last update date' })
-  updatedAt!: string;
-
-  @ApiPropertyOptional({ description: 'Person type (person or pet)' })
-  type?: string;
-}
+export class SpacePeopleQueryDto extends createZodDto(SpacePeopleQuerySchema) {}
+export class SharedSpacePersonUpdateDto extends createZodDto(SharedSpacePersonUpdateSchema) {}
+export class SharedSpacePersonAliasDto extends createZodDto(SharedSpacePersonAliasSchema) {}
+export class SharedSpacePersonMergeDto extends createZodDto(SharedSpacePersonMergeSchema) {}
+export class SharedSpacePersonResponseDto extends createZodDto(SharedSpacePersonResponseSchema) {}

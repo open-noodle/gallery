@@ -1,80 +1,50 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
-import { UserAvatarColor } from 'src/enum';
-import { ValidateEnum, ValidateUUID } from 'src/validation';
+import { createZodDto } from 'nestjs-zod';
+import { UserAvatarColor, UserAvatarColorSchema } from 'src/enum';
+import z from 'zod';
 
-export class UserGroupCreateDto {
-  @ApiProperty({ description: 'Group name' })
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(100)
-  name!: string;
-
-  @ValidateEnum({
-    enum: UserAvatarColor,
-    name: 'UserAvatarColor',
-    description: 'Group color',
-    optional: true,
+const UserGroupCreateSchema = z
+  .object({
+    name: z.string().trim().min(1).max(100).describe('Group name'),
+    color: UserAvatarColorSchema.optional().describe('Group color'),
   })
-  color?: UserAvatarColor;
-}
+  .meta({ id: 'UserGroupCreateDto' });
 
-export class UserGroupUpdateDto {
-  @ApiPropertyOptional({ description: 'Group name' })
-  @IsString()
-  @IsNotEmpty()
-  @IsOptional()
-  @MaxLength(100)
-  name?: string;
-
-  @ValidateEnum({
-    enum: UserAvatarColor,
-    name: 'UserAvatarColor',
-    description: 'Group color',
-    optional: true,
-    nullable: true,
+const UserGroupUpdateSchema = z
+  .object({
+    name: z.string().trim().min(1).max(100).optional().describe('Group name'),
+    color: UserAvatarColorSchema.nullable().optional().describe('Group color'),
   })
-  color?: UserAvatarColor | null;
-}
+  .meta({ id: 'UserGroupUpdateDto' });
 
-export class UserGroupMemberSetDto {
-  @ValidateUUID({ each: true, description: 'User IDs' })
-  userIds!: string[];
-}
+const UserGroupMemberSetSchema = z
+  .object({
+    userIds: z.array(z.uuidv4()).describe('User IDs'),
+  })
+  .meta({ id: 'UserGroupMemberSetDto' });
 
-export class UserGroupMemberResponseDto {
-  @ApiProperty({ description: 'User ID' })
-  userId!: string;
+const UserGroupMemberResponseSchema = z
+  .object({
+    userId: z.string().describe('User ID'),
+    name: z.string().describe('User name'),
+    email: z.string().describe('User email'),
+    profileImagePath: z.string().optional().describe('Profile image path'),
+    avatarColor: z.string().optional().describe('Avatar color'),
+  })
+  .meta({ id: 'UserGroupMemberResponseDto' });
 
-  @ApiProperty({ description: 'User name' })
-  name!: string;
+const UserGroupResponseSchema = z
+  .object({
+    id: z.string().describe('Group ID'),
+    name: z.string().describe('Group name'),
+    color: z.enum(UserAvatarColor).nullable().optional().describe('Group color'),
+    origin: z.string().describe('Group origin (manual or oidc)'),
+    createdAt: z.string().describe('Creation date'),
+    members: z.array(UserGroupMemberResponseSchema).describe('Members'),
+  })
+  .meta({ id: 'UserGroupResponseDto' });
 
-  @ApiProperty({ description: 'User email' })
-  email!: string;
-
-  @ApiPropertyOptional({ description: 'Profile image path' })
-  profileImagePath?: string;
-
-  @ApiPropertyOptional({ description: 'Avatar color' })
-  avatarColor?: string;
-}
-
-export class UserGroupResponseDto {
-  @ApiProperty({ description: 'Group ID' })
-  id!: string;
-
-  @ApiProperty({ description: 'Group name' })
-  name!: string;
-
-  @ApiPropertyOptional({ description: 'Group color', enum: UserAvatarColor })
-  color?: UserAvatarColor | null;
-
-  @ApiProperty({ description: 'Group origin (manual or oidc)' })
-  origin!: string;
-
-  @ApiProperty({ description: 'Creation date' })
-  createdAt!: string;
-
-  @ApiProperty({ description: 'Members', type: [UserGroupMemberResponseDto] })
-  members!: UserGroupMemberResponseDto[];
-}
+export class UserGroupCreateDto extends createZodDto(UserGroupCreateSchema) {}
+export class UserGroupUpdateDto extends createZodDto(UserGroupUpdateSchema) {}
+export class UserGroupMemberSetDto extends createZodDto(UserGroupMemberSetSchema) {}
+export class UserGroupMemberResponseDto extends createZodDto(UserGroupMemberResponseSchema) {}
+export class UserGroupResponseDto extends createZodDto(UserGroupResponseSchema) {}
