@@ -508,37 +508,9 @@ describe(SystemConfigService.name, () => {
       expect(mocks.event.emit).toHaveBeenCalledWith('ConfigInit', { newConfig: expect.any(Object) });
     });
 
-    it('should log deprecation warning when IMMICH_MACHINE_LEARNING_PING_TIMEOUT is set', async () => {
-      mocks.systemMetadata.get.mockResolvedValue({});
-      process.env.IMMICH_MACHINE_LEARNING_PING_TIMEOUT = '5000';
-
-      await sut.onBootstrap();
-
-      expect(mocks.logger.deprecate).toHaveBeenCalled();
-
-      delete process.env.IMMICH_MACHINE_LEARNING_PING_TIMEOUT;
-    });
-
-    it('should log deprecation warning when IMMICH_MACHINE_LEARNING_AVAILABILITY_BACKOFF_TIME is set', async () => {
-      mocks.systemMetadata.get.mockResolvedValue({});
-      process.env.IMMICH_MACHINE_LEARNING_AVAILABILITY_BACKOFF_TIME = '10000';
-
-      await sut.onBootstrap();
-
-      expect(mocks.logger.deprecate).toHaveBeenCalled();
-
-      delete process.env.IMMICH_MACHINE_LEARNING_AVAILABILITY_BACKOFF_TIME;
-    });
-
-    it('should not log deprecation warning when neither env var is set', async () => {
-      mocks.systemMetadata.get.mockResolvedValue({});
-      delete process.env.IMMICH_MACHINE_LEARNING_PING_TIMEOUT;
-      delete process.env.IMMICH_MACHINE_LEARNING_AVAILABILITY_BACKOFF_TIME;
-
-      await sut.onBootstrap();
-
-      expect(mocks.logger.deprecate).not.toHaveBeenCalled();
-    });
+    // IMMICH_MACHINE_LEARNING_PING_TIMEOUT and IMMICH_MACHINE_LEARNING_AVAILABILITY_BACKOFF_TIME
+    // were removed outright upstream (PR #27802), so the deprecation-warning paths no longer
+    // exist. The related tests were dropped alongside the env vars themselves.
   });
 
   describe('onShutdown', () => {
