@@ -54,20 +54,16 @@ class MatrixFixtures {
   Future<void> insertSpace(String id, String ownerId) =>
       db.into(db.sharedSpaceEntity).insert(SharedSpaceEntityCompanion.insert(id: id, name: id, createdById: ownerId));
 
-  Future<void> insertMember(
-    String spaceId,
-    String userId, {
-    bool showInTimeline = true,
-    String role = 'viewer',
-  }) =>
-      db.into(db.sharedSpaceMemberEntity).insert(
-            SharedSpaceMemberEntityCompanion.insert(
-              spaceId: spaceId,
-              userId: userId,
-              role: role,
-              showInTimeline: Value(showInTimeline),
-            ),
-          );
+  Future<void> insertMember(String spaceId, String userId, {bool showInTimeline = true, String role = 'viewer'}) => db
+      .into(db.sharedSpaceMemberEntity)
+      .insert(
+        SharedSpaceMemberEntityCompanion.insert(
+          spaceId: spaceId,
+          userId: userId,
+          role: role,
+          showInTimeline: Value(showInTimeline),
+        ),
+      );
 
   Future<void> linkAssetToSpace(String spaceId, String assetId) => db
       .into(db.sharedSpaceAssetEntity)
@@ -77,19 +73,16 @@ class MatrixFixtures {
       .into(db.sharedSpaceLibraryEntity)
       .insert(SharedSpaceLibraryEntityCompanion.insert(spaceId: spaceId, libraryId: libraryId));
 
-  Future<void> setLibraryId(String assetId, String libraryId) =>
-      (db.update(db.remoteAssetEntity)..where((t) => t.id.equals(assetId)))
-          .write(RemoteAssetEntityCompanion(libraryId: Value(libraryId)));
+  Future<void> setLibraryId(String assetId, String libraryId) => (db.update(
+    db.remoteAssetEntity,
+  )..where((t) => t.id.equals(assetId))).write(RemoteAssetEntityCompanion(libraryId: Value(libraryId)));
 }
 
 /// Returns the 13 cross-cutting permission cases. Each case's `setup` uses
 /// the supplied [f] fixtures so the same matrix can be exercised against any
 /// visibility-aware method.
 List<MatrixCase> permissionMatrixCases(MatrixFixtures f) {
-  Future<void> single(
-    String ownerId,
-    Future<void> Function(String assetId) extra,
-  ) async {
+  Future<void> single(String ownerId, Future<void> Function(String assetId) extra) async {
     await f.insertUser(ownerId);
     await f.insertAsset('asset-1', ownerId);
     await extra('asset-1');
