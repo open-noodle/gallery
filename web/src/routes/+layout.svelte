@@ -2,19 +2,16 @@
   import { afterNavigate, beforeNavigate } from '$app/navigation';
   import { page } from '$app/state';
   import { shortcut, shortcuts } from '#lib/actions/shortcut.ts';
+  import { getMyImmichLink } from '#lib/commands.ts';
   import GlobalSearch from '#lib/components/global-search/global-search.svelte';
-  import { featureFlagsManager } from '#lib/managers/feature-flags-manager.svelte.ts';
-  import { closePaletteOnNavigate } from '#lib/managers/close-palette-on-navigate.ts';
-  import { globalSearchManager, type SearchMode } from '#lib/managers/global-search-manager.svelte.ts';
-  import DownloadPanel from './DownloadPanel.svelte';
-  import ErrorLayout from './ErrorLayout.svelte';
   import OnEvents from '#lib/components/OnEvents.svelte';
-  import NavigationLoadingBar from './NavigationLoadingBar.svelte';
   import OpenInAppBanner from '#lib/components/shared-components/open-in-app-banner.svelte';
-  import UploadPanel from './UploadPanel.svelte';
-  import VersionAnnouncement from './VersionAnnouncement.svelte';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+  import { closePaletteOnNavigate } from '#lib/managers/close-palette-on-navigate.ts';
   import { eventManager } from '#lib/managers/event-manager.svelte.ts';
+  import { featureFlagsManager } from '#lib/managers/feature-flags-manager.svelte.ts';
+  import { globalSearchManager, type SearchMode } from '#lib/managers/global-search-manager.svelte.ts';
+  import { serverConfigManager } from '#lib/managers/server-config-manager.svelte';
   import ServerRestartingModal from '#lib/modals/ServerRestartingModal.svelte';
   import { queryClient } from '#lib/queries/client.ts';
   import { Route } from '#lib/route.ts';
@@ -39,6 +36,11 @@
   import { onMount, type Snippet } from 'svelte';
   import { t } from 'svelte-i18n';
   import { get } from 'svelte/store';
+  import DownloadPanel from './DownloadPanel.svelte';
+  import ErrorLayout from './ErrorLayout.svelte';
+  import NavigationLoadingBar from './NavigationLoadingBar.svelte';
+  import UploadPanel from './UploadPanel.svelte';
+  import VersionAnnouncement from './VersionAnnouncement.svelte';
   import '../app.css';
 
   interface Props {
@@ -166,8 +168,6 @@
 
   let showNavigationLoadingBar = $state(false);
 
-  const getMyImmichLink = () => new URL(page.url.pathname + page.url.search, 'https://my.immich.app');
-
   toastManager.setOptions({ class: 'top-16 fixed' });
 
   onMount(() => {
@@ -255,7 +255,7 @@
   }}
   use:shortcut={{
     shortcut: { shift: true, key: 't' },
-    onShortcut: () => themeManager.toggleTheme(),
+    onShortcut: () => themeManager.toggle(),
   }}
   use:shortcuts={[
     {
