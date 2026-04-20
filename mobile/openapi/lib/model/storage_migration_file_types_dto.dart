@@ -95,14 +95,14 @@ class StorageMigrationFileTypesDto {
       final json = value.cast<String, dynamic>();
 
       return StorageMigrationFileTypesDto(
-        encodedVideos: mapValueOfType<bool>(json, r'encodedVideos')!,
-        fullsize: mapValueOfType<bool>(json, r'fullsize')!,
-        originals: mapValueOfType<bool>(json, r'originals')!,
-        personThumbnails: mapValueOfType<bool>(json, r'personThumbnails')!,
-        previews: mapValueOfType<bool>(json, r'previews')!,
-        profileImages: mapValueOfType<bool>(json, r'profileImages')!,
-        sidecars: mapValueOfType<bool>(json, r'sidecars')!,
-        thumbnails: mapValueOfType<bool>(json, r'thumbnails')!,
+        encodedVideos: mapValueOfType<bool>(json, r'encodedVideos') ?? true,
+        fullsize: mapValueOfType<bool>(json, r'fullsize') ?? true,
+        originals: mapValueOfType<bool>(json, r'originals') ?? true,
+        personThumbnails: mapValueOfType<bool>(json, r'personThumbnails') ?? true,
+        previews: mapValueOfType<bool>(json, r'previews') ?? true,
+        profileImages: mapValueOfType<bool>(json, r'profileImages') ?? true,
+        sidecars: mapValueOfType<bool>(json, r'sidecars') ?? true,
+        thumbnails: mapValueOfType<bool>(json, r'thumbnails') ?? true,
       );
     }
     return null;
@@ -150,14 +150,6 @@ class StorageMigrationFileTypesDto {
 
   /// The list of required keys that must be present in a JSON.
   static const requiredKeys = <String>{
-    'encodedVideos',
-    'fullsize',
-    'originals',
-    'personThumbnails',
-    'previews',
-    'profileImages',
-    'sidecars',
-    'thumbnails',
   };
 }
 
