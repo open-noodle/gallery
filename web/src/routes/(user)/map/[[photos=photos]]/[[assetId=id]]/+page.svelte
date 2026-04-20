@@ -24,7 +24,13 @@
   import { delay } from '$lib/utils/asset-utils';
   import { buildMapFilterConfig } from '$lib/utils/map-filter-config';
   import { navigate } from '$lib/utils/navigation';
-  import { AssetVisibility, getFilteredMapMarkers, getTimeBuckets, type MapMarkerResponseDto } from '@immich/sdk';
+  import {
+    AssetVisibility,
+    getFilteredMapMarkers,
+    getTimeBuckets,
+    MapMediaType,
+    type MapMarkerResponseDto,
+  } from '@immich/sdk';
   import { Icon, IconButton } from '@immich/ui';
   import { SvelteMap } from 'svelte/reactivity';
   import { mdiArrowLeft, mdiFilterVariant } from '@mdi/js';
@@ -115,7 +121,7 @@
         ...(model && { model }),
         ...(tagIds.length > 0 && { tagIds }),
         ...(rating !== undefined && { rating }),
-        ...(mediaType !== 'all' && { $type: mediaType === 'image' ? 'IMAGE' : 'VIDEO' }),
+        ...(mediaType !== 'all' && { $type: mediaType === 'image' ? MapMediaType.Image : MapMediaType.Video }),
         ...(isFavorite !== undefined && { isFavorite }),
         ...(city && { city }),
         ...(country && { country }),

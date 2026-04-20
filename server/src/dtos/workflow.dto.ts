@@ -21,7 +21,7 @@ const WorkflowActionItemSchema = z
 const WorkflowCreateSchema = z
   .object({
     triggerType: PluginTriggerTypeSchema,
-    name: z.string().describe('Workflow name'),
+    name: z.string().min(1).describe('Workflow name'),
     description: z.string().optional().describe('Workflow description'),
     enabled: z.boolean().optional().describe('Workflow enabled'),
     filters: z.array(WorkflowFilterItemSchema).describe('Workflow filters'),

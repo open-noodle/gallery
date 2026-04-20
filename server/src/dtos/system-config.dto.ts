@@ -150,7 +150,7 @@ const SystemConfigMachineLearningSchema = z
 const SystemConfigClassificationCategorySchema = z
   .object({
     name: z.string().describe('Category name'),
-    prompts: z.array(z.string()).describe('CLIP text prompts for this category'),
+    prompts: z.array(z.string()).min(1).describe('CLIP text prompts for this category'),
     similarity: z
       .number()
       .meta({ format: 'double' })
@@ -165,7 +165,12 @@ const SystemConfigClassificationCategorySchema = z
 const SystemConfigClassificationSchema = z
   .object({
     enabled: configBool.describe('Enable classification globally'),
-    categories: z.array(SystemConfigClassificationCategorySchema).describe('Classification categories'),
+    categories: z
+      .array(SystemConfigClassificationCategorySchema)
+      .refine((cats) => new Set(cats.map((c) => c.name)).size === cats.length, {
+        message: 'Category names must be unique',
+      })
+      .describe('Classification categories'),
   })
   .meta({ id: 'SystemConfigClassificationDto' });
 

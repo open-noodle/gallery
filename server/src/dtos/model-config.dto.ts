@@ -8,7 +8,7 @@ const TaskConfigSchema = z
   .meta({ id: 'TaskConfig' });
 
 const ModelConfigSchema = TaskConfigSchema.extend({
-  modelName: z.string().describe('Name of the model to use'),
+  modelName: z.string().min(1).describe('Name of the model to use'),
 });
 
 export const CLIPConfigSchema = ModelConfigSchema.extend({
