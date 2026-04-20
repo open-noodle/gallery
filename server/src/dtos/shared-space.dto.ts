@@ -42,7 +42,7 @@ const SharedSpaceMemberResponseSchema = z
     userId: z.string().describe('User ID'),
     name: z.string().describe('User name'),
     email: z.string().describe('User email'),
-    role: z.string().describe('Member role'),
+    role: SharedSpaceRoleSchema.describe('Member role'),
     joinedAt: z.string().describe('Join date'),
     profileImagePath: z.string().optional().describe('Profile image path'),
     profileChangedAt: z.string().optional().describe('Profile change date'),
