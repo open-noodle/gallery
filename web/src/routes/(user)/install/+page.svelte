@@ -1,5 +1,5 @@
 <script lang="ts">
-  import OnboardingMobileApp from '$lib/components/onboarding-page/onboarding-mobile-app.svelte';
+  import OnboardingMobileApp from '../../auth/onboarding/onboarding-mobile-app.svelte';
   import { t } from 'svelte-i18n';
 </script>
 
