@@ -46,7 +46,9 @@
   let mergeTargetId = $state<string | null>(null);
 
   const currentMember = $derived(members.find((m) => m.userId === authManager.user.id));
-  const isEditor = $derived(currentMember?.role === SharedSpaceRole.Owner || currentMember?.role === SharedSpaceRole.Editor);
+  const isEditor = $derived(
+    currentMember?.role === SharedSpaceRole.Owner || currentMember?.role === SharedSpaceRole.Editor,
+  );
 
   const displayName = $derived(person.alias || person.name || '');
 

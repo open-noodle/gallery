@@ -20,7 +20,6 @@ import { mediumFactory, newMediumService } from 'test/medium.factory.js';
 import { factory } from 'test/small.factory.js';
 import { getKyselyDB } from 'test/utils.js';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
-import { DB } from 'src/schema.js';
 import { StorageService } from 'src/services/storage.service.js';
 
 let defaultDatabase: Kysely<DB>;
