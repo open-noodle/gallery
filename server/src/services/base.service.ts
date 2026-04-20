@@ -68,7 +68,6 @@ import { CacheControl } from 'src/enum.js';
 import { ServeStrategy } from 'src/interfaces/storage-backend.interface.js';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { StorageMigrationRepository } from 'src/repositories/storage-migration.repository.js';
-import { ClassConstructor } from 'src/types.js';
 import { ImmichFileResponse, ImmichMediaResponse, ImmichRedirectResponse, ImmichStreamResponse } from 'src/utils/file.js';
 import { UserGroupRepository } from 'src/repositories/user-group.repository.js';
 import { ClassificationRepository } from 'src/repositories/classification.repository.js';

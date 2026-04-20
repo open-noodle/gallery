@@ -181,12 +181,12 @@ const existingAsset = Object.freeze({
   originalFileName: 'existing-filename.jpeg',
 }) as MapAsset;
 
-const sidecarAsset = Object.freeze({
+const _sidecarAsset = Object.freeze({
   ...existingAsset,
   checksum: Buffer.from('_getExistingAssetWithSideCar', 'utf8'),
 }) as MapAsset;
 
-const copiedAsset = Object.freeze({
+const _copiedAsset = Object.freeze({
   id: 'copied-asset',
   originalPath: 'copied-path',
 }) as MapAsset;

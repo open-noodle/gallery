@@ -62,128 +62,132 @@ void main() {
     await db.close();
   });
 
-  test('backfills 100k-asset library through the sync handler without OOM', timeout: const Timeout(Duration(minutes: 15)), () async {
-    const int assetCount = 100000;
-    const String userId = 'user-1';
-    const String libraryId = 'library-scale-test';
-    const String spaceId = 'space-scale-test';
+  test(
+    'backfills 100k-asset library through the sync handler without OOM',
+    timeout: const Timeout(Duration(minutes: 15)),
+    () async {
+      const int assetCount = 100000;
+      const String userId = 'user-1';
+      const String libraryId = 'library-scale-test';
+      const String spaceId = 'space-scale-test';
 
-    // Pre-seed the user, the library, the space, and the link row so the
-    // backfill stream has somewhere to land.
-    await sut.updateUsersV1([
-      SyncUserV1(
-        id: userId,
-        name: 'Scale Test User',
-        email: 'scale@scale.test',
-        deletedAt: null,
-        avatarColor: null,
-        hasProfileImage: false,
-        profileChangedAt: DateTime(2024, 1, 1),
-      ),
-    ]);
-    await sut.updateLibrariesV1([
-      SyncLibraryV1(
-        id: libraryId,
-        name: 'Scale Test Library',
-        ownerId: userId,
-        createdAt: DateTime(2024, 1, 1),
-        updatedAt: DateTime(2024, 1, 1),
-      ),
-    ]);
-    await sut.updateSharedSpacesV1([
-      SyncSharedSpaceV1(
-        id: spaceId,
-        name: 'Scale Test Space',
-        description: null,
-        color: null,
-        createdById: userId,
-        thumbnailAssetId: null,
-        thumbnailCropY: null,
-        faceRecognitionEnabled: true,
-        petsEnabled: false,
-        lastActivityAt: null,
-        createdAt: DateTime(2024, 1, 1),
-        updatedAt: DateTime(2024, 1, 1),
-      ),
-    ]);
-    await sut.updateSharedSpaceLibrariesV1([
-      SyncSharedSpaceLibraryV1(
-        spaceId: spaceId,
-        libraryId: libraryId,
-        addedById: userId,
-        createdAt: DateTime(2024, 1, 1),
-        updatedAt: DateTime(2024, 1, 1),
-      ),
-    ]);
+      // Pre-seed the user, the library, the space, and the link row so the
+      // backfill stream has somewhere to land.
+      await sut.updateUsersV1([
+        SyncUserV1(
+          id: userId,
+          name: 'Scale Test User',
+          email: 'scale@scale.test',
+          deletedAt: null,
+          avatarColor: null,
+          hasProfileImage: false,
+          profileChangedAt: DateTime(2024, 1, 1),
+        ),
+      ]);
+      await sut.updateLibrariesV1([
+        SyncLibraryV1(
+          id: libraryId,
+          name: 'Scale Test Library',
+          ownerId: userId,
+          createdAt: DateTime(2024, 1, 1),
+          updatedAt: DateTime(2024, 1, 1),
+        ),
+      ]);
+      await sut.updateSharedSpacesV1([
+        SyncSharedSpaceV1(
+          id: spaceId,
+          name: 'Scale Test Space',
+          description: null,
+          color: null,
+          createdById: userId,
+          thumbnailAssetId: null,
+          thumbnailCropY: null,
+          faceRecognitionEnabled: true,
+          petsEnabled: false,
+          lastActivityAt: null,
+          createdAt: DateTime(2024, 1, 1),
+          updatedAt: DateTime(2024, 1, 1),
+        ),
+      ]);
+      await sut.updateSharedSpaceLibrariesV1([
+        SyncSharedSpaceLibraryV1(
+          spaceId: spaceId,
+          libraryId: libraryId,
+          addedById: userId,
+          createdAt: DateTime(2024, 1, 1),
+          updatedAt: DateTime(2024, 1, 1),
+        ),
+      ]);
 
-    // Build 100k synthetic asset DTOs. Spreading createdAt across one minute
-    // increments so the bucket query has a realistic distribution to walk.
-    final base = DateTime(2024, 1, 1);
-    final dtos = List<SyncAssetV1>.generate(
-      assetCount,
-      (i) => SyncAssetV1(
-        id: 'scale-asset-$i',
-        checksum: 'scale-checksum-$i',
-        originalFileName: 'scale-$i.jpg',
-        type: AssetTypeEnum.IMAGE,
-        ownerId: userId,
-        isFavorite: false,
-        fileCreatedAt: base.subtract(Duration(minutes: i)),
-        fileModifiedAt: base.subtract(Duration(minutes: i)),
-        localDateTime: base.subtract(Duration(minutes: i)),
-        visibility: AssetVisibility.timeline,
-        width: 100,
-        height: 100,
-        deletedAt: null,
-        duration: null,
-        libraryId: libraryId,
-        livePhotoVideoId: null,
-        stackId: null,
-        thumbhash: null,
-        isEdited: false,
-      ),
-    );
+      // Build 100k synthetic asset DTOs. Spreading createdAt across one minute
+      // increments so the bucket query has a realistic distribution to walk.
+      final base = DateTime(2024, 1, 1);
+      final dtos = List<SyncAssetV1>.generate(
+        assetCount,
+        (i) => SyncAssetV1(
+          id: 'scale-asset-$i',
+          checksum: 'scale-checksum-$i',
+          originalFileName: 'scale-$i.jpg',
+          type: AssetTypeEnum.IMAGE,
+          ownerId: userId,
+          isFavorite: false,
+          fileCreatedAt: base.subtract(Duration(minutes: i)),
+          fileModifiedAt: base.subtract(Duration(minutes: i)),
+          localDateTime: base.subtract(Duration(minutes: i)),
+          visibility: AssetVisibility.timeline,
+          width: 100,
+          height: 100,
+          deletedAt: null,
+          duration: null,
+          libraryId: libraryId,
+          livePhotoVideoId: null,
+          stackId: null,
+          thumbhash: null,
+          isEdited: false,
+        ),
+      );
 
-    // Time the actual handler path — this is the production hot path for a
-    // backfill. If memory pressure surfaces it shows up here.
-    final insertStart = DateTime.now();
-    await sut.updateLibraryAssetsV1(dtos);
-    final insertMs = DateTime.now().difference(insertStart).inMilliseconds;
+      // Time the actual handler path — this is the production hot path for a
+      // backfill. If memory pressure surfaces it shows up here.
+      final insertStart = DateTime.now();
+      await sut.updateLibraryAssetsV1(dtos);
+      final insertMs = DateTime.now().difference(insertStart).inMilliseconds;
 
-    // Verify all rows landed.
-    final rowCount = (await db.remoteAssetEntity.select().get()).length;
-    expect(rowCount, assetCount);
+      // Verify all rows landed.
+      final rowCount = (await db.remoteAssetEntity.select().get()).length;
+      expect(rowCount, assetCount);
 
-    // Time the bucket query — the hot path when a user opens the space on
-    // mobile. Target is 200ms; we assert <500ms with noise tolerance.
-    final timelineRepo = DriftTimelineRepository(db);
-    final query = timelineRepo.sharedSpace(spaceId, GroupAssetsBy.day);
+      // Time the bucket query — the hot path when a user opens the space on
+      // mobile. Target is 200ms; we assert <500ms with noise tolerance.
+      final timelineRepo = DriftTimelineRepository(db);
+      final query = timelineRepo.sharedSpace(spaceId, GroupAssetsBy.day);
 
-    final queryStart = DateTime.now();
-    final buckets = await query.bucketSource().first;
-    final queryMs = DateTime.now().difference(queryStart).inMilliseconds;
+      final queryStart = DateTime.now();
+      final buckets = await query.bucketSource().first;
+      final queryMs = DateTime.now().difference(queryStart).inMilliseconds;
 
-    // Time fetching the first page of assets (offset 0, count 100) — what the
-    // mobile UI actually requests on first render.
-    final pageStart = DateTime.now();
-    final firstPage = await query.assetSource(0, 100);
-    final pageMs = DateTime.now().difference(pageStart).inMilliseconds;
+      // Time fetching the first page of assets (offset 0, count 100) — what the
+      // mobile UI actually requests on first render.
+      final pageStart = DateTime.now();
+      final firstPage = await query.assetSource(0, 100);
+      final pageMs = DateTime.now().difference(pageStart).inMilliseconds;
 
-    // Print numbers for the manual run; record them in the scale-notes file.
-    // ignore: avoid_print
-    print(
-      '\n[scale-test] Insert ${insertMs}ms · Bucket query ${queryMs}ms · '
-      'First page (100 assets) ${pageMs}ms · Buckets ${buckets.length} · '
-      'Rows $rowCount · First page rows ${firstPage.length}',
-    );
+      // Print numbers for the manual run; record them in the scale-notes file.
+      // ignore: avoid_print
+      print(
+        '\n[scale-test] Insert ${insertMs}ms · Bucket query ${queryMs}ms · '
+        'First page (100 assets) ${pageMs}ms · Buckets ${buckets.length} · '
+        'Rows $rowCount · First page rows ${firstPage.length}',
+      );
 
-    // Loose sanity check on the bucket query — the real target is 200ms, this
-    // gives generous noise tolerance for varied developer hardware.
-    expect(queryMs, lessThan(500), reason: 'sharedSpace() bucket query should stay well under 500ms at 100k assets');
+      // Loose sanity check on the bucket query — the real target is 200ms, this
+      // gives generous noise tolerance for varied developer hardware.
+      expect(queryMs, lessThan(500), reason: 'sharedSpace() bucket query should stay well under 500ms at 100k assets');
 
-    // First page should return exactly min(100, assetCount) assets.
-    expect(firstPage, hasLength(assetCount < 100 ? assetCount : 100));
-  });
+      // First page should return exactly min(100, assetCount) assets.
+      expect(firstPage, hasLength(assetCount < 100 ? assetCount : 100));
+    },
+  );
 
   // --- gallery-fork: additional scale scenarios ---
   //
@@ -389,9 +393,7 @@ void main() {
 
       // Delta batch — typical "user reopens app and has 1k new photos".
       final deltaStart = DateTime.now();
-      await sut.updateLibraryAssetsV1(
-        List.generate(deltaCount, (i) => makeAsset(initialCount + i)),
-      );
+      await sut.updateLibraryAssetsV1(List.generate(deltaCount, (i) => makeAsset(initialCount + i)));
       final deltaMs = DateTime.now().difference(deltaStart).inMilliseconds;
 
       final finalCount = (await db.remoteAssetEntity.select().get()).length;
@@ -406,11 +408,7 @@ void main() {
       // Delta insert should be much faster than initial — the test is
       // whether it stays proportional (~1% of initial time) or whether
       // something in the batch path scales with total db size.
-      expect(
-        deltaMs,
-        lessThan(initialMs),
-        reason: '1k delta must be faster than 100k initial',
-      );
+      expect(deltaMs, lessThan(initialMs), reason: '1k delta must be faster than 100k initial');
     },
   );
 
@@ -496,10 +494,9 @@ void main() {
 
       // Delete the first 100 libraries — 50k orphan assets must be swept.
       final sweepStart = DateTime.now();
-      await sut.deleteLibrariesV1(
-        [for (int i = 0; i < librariesToDelete; i++) SyncLibraryDeleteV1(libraryId: 'sweep-lib-$i')],
-        currentUserId: userId,
-      );
+      await sut.deleteLibrariesV1([
+        for (int i = 0; i < librariesToDelete; i++) SyncLibraryDeleteV1(libraryId: 'sweep-lib-$i'),
+      ], currentUserId: userId);
       final sweepMs = DateTime.now().difference(sweepStart).inMilliseconds;
 
       // 100 libraries gone, 100 remain.

@@ -23,8 +23,6 @@ import { mimeTypes } from 'src/utils/mime-types.js';
 import { findOrFail } from 'src/utils/misc.js';
 import { getPreferences, getPreferencesPartial, mergePreferences } from 'src/utils/preferences.js';
 import { generateProfileImage } from 'src/utils/profile-image.js';
-import { ArgOf } from 'src/repositories/event.repository.js';
-import { JobOf, UserMetadataItem } from 'src/types.js';
 import { createReadStream } from 'node:fs';
 import { basename } from 'node:path';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
