@@ -17,6 +17,7 @@ class SystemConfigClassificationDto {
     required this.enabled,
   });
 
+  /// Classification categories
   List<SystemConfigClassificationCategoryDto> categories;
 
   /// Enable classification globally
