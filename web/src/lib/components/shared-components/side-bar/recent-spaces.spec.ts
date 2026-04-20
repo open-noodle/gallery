@@ -2,7 +2,7 @@ import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import RecentSpaces from '$lib/components/shared-components/side-bar/recent-spaces.svelte';
 import { pinnedSpaceIds } from '$lib/stores/space-view.store';
 import { userInteraction } from '$lib/stores/user.svelte';
-import { Color } from '@immich/sdk';
+import { UserAvatarColor } from '@immich/sdk';
 import { sharedSpaceFactory } from '@test-data/factories/shared-space-factory';
 import { render, screen } from '@testing-library/svelte';
 import { tick } from 'svelte';
@@ -94,7 +94,7 @@ describe('RecentSpaces component', () => {
 
   describe('colored dot', () => {
     it('shows colored dot when newAssetCount > 0', async () => {
-      const space = sharedSpaceFactory.build({ id: 'dot-1', newAssetCount: 5, color: Color.Blue });
+      const space = sharedSpaceFactory.build({ id: 'dot-1', newAssetCount: 5, color: UserAvatarColor.Blue });
       sdkMock.getAllSpaces.mockResolvedValueOnce([space]);
       await renderAndFlush();
 
@@ -120,7 +120,7 @@ describe('RecentSpaces component', () => {
     });
 
     it('applies correct bg class for blue color', async () => {
-      const space = sharedSpaceFactory.build({ id: 'blue-1', newAssetCount: 3, color: Color.Blue });
+      const space = sharedSpaceFactory.build({ id: 'blue-1', newAssetCount: 3, color: UserAvatarColor.Blue });
       sdkMock.getAllSpaces.mockResolvedValueOnce([space]);
       await renderAndFlush();
 
@@ -129,7 +129,7 @@ describe('RecentSpaces component', () => {
     });
 
     it('applies correct bg class for red color', async () => {
-      const space = sharedSpaceFactory.build({ id: 'red-1', newAssetCount: 3, color: Color.Red });
+      const space = sharedSpaceFactory.build({ id: 'red-1', newAssetCount: 3, color: UserAvatarColor.Red });
       sdkMock.getAllSpaces.mockResolvedValueOnce([space]);
       await renderAndFlush();
 
@@ -138,7 +138,7 @@ describe('RecentSpaces component', () => {
     });
 
     it('applies correct bg class for green color', async () => {
-      const space = sharedSpaceFactory.build({ id: 'green-1', newAssetCount: 3, color: Color.Green });
+      const space = sharedSpaceFactory.build({ id: 'green-1', newAssetCount: 3, color: UserAvatarColor.Green });
       sdkMock.getAllSpaces.mockResolvedValueOnce([space]);
       await renderAndFlush();
 
