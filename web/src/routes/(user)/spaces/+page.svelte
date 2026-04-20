@@ -7,7 +7,7 @@
   import SpaceCreateModal from '$lib/modals/SpaceCreateModal.svelte';
   import { Route } from '$lib/route';
   import { pinnedSpaceIds, spaceViewSettings } from '$lib/stores/space-view.store';
-  import { user } from '$lib/stores/user.store';
+  import { authManager } from '$lib/managers/auth-manager.svelte';
   import { splitPinnedSpaces } from '$lib/utils/space-utils';
   import { type SharedSpaceResponseDto } from '@immich/sdk';
   import { Button, modalManager } from '@immich/ui';
@@ -54,7 +54,7 @@
       <SpacesTable
         spaces={split.unpinned}
         pinnedSpaces={split.pinned}
-        currentUserId={$user?.id ?? ''}
+        currentUserId={authManager.authenticated ? (authManager.user?.id ?? '') : ''}
         pinnedIds={$pinnedSpaceIds}
         onTogglePin={handleTogglePin}
       />
