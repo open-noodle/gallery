@@ -14,7 +14,7 @@ class SharedSpaceActivityResponseDto {
   /// Returns a new [SharedSpaceActivityResponseDto] instance.
   SharedSpaceActivityResponseDto({
     required this.createdAt,
-    required this.data,
+    this.data = const {},
     required this.id,
     required this.type,
     this.userAvatarColor,
@@ -28,7 +28,7 @@ class SharedSpaceActivityResponseDto {
   String createdAt;
 
   /// Event-specific data
-  Object data;
+  Map<String, Object> data;
 
   /// Activity ID
   String id;
@@ -54,7 +54,7 @@ class SharedSpaceActivityResponseDto {
   @override
   bool operator ==(Object other) => identical(this, other) || other is SharedSpaceActivityResponseDto &&
     other.createdAt == createdAt &&
-    other.data == data &&
+    _deepEquality.equals(other.data, data) &&
     other.id == id &&
     other.type == type &&
     other.userAvatarColor == userAvatarColor &&
@@ -123,7 +123,7 @@ class SharedSpaceActivityResponseDto {
 
       return SharedSpaceActivityResponseDto(
         createdAt: mapValueOfType<String>(json, r'createdAt')!,
-        data: mapValueOfType<Object>(json, r'data')!,
+        data: mapCastOfType<String, Object>(json, r'data')!,
         id: mapValueOfType<String>(json, r'id')!,
         type: mapValueOfType<String>(json, r'type')!,
         userAvatarColor: mapValueOfType<String>(json, r'userAvatarColor'),
