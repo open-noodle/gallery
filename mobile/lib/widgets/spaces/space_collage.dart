@@ -4,18 +4,18 @@ import 'package:openapi/api.dart';
 
 /// Returns the gradient colors for a given space color enum value.
 /// Used by both SpaceCollage and SpaceCard.
-List<Color> spaceGradientColors(SharedSpaceResponseDtoColorEnum? color) {
+List<Color> spaceGradientColors(UserAvatarColor? color) {
   return switch (color) {
-    SharedSpaceResponseDtoColorEnum.primary => [const Color(0xFF6366F1), const Color(0xFF4338CA)],
-    SharedSpaceResponseDtoColorEnum.pink => [const Color(0xFFF9A8D4), const Color(0xFFEC4899)],
-    SharedSpaceResponseDtoColorEnum.red => [const Color(0xFFF87171), const Color(0xFFDC2626)],
-    SharedSpaceResponseDtoColorEnum.yellow => [const Color(0xFFFDE047), const Color(0xFFEAB308)],
-    SharedSpaceResponseDtoColorEnum.blue => [const Color(0xFF60A5FA), const Color(0xFF2563EB)],
-    SharedSpaceResponseDtoColorEnum.green => [const Color(0xFF4ADE80), const Color(0xFF15803D)],
-    SharedSpaceResponseDtoColorEnum.purple => [const Color(0xFFC084FC), const Color(0xFF7E22CE)],
-    SharedSpaceResponseDtoColorEnum.orange => [const Color(0xFFFB923C), const Color(0xFFEA580C)],
-    SharedSpaceResponseDtoColorEnum.gray => [const Color(0xFF9CA3AF), const Color(0xFF4B5563)],
-    SharedSpaceResponseDtoColorEnum.amber => [const Color(0xFFFBBF24), const Color(0xFFD97706)],
+    UserAvatarColor.primary => [const Color(0xFF6366F1), const Color(0xFF4338CA)],
+    UserAvatarColor.pink => [const Color(0xFFF9A8D4), const Color(0xFFEC4899)],
+    UserAvatarColor.red => [const Color(0xFFF87171), const Color(0xFFDC2626)],
+    UserAvatarColor.yellow => [const Color(0xFFFDE047), const Color(0xFFEAB308)],
+    UserAvatarColor.blue => [const Color(0xFF60A5FA), const Color(0xFF2563EB)],
+    UserAvatarColor.green => [const Color(0xFF4ADE80), const Color(0xFF15803D)],
+    UserAvatarColor.purple => [const Color(0xFFC084FC), const Color(0xFF7E22CE)],
+    UserAvatarColor.orange => [const Color(0xFFFB923C), const Color(0xFFEA580C)],
+    UserAvatarColor.gray => [const Color(0xFF9CA3AF), const Color(0xFF4B5563)],
+    UserAvatarColor.amber => [const Color(0xFFFBBF24), const Color(0xFFD97706)],
     _ => [const Color(0xFF6366F1), const Color(0xFF4338CA)],
   };
 }
@@ -23,7 +23,7 @@ List<Color> spaceGradientColors(SharedSpaceResponseDtoColorEnum? color) {
 class SpaceCollage extends StatelessWidget {
   final List<String> recentAssetIds;
   final List<String> recentAssetThumbhashes;
-  final SharedSpaceResponseDtoColorEnum? color;
+  final UserAvatarColor? color;
   final double size;
 
   const SpaceCollage({
