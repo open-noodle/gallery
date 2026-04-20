@@ -1,3 +1,4 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { createZodDto } from 'nestjs-zod';
 import { ExtraModel } from 'src/decorators';
 import { AssetEditActionSchema } from 'src/dtos/editing.dto';
