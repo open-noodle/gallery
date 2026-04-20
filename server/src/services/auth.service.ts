@@ -1,8 +1,12 @@
 import { BadRequestException, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { parse } from 'cookie';
 import { DateTime } from 'luxon';
+import { createReadStream } from 'node:fs';
 import { IncomingHttpHeaders } from 'node:http';
+import { basename } from 'node:path';
+import { DiskStorageBackend } from 'src/backends/disk-storage.backend';
 import { LOGIN_DUMMY_HASH, LOGIN_URL, MOBILE_REDIRECT, SALT_ROUNDS } from 'src/constants';
+import { StorageCore } from 'src/cores/storage.core';
 import { AuthSharedLink, AuthUser, UserAdmin } from 'src/database';
 import {
   AuthDto,
@@ -27,6 +31,7 @@ import { BaseService } from 'src/services/base.service';
 import { StorageService } from 'src/services/storage.service';
 import { isGranted } from 'src/utils/access';
 import { HumanReadableSize } from 'src/utils/bytes';
+import { mimeTypes } from 'src/utils/mime-types';
 import { generateProfileImage } from 'src/utils/profile-image';
 import { getUserAgentDetails } from 'src/utils/request';
 export interface LoginDetails {
@@ -388,12 +393,24 @@ export class AuthService extends BaseService {
       const { data } = await this.oauthRepository.getProfilePicture(url);
 
       const config = await this.getConfig({ withCache: true });
-      const profileImagePath = await generateProfileImage(
+      let profileImagePath = await generateProfileImage(
         { media: this.mediaRepository, crypto: this.cryptoRepository, storageCore: this.storageCore },
         config,
         user.id,
         Buffer.from(data),
       );
+
+      const writeBackend = StorageService.getWriteBackend();
+
+      if (!(writeBackend instanceof DiskStorageBackend)) {
+        const filename = basename(profileImagePath);
+        const relativeKey = StorageCore.getRelativeProfileImagePath(user.id, filename);
+        const stream = createReadStream(profileImagePath);
+        await writeBackend.put(relativeKey, stream, { contentType: mimeTypes.lookup(profileImagePath) });
+        // After S3 upload, drop the local generated file and store the relative key.
+        await this.jobRepository.queue({ name: JobName.FileDelete, data: { files: [profileImagePath] } });
+        profileImagePath = relativeKey;
+      }
 
       await this.userRepository.update(user.id, { profileImagePath, profileChangedAt: new Date() });
 

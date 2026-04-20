@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { DateTime } from 'luxon';
+import { Readable } from 'node:stream';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend';
 import { SALT_ROUNDS } from 'src/constants';
 import { StorageCore } from 'src/cores/storage.core';
@@ -19,6 +20,14 @@ import { systemConfigStub } from 'test/fixtures/system-config.stub';
 import { userStub } from 'test/fixtures/user.stub';
 import { factory, newUuid } from 'test/small.factory';
 import { newTestService, ServiceMocks } from 'test/utils';
+
+vi.mock('node:fs', async (importOriginal) => {
+  const original = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...original,
+    createReadStream: vi.fn().mockReturnValue(Readable.from(Buffer.from('fake-image-data'))),
+  };
+});
 
 const email = 'test@immich.com';
 const loginDetails = {
@@ -1082,9 +1091,11 @@ describe(AuthService.name, () => {
           loginDetails,
         );
 
-        const expectedRelativeKey = StorageCore.getRelativeProfileImagePath(user.id, `${fileId}.jpg`);
-        expect(mockS3Backend.put).toHaveBeenCalledWith(expectedRelativeKey, expect.any(Buffer), {
-          contentType: 'image/jpeg',
+        // OAuth profile pictures now flow through the thumbnail pipeline, which produces
+        // a file named `{uuid}.{thumbnail-format}`. The default thumbnail format is webp.
+        const expectedRelativeKey = StorageCore.getRelativeProfileImagePath(user.id, `${fileId}.webp`);
+        expect(mockS3Backend.put).toHaveBeenCalledWith(expectedRelativeKey, expect.anything(), {
+          contentType: 'image/webp',
         });
         expect(mocks.user.update).toHaveBeenCalledWith(user.id, {
           profileImagePath: expectedRelativeKey,
@@ -1092,7 +1103,7 @@ describe(AuthService.name, () => {
         });
       });
 
-      it('should use correct content type for non-JPEG OAuth pictures', async () => {
+      it('should use the configured thumbnail format as the S3 content type', async () => {
         const fileId = newUuid();
         const user = UserFactory.create({ oauthId: 'oauth-id' });
         const profile = OAuthProfileFactory.create({ picture: 'https://auth.immich.cloud/profiles/1.png' });
@@ -1101,6 +1112,8 @@ describe(AuthService.name, () => {
         mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({ profile });
         mocks.user.getByOAuthId.mockResolvedValue(user);
         mocks.crypto.randomUUID.mockReturnValue(fileId);
+        // Regardless of the OAuth picture mime, the S3 object mirrors the locally-generated
+        // thumbnail, so content type is derived from the thumbnail file extension.
         mocks.oauth.getProfilePicture.mockResolvedValue({
           contentType: 'image/png',
           data: new Uint8Array([1, 2, 3]).buffer,
@@ -1114,12 +1127,12 @@ describe(AuthService.name, () => {
           loginDetails,
         );
 
-        expect(mockS3Backend.put).toHaveBeenCalledWith(expect.any(String), expect.any(Buffer), {
-          contentType: 'image/png',
+        expect(mockS3Backend.put).toHaveBeenCalledWith(expect.any(String), expect.anything(), {
+          contentType: 'image/webp',
         });
       });
 
-      it('should still write to local disk first before S3 upload', async () => {
+      it('should run the OAuth picture through the thumbnail pipeline before S3 upload', async () => {
         const fileId = newUuid();
         const user = UserFactory.create({ oauthId: 'oauth-id' });
         const profile = OAuthProfileFactory.create({ picture: 'https://auth.immich.cloud/profiles/1.jpg' });
@@ -1141,9 +1154,12 @@ describe(AuthService.name, () => {
           loginDetails,
         );
 
-        expect(mocks.storage.createFile).toHaveBeenCalledWith(
-          expect.stringContaining(`/data/profile/${user.id}/${fileId}.jpg`),
+        // The thumbnail pipeline writes the resized image to the local profile folder
+        // before the S3 upload reads it back with createReadStream.
+        expect(mocks.media.generateThumbnail).toHaveBeenCalledWith(
           expect.any(Buffer),
+          expect.any(Object),
+          `/data/profile/${user.id}/${fileId}.webp`,
         );
       });
 
@@ -1171,7 +1187,7 @@ describe(AuthService.name, () => {
 
         expect(mocks.job.queue).toHaveBeenCalledWith({
           name: JobName.FileDelete,
-          data: { files: [expect.stringContaining(`/data/profile/${user.id}/${fileId}.jpg`)] },
+          data: { files: [`/data/profile/${user.id}/${fileId}.webp`] },
         });
       });
 
