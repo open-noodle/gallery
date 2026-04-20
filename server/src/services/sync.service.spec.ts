@@ -1,18 +1,11 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Writable } from 'node:stream';
-import { mapAsset } from 'src/dtos/asset-response.dto';
 import { AssetVisibility, SyncEntityType, SyncRequestType } from 'src/enum';
 import { SyncService } from 'src/services/sync.service';
 import { toAck } from 'src/utils/sync';
-import { AssetFactory } from 'test/factories/asset.factory';
-import { PartnerFactory } from 'test/factories/partner.factory';
 import { authStub } from 'test/fixtures/auth.stub';
-import { getForAsset, getForPartner } from 'test/mappers';
-import { factory, newUuid } from 'test/small.factory';
+import { newUuid } from 'test/small.factory';
 import { makeStream, newTestService, ServiceMocks } from 'test/utils';
-
-const untilDate = new Date(2024);
-const mapAssetOpts = { auth: authStub.user1, stripMetadata: false, withStack: true };
 
 const makeWritable = () => {
   const chunks: string[] = [];
@@ -1121,122 +1114,6 @@ describe(SyncService.name, () => {
     });
   });
 
-  describe('getFullSync', () => {
-    it('should return a list of all assets owned by the user', async () => {
-      const [asset1, asset2] = [
-        AssetFactory.from({ libraryId: 'library-id', isExternal: true }).owner(authStub.user1.user).build(),
-        AssetFactory.from().owner(authStub.user1.user).build(),
-      ];
-      mocks.asset.getAllForUserFullSync.mockResolvedValue([getForAsset(asset1), getForAsset(asset2)]);
-      await expect(sut.getFullSync(authStub.user1, { limit: 2, updatedUntil: untilDate })).resolves.toEqual([
-        mapAsset(getForAsset(asset1), mapAssetOpts),
-        mapAsset(getForAsset(asset2), mapAssetOpts),
-      ]);
-      expect(mocks.asset.getAllForUserFullSync).toHaveBeenCalledWith({
-        ownerId: authStub.user1.user.id,
-        updatedUntil: untilDate,
-        limit: 2,
-      });
-    });
-
-    it('should use provided userId when specified', async () => {
-      const userId = newUuid();
-      mocks.asset.getAllForUserFullSync.mockResolvedValue([]);
-      mocks.access.timeline.checkPartnerAccess.mockResolvedValue(new Set([userId]));
-
-      await sut.getFullSync(authStub.user1, { limit: 10, updatedUntil: untilDate, userId });
-
-      expect(mocks.asset.getAllForUserFullSync).toHaveBeenCalledWith({
-        ownerId: userId,
-        updatedUntil: untilDate,
-        limit: 10,
-      });
-    });
-  });
-
-  describe('getDeltaSync', () => {
-    it('should return a response requiring a full sync when partners are out of sync', async () => {
-      const partner = PartnerFactory.create();
-      const auth = factory.auth({ user: { id: partner.sharedWithId } });
-
-      mocks.partner.getAll.mockResolvedValue([getForPartner(partner)]);
-
-      await expect(
-        sut.getDeltaSync(authStub.user1, { updatedAfter: new Date(), userIds: [auth.user.id] }),
-      ).resolves.toEqual({ needsFullSync: true, upserted: [], deleted: [] });
-
-      expect(mocks.asset.getChangedDeltaSync).toHaveBeenCalledTimes(0);
-      expect(mocks.audit.getAfter).toHaveBeenCalledTimes(0);
-    });
-
-    it('should return a response requiring a full sync when last sync was too long ago', async () => {
-      mocks.partner.getAll.mockResolvedValue([]);
-      await expect(
-        sut.getDeltaSync(authStub.user1, { updatedAfter: new Date(2000), userIds: [authStub.user1.user.id] }),
-      ).resolves.toEqual({ needsFullSync: true, upserted: [], deleted: [] });
-      expect(mocks.asset.getChangedDeltaSync).toHaveBeenCalledTimes(0);
-      expect(mocks.audit.getAfter).toHaveBeenCalledTimes(0);
-    });
-
-    it('should return a response requiring a full sync when there are too many changes', async () => {
-      const asset = AssetFactory.create();
-      mocks.partner.getAll.mockResolvedValue([]);
-      mocks.asset.getChangedDeltaSync.mockResolvedValue(
-        Array.from<ReturnType<typeof getForAsset>>({ length: 10_000 }).fill(getForAsset(asset)),
-      );
-      await expect(
-        sut.getDeltaSync(authStub.user1, { updatedAfter: new Date(), userIds: [authStub.user1.user.id] }),
-      ).resolves.toEqual({ needsFullSync: true, upserted: [], deleted: [] });
-      expect(mocks.asset.getChangedDeltaSync).toHaveBeenCalledTimes(1);
-      expect(mocks.audit.getAfter).toHaveBeenCalledTimes(0);
-    });
-
-    it('should return a response with changes and deletions', async () => {
-      const asset = AssetFactory.create({ ownerId: authStub.user1.user.id });
-      const deletedAsset = AssetFactory.create({ libraryId: 'library-id', isExternal: true });
-      mocks.partner.getAll.mockResolvedValue([]);
-      mocks.asset.getChangedDeltaSync.mockResolvedValue([getForAsset(asset)]);
-      mocks.audit.getAfter.mockResolvedValue([deletedAsset.id]);
-      await expect(
-        sut.getDeltaSync(authStub.user1, { updatedAfter: new Date(), userIds: [authStub.user1.user.id] }),
-      ).resolves.toEqual({
-        needsFullSync: false,
-        upserted: [mapAsset(getForAsset(asset), mapAssetOpts)],
-        deleted: [deletedAsset.id],
-      });
-      expect(mocks.asset.getChangedDeltaSync).toHaveBeenCalledTimes(1);
-      expect(mocks.audit.getAfter).toHaveBeenCalledTimes(1);
-    });
-
-    it('should filter out archived partner assets from delta sync', async () => {
-      const ownAsset = AssetFactory.create({ ownerId: authStub.user1.user.id });
-      const partnerAssetTimeline = AssetFactory.create({
-        ownerId: 'partner-id',
-        visibility: AssetVisibility.Timeline,
-      });
-      const partnerAssetArchived = AssetFactory.create({
-        ownerId: 'partner-id',
-        visibility: AssetVisibility.Archive,
-      });
-
-      mocks.partner.getAll.mockResolvedValue([
-        factory.partner({
-          sharedById: 'partner-id',
-          sharedWithId: authStub.user1.user.id,
-        }),
-      ] as any);
-      mocks.asset.getChangedDeltaSync.mockResolvedValue([ownAsset, partnerAssetTimeline, partnerAssetArchived] as any);
-      mocks.audit.getAfter.mockResolvedValue([]);
-      mocks.access.timeline.checkPartnerAccess.mockResolvedValue(new Set(['partner-id']));
-
-      const result = await sut.getDeltaSync(authStub.user1, {
-        updatedAfter: new Date(),
-        userIds: [authStub.user1.user.id, 'partner-id'],
-      });
-
-      expect(result.needsFullSync).toBe(false);
-      // Should include own asset and partner timeline asset, but not partner archived asset
-      expect(result.upserted).toHaveLength(2);
-    });
-  });
+  // Removed: fork-era getFullSync/getDeltaSync tests — upstream PR #27804 "remove old timeline sync endpoints"
+  // deleted AssetRepository.getAllForUserFullSync / getChangedDeltaSync and the corresponding service methods.
 });
