@@ -1,6 +1,5 @@
+import { authManager } from '$lib/managers/auth-manager.svelte';
 import type { SearchMode } from '$lib/managers/global-search-manager.svelte';
-import { user } from '$lib/stores/user.store';
-import { get } from 'svelte/store';
 
 // Recents are scoped per logged-in user so multi-account browsers (user A logs
 // out, user B logs in on the same device) never leak each other's palette
@@ -47,8 +46,7 @@ function warn(err: unknown) {
 }
 
 function currentStorageKey(): string | null {
-  const current = get(user) as { id?: string } | null;
-  const id = current?.id;
+  const id = authManager.authenticated ? authManager.user?.id : undefined;
   return id ? `${STORAGE_KEY_PREFIX}${id}` : null;
 }
 

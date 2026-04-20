@@ -3,7 +3,6 @@ import { ADMIN_VISIBLE_QUEUES } from '$lib/constants';
 import { authManager } from '$lib/managers/auth-manager.svelte';
 import { isAlmostExactWordMatch } from '$lib/managers/cmdk-match';
 import type { CommandContext } from '$lib/managers/command-context-manager.svelte';
-import { themeManager } from '$lib/managers/theme-manager.svelte';
 import AlbumEditModal from '$lib/modals/AlbumEditModal.svelte';
 import AlbumOptionsModal from '$lib/modals/AlbumOptionsModal.svelte';
 import ShortcutsModal from '$lib/modals/ShortcutsModal.svelte';
@@ -28,7 +27,7 @@ import {
   runQueueCommandLegacy,
   type ServerFeaturesDto,
 } from '@immich/sdk';
-import { modalManager, toastManager } from '@immich/ui';
+import { modalManager, themeManager, toastManager } from '@immich/ui';
 import {
   mdiAccountGroupOutline,
   mdiAccountMultiplePlus,
@@ -121,7 +120,7 @@ export const COMMAND_ITEMS: readonly CommandItem[] = [
     labelKey: 'theme',
     descriptionKey: 'cmdk_cmd_theme_description',
     icon: mdiThemeLightDark,
-    handler: () => themeManager.toggleTheme(),
+    handler: () => themeManager.toggle(),
   },
   {
     id: 'cmd:upload',
