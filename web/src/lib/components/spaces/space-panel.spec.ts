@@ -1,8 +1,8 @@
 import TestWrapper from '$lib/components/TestWrapper.svelte';
 import SpacePanel from '$lib/components/spaces/space-panel.svelte';
-import { user } from '$lib/stores/user.store';
+import { authManager } from '$lib/managers/auth-manager.svelte';
 import {
-  Role,
+  SharedSpaceRole,
   type SharedSpaceMemberResponseDto,
   type SharedSpaceResponseDto,
   type UserAdminResponseDto,
@@ -21,7 +21,7 @@ const makeMember = (overrides: Partial<SharedSpaceMemberResponseDto> = {}): Shar
   userId: 'user-1',
   name: 'Alice',
   email: 'alice@test.com',
-  role: Role.Editor,
+  role: SharedSpaceRole.Editor,
   joinedAt: '2026-01-01T00:00:00.000Z',
   showInTimeline: false,
   contributionCount: 0,
@@ -50,8 +50,8 @@ describe('SpacePanel', () => {
   const defaultProps = {
     space: makeSpace(),
     members: [
-      makeMember({ userId: 'u1', name: 'Alice', role: Role.Owner }),
-      makeMember({ userId: 'u2', name: 'Bob', role: Role.Editor }),
+      makeMember({ userId: 'u1', name: 'Alice', role: SharedSpaceRole.Owner }),
+      makeMember({ userId: 'u2', name: 'Bob', role: SharedSpaceRole.Editor }),
     ],
     activities: [],
     currentUserId: 'u1',
@@ -120,7 +120,7 @@ describe('SpacePanel', () => {
 
   it('should only render Activity and Members tabs for admin users', () => {
     // Set user as admin to ensure the Libraries tab would render if it still existed
-    user.set({ id: 'u1', isAdmin: true, name: 'Admin', email: 'admin@test.com' } as UserAdminResponseDto);
+    authManager.setUser({ id: 'u1', isAdmin: true, name: 'Admin', email: 'admin@test.com' } as UserAdminResponseDto);
     renderPanel(defaultProps);
     const tabSwitcher = screen.getByTestId('tab-switcher');
     const tabs = tabSwitcher.querySelectorAll('button');
@@ -130,7 +130,7 @@ describe('SpacePanel', () => {
   });
 
   it('should not render a Libraries tab', () => {
-    user.set({ id: 'u1', isAdmin: true, name: 'Admin', email: 'admin@test.com' } as UserAdminResponseDto);
+    authManager.setUser({ id: 'u1', isAdmin: true, name: 'Admin', email: 'admin@test.com' } as UserAdminResponseDto);
     renderPanel(defaultProps);
     expect(screen.queryByTestId('tab-libraries')).not.toBeInTheDocument();
   });
