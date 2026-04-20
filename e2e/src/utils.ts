@@ -29,7 +29,6 @@ import {
   addAssets as addSpaceAssets,
   addMember as addSpaceMember,
   addUsersToAlbum,
-  checkExistingAssets,
   createAlbum,
   createApiKey,
   createJob,
