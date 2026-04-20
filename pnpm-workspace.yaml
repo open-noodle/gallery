@@ -62,6 +62,8 @@ packageExtensions:
   '@nestjs/swagger':
     peerDependencies:
       typescript: '*'
+patchedDependencies:
+  '@immich/ui@0.79.3': patches/@immich__ui@0.79.3.patch
 preferWorkspacePackages: true
 shamefullyHoist: false
 verifyDepsBeforeRun: install
