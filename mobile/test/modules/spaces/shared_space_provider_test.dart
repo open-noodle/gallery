@@ -106,9 +106,7 @@ void main() {
       );
       when(() => mockRepo.get('space-1')).thenAnswer((_) async => space);
 
-      final container = _container(
-        overrides: [sharedSpaceApiRepositoryProvider.overrideWithValue(mockRepo)],
-      );
+      final container = _container(overrides: [sharedSpaceApiRepositoryProvider.overrideWithValue(mockRepo)]);
 
       final result = await container.read(sharedSpaceProvider('space-1').future);
 
@@ -139,9 +137,7 @@ void main() {
       ];
       when(() => mockRepo.getMembers('space-1')).thenAnswer((_) async => members);
 
-      final container = _container(
-        overrides: [sharedSpaceApiRepositoryProvider.overrideWithValue(mockRepo)],
-      );
+      final container = _container(overrides: [sharedSpaceApiRepositoryProvider.overrideWithValue(mockRepo)]);
 
       final result = await container.read(sharedSpaceMembersProvider('space-1').future);
 
@@ -211,13 +207,7 @@ void main() {
     test('fetches users from API and excludes current user', () async {
       final mockUserApiRepo = MockUserApiRepository();
       final mockCurrentUser = MockCurrentUserProvider(
-        UserDto(
-          id: 'user-1',
-          name: 'Alice',
-          email: 'alice@test.com',
-          isAdmin: false,
-          profileChangedAt: DateTime(2024),
-        ),
+        UserDto(id: 'user-1', name: 'Alice', email: 'alice@test.com', isAdmin: false, profileChangedAt: DateTime(2024)),
       );
 
       final allUsers = [

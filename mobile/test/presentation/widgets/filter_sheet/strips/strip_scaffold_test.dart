@@ -23,10 +23,8 @@ Future<ValueNotifier<AsyncValue<List<dynamic>>>> _pumpHarness(
         items: value,
         height: 84,
         onRetry: onRetry,
-        childBuilder: (data) => ListView(
-          scrollDirection: Axis.horizontal,
-          children: [for (final d in data) Text('item:$d')],
-        ),
+        childBuilder: (data) =>
+            ListView(scrollDirection: Axis.horizontal, children: [for (final d in data) Text('item:$d')]),
       ),
     ),
   );
@@ -126,11 +124,7 @@ void main() {
 
   testWidgets('onRetry called when retry button tapped', (tester) async {
     var called = 0;
-    await _pumpHarness(
-      tester,
-      initial: AsyncError<List<dynamic>>('boom', StackTrace.current),
-      onRetry: () => called++,
-    );
+    await _pumpHarness(tester, initial: AsyncError<List<dynamic>>('boom', StackTrace.current), onRetry: () => called++);
     await tester.pumpAndSettle();
 
     await tester.tap(find.byIcon(Icons.refresh_rounded));

@@ -7,8 +7,7 @@ const SpacePeopleQuerySchema = z
     takenAfter: isoDatetimeToDate.optional(),
     takenBefore: isoDatetimeToDate.optional(),
     withHidden: stringToBool.optional(),
-    limit: z
-      .coerce
+    limit: z.coerce
       .number()
       .int()
       .min(1)

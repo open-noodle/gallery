@@ -17,7 +17,13 @@ const SharedSpaceUpdateSchema = z
     name: z.string().trim().min(1).max(100).optional().describe('Space name'),
     description: z.string().max(500).optional().describe('Space description'),
     thumbnailAssetId: z.uuidv4().nullable().optional().describe('Thumbnail asset ID'),
-    thumbnailCropY: z.int().min(0).max(100).nullable().optional().describe('Vertical crop position for cover photo (0-100)'),
+    thumbnailCropY: z
+      .int()
+      .min(0)
+      .max(100)
+      .nullable()
+      .optional()
+      .describe('Vertical crop position for cover photo (0-100)'),
     color: UserAvatarColorSchema.optional().describe('Space color'),
     faceRecognitionEnabled: z.boolean().optional().describe('Enable face recognition for this space'),
     petsEnabled: z.boolean().optional().describe('Show pets in space people list'),
