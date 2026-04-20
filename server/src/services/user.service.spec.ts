@@ -356,7 +356,9 @@ describe(UserService.name, () => {
       it('should upload profile image to S3 and store relative path', async () => {
         const user = factory.userAdmin({ profileImagePath: '' });
         const file = { path: '/data/profile/user-id/temp-file.jpg', originalname: 'avatar.jpg' } as Express.Multer.File;
-        const relativeKey = StorageCore.getRelativeProfileImagePath(user.id, 'temp-file.jpg');
+        // The profile image is run through the thumbnail pipeline, which generates a
+        // new file named `{uuid}.{thumbnail-format}`. The default thumbnail format is webp.
+        const relativeKey = StorageCore.getRelativeProfileImagePath(user.id, 'random-uuid.webp');
 
         mocks.user.get.mockResolvedValue(user);
         mocks.user.update.mockResolvedValue({ ...user, profileImagePath: relativeKey, profileChangedAt: new Date() });
@@ -364,7 +366,7 @@ describe(UserService.name, () => {
         await sut.createProfileImage(factory.auth({ user }), file);
 
         expect(mockS3Backend.put).toHaveBeenCalledWith(relativeKey, expect.anything(), {
-          contentType: 'image/jpeg',
+          contentType: 'image/webp',
         });
         expect(mocks.user.update).toHaveBeenCalledWith(user.id, {
           profileImagePath: relativeKey,
@@ -372,13 +374,15 @@ describe(UserService.name, () => {
         });
       });
 
-      it('should use correct content type for non-JPEG uploads', async () => {
+      it('should use correct content type derived from the generated thumbnail format', async () => {
         const user = factory.userAdmin({ profileImagePath: '' });
         const file = {
           path: '/data/profile/user-id/temp-file.png',
           originalname: 'avatar.png',
         } as Express.Multer.File;
-        const relativeKey = StorageCore.getRelativeProfileImagePath(user.id, 'temp-file.png');
+        // Regardless of upload mime, the S3 content type matches the generated thumbnail
+        // file extension (default: webp). This guards `mimeTypes.lookup(profileImagePath)`.
+        const relativeKey = StorageCore.getRelativeProfileImagePath(user.id, 'random-uuid.webp');
 
         mocks.user.get.mockResolvedValue(user);
         mocks.user.update.mockResolvedValue({ ...user, profileImagePath: relativeKey, profileChangedAt: new Date() });
@@ -386,7 +390,7 @@ describe(UserService.name, () => {
         await sut.createProfileImage(factory.auth({ user }), file);
 
         expect(mockS3Backend.put).toHaveBeenCalledWith(relativeKey, expect.anything(), {
-          contentType: 'image/png',
+          contentType: 'image/webp',
         });
       });
 
@@ -414,13 +418,17 @@ describe(UserService.name, () => {
 
         await sut.createProfileImage(factory.auth({ user }), file);
 
+        // After the thumbnail-pipeline refactor, the S3 branch emits two FileDelete jobs:
+        // 1) cleanup of the locally generated thumbnail after it is uploaded to S3,
+        // 2) cleanup of the original upload + previous profile image.
+        const generatedThumbnailPath = `/data/profile/${user.id}/random-uuid.webp`;
         expect(mocks.job.queue).toHaveBeenCalledWith({
           name: JobName.FileDelete,
-          data: { files: ['/data/profile/user-id/old.jpg'] },
+          data: { files: [generatedThumbnailPath] },
         });
         expect(mocks.job.queue).toHaveBeenCalledWith({
           name: JobName.FileDelete,
-          data: { files: [file.path] },
+          data: { files: [file.path, '/data/profile/user-id/old.jpg'] },
         });
       });
 
@@ -434,13 +442,14 @@ describe(UserService.name, () => {
 
         await sut.createProfileImage(factory.auth({ user }), file);
 
+        const generatedThumbnailPath = `/data/profile/${user.id}/random-uuid.webp`;
         expect(mocks.job.queue).toHaveBeenCalledWith({
           name: JobName.FileDelete,
-          data: { files: [oldRelativeKey] },
+          data: { files: [generatedThumbnailPath] },
         });
         expect(mocks.job.queue).toHaveBeenCalledWith({
           name: JobName.FileDelete,
-          data: { files: [file.path] },
+          data: { files: [file.path, oldRelativeKey] },
         });
       });
 
