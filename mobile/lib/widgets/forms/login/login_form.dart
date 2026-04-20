@@ -262,16 +262,9 @@ class LoginForm extends HookConsumerWidget {
         if (result.shouldChangePassword && !result.isAdmin) {
           unawaited(context.pushRoute(const ChangePasswordRoute()));
         } else {
-          final isBeta = Store.isBetaTimelineEnabled;
-          if (isBeta) {
-            await ref.read(galleryPermissionNotifier.notifier).requestGalleryPermission();
-            if (isSyncRemoteDeletionsMode()) {
-              await getManageMediaPermission();
-            }
-            unawaited(handleSyncFlow());
-            ref.read(websocketProvider.notifier).connect();
-            unawaited(context.replaceRoute(const GalleryTabShellRoute()));
-            return;
+          await ref.read(galleryPermissionNotifier.notifier).requestGalleryPermission();
+          if (isSyncRemoteDeletionsMode()) {
+            await getManageMediaPermission();
           }
           unawaited(handleSyncFlow());
           if (!context.mounted) {
@@ -284,7 +277,7 @@ class LoginForm extends HookConsumerWidget {
             return;
           }
 
-          unawaited(context.replaceRoute(const TabShellRoute()));
+          unawaited(context.replaceRoute(const GalleryTabShellRoute()));
           return;
         }
       } catch (error) {
@@ -378,21 +371,13 @@ class LoginForm extends HookConsumerWidget {
             if (isSyncRemoteDeletionsMode()) {
               await getManageMediaPermission();
             }
+            unawaited(ref.read(featureMessageServiceProvider).markSeen());
             unawaited(handleSyncFlow());
-            // #378: beta-timeline users get the fork's bottom-nav shell. Mirrors the
-            // password-login path above; the permission calls already ran unconditionally
-            // just above, so they are not repeated here.
-            final isBeta = Store.isBetaTimelineEnabled;
-            if (isBeta) {
-              unawaited(context.replaceRoute(const GalleryTabShellRoute()));
-              return;
-            }
             if (!context.mounted) {
               return;
             }
 
-            unawaited(ref.read(featureMessageServiceProvider).markSeen());
-            unawaited(context.router.replaceAll([const TabShellRoute()]));
+            unawaited(context.replaceRoute(const GalleryTabShellRoute()));
             return;
           }
         } catch (error, stack) {
