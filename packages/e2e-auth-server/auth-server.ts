@@ -17,6 +17,7 @@ export enum OAuthClient {
 export enum OAuthUser {
   NO_EMAIL = 'no-email',
   NO_NAME = 'no-name',
+  ID_TOKEN_CLAIMS = 'id-token-claims',
   WITH_QUOTA = 'with-quota',
   WITH_USERNAME = 'with-username',
   WITH_ROLE = 'with-role',
@@ -90,7 +91,17 @@ const withDefaultClaims = (sub: string) => ({
   email_verified: true,
 });
 
-const getClaims = (sub: string) => claims.find((user) => user.sub === sub) || withDefaultClaims(sub);
+const getClaims = (sub: string, use?: string) => {
+  if (sub === OAuthUser.ID_TOKEN_CLAIMS) {
+    return {
+      sub,
+      email: `oauth-${sub}@immich.app`,
+      email_verified: true,
+      name: use === 'id_token' ? 'ID Token User' : 'Userinfo User',
+    };
+  }
+  return claims.find((user) => user.sub === sub) || withDefaultClaims(sub);
+};
 
 const setup = async () => {
   const redirectUris = [
@@ -105,7 +116,10 @@ const setup = async () => {
       console.error(error);
       ctx.body = 'Internal Server Error';
     },
-    findAccount: (ctx, sub) => ({ accountId: sub, claims: () => getClaims(sub) }),
+    findAccount: (ctx, sub) => ({
+      accountId: sub,
+      claims: (use) => getClaims(sub, use),
+    }),
     scopes: ['openid', 'email', 'profile'],
     claims: {
       openid: ['sub'],
@@ -134,6 +148,7 @@ const setup = async () => {
         state: 'oidc.state',
       },
     },
+    conformIdTokenClaims: false,
     pkce: {
       required: () => false,
     },
@@ -165,7 +180,10 @@ const setup = async () => {
     ],
   });
 
-  const onStart = () => console.log(`[e2e-auth-server] http://${host}:${port}/.well-known/openid-configuration`);
+  const onStart = () =>
+    console.log(
+      `[e2e-auth-server] http://${host}:${port}/.well-known/openid-configuration`,
+    );
   const app = oidc.listen(port, host, onStart);
   return () => app.close();
 };
