@@ -61,6 +61,9 @@ String parameterToString(dynamic value) {
   if (value is AssetEditAction) {
     return AssetEditActionTypeTransformer().encode(value).toString();
   }
+  if (value is AssetIdErrorReason) {
+    return AssetIdErrorReasonTypeTransformer().encode(value).toString();
+  }
   if (value is AssetJobName) {
     return AssetJobNameTypeTransformer().encode(value).toString();
   }
@@ -73,8 +76,14 @@ String parameterToString(dynamic value) {
   if (value is AssetOrder) {
     return AssetOrderTypeTransformer().encode(value).toString();
   }
+  if (value is AssetRejectReason) {
+    return AssetRejectReasonTypeTransformer().encode(value).toString();
+  }
   if (value is AssetTypeEnum) {
     return AssetTypeEnumTypeTransformer().encode(value).toString();
+  }
+  if (value is AssetUploadAction) {
+    return AssetUploadActionTypeTransformer().encode(value).toString();
   }
   if (value is AssetVisibility) {
     return AssetVisibilityTypeTransformer().encode(value).toString();
@@ -106,6 +115,9 @@ String parameterToString(dynamic value) {
   if (value is ManualJobName) {
     return ManualJobNameTypeTransformer().encode(value).toString();
   }
+  if (value is MapMediaType) {
+    return MapMediaTypeTypeTransformer().encode(value).toString();
+  }
   if (value is MemorySearchOrder) {
     return MemorySearchOrderTypeTransformer().encode(value).toString();
   }
@@ -132,6 +144,9 @@ String parameterToString(dynamic value) {
   }
   if (value is PluginContextType) {
     return PluginContextTypeTypeTransformer().encode(value).toString();
+  }
+  if (value is PluginJsonSchemaType) {
+    return PluginJsonSchemaTypeTypeTransformer().encode(value).toString();
   }
   if (value is PluginTriggerType) {
     return PluginTriggerTypeTypeTransformer().encode(value).toString();
@@ -165,6 +180,9 @@ String parameterToString(dynamic value) {
   }
   if (value is StorageFolder) {
     return StorageFolderTypeTransformer().encode(value).toString();
+  }
+  if (value is StorageMigrationDirection) {
+    return StorageMigrationDirectionTypeTransformer().encode(value).toString();
   }
   if (value is SyncEntityType) {
     return SyncEntityTypeTypeTransformer().encode(value).toString();

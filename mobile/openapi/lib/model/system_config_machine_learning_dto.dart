@@ -38,6 +38,7 @@ class SystemConfigMachineLearningDto {
 
   PetDetectionConfig petDetection;
 
+  /// ML service URLs
   List<String> urls;
 
   @override

@@ -430,6 +430,8 @@ class ApiClient {
           return MaintenanceStatusResponseDto.fromJson(value);
         case 'ManualJobName':
           return ManualJobNameTypeTransformer().decode(value);
+        case 'MapMediaType':
+          return MapMediaTypeTypeTransformer().decode(value);
         case 'MapMarkerResponseDto':
           return MapMarkerResponseDto.fromJson(value);
         case 'MapReverseGeocodeResponseDto':
@@ -708,6 +710,8 @@ class ApiClient {
           return StatisticsSearchDto.fromJson(value);
         case 'StorageFolder':
           return StorageFolderTypeTransformer().decode(value);
+        case 'StorageMigrationDirection':
+          return StorageMigrationDirectionTypeTransformer().decode(value);
         case 'StorageMigrationFileTypesDto':
           return StorageMigrationFileTypesDto.fromJson(value);
         case 'StorageMigrationStartDto':

@@ -449,6 +449,57 @@ class AlbumsApi {
     return null;
   }
 
+  /// Retrieve album names
+  ///
+  /// Returns a lightweight list of albums available to the authenticated user for quick palette lookups.
+  ///
+  /// Note: This method returns the HTTP [Response].
+  Future<Response> getAlbumNamesWithHttpInfo() async {
+    // ignore: prefer_const_declarations
+    final apiPath = r'/albums/names';
+
+    // ignore: prefer_final_locals
+    Object? postBody;
+
+    final queryParams = <QueryParam>[];
+    final headerParams = <String, String>{};
+    final formParams = <String, String>{};
+
+    const contentTypes = <String>[];
+
+
+    return apiClient.invokeAPI(
+      apiPath,
+      'GET',
+      queryParams,
+      postBody,
+      headerParams,
+      formParams,
+      contentTypes.isEmpty ? null : contentTypes.first,
+    );
+  }
+
+  /// Retrieve album names
+  ///
+  /// Returns a lightweight list of albums available to the authenticated user for quick palette lookups.
+  Future<List<AlbumNameDto>?> getAlbumNames() async {
+    final response = await getAlbumNamesWithHttpInfo();
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
+    }
+    // When a remote server returns no body with a status of 204, we shall not decode it.
+    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
+    // FormatException when trying to decode an empty string.
+    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
+      final responseBody = await _decodeBodyBytes(response);
+      return (await apiClient.deserializeAsync(responseBody, 'List<AlbumNameDto>') as List)
+        .cast<AlbumNameDto>()
+        .toList(growable: false);
+
+    }
+    return null;
+  }
+
   /// Retrieve album statistics
   ///
   /// Returns statistics about the albums available to the authenticated user.

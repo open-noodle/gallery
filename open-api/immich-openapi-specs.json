@@ -25640,8 +25640,8 @@
             "type": "string"
           },
           "role": {
-            "description": "Member role",
-            "type": "string"
+            "$ref": "#/components/schemas/SharedSpaceRole",
+            "description": "Member role"
           },
           "showInTimeline": {
             "description": "Show space assets in timeline",

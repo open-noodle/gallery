@@ -2379,7 +2379,7 @@ export type SharedSpaceMemberResponseDto = {
     /** Most recently added asset ID by this member */
     recentAssetId?: string | null;
     /** Member role */
-    role: string;
+    role: SharedSpaceRole;
     /** Show space assets in timeline */
     showInTimeline: boolean;
     /** User ID */
