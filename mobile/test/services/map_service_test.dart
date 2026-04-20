@@ -20,8 +20,10 @@ void main() {
       buildNumber: '1',
       buildSignature: '',
     );
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(const MethodChannel('plugins.flutter.io/maplibre_gl'), (_) async => null);
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+      const MethodChannel('plugins.flutter.io/maplibre_gl'),
+      (_) async => null,
+    );
   });
 
   tearDownAll(() {
@@ -29,8 +31,10 @@ void main() {
     // Note: package_info_plus doesn't expose a public reset for setMockInitialValues;
     // leaving the PackageInfo mock state is acceptable since tests rarely call
     // PackageInfo.fromPlatform() outside of widget contexts.
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(const MethodChannel('plugins.flutter.io/maplibre_gl'), null);
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+      const MethodChannel('plugins.flutter.io/maplibre_gl'),
+      null,
+    );
   });
 
   group('MapService.getMapMarkers', () {

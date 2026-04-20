@@ -52,7 +52,10 @@ void main() {
 
     testWidgets('data renders people items', (tester) async {
       final s = _suggestions(
-        people: [FilterSuggestionsPersonDto(id: 'p1', name: 'Alice'), FilterSuggestionsPersonDto(id: 'p2', name: 'Bob')],
+        people: [
+          FilterSuggestionsPersonDto(id: 'p1', name: 'Alice'),
+          FilterSuggestionsPersonDto(id: 'p2', name: 'Bob'),
+        ],
       );
       await tester.pumpConsumerWidget(const PeopleStrip(), overrides: _overrideSuggestions(s));
       await tester.pumpAndSettle();
@@ -61,7 +64,9 @@ void main() {
     });
 
     testWidgets('tap on person toggles in filter state', (tester) async {
-      final s = _suggestions(people: [FilterSuggestionsPersonDto(id: 'p1', name: 'Alice')]);
+      final s = _suggestions(
+        people: [FilterSuggestionsPersonDto(id: 'p1', name: 'Alice')],
+      );
       await tester.pumpConsumerWidget(const PeopleStrip(), overrides: _overrideSuggestions(s));
       await tester.pumpAndSettle();
 
@@ -116,7 +121,9 @@ void main() {
     });
 
     testWidgets('tap toggles tag in filter', (tester) async {
-      final s = _suggestions(tags: [FilterSuggestionsTagDto(id: 't1', value: 'wedding')]);
+      final s = _suggestions(
+        tags: [FilterSuggestionsTagDto(id: 't1', value: 'wedding')],
+      );
       await tester.pumpConsumerWidget(const TagsStrip(), overrides: _overrideSuggestions(s));
       await tester.pumpAndSettle();
 
