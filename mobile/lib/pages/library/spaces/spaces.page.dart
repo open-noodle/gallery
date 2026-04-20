@@ -5,7 +5,6 @@ import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/providers/shared_space.provider.dart';
 import 'package:immich_mobile/repositories/shared_space_api.repository.dart';
 import 'package:immich_mobile/routing/router.dart';
-import 'package:immich_mobile/widgets/common/immich_app_bar.dart';
 import 'package:immich_mobile/widgets/common/immich_toast.dart';
 import 'package:immich_mobile/widgets/spaces/space_card.dart';
 
@@ -66,7 +65,7 @@ class SpacesPage extends HookConsumerWidget {
     }
 
     return Scaffold(
-      appBar: const ImmichAppBar(),
+      appBar: AppBar(title: const Text('Spaces')),
       body: spacesAsync.when(
         data: (spaces) {
           if (spaces.isEmpty) {

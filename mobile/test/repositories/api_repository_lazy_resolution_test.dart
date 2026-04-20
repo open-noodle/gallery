@@ -12,7 +12,6 @@ import 'package:immich_mobile/infrastructure/repositories/search_api.repository.
 import 'package:immich_mobile/infrastructure/repositories/tags_api.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/user_api.repository.dart';
 import 'package:immich_mobile/repositories/activity_api.repository.dart';
-import 'package:immich_mobile/repositories/album_api.repository.dart';
 import 'package:immich_mobile/repositories/asset_api.repository.dart';
 import 'package:immich_mobile/repositories/drift_album_api_repository.dart';
 import 'package:immich_mobile/repositories/folder_api.repository.dart';
@@ -168,21 +167,6 @@ void main() {
     verifyNever(() => oldApi.removeAssetFromAlbum(any(), any()));
   });
 
-  test('AlbumApiRepository resolves albumsApi lazily', () async {
-    final oldApi = _MockAlbumsApi();
-    final newApi = _MockAlbumsApi();
-    when(() => apiService.albumsApi).thenReturn(oldApi);
-    final repo = AlbumApiRepository(apiService);
-
-    when(() => apiService.albumsApi).thenReturn(newApi);
-    when(() => newApi.getAllAlbums(shared: any(named: 'shared'))).thenAnswer((_) async => []);
-
-    await repo.getAll();
-
-    verify(() => newApi.getAllAlbums(shared: null)).called(1);
-    verifyNever(() => oldApi.getAllAlbums(shared: any(named: 'shared')));
-  });
-
   test('AssetApiRepository resolves assetsApi lazily', () async {
     final oldApi = _MockAssetsApi();
     final newApi = _MockAssetsApi();
@@ -192,7 +176,7 @@ void main() {
     when(() => apiService.assetsApi).thenReturn(newApi);
     when(() => newApi.updateAsset(any(), any())).thenAnswer((_) => Future.error(Exception('stop')));
 
-    await expectLater(repo.update('a1'), throwsException);
+    await expectLater(repo.updateDescription('a1', 'desc'), throwsException);
 
     verify(() => newApi.updateAsset('a1', any())).called(1);
     verifyNever(() => oldApi.updateAsset(any(), any()));
