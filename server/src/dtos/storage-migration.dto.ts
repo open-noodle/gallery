@@ -1,73 +1,43 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
-import { IsEnum, IsInt, IsNotEmpty, IsOptional, IsUUID, Max, Min, ValidateNested } from 'class-validator';
-import { ValidateBoolean } from 'src/validation';
+import { createZodDto } from 'nestjs-zod';
+import z from 'zod';
 
-export class StorageMigrationFileTypesDto {
-  @ValidateBoolean({ optional: true, description: 'Include original files' })
-  originals: boolean = true;
+const StorageMigrationDirectionSchema = z.enum(['toS3', 'toDisk']).meta({ id: 'StorageMigrationDirection' });
 
-  @ValidateBoolean({ optional: true, description: 'Include thumbnail files' })
-  thumbnails: boolean = true;
-
-  @ValidateBoolean({ optional: true, description: 'Include preview files' })
-  previews: boolean = true;
-
-  @ValidateBoolean({ optional: true, description: 'Include full-size files' })
-  fullsize: boolean = true;
-
-  @ValidateBoolean({ optional: true, description: 'Include encoded video files' })
-  encodedVideos: boolean = true;
-
-  @ValidateBoolean({ optional: true, description: 'Include sidecar files' })
-  sidecars: boolean = true;
-
-  @ValidateBoolean({ optional: true, description: 'Include person thumbnail files' })
-  personThumbnails: boolean = true;
-
-  @ValidateBoolean({ optional: true, description: 'Include profile image files' })
-  profileImages: boolean = true;
-}
-
-export class StorageMigrationStartDto {
-  @IsEnum(['toS3', 'toDisk'])
-  @IsNotEmpty()
-  @ApiProperty({ enum: ['toS3', 'toDisk'], description: 'Migration direction' })
-  direction!: 'toS3' | 'toDisk';
-
-  @ValidateBoolean({ optional: true, description: 'Delete source files after migration' })
-  deleteSource: boolean = false;
-
-  @ValidateNested()
-  @Type(() => StorageMigrationFileTypesDto)
-  @ApiProperty({ type: StorageMigrationFileTypesDto, description: 'File types to migrate' })
-  fileTypes!: StorageMigrationFileTypesDto;
-
-  @IsInt()
-  @Min(1)
-  @Max(20)
-  @IsOptional()
-  @ApiProperty({
-    type: 'integer',
-    minimum: 1,
-    maximum: 20,
-    default: 5,
-    description: 'Concurrency level',
-    required: false,
+const StorageMigrationFileTypesSchema = z
+  .object({
+    originals: z.boolean().default(true).describe('Include original files'),
+    thumbnails: z.boolean().default(true).describe('Include thumbnail files'),
+    previews: z.boolean().default(true).describe('Include preview files'),
+    fullsize: z.boolean().default(true).describe('Include full-size files'),
+    encodedVideos: z.boolean().default(true).describe('Include encoded video files'),
+    sidecars: z.boolean().default(true).describe('Include sidecar files'),
+    personThumbnails: z.boolean().default(true).describe('Include person thumbnail files'),
+    profileImages: z.boolean().default(true).describe('Include profile image files'),
   })
-  concurrency: number = 5;
-}
+  .meta({ id: 'StorageMigrationFileTypesDto' });
 
-export class StorageMigrationEstimateQueryDto {
-  @IsEnum(['toS3', 'toDisk'])
-  @IsNotEmpty()
-  @ApiProperty({ enum: ['toS3', 'toDisk'], description: 'Migration direction' })
-  direction!: 'toS3' | 'toDisk';
-}
+const StorageMigrationStartSchema = z
+  .object({
+    direction: StorageMigrationDirectionSchema.describe('Migration direction'),
+    deleteSource: z.boolean().default(false).describe('Delete source files after migration'),
+    fileTypes: StorageMigrationFileTypesSchema.describe('File types to migrate'),
+    concurrency: z.int().min(1).max(20).default(5).describe('Concurrency level'),
+  })
+  .meta({ id: 'StorageMigrationStartDto' });
 
-export class StorageMigrationBatchParamDto {
-  @IsUUID('4')
-  @IsNotEmpty()
-  @ApiProperty({ format: 'uuid', description: 'Batch ID' })
-  batchId!: string;
-}
+const StorageMigrationEstimateQuerySchema = z
+  .object({
+    direction: StorageMigrationDirectionSchema.describe('Migration direction'),
+  })
+  .meta({ id: 'StorageMigrationEstimateQueryDto' });
+
+const StorageMigrationBatchParamSchema = z
+  .object({
+    batchId: z.uuidv4().describe('Batch ID'),
+  })
+  .meta({ id: 'StorageMigrationBatchParamDto' });
+
+export class StorageMigrationFileTypesDto extends createZodDto(StorageMigrationFileTypesSchema) {}
+export class StorageMigrationStartDto extends createZodDto(StorageMigrationStartSchema) {}
+export class StorageMigrationEstimateQueryDto extends createZodDto(StorageMigrationEstimateQuerySchema) {}
+export class StorageMigrationBatchParamDto extends createZodDto(StorageMigrationBatchParamSchema) {}
