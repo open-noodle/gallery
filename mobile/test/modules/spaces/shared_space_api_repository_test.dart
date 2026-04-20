@@ -156,7 +156,7 @@ void main() {
           userId: 'user-1',
           name: 'Alice',
           email: 'alice@example.com',
-          role: api.SharedSpaceMemberResponseDtoRoleEnum.owner,
+          role: api.SharedSpaceRole.owner,
           joinedAt: '2024-01-01T00:00:00Z',
           showInTimeline: true,
         ),
@@ -164,7 +164,7 @@ void main() {
           userId: 'user-2',
           name: 'Bob',
           email: 'bob@example.com',
-          role: api.SharedSpaceMemberResponseDtoRoleEnum.editor,
+          role: api.SharedSpaceRole.editor,
           joinedAt: '2024-01-01T00:00:00Z',
           showInTimeline: true,
         ),
@@ -175,7 +175,7 @@ void main() {
 
       expect(result.length, equals(2));
       expect(result[0].name, equals('Alice'));
-      expect(result[1].role, equals(api.SharedSpaceMemberResponseDtoRoleEnum.editor));
+      expect(result[1].role, equals(api.SharedSpaceRole.editor));
     });
   });
 
@@ -185,7 +185,7 @@ void main() {
         userId: 'user-2',
         name: 'Bob',
         email: 'bob@example.com',
-        role: api.SharedSpaceMemberResponseDtoRoleEnum.viewer,
+        role: api.SharedSpaceRole.viewer,
         joinedAt: '2024-01-01T00:00:00Z',
         showInTimeline: true,
       );
@@ -211,7 +211,7 @@ void main() {
         userId: 'user-2',
         name: 'Bob',
         email: 'bob@example.com',
-        role: api.SharedSpaceMemberResponseDtoRoleEnum.editor,
+        role: api.SharedSpaceRole.editor,
         joinedAt: '2024-01-01T00:00:00Z',
         showInTimeline: true,
       );
@@ -219,7 +219,7 @@ void main() {
 
       final result = await repository.addMember('space-1', 'user-2', role: api.SharedSpaceRole.editor);
 
-      expect(result.role, equals(api.SharedSpaceMemberResponseDtoRoleEnum.editor));
+      expect(result.role, equals(api.SharedSpaceRole.editor));
     });
   });
 
@@ -239,7 +239,7 @@ void main() {
         userId: 'user-2',
         name: 'Bob',
         email: 'bob@example.com',
-        role: api.SharedSpaceMemberResponseDtoRoleEnum.editor,
+        role: api.SharedSpaceRole.editor,
         joinedAt: '2024-01-01T00:00:00Z',
         showInTimeline: true,
       );
@@ -247,7 +247,7 @@ void main() {
 
       final result = await repository.updateMember('space-1', 'user-2', api.SharedSpaceRole.editor);
 
-      expect(result.role, equals(api.SharedSpaceMemberResponseDtoRoleEnum.editor));
+      expect(result.role, equals(api.SharedSpaceRole.editor));
       verify(
         () => mockApi.updateMember(
           'space-1',
@@ -264,7 +264,7 @@ void main() {
         userId: 'user-1',
         name: 'Alice',
         email: 'alice@example.com',
-        role: api.SharedSpaceMemberResponseDtoRoleEnum.viewer,
+        role: api.SharedSpaceRole.viewer,
         joinedAt: '2024-01-01T00:00:00Z',
         showInTimeline: true,
       );
@@ -286,7 +286,7 @@ void main() {
         userId: 'user-1',
         name: 'Alice',
         email: 'alice@example.com',
-        role: api.SharedSpaceMemberResponseDtoRoleEnum.viewer,
+        role: api.SharedSpaceRole.viewer,
         joinedAt: '2024-01-01T00:00:00Z',
         showInTimeline: false,
       );
