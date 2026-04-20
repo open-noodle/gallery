@@ -209,7 +209,7 @@ export const getPagesProvider = ($t: MessageFormatter) => {
   return defaultProvider({ name: $t('page'), actions: [...userPages, ...utilityPages, ...adminPages] });
 };
 
-const getMyImmichLink = () => {
+export const getMyImmichLink = () => {
   return new URL(page.url.pathname + page.url.search, 'https://my.immich.app');
 };
 
