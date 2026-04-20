@@ -28,12 +28,18 @@ const TimeBucketQueryBaseSchema = z
       .uuidv4()
       .optional()
       .describe('Filter assets containing a specific shared space person (space face recognition)'),
-    personIds: z.array(z.uuidv4()).optional().describe('Filter assets containing any of these persons (multi-select)'),
+    personIds: z
+      .preprocess((v) => (v === undefined ? undefined : Array.isArray(v) ? v : [v]), z.array(z.uuidv4()))
+      .optional()
+      .describe('Filter assets containing any of these persons (multi-select)'),
     spacePersonIds: z
-      .array(z.uuidv4())
+      .preprocess((v) => (v === undefined ? undefined : Array.isArray(v) ? v : [v]), z.array(z.uuidv4()))
       .optional()
       .describe('Filter assets containing any of these shared space persons (multi-select)'),
-    tagIds: z.array(z.uuidv4()).optional().describe('Filter assets with any of these tags (multi-select)'),
+    tagIds: z
+      .preprocess((v) => (v === undefined ? undefined : Array.isArray(v) ? v : [v]), z.array(z.uuidv4()))
+      .optional()
+      .describe('Filter assets with any of these tags (multi-select)'),
     city: z.string().optional().describe('Filter by city name'),
     country: z.string().optional().describe('Filter by country name'),
     make: z.string().optional().describe('Filter by camera make'),
