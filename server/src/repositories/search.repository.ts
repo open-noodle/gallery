@@ -3,6 +3,7 @@ import { Kysely, OrderByDirection, Selectable, ShallowDehydrateObject, sql, SqlB
 import { InjectKysely } from 'nestjs-kysely';
 import { DummyValue, GenerateSql } from 'src/decorators';
 import { AssetStatus, AssetType, AssetVisibility, VectorIndex } from 'src/enum';
+import { MapAsset } from 'src/dtos/asset-response.dto';
 import { probes } from 'src/repositories/database.repository';
 import { DB } from 'src/schema';
 import { AssetExifTable } from 'src/schema/tables/asset-exif.table';
