@@ -24,9 +24,9 @@ class StorageMigrationAdminApi {
   ///
   /// Parameters:
   ///
-  /// * [String] direction (required):
+  /// * [StorageMigrationDirection] direction (required):
   ///   Migration direction
-  Future<Response> getEstimateWithHttpInfo(String direction,) async {
+  Future<Response> getEstimateWithHttpInfo(StorageMigrationDirection direction,) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/storage-migration/estimate';
 
@@ -59,9 +59,9 @@ class StorageMigrationAdminApi {
   ///
   /// Parameters:
   ///
-  /// * [String] direction (required):
+  /// * [StorageMigrationDirection] direction (required):
   ///   Migration direction
-  Future<void> getEstimate(String direction,) async {
+  Future<void> getEstimate(StorageMigrationDirection direction,) async {
     final response = await getEstimateWithHttpInfo(direction,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
