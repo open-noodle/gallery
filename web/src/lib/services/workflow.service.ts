@@ -286,7 +286,7 @@ export const hasWorkflowChanged = (
   return false;
 };
 
-export const handleUpdateWorkflow = async (
+export const handleUpdateWorkflow = (
   workflowId: string,
   name: string,
   description: string,
