@@ -1228,6 +1228,16 @@ class FolderRouteArgs {
   String toString() {
     return 'FolderRouteArgs{key: $key, folder: $folder}';
   }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! FolderRouteArgs) return false;
+    return key == other.key && folder == other.folder;
+  }
+
+  @override
+  int get hashCode => key.hashCode ^ folder.hashCode;
 }
 
 /// generated route for
@@ -1426,6 +1436,9 @@ class MapLocationPickerRouteArgs {
     if (other is! MapLocationPickerRouteArgs) return false;
     return key == other.key && initialLatLng == other.initialLatLng;
   }
+
+  @override
+  int get hashCode => key.hashCode ^ initialLatLng.hashCode;
 }
 
 /// generated route for
