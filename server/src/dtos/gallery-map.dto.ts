@@ -1,66 +1,34 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { Transform, Type } from 'class-transformer';
-import { IsEnum, Max, Min } from 'class-validator';
-import { Optional, ValidateBoolean, ValidateDate, ValidateUUID } from 'src/validation';
+import { createZodDto } from 'nestjs-zod';
+import { isoDatetimeToDate, stringToBool } from 'src/validation';
+import z from 'zod';
 
 export enum MapMediaType {
   Image = 'IMAGE',
   Video = 'VIDEO',
 }
 
-export class FilteredMapMarkerDto {
-  @ValidateUUID({ each: true, optional: true, description: 'Filter by person IDs' })
-  @Transform(({ value }) => (value === undefined ? undefined : Array.isArray(value) ? value : [value]), {
-    toClassOnly: true,
+const MapMediaTypeSchema = z.enum(MapMediaType).meta({ id: 'MapMediaType' });
+
+const uuidArrayQuery = z
+  .preprocess((v) => (v === undefined ? undefined : Array.isArray(v) ? v : [v]), z.array(z.uuidv4()))
+  .optional();
+
+const FilteredMapMarkerSchema = z
+  .object({
+    personIds: uuidArrayQuery.describe('Filter by person IDs'),
+    tagIds: uuidArrayQuery.describe('Filter by tag IDs'),
+    spaceId: z.uuidv4().optional().describe('Scope to a shared space'),
+    make: z.string().optional().describe('Camera make'),
+    model: z.string().optional().describe('Camera model'),
+    rating: z.coerce.number().min(1).max(5).optional().describe('Minimum star rating'),
+    type: MapMediaTypeSchema.optional().describe('Filter by media type'),
+    takenAfter: isoDatetimeToDate.optional().describe('Filter assets taken after this date'),
+    takenBefore: isoDatetimeToDate.optional().describe('Filter assets taken before this date'),
+    isFavorite: stringToBool.optional().describe('Filter by favorite status'),
+    city: z.string().optional().describe('Filter by city'),
+    country: z.string().optional().describe('Filter by country'),
+    withSharedSpaces: stringToBool.optional().describe('Include shared space assets'),
   })
-  personIds?: string[];
+  .meta({ id: 'FilteredMapMarkerDto' });
 
-  @ValidateUUID({ each: true, optional: true, description: 'Filter by tag IDs' })
-  @Transform(({ value }) => (value === undefined ? undefined : Array.isArray(value) ? value : [value]), {
-    toClassOnly: true,
-  })
-  tagIds?: string[];
-
-  @ValidateUUID({ optional: true, description: 'Scope to a shared space' })
-  spaceId?: string;
-
-  @ApiProperty({ type: String, required: false, description: 'Camera make' })
-  @Optional()
-  make?: string;
-
-  @ApiProperty({ type: String, required: false, description: 'Camera model' })
-  @Optional()
-  model?: string;
-
-  @ApiProperty({ type: Number, required: false, description: 'Minimum star rating', minimum: 1, maximum: 5 })
-  @Optional()
-  @Min(1)
-  @Max(5)
-  @Type(() => Number)
-  rating?: number;
-
-  @ApiProperty({ enum: MapMediaType, required: false, description: 'Filter by media type' })
-  @Optional()
-  @IsEnum(MapMediaType)
-  type?: MapMediaType;
-
-  @ValidateDate({ optional: true, description: 'Filter assets taken after this date' })
-  takenAfter?: Date;
-
-  @ValidateDate({ optional: true, description: 'Filter assets taken before this date' })
-  takenBefore?: Date;
-
-  @ValidateBoolean({ optional: true, description: 'Filter by favorite status' })
-  isFavorite?: boolean;
-
-  @ApiProperty({ type: String, required: false, description: 'Filter by city' })
-  @Optional()
-  city?: string;
-
-  @ApiProperty({ type: String, required: false, description: 'Filter by country' })
-  @Optional()
-  country?: string;
-
-  @ValidateBoolean({ optional: true, description: 'Include shared space assets' })
-  withSharedSpaces?: boolean;
-}
+export class FilteredMapMarkerDto extends createZodDto(FilteredMapMarkerSchema) {}
