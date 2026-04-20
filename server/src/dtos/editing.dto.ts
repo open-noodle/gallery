@@ -154,3 +154,5 @@ export class AssetEditsCreateDto extends createZodDto(AssetEditsCreateSchema) {}
 export class AssetEditsResponseDto extends createZodDto(AssetEditsResponseSchema) {}
 export type CropParameters = z.infer<typeof CropParametersSchema>;
 export type TrimParameters = z.infer<typeof TrimParametersSchema>;
+export type RotateParameters = z.infer<typeof RotateParametersSchema>;
+export type MirrorParameters = z.infer<typeof MirrorParametersSchema>;
