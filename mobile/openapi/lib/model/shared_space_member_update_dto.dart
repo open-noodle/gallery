@@ -16,7 +16,6 @@ class SharedSpaceMemberUpdateDto {
     required this.role,
   });
 
-  /// Member role
   SharedSpaceRole role;
 
   @override

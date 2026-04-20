@@ -47,7 +47,7 @@ class SharedSpaceResponseDto {
   num? assetCount;
 
   /// Space color
-  SharedSpaceResponseDtoColorEnum? color;
+  UserAvatarColor? color;
 
   /// Creation date
   String createdAt;
@@ -82,12 +82,6 @@ class SharedSpaceResponseDto {
   /// Last activity timestamp (most recent asset add)
   String? lastActivityAt;
 
-  ///
-  /// Please note: This property should have been non-nullable! Since the specification file
-  /// does not include a default value (using the "default:" property), however, the generated
-  /// source code must fall back to having a nullable type.
-  /// Consider adding a "default:" property in the specification file to hide this note.
-  ///
   SharedSpaceResponseDtoLastContributor? lastContributor;
 
   /// When the current user last viewed this space
@@ -288,7 +282,7 @@ class SharedSpaceResponseDto {
         assetCount: json[r'assetCount'] == null
             ? null
             : num.parse('${json[r'assetCount']}'),
-        color: SharedSpaceResponseDtoColorEnum.fromJson(json[r'color']),
+        color: UserAvatarColor.fromJson(json[r'color']),
         createdAt: mapValueOfType<String>(json, r'createdAt')!,
         createdById: mapValueOfType<String>(json, r'createdById')!,
         description: mapValueOfType<String>(json, r'description'),
@@ -373,102 +367,4 @@ class SharedSpaceResponseDto {
     'updatedAt',
   };
 }
-
-/// Space color
-class SharedSpaceResponseDtoColorEnum {
-  /// Instantiate a new enum with the provided [value].
-  const SharedSpaceResponseDtoColorEnum._(this.value);
-
-  /// The underlying value of this enum member.
-  final String value;
-
-  @override
-  String toString() => value;
-
-  String toJson() => value;
-
-  static const primary = SharedSpaceResponseDtoColorEnum._(r'primary');
-  static const pink = SharedSpaceResponseDtoColorEnum._(r'pink');
-  static const red = SharedSpaceResponseDtoColorEnum._(r'red');
-  static const yellow = SharedSpaceResponseDtoColorEnum._(r'yellow');
-  static const blue = SharedSpaceResponseDtoColorEnum._(r'blue');
-  static const green = SharedSpaceResponseDtoColorEnum._(r'green');
-  static const purple = SharedSpaceResponseDtoColorEnum._(r'purple');
-  static const orange = SharedSpaceResponseDtoColorEnum._(r'orange');
-  static const gray = SharedSpaceResponseDtoColorEnum._(r'gray');
-  static const amber = SharedSpaceResponseDtoColorEnum._(r'amber');
-
-  /// List of all possible values in this [enum][SharedSpaceResponseDtoColorEnum].
-  static const values = <SharedSpaceResponseDtoColorEnum>[
-    primary,
-    pink,
-    red,
-    yellow,
-    blue,
-    green,
-    purple,
-    orange,
-    gray,
-    amber,
-  ];
-
-  static SharedSpaceResponseDtoColorEnum? fromJson(dynamic value) => SharedSpaceResponseDtoColorEnumTypeTransformer().decode(value);
-
-  static List<SharedSpaceResponseDtoColorEnum> listFromJson(dynamic json, {bool growable = false,}) {
-    final result = <SharedSpaceResponseDtoColorEnum>[];
-    if (json is List && json.isNotEmpty) {
-      for (final row in json) {
-        final value = SharedSpaceResponseDtoColorEnum.fromJson(row);
-        if (value != null) {
-          result.add(value);
-        }
-      }
-    }
-    return result.toList(growable: growable);
-  }
-}
-
-/// Transformation class that can [encode] an instance of [SharedSpaceResponseDtoColorEnum] to String,
-/// and [decode] dynamic data back to [SharedSpaceResponseDtoColorEnum].
-class SharedSpaceResponseDtoColorEnumTypeTransformer {
-  factory SharedSpaceResponseDtoColorEnumTypeTransformer() => _instance ??= const SharedSpaceResponseDtoColorEnumTypeTransformer._();
-
-  const SharedSpaceResponseDtoColorEnumTypeTransformer._();
-
-  String encode(SharedSpaceResponseDtoColorEnum data) => data.value;
-
-  /// Decodes a [dynamic value][data] to a SharedSpaceResponseDtoColorEnum.
-  ///
-  /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
-  /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
-  /// cannot be decoded successfully, then an [UnimplementedError] is thrown.
-  ///
-  /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
-  /// and users are still using an old app with the old code.
-  SharedSpaceResponseDtoColorEnum? decode(dynamic data, {bool allowNull = true}) {
-    if (data != null) {
-      switch (data) {
-        case r'primary': return SharedSpaceResponseDtoColorEnum.primary;
-        case r'pink': return SharedSpaceResponseDtoColorEnum.pink;
-        case r'red': return SharedSpaceResponseDtoColorEnum.red;
-        case r'yellow': return SharedSpaceResponseDtoColorEnum.yellow;
-        case r'blue': return SharedSpaceResponseDtoColorEnum.blue;
-        case r'green': return SharedSpaceResponseDtoColorEnum.green;
-        case r'purple': return SharedSpaceResponseDtoColorEnum.purple;
-        case r'orange': return SharedSpaceResponseDtoColorEnum.orange;
-        case r'gray': return SharedSpaceResponseDtoColorEnum.gray;
-        case r'amber': return SharedSpaceResponseDtoColorEnum.amber;
-        default:
-          if (!allowNull) {
-            throw ArgumentError('Unknown enum value to decode: $data');
-          }
-      }
-    }
-    return null;
-  }
-
-  /// Singleton [SharedSpaceResponseDtoColorEnumTypeTransformer] instance.
-  static SharedSpaceResponseDtoColorEnumTypeTransformer? _instance;
-}
-
 

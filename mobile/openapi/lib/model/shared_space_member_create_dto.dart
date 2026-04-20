@@ -13,12 +13,17 @@ part of openapi.api;
 class SharedSpaceMemberCreateDto {
   /// Returns a new [SharedSpaceMemberCreateDto] instance.
   SharedSpaceMemberCreateDto({
-    this.role = SharedSpaceRole.viewer,
+    this.role,
     required this.userId,
   });
 
-  /// Member role
-  SharedSpaceRole role;
+  ///
+  /// Please note: This property should have been non-nullable! Since the specification file
+  /// does not include a default value (using the "default:" property), however, the generated
+  /// source code must fall back to having a nullable type.
+  /// Consider adding a "default:" property in the specification file to hide this note.
+  ///
+  SharedSpaceRole? role;
 
   /// User ID
   String userId;
@@ -31,7 +36,7 @@ class SharedSpaceMemberCreateDto {
   @override
   int get hashCode =>
     // ignore: unnecessary_parenthesis
-    (role.hashCode) +
+    (role == null ? 0 : role!.hashCode) +
     (userId.hashCode);
 
   @override
@@ -39,7 +44,11 @@ class SharedSpaceMemberCreateDto {
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
+    if (this.role != null) {
       json[r'role'] = this.role;
+    } else {
+    //  json[r'role'] = null;
+    }
       json[r'userId'] = this.userId;
     return json;
   }
@@ -53,7 +62,7 @@ class SharedSpaceMemberCreateDto {
       final json = value.cast<String, dynamic>();
 
       return SharedSpaceMemberCreateDto(
-        role: SharedSpaceRole.fromJson(json[r'role']) ?? SharedSpaceRole.viewer,
+        role: SharedSpaceRole.fromJson(json[r'role']),
         userId: mapValueOfType<String>(json, r'userId')!,
       );
     }

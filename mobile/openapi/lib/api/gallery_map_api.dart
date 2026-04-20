@@ -57,12 +57,12 @@ class GalleryMapApi {
   /// * [DateTime] takenBefore:
   ///   Filter assets taken before this date
   ///
-  /// * [String] type:
+  /// * [MapMediaType] type:
   ///   Filter by media type
   ///
   /// * [bool] withSharedSpaces:
   ///   Include shared space assets
-  Future<Response> getFilteredMapMarkersWithHttpInfo({ String? city, String? country, bool? isFavorite, String? make, String? model, List<String>? personIds, num? rating, String? spaceId, List<String>? tagIds, DateTime? takenAfter, DateTime? takenBefore, String? type, bool? withSharedSpaces, }) async {
+  Future<Response> getFilteredMapMarkersWithHttpInfo({ String? city, String? country, bool? isFavorite, String? make, String? model, List<String>? personIds, num? rating, String? spaceId, List<String>? tagIds, DateTime? takenAfter, DateTime? takenBefore, MapMediaType? type, bool? withSharedSpaces, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/gallery/map/markers';
 
@@ -166,12 +166,12 @@ class GalleryMapApi {
   /// * [DateTime] takenBefore:
   ///   Filter assets taken before this date
   ///
-  /// * [String] type:
+  /// * [MapMediaType] type:
   ///   Filter by media type
   ///
   /// * [bool] withSharedSpaces:
   ///   Include shared space assets
-  Future<List<MapMarkerResponseDto>?> getFilteredMapMarkers({ String? city, String? country, bool? isFavorite, String? make, String? model, List<String>? personIds, num? rating, String? spaceId, List<String>? tagIds, DateTime? takenAfter, DateTime? takenBefore, String? type, bool? withSharedSpaces, }) async {
+  Future<List<MapMarkerResponseDto>?> getFilteredMapMarkers({ String? city, String? country, bool? isFavorite, String? make, String? model, List<String>? personIds, num? rating, String? spaceId, List<String>? tagIds, DateTime? takenAfter, DateTime? takenBefore, MapMediaType? type, bool? withSharedSpaces, }) async {
     final response = await getFilteredMapMarkersWithHttpInfo( city: city, country: country, isFavorite: isFavorite, make: make, model: model, personIds: personIds, rating: rating, spaceId: spaceId, tagIds: tagIds, takenAfter: takenAfter, takenBefore: takenBefore, type: type, withSharedSpaces: withSharedSpaces, );
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
