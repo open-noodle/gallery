@@ -9,7 +9,6 @@ import 'package:immich_mobile/domain/utils/event_stream.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/presentation/widgets/gallery_nav/gallery_nav_pill.widget.dart';
 import 'package:immich_mobile/presentation/widgets/gallery_nav/gallery_search_blob.widget.dart';
-import 'package:immich_mobile/providers/album/album.provider.dart';
 import 'package:immich_mobile/providers/gallery_nav/bottom_nav_height.provider.dart';
 import 'package:immich_mobile/providers/gallery_nav/gallery_nav_destination.dart';
 import 'package:immich_mobile/providers/gallery_nav/gallery_search_action.dart';
@@ -135,7 +134,7 @@ class _GalleryBottomNavState extends ConsumerState<GalleryBottomNav> {
         ref.invalidate(driftMemoryFutureProvider);
         break;
       case GalleryTabEnum.albums:
-        ref.invalidate(albumProvider);
+        ref.invalidate(remoteAlbumProvider);
         break;
       case GalleryTabEnum.library:
         ref.invalidate(localAlbumProvider);
