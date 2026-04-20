@@ -6,14 +6,14 @@
   import {
     getSpacePeople,
     mergeSpacePeople,
-    Role,
+    SharedSpaceRole,
     type SharedSpaceMemberResponseDto,
     type SharedSpacePersonResponseDto,
     type SharedSpaceResponseDto,
   } from '@immich/sdk';
   import { Icon, IconButton, toastManager } from '@immich/ui';
   import { mdiAccountMultipleCheckOutline, mdiArrowLeft, mdiCheck } from '@mdi/js';
-  import { user } from '$lib/stores/user.store';
+  import { authManager } from '$lib/managers/auth-manager.svelte';
   import { t } from 'svelte-i18n';
   import type { PageData } from './$types';
 
@@ -45,8 +45,8 @@
 
   let mergeTargetId = $state<string | null>(null);
 
-  const currentMember = $derived(members.find((m) => m.userId === $user.id));
-  const isEditor = $derived(currentMember?.role === Role.Owner || currentMember?.role === Role.Editor);
+  const currentMember = $derived(members.find((m) => m.userId === authManager.user.id));
+  const isEditor = $derived(currentMember?.role === SharedSpaceRole.Owner || currentMember?.role === SharedSpaceRole.Editor);
 
   const displayName = $derived(person.alias || person.name || '');
 

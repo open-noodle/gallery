@@ -45,7 +45,7 @@
   import { eventManager } from '$lib/managers/event-manager.svelte';
   import { Route } from '$lib/route';
   import { assetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
-  import { preferences, user } from '$lib/stores/user.store';
+  import { authManager } from '$lib/managers/auth-manager.svelte';
   import { createUrl } from '$lib/utils';
   import { handleError } from '$lib/utils/handle-error';
   import { loadHeroCollapsed, persistHeroCollapsed } from '$lib/utils/space-hero-storage';
@@ -63,7 +63,7 @@
     getSpacePeople,
     markSpaceViewed,
     removeSpace,
-    Role,
+    SharedSpaceRole,
     SearchSuggestionType,
     updateMemberTimeline,
     updateSpace,
@@ -264,9 +264,9 @@
     }
   }
 
-  const currentMember = $derived(members.find((m) => m.userId === $user.id));
-  const isOwner = $derived(currentMember?.role === Role.Owner);
-  const isEditor = $derived(currentMember?.role === Role.Owner || currentMember?.role === Role.Editor);
+  const currentMember = $derived(members.find((m) => m.userId === authManager.user.id));
+  const isOwner = $derived(currentMember?.role === SharedSpaceRole.Owner);
+  const isEditor = $derived(currentMember?.role === SharedSpaceRole.Owner || currentMember?.role === SharedSpaceRole.Editor);
   const showInTimeline = $derived(currentMember?.showInTimeline ?? true);
 
   const totalAssetCount = $derived(timelineManager?.assetCount ?? 0);
@@ -701,13 +701,13 @@
             icon={showInTimeline ? mdiEyeOutline : mdiEyeOffOutline}
             onClick={handleToggleTimeline}
           />
-          {#if isEditor || $user?.isAdmin}
+          {#if isEditor || authManager.user?.isAdmin}
             <hr class="my-1 border-gray-300" />
           {/if}
           {#if isEditor}
             <MenuOption text={$t('add_all_photos')} icon={mdiImageMultipleOutline} onClick={handleBulkAddAssets} />
           {/if}
-          {#if $user?.isAdmin}
+          {#if authManager.user?.isAdmin}
             <MenuOption text="Link Libraries" icon={mdiBookshelf} onClick={handleLinkLibraries} />
           {/if}
           {#if space.faceRecognitionEnabled}
@@ -893,7 +893,7 @@
           onArchive={(ids, visibility) => timelineManager.update(ids, (asset) => (asset.visibility = visibility))}
         />
       {/if}
-      {#if $preferences.tags.enabled && assetMultiSelectManager.isAllUserOwned}
+      {#if authManager.preferences.tags.enabled && assetMultiSelectManager.isAllUserOwned}
         <TagAction menuItem />
       {/if}
       {#if isEditor && assetMultiSelectManager.assets.length === 1}
@@ -907,7 +907,7 @@
   {space}
   {members}
   {activities}
-  currentUserId={$user.id}
+  currentUserId={authManager.user.id}
   {isOwner}
   open={panelOpen}
   onClose={() => (panelOpen = false)}

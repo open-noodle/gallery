@@ -1,7 +1,7 @@
 <script lang="ts">
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
   import { handleError } from '$lib/utils/handle-error';
-  import { Action2, getConfig, scanClassification, updateConfig, type SystemConfigDto } from '@immich/sdk';
+  import { Action, getConfig, scanClassification, updateConfig, type SystemConfigDto } from '@immich/sdk';
   import { Button, IconButton, modalManager, Switch, Text, toastManager } from '@immich/ui';
   import { mdiContentSave, mdiDelete, mdiPencil, mdiPlus, mdiUndoVariant } from '@mdi/js';
   import { onMount } from 'svelte';
@@ -20,7 +20,7 @@
   let formName = $state('');
   let formPrompts = $state('');
   let formSimilarity = $state(0.28);
-  let formAction: Action2 = $state(Action2.Tag);
+  let formAction: Action = $state(Action.Tag);
   let formEnabled = $state(true);
 
   const actionLabels: Record<string, string> = {
@@ -57,7 +57,7 @@
     formName = '';
     formPrompts = '';
     formSimilarity = 0.28;
-    formAction = Action2.Tag;
+    formAction = Action.Tag;
     formEnabled = true;
   };
 
@@ -240,8 +240,8 @@
             {disabled}
             class="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:border-immich-primary focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <option value={Action2.Tag}>{actionLabels.tag}</option>
-            <option value={Action2.TagAndArchive}>{actionLabels.tag_and_archive}</option>
+            <option value={Action.Tag}>{actionLabels.tag}</option>
+            <option value={Action.TagAndArchive}>{actionLabels.tag_and_archive}</option>
           </select>
         </div>
 
