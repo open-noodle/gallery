@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Theme, theme } from '@immich/ui';
+  import { Theme, themeManager } from '@immich/ui';
 
   type Props = {
     variant?: 'icon' | 'inline' | 'stacked';
@@ -27,16 +27,16 @@
   const src = $derived.by(() => {
     switch (variant) {
       case 'stacked': {
-        return theme.value === Theme.Light ? '/gallery-logo-stacked.svg' : '/gallery-logo-stacked-dark.svg';
+        return themeManager.value === Theme.Light ? '/gallery-logo-stacked.svg' : '/gallery-logo-stacked-dark.svg';
       }
       case 'inline': {
-        return theme.value === Theme.Light ? '/gallery-logo-inline-light.svg' : '/gallery-logo-inline-dark.svg';
+        return themeManager.value === Theme.Light ? '/gallery-logo-inline-light.svg' : '/gallery-logo-inline-dark.svg';
       }
       default: {
         if (transparent) {
-          return theme.value === Theme.Light ? '/gallery-loader.svg' : '/gallery-loader-dark.svg';
+          return themeManager.value === Theme.Light ? '/gallery-loader.svg' : '/gallery-loader-dark.svg';
         }
-        return theme.value === Theme.Light ? '/gallery-logo-mark.svg' : '/gallery-logo-mark-dark.svg';
+        return themeManager.value === Theme.Light ? '/gallery-logo-mark.svg' : '/gallery-logo-mark-dark.svg';
       }
     }
   });
