@@ -10,7 +10,7 @@
 
 part of openapi.api;
 
-/// Member role
+
 class SharedSpaceRole {
   /// Instantiate a new enum with the provided [value].
   const SharedSpaceRole._(this.value);

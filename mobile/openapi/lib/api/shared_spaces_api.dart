@@ -568,12 +568,12 @@ class SharedSpacesApi {
   ///
   /// * [String] id (required):
   ///
-  /// * [num] limit:
+  /// * [int] limit:
   ///   Number of items to return
   ///
-  /// * [num] offset:
+  /// * [int] offset:
   ///   Number of items to skip
-  Future<Response> getSpaceActivitiesWithHttpInfo(String id, { num? limit, num? offset, }) async {
+  Future<Response> getSpaceActivitiesWithHttpInfo(String id, { int? limit, int? offset, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/shared-spaces/{id}/activities'
       .replaceAll('{id}', id);
@@ -612,12 +612,12 @@ class SharedSpacesApi {
   ///
   /// * [String] id (required):
   ///
-  /// * [num] limit:
+  /// * [int] limit:
   ///   Number of items to return
   ///
-  /// * [num] offset:
+  /// * [int] offset:
   ///   Number of items to skip
-  Future<List<SharedSpaceActivityResponseDto>?> getSpaceActivities(String id, { num? limit, num? offset, }) async {
+  Future<List<SharedSpaceActivityResponseDto>?> getSpaceActivities(String id, { int? limit, int? offset, }) async {
     final response = await getSpaceActivitiesWithHttpInfo(id,  limit: limit, offset: offset, );
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
@@ -705,12 +705,12 @@ class SharedSpacesApi {
   ///
   /// * [String] id (required):
   ///
-  /// * [num] limit:
+  /// * [int] limit:
   ///   Maximum number of people to return (sorted by asset count)
   ///
   /// * [bool] named:
   ///
-  /// * [num] offset:
+  /// * [int] offset:
   ///   Number of people to skip
   ///
   /// * [DateTime] takenAfter:
@@ -718,7 +718,7 @@ class SharedSpacesApi {
   /// * [DateTime] takenBefore:
   ///
   /// * [bool] withHidden:
-  Future<Response> getSpacePeopleWithHttpInfo(String id, { num? limit, bool? named, num? offset, DateTime? takenAfter, DateTime? takenBefore, bool? withHidden, }) async {
+  Future<Response> getSpacePeopleWithHttpInfo(String id, { int? limit, bool? named, int? offset, DateTime? takenAfter, DateTime? takenBefore, bool? withHidden, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/shared-spaces/{id}/people'
       .replaceAll('{id}', id);
@@ -771,12 +771,12 @@ class SharedSpacesApi {
   ///
   /// * [String] id (required):
   ///
-  /// * [num] limit:
+  /// * [int] limit:
   ///   Maximum number of people to return (sorted by asset count)
   ///
   /// * [bool] named:
   ///
-  /// * [num] offset:
+  /// * [int] offset:
   ///   Number of people to skip
   ///
   /// * [DateTime] takenAfter:
@@ -784,7 +784,7 @@ class SharedSpacesApi {
   /// * [DateTime] takenBefore:
   ///
   /// * [bool] withHidden:
-  Future<List<SharedSpacePersonResponseDto>?> getSpacePeople(String id, { num? limit, bool? named, num? offset, DateTime? takenAfter, DateTime? takenBefore, bool? withHidden, }) async {
+  Future<List<SharedSpacePersonResponseDto>?> getSpacePeople(String id, { int? limit, bool? named, int? offset, DateTime? takenAfter, DateTime? takenBefore, bool? withHidden, }) async {
     final response = await getSpacePeopleWithHttpInfo(id,  limit: limit, named: named, offset: offset, takenAfter: takenAfter, takenBefore: takenBefore, withHidden: withHidden, );
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));

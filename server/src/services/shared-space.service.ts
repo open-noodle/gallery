@@ -1274,7 +1274,7 @@ export class SharedSpaceService extends BaseService {
       userId: member.userId,
       name: member.name,
       email: member.email,
-      role: member.role,
+      role: member.role as SharedSpaceRole,
       joinedAt: (member.joinedAt as Date).toISOString(),
       profileImagePath: member.profileImagePath,
       profileChangedAt: (member.profileChangedAt as Date).toISOString(),
