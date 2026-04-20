@@ -7,7 +7,9 @@ import 'package:immich_mobile/providers/photos_filter/chip_id.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
 import 'package:mocktail/mocktail.dart';
 
-import '../../test_utils.dart';
+class ListenerMock<T> extends Mock {
+  void call(T? previous, T next);
+}
 
 void main() {
   setUpAll(() {
