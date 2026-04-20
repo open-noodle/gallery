@@ -54,7 +54,7 @@ describe('AssetViewerNavBar component', () => {
 
   it('shows edited badge when asset is edited', () => {
     const prefs = preferencesFactory.build({ cast: { gCastEnabled: false } });
-    preferencesStore.set(prefs);
+    authManager.setPreferences(prefs);
 
     const asset = assetFactory.build({ isEdited: true, isTrashed: false });
     const { getByText } = renderWithTooltips(AssetViewerNavBar, { asset, ...additionalProps });
@@ -63,7 +63,7 @@ describe('AssetViewerNavBar component', () => {
 
   it('does not show edited badge when asset is not edited', () => {
     const prefs = preferencesFactory.build({ cast: { gCastEnabled: false } });
-    preferencesStore.set(prefs);
+    authManager.setPreferences(prefs);
 
     const asset = assetFactory.build({ isEdited: false, isTrashed: false });
     const { queryByText } = renderWithTooltips(AssetViewerNavBar, { asset, ...additionalProps });
