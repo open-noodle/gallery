@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Theme, theme } from '@immich/ui';
+  import { Theme, themeManager } from '@immich/ui';
 
   interface Props {
     size?: 'tiny' | 'small' | 'medium' | 'large' | 'giant';
@@ -16,7 +16,7 @@
 
   let { size = 'medium', class: className }: Props = $props();
 
-  const src = $derived(theme.value === Theme.Light ? '/gallery-loader.svg' : '/gallery-loader-dark.svg');
+  const src = $derived(themeManager.value === Theme.Light ? '/gallery-loader.svg' : '/gallery-loader-dark.svg');
 </script>
 
 <div>

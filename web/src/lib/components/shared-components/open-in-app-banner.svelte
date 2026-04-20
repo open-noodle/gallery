@@ -3,7 +3,7 @@
   import { afterNavigate } from '$app/navigation';
   import { page } from '$app/state';
   import { ANDROID_INSTALL_URL, IOS_APP_STORE_URL } from '$lib/constants';
-  import { user } from '$lib/stores/user.store';
+  import { authManager } from '$lib/managers/auth-manager.svelte';
   import { isAssetViewerRoute } from '$lib/utils/navigation';
   import { isEligible, type Eligibility, type Platform } from '$lib/utils/open-in-app';
   import { Button, IconButton } from '@immich/ui';
@@ -21,7 +21,7 @@
   // Re-arm cold-entry when auth resolves (null → user) so the banner survives
   // any pre-auth redirects that fired afterNavigate before the user store hydrated.
   $effect(() => {
-    const currentUserId = $user?.id ?? null;
+    const currentUserId = authManager.authenticated ? (authManager.user.id ?? null) : null;
     if (currentUserId && !lastUserId) {
       coldEntry = true;
     }
@@ -36,7 +36,7 @@
       userAgent: navigator.userAgent,
       maxTouchPoints: navigator.maxTouchPoints,
       pathname: page.url.pathname,
-      isAuthenticated: !!$user,
+      isAuthenticated: authManager.authenticated,
       coldEntry,
       dismissedUntil: localStorage.getItem(DISMISSAL_KEY),
       now: new Date(),

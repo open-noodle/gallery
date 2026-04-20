@@ -19,7 +19,7 @@ vi.mock('$lib/utils/tunables', () => ({
   },
 }));
 
-import { Role, type SharedSpaceMemberResponseDto } from '@immich/sdk';
+import { SharedSpaceRole, type SharedSpaceMemberResponseDto } from '@immich/sdk';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import SpaceMembersModal from './SpaceMembersModal.svelte';
 
@@ -31,7 +31,7 @@ describe('SpaceMembersModal', () => {
     userId: 'user-owner',
     name: 'Owner User',
     email: 'owner@test.com',
-    role: Role.Owner,
+    role: SharedSpaceRole.Owner,
     joinedAt: '2024-01-01T00:00:00.000Z',
     showInTimeline: true,
   };
@@ -40,7 +40,7 @@ describe('SpaceMembersModal', () => {
     userId: 'user-editor',
     name: 'Editor User',
     email: 'editor@test.com',
-    role: Role.Editor,
+    role: SharedSpaceRole.Editor,
     joinedAt: '2024-01-02T00:00:00.000Z',
     showInTimeline: true,
   };
@@ -49,7 +49,7 @@ describe('SpaceMembersModal', () => {
     userId: 'user-viewer',
     name: 'Viewer User',
     email: 'viewer@test.com',
-    role: Role.Viewer,
+    role: SharedSpaceRole.Viewer,
     joinedAt: '2024-01-03T00:00:00.000Z',
     showInTimeline: false,
   };
