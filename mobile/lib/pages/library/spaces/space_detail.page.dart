@@ -95,14 +95,14 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
   bool get _isOwner {
     final member = _currentMember;
     if (member == null) return false;
-    return member.role == SharedSpaceMemberResponseDtoRoleEnum.owner;
+    return member.role == SharedSpaceRole.owner;
   }
 
   bool get _canEdit {
     final member = _currentMember;
     if (member == null) return false;
-    return member.role == SharedSpaceMemberResponseDtoRoleEnum.owner ||
-        member.role == SharedSpaceMemberResponseDtoRoleEnum.editor;
+    return member.role == SharedSpaceRole.owner ||
+        member.role == SharedSpaceRole.editor;
   }
 
   SharedSpaceRole get _currentRole {
