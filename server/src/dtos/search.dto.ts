@@ -1,6 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Transform, Type } from 'class-transformer';
-import { IsInt, IsNotEmpty, IsString, Max, Min } from 'class-validator';
+import { createZodDto } from 'nestjs-zod';
 import { Place } from 'src/database';
 import { HistoryBuilder } from 'src/decorators';
 import { AlbumResponseSchema } from 'src/dtos/album.dto';
@@ -132,6 +130,9 @@ const SearchSuggestionRequestSchema = z
     takenAfter: isoDatetimeToDate.optional().describe('Filter suggestions by taken date (after)'),
     takenBefore: isoDatetimeToDate.optional().describe('Filter suggestions by taken date (before)'),
     spaceId: z.uuidv4().optional().describe('Scope suggestions to a specific shared space'),
+    withSharedSpaces: stringToBool
+      .optional()
+      .describe('Include suggestions from shared spaces the user is a member of'),
     includeNull: stringToBool
       .optional()
       .describe('Include null values in suggestions')
@@ -139,6 +140,176 @@ const SearchSuggestionRequestSchema = z
   })
   .meta({ id: 'SearchSuggestionRequestDto' });
 
+const TagSuggestionRequestSchema = z
+  .object({
+    spaceId: z.uuidv4().optional().describe('Scope suggestions to a specific shared space'),
+    withSharedSpaces: stringToBool
+      .optional()
+      .describe('Include suggestions from shared spaces the user is a member of'),
+    takenAfter: isoDatetimeToDate.optional().describe('Filter suggestions by taken date (after)'),
+    takenBefore: isoDatetimeToDate.optional().describe('Filter suggestions by taken date (before)'),
+  })
+  .meta({ id: 'TagSuggestionRequestDto' });
+
+const TagSuggestionResponseSchema = z
+  .object({
+    id: z.string().describe('Tag ID'),
+    value: z.string().describe('Tag value/name'),
+  })
+  .meta({ id: 'TagSuggestionResponseDto' });
+
+const FilterSuggestionsPersonSchema = z
+  .object({
+    id: z.string().describe('Person ID'),
+    name: z.string().describe('Person name'),
+  })
+  .meta({ id: 'FilterSuggestionsPersonDto' });
+
+const FilterSuggestionsTagSchema = z
+  .object({
+    id: z.string().describe('Tag ID'),
+    value: z.string().describe('Tag value/name'),
+  })
+  .meta({ id: 'FilterSuggestionsTagDto' });
+
+const FilterSuggestionsResponseSchema = z
+  .object({
+    countries: z.array(z.string()).describe('Available countries'),
+    cameraMakes: z.array(z.string()).describe('Available camera makes'),
+    tags: z.array(FilterSuggestionsTagSchema).describe('Available tags'),
+    people: z
+      .array(FilterSuggestionsPersonSchema)
+      .describe('Available people (named, non-hidden, with thumbnails)'),
+    ratings: z.array(z.number()).describe('Available ratings'),
+    mediaTypes: z.array(z.string()).describe('Available media types'),
+    hasUnnamedPeople: z.boolean().describe('Whether unnamed people exist in the filtered set'),
+  })
+  .meta({ id: 'FilterSuggestionsResponseDto' });
+
+const FilterSuggestionsRequestSchema = z
+  .object({
+    personIds: z
+      .preprocess((v) => (v === undefined ? undefined : Array.isArray(v) ? v : [v]), z.array(z.uuidv4()))
+      .optional()
+      .describe('Filter by person IDs'),
+    country: z.string().optional().describe('Filter by country'),
+    city: z.string().optional().describe('Filter by city'),
+    make: z.string().optional().describe('Filter by camera make'),
+    model: z.string().optional().describe('Filter by camera model'),
+    tagIds: z
+      .preprocess((v) => (v === undefined ? undefined : Array.isArray(v) ? v : [v]), z.array(z.uuidv4()))
+      .optional()
+      .describe('Filter by tag IDs'),
+    rating: z.coerce.number().int().min(1).max(5).optional().describe('Filter by rating (1-5)'),
+    mediaType: AssetTypeSchema.optional().describe('Filter by asset type'),
+    isFavorite: stringToBool.optional().describe('Filter by favorites'),
+    takenAfter: isoDatetimeToDate.optional().describe('Filter by taken date (after)'),
+    takenBefore: isoDatetimeToDate.optional().describe('Filter by taken date (before)'),
+    spaceId: z.uuidv4().optional().describe('Scope to a specific shared space'),
+    withSharedSpaces: stringToBool.optional().describe('Include shared spaces the user is a member of'),
+  })
+  .meta({ id: 'FilterSuggestionsRequestDto' });
+
+export class RandomSearchDto extends createZodDto(RandomSearchSchema) {}
+export class LargeAssetSearchDto extends createZodDto(LargeAssetSearchSchema) {}
+export class MetadataSearchDto extends createZodDto(MetadataSearchSchema) {}
+export class StatisticsSearchDto extends createZodDto(StatisticsSearchSchema) {}
+export class SmartSearchDto extends createZodDto(SmartSearchSchema) {}
+export class SearchPlacesDto extends createZodDto(SearchPlacesSchema) {}
+export class SearchPeopleDto extends createZodDto(SearchPeopleSchema) {}
+export class PlacesResponseDto extends createZodDto(PlacesResponseSchema) {}
+export class SearchSuggestionRequestDto extends createZodDto(SearchSuggestionRequestSchema) {}
+export class TagSuggestionRequestDto extends createZodDto(TagSuggestionRequestSchema) {}
+export class TagSuggestionResponseDto extends createZodDto(TagSuggestionResponseSchema) {}
+export class FilterSuggestionsPersonDto extends createZodDto(FilterSuggestionsPersonSchema) {}
+export class FilterSuggestionsTagDto extends createZodDto(FilterSuggestionsTagSchema) {}
+export class FilterSuggestionsResponseDto extends createZodDto(FilterSuggestionsResponseSchema) {}
+export class FilterSuggestionsRequestDto extends createZodDto(FilterSuggestionsRequestSchema) {}
+
+export function mapPlaces(place: Place): PlacesResponseDto {
+  return {
+    name: place.name,
+    latitude: place.latitude,
+    longitude: place.longitude,
+    admin1name: place.admin1Name ?? undefined,
+    admin2name: place.admin2Name ?? undefined,
+  };
+}
+
+const SearchFacetCountResponseSchema = z
+  .object({
+    count: z.int().min(0).describe('Number of assets with this facet value'),
+    value: z.string().describe('Facet value'),
+  })
+  .meta({ id: 'SearchFacetCountResponseDto' });
+
+const SearchFacetResponseSchema = z
+  .object({
+    fieldName: z.string().describe('Facet field name'),
+    counts: z.array(SearchFacetCountResponseSchema),
+  })
+  .meta({ id: 'SearchFacetResponseDto' });
+
+const SearchAlbumResponseSchema = z
+  .object({
+    total: z.int().min(0).describe('Total number of matching albums'),
+    count: z.int().min(0).describe('Number of albums in this page'),
+    items: z.array(AlbumResponseSchema),
+    facets: z.array(SearchFacetResponseSchema),
+  })
+  .meta({ id: 'SearchAlbumResponseDto' });
+
+const SearchAssetResponseSchema = z
+  .object({
+    total: z
+      .int()
+      .min(0)
+      .describe('Total number of matching assets')
+      .meta(new HistoryBuilder().deprecated('v3.0.0').getExtensions()),
+    count: z.int().min(0).describe('Number of assets in this page'),
+    items: z.array(AssetResponseSchema),
+    facets: z.array(SearchFacetResponseSchema),
+    nextPage: z.string().nullable().describe('Next page token'),
+  })
+  .meta({ id: 'SearchAssetResponseDto' });
+
+const SearchResponseSchema = z
+  .object({
+    albums: SearchAlbumResponseSchema,
+    assets: SearchAssetResponseSchema,
+  })
+  .meta({ id: 'SearchResponseDto' });
+
+export class SearchResponseDto extends createZodDto(SearchResponseSchema) {}
+
+const SearchStatisticsResponseSchema = z
+  .object({
+    total: z.int().describe('Total number of matching assets'),
+  })
+  .meta({ id: 'SearchStatisticsResponseDto' });
+
+export class SearchStatisticsResponseDto extends createZodDto(SearchStatisticsResponseSchema) {}
+
+const SearchExploreItemSchema = z
+  .object({
+    value: z.string().describe('Explore value'),
+    data: AssetResponseSchema,
+  })
+  .meta({ id: 'SearchExploreItem' });
+
+const SearchExploreResponseSchema = z
+  .object({
+    fieldName: z.string().describe('Explore field name'),
+    items: z.array(SearchExploreItemSchema),
+  })
+  .meta({ id: 'SearchExploreResponseDto' });
+
+export class SearchExploreResponseDto extends createZodDto(SearchExploreResponseSchema) {}
+
+// ─── UPSTREAM SEARCH V3 — DORMANT ───────────────────────────────
+// Not wired to any controller/service. The fork's live search runs on the legacy
+// path (searchAssetBuilderLegacy in search.repository.ts). Do not call from fork code.
+// Switch-over plan: docs/superpowers/specs/2026-07-23-search-v3-coexistence-design.md
 const IdFilterSchema = nonEmptyPartial({
   eq: z.uuidv4(),
   ne: z.uuidv4(),
@@ -403,271 +574,12 @@ const SmartSearchSchema = withShapeExclusivity(
     queryAssetId: z.uuidv4().optional().describe('Asset ID to use as search reference'),
     language: z.string().optional().describe('Search language code'),
     page: z.int().min(1).optional().describe('Page number').meta(DEPRECATED_FLAT_FIELD),
+    // Fork fields. Not marked DEPRECATED_FLAT_FIELD: that meta advertises a structured V3
+    // replacement, and neither of these has one (`order` here means relevance-vs-date on smart
+    // search; `withSharedSpaces` has no V3 equivalent at all).
+    order: AssetOrderSchema.optional().describe('Sort order (omit for relevance)'),
+    withSharedSpaces: stringToBool.optional().describe('Include shared spaces the user is a member of'),
     filter: filterField,
   }),
 ).meta({ id: 'SmartSearchDto' });
 
-export class RandomSearchDto extends createZodDto(RandomSearchSchema) {}
-export class LargeAssetSearchDto extends createZodDto(LargeAssetSearchSchema) {}
-export class MetadataSearchDto extends createZodDto(MetadataSearchSchema) {}
-export class StatisticsSearchDto extends createZodDto(StatisticsSearchSchema) {}
-export class SmartSearchDto extends createZodDto(SmartSearchSchema) {}
-export class SearchPlacesDto extends createZodDto(SearchPlacesSchema) {}
-export class SearchPeopleDto extends createZodDto(SearchPeopleSchema) {}
-export class PlacesResponseDto extends createZodDto(PlacesResponseSchema) {}
-export class SearchSuggestionRequestDto extends createZodDto(SearchSuggestionRequestSchema) {}
-
-export function mapPlaces(place: Place): PlacesResponseDto {
-  return {
-    name: place.name,
-    latitude: place.latitude,
-    longitude: place.longitude,
-    admin1name: place.admin1Name ?? undefined,
-    admin2name: place.admin2Name ?? undefined,
-  };
-}
-
-export enum SearchSuggestionType {
-  COUNTRY = 'country',
-  STATE = 'state',
-  CITY = 'city',
-  CAMERA_MAKE = 'camera-make',
-  CAMERA_MODEL = 'camera-model',
-  CAMERA_LENS_MODEL = 'camera-lens-model',
-}
-
-export class SearchSuggestionRequestDto {
-  @ValidateEnum({ enum: SearchSuggestionType, name: 'SearchSuggestionType', description: 'Suggestion type' })
-  type!: SearchSuggestionType;
-
-  @ApiPropertyOptional({ description: 'Filter by country' })
-  @IsString()
-  @Optional()
-  country?: string;
-
-  @ApiPropertyOptional({ description: 'Filter by state/province' })
-  @IsString()
-  @Optional()
-  state?: string;
-
-  @ApiPropertyOptional({ description: 'Filter by camera make' })
-  @IsString()
-  @Optional()
-  make?: string;
-
-  @ApiPropertyOptional({ description: 'Filter by camera model' })
-  @IsString()
-  @Optional()
-  model?: string;
-
-  @ApiPropertyOptional({ description: 'Filter by lens model' })
-  @IsString()
-  @Optional()
-  lensModel?: string;
-
-  @ValidateDate({ optional: true, description: 'Filter suggestions by taken date (after)' })
-  takenAfter?: Date;
-
-  @ValidateDate({ optional: true, description: 'Filter suggestions by taken date (before)' })
-  takenBefore?: Date;
-
-  @ValidateUUID({ optional: true, description: 'Scope suggestions to a specific shared space' })
-  spaceId?: string;
-
-  @ValidateBoolean({ optional: true, description: 'Include suggestions from shared spaces the user is a member of' })
-  withSharedSpaces?: boolean;
-
-  @ValidateBoolean({
-    optional: true,
-    description: 'Include null values in suggestions',
-    history: new HistoryBuilder().added('v1.111.0').stable('v2'),
-  })
-  .meta({ id: 'SearchFacetCountResponseDto' });
-
-export class TagSuggestionRequestDto {
-  @ValidateUUID({ optional: true, description: 'Scope suggestions to a specific shared space' })
-  spaceId?: string;
-
-  @ValidateBoolean({ optional: true, description: 'Include suggestions from shared spaces the user is a member of' })
-  withSharedSpaces?: boolean;
-
-  @ValidateDate({ optional: true, description: 'Filter suggestions by taken date (after)' })
-  takenAfter?: Date;
-
-  @ValidateDate({ optional: true, description: 'Filter suggestions by taken date (before)' })
-  takenBefore?: Date;
-}
-
-export class TagSuggestionResponseDto {
-  @ApiProperty({ description: 'Tag ID' })
-  id!: string;
-
-  @ApiProperty({ description: 'Tag value/name' })
-  value!: string;
-}
-
-export class FilterSuggestionsPersonDto {
-  @ApiProperty({ description: 'Person ID' })
-  id!: string;
-
-  @ApiProperty({ description: 'Person name' })
-  name!: string;
-}
-
-export class FilterSuggestionsTagDto {
-  @ApiProperty({ description: 'Tag ID' })
-  id!: string;
-
-  @ApiProperty({ description: 'Tag value/name' })
-  value!: string;
-}
-
-export class FilterSuggestionsResponseDto {
-  @ApiProperty({ type: [String], description: 'Available countries' })
-  countries!: string[];
-
-  @ApiProperty({ type: [String], description: 'Available camera makes' })
-  cameraMakes!: string[];
-
-  @ApiProperty({ type: [FilterSuggestionsTagDto], description: 'Available tags' })
-  tags!: FilterSuggestionsTagDto[];
-
-  @ApiProperty({
-    type: [FilterSuggestionsPersonDto],
-    description: 'Available people (named, non-hidden, with thumbnails)',
-  })
-  people!: FilterSuggestionsPersonDto[];
-
-  @ApiProperty({ type: [Number], description: 'Available ratings' })
-  ratings!: number[];
-
-  @ApiProperty({ type: [String], description: 'Available media types' })
-  mediaTypes!: string[];
-
-  @ApiProperty({ description: 'Whether unnamed people exist in the filtered set' })
-  hasUnnamedPeople!: boolean;
-}
-
-export class FilterSuggestionsRequestDto {
-  @ValidateUUID({ each: true, optional: true, description: 'Filter by person IDs' })
-  @Transform(({ value }) => (value === undefined ? undefined : Array.isArray(value) ? value : [value]), {
-    toClassOnly: true,
-  })
-  personIds?: string[];
-
-  @ApiPropertyOptional({ description: 'Filter by country' })
-  @IsString()
-  @Optional()
-  country?: string;
-
-  @ApiPropertyOptional({ description: 'Filter by city' })
-  @IsString()
-  @Optional()
-  city?: string;
-
-  @ApiPropertyOptional({ description: 'Filter by camera make' })
-  @IsString()
-  @Optional()
-  make?: string;
-
-  @ApiPropertyOptional({ description: 'Filter by camera model' })
-  @IsString()
-  @Optional()
-  model?: string;
-
-  @ValidateUUID({ each: true, optional: true, description: 'Filter by tag IDs' })
-  @Transform(({ value }) => (value === undefined ? undefined : Array.isArray(value) ? value : [value]), {
-    toClassOnly: true,
-  })
-  tagIds?: string[];
-
-  @Property({ type: 'number', description: 'Filter by rating (1-5)', minimum: 1, maximum: 5 })
-  @Optional()
-  @IsInt()
-  @Min(1)
-  @Max(5)
-  @Type(() => Number)
-  rating?: number;
-
-  @ValidateEnum({ enum: AssetType, name: 'AssetTypeEnum', optional: true, description: 'Filter by asset type' })
-  mediaType?: AssetType;
-
-  @ValidateBoolean({ optional: true, description: 'Filter by favorites' })
-  isFavorite?: boolean;
-
-  @ValidateDate({ optional: true, description: 'Filter by taken date (after)' })
-  takenAfter?: Date;
-
-  @ValidateDate({ optional: true, description: 'Filter by taken date (before)' })
-  takenBefore?: Date;
-
-  @ValidateUUID({ optional: true, description: 'Scope to a specific shared space' })
-  spaceId?: string;
-
-  @ValidateBoolean({ optional: true, description: 'Include shared spaces the user is a member of' })
-  withSharedSpaces?: boolean;
-}
-
-class SearchFacetCountResponseDto {
-  @ApiProperty({ type: 'integer', description: 'Number of assets with this facet value' })
-  count!: number;
-  @ApiProperty({ description: 'Facet value' })
-  value!: string;
-}
-
-const SearchAlbumResponseSchema = z
-  .object({
-    total: z.int().min(0).describe('Total number of matching albums'),
-    count: z.int().min(0).describe('Number of albums in this page'),
-    items: z.array(AlbumResponseSchema),
-    facets: z.array(SearchFacetResponseSchema),
-  })
-  .meta({ id: 'SearchAlbumResponseDto' });
-
-const SearchAssetResponseSchema = z
-  .object({
-    total: z
-      .int()
-      .min(0)
-      .describe('Total number of matching assets')
-      .meta(new HistoryBuilder().deprecated('v3.0.0').getExtensions()),
-    count: z.int().min(0).describe('Number of assets in this page'),
-    items: z.array(AssetResponseSchema),
-    facets: z.array(SearchFacetResponseSchema),
-    nextPage: z.string().nullable().describe('Next page token').meta(DEPRECATED_FLAT_FIELD),
-    nextCursor: z.string().nullable().describe('Cursor for the next page of results').meta(ADDED_V3_2),
-  })
-  .meta({ id: 'SearchAssetResponseDto' });
-
-const SearchResponseSchema = z
-  .object({
-    albums: SearchAlbumResponseSchema,
-    assets: SearchAssetResponseSchema,
-  })
-  .meta({ id: 'SearchResponseDto' });
-
-export class SearchResponseDto extends createZodDto(SearchResponseSchema) {}
-
-const SearchStatisticsResponseSchema = z
-  .object({
-    total: z.int().describe('Total number of matching assets'),
-  })
-  .meta({ id: 'SearchStatisticsResponseDto' });
-
-export class SearchStatisticsResponseDto extends createZodDto(SearchStatisticsResponseSchema) {}
-
-const SearchExploreItemSchema = z
-  .object({
-    value: z.string().describe('Explore value'),
-    data: AssetResponseSchema,
-  })
-  .meta({ id: 'SearchExploreItem' });
-
-const SearchExploreResponseSchema = z
-  .object({
-    fieldName: z.string().describe('Explore field name'),
-    items: z.array(SearchExploreItemSchema),
-  })
-  .meta({ id: 'SearchExploreResponseDto' });
-
-export class SearchExploreResponseDto extends createZodDto(SearchExploreResponseSchema) {}
