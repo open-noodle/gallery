@@ -61,6 +61,8 @@ packageExtensions:
   tailwind-variants:
     dependencies:
       tailwindcss: '>=4.1'
+patchedDependencies:
+  '@immich/ui@0.77.3': patches/@immich__ui@0.77.3.patch
 preferWorkspacePackages: true
 shamefullyHoist: false
 verifyDepsBeforeRun: install
