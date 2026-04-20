@@ -12,4 +12,14 @@ abstract final class UserStub {
     profileChangedAt: DateTime(2021),
     avatarColor: AvatarColor.green,
   );
+
+  static final user1 = UserDto(
+    id: "user-1",
+    email: "user1@test.com",
+    name: "user1",
+    isAdmin: false,
+    updatedAt: DateTime(2021),
+    profileChangedAt: DateTime(2021),
+    avatarColor: AvatarColor.blue,
+  );
 }
