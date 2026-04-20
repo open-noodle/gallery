@@ -123,14 +123,14 @@
       };
     },
     providers: {
-      cities: async (country, context) =>
+      cities: (country, context) =>
         getSearchSuggestions({
           $type: SearchSuggestionType.City,
           country,
           withSharedSpaces: true,
           ...context,
         }),
-      cameraModels: async (make, context) =>
+      cameraModels: (make, context) =>
         getSearchSuggestions({
           $type: SearchSuggestionType.CameraModel,
           make,
