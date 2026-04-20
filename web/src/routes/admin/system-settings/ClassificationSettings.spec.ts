@@ -1,5 +1,5 @@
-import ClassificationSettings from '$lib/components/admin-settings/ClassificationSettings.svelte';
-import { Action2, getConfig, scanClassification, updateConfig, type SystemConfigDto } from '@immich/sdk';
+import ClassificationSettings from './ClassificationSettings.svelte';
+import { Action, getConfig, scanClassification, updateConfig, type SystemConfigDto } from '@immich/sdk';
 import { modalManager, toastManager } from '@immich/ui';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
@@ -9,7 +9,7 @@ vi.mock('@immich/sdk', () => ({
   getConfig: vi.fn(),
   updateConfig: vi.fn(),
   scanClassification: vi.fn(),
-  Action2: { Tag: 'tag', TagAndArchive: 'tag_and_archive' },
+  Action: { Tag: 'tag', TagAndArchive: 'tag_and_archive' },
 }));
 
 const mockFeatureFlags = { configFile: false, smartSearch: true, trash: true };
@@ -45,7 +45,7 @@ const makeCategory = (
   name: 'Screenshots',
   prompts: ['a screenshot'],
   similarity: 0.28,
-  action: Action2.Tag,
+  action: Action.Tag,
   enabled: true,
   ...overrides,
 });

@@ -2,7 +2,7 @@
   import AdminPageLayout from '$lib/components/layouts/AdminPageLayout.svelte';
   import { handleError } from '$lib/utils/handle-error';
   import {
-    Direction,
+    StorageMigrationDirection,
     getEstimate as getEstimateRaw,
     getStatus as getStatusRaw,
     start as startMigrationRaw,
@@ -47,8 +47,8 @@
     paused: number;
   }
 
-  // Direction
-  let direction: Direction = $state(Direction.ToS3);
+  // StorageMigrationDirection
+  let direction: StorageMigrationDirection = $state(StorageMigrationDirection.ToS3);
 
   // File types
   let originals = $state(true);
@@ -186,16 +186,16 @@
 <AdminPageLayout breadcrumbs={[{ title: data.meta.title }]}>
   <Container size="medium" center>
     <div class="flex flex-col gap-8 pb-28">
-      <!-- Direction -->
+      <!-- StorageMigrationDirection -->
       <section class="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
-        <h2 class="mb-4 text-lg font-semibold">Migration Direction</h2>
+        <h2 class="mb-4 text-lg font-semibold">Migration StorageMigrationDirection</h2>
         <div class="flex gap-6">
           <label class="flex cursor-pointer items-center gap-2">
-            <input type="radio" bind:group={direction} value={Direction.ToS3} class="accent-primary" />
+            <input type="radio" bind:group={direction} value={StorageMigrationDirection.ToS3} class="accent-primary" />
             <span>Disk &rarr; S3</span>
           </label>
           <label class="flex cursor-pointer items-center gap-2">
-            <input type="radio" bind:group={direction} value={Direction.ToDisk} class="accent-primary" />
+            <input type="radio" bind:group={direction} value={StorageMigrationDirection.ToDisk} class="accent-primary" />
             <span>S3 &rarr; Disk</span>
           </label>
         </div>

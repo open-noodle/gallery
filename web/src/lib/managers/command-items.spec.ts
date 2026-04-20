@@ -8,7 +8,7 @@ import * as fileUploader from '$lib/utils/file-uploader';
 import * as handleErrorModule from '$lib/utils/handle-error';
 import type { AlbumResponseDto, SharedSpaceMemberResponseDto, SharedSpaceResponseDto } from '@immich/sdk';
 import * as sdk from '@immich/sdk';
-import { QueueCommand, QueueName, Role } from '@immich/sdk';
+import { QueueCommand, QueueName, SharedSpaceRole } from '@immich/sdk';
 import { modalManager, toastManager } from '@immich/ui';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import AlbumEditModal from '../modals/AlbumEditModal.svelte';
@@ -19,18 +19,6 @@ import SpaceCreateModal from '../modals/SpaceCreateModal.svelte';
 import SpaceMembersModal from '../modals/SpaceMembersModal.svelte';
 import type { CommandContext } from './command-context-manager.svelte';
 import { COMMAND_ITEMS, isAlmostExactCommandMatch, type CommandItem } from './command-items';
-
-const { mockUser } = vi.hoisted(() => ({
-  mockUser: { current: { id: 'test-user' } as { id: string } | null },
-}));
-vi.mock('$lib/stores/user.store', () => ({
-  user: {
-    subscribe: (run: (v: { id: string } | null) => void) => {
-      run(mockUser.current);
-      return () => {};
-    },
-  },
-}));
 
 vi.mock('@immich/ui', async (orig) => {
   const actual = await orig<typeof import('@immich/ui')>();
@@ -58,8 +46,19 @@ vi.mock('$lib/services/album.service', () => ({
   handleDownloadAlbum: vi.fn().mockResolvedValue(undefined),
 }));
 
+const { mockUser } = vi.hoisted(() => ({
+  mockUser: { current: { id: 'test-user' } as { id: string } | null },
+}));
 vi.mock('$lib/managers/auth-manager.svelte', () => ({
-  authManager: { logout: vi.fn().mockResolvedValue(undefined) },
+  authManager: {
+    logout: vi.fn().mockResolvedValue(undefined),
+    get authenticated() {
+      return mockUser.current !== null;
+    },
+    get user() {
+      return mockUser.current;
+    },
+  },
 }));
 
 beforeEach(() => {
@@ -522,7 +521,7 @@ describe('space-context commands', () => {
       email: 'me@test.com',
       name: 'Me',
       joinedAt: '2024-01-01T00:00:00.000Z',
-      role: Role.Editor,
+      role: SharedSpaceRole.Editor,
       ...overrides,
     }) as unknown as SharedSpaceMemberResponseDto;
 
@@ -599,7 +598,7 @@ describe('space-context commands', () => {
       expect(cmd().isAvailable!(makeCtx())).toBe(true);
     });
     it('handler opens SpaceMembersModal with ctx.space.members (NOT raw.members)', async () => {
-      const members = [makeMember({ userId: 'u-owner', role: Role.Owner })];
+      const members = [makeMember({ userId: 'u-owner', role: SharedSpaceRole.Owner })];
       const ctx = makeCtx({ space: { ...makeCtx().space!, members } });
       await cmd().handler(ctx);
       expect(modalManager.show).toHaveBeenCalledWith(
