@@ -1,5 +1,5 @@
 <script lang="ts">
-  import StorageTemplateSettings from '$lib/components/admin-settings/StorageTemplateSettings.svelte';
+  import StorageTemplateSettings from '../../admin/system-settings/StorageTemplateSettings.svelte';
   import FormatMessage from '$lib/elements/FormatMessage.svelte';
   import { authManager } from '$lib/managers/auth-manager.svelte';
   import { Link } from '@immich/ui';
