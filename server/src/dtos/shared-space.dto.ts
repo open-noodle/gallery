@@ -59,7 +59,7 @@ const SharedSpaceLinkedLibrarySchema = z
     libraryId: z.string(),
     libraryName: z.string(),
     addedById: z.string().nullable(),
-    createdAt: z.date(),
+    createdAt: z.string().meta({ format: 'date-time' }).describe('Link creation timestamp'),
   })
   .meta({ id: 'SharedSpaceLinkedLibraryDto' });
 
