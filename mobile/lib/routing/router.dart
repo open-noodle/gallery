@@ -26,11 +26,6 @@ import 'package:immich_mobile/pages/common/settings.page.dart';
 import 'package:immich_mobile/pages/common/splash_screen.page.dart';
 import 'package:immich_mobile/pages/common/tab_shell.page.dart';
 import 'package:immich_mobile/presentation/pages/common/gallery_tab_shell.page.dart';
-import 'package:immich_mobile/pages/editing/crop.page.dart';
-import 'package:immich_mobile/pages/editing/edit.page.dart';
-import 'package:immich_mobile/pages/editing/filter.page.dart';
-import 'package:immich_mobile/pages/library/archive.page.dart';
-import 'package:immich_mobile/pages/library/favorite.page.dart';
 import 'package:immich_mobile/pages/library/folder/folder.page.dart';
 import 'package:immich_mobile/pages/library/locked/pin_auth.page.dart';
 import 'package:immich_mobile/pages/library/partner/partner.page.dart';
@@ -152,17 +147,6 @@ class AppRouter extends RootStackRouter {
       ],
     ),
     // <<< fork-only gallery-bottom-nav
-    CustomRoute(
-      page: GalleryViewerRoute.page,
-      guards: [_authGuard, _galleryGuard],
-      transitionsBuilder: CustomTransitionsBuilders.zoomedPage,
-    ),
-    AutoRoute(page: BackupControllerRoute.page, guards: [_authGuard, _duplicateGuard, _backupPermissionGuard]),
-    AutoRoute(page: AllPlacesRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: CreateAlbumRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: EditImageRoute.page),
-    AutoRoute(page: CropImageRoute.page),
-    AutoRoute(page: FilterImageRoute.page),
     AutoRoute(page: ProfilePictureCropRoute.page),
     AutoRoute(page: SettingsRoute.page, guards: [_duplicateGuard]),
     AutoRoute(page: SettingsSubRoute.page, guards: [_duplicateGuard]),
@@ -190,12 +174,6 @@ class AppRouter extends RootStackRouter {
     // (which would render the old 4-tab nav).
     AutoRoute(page: SpacesRoute.page, guards: [_authGuard, _duplicateGuard]),
     // <<< fork-only
-    CustomRoute(
-      page: ActivitiesRoute.page,
-      guards: [_authGuard, _duplicateGuard],
-      transitionsBuilder: TransitionsBuilders.slideLeft,
-      durationInMilliseconds: 200,
-    ),
     CustomRoute(page: MapLocationPickerRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: HeaderSettingsRoute.page, guards: [_duplicateGuard]),
     AutoRoute(page: ShareIntentRoute.page, guards: [_authGuard, _duplicateGuard]),
