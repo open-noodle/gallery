@@ -8,8 +8,8 @@ import { uploadRequest } from '#lib/utils.ts';
 import { ExecutorQueue } from '#lib/utils/executor-queue.ts';
 import { asQueryString } from '#lib/utils/shared-links.ts';
 import {
-  Action,
   AssetMediaStatus,
+  AssetUploadAction,
   AssetVisibility,
   checkBulkUpload,
   getBaseUrl,
@@ -185,7 +185,7 @@ async function fileUploader({
         const {
           results: [checkUploadResult],
         } = await checkBulkUpload({ assetBulkUploadCheckDto: { assets: [{ id: assetFile.name, checksum }] } });
-        if (checkUploadResult && checkUploadResult.action === Action.Reject && checkUploadResult.assetId) {
+        if (checkUploadResult && checkUploadResult.action === AssetUploadAction.Reject && checkUploadResult.assetId) {
           responseData = {
             status: AssetMediaStatus.Duplicate,
             id: checkUploadResult.assetId,
