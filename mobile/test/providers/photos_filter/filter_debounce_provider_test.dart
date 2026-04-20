@@ -91,8 +91,11 @@ void main() {
 
         container.read(photosFilterProvider.notifier).setText('oslo');
         async.elapse(const Duration(milliseconds: 260));
-        expect(container.read(photosTimelineFilterProvider).context, isNull,
-            reason: '260 ms is within the 500 ms timeline debounce');
+        expect(
+          container.read(photosTimelineFilterProvider).context,
+          isNull,
+          reason: '260 ms is within the 500 ms timeline debounce',
+        );
         async.elapse(const Duration(milliseconds: 260));
         expect(container.read(photosTimelineFilterProvider).context, 'oslo');
       });
