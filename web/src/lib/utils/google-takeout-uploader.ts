@@ -3,8 +3,8 @@ import { uploadRequest } from '$lib/utils';
 import { createAlbum } from '$lib/utils/album-utils';
 import type { TakeoutMediaItem } from '$lib/utils/google-takeout-parser';
 import {
-  Action,
   AssetMediaStatus,
+  AssetUploadAction,
   AssetVisibility,
   checkBulkUpload,
   getBaseUrl,
@@ -42,7 +42,7 @@ export async function uploadTakeoutItem(item: TakeoutMediaItem, options: ImportO
         } = await checkBulkUpload({
           assetBulkUploadCheckDto: { assets: [{ id: item.file.name, checksum }] },
         });
-        if (checkResult.action === Action.Reject && checkResult.assetId) {
+        if (checkResult.action === AssetUploadAction.Reject && checkResult.assetId) {
           return { assetId: checkResult.assetId, status: 'duplicate' };
         }
       } catch (error) {
