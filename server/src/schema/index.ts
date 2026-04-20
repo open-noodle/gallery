@@ -50,7 +50,6 @@ import { AssetMetadataTable } from 'src/schema/tables/asset-metadata.table.js';
 import { AssetOcrAuditTable } from 'src/schema/tables/asset-ocr-audit.table.js';
 import { AssetOcrTable } from 'src/schema/tables/asset-ocr.table.js';
 import { AssetTable } from 'src/schema/tables/asset.table.js';
-import { AuditTable } from 'src/schema/tables/audit.table.js';
 import { ClusterGroupRequestTable } from 'src/schema/tables/cluster-group-request.table.js';
 import { ClusterGroupTable } from 'src/schema/tables/cluster-group.table.js';
 import { FaceSearchTable } from 'src/schema/tables/face-search.table.js';
@@ -269,8 +268,6 @@ export interface DB {
   asset_video: AssetVideoTable;
   asset_keyframe: AssetKeyframeTable;
   ocr_search: OcrSearchTable;
-
-  audit: AuditTable;
 
   face_search: FaceSearchTable;
 
