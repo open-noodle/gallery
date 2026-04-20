@@ -41,18 +41,9 @@ void main() {
     });
 
     test('returns bucket counts grouped by day', () async {
-      final asset1 = await ctx.newRemoteAsset(
-        ownerId: userId,
-        createdAt: DateTime(2026, 4, 1, 12),
-      );
-      final asset2 = await ctx.newRemoteAsset(
-        ownerId: userId,
-        createdAt: DateTime(2026, 4, 1, 18),
-      );
-      final asset3 = await ctx.newRemoteAsset(
-        ownerId: userId,
-        createdAt: DateTime(2026, 4, 2, 9),
-      );
+      final asset1 = await ctx.newRemoteAsset(ownerId: userId, createdAt: DateTime(2026, 4, 1, 12));
+      final asset2 = await ctx.newRemoteAsset(ownerId: userId, createdAt: DateTime(2026, 4, 1, 18));
+      final asset3 = await ctx.newRemoteAsset(ownerId: userId, createdAt: DateTime(2026, 4, 2, 9));
       await ctx.insertSharedSpaceAsset(spaceId: spaceId, assetId: asset1.id);
       await ctx.insertSharedSpaceAsset(spaceId: spaceId, assetId: asset2.id);
       await ctx.insertSharedSpaceAsset(spaceId: spaceId, assetId: asset3.id);
@@ -85,10 +76,7 @@ void main() {
 
     test('respects offset and limit on the asset source', () async {
       for (var i = 0; i < 5; i++) {
-        final asset = await ctx.newRemoteAsset(
-          ownerId: userId,
-          createdAt: DateTime(2026, 4, i + 1),
-        );
+        final asset = await ctx.newRemoteAsset(ownerId: userId, createdAt: DateTime(2026, 4, i + 1));
         await ctx.insertSharedSpaceAsset(spaceId: spaceId, assetId: asset.id);
       }
 
@@ -300,11 +288,7 @@ void main() {
       test('reactive stream: removing a shared_space_library row drops library assets', () async {
         final library = await ctx.newLibrary(ownerId: userId);
         await ctx.insertSharedSpaceLibrary(spaceId: spaceId, libraryId: library.id);
-        await ctx.newRemoteAsset(
-          ownerId: userId,
-          libraryId: library.id,
-          createdAt: DateTime(2026, 4, 1, 12),
-        );
+        await ctx.newRemoteAsset(ownerId: userId, libraryId: library.id, createdAt: DateTime(2026, 4, 1, 12));
 
         final query = sut.sharedSpace(spaceId, GroupAssetsBy.day);
         final emissions = <List<Bucket>>[];
@@ -315,9 +299,9 @@ void main() {
         expect(emissions.last, hasLength(1));
 
         // Remove the library link — the asset should drop out of the space timeline.
-        await (ctx.db.delete(ctx.db.sharedSpaceLibraryEntity)
-              ..where((row) => row.spaceId.equals(spaceId) & row.libraryId.equals(library.id)))
-            .go();
+        await (ctx.db.delete(
+          ctx.db.sharedSpaceLibraryEntity,
+        )..where((row) => row.spaceId.equals(spaceId) & row.libraryId.equals(library.id))).go();
         await Future<void>.delayed(const Duration(milliseconds: 100));
 
         expect(emissions.last, isEmpty);
@@ -337,11 +321,7 @@ void main() {
         expect(emissions[0], isEmpty);
 
         // Insert an asset directly tagged with the linked libraryId
-        await ctx.newRemoteAsset(
-          ownerId: userId,
-          libraryId: library.id,
-          createdAt: DateTime(2026, 4, 1, 12),
-        );
+        await ctx.newRemoteAsset(ownerId: userId, libraryId: library.id, createdAt: DateTime(2026, 4, 1, 12));
         await Future<void>.delayed(const Duration(milliseconds: 100));
 
         expect(emissions.length, greaterThanOrEqualTo(2));
@@ -353,16 +333,8 @@ void main() {
       test('reactive stream: inserting a new library link exposes pre-existing library assets', () async {
         final library = await ctx.newLibrary(ownerId: userId);
         // Library has assets BEFORE the link exists.
-        await ctx.newRemoteAsset(
-          ownerId: userId,
-          libraryId: library.id,
-          createdAt: DateTime(2026, 4, 1, 12),
-        );
-        await ctx.newRemoteAsset(
-          ownerId: userId,
-          libraryId: library.id,
-          createdAt: DateTime(2026, 4, 2, 12),
-        );
+        await ctx.newRemoteAsset(ownerId: userId, libraryId: library.id, createdAt: DateTime(2026, 4, 1, 12));
+        await ctx.newRemoteAsset(ownerId: userId, libraryId: library.id, createdAt: DateTime(2026, 4, 2, 12));
 
         final query = sut.sharedSpace(spaceId, GroupAssetsBy.day);
         final emissions = <List<Bucket>>[];
@@ -390,13 +362,25 @@ void main() {
         await ctx.insertSharedSpaceLibrary(spaceId: spaceId, libraryId: library.id);
 
         // Interleave: lib(day1) → direct(day2) → lib(day3) → direct(day4) → lib(day5) → direct(day6)
-        final lib1 = await ctx.newRemoteAsset(ownerId: userId, libraryId: library.id, createdAt: DateTime(2026, 4, 1, 12));
+        final lib1 = await ctx.newRemoteAsset(
+          ownerId: userId,
+          libraryId: library.id,
+          createdAt: DateTime(2026, 4, 1, 12),
+        );
         final direct2 = await ctx.newRemoteAsset(ownerId: userId, createdAt: DateTime(2026, 4, 2, 12));
         await ctx.insertSharedSpaceAsset(spaceId: spaceId, assetId: direct2.id);
-        final lib3 = await ctx.newRemoteAsset(ownerId: userId, libraryId: library.id, createdAt: DateTime(2026, 4, 3, 12));
+        final lib3 = await ctx.newRemoteAsset(
+          ownerId: userId,
+          libraryId: library.id,
+          createdAt: DateTime(2026, 4, 3, 12),
+        );
         final direct4 = await ctx.newRemoteAsset(ownerId: userId, createdAt: DateTime(2026, 4, 4, 12));
         await ctx.insertSharedSpaceAsset(spaceId: spaceId, assetId: direct4.id);
-        final lib5 = await ctx.newRemoteAsset(ownerId: userId, libraryId: library.id, createdAt: DateTime(2026, 4, 5, 12));
+        final lib5 = await ctx.newRemoteAsset(
+          ownerId: userId,
+          libraryId: library.id,
+          createdAt: DateTime(2026, 4, 5, 12),
+        );
         final direct6 = await ctx.newRemoteAsset(ownerId: userId, createdAt: DateTime(2026, 4, 6, 12));
         await ctx.insertSharedSpaceAsset(spaceId: spaceId, assetId: direct6.id);
 
@@ -465,11 +449,7 @@ void main() {
           createdAt: DateTime(2026, 4, 1, 12),
         );
         // Asset in the dangling library — should NOT appear.
-        await ctx.newRemoteAsset(
-          ownerId: userId,
-          libraryId: danglingLib.id,
-          createdAt: DateTime(2026, 4, 2, 12),
-        );
+        await ctx.newRemoteAsset(ownerId: userId, libraryId: danglingLib.id, createdAt: DateTime(2026, 4, 2, 12));
 
         final query = sut.sharedSpace(spaceId, GroupAssetsBy.day);
         final assets = await query.assetSource(0, 10);
@@ -517,43 +497,19 @@ void main() {
         await ctx.insertSharedSpaceLibrary(spaceId: spaceId, libraryId: libB.id);
 
         // 2 assets in libA
-        final a1 = await ctx.newRemoteAsset(
-          ownerId: userId,
-          libraryId: libA.id,
-          createdAt: DateTime(2026, 4, 1, 12),
-        );
-        final a2 = await ctx.newRemoteAsset(
-          ownerId: userId,
-          libraryId: libA.id,
-          createdAt: DateTime(2026, 4, 2, 12),
-        );
+        final a1 = await ctx.newRemoteAsset(ownerId: userId, libraryId: libA.id, createdAt: DateTime(2026, 4, 1, 12));
+        final a2 = await ctx.newRemoteAsset(ownerId: userId, libraryId: libA.id, createdAt: DateTime(2026, 4, 2, 12));
         // 2 assets in libB
-        final b1 = await ctx.newRemoteAsset(
-          ownerId: userId,
-          libraryId: libB.id,
-          createdAt: DateTime(2026, 4, 3, 12),
-        );
-        final b2 = await ctx.newRemoteAsset(
-          ownerId: userId,
-          libraryId: libB.id,
-          createdAt: DateTime(2026, 4, 4, 12),
-        );
+        final b1 = await ctx.newRemoteAsset(ownerId: userId, libraryId: libB.id, createdAt: DateTime(2026, 4, 3, 12));
+        final b2 = await ctx.newRemoteAsset(ownerId: userId, libraryId: libB.id, createdAt: DateTime(2026, 4, 4, 12));
         // 1 asset that is BOTH in libA AND directly added — exercises the OR-dedup
         // path (the row matches the libraryId branch AND the id branch).
-        final c1 = await ctx.newRemoteAsset(
-          ownerId: userId,
-          libraryId: libA.id,
-          createdAt: DateTime(2026, 4, 5, 12),
-        );
+        final c1 = await ctx.newRemoteAsset(ownerId: userId, libraryId: libA.id, createdAt: DateTime(2026, 4, 5, 12));
         await ctx.insertSharedSpaceAsset(spaceId: spaceId, assetId: c1.id);
         // 1 asset that is in an unrelated library (NOT linked to this space) —
         // must NOT appear in the timeline.
         final unrelatedLib = await ctx.newLibrary(ownerId: userId);
-        await ctx.newRemoteAsset(
-          ownerId: userId,
-          libraryId: unrelatedLib.id,
-          createdAt: DateTime(2026, 4, 6, 12),
-        );
+        await ctx.newRemoteAsset(ownerId: userId, libraryId: unrelatedLib.id, createdAt: DateTime(2026, 4, 6, 12));
 
         final query = sut.sharedSpace(spaceId, GroupAssetsBy.day);
         final assets = await query.assetSource(0, 20);
