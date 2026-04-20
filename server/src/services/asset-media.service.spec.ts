@@ -4,14 +4,13 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { Stats } from 'node:fs';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend';
 import { AssetFile } from 'src/database';
 import { AssetMediaStatus, AssetRejectReason, AssetUploadAction } from 'src/dtos/asset-media-response.dto';
 import { AssetMediaCreateDto, AssetMediaSize, UploadFieldName } from 'src/dtos/asset-media.dto';
 import { MapAsset } from 'src/dtos/asset-response.dto';
 import { AssetEditAction } from 'src/dtos/editing.dto';
-import { AssetFileType, AssetStatus, AssetType, AssetVisibility, CacheControl, JobName } from 'src/enum';
+import { AssetFileType, AssetType, AssetVisibility, CacheControl, JobName } from 'src/enum';
 import { AuthRequest } from 'src/middleware/auth.guard';
 import { AssetMediaService } from 'src/services/asset-media.service';
 import { StorageService } from 'src/services/storage.service';
@@ -181,12 +180,12 @@ const existingAsset = Object.freeze({
   originalFileName: 'existing-filename.jpeg',
 }) as MapAsset;
 
-const sidecarAsset = Object.freeze({
+const _sidecarAsset = Object.freeze({
   ...existingAsset,
   checksum: Buffer.from('_getExistingAssetWithSideCar', 'utf8'),
 }) as MapAsset;
 
-const copiedAsset = Object.freeze({
+const _copiedAsset = Object.freeze({
   id: 'copied-asset',
   originalPath: 'copied-path',
 }) as MapAsset;
