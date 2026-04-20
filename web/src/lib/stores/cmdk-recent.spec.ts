@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// The cmdk-recent store reads the current user id from $lib/stores/user.store so
+// The cmdk-recent store reads the current user id from the authManager so
 // it can scope entries per user. Tests drive this via a hoisted mock — flipping
 // `mockUser.current` simulates a logout/login without having to touch a real
 // Svelte store. The default `test-user` keeps the broad suite of existing tests
@@ -8,11 +8,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const { mockUser } = vi.hoisted(() => ({
   mockUser: { current: { id: 'test-user' } as { id: string } | null },
 }));
-vi.mock('$lib/stores/user.store', () => ({
-  user: {
-    subscribe: (run: (v: { id: string } | null) => void) => {
-      run(mockUser.current);
-      return () => {};
+vi.mock('$lib/managers/auth-manager.svelte', () => ({
+  authManager: {
+    get authenticated() {
+      return mockUser.current !== null;
+    },
+    get user() {
+      return mockUser.current;
     },
   },
 }));

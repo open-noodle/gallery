@@ -5,7 +5,6 @@
   import { handleError } from '$lib/utils/handle-error';
   import {
     removeMember,
-    Role,
     SharedSpaceRole,
     updateMember,
     UserAvatarColor,
@@ -67,7 +66,7 @@
     }
 
     const previousRole = member.role;
-    members = members.map((m) => (m.userId === member.userId ? { ...m, role: newRole as unknown as Role } : m));
+    members = members.map((m) => (m.userId === member.userId ? { ...m, role: newRole } : m));
 
     try {
       const updated = await updateMember({
