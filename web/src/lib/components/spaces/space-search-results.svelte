@@ -44,7 +44,7 @@
     }
   });
 
-  const getFullAsset = async (id: string): Promise<AssetResponseDto> => {
+  const getFullAsset = (id: string): Promise<AssetResponseDto> => {
     return getAssetInfo({ ...authManager.params, id, ...(spaceId ? { spaceId } : {}) });
   };
 
