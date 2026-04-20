@@ -131,19 +131,7 @@ describe('SessionService', () => {
       expect(mocks.session.getByUserId).toHaveBeenCalledWith(auth.user.id);
     });
 
-    it('should handle auth without a session (e.g. api key)', async () => {
-      const session = factory.session();
-      const auth = factory.auth();
-
-      mocks.session.invalidateAll.mockResolvedValue();
-
-      const result = await sut.getAll(auth);
-
-      expect(mocks.session.invalidateAll).toHaveBeenCalledWith({
-        userId: auth.user.id,
-        excludeId: currentSession.id,
-      });
-    });
+    // Removed: fork-era test for getAll invoking invalidateAll — service.getAll() only reads, it does not invalidate.
   });
 
   describe('update', () => {
@@ -213,21 +201,21 @@ describe('SessionService', () => {
       const currentSession = factory.session();
       const auth = factory.auth({ session: currentSession });
 
-      mocks.session.invalidate.mockResolvedValue();
+      mocks.session.invalidateAll.mockResolvedValue();
 
       await sut.deleteAll(auth);
 
-      expect(mocks.session.invalidate).toHaveBeenCalledWith({ userId: auth.user.id, excludeId: currentSession.id });
+      expect(mocks.session.invalidateAll).toHaveBeenCalledWith({ userId: auth.user.id, excludeId: currentSession.id });
     });
 
     it('should handle auth without a session', async () => {
       const auth = factory.auth();
 
-      mocks.session.invalidate.mockResolvedValue();
+      mocks.session.invalidateAll.mockResolvedValue();
 
       await sut.deleteAll(auth);
 
-      expect(mocks.session.invalidate).toHaveBeenCalledWith({ userId: auth.user.id, excludeId: undefined });
+      expect(mocks.session.invalidateAll).toHaveBeenCalledWith({ userId: auth.user.id, excludeId: undefined });
     });
   });
 
@@ -261,21 +249,21 @@ describe('SessionService', () => {
       const userId = newUuid();
       const currentSessionId = newUuid();
 
-      mocks.session.invalidate.mockResolvedValue();
+      mocks.session.invalidateAll.mockResolvedValue();
 
       await sut.onAuthChangePassword({ userId, currentSessionId });
 
-      expect(mocks.session.invalidate).toHaveBeenCalledWith({ userId, excludeId: currentSessionId });
+      expect(mocks.session.invalidateAll).toHaveBeenCalledWith({ userId, excludeId: currentSessionId });
     });
 
     it('should invalidate all sessions when no current session id is provided', async () => {
       const userId = newUuid();
 
-      mocks.session.invalidate.mockResolvedValue();
+      mocks.session.invalidateAll.mockResolvedValue();
 
       await sut.onAuthChangePassword({ userId, currentSessionId: undefined as unknown as string });
 
-      expect(mocks.session.invalidate).toHaveBeenCalledWith({ userId, excludeId: undefined });
+      expect(mocks.session.invalidateAll).toHaveBeenCalledWith({ userId, excludeId: undefined });
     });
   });
 });
