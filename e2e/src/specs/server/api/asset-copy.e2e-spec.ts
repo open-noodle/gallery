@@ -27,6 +27,17 @@ import { beforeAll, describe, expect, it } from 'vitest';
 // would need a stack fixture and a shared-link fixture respectively, which is
 // more setup than the T26 scope justifies.
 
+// Upstream removed `assets` from AlbumResponseDto; query members via metadata
+// search filtered by albumIds instead.
+const getAlbumAssetIds = async (accessToken: string, albumId: string): Promise<string[]> => {
+  const { body } = await request(app)
+    .post('/search/metadata')
+    .set(asBearerAuth(accessToken))
+    .send({ albumIds: [albumId], size: 1000 });
+  const items = (body as { assets: { items: Array<{ id: string }> } }).assets.items;
+  return items.map((item) => item.id);
+};
+
 describe('PUT /assets/copy', () => {
   let admin: LoginResponseDto;
   let owner: LoginResponseDto;
@@ -201,10 +212,7 @@ describe('PUT /assets/copy', () => {
     });
 
     // Sanity: target is NOT in the album before the copy.
-    const before = await request(app)
-      .get(`/albums/${album.id}?withoutAssets=false`)
-      .set(asBearerAuth(owner.accessToken));
-    const beforeIds = (before.body as { assets: Array<{ id: string }> }).assets.map((a) => a.id);
+    const beforeIds = await getAlbumAssetIds(owner.accessToken, album.id);
     expect(beforeIds).toContain(sourceId);
     expect(beforeIds).not.toContain(targetId);
 
@@ -214,10 +222,7 @@ describe('PUT /assets/copy', () => {
       .send({ sourceId, targetId });
     expect(copy.status).toBe(204);
 
-    const after = await request(app)
-      .get(`/albums/${album.id}?withoutAssets=false`)
-      .set(asBearerAuth(owner.accessToken));
-    const afterIds = (after.body as { assets: Array<{ id: string }> }).assets.map((a) => a.id);
+    const afterIds = await getAlbumAssetIds(owner.accessToken, album.id);
     expect(afterIds).toContain(sourceId);
     expect(afterIds).toContain(targetId);
   });
@@ -232,10 +237,7 @@ describe('PUT /assets/copy', () => {
 
     // Sanity-read: target is NOT in the album, so a working copy WOULD add it.
     // The opt-out below is the only thing that should prevent that.
-    const before = await request(app)
-      .get(`/albums/${album.id}?withoutAssets=false`)
-      .set(asBearerAuth(owner.accessToken));
-    const beforeIds = (before.body as { assets: Array<{ id: string }> }).assets.map((a) => a.id);
+    const beforeIds = await getAlbumAssetIds(owner.accessToken, album.id);
     expect(beforeIds).toContain(sourceId);
     expect(beforeIds).not.toContain(targetId);
 
@@ -245,10 +247,7 @@ describe('PUT /assets/copy', () => {
       .send({ sourceId, targetId, albums: false });
     expect(copy.status).toBe(204);
 
-    const after = await request(app)
-      .get(`/albums/${album.id}?withoutAssets=false`)
-      .set(asBearerAuth(owner.accessToken));
-    const afterIds = (after.body as { assets: Array<{ id: string }> }).assets.map((a) => a.id);
+    const afterIds = await getAlbumAssetIds(owner.accessToken, album.id);
     expect(afterIds).not.toContain(targetId);
   });
 });
