@@ -105,7 +105,7 @@ export class SharedSpaceService extends BaseService {
               libraryId: link.libraryId,
               libraryName: library.name,
               addedById: link.addedById,
-              createdAt: link.createdAt as unknown as Date,
+              createdAt: (link.createdAt as unknown as Date).toISOString(),
             });
           }
         }
@@ -177,7 +177,7 @@ export class SharedSpaceService extends BaseService {
             libraryId: link.libraryId,
             libraryName: library.name,
             addedById: link.addedById,
-            createdAt: link.createdAt as unknown as Date,
+            createdAt: (link.createdAt as unknown as Date).toISOString(),
           });
         }
       }
