@@ -1,5 +1,5 @@
 import type { AlbumResponseDto, SharedSpaceMemberResponseDto, SharedSpaceResponseDto } from '@immich/sdk';
-import { Role, SharedSpaceRole } from '@immich/sdk';
+import { SharedSpaceRole } from '@immich/sdk';
 import { render } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -8,11 +8,13 @@ const { mockPage, mockUser } = vi.hoisted(() => ({
   mockUser: { current: null as { id: string; isAdmin: boolean } | null },
 }));
 vi.mock('$app/state', () => ({ page: mockPage }));
-vi.mock('$lib/stores/user.store', () => ({
-  user: {
-    subscribe: (fn: (v: { id: string; isAdmin: boolean } | null) => void) => {
-      fn(mockUser.current);
-      return () => {};
+vi.mock('$lib/managers/auth-manager.svelte', () => ({
+  authManager: {
+    get authenticated() {
+      return mockUser.current !== null;
+    },
+    get user() {
+      return mockUser.current;
     },
   },
 }));
@@ -182,7 +184,7 @@ const makeMember = (overrides: Partial<SharedSpaceMemberResponseDto> = {}): Shar
     email: 'me@test.com',
     name: 'Me',
     joinedAt: '2024-01-01T00:00:00.000Z',
-    role: Role.Editor,
+    role: SharedSpaceRole.Editor,
     ...overrides,
   }) as unknown as SharedSpaceMemberResponseDto;
 
@@ -203,7 +205,7 @@ describe('registerSpaceContext', () => {
 
   it('canWrite=true for owner role in members list', () => {
     mockUser.current = { id: 'u-me', isAdmin: false };
-    const members = [makeMember({ userId: 'u-me', role: Role.Owner })];
+    const members = [makeMember({ userId: 'u-me', role: SharedSpaceRole.Owner })];
     const { unmount } = render(RegisterSpaceContextHarness, {
       props: { spaceThunk: () => makeSpace(), membersThunk: () => members },
     });
@@ -213,7 +215,7 @@ describe('registerSpaceContext', () => {
 
   it('canWrite=true for editor', () => {
     mockUser.current = { id: 'u-me', isAdmin: false };
-    const members = [makeMember({ userId: 'u-me', role: Role.Editor })];
+    const members = [makeMember({ userId: 'u-me', role: SharedSpaceRole.Editor })];
     const { unmount } = render(RegisterSpaceContextHarness, {
       props: { spaceThunk: () => makeSpace(), membersThunk: () => members },
     });
@@ -223,7 +225,7 @@ describe('registerSpaceContext', () => {
 
   it('canWrite=false for viewer', () => {
     mockUser.current = { id: 'u-me', isAdmin: false };
-    const members = [makeMember({ userId: 'u-me', role: Role.Viewer })];
+    const members = [makeMember({ userId: 'u-me', role: SharedSpaceRole.Viewer })];
     const { unmount } = render(RegisterSpaceContextHarness, {
       props: { spaceThunk: () => makeSpace(), membersThunk: () => members },
     });
@@ -265,7 +267,7 @@ describe('registerSpaceContext', () => {
   it('stores raw DTO and separately-fetched members on context', () => {
     mockUser.current = { id: 'u-me', isAdmin: false };
     const space = makeSpace({ name: 'Original' });
-    const members = [makeMember({ userId: 'u-me', role: Role.Owner })];
+    const members = [makeMember({ userId: 'u-me', role: SharedSpaceRole.Owner })];
     const { unmount } = render(RegisterSpaceContextHarness, {
       props: { spaceThunk: () => space, membersThunk: () => members },
     });
@@ -276,8 +278,8 @@ describe('registerSpaceContext', () => {
     unmount();
   });
 
-  it('SharedSpaceRole enum values are lowercase strings matching Role casts', () => {
-    // Drift guard: the Role→SharedSpaceRole cast relies on identical string values.
+  it('SharedSpaceRole enum values are lowercase strings', () => {
+    // Drift guard: backend expects these exact string values.
     expect(SharedSpaceRole.Owner).toBe('owner');
     expect(SharedSpaceRole.Editor).toBe('editor');
     expect(SharedSpaceRole.Viewer).toBe('viewer');
