@@ -1,5 +1,5 @@
 import { page } from '$app/state';
-import { user } from '$lib/stores/user.store';
+import { authManager } from '$lib/managers/auth-manager.svelte';
 import { isAlbumsRoute, isSpacesRoute } from '$lib/utils/navigation';
 import {
   SharedSpaceRole,
@@ -7,7 +7,6 @@ import {
   type SharedSpaceMemberResponseDto,
   type SharedSpaceResponseDto,
 } from '@immich/sdk';
-import { get } from 'svelte/store';
 
 export interface AlbumContext {
   id: string;
@@ -61,7 +60,7 @@ class CommandContextManager {
    * (e.g. album commands appearing while on a space).
    */
   getContext(): CommandContext {
-    const u = get(user);
+    const u = authManager.authenticated ? authManager.user : null;
     const routeId = page.route.id;
     return {
       routeId,
@@ -83,7 +82,7 @@ export const commandContextManager = new CommandContextManager();
  */
 export function registerAlbumContext(albumDto: () => AlbumResponseDto) {
   $effect(() => {
-    const currentUserId = get(user)?.id ?? null;
+    const currentUserId = authManager.authenticated ? (authManager.user?.id ?? null) : null;
     const album = albumDto();
     const isMember = album.albumUsers?.some((u) => u.user.id === currentUserId) ?? false;
     commandContextManager.setAlbum({
@@ -108,7 +107,7 @@ export function registerSpaceContext(
   getMembers: () => SharedSpaceMemberResponseDto[] | undefined,
 ) {
   $effect(() => {
-    const currentUserId = get(user)?.id ?? null;
+    const currentUserId = authManager.authenticated ? (authManager.user?.id ?? null) : null;
     const space = getSpace();
     if (!space) {
       commandContextManager.setSpace(null);
