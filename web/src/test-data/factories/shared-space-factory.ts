@@ -1,5 +1,5 @@
 import { faker } from '@faker-js/faker';
-import { Color, type SharedSpaceResponseDto } from '@immich/sdk';
+import { UserAvatarColor, type SharedSpaceResponseDto } from '@immich/sdk';
 import { Sync } from 'factory.ts';
 
 export const sharedSpaceFactory = Sync.makeFactory<SharedSpaceResponseDto>({
@@ -9,7 +9,7 @@ export const sharedSpaceFactory = Sync.makeFactory<SharedSpaceResponseDto>({
   createdById: Sync.each(() => faker.string.uuid()),
   createdAt: Sync.each(() => faker.date.past().toISOString()),
   updatedAt: Sync.each(() => faker.date.past().toISOString()),
-  color: Color.Primary,
+  color: UserAvatarColor.Primary,
   thumbnailAssetId: null,
   assetCount: Sync.each((i) => i * 10),
   memberCount: Sync.each((i) => (i % 5) + 1),

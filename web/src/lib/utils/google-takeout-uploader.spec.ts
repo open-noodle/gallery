@@ -1,6 +1,6 @@
 import type { ImportOptions } from '$lib/managers/import-manager.svelte';
 import type { TakeoutMediaItem } from '$lib/utils/google-takeout-parser';
-import { Action, Reason } from '@immich/sdk';
+import { AssetRejectReason, AssetUploadAction } from '@immich/sdk';
 
 vi.mock('@immich/sdk', () => ({
   getBaseUrl: vi.fn(() => 'http://localhost'),
@@ -8,8 +8,8 @@ vi.mock('@immich/sdk', () => ({
   updateAsset: vi.fn(),
   AssetMediaStatus: { Duplicate: 'duplicate', Created: 'created' },
   AssetVisibility: { Archive: 'archive', Timeline: 'timeline' },
-  Action: { Reject: 'reject', Accept: 'accept' },
-  Reason: { Duplicate: 'duplicate', UnsupportedFormat: 'unsupported-format' },
+  AssetUploadAction: { Reject: 'reject', Accept: 'accept' },
+  AssetRejectReason: { Duplicate: 'duplicate', UnsupportedFormat: 'unsupported-format' },
 }));
 
 vi.mock('$lib/utils', () => ({
@@ -63,7 +63,7 @@ describe('uploadTakeoutItem', () => {
 
     // Default: checkBulkUpload accepts the asset (no duplicate)
     vi.mocked(sdkMock.checkBulkUpload).mockResolvedValue({
-      results: [{ id: 'IMG_001.jpg', action: Action.Accept, reason: undefined as unknown as Reason }],
+      results: [{ id: 'IMG_001.jpg', action: AssetUploadAction.Accept, reason: undefined as unknown as AssetRejectReason }],
     });
   });
 
@@ -206,7 +206,7 @@ describe('uploadTakeoutItem', () => {
 
   it('returns duplicate status when dedup check rejects', async () => {
     vi.mocked(sdkMock.checkBulkUpload).mockResolvedValue({
-      results: [{ id: 'IMG_001.jpg', assetId: 'existing-asset-1', action: Action.Reject, reason: Reason.Duplicate }],
+      results: [{ id: 'IMG_001.jpg', assetId: 'existing-asset-1', action: AssetUploadAction.Reject, reason: AssetRejectReason.Duplicate }],
     });
 
     const item = makeItem();
