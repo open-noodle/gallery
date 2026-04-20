@@ -13,7 +13,7 @@ part of openapi.api;
 class SharedSpaceLinkedLibraryDto {
   /// Returns a new [SharedSpaceLinkedLibraryDto] instance.
   SharedSpaceLinkedLibraryDto({
-    this.addedById,
+    required this.addedById,
     required this.createdAt,
     required this.libraryId,
     required this.libraryName,
@@ -21,6 +21,7 @@ class SharedSpaceLinkedLibraryDto {
 
   String? addedById;
 
+  /// Link creation timestamp
   DateTime createdAt;
 
   String libraryId;
@@ -118,6 +119,7 @@ class SharedSpaceLinkedLibraryDto {
 
   /// The list of required keys that must be present in a JSON.
   static const requiredKeys = <String>{
+    'addedById',
     'createdAt',
     'libraryId',
     'libraryName',

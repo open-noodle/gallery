@@ -100,11 +100,11 @@ class SpaceMembersPage extends HookConsumerWidget {
                 padding: const EdgeInsets.all(16),
                 child: Text(member.name, style: context.textTheme.titleMedium),
               ),
-              if (isOwner && member.role != SharedSpaceMemberResponseDtoRoleEnum.owner) ...[
+              if (isOwner && member.role != SharedSpaceRole.owner) ...[
                 ListTile(
                   leading: const Icon(Icons.edit_outlined),
                   title: const Text('Set as Editor'),
-                  trailing: member.role == SharedSpaceMemberResponseDtoRoleEnum.editor ? const Icon(Icons.check) : null,
+                  trailing: member.role == SharedSpaceRole.editor ? const Icon(Icons.check) : null,
                   onTap: () {
                     Navigator.of(ctx).pop();
                     updateRole(member, SharedSpaceRole.editor);
@@ -113,7 +113,7 @@ class SpaceMembersPage extends HookConsumerWidget {
                 ListTile(
                   leading: const Icon(Icons.visibility_outlined),
                   title: const Text('Set as Viewer'),
-                  trailing: member.role == SharedSpaceMemberResponseDtoRoleEnum.viewer ? const Icon(Icons.check) : null,
+                  trailing: member.role == SharedSpaceRole.viewer ? const Icon(Icons.check) : null,
                   onTap: () {
                     Navigator.of(ctx).pop();
                     updateRole(member, SharedSpaceRole.viewer);
@@ -152,7 +152,7 @@ class SpaceMembersPage extends HookConsumerWidget {
           membersAsync.when(
             data: (members) {
               final currentMember = getCurrentMember(members);
-              if (currentMember?.role == SharedSpaceMemberResponseDtoRoleEnum.owner) {
+              if (currentMember?.role == SharedSpaceRole.owner) {
                 return IconButton(
                   icon: const Icon(Icons.person_add_outlined),
                   onPressed: () async {
@@ -175,7 +175,7 @@ class SpaceMembersPage extends HookConsumerWidget {
       body: membersAsync.when(
         data: (members) {
           final currentMember = getCurrentMember(members);
-          final isOwner = currentMember?.role == SharedSpaceMemberResponseDtoRoleEnum.owner;
+          final isOwner = currentMember?.role == SharedSpaceRole.owner;
 
           return ListView.builder(
             itemCount: members.length,
@@ -191,7 +191,7 @@ class SpaceMembersPage extends HookConsumerWidget {
                   visualDensity: VisualDensity.compact,
                 ),
                 onTap:
-                    (isOwner && member.role != SharedSpaceMemberResponseDtoRoleEnum.owner) ||
+                    (isOwner && member.role != SharedSpaceRole.owner) ||
                         (!isOwner && member.userId == currentUser?.id)
                     ? () => showMemberActions(member, isOwner)
                     : null,
