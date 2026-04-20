@@ -1,49 +1,27 @@
 import { type LoginResponseDto } from '@immich/sdk';
 import { type Actor, authHeaders } from 'src/actors';
 import { createUserDto } from 'src/fixtures';
-import { makeRandomImage } from 'src/generators';
 import { errorDto } from 'src/responses';
 import { app, asBearerAuth, utils } from 'src/utils';
 import request from 'supertest';
 import { beforeAll, describe, expect, it } from 'vitest';
 
-// T27 — covers three small fork-relevant /assets surfaces in one spec:
+// T27 — covers two small fork-relevant /assets surfaces in one spec:
 //
-//   PUT  /assets/:id/original     (replaceAsset)
 //   POST /assets/jobs             (runAssetJobs)
 //   POST /assets/bulk-upload-check
 //
-// All three are uncovered in the existing api specs. They're grouped together
-// here because each individual surface is too small to warrant its own file
-// (~4 tests each), but together they round out the asset-controller backlog.
+// (PUT /assets/:id/original was removed upstream and the corresponding tests
+// were dropped along with it.)
 //
 // Service shapes:
-//   - replaceAsset (asset-media.service.ts:170-202) — requireAccess(AssetUpdate),
-//     replaces the file content for an existing asset id, soft-trashes a copy of
-//     the previous version, returns { status: REPLACED, id: copyId }.
 //   - runAssetJobs (asset.service.ts:530-560) — requireAccess(AssetUpdate, ids),
 //     queues a job per asset, returns 204.
 //   - bulkUploadCheck (asset-media.service.ts:294-322) — NO requireAccess. Just
 //     scopes by auth.user.id when querying checksums. Response is per-item with
 //     ACCEPT or REJECT/DUPLICATE.
 
-// Helper builds a multipart PUT mirroring the shape of utils.replaceAsset.
-// Hoisted to file scope (no closure dependencies — both ids are passed as args).
-const buildReplaceRequest = (assetId: string, accessToken: string | null) => {
-  const builder = request(app)
-    .put(`/assets/${assetId}/original`)
-    .attach('assetData', makeRandomImage(), 'replacement.png');
-  if (accessToken) {
-    builder.set('Authorization', `Bearer ${accessToken}`);
-  }
-  return builder
-    .field('deviceAssetId', 'replace-test')
-    .field('deviceId', 'replace-device')
-    .field('fileCreatedAt', new Date().toISOString())
-    .field('fileModifiedAt', new Date().toISOString());
-};
-
-describe('asset replace + jobs + bulk-upload-check', () => {
+describe('asset jobs + bulk-upload-check', () => {
   let admin: LoginResponseDto;
   let owner: LoginResponseDto;
   let other: LoginResponseDto;
@@ -60,8 +38,8 @@ describe('asset replace + jobs + bulk-upload-check', () => {
       utils.userSetup(admin.accessToken, createUserDto.create('t27-other')),
     ]);
 
-    // One owner-side asset for replace + jobs (read-only across the suite —
-    // mutating tests use their own fresh asset).
+    // One owner-side asset for jobs (read-only across the suite — mutating
+    // tests use their own fresh asset).
     const ownerAsset = await utils.createAsset(owner.accessToken);
     ownerAssetId = ownerAsset.id;
 
@@ -75,48 +53,6 @@ describe('asset replace + jobs + bulk-upload-check', () => {
     ]);
     ownerAssetChecksum = (ownerInfo.body as { checksum: string }).checksum;
     otherAssetChecksum = (otherInfo.body as { checksum: string }).checksum;
-  });
-
-  describe('PUT /assets/:id/original (replaceAsset)', () => {
-    it('requires authentication', async () => {
-      const freshAsset = await utils.createAsset(owner.accessToken);
-      const { status } = await buildReplaceRequest(freshAsset.id, null).set(authHeaders(anonActor));
-      expect(status).toBe(401);
-    });
-
-    it('owner can replace their own asset (status REPLACED)', async () => {
-      // Replace creates a soft-trashed copy of the previous version and returns
-      // { status: 'replaced', id: <newly-trashed-copy-id> }.
-      const freshAsset = await utils.createAsset(owner.accessToken);
-      const { status, body } = await buildReplaceRequest(freshAsset.id, owner.accessToken);
-      expect(status).toBe(200);
-      expect(body).toEqual(
-        expect.objectContaining({
-          status: 'replaced',
-          id: expect.any(String),
-        }),
-      );
-      // The returned id is the trashed-copy id, NOT the original asset id —
-      // the original keeps its id and gets the new file content.
-      expect((body as { id: string }).id).not.toBe(freshAsset.id);
-    });
-
-    it('non-owner returns 400 (bulk-access pattern)', async () => {
-      const { status, body } = await buildReplaceRequest(ownerAssetId, other.accessToken);
-      expect(status).toBe(400);
-      expect(body).toEqual(errorDto.noPermission);
-    });
-
-    it('non-existent asset returns 400', async () => {
-      const { status, body } = await buildReplaceRequest('00000000-0000-4000-a000-000000000099', owner.accessToken);
-      expect(status).toBe(400);
-      expect(body).toEqual(errorDto.noPermission);
-    });
-
-    it('malformed asset id returns 400', async () => {
-      const { status } = await buildReplaceRequest('not-a-uuid', owner.accessToken);
-      expect(status).toBe(400);
-    });
   });
 
   describe('POST /assets/jobs (runAssetJobs)', () => {

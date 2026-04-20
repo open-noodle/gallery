@@ -9,12 +9,11 @@ import { beforeAll, describe, expect, it } from 'vitest';
 // is the primary consumer; there's no existing e2e coverage.
 //
 // Endpoints:
-//   POST /sync/full-sync   (deprecated v2, but still wired)
-//   POST /sync/delta-sync  (deprecated v2, but still wired)
 //   POST /sync/stream      (current)
 //   GET  /sync/ack
 //   POST /sync/ack
 //   DELETE /sync/ack
+// (POST /sync/full-sync and /sync/delta-sync removed upstream; tests dropped.)
 //
 // All routes require authentication. The full/delta endpoints are user-scoped
 // and respect the partner timeline graph; the stream endpoint emits jsonl.
@@ -23,8 +22,6 @@ describe('/sync', () => {
   let admin: LoginResponseDto;
   let userA: LoginResponseDto;
   let userB: LoginResponseDto;
-  let userAAssetId: string;
-  let userBAssetId: string;
   const anonActor: Actor = { id: 'anon' };
 
   beforeAll(async () => {
@@ -35,95 +32,9 @@ describe('/sync', () => {
       utils.userSetup(admin.accessToken, createUserDto.create('t38-userB')),
     ]);
 
-    // Both users own their own asset so cross-user isolation tests have a
-    // non-empty baseline on each side. Without userB's asset the cross-user
-    // assertion would be vacuously true (empty list contains nothing).
-    const [assetA, assetB] = await Promise.all([
-      utils.createAsset(userA.accessToken),
-      utils.createAsset(userB.accessToken),
-    ]);
-    userAAssetId = assetA.id;
-    userBAssetId = assetB.id;
-  });
-
-  describe('POST /sync/full-sync', () => {
-    it('requires authentication', async () => {
-      const { status } = await request(app)
-        .post('/sync/full-sync')
-        .set(authHeaders(anonActor))
-        .send({ updatedUntil: new Date().toISOString(), limit: 100 });
-      expect(status).toBe(401);
-    });
-
-    it('owner sees their own assets in the full sync result', async () => {
-      const { status, body } = await request(app)
-        .post('/sync/full-sync')
-        .set(asBearerAuth(userA.accessToken))
-        .send({ updatedUntil: new Date(Date.now() + 60_000).toISOString(), limit: 100 });
-      expect(status).toBe(200);
-      expect(Array.isArray(body)).toBe(true);
-      const ids = (body as Array<{ id: string }>).map((a) => a.id);
-      expect(ids).toContain(userAAssetId);
-    });
-
-    it("cross-user isolation: userB sees their own asset but NOT userA's", async () => {
-      // Both userA and userB own assets. The sync result for userB must
-      // contain userBAssetId AND must NOT contain userAAssetId. Asserting both
-      // halves makes the test load-bearing — a fully-broken endpoint that
-      // returns an empty list would fail the toContain check, and a leaking
-      // endpoint that returns userA's asset would fail the not.toContain check.
-      const { status, body } = await request(app)
-        .post('/sync/full-sync')
-        .set(asBearerAuth(userB.accessToken))
-        .send({ updatedUntil: new Date(Date.now() + 60_000).toISOString(), limit: 100 });
-      expect(status).toBe(200);
-      const ids = (body as Array<{ id: string }>).map((a) => a.id);
-      expect(ids).toContain(userBAssetId);
-      expect(ids).not.toContain(userAAssetId);
-    });
-  });
-
-  describe('POST /sync/delta-sync', () => {
-    it('requires authentication', async () => {
-      const { status } = await request(app)
-        .post('/sync/delta-sync')
-        .set(authHeaders(anonActor))
-        .send({ updatedAfter: new Date(0).toISOString(), userIds: [] });
-      expect(status).toBe(401);
-    });
-
-    it('very old cutoff (>100 days) returns needsFullSync=true with empty upserted', async () => {
-      // sync.service.ts:906-909 — the audit log only retains 100 days, so a
-      // cutoff older than that always returns the FULL_SYNC sentinel.
-      const { status, body } = await request(app)
-        .post('/sync/delta-sync')
-        .set(asBearerAuth(userA.accessToken))
-        .send({ updatedAfter: new Date(0).toISOString(), userIds: [userA.userId] });
-      expect(status).toBe(200);
-      expect(body).toEqual({ needsFullSync: true, upserted: [], deleted: [] });
-    });
-
-    it("recent cutoff returns the user's recent assets", async () => {
-      // Use a cutoff well within the 100-day window. The asset was created
-      // moments ago in beforeAll, so it must be in the upserted list.
-      const recentCutoff = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-      const { status, body } = await request(app)
-        .post('/sync/delta-sync')
-        .set(asBearerAuth(userA.accessToken))
-        .send({ updatedAfter: recentCutoff, userIds: [userA.userId] });
-      expect(status).toBe(200);
-      expect((body as { needsFullSync: boolean }).needsFullSync).toBe(false);
-      const upsertedIds = (body as { upserted: Array<{ id: string }> }).upserted.map((a) => a.id);
-      expect(upsertedIds).toContain(userAAssetId);
-    });
-
-    it('rejects malformed userId UUIDs in the userIds array', async () => {
-      const { status } = await request(app)
-        .post('/sync/delta-sync')
-        .set(asBearerAuth(userA.accessToken))
-        .send({ updatedAfter: new Date(0).toISOString(), userIds: ['not-a-uuid'] });
-      expect(status).toBe(400);
-    });
+    // Stream tests need each user to own at least one asset so the response
+    // body is non-empty.
+    await Promise.all([utils.createAsset(userA.accessToken), utils.createAsset(userB.accessToken)]);
   });
 
   describe('POST /sync/stream', () => {
