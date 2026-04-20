@@ -6,7 +6,7 @@
 //   → not-in-album → text.
 
 import 'package:flutter/material.dart';
-import 'package:immich_mobile/entities/asset.entity.dart';
+import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/models/search/search_filter.model.dart';
 import 'package:immich_mobile/providers/photos_filter/chip_id.dart';
 import 'package:intl/intl.dart';
