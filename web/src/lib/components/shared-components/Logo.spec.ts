@@ -1,4 +1,4 @@
-import { Theme, theme } from '@immich/ui';
+import { themeManager, ThemePreference } from '@immich/ui';
 import { render } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Logo from './Logo.svelte';
@@ -6,7 +6,7 @@ import Logo from './Logo.svelte';
 describe('Logo Component', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    theme.value = Theme.Light;
+    themeManager.setPreference(ThemePreference.Light);
   });
 
   it('should render logo with default props', () => {
@@ -42,14 +42,14 @@ describe('Logo Component', () => {
   });
 
   it('should use light theme logo by default', () => {
-    theme.value = Theme.Light;
+    themeManager.setPreference(ThemePreference.Light);
     const { container } = render(Logo, { props: { variant: 'inline' } });
     const img = container.querySelector('img');
     expect(img?.src).toContain('light');
   });
 
   it('should use dark theme logo when theme is dark', () => {
-    theme.value = Theme.Dark;
+    themeManager.setPreference(ThemePreference.Dark);
     const { container } = render(Logo, { props: { variant: 'inline' } });
     const img = container.querySelector('img');
     expect(img?.src).toContain('dark');
