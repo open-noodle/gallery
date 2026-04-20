@@ -1,6 +1,6 @@
 import {
+  Action,
   AssetMediaStatus,
-  AssetUploadAction,
   AssetVisibility,
   checkBulkUpload,
   getBaseUrl,
@@ -184,7 +184,7 @@ async function fileUploader({
         const {
           results: [checkUploadResult],
         } = await checkBulkUpload({ assetBulkUploadCheckDto: { assets: [{ id: assetFile.name, checksum }] } });
-        if (checkUploadResult.action === AssetUploadAction.Reject && checkUploadResult.assetId) {
+        if (checkUploadResult && checkUploadResult.action === Action.Reject && checkUploadResult.assetId) {
           responseData = {
             status: AssetMediaStatus.Duplicate,
             id: checkUploadResult.assetId,
