@@ -7,7 +7,6 @@ import 'package:immich_mobile/domain/services/memory.service.dart';
 import 'package:immich_mobile/domain/services/people.service.dart';
 import 'package:immich_mobile/domain/services/remote_album.service.dart';
 import 'package:immich_mobile/domain/services/timeline.service.dart';
-import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/presentation/widgets/asset_viewer/asset_viewer.page.dart';
 import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/asset.provider.dart' as beta_asset_provider;
@@ -150,14 +149,8 @@ class DeepLinkService {
     return RemoteAlbumRoute(album: album);
   }
 
+  /// Fork-only: shared spaces are a Gallery feature with no Immich equivalent.
   Future<PageRouteInfo?> _buildSpaceDeepLink(String spaceId) async {
-    // Shared spaces are a fork-only feature wired into the Drift-backed
-    // beta timeline navigation. Outside of beta we have no surface to land on,
-    // so return null and let the caller fall back to the default route.
-    if (Store.isBetaTimelineEnabled == false) {
-      return null;
-    }
-
     if (spaceId.isEmpty) {
       return null;
     }
