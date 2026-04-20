@@ -1,4 +1,4 @@
-import 'package:immich_mobile/entities/asset.entity.dart';
+import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:openapi/api.dart';
 
 /// Maps the mobile-side `AssetType` enum to the OpenAPI `AssetTypeEnum`.
