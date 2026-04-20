@@ -84,7 +84,7 @@ class _FilterSheetState extends ConsumerState<FilterSheet> {
       if ((_controller.size - target).abs() < 0.01) return;
       _controller.animateTo(target, duration: const Duration(milliseconds: 280), curve: Curves.easeOutCubic);
       if (MediaQuery.of(context).accessibleNavigation) {
-        SemanticsService.announce('filter panel ${next.name}', Directionality.of(context));
+        SemanticsService.sendAnnouncement(View.of(context), 'filter panel ${next.name}', Directionality.of(context));
       }
     });
 
