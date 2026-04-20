@@ -965,8 +965,8 @@ describe('activate("command")', () => {
       raw: { id: 'a1' } as unknown as import('@immich/sdk').AlbumResponseDto,
     });
     const themeCmd = COMMAND_ITEMS.find((c) => c.id === 'cmd:theme')!;
-    const { themeManager } = await import('$lib/managers/theme-manager.svelte');
-    const toggleSpy = vi.spyOn(themeManager, 'toggleTheme').mockImplementation(() => undefined);
+    const { themeManager } = await import('@immich/ui');
+    const toggleSpy = vi.spyOn(themeManager, 'toggle').mockImplementation(() => undefined);
     manager.activate('command', themeCmd);
     await flushMicrotasks();
     expect(toggleSpy).toHaveBeenCalledOnce();
