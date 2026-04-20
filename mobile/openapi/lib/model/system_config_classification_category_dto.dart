@@ -20,18 +20,23 @@ class SystemConfigClassificationCategoryDto {
     required this.similarity,
   });
 
+  /// Action to take when an asset matches
   SystemConfigClassificationCategoryDtoActionEnum action;
 
-  /// Enable or disable this category
+  /// Whether this category is enabled
   bool enabled;
 
+  /// Category name
   String name;
 
+  /// CLIP text prompts for this category
   List<String> prompts;
 
+  /// Cosine similarity threshold for matching this category
+  ///
   /// Minimum value: 0
   /// Maximum value: 1
-  num similarity;
+  double similarity;
 
   @override
   bool operator ==(Object other) => identical(this, other) || other is SystemConfigClassificationCategoryDto &&
@@ -78,7 +83,7 @@ class SystemConfigClassificationCategoryDto {
         prompts: json[r'prompts'] is Iterable
             ? (json[r'prompts'] as Iterable).cast<String>().toList(growable: false)
             : const [],
-        similarity: num.parse('${json[r'similarity']}'),
+        similarity: (mapValueOfType<num>(json, r'similarity')!).toDouble(),
       );
     }
     return null;
@@ -134,7 +139,7 @@ class SystemConfigClassificationCategoryDto {
   };
 }
 
-
+/// Action to take when an asset matches
 class SystemConfigClassificationCategoryDtoActionEnum {
   /// Instantiate a new enum with the provided [value].
   const SystemConfigClassificationCategoryDtoActionEnum._(this.value);
