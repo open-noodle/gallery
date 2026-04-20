@@ -7,7 +7,7 @@ import {
 import type { UploadBody } from 'src/types.js';
 import { AssetFile } from 'src/database.js';
 import { AssetMediaStatus, AssetRejectReason, AssetUploadAction } from 'src/dtos/asset-media-response.dto.js';
-import { AssetMediaCreateDto, AssetMediaSize, UploadFieldName, AssetMediaReplaceDto } from 'src/dtos/asset-media.dto.js';
+import { AssetMediaCreateDto, AssetMediaSize, UploadFieldName } from 'src/dtos/asset-media.dto.js';
 import { MapAsset } from 'src/dtos/asset-response.dto.js';
 import { AssetEditAction } from 'src/dtos/editing.dto.js';
 import { AssetFileType, AssetType, AssetVisibility, CacheControl, JobName, AssetStatus } from 'src/enum.js';
@@ -171,13 +171,6 @@ const assetEntity = Object.freeze({
   },
   livePhotoVideoId: null,
 } as MapAsset);
-
-const replaceDto = Object.freeze({
-  deviceAssetId: 'deviceAssetId',
-  deviceId: 'deviceId',
-  fileModifiedAt: new Date('2024-04-15T23:41:36.910Z'),
-  fileCreatedAt: new Date('2024-04-15T23:41:36.910Z'),
-}) as AssetMediaReplaceDto;
 
 const existingAsset = Object.freeze({
   ...assetEntity,
@@ -1101,22 +1094,7 @@ describe(AssetMediaService.name, () => {
     });
   });
 
-  describe('replaceAsset - duplicate handling', () => {
-    it('should throw InternalServerErrorException if duplicate cannot be located', async () => {
-      const updatedFile = fileStub.photo;
-      const error = new Error('unique key violation');
-      (error as any).constraint_name = ASSET_CHECKSUM_CONSTRAINT;
-
-      mocks.asset.update.mockRejectedValue(error);
-      mocks.asset.getById.mockResolvedValueOnce(existingAsset as any);
-      mocks.asset.getUploadAssetIdByChecksum.mockResolvedValue(void 0);
-      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([existingAsset.id]));
-
-      await expect(sut.replaceAsset(authStub.user1, existingAsset.id, replaceDto, updatedFile)).rejects.toBeInstanceOf(
-        InternalServerErrorException,
-      );
-    });
-  });
+  // replaceAsset removed upstream (PR #27022 "refactor!: remove replace asset"); fork-era duplicate-handling test dropped.
 
   describe('getUploadFilename - body filename override', () => {
     it('should use body filename extension over file original name', () => {
