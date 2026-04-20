@@ -266,7 +266,9 @@
 
   const currentMember = $derived(members.find((m) => m.userId === authManager.user.id));
   const isOwner = $derived(currentMember?.role === SharedSpaceRole.Owner);
-  const isEditor = $derived(currentMember?.role === SharedSpaceRole.Owner || currentMember?.role === SharedSpaceRole.Editor);
+  const isEditor = $derived(
+    currentMember?.role === SharedSpaceRole.Owner || currentMember?.role === SharedSpaceRole.Editor,
+  );
   const showInTimeline = $derived(currentMember?.showInTimeline ?? true);
 
   const totalAssetCount = $derived(timelineManager?.assetCount ?? 0);

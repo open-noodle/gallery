@@ -195,7 +195,12 @@
             <span>Disk &rarr; S3</span>
           </label>
           <label class="flex cursor-pointer items-center gap-2">
-            <input type="radio" bind:group={direction} value={StorageMigrationDirection.ToDisk} class="accent-primary" />
+            <input
+              type="radio"
+              bind:group={direction}
+              value={StorageMigrationDirection.ToDisk}
+              class="accent-primary"
+            />
             <span>S3 &rarr; Disk</span>
           </label>
         </div>
