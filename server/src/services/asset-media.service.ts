@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { createReadStream } from 'node:fs';
-import { extname, isAbsolute } from 'node:path';
+import { extname } from 'node:path';
 import sanitize from 'sanitize-filename';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend';
 import { StorageCore } from 'src/cores/storage.core';

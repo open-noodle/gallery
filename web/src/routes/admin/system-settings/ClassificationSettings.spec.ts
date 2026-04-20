@@ -1,9 +1,9 @@
-import ClassificationSettings from './ClassificationSettings.svelte';
 import { Action, getConfig, scanClassification, updateConfig, type SystemConfigDto } from '@immich/sdk';
 import { modalManager, toastManager } from '@immich/ui';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import ClassificationSettings from './ClassificationSettings.svelte';
 
 vi.mock('@immich/sdk', () => ({
   getConfig: vi.fn(),
