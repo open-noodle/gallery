@@ -41,7 +41,7 @@ const WorkflowShareStepSchema = z
 const WorkflowCreateSchema = z
   .object({
     trigger: WorkflowTriggerSchema.describe('Workflow trigger type'),
-    name: z.string().nullable().optional().describe('Workflow name'),
+    name: z.string().min(1).nullable().optional().describe('Workflow name'),
     description: z.string().nullable().optional().describe('Workflow description'),
     enabled: z.boolean().optional().describe('Workflow enabled'),
     logging: z.boolean().optional().describe('Workflow logs run results'),
