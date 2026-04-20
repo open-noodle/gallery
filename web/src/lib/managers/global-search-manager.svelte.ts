@@ -1,9 +1,9 @@
 import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
+import { authManager } from '$lib/managers/auth-manager.svelte';
 import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
 import { Route } from '$lib/route';
 import { addEntry, getEntries, makePlaceId, removeEntry, type RecentEntry } from '$lib/stores/cmdk-recent';
-import { user } from '$lib/stores/user.store';
 import {
   getAlbumInfo,
   getAlbumNames,
@@ -431,7 +431,7 @@ export class GlobalSearchManager {
       return { commands: [], navigation: [] };
     }
 
-    const u = get(user);
+    const u = authManager.authenticated ? authManager.user : undefined;
     const isAdmin = u?.isAdmin ?? false;
     const flags = featureFlagsManager.valueOrUndefined;
 
@@ -1286,7 +1286,7 @@ export class GlobalSearchManager {
     let liveNavItem: NavigationItem | undefined;
     if (entry.kind === 'navigate') {
       liveNavItem = NAVIGATION_ITEMS.find((n) => n.id === entry.id);
-      const isAdmin = get(user)?.isAdmin ?? false;
+      const isAdmin = (authManager.authenticated ? authManager.user : undefined)?.isAdmin ?? false;
       const flags = featureFlagsManager.valueOrUndefined;
       if (!liveNavItem) {
         console.warn('[cmdk] purging stale recent — unknown nav item', entry.id);
@@ -1543,7 +1543,7 @@ export class GlobalSearchManager {
     if (this.topCommandMatch !== null) {
       return null;
     }
-    const isAdmin = get(user)?.isAdmin ?? false;
+    const isAdmin = (authManager.authenticated ? authManager.user : undefined)?.isAdmin ?? false;
     const flags = featureFlagsManager.valueOrUndefined;
     const translate = get(t);
     for (const item of NAVIGATION_ITEMS) {
@@ -1578,7 +1578,7 @@ export class GlobalSearchManager {
     if (q.length === 0) {
       return null;
     }
-    const isAdmin = get(user)?.isAdmin ?? false;
+    const isAdmin = (authManager.authenticated ? authManager.user : undefined)?.isAdmin ?? false;
     const flags = featureFlagsManager.valueOrUndefined;
     const translate = get(t);
     const ctx = commandContextManager.getContext();
