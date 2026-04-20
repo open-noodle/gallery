@@ -1,19 +1,12 @@
 import 'package:auto_route/auto_route.dart';
-import 'package:drift/drift.dart' as drift;
-import 'package:drift/native.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/domain/services/asset.service.dart' as beta_asset_service;
 import 'package:immich_mobile/domain/services/memory.service.dart';
 import 'package:immich_mobile/domain/services/people.service.dart';
 import 'package:immich_mobile/domain/services/remote_album.service.dart';
-import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/domain/services/timeline.service.dart';
-import 'package:immich_mobile/entities/store.entity.dart';
-import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
-import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/repositories/shared_space_api.repository.dart';
 import 'package:immich_mobile/routing/router.dart';
 import 'package:immich_mobile/services/deep_link.service.dart';
@@ -49,20 +42,14 @@ void main() {
   late DeepLinkService sut;
   late _MockSharedSpaceApiRepository sharedSpaceApiRepository;
   late _MockWidgetRef ref;
-  late Drift db;
 
   setUpAll(() async {
     TestWidgetsFlutterBinding.ensureInitialized();
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
-
-    db = Drift(drift.DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true));
-    await StoreService.init(storeRepository: DriftStoreRepository(db));
   });
 
   tearDownAll(() async {
     debugDefaultTargetPlatformOverride = null;
-    await Store.clear();
-    await db.close();
   });
 
   setUp(() async {
@@ -78,13 +65,6 @@ void main() {
       sharedSpaceApiRepository,
       UserStub.user1,
     );
-
-    // Spaces require beta; make sure tests run with beta enabled.
-    await Store.put(StoreKey.betaTimeline, true);
-  });
-
-  tearDown(() async {
-    await Store.clear();
   });
 
   group('handleScheme - space intent', () {
@@ -120,15 +100,6 @@ void main() {
 
     test('returns null when id query parameter is missing', () async {
       final result = await sut.handleScheme(_deepLinkFor('immich://space'), ref);
-
-      expect(result, isNull);
-      verifyNever(() => sharedSpaceApiRepository.get(any()));
-    });
-
-    test('returns null when beta timeline is disabled', () async {
-      await Store.put(StoreKey.betaTimeline, false);
-
-      final result = await sut.handleScheme(_deepLinkFor('immich://space?id=$spaceId'), ref);
 
       expect(result, isNull);
       verifyNever(() => sharedSpaceApiRepository.get(any()));

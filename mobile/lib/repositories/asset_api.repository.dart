@@ -17,30 +17,8 @@ class AssetApiRepository extends ApiRepository {
   AssetApiRepository(this._apiService);
 
   AssetsApi get _api => _apiService.assetsApi;
-  SearchApi get _searchApi => _apiService.searchApi;
   StacksApi get _stacksApi => _apiService.stacksApi;
   TrashApi get _trashApi => _apiService.trashApi;
-
-  Future<Asset> update(String id, {String? description}) async {
-    final response = await checkNull(_api.updateAsset(id, UpdateAssetDto(description: description)));
-    return Asset.remote(response);
-  }
-
-  Future<List<Asset>> search({List<String> personIds = const []}) async {
-    // TODO this always fetches all assets, change API and usage to actually do pagination
-    final List<Asset> result = [];
-    bool hasNext = true;
-    int currentPage = 1;
-    while (hasNext) {
-      final response = await checkNull(
-        _searchApi.searchAssets(MetadataSearchDto(personIds: personIds, page: currentPage, size: 1000)),
-      );
-      result.addAll(response.assets.items.map(Asset.remote));
-      hasNext = response.assets.nextPage != null;
-      currentPage++;
-    }
-    return result;
-  }
 
   Future<void> delete(List<String> ids, bool force) async {
     return _api.deleteAssets(AssetBulkDeleteDto(ids: ids, force: force));
