@@ -1207,13 +1207,13 @@ describe('/search', () => {
       outsiderWebsocket = await utils.connectWebsocket(outsiderUser.accessToken);
 
       // Upload assets while ML is still disabled (avoids background ML job churn)
-      ownerAsset = await utils.createAsset(ownerUser.accessToken, { deviceAssetId: 'smart-shared-owner-1' });
+      ownerAsset = await utils.createAsset(ownerUser.accessToken, { });
       ownerAssetNotInSpace = await utils.createAsset(ownerUser.accessToken, {
-        deviceAssetId: 'smart-shared-owner-2',
+        
       });
-      memberAsset = await utils.createAsset(memberUser.accessToken, { deviceAssetId: 'smart-shared-member-1' });
+      memberAsset = await utils.createAsset(memberUser.accessToken, { });
       outsiderAsset = await utils.createAsset(outsiderUser.accessToken, {
-        deviceAssetId: 'smart-shared-outsider-1',
+        
       });
 
       await utils.waitForWebsocketEvent({ event: 'assetUpload', id: ownerAsset.id });
@@ -1406,7 +1406,6 @@ describe('/search', () => {
       paginationAssets = [];
       for (let i = 0; i < ASSET_COUNT; i++) {
         const asset = await utils.createAsset(paginationUser.accessToken, {
-          deviceAssetId: `smart-pagination-${i}`,
         });
         paginationAssets.push(asset);
       }
@@ -1509,17 +1508,17 @@ describe('/search', () => {
       // Upload three assets with distinct dates — they'll use random PNG images with no EXIF,
       // so we assign GPS coords afterwards to get country/city populated by reverse geocoding.
       asset1 = await utils.createAsset(temporalUser.accessToken, {
-        deviceAssetId: 'temporal-1',
+        
         fileCreatedAt: date1,
         fileModifiedAt: date1,
       });
       asset2 = await utils.createAsset(temporalUser.accessToken, {
-        deviceAssetId: 'temporal-2',
+        
         fileCreatedAt: date2,
         fileModifiedAt: date2,
       });
       asset3 = await utils.createAsset(temporalUser.accessToken, {
-        deviceAssetId: 'temporal-3',
+        
         fileCreatedAt: date3,
         fileModifiedAt: date3,
       });
