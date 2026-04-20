@@ -17,6 +17,7 @@ import { AssetStatus, AssetType, AssetVisibility, VectorIndex } from 'src/enum.j
 import { probes } from 'src/repositories/database.repository.js';
 import { DB } from 'src/schema/index.js';
 import { AssetExifTable } from 'src/schema/tables/asset-exif.table.js';
+import { DB } from 'src/schema.js';
 import {
   anyUuid,
   asUuid,
