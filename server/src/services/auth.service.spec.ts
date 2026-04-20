@@ -17,7 +17,7 @@ import { UserFactory } from 'test/factories/user.factory.js';
 import { sharedLinkStub } from 'test/fixtures/shared-link.stub.js';
 import { systemConfigStub } from 'test/fixtures/system-config.stub.js';
 import { userStub } from 'test/fixtures/user.stub.js';
-import { newUuid } from 'test/small.factory.js';
+import { factory, newUuid } from 'test/small.factory.js';
 import { ServiceMocks, newTestService } from 'test/utils.js';
 
 const email = 'test@immich.com';
@@ -1135,7 +1135,7 @@ describe(AuthService.name, () => {
         const profile = OAuthProfileFactory.create({ picture: 'https://auth.immich.cloud/profiles/1.jpg' });
 
         mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.oauthEnabled);
-        mocks.oauth.getProfile.mockResolvedValue(profile);
+        mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({ profile });
         mocks.user.getByOAuthId.mockResolvedValue(user);
         mocks.crypto.randomUUID.mockReturnValue(fileId);
         mocks.oauth.getProfilePicture.mockResolvedValue({
@@ -1167,7 +1167,7 @@ describe(AuthService.name, () => {
         const profile = OAuthProfileFactory.create({ picture: 'https://auth.immich.cloud/profiles/1.png' });
 
         mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.oauthEnabled);
-        mocks.oauth.getProfile.mockResolvedValue(profile);
+        mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({ profile });
         mocks.user.getByOAuthId.mockResolvedValue(user);
         mocks.crypto.randomUUID.mockReturnValue(fileId);
         mocks.oauth.getProfilePicture.mockResolvedValue({
@@ -1194,7 +1194,7 @@ describe(AuthService.name, () => {
         const profile = OAuthProfileFactory.create({ picture: 'https://auth.immich.cloud/profiles/1.jpg' });
 
         mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.oauthEnabled);
-        mocks.oauth.getProfile.mockResolvedValue(profile);
+        mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({ profile });
         mocks.user.getByOAuthId.mockResolvedValue(user);
         mocks.crypto.randomUUID.mockReturnValue(fileId);
         mocks.oauth.getProfilePicture.mockResolvedValue({
@@ -1222,7 +1222,7 @@ describe(AuthService.name, () => {
         const profile = OAuthProfileFactory.create({ picture: 'https://auth.immich.cloud/profiles/1.jpg' });
 
         mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.oauthEnabled);
-        mocks.oauth.getProfile.mockResolvedValue(profile);
+        mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({ profile });
         mocks.user.getByOAuthId.mockResolvedValue(user);
         mocks.crypto.randomUUID.mockReturnValue(fileId);
         mocks.oauth.getProfilePicture.mockResolvedValue({
@@ -1250,7 +1250,7 @@ describe(AuthService.name, () => {
         const profile = OAuthProfileFactory.create({ picture: 'https://auth.immich.cloud/profiles/1.jpg' });
 
         mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.oauthEnabled);
-        mocks.oauth.getProfile.mockResolvedValue(profile);
+        mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({ profile });
         mocks.user.getByOAuthId.mockResolvedValue(user);
         mocks.crypto.randomUUID.mockReturnValue(fileId);
         mocks.oauth.getProfilePicture.mockResolvedValue({
@@ -2081,7 +2081,7 @@ describe(AuthService.name, () => {
       const user = factory.userAdmin();
 
       mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.oauthEnabled);
-      mocks.oauth.getProfile.mockResolvedValue({ sub: user.oauthId });
+      mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({ profile: { sub: user.oauthId } });
       mocks.user.getByOAuthId.mockResolvedValue(user);
       mocks.session.create.mockResolvedValue(factory.session());
 
@@ -2091,14 +2091,19 @@ describe(AuthService.name, () => {
         loginDetails,
       );
 
-      expect(mocks.oauth.getProfile).toHaveBeenCalledWith(expect.anything(), expect.any(String), 'cookie-state', 'foo');
+      expect(mocks.oauth.getProfileAndOAuthSid).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.any(String),
+        'cookie-state',
+        'foo',
+      );
     });
 
     it('should use code verifier from cookie when not in dto', async () => {
       const user = factory.userAdmin();
 
       mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.oauthEnabled);
-      mocks.oauth.getProfile.mockResolvedValue({ sub: user.oauthId });
+      mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({ profile: { sub: user.oauthId } });
       mocks.user.getByOAuthId.mockResolvedValue(user);
       mocks.session.create.mockResolvedValue(factory.session());
 
@@ -2108,7 +2113,7 @@ describe(AuthService.name, () => {
         loginDetails,
       );
 
-      expect(mocks.oauth.getProfile).toHaveBeenCalledWith(
+      expect(mocks.oauth.getProfileAndOAuthSid).toHaveBeenCalledWith(
         expect.anything(),
         expect.any(String),
         'foo',
@@ -2143,7 +2148,7 @@ describe(AuthService.name, () => {
       const auth = factory.auth({ user, apiKey: { permissions: [] } });
 
       mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.enabled);
-      mocks.oauth.getProfile.mockResolvedValue({ sub: user.oauthId });
+      mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({ profile: { sub: user.oauthId } });
       mocks.user.getByOAuthId.mockResolvedValue(user as any);
       mocks.user.update.mockResolvedValue(user);
 
@@ -2162,11 +2167,13 @@ describe(AuthService.name, () => {
       const user = factory.userAdmin({ oauthId: 'oauth-id' });
 
       mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.enabled);
-      mocks.oauth.getProfile.mockResolvedValue({
-        sub: user.oauthId,
-        email: user.email,
-        given_name: 'John',
-        family_name: 'Doe',
+      mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({
+        profile: {
+          sub: user.oauthId,
+          email: user.email,
+          given_name: 'John',
+          family_name: 'Doe',
+        },
       });
       mocks.user.getByEmail.mockResolvedValue(void 0);
       mocks.user.getAdmin.mockResolvedValue(factory.userAdmin({ isAdmin: true }));
@@ -2186,12 +2193,14 @@ describe(AuthService.name, () => {
       const user = factory.userAdmin({ oauthId: 'oauth-id' });
 
       mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.enabled);
-      mocks.oauth.getProfile.mockResolvedValue({
-        sub: user.oauthId,
-        email: user.email,
-        name: 'Full Name',
-        given_name: 'John',
-        family_name: 'Doe',
+      mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({
+        profile: {
+          sub: user.oauthId,
+          email: user.email,
+          name: 'Full Name',
+          given_name: 'John',
+          family_name: 'Doe',
+        },
       });
       mocks.user.getByEmail.mockResolvedValue(void 0);
       mocks.user.getAdmin.mockResolvedValue(factory.userAdmin({ isAdmin: true }));
@@ -2213,10 +2222,12 @@ describe(AuthService.name, () => {
       const user = factory.userAdmin({ oauthId: 'oauth-id' });
 
       mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.oauthEnabled);
-      mocks.oauth.getProfile.mockResolvedValue({
-        sub: user.oauthId,
-        email: user.email,
-        picture: 'https://auth.immich.cloud/profiles/1.jpg',
+      mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({
+        profile: {
+          sub: user.oauthId,
+          email: user.email,
+          picture: 'https://auth.immich.cloud/profiles/1.jpg',
+        },
       });
       mocks.user.getByOAuthId.mockResolvedValue(user);
       mocks.oauth.getProfilePicture.mockRejectedValue(new Error('network error'));
@@ -2239,10 +2250,12 @@ describe(AuthService.name, () => {
       const userNoProfile = { ...user, profileImagePath: '' };
 
       mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.oauthEnabled);
-      mocks.oauth.getProfile.mockResolvedValue({
-        sub: userNoProfile.oauthId,
-        email: userNoProfile.email,
-        picture: 'https://auth.immich.cloud/profiles/1.jpg',
+      mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({
+        profile: {
+          sub: userNoProfile.oauthId,
+          email: userNoProfile.email,
+          picture: 'https://auth.immich.cloud/profiles/1.jpg',
+        },
       });
       mocks.user.getByOAuthId.mockResolvedValue(userNoProfile);
       mocks.crypto.randomUUID.mockReturnValue(fileId);
