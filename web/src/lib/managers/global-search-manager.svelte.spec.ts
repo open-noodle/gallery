@@ -102,6 +102,7 @@ vi.mock('$app/state', () => ({ page: mockPage }));
 // stub minimal (just the members the manager actually touches).
 vi.mock('@immich/ui', () => ({
   toastManager: { warning: vi.fn(), danger: vi.fn(), primary: vi.fn(), success: vi.fn() },
+  themeManager: { toggle: vi.fn(), setPreference: vi.fn(), value: 'light' },
 }));
 
 // Mock ONLY svelte-i18n's `locale` store so tests can control it. The `t` store
