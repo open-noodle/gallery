@@ -31,12 +31,7 @@ class _FakeFilter extends Fake implements SearchFilter {}
 
 class _MockUserService extends Mock implements UserService {}
 
-UserDto _user(String id) => UserDto(
-  id: id,
-  email: '$id@example.com',
-  name: id,
-  profileChangedAt: DateTime(2024, 1, 1),
-);
+UserDto _user(String id) => UserDto(id: id, email: '$id@example.com', name: id, profileChangedAt: DateTime(2024, 1, 1));
 
 class _StubCurrentUserNotifier extends CurrentUserProvider {
   _StubCurrentUserNotifier(super.service, UserDto? initial) {
@@ -44,11 +39,7 @@ class _StubCurrentUserNotifier extends CurrentUserProvider {
   }
 }
 
-ProviderContainer _container({
-  required TimelineFactory factory,
-  required SearchService search,
-  UserDto? user,
-}) {
+ProviderContainer _container({required TimelineFactory factory, required SearchService search, UserDto? user}) {
   final mockUserSvc = _MockUserService();
   when(() => mockUserSvc.tryGetMyUser()).thenReturn(user);
   when(() => mockUserSvc.watchMyUser()).thenAnswer((_) => const Stream<UserDto?>.empty());

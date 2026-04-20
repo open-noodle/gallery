@@ -191,8 +191,7 @@ class SpaceMembersPage extends HookConsumerWidget {
                   visualDensity: VisualDensity.compact,
                 ),
                 onTap:
-                    (isOwner && member.role != SharedSpaceRole.owner) ||
-                        (!isOwner && member.userId == currentUser?.id)
+                    (isOwner && member.role != SharedSpaceRole.owner) || (!isOwner && member.userId == currentUser?.id)
                     ? () => showMemberActions(member, isOwner)
                     : null,
               );
