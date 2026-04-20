@@ -17,12 +17,22 @@ class MockSharedSpaceApiRepository extends Mock implements SharedSpaceApiReposit
 /// Test-local stand-in for the real [CurrentUserProvider]. Lets us seed a
 /// user (or null) without wiring up a full UserService.
 class MockCurrentUserProvider extends CurrentUserProvider with Mock {
-  MockCurrentUserProvider([UserDto? initial]) : super(_NoopUserService()) {
+  MockCurrentUserProvider([UserDto? initial]) : super(_makeNoopUserService()) {
     state = initial;
   }
 }
 
 class _NoopUserService extends Mock implements UserService {}
+
+UserService _makeNoopUserService() {
+  final svc = _NoopUserService();
+  // CurrentUserProvider's constructor calls tryGetMyUser() and watchMyUser();
+  // mocktail returns null for unstubbed methods which crashes on the
+  // non-nullable `Stream<UserDto?>` return type.
+  when(() => svc.tryGetMyUser()).thenReturn(null);
+  when(() => svc.watchMyUser()).thenAnswer((_) => const Stream<UserDto?>.empty());
+  return svc;
+}
 
 ProviderContainer _container({required List<Override> overrides}) {
   final container = ProviderContainer(overrides: overrides);
@@ -114,7 +124,7 @@ void main() {
           userId: 'user-1',
           name: 'Alice',
           email: 'alice@test.com',
-          role: api.SharedSpaceMemberResponseDtoRoleEnum.owner,
+          role: api.SharedSpaceRole.owner,
           joinedAt: '2024-01-01T00:00:00Z',
           showInTimeline: true,
         ),
@@ -122,7 +132,7 @@ void main() {
           userId: 'user-2',
           name: 'Bob',
           email: 'bob@test.com',
-          role: api.SharedSpaceMemberResponseDtoRoleEnum.viewer,
+          role: api.SharedSpaceRole.viewer,
           joinedAt: '2024-01-01T00:00:00Z',
           showInTimeline: true,
         ),
@@ -136,8 +146,8 @@ void main() {
       final result = await container.read(sharedSpaceMembersProvider('space-1').future);
 
       expect(result.length, equals(2));
-      expect(result[0].role, equals(api.SharedSpaceMemberResponseDtoRoleEnum.owner));
-      expect(result[1].role, equals(api.SharedSpaceMemberResponseDtoRoleEnum.viewer));
+      expect(result[0].role, equals(api.SharedSpaceRole.owner));
+      expect(result[1].role, equals(api.SharedSpaceRole.viewer));
     });
   });
 
