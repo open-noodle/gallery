@@ -1,6 +1,6 @@
 import { createZodDto } from 'nestjs-zod';
 import { BBoxSchema } from 'src/dtos/bbox.dto';
-import { AssetOrderBySchema, AssetOrderSchema, AssetVisibilitySchema } from 'src/enum';
+import { AssetOrderBySchema, AssetOrderSchema, AssetTypeSchema, AssetVisibilitySchema } from 'src/enum';
 import { stringToBool } from 'src/validation';
 import z from 'zod';
 
@@ -28,6 +28,20 @@ const TimeBucketQueryBaseSchema = z
       .uuidv4()
       .optional()
       .describe('Filter assets containing a specific shared space person (space face recognition)'),
+    personIds: z.array(z.uuidv4()).optional().describe('Filter assets containing any of these persons (multi-select)'),
+    spacePersonIds: z
+      .array(z.uuidv4())
+      .optional()
+      .describe('Filter assets containing any of these shared space persons (multi-select)'),
+    tagIds: z.array(z.uuidv4()).optional().describe('Filter assets with any of these tags (multi-select)'),
+    city: z.string().optional().describe('Filter by city name'),
+    country: z.string().optional().describe('Filter by country name'),
+    make: z.string().optional().describe('Filter by camera make'),
+    model: z.string().optional().describe('Filter by camera model'),
+    rating: z.coerce.number().int().min(1).max(5).optional().describe('Minimum star rating (>=)'),
+    type: AssetTypeSchema.optional().describe('Filter by asset type (IMAGE or VIDEO)'),
+    takenAfter: z.string().optional().describe('Only include assets taken on or after this date (ISO 8601)'),
+    takenBefore: z.string().optional().describe('Only include assets taken on or before this date (ISO 8601)'),
     order: AssetOrderSchema.optional().describe(
       'Sort order for assets within time buckets (ASC for oldest first, DESC for newest first)',
     ),
