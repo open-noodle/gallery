@@ -104,7 +104,6 @@ export const AssetResponseSchema = SanitizedAssetResponseSchema.extend(
     checksum: z.string().describe('Base64 encoded SHA1 hash'),
     stack: AssetStackResponseSchema.nullish(),
     duplicateId: z.string().nullish().describe('Duplicate group ID'),
-    resolvedSpaceId: z.string().optional().describe('Resolved space ID when server auto-detects space context'),
     resized: z
       .boolean()
       .optional()
@@ -114,6 +113,7 @@ export const AssetResponseSchema = SanitizedAssetResponseSchema.extend(
       .boolean()
       .describe('Is edited')
       .meta(new HistoryBuilder().added('v2.5.0').beta('v2.5.0').getExtensions()),
+    resolvedSpaceId: z.string().optional().describe('Resolved space ID (when server auto-detects space context)'),
   }).shape,
 ).meta({ id: 'AssetResponseDto' });
 

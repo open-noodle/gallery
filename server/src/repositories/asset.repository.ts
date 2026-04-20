@@ -552,7 +552,6 @@ export class AssetRepository {
       .execute();
   }
 
-
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.STRING] })
   getByLibraryIdAndOriginalPath(libraryId: string, originalPath: string) {
     return this.db

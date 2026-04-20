@@ -443,9 +443,7 @@ void main() {
         // is essential — we cannot wedge on a missing store) and the
         // repository method is NOT called.
         await simulateEvents([SyncStreamStub.libraryDeleteV1]);
-        verifyNever(
-          () => mockSyncStreamRepo.deleteLibrariesV1(any(), currentUserId: any(named: 'currentUserId')),
-        );
+        verifyNever(() => mockSyncStreamRepo.deleteLibrariesV1(any(), currentUserId: any(named: 'currentUserId')));
         // The event is still acked — the dispatch must not wedge when
         // there's no current user. (If you change the contract to wedge,
         // update this assertion.)

@@ -188,9 +188,7 @@ const FilterSuggestionsResponseSchema = z
     countries: z.array(z.string()).describe('Available countries'),
     cameraMakes: z.array(z.string()).describe('Available camera makes'),
     tags: z.array(FilterSuggestionsTagSchema).describe('Available tags'),
-    people: z
-      .array(FilterSuggestionsPersonSchema)
-      .describe('Available people (named, non-hidden, with thumbnails)'),
+    people: z.array(FilterSuggestionsPersonSchema).describe('Available people (named, non-hidden, with thumbnails)'),
     ratings: z.array(z.number()).describe('Available ratings'),
     mediaTypes: z.array(z.string()).describe('Available media types'),
     hasUnnamedPeople: z.boolean().describe('Whether unnamed people exist in the filtered set'),

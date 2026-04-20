@@ -86,9 +86,8 @@ void main() {
         );
   }
 
-  Future<void> insertSpace(String id, String ownerId) => db
-      .into(db.sharedSpaceEntity)
-      .insert(SharedSpaceEntityCompanion.insert(id: id, name: id, createdById: ownerId));
+  Future<void> insertSpace(String id, String ownerId) =>
+      db.into(db.sharedSpaceEntity).insert(SharedSpaceEntityCompanion.insert(id: id, name: id, createdById: ownerId));
 
   Future<void> insertMember(String spaceId, String userId, {bool showInTimeline = true}) => db
       .into(db.sharedSpaceMemberEntity)
@@ -264,17 +263,14 @@ void main() {
       await linkAssetToSpace('space1', 'a1');
 
       final emissions = <List<Bucket>>[];
-      final sub = sut
-          .video(['viewer'], 'viewer', GroupAssetsBy.day)
-          .bucketSource()
-          .listen(emissions.add);
+      final sub = sut.video(['viewer'], 'viewer', GroupAssetsBy.day).bucketSource().listen(emissions.add);
 
       await _waitFor(() => emissions.isNotEmpty);
       expect(emissions.last, hasLength(1));
 
-      await (db.delete(db.sharedSpaceAssetEntity)
-            ..where((t) => t.spaceId.equals('space1') & t.assetId.equals('a1')))
-          .go();
+      await (db.delete(
+        db.sharedSpaceAssetEntity,
+      )..where((t) => t.spaceId.equals('space1') & t.assetId.equals('a1'))).go();
 
       await _waitFor(() => emissions.length >= 2);
       expect(emissions.last, isEmpty);
@@ -291,10 +287,7 @@ void main() {
       await linkAssetToSpace('space1', 'a1');
 
       final emissions = <List<Bucket>>[];
-      final sub = sut
-          .video(['viewer'], 'viewer', GroupAssetsBy.day)
-          .bucketSource()
-          .listen(emissions.add);
+      final sub = sut.video(['viewer'], 'viewer', GroupAssetsBy.day).bucketSource().listen(emissions.add);
 
       await _waitFor(() => emissions.isNotEmpty);
       expect((emissions.last.single as TimeBucket).assetCount, 1);
@@ -339,17 +332,14 @@ void main() {
       await linkAssetToSpace('space1', 'a1');
 
       final emissions = <List<Bucket>>[];
-      final sub = sut
-          .video(['viewer'], 'viewer', GroupAssetsBy.day)
-          .bucketSource()
-          .listen(emissions.add);
+      final sub = sut.video(['viewer'], 'viewer', GroupAssetsBy.day).bucketSource().listen(emissions.add);
 
       await _waitFor(() => emissions.isNotEmpty);
       expect((emissions.last.single as TimeBucket).assetCount, 1);
 
-      await (db.delete(db.sharedSpaceMemberEntity)
-            ..where((t) => t.spaceId.equals('space1') & t.userId.equals('viewer')))
-          .go();
+      await (db.delete(
+        db.sharedSpaceMemberEntity,
+      )..where((t) => t.spaceId.equals('space1') & t.userId.equals('viewer'))).go();
 
       await _waitFor(() => emissions.length >= 2);
       expect(
@@ -365,19 +355,15 @@ void main() {
   });
 
   group('DriftTimelineRepository.place()', () {
-    Future<void> insertExif(String assetId, String? city) => db
-        .into(db.remoteExifEntity)
-        .insert(RemoteExifEntityCompanion.insert(assetId: assetId, city: Value(city)));
+    Future<void> insertExif(String assetId, String? city) =>
+        db.into(db.remoteExifEntity).insert(RemoteExifEntityCompanion.insert(assetId: assetId, city: Value(city)));
 
     test('place() hides assets with wrong city even when viewer-visible', () async {
       await insertUser('viewer');
       await insertVideo('a1', 'viewer', type: AssetType.image);
       await insertExif('a1', 'Berlin');
 
-      final buckets = await sut
-          .place('Paris', ['viewer'], 'viewer', GroupAssetsBy.day)
-          .bucketSource()
-          .first;
+      final buckets = await sut.place('Paris', ['viewer'], 'viewer', GroupAssetsBy.day).bucketSource().first;
       expect(buckets, isEmpty);
     });
 
@@ -390,10 +376,7 @@ void main() {
       await insertMember('space1', 'viewer');
       await linkAssetToSpace('space1', 'a1');
 
-      final buckets = await sut
-          .place('Paris', ['viewer'], 'viewer', GroupAssetsBy.day)
-          .bucketSource()
-          .first;
+      final buckets = await sut.place('Paris', ['viewer'], 'viewer', GroupAssetsBy.day).bucketSource().first;
       expect(buckets, hasLength(1));
       expect((buckets.single as TimeBucket).assetCount, 1);
     });
@@ -408,17 +391,14 @@ void main() {
       await linkAssetToSpace('space1', 'a1');
 
       final emissions = <List<Bucket>>[];
-      final sub = sut
-          .place('Paris', ['viewer'], 'viewer', GroupAssetsBy.day)
-          .bucketSource()
-          .listen(emissions.add);
+      final sub = sut.place('Paris', ['viewer'], 'viewer', GroupAssetsBy.day).bucketSource().listen(emissions.add);
 
       await _waitFor(() => emissions.isNotEmpty);
       expect(emissions.last, hasLength(1));
 
-      await (db.delete(db.sharedSpaceAssetEntity)
-            ..where((t) => t.spaceId.equals('space1') & t.assetId.equals('a1')))
-          .go();
+      await (db.delete(
+        db.sharedSpaceAssetEntity,
+      )..where((t) => t.spaceId.equals('space1') & t.assetId.equals('a1'))).go();
 
       await _waitFor(() => emissions.length >= 2);
       expect(emissions.last, isEmpty);
@@ -432,10 +412,7 @@ void main() {
       await insertVideo('a1', 'stranger', type: AssetType.image);
       await insertExif('a1', 'Paris');
 
-      final buckets = await sut
-          .place('Paris', ['viewer'], 'viewer', GroupAssetsBy.day)
-          .bucketSource()
-          .first;
+      final buckets = await sut.place('Paris', ['viewer'], 'viewer', GroupAssetsBy.day).bucketSource().first;
       expect(buckets, isEmpty, reason: 'Unowned, unshared asset must not appear on place detail');
     });
 
@@ -457,34 +434,20 @@ void main() {
       await insertVideo('stranger1', 'stranger', type: AssetType.image);
       await insertExif('stranger1', 'Paris');
 
-      final assets = await sut
-          .place('Paris', ['viewer'], 'viewer', GroupAssetsBy.day)
-          .assetSource(0, 100);
+      final assets = await sut.place('Paris', ['viewer'], 'viewer', GroupAssetsBy.day).assetSource(0, 100);
       expect(assets, hasLength(1));
       expect((assets.single as RemoteAsset).id, 'a1');
     });
   });
 
   group('DriftTimelineRepository.map() bucket sheet', () {
-    LatLngBounds globeBounds() => LatLngBounds(
-          southwest: const LatLng(-89, -179),
-          northeast: const LatLng(89, 179),
-        );
+    LatLngBounds globeBounds() => LatLngBounds(southwest: const LatLng(-89, -179), northeast: const LatLng(89, 179));
 
-    LatLngBounds europeBounds() => LatLngBounds(
-          southwest: const LatLng(35, -10),
-          northeast: const LatLng(70, 40),
-        );
+    LatLngBounds europeBounds() => LatLngBounds(southwest: const LatLng(35, -10), northeast: const LatLng(70, 40));
 
     Future<void> insertExifAt(String assetId, double lat, double lng) => db
         .into(db.remoteExifEntity)
-        .insert(
-          RemoteExifEntityCompanion.insert(
-            assetId: assetId,
-            latitude: Value(lat),
-            longitude: Value(lng),
-          ),
-        );
+        .insert(RemoteExifEntityCompanion.insert(assetId: assetId, latitude: Value(lat), longitude: Value(lng)));
 
     test('map() hides out-of-bounds asset even when viewer-visible', () async {
       await insertUser('viewer');
@@ -495,10 +458,7 @@ void main() {
       await insertMember('space1', 'viewer');
       await linkAssetToSpace('space1', 'a1');
 
-      final naBounds = LatLngBounds(
-        southwest: const LatLng(20, -130),
-        northeast: const LatLng(60, -60),
-      );
+      final naBounds = LatLngBounds(southwest: const LatLng(20, -130), northeast: const LatLng(60, -60));
 
       final buckets = await sut
           .map(['viewer'], 'viewer', TimelineMapOptions(bounds: naBounds), GroupAssetsBy.day)
@@ -549,12 +509,7 @@ void main() {
       await linkAssetToSpace('space1', 'a1');
 
       final buckets = await sut
-          .map(
-            ['viewer'],
-            'viewer',
-            TimelineMapOptions(bounds: globeBounds(), relativeDays: 7),
-            GroupAssetsBy.day,
-          )
+          .map(['viewer'], 'viewer', TimelineMapOptions(bounds: globeBounds(), relativeDays: 7), GroupAssetsBy.day)
           .bucketSource()
           .first;
       expect(buckets, isEmpty);
@@ -574,12 +529,7 @@ void main() {
       await linkAssetToSpace('space1', 'a1');
 
       final assets = await sut
-          .map(
-            ['viewer'],
-            'viewer',
-            TimelineMapOptions(bounds: europeBounds()),
-            GroupAssetsBy.day,
-          )
+          .map(['viewer'], 'viewer', TimelineMapOptions(bounds: europeBounds()), GroupAssetsBy.day)
           .assetSource(0, 100);
       expect(assets, hasLength(1));
       expect((assets.single as RemoteAsset).id, 'a1');
@@ -596,21 +546,16 @@ void main() {
 
       final emissions = <List<Bucket>>[];
       final sub = sut
-          .map(
-            ['viewer'],
-            'viewer',
-            TimelineMapOptions(bounds: europeBounds()),
-            GroupAssetsBy.day,
-          )
+          .map(['viewer'], 'viewer', TimelineMapOptions(bounds: europeBounds()), GroupAssetsBy.day)
           .bucketSource()
           .listen(emissions.add);
 
       await _waitFor(() => emissions.isNotEmpty);
       expect(emissions.last, hasLength(1));
 
-      await (db.delete(db.sharedSpaceAssetEntity)
-            ..where((t) => t.spaceId.equals('space1') & t.assetId.equals('a1')))
-          .go();
+      await (db.delete(
+        db.sharedSpaceAssetEntity,
+      )..where((t) => t.spaceId.equals('space1') & t.assetId.equals('a1'))).go();
 
       await _waitFor(() => emissions.length >= 2);
       expect(emissions.last, isEmpty);
@@ -627,10 +572,7 @@ void main() {
         insertAsset: (assetId, ownerId) => insertVideo(assetId, ownerId, type: AssetType.video),
       ),
       count: (userIds, currentUserId) async {
-        final buckets = await sut
-            .video(userIds, currentUserId, GroupAssetsBy.day)
-            .bucketSource()
-            .first;
+        final buckets = await sut.video(userIds, currentUserId, GroupAssetsBy.day).bucketSource().first;
         return buckets.fold<int>(0, (sum, b) => sum + (b as TimeBucket).assetCount);
       },
     );
@@ -649,27 +591,23 @@ void main() {
         },
       ),
       count: (userIds, currentUserId) async {
-        final buckets = await sut
-            .place('Paris', userIds, currentUserId, GroupAssetsBy.day)
-            .bucketSource()
-            .first;
+        final buckets = await sut.place('Paris', userIds, currentUserId, GroupAssetsBy.day).bucketSource().first;
         return buckets.fold<int>(0, (sum, b) => sum + (b as TimeBucket).assetCount);
       },
     );
   });
 
   group('Cross-method permission matrix — map()', () {
-    final bounds = LatLngBounds(
-      southwest: const LatLng(-89, -179),
-      northeast: const LatLng(89, 179),
-    );
+    final bounds = LatLngBounds(southwest: const LatLng(-89, -179), northeast: const LatLng(89, 179));
     runPermissionMatrix(
       methodName: 'map',
       fixtures: MatrixFixtures(
         db: () => db,
         insertAsset: (assetId, ownerId) async {
           await insertVideo(assetId, ownerId, type: AssetType.image);
-          await db.into(db.remoteExifEntity).insert(
+          await db
+              .into(db.remoteExifEntity)
+              .insert(
                 RemoteExifEntityCompanion.insert(
                   assetId: assetId,
                   latitude: const Value(48.85),
@@ -766,8 +704,7 @@ void main() {
 
     // Toggle showInTimeline=false on the member row. The aliased join's ON clause
     // requires showInTimeline=true, so the asset should drop out of the count.
-    await (db.update(db.sharedSpaceMemberEntity)
-          ..where((t) => t.spaceId.equals(spaceId) & t.userId.equals(viewerId)))
+    await (db.update(db.sharedSpaceMemberEntity)..where((t) => t.spaceId.equals(spaceId) & t.userId.equals(viewerId)))
         .write(const SharedSpaceMemberEntityCompanion(showInTimeline: Value(false)));
 
     await _waitFor(() => emissions.length >= 2);
@@ -811,9 +748,7 @@ void main() {
         .insert(SharedSpaceEntityCompanion.insert(id: spaceId, name: 'Space', createdById: ownerId));
     await db
         .into(db.sharedSpaceMemberEntity)
-        .insert(
-          SharedSpaceMemberEntityCompanion.insert(spaceId: spaceId, userId: viewerId, role: 'viewer'),
-        );
+        .insert(SharedSpaceMemberEntityCompanion.insert(spaceId: spaceId, userId: viewerId, role: 'viewer'));
     // Asset IS in the space at subscription time — first emission should show it.
     await db
         .into(db.sharedSpaceAssetEntity)
@@ -821,10 +756,7 @@ void main() {
 
     final emissions = <List<Bucket>>[];
     final errors = <Object>[];
-    final sub = sut
-        .sharedSpace(spaceId, GroupAssetsBy.day)
-        .bucketSource()
-        .listen(emissions.add, onError: errors.add);
+    final sub = sut.sharedSpace(spaceId, GroupAssetsBy.day).bucketSource().listen(emissions.add, onError: errors.add);
 
     await _waitFor(() => emissions.isNotEmpty || errors.isNotEmpty);
     if (errors.isNotEmpty) {
@@ -834,9 +766,9 @@ void main() {
     expect((emissions.last.single as TimeBucket).assetCount, 1);
 
     // Remove the asset from the space.
-    await (db.delete(db.sharedSpaceAssetEntity)
-          ..where((t) => t.spaceId.equals(spaceId) & t.assetId.equals(assetId)))
-        .go();
+    await (db.delete(
+      db.sharedSpaceAssetEntity,
+    )..where((t) => t.spaceId.equals(spaceId) & t.assetId.equals(assetId))).go();
 
     // The watch stream MUST re-emit with zero buckets.
     await _waitFor(() => emissions.length >= 2);
@@ -876,9 +808,7 @@ void main() {
         .insert(SharedSpaceEntityCompanion.insert(id: spaceId, name: 'Space', createdById: ownerId));
     await db
         .into(db.sharedSpaceMemberEntity)
-        .insert(
-          SharedSpaceMemberEntityCompanion.insert(spaceId: spaceId, userId: viewerId, role: 'viewer'),
-        );
+        .insert(SharedSpaceMemberEntityCompanion.insert(spaceId: spaceId, userId: viewerId, role: 'viewer'));
     // Library IS linked at subscription time.
     await db
         .into(db.sharedSpaceLibraryEntity)
@@ -892,9 +822,9 @@ void main() {
     expect((emissions.last.single as TimeBucket).assetCount, 1);
 
     // Remove the library link.
-    await (db.delete(db.sharedSpaceLibraryEntity)
-          ..where((t) => t.spaceId.equals(spaceId) & t.libraryId.equals(libraryId)))
-        .go();
+    await (db.delete(
+      db.sharedSpaceLibraryEntity,
+    )..where((t) => t.spaceId.equals(spaceId) & t.libraryId.equals(libraryId))).go();
 
     await _waitFor(() => emissions.length >= 2);
     expect(emissions.last, isEmpty);

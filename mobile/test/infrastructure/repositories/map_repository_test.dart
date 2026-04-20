@@ -65,18 +65,12 @@ void main() {
         );
   }
 
-  Future<void> insertExifAt(String assetId, double lat, double lng) =>
-      db.into(db.remoteExifEntity).insert(
-            RemoteExifEntityCompanion.insert(
-              assetId: assetId,
-              latitude: Value(lat),
-              longitude: Value(lng),
-            ),
-          );
+  Future<void> insertExifAt(String assetId, double lat, double lng) => db
+      .into(db.remoteExifEntity)
+      .insert(RemoteExifEntityCompanion.insert(assetId: assetId, latitude: Value(lat), longitude: Value(lng)));
 
-  Future<void> insertSpace(String id, String ownerId) => db
-      .into(db.sharedSpaceEntity)
-      .insert(SharedSpaceEntityCompanion.insert(id: id, name: id, createdById: ownerId));
+  Future<void> insertSpace(String id, String ownerId) =>
+      db.into(db.sharedSpaceEntity).insert(SharedSpaceEntityCompanion.insert(id: id, name: id, createdById: ownerId));
 
   Future<void> insertMember(String spaceId, String userId, {bool showInTimeline = true}) => db
       .into(db.sharedSpaceMemberEntity)
@@ -93,8 +87,7 @@ void main() {
       .into(db.sharedSpaceAssetEntity)
       .insert(SharedSpaceAssetEntityCompanion.insert(spaceId: spaceId, assetId: assetId));
 
-  LatLngBounds globeBounds() =>
-      LatLngBounds(southwest: const LatLng(-89, -179), northeast: const LatLng(89, 179));
+  LatLngBounds globeBounds() => LatLngBounds(southwest: const LatLng(-89, -179), northeast: const LatLng(89, 179));
 
   group('DriftMapRepository.remote()', () {
     test('owner marker returned', () async {
@@ -125,10 +118,7 @@ void main() {
   });
 
   group('Cross-method permission matrix — DriftMapRepository.remote() markers', () {
-    final bounds = LatLngBounds(
-      southwest: const LatLng(-89, -179),
-      northeast: const LatLng(89, 179),
-    );
+    final bounds = LatLngBounds(southwest: const LatLng(-89, -179), northeast: const LatLng(89, 179));
     runPermissionMatrix(
       methodName: 'marker',
       fixtures: MatrixFixtures(
