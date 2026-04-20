@@ -8,14 +8,10 @@ type Nav = {
   to?: { route?: { id?: string | null }; params?: Record<string, string> | null } | null;
 };
 
-const { pageState, userStore, navState } = await vi.hoisted(async () => {
-  const { writable } = await import('svelte/store');
-  return {
-    pageState: { url: { pathname: '/photos/550e8400-e29b-41d4-a716-446655440000' } },
-    userStore: writable<{ id: string } | null>({ id: 'user-1' }),
-    navState: { callback: undefined as ((nav: { type: string }) => void) | undefined },
-  };
-});
+const { pageState, navState } = vi.hoisted(() => ({
+  pageState: { url: { pathname: '/photos/550e8400-e29b-41d4-a716-446655440000' } },
+  navState: { callback: undefined as ((nav: { type: string }) => void) | undefined },
+}));
 
 const ASSET_VIEWER_TARGET = {
   route: { id: '/(user)/photos/[[assetId=id]]' },
@@ -33,15 +29,25 @@ vi.mock('$app/navigation', () => ({
   },
 }));
 
-vi.mock('$lib/stores/user.store', () => ({ user: userStore }));
-
 vi.mock('$app/state', () => ({ page: pageState }));
 
+import { authManager } from '$lib/managers/auth-manager.svelte';
+import { preferencesFactory } from '@test-data/factories/preferences-factory';
+import { userAdminFactory } from '@test-data/factories/user-factory';
 import OpenInAppBanner from './open-in-app-banner.svelte';
+
+const setUser = (id: string | null) => {
+  if (id === null) {
+    authManager.reset();
+  } else {
+    authManager.setUser(userAdminFactory.build({ id }));
+    authManager.setPreferences(preferencesFactory.build());
+  }
+};
 
 describe('OpenInAppBanner', () => {
   beforeEach(() => {
-    userStore.set({ id: 'user-1' });
+    setUser('user-1');
     pageState.url.pathname = '/photos/550e8400-e29b-41d4-a716-446655440000';
     localStorage.clear();
     Object.defineProperty(navigator, 'userAgent', {
@@ -67,12 +73,12 @@ describe('OpenInAppBanner', () => {
   });
 
   it('appears after auth resolves (auth-late race)', async () => {
-    userStore.set(null);
+    setUser(null);
     render(OpenInAppBanner);
     await tick();
     expect(screen.queryByRole('region', { name: 'open_in_app_banner_aria_label' })).not.toBeInTheDocument();
 
-    userStore.set({ id: 'user-1' });
+    setUser('user-1');
     await tick();
     expect(screen.getByRole('region', { name: 'open_in_app_banner_aria_label' })).toBeInTheDocument();
   });
@@ -117,7 +123,7 @@ describe('OpenInAppBanner', () => {
   });
 
   it('re-arms cold-entry when auth resolves after a prior navigation', async () => {
-    userStore.set(null);
+    setUser(null);
     render(OpenInAppBanner);
     await tick();
 
@@ -131,7 +137,7 @@ describe('OpenInAppBanner', () => {
     expect(screen.queryByRole('region', { name: 'open_in_app_banner_aria_label' })).not.toBeInTheDocument();
 
     // Now auth resolves — banner should still appear.
-    userStore.set({ id: 'user-1' });
+    setUser('user-1');
     await tick();
     expect(screen.getByRole('region', { name: 'open_in_app_banner_aria_label' })).toBeInTheDocument();
   });

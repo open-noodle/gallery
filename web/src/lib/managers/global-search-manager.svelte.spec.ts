@@ -9,11 +9,13 @@ const { mockUser } = vi.hoisted(() => ({
   // flips `mockUser.current` to something else.
   mockUser: { current: { id: 'test-user', isAdmin: true } as { id: string; isAdmin: boolean } | null },
 }));
-vi.mock('$lib/stores/user.store', () => ({
-  user: {
-    subscribe: (run: (v: { id: string; isAdmin: boolean } | null) => void) => {
-      run(mockUser.current);
-      return () => {};
+vi.mock('$lib/managers/auth-manager.svelte', () => ({
+  authManager: {
+    get authenticated() {
+      return mockUser.current !== null;
+    },
+    get user() {
+      return mockUser.current;
     },
   },
 }));

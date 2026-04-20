@@ -1,6 +1,6 @@
 <script lang="ts">
-  import SupportedDatetimePanel from '$lib/components/admin-settings/SupportedDatetimePanel.svelte';
-  import SupportedVariablesPanel from '$lib/components/admin-settings/SupportedVariablesPanel.svelte';
+  import SupportedDatetimePanel from './SupportedDatetimePanel.svelte';
+  import SupportedVariablesPanel from './SupportedVariablesPanel.svelte';
   import SettingButtonsRow from '$lib/components/shared-components/settings/SystemConfigButtonRow.svelte';
   import SettingInputField from '$lib/components/shared-components/settings/SettingInputField.svelte';
   import SettingSwitch from '$lib/components/shared-components/settings/SettingSwitch.svelte';
