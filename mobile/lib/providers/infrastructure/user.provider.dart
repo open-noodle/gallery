@@ -10,19 +10,16 @@ import 'package:immich_mobile/providers/infrastructure/partner.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/store.provider.dart';
 import 'package:immich_mobile/repositories/partner_api.repository.dart';
 
-final userApiRepositoryProvider = Provider((ref) => UserApiRepository(ref.watch(apiServiceProvider).usersApi));
+// Fork: UserApiRepository takes the full ApiService (lazy `.usersApi` resolution
+// via an internal getter) — see PR #369. Upstream passes `apiServiceProvider.usersApi`
+// directly, but our constructor signature differs.
+final userApiRepositoryProvider = Provider((ref) => UserApiRepository(ref.watch(apiServiceProvider)));
 
-@Riverpod(keepAlive: true)
-IsarUserRepository userRepository(Ref ref) => IsarUserRepository(ref.watch(isarProvider));
-
-@Riverpod(keepAlive: true)
-UserApiRepository userApiRepository(Ref ref) => UserApiRepository(ref.watch(apiServiceProvider));
-
-@Riverpod(keepAlive: true)
-UserService userService(Ref ref) => UserService(
-  isarUserRepository: ref.watch(userRepositoryProvider),
-  userApiRepository: ref.watch(userApiRepositoryProvider),
-  storeService: ref.watch(storeServiceProvider),
+final userServiceProvider = Provider(
+  (ref) => UserService(
+    userApiRepository: ref.watch(userApiRepositoryProvider),
+    storeService: ref.watch(storeServiceProvider),
+  ),
 );
 
 /// Drifts
