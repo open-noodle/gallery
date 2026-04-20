@@ -7,7 +7,10 @@ import 'package:immich_mobile/providers/infrastructure/db.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/store.provider.dart';
 import 'package:immich_mobile/repositories/partner_api.repository.dart';
 
-final userApiRepositoryProvider = Provider((ref) => UserApiRepository(ref.watch(apiServiceProvider).usersApi));
+// Fork: UserApiRepository takes the full ApiService (lazy `.usersApi` resolution
+// via an internal getter) — see PR #369. Upstream passes `apiServiceProvider.usersApi`
+// directly, but our constructor signature differs.
+final userApiRepositoryProvider = Provider((ref) => UserApiRepository(ref.watch(apiServiceProvider)));
 
 final userServiceProvider = Provider(
   (ref) => UserService(
