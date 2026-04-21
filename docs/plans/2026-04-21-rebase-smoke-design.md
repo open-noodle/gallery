@@ -199,9 +199,12 @@ owner → invites editor (Editor), viewer (Viewer)
 owner → uploads thompson-springs.jpg, adds tag, rates 5, creates a face
 owner → adds asset to space
 
-For editor, viewer:
-  updateMyPreferences { tags: { enabled: true }, ratings: { enabled: true } }
+For owner, editor, viewer:
+  updateMyPreferences { ratings: { enabled: true } }
     per feedback_env_prep_preferences
+    Note: tags.enabled does NOT gate the FilterPanel Tags section (filter-panel.svelte
+    has no preferences.tags check), so we only set ratings here. Detail-panel rating
+    row is gated by preferences.ratings.enabled.
 
 Drain background jobs before asserting visible state (use ADMIN token — not
 role tokens — per feedback_e2e_admin_only_queues; the legacy queue endpoints
