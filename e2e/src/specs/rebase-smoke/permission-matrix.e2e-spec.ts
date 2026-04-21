@@ -92,5 +92,17 @@ test.describe('Rebase Smoke — UI Permission Matrix', () => {
     await expect(page.getByRole('menuitem', { name: /delete/i })).toBeVisible();
   });
 
-  // Tests 2–10 added in subsequent commits.
+  test('Test 2 — editor: role badge Editor, add-photos visible, delete menu option absent', async ({
+    context,
+    page,
+  }) => {
+    await utils.setAuthCookies(context, editor.accessToken);
+    await page.goto(`/spaces/${space.id}`);
+    await expect(page.locator('[data-testid="hero-role-badge"]')).toContainText('Editor');
+    await expect(page.getByLabel('Add photos')).toBeVisible();
+    await page.getByRole('button', { name: 'More' }).click();
+    await expect(page.getByRole('menuitem', { name: /delete/i })).toHaveCount(0);
+  });
+
+  // Tests 3–10 added in subsequent commits.
 });
