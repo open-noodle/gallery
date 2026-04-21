@@ -1,12 +1,12 @@
-import { Body, Controller, HttpCode, HttpStatus, Post, StreamableFile } from '@nestjs/common';
+import { Body, Controller, HttpCode, HttpStatus, Post, Req, StreamableFile } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { Request } from 'express';
 import { Endpoint, HistoryBuilder } from 'src/decorators';
 import { AuthDto } from 'src/dtos/auth.dto';
 import { DownloadArchiveDto, DownloadInfoDto, DownloadResponseDto } from 'src/dtos/download.dto';
 import { ApiTag, Permission } from 'src/enum';
 import { Auth, Authenticated, FileResponse } from 'src/middleware/auth.guard';
 import { DownloadService } from 'src/services/download.service';
-import { asStreamableFile } from 'src/utils/file';
 
 @ApiTags(ApiTag.Download)
 @Controller('download')
@@ -35,7 +35,13 @@ export class DownloadController {
       'Download a ZIP archive containing the specified assets. The assets must have been previously requested via the "getDownloadInfo" endpoint.',
     history: new HistoryBuilder().added('v1').beta('v1').stable('v2'),
   })
-  downloadArchive(@Auth() auth: AuthDto, @Body() dto: DownloadArchiveDto): Promise<StreamableFile> {
-    return this.service.downloadArchive(auth, dto).then(asStreamableFile);
+  async downloadArchive(
+    @Auth() auth: AuthDto,
+    @Body() dto: DownloadArchiveDto,
+    @Req() req: Request,
+  ): Promise<StreamableFile> {
+    const { stream, abort } = await this.service.downloadArchive(auth, dto);
+    req.on('close', abort);
+    return new StreamableFile(stream);
   }
 }
