@@ -127,7 +127,7 @@ Fallback strategy if the production edits can't ship in the same PR: target `#us
 | `/map`                   | `.maplibregl-map`                                                                |
 | `/people`                | `[data-testid="page-header"]`                                                    |
 | `/places`                | `[data-testid="page-header"]`                                                    |
-| `/partners`              | `[data-testid="page-header"]`                                                    |
+| `/sharing`               | `[data-testid="page-header"]` (fork's Partners index lives at `/sharing`)        |
 | `/shared-links`          | `[data-testid="page-header"]`                                                    |
 | `/tags`                  | `[data-testid="page-header"]`                                                    |
 | `/explore`               | `[data-testid="page-header"]`                                                    |
