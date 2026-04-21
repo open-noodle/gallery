@@ -132,8 +132,7 @@ from
       and "asset"."deletedAt" is null
       and (smart_search.embedding <=> $9) <= $10
     order by
-      smart_search.embedding <=> $11,
-      "asset"."id"
+      smart_search.embedding <=> $11
     limit
       $12
   ) as "candidates"
