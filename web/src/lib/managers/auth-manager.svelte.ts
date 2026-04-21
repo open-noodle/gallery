@@ -113,6 +113,8 @@ class AuthManager {
 
     if (redirectUri.startsWith('/')) {
       this.isPurchased = false;
+
+      this.reset();
       eventManager.emit('AuthLogout');
 
       await goto(redirectUri);
