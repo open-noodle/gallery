@@ -63,7 +63,7 @@ test.describe.serial('Rebase Smoke — Page Render', () => {
     test(route.description, async ({ context, page }) => {
       await utils.setAuthCookies(context, admin.accessToken);
       await page.goto(route.path);
-      await expect(page.locator(route.landmark).first()).toBeVisible({ timeout: 5_000 });
+      await expect(page.locator(route.landmark).first()).toBeVisible({ timeout: 5000 });
     });
   }
 });
