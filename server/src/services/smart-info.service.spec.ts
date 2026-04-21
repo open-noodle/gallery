@@ -431,6 +431,87 @@ describe(SmartInfoService.name, () => {
         );
       });
     });
+
+    describe('handleEncodeClip — S3 video', () => {
+      const tempPath = '/tmp/immich-xyz.mp4';
+      let cleanupSpy: ReturnType<typeof vi.fn>;
+
+      beforeEach(() => {
+        cleanupSpy = vi.fn().mockResolvedValue(void 0);
+        vi.spyOn(sut as any, 'ensureLocalFile').mockResolvedValue({ localPath: tempPath, cleanup: cleanupSpy });
+      });
+
+      it('passes the local temp path to probe and extractVideoFrames on success', async () => {
+        const asset = AssetFactory.from({ type: AssetType.Video, originalPath: 'upload/abc/foo.mp4' })
+          .file({ type: AssetFileType.Preview })
+          .build();
+        mocks.assetJob.getForClipEncoding.mockResolvedValue(asset);
+        mocks.media.probe.mockResolvedValue(probeStub(10));
+        mocks.media.extractVideoFrames.mockResolvedValue(['/tmp/frame-0.jpg']);
+        mocks.machineLearning.encodeImage.mockResolvedValue('[0.1, 0.2]');
+
+        await sut.handleEncodeClip({ id: asset.id });
+
+        expect(mocks.media.probe).toHaveBeenCalledWith(tempPath);
+        expect(mocks.media.extractVideoFrames).toHaveBeenCalledWith(tempPath, expect.any(Array), expect.any(String));
+        expect(cleanupSpy).toHaveBeenCalledOnce();
+      });
+
+      it('calls cleanup when probe throws', async () => {
+        const asset = AssetFactory.from({ type: AssetType.Video, originalPath: 'upload/abc/foo.mp4' })
+          .file({ type: AssetFileType.Preview })
+          .build();
+        mocks.assetJob.getForClipEncoding.mockResolvedValue(asset);
+        mocks.media.probe.mockRejectedValue(new Error('ENOENT'));
+
+        await sut.handleEncodeClip({ id: asset.id });
+
+        expect(cleanupSpy).toHaveBeenCalledOnce();
+      });
+
+      it('calls cleanup when extractVideoFrames throws', async () => {
+        const asset = AssetFactory.from({ type: AssetType.Video, originalPath: 'upload/abc/foo.mp4' })
+          .file({ type: AssetFileType.Preview })
+          .build();
+        mocks.assetJob.getForClipEncoding.mockResolvedValue(asset);
+        mocks.media.probe.mockResolvedValue(probeStub(10));
+        mocks.media.extractVideoFrames.mockRejectedValue(new Error('frame extraction failed'));
+
+        await sut.handleEncodeClip({ id: asset.id });
+
+        expect(cleanupSpy).toHaveBeenCalledOnce();
+      });
+
+      it('calls cleanup when encodeImage throws on a frame', async () => {
+        const asset = AssetFactory.from({ type: AssetType.Video, originalPath: 'upload/abc/foo.mp4' })
+          .file({ type: AssetFileType.Preview })
+          .build();
+        mocks.assetJob.getForClipEncoding.mockResolvedValue(asset);
+        mocks.media.probe.mockResolvedValue(probeStub(10));
+        mocks.media.extractVideoFrames.mockResolvedValue(['/tmp/frame-0.jpg']);
+        mocks.machineLearning.encodeImage.mockRejectedValue(new Error('ML down'));
+
+        await sut.handleEncodeClip({ id: asset.id });
+
+        expect(cleanupSpy).toHaveBeenCalledOnce();
+      });
+    });
+
+    describe('handleEncodeClip — disk video regression', () => {
+      it('still works when originalPath is absolute (no-op cleanup)', async () => {
+        const asset = AssetFactory.from({ type: AssetType.Video, originalPath: '/usr/src/app/upload/abc/foo.mp4' })
+          .file({ type: AssetFileType.Preview })
+          .build();
+        mocks.assetJob.getForClipEncoding.mockResolvedValue(asset);
+        mocks.media.probe.mockResolvedValue(probeStub(10));
+        mocks.media.extractVideoFrames.mockResolvedValue(['/tmp/frame-0.jpg']);
+        mocks.machineLearning.encodeImage.mockResolvedValue('[0.1, 0.2]');
+
+        await sut.handleEncodeClip({ id: asset.id });
+
+        expect(mocks.media.probe).toHaveBeenCalledWith('/usr/src/app/upload/abc/foo.mp4');
+      });
+    });
   });
 
   describe('getCLIPModelInfo', () => {
