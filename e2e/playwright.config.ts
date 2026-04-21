@@ -58,6 +58,13 @@ const config: PlaywrightTestConfig = {
       testDir: './src/specs/maintenance/web',
       workers: 1,
     },
+    {
+      name: 'rebase-smoke',
+      use: { ...devices['Desktop Chrome'] },
+      testDir: './src/specs/rebase-smoke',
+      workers: 1,
+      retries: 0, // explicit — default config has retries: 4 on CI which would mask flakes
+    },
   ],
 
   /* Run your local dev server before starting the tests */
