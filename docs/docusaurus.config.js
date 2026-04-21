@@ -40,6 +40,15 @@ const config = {
           postcssOptions.plugins.push(require('autoprefixer'));
           return postcssOptions;
         },
+        // webpackbar@6 stores extra options (name, color, reporters) in this.options which
+        // extends ProgressPlugin — webpack 5.106+ validates those options strictly and rejects
+        // the unknown fields. Strip the webpackbar plugins before webpack sees them.
+        configureWebpack(config) {
+          return {
+            mergeStrategy: { plugins: 'replace' },
+            plugins: (config.plugins ?? []).filter((p) => p?.constructor.name !== 'WebpackBarPlugin'),
+          };
+        },
       };
     },
     require.resolve('docusaurus-lunr-search'),
