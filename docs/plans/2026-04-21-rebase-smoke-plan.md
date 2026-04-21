@@ -130,7 +130,7 @@ const routes: CanaryRoute[] = [
   { path: '/map', landmark: '.maplibregl-map', description: '/map renders' },
   { path: '/people', landmark: '[data-testid="page-header"]', description: '/people renders' },
   { path: '/places', landmark: '[data-testid="page-header"]', description: '/places renders' },
-  { path: '/partners', landmark: '[data-testid="page-header"]', description: '/partners renders' },
+  { path: '/sharing', landmark: '[data-testid="page-header"]', description: '/sharing (Partners) renders' },
   { path: '/shared-links', landmark: '[data-testid="page-header"]', description: '/shared-links renders' },
   { path: '/tags', landmark: '[data-testid="page-header"]', description: '/tags renders' },
   { path: '/explore', landmark: '[data-testid="page-header"]', description: '/explore renders' },
@@ -179,6 +179,8 @@ cd e2e && PLAYWRIGHT_DISABLE_WEBSERVER=true pnpm exec playwright test --project=
 ```
 
 Expected: 18 tests execute serially. All should pass given Tasks A1 + A2 added the testids. If any fail (e.g. a route that doesn't pass a `title` prop to `user-page-layout`), note which and either: (a) fix the page to pass a title, (b) pick a page-specific landmark, or (c) remove the route from the list with a comment.
+
+**Empty-state note for `/photos`:** `filter-panel.svelte:552,580` always renders either `collapsed-icon-strip` or `discovery-panel` regardless of whether the timeline has assets (verified against source). So the canary's empty-DB setup won't fail the `/photos` landmark. If that assumption ever drifts, the fallback is to upload a single asset in `beforeAll`.
 
 **Step 3: If any routes fail, fix them before moving on.** Common failure modes:
 
@@ -251,10 +253,12 @@ test('renders all panel sections simultaneously for a fully-tagged photo', async
   const tags = await utils.upsertTags(admin.accessToken, ['rebase-smoke']);
   await utils.tagAssets(admin.accessToken, tags[0].id, [asset.id]);
 
-  // Open the asset viewer + detail panel.
+  // Open the asset viewer + detail panel using the existing spec's pattern.
   await utils.setAuthCookies(context, admin.accessToken);
   await page.goto(`/photos/${asset.id}`);
-  await page.getByRole('button', { name: 'Info' }).click(); // or the existing pattern in this file
+  await page.waitForSelector('#immich-asset-viewer');
+  await page.keyboard.press('i');
+  await expect(page.locator('#detail-panel')).toBeVisible();
 
   // All 7 section testids must be visible together.
   for (const testid of [
@@ -430,6 +434,12 @@ e2e-rebase-smoke:
 	cd e2e && docker compose down -v
 ```
 
+Note on local iteration cost: `docker compose up --build --wait` rebuilds every invocation (~60–90 s on warm cache). For repeated local runs during development, skip the target and run the Playwright command directly against an already-running `make e2e` stack:
+
+```bash
+cd e2e && PLAYWRIGHT_DISABLE_WEBSERVER=true pnpm exec playwright test --project=rebase-smoke
+```
+
 **Step 3: Verify the target is wired correctly.**
 
 ```bash
@@ -529,15 +539,23 @@ test.describe('Rebase Smoke — UI Permission Matrix', () => {
 });
 ```
 
-**Step 2: Run to confirm the skeleton parses and setup works.**
+**Step 2: Compile check — catch typos before running Playwright.**
 
 ```bash
-cd e2e && PLAYWRIGHT_DISABLE_WEBSERVER=true pnpm exec playwright test --project=rebase-smoke
+cd e2e && pnpm exec tsc --noEmit
 ```
 
-Expected: `0 tests` or `1 test skipped` — the empty describe shouldn't register tests but the `beforeAll` is not triggered without tests. This step is just a compile check.
+Expected: 0 errors. The Playwright test runner doesn't give great error messages for type errors inside `beforeAll`; `tsc` catches them clearly.
 
-**Step 3: Commit.**
+**Step 3: Discovery check.**
+
+```bash
+cd e2e && PLAYWRIGHT_DISABLE_WEBSERVER=true pnpm exec playwright test --project=rebase-smoke --list
+```
+
+Expected: `0 tests in 0 files` (no specs register tests yet — the describe is empty). Confirms the file parses but no tests run.
+
+**Step 4: Commit.**
 
 ```bash
 git add e2e/src/specs/rebase-smoke/permission-matrix.e2e-spec.ts
@@ -552,29 +570,35 @@ git commit -m "test(e2e): scaffold permission-matrix spec for rebase-smoke"
 
 - Modify: `e2e/src/specs/rebase-smoke/permission-matrix.e2e-spec.ts`
 
+**Selector notes (applies to Tests 1–3):**
+
+- `[data-testid="hero-role-badge"]` exists at `web/src/lib/components/spaces/space-hero.svelte:316` — always rendered, contains the role name.
+- The "Add photos" button is an `IconButton` with `aria-label={$t('add_photos')}` at `web/src/routes/(user)/spaces/[spaceId]/[[photos=photos]]/[[assetId=id]]/+page.svelte:680`, gated by `{#if isEditor}` (so owner + editor only). Target via `page.getByLabel('Add photos')`.
+- The "Delete space" owner-gated action lives inside a `<ButtonContextMenu>` (same file, line 700). The menu trigger is an IconButton with `title="More"` — target via `page.getByRole('button', { name: 'More' })`; after click, target the menu item via `page.getByRole('menuitem', { name: /delete/i })`. The menu item text is `$t('spaces_delete')` which in `i18n/en.json` resolves to "Delete".
+- No new production testids required for these tests.
+
 **Step 1: Write the test (place inside the describe, after `beforeAll`).**
 
 ```ts
-test('Test 1 — owner: space-menu-button visible, role badge Owner', async ({ context, page }) => {
+test('Test 1 — owner: role badge Owner, add-photos visible, delete menu option present', async ({ context, page }) => {
   await utils.setAuthCookies(context, owner.accessToken);
   await page.goto(`/spaces/${space.id}`);
-  await expect(page.locator('[data-testid="space-menu-button"]')).toBeVisible({ timeout: 5_000 });
   await expect(page.locator('[data-testid="hero-role-badge"]')).toContainText('Owner');
+  await expect(page.getByLabel('Add photos')).toBeVisible();
+  await page.getByRole('button', { name: 'More' }).click();
+  await expect(page.getByRole('menuitem', { name: /delete/i })).toBeVisible();
 });
 ```
 
-**Step 2: Run the test. Expect it to PASS (existing spaces page already has these testids per `spaces-p1.e2e-spec.ts`).**
+**Step 2: Run the test.**
 
 ```bash
 cd e2e && PLAYWRIGHT_DISABLE_WEBSERVER=true pnpm exec playwright test --project=rebase-smoke -g "Test 1"
 ```
 
-**Step 3: If testids are missing,** inspect the spaces page (`web/src/routes/(user)/spaces/`) and either:
+If `page.getByRole('button', { name: 'More' })` is ambiguous (multiple "More" buttons on the page), narrow via `.locator('header')` or similar scope before `.click()`. Verify the menu item label matches the actual translation of `spaces_delete` in `i18n/en.json` before committing — grep the key and confirm.
 
-- Add missing testids to the space page hero/menu components (production-code edit — commit separately with `feat(web):` prefix).
-- Fall back to text-based or `role=` locators if the visual element reliably renders.
-
-**Step 4: Commit.**
+**Step 3: Commit.**
 
 ```bash
 git add e2e/src/specs/rebase-smoke/permission-matrix.e2e-spec.ts
@@ -588,16 +612,17 @@ git commit -m "test(e2e): permission-matrix Test 1 — owner space page"
 **Step 1: Write the test.**
 
 ```ts
-test('Test 2 — editor: add-assets visible, delete-space NOT visible', async ({ context, page }) => {
+test('Test 2 — editor: role badge Editor, add-photos visible, delete menu option absent', async ({ context, page }) => {
   await utils.setAuthCookies(context, editor.accessToken);
   await page.goto(`/spaces/${space.id}`);
   await expect(page.locator('[data-testid="hero-role-badge"]')).toContainText('Editor');
-  await expect(page.locator('[data-testid="add-assets-button"]')).toBeVisible();
-  await expect(page.locator('[data-testid="delete-space-button"]')).not.toBeVisible();
+  await expect(page.getByLabel('Add photos')).toBeVisible();
+  await page.getByRole('button', { name: 'More' }).click();
+  await expect(page.getByRole('menuitem', { name: /delete/i })).toHaveCount(0);
 });
 ```
 
-**Step 2: Run, fix testids if missing, commit.**
+**Step 2: Run, commit.**
 
 ```bash
 cd e2e && PLAYWRIGHT_DISABLE_WEBSERVER=true pnpm exec playwright test --project=rebase-smoke -g "Test 2"
@@ -612,13 +637,15 @@ git commit -m "test(e2e): permission-matrix Test 2 — editor space page"
 **Step 1: Write the test.**
 
 ```ts
-test('Test 3 — viewer: add-assets NOT visible', async ({ context, page }) => {
+test('Test 3 — viewer: role badge Viewer, add-photos NOT visible', async ({ context, page }) => {
   await utils.setAuthCookies(context, viewer.accessToken);
   await page.goto(`/spaces/${space.id}`);
   await expect(page.locator('[data-testid="hero-role-badge"]')).toContainText('Viewer');
-  await expect(page.locator('[data-testid="add-assets-button"]')).not.toBeVisible();
+  await expect(page.getByLabel('Add photos')).toHaveCount(0);
 });
 ```
+
+Note: use `toHaveCount(0)` rather than `not.toBeVisible()` for absence checks — `not.toBeVisible()` passes if the element exists but is simply hidden, whereas the viewer role should have the element NOT rendered at all.
 
 **Step 2: Run, commit.**
 
@@ -632,18 +659,35 @@ git commit -m "test(e2e): permission-matrix Test 3 — viewer space page"
 
 ### Task D5: Test 4 — owner detail panel
 
-**Step 1: Write the test. Uses detail-panel testids from Phase B.**
+**Viewer + detail-panel navigation pattern (applies to Tests 4–6 and 8).**
+
+Existing `e2e/src/specs/web/asset-viewer/detail-panel.e2e-spec.ts` opens the detail panel via:
+
+```ts
+await page.goto(`/spaces/${space.id}/photos/${asset.id}`);
+await page.waitForSelector('#immich-asset-viewer');
+await page.keyboard.press('i'); // toggles the detail panel
+await expect(page.locator('#detail-panel')).toBeVisible();
+```
+
+Use this pattern in every test that opens the detail panel. Do NOT use `page.getByRole('button', { name: 'Info' }).click()` — the button's accessible name is i18n'd; the `i` keyboard shortcut is locale-proof and matches the existing spec's convention. The URL `/spaces/<id>/photos/<assetId>` maps to the SvelteKit route at `web/src/routes/(user)/spaces/[spaceId]/[[photos=photos]]/[[assetId=id]]/+page.svelte` (the `[[photos=photos]]` matcher accepts the literal string `photos`).
+
+**Step 1: Write the test.**
 
 ```ts
 test('Test 4 — owner detail panel: edit controls visible, file path visible', async ({ context, page }) => {
   await utils.setAuthCookies(context, owner.accessToken);
   await page.goto(`/spaces/${space.id}/photos/${asset.id}`);
-  await page.getByRole('button', { name: 'Info' }).click();
+  await page.waitForSelector('#immich-asset-viewer');
+  await page.keyboard.press('i');
+  await expect(page.locator('#detail-panel')).toBeVisible();
   await expect(page.locator('[data-testid="detail-panel-edit-date-button"]')).toBeVisible();
-  await expect(page.locator('[data-testid="detail-panel-rating"] [role="button"]').first()).toBeEnabled();
-  // Click the file-info toggle to reveal the path (owner-only).
-  await page.locator('[aria-label="Show file location"]').click();
-  await expect(page.locator('text=/rebase-smoke.jpg/')).toBeVisible();
+  // Owner-only: the "Show file location" IconButton is visible inside the filename section.
+  // aria-label is the translated `$t('show_file_location')`; in en it's "Show file location".
+  // Before committing this test, grep web/src/i18n/en.json to confirm the exact translation.
+  await expect(page.getByLabel('Show file location')).toBeVisible();
+  await page.getByLabel('Show file location').click();
+  await expect(page.locator('[data-testid="detail-panel-filename"]')).toContainText('rebase-smoke.jpg');
 });
 ```
 
@@ -662,14 +706,14 @@ git commit -m "test(e2e): permission-matrix Test 4 — owner detail panel"
 **Step 1: Write the test.**
 
 ```ts
-test('Test 5 — editor detail panel: edit controls hidden, rating readonly', async ({ context, page }) => {
+test('Test 5 — editor detail panel: edit controls hidden, file path hidden', async ({ context, page }) => {
   await utils.setAuthCookies(context, editor.accessToken);
   await page.goto(`/spaces/${space.id}/photos/${asset.id}`);
-  await page.getByRole('button', { name: 'Info' }).click();
-  await expect(page.locator('[data-testid="detail-panel-edit-date-button"]')).not.toBeVisible();
-  await expect(
-    page.locator('[data-testid="detail-panel-filename"] [aria-label="Show file location"]'),
-  ).not.toBeVisible();
+  await page.waitForSelector('#immich-asset-viewer');
+  await page.keyboard.press('i');
+  await expect(page.locator('#detail-panel')).toBeVisible();
+  await expect(page.locator('[data-testid="detail-panel-edit-date-button"]')).toHaveCount(0);
+  await expect(page.getByLabel('Show file location')).toHaveCount(0);
 });
 ```
 
@@ -685,17 +729,17 @@ git commit -m "test(e2e): permission-matrix Test 5 — editor detail panel"
 
 ### Task D7: Test 6 — viewer detail panel
 
-**Step 1: Write the test — same assertions as Test 5 but for viewer, plus no add-assets in parent viewer.**
+**Step 1: Write the test — same gates as Test 5 (viewers have the same UI restrictions as editors for these specific controls).**
 
 ```ts
-test('Test 6 — viewer detail panel: same as editor, no editor-only controls', async ({ context, page }) => {
+test('Test 6 — viewer detail panel: edit controls hidden, file path hidden', async ({ context, page }) => {
   await utils.setAuthCookies(context, viewer.accessToken);
   await page.goto(`/spaces/${space.id}/photos/${asset.id}`);
-  await page.getByRole('button', { name: 'Info' }).click();
-  await expect(page.locator('[data-testid="detail-panel-edit-date-button"]')).not.toBeVisible();
-  await expect(
-    page.locator('[data-testid="detail-panel-filename"] [aria-label="Show file location"]'),
-  ).not.toBeVisible();
+  await page.waitForSelector('#immich-asset-viewer');
+  await page.keyboard.press('i');
+  await expect(page.locator('#detail-panel')).toBeVisible();
+  await expect(page.locator('[data-testid="detail-panel-edit-date-button"]')).toHaveCount(0);
+  await expect(page.getByLabel('Show file location')).toHaveCount(0);
 });
 ```
 
@@ -746,7 +790,12 @@ git commit -m "test(e2e): permission-matrix Test 7 — stranger blocked"
 ```ts
 test('Test 8 — owner nav bar: Edit / Delete / Archive / Favorite / Share all visible', async ({ context, page }) => {
   await utils.setAuthCookies(context, owner.accessToken);
-  await page.goto(`/photos/${asset.id}`); // owner's personal viewer path, not space
+  await page.goto(`/photos/${asset.id}`);
+  await page.waitForSelector('#immich-asset-viewer');
+  // Nav-bar action buttons are rendered as IconButtons whose accessible name comes from
+  // the i18n label of each Actions.<Name> enum. Before committing, confirm the en.json
+  // translations for: 'edit', 'delete', 'archive', 'favorite', 'share_to' (or equivalents
+  // from asset-viewer-nav-bar.svelte's <ActionButton action={Actions.*}> usages).
   for (const label of ['Edit', 'Delete', 'Archive', 'Favorite', 'Share']) {
     await expect(page.getByRole('button', { name: label })).toBeVisible();
   }
@@ -757,6 +806,11 @@ test('Test 8 — owner nav bar: Edit / Delete / Archive / Favorite / Share all v
 
 ```bash
 cd e2e && PLAYWRIGHT_DISABLE_WEBSERVER=true pnpm exec playwright test --project=rebase-smoke -g "Test 8"
+```
+
+If any label mismatches (e.g. the Share button renders as "Share to…"), narrow via `name: /share/i` regex. Commit only once all 5 assertions pass.
+
+```bash
 git add e2e/src/specs/rebase-smoke/permission-matrix.e2e-spec.ts
 git commit -m "test(e2e): permission-matrix Test 8 — owner nav bar actions"
 ```
@@ -773,11 +827,21 @@ test('Test 9 — viewer /photos filter panel includes space suggestions', async 
   test.skip(!fullAsset.exifInfo?.city, 'Reverse-geocoding produced no city; skipping');
 
   await utils.setAuthCookies(context, viewer.accessToken);
+  // Wait for the filter-suggestions response so we don't race the render.
+  const suggestionsResponse = page.waitForResponse((r) => r.url().includes('/search/suggestions/filters') && r.ok(), {
+    timeout: 15_000,
+  });
   await page.goto('/photos');
-  // FilterPanel is open by default on /photos.
-  await page.locator('[data-testid="filter-section-location"]').waitFor({ timeout: 10_000 });
-  // The owner's tag must appear in the viewer's Tags section (via withSharedSpaces=true).
-  await expect(page.locator('text=/rebase-smoke/i').first()).toBeVisible({ timeout: 10_000 });
+  await suggestionsResponse;
+
+  // FilterPanel is open by default on /photos. Wait for the Tags section root to mount.
+  await page.locator('[data-testid="filter-section-tags"]').waitFor({ timeout: 10_000 });
+
+  // Narrow the text match to the Tags section to avoid false-greens from the filename
+  // appearing elsewhere on the page (thumbnail alt text, page title, etc.).
+  await expect(page.locator('[data-testid="filter-section-tags"]').getByText(/rebase-smoke/i)).toBeVisible({
+    timeout: 10_000,
+  });
 });
 ```
 
@@ -843,11 +907,18 @@ test('Test 10 — viewer /map sees space marker', async ({ context, page }) => {
   test.skip(!fullAsset.exifInfo?.latitude, 'Asset has no GPS; skipping');
 
   await utils.setAuthCookies(context, viewer.accessToken);
+  // Wait for the map-markers endpoint to respond before asserting — maplibre tile load
+  // + marker hydration can take several seconds on cold CI and the test was flaking at 15s.
+  const markersResponse = page.waitForResponse(
+    (r) => r.url().includes('/map/markers') || r.url().includes('/gallery-map'),
+    { timeout: 20_000 },
+  );
   await page.goto('/map');
-  await page.locator('.maplibregl-map').waitFor({ timeout: 10_000 });
-  // At least one marker must render for the space-owned asset.
+  await markersResponse;
+  await page.locator('.maplibregl-map').waitFor({ timeout: 15_000 });
+
   const markers = page.locator('[data-testid="map-marker"]');
-  await expect.poll(async () => markers.count(), { timeout: 15_000 }).toBeGreaterThan(0);
+  await expect.poll(async () => markers.count(), { timeout: 20_000 }).toBeGreaterThan(0);
 });
 ```
 
@@ -1091,10 +1162,18 @@ If anything is red, fix at root. Never force-push on a red workflow.
 
 **Step 3: Commit in its own PR.**
 
+`~/.claude/skills/push-rebase/SKILL.md` lives OUTSIDE the gallery repo (it's in the user's dotfiles). The repo this file lives in is tracked separately (run `cd ~/.claude && git remote -v` to find it). Open that repo's worktree, edit the SKILL, and commit there — NOT in the gallery worktree:
+
 ```bash
-git add ~/.claude/skills/push-rebase/SKILL.md   # or the skill's actual location
+cd ~/.claude   # or wherever the skills repo is checked out
+git pull
+# edit skills/push-rebase/SKILL.md
+git add skills/push-rebase/SKILL.md
 git commit -m "skills: push-rebase dispatches rebase-smoke workflow before force-push"
+git push
 ```
+
+If the skill's source repo isn't writeable from this machine, copy the edit into a plain-text note in a new issue or Discord message to the maintainer so they can apply it on their end. Do NOT commit the skill edit to the gallery repo.
 
 ---
 
