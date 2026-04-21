@@ -223,6 +223,15 @@ Three resolution decisions during the rebase silently lost fork behavior. All th
 3. ~~**Regenerate OpenAPI specs (TS + Dart) + SQL query files**~~ — **DONE** locally and committed.
 4. ~~**Deferred fork-only zod conversion**~~ — **DONE** in this rebase (R3). All 5 fork-only DTOs (system-config, shared-space, time-bucket, classification, pet-detection) converted to zod alongside the upstream-shared ones.
 
+### Pre-existing finding (not introduced by this rebase)
+
+The structured 3-parallel-agent review surfaced **duplicate migration timestamps** in `server/src/schema/migrations-gallery/`:
+
+- `1775100000000-AddAssetDuplicateChecksum.ts` + `1775100000000-DropSpacePersonThumbnailPath.ts`
+- `1777000000000-AddSpacePersonCounts.ts` + `1777000000000-AdminScopedClassification.ts`
+
+**Practical impact: NONE for this rebase.** Both pairs touch different tables (asset vs shared_space_person, shared_space_person vs system_metadata), so first-run ordering doesn't affect schema correctness. All four migrations already shipped to production via PRs #249, #196, #233, #229 — kysely tracks by filename so renaming now would cause existing installs to see them as new migrations and re-run them (failing on existing/missing columns). Leaving as-is is the correct call. Future fork migrations should use unique timestamps.
+
 ### Bugs surfaced and fixed during CI iteration
 
 See "Remote CI Iteration Log" above. All have memory entries for next rebase:
