@@ -88,19 +88,13 @@ describe('dedupeAppend', () => {
   it('appends new items and de-duplicates by id (primary cross-page scenario)', () => {
     // Page 1 returned [a, b, c]; page 2 returned [b, d].
     // After append + dedup, searchResults should be [a, b, c, d].
-    const result = dedupeAppend(
-      [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
-      [{ id: 'b' }, { id: 'd' }],
-    );
+    const result = dedupeAppend([{ id: 'a' }, { id: 'b' }, { id: 'c' }], [{ id: 'b' }, { id: 'd' }]);
     expect(result.map((r) => r.id)).toEqual(['a', 'b', 'c', 'd']);
   });
 
   it('returns existing array unchanged when every incoming item is a duplicate', () => {
     // Byte-identical images scenario: page 2 returns the same assets as page 1.
-    const result = dedupeAppend(
-      [{ id: 'a' }, { id: 'b' }],
-      [{ id: 'a' }, { id: 'b' }],
-    );
+    const result = dedupeAppend([{ id: 'a' }, { id: 'b' }], [{ id: 'a' }, { id: 'b' }]);
     expect(result.map((r) => r.id)).toEqual(['a', 'b']);
     // No duplicates in output.
     expect(new Set(result.map((r) => r.id)).size).toBe(result.length);
@@ -117,10 +111,7 @@ describe('dedupeAppend', () => {
   });
 
   it('preserves order — new items append after existing, no reordering', () => {
-    const result = dedupeAppend(
-      [{ id: 'a' }, { id: 'b' }],
-      [{ id: 'c' }, { id: 'a' }, { id: 'd' }],
-    );
+    const result = dedupeAppend([{ id: 'a' }, { id: 'b' }], [{ id: 'c' }, { id: 'a' }, { id: 'd' }]);
     // 'a' is dropped from incoming; 'c' and 'd' append in the order they arrived.
     expect(result.map((r) => r.id)).toEqual(['a', 'b', 'c', 'd']);
   });
@@ -149,30 +140,30 @@ import { dedupeAppend } from '$lib/utils/search-dedup';
 Then replace lines 47-55 (the `if (append) { ... } else { ... }` block). Old:
 
 ```ts
-      if (append) {
-        // Defend against pagination overlaps (e.g., backend tie-breaker gaps or
-        // race-y page boundaries) so Svelte's keyed {#each} doesn't crash on duplicate IDs.
-        const existingIds = new Set(searchResults.map((a) => a.id));
-        const deduped = assets.items.filter((a) => !existingIds.has(a.id));
-        searchResults = [...searchResults, ...deduped];
-      } else {
-        searchResults = assets.items;
-      }
+if (append) {
+  // Defend against pagination overlaps (e.g., backend tie-breaker gaps or
+  // race-y page boundaries) so Svelte's keyed {#each} doesn't crash on duplicate IDs.
+  const existingIds = new Set(searchResults.map((a) => a.id));
+  const deduped = assets.items.filter((a) => !existingIds.has(a.id));
+  searchResults = [...searchResults, ...deduped];
+} else {
+  searchResults = assets.items;
+}
 ```
 
 New:
 
 ```ts
-      if (append) {
-        // Primary guard against duplicate IDs across paginated searchSmart
-        // responses. The server's ORDER BY is single-key (smart_search.embedding
-        // <=>) so that vchord's ordered index scan can be used; identical
-        // embeddings (byte-identical image content) can then yield the same
-        // asset.id on adjacent pages. See docs/plans/2026-04-21-search-tiebreaker-design.md.
-        searchResults = dedupeAppend(searchResults, assets.items);
-      } else {
-        searchResults = assets.items;
-      }
+if (append) {
+  // Primary guard against duplicate IDs across paginated searchSmart
+  // responses. The server's ORDER BY is single-key (smart_search.embedding
+  // <=>) so that vchord's ordered index scan can be used; identical
+  // embeddings (byte-identical image content) can then yield the same
+  // asset.id on adjacent pages. See docs/plans/2026-04-21-search-tiebreaker-design.md.
+  searchResults = dedupeAppend(searchResults, assets.items);
+} else {
+  searchResults = assets.items;
+}
 ```
 
 **Step 5: Run the component's existing spec to catch regressions**
@@ -582,11 +573,7 @@ it('CTE path orderDirection=desc: inner single key is embedding, outer has fileC
 
 ```ts
 it('CTE path orderDirection=asc: inner single key is embedding, outer sorts ascending', () => {
-  const { base, outer } = buildQueries(
-    sut,
-    { page: 1, size: 100 },
-    { ...baseOptions, orderDirection: AssetOrder.Asc },
-  );
+  const { base, outer } = buildQueries(sut, { page: 1, size: 100 }, { ...baseOptions, orderDirection: AssetOrder.Asc });
 
   const innerSql = base.compile().sql;
   expect(countOrderByExpressions(innerSql + ' limit', 'limit'), FAILURE_MESSAGE).toBe(1);
