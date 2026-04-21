@@ -31,7 +31,7 @@
 </script>
 
 <div class="flex h-full flex-col">
-  <div class="flex h-16 w-full items-center justify-between border-b px-4 py-2 md:px-2">
+  <div class="flex h-16 w-full items-center justify-between border-b px-4 py-2 md:px-2" data-testid="admin-page-header">
     <Breadcrumbs items={breadcrumbs} separator={mdiSlashForward} />
 
     {#if enabledActions.length > 0}
