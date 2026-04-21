@@ -1,4 +1,5 @@
 import mockfs from 'mock-fs';
+import { Readable } from 'node:stream';
 import { CrawlOptionsDto } from 'src/dtos/library.dto';
 import { LoggingRepository } from 'src/repositories/logging.repository';
 import { StorageRepository } from 'src/repositories/storage.repository';
@@ -204,5 +205,70 @@ describe(StorageRepository.name, () => {
         expect(actual.toSorted()).toEqual(expected.toSorted());
       });
     }
+  });
+
+  describe('createZipStream', () => {
+    it('does not start subsequent Readable entries until the previous one is drained', async () => {
+      // Regression for S3 archive hang: archiver-utils `normalizeInputSource()` pipes every
+      // input stream to a PassThrough immediately, which triggers `_read()` on the source via
+      // pipe's `resume()`. If `addFile()` forwards all inputs to `archive.append()` synchronously,
+      // every LazyS3Readable opens its S3 socket up-front — the exact behaviour that stalls the
+      // archive in `redirect` serve mode on a large selection.
+      const readCalls = [0, 0, 0];
+      const sources = readCalls.map(
+        (_, i) =>
+          new Readable({
+            read() {
+              readCalls[i]++;
+            },
+          }),
+      );
+
+      const zip = sut.createZipStream();
+      zip.stream.on('error', () => {}); // silence archive errors on test cleanup
+
+      for (const [i, source] of sources.entries()) {
+        zip.addFile(source, `file-${i}.txt`);
+      }
+
+      // Drain microtasks and process.nextTick callbacks so any eagerly-scheduled
+      // `_read()` fires before we assert.
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(readCalls[1]).toBe(0);
+      expect(readCalls[2]).toBe(0);
+
+      zip.stream.destroy();
+      for (const source of sources) {
+        source.destroy();
+      }
+    });
+
+    it('produces an archive containing every Readable entry', async () => {
+      const sources = [
+        Readable.from([Buffer.from('content-0')]),
+        Readable.from([Buffer.from('content-1')]),
+        Readable.from([Buffer.from('content-2')]),
+      ];
+
+      const zip = sut.createZipStream();
+      for (const [i, source] of sources.entries()) {
+        zip.addFile(source, `file-${i}.txt`);
+      }
+      void zip.finalize();
+
+      const chunks: Buffer[] = [];
+      for await (const chunk of zip.stream) {
+        chunks.push(chunk as Buffer);
+      }
+      const output = Buffer.concat(chunks).toString('binary');
+
+      expect(output).toContain('file-0.txt');
+      expect(output).toContain('file-1.txt');
+      expect(output).toContain('file-2.txt');
+      expect(output).toContain('content-0');
+      expect(output).toContain('content-1');
+      expect(output).toContain('content-2');
+    });
   });
 });
