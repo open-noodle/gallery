@@ -335,10 +335,13 @@ export class SearchRepository {
       .$if(hasDistanceThreshold, (qb) =>
         qb.where(sql<SqlBool>`(smart_search.embedding <=> ${options.embedding}) <= ${options.maxDistance!}`),
       )
-      .orderBy(sql`smart_search.embedding <=> ${options.embedding}`)
-      // Stable tiebreaker so offset-based pagination doesn't return overlapping pages
-      // when multiple assets have identical CLIP distances.
-      .orderBy('asset.id');
+      // DO NOT add a secondary ORDER BY key on any column here.
+      // vchord's ordered index scan can only satisfy a single-key ORDER BY on
+      // `smart_search.embedding <=>`. Any additional sort key forces the planner
+      // to Parallel Seq Scan + in-memory sort (~15s on 200k rows vs ~200ms via
+      // vchord). Cross-page duplicates from identical embeddings are caught by
+      // the frontend dedup in web/src/lib/utils/search-dedup.ts.
+      .orderBy(sql`smart_search.embedding <=> ${options.embedding}`);
 
     if (options.orderDirection) {
       const orderDirection = options.orderDirection.toLowerCase() as OrderByDirection;
