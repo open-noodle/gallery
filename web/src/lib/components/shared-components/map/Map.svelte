@@ -432,6 +432,7 @@
                     values: { city: feature.properties.city, country: feature.properties.country },
                   })
                 : $t('map_marker_with_image')}
+              data-testid="map-marker"
             />
           {/if}
           {#if popup}
