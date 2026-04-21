@@ -25,7 +25,7 @@
 </script>
 
 {#if !authManager.isSharedLink && authManager.authenticated && authManager.preferences.ratings.enabled}
-  <section class="px-4 pt-4">
+  <section class="px-4 pt-4" data-testid="detail-panel-rating">
     <StarRating {rating} readOnly={!isOwner} onRating={(rating) => handlePromiseError(handleChangeRating(rating))} />
   </section>
 {/if}
