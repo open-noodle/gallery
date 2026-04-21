@@ -149,5 +149,22 @@ test.describe('Rebase Smoke — UI Permission Matrix', () => {
     await expect(page.getByLabel('Show file location')).toHaveCount(0);
   });
 
-  // Tests 7–10 added in subsequent commits.
+  test('Test 7 — stranger: blocked on /spaces/:id direct URL', async ({ context, page }) => {
+    await utils.setAuthCookies(context, stranger.accessToken);
+    const response = await page.goto(`/spaces/${space.id}`);
+    await page.waitForLoadState('networkidle');
+    const is403 = response?.status() === 403;
+    const redirectedAway = !page.url().includes(`/spaces/${space.id}`);
+    // SvelteKit returns 200 for the shell and renders the error page client-side when the
+    // page load throws. The fork's service returns 403 "Not a member of this space", which
+    // surfaces in the error page body as "HTTP 403" plus the message text.
+    const blockedText = await page
+      .locator('text=/access denied|not found|no access|not a member|http 403/i')
+      .first()
+      .isVisible()
+      .catch(() => false);
+    expect(is403 || redirectedAway || blockedText).toBeTruthy();
+  });
+
+  // Tests 8–10 added in subsequent commits.
 });
