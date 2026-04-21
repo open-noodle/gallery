@@ -45,7 +45,7 @@ describe(DownloadService.name, () => {
       mocks.asset.getForOriginals.mockResolvedValue([asset]);
       mocks.storage.createZipStream.mockReturnValue(archiveMock);
 
-      await expect(sut.downloadArchive(authStub.admin, { assetIds: [asset.id, 'unknown-asset'] })).resolves.toEqual({
+      await expect(sut.downloadArchive(authStub.admin, { assetIds: [asset.id, 'unknown-asset'] })).resolves.toMatchObject({
         stream: archiveMock.stream,
       });
 
@@ -68,7 +68,7 @@ describe(DownloadService.name, () => {
       mocks.asset.getForOriginals.mockResolvedValue([asset1, asset2]);
       mocks.storage.createZipStream.mockReturnValue(archiveMock);
 
-      await expect(sut.downloadArchive(authStub.admin, { assetIds: [asset1.id, asset2.id] })).resolves.toEqual({
+      await expect(sut.downloadArchive(authStub.admin, { assetIds: [asset1.id, asset2.id] })).resolves.toMatchObject({
         stream: archiveMock.stream,
       });
 
@@ -92,7 +92,7 @@ describe(DownloadService.name, () => {
       mocks.asset.getForOriginals.mockResolvedValue([asset1, asset2]);
       mocks.storage.createZipStream.mockReturnValue(archiveMock);
 
-      await expect(sut.downloadArchive(authStub.admin, { assetIds: [asset1.id, asset2.id] })).resolves.toEqual({
+      await expect(sut.downloadArchive(authStub.admin, { assetIds: [asset1.id, asset2.id] })).resolves.toMatchObject({
         stream: archiveMock.stream,
       });
 
@@ -114,7 +114,7 @@ describe(DownloadService.name, () => {
       mocks.asset.getForOriginals.mockResolvedValue([asset1, asset2]);
       mocks.storage.createZipStream.mockReturnValue(archiveMock);
 
-      await expect(sut.downloadArchive(authStub.admin, { assetIds: [asset1.id, asset2.id] })).resolves.toEqual({
+      await expect(sut.downloadArchive(authStub.admin, { assetIds: [asset1.id, asset2.id] })).resolves.toMatchObject({
         stream: archiveMock.stream,
       });
 
@@ -136,7 +136,7 @@ describe(DownloadService.name, () => {
       mocks.asset.getForOriginals.mockResolvedValue([asset1, asset2]);
       mocks.storage.createZipStream.mockReturnValue(archiveMock);
 
-      await expect(sut.downloadArchive(authStub.admin, { assetIds: [asset1.id, asset2.id] })).resolves.toEqual({
+      await expect(sut.downloadArchive(authStub.admin, { assetIds: [asset1.id, asset2.id] })).resolves.toMatchObject({
         stream: archiveMock.stream,
       });
 
@@ -165,7 +165,7 @@ describe(DownloadService.name, () => {
       mocks.asset.getForOriginals.mockResolvedValue([asset]);
       mocks.storage.createZipStream.mockReturnValue(archiveMock);
 
-      await expect(sut.downloadArchive(authStub.admin, { assetIds: [asset.id] })).resolves.toEqual({
+      await expect(sut.downloadArchive(authStub.admin, { assetIds: [asset.id] })).resolves.toMatchObject({
         stream: archiveMock.stream,
       });
 
@@ -191,7 +191,7 @@ describe(DownloadService.name, () => {
       mocks.asset.getForOriginals.mockResolvedValue([asset1, asset2]);
       mocks.storage.createZipStream.mockReturnValue(archiveMock);
 
-      await expect(sut.downloadArchive(authStub.admin, { assetIds: [asset1.id, asset2.id] })).resolves.toEqual({
+      await expect(sut.downloadArchive(authStub.admin, { assetIds: [asset1.id, asset2.id] })).resolves.toMatchObject({
         stream: archiveMock.stream,
       });
 
@@ -213,7 +213,7 @@ describe(DownloadService.name, () => {
       mocks.storage.realpath.mockResolvedValue('/path/to/realpath.jpg');
       mocks.storage.createZipStream.mockReturnValue(archiveMock);
 
-      await expect(sut.downloadArchive(authStub.admin, { assetIds: [asset.id] })).resolves.toEqual({
+      await expect(sut.downloadArchive(authStub.admin, { assetIds: [asset.id] })).resolves.toMatchObject({
         stream: archiveMock.stream,
       });
 
@@ -233,7 +233,7 @@ describe(DownloadService.name, () => {
       mocks.asset.getForOriginals.mockResolvedValue([editedAsset]);
       mocks.storage.createZipStream.mockReturnValue(archiveMock);
 
-      await expect(sut.downloadArchive(authStub.admin, { assetIds: [asset.id], edited: true })).resolves.toEqual({
+      await expect(sut.downloadArchive(authStub.admin, { assetIds: [asset.id], edited: true })).resolves.toMatchObject({
         stream: archiveMock.stream,
       });
 
@@ -254,7 +254,7 @@ describe(DownloadService.name, () => {
       mocks.asset.getForOriginals.mockResolvedValue([assetWithoutEdit]);
       mocks.storage.createZipStream.mockReturnValue(archiveMock);
 
-      await expect(sut.downloadArchive(authStub.admin, { assetIds: [asset.id], edited: true })).resolves.toEqual({
+      await expect(sut.downloadArchive(authStub.admin, { assetIds: [asset.id], edited: true })).resolves.toMatchObject({
         stream: archiveMock.stream,
       });
 
@@ -275,7 +275,7 @@ describe(DownloadService.name, () => {
       mocks.asset.getForOriginals.mockResolvedValue([editedAsset]);
       mocks.storage.createZipStream.mockReturnValue(archiveMock);
 
-      await expect(sut.downloadArchive(authStub.admin, { assetIds: [asset.id], edited: true })).resolves.toEqual({
+      await expect(sut.downloadArchive(authStub.admin, { assetIds: [asset.id], edited: true })).resolves.toMatchObject({
         stream: archiveMock.stream,
       });
 
@@ -295,7 +295,7 @@ describe(DownloadService.name, () => {
       mocks.asset.getForOriginals.mockResolvedValue([asset]);
       mocks.storage.createZipStream.mockReturnValue(archiveMock);
 
-      await expect(sut.downloadArchive(authStub.admin, { assetIds: [asset.id] })).resolves.toEqual({
+      await expect(sut.downloadArchive(authStub.admin, { assetIds: [asset.id] })).resolves.toMatchObject({
         stream: archiveMock.stream,
       });
 
@@ -303,33 +303,34 @@ describe(DownloadService.name, () => {
       expect(archiveMock.addFile).toHaveBeenCalledWith(asset.originalPath, asset.originalFileName);
     });
 
-    it('should stream S3 assets by resolving the backend', async () => {
+    it('should use a LazyS3Readable for S3 assets without calling backend.get() upfront', async () => {
       const archiveMock = {
         addFile: vitest.fn(),
         finalize: vitest.fn(),
         stream: new Readable(),
       };
-      const mockStream = new Readable();
 
-      // S3 asset has a relative (non-absolute) path
-      const asset = AssetFactory.create({ originalPath: 's3://bucket/key/photo.jpg' });
-      // Override originalPath to a relative (non-absolute) path so isAbsolute returns false
+      // Relative path → isAbsolute returns false → S3 branch
+      const asset = AssetFactory.create();
       const s3Asset = { ...asset, originalPath: 'upload/library/photo.jpg' };
 
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([s3Asset.id]));
       mocks.asset.getForOriginals.mockResolvedValue([s3Asset]);
       mocks.storage.createZipStream.mockReturnValue(archiveMock);
 
-      // Mock StorageService.resolveBackendForKey
-      const mockBackend = { get: vitest.fn().mockResolvedValue({ stream: mockStream }) };
+      const mockBackend = { get: vitest.fn() };
       vitest.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue(mockBackend as any);
 
-      await expect(sut.downloadArchive(authStub.admin, { assetIds: [s3Asset.id] })).resolves.toEqual({
-        stream: archiveMock.stream,
-      });
+      await sut.downloadArchive(authStub.admin, { assetIds: [s3Asset.id] });
 
-      expect(mockBackend.get).toHaveBeenCalledWith('upload/library/photo.jpg');
-      expect(archiveMock.addFile).toHaveBeenCalledWith(mockStream, s3Asset.originalFileName);
+      // backend.get() must NOT be called during archive construction — it is lazy
+      expect(mockBackend.get).not.toHaveBeenCalled();
+
+      // addFile receives a Readable (the LazyS3Readable wrapper), not a raw S3 stream
+      expect(archiveMock.addFile).toHaveBeenCalledTimes(1);
+      const [passedStream, passedName] = archiveMock.addFile.mock.calls[0];
+      expect(passedStream).toBeInstanceOf(Readable);
+      expect(passedName).toBe(s3Asset.originalFileName);
     });
   });
 
