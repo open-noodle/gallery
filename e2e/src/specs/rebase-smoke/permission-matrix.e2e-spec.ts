@@ -188,5 +188,50 @@ test.describe('Rebase Smoke — UI Permission Matrix', () => {
     await expect(page.getByRole('menuitem', { name: /archive/i })).toBeVisible();
   });
 
-  // Tests 9–10 added in subsequent commits.
+  test('Test 9 — viewer /photos filter panel includes Location / Camera / Tags from space', async ({
+    context,
+    page,
+  }) => {
+    // Pattern: `test.skip(condition, reason)` is Playwright's conditional-skip form. No
+    // prior use in this repo — verified valid against Playwright docs. If the geocoded
+    // country is missing (stale tile data, etc.), the test is skipped rather than flaked.
+    const fullAsset = await utils.getAssetInfo(owner.accessToken, asset.id);
+    test.skip(!fullAsset.exifInfo?.country, 'Reverse-geocoding produced no country; skipping');
+
+    await utils.setAuthCookies(context, viewer.accessToken);
+    const suggestionsResponse = page.waitForResponse(
+      (r) => r.url().includes('/search/suggestions/filters') && r.ok(),
+      { timeout: 15_000 },
+    );
+    await page.goto('/photos');
+    await suggestionsResponse;
+
+    // FilterPanel is open by default on /photos. Wait for all 3 sections to mount.
+    await page.locator('[data-testid="filter-section-location"]').waitFor({ timeout: 10_000 });
+    await page.locator('[data-testid="filter-section-camera"]').waitFor({ timeout: 10_000 });
+    await page.locator('[data-testid="filter-section-tags"]').waitFor({ timeout: 10_000 });
+
+    // Tags: the owner's "rebase-smoke" tag must appear.
+    await expect(page.locator('[data-testid="filter-section-tags"]').getByText(/rebase-smoke/i)).toBeVisible({
+      timeout: 10_000,
+    });
+
+    // Location: the geocoded country must appear. The location filter renders country-level
+    // chips by default (city-level visible only after expanding the country). Use country
+    // for a robust smoke check — presence proves the space asset's EXIF flowed into the
+    // viewer's /photos filter panel.
+    const country = fullAsset.exifInfo!.country!;
+    await expect(page.locator('[data-testid="filter-section-location"]').getByText(country)).toBeVisible({
+      timeout: 10_000,
+    });
+
+    // Camera: if make is populated, assert it.
+    if (fullAsset.exifInfo?.make) {
+      await expect(
+        page.locator('[data-testid="filter-section-camera"]').getByText(fullAsset.exifInfo.make),
+      ).toBeVisible({ timeout: 10_000 });
+    }
+  });
+
+  // Test 10 added in subsequent commit.
 });
