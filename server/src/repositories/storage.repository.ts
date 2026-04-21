@@ -84,16 +84,57 @@ export class StorageRepository {
 
   createZipStream(): ImmichZipStream {
     const archive = archiver('zip', { store: true });
+    let chain: Promise<void> = Promise.resolve();
 
-    const addFile = (input: string | Readable, filename: string) => {
-      if (typeof input === 'string') {
-        archive.file(input, { name: filename, mode: 0o644 });
-      } else {
-        archive.append(input, { name: filename, mode: 0o644 });
-      }
+    // archiver-utils' normalizeInputSource() pipes every Readable to a PassThrough as soon
+    // as archive.append() is called, which triggers _read() on the source. For S3-backed
+    // assets that maps 1:1 to an S3 socket open, so forwarding every source up-front saturates
+    // the connection pool and stalls the archive. Serialize archive.append() calls via a
+    // promise chain gated on the 'entry' event so only one source is ever being consumed.
+    const addFile = (input: string | Readable, filename: string): void => {
+      chain = chain
+        .then(
+          () =>
+            new Promise<void>((resolve, reject) => {
+              if (archive.destroyed) {
+                resolve();
+                return;
+              }
+              const source = typeof input === 'string' ? createReadStream(input) : input;
+              const onEntry = () => {
+                archive.off('error', onError);
+                archive.off('close', onClose);
+                resolve();
+              };
+              const onError = (error: Error) => {
+                archive.off('entry', onEntry);
+                archive.off('close', onClose);
+                reject(error);
+              };
+              const onClose = () => {
+                archive.off('entry', onEntry);
+                archive.off('error', onError);
+                resolve();
+              };
+              archive.once('entry', onEntry);
+              archive.once('error', onError);
+              archive.once('close', onClose);
+              archive.append(source, { name: filename, mode: 0o644 });
+            }),
+        )
+        .catch((error) => {
+          this.logger.warn(
+            `Failed to add '${filename}' to archive: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        });
     };
 
-    const finalize = () => archive.finalize();
+    const finalize = (): Promise<void> =>
+      chain.then(() => {
+        if (!archive.destroyed) {
+          return archive.finalize();
+        }
+      });
 
     return { stream: archive, addFile, finalize };
   }
