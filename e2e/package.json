@@ -27,7 +27,7 @@
   "license": "GNU Affero General Public License version 3",
   "devDependencies": {
     "@eslint/js": "^10.0.0",
-    "@faker-js/faker": "^10.1.0",
+    "@faker-js/faker": "^10.3.0",
     "@immich/cli": "workspace:*",
     "@immich/e2e-auth-server": "workspace:*",
     "@immich/sdk": "workspace:*",
