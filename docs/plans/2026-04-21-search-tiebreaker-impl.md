@@ -735,9 +735,9 @@ Expected: all green.
 
 ---
 
-## Task 7: Local reproducer on pierre.opennoodle.de
+## Task 7: Local reproducer on a smaller personal instance
 
-Validate the fix on real data before shipping to users. Pierre's personal instance (~40k photos) is the fastest feedback loop. If vchord wins there, it wins on atlasshrugged's 200k.
+Validate the fix on real data before shipping to users. A personal dev instance (~40k photos) is the fastest feedback loop. If vchord wins there, it wins on a 200k-photo instance too.
 
 **Step 1: Push the branch and ship an RC**
 
@@ -745,11 +745,11 @@ Validate the fix on real data before shipping to users. Pierre's personal instan
 git push -u origin fix/search-tiebreaker-vchord
 ```
 
-Then use the `rc-personal` skill (or invoke the `gallery-rc-build` workflow manually): build the fork's `gallery-server` image from `fix/search-tiebreaker-vchord`, push to GHCR, pin via the compose override in the personal gitops repo.
+Build an RC of `gallery-server` from the fix branch, push to the image registry, and pin via a compose override on the personal instance.
 
-**Step 2: Determine pierre's container names**
+**Step 2: Determine the instance's container names**
 
-Personal instance container names may differ from `immich_postgres` / `immich_server`. SSH into pierre and run:
+Container names may differ from `immich_postgres` / `immich_server`. SSH into the instance and run:
 
 ```bash
 docker ps --format '{{.Names}}' | grep -iE 'postgres|server'
@@ -757,21 +757,21 @@ docker ps --format '{{.Names}}' | grep -iE 'postgres|server'
 
 Record the actual container names for use in Steps 3-4.
 
-**Step 3: Enable diagnostics on pierre's instance**
+**Step 3: Enable diagnostics on the instance**
 
-On pierre's box, via SSH:
+On the instance, via SSH:
 
-1. Set `GALLERY_SEARCH_TIMING=true` in the personal instance's compose env.
-2. Run the enable script from https://gist.github.com/Deeds67/75bb0e5b2c1443402454068adb0cd102 (`enable-auto-explain.sh <postgres-container-name>`) against pierre's Postgres container.
+1. Set `GALLERY_SEARCH_TIMING=true` in the compose env.
+2. Run the enable script from the diagnostic gist (`enable-auto-explain.sh <postgres-container-name>`) against the Postgres container.
 3. Restart the server container so the env var takes effect.
 
 **Step 4: Smoke test from the UI**
 
-Open pierre.opennoodle.de. Run at least 3 distinct smart search queries ("mountains", "books", "trees"). Use both the command palette (size=5) and the /search page (size=100).
+Open the instance. Run at least 3 distinct smart search queries ("mountains", "books", "trees"). Use both the command palette (size=5) and the /search page (size=100).
 
 **Step 5: Inspect the phase timings + plan**
 
-On pierre's box (use the container names recorded in Step 2):
+On the instance (use the container names recorded in Step 2):
 
 ```bash
 # Scope to smart_search plans specifically, not any Index Scan anywhere.
@@ -793,9 +793,9 @@ If any criterion fails: do NOT proceed to open a PR. Re-investigate (the helper 
 
 **Step 6: Tear down diagnostics**
 
-Run `disable-auto-explain.sh <postgres-container-name>` from the gist. Unset `GALLERY_SEARCH_TIMING=true` (or leave it — atlasshrugged keeps it on for measurement and it's cheap).
+Run `disable-auto-explain.sh <postgres-container-name>` from the diagnostic gist. Unset `GALLERY_SEARCH_TIMING=true` (or leave it on — it's cheap).
 
-Also: remove the pierre compose override per `feedback_pierre_rc_override_cleanup` when the PR is merged to main, so release deploys don't silently keep shipping the RC image.
+Also: remove the personal-instance compose override when the PR is merged to main, so release deploys don't silently keep shipping the RC image.
 
 (No commit for this task — it's out-of-tree validation.)
 
@@ -825,12 +825,12 @@ For users with byte-identical duplicate image content (rare), infinite scroll ma
 - [x] Unit tests added for searchSmart SQL shape (all four permutations: non-CTE, CTE desc, CTE asc, no-maxDistance); each asserts exactly one inner ORDER BY expression AND that the primary key is `smart_search.embedding <=>`.
 - [x] Frontend dedup extracted to `web/src/lib/utils/search-dedup.ts` and unit-tested (5 cases).
 - [x] Reference SQL regenerated.
-- [ ] Local reproducer on pierre.opennoodle.de: auto_explain shows `Index Scan using clip_index` and `db=` phase <500ms.
-- [ ] atlasshrugged verifies on 200k-photo instance after release: 3-16s → <1s.
+- [ ] Local reproducer on a personal dev instance: auto_explain shows `Index Scan using clip_index` and `db=` phase <500ms.
+- [ ] Reporter verifies on their 200k-photo instance after release: 3-16s → <1s.
 
 ## Follow-ups (separate PRs, not this one)
 - Filter-suggestions batch burst caching (`getFilterSuggestions` fires 6 parallel seq-scans per call).
-- `maxDistance` docs note (pending atlasshrugged's post-fix report).
+- `maxDistance` docs note (pending the reporter's post-fix report).
 - `asset.type` and composite `(ownerId, visibility, deletedAt, fileCreatedAt)` indexes (upstream candidates).
 
 Design: `docs/plans/2026-04-21-search-tiebreaker-design.md`
@@ -849,21 +849,11 @@ Expect checks to go green. If the "Schema Check" workflow fails with a diff on `
 
 ---
 
-## Task 9: Post-merge memory update
+## Task 9: Post-merge notes update
 
-After PR merges and atlasshrugged confirms the fix on his 200k instance, update memory to reflect the shipped state.
+After PR merges and the reporter confirms the fix on a 200k instance, update any local notes or tracking to reflect the shipped state: shipment date, PR number, the reporter's new `db=` value. Leave the filter-suggestions follow-up in place — that's the next iteration.
 
-**Step 1: Edit `~/.claude/projects/-home-pierre-dev-gallery/memory/project_search_perf_investigation.md`**
-
-- Change the "Status" line to reflect shipment date, PR number, and atlasshrugged's reported new `db=` value.
-- Move the `asset.id tiebreaker` bullet out of "Ranked fix impact" and into a "Shipped" section (link PR).
-- Leave the filter-suggestions follow-up in place — that's the next iteration.
-
-**Step 2: Edit `~/.claude/projects/-home-pierre-dev-gallery/memory/MEMORY.md`**
-
-- Shorten the `project_search_perf_investigation.md` index line to reflect that the fix shipped and what's still open.
-
-(No source-tree commit; memory edits are local to the session's user memory store.)
+(No source-tree commit; notes are out-of-tree.)
 
 ---
 

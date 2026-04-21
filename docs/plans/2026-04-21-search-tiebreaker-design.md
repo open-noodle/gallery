@@ -88,25 +88,25 @@ Add two new `it` blocks:
 
 Run `pnpm sql` in `server/` after the code change. `server/src/queries/search.repository.sql` will update; commit the diff. CI's Schema Check catches drift between committed SQL and regenerated SQL.
 
-### Local reproducer on pierre.opennoodle.de (before shipping to users)
+### Local reproducer on a smaller personal instance (before shipping to users)
 
-Pierre's personal instance (~40k photos) is the fastest feedback loop. Before cutting a Gallery release:
+A personal dev instance (~40k photos, for example) is the fastest feedback loop. Before cutting a Gallery release:
 
-1. Build an RC via `rc-personal` skill pointing at the fix branch.
-2. Enable `GALLERY_SEARCH_TIMING=true` on pierre's instance.
-3. Run `auto_explain` (reuse the gist: https://gist.github.com/Deeds67/75bb0e5b2c1443402454068adb0cd102).
+1. Build an RC pointing at the fix branch.
+2. Enable `GALLERY_SEARCH_TIMING=true` on the instance.
+3. Run `auto_explain` via the diagnostic gist.
 4. Smoke-test 3-4 smart searches from the UI.
 5. Confirm EXPLAIN lines show `Index Scan using clip_index` and `db=` phase drops to <500ms.
 
-This catches anything unit tests miss — real planner behavior, real CPU saturation, real pagination. Only ship the release once pierre looks good.
+This catches anything unit tests miss — real planner behavior, real CPU saturation, real pagination. Only ship the release once the smaller instance looks good.
 
-Pierre's 40k vs atlasshrugged's 200k: the query shape is identical; planner behavior should match. If vchord wins on 40k, it should win on 200k — the difference is just how much slower the seq-scan fallback is at each size.
+Smaller instance (~40k) vs the reporter's 200k: the query shape is identical; planner behavior should match. If vchord wins on 40k, it should win on 200k — the difference is just how much slower the seq-scan fallback is at each size.
 
-### Real-data validation on atlasshrugged's 200k instance
+### Real-data validation on the reporter's 200k instance
 
 After Gallery release:
 
-1. atlasshrugged pulls the release.
+1. Reporter pulls the release.
 2. Re-runs the diagnostic gist (with `GALLERY_SEARCH_TIMING=true` still set).
 3. Reports new `db=` values + `auto_explain` output.
 
@@ -133,7 +133,7 @@ Proposed follow-up: add a short per-user TTL cache (30-60s) keyed by `(userId, s
 
 ### `maxDistance` config perf impact (docs-only)
 
-Default `machineLearning.clip.maxDistance = 0.5` in fork config. The reporter had it bumped to `0.95`, which expands the filter's selectivity estimate enough to push the planner further toward seq scan even with the tiebreaker fix. Re-validate on atlasshrugged's instance after the fix lands; if still seq-scanning, add a docs note in `docs/docs/features/searching.md` about the tradeoff.
+Default `machineLearning.clip.maxDistance = 0.5` in fork config. The reporter had it bumped to `0.95`, which expands the filter's selectivity estimate enough to push the planner further toward seq scan even with the tiebreaker fix. Re-validate on the reporter's instance after the fix lands; if still seq-scanning, add a docs note in `docs/docs/features/searching.md` about the tradeoff.
 
 ### Missing indexes (benefits upstream too)
 
