@@ -45,16 +45,13 @@
         return;
       }
 
-      if (append) {
-        // Primary guard against duplicate IDs across paginated searchSmart
-        // responses. The server's ORDER BY is single-key (smart_search.embedding
-        // <=>) so that vchord's ordered index scan can be used; identical
-        // embeddings (byte-identical image content) can then yield the same
-        // asset.id on adjacent pages. See docs/plans/2026-04-21-search-tiebreaker-design.md.
-        searchResults = dedupeAppend(searchResults, assets.items);
-      } else {
-        searchResults = assets.items;
-      }
+      // On append, dedupe by id — primary guard against duplicate rows across
+      // paginated searchSmart responses. The server's ORDER BY is single-key
+      // (smart_search.embedding <=>) so that vchord's ordered index scan can
+      // be used; identical embeddings (byte-identical image content) can then
+      // yield the same asset.id on adjacent pages. See
+      // docs/plans/2026-04-21-search-tiebreaker-design.md.
+      searchResults = append ? dedupeAppend(searchResults, assets.items) : assets.items;
       searchPage = page;
       hasMoreResults = assets.nextPage !== null;
     } catch {
