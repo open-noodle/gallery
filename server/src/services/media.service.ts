@@ -77,7 +77,7 @@ export class MediaService extends BaseService {
    * For S3 assets, downloads original to temp before processing.
    * Returns the local path to use for processing and a cleanup function.
    */
-  private async ensureLocalFile(filePath: string): Promise<{ localPath: string; cleanup: () => Promise<void> }> {
+  protected async ensureLocalFile(filePath: string): Promise<{ localPath: string; cleanup: () => Promise<void> }> {
     if (isAbsolute(filePath)) {
       return { localPath: filePath, cleanup: async () => {} };
     }

@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { Insertable } from 'kysely';
+import { isAbsolute } from 'node:path';
 import sanitize from 'sanitize-filename';
 import { SystemConfig } from 'src/config';
 import { SALT_ROUNDS } from 'src/constants';
@@ -263,6 +264,28 @@ export class BaseService {
         });
       }
     }
+  }
+
+  /**
+   * For assets on S3 backends, download to a local temp file for processing by
+   * tools that require a filesystem path (ffmpeg, exiftool, sharp). Caller is
+   * responsible for catching `downloadToTemp` errors or letting them propagate.
+   *
+   * @param filePath absolute disk path OR S3 relative key (anything that might
+   *                 come from a DB column such as `asset.originalPath`).
+   * @returns { localPath, cleanup } — cleanup is a no-op for disk paths and
+   *          removes the temp file for S3-sourced paths. Always call cleanup
+   *          in a `finally` block.
+   */
+  protected async ensureLocalFile(filePath: string): Promise<{ localPath: string; cleanup: () => Promise<void> }> {
+    if (isAbsolute(filePath)) {
+      return { localPath: filePath, cleanup: async () => {} };
+    }
+    // lazy import to avoid circular dependency (StorageService extends BaseService)
+    const { StorageService } = await import('./storage.service.js');
+    const backend = StorageService.resolveBackendForKey(filePath);
+    const { tempPath, cleanup } = await backend.downloadToTemp(filePath);
+    return { localPath: tempPath, cleanup };
   }
 
   async createUser(dto: Insertable<UserTable> & { email: string }): Promise<UserAdmin> {
