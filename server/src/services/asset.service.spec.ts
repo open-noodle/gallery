@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { DateTime } from 'luxon';
 import path from 'node:path';
+import { Readable } from 'node:stream';
 import { AssetJobName, AssetStatsResponseDto } from 'src/dtos/asset.dto';
 import { AssetEditAction } from 'src/dtos/editing.dto';
 import { AssetFileType, AssetMetadataKey, AssetStatus, AssetType, AssetVisibility, JobName, JobStatus } from 'src/enum';
@@ -1527,18 +1528,20 @@ describe(AssetService.name, () => {
   });
 
   describe('copySidecar', () => {
-    const diskSource = { path: '/usr/src/app/upload/user/src.jpg.xmp', type: AssetFileType.Sidecar };
-    const s3Source = { path: 'upload/user/src.jpg.xmp', type: AssetFileType.Sidecar };
+    const diskSource = { path: '/usr/src/app/upload/user/src.jpg.xmp', type: AssetFileType.Sidecar, isEdited: false };
+    const s3Source = { path: 'upload/user/src.jpg.xmp', type: AssetFileType.Sidecar, isEdited: false };
     const diskTargetAsset = { id: 'target-id', originalPath: '/usr/src/app/upload/user/dst.jpg', files: [] };
     const s3TargetAsset = { id: 'target-id', originalPath: 'upload/user/dst.jpg', files: [] };
     let cleanupSpy: ReturnType<typeof vi.fn>;
 
     beforeEach(() => {
       cleanupSpy = vi.fn().mockResolvedValue(void 0);
-      vi.spyOn(sut as any, 'ensureLocalFile').mockImplementation(async (p: string) => ({
-        localPath: p.startsWith('/') ? p : `/tmp/dl-${path.basename(p)}`,
-        cleanup: p.startsWith('/') ? async () => {} : cleanupSpy,
-      }));
+      vi.spyOn(sut as any, 'ensureLocalFile').mockImplementation(((p: string) =>
+        Promise.resolve({
+          localPath: p.startsWith('/') ? p : `/tmp/dl-${path.basename(p)}`,
+          cleanup: p.startsWith('/') ? async () => {} : cleanupSpy,
+        })) as any);
+      mocks.storage.createPlainReadStream.mockReturnValue(Readable.from(['<xml/>']));
     });
 
     it('disk → disk: copies via storageRepository.copyFile (regression guard)', async () => {
@@ -1580,23 +1583,27 @@ describe(AssetService.name, () => {
 
     it('overwrites an existing target sidecar without an unlink, with source content reaching the put', async () => {
       // Headline behavioral change: no more pre-copy unlink, and the stream handed to backend.put must
-      // come from localPath. Asserting on the ReadStream's `.path` property (a public Node fs.ReadStream
-      // field) instead of spying on createReadStream — ESM static imports bind the symbol at load time,
-      // so vi.spyOn(fs, 'createReadStream') wouldn't intercept asset.service.ts's calls.
+      // come from localPath. Mock createPlainReadStream and assert it was called with the source's
+      // localPath — proves the stream argument originated from the source, not /dev/null or the target.
       const existingTarget = { ...s3Source, path: `${s3TargetAsset.originalPath}.xmp` };
       const target = { ...s3TargetAsset, files: [existingTarget] };
       const backendPut = vi.fn().mockResolvedValue(void 0);
       const { StorageService } = await import('src/services/storage.service.js');
       vi.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue({ put: backendPut } as any);
 
+      const sourceStream = Readable.from(['<xml/>']);
+      mocks.storage.createPlainReadStream.mockReturnValue(sourceStream);
+
       await (sut as any).copySidecar({ sourceAsset: { files: [s3Source] }, targetAsset: target });
 
       expect(mocks.storage.unlink).not.toHaveBeenCalled();
+      // createPlainReadStream must be called with the SOURCE's localPath — not the target's path.
+      expect(mocks.storage.createPlainReadStream).toHaveBeenCalledWith(`/tmp/dl-${path.basename(s3Source.path)}`);
       expect(backendPut).toHaveBeenCalledOnce();
+      // And the stream handed to backend.put must be exactly that stream — guards against an
+      // accidental empty buffer or wrong stream reaching the S3 put.
       const [, streamArg] = backendPut.mock.calls[0];
-      // The stream passed to backend.put must be a createReadStream of the source's localPath —
-      // not of /dev/null, an empty buffer, or the target's path.
-      expect(streamArg.path).toBe(`/tmp/dl-${path.basename(s3Source.path)}`);
+      expect(streamArg).toBe(sourceStream);
     });
 
     it('succeeds when target has no existing sidecar (files: []) — disk→S3 variant', async () => {

@@ -1,7 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import _ from 'lodash';
 import { DateTime, Duration } from 'luxon';
-import { createReadStream } from 'node:fs';
 import { isAbsolute } from 'node:path';
 import { JOBS_ASSET_PAGINATION_SIZE } from 'src/constants';
 import { StorageCore } from 'src/cores/storage.core';
@@ -336,7 +335,8 @@ export class AssetService extends BaseService {
         await this.storageRepository.copyFile(localPath, targetSidecarPath);
       } else {
         const backend = StorageService.resolveBackendForKey(targetSidecarPath);
-        await backend.put(targetSidecarPath, createReadStream(localPath), { contentType: 'application/xml' });
+        const stream = this.storageRepository.createPlainReadStream(localPath);
+        await backend.put(targetSidecarPath, stream, { contentType: 'application/xml' });
       }
     } finally {
       await cleanup();
