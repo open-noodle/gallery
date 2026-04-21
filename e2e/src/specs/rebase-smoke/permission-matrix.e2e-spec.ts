@@ -138,5 +138,16 @@ test.describe('Rebase Smoke — UI Permission Matrix', () => {
     await expect(page.getByLabel('Show file location')).toHaveCount(0);
   });
 
-  // Tests 6–10 added in subsequent commits.
+  test('Test 6 — viewer detail panel: edit controls hidden, file path hidden', async ({ context, page }) => {
+    await utils.setAuthCookies(context, viewer.accessToken);
+    await page.goto(`/spaces/${space.id}/photos/${asset.id}`);
+    await page.waitForSelector('#immich-asset-viewer');
+    await page.keyboard.press('i');
+    await expect(page.locator('#detail-panel')).toBeVisible();
+    // Viewer has same UI gating as editor for these owner-only controls.
+    await expect(page.locator('[data-testid="detail-panel-edit-date-button"]')).toHaveAttribute('title', '');
+    await expect(page.getByLabel('Show file location')).toHaveCount(0);
+  });
+
+  // Tests 7–10 added in subsequent commits.
 });
