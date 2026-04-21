@@ -37,7 +37,7 @@ describe(DownloadController.name, () => {
           this.push(null);
         },
       });
-      service.downloadArchive.mockResolvedValue({ stream, abort: vitest.fn() });
+      service.downloadArchive.mockResolvedValue({ stream, abort: vitest.fn() } as any);
       await request(ctx.getHttpServer())
         .post('/download/archive')
         .send({ assetIds: [factory.uuid()] });
