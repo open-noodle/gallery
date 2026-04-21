@@ -1841,6 +1841,81 @@ async function phaseTemplateDiskBaseline(): Promise<void> {
   console.log('=== Phase: template-disk-baseline complete ===');
 }
 
+async function phaseCopyAssetSidecarS3(): Promise<void> {
+  console.log('=== Phase: copy-asset-sidecar-s3 ===');
+  const token = await loginAdmin();
+
+  // createPng() resets its module counter each tsx invocation, so the first few PNGs of every
+  // phase are deterministic (R=0,G=0,B=0 → test-image.png's checksum). Burn counter ahead so
+  // our fixtures don't collide with setup or other phases via the server's checksum dedup.
+  for (let i = 0; i < 200; i++) {
+    createPng();
+  }
+
+  // Source: photo with XMP sidecar. Target: photo without.
+  const { id: sourceId } = await uploadAsset(token, 'copy-sidecar-src.png', createPng(), createXmpSidecar());
+  console.log(`  Uploaded source ${sourceId} (with sidecar)`);
+  const { id: targetId } = await uploadAsset(token, 'copy-sidecar-dst.png', createPng());
+  console.log(`  Uploaded target ${targetId} (no sidecar)`);
+
+  // Drain metadata extraction so the sidecar row gets linked to the source asset.
+  await waitForProcessing(token);
+  console.log('  Processing drained');
+
+  // Source must have exactly one sidecar row with a relative (S3) path.
+  const srcSidecarRows = await queryDb<{ path: string }>(
+    `SELECT path FROM asset_file WHERE "assetId" = $1 AND type = 'sidecar'`,
+    [sourceId],
+  );
+  assert.equal(srcSidecarRows.length, 1, `Expected source to have 1 sidecar row, got ${srcSidecarRows.length}`);
+  assert.ok(
+    !srcSidecarRows[0].path.startsWith('/'),
+    `Expected source sidecar path relative (S3), got ${srcSidecarRows[0].path}`,
+  );
+
+  // Target's originalPath must also be a relative S3 key (proves backend config).
+  const targetRows = await queryDb<{ originalPath: string }>(`SELECT "originalPath" FROM asset WHERE id = $1`, [
+    targetId,
+  ]);
+  assert.ok(targetRows[0], `Target asset ${targetId} not found`);
+  assert.ok(
+    !targetRows[0].originalPath.startsWith('/'),
+    `Expected target originalPath relative, got ${targetRows[0].originalPath}`,
+  );
+  const targetSidecarKey = `${targetRows[0].originalPath}.xmp`;
+
+  // Trigger copy with sidecar=true — this is the code path the bug fix targets.
+  await api('PUT', '/assets/copy', { token, body: { sourceId, targetId, sidecar: true } });
+
+  // Drain the AssetExtractMetadata job copySidecar queues.
+  await waitForProcessing(token);
+
+  // Target now has a sidecar row in asset_file, pointing at <targetOriginalPath>.xmp.
+  const targetSidecarRows = await queryDb<{ path: string }>(
+    `SELECT path FROM asset_file WHERE "assetId" = $1 AND type = 'sidecar'`,
+    [targetId],
+  );
+  assert.equal(
+    targetSidecarRows.length,
+    1,
+    `Expected target to have 1 sidecar row after copy, got ${targetSidecarRows.length}`,
+  );
+  assert.equal(
+    targetSidecarRows[0].path,
+    targetSidecarKey,
+    `Expected target sidecar path ${targetSidecarKey}, got ${targetSidecarRows[0].path}`,
+  );
+
+  // Object must exist in MinIO AND be non-empty (cheap content guard).
+  minioSetupAlias();
+  assert.ok(minioFileExists(targetSidecarKey), `MinIO key missing: ${targetSidecarKey}`);
+  const content = minioReadFile(targetSidecarKey);
+  assert.ok(content.length > 0, `Sidecar in S3 is empty: ${targetSidecarKey}`);
+
+  console.log(`  Copied sidecar from ${sourceId} → ${targetId} at ${targetSidecarKey} (${content.length} bytes).`);
+  console.log('=== Phase: copy-asset-sidecar-s3 complete ===');
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -1926,9 +2001,13 @@ async function main() {
         await phaseTemplateDiskBaseline();
         break;
       }
+      case 'copy-asset-sidecar-s3': {
+        await phaseCopyAssetSidecarS3();
+        break;
+      }
       default: {
         throw new Error(
-          `Unknown phase: ${phase}. Valid phases: setup, estimate, migrate-to-s3, migrate-to-disk, rollback, no-files, concurrent-rejection, selective-to-s3, selective-cleanup, delete-source-false, content-verify, sidecar-verify, template-s3-bulk-skipped, template-s3-upload-skipped, template-s3-live-photo-skipped, template-s3-sidecar-skipped, template-s3-queue-migration-skipped, template-disk-baseline`,
+          `Unknown phase: ${phase}. Valid phases: setup, estimate, migrate-to-s3, migrate-to-disk, rollback, no-files, concurrent-rejection, selective-to-s3, selective-cleanup, delete-source-false, content-verify, sidecar-verify, template-s3-bulk-skipped, template-s3-upload-skipped, template-s3-live-photo-skipped, template-s3-sidecar-skipped, template-s3-queue-migration-skipped, template-disk-baseline, copy-asset-sidecar-s3`,
         );
       }
     }
