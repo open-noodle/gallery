@@ -233,5 +233,22 @@ test.describe('Rebase Smoke — UI Permission Matrix', () => {
     }
   });
 
-  // Test 10 added in subsequent commit.
+  test('Test 10 — viewer /map sees space marker', async ({ context, page }) => {
+    const fullAsset = await utils.getAssetInfo(owner.accessToken, asset.id);
+    test.skip(!fullAsset.exifInfo?.latitude, 'Asset has no GPS; skipping');
+
+    await utils.setAuthCookies(context, viewer.accessToken);
+    // Wait for the map markers endpoint to respond. Real endpoint is
+    // /gallery/map/markers (gallery-map.controller.ts declares @Controller('gallery/map')).
+    // Substring match on '/map/markers' covers it.
+    const markersResponse = page.waitForResponse((r) => r.url().includes('/map/markers'), {
+      timeout: 20_000,
+    });
+    await page.goto('/map');
+    await markersResponse;
+    await page.locator('.maplibregl-map').waitFor({ timeout: 15_000 });
+
+    const markers = page.locator('[data-testid="map-marker"]');
+    await expect.poll(async () => markers.count(), { timeout: 20_000 }).toBeGreaterThan(0);
+  });
 });
