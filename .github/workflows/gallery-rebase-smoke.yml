@@ -1,0 +1,34 @@
+name: Gallery Rebase Smoke
+
+on:
+  workflow_dispatch:
+
+jobs:
+  rebase-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - run: pnpm install --frozen-lockfile
+      - name: Start e2e stack
+        working-directory: e2e
+        run: docker compose up -d --build --wait
+      - name: Run rebase-smoke project
+        working-directory: e2e
+        env:
+          PLAYWRIGHT_DISABLE_WEBSERVER: 'true'
+        run: pnpm exec playwright test --project=rebase-smoke
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: e2e/playwright-report
+      - name: Teardown
+        if: always()
+        working-directory: e2e
+        run: docker compose down -v
