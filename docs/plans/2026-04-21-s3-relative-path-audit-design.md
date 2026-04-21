@@ -38,7 +38,7 @@ Trigger: `copyAssetProperties({ sidecar: true })`. Asset-duplicate/copy operatio
 
 These paths work correctly today, but their correctness depends on invariants rather than guards. Documenting here so the audit coverage is explicit rather than implied:
 
-- `server/src/services/asset-media.service.ts:345,347` — `storageRepository.utimes(...)` on upload-temp paths. Safe because NestJS/multer writes incoming uploads to local disk first; the S3 move (line 365) happens only after `utimes`.
+- `server/src/services/asset-media.service.ts:345,347` — `storageRepository.utimes(...)` on upload-temp paths. Safe because NestJS/multer writes incoming uploads to local disk first; the S3 move (line 365) happens only after `utimes`. Implementation step: cite the multer disk-storage config (`server/src/middleware/file-upload.interceptor.ts` or equivalent) in the PR body so the invariant is checkable against a specific line, not a handwave.
 - `server/src/services/asset-media.service.ts:361,371` — `createReadStream(...)` of upload-temp paths feeding into S3 `put`. Same invariant.
 
 All other `mediaRepository.probe` / `.transcode` / `.extractFrame` / `.extractVideoFrames` callers are either wrapped via `ensureLocalFile` (media.service.ts, metadata.service.ts), operate on output paths known to be local (media.service.ts:323), or are gated by `StorageCore.isImmichPath` (asset.service.ts:662).
@@ -71,10 +71,25 @@ Rationale for always routing through a local temp on S3→S3 (same backend): sid
 
 ### Unit
 
-- `server/src/services/base.service.spec.ts` — new coverage for `ensureLocalFile`: absolute path returns passthrough with no-op cleanup; relative path calls `StorageService.resolveBackendForKey(key).downloadToTemp(key)` and returns its `{ tempPath, cleanup }`; invoking the returned cleanup triggers the backend-side cleanup.
-- `server/src/services/smart-info.service.spec.ts` — extend the `handleEncodeClip` video case with an S3 scenario: relative `originalPath` → `ensureLocalFile` invoked, `probe` and `extractVideoFrames` receive the local temp path, cleanup called on the success path AND on the `probe`-throws path (so the early `return null` still triggers the outer `finally`).
-- `server/src/services/asset.service.spec.ts` — `copySidecar` tests covering all 4 source/target backend combinations: disk→disk (regression guard; unchanged semantics but new code path), disk→S3, S3→disk, S3→S3. Plus: cleanup called on `put`/`copyFile` failure; source and target sidecar paths asserted distinct (documented as safe-by-invariant from the `copy` endpoint's `sourceId === targetId` rejection at asset.service.ts:269).
-- Remove any `ensureLocalFile` tests from `media.service.spec.ts` / `metadata.service.spec.ts`; consolidated into the base service spec.
+- `server/src/services/base.service.spec.ts` — new coverage for `ensureLocalFile`:
+  - Absolute path returns passthrough with no-op cleanup.
+  - Relative path calls `StorageService.resolveBackendForKey(key).downloadToTemp(key)` and returns its `{ tempPath, cleanup }`; invoking the returned cleanup triggers the backend-side cleanup.
+  - `StorageService.resolveBackendForKey` throws for an unknown backend prefix → error propagates, no cleanup leaked (nothing was captured yet).
+  - `downloadToTemp` throws after the backend resolves → error propagates, no cleanup leaked.
+- `server/src/services/smart-info.service.spec.ts` — extend the `handleEncodeClip` video case:
+  - Relative `originalPath` → `ensureLocalFile` invoked; `probe` and `extractVideoFrames` receive the local temp path; cleanup called on the success path.
+  - `probe` throws → inner catch returns `null` early; outer `finally` still runs cleanup.
+  - `extractVideoFrames` throws → inner catch at smart-info.service.ts:168 returns `null`; outer `finally` still runs cleanup.
+  - `machineLearningRepository.encodeImage` throws on a frame → inner catch at smart-info.service.ts:181 returns `null`; outer `finally` still runs cleanup.
+  - Absolute `originalPath` (disk) → `ensureLocalFile` returns passthrough; behavior unchanged (regression guard for the non-S3 path).
+- `server/src/services/asset.service.spec.ts` — `copySidecar` tests:
+  - All 4 source/target backend combinations: disk→disk (regression guard; unchanged semantics but new code path), disk→S3, S3→disk, S3→S3.
+  - **Target has an existing sidecar → the new copy overwrites it.** This is the headline behavioral change of this PR (no more unlink); assert content matches source in the overwrite case so a future accidental "empty put" regression is caught.
+  - Target has no existing sidecar (`files: []`) → the `targetFile?.path` branch short-circuits cleanly, copy still succeeds.
+  - Source has no sidecar → early return at asset.service.ts:322; no copy attempted, no cleanup needed.
+  - Cleanup called on `put` / `copyFile` failure.
+  - Source and target sidecar paths asserted distinct (documented as safe-by-invariant from the `copy` endpoint's `sourceId === targetId` rejection at asset.service.ts:269).
+- Remove any `ensureLocalFile` tests from `media.service.spec.ts` / `metadata.service.spec.ts` if they exist; consolidated into the base service spec. (If no such tests exist today, this bullet is a no-op — verify during implementation.)
 
 ### Medium
 
@@ -87,7 +102,7 @@ Two phases added to `e2e/src/storage-migration.ts` (the harness created by PR #3
 Both phases use the existing `waitForQueueFinish` helper from `e2e/src/utils.ts:741` and inline the `expect(asset.originalPath).not.toMatch(/^\//)` assertion consistent with the six existing sites in the file (lines 589, 618, 960, 1126, 1156, 1264). No new helpers extracted.
 
 - **`phaseSmartSearchS3VideoClip`** — upload a video to S3, assert the resulting `originalPath` is a relative key (proves backend config), wait for the `SmartSearch` queue to drain, assert a `smart_search` row exists for the asset. Pre-fix: job throws `ENOENT`, no row. Post-fix: embedding persisted.
-- **`phaseCopyAssetSidecarS3`** — upload a photo + XMP sidecar pair to S3, call the asset-copy endpoint with `sidecar: true`, assert the target has a `Sidecar` row in `asset_file` AND `backend.exists(target)` returns true.
+- **`phaseCopyAssetSidecarS3`** — upload a photo + XMP sidecar pair to S3, call the asset-copy endpoint with `sidecar: true`, assert the target has a `Sidecar` row in `asset_file` AND `backend.exists(target)` returns true AND the S3 object's size is > 0 (cheap content check so an accidental empty `put` doesn't silently pass).
 
 ### Manual smoke (pre-merge)
 
@@ -98,9 +113,11 @@ Via `/rc-personal` to Pierre's personal S3 instance:
 
 ## Rollout
 
-Single PR targeting main. No migration, no config, no backwards-compat shim. Reporter on #396 gets the fix in the release that ships after merge.
+Single PR targeting main. No migration, no config, no backwards-compat shim. Reporter on #396 gets the fix in the release that ships after merge; @-mention the reporter in the PR body and ask them to confirm on their instance once the release is live.
+
+Expected rough diff size: ≈400–600 LOC of production code and tests (excluding the E2E phase bodies, which add ≈100–200 more). If the implementation plan grows materially beyond this, re-scope before continuing.
 
 ## Risks
 
 - **Lazy `StorageService` import in `BaseService`.** Blast radius shared with `serveFromBackend` (same file, same pattern). That helper has been stable. Risk is low.
-- **Dropping the pre-copy unlink in `copySidecar`.** Changes delete semantics from "unlink-then-copy" to "overwrite-via-copy/put". For identical keys (always the case here) this is semantically equivalent and strictly safer on partial failure. No caller of `copyAssetProperties({ sidecar: true })` inspects filesystem state synchronously after return, so the change is not externally observable.
+- **Dropping the pre-copy unlink in `copySidecar`.** Changes delete semantics from "unlink-then-copy" to "overwrite-via-copy/put". For identical keys (always the case here) this is semantically equivalent and strictly safer on partial failure. The claim that no caller of `copyAssetProperties({ sidecar: true })` inspects filesystem state synchronously after return was reasoned from the call graph but not grep-verified at design time; implementation task 1 is to grep-verify and record the callers in the PR body before shipping.
