@@ -166,12 +166,6 @@ class AppRouter extends RootStackRouter {
     AutoRoute(page: FolderRoute.page, guards: [_authGuard]),
     AutoRoute(page: SharedLinkRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: SharedLinkEditRoute.page, guards: [_authGuard, _duplicateGuard]),
-    // >>> fork-only gallery-bottom-nav — expose Spaces as a top-level
-    // fullscreen route so pushes from GalleryTabShellRoute (Library card +
-    // list item) don't fall back to the legacy TabShellRoute's Spaces tab
-    // (which would render the old 4-tab nav).
-    AutoRoute(page: SpacesRoute.page, guards: [_authGuard, _duplicateGuard]),
-    // <<< fork-only
     CustomRoute(page: MapLocationPickerRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: HeaderSettingsRoute.page, guards: [_duplicateGuard]),
     AutoRoute(page: ShareIntentRoute.page, guards: [_authGuard, _duplicateGuard]),
