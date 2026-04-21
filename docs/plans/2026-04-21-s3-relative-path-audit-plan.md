@@ -62,7 +62,7 @@ rg -n 'diskStorage|multer|FileInterceptor|FilesInterceptor|destination:|dest:' s
 
 ## Phase 1 — Lift `ensureLocalFile` to `BaseService` (C1)
 
-Pure refactor. No behavior change. Five commits: add + tests, then two removal commits, one final validation.
+Pure refactor. No behavior change. Three to four commits: add + tests together, then two removal commits, plus an optional final spec-consolidation commit.
 
 ### Task 1.1: Write failing tests for `BaseService.ensureLocalFile`
 
@@ -609,27 +609,24 @@ describe('copySidecar', () => {
   });
 
   it('overwrites an existing target sidecar without an unlink, with source content reaching the put', async () => {
-    // Headline behavioral change: no more pre-copy unlink, and the stream handed to backend.put must come from localPath.
-    // Guarding against a future regression that accidentally puts an empty/wrong body.
+    // Headline behavioral change: no more pre-copy unlink, and the stream handed to backend.put must
+    // come from localPath. Asserting on the ReadStream's `.path` property (a public Node fs.ReadStream
+    // field) instead of spying on createReadStream — ESM static imports bind the symbol at load time,
+    // so vi.spyOn(fs, 'createReadStream') wouldn't intercept asset.service.ts's calls.
     const existingTarget = { ...s3Source, path: `${s3TargetAsset.originalPath}.xmp` };
     const target = { ...s3TargetAsset, files: [existingTarget] };
     const backendPut = vi.fn().mockResolvedValue(undefined);
     const { StorageService } = await import('src/services/storage.service');
     vi.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue({ put: backendPut } as any);
 
-    // Capture what createReadStream is invoked with — this is the only stream handed to put().
-    const fs = await import('node:fs');
-    const createReadStreamSpy = vi.spyOn(fs, 'createReadStream');
-
     await (sut as any).copySidecar({ sourceAsset: { files: [s3Source] }, targetAsset: target });
 
     expect(mocks.storage.unlink).not.toHaveBeenCalled();
     expect(backendPut).toHaveBeenCalledOnce();
-    // The stream passed to backend.put must be a createReadStream of the source's localPath,
+    // The stream passed to backend.put must be a createReadStream of the source's localPath —
     // not of /dev/null, an empty buffer, or the target's path.
-    expect(createReadStreamSpy).toHaveBeenCalledWith(`/tmp/dl-${path.basename(s3Source.path)}`);
     const [, streamArg] = backendPut.mock.calls[0];
-    expect(streamArg).toBe(createReadStreamSpy.mock.results[0].value);
+    expect(streamArg.path).toBe(`/tmp/dl-${path.basename(s3Source.path)}`);
   });
 
   it('succeeds when target has no existing sidecar (files: []) — disk→S3 variant', async () => {
@@ -666,15 +663,10 @@ describe('copySidecar', () => {
     expect(cleanupSpy).not.toHaveBeenCalled();
   });
 
-  it('documents the source-vs-target-distinct-paths invariant', async () => {
-    // Safe-by-invariant: AssetService.copyAssetProperties rejects sourceId === targetId
-    // (asset.service.ts around the copy endpoint handler), so distinct assets → distinct
-    // originalPaths → distinct `${originalPath}.xmp` paths. This spec documents the
-    // invariant rather than guarding at runtime.
-    const srcPath = s3Source.path;
-    const dstPath = `${s3TargetAsset.originalPath}.xmp`;
-    expect(srcPath).not.toBe(dstPath);
-  });
+  // Source-vs-target-distinct-paths invariant is documented as a code comment in
+  // asset.service.ts copySidecar (see task 3.2 step 1), not as a test — it's a
+  // static fact about copyAssetProperties' sourceId !== targetId gate, not behavior
+  // that copySidecar itself can verify at runtime.
 
   it('calls cleanup when backend.put fails', async () => {
     const backendPut = vi.fn().mockRejectedValue(new Error('S3 down'));
@@ -731,6 +723,8 @@ private async copySidecar({
     return;
   }
 
+  // Safe-by-invariant: copyAssetProperties rejects sourceId === targetId, so distinct
+  // assets guarantee sourceFile.path !== targetSidecarPath.
   const targetSidecarPath = `${targetAsset.originalPath}.xmp`;
 
   const { localPath, cleanup } = await this.ensureLocalFile(sourceFile.path);
@@ -845,24 +839,28 @@ export const phaseSmartSearchS3VideoClip = async (state: PhaseState) => {
 
 Use an existing small test video from `e2e/test-assets/` — verify the path in `e2e/test-assets/formats/` or similar. If none exists, pick the smallest mp4 fixture already committed.
 
-**Step 3: Verify the phase is a real regression test by proving it fails against pre-fix code.** A phase that passes against both broken and fixed code isn't catching anything. Do this before committing:
+**Step 3: Verify the phase is a real regression test by proving it fails against pre-fix code.** A phase that passes against both broken and fixed code isn't catching anything. The C2 fix was committed in task 2.2, so `git stash push -- <file>` is a no-op here (no uncommitted changes) — we need to overwrite the working tree with the pre-fix version, then restore:
 
 ```bash
-# 1. stash the C2 production fix so smart-info.service.ts is back to the broken state
-git stash push -- server/src/services/smart-info.service.ts
+# 1. find the C2 commit SHA (the fix(server): route video CLIP... commit)
+C2_SHA=$(git log --oneline --grep='route video CLIP' -1 --format=%H)
 
-# 2. run the phase (follow the existing phase-running guidance at the top of storage-migration.ts or the e2e/ README)
-# ... run phase: smart-search-s3-video-clip ...
+# 2. overwrite the working tree with the pre-fix version (parent of C2)
+git checkout ${C2_SHA}^ -- server/src/services/smart-info.service.ts
 
-# 3. assert the phase FAILS (smart_search row should be missing — job threw ENOENT silently)
+# 3. rebuild if the harness needs compiled dist (make dev-update or similar — follow e2e/ README)
 
-# 4. restore the fix
-git stash pop
+# 4. run the phase; assert it FAILS (smart_search row should be missing — job threw ENOENT)
 
-# 5. re-run the phase; assert it PASSES
+# 5. restore the fix
+git checkout HEAD -- server/src/services/smart-info.service.ts
+
+# 6. rebuild again; re-run the phase; assert it PASSES
 ```
 
-If the phase passes against the broken code, the phase is buggy — fix it before committing. If running locally is truly infeasible, document in the commit message that "pre-fix failure verification deferred to CI (revert C2 in a branch, confirm nightly goes red)."
+This assumes no commit between C2 and HEAD also touched `smart-info.service.ts`. If anything did (check `git log ${C2_SHA}..HEAD -- server/src/services/smart-info.service.ts`), manually revert only the wrap hunk that C2 introduced and use that for the "broken state" run.
+
+If running locally is truly infeasible, document in the commit message that "pre-fix failure verification deferred to CI (revert C2 in a branch, confirm nightly goes red)."
 
 **Step 4: Commit.**
 
@@ -932,23 +930,25 @@ Verify during implementation: does `createAsset` accept a `sidecarBuffer`? If no
 
 `resolveTestS3Backend` may or may not exist. Check `e2e/src/` for how other phases call `backend.exists` — there are prior art sites in `storage-migration.ts`. Reuse; don't invent.
 
-**Step 2: Verify the phase is a real regression test by proving it fails against pre-fix code.** Same technique as task 4.1 step 3:
+**Step 2: Verify the phase is a real regression test by proving it fails against pre-fix code.** Same technique as task 4.1 step 3 (`git checkout <fix-commit>^ -- <file>` rather than `git stash`, because the fix is already committed by now):
 
 ```bash
-# 1. stash the C3 production fix so copySidecar is back to the broken state
-git stash push -- server/src/services/asset.service.ts
+# 1. find the C3 commit SHA (the fix(server): route copySidecar... commit)
+C3_SHA=$(git log --oneline --grep='route copySidecar' -1 --format=%H)
 
-# 2. run the phase: copy-asset-sidecar-s3
+# 2. overwrite with the pre-fix version
+git checkout ${C3_SHA}^ -- server/src/services/asset.service.ts
 
-# 3. assert the phase FAILS (target sidecar should be missing from S3 — copyFile threw ENOENT)
+# 3. rebuild, run phase: copy-asset-sidecar-s3
+# 4. assert FAIL (target sidecar should be missing — copyFile threw ENOENT)
 
-# 4. restore the fix
-git stash pop
+# 5. restore
+git checkout HEAD -- server/src/services/asset.service.ts
 
-# 5. re-run the phase; assert it PASSES
+# 6. rebuild, re-run, assert PASS
 ```
 
-Same fallback guidance as 4.1 if running locally is infeasible.
+If anything between C3 and HEAD also touched `asset.service.ts`, manually revert only the `copySidecar` hunks C3 introduced for the "broken state" run. Same fallback guidance as 4.1 if running locally is infeasible.
 
 **Step 3: Commit.**
 
