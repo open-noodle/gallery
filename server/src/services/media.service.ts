@@ -72,19 +72,6 @@ export class MediaService extends BaseService {
   }
 
   /**
-   * For S3 assets, downloads original to temp before processing.
-   * Returns the local path to use for processing and a cleanup function.
-   */
-  private async ensureLocalFile(filePath: string): Promise<{ localPath: string; cleanup: () => Promise<void> }> {
-    if (isAbsolute(filePath)) {
-      return { localPath: filePath, cleanup: async () => {} };
-    }
-    const backend = StorageService.resolveBackendForKey(filePath);
-    const { tempPath, cleanup } = await backend.downloadToTemp(filePath);
-    return { localPath: tempPath, cleanup };
-  }
-
-  /**
    * After generating a file locally, uploads it to S3 if the write backend is S3.
    * Returns the key to store in the DB.
    */
