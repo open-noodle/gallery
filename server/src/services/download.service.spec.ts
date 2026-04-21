@@ -45,7 +45,9 @@ describe(DownloadService.name, () => {
       mocks.asset.getForOriginals.mockResolvedValue([asset]);
       mocks.storage.createZipStream.mockReturnValue(archiveMock);
 
-      await expect(sut.downloadArchive(authStub.admin, { assetIds: [asset.id, 'unknown-asset'] })).resolves.toMatchObject({
+      await expect(
+        sut.downloadArchive(authStub.admin, { assetIds: [asset.id, 'unknown-asset'] }),
+      ).resolves.toMatchObject({
         stream: archiveMock.stream,
       });
 
