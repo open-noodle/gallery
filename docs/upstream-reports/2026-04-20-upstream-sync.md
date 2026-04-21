@@ -10,13 +10,13 @@
 
 ## Final CI status (commit `a54e8552e` on `rebase/upstream-post-v2.7.5`)
 
-| Workflow              | Status |
-| --------------------- | ------ |
-| Test                  | ✅ pass |
-| Static Code Analysis  | ✅ pass |
-| Storage Migration     | ✅ pass |
-| PR Label Validation   | ✅ pass |
-| Pull Request Labeler  | ✅ pass |
+| Workflow             | Status  |
+| -------------------- | ------- |
+| Test                 | ✅ pass |
+| Static Code Analysis | ✅ pass |
+| Storage Migration    | ✅ pass |
+| PR Label Validation  | ✅ pass |
+| Pull Request Labeler | ✅ pass |
 
 ## Strategy used for conflict resolution
 
@@ -64,13 +64,14 @@ For non-refactor conflicts, resolution was:
 
 Three resolution decisions during the rebase silently lost fork behavior. All three were caught later by CI iteration but should be flagged at Checkpoint 2 in future rebases:
 
-| File                                        | What was lost                                                                                                                                                  | Detected via                                       | Fix commit |
-| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- | ---------- |
-| `server/src/services/auth.service.ts`       | Fork's S3 upload branch in `syncProfilePicture` — taking upstream cleanly dropped it                                                                            | Manual review during rebase fixup                  | `fee878e34` |
+| File                                                      | What was lost                                                                                                                                                                                                      | Detected via                                           | Fix commit  |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------ | ----------- |
+| `server/src/services/auth.service.ts`                     | Fork's S3 upload branch in `syncProfilePicture` — taking upstream cleanly dropped it                                                                                                                               | Manual review during rebase fixup                      | `fee878e34` |
 | `web/src/lib/components/asset-viewer/detail-panel.svelte` | "Orphan-div fix" deleted the entire `<div class="px-4 py-4">` containing DetailPanelDate / originalFileName / Location. Camera + lens were re-added INSIDE people section but Date + filename + Location were lost | Web E2E test on `detail-panel-edit-date-button` testid | `60cc13c65` |
-| `web/src/lib/managers/auth-manager.svelte.ts` | `this.reset()` call before `goto(redirectUri)` in `logout()` — without it, user stays "authenticated" client-side and `/auth/login` redirects to `/photos`     | Web E2E auth Registration test (URL mismatch)      | `a54e8552e` |
+| `web/src/lib/managers/auth-manager.svelte.ts`             | `this.reset()` call before `goto(redirectUri)` in `logout()` — without it, user stays "authenticated" client-side and `/auth/login` redirects to `/photos`                                                         | Web E2E auth Registration test (URL mismatch)          | `a54e8552e` |
 
 **Side-effect of `pnpm install --no-frozen-lockfile`** during conflict resolution:
+
 - Bumped `@faker-js/faker` 10.3.0 → 10.4.0, which silently changed seeded UUIDs in UI Playwright fixtures (5 tests broke). Fixed in `f75397836`.
 
 ## Conflict Resolutions (summary by file category)
@@ -235,6 +236,7 @@ The structured 3-parallel-agent review surfaced **duplicate migration timestamps
 ### Bugs surfaced and fixed during CI iteration
 
 See "Remote CI Iteration Log" above. All have memory entries for next rebase:
+
 - `feedback_zod_dto_gotchas` — 3 zod conversion pitfalls (z.date crash, query-param arrays, enum codegen)
 - `feedback_e2e_auth_server_no_divergence` — always take upstream's auth-server.ts
 - `feedback_mocktail_stream_stub` — Dart mockail null-Stream gotcha
@@ -256,17 +258,23 @@ Performed locally before initial test-branch push:
 The push surfaced **8 categories of failures** that needed iterative fixing:
 
 ### 1. Mobile generated code stale (`mobile/lib/routing/router.gr.dart`)
+
 Newer `auto_route` adds `operator==`/`hashCode` overrides to RouteArgs. Dart Code Analysis "Verify files have not changed" caught the stale file.
+
 - **Fix**: `make build` in `mobile/` to regenerate.
 - **Commit**: `ad9492a32`
 
 ### 2. Mobile deprecation: `SemanticsService.announce` → `sendAnnouncement`
+
 Flutter 3.41 deprecated `announce` in favor of `sendAnnouncement(FlutterView, message, textDirection)`. `dart analyze --fatal-infos` failed.
+
 - **File**: `mobile/lib/presentation/widgets/filter_sheet/filter_sheet.widget.dart`
 - **Commit**: `edbe5a232`
 
 ### 3. e2e workspace drift: removed-API tests + auth-server divergence
+
 Multiple e2e issues from upstream API removals (#27818 `deviceId`, #27022 `replaceAsset`) and an out-of-date local copy of `e2e-auth-server/auth-server.ts` that lacked upstream's new `OAuthUser.ID_TOKEN_CLAIMS` enum.
+
 - **Fixes**:
   - Took upstream's `e2e-auth-server/auth-server.ts` wholesale (file has zero fork-only content — saved as `feedback_e2e_auth_server_no_divergence`)
   - Deleted `e2e/src/specs/server/api/asset-video-device.e2e-spec.ts` (tested removed `getAllByDeviceId` endpoint)
@@ -275,7 +283,9 @@ Multiple e2e issues from upstream API removals (#27818 `deviceId`, #27022 `repla
 - **Commit**: `c861fb57d`
 
 ### 4. Lost zod validation rules + `replaceAsset` test cleanup
+
 The class-validator → zod conversion silently dropped 6 validation constraints and broke 25+ e2e tests testing removed endpoints.
+
 - **Server fixes (validation gaps)**:
   - `SmartSearchDto.withSharedSpaces` — was `stringToBool` (rejects native booleans on POST body); switched to `z.boolean()`
   - `ModelConfigSchema.modelName` — added `.min(1)` (was `@IsNotEmpty`)
@@ -291,6 +301,7 @@ The class-validator → zod conversion silently dropped 6 validation constraints
 - **Commit**: `5c0a574cf` (memory: `feedback_zod_dto_gotchas`)
 
 ### 5. SvelteKit env hash mismatch — Web E2E hung indefinitely
+
 Symptom: every Web E2E test timed out at 30s with browser console showing `Cannot read properties of undefined (reading 'env')`. Server healthy, uploads worked, websocket events fired — but the page stayed on the loading spinner.
 
 Root cause: `web/svelte.config.js` had `version: { name: process.env.IMMICH_BUILD || Date.now().toString() }`. When `IMMICH_BUILD` is unset, SvelteKit's `load_config()` re-imports `svelte.config.js` with `?ts=` cache buster between Vite phases (chunks vs adapter-static prerender). The user's `Date.now()` is recomputed each time, producing different `version_hash = hash(kit.version.name)` values. Chunks bake in one hash (`globalThis.__sveltekit_<hash>.env`), the SPA-fallback `index.html` bakes in another. At runtime the chunk's lookup is undefined — anything reading `$env/dynamic/public` (e.g., `@immich/ui`'s `env.PUBLIC_IMMICH_HOSTNAME`) crashes.
@@ -299,18 +310,21 @@ Root cause: `web/svelte.config.js` had `version: { name: process.env.IMMICH_BUIL
 - **Commit**: `e0fb67f73` (memory: `feedback_sveltekit_version_name_datenow`)
 
 ### 6. Detail-panel orphan-div fix over-deleted upstream content
+
 The earlier orphan-div fix (`5ae8d47fc`) removed the entire `<div class="px-4 py-4">` containing `<DetailPanelDate />`, `originalFileName`/path/dimensions, camera, lens, and `<DetailPanelLocation />`. Camera and lens were re-added inside the people `<section>` but Date + filename + Location were lost. Web E2E test "Detail Panel > Date editor > displays inferred asset timezone" timed out at 30s on the missing `detail-panel-edit-date-button` testid.
 
 - **Fix**: restored the full upstream layout (Date → filename + path + dimensions → camera → lens → Location) inside its own `px-4 py-4` div; restored `DetailPanelDate` import; added inline `getMegapixel`/`getAssetFolderHref` helpers; added `slide` transition import.
 - **Commit**: `60cc13c65` (+ `818c9b87e` for prettier format)
 
 ### 7. Faker bumped 10.3.0 → 10.4.0 → seeded UUIDs shifted
+
 `pnpm install --no-frozen-lockfile` (run during conflict resolution) bumped `@faker-js/faker` from 10.3.0 to 10.4.0 (allowed by `^10.1.0` specifier). UI Playwright tests under `e2e/src/ui/specs/timeline/` use `faker.seed(42)` and **hardcode** specific UUIDs like `ad31e29f-2069-4574-b9a9-ad86523c92cb`. Faker 10.4.0 produces different UUIDs from the same seed — `getAsset()` returned undefined → `.id` access threw `TypeError`.
 
 - **Fix**: pinned `@faker-js/faker` to `^10.3.0` to match upstream's lockfile.
 - **Commit**: `f75397836` (memory: `feedback_faker_pin_seeded_uuids`)
 
 ### 8. authManager.logout() lost upstream's `this.reset()` call
+
 Symptom: e2e Registration test ended up on `/photos` after change-password instead of `/auth/login?autoLaunch=0` (the URL the server returns from `LOGIN_URL`).
 
 Root cause: the squashed fork commit was missing the `this.reset()` call that upstream's `authManager.logout()` makes before `goto(redirectUri)`. Without it, `#user`/`#preferences` stay populated; `/auth/login`'s page-load sees `authManager.authenticated === true` and 307s to the continue URL (`/photos`).
@@ -320,18 +334,18 @@ Root cause: the squashed fork commit was missing the `this.reset()` call that up
 
 ### CI iteration summary
 
-| Iteration | Commit      | Failure category                                | Outcome             |
-| --------- | ----------- | ----------------------------------------------- | ------------------- |
-| 1         | `2e6e88148` | Initial push                                    | Test failed (e2e)   |
-| 2         | `c861fb57d` | e2e cleanup (auth-server, deviceId)             | Static Analysis ❌  |
-| 3         | `ad9492a32` | router.gr.dart regen                            | Static Analysis ❌  |
-| 4         | `edbe5a232` | sendAnnouncement migration                      | Static Analysis ✅; Test failed (zod gaps + endpoint tests) |
-| 5         | `5c0a574cf` | zod validation + e2e cleanup                    | Test failed (Lint Web + Web E2E hung) |
-| 6         | `e0fb67f73` | svelte-config Date.now fallback                 | Web E2E partial — detail-panel test still fails |
-| 7         | `60cc13c65` | restore detail-panel details section            | Lint Web (prettier) failed |
-| 8         | `818c9b87e` | prettier format detail-panel                    | UI tests fail (faker) |
-| 9         | `f75397836` | pin faker 10.3.0                                | Web auth.e2e fails |
-| 10        | `a54e8552e` | authManager.logout reset() call                 | **ALL CI GREEN** ✅ |
+| Iteration | Commit      | Failure category                     | Outcome                                                     |
+| --------- | ----------- | ------------------------------------ | ----------------------------------------------------------- |
+| 1         | `2e6e88148` | Initial push                         | Test failed (e2e)                                           |
+| 2         | `c861fb57d` | e2e cleanup (auth-server, deviceId)  | Static Analysis ❌                                          |
+| 3         | `ad9492a32` | router.gr.dart regen                 | Static Analysis ❌                                          |
+| 4         | `edbe5a232` | sendAnnouncement migration           | Static Analysis ✅; Test failed (zod gaps + endpoint tests) |
+| 5         | `5c0a574cf` | zod validation + e2e cleanup         | Test failed (Lint Web + Web E2E hung)                       |
+| 6         | `e0fb67f73` | svelte-config Date.now fallback      | Web E2E partial — detail-panel test still fails             |
+| 7         | `60cc13c65` | restore detail-panel details section | Lint Web (prettier) failed                                  |
+| 8         | `818c9b87e` | prettier format detail-panel         | UI tests fail (faker)                                       |
+| 9         | `f75397836` | pin faker 10.3.0                     | Web auth.e2e fails                                          |
+| 10        | `a54e8552e` | authManager.logout reset() call      | **ALL CI GREEN** ✅                                         |
 
 ## Post-Rebase Verification
 
