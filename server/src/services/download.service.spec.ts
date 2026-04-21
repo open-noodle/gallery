@@ -332,6 +332,201 @@ describe(DownloadService.name, () => {
       expect(passedStream).toBeInstanceOf(Readable);
       expect(passedName).toBe(s3Asset.originalFileName);
     });
+
+    it('should destroy all lazy streams and the zip stream when abort() is called', async () => {
+      const capturedStreams: Readable[] = [];
+      const archiveMock = {
+        addFile: vitest.fn().mockImplementation((input: Readable | string) => {
+          if (typeof input !== 'string') capturedStreams.push(input);
+        }),
+        finalize: vitest.fn(),
+        stream: new Readable(),
+      };
+
+      const asset1 = AssetFactory.create();
+      const asset2 = AssetFactory.create();
+      const s3Asset1 = { ...asset1, originalPath: 'upload/library/a.jpg' };
+      const s3Asset2 = { ...asset2, originalPath: 'upload/library/b.jpg' };
+
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([s3Asset1.id, s3Asset2.id]));
+      mocks.asset.getForOriginals.mockResolvedValue([s3Asset1, s3Asset2]);
+      mocks.storage.createZipStream.mockReturnValue(archiveMock);
+
+      const mockBackend = { get: vitest.fn() };
+      vitest.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue(mockBackend as any);
+
+      const { abort } = await sut.downloadArchive(authStub.admin, {
+        assetIds: [s3Asset1.id, s3Asset2.id],
+      });
+
+      const lazyDestroySpies = capturedStreams.map((s) => vitest.spyOn(s, 'destroy'));
+      const zipDestroySpy = vitest.spyOn(archiveMock.stream, 'destroy');
+
+      abort();
+
+      expect(zipDestroySpy).toHaveBeenCalled();
+      for (const spy of lazyDestroySpies) {
+        expect(spy).toHaveBeenCalled();
+      }
+    });
+
+    it('should not throw when abort() is called before archiver has started any entry', async () => {
+      const archiveMock = {
+        addFile: vitest.fn(),
+        finalize: vitest.fn(),
+        stream: new Readable(),
+      };
+
+      const asset = AssetFactory.create();
+      const s3Asset = { ...asset, originalPath: 'upload/library/photo.jpg' };
+
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([s3Asset.id]));
+      mocks.asset.getForOriginals.mockResolvedValue([s3Asset]);
+      mocks.storage.createZipStream.mockReturnValue(archiveMock);
+
+      const mockBackend = { get: vitest.fn() };
+      vitest.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue(mockBackend as any);
+
+      const { abort } = await sut.downloadArchive(authStub.admin, { assetIds: [s3Asset.id] });
+
+      // abort() fires before _read() is ever called — no S3 socket is open, source is undefined
+      expect(() => abort()).not.toThrow();
+      // backend.get() must still not have been called
+      expect(mockBackend.get).not.toHaveBeenCalled();
+    });
+
+    it('should not throw when abort() is called on an all-disk archive', async () => {
+      const archiveMock = {
+        addFile: vitest.fn(),
+        finalize: vitest.fn(),
+        stream: new Readable(),
+      };
+
+      // AssetFactory.create() produces absolute paths by default → disk branch
+      const asset1 = AssetFactory.create();
+      const asset2 = AssetFactory.create();
+
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset1.id, asset2.id]));
+      mocks.asset.getForOriginals.mockResolvedValue([asset1, asset2]);
+      mocks.storage.createZipStream.mockReturnValue(archiveMock);
+
+      const { abort } = await sut.downloadArchive(authStub.admin, {
+        assetIds: [asset1.id, asset2.id],
+      });
+
+      expect(() => abort()).not.toThrow();
+    });
+
+    it('should wrap only S3 assets in LazyS3Readable, leaving disk assets as string paths', async () => {
+      const capturedCalls: Array<[Readable | string, string]> = [];
+      const archiveMock = {
+        addFile: vitest.fn().mockImplementation((input: Readable | string, name: string) => {
+          capturedCalls.push([input, name]);
+        }),
+        finalize: vitest.fn(),
+        stream: new Readable(),
+      };
+
+      // Disk asset — absolute path
+      const diskAsset = AssetFactory.create({ originalPath: '/data/library/disk.jpg' });
+      // S3 asset — relative path
+      const s3AssetBase = AssetFactory.create();
+      const s3Asset = { ...s3AssetBase, originalPath: 'upload/library/s3.jpg' };
+
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([diskAsset.id, s3Asset.id]));
+      mocks.asset.getForOriginals.mockResolvedValue([diskAsset, s3Asset]);
+      mocks.storage.createZipStream.mockReturnValue(archiveMock);
+      mocks.storage.realpath.mockResolvedValue('/data/library/disk.jpg');
+
+      const mockBackend = { get: vitest.fn() };
+      vitest.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue(mockBackend as any);
+
+      await sut.downloadArchive(authStub.admin, { assetIds: [diskAsset.id, s3Asset.id] });
+
+      expect(archiveMock.addFile).toHaveBeenCalledTimes(2);
+
+      // Disk asset — must receive a string path, not a Readable
+      const [diskInput] = capturedCalls[0];
+      expect(typeof diskInput).toBe('string');
+
+      // S3 asset — must receive a Readable (LazyS3Readable), not a string
+      const [s3Input] = capturedCalls[1];
+      expect(s3Input).toBeInstanceOf(Readable);
+
+      // backend.get() must not have been called upfront
+      expect(mockBackend.get).not.toHaveBeenCalled();
+    });
+
+    it('should forward backend.get() rejection as a stream error on _read()', async () => {
+      let capturedLazy: Readable | undefined;
+      const archiveMock = {
+        addFile: vitest.fn().mockImplementation((input: Readable | string) => {
+          if (typeof input !== 'string') capturedLazy = input;
+        }),
+        finalize: vitest.fn(),
+        stream: new Readable(),
+      };
+
+      const asset = AssetFactory.create();
+      const s3Asset = { ...asset, originalPath: 'upload/library/photo.jpg' };
+
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([s3Asset.id]));
+      mocks.asset.getForOriginals.mockResolvedValue([s3Asset]);
+      mocks.storage.createZipStream.mockReturnValue(archiveMock);
+
+      const fetchError = new Error('S3 connection refused');
+      const mockBackend = { get: vitest.fn().mockRejectedValue(fetchError) };
+      vitest.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue(mockBackend as any);
+
+      await sut.downloadArchive(authStub.admin, { assetIds: [s3Asset.id] });
+
+      // Register an error handler before triggering _read()
+      const errorHandler = vitest.fn();
+      capturedLazy!.on('error', errorHandler);
+
+      // Trigger _read() — this starts the fetch which will reject
+      capturedLazy!.read();
+
+      // Let the rejected promise settle
+      await new Promise<void>((resolve) => setImmediate(resolve));
+
+      expect(errorHandler).toHaveBeenCalledWith(fetchError);
+    });
+
+    it('should forward a mid-stream S3 error to the lazy readable', async () => {
+      let capturedLazy: Readable | undefined;
+      const archiveMock = {
+        addFile: vitest.fn().mockImplementation((input: Readable | string) => {
+          if (typeof input !== 'string') capturedLazy = input;
+        }),
+        finalize: vitest.fn(),
+        stream: new Readable(),
+      };
+
+      const asset = AssetFactory.create();
+      const s3Asset = { ...asset, originalPath: 'upload/library/photo.jpg' };
+
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([s3Asset.id]));
+      mocks.asset.getForOriginals.mockResolvedValue([s3Asset]);
+      mocks.storage.createZipStream.mockReturnValue(archiveMock);
+
+      const s3Stream = new Readable({ read() {} });
+      const mockBackend = { get: vitest.fn().mockResolvedValue({ stream: s3Stream }) };
+      vitest.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue(mockBackend as any);
+
+      await sut.downloadArchive(authStub.admin, { assetIds: [s3Asset.id] });
+
+      const errorHandler = vitest.fn();
+      capturedLazy!.on('error', errorHandler);
+      capturedLazy!.read(); // starts fetch
+
+      await new Promise<void>((resolve) => setImmediate(resolve)); // let .then() run
+
+      const midStreamError = new Error('S3 connection reset');
+      s3Stream.emit('error', midStreamError);
+
+      expect(errorHandler).toHaveBeenCalledWith(midStreamError);
+    });
   });
 
   describe('getDownloadInfo', () => {
