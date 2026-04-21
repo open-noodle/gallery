@@ -33,6 +33,7 @@ Trigger: `copyAssetProperties({ sidecar: true })`. Asset-duplicate/copy operatio
 - S3 coverage for ML calls (face detection, OCR, pet detection, image CLIP encoding). Already S3-aware via `MachineLearningRepository.getFormData` at `server/src/repositories/machine-learning.repository.ts:315-327`, which branches on `isAbsolute(imagePath)` and streams via `StorageService.resolveBackendForKey(...).get(...)`.
 - `withLocalFile(fn)` ergonomics refactor. Keeping the current `{ localPath, cleanup }` shape.
 - Renaming `storage-migration-tests.yml` to reflect broader S3 coverage.
+- S3 download-hang on bulk selection (separate bug class — resource management, not path handling). Hypothesis: `download.service.ts` opens all S3 `Readable` streams upfront via `await backend.get(...)` in a sequential loop, leaving 149/150 sockets idle-but-held while `archiver` consumes one at a time, exhausting the S3 client socket pool and starving `serveMode: 'proxy'` thumbnail requests. Tracked in its own design (next iteration).
 
 ## Audited-safe-by-invariant
 
