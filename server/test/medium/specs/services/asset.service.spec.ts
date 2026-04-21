@@ -1,4 +1,5 @@
 import { Kysely } from 'kysely';
+import { StorageCore } from 'src/cores/storage.core';
 import { AssetEditAction } from 'src/dtos/editing.dto';
 import { AssetFileType, AssetMetadataKey, AssetStatus, JobName, SharedLinkType } from 'src/enum';
 import { AccessRepository } from 'src/repositories/access.repository';
@@ -192,11 +193,19 @@ describe(AssetService.name, () => {
     });
 
     it('should copy sidecar file', async () => {
+      // StorageCore is a module-level singleton (see cores/storage.core.ts), so it keeps the
+      // mocked StorageRepository from whichever medium test ran first. Reset it before setup()
+      // so the real mock for THIS test is the one StorageCore.ensureFolders sees.
+      StorageCore.reset();
       const { sut, ctx } = setup();
       const storageRepo = ctx.getMock(StorageRepository);
       const jobRepo = ctx.getMock(JobRepository);
 
       storageRepo.copyFile.mockResolvedValue();
+      // copySidecar calls StorageCore.ensureFolders(targetSidecarPath) on the disk branch,
+      // which invokes StorageRepository.mkdirSync. Stub it so the strict auto-mock default
+      // (which asserts on any unstubbed call) doesn't fire.
+      storageRepo.mkdirSync.mockImplementation(() => {});
       jobRepo.queue.mockResolvedValue();
 
       const { user } = await ctx.newUser();

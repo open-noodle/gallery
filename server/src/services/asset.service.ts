@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import _ from 'lodash';
 import { DateTime, Duration } from 'luxon';
+import { isAbsolute } from 'node:path';
 import { JOBS_ASSET_PAGINATION_SIZE } from 'src/constants';
 import { StorageCore } from 'src/cores/storage.core';
 import { AssetFile } from 'src/database';
@@ -41,6 +42,7 @@ import {
   QueueName,
 } from 'src/enum';
 import { BaseService } from 'src/services/base.service';
+import { StorageService } from 'src/services/storage.service';
 import { JobItem, JobOf } from 'src/types';
 import { requireElevatedPermission } from 'src/utils/access';
 import {
@@ -322,15 +324,27 @@ export class AssetService extends BaseService {
       return;
     }
 
-    const { sidecarFile: targetFile } = getAssetFiles(targetAsset.files ?? []);
-    if (targetFile?.path) {
-      await this.storageRepository.unlink(targetFile.path);
+    // Safe-by-invariant: AssetService.copy rejects sourceId === targetId, so distinct
+    // assets guarantee sourceFile.path !== targetSidecarPath.
+    const targetSidecarPath = `${targetAsset.originalPath}.xmp`;
+
+    const { localPath, cleanup } = await this.ensureLocalFile(sourceFile.path);
+    try {
+      if (isAbsolute(targetSidecarPath)) {
+        this.storageCore.ensureFolders(targetSidecarPath);
+        await this.storageRepository.copyFile(localPath, targetSidecarPath);
+      } else {
+        const backend = StorageService.resolveBackendForKey(targetSidecarPath);
+        const stream = this.storageRepository.createPlainReadStream(localPath);
+        await backend.put(targetSidecarPath, stream, { contentType: 'application/xml' });
+      }
+    } finally {
+      await cleanup();
     }
 
-    await this.storageRepository.copyFile(sourceFile.path, `${targetAsset.originalPath}.xmp`);
     await this.assetRepository.upsertFile({
       assetId: targetAsset.id,
-      path: `${targetAsset.originalPath}.xmp`,
+      path: targetSidecarPath,
       type: AssetFileType.Sidecar,
     });
     await this.jobRepository.queue({ name: JobName.AssetExtractMetadata, data: { id: targetAsset.id } });

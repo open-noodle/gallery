@@ -1,5 +1,7 @@
 import { BadRequestException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { DateTime } from 'luxon';
+import path from 'node:path';
+import { Readable } from 'node:stream';
 import { AssetJobName, AssetStatsResponseDto } from 'src/dtos/asset.dto';
 import { AssetEditAction } from 'src/dtos/editing.dto';
 import { AssetFileType, AssetMetadataKey, AssetStatus, AssetType, AssetVisibility, JobName, JobStatus } from 'src/enum';
@@ -1526,6 +1528,143 @@ describe(AssetService.name, () => {
       await sut.copy(authStub.admin, { sourceId, targetId, favorite: false });
 
       expect(mocks.asset.update).not.toHaveBeenCalledWith(expect.objectContaining({ isFavorite: true }));
+    });
+  });
+
+  describe('copySidecar', () => {
+    const diskSource = { path: '/usr/src/app/upload/user/src.jpg.xmp', type: AssetFileType.Sidecar, isEdited: false };
+    const s3Source = { path: 'upload/user/src.jpg.xmp', type: AssetFileType.Sidecar, isEdited: false };
+    const diskTargetAsset = { id: 'target-id', originalPath: '/usr/src/app/upload/user/dst.jpg', files: [] };
+    const s3TargetAsset = { id: 'target-id', originalPath: 'upload/user/dst.jpg', files: [] };
+    let cleanupSpy: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+      cleanupSpy = vi.fn().mockResolvedValue(void 0);
+      vi.spyOn(sut as any, 'ensureLocalFile').mockImplementation(((p: string) =>
+        Promise.resolve({
+          localPath: p.startsWith('/') ? p : `/tmp/dl-${path.basename(p)}`,
+          cleanup: p.startsWith('/') ? async () => {} : cleanupSpy,
+        })) as any);
+      mocks.storage.createPlainReadStream.mockReturnValue(Readable.from(['<xml/>']));
+    });
+
+    it('disk → disk: copies via storageRepository.copyFile (regression guard)', async () => {
+      await (sut as any).copySidecar({ sourceAsset: { files: [diskSource] }, targetAsset: diskTargetAsset });
+      expect(mocks.storage.copyFile).toHaveBeenCalledWith(diskSource.path, `${diskTargetAsset.originalPath}.xmp`);
+    });
+
+    it('disk → S3: uploads via backend.put', async () => {
+      const backendPut = vi.fn().mockResolvedValue(void 0);
+      const { StorageService } = await import('src/services/storage.service.js');
+      vi.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue({ put: backendPut } as any);
+
+      await (sut as any).copySidecar({ sourceAsset: { files: [diskSource] }, targetAsset: s3TargetAsset });
+
+      expect(backendPut).toHaveBeenCalledWith(`${s3TargetAsset.originalPath}.xmp`, expect.anything(), {
+        contentType: 'application/xml',
+      });
+    });
+
+    it('S3 → disk: downloads source then copies to disk', async () => {
+      await (sut as any).copySidecar({ sourceAsset: { files: [s3Source] }, targetAsset: diskTargetAsset });
+      expect(mocks.storage.copyFile).toHaveBeenCalledWith(
+        `/tmp/dl-${path.basename(s3Source.path)}`,
+        `${diskTargetAsset.originalPath}.xmp`,
+      );
+      expect(cleanupSpy).toHaveBeenCalledOnce();
+    });
+
+    it('S3 → S3: downloads source then uploads to target', async () => {
+      const backendPut = vi.fn().mockResolvedValue(void 0);
+      const { StorageService } = await import('src/services/storage.service.js');
+      vi.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue({ put: backendPut } as any);
+
+      await (sut as any).copySidecar({ sourceAsset: { files: [s3Source] }, targetAsset: s3TargetAsset });
+
+      expect(backendPut).toHaveBeenCalledOnce();
+      expect(cleanupSpy).toHaveBeenCalledOnce();
+    });
+
+    it('overwrites an existing target sidecar without an unlink, with source content reaching the put', async () => {
+      // Headline behavioral change: no more pre-copy unlink, and the stream handed to backend.put must
+      // come from localPath. Mock createPlainReadStream and assert it was called with the source's
+      // localPath — proves the stream argument originated from the source, not /dev/null or the target.
+      const existingTarget = { ...s3Source, path: `${s3TargetAsset.originalPath}.xmp` };
+      const target = { ...s3TargetAsset, files: [existingTarget] };
+      const backendPut = vi.fn().mockResolvedValue(void 0);
+      const { StorageService } = await import('src/services/storage.service.js');
+      vi.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue({ put: backendPut } as any);
+
+      const sourceStream = Readable.from(['<xml/>']);
+      mocks.storage.createPlainReadStream.mockReturnValue(sourceStream);
+
+      await (sut as any).copySidecar({ sourceAsset: { files: [s3Source] }, targetAsset: target });
+
+      expect(mocks.storage.unlink).not.toHaveBeenCalled();
+      // createPlainReadStream must be called with the SOURCE's localPath — not the target's path.
+      expect(mocks.storage.createPlainReadStream).toHaveBeenCalledWith(`/tmp/dl-${path.basename(s3Source.path)}`);
+      expect(backendPut).toHaveBeenCalledOnce();
+      // And the stream handed to backend.put must be exactly that stream — guards against an
+      // accidental empty buffer or wrong stream reaching the S3 put.
+      const [, streamArg] = backendPut.mock.calls[0];
+      expect(streamArg).toBe(sourceStream);
+    });
+
+    it('succeeds when target has no existing sidecar (files: []) — disk→S3 variant', async () => {
+      const backendPut = vi.fn().mockResolvedValue(void 0);
+      const { StorageService } = await import('src/services/storage.service.js');
+      vi.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue({ put: backendPut } as any);
+
+      await (sut as any).copySidecar({
+        sourceAsset: { files: [diskSource] },
+        targetAsset: { ...s3TargetAsset, files: [] },
+      });
+
+      expect(backendPut).toHaveBeenCalledOnce();
+    });
+
+    it('succeeds when targetAsset.files is undefined (not just empty)', async () => {
+      const backendPut = vi.fn().mockResolvedValue(void 0);
+      const { StorageService } = await import('src/services/storage.service.js');
+      vi.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue({ put: backendPut } as any);
+
+      await (sut as any).copySidecar({
+        sourceAsset: { files: [s3Source] },
+        targetAsset: { id: 'target-id', originalPath: s3TargetAsset.originalPath, files: undefined as any },
+      });
+
+      expect(backendPut).toHaveBeenCalledOnce();
+    });
+
+    it('returns early when source has no sidecar', async () => {
+      await (sut as any).copySidecar({ sourceAsset: { files: [] }, targetAsset: s3TargetAsset });
+      expect(mocks.storage.copyFile).not.toHaveBeenCalled();
+      expect(cleanupSpy).not.toHaveBeenCalled();
+    });
+
+    // Source-vs-target-distinct-paths invariant is documented as a code comment in
+    // asset.service.ts copySidecar, not as a test — it's a static fact about
+    // AssetService.copy rejecting sourceId === targetId, not behavior that
+    // copySidecar itself can verify at runtime.
+
+    it('calls cleanup when backend.put fails', async () => {
+      const backendPut = vi.fn().mockRejectedValue(new Error('S3 down'));
+      const { StorageService } = await import('src/services/storage.service.js');
+      vi.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue({ put: backendPut } as any);
+
+      await expect(
+        (sut as any).copySidecar({ sourceAsset: { files: [s3Source] }, targetAsset: s3TargetAsset }),
+      ).rejects.toThrow('S3 down');
+      expect(cleanupSpy).toHaveBeenCalledOnce();
+    });
+
+    it('calls cleanup when storageRepository.copyFile fails', async () => {
+      mocks.storage.copyFile.mockRejectedValue(new Error('disk full'));
+
+      await expect(
+        (sut as any).copySidecar({ sourceAsset: { files: [s3Source] }, targetAsset: diskTargetAsset }),
+      ).rejects.toThrow('disk full');
+      expect(cleanupSpy).toHaveBeenCalledOnce();
     });
   });
 

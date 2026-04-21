@@ -177,19 +177,6 @@ export class MetadataService extends BaseService {
     }
   }
 
-  /**
-   * For S3 assets, downloads to a local temp file for processing.
-   * For disk assets (absolute paths), returns the path as-is with a no-op cleanup.
-   */
-  private async ensureLocalFile(filePath: string): Promise<{ localPath: string; cleanup: () => Promise<void> }> {
-    if (isAbsolute(filePath)) {
-      return { localPath: filePath, cleanup: async () => {} };
-    }
-    const backend = StorageService.resolveBackendForKey(filePath);
-    const { tempPath, cleanup } = await backend.downloadToTemp(filePath);
-    return { localPath: tempPath, cleanup };
-  }
-
   private async linkLivePhotos(
     asset: { id: string; type: AssetType; ownerId: string; libraryId: string | null },
     exifInfo: Insertable<AssetExifTable>,
