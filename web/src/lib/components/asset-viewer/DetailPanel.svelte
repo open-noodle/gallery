@@ -167,7 +167,7 @@
 
       <DetailPanelDate {asset} />
 
-      <div class="flex gap-4 py-4">
+      <div class="flex gap-4 py-4" data-testid="detail-panel-filename">
         <div><Icon icon={mdiImageOutline} size="24" /></div>
 
         <div>
@@ -213,7 +213,7 @@
       </div>
 
       {#if asset.exifInfo?.make || asset.exifInfo?.model || asset.exifInfo?.exposureTime || asset.exifInfo?.iso}
-        <div class="flex gap-4 py-4">
+        <div class="flex gap-4 py-4" data-testid="detail-panel-camera">
           <div><Icon icon={mdiCamera} size="24" /></div>
 
           <div>
@@ -247,7 +247,7 @@
       {/if}
 
       {#if asset.exifInfo?.lensModel || asset.exifInfo?.fNumber || asset.exifInfo?.focalLength}
-        <div class="flex gap-4 py-4">
+        <div class="flex gap-4 py-4" data-testid="detail-panel-lens">
           <div><Icon icon={mdiCameraIris} size="24" /></div>
 
           <div>
