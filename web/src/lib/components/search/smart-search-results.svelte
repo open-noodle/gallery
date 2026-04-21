@@ -1,6 +1,7 @@
 <script lang="ts">
   import SpaceSearchResults from '$lib/components/spaces/space-search-results.svelte';
   import type { FilterState } from '$lib/components/filter-panel/filter-panel';
+  import { dedupeAppend } from '$lib/utils/search-dedup';
   import { buildSmartSearchParams, SEARCH_FILTER_DEBOUNCE_MS } from '$lib/utils/space-search';
   import { searchSmart, type AssetResponseDto } from '@immich/sdk';
 
@@ -44,15 +45,13 @@
         return;
       }
 
-      if (append) {
-        // Defend against pagination overlaps (e.g., backend tie-breaker gaps or
-        // race-y page boundaries) so Svelte's keyed {#each} doesn't crash on duplicate IDs.
-        const existingIds = new Set(searchResults.map((a) => a.id));
-        const deduped = assets.items.filter((a) => !existingIds.has(a.id));
-        searchResults = [...searchResults, ...deduped];
-      } else {
-        searchResults = assets.items;
-      }
+      // On append, dedupe by id — primary guard against duplicate rows across
+      // paginated searchSmart responses. The server's ORDER BY is single-key
+      // (smart_search.embedding <=>) so that vchord's ordered index scan can
+      // be used; identical embeddings (byte-identical image content) can then
+      // yield the same asset.id on adjacent pages. See
+      // docs/plans/2026-04-21-search-tiebreaker-design.md.
+      searchResults = append ? dedupeAppend(searchResults, assets.items) : assets.items;
       searchPage = page;
       hasMoreResults = assets.nextPage !== null;
     } catch {
