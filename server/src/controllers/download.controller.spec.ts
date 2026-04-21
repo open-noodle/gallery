@@ -1,5 +1,6 @@
 import { Readable } from 'node:stream';
 import { DownloadController } from 'src/controllers/download.controller';
+import { vitest } from 'vitest';
 import { DownloadService } from 'src/services/download.service';
 import request from 'supertest';
 import { factory } from 'test/small.factory';
@@ -36,7 +37,7 @@ describe(DownloadController.name, () => {
           this.push(null);
         },
       });
-      service.downloadArchive.mockResolvedValue({ stream });
+      service.downloadArchive.mockResolvedValue({ stream, abort: vitest.fn() });
       await request(ctx.getHttpServer())
         .post('/download/archive')
         .send({ assetIds: [factory.uuid()] });
