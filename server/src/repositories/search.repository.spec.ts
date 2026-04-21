@@ -50,7 +50,7 @@ const countOuterOrderByExpressions = (compiledSql: string): number => {
   if (matches.length === 0) {
     throw new Error(`no ORDER BY in: ${compiledSql}`);
   }
-  const last = matches[matches.length - 1];
+  const last = matches.at(-1)!;
   return last[1].split(',').filter((s) => s.trim().length > 0).length;
 };
 
