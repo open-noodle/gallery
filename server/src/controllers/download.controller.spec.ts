@@ -4,6 +4,7 @@ import { DownloadService } from 'src/services/download.service';
 import request from 'supertest';
 import { factory } from 'test/small.factory';
 import { ControllerContext, controllerSetup, mockBaseService } from 'test/utils';
+import { vitest } from 'vitest';
 
 describe(DownloadController.name, () => {
   let ctx: ControllerContext;
@@ -36,7 +37,7 @@ describe(DownloadController.name, () => {
           this.push(null);
         },
       });
-      service.downloadArchive.mockResolvedValue({ stream });
+      service.downloadArchive.mockResolvedValue({ stream, abort: vitest.fn() });
       await request(ctx.getHttpServer())
         .post('/download/archive')
         .send({ assetIds: [factory.uuid()] });
