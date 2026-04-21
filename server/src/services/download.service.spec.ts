@@ -337,7 +337,9 @@ describe(DownloadService.name, () => {
       const capturedStreams: Readable[] = [];
       const archiveMock = {
         addFile: vitest.fn().mockImplementation((input: Readable | string) => {
-          if (typeof input !== 'string') capturedStreams.push(input);
+          if (typeof input !== 'string') {
+            capturedStreams.push(input);
+          }
         }),
         finalize: vitest.fn(),
         stream: new Readable(),
@@ -461,7 +463,9 @@ describe(DownloadService.name, () => {
       let capturedLazy: Readable | undefined;
       const archiveMock = {
         addFile: vitest.fn().mockImplementation((input: Readable | string) => {
-          if (typeof input !== 'string') capturedLazy = input;
+          if (typeof input !== 'string') {
+            capturedLazy = input;
+          }
         }),
         finalize: vitest.fn(),
         stream: new Readable(),
@@ -497,7 +501,9 @@ describe(DownloadService.name, () => {
       let capturedLazy: Readable | undefined;
       const archiveMock = {
         addFile: vitest.fn().mockImplementation((input: Readable | string) => {
-          if (typeof input !== 'string') capturedLazy = input;
+          if (typeof input !== 'string') {
+            capturedLazy = input;
+          }
         }),
         finalize: vitest.fn(),
         stream: new Readable(),
