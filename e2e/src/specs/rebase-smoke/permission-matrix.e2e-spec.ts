@@ -104,5 +104,12 @@ test.describe('Rebase Smoke — UI Permission Matrix', () => {
     await expect(page.getByRole('menuitem', { name: /delete/i })).toHaveCount(0);
   });
 
-  // Tests 3–10 added in subsequent commits.
+  test('Test 3 — viewer: role badge Viewer, add-photos NOT visible', async ({ context, page }) => {
+    await utils.setAuthCookies(context, viewer.accessToken);
+    await page.goto(`/spaces/${space.id}`);
+    await expect(page.locator('[data-testid="hero-role-badge"]')).toContainText('Viewer');
+    await expect(page.getByLabel('Add photos')).toHaveCount(0);
+  });
+
+  // Tests 4–10 added in subsequent commits.
 });
