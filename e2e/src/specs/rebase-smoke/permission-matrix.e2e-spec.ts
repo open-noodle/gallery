@@ -199,10 +199,9 @@ test.describe('Rebase Smoke — UI Permission Matrix', () => {
     test.skip(!fullAsset.exifInfo?.country, 'Reverse-geocoding produced no country; skipping');
 
     await utils.setAuthCookies(context, viewer.accessToken);
-    const suggestionsResponse = page.waitForResponse(
-      (r) => r.url().includes('/search/suggestions/filters') && r.ok(),
-      { timeout: 15_000 },
-    );
+    const suggestionsResponse = page.waitForResponse((r) => r.url().includes('/search/suggestions/filters') && r.ok(), {
+      timeout: 15_000,
+    });
     await page.goto('/photos');
     await suggestionsResponse;
 
