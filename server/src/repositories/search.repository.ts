@@ -322,6 +322,47 @@ export class SearchRepository {
       .execute();
   }
 
+  private buildSearchSmartQueries(
+    kysely: Kysely<DB>,
+    pagination: SearchPaginationOptions,
+    options: SmartSearchOptions,
+  ) {
+    const hasDistanceThreshold = isActiveDistanceThreshold(options.maxDistance);
+
+    const baseQuery = searchAssetBuilder(kysely, options)
+      .selectAll('asset')
+      .innerJoin('smart_search', 'asset.id', 'smart_search.assetId')
+      .$if(hasDistanceThreshold, (qb) =>
+        qb.where(sql<SqlBool>`(smart_search.embedding <=> ${options.embedding}) <= ${options.maxDistance!}`),
+      )
+      // DO NOT add a secondary ORDER BY key on any column here.
+      // vchord's ordered index scan can only satisfy a single-key ORDER BY on
+      // `smart_search.embedding <=>`. Any additional sort key forces the planner
+      // to Parallel Seq Scan + in-memory sort (~15s on 200k rows vs ~200ms via
+      // vchord). Cross-page duplicates from identical embeddings are caught by
+      // the frontend dedup in web/src/lib/utils/search-dedup.ts.
+      .orderBy(sql`smart_search.embedding <=> ${options.embedding}`);
+
+    if (options.orderDirection) {
+      const orderDirection = options.orderDirection.toLowerCase() as OrderByDirection;
+      const candidates = baseQuery.limit(500).as('candidates');
+      const outerQuery = kysely
+        .selectFrom(candidates)
+        .selectAll()
+        // sql.raw is safe here — orderDirection is validated to 'asc'|'desc' by the AssetOrder enum
+        .orderBy(sql`"candidates"."fileCreatedAt" ${sql.raw(orderDirection)} nulls last`)
+        // Stable tiebreaker (same rationale as the base query)
+        .orderBy('candidates.id')
+        .limit(pagination.size + 1)
+        .offset((pagination.page - 1) * pagination.size);
+      return { kind: 'cte' as const, base: baseQuery, outer: outerQuery };
+    }
+
+    const outerQuery = baseQuery.limit(pagination.size + 1).offset((pagination.page - 1) * pagination.size);
+
+    return { kind: 'simple' as const, base: baseQuery, outer: outerQuery };
+  }
+
   @GenerateSql({
     params: [
       { page: 1, size: 200 },
@@ -344,42 +385,15 @@ export class SearchRepository {
       throw new Error(`Invalid value for 'size': ${pagination.size}`);
     }
 
-    const hasDistanceThreshold = isActiveDistanceThreshold(options.maxDistance);
-
     return this.db.transaction().execute(async (trx) => {
       await sql`set local vchordrq.probes = ${sql.lit(probes[VectorIndex.Clip])}`.execute(trx);
 
-      const baseQuery = searchAssetBuilder(trx, options)
-        .selectAll('asset')
-        .innerJoin('smart_search', 'asset.id', 'smart_search.assetId')
-        .$if(hasDistanceThreshold, (qb) =>
-          qb.where(sql<SqlBool>`(smart_search.embedding <=> ${options.embedding}) <= ${options.maxDistance!}`),
-        )
-        .orderBy(sql`smart_search.embedding <=> ${options.embedding}`)
-        // Stable tiebreaker so offset-based pagination doesn't return overlapping pages
-        // when multiple assets have identical CLIP distances.
-        .orderBy('asset.id');
-
-      if (options.orderDirection) {
-        const orderDirection = options.orderDirection.toLowerCase() as OrderByDirection;
-        const candidates = baseQuery.limit(500).as('candidates');
-        const items = await trx
-          .selectFrom(candidates)
-          .selectAll()
-          // sql.raw is safe here — orderDirection is validated to 'asc'|'desc' by the AssetOrder enum
-          .orderBy(sql`"candidates"."fileCreatedAt" ${sql.raw(orderDirection)} nulls last`)
-          // Stable tiebreaker (same rationale as the base query)
-          .orderBy('candidates.id')
-          .limit(pagination.size + 1)
-          .offset((pagination.page - 1) * pagination.size)
-          .execute();
-        return paginationHelper(items as MapAsset[], pagination.size);
+      const { kind, outer } = this.buildSearchSmartQueries(trx, pagination, options);
+      if (kind === 'cte') {
+        const items = (await outer.execute()) as MapAsset[];
+        return paginationHelper(items, pagination.size);
       }
-
-      const items = await baseQuery
-        .limit(pagination.size + 1)
-        .offset((pagination.page - 1) * pagination.size)
-        .execute();
+      const items = await outer.execute();
       return paginationHelper(items, pagination.size);
     });
   }
