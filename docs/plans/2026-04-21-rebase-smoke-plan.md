@@ -511,14 +511,15 @@ test.describe('Rebase Smoke — UI Permission Matrix', () => {
     await updateAsset({ id: asset.id, updateAssetDto: { rating: 5 } }, { headers: asBearerAuth(owner.accessToken) });
     const tags = await utils.upsertTags(owner.accessToken, ['rebase-smoke']);
     await utils.tagAssets(owner.accessToken, tags[0].id, [asset.id]);
-    const person = await utils.createPerson(owner.accessToken, { name: 'RebasePerson' });
-    await utils.createFace({ assetId: asset.id, personId: person.id });
     await utils.addSpaceAssets(owner.accessToken, space.id, [asset.id]);
 
-    // Enable tags + ratings for editor/viewer.
-    for (const role of [editor, viewer]) {
+    // Enable ratings preference for ALL three roles (detail-panel-star-rating.svelte:27
+    // gates the rating row on authManager.preferences.ratings.enabled). Admin-created
+    // users may not have it on by default. The `tags` preference does NOT gate the
+    // FilterPanel Tags section (verified against filter-panel.svelte — no preferences.tags
+    // check) so we don't set it here.
+    for (const role of [owner, editor, viewer]) {
       await utils.updateMyPreferences(role.accessToken, {
-        tags: { enabled: true },
         ratings: { enabled: true },
       });
     }
@@ -574,7 +575,7 @@ git commit -m "test(e2e): scaffold permission-matrix spec for rebase-smoke"
 
 - `[data-testid="hero-role-badge"]` exists at `web/src/lib/components/spaces/space-hero.svelte:316` — always rendered, contains the role name.
 - The "Add photos" button is an `IconButton` with `aria-label={$t('add_photos')}` at `web/src/routes/(user)/spaces/[spaceId]/[[photos=photos]]/[[assetId=id]]/+page.svelte:680`, gated by `{#if isEditor}` (so owner + editor only). Target via `page.getByLabel('Add photos')`.
-- The "Delete space" owner-gated action lives inside a `<ButtonContextMenu>` (same file, line 700). The menu trigger is an IconButton with `title="More"` — target via `page.getByRole('button', { name: 'More' })`; after click, target the menu item via `page.getByRole('menuitem', { name: /delete/i })`. The menu item text is `$t('spaces_delete')` which in `i18n/en.json` resolves to "Delete".
+- The "Delete Space" owner-gated action lives inside a `<ButtonContextMenu>` (same file, line 700). The menu trigger is an IconButton with `title="More"` — target via `page.getByRole('button', { name: 'More' })`; after click, target the menu item via `page.getByRole('menuitem', { name: /delete/i })`. The menu item text is `$t('spaces_delete')` which in `i18n/en.json:2540` resolves to "Delete Space" — the `/delete/i` regex matches that, and no other non-owner menuitem contains "delete" (other items are "Show/Hide people", "Show/Hide pets", "Hide from timeline"/"Show on timeline", etc.).
 - No new production testids required for these tests.
 
 **Step 1: Write the test (place inside the describe, after `beforeAll`).**
@@ -596,7 +597,7 @@ test('Test 1 — owner: role badge Owner, add-photos visible, delete menu option
 cd e2e && PLAYWRIGHT_DISABLE_WEBSERVER=true pnpm exec playwright test --project=rebase-smoke -g "Test 1"
 ```
 
-If `page.getByRole('button', { name: 'More' })` is ambiguous (multiple "More" buttons on the page), narrow via `.locator('header')` or similar scope before `.click()`. Verify the menu item label matches the actual translation of `spaces_delete` in `i18n/en.json` before committing — grep the key and confirm.
+The `title="More"` on the `ButtonContextMenu` is the only "More" button on the space page (verified) — no disambiguation needed.
 
 **Step 3: Commit.**
 
@@ -755,6 +756,8 @@ git commit -m "test(e2e): permission-matrix Test 6 — viewer detail panel"
 
 ### Task D8: Test 7 — stranger blocked at `/spaces/:id`
 
+**Design note:** `web/src/routes/(user)/spaces/[spaceId]/[[photos=photos]]/[[assetId=id]]/+page.ts` calls `getSpace({ id })` in `load`; SDK errors render as SvelteKit error pages rather than a deterministic redirect. The assertion accepts any of three success modes. After the first successful CI run, reduce the assertion to whatever behavior is actually observed (edit this task and follow up).
+
 **Step 1: Write the test.**
 
 ```ts
@@ -788,17 +791,27 @@ git commit -m "test(e2e): permission-matrix Test 7 — stranger blocked"
 **Step 1: Write the test.**
 
 ```ts
-test('Test 8 — owner nav bar: Edit / Delete / Archive / Favorite / Share all visible', async ({ context, page }) => {
+test('Test 8 — owner nav bar: top-level actions visible, Archive reachable via overflow menu', async ({
+  context,
+  page,
+}) => {
   await utils.setAuthCookies(context, owner.accessToken);
   await page.goto(`/photos/${asset.id}`);
   await page.waitForSelector('#immich-asset-viewer');
-  // Nav-bar action buttons are rendered as IconButtons whose accessible name comes from
-  // the i18n label of each Actions.<Name> enum. Before committing, confirm the en.json
-  // translations for: 'edit', 'delete', 'archive', 'favorite', 'share_to' (or equivalents
-  // from asset-viewer-nav-bar.svelte's <ActionButton action={Actions.*}> usages).
-  for (const label of ['Edit', 'Delete', 'Archive', 'Favorite', 'Share']) {
+
+  // Top-level ActionButton instances on asset-viewer-nav-bar.svelte (verified against i18n/en.json):
+  //   Actions.Share    → "Share"
+  //   Actions.Favorite → "Favorite"          (becomes "Unfavorite" once toggled; initial state is unfavorited)
+  //   Actions.Edit     → "Editor"            (NOT "Edit" — i18n key is $t('editor'))
+  //   DeleteAction     → "Delete"
+  for (const label of ['Share', 'Favorite', 'Editor', 'Delete']) {
     await expect(page.getByRole('button', { name: label })).toBeVisible();
   }
+
+  // Archive is nested inside the overflow context menu (asset-viewer-nav-bar.svelte:201).
+  // Open the menu via the IconButton with title/aria "More", then assert the Archive menuitem.
+  await page.getByRole('button', { name: /more/i }).click();
+  await expect(page.getByRole('menuitem', { name: /archive/i })).toBeVisible();
 });
 ```
 
@@ -822,26 +835,47 @@ git commit -m "test(e2e): permission-matrix Test 8 — owner nav bar actions"
 **Step 1: Write the test.**
 
 ```ts
-test('Test 9 — viewer /photos filter panel includes space suggestions', async ({ context, page }) => {
+test('Test 9 — viewer /photos filter panel includes Location / Camera / Tags from space', async ({ context, page }) => {
+  // Pattern: `test.skip(condition, reason)` is Playwright's conditional-skip form. No
+  // prior use in this repo — verified valid against Playwright docs. If the geocoded
+  // city is missing (stale tile data, etc.), the test is skipped rather than flaked.
   const fullAsset = await utils.getAssetInfo(owner.accessToken, asset.id);
   test.skip(!fullAsset.exifInfo?.city, 'Reverse-geocoding produced no city; skipping');
 
   await utils.setAuthCookies(context, viewer.accessToken);
-  // Wait for the filter-suggestions response so we don't race the render.
   const suggestionsResponse = page.waitForResponse((r) => r.url().includes('/search/suggestions/filters') && r.ok(), {
     timeout: 15_000,
   });
   await page.goto('/photos');
   await suggestionsResponse;
 
-  // FilterPanel is open by default on /photos. Wait for the Tags section root to mount.
+  // FilterPanel is open by default on /photos. Wait for all 3 sections to mount
+  // before asserting content.
+  await page.locator('[data-testid="filter-section-location"]').waitFor({ timeout: 10_000 });
+  await page.locator('[data-testid="filter-section-camera"]').waitFor({ timeout: 10_000 });
   await page.locator('[data-testid="filter-section-tags"]').waitFor({ timeout: 10_000 });
 
-  // Narrow the text match to the Tags section to avoid false-greens from the filename
-  // appearing elsewhere on the page (thumbnail alt text, page title, etc.).
+  // Narrow each text match to its specific section root to avoid false-greens from
+  // the filename, page title, or other unrelated text elsewhere on /photos.
+
+  // Tags: the owner's "rebase-smoke" tag must appear.
   await expect(page.locator('[data-testid="filter-section-tags"]').getByText(/rebase-smoke/i)).toBeVisible({
     timeout: 10_000,
   });
+
+  // Location: the geocoded city must appear. Use the actual value read from fullAsset
+  // (the e2e stack's tile data varies between Palisade/Utah depending on version).
+  const city = fullAsset.exifInfo!.city!;
+  await expect(page.locator('[data-testid="filter-section-location"]').getByText(city)).toBeVisible({
+    timeout: 10_000,
+  });
+
+  // Camera: thompson-springs.jpg has EXIF make+model. If make is populated, assert it.
+  if (fullAsset.exifInfo?.make) {
+    await expect(page.locator('[data-testid="filter-section-camera"]').getByText(fullAsset.exifInfo.make)).toBeVisible({
+      timeout: 10_000,
+    });
+  }
 });
 ```
 
@@ -909,10 +943,9 @@ test('Test 10 — viewer /map sees space marker', async ({ context, page }) => {
   await utils.setAuthCookies(context, viewer.accessToken);
   // Wait for the map-markers endpoint to respond before asserting — maplibre tile load
   // + marker hydration can take several seconds on cold CI and the test was flaking at 15s.
-  const markersResponse = page.waitForResponse(
-    (r) => r.url().includes('/map/markers') || r.url().includes('/gallery-map'),
-    { timeout: 20_000 },
-  );
+  // Real endpoint is /gallery/map/markers (gallery-map.controller.ts declares
+  // @Controller('gallery/map')); substring match on '/map/markers' covers it.
+  const markersResponse = page.waitForResponse((r) => r.url().includes('/map/markers'), { timeout: 20_000 });
   await page.goto('/map');
   await markersResponse;
   await page.locator('.maplibregl-map').waitFor({ timeout: 15_000 });
@@ -1110,7 +1143,15 @@ gh run list --branch rebase/upstream --limit 10
 # When all show "completed success", proceed. If any red, fix at root and re-dispatch.
 ```
 
-**Step 4: Nothing to commit — this is the verification step.**
+**Step 4: If `gallery-rebase-smoke.yml` fails its first dispatched run**, this is expected — it's the workflow's first real exercise. Recovery path:
+
+- Download the failure artifact (`gh run view <run-id> --log-failed` or download the `playwright-report` artifact from the run's GitHub UI).
+- Reproduce locally via `make e2e-rebase-smoke`.
+- Fix at root (per `feedback_no_flake_allowance`; no `test.retry()` additions).
+- Amend or add follow-up commits to `rebase/upstream` and re-dispatch.
+- Do NOT merge the smoke-suite PR or force-push to main until the first run is green.
+
+**Step 5: Nothing to commit — this is the verification step.**
 
 ---
 
