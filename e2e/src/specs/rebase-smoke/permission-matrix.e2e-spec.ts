@@ -125,5 +125,18 @@ test.describe('Rebase Smoke — UI Permission Matrix', () => {
     await expect(page.locator('[data-testid="detail-panel-filename"]')).toContainText('rebase-smoke.jpg');
   });
 
-  // Tests 5–10 added in subsequent commits.
+  test('Test 5 — editor detail panel: edit controls hidden, file path hidden', async ({ context, page }) => {
+    await utils.setAuthCookies(context, editor.accessToken);
+    await page.goto(`/spaces/${space.id}/photos/${asset.id}`);
+    await page.waitForSelector('#immich-asset-viewer');
+    await page.keyboard.press('i');
+    await expect(page.locator('#detail-panel')).toBeVisible();
+    // The edit-date button is always rendered, but for non-owners the click handler is a no-op,
+    // the pencil indicator is omitted, and the title attribute is empty. Assert on the title
+    // (locale-proof via empty string) as the owner-only gate.
+    await expect(page.locator('[data-testid="detail-panel-edit-date-button"]')).toHaveAttribute('title', '');
+    await expect(page.getByLabel('Show file location')).toHaveCount(0);
+  });
+
+  // Tests 6–10 added in subsequent commits.
 });
