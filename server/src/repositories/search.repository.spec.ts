@@ -1,5 +1,6 @@
 // server/src/repositories/search.repository.spec.ts
 import { DummyDriver, Kysely, PostgresAdapter, PostgresIntrospector, PostgresQueryCompiler } from 'kysely';
+import { AssetOrder } from 'src/enum';
 import { SearchRepository } from 'src/repositories/search.repository';
 import type { DB } from 'src/schema';
 
@@ -40,6 +41,19 @@ const countOrderByExpressions = (compiledSql: string, anchor: string): number =>
   return match[1].split(',').filter((s) => s.trim().length > 0).length;
 };
 
+// Count ORDER BY expressions in the OUTER (last) ORDER BY clause — the one after
+// `) as "candidates"`. Used for the CTE path, where the inner subquery also has
+// its own ORDER BY.
+const countOuterOrderByExpressions = (compiledSql: string): number => {
+  const orderByRegex = /order by\s+([\s\S]+?)\s+(?:limit\b|offset\b)/gi;
+  const matches = [...compiledSql.matchAll(orderByRegex)];
+  if (matches.length === 0) {
+    throw new Error(`no ORDER BY in: ${compiledSql}`);
+  }
+  const last = matches[matches.length - 1];
+  return last[1].split(',').filter((s) => s.trim().length > 0).length;
+};
+
 describe(SearchRepository.name, () => {
   const sut = new SearchRepository(offlineKysely());
 
@@ -60,6 +74,62 @@ describe(SearchRepository.name, () => {
       expect(innerSql, 'primary ORDER BY must be on smart_search.embedding <=>').toMatch(
         /order by\s+smart_search\.embedding\s*<=>/i,
       );
+    });
+
+    it('CTE path orderDirection=desc: inner single key is embedding, outer has fileCreatedAt + candidates.id', () => {
+      const { base, outer } = buildQueries(
+        sut,
+        { page: 1, size: 100 },
+        { ...baseOptions, orderDirection: AssetOrder.Desc },
+      );
+
+      // Inner query (subject to vchord): single-key ORDER BY on embedding.
+      const innerSql = base.compile().sql;
+      expect(countOrderByExpressions(innerSql + ' limit', 'limit'), FAILURE_MESSAGE).toBe(1);
+      expect(innerSql, 'inner primary ORDER BY must be on smart_search.embedding <=>').toMatch(
+        /order by\s+smart_search\.embedding\s*<=>/i,
+      );
+
+      // Outer (CTE wrapper, materialized 500 rows): tiebreaker IS retained here by design.
+      const outerSql = outer.compile().sql;
+      expect(outerSql).toMatch(/"candidates"\."fileCreatedAt"\s+desc/i);
+      expect(outerSql).toContain('"candidates"."id"');
+      // Also: outer ORDER BY must have exactly 2 keys (fileCreatedAt + candidates.id);
+      // any third key here would be a new, undocumented tiebreaker.
+      const outerKeys = countOuterOrderByExpressions(outerSql);
+      expect(outerKeys, 'outer CTE ORDER BY must be exactly (fileCreatedAt, candidates.id)').toBe(2);
+    });
+
+    it('CTE path orderDirection=asc: inner single key is embedding, outer sorts ascending', () => {
+      const { base, outer } = buildQueries(
+        sut,
+        { page: 1, size: 100 },
+        { ...baseOptions, orderDirection: AssetOrder.Asc },
+      );
+
+      const innerSql = base.compile().sql;
+      expect(countOrderByExpressions(innerSql + ' limit', 'limit'), FAILURE_MESSAGE).toBe(1);
+      expect(innerSql, 'inner primary ORDER BY must be on smart_search.embedding <=>').toMatch(
+        /order by\s+smart_search\.embedding\s*<=>/i,
+      );
+
+      const outerSql = outer.compile().sql;
+      expect(outerSql).toMatch(/"candidates"\."fileCreatedAt"\s+asc/i);
+      expect(outerSql).toContain('"candidates"."id"');
+      expect(countOuterOrderByExpressions(outerSql), 'outer must be 2 keys').toBe(2);
+    });
+
+    it('no-maxDistance path: single key is embedding, no distance WHERE predicate', () => {
+      const { base } = buildQueries(sut, { page: 1, size: 100 }, { ...baseOptions, maxDistance: undefined });
+      const innerSql = base.compile().sql;
+
+      expect(countOrderByExpressions(innerSql + ' limit', 'limit'), FAILURE_MESSAGE).toBe(1);
+      expect(innerSql, 'primary ORDER BY must be on smart_search.embedding <=>').toMatch(
+        /order by\s+smart_search\.embedding\s*<=>/i,
+      );
+
+      // No WHERE predicate on the distance operator (<=>).
+      expect(innerSql).not.toMatch(/\(smart_search\.embedding <=> \$\d+\)\s*<=/i);
     });
   });
 });
