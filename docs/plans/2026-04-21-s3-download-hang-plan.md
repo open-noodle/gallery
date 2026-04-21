@@ -25,6 +25,7 @@ archiver drains the entry, so rewrite that test to assert `get()` was NOT called
 and that the stream passed to `addFile` is a `Readable` (the lazy wrapper), not the raw S3 stream.
 
 **Files:**
+
 - Modify: `server/src/services/download.service.spec.ts`
 
 **Step 1: Replace all `resolves.toEqual({ stream: ... })` with `resolves.toMatchObject`**
@@ -95,6 +96,7 @@ EventEmitter throws `TypeError: "listener" argument must be a function`. The moc
 before the controller is changed.
 
 **Files:**
+
 - Modify: `server/src/controllers/download.controller.spec.ts`
 
 **Step 1: Add `abort` to the mock resolved value**
@@ -127,6 +129,7 @@ implementation hasn't changed yet).
 ### Task 3: Add new failing unit tests
 
 **Files:**
+
 - Modify: `server/src/services/download.service.spec.ts`
 
 Add all tests below inside the `downloadArchive` describe block, after the rewritten S3 test.
@@ -365,6 +368,7 @@ tests pass.
 ### Task 4: Implement LazyS3Readable and update downloadArchive()
 
 **Files:**
+
 - Modify: `server/src/services/download.service.ts`
 
 **Step 1: Add import for Readable at the top of the file**
@@ -532,6 +536,7 @@ git commit -m "fix(download): lazy S3 socket opening and abort cleanup"
 ### Task 5: Update the download controller
 
 **Files:**
+
 - Modify: `server/src/controllers/download.controller.ts`
 
 **Step 1: Add `@Req()` import and `Request` type**
@@ -645,4 +650,4 @@ Run the dev stack (`make dev` from repo root) with an S3 backend configured.
 - [ ] Repeat with 1 and 20 photos to confirm no regressions at small scale
 - [ ] Repeat with disk-only assets to confirm the disk path is unaffected
 - [ ] Repeat with `serveMode: redirect` — thumbnails should be unaffected regardless of download
-  state (presigned URLs use no server-side sockets)
+      state (presigned URLs use no server-side sockets)

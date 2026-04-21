@@ -57,6 +57,7 @@ Because archiver's internal queue runs at concurrency 1, `_read()` on entry N+1 
 until entry N has fully drained. At any moment, exactly one S3 socket is open.
 
 **Loop change:**
+
 ```typescript
 // Before: opens socket immediately for every asset
 const { stream } = await backend.get(filePath);
@@ -73,6 +74,7 @@ still call `await this.storageRepository.realpath(filePath)` inside the same loo
 unchanged.
 
 **`LazyS3Readable` class:**
+
 ```typescript
 class LazyS3Readable extends Readable {
   private source?: Readable;
@@ -81,7 +83,9 @@ class LazyS3Readable extends Readable {
   constructor(
     private readonly backend: StorageBackend,
     private readonly key: string,
-  ) { super(); }
+  ) {
+    super();
+  }
 
   override _read(): void {
     if (this.source) {
@@ -92,7 +96,8 @@ class LazyS3Readable extends Readable {
     if (this.started) return; // fetch already in flight
     this.started = true;
 
-    this.backend.get(this.key)
+    this.backend
+      .get(this.key)
       .then(({ stream }) => {
         this.source = stream;
         stream.on('data', (chunk: Buffer) => {
@@ -114,6 +119,7 @@ class LazyS3Readable extends Readable {
 ```
 
 Backpressure notes:
+
 - When `this.push(chunk)` returns false (consumer is slow), `source.pause()` applies backpressure
   to the S3 stream.
 - When the consumer calls `_read()` again (internal Node.js stream machinery, not the `'resume'`
@@ -122,6 +128,7 @@ Backpressure notes:
   resolution and must not be used for this purpose.
 
 Error handling notes:
+
 - `backend.get()` rejection inside the async `.then()/.catch()` chain must be caught explicitly;
   without `.catch()`, a rejected promise inside `_read()` (which is synchronous) becomes an
   unhandled rejection.
@@ -148,6 +155,7 @@ const abort = () => {
 ```
 
 **Controller wiring:**
+
 ```typescript
 async downloadArchive(
   @Auth() auth: AuthDto,
@@ -166,22 +174,22 @@ in the controller is replaced by the `async/await` form above.
 
 ## Files Changed
 
-| File | Change |
-|------|--------|
-| `server/src/services/download.service.ts` | Add `LazyS3Readable`; change S3 branch to use it; collect `lazies`; return `{ stream, abort }` |
-| `server/src/controllers/download.controller.ts` | Add `@Req() req: Request`; `async/await` form; wire `req.on('close', abort)` |
+| File                                            | Change                                                                                         |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `server/src/services/download.service.ts`       | Add `LazyS3Readable`; change S3 branch to use it; collect `lazies`; return `{ stream, abort }` |
+| `server/src/controllers/download.controller.ts` | Add `@Req() req: Request`; `async/await` form; wire `req.on('close', abort)`                   |
 
 **No changes to:** `S3StorageBackend`, `StorageRepository`, `StorageBackend` interface,
 `ImmichReadStream` (globally), archiver wiring, disk-asset path.
 
 ## Approaches Considered and Rejected
 
-| Approach | Why rejected |
-|----------|-------------|
-| Pin `maxSockets` on the AWS SDK agent | Bounds pool size but does not fix the deadlock: N streams are still registered upfront, N−1 still stall |
-| Sequential `await`-before-append | Requires archiver per-entry completion signals; archiver does not expose these without significant additional wiring |
+| Approach                                 | Why rejected                                                                                                                                                  |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Pin `maxSockets` on the AWS SDK agent    | Bounds pool size but does not fix the deadlock: N streams are still registered upfront, N−1 still stall                                                       |
+| Sequential `await`-before-append         | Requires archiver per-entry completion signals; archiver does not expose these without significant additional wiring                                          |
 | Presigned URL manifest (client-side zip) | Correct long-term architecture for very large archives but a major scope change (web app changes, new API shape, OpenAPI churn); wrong fix for a one-file bug |
-| Async semaphore (K=2 prefetch) | More complex than needed; marginal throughput gain not worth the complexity for a bug fix |
+| Async semaphore (K=2 prefetch)           | More complex than needed; marginal throughput gain not worth the complexity for a bug fix                                                                     |
 
 ## Testing
 
