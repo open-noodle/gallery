@@ -141,51 +141,56 @@ export class SmartInfoService extends BaseService {
   }
 
   private async encodeVideoClip(originalPath: string, clipConfig: CLIPConfig): Promise<string | null> {
-    let videoInfo: VideoInfo;
+    const { localPath, cleanup } = await this.ensureLocalFile(originalPath);
     try {
-      videoInfo = await this.mediaRepository.probe(originalPath);
-    } catch (error) {
-      this.logger.error(`Failed to probe video: ${originalPath}`, error);
-      return null;
-    }
-
-    const duration = videoInfo.format.duration;
-    let timestamps: number[];
-    if (!duration || duration <= 0 || !Number.isFinite(duration)) {
-      timestamps = [0];
-    } else if (duration < 2) {
-      timestamps = [duration / 2];
-    } else {
-      const count = 8;
-      timestamps = Array.from({ length: count }, (_, i) => duration * (0.05 + (0.9 * i) / (count - 1)));
-    }
-
-    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'immich-video-clip-'));
-    try {
-      let framePaths: string[];
+      let videoInfo: VideoInfo;
       try {
-        framePaths = await this.mediaRepository.extractVideoFrames(originalPath, timestamps, tempDir);
+        videoInfo = await this.mediaRepository.probe(localPath);
       } catch (error) {
-        this.logger.error(`Failed to extract video frames: ${originalPath}`, error);
+        this.logger.error(`Failed to probe video: ${originalPath}`, error);
         return null;
       }
 
-      let embeddings: number[][];
+      const duration = videoInfo.format.duration;
+      let timestamps: number[];
+      if (!duration || duration <= 0 || !Number.isFinite(duration)) {
+        timestamps = [0];
+      } else if (duration < 2) {
+        timestamps = [duration / 2];
+      } else {
+        const count = 8;
+        timestamps = Array.from({ length: count }, (_, i) => duration * (0.05 + (0.9 * i) / (count - 1)));
+      }
+
+      const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'immich-video-clip-'));
       try {
-        embeddings = [];
-        for (const framePath of framePaths) {
-          const raw = await this.machineLearningRepository.encodeImage(framePath, clipConfig);
-          embeddings.push(JSON.parse(raw));
+        let framePaths: string[];
+        try {
+          framePaths = await this.mediaRepository.extractVideoFrames(localPath, timestamps, tempDir);
+        } catch (error) {
+          this.logger.error(`Failed to extract video frames: ${originalPath}`, error);
+          return null;
         }
-      } catch (error) {
-        this.logger.error(`Failed to encode video frames: ${originalPath}`, error);
-        return null;
-      }
 
-      const averaged = elementWiseMean(embeddings);
-      return JSON.stringify(averaged);
+        let embeddings: number[][];
+        try {
+          embeddings = [];
+          for (const framePath of framePaths) {
+            const raw = await this.machineLearningRepository.encodeImage(framePath, clipConfig);
+            embeddings.push(JSON.parse(raw));
+          }
+        } catch (error) {
+          this.logger.error(`Failed to encode video frames: ${originalPath}`, error);
+          return null;
+        }
+
+        const averaged = elementWiseMean(embeddings);
+        return JSON.stringify(averaged);
+      } finally {
+        await fs.rm(tempDir, { recursive: true, force: true });
+      }
     } finally {
-      await fs.rm(tempDir, { recursive: true, force: true });
+      await cleanup();
     }
   }
 }
