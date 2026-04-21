@@ -197,6 +197,9 @@ describe(AssetService.name, () => {
       const jobRepo = ctx.getMock(JobRepository);
 
       storageRepo.copyFile.mockResolvedValue();
+      // copySidecar now calls StorageCore.ensureFolders(targetSidecarPath) on the disk branch,
+      // which ultimately invokes StorageRepository.mkdirSync. Give it a no-op mock.
+      storageRepo.mkdirSync.mockReturnValue(undefined);
       jobRepo.queue.mockResolvedValue();
 
       const { user } = await ctx.newUser();

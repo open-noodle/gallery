@@ -1848,7 +1848,9 @@ async function phaseCopyAssetSidecarS3(): Promise<void> {
   // createPng() resets its module counter each tsx invocation, so the first few PNGs of every
   // phase are deterministic (R=0,G=0,B=0 → test-image.png's checksum). Burn counter ahead so
   // our fixtures don't collide with setup or other phases via the server's checksum dedup.
-  for (let i = 0; i < 200; i++) createPng();
+  for (let i = 0; i < 200; i++) {
+    createPng();
+  }
 
   // Source: photo with XMP sidecar. Target: photo without.
   const { id: sourceId } = await uploadAsset(token, 'copy-sidecar-src.png', createPng(), createXmpSidecar());
