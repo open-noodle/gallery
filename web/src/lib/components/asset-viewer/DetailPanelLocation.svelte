@@ -37,6 +37,7 @@
     onclick={isOwner ? onAction : undefined}
     title={isOwner ? $t('edit_location') : ''}
     class:hover:text-primary={isOwner}
+    data-testid="detail-panel-location"
   >
     <div class="flex gap-4">
       <div><Icon icon={mdiMapMarkerOutline} size="24" /></div>
@@ -70,6 +71,7 @@
     class="flex w-full place-items-start justify-between gap-4 rounded-lg py-4 text-start hover:text-primary"
     onclick={onAction}
     title={$t('add_location')}
+    data-testid="detail-panel-location"
   >
     <div class="flex gap-4">
       <div><Icon icon={mdiMapMarkerOutline} size="24" /></div>
