@@ -29,7 +29,7 @@ and that the stream passed to `addFile` is a `Readable` (the lazy wrapper), not 
 
 **Step 1: Replace all `resolves.toEqual({ stream: ... })` with `resolves.toMatchObject`**
 
-There are 11 occurrences across the `downloadArchive` describe block (lines 48, 71, 95, 117, 139,
+There are 12 occurrences across the `downloadArchive` describe block (lines 48, 71, 95, 117, 139,
 168, 194, 216, 236, 257, 278, 298). Replace every instance.
 
 Find: `resolves.toEqual({`
@@ -86,17 +86,55 @@ implementation still calls `backend.get()` upfront). This establishes the red ba
 
 ---
 
-### Task 2: Add three new failing unit tests
+### Task 2: Update the controller spec mock
+
+The controller spec at `server/src/controllers/download.controller.spec.ts:39` mocks
+`service.downloadArchive.mockResolvedValue({ stream })`. After the fix the controller destructures
+`abort` from that result and calls `req.on('close', abort)`. With `abort === undefined`, Node.js
+EventEmitter throws `TypeError: "listener" argument must be a function`. The mock must be updated
+before the controller is changed.
+
+**Files:**
+- Modify: `server/src/controllers/download.controller.spec.ts`
+
+**Step 1: Add `abort` to the mock resolved value**
+
+Find the test at line 33–44 (`should be an authenticated route` inside `POST /download/archive`).
+Change:
+
+```typescript
+service.downloadArchive.mockResolvedValue({ stream });
+```
+
+To:
+
+```typescript
+service.downloadArchive.mockResolvedValue({ stream, abort: vitest.fn() });
+```
+
+**Step 2: Run the controller spec to confirm it still passes**
+
+```bash
+cd /home/pierre/dev/gallery/.worktrees/s3-download-hang-design/server
+pnpm test -- --run src/controllers/download.controller.spec.ts
+```
+
+Expected: all tests pass (the mock shape now matches the new return type even though the
+implementation hasn't changed yet).
+
+---
+
+### Task 3: Add new failing unit tests
 
 **Files:**
 - Modify: `server/src/services/download.service.spec.ts`
 
-Add the three tests below inside the `downloadArchive` describe block, after the rewritten S3 test.
+Add all tests below inside the `downloadArchive` describe block, after the rewritten S3 test.
 
-**Step 1: Add test — abort() destroys all registered lazy streams**
+**Step 1: Add test — abort() destroys all lazy streams AND the zip stream**
 
 ```typescript
-it('should destroy all lazy streams when abort() is called', async () => {
+it('should destroy all lazy streams and the zip stream when abort() is called', async () => {
   const capturedStreams: Readable[] = [];
   const archiveMock = {
     addFile: vitest.fn().mockImplementation((input: Readable | string) => {
@@ -122,17 +160,118 @@ it('should destroy all lazy streams when abort() is called', async () => {
     assetIds: [s3Asset1.id, s3Asset2.id],
   });
 
-  const destroySpies = capturedStreams.map((s) => vitest.spyOn(s, 'destroy'));
+  const lazyDestroySpies = capturedStreams.map((s) => vitest.spyOn(s, 'destroy'));
+  const zipDestroyspy = vitest.spyOn(archiveMock.stream, 'destroy');
 
   abort();
 
-  for (const spy of destroySpies) {
+  expect(zipDestroyspy).toHaveBeenCalled();
+  for (const spy of lazyDestroySpies) {
     expect(spy).toHaveBeenCalled();
   }
 });
 ```
 
-**Step 2: Add test — backend.get() rejection surfaces as stream error**
+**Step 2: Add test — abort() is safe when called before any entry is read (pre-activation)**
+
+```typescript
+it('should not throw when abort() is called before archiver has started any entry', async () => {
+  const archiveMock = {
+    addFile: vitest.fn(),
+    finalize: vitest.fn(),
+    stream: new Readable(),
+  };
+
+  const asset = AssetFactory.create();
+  const s3Asset = { ...asset, originalPath: 'upload/library/photo.jpg' };
+
+  mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([s3Asset.id]));
+  mocks.asset.getForOriginals.mockResolvedValue([s3Asset]);
+  mocks.storage.createZipStream.mockReturnValue(archiveMock);
+
+  const mockBackend = { get: vitest.fn() };
+  vitest.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue(mockBackend as any);
+
+  const { abort } = await sut.downloadArchive(authStub.admin, { assetIds: [s3Asset.id] });
+
+  // abort() fires before _read() is ever called — no S3 socket is open, source is undefined
+  expect(() => abort()).not.toThrow();
+  // backend.get() must still not have been called
+  expect(mockBackend.get).not.toHaveBeenCalled();
+});
+```
+
+**Step 3: Add test — abort() is safe when lazies is empty (all-disk archive)**
+
+```typescript
+it('should not throw when abort() is called on an all-disk archive', async () => {
+  const archiveMock = {
+    addFile: vitest.fn(),
+    finalize: vitest.fn(),
+    stream: new Readable(),
+  };
+
+  // AssetFactory.create() produces absolute paths by default → disk branch
+  const asset1 = AssetFactory.create();
+  const asset2 = AssetFactory.create();
+
+  mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset1.id, asset2.id]));
+  mocks.asset.getForOriginals.mockResolvedValue([asset1, asset2]);
+  mocks.storage.createZipStream.mockReturnValue(archiveMock);
+
+  const { abort } = await sut.downloadArchive(authStub.admin, {
+    assetIds: [asset1.id, asset2.id],
+  });
+
+  expect(() => abort()).not.toThrow();
+});
+```
+
+**Step 4: Add test — mixed disk + S3 archive routes correctly**
+
+```typescript
+it('should wrap only S3 assets in LazyS3Readable, leaving disk assets as string paths', async () => {
+  const capturedCalls: Array<[Readable | string, string]> = [];
+  const archiveMock = {
+    addFile: vitest.fn().mockImplementation((input: Readable | string, name: string) => {
+      capturedCalls.push([input, name]);
+    }),
+    finalize: vitest.fn(),
+    stream: new Readable(),
+  };
+
+  // Disk asset — absolute path
+  const diskAsset = AssetFactory.create({ originalPath: '/data/library/disk.jpg' });
+  // S3 asset — relative path
+  const s3AssetBase = AssetFactory.create();
+  const s3Asset = { ...s3AssetBase, originalPath: 'upload/library/s3.jpg' };
+
+  mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([diskAsset.id, s3Asset.id]));
+  mocks.asset.getForOriginals.mockResolvedValue([diskAsset, s3Asset]);
+  mocks.storage.createZipStream.mockReturnValue(archiveMock);
+  mocks.storage.realpath.mockResolvedValue('/data/library/disk.jpg');
+
+  const mockBackend = { get: vitest.fn() };
+  vitest.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue(mockBackend as any);
+
+  await sut.downloadArchive(authStub.admin, { assetIds: [diskAsset.id, s3Asset.id] });
+
+  expect(archiveMock.addFile).toHaveBeenCalledTimes(2);
+
+  // Disk asset — must receive a string path, not a Readable
+  const [diskInput] = capturedCalls[0];
+  expect(typeof diskInput).toBe('string');
+
+  // S3 asset — must receive a Readable (LazyS3Readable), not a string
+  const [s3Input] = capturedCalls[1];
+  expect(s3Input).toBeInstanceOf(Readable);
+
+  // backend.get() must not have been called upfront
+  expect(mockBackend.get).not.toHaveBeenCalled();
+});
+```
+
+**Step 5: Add test — backend.get() rejection surfaces as stream error**
 
 ```typescript
 it('should forward backend.get() rejection as a stream error on _read()', async () => {
@@ -172,7 +311,7 @@ it('should forward backend.get() rejection as a stream error on _read()', async 
 });
 ```
 
-**Step 3: Add test — mid-stream S3 error forwarded**
+**Step 6: Add test — mid-stream S3 error forwarded**
 
 ```typescript
 it('should forward a mid-stream S3 error to the lazy readable', async () => {
@@ -211,18 +350,19 @@ it('should forward a mid-stream S3 error to the lazy readable', async () => {
 });
 ```
 
-**Step 4: Run to confirm all three new tests fail**
+**Step 7: Run to confirm all new tests fail**
 
 ```bash
 cd /home/pierre/dev/gallery/.worktrees/s3-download-hang-design/server
 pnpm test -- --run src/services/download.service.spec.ts
 ```
 
-Expected: 4 failures (the rewritten S3 test + the 3 new tests). All other tests pass.
+Expected: the rewritten S3 test + the 6 new tests fail (7 failures total). All other existing
+tests pass.
 
 ---
 
-### Task 3: Implement LazyS3Readable and update downloadArchive()
+### Task 4: Implement LazyS3Readable and update downloadArchive()
 
 **Files:**
 - Modify: `server/src/services/download.service.ts`
@@ -235,7 +375,13 @@ The file already imports from `node:path`. Add `Readable` to the existing Node i
 import { Readable } from 'node:stream';
 ```
 
-**Step 2: Add the LazyS3Readable class**
+**Step 2: Add StorageBackend to the imports**
+
+```typescript
+import { StorageBackend } from 'src/interfaces/storage-backend.interface';
+```
+
+**Step 3: Add the LazyS3Readable class**
 
 Insert this class just above the `@Injectable()` decorator (before the `DownloadService` class):
 
@@ -253,10 +399,12 @@ class LazyS3Readable extends Readable {
 
   override _read(): void {
     if (this.source) {
+      // Node.js calls _read() again when consumer drains the buffer after backpressure.
+      // Resume the source so data starts flowing again.
       if (this.source.isPaused()) this.source.resume();
       return;
     }
-    if (this.started) return;
+    if (this.started) return; // fetch already in flight — another _read() will not re-trigger it
     this.started = true;
 
     this.backend
@@ -264,32 +412,32 @@ class LazyS3Readable extends Readable {
       .then(({ stream }) => {
         this.source = stream;
         stream.on('data', (chunk: Buffer) => {
-          if (!this.push(chunk)) stream.pause();
+          if (!this.push(chunk)) stream.pause(); // apply backpressure to S3 source
         });
         stream.on('end', () => this.push(null));
         stream.on('error', (err: Error) => this.destroy(err));
       })
-      .catch((err: Error) => this.destroy(err));
+      .catch((err: Error) => this.destroy(err)); // prevent unhandled rejection
   }
 
   override _destroy(err: Error | null, callback: (err?: Error | null) => void): void {
+    // Calling destroy() without an error arg emits 'close' on source, not 'error',
+    // which avoids triggering archiver's error listener on the piped stream.
     this.source?.destroy();
     callback(err);
   }
 }
 ```
 
-**Step 3: Add StorageBackend to the imports**
+**Step 4: Declare the lazies array at the top of downloadArchive()**
 
-`StorageBackend` is the interface type used in the constructor. It is already used via
-`StorageService.resolveBackendForKey()`, but the class constructor parameter needs the type.
-Add to the existing import line at the top:
+Just after `const paths: Record<string, number> = {};` (line 94), add:
 
 ```typescript
-import { StorageBackend } from 'src/interfaces/storage-backend.interface';
+const lazies: LazyS3Readable[] = [];
 ```
 
-**Step 4: Rewrite the S3 branch of downloadArchive()**
+**Step 5: Rewrite the S3 branch of downloadArchive() and return statement**
 
 Replace the current S3 else-branch and return statement (lines 122–132):
 
@@ -331,14 +479,6 @@ With:
     return { stream: zip.stream, abort };
 ```
 
-**Step 5: Declare the lazies array at the top of downloadArchive()**
-
-Just after `const paths: Record<string, number> = {};` (line 94), add:
-
-```typescript
-const lazies: LazyS3Readable[] = [];
-```
-
 **Step 6: Update the return type of downloadArchive()**
 
 Change the method signature from:
@@ -353,10 +493,15 @@ To:
 async downloadArchive(auth: AuthDto, dto: DownloadArchiveDto): Promise<{ stream: Readable; abort: () => void }> {
 ```
 
-Remove `ImmichReadStream` from the import at the top of the file if it is no longer used anywhere
-else in this file (check — it's only used in `downloadArchive`'s return type, so remove it).
+**Step 7: Remove the ImmichReadStream import**
 
-**Step 7: Run the spec to verify all tests now pass**
+`ImmichReadStream` is now unused in this file. Remove it from the import:
+
+```typescript
+import { ImmichReadStream } from 'src/repositories/storage.repository';
+```
+
+**Step 8: Run the spec to verify all tests now pass**
 
 ```bash
 cd /home/pierre/dev/gallery/.worktrees/s3-download-hang-design/server
@@ -365,7 +510,16 @@ pnpm test -- --run src/services/download.service.spec.ts
 
 Expected: all tests pass, 0 failures.
 
-**Step 8: Commit**
+**Step 9: Lint the service file**
+
+```bash
+cd /home/pierre/dev/gallery/.worktrees/s3-download-hang-design/server
+pnpm exec eslint --max-warnings 0 src/services/download.service.ts src/services/download.service.spec.ts
+```
+
+Expected: no warnings or errors. Fix any that appear before continuing.
+
+**Step 10: Commit**
 
 ```bash
 cd /home/pierre/dev/gallery/.worktrees/s3-download-hang-design
@@ -375,7 +529,7 @@ git commit -m "fix(download): lazy S3 socket opening and abort cleanup"
 
 ---
 
-### Task 4: Update the download controller
+### Task 5: Update the download controller
 
 **Files:**
 - Modify: `server/src/controllers/download.controller.ts`
@@ -418,30 +572,41 @@ With:
   }
 ```
 
-`asStreamableFile` is no longer called from this method. Check if it is still imported and used
-elsewhere in the file — if not, remove the import.
+**Step 3: Remove the asStreamableFile import**
 
-**Step 3: Run a type-check to catch any import or type errors**
+`asStreamableFile` is now unused in the controller. Remove it from the import at the top of the
+file.
+
+**Step 4: Run both controller and service specs**
 
 ```bash
 cd /home/pierre/dev/gallery/.worktrees/s3-download-hang-design/server
-pnpm exec tsc --noEmit
+pnpm test -- --run src/controllers/download.controller.spec.ts
+pnpm test -- --run src/services/download.service.spec.ts
 ```
 
-Expected: no errors. If `Request` is not found, the express type package is `@types/express` which
-is already a devDependency of the server workspace.
+Expected: all tests pass.
 
-**Step 4: Commit**
+**Step 5: Lint the controller file**
+
+```bash
+cd /home/pierre/dev/gallery/.worktrees/s3-download-hang-design/server
+pnpm exec eslint --max-warnings 0 src/controllers/download.controller.ts src/controllers/download.controller.spec.ts
+```
+
+Expected: no warnings or errors.
+
+**Step 6: Commit**
 
 ```bash
 cd /home/pierre/dev/gallery/.worktrees/s3-download-hang-design
-git add server/src/controllers/download.controller.ts
+git add server/src/controllers/download.controller.ts server/src/controllers/download.controller.spec.ts
 git commit -m "fix(download): wire req.on('close', abort) to release S3 socket on disconnect"
 ```
 
 ---
 
-### Task 5: Full test run and type-check
+### Task 6: Full test run and type-check
 
 **Step 1: Run the full server test suite**
 
@@ -450,7 +615,8 @@ cd /home/pierre/dev/gallery/.worktrees/s3-download-hang-design/server
 pnpm test
 ```
 
-Expected: all tests pass. `download.service.spec.ts` should show 0 failures.
+Expected: all tests pass. `download.service.spec.ts` and `download.controller.spec.ts` show 0
+failures.
 
 **Step 2: TypeScript type-check**
 
@@ -460,13 +626,11 @@ pnpm exec tsc --noEmit
 
 Expected: no errors.
 
-**Step 3: If any failures — diagnose before fixing**
+**Step 3: If any failures — common causes**
 
-Common issues:
-- `ImmichReadStream` import left dangling → remove it from `download.service.ts`
-- `asStreamableFile` import left dangling in controller → remove it
-- `Request` from express not found → confirm `@types/express` is in `server/package.json` devDeps
-  (it is — NestJS installs it transitively)
+- `ImmichReadStream` import still present in `download.service.ts` → remove it
+- `asStreamableFile` import still present in controller → remove it
+- `Request` from express not found → `@types/express` is a transitive NestJS dep, should be present
 
 ---
 
@@ -480,3 +644,5 @@ Run the dev stack (`make dev` from repo root) with an S3 backend configured.
 - [ ] Cancel the download mid-way. Server stays responsive; connection count drops to 0 within ~10 s
 - [ ] Repeat with 1 and 20 photos to confirm no regressions at small scale
 - [ ] Repeat with disk-only assets to confirm the disk path is unaffected
+- [ ] Repeat with `serveMode: redirect` — thumbnails should be unaffected regardless of download
+  state (presigned URLs use no server-side sockets)
