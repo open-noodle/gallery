@@ -166,5 +166,27 @@ test.describe('Rebase Smoke — UI Permission Matrix', () => {
     expect(is403 || redirectedAway || blockedText).toBeTruthy();
   });
 
-  // Tests 8–10 added in subsequent commits.
+  test('Test 8 — owner nav bar: top-level actions visible, Archive reachable via More menu', async ({
+    context,
+    page,
+  }) => {
+    await utils.setAuthCookies(context, owner.accessToken);
+    await page.goto(`/photos/${asset.id}`);
+    await page.waitForSelector('#immich-asset-viewer');
+
+    // Top-level ActionButton accessible names (verified against i18n/en.json):
+    //   Actions.Share    → "Share"
+    //   Actions.Favorite → "Favorite"     (initial state; becomes "Unfavorite" once toggled)
+    //   Actions.Edit     → "Editor"       (NOT "Edit" — i18n key is $t('editor'))
+    //   DeleteAction     → "Delete"
+    for (const label of ['Share', 'Favorite', 'Editor', 'Delete']) {
+      await expect(page.getByRole('button', { name: label })).toBeVisible();
+    }
+
+    // Archive nested inside the overflow context menu.
+    await page.getByRole('button', { name: /more/i }).click();
+    await expect(page.getByRole('menuitem', { name: /archive/i })).toBeVisible();
+  });
+
+  // Tests 9–10 added in subsequent commits.
 });
