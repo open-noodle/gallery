@@ -111,5 +111,19 @@ test.describe('Rebase Smoke — UI Permission Matrix', () => {
     await expect(page.getByLabel('Add photos')).toHaveCount(0);
   });
 
-  // Tests 4–10 added in subsequent commits.
+  test('Test 4 — owner detail panel: edit controls visible, file path visible', async ({ context, page }) => {
+    await utils.setAuthCookies(context, owner.accessToken);
+    await page.goto(`/spaces/${space.id}/photos/${asset.id}`);
+    await page.waitForSelector('#immich-asset-viewer');
+    await page.keyboard.press('i');
+    await expect(page.locator('#detail-panel')).toBeVisible();
+    await expect(page.locator('[data-testid="detail-panel-edit-date-button"]')).toBeVisible();
+    // Owner-only: the "Show file location" IconButton is visible inside the filename section.
+    // aria-label is $t('show_file_location') = "Show file location" per i18n/en.json:2478.
+    await expect(page.getByLabel('Show file location')).toBeVisible();
+    await page.getByLabel('Show file location').click();
+    await expect(page.locator('[data-testid="detail-panel-filename"]')).toContainText('rebase-smoke.jpg');
+  });
+
+  // Tests 5–10 added in subsequent commits.
 });
