@@ -42,6 +42,12 @@ e2e-integration-dev:
 e2e-integration-dev-ui:
 	cd e2e && PLAYWRIGHT_BASE_URL=http://127.0.0.1:2283 PLAYWRIGHT_DISABLE_WEBSERVER=1 pnpm exec playwright test --ui --project=integration
 
+.PHONY: e2e-rebase-smoke
+e2e-rebase-smoke:
+	cd e2e && docker compose up -d --build --wait
+	cd e2e && PLAYWRIGHT_DISABLE_WEBSERVER=true pnpm exec playwright test --project=rebase-smoke
+	cd e2e && docker compose down -v
+
 prod:
 	@trap 'make prod-down' EXIT; COMPOSE_BAKE=true docker compose -f ./docker/docker-compose.prod.yml up --build -V --remove-orphans
 
