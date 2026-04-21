@@ -437,7 +437,7 @@ describe(SmartInfoService.name, () => {
       let cleanupSpy: ReturnType<typeof vi.fn>;
 
       beforeEach(() => {
-        cleanupSpy = vi.fn().mockResolvedValue(undefined);
+        cleanupSpy = vi.fn().mockResolvedValue(void 0);
         vi.spyOn(sut as any, 'ensureLocalFile').mockResolvedValue({ localPath: tempPath, cleanup: cleanupSpy });
       });
 
