@@ -32,7 +32,7 @@ rg -n 'copyAssetProperties\s*\(' server/src
 
 **Step 2: Inspect each caller.** For each hit, look at the 20 lines after the call. Answer: does any caller synchronously inspect filesystem state (via `fs.*`, `storageRepository.checkFileExists`, `backend.exists`, or similar) on the target asset immediately after `copyAssetProperties({ sidecar: true })` returns?
 
-**Step 3: Record the answer** in a scratch file `server/.scratch-copy-asset-caller-audit.md` (add to `.gitignore` if needed) with one line per caller: `<file>:<line> — <synchronous-fs-check? yes/no>`. This content lands in the PR body later (task 8.2).
+**Step 3: Record the answer** in a scratch file `server/.scratch-copy-asset-caller-audit.md` (add to `.gitignore` if needed) with one line per caller: `<file>:<line> — <synchronous-fs-check? yes/no>`. This content lands in the PR body later (task 5.4).
 
 **Expected outcome:** all callers answer "no". If any answer "yes", STOP and reopen the design doc — the `unlink` drop assumption is broken and needs rework.
 
@@ -218,9 +218,15 @@ come in follow-up commits."
 
 **Files:**
 
-- Modify: `server/src/services/media.service.ts` (remove method at lines 76-87; verify imports remain needed)
+- Modify: `server/src/services/media.service.ts` (remove the `ensureLocalFile` private method; verify imports remain needed)
 
-**Step 1: Delete the duplicated method.** Remove lines 76-87 in `media.service.ts` (the `ensureLocalFile` private method and its docstring). Call sites at lines 233, 394, 633-634, 814 already call `this.ensureLocalFile(...)` and will now hit the inherited `BaseService` method.
+**Step 1: Locate and delete the duplicated method.** Grep for the method body (don't rely on the line numbers above — they drift with any intervening PR):
+
+```bash
+cd server && rg -n 'private async ensureLocalFile' src/services/media.service.ts
+```
+
+Delete the method **and its preceding JSDoc comment**. Call sites that read `this.ensureLocalFile(...)` remain and will now hit the inherited `BaseService` method.
 
 **Step 2: Check unused imports.** If `isAbsolute` is no longer referenced in `media.service.ts`, remove its import. Same for any `StorageService` direct import that was only used by the deleted method.
 
@@ -258,11 +264,17 @@ git commit -m "refactor(server): drop media.service ensureLocalFile duplicate"
 
 **Files:**
 
-- Modify: `server/src/services/metadata.service.ts` (remove method at lines 180-191)
+- Modify: `server/src/services/metadata.service.ts` (remove the `ensureLocalFile` private method)
 
-**Step 1: Delete the method** at lines 180-191 mirroring task 1.3.
+**Step 1: Locate and delete the duplicated method,** same technique as task 1.3:
 
-**Step 2: Check unused imports** in `metadata.service.ts`. `isAbsolute` may still be needed elsewhere in the file (sidecar-path branching at line 520); verify before removing.
+```bash
+cd server && rg -n 'private async ensureLocalFile' src/services/metadata.service.ts
+```
+
+Delete the method and its preceding JSDoc comment.
+
+**Step 2: Check unused imports** in `metadata.service.ts`. `isAbsolute` is also used for sidecar-path branching elsewhere in the file (around the S3 sidecar write path), so almost certainly stays. Verify with `rg -n 'isAbsolute\b' src/services/metadata.service.ts` before removing anything.
 
 **Step 3: Run metadata-service tests.**
 
@@ -596,16 +608,55 @@ describe('copySidecar', () => {
     expect(cleanupSpy).toHaveBeenCalledOnce();
   });
 
-  it('overwrites an existing target sidecar without an unlink call', async () => {
+  it('overwrites an existing target sidecar without an unlink, with source content reaching the put', async () => {
+    // Headline behavioral change: no more pre-copy unlink, and the stream handed to backend.put must come from localPath.
+    // Guarding against a future regression that accidentally puts an empty/wrong body.
     const existingTarget = { ...s3Source, path: `${s3TargetAsset.originalPath}.xmp` };
     const target = { ...s3TargetAsset, files: [existingTarget] };
     const backendPut = vi.fn().mockResolvedValue(undefined);
     const { StorageService } = await import('src/services/storage.service');
     vi.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue({ put: backendPut } as any);
 
+    // Capture what createReadStream is invoked with — this is the only stream handed to put().
+    const fs = await import('node:fs');
+    const createReadStreamSpy = vi.spyOn(fs, 'createReadStream');
+
     await (sut as any).copySidecar({ sourceAsset: { files: [s3Source] }, targetAsset: target });
 
     expect(mocks.storage.unlink).not.toHaveBeenCalled();
+    expect(backendPut).toHaveBeenCalledOnce();
+    // The stream passed to backend.put must be a createReadStream of the source's localPath,
+    // not of /dev/null, an empty buffer, or the target's path.
+    expect(createReadStreamSpy).toHaveBeenCalledWith(`/tmp/dl-${path.basename(s3Source.path)}`);
+    const [, streamArg] = backendPut.mock.calls[0];
+    expect(streamArg).toBe(createReadStreamSpy.mock.results[0].value);
+  });
+
+  it('succeeds when target has no existing sidecar (files: []) — disk→S3 variant', async () => {
+    // Explicit coverage that the no-existing-target branch works; matrix tests cover the other combos.
+    const backendPut = vi.fn().mockResolvedValue(undefined);
+    const { StorageService } = await import('src/services/storage.service');
+    vi.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue({ put: backendPut } as any);
+
+    await (sut as any).copySidecar({
+      sourceAsset: { files: [diskSource] },
+      targetAsset: { ...s3TargetAsset, files: [] },
+    });
+
+    expect(backendPut).toHaveBeenCalledOnce();
+  });
+
+  it('succeeds when targetAsset.files is undefined (not just empty)', async () => {
+    // Line in copySidecar does `targetAsset.files ?? []` — assert the nullish-coalesce path is exercised.
+    const backendPut = vi.fn().mockResolvedValue(undefined);
+    const { StorageService } = await import('src/services/storage.service');
+    vi.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue({ put: backendPut } as any);
+
+    await (sut as any).copySidecar({
+      sourceAsset: { files: [s3Source] },
+      targetAsset: { id: 'target-id', originalPath: s3TargetAsset.originalPath, files: undefined as any },
+    });
+
     expect(backendPut).toHaveBeenCalledOnce();
   });
 
@@ -613,6 +664,16 @@ describe('copySidecar', () => {
     await (sut as any).copySidecar({ sourceAsset: { files: [] }, targetAsset: s3TargetAsset });
     expect(mocks.storage.copyFile).not.toHaveBeenCalled();
     expect(cleanupSpy).not.toHaveBeenCalled();
+  });
+
+  it('documents the source-vs-target-distinct-paths invariant', async () => {
+    // Safe-by-invariant: AssetService.copyAssetProperties rejects sourceId === targetId
+    // (asset.service.ts around the copy endpoint handler), so distinct assets → distinct
+    // originalPaths → distinct `${originalPath}.xmp` paths. This spec documents the
+    // invariant rather than guarding at runtime.
+    const srcPath = s3Source.path;
+    const dstPath = `${s3TargetAsset.originalPath}.xmp`;
+    expect(srcPath).not.toBe(dstPath);
   });
 
   it('calls cleanup when backend.put fails', async () => {
@@ -694,15 +755,26 @@ private async copySidecar({
 }
 ```
 
-**Step 2: Add the imports** at the top of `asset.service.ts` (check each; skip if already present):
+**Step 2: Match the `StorageService` import style used elsewhere.** `base.service.ts` lazy-imports `StorageService` inside methods because `StorageService extends BaseService` — top-level import there would cycle. `AssetService` also extends `BaseService`, so top-level is _probably_ safe — but don't guess. Check how the existing callers import:
+
+```bash
+cd server && rg -n "import .*StorageService|const \\{ StorageService \\}" src/services/asset.service.ts src/services/metadata.service.ts src/services/media.service.ts
+```
+
+Use whichever style (top-level vs. lazy-in-method) is already used in `metadata.service.ts` / `media.service.ts` for callers of `StorageService.resolveBackendForKey`. If both patterns exist, prefer lazy-in-method to match `BaseService`'s pattern. Update the step below accordingly.
+
+**Step 3: Add the imports** at the top of `asset.service.ts` (skip any already present; move `StorageService` into a lazy import inside `copySidecar` if step 2 said so):
 
 ```typescript
 import { createReadStream } from 'node:fs';
 import { isAbsolute } from 'node:path';
+// Either top-level:
 import { StorageService } from 'src/services/storage.service';
+// Or in-method (drop the top-level import if using this):
+// const { StorageService } = await import('./storage.service.js');
 ```
 
-**Step 3: Run the asset-service tests.**
+**Step 4: Run the asset-service tests.**
 
 ```bash
 cd server && pnpm test -- --run src/services/asset.service.spec.ts
@@ -710,14 +782,14 @@ cd server && pnpm test -- --run src/services/asset.service.spec.ts
 
 Expected: all new `copySidecar` tests pass; existing `copyAssetProperties` tests pass.
 
-**Step 4: Type-check and lint.**
+**Step 5: Type-check and lint.**
 
 ```bash
 make check-server
 cd server && pnpm lint --max-warnings 0
 ```
 
-**Step 5: Commit.**
+**Step 6: Commit.**
 
 ```bash
 git add server/src/services/asset.service.ts server/src/services/asset.service.spec.ts
@@ -773,9 +845,24 @@ export const phaseSmartSearchS3VideoClip = async (state: PhaseState) => {
 
 Use an existing small test video from `e2e/test-assets/` — verify the path in `e2e/test-assets/formats/` or similar. If none exists, pick the smallest mp4 fixture already committed.
 
-**Step 3: Run the phase locally against the storage-migration harness** (optional; the workflow does it in CI):
+**Step 3: Verify the phase is a real regression test by proving it fails against pre-fix code.** A phase that passes against both broken and fixed code isn't catching anything. Do this before committing:
 
-Follow existing phase-running guidance at the top of `storage-migration.ts` or the `README` for `e2e/`. If running locally is awkward, document that CI is the verification step.
+```bash
+# 1. stash the C2 production fix so smart-info.service.ts is back to the broken state
+git stash push -- server/src/services/smart-info.service.ts
+
+# 2. run the phase (follow the existing phase-running guidance at the top of storage-migration.ts or the e2e/ README)
+# ... run phase: smart-search-s3-video-clip ...
+
+# 3. assert the phase FAILS (smart_search row should be missing — job threw ENOENT silently)
+
+# 4. restore the fix
+git stash pop
+
+# 5. re-run the phase; assert it PASSES
+```
+
+If the phase passes against the broken code, the phase is buggy — fix it before committing. If running locally is truly infeasible, document in the commit message that "pre-fix failure verification deferred to CI (revert C2 in a branch, confirm nightly goes red)."
 
 **Step 4: Commit.**
 
@@ -845,7 +932,25 @@ Verify during implementation: does `createAsset` accept a `sidecarBuffer`? If no
 
 `resolveTestS3Backend` may or may not exist. Check `e2e/src/` for how other phases call `backend.exists` — there are prior art sites in `storage-migration.ts`. Reuse; don't invent.
 
-**Step 2: Commit.**
+**Step 2: Verify the phase is a real regression test by proving it fails against pre-fix code.** Same technique as task 4.1 step 3:
+
+```bash
+# 1. stash the C3 production fix so copySidecar is back to the broken state
+git stash push -- server/src/services/asset.service.ts
+
+# 2. run the phase: copy-asset-sidecar-s3
+
+# 3. assert the phase FAILS (target sidecar should be missing from S3 — copyFile threw ENOENT)
+
+# 4. restore the fix
+git stash pop
+
+# 5. re-run the phase; assert it PASSES
+```
+
+Same fallback guidance as 4.1 if running locally is infeasible.
+
+**Step 3: Commit.**
 
 ```bash
 git add e2e/src/storage-migration.ts
@@ -969,11 +1074,12 @@ If it reports issues, run `pnpm format` and commit as `chore: prettier`.
 
 **Step 1: Push.**
 
-```bash
-git push -u origin investigate/s3-ffmpeg-396
-```
+**Rename the branch to something PR-friendly** before pushing — `investigate/*` is the wrong prefix for a merged PR:
 
-(If the branch name should be conventional like `fix/s3-relative-path-audit`, rename first with `git branch -m` and push as that.)
+```bash
+git branch -m fix/s3-relative-path-audit
+git push -u origin fix/s3-relative-path-audit
+```
 
 **Step 2: Open PR** using `gh pr create`. Body template:
 
