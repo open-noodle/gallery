@@ -108,43 +108,39 @@ describe.skipIf(!canRunDocker)('S3StorageBackend integration (MinIO)', () => {
     }
   });
 
-  it(
-    'deletePrefix sweeps objects across list-pagination and delete-batch boundaries',
-    async () => {
-      // 2500 keys exercises both SDK caps in one test: ListObjectsV2 returns 1000 per page,
-      // DeleteObjects takes 1000 per call. Three pages in, three batches out.
-      const endpoint = `http://${container.getHost()}:${container.getMappedPort(9000)}`;
-      const verifyClient = new S3Client({
-        region: 'us-east-1',
-        endpoint,
-        forcePathStyle: true,
-        credentials: { accessKeyId: 'minioadmin', secretAccessKey: 'minioadmin' },
-      });
+  it('deletePrefix sweeps objects across list-pagination and delete-batch boundaries', async () => {
+    // 2500 keys exercises both SDK caps in one test: ListObjectsV2 returns 1000 per page,
+    // DeleteObjects takes 1000 per call. Three pages in, three batches out.
+    const endpoint = `http://${container.getHost()}:${container.getMappedPort(9000)}`;
+    const verifyClient = new S3Client({
+      region: 'us-east-1',
+      endpoint,
+      forcePathStyle: true,
+      credentials: { accessKeyId: 'minioadmin', secretAccessKey: 'minioadmin' },
+    });
 
-      const prefix = 'delete-prefix-boundary/';
-      const totalKeys = 2500;
-      const body = Buffer.from('x');
-      const concurrency = 100;
-      for (let offset = 0; offset < totalKeys; offset += concurrency) {
-        const batch: Promise<unknown>[] = [];
-        for (let i = 0; i < concurrency && offset + i < totalKeys; i++) {
-          batch.push(backend.put(`${prefix}object-${offset + i}.txt`, body));
-        }
-        await Promise.all(batch);
+    const prefix = 'delete-prefix-boundary/';
+    const totalKeys = 2500;
+    const body = Buffer.from('x');
+    const concurrency = 100;
+    for (let offset = 0; offset < totalKeys; offset += concurrency) {
+      const batch: Promise<unknown>[] = [];
+      for (let i = 0; i < concurrency && offset + i < totalKeys; i++) {
+        batch.push(backend.put(`${prefix}object-${offset + i}.txt`, body));
       }
+      await Promise.all(batch);
+    }
 
-      const preCount = await countKeysForPrefix(verifyClient, bucket, prefix);
-      expect(preCount).toBe(totalKeys);
+    const preCount = await countKeysForPrefix(verifyClient, bucket, prefix);
+    expect(preCount).toBe(totalKeys);
 
-      await backend.deletePrefix(prefix);
+    await backend.deletePrefix(prefix);
 
-      const postCount = await countKeysForPrefix(verifyClient, bucket, prefix);
-      expect(postCount).toBe(0);
+    const postCount = await countKeysForPrefix(verifyClient, bucket, prefix);
+    expect(postCount).toBe(0);
 
-      verifyClient.destroy();
-    },
-    120_000,
-  );
+    verifyClient.destroy();
+  }, 120_000);
 
   it('should stream content in proxy mode', async () => {
     // Create a second backend instance in proxy mode
