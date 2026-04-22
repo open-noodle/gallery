@@ -183,11 +183,9 @@ describe('matchSidecarToMedia', () => {
     // Google truncates the suffix at various points to fit the filename budget.
     const truncations = ['supplemental-metadat', 'supplemental-me', 'supple', 's'];
     for (const suffix of truncations) {
-      const result = matchSidecarToMedia(
-        `Takeout/Google Photos/Trip/IMG_1234.jpg.${suffix}.json`,
-        validSidecar,
-        ['Takeout/Google Photos/Trip/IMG_1234.jpg'],
-      );
+      const result = matchSidecarToMedia(`Takeout/Google Photos/Trip/IMG_1234.jpg.${suffix}.json`, validSidecar, [
+        'Takeout/Google Photos/Trip/IMG_1234.jpg',
+      ]);
       expect(result, `suffix=${suffix}`).toBe('Takeout/Google Photos/Trip/IMG_1234.jpg');
     }
   });
