@@ -349,7 +349,9 @@ git commit -m "feat(takeout-import): add matchFastTrack matcher"
 
 ## Task 5 — Implement `matchNormal`
 
-Strips `(N)` from both sides (indexes must match), strips supplemental-metadata, compares stems. Tolerates Google's 46-code-point basename truncation when the media filename is long.
+Strips `(N)` from both sides (indexes must match), strips supplemental-metadata, compares stems. Tolerates Google's basename truncation by accepting `fileStem.startsWith(jsonStem)` as a fallback.
+
+**Key ordering:** strip supplemental FIRST, then extract index, then strip supplemental AGAIN on the resulting stem. The double-strip is required because `stripSupplementalSuffix` walks back from the last `.` — when the trailing segment is `(N)` (as in `IMG.jpg.supplemental-metadata(1).json`), the first strip misses the supplemental, and we need a second pass after `extractFileIndex` removes `(1)`.
 
 **Files:**
 
@@ -392,18 +394,21 @@ describe('matchNormal', () => {
     expect(matchNormal('IMG.jpg.json', 'IMG(1).jpg')).toBe(false);
   });
 
-  it('tolerates 46-code-point media-basename truncation', () => {
-    // sidecar stem (after supplemental strip) is 46 chars, but the real media filename is longer.
-    const longBase = 'A'.repeat(50);
-    const short = 'A'.repeat(46);
-    expect(matchNormal(`${short}.jpg.supplemental-metadata.json`, `${longBase}.jpg`)).toBe(true);
+  it('tolerates Google basename truncation (sidecar stem is prefix of media basename)', () => {
+    // When Google's ~51-char filename budget is exceeded, the sidecar stem
+    // drops the trailing media extension and becomes a strict prefix of the
+    // media basename. This is the shape the existing PR #405 truncation test
+    // covers.
+    const longMedia = 'A'.repeat(40) + 'suffix.jpg';
+    const truncatedStem = 'A'.repeat(40) + 'suffi';
+    expect(matchNormal(`${truncatedStem}.supplemental-metadata.json`, longMedia)).toBe(true);
   });
 
-  it('handles surrogate-pair emoji in the 46-code-point truncation', () => {
-    // 🌟 = 2 UTF-16 units, 1 code point. Stem of 46 code points == 92 UTF-16 units.
-    const base = '🌟'.repeat(50);
-    const short = '🌟'.repeat(46);
-    expect(matchNormal(`${short}.jpg.supplemental-metadata.json`, `${base}.jpg`)).toBe(true);
+  it('handles surrogate-pair emoji in the truncation prefix', () => {
+    // 🌟 = 2 UTF-16 units, 1 code point. Prefix-matching must survive that.
+    const mediaBase = '🌟'.repeat(10) + '.jpg';
+    const truncStem = '🌟'.repeat(10);
+    expect(matchNormal(`${truncStem}.supplemental-metadata.json`, mediaBase)).toBe(true);
   });
 });
 ```
@@ -420,18 +425,24 @@ Add below `matchFastTrack`:
 
 ```ts
 /**
- * Normal matcher: strip `.json`, strip trailing `(N)` from both sides,
- * strip `.supplemental-metadata` segment, compare stems. Tolerates Google's
- * 46-code-point basename truncation when the media name is longer than that.
+ * Normal matcher: handles Google's three `(N)` sidecar shapes:
+ *   - `name.jpg(1).json`                          — legacy
+ *   - `name.jpg(1).supplemental-metadata.json`    — (N) before supplemental
+ *   - `name.jpg.supplemental-metadata(1).json`    — (N) after supplemental
+ *
+ * Ordering is load-bearing: strip supplemental first (so shape 2 loses its
+ * `.supplemental-metadata` segment), extract `(N)`, then strip supplemental
+ * again on the resulting stem (so shape 3's supplemental — which was hidden
+ * behind the trailing `(N)` on the first pass — also comes off).
  */
 export function matchNormal(jsonName: string, fileName: string): boolean {
   if (!jsonName.endsWith('.json')) {
     return false;
   }
 
-  const jsonWithoutJson = jsonName.slice(0, -5);
+  const afterJson = stripSupplementalSuffix(jsonName.slice(0, -5));
 
-  const jsonExtract = extractFileIndex(jsonWithoutJson);
+  const jsonExtract = extractFileIndex(afterJson);
   const fileExtract = extractFileIndex(fileName);
   if (jsonExtract.index !== fileExtract.index) {
     return false;
@@ -444,14 +455,11 @@ export function matchNormal(jsonName: string, fileName: string): boolean {
     return true;
   }
 
-  // Tolerate Google's 46-code-point basename truncation. The sidecar's stem
-  // may be the truncation of a longer media basename.
-  const fileStemCodePoints = [...fileStem];
-  if (fileStemCodePoints.length <= 46) {
-    return false;
-  }
-  const truncated = fileStemCodePoints.slice(0, 46).join('');
-  return jsonStem === truncated;
+  // Tolerate Google's basename truncation: when the sidecar filename is
+  // too long for Google's budget, the stem (after stripping
+  // `.supplemental-metadata` + `.json`) becomes a strict prefix of the
+  // media basename. Require length strictly greater to avoid false positives.
+  return fileStem.length > jsonStem.length && fileStem.startsWith(jsonStem);
 }
 ```
 
@@ -496,7 +504,16 @@ describe('matchForgottenDuplicates', () => {
     );
   });
 
-  it('rejects when diff >= 10 code points', () => {
+  it('matches at boundary diff of 9 code points', () => {
+    // 'short' (5) -> 'short123.jpg' (12) = diff 7. Use explicit 9:
+    expect(matchForgottenDuplicates('abc.json', 'abc123456.jpg')).toBe(true);
+  });
+
+  it('rejects at boundary diff of 10 code points', () => {
+    expect(matchForgottenDuplicates('abc.json', 'abc1234567.jpg')).toBe(false);
+  });
+
+  it('rejects when diff is much larger than 10', () => {
     expect(matchForgottenDuplicates('short.json', 'short_with_too_many_extra_chars.jpg')).toBe(false);
   });
 
@@ -826,10 +843,12 @@ Belt-and-braces regression coverage on the full cascade. Grab the test rows from
 
 ```bash
 curl -sL https://raw.githubusercontent.com/simulot/immich-go/cc928edbce49216584647e5f756a2af6478bb7ea/adapters/googlePhotos/matcher_test.go -o /tmp/matcher_test.go
-grep -A 3 'jsonName:' /tmp/matcher_test.go | head -80
+# Field name may be `jsonName`, `JsonName`, `jsonname`, or unlabelled. Try in order:
+grep -nE '(json|JSON)[Nn]?ame' /tmp/matcher_test.go | head -30
+grep -nE '\{[^}]*"[^"]*\.json"[^}]*"[^"]*\.(jpg|png|mp4|heic|JPG|HEIC)"' /tmp/matcher_test.go | head -30
 ```
 
-Read through the `matchNames` / `matchTests` table (exact var name varies — look for the `[]struct{ jsonName, fileName, want string }` pattern). Extract each row.
+Read through whichever pattern matches — the test table is a `[]struct{ …, … string }` literal with one `.json` sidecar name and one media filename per row. Extract each row, noting whether `want` is `""` (no match expected) or a matcher function name (which one doesn't matter for our port, only that `shouldMatch = want !== ""`).
 
 **Step 2: Write a single `describe.each` block.**
 
@@ -839,11 +858,11 @@ Add at the bottom of the `describe('matchSidecarToMedia', …)` block:
 describe('immich-go matcher_test.go parity', () => {
   // Each row: [jsonName (basename), fileName (basename), shouldMatch]
   // Ported from adapters/googlePhotos/matcher_test.go @ cc928edbce4 (AGPL-3.0).
+  // REPLACE THIS ARRAY ENTIRELY with the actual rows from /tmp/matcher_test.go —
+  // the two entries below are illustrative shapes, not real upstream data.
   const rows: Array<[string, string, boolean]> = [
-    // Paste each row from the upstream table. Example:
     ['PXL_20230922_144751370.jpg.json', 'PXL_20230922_144751370.jpg', true],
     ['PXL_20230922_144751370.jpg(1).json', 'PXL_20230922_144751370(1).jpg', true],
-    // …30 rows total
   ];
 
   it.each(rows)('%s + %s → %s', (jsonName, fileName, shouldMatch) => {
@@ -859,7 +878,7 @@ describe('immich-go matcher_test.go parity', () => {
 });
 ```
 
-Replace the placeholder rows with the actual ~30 rows from the upstream file. Preserve the exact string literals (including any UTF-8 characters like emoji or localized suffixes).
+Replace the array entirely with the actual ~30 rows from the upstream file. Preserve the exact string literals (including any UTF-8 characters like emoji or localized suffixes).
 
 **Step 3: Run — some rows may FAIL if our cascade disagrees with immich-go.**
 
@@ -991,7 +1010,17 @@ Replace `parts.indexOf('Google Photos')` with `photoRoots.has(parts[1])`. Signat
 - Modify: `web/src/lib/utils/google-takeout-parser.ts` (function at ~line 209)
 - Modify: `web/src/lib/utils/google-takeout-parser.spec.ts` (existing `detectAlbums` tests)
 
-**Step 1: Update existing `detectAlbums` specs to pass `photoRoots` explicitly.**
+**Step 1: Pre-flight — inspect every existing `detectAlbums` caller.**
+
+The new function filters on `parts[0] === 'Takeout'` in addition to the root check. Any existing test case whose input path doesn't start with `Takeout/` will silently flip from "returns an album" to "returns no albums". Pre-flight before changing code:
+
+```bash
+grep -nE "detectAlbums\(|path: '[^']*'" web/src/lib/utils/google-takeout-parser.spec.ts | grep -A 1 detectAlbums
+```
+
+Review each matched test's fixture paths. If any path doesn't begin with `Takeout/`, that test will need its fixture adjusted (prefix `Takeout/` to keep behavior stable) in the same commit. Record the affected test names before moving to step 2.
+
+**Step 2: Update existing `detectAlbums` specs to pass `photoRoots` explicitly.**
 
 Find the existing `describe('detectAlbums', …)` block. For each existing test, pass a second argument: `new Set(['Google Photos'])`. Example:
 
@@ -1002,7 +1031,7 @@ const albums = detectAlbums(items);
 const albums = detectAlbums(items, new Set(['Google Photos']));
 ```
 
-**Step 2: Add new localized-folder test cases.**
+**Step 3: Add new localized-folder test cases.**
 
 Inside the same `describe` block:
 
@@ -1037,13 +1066,13 @@ it('ignores items under paths NOT in photoRoots', () => {
 });
 ```
 
-**Step 3: Run — expected FAIL.**
+**Step 4: Run — expected FAIL.**
 
 ```bash
 pnpm vitest run src/lib/utils/google-takeout-parser.spec.ts
 ```
 
-**Step 4: Update `detectAlbums` signature + body.**
+**Step 5: Update `detectAlbums` signature + body.**
 
 Replace the existing function (around line 209). New version:
 
@@ -1091,13 +1120,13 @@ export function detectAlbums(items: TakeoutMediaItem[], photoRoots: Set<string>)
 }
 ```
 
-**Step 5: Run — expected PASS.**
+**Step 6: Run — expected PASS.**
 
 ```bash
 pnpm vitest run src/lib/utils/google-takeout-parser.spec.ts
 ```
 
-**Step 6: Commit.**
+**Step 7: Commit.**
 
 ```bash
 git add web/src/lib/utils/google-takeout-parser.ts web/src/lib/utils/google-takeout-parser.spec.ts
@@ -1320,7 +1349,9 @@ const albums = detectAlbums(allItems, photoRoots);
 // Reconcile progress.albumNames — the extraction-time heuristic may have
 // over-counted (e.g. YouTube playlist folders under a full Takeout export).
 // Rebuild from the authoritative album list and fire onProgress one last time
-// so the UI snaps to the correct count.
+// so the UI snaps to the correct count. Reassigning the property (rather than
+// clearing + re-adding) is safe because the progress-UI callback snapshots
+// with `new Set(p.albumNames)` on receive — it doesn't hold a reference.
 progress.albumNames = new Set(albums.map((a) => a.name));
 onProgress?.(progress);
 
@@ -1347,17 +1378,61 @@ return {
 };
 ```
 
-Also update the `scanFolderFiles` path's item-build loop: remove its inline album-name logic the same way as Step 3 (if present — check around line 320; the folder path uses `trackItemStats` which still sets a tentative value, and the final item push should use `undefined` there too for consistency).
+**Step 5: Update `scanFolderFiles` item-build loop (around lines 320-338).**
 
-Grep to find the remaining inline logic:
+Drop `albumName` from the item construction and discard `trackItemStats`'s return value (its side effect of updating `progress.albumNames` is still wanted):
+
+```ts
+// before
+for (const file of mediaFiles) {
+  checkAbort(signal);
+  const filePath = getFilePath(file);
+  progress.currentFile = filePath;
+
+  const metadata = metadataMap.get(filePath);
+  const albumName = trackItemStats(metadata, filePath, progress);
+
+  const item: TakeoutMediaItem = {
+    path: filePath,
+    file,
+    metadata,
+    albumName,
+  };
+  allItems.push(item);
+  onProgress?.(progress);
+}
+
+// after
+for (const file of mediaFiles) {
+  checkAbort(signal);
+  const filePath = getFilePath(file);
+  progress.currentFile = filePath;
+
+  const metadata = metadataMap.get(filePath);
+  // Side effect only: updates progress.albumNames tentatively + mediaCount + stats.
+  trackItemStats(metadata, filePath, progress);
+
+  const item: TakeoutMediaItem = {
+    path: filePath,
+    file,
+    metadata,
+    // albumName is finalized later by finalizeItemAlbumNames.
+    albumName: undefined,
+  };
+  allItems.push(item);
+  onProgress?.(progress);
+}
+```
+
+**Step 6: Verify no `'Google Photos'` or `googlePhotosIndex` remains in the runtime path.**
 
 ```bash
 grep -n "googlePhotosIndex\|'Google Photos'" web/src/lib/utils/google-takeout-scanner.ts
 ```
 
-Expected after the task: the only `'Google Photos'` references left in scanner.ts are in comments or re-exports (none in runtime path).
+Expected: zero matches. Any remaining references must be in re-export types or comments only.
 
-**Step 5: Run existing scanner specs.**
+**Step 7: Run existing scanner specs.**
 
 ```bash
 pnpm vitest run src/lib/utils/google-takeout-scanner.spec.ts
@@ -1365,7 +1440,7 @@ pnpm vitest run src/lib/utils/google-takeout-scanner.spec.ts
 
 Expected: all existing tests still pass (they use `Takeout/Google Photos/…` paths, which survive because `derivePhotoRoots` picks up `Google Photos` from items with matched sidecars).
 
-**Step 6: Commit.**
+**Step 8: Commit.**
 
 ```bash
 git add web/src/lib/utils/google-takeout-scanner.ts
@@ -1471,6 +1546,29 @@ describe('localized Google Photos root (Gap #1)', () => {
     expect(result.items).toHaveLength(0);
     expect(result.albums).toHaveLength(0);
   });
+
+  it('works via the scanFolderFiles (drag-and-drop) path with a localized folder', async () => {
+    // scanFolderFiles uses File.webkitRelativePath rather than zip entries.
+    // Exercise that entry-point explicitly with a File constructor trick.
+    const mkFile = (content: string, relPath: string, type = 'application/octet-stream'): File => {
+      const file = new File([content], relPath.split('/').pop() ?? 'file', { type });
+      Object.defineProperty(file, 'webkitRelativePath', { value: relPath });
+      return file;
+    };
+
+    const result = await scanTakeoutFiles({
+      files: [
+        mkFile('fake-image-bytes', 'Takeout/Google Fotos/Sommer/IMG_001.jpg', 'image/jpeg'),
+        mkFile(makeSidecar(), 'Takeout/Google Fotos/Sommer/IMG_001.jpg.json', 'application/json'),
+      ],
+    });
+
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].path).toBe('Takeout/Google Fotos/Sommer/IMG_001.jpg');
+    expect(result.items[0].albumName).toBe('Sommer');
+    expect(result.items[0].metadata).toBeDefined();
+    expect(result.albums.map((a) => a.name)).toEqual(['Sommer']);
+  });
 });
 ```
 
@@ -1480,7 +1578,7 @@ describe('localized Google Photos root (Gap #1)', () => {
 pnpm vitest run src/lib/utils/google-takeout-scanner.spec.ts
 ```
 
-Expected: all 6 new tests pass.
+Expected: all 7 new tests pass.
 
 **Step 3: Commit.**
 
@@ -1537,12 +1635,20 @@ describe('sidecar matching edge cases end-to-end', () => {
     expect(result.items[0].metadata!.latitude).toBe(48.8566);
   });
 
-  it('progress.albumNames reconciles to the final album set (no transient over-counts leak)', async () => {
+  it('progress.albumNames reconciles to drop tentatively-added non-Photos folders', async () => {
+    // This fixture MUST include a MEDIA file under a non-Photos subtree, so the
+    // extraction-time tentative heuristic (in scanZipFile's per-entry loop)
+    // actually over-counts. A bare non-media file like a YouTube playlist JSON
+    // won't trigger the heuristic and leaves nothing for reconciliation to
+    // correct — the test would pass even if reconciliation were missing.
     const zipBlob = await createZipBlob([
       { path: 'Takeout/Google Fotos/Real Album/IMG_001.jpg', content: 'fake' },
       { path: 'Takeout/Google Fotos/Real Album/IMG_001.jpg.json', content: makeSidecar() },
-      // Non-photo subtree would be counted by the tentative heuristic during extraction
-      { path: 'Takeout/YouTube/playlists/playlist.json', content: '{"kind":"playlist","items":[]}' },
+      // Media file under Drive/. The hot-loop heuristic adds 'Videos' to
+      // progress.albumNames tentatively. No matching sidecar → item has no
+      // metadata → derivePhotoRoots does not include 'Drive' → detectAlbums
+      // excludes this item → reconciliation must drop 'Videos'.
+      { path: 'Takeout/Drive/Videos/clip.mp4', content: 'fake-video' },
     ]);
 
     const progressSnapshots: ScanProgress[] = [];
@@ -1551,9 +1657,27 @@ describe('sidecar matching edge cases end-to-end', () => {
       onProgress: (p) => progressSnapshots.push({ ...p, albumNames: new Set(p.albumNames) }),
     });
 
+    // At least one mid-extraction snapshot saw the transient over-count.
+    const sawTransientOverCount = progressSnapshots.some((p) => p.albumNames.has('Videos'));
+    expect(sawTransientOverCount).toBe(true);
+
+    // The final snapshot is the reconciled one — 'Videos' must be gone.
     const last = progressSnapshots.at(-1)!;
     expect(last.albumNames).toEqual(new Set(['Real Album']));
-    expect(last.albumNames.has('playlists')).toBe(false);
+    expect(last.albumNames.has('Videos')).toBe(false);
+  });
+
+  it('Gap #3: German -bearbeitet variant binds to the same sidecar (scanner level)', async () => {
+    const zipBlob = await createZipBlob([
+      { path: 'Takeout/Google Fotos/Album/IMAG.JPG', content: 'original-bytes' },
+      { path: 'Takeout/Google Fotos/Album/IMAG-bearbeitet.JPG', content: 'edited-bytes' },
+      { path: 'Takeout/Google Fotos/Album/IMAG.JPG.supplemental-metadata.json', content: makeSidecar() },
+    ]);
+
+    const result = await scanTakeoutFiles({ files: [blobToFile(zipBlob, 'takeout.zip')] });
+
+    expect(result.items).toHaveLength(2);
+    expect(result.items.filter((i) => i.metadata !== undefined)).toHaveLength(2);
   });
 });
 ```
@@ -1564,7 +1688,7 @@ describe('sidecar matching edge cases end-to-end', () => {
 pnpm vitest run src/lib/utils/google-takeout-scanner.spec.ts
 ```
 
-Expected: all 3 new tests pass.
+Expected: all 4 new tests pass.
 
 **Step 3: Commit.**
 
