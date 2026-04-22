@@ -100,8 +100,14 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Manual override always wins.
+          # Manual override always wins. Enforce the same v-prefixed semver
+          # phase 2's discover step requires — a bare "4.53.0" draft is
+          # invisible to phase 2 and silently fails the release.
           if [[ -n "$INPUT_VERSION" ]]; then
+            if [[ ! "$INPUT_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "::error::Invalid version override: '$INPUT_VERSION' (expected v<major>.<minor>.<patch>, e.g. v4.53.0)"
+              exit 1
+            fi
             echo "version=$INPUT_VERSION" >> "$GITHUB_OUTPUT"
             echo "Version: $INPUT_VERSION — manual override"
             exit 0
