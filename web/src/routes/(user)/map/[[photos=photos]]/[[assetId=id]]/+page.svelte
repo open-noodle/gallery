@@ -96,9 +96,13 @@
   let fetchTimeout: ReturnType<typeof setTimeout> | undefined;
 
   $effect(() => {
+    // Read the derived options before the debounce callback so filter changes
+    // are tracked as dependencies of this effect.
+    const options = mapMarkerOptions;
+
     clearTimeout(fetchTimeout);
     fetchTimeout = setTimeout(() => {
-      void getFilteredMapMarkers(mapMarkerOptions)
+      void getFilteredMapMarkers(options)
         .then((result) => {
           mapMarkers = result;
         })
