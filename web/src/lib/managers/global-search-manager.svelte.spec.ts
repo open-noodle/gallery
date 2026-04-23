@@ -2805,7 +2805,10 @@ describe('batch lifecycle: close, empty-query, grace window (review fixes)', () 
   });
 
   it('setMode decrements counter when photos provider rejects (catch path)', async () => {
-    vi.mocked(searchSmart).mockResolvedValueOnce({
+    // Use a stable default, not `mockResolvedValueOnce`, because stray async work
+    // from nearby tests can consume a one-shot smart-search response before this
+    // manager's first batch runs, making the initial assertion flaky in CI.
+    vi.mocked(searchSmart).mockResolvedValue({
       assets: { items: [{ id: 'initial' } as never], nextPage: null },
     } as never);
     const m = new GlobalSearchManager();
