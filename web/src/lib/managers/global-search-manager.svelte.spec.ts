@@ -2936,7 +2936,10 @@ describe('setMode stale photos race (review fix U3)', () => {
 
   it('stale first-setMode photos does not overwrite fresh second-setMode photos', async () => {
     // Initial batch: photos = [initial]
-    vi.mocked(searchSmart).mockResolvedValueOnce({
+    // Use a stable default, not `mockResolvedValueOnce`, because stray async work
+    // from nearby tests can consume a one-shot smart-search response before this
+    // manager's first batch runs, making the initial assertion flaky in CI.
+    vi.mocked(searchSmart).mockResolvedValue({
       assets: { items: [{ id: 'initial' } as never], nextPage: null },
     } as never);
     // First setMode (metadata): slow — stays pending until resolvePhotos1().
