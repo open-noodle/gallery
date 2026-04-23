@@ -30,6 +30,23 @@ export const MEDIA_EXTENSIONS = new Set([
   '.m2ts',
 ]);
 
+/**
+ * Extract the trailing `(N)` duplicate-index from a filename, if present.
+ * Recognises both `file(1).ext` and `file(1)` (no extension) shapes; rejects
+ * `file(1)-something.ext` where `(N)` is not immediately before the extension.
+ *
+ * Returns `{ name, index }` where `name` is the filename with `(N)` removed
+ * and `index` is the number as a string (or `''` when no index is present).
+ */
+export function extractFileIndex(filename: string): { name: string; index: string } {
+  const match = filename.match(/^(.*)\((\d+)\)(\.[^.]*)?$/);
+  if (!match) {
+    return { name: filename, index: '' };
+  }
+  const [, prefix, index, ext = ''] = match;
+  return { name: prefix + ext, index };
+}
+
 export interface TakeoutMetadata {
   title: string;
   description: string | undefined;
