@@ -26,7 +26,9 @@ const buildQueries = (
 ) => (sut as any).buildSearchSmartQueries(offlineKysely(), pagination, options);
 
 const buildAssetSearchSql = (options: Record<string, unknown>) =>
-  searchAssetBuilder(offlineKysely(), options as any).selectAll('asset').compile().sql;
+  searchAssetBuilder(offlineKysely(), options as any)
+    .selectAll('asset')
+    .compile().sql;
 
 const FAILURE_MESSAGE =
   'Do not add any secondary ORDER BY key to the inner searchSmart query. ' +
