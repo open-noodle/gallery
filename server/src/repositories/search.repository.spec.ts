@@ -3,6 +3,7 @@ import { DummyDriver, Kysely, PostgresAdapter, PostgresIntrospector, PostgresQue
 import { AssetOrder } from 'src/enum';
 import { SearchRepository } from 'src/repositories/search.repository';
 import type { DB } from 'src/schema';
+import { describe, expect, it } from 'vitest';
 
 // Offline Kysely — compiles SQL without executing it. No DB connection needed.
 const offlineKysely = () =>
@@ -64,6 +65,18 @@ describe(SearchRepository.name, () => {
   };
 
   describe('searchSmart query shape', () => {
+    it('applies rating as an inclusive threshold when combined with other filters', () => {
+      const { base } = buildQueries(sut, { page: 1, size: 100 }, {
+        ...baseOptions,
+        personIds: ['00000000-0000-0000-0000-000000000001'],
+        rating: 2,
+      });
+      const innerSql = base.compile().sql;
+
+      expect(innerSql).toMatch(/rating"?\s*>=\s*\$\d+/i);
+      expect(innerSql).not.toMatch(/rating"?\s*=\s*\$\d+/i);
+    });
+
     it('non-CTE inner ORDER BY: exactly one expression AND primary key is smart_search.embedding', () => {
       const { base } = buildQueries(sut, { page: 1, size: 100 }, baseOptions);
       const innerSql = base.compile().sql;
