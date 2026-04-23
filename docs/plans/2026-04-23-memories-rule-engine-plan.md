@@ -39,7 +39,7 @@
 - `server/src/services/memory-rules/birthday.rule.ts`
   Deterministic birthday rule.
 - `server/src/services/memory-rules/recent-trip.rule.ts`
-  Travel heuristic + 30-day same-place cooldown.
+  Confidence-gated travel heuristic + 30-day same-place cooldown.
 - `server/src/services/memory.service.ts`
   Separate cursors, rule registry, fail-soft orchestration, and daily cap.
 - `server/src/services/memory.service.spec.ts`
@@ -47,7 +47,7 @@
 - `server/src/services/memory-rules/birthday.rule.spec.ts`
   Birthday candidate selection tests.
 - `server/src/services/memory-rules/recent-trip.rule.spec.ts`
-  Trip candidate, country/city confidence, and cooldown tests.
+  Trip candidate, home-confidence, country/city confidence, stable dedupe, and cooldown tests.
 - `server/test/medium/specs/services/memory.service.spec.ts`
   Real-DB coverage for birthday and trip generation.
 - `web/src/lib/utils.ts`
@@ -668,6 +668,7 @@ describe(RecentTripMemoryRule.name, () => {
     });
     expect(candidate).toMatchObject({
       ruleId: 'recent_trip',
+      dedupeKey: 'recent_trip:france:paris:2026-04-23',
       title: 'Recent trip to Paris, France',
       subtitle: '9 photos over 3 days',
       assetIds: ['asset-1', 'asset-2', 'asset-3', 'asset-4', 'asset-5', 'asset-6', 'asset-7'],
@@ -792,6 +793,51 @@ describe(RecentTripMemoryRule.name, () => {
             dayCount: 3,
             firstDate: new Date('2026-04-15T00:00:00Z'),
             lastDate: new Date('2026-04-17T00:00:00Z'),
+          },
+        ]),
+      getMemoryAssetsForLocation: vi.fn(),
+    };
+    const memoryRepository = { search: vi.fn().mockResolvedValue([]) };
+
+    const rule = new RecentTripMemoryRule(assetRepository as any, memoryRepository as any);
+    await expect(
+      rule.evaluate({
+        ownerId: 'user-1',
+        target: DateTime.fromISO('2026-04-23', { zone: 'utc' }),
+      }),
+    ).resolves.toEqual([]);
+  });
+
+  it('skips when the baseline home location is ambiguous', async () => {
+    const assetRepository = {
+      getMemoryLocationClusters: vi
+        .fn()
+        .mockResolvedValueOnce([
+          {
+            country: 'Germany',
+            city: 'Berlin',
+            assetCount: 10,
+            dayCount: 6,
+            firstDate: new Date('2026-01-01T00:00:00Z'),
+            lastDate: new Date('2026-03-20T00:00:00Z'),
+          },
+          {
+            country: 'Austria',
+            city: 'Vienna',
+            assetCount: 9,
+            dayCount: 6,
+            firstDate: new Date('2026-01-05T00:00:00Z'),
+            lastDate: new Date('2026-03-18T00:00:00Z'),
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            country: 'France',
+            city: 'Paris',
+            assetCount: 8,
+            dayCount: 2,
+            firstDate: new Date('2026-04-15T00:00:00Z'),
+            lastDate: new Date('2026-04-16T00:00:00Z'),
           },
         ]),
       getMemoryAssetsForLocation: vi.fn(),
@@ -1010,6 +1056,7 @@ import { MemoryRule, MemoryRuleCandidate, MemoryRuleContext } from 'src/services
 
 export class RecentTripMemoryRule implements MemoryRule {
   readonly id = 'recent_trip';
+  private static readonly HOME_DOMINANCE_RATIO = 1.25;
 
   constructor(
     private assetRepository: Pick<AssetRepository, 'getMemoryLocationClusters' | 'getMemoryAssetsForLocation'>,
@@ -1037,8 +1084,16 @@ export class RecentTripMemoryRule implements MemoryRule {
       }),
     ]);
 
-    const home = baseline[0];
+    const [home, runnerUp] = baseline;
     if (!home?.country) {
+      return [];
+    }
+
+    const isAmbiguousHome =
+      !!runnerUp &&
+      runnerUp.country !== home.country &&
+      runnerUp.assetCount >= home.assetCount / RecentTripMemoryRule.HOME_DOMINANCE_RATIO;
+    if (isAmbiguousHome) {
       return [];
     }
 
@@ -1084,11 +1139,12 @@ export class RecentTripMemoryRule implements MemoryRule {
     ).map(({ id }) => id);
 
     const placeLabel = candidate.city ? `${candidate.city}, ${candidate.country}` : candidate.country;
+    const dedupeDay = target.toFormat('yyyy-MM-dd');
 
     return [
       {
         ruleId: this.id,
-        dedupeKey: `recent_trip:${placeKey}:${candidate.firstDate.toISOString()}:${candidate.lastDate.toISOString()}`,
+        dedupeKey: `recent_trip:${placeKey}:${dedupeDay}`,
         title: `Recent trip to ${placeLabel}`,
         subtitle: `${candidate.assetCount} photos over ${candidate.dayCount} days`,
         score: 50 + candidate.dayCount * 5 + Math.min(candidate.assetCount, 20),
@@ -1101,6 +1157,8 @@ export class RecentTripMemoryRule implements MemoryRule {
           city: candidate.city,
           assetCount: candidate.assetCount,
           dayCount: candidate.dayCount,
+          tripWindowStart: candidate.firstDate.toISOString(),
+          tripWindowEnd: candidate.lastDate.toISOString(),
         },
       },
     ];
@@ -1164,7 +1222,7 @@ it('should only evaluate rules through today, not future precompute dates', asyn
   ]);
 });
 
-it('should keep only the top two non-duplicate rule candidates and fail soft', async () => {
+it('should keep only the top two surviving rule candidates after dedupe and fail soft', async () => {
   const user = factory.userAdmin();
   vi.setSystemTime(new Date('2026-04-23T12:00:00Z'));
   mocks.user.getList.mockResolvedValue([user]);
@@ -1174,7 +1232,7 @@ it('should keep only the top two non-duplicate rule candidates and fail soft', a
   });
   mocks.asset.getByDayOfYear.mockResolvedValue([]);
   mocks.memory.search.mockResolvedValue([]);
-  mocks.memory.hasRuleMemory.mockResolvedValue(false);
+  mocks.memory.hasRuleMemory.mockResolvedValueOnce(false).mockResolvedValueOnce(true).mockResolvedValueOnce(false);
   mocks.memory.create.mockResolvedValue(MemoryFactory.create() as any);
 
   const failingRule = { id: 'broken', evaluate: vi.fn().mockRejectedValue(new Error('boom')) };
@@ -1213,8 +1271,13 @@ it('should keep only the top two non-duplicate rule candidates and fail soft', a
   await sut.onMemoriesCreate();
 
   expect(mocks.memory.create).toHaveBeenCalledTimes(2);
+  expect(mocks.memory.hasRuleMemory.mock.calls).toEqual([
+    [user.id, 'birthday', 'k-1'],
+    [user.id, 'birthday', 'k-2'],
+    [user.id, 'birthday', 'k-3'],
+  ]);
   expect(mocks.memory.create.mock.calls[0][0].data).toMatchObject({ title: 'First', dedupeKey: 'k-1' });
-  expect(mocks.memory.create.mock.calls[1][0].data).toMatchObject({ title: 'Second', dedupeKey: 'k-2' });
+  expect(mocks.memory.create.mock.calls[1][0].data).toMatchObject({ title: 'Third', dedupeKey: 'k-3' });
 });
 
 it('should not advance the rule cursor when any owner run fails', async () => {
@@ -1825,8 +1888,8 @@ pnpm --filter immich test:medium -- --run test/medium/specs/services/memory.serv
 pnpm --filter immich check
 pnpm --filter immich-web test -- --run src/lib/utils.spec.ts
 pnpm --filter immich-web check
-cd mobile && flutter test test/domain/models/memory_model_test.dart test/domain/repositories/sync_stream_repository_test.dart test/presentation/memory/memory_title_test.dart
-cd mobile && dart analyze --fatal-infos
+cd /tmp/gallery-memories-rules-exploration-20260423/mobile && flutter test test/domain/models/memory_model_test.dart test/domain/repositories/sync_stream_repository_test.dart test/presentation/memory/memory_title_test.dart
+cd /tmp/gallery-memories-rules-exploration-20260423/mobile && dart analyze --fatal-infos
 ```
 
 Expected: all commands pass.
