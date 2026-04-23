@@ -4,7 +4,7 @@
 
 **Goal:** Add rule-based Memories (`birthday` and `recent_trip`) alongside existing `on_this_day` memories with minimal fork churn, generic client rendering, and strong duplicate protection.
 
-**Architecture:** Keep the existing `on_this_day` generation path intact and add a second server-side rule pipeline with its own `lastRuleDate` cursor so rules run only through the current day. Persist `ruleId`, `dedupeKey`, `title`, `subtitle`, `score`, and context inside `memory.data`; mirror `title` and `subtitle` onto direct memory responses; let sync keep shipping the generic `data` blob so mobile only needs a generic renderer instead of per-rule UI branches.
+**Architecture:** Keep the existing `on_this_day` generation path intact and add a second server-side rule pipeline with its own `lastRuleDate` cursor so rules run only through the current day. Treat that cursor as a retry optimization, not the correctness boundary: if a rule day partially fails, do not advance it, and let persisted dedupe keys keep reruns safe. Persist `ruleId`, `dedupeKey`, `title`, `subtitle`, `score`, and context inside `memory.data`; mirror `title` and `subtitle` onto direct memory responses; let sync keep shipping the generic `data` blob so mobile only needs a generic renderer instead of per-rule UI branches.
 
 **Tech Stack:** NestJS, Kysely, Luxon, Zod, generated OpenAPI/TypeScript SDK, SvelteKit, Flutter + Drift sync cache, native Android/iOS widget clients.
 
@@ -33,7 +33,7 @@
 - `server/src/repositories/asset.repository.ts`
   Add rule-query helpers for person assets and location clusters.
 - `server/src/repositories/memory.repository.ts`
-  Add `hasRuleMemory(ownerId, dedupeKey)`.
+  Add `hasRuleMemory(ownerId, ruleId, dedupeKey)`.
 - `server/src/services/memory-rules/memory-rule.interface.ts`
   Shared candidate / context types.
 - `server/src/services/memory-rules/birthday.rule.ts`
@@ -47,7 +47,7 @@
 - `server/src/services/memory-rules/birthday.rule.spec.ts`
   Birthday candidate selection tests.
 - `server/src/services/memory-rules/recent-trip.rule.spec.ts`
-  Trip candidate and cooldown tests.
+  Trip candidate, country/city confidence, and cooldown tests.
 - `server/test/medium/specs/services/memory.service.spec.ts`
   Real-DB coverage for birthday and trip generation.
 - `web/src/lib/utils.ts`
@@ -72,6 +72,8 @@
   Generic memory-data parsing tests.
 - `mobile/test/domain/repositories/sync_stream_repository_test.dart`
   Sync-store coverage for `rule` memories.
+- `mobile/test/presentation/memory/memory_title_test.dart`
+  Title fallback coverage for generic memories in the mobile UI.
 - `mobile/android/app/src/main/kotlin/app/alextran/immich/widget/ImmichAPI.kt`
   Keep widget memories filtered to `on_this_day`.
 - `mobile/ios/WidgetExtension/ImmichAPI.swift`
@@ -716,6 +718,94 @@ describe(RecentTripMemoryRule.name, () => {
       }),
     ).resolves.toEqual([]);
   });
+
+  it('creates a country-level trip when the country changed but city metadata is missing', async () => {
+    const assetRepository = {
+      getMemoryLocationClusters: vi
+        .fn()
+        .mockResolvedValueOnce([
+          {
+            country: 'Germany',
+            city: 'Berlin',
+            assetCount: 20,
+            dayCount: 12,
+            firstDate: new Date('2026-01-01T00:00:00Z'),
+            lastDate: new Date('2026-03-20T00:00:00Z'),
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            country: 'France',
+            city: null,
+            assetCount: 8,
+            dayCount: 2,
+            firstDate: new Date('2026-04-15T00:00:00Z'),
+            lastDate: new Date('2026-04-16T00:00:00Z'),
+          },
+        ]),
+      getMemoryAssetsForLocation: vi
+        .fn()
+        .mockResolvedValue([
+          { id: 'asset-1' },
+          { id: 'asset-2' },
+          { id: 'asset-3' },
+          { id: 'asset-4' },
+          { id: 'asset-5' },
+          { id: 'asset-6' },
+          { id: 'asset-7' },
+        ]),
+    };
+    const memoryRepository = { search: vi.fn().mockResolvedValue([]) };
+
+    const rule = new RecentTripMemoryRule(assetRepository as any, memoryRepository as any);
+    const [candidate] = await rule.evaluate({
+      ownerId: 'user-1',
+      target: DateTime.fromISO('2026-04-23', { zone: 'utc' }),
+    });
+
+    expect(candidate).toMatchObject({
+      ruleId: 'recent_trip',
+      title: 'Recent trip to France',
+      subtitle: '8 photos over 2 days',
+    });
+  });
+
+  it('skips same-country clusters when city metadata is missing or not trustworthy', async () => {
+    const assetRepository = {
+      getMemoryLocationClusters: vi
+        .fn()
+        .mockResolvedValueOnce([
+          {
+            country: 'Germany',
+            city: 'Berlin',
+            assetCount: 20,
+            dayCount: 12,
+            firstDate: new Date('2026-01-01T00:00:00Z'),
+            lastDate: new Date('2026-03-20T00:00:00Z'),
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            country: 'Germany',
+            city: null,
+            assetCount: 9,
+            dayCount: 3,
+            firstDate: new Date('2026-04-15T00:00:00Z'),
+            lastDate: new Date('2026-04-17T00:00:00Z'),
+          },
+        ]),
+      getMemoryAssetsForLocation: vi.fn(),
+    };
+    const memoryRepository = { search: vi.fn().mockResolvedValue([]) };
+
+    const rule = new RecentTripMemoryRule(assetRepository as any, memoryRepository as any);
+    await expect(
+      rule.evaluate({
+        ownerId: 'user-1',
+        target: DateTime.fromISO('2026-04-23', { zone: 'utc' }),
+      }),
+    ).resolves.toEqual([]);
+  });
 });
 ```
 
@@ -897,13 +987,14 @@ getMemoryAssetsForLocation(
 }
 
 // server/src/repositories/memory.repository.ts
-@GenerateSql({ params: [DummyValue.UUID, DummyValue.STRING] })
-async hasRuleMemory(ownerId: string, dedupeKey: string) {
+@GenerateSql({ params: [DummyValue.UUID, DummyValue.STRING, DummyValue.STRING] })
+async hasRuleMemory(ownerId: string, ruleId: string, dedupeKey: string) {
   const result = await this.db
     .selectFrom('memory')
     .select('id')
     .where('ownerId', '=', ownerId)
     .where('type', '=', MemoryType.Rule)
+    .where(sql<string>`memory.data->>'ruleId'`, '=', ruleId)
     .where(sql<string>`memory.data->>'dedupeKey'`, '=', dedupeKey)
     .where('deletedAt', 'is', null)
     .executeTakeFirst();
@@ -1125,6 +1216,29 @@ it('should keep only the top two non-duplicate rule candidates and fail soft', a
   expect(mocks.memory.create.mock.calls[0][0].data).toMatchObject({ title: 'First', dedupeKey: 'k-1' });
   expect(mocks.memory.create.mock.calls[1][0].data).toMatchObject({ title: 'Second', dedupeKey: 'k-2' });
 });
+
+it('should not advance the rule cursor when any owner run fails', async () => {
+  const userA = factory.userAdmin();
+  const userB = factory.userAdmin();
+  vi.setSystemTime(new Date('2026-04-23T12:00:00Z'));
+  mocks.user.getList.mockResolvedValue([userA, userB]);
+  mocks.systemMetadata.get.mockResolvedValue({
+    lastOnThisDayDate: '2026-04-25T00:00:00.000Z',
+    lastRuleDate: '2026-04-22T00:00:00.000Z',
+  });
+  mocks.asset.getByDayOfYear.mockResolvedValue([]);
+
+  vi.spyOn(sut as any, 'createRuleMemories')
+    .mockResolvedValueOnce(undefined)
+    .mockRejectedValueOnce(new Error('boom'));
+
+  await sut.onMemoriesCreate();
+
+  expect(mocks.systemMetadata.set).not.toHaveBeenCalledWith(
+    SystemMetadataKey.MemoriesState,
+    expect.objectContaining({ lastRuleDate: '2026-04-23T00:00:00.000Z' }),
+  );
+});
 ```
 
 - [ ] **Step 2: Run the tests to verify they fail**
@@ -1179,10 +1293,14 @@ export class MemoryService extends BaseService {
       }
 
       for (let target = lastRuleDate.plus({ days: 1 }); target <= today; target = target.plus({ days: 1 })) {
-        try {
-          await Promise.all(users.map((owner) => this.createRuleMemories(owner.id, target)));
-        } catch (error) {
-          this.logger.error(`Failed to create rule memories for ${target.toISO()}: ${error}`);
+        const results = await Promise.allSettled(users.map((owner) => this.createRuleMemories(owner.id, target)));
+        const failures = results.filter((result) => result.status === 'rejected');
+        if (failures.length > 0) {
+          for (const failure of failures) {
+            this.logger.error(`Failed to create rule memories for ${target.toISO()}: ${failure.reason}`);
+          }
+
+          break;
         }
 
         state.lastRuleDate = target.toISO();
@@ -1228,7 +1346,7 @@ export class MemoryService extends BaseService {
         break;
       }
 
-      const exists = await this.memoryRepository.hasRuleMemory(ownerId, candidate.dedupeKey);
+      const exists = await this.memoryRepository.hasRuleMemory(ownerId, candidate.ruleId, candidate.dedupeKey);
       if (exists) {
         continue;
       }
@@ -1411,6 +1529,7 @@ git commit -m "feat(web): render server-defined memory titles"
 
 - Create: `mobile/test/domain/models/memory_model_test.dart`
 - Modify: `mobile/test/domain/repositories/sync_stream_repository_test.dart`
+- Create: `mobile/test/presentation/memory/memory_title_test.dart`
 - Modify: `mobile/lib/domain/models/memory.model.dart`
 - Modify: `mobile/lib/infrastructure/repositories/sync_stream.repository.dart`
 - Modify: `mobile/lib/presentation/widgets/memory/memory_lane.widget.dart`
@@ -1487,14 +1606,67 @@ test('stores rule memories from sync without requiring year data', () async {
 });
 ```
 
+Create `mobile/test/presentation/memory/memory_title_test.dart`:
+
+```dart
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:immich_mobile/domain/models/memory.model.dart';
+import 'package:immich_mobile/presentation/pages/drift_memory.page.dart' as drift_page;
+import 'package:immich_mobile/presentation/widgets/memory/memory_lane.widget.dart' as memory_lane;
+
+void main() {
+  testWidgets('prefers server title and falls back gracefully when year is absent', (tester) async {
+    late BuildContext context;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (ctx) {
+            context = ctx;
+            return const SizedBox.shrink();
+          },
+        ),
+      ),
+    );
+
+    final ruleMemory = DriftMemory(
+      id: 'memory-rule-1',
+      type: MemoryTypeEnum.rule,
+      data: const MemoryData({
+        'ruleId': 'birthday',
+        'title': 'Happy birthday, Alice',
+      }),
+      createdAt: DateTime(2026, 4, 23),
+      memoryAt: DateTime(2026, 4, 23),
+      showAt: DateTime(2026, 4, 23),
+      hideAt: DateTime(2026, 4, 23, 23, 59),
+    );
+
+    final unknownRuleMemory = DriftMemory(
+      id: 'memory-rule-2',
+      type: MemoryTypeEnum.rule,
+      data: const MemoryData({'ruleId': 'recent_trip'}),
+      createdAt: DateTime(2026, 4, 23),
+      memoryAt: DateTime(2026, 4, 23),
+      showAt: DateTime(2026, 4, 23),
+      hideAt: DateTime(2026, 4, 23, 23, 59),
+    );
+
+    expect(memory_lane.getMemoryTitle(context, ruleMemory), 'Happy birthday, Alice');
+    expect(drift_page.getMemoryTitle(context, unknownRuleMemory), isNotEmpty);
+  });
+}
+```
+
 - [ ] **Step 2: Run the Dart tests to verify they fail**
 
 ```bash
 cd /tmp/gallery-memories-rules-exploration-20260423/mobile
 flutter test test/domain/models/memory_model_test.dart test/domain/repositories/sync_stream_repository_test.dart
+flutter test test/presentation/memory/memory_title_test.dart
 ```
 
-Expected: the tests fail because `MemoryData` still requires `year`, and `MemoryType.rule` is not mapped into Drift yet.
+Expected: the data/sync tests fail because `MemoryData` still requires `year`, and `MemoryType.rule` is not mapped into Drift yet. The new title test may also fail until the generic title helpers exist.
 
 - [ ] **Step 3: Implement generic mobile memory data and widget filtering**
 
@@ -1599,6 +1771,7 @@ let memoryParams = [
 ```bash
 cd /tmp/gallery-memories-rules-exploration-20260423/mobile
 flutter test test/domain/models/memory_model_test.dart test/domain/repositories/sync_stream_repository_test.dart
+flutter test test/presentation/memory/memory_title_test.dart
 dart analyze --fatal-infos
 cd android && ./gradlew :app:compileDebugKotlin
 ```
@@ -1618,7 +1791,7 @@ Expected: the iOS build succeeds; if Xcode is unavailable, record that the chang
 
 ```bash
 cd /tmp/gallery-memories-rules-exploration-20260423
-git add mobile/test/domain/models/memory_model_test.dart mobile/test/domain/repositories/sync_stream_repository_test.dart mobile/lib/domain/models/memory.model.dart mobile/lib/infrastructure/repositories/sync_stream.repository.dart mobile/lib/presentation/widgets/memory/memory_lane.widget.dart mobile/lib/presentation/pages/drift_memory.page.dart mobile/android/app/src/main/kotlin/app/alextran/immich/widget/ImmichAPI.kt mobile/ios/WidgetExtension/ImmichAPI.swift
+git add mobile/test/domain/models/memory_model_test.dart mobile/test/domain/repositories/sync_stream_repository_test.dart mobile/test/presentation/memory/memory_title_test.dart mobile/lib/domain/models/memory.model.dart mobile/lib/infrastructure/repositories/sync_stream.repository.dart mobile/lib/presentation/widgets/memory/memory_lane.widget.dart mobile/lib/presentation/pages/drift_memory.page.dart mobile/android/app/src/main/kotlin/app/alextran/immich/widget/ImmichAPI.kt mobile/ios/WidgetExtension/ImmichAPI.swift
 git commit -m "feat(mobile): render generic rule memories"
 ```
 
@@ -1652,7 +1825,7 @@ pnpm --filter immich test:medium -- --run test/medium/specs/services/memory.serv
 pnpm --filter immich check
 pnpm --filter immich-web test -- --run src/lib/utils.spec.ts
 pnpm --filter immich-web check
-cd mobile && flutter test test/domain/models/memory_model_test.dart test/domain/repositories/sync_stream_repository_test.dart
+cd mobile && flutter test test/domain/models/memory_model_test.dart test/domain/repositories/sync_stream_repository_test.dart test/presentation/memory/memory_title_test.dart
 cd mobile && dart analyze --fatal-infos
 ```
 
@@ -1682,6 +1855,7 @@ Record these points in the PR body or handoff note:
 
 ```text
 - Added generic rule memory pipeline with separate lastRuleDate cursor.
+- lastRuleDate stays retry-safe: failed rule days rerun and dedupe prevents duplicates.
 - Shipped birthday and recent_trip server rules.
 - Rule display text lives in memory.data and mirrors to API title/subtitle.
 - Web and mobile render server titles generically; on_this_day keeps localized fallback.
