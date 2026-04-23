@@ -187,6 +187,19 @@ export function stripSupplementalSuffix(pathWithoutJson: string): string {
   return pathWithoutJson.slice(0, lastDot);
 }
 
+function hasKnownMediaExtension(filename: string): boolean {
+  const lastDot = filename.lastIndexOf('.');
+  return lastDot !== -1 && MEDIA_EXTENSIONS.has(filename.slice(lastDot).toLowerCase());
+}
+
+function dirname(path: string): string {
+  return path.slice(0, Math.max(0, path.lastIndexOf('/')));
+}
+
+function basename(path: string): string {
+  return path.slice(Math.max(0, path.lastIndexOf('/') + 1));
+}
+
 /**
  * Sidecar-to-media matching cascade. Ported from simulot/immich-go
  * (AGPL-3.0) —
@@ -236,15 +249,26 @@ export function matchNormal(jsonName: string, fileName: string): boolean {
   // Tolerate Google's basename truncation: when the sidecar filename is
   // too long for Google's budget, the stem (after stripping
   // `.supplemental-metadata` + `.json`) becomes a strict prefix of the
-  // media basename. Require length strictly greater to avoid false positives.
-  return fileStem.length > jsonStem.length && fileStem.startsWith(jsonStem);
+  // media basename. Only allow this when the sidecar stem does not already
+  // include a complete known media extension; otherwise `IMG.jpg.json` would
+  // incorrectly fan out to siblings like `IMG.jpg.mp4`.
+  if (hasKnownMediaExtension(jsonStem) || fileStem.length <= jsonStem.length || !fileStem.startsWith(jsonStem)) {
+    return false;
+  }
+
+  const tail = fileStem.slice(jsonStem.length).toLowerCase();
+  return !MEDIA_EXTENSIONS.has(tail);
 }
 
 /**
  * Forgotten-duplicates matcher: handles Google's `original_<uuid>_.json`
  * sidecars whose media files gained a `_P` or `_P(N)` suffix, and sidecars
- * that omit the media extension entirely (Gap #4). Requires `fileName`
- * starts with the stripped jsonStem and the code-point length diff is < 10.
+ * that omit the media extension entirely (Gap #4). Unlike immich-go
+ * `cc928edbce4`, this port strips `.supplemental-metadata` before the prefix
+ * check so Gap #4 keeps matching sidecars that omit the media extension; see
+ * `docs/plans/2026-04-22-google-takeout-gaps-design.md`.
+ * Requires `fileName` to start with the stripped jsonStem and the code-point
+ * length diff is < 10.
  */
 export function matchForgottenDuplicates(jsonName: string, fileName: string): boolean {
   if (!jsonName.endsWith('.json')) {
@@ -255,59 +279,155 @@ export function matchForgottenDuplicates(jsonName: string, fileName: string): bo
     return false;
   }
   const diff = [...fileName].length - [...jsonStem].length;
-  return diff < 10;
+  return diff < 10; // Keep immich-go `cc928edbce4`'s pinned < 10 cutoff as the local slack budget.
 }
 
 /**
- * Match a JSON sidecar file to its corresponding media file.
+ * Confirmed edited-copy suffixes Google Takeout appends to edited variants.
+ * Only the 4 entries confirmed in immich-go's docs ship here — unconfirmed
+ * variants are deliberately omitted to avoid false-match chains. See
+ * docs/plans/2026-04-22-google-takeout-gaps.md for the full candidate list
+ * and the rationale for the conservative cut.
+ */
+const EDITED_SUFFIXES = ['-edited', '-modifié', '-bearbeitet', '-modificato'] as const;
+
+/**
+ * Edited-name matcher: handles `IMAG0061-edited.JPG` etc. sharing the sidecar
+ * of `IMAG0061.JPG`. Requires no `(N)` on fileName, strips supplemental-metadata
+ * on the sidecar side, drops trailing media extension on the stem, then checks
+ * startsWith + an edited suffix immediately before the file extension.
+ */
+export function matchEditedName(jsonName: string, fileName: string): boolean {
+  if (!jsonName.endsWith('.json')) {
+    return false;
+  }
+  if (extractFileIndex(fileName).index !== '') {
+    return false;
+  }
+
+  let jsonStem = stripSupplementalSuffix(jsonName.slice(0, -5));
+  let expectedExtension: string | undefined;
+
+  // Drop trailing media extension from jsonStem, if any.
+  const lastDot = jsonStem.lastIndexOf('.');
+  if (lastDot !== -1) {
+    const jsonExtension = jsonStem.slice(lastDot).toLowerCase();
+    if (MEDIA_EXTENSIONS.has(jsonExtension)) {
+      expectedExtension = jsonExtension;
+      jsonStem = jsonStem.slice(0, lastDot);
+    }
+  }
+
+  if (!fileName.startsWith(jsonStem)) {
+    return false;
+  }
+
+  // `tail` is the remainder after the stem — must be `<edited-suffix><media-ext>`.
+  const tail = fileName.slice(jsonStem.length);
+  const tailDot = tail.lastIndexOf('.');
+  if (tailDot === -1) {
+    return false;
+  }
+  const suffix = tail.slice(0, tailDot);
+  const ext = tail.slice(tailDot).toLowerCase();
+
+  return (
+    MEDIA_EXTENSIONS.has(ext) &&
+    (expectedExtension === undefined || ext === expectedExtension) &&
+    EDITED_SUFFIXES.includes(suffix as (typeof EDITED_SUFFIXES)[number])
+  );
+}
+
+/**
+ * Match a JSON sidecar to one or more media files in the same directory.
  *
- * Google Takeout places sidecars alongside media files in one of two formats:
- *   - legacy: `IMG_1234.jpg.json`
- *   - 2024+:  `IMG_1234.jpg.supplemental-metadata.json` (suffix may be truncated to fit ~51 chars)
- *
- * For media filenames longer than 47 characters, Google also truncates the media
- * basename before appending the sidecar tail.
- *
- * Returns the matching media path, or undefined if no match found or sidecar is not valid Takeout JSON.
+ * Returns an array of matching media paths. A single sidecar may bind to
+ * multiple media files (e.g. an `IMG.jpg` original + `IMG-edited.jpg`
+ * sharing one sidecar). Returns `[]` when the sidecar is not a valid
+ * Takeout photo sidecar or has no matching candidates.
  */
 export function matchSidecarToMedia(
   sidecarPath: string,
   sidecarContent: string,
   mediaFilePaths: string[],
-): string | undefined {
-  // Validate that the sidecar is actually a Takeout JSON file
-  if (!parseGoogleTakeoutSidecar(sidecarContent)) {
-    return undefined;
+): string[] {
+  const metadata = parseGoogleTakeoutSidecar(sidecarContent);
+  if (!metadata) {
+    return [];
   }
-
-  // Strip .json extension to get the expected media path
   if (!sidecarPath.endsWith('.json')) {
-    return undefined;
-  }
-  const expectedMediaPath = stripSupplementalSuffix(sidecarPath.slice(0, -5));
-
-  // Try exact match first
-  const exactMatch = mediaFilePaths.find((p) => p === expectedMediaPath);
-  if (exactMatch) {
-    return exactMatch;
+    return [];
   }
 
-  // Fallback: truncated filename matching (Google's 47-char limit)
-  const sidecarDir = expectedMediaPath.slice(0, Math.max(0, expectedMediaPath.lastIndexOf('/')));
-  const sidecarBasename = expectedMediaPath.slice(Math.max(0, expectedMediaPath.lastIndexOf('/') + 1));
+  // Same-dir filter: Takeout's invariant is that sidecars sit alongside media
+  // in each album folder, so basename-collision across albums is impossible.
+  const sidecarDir = dirname(sidecarPath);
+  const sidecarBasename = basename(sidecarPath);
+  const titleBasename = metadata.title.trim();
 
-  if (sidecarBasename.length > 0) {
-    const truncatedMatch = mediaFilePaths.find((p) => {
-      const dir = p.slice(0, Math.max(0, p.lastIndexOf('/')));
-      const basename = p.slice(Math.max(0, p.lastIndexOf('/') + 1));
-      return dir === sidecarDir && basename.startsWith(sidecarBasename) && basename.length > sidecarBasename.length;
-    });
-    if (truncatedMatch) {
-      return truncatedMatch;
+  const fastTrackMatches: string[] = [];
+  const normalMatches: string[] = [];
+  const editedMatches: string[] = [];
+  const forgottenMatches: string[] = [];
+  const titleExactMatches: string[] = [];
+  const titleEditedMatches: string[] = [];
+
+  for (const mediaPath of mediaFilePaths) {
+    const mediaDir = dirname(mediaPath);
+    if (mediaDir !== sidecarDir) {
+      continue;
+    }
+    const mediaBasename = basename(mediaPath);
+
+    if (matchFastTrack(sidecarBasename, mediaBasename)) {
+      fastTrackMatches.push(mediaPath);
+      continue;
+    }
+
+    if (matchNormal(sidecarBasename, mediaBasename)) {
+      normalMatches.push(mediaPath);
+      continue;
+    }
+
+    if (matchEditedName(sidecarBasename, mediaBasename)) {
+      editedMatches.push(mediaPath);
+      continue;
+    }
+
+    if (matchForgottenDuplicates(sidecarBasename, mediaBasename)) {
+      forgottenMatches.push(mediaPath);
+      if (!titleBasename) {
+        continue;
+      }
+
+      if (mediaBasename === titleBasename) {
+        titleExactMatches.push(mediaPath);
+        continue;
+      }
+
+      if (matchEditedName(`${titleBasename}.json`, mediaBasename)) {
+        titleEditedMatches.push(mediaPath);
+      }
     }
   }
 
-  return undefined;
+  if (fastTrackMatches.length > 0) {
+    return [...fastTrackMatches, ...editedMatches];
+  }
+
+  if (normalMatches.length > 0) {
+    return [...normalMatches, ...editedMatches];
+  }
+
+  if (titleExactMatches.length > 0) {
+    return [...titleExactMatches, ...titleEditedMatches];
+  }
+
+  if (editedMatches.length > 0) {
+    return editedMatches;
+  }
+
+  return forgottenMatches;
 }
 
 const AUTO_GENERATED_ALBUM_PATTERN = /^Photos from \d{4}$/;
@@ -320,32 +440,64 @@ export function isAutoGeneratedAlbum(name: string): boolean {
 }
 
 /**
- * Extract album information from the folder structure of Takeout items.
- * Google Takeout organizes photos into folders like:
- *   Takeout/Google Photos/<AlbumName>/filename.jpg
- *
- * Items not in the expected folder structure are excluded from albums.
+ * Identify the Google Photos root folder names in a batch of scanned items.
+ * A root is the segment `parts[1]` of every item whose sidecar parsed
+ * successfully (proven by `metadata !== undefined`) and whose path begins
+ * with `Takeout/`. A full Google Account export may include `YouTube/`,
+ * `Gmail/`, etc. alongside the Photos root; only the Photos root passes
+ * this shape filter.
  */
-export function detectAlbums(items: TakeoutMediaItem[]): TakeoutAlbum[] {
+export function derivePhotoRoots(items: TakeoutMediaItem[]): Set<string> {
+  const roots = new Set<string>();
+  for (const item of items) {
+    if (item.metadata === undefined) {
+      continue;
+    }
+    const parts = item.path.split('/');
+    if (parts[0] === 'Takeout' && parts[1]) {
+      roots.add(parts[1]);
+    }
+  }
+  return roots;
+}
+
+/**
+ * Finalize `item.albumName` in place using the authoritative `photoRoots`.
+ * Writes `parts[2]` when the item sits under `Takeout/<root>/<album>/...`
+ * and `<root>` is a confirmed Photos root; otherwise clears albumName to
+ * `undefined` (overriding any tentative value the extraction-time heuristic
+ * left on the item).
+ */
+export function finalizeItemAlbumNames(items: TakeoutMediaItem[], photoRoots: Set<string>): void {
+  for (const item of items) {
+    const parts = item.path.split('/');
+    item.albumName = parts.length >= 4 && parts[0] === 'Takeout' && photoRoots.has(parts[1]) && parts[2] ? parts[2] : undefined;
+  }
+}
+
+/**
+ * Extract album information from the folder structure of Takeout items.
+ * Uses `photoRoots` (from `derivePhotoRoots`) to distinguish Google Photos
+ * content from other Takeout services (YouTube, Drive, etc.) in the same
+ * export. Items whose `parts[1]` is not in `photoRoots` are ignored.
+ *
+ * Expected structure: `Takeout/<root>/<AlbumName>/<filename>`.
+ * Nested albums flatten: `Takeout/<root>/Parent/Child/file.jpg` -> album "Child".
+ */
+export function detectAlbums(items: TakeoutMediaItem[], photoRoots: Set<string>): TakeoutAlbum[] {
   const albumMap = new Map<string, string[]>();
 
   for (const item of items) {
     const parts = item.path.split('/');
-    // Expected structure: Takeout/Google Photos/<AlbumName>/filename
-    // We need at least 4 parts to have an album folder
     if (parts.length < 4) {
       continue;
     }
-
-    // The album name is the second-to-last directory component
-    const albumName = parts.at(-2);
-    if (!albumName) {
+    if (parts[0] !== 'Takeout' || !photoRoots.has(parts[1])) {
       continue;
     }
 
-    // Skip the root "Google Photos" folder itself — we want subfolders of it
-    const googlePhotosIndex = parts.indexOf('Google Photos');
-    if (googlePhotosIndex === -1 || googlePhotosIndex >= parts.length - 2) {
+    const albumName = parts.at(-2);
+    if (!albumName) {
       continue;
     }
 
