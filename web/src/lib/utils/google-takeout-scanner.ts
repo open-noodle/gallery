@@ -1,7 +1,7 @@
 import type { TakeoutAlbum, TakeoutMediaItem, TakeoutMetadata } from '$lib/utils/google-takeout-parser';
 import {
-  detectAlbums,
   derivePhotoRoots,
+  detectAlbums,
   finalizeItemAlbumNames,
   matchSidecarToMedia,
   MEDIA_EXTENSIONS,

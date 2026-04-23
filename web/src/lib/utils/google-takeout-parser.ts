@@ -346,11 +346,7 @@ export function matchEditedName(jsonName: string, fileName: string): boolean {
  * sharing one sidecar). Returns `[]` when the sidecar is not a valid
  * Takeout photo sidecar or has no matching candidates.
  */
-export function matchSidecarToMedia(
-  sidecarPath: string,
-  sidecarContent: string,
-  mediaFilePaths: string[],
-): string[] {
+export function matchSidecarToMedia(sidecarPath: string, sidecarContent: string, mediaFilePaths: string[]): string[] {
   const metadata = parseGoogleTakeoutSidecar(sidecarContent);
   if (!metadata) {
     return [];
@@ -471,7 +467,8 @@ export function derivePhotoRoots(items: TakeoutMediaItem[]): Set<string> {
 export function finalizeItemAlbumNames(items: TakeoutMediaItem[], photoRoots: Set<string>): void {
   for (const item of items) {
     const parts = item.path.split('/');
-    item.albumName = parts.length >= 4 && parts[0] === 'Takeout' && photoRoots.has(parts[1]) && parts[2] ? parts[2] : undefined;
+    item.albumName =
+      parts.length >= 4 && parts[0] === 'Takeout' && photoRoots.has(parts[1]) && parts[2] ? parts[2] : undefined;
   }
 }
 
