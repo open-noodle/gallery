@@ -212,6 +212,8 @@ export interface FilterSuggestionsOptions extends SuggestionScopeOptions {
   isFavorite?: boolean;
 }
 
+type AccessibleTagScopeOptions = Pick<SuggestionScopeOptions, 'spaceId' | 'timelineSpaceIds' | 'takenAfter' | 'takenBefore'>;
+
 export interface FilterSuggestionsResult {
   countries: string[];
   cameraMakes: string[];
@@ -615,7 +617,7 @@ export class SearchRepository {
   @GenerateSql({ params: [[DummyValue.UUID]] })
   async getAccessibleTags(
     userIds: string[],
-    options?: SuggestionScopeOptions,
+    options?: AccessibleTagScopeOptions,
   ): Promise<Array<{ id: string; value: string }>> {
     return this.db
       .selectFrom('tag')
