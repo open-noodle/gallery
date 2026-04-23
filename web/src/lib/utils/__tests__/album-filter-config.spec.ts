@@ -1,7 +1,7 @@
 import { createFilterState } from '$lib/components/filter-panel/filter-panel';
 import { buildAlbumAssetPickerFilterConfig, buildAlbumDetailFilterConfig } from '$lib/utils/album-filter-config';
 import { AssetTypeEnum, getFilterSuggestions, getSearchSuggestions } from '@immich/sdk';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@immich/sdk', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@immich/sdk')>();
@@ -20,13 +20,27 @@ vi.mock('@immich/sdk', async (importOriginal) => {
   };
 });
 
+beforeEach(() => {
+  vi.clearAllMocks();
+});
+
 describe('buildAlbumDetailFilterConfig', () => {
   it('keeps the album filter sections in plan order', () => {
     const config = buildAlbumDetailFilterConfig('album-1');
     expect(config.sections).toEqual(['timeline', 'people', 'location', 'camera', 'tags', 'rating', 'media']);
   });
 
-  it('passes albumId to filter suggestions and dependent providers', async () => {
+  it('passes albumId to filter suggestions, maps suggestions, and scopes dependent providers', async () => {
+    vi.mocked(getFilterSuggestions).mockResolvedValueOnce({
+      countries: ['Germany'],
+      cameraMakes: ['Sony'],
+      tags: [{ id: 'tag-1', value: 'Vacation' }],
+      people: [{ id: 'person-1', name: 'Alice' }],
+      ratings: [5],
+      mediaTypes: ['IMAGE'],
+      hasUnnamedPeople: true,
+    } as never);
+
     const config = buildAlbumDetailFilterConfig('album-1');
     const filters = {
       ...createFilterState(),
@@ -35,9 +49,19 @@ describe('buildAlbumDetailFilterConfig', () => {
       mediaType: 'image' as const,
     };
 
-    await config.suggestionsProvider!(filters);
+    const result = await config.suggestionsProvider!(filters);
     await config.providers!.cities!('Germany', { takenAfter: '2024-01-01T00:00:00.000Z' });
     await config.providers!.cameraModels!('Sony', { takenBefore: '2024-12-31T00:00:00.000Z' });
+
+    expect(result.tags).toEqual([{ id: 'tag-1', name: 'Vacation' }]);
+    expect(result.people).toEqual([
+      expect.objectContaining({
+        id: 'person-1',
+        name: 'Alice',
+        thumbnailUrl: expect.stringContaining('/people/person-1/thumbnail'),
+      }),
+    ]);
+    expect(result.hasUnnamedPeople).toBe(true);
 
     expect(getFilterSuggestions).toHaveBeenCalledWith(
       expect.objectContaining({
