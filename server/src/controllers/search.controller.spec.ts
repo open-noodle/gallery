@@ -16,6 +16,7 @@ describe(SearchController.name, () => {
   beforeEach(() => {
     service.resetAllMocks();
     ctx.reset();
+    ctx.authenticate.mockResolvedValue({});
   });
 
   describe('POST /search/metadata', () => {
@@ -174,6 +175,88 @@ describe(SearchController.name, () => {
         const { status, body } = await request(ctx.getHttpServer()).get('/search/suggestions').send({});
         expect(status).toBe(400);
         expect(body).toEqual(errorDto.badRequest([expect.stringContaining('[type] Invalid option: expected one of')]));
+      });
+
+      it('accepts a valid albumId query param', async () => {
+        const albumId = '11111111-1111-4111-8111-111111111111';
+        service.getSearchSuggestions.mockResolvedValue(['Germany']);
+
+        const { status, body } = await request(ctx.getHttpServer())
+          .get('/search/suggestions')
+          .query({ type: 'country', albumId });
+
+        expect(status).toBe(200);
+        expect(body).toEqual(['Germany']);
+        expect(service.getSearchSuggestions).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ type: 'country', albumId }),
+        );
+      });
+
+      it('rejects an invalid albumId query param', async () => {
+        const { status, body } = await request(ctx.getHttpServer())
+          .get('/search/suggestions')
+          .query({ type: 'country', albumId: 'not-a-uuid' });
+
+        expect(status).toBe(400);
+        expect(body).toEqual(errorDto.badRequest([expect.stringContaining('[albumId]')]));
+      });
+
+      it('rejects albumId mixed with withSharedSpaces', async () => {
+        const albumId = '11111111-1111-4111-8111-111111111111';
+
+        const { status, body } = await request(ctx.getHttpServer())
+          .get('/search/suggestions')
+          .query({ type: 'country', albumId, withSharedSpaces: true });
+
+        expect(status).toBe(400);
+        expect(body).toEqual(errorDto.badRequest([expect.stringContaining('albumId')]));
+      });
+    });
+
+    describe('GET /search/suggestions/filters', () => {
+      it('accepts a valid albumId query param', async () => {
+        const albumId = '11111111-1111-4111-8111-111111111111';
+        service.getFilterSuggestions.mockResolvedValue({
+          countries: [],
+          cameraMakes: [],
+          tags: [],
+          people: [],
+          ratings: [],
+          mediaTypes: [],
+          hasUnnamedPeople: false,
+        });
+
+        const { status, body } = await request(ctx.getHttpServer())
+          .get('/search/suggestions/filters')
+          .query({ albumId });
+
+        expect(status).toBe(200);
+        expect(body).toEqual({
+          countries: [],
+          cameraMakes: [],
+          tags: [],
+          people: [],
+          ratings: [],
+          mediaTypes: [],
+          hasUnnamedPeople: false,
+        });
+        expect(service.getFilterSuggestions).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ albumId }),
+        );
+      });
+
+      it('rejects albumId mixed with spaceId', async () => {
+        const albumId = '11111111-1111-4111-8111-111111111111';
+        const spaceId = '22222222-2222-4222-8222-222222222222';
+
+        const { status, body } = await request(ctx.getHttpServer())
+          .get('/search/suggestions/filters')
+          .query({ albumId, spaceId });
+
+        expect(status).toBe(400);
+        expect(body).toEqual(errorDto.badRequest([expect.stringContaining('albumId')]));
       });
     });
   });

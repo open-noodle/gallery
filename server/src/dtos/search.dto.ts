@@ -133,11 +133,12 @@ const SearchSuggestionTypeSchema = z
 const SearchSuggestionRequestSchema = z
   .object({
     type: SearchSuggestionTypeSchema,
+    albumId: z.uuidv4().optional().describe('Scope suggestions to a specific album'),
     country: z.string().optional().describe('Filter by country'),
     state: z.string().optional().describe('Filter by state/province'),
     make: z.string().optional().describe('Filter by camera make'),
     model: z.string().optional().describe('Filter by camera model'),
-    lensModel: z.string().optional().describe('Filter by lens model'),
+    lensModel: z.string().optional().describe('Filter by camera lens model'),
     takenAfter: isoDatetimeToDate.optional().describe('Filter suggestions by taken date (after)'),
     takenBefore: isoDatetimeToDate.optional().describe('Filter suggestions by taken date (before)'),
     spaceId: z.uuidv4().optional().describe('Scope suggestions to a specific shared space'),
@@ -148,6 +149,10 @@ const SearchSuggestionRequestSchema = z
       .optional()
       .describe('Include null values in suggestions')
       .meta(new HistoryBuilder().added('v1.111.0').stable('v2').getExtensions()),
+  })
+  .refine((data) => !(data.albumId && data.spaceId), { error: 'Cannot use both albumId and spaceId' })
+  .refine((data) => !(data.albumId && data.withSharedSpaces), {
+    error: 'Cannot use both albumId and withSharedSpaces',
   })
   .meta({ id: 'SearchSuggestionRequestDto' });
 
@@ -214,8 +219,13 @@ const FilterSuggestionsRequestSchema = z
     isFavorite: stringToBool.optional().describe('Filter by favorites'),
     takenAfter: isoDatetimeToDate.optional().describe('Filter by taken date (after)'),
     takenBefore: isoDatetimeToDate.optional().describe('Filter by taken date (before)'),
+    albumId: z.uuidv4().optional().describe('Scope to a specific album'),
     spaceId: z.uuidv4().optional().describe('Scope to a specific shared space'),
     withSharedSpaces: stringToBool.optional().describe('Include shared spaces the user is a member of'),
+  })
+  .refine((data) => !(data.albumId && data.spaceId), { error: 'Cannot use both albumId and spaceId' })
+  .refine((data) => !(data.albumId && data.withSharedSpaces), {
+    error: 'Cannot use both albumId and withSharedSpaces',
   })
   .meta({ id: 'FilterSuggestionsRequestDto' });
 
