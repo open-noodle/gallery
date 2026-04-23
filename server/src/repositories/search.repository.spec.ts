@@ -66,11 +66,15 @@ describe(SearchRepository.name, () => {
 
   describe('searchSmart query shape', () => {
     it('applies rating as an inclusive threshold when combined with other filters', () => {
-      const { base } = buildQueries(sut, { page: 1, size: 100 }, {
-        ...baseOptions,
-        personIds: ['00000000-0000-0000-0000-000000000001'],
-        rating: 2,
-      });
+      const { base } = buildQueries(
+        sut,
+        { page: 1, size: 100 },
+        {
+          ...baseOptions,
+          personIds: ['00000000-0000-0000-0000-000000000001'],
+          rating: 2,
+        },
+      );
       const innerSql = base.compile().sql;
 
       expect(innerSql).toMatch(/rating"?\s*>=\s*\$\d+/i);
