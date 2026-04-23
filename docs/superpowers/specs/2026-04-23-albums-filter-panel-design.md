@@ -75,13 +75,15 @@ Create two route-local or helper-based configs:
 `buildAlbumDetailFilterConfig` uses:
 
 - `getFilterSuggestions({ albumId, ...filters })`
-- `getSearchSuggestions({ albumId, ...context })`
+- `providers.cities(country, context) -> getSearchSuggestions({ albumId, country, ...context })`
+- `providers.cameraModels(make, context) -> getSearchSuggestions({ albumId, make, ...context })`
 
 `buildAlbumAssetPickerFilterConfig` uses picker scope only:
 
 - no `albumId`
 - no `withSharedSpaces`
 - suggestions aligned with the current picker dataset, which already uses `withPartners: true` and `timelineAlbumId`
+- `providers.cities(country, context)` and `providers.cameraModels(make, context)` follow the same picker scope rules
 
 Do not add a search box, sort dropdown, or favorites section in this work.
 
@@ -240,7 +242,7 @@ pickerFilters
 
 ## Testing
 
-## TDD Execution
+### TDD Execution
 
 Implementation should follow strict red-green-refactor order instead of treating the test list as a post-hoc checklist.
 
@@ -273,8 +275,17 @@ No production code for a slice should be added before at least one failing test 
 - Active filter chips use album-scoped labels in album modes and picker-scoped labels in picker mode.
 - Filtered zero-results state shows the correct empty message and clear-all action.
 - `SELECT_ASSETS` keeps already-in-album assets disabled and visibly marked after filters change.
+- Navigating from one album detail page to another resets both filter states and both label caches.
 
 ### Server Tests
+
+#### Controller / HTTP validation
+
+- `/search/suggestions` accepts a valid `albumId` query param.
+- `/search/suggestions/filters` accepts a valid `albumId` query param.
+- Invalid `albumId` query params return `400` on both endpoints.
+
+#### Service / repository behavior
 
 - `getFilterSuggestions` accepts `albumId` and scopes results to accessible album assets.
 - `getSearchSuggestions` accepts `albumId` and scopes follow-up suggestions to accessible album assets.
@@ -295,6 +306,7 @@ No production code for a slice should be added before at least one failing test 
 
 - `web/src/routes/(user)/albums/[albumId=id]/[[photos=photos]]/[[assetId=id]]/+page.svelte`
 - `web/src/lib/utils/` helper for album timeline filter option mapping
+- `server/src/controllers/search.controller.spec.ts`
 - `server/src/dtos/search.dto.ts`
 - `server/src/services/search.service.ts`
 - `server/src/repositories/search.repository.ts`
