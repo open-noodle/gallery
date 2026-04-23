@@ -241,6 +241,24 @@ export function matchNormal(jsonName: string, fileName: string): boolean {
 }
 
 /**
+ * Forgotten-duplicates matcher: handles Google's `original_<uuid>_.json`
+ * sidecars whose media files gained a `_P` or `_P(N)` suffix, and sidecars
+ * that omit the media extension entirely (Gap #4). Requires `fileName`
+ * starts with the stripped jsonStem and the code-point length diff is < 10.
+ */
+export function matchForgottenDuplicates(jsonName: string, fileName: string): boolean {
+  if (!jsonName.endsWith('.json')) {
+    return false;
+  }
+  const jsonStem = stripSupplementalSuffix(jsonName.slice(0, -5));
+  if (!fileName.startsWith(jsonStem)) {
+    return false;
+  }
+  const diff = [...fileName].length - [...jsonStem].length;
+  return diff < 10;
+}
+
+/**
  * Match a JSON sidecar file to its corresponding media file.
  *
  * Google Takeout places sidecars alongside media files in one of two formats:
