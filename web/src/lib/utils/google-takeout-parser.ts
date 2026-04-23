@@ -203,6 +203,44 @@ export function matchFastTrack(jsonName: string, fileName: string): boolean {
 }
 
 /**
+ * Normal matcher: handles Google's three `(N)` sidecar shapes:
+ *   - `name.jpg(1).json`                          — legacy
+ *   - `name.jpg(1).supplemental-metadata.json`    — (N) before supplemental
+ *   - `name.jpg.supplemental-metadata(1).json`    — (N) after supplemental
+ *
+ * Ordering is load-bearing: strip supplemental first (so shape 2 loses its
+ * `.supplemental-metadata` segment), extract `(N)`, then strip supplemental
+ * again on the resulting stem (so shape 3's supplemental — which was hidden
+ * behind the trailing `(N)` on the first pass — also comes off).
+ */
+export function matchNormal(jsonName: string, fileName: string): boolean {
+  if (!jsonName.endsWith('.json')) {
+    return false;
+  }
+
+  const afterJson = stripSupplementalSuffix(jsonName.slice(0, -5));
+
+  const jsonExtract = extractFileIndex(afterJson);
+  const fileExtract = extractFileIndex(fileName);
+  if (jsonExtract.index !== fileExtract.index) {
+    return false;
+  }
+
+  const jsonStem = stripSupplementalSuffix(jsonExtract.name);
+  const fileStem = fileExtract.name;
+
+  if (jsonStem === fileStem) {
+    return true;
+  }
+
+  // Tolerate Google's basename truncation: when the sidecar filename is
+  // too long for Google's budget, the stem (after stripping
+  // `.supplemental-metadata` + `.json`) becomes a strict prefix of the
+  // media basename. Require length strictly greater to avoid false positives.
+  return fileStem.length > jsonStem.length && fileStem.startsWith(jsonStem);
+}
+
+/**
  * Match a JSON sidecar file to its corresponding media file.
  *
  * Google Takeout places sidecars alongside media files in one of two formats:
