@@ -211,7 +211,7 @@ describe(SearchController.name, () => {
 
         expect(status).toBe(400);
         expect(body).toEqual(
-          errorDto.badRequest([expect.stringContaining('Cannot use both albumId and withSharedSpaces')]),
+          errorDto.badRequest([expect.stringContaining('albumId cannot exist alongside withSharedSpaces')]),
         );
       });
 
@@ -224,7 +224,7 @@ describe(SearchController.name, () => {
           .query({ type: 'country', albumId, spaceId });
 
         expect(status).toBe(400);
-        expect(body).toEqual(errorDto.badRequest([expect.stringContaining('Cannot use both albumId and spaceId')]));
+        expect(body).toEqual(errorDto.badRequest([expect.stringContaining('albumId cannot exist alongside spaceId')]));
       });
     });
 
@@ -271,7 +271,7 @@ describe(SearchController.name, () => {
           .query({ albumId, spaceId });
 
         expect(status).toBe(400);
-        expect(body).toEqual(errorDto.badRequest([expect.stringContaining('Cannot use both albumId and spaceId')]));
+        expect(body).toEqual(errorDto.badRequest([expect.stringContaining('albumId cannot exist alongside spaceId')]));
       });
 
       it('rejects an invalid albumId query param', async () => {
@@ -292,7 +292,7 @@ describe(SearchController.name, () => {
 
         expect(status).toBe(400);
         expect(body).toEqual(
-          errorDto.badRequest([expect.stringContaining('Cannot use both albumId and withSharedSpaces')]),
+          errorDto.badRequest([expect.stringContaining('albumId cannot exist alongside withSharedSpaces')]),
         );
       });
     });
