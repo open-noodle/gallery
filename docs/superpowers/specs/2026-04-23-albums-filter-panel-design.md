@@ -148,14 +148,14 @@ Only the filter values themselves are mode-specific.
 Add `albumId?: string` support to:
 
 - `SearchSuggestionRequestDto`
-- `TagSuggestionRequestDto`
 - `FilterSuggestionsRequestDto`
 
 Regenerate the TypeScript SDK so `@immich/sdk` exposes `albumId` for:
 
 - `getSearchSuggestions`
-- `getTagSuggestions`
 - `getFilterSuggestions`
+
+Do not extend `TagSuggestionRequestDto` in v1. The current design uses the unified `suggestionsProvider`, which already returns tags through `getFilterSuggestions`, so widening the tag-specific endpoint would add scope without a consumer.
 
 ### Validation Rules
 
@@ -205,6 +205,8 @@ and be reused by filtered suggestion queries for:
 
 The intent is not a broad repository rewrite. It is a targeted refactor that keeps album scope consistent across all suggestion queries.
 
+One correctness requirement is non-negotiable: album scope must not fall back to `ownerId IN userIds` semantics. Shared album suggestions must include assets from accessible album members even when those owners are neither the current user nor a partner.
+
 ## Data Flow
 
 ### `VIEW` / `SELECT_THUMBNAIL`
@@ -238,11 +240,28 @@ pickerFilters
 
 ## Testing
 
+## TDD Execution
+
+Implementation should follow strict red-green-refactor order instead of treating the test list as a post-hoc checklist.
+
+### Sequence
+
+1. Add failing server tests for `albumId` validation, authorization, and album-scoped suggestion behavior.
+2. Add failing repository/service tests for shared-album scope, especially assets owned by non-partner collaborators.
+3. Add failing web unit tests for filter-state separation and timeline option builders.
+4. Add failing route/component tests for mode wiring, chip behavior, and filtered empty states.
+5. Implement the minimum code to make those tests pass.
+6. Add or update E2E coverage for the user-visible flows once the lower-level tests are green.
+7. Refactor only after the relevant test slice is green.
+
+No production code for a slice should be added before at least one failing test exists for that slice.
+
 ### Web Unit Tests
 
 - Album timeline option builder maps all supported filter fields without changing album order.
 - Picker option builder maps all supported filter fields without adding album scope.
 - Mode switching preserves `albumFilters` across `VIEW` <-> `SELECT_THUMBNAIL`.
+- Mode switching preserves `albumFilters` when entering and leaving `SELECT_ASSETS`.
 - Mode switching preserves `pickerFilters` independently of `albumFilters`.
 - Active filter removal updates the correct state for the current mode.
 
@@ -253,20 +272,23 @@ pickerFilters
 - Panel renders in `SELECT_THUMBNAIL`.
 - Active filter chips use album-scoped labels in album modes and picker-scoped labels in picker mode.
 - Filtered zero-results state shows the correct empty message and clear-all action.
+- `SELECT_ASSETS` keeps already-in-album assets disabled and visibly marked after filters change.
 
 ### Server Tests
 
 - `getFilterSuggestions` accepts `albumId` and scopes results to accessible album assets.
 - `getSearchSuggestions` accepts `albumId` and scopes follow-up suggestions to accessible album assets.
-- `getTagSuggestions` accepts `albumId` if used.
 - Requests mixing `albumId` with `spaceId` or `withSharedSpaces` are rejected.
 - `Permission.AlbumRead` is enforced before album-scoped suggestions run.
+- Album-scoped suggestions include assets from shared album collaborators who are not partners.
 
 ### E2E Coverage
 
 - Album detail panel filters existing album assets by at least one person/tag/timeline case.
 - `SELECT_THUMBNAIL` reuses album filters.
+- `VIEW` and `SELECT_ASSETS` preserve separate filter states when switching back and forth.
 - `SELECT_ASSETS` uses a separate filter state and restores it when switching back into picker mode.
+- `SELECT_ASSETS` filtering does not make already-in-album assets selectable.
 - Clearing filters restores the expected dataset for the active mode.
 
 ## Files Expected To Change
