@@ -4,7 +4,7 @@ import { HistoryBuilder } from 'src/decorators';
 import { AlbumResponseSchema } from 'src/dtos/album.dto';
 import { AssetResponseSchema } from 'src/dtos/asset-response.dto';
 import { AssetOrder, AssetOrderSchema, AssetTypeSchema, AssetVisibilitySchema } from 'src/enum';
-import { emptyStringToNull, isoDatetimeToDate, stringToBool } from 'src/validation';
+import { emptyStringToNull, IsNotSiblingOf, isoDatetimeToDate, stringToBool } from 'src/validation';
 import z from 'zod';
 
 const BaseSearchSchema = z.object({
@@ -130,7 +130,7 @@ const SearchSuggestionTypeSchema = z
   .describe('Suggestion type')
   .meta({ id: 'SearchSuggestionType' });
 
-const SearchSuggestionRequestSchema = z
+const SearchSuggestionRequestBaseSchema = z
   .object({
     type: SearchSuggestionTypeSchema,
     albumId: z.uuidv4().optional().describe('Scope suggestions to a specific album'),
@@ -149,11 +149,11 @@ const SearchSuggestionRequestSchema = z
       .optional()
       .describe('Include null values in suggestions')
       .meta(new HistoryBuilder().added('v1.111.0').stable('v2').getExtensions()),
-  })
-  .refine((data) => !(data.albumId && data.spaceId), { error: 'Cannot use both albumId and spaceId' })
-  .refine((data) => !(data.albumId && data.withSharedSpaces), {
-    error: 'Cannot use both albumId and withSharedSpaces',
-  })
+  });
+
+const SearchSuggestionRequestSchema = SearchSuggestionRequestBaseSchema
+  .pipe(IsNotSiblingOf(SearchSuggestionRequestBaseSchema, 'albumId', ['spaceId']))
+  .pipe(IsNotSiblingOf(SearchSuggestionRequestBaseSchema, 'albumId', ['withSharedSpaces']))
   .meta({ id: 'SearchSuggestionRequestDto' });
 
 const TagSuggestionRequestSchema = z
@@ -200,7 +200,7 @@ const FilterSuggestionsResponseSchema = z
   })
   .meta({ id: 'FilterSuggestionsResponseDto' });
 
-const FilterSuggestionsRequestSchema = z
+const FilterSuggestionsRequestBaseSchema = z
   .object({
     personIds: z
       .preprocess((v) => (v === undefined ? undefined : Array.isArray(v) ? v : [v]), z.array(z.uuidv4()))
@@ -222,11 +222,11 @@ const FilterSuggestionsRequestSchema = z
     albumId: z.uuidv4().optional().describe('Scope to a specific album'),
     spaceId: z.uuidv4().optional().describe('Scope to a specific shared space'),
     withSharedSpaces: stringToBool.optional().describe('Include shared spaces the user is a member of'),
-  })
-  .refine((data) => !(data.albumId && data.spaceId), { error: 'Cannot use both albumId and spaceId' })
-  .refine((data) => !(data.albumId && data.withSharedSpaces), {
-    error: 'Cannot use both albumId and withSharedSpaces',
-  })
+  });
+
+const FilterSuggestionsRequestSchema = FilterSuggestionsRequestBaseSchema
+  .pipe(IsNotSiblingOf(FilterSuggestionsRequestBaseSchema, 'albumId', ['spaceId']))
+  .pipe(IsNotSiblingOf(FilterSuggestionsRequestBaseSchema, 'albumId', ['withSharedSpaces']))
   .meta({ id: 'FilterSuggestionsRequestDto' });
 
 export class RandomSearchDto extends createZodDto(RandomSearchSchema) {}

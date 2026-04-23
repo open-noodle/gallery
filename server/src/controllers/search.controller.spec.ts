@@ -210,7 +210,21 @@ describe(SearchController.name, () => {
           .query({ type: 'country', albumId, withSharedSpaces: true });
 
         expect(status).toBe(400);
-        expect(body).toEqual(errorDto.badRequest([expect.stringContaining('albumId')]));
+        expect(body).toEqual(
+          errorDto.badRequest([expect.stringContaining('Cannot use both albumId and withSharedSpaces')]),
+        );
+      });
+
+      it('rejects albumId mixed with spaceId', async () => {
+        const albumId = '11111111-1111-4111-8111-111111111111';
+        const spaceId = '22222222-2222-4222-8222-222222222222';
+
+        const { status, body } = await request(ctx.getHttpServer())
+          .get('/search/suggestions')
+          .query({ type: 'country', albumId, spaceId });
+
+        expect(status).toBe(400);
+        expect(body).toEqual(errorDto.badRequest([expect.stringContaining('Cannot use both albumId and spaceId')]));
       });
     });
 
@@ -257,7 +271,29 @@ describe(SearchController.name, () => {
           .query({ albumId, spaceId });
 
         expect(status).toBe(400);
-        expect(body).toEqual(errorDto.badRequest([expect.stringContaining('albumId')]));
+        expect(body).toEqual(errorDto.badRequest([expect.stringContaining('Cannot use both albumId and spaceId')]));
+      });
+
+      it('rejects an invalid albumId query param', async () => {
+        const { status, body } = await request(ctx.getHttpServer())
+          .get('/search/suggestions/filters')
+          .query({ albumId: 'not-a-uuid' });
+
+        expect(status).toBe(400);
+        expect(body).toEqual(errorDto.badRequest([expect.stringContaining('[albumId]')]));
+      });
+
+      it('rejects albumId mixed with withSharedSpaces', async () => {
+        const albumId = '11111111-1111-4111-8111-111111111111';
+
+        const { status, body } = await request(ctx.getHttpServer())
+          .get('/search/suggestions/filters')
+          .query({ albumId, withSharedSpaces: true });
+
+        expect(status).toBe(400);
+        expect(body).toEqual(
+          errorDto.badRequest([expect.stringContaining('Cannot use both albumId and withSharedSpaces')]),
+        );
       });
     });
   });
