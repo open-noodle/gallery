@@ -243,6 +243,7 @@ describe(SearchRepository.name, () => {
 
       expect(sql).toContain('"album_asset"');
       expect(sql).toContain('"album_asset"."albumId"');
+      expect(sql).toContain('"album_asset"."assetId" = "asset"."id"');
       expect(sql).not.toContain('"asset"."ownerId" = any(');
     });
 
@@ -253,6 +254,7 @@ describe(SearchRepository.name, () => {
 
       expect(sql).toContain('"album_asset"');
       expect(sql).toContain('"album_asset"."albumId"');
+      expect(sql).toContain('"album_asset"."assetId" = "asset"."id"');
       expect(sql).not.toContain('"ownerId" = any(');
     });
   });
