@@ -1,7 +1,4 @@
-import {
-  buildFilterContext,
-  type FilterState,
-} from '$lib/components/filter-panel/filter-panel';
+import { buildFilterContext, type FilterState } from '$lib/components/filter-panel/filter-panel';
 import { AssetTypeEnum, AssetVisibility, MapMediaType } from '@immich/sdk';
 
 function applyCommonMapFilters(base: Record<string, unknown>, filters: FilterState) {

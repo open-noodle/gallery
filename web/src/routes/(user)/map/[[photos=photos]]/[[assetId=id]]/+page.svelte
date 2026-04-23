@@ -3,11 +3,7 @@
   import { page } from '$app/stores';
   import ActiveFiltersBar from '$lib/components/filter-panel/active-filters-bar.svelte';
   import FilterPanel from '$lib/components/filter-panel/filter-panel.svelte';
-  import {
-    clearFilters,
-    createFilterState,
-    getActiveFilterCount,
-  } from '$lib/components/filter-panel/filter-panel';
+  import { clearFilters, createFilterState, getActiveFilterCount } from '$lib/components/filter-panel/filter-panel';
   import type { FilterState } from '$lib/components/filter-panel/filter-panel';
   import { handlePhotosRemoveFilter } from '$lib/utils/photos-filter-options';
   import { buildMapMarkerOptions, buildMapTimeBucketOptions } from '$lib/utils/map-filter-options';
