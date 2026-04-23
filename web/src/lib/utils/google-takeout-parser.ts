@@ -174,7 +174,7 @@ const SUPPLEMENTAL_SUFFIX = 'supplemental-metadata';
  * and truncates it to fit a total filename budget (~51 chars), so any prefix of
  * `supplemental-metadata` is accepted — e.g. `.supplemental-me`, `.supple`, `.s`.
  */
-function stripSupplementalSuffix(pathWithoutJson: string): string {
+export function stripSupplementalSuffix(pathWithoutJson: string): string {
   const lastDot = pathWithoutJson.lastIndexOf('.');
   const lastSlash = pathWithoutJson.lastIndexOf('/');
   if (lastDot <= lastSlash) {
