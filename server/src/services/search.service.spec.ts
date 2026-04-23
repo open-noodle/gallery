@@ -599,6 +599,9 @@ describe(SearchService.name, () => {
         sut.searchMetadata(auth, { size: 250, filter: { or: [{ albumIds: { any: [albumId] } }] } }),
       ).resolves.toBeDefined();
       expect(mocks.search.searchMetadataV3).toHaveBeenCalled();
+    });
+  });
+
   describe('getTagSuggestions', () => {
     it('should return accessible tags for personal timeline', async () => {
       const tags = [
