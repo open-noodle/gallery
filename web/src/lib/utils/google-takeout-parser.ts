@@ -1,3 +1,35 @@
+export const MEDIA_EXTENSIONS = new Set([
+  '.jpg',
+  '.jpeg',
+  '.png',
+  '.gif',
+  '.webp',
+  '.heic',
+  '.heif',
+  '.tiff',
+  '.tif',
+  '.bmp',
+  '.avif',
+  '.raw',
+  '.arw',
+  '.cr2',
+  '.cr3',
+  '.dng',
+  '.nef',
+  '.orf',
+  '.raf',
+  '.rw2',
+  '.mp4',
+  '.mov',
+  '.avi',
+  '.mkv',
+  '.webm',
+  '.m4v',
+  '.3gp',
+  '.mts',
+  '.m2ts',
+]);
+
 export interface TakeoutMetadata {
   title: string;
   description: string | undefined;

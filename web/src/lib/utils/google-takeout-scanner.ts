@@ -1,5 +1,10 @@
 import type { TakeoutAlbum, TakeoutMediaItem, TakeoutMetadata } from '$lib/utils/google-takeout-parser';
-import { detectAlbums, matchSidecarToMedia, parseGoogleTakeoutSidecar } from '$lib/utils/google-takeout-parser';
+import {
+  detectAlbums,
+  matchSidecarToMedia,
+  MEDIA_EXTENSIONS,
+  parseGoogleTakeoutSidecar,
+} from '$lib/utils/google-takeout-parser';
 
 export interface ScanProgress {
   currentFile: string;
@@ -32,38 +37,6 @@ export interface ScanOptions {
   onProgress?: (progress: ScanProgress) => void;
   signal?: AbortSignal;
 }
-
-const MEDIA_EXTENSIONS = new Set([
-  '.jpg',
-  '.jpeg',
-  '.png',
-  '.gif',
-  '.webp',
-  '.heic',
-  '.heif',
-  '.tiff',
-  '.tif',
-  '.bmp',
-  '.avif',
-  '.raw',
-  '.arw',
-  '.cr2',
-  '.cr3',
-  '.dng',
-  '.nef',
-  '.orf',
-  '.raf',
-  '.rw2',
-  '.mp4',
-  '.mov',
-  '.avi',
-  '.mkv',
-  '.webm',
-  '.m4v',
-  '.3gp',
-  '.mts',
-  '.m2ts',
-]);
 
 function isMediaFile(path: string): boolean {
   const lastDot = path.lastIndexOf('.');
@@ -413,4 +386,9 @@ export async function scanTakeoutFiles(options: ScanOptions): Promise<ScanResult
   };
 }
 
-export { type TakeoutAlbum, type TakeoutMediaItem, type TakeoutMetadata } from '$lib/utils/google-takeout-parser';
+export {
+  MEDIA_EXTENSIONS,
+  type TakeoutAlbum,
+  type TakeoutMediaItem,
+  type TakeoutMetadata,
+} from '$lib/utils/google-takeout-parser';
