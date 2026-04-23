@@ -1,7 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { MemoryType } from 'src/enum';
 import { MemoryService } from 'src/services/memory.service';
-import { OnThisDayData } from 'src/types';
+import { OnThisDayData, RuleMemoryData } from 'src/types';
 import { AssetFactory } from 'test/factories/asset.factory';
 import { MemoryFactory } from 'test/factories/memory.factory';
 import { getForMemory } from 'test/mappers';
@@ -113,6 +113,31 @@ describe(MemoryService.name, () => {
       await sut.search(auth, dto);
 
       expect(mocks.memory.search).toHaveBeenCalledWith(auth.user.id, dto);
+    });
+
+    it('should expose server-owned title and subtitle for rule memories', async () => {
+      const userId = newUuid();
+      const memory = MemoryFactory.create({
+        ownerId: userId,
+        type: MemoryType.Rule,
+        data: {
+          ruleId: 'birthday',
+          dedupeKey: 'birthday:person-1:2026-04-23',
+          title: 'Happy birthday, Alice',
+          subtitle: 'Photos from different years',
+        } satisfies RuleMemoryData,
+      });
+
+      mocks.memory.search.mockResolvedValue([getForMemory(memory)]);
+
+      await expect(sut.search(factory.auth({ user: { id: userId } }), {})).resolves.toEqual([
+        expect.objectContaining({
+          id: memory.id,
+          type: MemoryType.Rule,
+          title: 'Happy birthday, Alice',
+          subtitle: 'Photos from different years',
+        }),
+      ]);
     });
   });
 
