@@ -188,6 +188,21 @@ export function stripSupplementalSuffix(pathWithoutJson: string): string {
 }
 
 /**
+ * Sidecar-to-media matching cascade. Ported from simulot/immich-go
+ * (AGPL-3.0) —
+ * https://github.com/simulot/immich-go/blob/cc928edbce49216584647e5f756a2af6478bb7ea/adapters/googlePhotos/matchers.go
+ * See docs/plans/2026-04-22-google-takeout-gaps.md for gap context.
+ */
+
+/** Exact-match matcher: strip `.json`, compare for equality. */
+export function matchFastTrack(jsonName: string, fileName: string): boolean {
+  if (!jsonName.endsWith('.json')) {
+    return false;
+  }
+  return jsonName.slice(0, -5) === fileName;
+}
+
+/**
  * Match a JSON sidecar file to its corresponding media file.
  *
  * Google Takeout places sidecars alongside media files in one of two formats:
