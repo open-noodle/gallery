@@ -16,7 +16,6 @@ describe(SearchController.name, () => {
   beforeEach(() => {
     service.resetAllMocks();
     ctx.reset();
-    ctx.authenticate.mockResolvedValue({});
   });
 
   describe('POST /search/metadata', () => {
@@ -179,6 +178,7 @@ describe(SearchController.name, () => {
 
       it('accepts a valid albumId query param', async () => {
         const albumId = '11111111-1111-4111-8111-111111111111';
+        ctx.authenticate.mockResolvedValue({});
         service.getSearchSuggestions.mockResolvedValue(['Germany']);
 
         const { status, body } = await request(ctx.getHttpServer())
@@ -217,6 +217,7 @@ describe(SearchController.name, () => {
     describe('GET /search/suggestions/filters', () => {
       it('accepts a valid albumId query param', async () => {
         const albumId = '11111111-1111-4111-8111-111111111111';
+        ctx.authenticate.mockResolvedValue({});
         service.getFilterSuggestions.mockResolvedValue({
           countries: [],
           cameraMakes: [],
