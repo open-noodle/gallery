@@ -1,5 +1,6 @@
 import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
+import { page } from '$app/state';
 import { authManager } from '$lib/managers/auth-manager.svelte';
 import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
 import { Route } from '$lib/route';
@@ -1162,6 +1163,59 @@ export class GlobalSearchManager {
       // Fall through to goto if URL parsing fails.
     }
     void goto(route);
+  }
+
+  private getSpaceSearchBasePath(pathname: string): string | null {
+    const parts = pathname.split('/').filter(Boolean);
+    if (parts[0] !== 'spaces' || parts[1] === undefined) {
+      return null;
+    }
+    if (parts.length === 2) {
+      return `/spaces/${parts[1]}`;
+    }
+    if (parts[2] === 'photos') {
+      return `/spaces/${parts[1]}/photos`;
+    }
+    return null;
+  }
+
+  private buildSearchDestination(text: string): string {
+    const pathname = page.url.pathname;
+    const params = new URLSearchParams(page.url.searchParams);
+    params.set('q', text);
+
+    if (pathname.startsWith('/photos')) {
+      return `/photos?${params.toString()}`;
+    }
+
+    const spaceBasePath = this.getSpaceSearchBasePath(pathname);
+    if (spaceBasePath) {
+      return `${spaceBasePath}?${params.toString()}`;
+    }
+
+    if (pathname.startsWith('/map')) {
+      return `/map?${params.toString()}`;
+    }
+
+    const fresh = new URLSearchParams();
+    fresh.set('q', text);
+    return `/photos?${fresh.toString()}`;
+  }
+
+  activateSearch(text: string): void {
+    const trimmed = text.trim();
+    if (!trimmed) {
+      return;
+    }
+
+    addEntry({
+      kind: 'query',
+      id: `query:${trimmed.toLowerCase()}`,
+      text: trimmed,
+      mode: this.mode,
+      lastUsed: Date.now(),
+    });
+    void goto(this.buildSearchDestination(trimmed));
   }
 
   activate(kind: 'photo' | 'person' | 'place' | 'tag' | 'nav' | 'command', item: unknown) {

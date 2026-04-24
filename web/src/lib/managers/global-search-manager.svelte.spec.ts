@@ -93,7 +93,11 @@ vi.mock('$app/navigation', () => ({
 }));
 
 const { mockPage } = vi.hoisted(() => ({
-  mockPage: { route: { id: null as string | null }, params: {} as Record<string, string> },
+  mockPage: {
+    route: { id: null as string | null },
+    params: {} as Record<string, string>,
+    url: new URL('https://gallery.test/photos'),
+  },
 }));
 vi.mock('$app/state', () => ({ page: mockPage }));
 
@@ -146,6 +150,9 @@ describe('GlobalSearchManager (skeleton)', () => {
 
   beforeEach(() => {
     localStorage.clear();
+    mockPage.route.id = null;
+    mockPage.params = {};
+    mockPage.url = new URL('https://gallery.test/photos');
     manager = new GlobalSearchManager();
   });
 
@@ -1158,6 +1165,33 @@ describe('activate("command")', () => {
     manager.close();
     manager.open();
     expect(getEntries()).toEqual([]);
+  });
+
+  it('activateSearch preserves same-route params but drops stale space asset ids', () => {
+    const m = new GlobalSearchManager();
+    mockPage.url = new URL('https://gallery.test/spaces/space-1/photos/asset-123?view=grid');
+
+    m.activateSearch('beach');
+
+    expect(goto).toHaveBeenCalledWith('/spaces/space-1/photos?view=grid&q=beach');
+  });
+
+  it('activateSearch falls back to /photos and drops unrelated params', () => {
+    const m = new GlobalSearchManager();
+    mockPage.url = new URL('https://gallery.test/albums?view=list');
+
+    m.activateSearch('beach');
+
+    expect(goto).toHaveBeenCalledWith('/photos?q=beach');
+  });
+
+  it('activateSearch falls back from /spaces/:id/people to /photos', () => {
+    const m = new GlobalSearchManager();
+    mockPage.url = new URL('https://gallery.test/spaces/space-1/people');
+
+    m.activateSearch('beach');
+
+    expect(goto).toHaveBeenCalledWith('/photos?q=beach');
   });
 });
 
