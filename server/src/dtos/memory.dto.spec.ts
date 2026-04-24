@@ -63,7 +63,7 @@ describe('Memory DTOs', () => {
           subtitle: 'Photos from different years',
         }),
       );
-      expect(MemoryResponseDto.schema.safeParse(result).success).toBe(true);
+      expect(MemoryResponseDto.schema.safeEncode(result).success).toBe(true);
     });
 
     it('should preserve on-this-day responses without server-owned titles', () => {
@@ -79,7 +79,7 @@ describe('Memory DTOs', () => {
           subtitle: undefined,
         }),
       );
-      expect(MemoryResponseDto.schema.safeParse(result).success).toBe(true);
+      expect(MemoryResponseDto.schema.safeEncode(result).success).toBe(true);
     });
   });
 });
