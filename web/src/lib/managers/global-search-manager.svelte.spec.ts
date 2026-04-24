@@ -1230,6 +1230,30 @@ describe('activate("command")', () => {
     expect(m.consumeKeepOpenOnNextNavigate()).toBe(true);
     expect(m.consumeKeepOpenOnNextNavigate()).toBe(false);
   });
+
+  it('applySearchSort persists an explicit pre-search sort on searchable pages', async () => {
+    const m = new GlobalSearchManager();
+    mockPage.url = new URL('https://gallery.test/spaces/space-1');
+
+    await m.applySearchSort('desc', '');
+
+    expect(goto).toHaveBeenCalledWith('/spaces/space-1?sort=desc', {
+      replaceState: true,
+      keepFocus: true,
+      noScroll: true,
+    });
+    expect(m.consumeKeepOpenOnNextNavigate()).toBe(true);
+  });
+
+  it('open resets pre-search page sorting back to relevance for a new search session', () => {
+    const m = new GlobalSearchManager();
+    mockPage.url = new URL('https://gallery.test/photos?sort=asc');
+
+    m.open();
+
+    expect(m.query).toBe('');
+    expect(m.searchSortOrder).toBe('relevance');
+  });
 });
 
 describe('activateRecent()', () => {

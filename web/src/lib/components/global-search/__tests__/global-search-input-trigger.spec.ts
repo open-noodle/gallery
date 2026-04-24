@@ -49,19 +49,35 @@ describe('global-search-input-trigger', () => {
 
     render(GlobalSearchInputTrigger);
 
-    expect(screen.getByTestId('search-sort-btn')).toHaveTextContent(/oldest first/i);
+    expect(screen.getByTestId('search-sort-btn')).toHaveAttribute('aria-label', 'Oldest first');
   });
 
-  it('shows the sort dropdown on a space detail page when a query is active', () => {
+  it('shows the sort dropdown on the photos page before a query exists', () => {
+    mockPage.url = new URL('https://gallery.test/photos');
+
+    render(GlobalSearchInputTrigger);
+
+    expect(screen.getByTestId('search-sort-btn')).toHaveAttribute('aria-label', 'Newest first');
+  });
+
+  it('shows the sort dropdown on a space detail page before a query exists', () => {
+    mockPage.url = new URL('https://gallery.test/spaces/space-123');
+
+    render(GlobalSearchInputTrigger);
+
+    expect(screen.getByTestId('search-sort-btn')).toHaveAttribute('aria-label', 'Newest first');
+  });
+
+  it('shows relevance on searchable pages with an active query', () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-123?q=mountain');
 
     render(GlobalSearchInputTrigger);
 
-    expect(screen.getByTestId('search-sort-btn')).toHaveTextContent(/relevance/i);
+    expect(screen.getByTestId('search-sort-btn')).toHaveAttribute('aria-label', 'Relevance');
   });
 
-  it('hides the sort dropdown when there is no active page query', () => {
-    mockPage.url = new URL('https://gallery.test/photos');
+  it('hides the sort dropdown on non-searchable pages', () => {
+    mockPage.url = new URL('https://gallery.test/albums');
 
     render(GlobalSearchInputTrigger);
 
@@ -79,5 +95,18 @@ describe('global-search-input-trigger', () => {
     await user.click(screen.getByText('Newest first'));
 
     expect(applySortSpy).toHaveBeenCalledWith('desc', 'mountain');
+  });
+
+  it('applies sort immediately before a query exists', async () => {
+    mockPage.url = new URL('https://gallery.test/spaces/space-123');
+    const applySortSpy = vi.spyOn(globalSearchManager, 'applySearchSort').mockResolvedValue();
+    const user = userEvent.setup();
+
+    render(GlobalSearchInputTrigger);
+
+    await user.click(screen.getByTestId('search-sort-btn'));
+    await user.click(screen.getByText('Oldest first'));
+
+    expect(applySortSpy).toHaveBeenCalledWith('asc', '');
   });
 });

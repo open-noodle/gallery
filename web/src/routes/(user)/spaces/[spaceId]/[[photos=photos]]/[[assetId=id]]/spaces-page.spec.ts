@@ -59,7 +59,7 @@ vi.mock('$lib/components/filter-panel/search-sort-dropdown.svelte', async () => 
 });
 
 vi.mock('$lib/components/filter-panel/sort-toggle.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('@test-data/mocks/sort-toggle.stub.svelte');
   return { default: MockComponent };
 });
 
@@ -169,6 +169,7 @@ describe('Spaces page search URL state', () => {
     renderPage();
 
     expect(screen.queryByPlaceholderText(/search/i)).not.toBeInTheDocument();
+    expect(screen.queryByTestId('sort-toggle')).not.toBeInTheDocument();
     expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-search-query', 'beach');
     expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-sort-order', 'relevance');
   });
@@ -179,6 +180,7 @@ describe('Spaces page search URL state', () => {
     renderPage();
 
     expect(screen.queryByPlaceholderText(/search/i)).not.toBeInTheDocument();
+    expect(screen.queryByTestId('sort-toggle')).not.toBeInTheDocument();
     expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-search-query', 'beach');
     expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-sort-order', 'asc');
   });

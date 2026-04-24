@@ -3,7 +3,6 @@
   import { page } from '$app/state';
   import FilterPanel from '$lib/components/filter-panel/filter-panel.svelte';
   import ActiveFiltersBar from '$lib/components/filter-panel/active-filters-bar.svelte';
-  import SortToggle from '$lib/components/filter-panel/sort-toggle.svelte';
   import {
     buildFilterContext,
     createFilterState,
@@ -669,15 +668,6 @@
   {#snippet buttons()}
     {#if viewMode === 'view' && !assetMultiSelectManager.selectionActive}
       <div class="flex items-center gap-1">
-        {#if !showSearchResults}
-          <SortToggle
-            sortOrder={filters.sortOrder === 'relevance' ? 'desc' : filters.sortOrder}
-            onToggle={(order) => {
-              filters = { ...filters, sortOrder: order };
-            }}
-          />
-        {/if}
-
         {#if isEditor}
           <IconButton
             variant="ghost"

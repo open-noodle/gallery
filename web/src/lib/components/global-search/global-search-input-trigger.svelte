@@ -2,6 +2,7 @@
   import { page } from '$app/state';
   import SearchSortDropdown from '$lib/components/filter-panel/search-sort-dropdown.svelte';
   import { globalSearchManager } from '$lib/managers/global-search-manager.svelte';
+  import { mediaQueryManager } from '$lib/stores/media-query-manager.svelte';
   import { getSearchablePageState } from '$lib/utils/searchable-page-search';
   import { Icon } from '@immich/ui';
   import { mdiMagnify } from '@mdi/js';
@@ -10,7 +11,7 @@
   const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPod|iPad/.test(navigator.platform);
   const hotkeyLabel = isMac ? '⌘K' : 'Ctrl+K';
   const searchablePageState = $derived(getSearchablePageState(page.url));
-  const showSearchSortControl = $derived(searchablePageState.isSearchable && searchablePageState.query.length > 0);
+  const showSearchSortControl = $derived(searchablePageState.isSearchable);
 </script>
 
 <div class="flex items-center gap-2">
@@ -39,6 +40,8 @@
     <div class="shrink-0">
       <SearchSortDropdown
         sortOrder={searchablePageState.sortOrder}
+        compact={!mediaQueryManager.minLg}
+        showRelevance={searchablePageState.query.length > 0}
         onSelect={(mode) => {
           void globalSearchManager.applySearchSort(mode, searchablePageState.query);
         }}

@@ -4,14 +4,18 @@ type SearchablePageState = {
   basePath: string | null;
   isSearchable: boolean;
   query: string;
+  hasExplicitSort: boolean;
   sortOrder: SearchablePageSortOrder;
 };
 
 function getSortOrder(query: string, rawSort: string | null): SearchablePageSortOrder {
+  if (rawSort === 'asc' || rawSort === 'desc') {
+    return rawSort;
+  }
   if (query.length === 0) {
     return 'desc';
   }
-  return rawSort === 'asc' || rawSort === 'desc' ? rawSort : 'relevance';
+  return 'relevance';
 }
 
 export function getSearchablePageBasePath(pathname: string): string | null {
@@ -42,16 +46,19 @@ export function getSearchablePageState(url: URL): SearchablePageState {
       basePath: null,
       isSearchable: false,
       query: '',
+      hasExplicitSort: false,
       sortOrder: 'desc',
     };
   }
 
   const query = (url.searchParams.get('q') ?? '').trim();
+  const rawSort = url.searchParams.get('sort');
   return {
     basePath,
     isSearchable: true,
     query,
-    sortOrder: getSortOrder(query, url.searchParams.get('sort')),
+    hasExplicitSort: rawSort === 'asc' || rawSort === 'desc',
+    sortOrder: getSortOrder(query, rawSort),
   };
 }
 
@@ -70,7 +77,11 @@ export function buildSearchablePageUrl(
 
   if (!trimmedQuery) {
     params.delete('q');
-    params.delete('sort');
+    if (sortOrder === 'asc' || sortOrder === 'desc') {
+      params.set('sort', sortOrder);
+    } else {
+      params.delete('sort');
+    }
   } else {
     params.set('q', trimmedQuery);
     if (sortOrder === 'relevance') {
