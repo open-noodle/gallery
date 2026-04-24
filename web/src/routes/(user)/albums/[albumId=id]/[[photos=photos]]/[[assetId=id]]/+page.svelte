@@ -296,12 +296,15 @@
   });
 
   const totalAssetCount = $derived(timelineManager?.assetCount ?? 0);
+  const hasTimelineMonths = $derived((timelineManager?.months?.length ?? 0) > 0);
   const activeFilterCount = $derived(
     getActiveFilterCount(viewMode === AlbumPageViewMode.SELECT_ASSETS ? pickerFilters : albumFilters),
   );
-  const isTimelineEmpty = $derived(timelineManager?.isInitialized && totalAssetCount === 0 && activeFilterCount === 0);
+  const isTimelineEmpty = $derived(
+    timelineManager?.isInitialized && !hasTimelineMonths && totalAssetCount === 0 && activeFilterCount === 0,
+  );
   const showFilteredEmptyState = $derived(
-    timelineManager?.isInitialized && totalAssetCount === 0 && activeFilterCount > 0,
+    timelineManager?.isInitialized && !hasTimelineMonths && totalAssetCount === 0 && activeFilterCount > 0,
   );
   const timeBuckets = $derived(
     timelineManager?.months?.map((month) => ({
@@ -431,21 +434,25 @@
     <main class="relative h-dvh overflow-hidden px-2 md:px-6 max-md:pt-(--navbar-height-md) pt-(--navbar-height)">
       <div class="flex h-full" data-testid="discovery-timeline">
         {#if viewMode === AlbumPageViewMode.SELECT_ASSETS}
-          <FilterPanel
-            config={pickerFilterConfig}
-            bind:filters={pickerFilters}
-            {timeBuckets}
-            storageKey="gallery-filter-visible-sections-album-detail"
-            hidden={isTimelineEmpty}
-          />
+          {#key `picker-${album.id}`}
+            <FilterPanel
+              config={pickerFilterConfig}
+              bind:filters={pickerFilters}
+              {timeBuckets}
+              storageKey="gallery-filter-visible-sections-album-detail"
+              hidden={isTimelineEmpty}
+            />
+          {/key}
         {:else}
-          <FilterPanel
-            config={albumFilterConfig}
-            bind:filters={albumFilters}
-            {timeBuckets}
-            storageKey="gallery-filter-visible-sections-album-detail"
-            hidden={isTimelineEmpty}
-          />
+          {#key `album-${album.id}`}
+            <FilterPanel
+              config={albumFilterConfig}
+              bind:filters={albumFilters}
+              {timeBuckets}
+              storageKey="gallery-filter-visible-sections-album-detail"
+              hidden={isTimelineEmpty}
+            />
+          {/key}
         {/if}
 
         <div class="flex flex-1 flex-col overflow-hidden pl-4">

@@ -1,4 +1,6 @@
+import { getAnimateMock } from '$lib/__mocks__/animate.mock';
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
+import TestWrapper from '$lib/components/TestWrapper.svelte';
 import { authManager } from '$lib/managers/auth-manager.svelte';
 import { albumFactory } from '@test-data/factories/album-factory';
 import { preferencesFactory } from '@test-data/factories/preferences-factory';
@@ -6,7 +8,7 @@ import { userAdminFactory } from '@test-data/factories/user-factory';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import AlbumPage from './+page.svelte';
 
 vi.mock('$lib/components/timeline/Timeline.svelte', async () => {
@@ -18,20 +20,41 @@ vi.mock('$lib/managers/command-context-manager.svelte', () => ({
   registerAlbumContext: () => {},
 }));
 
+vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({
+  featureFlagsManager: {
+    init: vi.fn(),
+    loadFeatureFlags: vi.fn(),
+    value: { map: false },
+  } as never,
+}));
+
+vi.mock('$lib/utils/navigation', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('$lib/utils/navigation')>();
+  return {
+    ...actual,
+    isAlbumsRoute: () => true,
+    navigate: vi.fn().mockResolvedValue(undefined),
+  };
+});
+
 function renderPage(album = albumFactory.build({ assetCount: 2 })) {
   authManager.setUser(userAdminFactory.build({ id: album.ownerId }));
   authManager.setPreferences(preferencesFactory.build());
 
   sdkMock.getFilterSuggestions.mockImplementation(async (request: { albumId?: string } = {}) => {
     if (request.albumId) {
+      const personName =
+        request.albumId === 'album-2' ? 'Second Album Person' : request.albumId === 'album-1' ? 'First Album Person' : 'Album Person';
+      const tagName =
+        request.albumId === 'album-2' ? 'Second Album Tag' : request.albumId === 'album-1' ? 'First Album Tag' : 'Album Tag';
       return {
         countries: [],
         cameraMakes: [],
         tags: [
-          { id: 'tag-view', value: 'Album Tag' },
+          { id: 'tag-view', value: tagName },
           { id: 'tag-no-match', value: 'No Match' },
         ],
-        people: [{ id: 'person-view', name: 'Album Person' }],
+        people: [{ id: 'person-view', name: personName }],
         ratings: [5],
         mediaTypes: ['IMAGE'],
         hasUnnamedPeople: false,
@@ -41,7 +64,10 @@ function renderPage(album = albumFactory.build({ assetCount: 2 })) {
     return {
       countries: [],
       cameraMakes: [],
-      tags: [{ id: 'tag-picker', value: 'Picker Tag' }],
+      tags: [
+        { id: 'tag-picker', value: 'Picker Tag' },
+        { id: 'tag-no-match', value: 'No Match' },
+      ],
       people: [{ id: 'person-picker', name: 'Picker Person' }],
       ratings: [5],
       mediaTypes: ['IMAGE'],
@@ -51,8 +77,9 @@ function renderPage(album = albumFactory.build({ assetCount: 2 })) {
 
   sdkMock.getSearchSuggestions.mockResolvedValue([]);
 
-  return render(AlbumPage, {
-    props: {
+  return render(TestWrapper, {
+    component: AlbumPage,
+    componentProps: {
       data: {
         album,
         asset: undefined,
@@ -63,9 +90,14 @@ function renderPage(album = albumFactory.build({ assetCount: 2 })) {
   });
 }
 
-describe('album detail filter panel', () => {
+describe('album detail filter panel route', () => {
   beforeEach(() => {
-    vi.resetAllMocks();
+    vi.clearAllMocks();
+    Element.prototype.animate = getAnimateMock();
+  });
+
+  afterAll(() => {
+    vi.restoreAllMocks();
   });
 
   it('renders the filter panel in view mode and select-assets mode', async () => {
@@ -82,32 +114,38 @@ describe('album detail filter panel', () => {
     await waitFor(() => expect(screen.queryByTestId('discovery-panel')).not.toBeInTheDocument());
   });
 
+  it('keeps the filter panel visible when timeline months exist but the manager asset count is zero', async () => {
+    renderPage(albumFactory.build({ id: 'timeline-months-only', assetCount: 2 }));
+
+    await waitFor(() => expect(screen.getByTestId('discovery-panel')).toBeInTheDocument());
+  });
+
   it('keeps separate filter state for view and select-assets, and reuses view filters for select-thumbnail', async () => {
     renderPage();
     const user = userEvent.setup();
 
     await waitFor(() => expect(screen.getByTestId('people-item-person-view')).toBeInTheDocument());
     await user.click(screen.getByTestId('people-item-person-view'));
-    expect(screen.getByText(/Album Person/)).toBeInTheDocument();
+    expect(screen.getByTestId('active-chip')).toHaveTextContent('Album Person');
 
     await fireEvent.click(screen.getByLabelText('add_photos'));
     await waitFor(() => expect(screen.getByTestId('people-item-person-picker')).toBeInTheDocument());
-    expect(screen.queryByText(/Album Person/)).not.toBeInTheDocument();
+    expect(screen.queryByTestId('active-chip')).not.toBeInTheDocument();
 
     await user.click(screen.getByTestId('people-item-person-picker'));
-    expect(screen.getByText(/Picker Person/)).toBeInTheDocument();
+    expect(screen.getByTestId('active-chip')).toHaveTextContent('Picker Person');
 
-    await fireEvent.click(screen.getByLabelText('go_back'));
-    expect(screen.getByText(/Album Person/)).toBeInTheDocument();
+    await fireEvent.click(screen.getByLabelText('close'));
+    expect(screen.getByTestId('active-chip')).toHaveTextContent('Album Person');
 
     await fireEvent.click(screen.getByLabelText('add_photos'));
-    expect(screen.getByText(/Picker Person/)).toBeInTheDocument();
+    expect(screen.getByTestId('active-chip')).toHaveTextContent('Picker Person');
 
-    await fireEvent.click(screen.getByLabelText('go_back'));
+    await fireEvent.click(screen.getByLabelText('close'));
     await user.click(screen.getByLabelText('album_options'));
     await user.click(screen.getByText('select_album_cover'));
     expect(screen.getByTestId('discovery-panel')).toBeInTheDocument();
-    expect(screen.getByText(/Album Person/)).toBeInTheDocument();
+    expect(screen.getByTestId('active-chip')).toHaveTextContent('Album Person');
   });
 
   it('keeps timelineAlbumId in picker options after filters change and shows filtered empty state', async () => {
@@ -116,14 +154,29 @@ describe('album detail filter panel', () => {
 
     await fireEvent.click(screen.getByLabelText('add_photos'));
     await waitFor(() => expect(screen.getByTestId('tags-item-tag-no-match')).toBeInTheDocument());
-    await user.click(screen.getByTestId('tags-item-tag-no-match'));
-
     expect(screen.getByTestId('timeline-options').textContent).toContain('"timelineAlbumId"');
+
+    await user.click(screen.getByTestId('tags-item-tag-picker'));
+    expect(screen.getByTestId('timeline-options').textContent).toContain('"timelineAlbumId"');
+
+    await user.click(screen.getByTestId('tags-item-tag-no-match'));
     expect(screen.getByText('No photos available to add match your filters')).toBeInTheDocument();
     await user.click(screen.getByText('Clear all filters'));
     await waitFor(() =>
       expect(screen.queryByText('No photos available to add match your filters')).not.toBeInTheDocument(),
     );
+  });
+
+  it('keeps already-in-album assets disabled after picker filters change', async () => {
+    renderPage();
+    const user = userEvent.setup();
+
+    await fireEvent.click(screen.getByLabelText('add_photos'));
+    await waitFor(() => expect(screen.getByTestId('tags-item-tag-picker')).toBeInTheDocument());
+    await user.click(screen.getByTestId('tags-item-tag-picker'));
+
+    expect(screen.getByTestId('timeline-options').textContent).toContain('"timelineAlbumId"');
+    expect(screen.getByTestId('mock-disabled-asset')).toHaveAttribute('data-disabled', 'true');
   });
 
   it('resets both filter states and label caches when navigating to another album', async () => {
@@ -134,18 +187,26 @@ describe('album detail filter panel', () => {
 
     await waitFor(() => expect(screen.getByTestId('people-item-person-view')).toBeInTheDocument());
     await user.click(screen.getByTestId('people-item-person-view'));
-    expect(screen.getByText(/Album Person/)).toBeInTheDocument();
+    expect(screen.getByTestId('active-chip')).toHaveTextContent('First Album Person');
 
     await view.rerender({
-      data: {
-        album: secondAlbum,
-        asset: undefined,
-        error: undefined,
-        meta: { title: secondAlbum.albumName },
+      component: AlbumPage,
+      componentProps: {
+        data: {
+          album: secondAlbum,
+          asset: undefined,
+          error: undefined,
+          meta: { title: secondAlbum.albumName },
+        },
       },
     });
 
-    await waitFor(() => expect(screen.queryByText(/Album Person/)).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByTestId('active-chip')).not.toBeInTheDocument());
     expect(screen.queryByTestId('active-chip')).not.toBeInTheDocument();
+
+    await waitFor(() => expect(screen.getByTestId('people-item-person-view')).toBeInTheDocument());
+    await user.click(screen.getByTestId('people-item-person-view'));
+    expect(screen.getByTestId('active-chip')).toHaveTextContent('Second Album Person');
+    expect(screen.queryByText('First Album Person')).not.toBeInTheDocument();
   });
 });
