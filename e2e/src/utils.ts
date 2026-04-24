@@ -132,7 +132,9 @@ const executeCommand = (command: string, args: string[], options?: { cwd?: strin
 };
 
 const queueCleanupScript = `
-const { Queue } = require('/usr/src/app/node_modules/bullmq');
+const { createRequire } = require('node:module');
+const requireFromServer = createRequire('/usr/src/app/server/package.json');
+const { Queue } = requireFromServer('bullmq');
 
 const queueNames = ${JSON.stringify(Object.values(QueueName))};
 const connection = {
