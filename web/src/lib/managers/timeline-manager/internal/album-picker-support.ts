@@ -9,18 +9,22 @@ export function getTimelineAlbumQueryOptions(
     return;
   }
 
-  const {
-    timelineAlbumId,
-    timelineSpaceId: _timelineSpaceId,
-    deferInit: _deferInit,
-    assetFilter: _assetFilter,
-    userId: _userId,
-    withPartners: _withPartners,
-    withSharedSpaces: _withSharedSpaces,
-    ...rest
-  } = options;
+  const rest = Object.fromEntries(
+    Object.entries(options).filter(
+      ([key]) =>
+        ![
+          'timelineAlbumId',
+          'timelineSpaceId',
+          'deferInit',
+          'assetFilter',
+          'userId',
+          'withPartners',
+          'withSharedSpaces',
+        ].includes(key),
+    ),
+  ) as AssetApiGetTimeBucketsRequest;
 
-  return { ...rest, albumId: timelineAlbumId };
+  return { ...rest, albumId: options.timelineAlbumId };
 }
 
 export function mergeTimeBuckets(

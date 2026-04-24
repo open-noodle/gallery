@@ -8,7 +8,7 @@ import { userAdminFactory } from '@test-data/factories/user-factory';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import AlbumPage from './+page.svelte';
 
 vi.mock('$lib/components/timeline/Timeline.svelte', async () => {
@@ -41,13 +41,21 @@ function renderPage(album = albumFactory.build({ assetCount: 2 })) {
   authManager.setUser(userAdminFactory.build({ id: album.ownerId }));
   authManager.setPreferences(preferencesFactory.build());
 
-  sdkMock.getFilterSuggestions.mockImplementation(async (request: { albumId?: string } = {}) => {
+  sdkMock.getFilterSuggestions.mockImplementation((request: { albumId?: string } = {}) => {
     if (request.albumId) {
       const personName =
-        request.albumId === 'album-2' ? 'Second Album Person' : request.albumId === 'album-1' ? 'First Album Person' : 'Album Person';
+        request.albumId === 'album-2'
+          ? 'Second Album Person'
+          : request.albumId === 'album-1'
+            ? 'First Album Person'
+            : 'Album Person';
       const tagName =
-        request.albumId === 'album-2' ? 'Second Album Tag' : request.albumId === 'album-1' ? 'First Album Tag' : 'Album Tag';
-      return {
+        request.albumId === 'album-2'
+          ? 'Second Album Tag'
+          : request.albumId === 'album-1'
+            ? 'First Album Tag'
+            : 'Album Tag';
+      return Promise.resolve({
         countries: [],
         cameraMakes: [],
         tags: [
@@ -58,10 +66,10 @@ function renderPage(album = albumFactory.build({ assetCount: 2 })) {
         ratings: [5],
         mediaTypes: ['IMAGE'],
         hasUnnamedPeople: false,
-      };
+      });
     }
 
-    return {
+    return Promise.resolve({
       countries: [],
       cameraMakes: [],
       tags: [
@@ -72,10 +80,10 @@ function renderPage(album = albumFactory.build({ assetCount: 2 })) {
       ratings: [5],
       mediaTypes: ['IMAGE'],
       hasUnnamedPeople: false,
-    };
+    });
   });
 
-  sdkMock.getSearchSuggestions.mockResolvedValue([]);
+  sdkMock.getSearchSuggestions.mockImplementation((() => Promise.resolve([] as string[])) as never);
 
   return render(TestWrapper, {
     component: AlbumPage,

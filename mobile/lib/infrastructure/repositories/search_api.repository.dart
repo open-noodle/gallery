@@ -1,4 +1,7 @@
-import 'package:immich_mobile/domain/models/asset/base_asset.model.dart' hide AssetVisibility;
+import 'dart:convert';
+
+import 'package:immich_mobile/domain/models/asset/base_asset.model.dart'
+    hide AssetVisibility;
 import 'package:immich_mobile/infrastructure/repositories/api.repository.dart';
 import 'package:immich_mobile/models/search/search_filter.model.dart';
 import 'package:immich_mobile/services/api.service.dart';
@@ -33,7 +36,9 @@ class SearchApiRepository extends ApiRepository {
           model: filter.camera.model,
           takenAfter: filter.date.takenAfter,
           takenBefore: filter.date.takenBefore,
-          visibility: filter.display.isArchive ? AssetVisibility.archive : AssetVisibility.timeline,
+          visibility: filter.display.isArchive
+              ? AssetVisibility.archive
+              : AssetVisibility.timeline,
           rating: filter.rating.rating,
           isFavorite: filter.display.isFavorite ? true : null,
           isNotInAlbum: filter.display.isNotInAlbum ? true : null,
@@ -48,9 +53,14 @@ class SearchApiRepository extends ApiRepository {
 
     return _api.searchAssets(
       MetadataSearchDto(
-        originalFileName: filter.filename != null && filter.filename!.isNotEmpty ? filter.filename : null,
+        originalFileName: filter.filename != null && filter.filename!.isNotEmpty
+            ? filter.filename
+            : null,
         country: filter.location.country,
-        description: filter.description != null && filter.description!.isNotEmpty ? filter.description : null,
+        description:
+            filter.description != null && filter.description!.isNotEmpty
+            ? filter.description
+            : null,
         ocr: filter.ocr != null && filter.ocr!.isNotEmpty ? filter.ocr : null,
         state: filter.location.state,
         city: filter.location.city,
@@ -58,7 +68,9 @@ class SearchApiRepository extends ApiRepository {
         model: filter.camera.model,
         takenAfter: filter.date.takenAfter,
         takenBefore: filter.date.takenBefore,
-        visibility: filter.display.isArchive ? AssetVisibility.archive : AssetVisibility.timeline,
+        visibility: filter.display.isArchive
+            ? AssetVisibility.archive
+            : AssetVisibility.timeline,
         rating: filter.rating.rating,
         isFavorite: filter.display.isFavorite ? true : null,
         isNotInAlbum: filter.display.isNotInAlbum ? true : null,
@@ -77,5 +89,21 @@ class SearchApiRepository extends ApiRepository {
     String? state,
     String? make,
     String? model,
-  }) => _api.getSearchSuggestions(type, country: country, state: state, make: make, model: model);
+  }) async {
+    final response = await _api.getSearchSuggestionsWithHttpInfo(
+      type,
+      country: country,
+      state: state,
+      make: make,
+      model: model,
+    );
+
+    if (response.body.isEmpty) {
+      return const [];
+    }
+
+    return List<String>.from(
+      jsonDecode(utf8.decode(response.bodyBytes)) as List,
+    );
+  }
 }

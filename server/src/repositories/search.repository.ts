@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Kysely, OrderByDirection, SelectQueryBuilder, Selectable, ShallowDehydrateObject, sql, SqlBool } from 'kysely';
+import { Kysely, OrderByDirection, Selectable, SelectQueryBuilder, ShallowDehydrateObject, sql, SqlBool } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { DummyValue, GenerateSql } from 'src/decorators';
 import { MapAsset } from 'src/dtos/asset-response.dto';
@@ -212,7 +212,10 @@ export interface FilterSuggestionsOptions extends SuggestionScopeOptions {
   isFavorite?: boolean;
 }
 
-type AccessibleTagScopeOptions = Pick<SuggestionScopeOptions, 'spaceId' | 'timelineSpaceIds' | 'takenAfter' | 'takenBefore'>;
+type AccessibleTagScopeOptions = Pick<
+  SuggestionScopeOptions,
+  'spaceId' | 'timelineSpaceIds' | 'takenAfter' | 'takenBefore'
+>;
 
 export interface FilterSuggestionsResult {
   countries: string[];

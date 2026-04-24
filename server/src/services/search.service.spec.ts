@@ -1377,17 +1377,17 @@ describe(SearchService.name, () => {
     it('rejects albumId mixed with withSharedSpaces for getFilterSuggestions', async () => {
       const auth = AuthFactory.create();
 
-      await expect(
-        sut.getFilterSuggestions(auth, { albumId: newUuid(), withSharedSpaces: true }),
-      ).rejects.toThrow('Cannot use albumId with withSharedSpaces');
+      await expect(sut.getFilterSuggestions(auth, { albumId: newUuid(), withSharedSpaces: true })).rejects.toThrow(
+        'Cannot use albumId with withSharedSpaces',
+      );
     });
 
     it('rejects albumId mixed with spaceId for getFilterSuggestions', async () => {
       const auth = AuthFactory.create();
 
-      await expect(
-        sut.getFilterSuggestions(auth, { albumId: newUuid(), spaceId: newUuid() }),
-      ).rejects.toThrow('Cannot use albumId with spaceId');
+      await expect(sut.getFilterSuggestions(auth, { albumId: newUuid(), spaceId: newUuid() })).rejects.toThrow(
+        'Cannot use albumId with spaceId',
+      );
     });
 
     it('should check space access when spaceId is set', async () => {

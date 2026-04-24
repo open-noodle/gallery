@@ -1,7 +1,8 @@
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:http/http.dart';
 import 'package:immich_mobile/constants/enums.dart';
-import 'package:immich_mobile/domain/models/asset_edit.model.dart' hide AssetEditAction;
+import 'package:immich_mobile/domain/models/asset_edit.model.dart'
+    hide AssetEditAction;
 import 'package:immich_mobile/domain/models/stack.model.dart';
 import 'package:immich_mobile/providers/api.provider.dart';
 import 'package:immich_mobile/repositories/api.repository.dart';
@@ -9,7 +10,9 @@ import 'package:immich_mobile/services/api.service.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 import 'package:openapi/api.dart';
 
-final assetApiRepositoryProvider = Provider((ref) => AssetApiRepository(ref.watch(apiServiceProvider)));
+final assetApiRepositoryProvider = Provider(
+  (ref) => AssetApiRepository(ref.watch(apiServiceProvider)),
+);
 
 class AssetApiRepository extends ApiRepository {
   final ApiService _apiService;
@@ -21,37 +24,57 @@ class AssetApiRepository extends ApiRepository {
   TrashApi get _trashApi => _apiService.trashApi;
 
   Future<void> delete(List<String> ids, bool force) async {
-    return _api.deleteAssets(AssetBulkDeleteDto(ids: ids, force: force));
+    await _api.deleteAssets(AssetBulkDeleteDto(ids: ids, force: force));
   }
 
   Future<void> restoreTrash(List<String> ids) async {
     await _trashApi.restoreAssets(BulkIdsDto(ids: ids));
   }
 
-  Future<void> updateVisibility(List<String> ids, AssetVisibilityEnum visibility) async {
-    return _api.updateAssets(AssetBulkUpdateDto(ids: ids, visibility: _mapVisibility(visibility)));
+  Future<void> updateVisibility(
+    List<String> ids,
+    AssetVisibilityEnum visibility,
+  ) async {
+    await _api.updateAssets(
+      AssetBulkUpdateDto(ids: ids, visibility: _mapVisibility(visibility)),
+    );
   }
 
   Future<void> updateFavorite(List<String> ids, bool isFavorite) async {
-    return _api.updateAssets(AssetBulkUpdateDto(ids: ids, isFavorite: isFavorite));
+    await _api.updateAssets(
+      AssetBulkUpdateDto(ids: ids, isFavorite: isFavorite),
+    );
   }
 
   Future<void> updateLocation(List<String> ids, LatLng location) async {
-    return _api.updateAssets(AssetBulkUpdateDto(ids: ids, latitude: location.latitude, longitude: location.longitude));
+    await _api.updateAssets(
+      AssetBulkUpdateDto(
+        ids: ids,
+        latitude: location.latitude,
+        longitude: location.longitude,
+      ),
+    );
   }
 
   Future<void> updateDateTime(List<String> ids, DateTime dateTime) async {
-    return _api.updateAssets(AssetBulkUpdateDto(ids: ids, dateTimeOriginal: dateTime.toIso8601String()));
+    await _api.updateAssets(
+      AssetBulkUpdateDto(
+        ids: ids,
+        dateTimeOriginal: dateTime.toIso8601String(),
+      ),
+    );
   }
 
   Future<StackResponse> stack(List<String> ids) async {
-    final responseDto = await checkNull(_stacksApi.createStack(StackCreateDto(assetIds: ids)));
+    final responseDto = await checkNull(
+      _stacksApi.createStack(StackCreateDto(assetIds: ids)),
+    );
 
     return responseDto.toStack();
   }
 
   Future<void> unStack(List<String> ids) async {
-    return _stacksApi.deleteStacks(BulkIdsDto(ids: ids));
+    await _stacksApi.deleteStacks(BulkIdsDto(ids: ids));
   }
 
   Future<Response> downloadAsset(String id, {required bool edited}) {
@@ -80,18 +103,28 @@ class AssetApiRepository extends ApiRepository {
     return _api.updateAsset(assetId, UpdateAssetDto(rating: rating));
   }
 
-  Future<AssetEditsResponseDto?> editAsset(String assetId, List<AssetEdit> edits) {
-    return _api.editAsset(assetId, AssetEditsCreateDto(edits: edits.map((e) => e.toApi()).toList()));
+  Future<AssetEditsResponseDto?> editAsset(
+    String assetId,
+    List<AssetEdit> edits,
+  ) {
+    return _api.editAsset(
+      assetId,
+      AssetEditsCreateDto(edits: edits.map((e) => e.toApi()).toList()),
+    );
   }
 
   Future<void> removeEdits(String assetId) async {
-    return _api.removeAssetEdits(assetId);
+    await _api.removeAssetEdits(assetId);
   }
 }
 
 extension on StackResponseDto {
   StackResponse toStack() {
-    return StackResponse(id: id, primaryAssetId: primaryAssetId, assetIds: assets.map((asset) => asset.id).toList());
+    return StackResponse(
+      id: id,
+      primaryAssetId: primaryAssetId,
+      assetIds: assets.map((asset) => asset.id).toList(),
+    );
   }
 }
 

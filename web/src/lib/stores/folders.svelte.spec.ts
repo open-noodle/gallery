@@ -20,12 +20,13 @@ describe('foldersStore', () => {
   });
 
   it('returns the same non-null tree for concurrent fetchTree calls', async () => {
-    let resolvePaths: (value: string[]) => void;
+    let resolvePaths!: (value: string[] | PromiseLike<string[]>) => void;
+    const pendingPaths = new Promise<string[]>((resolve) => {
+      resolvePaths = resolve;
+    });
 
-    vi.mocked(getUniqueOriginalPaths).mockReturnValue(
-      new Promise<string[]>((resolve) => {
-        resolvePaths = resolve;
-      }),
+    vi.mocked(getUniqueOriginalPaths).mockImplementation(
+      (() => pendingPaths) as typeof getUniqueOriginalPaths,
     );
 
     const first = foldersStore.fetchTree();

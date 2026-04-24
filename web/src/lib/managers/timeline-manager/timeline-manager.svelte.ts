@@ -2,9 +2,12 @@ import { VirtualScrollManager } from '$lib/managers/VirtualScrollManager/Virtual
 import { authManager } from '$lib/managers/auth-manager.svelte';
 import { eventManager } from '$lib/managers/event-manager.svelte';
 import { GroupInsertionCache } from '$lib/managers/timeline-manager/group-insertion-cache.svelte';
+import {
+  getTimelineAlbumQueryOptions,
+  mergeTimeBuckets,
+} from '$lib/managers/timeline-manager/internal/album-picker-support';
 import { updateTimelineMonthViewportProximity } from '$lib/managers/timeline-manager/internal/intersection-support.svelte';
 import { updateGeometry } from '$lib/managers/timeline-manager/internal/layout-support.svelte';
-import { getTimelineAlbumQueryOptions, mergeTimeBuckets } from '$lib/managers/timeline-manager/internal/album-picker-support';
 import { loadFromTimeBuckets } from '$lib/managers/timeline-manager/internal/load-support.svelte';
 import {
   findClosestTimelineMonthForDate,

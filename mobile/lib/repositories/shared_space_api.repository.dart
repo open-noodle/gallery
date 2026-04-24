@@ -4,7 +4,9 @@ import 'package:immich_mobile/repositories/api.repository.dart';
 import 'package:immich_mobile/services/api.service.dart';
 import 'package:openapi/api.dart';
 
-final sharedSpaceApiRepositoryProvider = Provider((ref) => SharedSpaceApiRepository(ref.watch(apiServiceProvider)));
+final sharedSpaceApiRepositoryProvider = Provider(
+  (ref) => SharedSpaceApiRepository(ref.watch(apiServiceProvider)),
+);
 
 class SharedSpaceApiRepository extends ApiRepository {
   final ApiService _apiService;
@@ -27,12 +29,17 @@ class SharedSpaceApiRepository extends ApiRepository {
     return await checkNull(_api.getSpace(id));
   }
 
-  Future<SharedSpaceResponseDto> create(String name, {String? description}) async {
+  Future<SharedSpaceResponseDto> create(
+    String name, {
+    String? description,
+  }) async {
     final dto = SharedSpaceCreateDto(name: name, description: description);
     return await checkNull(_api.createSpace(dto));
   }
 
-  Future<void> delete(String id) => _api.removeSpace(id);
+  Future<void> delete(String id) async {
+    await _api.removeSpace(id);
+  }
 
   Future<List<SharedSpaceMemberResponseDto>> getMembers(String id) async {
     final response = await checkNull(_api.getMembers(id));
@@ -48,14 +55,23 @@ class SharedSpaceApiRepository extends ApiRepository {
     return await checkNull(_api.addMember(spaceId, dto));
   }
 
-  Future<void> removeMember(String spaceId, String userId) => _api.removeMember(spaceId, userId);
+  Future<void> removeMember(String spaceId, String userId) async {
+    await _api.removeMember(spaceId, userId);
+  }
 
-  Future<SharedSpaceMemberResponseDto> updateMember(String spaceId, String userId, SharedSpaceRole role) async {
+  Future<SharedSpaceMemberResponseDto> updateMember(
+    String spaceId,
+    String userId,
+    SharedSpaceRole role,
+  ) async {
     final dto = SharedSpaceMemberUpdateDto(role: role);
     return await checkNull(_api.updateMember(spaceId, userId, dto));
   }
 
-  Future<SharedSpaceMemberResponseDto> updateMemberTimeline(String spaceId, {required bool showInTimeline}) async {
+  Future<SharedSpaceMemberResponseDto> updateMemberTimeline(
+    String spaceId, {
+    required bool showInTimeline,
+  }) async {
     final dto = SharedSpaceMemberTimelineDto(showInTimeline: showInTimeline);
     return await checkNull(_api.updateMemberTimeline(spaceId, dto));
   }

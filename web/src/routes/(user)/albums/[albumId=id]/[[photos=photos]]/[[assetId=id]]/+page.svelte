@@ -59,10 +59,7 @@
   import { getAssetBulkActions } from '$lib/services/asset.service';
   import { SlideshowNavigation, SlideshowState, slideshowStore } from '$lib/stores/slideshow.store';
   import { handlePromiseError } from '$lib/utils';
-  import {
-    buildAlbumAssetPickerFilterConfig,
-    buildAlbumDetailFilterConfig,
-  } from '$lib/utils/album-filter-config';
+  import { buildAlbumAssetPickerFilterConfig, buildAlbumDetailFilterConfig } from '$lib/utils/album-filter-config';
   import { buildAlbumAssetPickerOptions, buildAlbumTimelineOptions } from '$lib/utils/album-filter-options';
   import { handleError } from '$lib/utils/handle-error';
   import { isAlbumsRoute, navigate, type AssetGridRouteSearchParams } from '$lib/utils/navigation';
@@ -317,7 +314,11 @@
     if (viewMode === AlbumPageViewMode.SELECT_ASSETS) {
       return buildAlbumAssetPickerOptions(album.id, pickerFilters);
     }
-    return buildAlbumTimelineOptions(album.id, album.order ?? authManager.preferences.albums.defaultAssetOrder, albumFilters);
+    return buildAlbumTimelineOptions(
+      album.id,
+      album.order ?? authManager.preferences.albums.defaultAssetOrder,
+      albumFilters,
+    );
   });
 
   const isShared = $derived(viewMode === AlbumPageViewMode.SELECT_ASSETS ? false : album.albumUsers.length > 0);

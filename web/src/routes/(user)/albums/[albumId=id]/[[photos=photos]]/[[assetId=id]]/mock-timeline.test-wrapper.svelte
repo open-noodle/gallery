@@ -1,10 +1,11 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
+  import type { TimelineManager } from '$lib/managers/timeline-manager/timeline-manager.svelte';
 
   interface Props {
-    timelineManager?: any;
+    timelineManager?: TimelineManager | Record<string, unknown>;
     options?: Record<string, unknown>;
-    album?: { assetCount?: number };
+    album?: { id?: string; assetCount?: number };
     children?: Snippet;
   }
 
@@ -15,7 +16,7 @@
     const empty = tagIds.includes('tag-no-match') || album?.assetCount === 0;
     const monthsOnly = album?.id === 'timeline-months-only';
 
-    timelineManager = {
+    const nextTimelineManager = {
       months: empty ? [] : [{ yearMonth: { year: 2024, month: 4 }, assetsCount: 2 }],
       assetCount: empty || monthsOnly ? 0 : 2,
       isInitialized: true,
@@ -26,11 +27,18 @@
       upsertAssets: () => {},
       update: () => {},
       toggleShowAssetOwners: () => {},
-      getRandomAsset: async () => undefined,
+      getRandomAsset: () => Promise.resolve(undefined),
     };
+
+    if (timelineManager) {
+      Object.assign(timelineManager, nextTimelineManager);
+    } else {
+      timelineManager = nextTimelineManager;
+    }
   });
 </script>
 
 <div data-testid="timeline-options">{JSON.stringify(options)}</div>
 <div data-testid="mock-disabled-asset" data-asset="asset-in-album" data-disabled="true"></div>
+<div data-testid="mock-timeline-asset-count">{timelineManager?.assetCount ?? 0}</div>
 {@render children?.()}
