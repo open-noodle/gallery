@@ -53,7 +53,7 @@ select
               and "person"."isHidden" = $2
           )
         order by
-          "asset"."fileCreatedAt" asc
+          "asset"."localDateTime" asc
       ) as agg
   ) as "assets",
   "memory".*
@@ -92,7 +92,7 @@ select
               and "person"."isHidden" = $2
           )
         order by
-          "asset"."fileCreatedAt" asc
+          "asset"."localDateTime" asc
       ) as agg
   ) as "assets",
   "memory".*
@@ -130,7 +130,7 @@ select
           and "asset"."visibility" = 'timeline'
           and "asset"."deletedAt" is null
         order by
-          "asset"."fileCreatedAt" asc
+          "asset"."localDateTime" asc
       ) as agg
   ) as "assets"
 from
@@ -163,7 +163,7 @@ select
           and "asset"."visibility" = 'timeline'
           and "asset"."deletedAt" is null
         order by
-          "asset"."fileCreatedAt" asc
+          "asset"."localDateTime" asc
       ) as agg
   ) as "assets"
 from
