@@ -185,15 +185,13 @@ describe('utils', () => {
   });
 
   describe(getMemoryTitle.name, () => {
-    const translate: Parameters<typeof getMemoryTitle>[1] = vi.fn(
-      (key: string, payload?: { values?: Record<string, number> }) => {
-        if (key === 'years_ago') {
-          return `${payload?.values?.years} years ago`;
-        }
+    const translate = ((key: string, payload?: { values?: Record<string, number> }) => {
+      if (key === 'years_ago') {
+        return `${payload?.values?.years} years ago`;
+      }
 
-        return key;
-      },
-    );
+      return key;
+    }) as unknown as Parameters<typeof getMemoryTitle>[1];
     const memory = (overrides: Partial<MemoryResponseDto>): MemoryResponseDto => ({
       assets: [],
       createdAt: '2026-04-23T00:00:00Z',
