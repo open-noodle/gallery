@@ -1650,6 +1650,13 @@ export class GlobalSearchManager {
     if (this.scope !== 'all' || query.length === 0) {
       return null;
     }
+    // The synthetic free-text search row only owns the top slot when there is no
+    // stronger promoted command/navigation match. This keeps Enter aligned with the
+    // high-confidence command/nav result for queries like `theme` or
+    // `auto-classification`.
+    if (this.topCommandMatch !== null || this.topNavigationMatch !== null) {
+      return null;
+    }
     return { id: 'top-search', query };
   });
 

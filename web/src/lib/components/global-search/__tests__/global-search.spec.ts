@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/svelte';
+import { fireEvent, render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -466,24 +466,17 @@ describe('global-search root', () => {
     expect(activateSpy).toHaveBeenCalledWith('nav', expect.objectContaining({ id: 'nav:userPages:photos' }));
   });
 
-  it('renders a "Top result" band above content sections when a query almost-exactly matches a nav item', async () => {
+  it('almost-exact nav queries suppress top-search and auto-select the promoted nav row', async () => {
     // User types "people" — the Navigation > People item is a near-exact
-    // label match and gets promoted into a top-of-palette row. The row must
-    // appear in the DOM BEFORE the first content section (Photos) so the
-    // keyboard cursor lands on it first.
+    // label match and should own the top slot outright. The synthetic
+    // "Search for ..." row must disappear so Enter activates the nav target.
     const m = new GlobalSearchManager();
     m.open();
     render(GlobalSearch, { props: { manager: m } });
     await user.type(screen.getByRole('combobox'), 'people');
-    await vi.waitFor(() => expect(document.querySelector('[data-cmdk-top-result-search]')).not.toBeNull());
-    const topSearchGroup = document.querySelector('[data-cmdk-top-result-search]');
-    expect(topSearchGroup).not.toBeNull();
-    // The promoted Navigation > People row is inside the top result group,
-    // and must precede the Photos section in DOM order.
-    const photosHeading = screen.queryByText(/^cmdk_photos_heading$|^photos$/i);
-    if (photosHeading && topSearchGroup) {
-      expect(topSearchGroup.compareDocumentPosition(photosHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    }
+    await vi.waitFor(() => expect(document.querySelector('[data-cmdk-top-result-navigation]')).not.toBeNull());
+    expect(document.querySelector('[data-cmdk-top-result-search]')).toBeNull();
+    await vi.waitFor(() => expect(m.activeItemId).toBe('nav:userPages:people'));
   });
 
   it('top-result promoted item is removed from the regular Navigation section below (no dup)', async () => {
@@ -510,6 +503,48 @@ describe('global-search root', () => {
     await user.type(screen.getByRole('combobox'), 'beach{enter}');
 
     expect(activateSearchSpy).toHaveBeenCalledWith('beach');
+  });
+
+  it('pressing Enter on an almost-exact command query activates the promoted command instead of search', async () => {
+    const m = new GlobalSearchManager();
+    const activateSpy = vi.spyOn(m, 'activate').mockImplementation(() => {});
+    const activateSearchSpy = vi.spyOn(m, 'activateSearch').mockImplementation(() => {});
+    m.open();
+    render(GlobalSearch, { props: { manager: m } });
+
+    await user.type(screen.getByRole('combobox'), 'theme');
+    await vi.waitFor(() => expect(m.activeItemId).toBe('cmd:theme'));
+
+    await user.keyboard('{Enter}');
+
+    expect(activateSearchSpy).not.toHaveBeenCalled();
+    expect(activateSpy).toHaveBeenCalledWith('command', expect.objectContaining({ id: 'cmd:theme' }));
+  });
+
+  it('re-arms top-search after rapid input edits even if the final query matches a previously dismissed string', async () => {
+    const m = new GlobalSearchManager();
+    installPhotoStub(m, [{ id: 'photo-1', originalFileName: 'beach.jpg' }]);
+    m.open();
+    render(GlobalSearch, { props: { manager: m } });
+
+    const input = screen.getByRole('combobox') as HTMLInputElement;
+    await user.type(input, 'beach');
+    await vi.waitFor(() => expect(m.activeItemId).toBe('top-search'));
+    await vi.waitFor(
+      () => expect(document.querySelector('[data-command-item][data-value="photo:photo-1"]')).not.toBeNull(),
+      { timeout: 2000 },
+    );
+
+    await user.keyboard('{ArrowDown}');
+    await vi.waitFor(() => expect(m.activeItemId).toBe('photo:photo-1'));
+
+    input.value = 'beachx';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.value = 'beach';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+
+    await vi.waitFor(() => expect(input.value).toBe('beach'));
+    await vi.waitFor(() => expect(m.activeItemId).toBe('top-search'));
   });
 
   it('does not steal selection back from a real row until the query changes again', async () => {
