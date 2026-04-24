@@ -11,7 +11,7 @@ import {
   SearchOrderField,
   SearchOrderFieldSchema,
 } from 'src/enum';
-import { isoDatetimeToDate, nonEmptyPartial, stringToBool } from 'src/validation';
+import { IsNotSiblingOf, isoDatetimeToDate, nonEmptyPartial, stringToBool } from 'src/validation';
 import z from 'zod';
 
 const ADDED_V3_2 = new HistoryBuilder().added('v3.2.0').getExtensions();
@@ -119,25 +119,28 @@ const SearchSuggestionTypeSchema = z
   .describe('Suggestion type')
   .meta({ id: 'SearchSuggestionType' });
 
-const SearchSuggestionRequestSchema = z
-  .object({
-    type: SearchSuggestionTypeSchema,
-    country: z.string().optional().describe('Filter by country'),
-    state: z.string().optional().describe('Filter by state/province'),
-    make: z.string().optional().describe('Filter by camera make'),
-    model: z.string().optional().describe('Filter by camera model'),
-    lensModel: z.string().optional().describe('Filter by lens model'),
-    takenAfter: isoDatetimeToDate.optional().describe('Filter suggestions by taken date (after)'),
-    takenBefore: isoDatetimeToDate.optional().describe('Filter suggestions by taken date (before)'),
-    spaceId: z.uuidv4().optional().describe('Scope suggestions to a specific shared space'),
-    withSharedSpaces: stringToBool
-      .optional()
-      .describe('Include suggestions from shared spaces the user is a member of'),
-    includeNull: stringToBool
-      .optional()
-      .describe('Include null values in suggestions')
-      .meta(new HistoryBuilder().added('v1.111.0').stable('v2').getExtensions()),
-  })
+const SearchSuggestionRequestBaseSchema = z.object({
+  type: SearchSuggestionTypeSchema,
+  albumId: z.uuidv4().optional().describe('Scope suggestions to a specific album'),
+  country: z.string().optional().describe('Filter by country'),
+  state: z.string().optional().describe('Filter by state/province'),
+  make: z.string().optional().describe('Filter by camera make'),
+  model: z.string().optional().describe('Filter by camera model'),
+  lensModel: z.string().optional().describe('Filter by lens model'),
+  takenAfter: isoDatetimeToDate.optional().describe('Filter suggestions by taken date (after)'),
+  takenBefore: isoDatetimeToDate.optional().describe('Filter suggestions by taken date (before)'),
+  spaceId: z.uuidv4().optional().describe('Scope suggestions to a specific shared space'),
+  withSharedSpaces: stringToBool.optional().describe('Include suggestions from shared spaces the user is a member of'),
+  includeNull: stringToBool
+    .optional()
+    .describe('Include null values in suggestions')
+    .meta(new HistoryBuilder().added('v1.111.0').stable('v2').getExtensions()),
+});
+
+const SearchSuggestionRequestSchema = SearchSuggestionRequestBaseSchema.pipe(
+  IsNotSiblingOf(SearchSuggestionRequestBaseSchema, 'albumId', ['spaceId']),
+)
+  .pipe(IsNotSiblingOf(SearchSuggestionRequestBaseSchema, 'albumId', ['withSharedSpaces']))
   .meta({ id: 'SearchSuggestionRequestDto' });
 
 const TagSuggestionRequestSchema = z
@@ -184,28 +187,33 @@ const FilterSuggestionsResponseSchema = z
   })
   .meta({ id: 'FilterSuggestionsResponseDto' });
 
-const FilterSuggestionsRequestSchema = z
-  .object({
-    personIds: z
-      .preprocess((v) => (v === undefined ? undefined : Array.isArray(v) ? v : [v]), z.array(z.uuidv4()))
-      .optional()
-      .describe('Filter by person IDs'),
-    country: z.string().optional().describe('Filter by country'),
-    city: z.string().optional().describe('Filter by city'),
-    make: z.string().optional().describe('Filter by camera make'),
-    model: z.string().optional().describe('Filter by camera model'),
-    tagIds: z
-      .preprocess((v) => (v === undefined ? undefined : Array.isArray(v) ? v : [v]), z.array(z.uuidv4()))
-      .optional()
-      .describe('Filter by tag IDs'),
-    rating: z.coerce.number().int().min(1).max(5).optional().describe('Filter by rating (1-5)'),
-    mediaType: AssetTypeSchema.optional().describe('Filter by asset type'),
-    isFavorite: stringToBool.optional().describe('Filter by favorites'),
-    takenAfter: isoDatetimeToDate.optional().describe('Filter by taken date (after)'),
-    takenBefore: isoDatetimeToDate.optional().describe('Filter by taken date (before)'),
-    spaceId: z.uuidv4().optional().describe('Scope to a specific shared space'),
-    withSharedSpaces: stringToBool.optional().describe('Include shared spaces the user is a member of'),
-  })
+const FilterSuggestionsRequestBaseSchema = z.object({
+  personIds: z
+    .preprocess((v) => (v === undefined ? undefined : Array.isArray(v) ? v : [v]), z.array(z.uuidv4()))
+    .optional()
+    .describe('Filter by person IDs'),
+  country: z.string().optional().describe('Filter by country'),
+  city: z.string().optional().describe('Filter by city'),
+  make: z.string().optional().describe('Filter by camera make'),
+  model: z.string().optional().describe('Filter by camera model'),
+  tagIds: z
+    .preprocess((v) => (v === undefined ? undefined : Array.isArray(v) ? v : [v]), z.array(z.uuidv4()))
+    .optional()
+    .describe('Filter by tag IDs'),
+  rating: z.coerce.number().int().min(1).max(5).optional().describe('Filter by rating (1-5)'),
+  mediaType: AssetTypeSchema.optional().describe('Filter by asset type'),
+  isFavorite: stringToBool.optional().describe('Filter by favorites'),
+  takenAfter: isoDatetimeToDate.optional().describe('Filter by taken date (after)'),
+  takenBefore: isoDatetimeToDate.optional().describe('Filter by taken date (before)'),
+  albumId: z.uuidv4().optional().describe('Scope to a specific album'),
+  spaceId: z.uuidv4().optional().describe('Scope to a specific shared space'),
+  withSharedSpaces: stringToBool.optional().describe('Include shared spaces the user is a member of'),
+});
+
+const FilterSuggestionsRequestSchema = FilterSuggestionsRequestBaseSchema.pipe(
+  IsNotSiblingOf(FilterSuggestionsRequestBaseSchema, 'albumId', ['spaceId']),
+)
+  .pipe(IsNotSiblingOf(FilterSuggestionsRequestBaseSchema, 'albumId', ['withSharedSpaces']))
   .meta({ id: 'FilterSuggestionsRequestDto' });
 
 export class RandomSearchDto extends createZodDto(RandomSearchSchema) {}
