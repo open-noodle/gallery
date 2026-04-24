@@ -59,6 +59,7 @@ This keeps the behavioral change narrow:
 - recent-trip asset curation in `server/src/services/memory-rules/recent-trip.rule.ts`
 - expanding `getMemoryAssetsForLocation` so the rule can curate using timestamps
 - adjusting the raw location asset pool so curation can cover the full trip timeline
+- updating memory asset readback ordering so curated trip memories stay chronological when fetched back from the repository
 - rule and medium test coverage for burst thinning, adaptive sizing, and chronological ordering
 
 ### Out of Scope
@@ -102,6 +103,16 @@ Rationale:
 - curation needs timestamps
 - a hard `20`-asset cap biases selection toward the start of long burst-heavy trips
 - this query only runs for one chosen trip candidate per owner per day, so a fuller pool is acceptable for this feature
+
+`MemoryRepository.search(...)` and `getByIdBuilder(...)` should also stop ordering memory assets by `asset.fileCreatedAt` for this feature path.
+
+They should order by `asset.localDateTime asc` instead.
+
+Rationale:
+
+- the trip rule now curates by capture timeline, not file import time
+- if memory readback stays on `fileCreatedAt`, the UI can still display the curated subset in the wrong order
+- ordering memory assets by `localDateTime asc` is a better fit for memory recap presentation in general
 
 ## Curation Pipeline
 
@@ -150,6 +161,7 @@ First pass selection should maximize trip-day coverage:
 When selecting one representative for a day:
 
 - choose the representative nearest the midpoint of that day's representatives
+- if the day has an even number of representatives, use the earlier of the two middle representatives
 
 This avoids bias toward just the earliest photo on a day while still remaining deterministic.
 
@@ -180,6 +192,8 @@ This change does not alter:
 - the rule score formula
 - the rule dedupe key
 - trip qualification thresholds
+
+It does intentionally alter memory asset ordering on readback from `fileCreatedAt asc` to `localDateTime asc` so the curated recap order survives through the repository layer.
 
 The subtitle should still describe the full detected trip cluster, for example:
 
@@ -244,7 +258,7 @@ Add a real-DB regression in `server/test/medium/specs/services/memory.service.sp
   - is created successfully
   - contains fewer assets than the raw qualifying trip pool
   - includes both trip days
-  - keeps the assets in chronological order
+  - keeps the assets in chronological `localDateTime` order after readback
 
 ## Risks
 
