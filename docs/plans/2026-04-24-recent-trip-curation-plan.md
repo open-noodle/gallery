@@ -198,6 +198,55 @@ Update the existing `getMemoryAssetsForLocation` mocks to use `makeAsset(...)` i
 
     expect(candidate?.assetIds).toEqual(['a-1', 'a-2', 'a-3', 'a-4', 'a-5', 'a-6']);
   });
+
+  it('caps a long trip at ten assets while preserving the trip endpoints', async () => {
+    const assetRepository = {
+      getMemoryLocationClusters: vi
+        .fn()
+        .mockResolvedValueOnce([
+          {
+            country: 'Germany',
+            city: 'Berlin',
+            assetCount: 20,
+            dayCount: 12,
+            firstDate: new Date('2026-01-01T00:00:00Z'),
+            lastDate: new Date('2026-03-20T00:00:00Z'),
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            country: 'France',
+            city: 'Paris',
+            assetCount: 21,
+            dayCount: 11,
+            firstDate: new Date('2026-04-01T00:00:00Z'),
+            lastDate: new Date('2026-04-11T00:00:00Z'),
+          },
+        ]),
+      getMemoryAssetsForLocation: vi.fn().mockResolvedValue([
+        makeAsset('a-1', '2026-04-01T09:00:00Z'),
+        makeAsset('a-2', '2026-04-02T09:00:00Z'),
+        makeAsset('a-3', '2026-04-03T09:00:00Z'),
+        makeAsset('a-4', '2026-04-04T09:00:00Z'),
+        makeAsset('a-5', '2026-04-05T09:00:00Z'),
+        makeAsset('a-6', '2026-04-06T09:00:00Z'),
+        makeAsset('a-7', '2026-04-07T09:00:00Z'),
+        makeAsset('a-8', '2026-04-08T09:00:00Z'),
+        makeAsset('a-9', '2026-04-09T09:00:00Z'),
+        makeAsset('a-10', '2026-04-10T09:00:00Z'),
+        makeAsset('a-11', '2026-04-11T09:00:00Z'),
+      ]),
+    };
+    const memoryRepository = { search: vi.fn().mockResolvedValue([]) };
+
+    const rule = new RecentTripMemoryRule(assetRepository as never, memoryRepository as never);
+    const [candidate] = await rule.evaluate({
+      ownerId: 'user-1',
+      target: DateTime.fromISO('2026-04-23', { zone: 'utc' }),
+    });
+
+    expect(candidate?.assetIds).toEqual(['a-1', 'a-2', 'a-3', 'a-4', 'a-5', 'a-7', 'a-8', 'a-9', 'a-10', 'a-11']);
+  });
 ```
 
 - [ ] **Step 2: Run the rule spec to verify it fails**
@@ -210,8 +259,8 @@ pnpm --dir server test --run src/services/memory-rules/recent-trip.rule.spec.ts
 
 Expected:
 
-- existing `recent_trip` tests start failing because the mocks no longer match the rule contract
 - the new curation tests fail because the rule still returns the raw asset IDs
+- the long-trip test fails because the rule does not cap output at `10`
 
 - [ ] **Step 3: Implement the curation helpers and widen the repository contract**
 
@@ -273,8 +322,8 @@ export class RecentTripMemoryRule implements MemoryRule {
         asset.localDateTime.getTime() - previous.localDateTime.getTime() > RecentTripMemoryRule.BURST_WINDOW_MS
       ) {
         representatives.push(asset);
-        previous = asset;
       }
+      previous = asset;
     }
 
     return representatives;
@@ -387,6 +436,7 @@ Expected:
 
 - all `recent-trip.rule.spec.ts` tests pass
 - the new burst-heavy test returns exactly `7` curated IDs
+- the long-trip test returns exactly `10` curated IDs
 - the existing non-home and cooldown behavior remains intact
 
 - [ ] **Step 5: Rebuild and regenerate the asset repository SQL snapshot**

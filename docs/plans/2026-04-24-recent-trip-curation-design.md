@@ -246,6 +246,11 @@ Add focused coverage in `server/src/services/memory-rules/recent-trip.rule.spec.
    - when the representative pool is already `<= 6`
    - the rule returns all representatives unchanged
 
+6. `Long trip caps at ten while spanning the trip timeline`
+   - more representative days than the target allows
+   - curated output caps at `10`
+   - first and last trip days can still appear
+
 ### Medium Tests
 
 Add a real-DB regression in `server/test/medium/specs/services/memory.service.spec.ts`:
