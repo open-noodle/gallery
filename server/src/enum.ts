@@ -113,6 +113,8 @@ export enum MemoryType {
 
   /** pictures of a person, shown leading up to their birthday */
   Birthday = 'birthday',
+  /** server-defined rule memory */
+  Rule = 'rule',
 }
 
 export const MemoryTypeSchema = z.enum(MemoryType).describe('Memory type').meta({ id: 'MemoryType' });

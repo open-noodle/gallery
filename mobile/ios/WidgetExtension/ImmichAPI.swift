@@ -206,7 +206,10 @@ class ImmichAPI {
     let localDay = date.formatted(
       Date.ISO8601FormatStyle(timeZone: .current).year().month().day().dateSeparator(.dash)
     )
-    let memoryParams = [URLQueryItem(name: "for", value: localDay)]
+    let memoryParams = [
+      URLQueryItem(name: "for", value: localDay),
+      URLQueryItem(name: "type", value: "on_this_day"),
+    ]
     guard
       let searchURL = buildRequestURL(
         serverConfig: serverConfig,

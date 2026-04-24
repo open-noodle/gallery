@@ -22,7 +22,7 @@ import {
 import { toastManager, type ActionItem, type IfLike } from '@immich/ui';
 import { DateTime } from 'luxon';
 import { init, register, t } from 'svelte-i18n';
-import { derived, get } from 'svelte/store';
+import { derived, get, type Readable } from 'svelte/store';
 import { defaultLang, locales } from '$lib/constants';
 import { authManager } from '$lib/managers/auth-manager.svelte';
 import { alwaysLoadOriginalFile, lang, locale } from '$lib/stores/preferences.store';
@@ -43,6 +43,8 @@ interface DateFormatter {
   formatTime: (date: Date) => string;
   formatDateTime: (date: Date) => string;
 }
+
+type MessageFormatter = typeof t extends Readable<infer Formatter> ? Formatter : never;
 
 export const initLanguage = async () => {
   const preferenceLang = get(lang);
@@ -386,23 +388,34 @@ export const handlePromiseError = <T>(promise: Promise<T>): void => {
   promise.catch((error) => console.error(`[utils.ts]:handlePromiseError ${error}`, error));
 };
 
+export const getMemoryTitle = (memory: MemoryResponseDto, translate: MessageFormatter, now = new Date()) => {
+  if (memory.title) {
+    return memory.title;
+  }
+
+  if (memory.type === MemoryType.OnThisDay) {
+    const year =
+      typeof (memory.data as Record<string, unknown>).year === 'number' ? (memory.data.year as number) : undefined;
+
+    const memoryDate = new Date(memory.memoryAt);
+    const isOnThisDay = memoryDate.getUTCDate() === now.getDate() && memoryDate.getUTCMonth() === now.getMonth();
+
+    if (year !== undefined) {
+      return isOnThisDay
+        ? translate('years_ago', { values: { years: now.getFullYear() - year } })
+        : DateTime.fromISO(memory.memoryAt, { zone: 'utc' }).toLocaleString(DateTime.DATE_MED, { locale: get(locale) });
+    }
+  }
+
+  if (memory.type === MemoryType.Birthday && typeof memory.data.personName === 'string') {
+    return translate('birthday_memory_title', { values: { name: memory.data.personName } });
+  }
+
+  return translate('unknown');
+};
+
 export const memoryLaneTitle = derived(t, ($t) => {
-  return (memory: MemoryResponseDto) => {
-    if (memory.type === MemoryType.OnThisDay) {
-      const now = DateTime.now();
-      const memoryDate = DateTime.fromISO(memory.memoryAt, { zone: 'utc' });
-
-      return memoryDate.day === now.day && memoryDate.month === now.month
-        ? $t('years_ago', { values: { years: now.year - memory.data.year } })
-        : memoryDate.toLocaleString(DateTime.DATE_MED, { locale: get(locale) });
-    }
-
-    if (memory.type === MemoryType.Birthday && 'personName' in memory.data) {
-      return $t('birthday_memory_title', { values: { name: memory.data.personName } });
-    }
-
-    return $t('unknown');
-  };
+  return (memory: MemoryResponseDto) => getMemoryTitle(memory, $t);
 });
 
 export const withError = async <T>(fn: () => Promise<T>): Promise<[undefined, T] | [unknown, undefined]> => {
