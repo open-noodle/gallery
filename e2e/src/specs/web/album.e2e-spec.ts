@@ -191,5 +191,4 @@ test.describe('Album', () => {
     await expect(page.locator(`[data-asset="${pickerAsset.id}"]`)).toHaveCount(1);
     await expect(page.locator(`[data-asset="${albumAsset.id}"][data-disabled="true"]`)).toBeVisible();
   });
-
 });
