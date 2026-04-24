@@ -36,6 +36,15 @@ vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({
   featureFlagsManager: mockFlags,
 }));
 
+const { mockPage } = vi.hoisted(() => ({
+  mockPage: {
+    url: new URL('https://gallery.test/photos'),
+    route: { id: null as string | null },
+    params: {} as Record<string, string>,
+  },
+}));
+vi.mock('$app/state', () => ({ page: mockPage }));
+
 import { GlobalSearchManager, type Provider, type Sections } from '$lib/managers/global-search-manager.svelte';
 import ShortcutsModal from '$lib/modals/ShortcutsModal.svelte';
 import { addEntry, getEntries, __resetForTests as resetRecentStore } from '$lib/stores/cmdk-recent';
@@ -137,6 +146,9 @@ describe('global-search root', () => {
     localStorage.clear();
     resetRecentStore();
     mediaState.minLg = false;
+    mockPage.url = new URL('https://gallery.test/photos');
+    mockPage.route.id = null;
+    mockPage.params = {};
     // Default: stable non-admin user with an id so cmdk-recent scoping writes to a
     // predictable localStorage key. Tests that need admin-scoped navigation results
     // override `isAdmin` explicitly; anonymous-user edge cases flip to `null`.
@@ -232,6 +244,39 @@ describe('global-search root', () => {
     const closeBtn = screen.getByRole('button', { name: /close/i });
     await user.click(closeBtn);
     expect(m.isOpen).toBe(false);
+  });
+
+  it('shows the search sort control on searchable pages with an active query', () => {
+    mockPage.url = new URL('https://gallery.test/photos?q=beach&sort=asc');
+    const m = new GlobalSearchManager();
+    m.open();
+
+    render(GlobalSearch, { props: { manager: m } });
+
+    expect(screen.getByTestId('search-sort-btn')).toHaveTextContent(/oldest first/i);
+  });
+
+  it('hides the search sort control on non-searchable pages', () => {
+    mockPage.url = new URL('https://gallery.test/albums');
+    const m = new GlobalSearchManager();
+    m.open();
+
+    render(GlobalSearch, { props: { manager: m } });
+
+    expect(screen.queryByTestId('search-sort-btn')).not.toBeInTheDocument();
+  });
+
+  it('reveals the search sort control while typing on a searchable page', async () => {
+    mockPage.url = new URL('https://gallery.test/photos');
+    const m = new GlobalSearchManager();
+    m.open();
+
+    render(GlobalSearch, { props: { manager: m } });
+    expect(screen.queryByTestId('search-sort-btn')).not.toBeInTheDocument();
+
+    await user.type(screen.getByRole('combobox'), 'beach');
+
+    expect(screen.getByTestId('search-sort-btn')).toBeInTheDocument();
   });
 
   it('Esc once clears input, twice closes (APG two-stage)', async () => {

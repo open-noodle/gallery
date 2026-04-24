@@ -69,6 +69,9 @@ afterEach(() => {
   mockUser.current = { id: 'test-user', isAdmin: true };
   mockFlags.valueOrUndefined = { search: true, map: true, trash: true };
   mockI18nLocale.current = 'en';
+  mockPage.route.id = null;
+  mockPage.params = {};
+  mockPage.url = new URL('https://gallery.test/photos');
 });
 
 vi.mock('@immich/sdk', async () => ({
@@ -170,6 +173,23 @@ describe('GlobalSearchManager (skeleton)', () => {
   it('open() sets isOpen=true', () => {
     manager.open();
     expect(manager.isOpen).toBe(true);
+  });
+
+  it('open() hydrates the current searchable page query and sort', () => {
+    mockPage.url = new URL('https://gallery.test/photos?q=beach&sort=asc');
+    manager.open();
+
+    expect(manager.isOpen).toBe(true);
+    expect(manager.query).toBe('beach');
+    expect(manager.searchSortOrder).toBe('asc');
+  });
+
+  it('open() resets the search draft sort to relevance when the current searchable page has no query', () => {
+    mockPage.url = new URL('https://gallery.test/photos');
+    manager.open();
+
+    expect(manager.query).toBe('');
+    expect(manager.searchSortOrder).toBe('relevance');
   });
 
   it('close() resets sections to idle and clears active item', () => {
@@ -1168,13 +1188,14 @@ describe('activate("command")', () => {
     expect(getEntries()).toEqual([]);
   });
 
-  it('activateSearch preserves same-route params but drops stale space asset ids', () => {
+  it('activateSearch preserves same-route params, drops stale space asset ids, and carries an explicit sort', () => {
     const m = new GlobalSearchManager();
     mockPage.url = new URL('https://gallery.test/spaces/space-1/photos/asset-123?view=grid');
+    m.searchSortOrder = 'asc';
 
     m.activateSearch('beach');
 
-    expect(goto).toHaveBeenCalledWith('/spaces/space-1/photos?view=grid&q=beach');
+    expect(goto).toHaveBeenCalledWith('/spaces/space-1/photos?view=grid&q=beach&sort=asc');
   });
 
   it('activateSearch falls back to /photos and drops unrelated params', () => {
@@ -1193,6 +1214,21 @@ describe('activate("command")', () => {
     m.activateSearch('beach');
 
     expect(goto).toHaveBeenCalledWith('/photos?q=beach');
+  });
+
+  it('applySearchSort immediately updates the current searchable page and marks the next navigate to keep the palette open', async () => {
+    const m = new GlobalSearchManager();
+    mockPage.url = new URL('https://gallery.test/photos?q=beach');
+
+    await m.applySearchSort('asc', 'beach');
+
+    expect(goto).toHaveBeenCalledWith('/photos?q=beach&sort=asc', {
+      replaceState: true,
+      keepFocus: true,
+      noScroll: true,
+    });
+    expect(m.consumeKeepOpenOnNextNavigate()).toBe(true);
+    expect(m.consumeKeepOpenOnNextNavigate()).toBe(false);
   });
 });
 
