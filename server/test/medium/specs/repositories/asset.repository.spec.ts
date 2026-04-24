@@ -29,6 +29,108 @@ beforeAll(async () => {
 });
 
 describe(AssetRepository.name, () => {
+  describe('getMemoryLocationClusters', () => {
+    it('should group previewable timeline assets by country and city within the requested window', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+
+      const addAsset = async ({
+        localDateTime,
+        country,
+        city,
+        withPreview = true,
+      }: {
+        localDateTime: Date;
+        country: string | null;
+        city: string | null;
+        withPreview?: boolean;
+      }) => {
+        const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline, localDateTime });
+        await Promise.all([
+          ctx.newExif({ assetId: asset.id, country, city }),
+          ctx.newJobStatus({ assetId: asset.id }),
+          withPreview ? ctx.newAssetFile({ assetId: asset.id, type: AssetFileType.Preview, path: `${asset.id}.jpg` }) : null,
+        ]);
+      };
+
+      await addAsset({ localDateTime: new Date('2026-04-15T10:00:00Z'), country: 'France', city: 'Paris' });
+      await addAsset({ localDateTime: new Date('2026-04-16T10:00:00Z'), country: 'France', city: 'Paris' });
+      await addAsset({ localDateTime: new Date('2026-04-17T10:00:00Z'), country: 'France', city: 'Lyon' });
+      await addAsset({ localDateTime: new Date('2026-04-18T10:00:00Z'), country: null, city: null });
+      await addAsset({
+        localDateTime: new Date('2026-04-19T10:00:00Z'),
+        country: 'France',
+        city: 'Paris',
+        withPreview: false,
+      });
+
+      const result = await sut.getMemoryLocationClusters(user.id, {
+        takenAfter: new Date('2026-04-01T00:00:00Z'),
+        takenBefore: new Date('2026-04-30T23:59:59Z'),
+      });
+
+      expect(result).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ country: 'France', city: 'Paris', assetCount: 2, dayCount: 2 }),
+          expect.objectContaining({ country: 'France', city: 'Lyon', assetCount: 1, dayCount: 1 }),
+        ]),
+      );
+      expect(result).toHaveLength(2);
+    });
+  });
+
+  describe('getMemoryAssetsForLocation', () => {
+    it('should return previewable timeline assets for the requested country and city, including city=null', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const takenAfter = new Date('2026-04-01T00:00:00Z');
+      const takenBefore = new Date('2026-04-30T23:59:59Z');
+
+      const { asset: parisAsset } = await ctx.newAsset({
+        ownerId: user.id,
+        visibility: AssetVisibility.Timeline,
+        localDateTime: new Date('2026-04-15T10:00:00Z'),
+      });
+      const { asset: countryOnlyAsset } = await ctx.newAsset({
+        ownerId: user.id,
+        visibility: AssetVisibility.Timeline,
+        localDateTime: new Date('2026-04-16T10:00:00Z'),
+      });
+      const { asset: berlinAsset } = await ctx.newAsset({
+        ownerId: user.id,
+        visibility: AssetVisibility.Timeline,
+        localDateTime: new Date('2026-04-17T10:00:00Z'),
+      });
+
+      await Promise.all([
+        ctx.newExif({ assetId: parisAsset.id, country: 'France', city: 'Paris' }),
+        ctx.newExif({ assetId: countryOnlyAsset.id, country: 'France', city: null }),
+        ctx.newExif({ assetId: berlinAsset.id, country: 'Germany', city: 'Berlin' }),
+        ctx.newAssetFile({ assetId: parisAsset.id, type: AssetFileType.Preview, path: 'paris.jpg' }),
+        ctx.newAssetFile({ assetId: countryOnlyAsset.id, type: AssetFileType.Preview, path: 'france.jpg' }),
+        ctx.newAssetFile({ assetId: berlinAsset.id, type: AssetFileType.Preview, path: 'berlin.jpg' }),
+      ]);
+
+      await expect(
+        sut.getMemoryAssetsForLocation(user.id, {
+          country: 'France',
+          city: 'Paris',
+          takenAfter,
+          takenBefore,
+        }),
+      ).resolves.toEqual([expect.objectContaining({ id: parisAsset.id })]);
+
+      await expect(
+        sut.getMemoryAssetsForLocation(user.id, {
+          country: 'France',
+          city: null,
+          takenAfter,
+          takenBefore,
+        }),
+      ).resolves.toEqual([expect.objectContaining({ id: countryOnlyAsset.id })]);
+    });
+  });
+
   describe('getMemoryAssetsForPerson', () => {
     it('should return previewable timeline assets for the person before the cutoff and deduplicate multiple faces', async () => {
       const { ctx, sut } = setup();

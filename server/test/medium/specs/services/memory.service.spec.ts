@@ -285,6 +285,97 @@ describe(MemoryService.name, () => {
         }),
       ]);
     });
+
+    it('creates a recent-trip rule memory for a dense non-home cluster', async () => {
+      const { sut, ctx } = setup();
+      const assetRepo = ctx.get(AssetRepository);
+      const memoryRepo = ctx.get(MemoryRepository);
+      const now = DateTime.fromObject({ year: 2026, month: 4, day: 23 }, { zone: 'utc' }) as DateTime<true>;
+      const { user } = await ctx.newUser();
+
+      const addTripAsset = async ({
+        localDateTime,
+        city,
+        country,
+      }: {
+        localDateTime: string;
+        city: string;
+        country: string;
+      }) => {
+        const { asset } = await ctx.newAsset({ ownerId: user.id, localDateTime });
+        await Promise.all([
+          ctx.newExif({ assetId: asset.id, city, country }),
+          ctx.newJobStatus({ assetId: asset.id }),
+          assetRepo.upsertFiles([
+            { assetId: asset.id, type: AssetFileType.Preview, path: `/preview-${asset.id}.jpg` },
+            { assetId: asset.id, type: AssetFileType.Thumbnail, path: `/thumb-${asset.id}.jpg` },
+          ]),
+        ]);
+      };
+
+      await addTripAsset({ localDateTime: '2026-01-15T12:00:00Z', city: 'Berlin', country: 'Germany' });
+      await addTripAsset({ localDateTime: '2026-01-22T12:00:00Z', city: 'Berlin', country: 'Germany' });
+      await addTripAsset({ localDateTime: '2026-02-01T12:00:00Z', city: 'Berlin', country: 'Germany' });
+      await addTripAsset({ localDateTime: '2026-02-10T12:00:00Z', city: 'Berlin', country: 'Germany' });
+      await addTripAsset({ localDateTime: '2026-02-18T12:00:00Z', city: 'Berlin', country: 'Germany' });
+      await addTripAsset({ localDateTime: '2026-03-01T12:00:00Z', city: 'Berlin', country: 'Germany' });
+      await addTripAsset({ localDateTime: '2026-03-12T12:00:00Z', city: 'Berlin', country: 'Germany' });
+      await addTripAsset({ localDateTime: '2026-04-15T10:00:00Z', city: 'Paris', country: 'France' });
+      await addTripAsset({ localDateTime: '2026-04-15T18:00:00Z', city: 'Paris', country: 'France' });
+      await addTripAsset({ localDateTime: '2026-04-16T10:00:00Z', city: 'Paris', country: 'France' });
+      await addTripAsset({ localDateTime: '2026-04-16T18:00:00Z', city: 'Paris', country: 'France' });
+      await addTripAsset({ localDateTime: '2026-04-17T10:00:00Z', city: 'Paris', country: 'France' });
+      await addTripAsset({ localDateTime: '2026-04-17T18:00:00Z', city: 'Paris', country: 'France' });
+      await addTripAsset({ localDateTime: '2026-04-18T10:00:00Z', city: 'Paris', country: 'France' });
+
+      vi.setSystemTime(now.toJSDate());
+      await sut.onMemoriesCreate();
+
+      const memories = await memoryRepo.search(user.id, { type: MemoryType.Rule, for: now.toJSDate() });
+      expect(memories).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            type: MemoryType.Rule,
+            data: expect.objectContaining({
+              ruleId: 'recent_trip',
+              title: 'Recent trip to Paris, France',
+            }),
+          }),
+        ]),
+      );
+    });
+
+    it('does not create a recent-trip rule memory for weak signals', async () => {
+      const { sut, ctx } = setup();
+      const assetRepo = ctx.get(AssetRepository);
+      const memoryRepo = ctx.get(MemoryRepository);
+      const now = DateTime.fromObject({ year: 2026, month: 4, day: 23 }, { zone: 'utc' }) as DateTime<true>;
+      const { user } = await ctx.newUser();
+
+      const addWeakAsset = async (localDateTime: string, city: string, country: string) => {
+        const { asset } = await ctx.newAsset({ ownerId: user.id, localDateTime });
+        await Promise.all([
+          ctx.newExif({ assetId: asset.id, city, country }),
+          ctx.newJobStatus({ assetId: asset.id }),
+          assetRepo.upsertFiles([
+            { assetId: asset.id, type: AssetFileType.Preview, path: `/preview-${asset.id}.jpg` },
+            { assetId: asset.id, type: AssetFileType.Thumbnail, path: `/thumb-${asset.id}.jpg` },
+          ]),
+        ]);
+      };
+
+      await addWeakAsset('2026-02-01T12:00:00Z', 'Berlin', 'Germany');
+      await addWeakAsset('2026-03-01T12:00:00Z', 'Berlin', 'Germany');
+      await addWeakAsset('2026-04-15T10:00:00Z', 'Paris', 'France');
+      await addWeakAsset('2026-04-15T18:00:00Z', 'Paris', 'France');
+      await addWeakAsset('2026-04-16T10:00:00Z', 'Paris', 'France');
+
+      vi.setSystemTime(now.toJSDate());
+      await sut.onMemoriesCreate();
+
+      const memories = await memoryRepo.search(user.id, { type: MemoryType.Rule, for: now.toJSDate() });
+      expect(memories).toEqual([]);
+    });
   });
 
   describe('onMemoriesCleanup', () => {

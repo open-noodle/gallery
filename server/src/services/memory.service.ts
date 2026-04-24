@@ -8,6 +8,7 @@ import { DatabaseLock, JobName, MemoryType, Permission, QueueName, SystemMetadat
 import { BaseService } from 'src/services/base.service';
 import { BirthdayMemoryRule } from 'src/services/memory-rules/birthday.rule';
 import { MemoryRule, MemoryRuleCandidate } from 'src/services/memory-rules/memory-rule.interface';
+import { RecentTripMemoryRule } from 'src/services/memory-rules/recent-trip.rule';
 import { addAssets, removeAssets } from 'src/utils/asset.util';
 
 const DAYS = 3;
@@ -85,7 +86,10 @@ export class MemoryService extends BaseService {
   }
 
   private getMemoryRules(): MemoryRule[] {
-    return [new BirthdayMemoryRule(this.personRepository, this.assetRepository)];
+    return [
+      new BirthdayMemoryRule(this.personRepository, this.assetRepository),
+      new RecentTripMemoryRule(this.assetRepository, this.memoryRepository),
+    ];
   }
 
   private async createRuleMemories(ownerId: string, target: DateTime) {
