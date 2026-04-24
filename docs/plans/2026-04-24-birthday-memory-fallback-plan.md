@@ -4,7 +4,7 @@
 
 **Goal:** Let birthday memories fall back to a `4`-photo single-year snapshot when the multi-year throwback path does not qualify, while keeping multi-year birthdays preferred.
 
-**Architecture:** Keep all changes server-side. Preserve the existing throwback path in `BirthdayMemoryRule`, add a snapshot fallback path that only runs when throwback fails, and verify the new score ordering through unit and medium tests. One design clarification is required: the fallback path cannot reuse the current `2`-assets-per-year cap, or a single-year `4`-photo birthday can never qualify; instead, fallback should reuse the same repository query but select the `4` most recent qualifying assets overall.
+**Architecture:** Keep all changes server-side. Preserve the existing throwback path in `BirthdayMemoryRule`, add a snapshot fallback path that only runs when throwback fails, and verify the new score ordering through unit and medium tests. The fallback path cannot reuse the current `2`-assets-per-year cap, or a single-year `4`-photo birthday can never qualify; instead, fallback should reuse the same repository query but select the `4` most recent qualifying assets overall. To keep birthday memories preferred without changing service orchestration, birthday scores should move into a dedicated band above the current `recent_trip` maximum, with throwback still above fallback.
 
 **Tech Stack:** NestJS, Luxon, Vitest, medium Vitest integration tests, Kysely-backed repositories.
 
@@ -64,7 +64,7 @@ Append these tests to `server/src/services/memory-rules/birthday.rule.spec.ts`:
       dedupeKey: 'birthday:person-1:2026-04-24',
       title: 'Happy birthday, Pierre',
       subtitle: 'Recent photos of Pierre',
-      score: 94,
+      score: 254,
       assetIds: ['a-4', 'a-3', 'a-2', 'a-1'],
       context: { personId: 'person-1', distinctYears: 1 },
     });
@@ -120,7 +120,7 @@ Append these tests to `server/src/services/memory-rules/birthday.rule.spec.ts`:
     expect(candidates).toEqual([
       expect.objectContaining({
         subtitle: 'Photos from different years',
-        score: 146,
+        score: 356,
         assetIds: ['a-2025-1', 'a-2025-2', 'a-2024-1', 'a-2023-1', 'a-2022-1', 'a-2021-1'],
       }),
     ]);
@@ -178,7 +178,7 @@ Replace the body of `evaluate()` in `server/src/services/memory-rules/birthday.r
           dedupeKey: `birthday:${person.id}:${target.toFormat('yyyy-MM-dd')}`,
           title: `Happy birthday, ${person.name}`,
           subtitle: 'Photos from different years',
-          score: 100 + byYear.size * 10 + throwbackAssetIds.length,
+          score: 300 + byYear.size * 10 + throwbackAssetIds.length,
           assetIds: throwbackAssetIds,
           memoryAt: target,
           context: { personId: person.id, distinctYears: byYear.size },
@@ -200,7 +200,7 @@ Replace the body of `evaluate()` in `server/src/services/memory-rules/birthday.r
         dedupeKey: `birthday:${person.id}:${target.toFormat('yyyy-MM-dd')}`,
         title: `Happy birthday, ${person.name}`,
         subtitle: `Recent photos of ${person.name}`,
-        score: 90 + fallbackAssetIds.length,
+        score: 250 + fallbackAssetIds.length,
         assetIds: fallbackAssetIds,
         memoryAt: target,
         context: { personId: person.id, distinctYears: byYear.size },
@@ -222,7 +222,7 @@ pnpm --dir server test --run src/services/memory-rules/birthday.rule.spec.ts
 Expected:
 
 - all tests in `birthday.rule.spec.ts` pass
-- the fallback test shows `score: 94`
+- the fallback test shows `score: 254`
 - the throwback-preference test still returns only one candidate
 
 - [ ] **Step 5: Commit the rule change**
@@ -278,7 +278,7 @@ Append this test to the `describe('onMemoriesCreate')` block in `server/src/serv
             dedupeKey: 'birthday:person-1:2026-04-24',
             title: 'Happy birthday, Pierre',
             subtitle: 'Recent photos of Pierre',
-            score: 94,
+            score: 254,
             assetIds: ['a-1', 'a-2', 'a-3', 'a-4'],
             memoryAt: DateTime.fromISO('2026-04-24T00:00:00Z'),
           },
@@ -291,8 +291,8 @@ Append this test to the `describe('onMemoriesCreate')` block in `server/src/serv
             ruleId: 'recent_trip',
             dedupeKey: 'recent_trip:germany:nurnberg:2026-04-24',
             title: 'Recent trip to Nürnberg, Germany',
-            subtitle: '12 photos over 2 days',
-            score: 72,
+            subtitle: '20 photos over 30 days',
+            score: 220,
             assetIds: ['t-1', 't-2', 't-3'],
             memoryAt: DateTime.fromISO('2026-04-24T00:00:00Z'),
           },
@@ -312,7 +312,7 @@ Append this test to the `describe('onMemoriesCreate')` block in `server/src/serv
             ruleId: 'birthday',
             title: 'Happy birthday, Pierre',
             subtitle: 'Recent photos of Pierre',
-            score: 94,
+            score: 254,
           }),
         }),
         new Set(['a-1', 'a-2', 'a-3', 'a-4']),
@@ -340,13 +340,13 @@ Expected:
 If the new test still fails after Task 1, keep the fallback score line in `server/src/services/memory-rules/birthday.rule.ts` exactly as:
 
 ```ts
-        score: 90 + fallbackAssetIds.length,
+        score: 250 + fallbackAssetIds.length,
 ```
 
 Do not raise the throwback score above its current formula:
 
 ```ts
-          score: 100 + byYear.size * 10 + throwbackAssetIds.length,
+          score: 300 + byYear.size * 10 + throwbackAssetIds.length,
 ```
 
 - [ ] **Step 4: Re-run the service test and the birthday rule test together**

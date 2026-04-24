@@ -56,6 +56,7 @@ The fallback path only runs when the throwback path fails, so the multi-year ret
 
 - changing birthday-rule eligibility in `server/src/services/memory-rules/birthday.rule.ts`
 - adding fallback birthday candidate generation for single-year photo sets
+- slightly changing birthday-only asset selection so the fallback path can actually produce `4` same-year assets
 - adjusting birthday rule scoring so:
   - multi-year throwback remains preferred
   - fallback birthday still outranks `recent_trip` on the same day
@@ -90,6 +91,7 @@ Presentation:
 Scoring:
 
 - keep this above the fallback path
+- move birthday memories into a dedicated score band above the current `recent_trip` maximum so birthday wins without changing service orchestration
 
 ### Snapshot Fallback Path
 
@@ -109,17 +111,19 @@ Presentation:
 Scoring:
 
 - lower than the throwback path
-- higher than the current `recent_trip` candidate range so a birthday memory wins on that day
+- higher than the current `recent_trip` maximum so a birthday memory wins on that day
 
 ## Asset Selection
 
-Do not change the repository query or the selection algorithm in this change.
+Do not change the repository query in this change.
 
 That means:
 
 - qualifying assets still come from `getMemoryAssetsForPerson`
-- the rule still groups by year
-- the rule still keeps at most `2` assets per year
+- the throwback path still groups by year
+- the throwback path still keeps at most `2` assets per year
+- the fallback path does **not** reuse the `2`-per-year cap
+- instead, the fallback path takes the `4` most recent qualifying assets overall
 - the fallback path may therefore use multiple assets from the same year and same day
 
 This is intentional for this change. Duplicate suppression and burst-thinning are a separate follow-up.
@@ -141,7 +145,7 @@ Birthday candidates should continue to outrank `recent_trip`.
 Implementation requirement:
 
 - multi-year throwback score stays above fallback birthday score
-- fallback birthday score stays above plausible `recent_trip` scores produced by the current rule
+- fallback birthday score stays above the current `recent_trip` maximum produced by the current rule for the 30-day window
 
 The exact numeric values can be chosen during implementation, but this ordering must be covered by tests.
 
@@ -174,11 +178,12 @@ Required cases:
 
 4. Ranking against recent trip
    - when a fallback birthday and a recent trip candidate exist on the same day
-   - the birthday candidate should be selected ahead of the trip candidate
+   - the birthday candidate should be selected ahead of the highest-scoring `recent_trip` case supported by the current formula
 
 5. Live Pierre regression shape
    - `4` qualifying assets in one year only
    - birthday candidate is generated
+   - all `4` assets are included despite the throwback path's `2`-per-year cap
 
 ## TDD Order
 
