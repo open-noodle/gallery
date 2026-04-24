@@ -49,7 +49,9 @@ describe(AssetRepository.name, () => {
         await Promise.all([
           ctx.newExif({ assetId: asset.id, country, city }),
           ctx.newJobStatus({ assetId: asset.id }),
-          withPreview ? ctx.newAssetFile({ assetId: asset.id, type: AssetFileType.Preview, path: `${asset.id}.jpg` }) : null,
+          withPreview
+            ? ctx.newAssetFile({ assetId: asset.id, type: AssetFileType.Preview, path: `${asset.id}.jpg` })
+            : null,
         ]);
       };
 

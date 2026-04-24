@@ -534,7 +534,12 @@ export class AssetRepository {
   })
   getMemoryAssetsForLocation(
     ownerId: string,
-    { country, city, takenAfter, takenBefore }: { country: string; city: string | null; takenAfter: Date; takenBefore: Date },
+    {
+      country,
+      city,
+      takenAfter,
+      takenBefore,
+    }: { country: string; city: string | null; takenAfter: Date; takenBefore: Date },
   ) {
     return this.db
       .selectFrom('asset')

@@ -27,15 +27,17 @@ describe(RecentTripMemoryRule.name, () => {
             lastDate: new Date('2026-04-17T00:00:00Z'),
           },
         ]),
-      getMemoryAssetsForLocation: vi.fn().mockResolvedValue([
-        { id: 'asset-1' },
-        { id: 'asset-2' },
-        { id: 'asset-3' },
-        { id: 'asset-4' },
-        { id: 'asset-5' },
-        { id: 'asset-6' },
-        { id: 'asset-7' },
-      ]),
+      getMemoryAssetsForLocation: vi
+        .fn()
+        .mockResolvedValue([
+          { id: 'asset-1' },
+          { id: 'asset-2' },
+          { id: 'asset-3' },
+          { id: 'asset-4' },
+          { id: 'asset-5' },
+          { id: 'asset-6' },
+          { id: 'asset-7' },
+        ]),
     };
     const memoryRepository = {
       search: vi.fn().mockResolvedValue([]),
@@ -130,15 +132,17 @@ describe(RecentTripMemoryRule.name, () => {
             lastDate: new Date('2026-04-16T00:00:00Z'),
           },
         ]),
-      getMemoryAssetsForLocation: vi.fn().mockResolvedValue([
-        { id: 'asset-1' },
-        { id: 'asset-2' },
-        { id: 'asset-3' },
-        { id: 'asset-4' },
-        { id: 'asset-5' },
-        { id: 'asset-6' },
-        { id: 'asset-7' },
-      ]),
+      getMemoryAssetsForLocation: vi
+        .fn()
+        .mockResolvedValue([
+          { id: 'asset-1' },
+          { id: 'asset-2' },
+          { id: 'asset-3' },
+          { id: 'asset-4' },
+          { id: 'asset-5' },
+          { id: 'asset-6' },
+          { id: 'asset-7' },
+        ]),
     };
     const memoryRepository = { search: vi.fn().mockResolvedValue([]) };
 

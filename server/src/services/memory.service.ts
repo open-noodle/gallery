@@ -47,7 +47,9 @@ export class MemoryService extends BaseService {
       }
 
       const today = DateTime.utc().startOf('day');
-      const lastRuleDate = nextState.lastRuleDate ? DateTime.fromISO(nextState.lastRuleDate).startOf('day') : today.minus({ days: 1 });
+      const lastRuleDate = nextState.lastRuleDate
+        ? DateTime.fromISO(nextState.lastRuleDate).startOf('day')
+        : today.minus({ days: 1 });
 
       for (let target = lastRuleDate.plus({ days: 1 }); target <= today; target = target.plus({ days: 1 })) {
         this.logger.log(`Creating rule memories for ${target.toISO()}`);

@@ -279,7 +279,10 @@ describe(MemoryService.name, () => {
 
       await sut.onMemoriesCreate();
 
-      expect(mocks.memory.search).toHaveBeenCalledWith(user.id, { type: MemoryType.Rule, for: new Date('2026-04-23T00:00:00Z') });
+      expect(mocks.memory.search).toHaveBeenCalledWith(user.id, {
+        type: MemoryType.Rule,
+        for: new Date('2026-04-23T00:00:00Z'),
+      });
       expect(mocks.memory.create).toHaveBeenCalledTimes(1);
       expect(mocks.memory.create.mock.calls[0]?.[0].data).toMatchObject({ title: 'First', dedupeKey: 'k-1' });
 

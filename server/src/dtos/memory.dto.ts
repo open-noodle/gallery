@@ -94,7 +94,10 @@ const MemoryResponseSchema = z
   .meta({ id: 'MemoryResponseDto' });
 
 export type MemoryDataDto<T extends MemoryType = MemoryType> = MemoryDataOf<T>;
-export type MemoryResponse<T extends MemoryType = MemoryType> = Omit<z.infer<typeof MemoryResponseSchema>, 'type' | 'data'> & {
+export type MemoryResponse<T extends MemoryType = MemoryType> = Omit<
+  z.infer<typeof MemoryResponseSchema>,
+  'type' | 'data'
+> & {
   type: T;
   data: MemoryDataDto<T>;
 };

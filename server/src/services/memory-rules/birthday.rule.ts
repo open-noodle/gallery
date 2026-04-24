@@ -16,7 +16,11 @@ export class BirthdayMemoryRule implements MemoryRule {
     const candidates: MemoryRuleCandidate[] = [];
 
     for (const person of people) {
-      const assets = await this.assetRepository.getMemoryAssetsForPerson(ownerId, person.id, target.endOf('day').toJSDate());
+      const assets = await this.assetRepository.getMemoryAssetsForPerson(
+        ownerId,
+        person.id,
+        target.endOf('day').toJSDate(),
+      );
       const byYear = new Map<number, string[]>();
 
       for (const asset of assets) {
