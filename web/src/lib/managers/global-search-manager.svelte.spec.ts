@@ -2683,27 +2683,39 @@ describe('SWR loading rules', () => {
   });
 
   it('setMode joins the batch counter — mode switch during live batch does NOT drop stripe early', async () => {
-    // Slow photos provider so the main batch stays in flight.
-    let resolvePhotos!: () => void;
-    vi.mocked(searchSmart).mockImplementationOnce(
-      () => new Promise((r) => (resolvePhotos = () => r({ assets: { items: [], nextPage: null } } as never))),
-    );
     const m = new GlobalSearchManager();
-    m.open();
-    m.setQuery('beach');
-    await vi.advanceTimersByTimeAsync(200);
-    expect(m.batchInFlight).toBe(true);
-    // Mode switch while photos is still in flight — counter should increment, not reset.
-    m.setMode('metadata');
-    expect(m.batchInFlight).toBe(true);
-    // setMode's re-run (searchAssets) resolves first from the default mockResolvedValue.
-    await vi.advanceTimersByTimeAsync(10);
-    // Original photos still in flight — batchInFlight MUST remain true.
-    expect(m.batchInFlight).toBe(true);
-    // Finally, let the original photos resolve.
-    resolvePhotos();
-    await vi.advanceTimersByTimeAsync(10);
-    expect(m.batchInFlight).toBe(false);
+    const photosProvider = (m as unknown as { providers: { photos: Provider<EntityItem> } }).providers.photos;
+    const originalPhotosRun = photosProvider.run;
+    let resolvePhotos!: () => void;
+
+    photosProvider.run = vi.fn((_query: string, mode: SearchMode) => {
+      if (mode === 'smart') {
+        return new Promise(
+          (r) => (resolvePhotos = () => r({ status: 'empty' } as ProviderStatus<EntityItem>)),
+        ) as Promise<ProviderStatus<EntityItem>>;
+      }
+      return Promise.resolve({ status: 'empty' } as ProviderStatus<EntityItem>);
+    });
+
+    try {
+      m.open();
+      m.setQuery('beach');
+      await vi.advanceTimersByTimeAsync(200);
+      expect(m.batchInFlight).toBe(true);
+      // Mode switch while photos is still in flight — counter should increment, not reset.
+      m.setMode('metadata');
+      expect(m.batchInFlight).toBe(true);
+      // setMode's re-run resolves first from the provider override above.
+      await vi.advanceTimersByTimeAsync(10);
+      // Original photos is still unresolved — batchInFlight MUST remain true.
+      expect(m.batchInFlight).toBe(true);
+      // Finally, let the original photos resolve.
+      resolvePhotos();
+      await vi.advanceTimersByTimeAsync(10);
+      expect(m.batchInFlight).toBe(false);
+    } finally {
+      photosProvider.run = originalPhotosRun;
+    }
   });
 
   it('stale-batch providers do not deadlock batchInFlight after a new batch supersedes', async () => {
