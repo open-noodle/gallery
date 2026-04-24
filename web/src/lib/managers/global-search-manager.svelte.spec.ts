@@ -1468,6 +1468,20 @@ describe('topNavigationMatch', () => {
   });
 });
 
+describe('topSearchMatch', () => {
+  it('is present only for non-empty all-scope queries', () => {
+    const m = new GlobalSearchManager();
+    m.query = ' beach ';
+    expect(m.topSearchMatch).toEqual({ id: 'top-search', query: 'beach' });
+
+    m.query = '';
+    expect(m.topSearchMatch).toBeNull();
+
+    m.query = '@alice';
+    expect(m.topSearchMatch).toBeNull();
+  });
+});
+
 describe('removeRecent()', () => {
   beforeEach(() => {
     vi.resetAllMocks();

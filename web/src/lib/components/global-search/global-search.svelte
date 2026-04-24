@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Icon, IconButton, Modal, modalManager, ModalBody } from '@immich/ui';
-  import { mdiClose } from '@mdi/js';
+  import { mdiClose, mdiMagnify } from '@mdi/js';
   import { Command } from 'bits-ui';
   import { t } from 'svelte-i18n';
   import type { GlobalSearchManager, SearchMode } from '$lib/managers/global-search-manager.svelte';
@@ -93,6 +93,19 @@
   $effect(() => {
     if (manager.activeItemId && manager.activeItemId !== selectedValue) {
       selectedValue = manager.activeItemId;
+    }
+  });
+
+  let lastAutoSelectedTopSearchQuery = $state<string | null>(null);
+  $effect(() => {
+    const topSearchMatch = manager.topSearchMatch;
+    if (!topSearchMatch) {
+      lastAutoSelectedTopSearchQuery = null;
+      return;
+    }
+    if (lastAutoSelectedTopSearchQuery !== topSearchMatch.query) {
+      selectedValue = topSearchMatch.id;
+      lastAutoSelectedTopSearchQuery = topSearchMatch.query;
     }
   });
 
@@ -221,6 +234,7 @@
     if (e.key === 'Escape' && manager.pendingConfirmId !== null) {
       manager.cancelConfirm();
       e.preventDefault();
+      e.stopPropagation();
       return;
     }
     if (e.key === 'Escape') {
@@ -411,6 +425,27 @@
                 </div>
               {/if}
             {:else if manager.scope === 'all'}
+              {#if manager.topSearchMatch}
+                <Command.Group class="mb-4" data-cmdk-top-result-search>
+                  <Command.GroupHeading
+                    class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400"
+                  >
+                    {$t('cmdk_top_result')}
+                  </Command.GroupHeading>
+                  <Command.GroupItems>
+                    <Command.Item
+                      value={manager.topSearchMatch.id}
+                      onSelect={() => manager.topSearchMatch && manager.activateSearch(manager.topSearchMatch.query)}
+                      class="group"
+                    >
+                      <div class="flex items-center gap-3 rounded-lg px-3 py-2 group-data-[selected]:bg-primary/10">
+                        <Icon icon={mdiMagnify} />
+                        <span>{$t('cmdk_top_search_label', { values: { query: manager.topSearchMatch.query } })}</span>
+                      </div>
+                    </Command.Item>
+                  </Command.GroupItems>
+                </Command.Group>
+              {/if}
               {#if manager.topCommandMatch}
                 <Command.Group class="mb-4" data-cmdk-top-result-commands>
                   <Command.GroupHeading
@@ -429,7 +464,7 @@
                   </Command.GroupItems>
                 </Command.Group>
               {:else if manager.topNavigationMatch}
-                <Command.Group class="mb-4">
+                <Command.Group class="mb-4" data-cmdk-top-result-navigation>
                   <Command.GroupHeading
                     class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400"
                   >

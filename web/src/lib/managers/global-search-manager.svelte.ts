@@ -85,6 +85,8 @@ export type ActiveItem =
   | { kind: 'nav'; data: NavigationItem }
   | { kind: 'command'; data: CommandItem };
 
+type TopSearchMatch = { id: 'top-search'; query: string };
+
 const VALID_MODES: ReadonlySet<SearchMode> = new Set(['smart', 'metadata', 'description', 'ocr']);
 // Slice size for the albums section. Kept as a named constant so the buildProviders
 // `topN: 5` and the runAlbums slice cannot drift apart silently.
@@ -1102,6 +1104,9 @@ export class GlobalSearchManager {
   }
 
   reconcileCursor() {
+    if (this.activeItemId === this.topSearchMatch?.id) {
+      return;
+    }
     if (this.getActiveItem() !== null) {
       return;
     }
@@ -1613,6 +1618,14 @@ export class GlobalSearchManager {
       }
     }
     return null;
+  });
+
+  topSearchMatch = $derived.by<TopSearchMatch | null>(() => {
+    const query = this.query.trim();
+    if (this.scope !== 'all' || query.length === 0) {
+      return null;
+    }
+    return { id: 'top-search', query };
   });
 
   /**
