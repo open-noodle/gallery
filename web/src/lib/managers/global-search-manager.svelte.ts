@@ -1221,7 +1221,7 @@ export class GlobalSearchManager {
       return;
     }
 
-    this.keepOpenOnNextNavigate = true;
+    this.keepOpenOnNextNavigate = this.isOpen;
     try {
       await goto(nextUrl, {
         replaceState: true,

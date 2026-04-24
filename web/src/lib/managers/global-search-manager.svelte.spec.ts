@@ -1219,6 +1219,7 @@ describe('activate("command")', () => {
   it('applySearchSort immediately updates the current searchable page and marks the next navigate to keep the palette open', async () => {
     const m = new GlobalSearchManager();
     mockPage.url = new URL('https://gallery.test/photos?q=beach');
+    m.open();
 
     await m.applySearchSort('asc', 'beach');
 
@@ -1228,6 +1229,20 @@ describe('activate("command")', () => {
       noScroll: true,
     });
     expect(m.consumeKeepOpenOnNextNavigate()).toBe(true);
+    expect(m.consumeKeepOpenOnNextNavigate()).toBe(false);
+  });
+
+  it('applySearchSort does not arm keep-open when the palette is closed', async () => {
+    const m = new GlobalSearchManager();
+    mockPage.url = new URL('https://gallery.test/photos?q=beach');
+
+    await m.applySearchSort('asc', 'beach');
+
+    expect(goto).toHaveBeenCalledWith('/photos?q=beach&sort=asc', {
+      replaceState: true,
+      keepFocus: true,
+      noScroll: true,
+    });
     expect(m.consumeKeepOpenOnNextNavigate()).toBe(false);
   });
 
@@ -1242,7 +1257,7 @@ describe('activate("command")', () => {
       keepFocus: true,
       noScroll: true,
     });
-    expect(m.consumeKeepOpenOnNextNavigate()).toBe(true);
+    expect(m.consumeKeepOpenOnNextNavigate()).toBe(false);
   });
 
   it('open resets pre-search page sorting back to relevance for a new search session', () => {
