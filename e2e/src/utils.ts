@@ -131,71 +131,6 @@ const executeCommand = (command: string, args: string[], options?: { cwd?: strin
   return { promise, child };
 };
 
-const queueCleanupScript = `
-const { createRequire } = require('node:module');
-const requireFromServer = createRequire('/usr/src/app/server/package.json');
-const { Queue } = requireFromServer('bullmq');
-
-const queueNames = ${JSON.stringify(Object.values(QueueName))};
-const cleanupQueueNames = queueNames.filter((name) => name !== 'backgroundTask');
-const connection = {
-  host: process.env.REDIS_HOSTNAME || 'redis',
-  port: process.env.REDIS_PORT ? Number(process.env.REDIS_PORT) : 6379,
-  ...(process.env.REDIS_USERNAME ? { username: process.env.REDIS_USERNAME } : {}),
-  ...(process.env.REDIS_PASSWORD ? { password: process.env.REDIS_PASSWORD } : {}),
-};
-
-const queues = queueNames.map((name) => new Queue(name, { connection, prefix: 'immich_bull' }));
-const cleanupQueues = queues.filter((queue) => cleanupQueueNames.includes(queue.name));
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-const cleanup = async () => {
-  try {
-    await Promise.all(cleanupQueues.map((queue) => queue.pause()));
-
-    const deadline = Date.now() + 30_000;
-    while (true) {
-      const counts = await Promise.all(cleanupQueues.map((queue) => queue.getJobCounts('active')));
-      const active = counts.reduce((sum, count) => sum + (count.active || 0), 0);
-
-      if (active === 0) {
-        break;
-      }
-
-      if (Date.now() > deadline) {
-        throw new Error(\`Timed out waiting for active BullMQ jobs to finish (\${active} still active)\`);
-      }
-
-      await sleep(250);
-    }
-
-    await Promise.all(
-      cleanupQueues.map(async (queue) => {
-        await queue.drain(true);
-        await queue.clean(0, 1000, 'failed');
-      }),
-    );
-  } finally {
-    await Promise.all(
-      cleanupQueues.map(async (queue) => {
-        try {
-          await queue.resume();
-        } catch {}
-
-        try {
-          await queue.close();
-        } catch {}
-      }),
-    );
-  }
-};
-
-cleanup().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
-`;
-
 let client: pg.Client | null = null;
 
 const events: Record<EventType, Set<string>> = {
@@ -295,18 +230,6 @@ export const utils = {
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        // E2E files reuse the same Docker stack. Pause and drain BullMQ queues
-        // through the official API so stale jobs do not survive the DB reset.
-        const { exitCode, stderr } = await executeCommand('docker', [
-          'exec',
-          'immich-e2e-server',
-          'node',
-          '-e',
-          queueCleanupScript,
-        ]).promise;
-        if (exitCode !== 0) {
-          throw new Error(`Failed to clean BullMQ queues: ${stderr || `exit code ${exitCode}`}`);
-        }
         await client.query(query);
         return;
       } catch (error: any) {
