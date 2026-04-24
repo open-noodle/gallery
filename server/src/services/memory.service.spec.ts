@@ -1,4 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
+import { DateTime } from 'luxon';
 import { MemoryType, SystemMetadataKey } from 'src/enum';
 import { MemoryService } from 'src/services/memory.service';
 import { OnThisDayData, RuleMemoryData } from 'src/types';
@@ -14,6 +15,7 @@ describe(MemoryService.name, () => {
 
   beforeEach(() => {
     ({ sut, mocks } = newTestService(MemoryService));
+    mocks.memory.search.mockResolvedValue([]);
   });
 
   it('should be defined', () => {
@@ -129,6 +131,181 @@ describe(MemoryService.name, () => {
         new Set(['a-2025-1', 'a-2024-1', 'a-2023-1', 'a-2022-1', 'a-2021-1', 'a-2020-1']),
       );
       expect(mocks.systemMetadata.set).toHaveBeenCalledWith(
+        SystemMetadataKey.MemoriesState,
+        expect.objectContaining({ lastRuleDate: '2026-04-23T00:00:00.000Z' }),
+      );
+
+      vi.useRealTimers();
+    });
+
+    it('should only evaluate rules through today, not future precompute dates', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-04-23T12:00:00Z'));
+
+      const user = factory.userAdmin();
+      mocks.user.getList.mockResolvedValue([user]);
+      mocks.systemMetadata.get.mockResolvedValue({
+        lastOnThisDayDate: '2026-04-25T00:00:00.000Z',
+        lastRuleDate: '2026-04-20T00:00:00.000Z',
+      });
+      mocks.asset.getByDayOfYear.mockResolvedValue([]);
+
+      const birthdayRule = { id: 'birthday', evaluate: vi.fn().mockResolvedValue([]) };
+      vi.spyOn(sut as never, 'getMemoryRules').mockReturnValue([birthdayRule] as never);
+
+      await sut.onMemoriesCreate();
+
+      expect(birthdayRule.evaluate.mock.calls.map(([input]) => input.target.toISODate())).toEqual([
+        '2026-04-21',
+        '2026-04-22',
+        '2026-04-23',
+      ]);
+
+      vi.useRealTimers();
+    });
+
+    it('should keep only the top two surviving rule candidates after dedupe and fail soft', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-04-23T12:00:00Z'));
+
+      const user = factory.userAdmin();
+      mocks.user.getList.mockResolvedValue([user]);
+      mocks.systemMetadata.get.mockResolvedValue({
+        lastOnThisDayDate: '2026-04-25T00:00:00.000Z',
+        lastRuleDate: '2026-04-22T00:00:00.000Z',
+      });
+      mocks.asset.getByDayOfYear.mockResolvedValue([]);
+      mocks.memory.hasRuleMemory.mockResolvedValueOnce(false).mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+      mocks.memory.create.mockResolvedValue(MemoryFactory.create() as any);
+
+      const failingRule = { id: 'broken', evaluate: vi.fn().mockRejectedValue(new Error('boom')) };
+      const scoringRule = {
+        id: 'scoring',
+        evaluate: vi.fn().mockResolvedValue([
+          {
+            ruleId: 'birthday',
+            dedupeKey: 'k-1',
+            title: 'First',
+            score: 100,
+            assetIds: ['asset-1'],
+            memoryAt: DateTime.fromISO('2026-04-23T00:00:00Z'),
+          },
+          {
+            ruleId: 'birthday',
+            dedupeKey: 'k-2',
+            title: 'Second',
+            score: 90,
+            assetIds: ['asset-2'],
+            memoryAt: DateTime.fromISO('2026-04-23T00:00:00Z'),
+          },
+          {
+            ruleId: 'birthday',
+            dedupeKey: 'k-3',
+            title: 'Third',
+            score: 10,
+            assetIds: ['asset-3'],
+            memoryAt: DateTime.fromISO('2026-04-23T00:00:00Z'),
+          },
+        ]),
+      };
+
+      vi.spyOn(sut as never, 'getMemoryRules').mockReturnValue([failingRule, scoringRule] as never);
+
+      await sut.onMemoriesCreate();
+
+      expect(mocks.memory.create).toHaveBeenCalledTimes(2);
+      expect(mocks.memory.hasRuleMemory.mock.calls).toEqual([
+        [user.id, 'birthday', 'k-1'],
+        [user.id, 'birthday', 'k-2'],
+        [user.id, 'birthday', 'k-3'],
+      ]);
+      expect(mocks.memory.create.mock.calls[0]?.[0].data).toMatchObject({ title: 'First', dedupeKey: 'k-1' });
+      expect(mocks.memory.create.mock.calls[1]?.[0].data).toMatchObject({ title: 'Third', dedupeKey: 'k-3' });
+
+      vi.useRealTimers();
+    });
+
+    it('should respect the daily rule cap across reruns when a rule memory already exists', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-04-23T12:00:00Z'));
+
+      const user = factory.userAdmin();
+      mocks.user.getList.mockResolvedValue([user]);
+      mocks.systemMetadata.get.mockResolvedValue({
+        lastOnThisDayDate: '2026-04-25T00:00:00.000Z',
+        lastRuleDate: '2026-04-22T00:00:00.000Z',
+      });
+      mocks.asset.getByDayOfYear.mockResolvedValue([]);
+      mocks.memory.search.mockResolvedValue([
+        getForMemory(
+          MemoryFactory.create({
+            ownerId: user.id,
+            type: MemoryType.Rule,
+            memoryAt: new Date('2026-04-23T00:00:00Z'),
+            data: {
+              ruleId: 'birthday',
+              dedupeKey: 'existing',
+              title: 'Existing',
+            } satisfies RuleMemoryData,
+          }),
+        ),
+      ]);
+      mocks.memory.hasRuleMemory.mockResolvedValue(false);
+      mocks.memory.create.mockResolvedValue(MemoryFactory.create() as any);
+
+      const scoringRule = {
+        id: 'scoring',
+        evaluate: vi.fn().mockResolvedValue([
+          {
+            ruleId: 'birthday',
+            dedupeKey: 'k-1',
+            title: 'First',
+            score: 100,
+            assetIds: ['asset-1'],
+            memoryAt: DateTime.fromISO('2026-04-23T00:00:00Z'),
+          },
+          {
+            ruleId: 'birthday',
+            dedupeKey: 'k-2',
+            title: 'Second',
+            score: 90,
+            assetIds: ['asset-2'],
+            memoryAt: DateTime.fromISO('2026-04-23T00:00:00Z'),
+          },
+        ]),
+      };
+
+      vi.spyOn(sut as never, 'getMemoryRules').mockReturnValue([scoringRule] as never);
+
+      await sut.onMemoriesCreate();
+
+      expect(mocks.memory.search).toHaveBeenCalledWith(user.id, { type: MemoryType.Rule, for: new Date('2026-04-23T00:00:00Z') });
+      expect(mocks.memory.create).toHaveBeenCalledTimes(1);
+      expect(mocks.memory.create.mock.calls[0]?.[0].data).toMatchObject({ title: 'First', dedupeKey: 'k-1' });
+
+      vi.useRealTimers();
+    });
+
+    it('should not advance the rule cursor when any owner run fails', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-04-23T12:00:00Z'));
+
+      const userA = factory.userAdmin();
+      const userB = factory.userAdmin();
+      mocks.user.getList.mockResolvedValue([userA, userB]);
+      mocks.systemMetadata.get.mockResolvedValue({
+        lastOnThisDayDate: '2026-04-25T00:00:00.000Z',
+        lastRuleDate: '2026-04-22T00:00:00.000Z',
+      });
+      mocks.asset.getByDayOfYear.mockResolvedValue([]);
+
+      vi.spyOn(sut as never, 'createRuleMemories')
+        .mockResolvedValueOnce(undefined as never)
+        .mockRejectedValueOnce(new Error('boom'));
+
+      await sut.onMemoriesCreate();
+
+      expect(mocks.systemMetadata.set).not.toHaveBeenCalledWith(
         SystemMetadataKey.MemoriesState,
         expect.objectContaining({ lastRuleDate: '2026-04-23T00:00:00.000Z' }),
       );

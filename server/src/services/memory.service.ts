@@ -93,23 +93,37 @@ export class MemoryService extends BaseService {
   }
 
   private async createRuleMemories(ownerId: string, target: DateTime) {
+    const existingRuleMemories = await this.memoryRepository.search(ownerId, {
+      type: MemoryType.Rule,
+      for: target.toJSDate(),
+    });
+    const remainingSlots = Math.max(0, RULE_DAILY_LIMIT - existingRuleMemories.length);
+
+    if (remainingSlots === 0) {
+      return;
+    }
+
     const showAt = target.startOf('day').toJSDate();
     const hideAt = target.endOf('day').toJSDate();
     const seenDedupeKeys = new Set<string>();
-    const candidates = (await this.evaluateRuleCandidates(ownerId, target))
-      .sort((left, right) => right.score - left.score)
-      .slice(0, RULE_DAILY_LIMIT);
+    const candidates = (await this.evaluateRuleCandidates(ownerId, target)).sort((left, right) => right.score - left.score);
+    let inserted = 0;
 
     for (const candidate of candidates) {
+      if (inserted >= remainingSlots) {
+        break;
+      }
+
       if (seenDedupeKeys.has(candidate.dedupeKey)) {
         continue;
       }
+
+      seenDedupeKeys.add(candidate.dedupeKey);
 
       if (await this.memoryRepository.hasRuleMemory(ownerId, candidate.ruleId, candidate.dedupeKey)) {
         continue;
       }
 
-      seenDedupeKeys.add(candidate.dedupeKey);
       await this.memoryRepository.create(
         {
           ownerId,
@@ -128,6 +142,7 @@ export class MemoryService extends BaseService {
         },
         new Set(candidate.assetIds),
       );
+      inserted++;
     }
   }
 
