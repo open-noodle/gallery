@@ -230,13 +230,16 @@ export const utils = {
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        // E2E files reuse the same Docker stack. Clearing Redis first drops
-        // stale BullMQ jobs from the previous file before we truncate Postgres.
+        // E2E files reuse the same Docker stack. Clear only BullMQ keys so
+        // stale jobs from the previous file do not outlive the Postgres reset.
         const { exitCode, stderr } = await executeCommand('docker', [
           'exec',
           'immich-e2e-redis',
-          'redis-cli',
-          'FLUSHALL',
+          'sh',
+          '-lc',
+          `for key in $(redis-cli --scan --pattern 'immich_bull:*'); do
+             redis-cli DEL "$key" >/dev/null
+           done`,
         ]).promise;
         if (exitCode !== 0) {
           throw new Error(`Failed to flush Redis queues: ${stderr || `exit code ${exitCode}`}`);
