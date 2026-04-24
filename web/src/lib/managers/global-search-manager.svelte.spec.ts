@@ -2635,9 +2635,16 @@ describe('SWR loading rules', () => {
     const photosProvider = (m as unknown as { providers: { photos: Provider } }).providers.photos;
     const originalPhotosRun = photosProvider.run;
     let resolveStalePhotos!: () => void;
-    photosProvider.run = vi.fn(
-      () => new Promise((r) => (resolveStalePhotos = () => r({ status: 'empty' } as ProviderStatus<EntityItem>))),
-    );
+    let invocationCount = 0;
+    photosProvider.run = vi.fn((...args) => {
+      invocationCount++;
+      if (invocationCount === 1) {
+        return new Promise(
+          (r) => (resolveStalePhotos = () => r({ status: 'empty' } as ProviderStatus<EntityItem>)),
+        ) as Promise<ProviderStatus<EntityItem>>;
+      }
+      return originalPhotosRun(...args);
+    });
     try {
       m.open();
       m.setQuery('first');
@@ -4167,13 +4174,16 @@ describe('prefix scoping — runBatch gating', () => {
     ]) {
       s.mockClear();
     }
+    const searchSmartCallsBefore = searchSmartSpy.mock.calls.length;
+    const searchPersonCallsBefore = searchPersonSpy.mock.calls.length;
+    const searchPlacesCallsBefore = searchPlacesSpy.mock.calls.length;
 
     m.setQuery('>theme');
     await vi.advanceTimersByTimeAsync(150);
 
-    expect(searchSmartSpy).not.toHaveBeenCalled();
-    expect(searchPersonSpy).not.toHaveBeenCalled();
-    expect(searchPlacesSpy).not.toHaveBeenCalled();
+    expect(searchSmartSpy).toHaveBeenCalledTimes(searchSmartCallsBefore);
+    expect(searchPersonSpy).toHaveBeenCalledTimes(searchPersonCallsBefore);
+    expect(searchPlacesSpy).toHaveBeenCalledTimes(searchPlacesCallsBefore);
     // Navigation section populated via synchronous runNavigationProvider, not runBatch.
     expect(m.sections.navigation.status).toBe('ok');
   });
