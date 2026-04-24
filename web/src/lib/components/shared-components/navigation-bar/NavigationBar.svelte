@@ -5,11 +5,11 @@
 <script lang="ts">
   import { page } from '$app/state';
   import { clickOutside } from '#lib/actions/click-outside.ts';
-  import GlobalSearchTrigger from '#lib/components/global-search/global-search-trigger.svelte';
+  import GlobalSearchInputTrigger from '#lib/components/global-search/global-search-input-trigger.svelte';
   import NotificationPanel from '#lib/components/shared-components/navigation-bar/NotificationPanel.svelte';
-  import SearchBar from '#lib/components/shared-components/search-bar/SearchBar.svelte';
   import SkipLink from '#lib/elements/SkipLink.svelte';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
+  import { globalSearchManager } from '#lib/managers/global-search-manager.svelte.ts';
   import { Route } from '#lib/route.ts';
   import { getGlobalActions } from '#lib/services/app.service.ts';
   import { mediaQueryManager } from '#lib/stores/media-query-manager.svelte.ts';
@@ -77,20 +77,17 @@
     </div>
     <div class="flex justify-between gap-4 pe-6 lg:gap-8">
       <div class="hidden w-full max-w-5xl flex-1 sm:block tall:ps-0">
-        <SearchBar grayTheme={true} />
+        <GlobalSearchInputTrigger />
       </div>
 
       <section class="flex w-full place-items-center justify-end gap-1 sm:w-auto md:gap-2">
-        <div class="hidden sm:flex">
-          <GlobalSearchTrigger />
-        </div>
         <IconButton
           color="secondary"
           shape="round"
           variant="ghost"
           size="medium"
           icon={mdiMagnify}
-          href={Route.search()}
+          onclick={() => globalSearchManager.open()}
           id="search-button"
           class="sm:hidden"
           aria-label={$t('go_to_search')}
