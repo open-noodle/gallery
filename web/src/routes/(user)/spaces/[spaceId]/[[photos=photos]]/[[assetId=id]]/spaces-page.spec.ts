@@ -161,7 +161,7 @@ describe('Spaces page search URL sync', () => {
     mockAssetMultiSelectManager.selectionActive = false;
     mockAssetMultiSelectManager.assets = [];
     mockPage.url = new URL('https://gallery.test/spaces/space-1/photos');
-    sdkMock.markSpaceViewed.mockResolvedValue(undefined);
+    vi.mocked(sdkMock.markSpaceViewed).mockResolvedValue(void 0 as never);
     sdkMock.getSpaceActivities.mockResolvedValue([]);
     sdkMock.getSpacePeople.mockResolvedValue([]);
   });

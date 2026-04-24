@@ -34,7 +34,7 @@ test.describe('Spaces Search', () => {
     await expect(searchInput).toBeVisible({ timeout: 10_000 });
     await searchInput.fill('test');
     await searchInput.press('Enter');
-    await expect(page).toHaveURL(new RegExp(`/spaces/${space.id}/photos\\?q=test$`));
+    await expect(page).toHaveURL(new RegExp(String.raw`/spaces/${space.id}/photos\?q=test$`));
 
     // Smart search requires ML (CLIP) — handle both results and empty state
     await expect(page.getByTestId('result-count').or(page.getByTestId('search-empty'))).toBeVisible({
@@ -50,12 +50,12 @@ test.describe('Spaces Search', () => {
     await expect(searchInput).toBeVisible({ timeout: 10_000 });
     await searchInput.fill('sunset');
     await searchInput.press('Enter');
-    await expect(page).toHaveURL(new RegExp(`/spaces/${space.id}/photos\\?q=sunset$`));
+    await expect(page).toHaveURL(new RegExp(String.raw`/spaces/${space.id}/photos\?q=sunset$`));
 
     await page.goto('/photos');
     await page.goBack();
 
-    await expect(page).toHaveURL(new RegExp(`/spaces/${space.id}/photos\\?q=sunset$`));
+    await expect(page).toHaveURL(new RegExp(String.raw`/spaces/${space.id}/photos\?q=sunset$`));
     await expect(searchInput).toHaveValue('sunset');
   });
 
@@ -77,7 +77,7 @@ test.describe('Spaces Search', () => {
     const clearButton = page.locator('[aria-label="Clear value"]');
     await clearButton.click();
 
-    await expect(page).toHaveURL(new RegExp(`/spaces/${space.id}/photos$`));
+    await expect(page).toHaveURL(new RegExp(String.raw`/spaces/${space.id}/photos$`));
     await expect(page.getByTestId('result-count')).not.toBeVisible({ timeout: 5000 });
     await expect(page.getByTestId('search-empty')).not.toBeVisible({ timeout: 5000 });
     await expect(page.getByTestId('search-chip')).not.toBeVisible({ timeout: 5000 });

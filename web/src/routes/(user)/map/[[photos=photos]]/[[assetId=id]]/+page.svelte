@@ -28,7 +28,7 @@
     searchSmart,
   } from '@immich/sdk';
   import { Icon, IconButton } from '@immich/ui';
-  import { SvelteMap } from 'svelte/reactivity';
+  import { SvelteMap, SvelteSet } from 'svelte/reactivity';
   import { mdiArrowLeft, mdiFilterVariant } from '@mdi/js';
   import { onDestroy, onMount } from 'svelte';
   import { t } from 'svelte-i18n';
@@ -134,8 +134,8 @@
             return;
           }
 
-          const matchingIds = new Set<string>();
-          const unmatchedMarkerIds = new Set(markers.map((marker) => marker.id));
+          const matchingIds = new SvelteSet<string>();
+          const unmatchedMarkerIds = new SvelteSet(markers.map((marker) => marker.id));
           let nextPage: number | null = 1;
 
           while (nextPage !== null && !controller.signal.aborted) {

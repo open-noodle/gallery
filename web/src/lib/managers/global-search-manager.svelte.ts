@@ -26,7 +26,7 @@ import {
 import { toastManager } from '@immich/ui';
 import { computeCommandScore } from 'bits-ui';
 import { locale as i18nLocale, t, type Translations } from 'svelte-i18n';
-import { SvelteMap, SvelteSet } from 'svelte/reactivity';
+import { SvelteMap, SvelteSet, SvelteURLSearchParams } from 'svelte/reactivity';
 import { get } from 'svelte/store';
 import { parseScope, personSuggestionsComparator, type ParsedQuery, type Scope } from './cmdk-prefix';
 import { commandContextManager } from './command-context-manager.svelte';
@@ -1186,7 +1186,7 @@ export class GlobalSearchManager {
 
   private buildSearchDestination(text: string): string {
     const pathname = page.url.pathname;
-    const params = new URLSearchParams(page.url.searchParams);
+    const params = new SvelteURLSearchParams(page.url.searchParams);
     params.set('q', text);
 
     if (pathname.startsWith('/photos')) {
@@ -1202,7 +1202,7 @@ export class GlobalSearchManager {
       return `/map?${params.toString()}`;
     }
 
-    const fresh = new URLSearchParams();
+    const fresh = new SvelteURLSearchParams();
     fresh.set('q', text);
     return `/photos?${fresh.toString()}`;
   }

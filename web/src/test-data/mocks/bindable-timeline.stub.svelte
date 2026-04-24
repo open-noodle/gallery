@@ -4,7 +4,7 @@
     [key: string]: unknown;
   }
 
-  let { timelineManager = $bindable() }: Props = $props();
+  let { timelineManager = $bindable(), ...rest }: Props = $props();
 </script>
 
-<div data-testid="timeline-stub" data-has-timeline={String(timelineManager !== undefined)}></div>
+<div {...rest} data-testid="timeline-stub" data-has-timeline={String(timelineManager !== undefined)}></div>

@@ -93,7 +93,7 @@
   } from '@mdi/js';
   import { t } from 'svelte-i18n';
   import { untrack } from 'svelte';
-  import { SvelteMap } from 'svelte/reactivity';
+  import { SvelteMap, SvelteURLSearchParams } from 'svelte/reactivity';
   import type { PageData } from './$types';
 
   type ViewMode = 'view' | 'select-assets' | 'select-cover';
@@ -611,22 +611,25 @@
 
   const commitSearch = async (nextQuery = draftSearchQuery) => {
     const trimmed = nextQuery.trim();
-    const url = new URL(page.url);
-    url.pathname = getSearchPathname(url.pathname);
+    const pathname = getSearchPathname(page.url.pathname);
+    const searchParams = new SvelteURLSearchParams(page.url.searchParams);
 
     if (trimmed) {
-      url.searchParams.set('q', trimmed);
+      searchParams.set('q', trimmed);
     } else {
-      url.searchParams.delete('q');
+      searchParams.delete('q');
     }
 
     draftSearchQuery = trimmed;
 
-    if (url.pathname + url.search === page.url.pathname + page.url.search) {
+    const search = searchParams.toString();
+    const nextUrl = pathname + (search ? `?${search}` : '');
+
+    if (nextUrl === page.url.pathname + page.url.search) {
       return;
     }
 
-    await goto(url.pathname + url.search, {
+    await goto(nextUrl, {
       replaceState: true,
       keepFocus: true,
       noScroll: true,

@@ -4,7 +4,7 @@
     [key: string]: unknown;
   }
 
-  let { filters = $bindable() }: Props = $props();
+  let { filters = $bindable(), ...rest }: Props = $props();
 </script>
 
-<div data-testid="filter-panel-stub" data-has-filters={String(filters !== undefined)}></div>
+<div {...rest} data-testid="filter-panel-stub" data-has-filters={String(filters !== undefined)}></div>
