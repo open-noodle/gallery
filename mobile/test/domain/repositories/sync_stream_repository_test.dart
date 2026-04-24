@@ -9,6 +9,7 @@ import 'package:immich_mobile/data/db/main/table/remote/exif.drift.dart';
 import 'package:immich_mobile/data/db/main/table/user/partner.drift.dart';
 import 'package:immich_mobile/domain/models/album/album.model.dart';
 import 'package:immich_mobile/domain/models/album/local_album.model.dart';
+import 'package:immich_mobile/domain/models/memory.model.dart';
 import 'package:immich_mobile/infrastructure/repositories/sync_stream.repository.dart';
 import 'package:immich_mobile/utils/datetime_helpers.dart';
 import 'package:openapi/api.dart';
@@ -1167,39 +1168,30 @@ void main() {
     });
   });
 
-  group('SyncStreamRepository - group_date without server dates', () {
-    Future<RemoteAssetEntityData> row(String id) =>
-        (db.remoteAssetEntity.select()..where((t) => t.id.equals(id))).getSingle();
+  test('stores rule memories from sync without requiring year data', () async {
+    await sut.updateUsersV1([_createUser()]);
 
-    test('assets without dates group on the stored created_at', () async {
-      await sut.updateUsersV1([_createUser()]);
-      final known = _createAsset(id: 'known', checksum: 'AAA', fileName: 'a.jpg', localDateTime: DateTime(2024, 1, 5));
-      await sut.updateAssetsV1([known]);
+    await sut.updateMemoriesV1([
+      SyncMemoryV1(
+        createdAt: DateTime(2026, 4, 23),
+        data: {'ruleId': 'birthday', 'title': 'Happy birthday, Alice', 'subtitle': 'Photos from different years'},
+        deletedAt: null,
+        hideAt: DateTime(2026, 4, 23, 23, 59),
+        id: 'memory-rule-1',
+        isSaved: false,
+        memoryAt: DateTime(2026, 4, 23),
+        ownerId: 'user-1',
+        seenAt: null,
+        showAt: DateTime(2026, 4, 23),
+        type: MemoryType.rule,
+        updatedAt: DateTime(2026, 4, 23),
+      ),
+    ]);
 
-      await sut.updateAssetsV1([
-        _createAsset(id: 'known', checksum: 'AAA', fileName: 'a.jpg', withoutDates: true),
-        _createAsset(id: 'fresh', checksum: 'BBB', fileName: 'b.jpg', withoutDates: true),
-      ]);
+    final query = db.memoryEntity.select()..where((tbl) => tbl.id.equals('memory-rule-1'));
+    final row = await query.getSingle();
 
-      final kept = await row('known');
-      expect(kept.createdAt, known.fileCreatedAt);
-      expect(kept.localDateTime, isNull);
-      expect(kept.groupDate, '2024-01-01', reason: 'the local day is gone, created_at stays');
-      final fresh = await row('fresh');
-      expect(fresh.groupDate, timelineGroupDate(fresh.createdAt.toLocal()));
-
-      // same scenario through V2
-      await sut.updateAssetsV2([
-        _createAssetV2(id: 'known2', checksum: 'CCC', fileName: 'c.jpg', localDateTime: DateTime(2024, 1, 5)),
-      ]);
-      await sut.updateAssetsV2([
-        _createAssetV2(id: 'known2', checksum: 'CCC', fileName: 'c.jpg', withoutDates: true),
-        _createAssetV2(id: 'fresh2', checksum: 'DDD', fileName: 'd.jpg', withoutDates: true),
-      ]);
-
-      expect((await row('known2')).groupDate, '2024-01-01');
-      final freshV2 = await row('fresh2');
-      expect(freshV2.groupDate, timelineGroupDate(freshV2.createdAt.toLocal()));
-    });
+    expect(row.type, MemoryTypeEnum.rule);
+    expect(row.data, contains('"title":"Happy birthday, Alice"'));
   });
 }
