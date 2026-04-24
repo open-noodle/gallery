@@ -11,6 +11,7 @@
     placeholder: string;
     onSearch?: (options: { force?: boolean }) => void;
     onReset?: () => void;
+    onBlurSearch?: () => void;
   }
 
   let {
@@ -20,9 +21,11 @@
     placeholder,
     onSearch = () => {},
     onReset = () => {},
+    onBlurSearch,
   }: Props = $props();
 
-  let inputRef = $state<HTMLElement>();
+  let containerRef = $state<HTMLDivElement>();
+  let inputRef = $state<HTMLInputElement>();
 
   const resetSearch = () => {
     name = '';
@@ -35,9 +38,18 @@
       onSearch({ force: true });
     }
   };
+
+  const handleInputBlur = (event: FocusEvent) => {
+    const nextFocusTarget = event.relatedTarget;
+    if (nextFocusTarget instanceof Node && containerRef?.contains(nextFocusTarget)) {
+      return;
+    }
+    onBlurSearch?.();
+  };
 </script>
 
 <div
+  bind:this={containerRef}
   class="flex items-center text-sm {roundedBottom
     ? 'rounded-2xl'
     : 'rounded-t-lg'} h-full place-items-center gap-2 bg-gray-200 p-2 dark:bg-gray-800"
@@ -59,6 +71,7 @@
     bind:this={inputRef}
     onkeydown={handleSearch}
     oninput={() => onSearch({ force: false })}
+    onblur={handleInputBlur}
   />
   {#if showLoadingSpinner}
     <div class="flex place-items-center">
