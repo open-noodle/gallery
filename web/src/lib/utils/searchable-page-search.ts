@@ -75,19 +75,19 @@ export function buildSearchablePageUrl(
   const trimmedQuery = query.trim();
   const params = new URLSearchParams(url.searchParams);
 
-  if (!trimmedQuery) {
-    params.delete('q');
-    if (sortOrder === 'asc' || sortOrder === 'desc') {
-      params.set('sort', sortOrder);
-    } else {
-      params.delete('sort');
-    }
-  } else {
+  if (trimmedQuery) {
     params.set('q', trimmedQuery);
     if (sortOrder === 'relevance') {
       params.delete('sort');
     } else {
       params.set('sort', sortOrder);
+    }
+  } else {
+    params.delete('q');
+    if (sortOrder === 'asc' || sortOrder === 'desc') {
+      params.set('sort', sortOrder);
+    } else {
+      params.delete('sort');
     }
   }
 

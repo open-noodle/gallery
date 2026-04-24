@@ -1200,11 +1200,15 @@ export class GlobalSearchManager {
     }
 
     if (page.url.pathname.startsWith('/map')) {
+      // Ephemeral serialization for navigation only; no reactive state is retained.
+      // eslint-disable-next-line svelte/prefer-svelte-reactivity
       const params = new URLSearchParams(page.url.searchParams);
       params.set('q', text);
       return `/map?${params.toString()}`;
     }
 
+    // Ephemeral serialization for navigation only; no reactive state is retained.
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const fresh = new URLSearchParams();
     fresh.set('q', text);
     if (this.searchSortOrder !== 'relevance') {

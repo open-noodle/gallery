@@ -1,6 +1,6 @@
 import { init, register, t, waitLocale } from 'svelte-i18n';
-import { beforeAll, describe, expect, it } from 'vitest';
 import { get } from 'svelte/store';
+import { beforeAll, describe, expect, it } from 'vitest';
 
 describe('cmdk top search label', () => {
   beforeAll(async () => {
