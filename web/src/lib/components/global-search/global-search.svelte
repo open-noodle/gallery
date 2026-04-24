@@ -97,16 +97,27 @@
   });
 
   let lastAutoSelectedTopSearchQuery = $state<string | null>(null);
+  let lastDismissedTopSearchQuery = $state<string | null>(null);
+  let previousSelectedValue = $state('');
   $effect(() => {
     const topSearchMatch = manager.topSearchMatch;
     if (!topSearchMatch) {
       lastAutoSelectedTopSearchQuery = null;
+      lastDismissedTopSearchQuery = null;
+      previousSelectedValue = selectedValue;
       return;
     }
-    if (lastAutoSelectedTopSearchQuery !== topSearchMatch.query) {
+    if (previousSelectedValue === topSearchMatch.id && selectedValue !== topSearchMatch.id) {
+      lastDismissedTopSearchQuery = topSearchMatch.query;
+    }
+    if (
+      lastAutoSelectedTopSearchQuery !== topSearchMatch.query &&
+      lastDismissedTopSearchQuery !== topSearchMatch.query
+    ) {
       selectedValue = topSearchMatch.id;
       lastAutoSelectedTopSearchQuery = topSearchMatch.query;
     }
+    previousSelectedValue = selectedValue;
   });
 
   // Render-time filter: drop unreachable navigate recents before they hit the DOM.
