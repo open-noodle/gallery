@@ -116,7 +116,10 @@ describe('/search/suggestions/filters', () => {
         [admin.userId, name],
       );
       const personId = personResult.rows[0].id as string;
-      await db.query(`INSERT INTO "asset_face" ("assetId", "personId") VALUES ($1, $2)`, [assets[assetIndex].id, personId]);
+      await db.query(`INSERT INTO "asset_face" ("assetId", "personId") VALUES ($1, $2)`, [
+        assets[assetIndex].id,
+        personId,
+      ]);
       thresholdPeopleByRating[rating] = name;
     }
 
@@ -298,7 +301,13 @@ describe('/search/suggestions/filters', () => {
     }
 
     const expectedPeopleByThreshold = [
-      [thresholdPeopleByRating[1], thresholdPeopleByRating[2], thresholdPeopleByRating[3], thresholdPeopleByRating[4], thresholdPeopleByRating[5]],
+      [
+        thresholdPeopleByRating[1],
+        thresholdPeopleByRating[2],
+        thresholdPeopleByRating[3],
+        thresholdPeopleByRating[4],
+        thresholdPeopleByRating[5],
+      ],
       [thresholdPeopleByRating[2], thresholdPeopleByRating[3], thresholdPeopleByRating[4], thresholdPeopleByRating[5]],
       [thresholdPeopleByRating[3], thresholdPeopleByRating[4], thresholdPeopleByRating[5]],
       [thresholdPeopleByRating[4], thresholdPeopleByRating[5]],
