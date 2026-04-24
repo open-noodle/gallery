@@ -113,19 +113,11 @@ class AuthenticationApi {
   /// Parameters:
   ///
   /// * [PinCodeChangeDto] pinCodeChangeDto (required):
-  Future<bool?> changePinCode(PinCodeChangeDto pinCodeChangeDto,) async {
+  Future<void> changePinCode(PinCodeChangeDto pinCodeChangeDto,) async {
     final response = await changePinCodeWithHttpInfo(pinCodeChangeDto,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
-    // When a remote server returns no body with a status of 204, we shall not decode it.
-    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
-    // FormatException when trying to decode an empty string.
-    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
-      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'bool',) as bool;
-    
-    }
-    return null;
   }
 
   /// Finish OAuth
@@ -321,19 +313,11 @@ class AuthenticationApi {
   /// Lock auth session
   ///
   /// Remove elevated access to locked assets from the current session.
-  Future<bool?> lockAuthSession() async {
+  Future<void> lockAuthSession() async {
     final response = await lockAuthSessionWithHttpInfo();
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
-    // When a remote server returns no body with a status of 204, we shall not decode it.
-    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
-    // FormatException when trying to decode an empty string.
-    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
-      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'bool',) as bool;
-    
-    }
-    return null;
   }
 
   /// Login
@@ -486,19 +470,11 @@ class AuthenticationApi {
   ///
   /// * [String] logoutToken (required):
   ///   OAuth logout token
-  Future<bool?> logoutOAuth(String logoutToken,) async {
+  Future<void> logoutOAuth(String logoutToken,) async {
     final response = await logoutOAuthWithHttpInfo(logoutToken,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
-    // When a remote server returns no body with a status of 204, we shall not decode it.
-    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
-    // FormatException when trying to decode an empty string.
-    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
-      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'bool',) as bool;
-    
-    }
-    return null;
   }
 
   /// Redirect OAuth to mobile
@@ -582,19 +558,11 @@ class AuthenticationApi {
   /// Parameters:
   ///
   /// * [PinCodeResetDto] pinCodeResetDto (required):
-  Future<bool?> resetPinCode(PinCodeResetDto pinCodeResetDto,) async {
+  Future<void> resetPinCode(PinCodeResetDto pinCodeResetDto,) async {
     final response = await resetPinCodeWithHttpInfo(pinCodeResetDto,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
-    // When a remote server returns no body with a status of 204, we shall not decode it.
-    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
-    // FormatException when trying to decode an empty string.
-    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
-      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'bool',) as bool;
-    
-    }
-    return null;
   }
 
   /// Setup pin code
@@ -638,19 +606,11 @@ class AuthenticationApi {
   /// Parameters:
   ///
   /// * [PinCodeSetupDto] pinCodeSetupDto (required):
-  Future<bool?> setupPinCode(PinCodeSetupDto pinCodeSetupDto,) async {
+  Future<void> setupPinCode(PinCodeSetupDto pinCodeSetupDto,) async {
     final response = await setupPinCodeWithHttpInfo(pinCodeSetupDto,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
-    // When a remote server returns no body with a status of 204, we shall not decode it.
-    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
-    // FormatException when trying to decode an empty string.
-    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
-      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'bool',) as bool;
-    
-    }
-    return null;
   }
 
   /// Register admin
@@ -854,19 +814,11 @@ class AuthenticationApi {
   /// Parameters:
   ///
   /// * [SessionUnlockDto] sessionUnlockDto (required):
-  Future<bool?> unlockAuthSession(SessionUnlockDto sessionUnlockDto,) async {
+  Future<void> unlockAuthSession(SessionUnlockDto sessionUnlockDto,) async {
     final response = await unlockAuthSessionWithHttpInfo(sessionUnlockDto,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
-    // When a remote server returns no body with a status of 204, we shall not decode it.
-    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
-    // FormatException when trying to decode an empty string.
-    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
-      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'bool',) as bool;
-    
-    }
-    return null;
   }
 
   /// Validate access token

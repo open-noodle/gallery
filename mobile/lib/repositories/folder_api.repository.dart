@@ -9,9 +9,7 @@ import 'package:immich_mobile/services/api.service.dart';
 import 'package:logging/logging.dart';
 import 'package:openapi/api.dart';
 
-final folderApiRepositoryProvider = Provider(
-  (ref) => FolderApiRepository(ref.watch(apiServiceProvider)),
-);
+final folderApiRepositoryProvider = Provider((ref) => FolderApiRepository(ref.watch(apiServiceProvider)));
 
 class FolderApiRepository extends ApiRepository {
   final ApiService _apiService;
@@ -28,9 +26,7 @@ class FolderApiRepository extends ApiRepository {
         return [];
       }
 
-      return List<String>.from(
-        jsonDecode(utf8.decode(response.bodyBytes)) as List,
-      );
+      return List<String>.from(jsonDecode(utf8.decode(response.bodyBytes)) as List);
     } catch (e, stack) {
       _log.severe("Failed to fetch unique original links", e, stack);
       return [];
