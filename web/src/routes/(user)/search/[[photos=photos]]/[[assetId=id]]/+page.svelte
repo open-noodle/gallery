@@ -6,7 +6,7 @@
   import ButtonContextMenu from '#lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
   import ControlAppBar from '#lib/components/shared-components/ControlAppBar.svelte';
   import GalleryViewer from '#lib/components/shared-components/gallery-viewer/GalleryViewer.svelte';
-  import SearchBar from '#lib/components/shared-components/search-bar/SearchBar.svelte';
+  import ArchiveAction from '#lib/components/timeline/actions/ArchiveAction.svelte';
   import ChangeDate from '#lib/components/timeline/actions/ChangeDateAction.svelte';
   import ChangeDescription from '#lib/components/timeline/actions/ChangeDescriptionAction.svelte';
   import ChangeLocation from '#lib/components/timeline/actions/ChangeLocationAction.svelte';
@@ -18,8 +18,8 @@
   import AssetSelectControlBar from '#lib/components/timeline/AssetSelectControlBar.svelte';
   import { QueryParameter } from '#lib/constants.ts';
   import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
-  import { searchManager } from '#lib/managers/search-manager.svelte.ts';
-  import type { TimelineAsset, Viewport } from '#lib/managers/timeline-manager/types.ts';
+  import { globalSearchManager } from '#lib/managers/global-search-manager.svelte.ts';
+  import type { Viewport } from '#lib/managers/timeline-manager/types.ts';
   import { Route } from '#lib/route.ts';
   import { getAssetBulkActions } from '#lib/services/asset.service.ts';
   import { lang, locale } from '#lib/stores/preferences.store.ts';
@@ -41,7 +41,7 @@
   } from '@immich/sdk';
   import { ActionButton, CommandPaletteDefaultProvider, Icon, IconButton } from '@immich/ui';
   import { mdiArrowLeft, mdiClose, mdiDotsVertical, mdiImageOffOutline, mdiSelectAll } from '@mdi/js';
-  import { onMount, tick, untrack } from 'svelte';
+  import { tick, untrack } from 'svelte';
   import { t } from 'svelte-i18n';
   import LoadingSpinner from '#lib/components/shared-components/LoadingSpinner.svelte';
   import { createPreloadedQuery } from '#lib/queries/client.ts';
@@ -240,21 +240,6 @@
     }
   };
 
-  const onAssetsArchive = (assetIds: string[]) => {
-    if (!terms.visibility || terms.visibility === AssetVisibility.Timeline) {
-      const assetIdSet = new Set(assetIds);
-      searchResultAssets = searchResultAssets.filter((asset) => !assetIdSet.has(asset.id));
-    }
-  };
-
-  // TODO: add back in opposite case
-  const onAssetsUnarchive = (assets: TimelineAsset[]) => {
-    if (terms.visibility === AssetVisibility.Archive) {
-      const assetIdSet = new Set(assets.map((asset) => asset.id));
-      searchResultAssets = searchResultAssets.filter((asset) => !assetIdSet.has(asset.id));
-    }
-  };
-
   function getObjectKeys<T extends object>(obj: T): (keyof T)[] {
     return Object.keys(obj) as (keyof T)[];
   }
@@ -263,14 +248,11 @@
     delete terms[key];
     assetMultiSelectManager.clear();
     void goto(Route.search(terms));
-    searchManager.setQuery(terms);
   }
-
-  onMount(() => searchManager.setQuery(terms));
 </script>
 
 <svelte:window bind:scrollY />
-<OnEvents {onAlbumAddAssets} {onAssetsArchive} {onAssetsUnarchive} />
+<OnEvents {onAlbumAddAssets} />
 
 {#if searchTermKeys.length > 0}
   <section id="search-chips" class="mx-auto mt-24 w-full max-w-7xl px-4 sm:px-8 lg:px-12">
@@ -394,8 +376,7 @@
               <ChangeDate menuItem />
               <ChangeDescription menuItem />
               <ChangeLocation menuItem />
-              <ActionMenuItem action={Actions.Archive} />
-              <ActionMenuItem action={Actions.Unarchive} />
+              <ArchiveAction menuItem unarchive={assetMultiSelectManager.isAllArchived} />
               <SetVisibilityAction menuItem onVisibilitySet={handleSetVisibility} />
               <ActionMenuItem action={Actions.Tag} />
 
@@ -415,7 +396,18 @@
       <div class="fixed inset-s-0 top-0 z-2 w-full">
         <ControlAppBar onClose={() => goto(previousRoute)} backIcon={mdiArrowLeft}>
           <div class="mx-auto w-full max-w-2xl pe-2">
-            <SearchBar grayTheme={false} />
+            <div
+              class="flex flex-wrap items-center gap-2 rounded-xl border border-gray-200/80 bg-white/90 px-4 py-2 text-sm text-gray-700 shadow-sm dark:border-gray-700 dark:bg-immich-dark-gray/90 dark:text-gray-200"
+            >
+              <span>{$t('search_legacy_notice')}</span>
+              <button
+                type="button"
+                class="font-medium text-primary hover:text-primary/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                onclick={() => globalSearchManager.open()}
+              >
+                {$t('search_open_palette')}
+              </button>
+            </div>
           </div>
         </ControlAppBar>
       </div>
