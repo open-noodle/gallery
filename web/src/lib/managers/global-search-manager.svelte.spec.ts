@@ -2631,24 +2631,30 @@ describe('SWR loading rules', () => {
   });
 
   it('stale-batch providers do not deadlock batchInFlight after a new batch supersedes', async () => {
-    let resolveStalePhotos!: () => void;
-    vi.mocked(searchSmart).mockImplementationOnce(
-      () => new Promise((r) => (resolveStalePhotos = () => r({ assets: { items: [], nextPage: null } } as never))),
-    );
     const m = new GlobalSearchManager();
-    m.open();
-    m.setQuery('first');
-    await vi.advanceTimersByTimeAsync(200);
-    expect(m.batchInFlight).toBe(true);
-    // Second query — runBatch2 resets counter and uses the default empty mock so it settles fast.
-    m.setQuery('second');
-    await vi.advanceTimersByTimeAsync(200);
-    expect(m.batchInFlight).toBe(false);
-    // Release stale photos — check-before-decrement guard must prevent corruption.
-    resolveStalePhotos();
-    await vi.advanceTimersByTimeAsync(10);
-    expect((m as unknown as { inFlightCounter: number }).inFlightCounter).toBe(0);
-    expect(m.batchInFlight).toBe(false);
+    const photosProvider = (m as unknown as { providers: { photos: Provider } }).providers.photos;
+    const originalPhotosRun = photosProvider.run;
+    let resolveStalePhotos!: () => void;
+    photosProvider.run = vi.fn(
+      () => new Promise((r) => (resolveStalePhotos = () => r({ status: 'empty' } as ProviderStatus<EntityItem>))),
+    );
+    try {
+      m.open();
+      m.setQuery('first');
+      await vi.advanceTimersByTimeAsync(200);
+      expect(m.batchInFlight).toBe(true);
+      // Second query — runBatch2 resets counter and uses the default empty mock so it settles fast.
+      m.setQuery('second');
+      await vi.advanceTimersByTimeAsync(200);
+      expect(m.batchInFlight).toBe(false);
+      // Release stale photos — check-before-decrement guard must prevent corruption.
+      resolveStalePhotos();
+      await vi.advanceTimersByTimeAsync(10);
+      expect((m as unknown as { inFlightCounter: number }).inFlightCounter).toBe(0);
+      expect(m.batchInFlight).toBe(false);
+    } finally {
+      photosProvider.run = originalPhotosRun;
+    }
   });
 
   it('runBatch entry resets inFlightCounter to zero before incrementing per-provider', async () => {

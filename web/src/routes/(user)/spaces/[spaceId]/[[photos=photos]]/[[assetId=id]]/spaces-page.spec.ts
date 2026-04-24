@@ -145,13 +145,10 @@ function renderPage() {
     },
   };
 
-  return render(
-    TestWrapper as Component<{ component: typeof SpacesPage; componentProps: typeof props }>,
-    {
-      component: SpacesPage,
-      componentProps: props,
-    },
-  );
+  return render(TestWrapper as Component<{ component: typeof SpacesPage; componentProps: typeof props }>, {
+    component: SpacesPage,
+    componentProps: props,
+  });
 }
 
 describe('Spaces page search URL sync', () => {
