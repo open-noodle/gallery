@@ -627,7 +627,7 @@ describe('global-search root', () => {
     expect(activateSpy).toHaveBeenCalledWith('photo', expect.objectContaining({ id: 'a1' }));
   });
 
-  it('activateRecent("query", ...) replays through activateSearch on the current page', async () => {
+  it('activateRecent("query", ...) replays through activateSearch on the current page', () => {
     addEntry({ kind: 'query', id: 'query:sunset', text: 'sunset', lastUsed: 1 });
     const m = new GlobalSearchManager();
     const activateSearchSpy = vi.spyOn(m, 'activateSearch').mockImplementation(() => {});
