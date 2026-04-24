@@ -37,6 +37,7 @@
 ## Task 1: Add Rule-Level Trip Curation
 
 **Files:**
+
 - Modify: `server/src/services/memory-rules/recent-trip.rule.spec.ts`
 - Modify: `server/src/services/memory-rules/recent-trip.rule.ts`
 - Modify: `server/src/repositories/asset.repository.ts`
@@ -56,31 +57,33 @@ const makeAsset = (id: string, localDateTime: string) => ({
 Update the existing `getMemoryAssetsForLocation` mocks to use `makeAsset(...)` instead of `{ id: 'asset-1' }`, then append these focused curation tests:
 
 ```ts
-  it('curates a burst-heavy trip down to seven chronological assets', async () => {
-    const assetRepository = {
-      getMemoryLocationClusters: vi
-        .fn()
-        .mockResolvedValueOnce([
-          {
-            country: 'Germany',
-            city: 'Berlin',
-            assetCount: 20,
-            dayCount: 12,
-            firstDate: new Date('2026-01-01T00:00:00Z'),
-            lastDate: new Date('2026-03-20T00:00:00Z'),
-          },
-        ])
-        .mockResolvedValueOnce([
-          {
-            country: 'France',
-            city: 'Paris',
-            assetCount: 12,
-            dayCount: 3,
-            firstDate: new Date('2026-04-15T00:00:00Z'),
-            lastDate: new Date('2026-04-17T00:00:00Z'),
-          },
-        ]),
-      getMemoryAssetsForLocation: vi.fn().mockResolvedValue([
+it('curates a burst-heavy trip down to seven chronological assets', async () => {
+  const assetRepository = {
+    getMemoryLocationClusters: vi
+      .fn()
+      .mockResolvedValueOnce([
+        {
+          country: 'Germany',
+          city: 'Berlin',
+          assetCount: 20,
+          dayCount: 12,
+          firstDate: new Date('2026-01-01T00:00:00Z'),
+          lastDate: new Date('2026-03-20T00:00:00Z'),
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          country: 'France',
+          city: 'Paris',
+          assetCount: 12,
+          dayCount: 3,
+          firstDate: new Date('2026-04-15T00:00:00Z'),
+          lastDate: new Date('2026-04-17T00:00:00Z'),
+        },
+      ]),
+    getMemoryAssetsForLocation: vi
+      .fn()
+      .mockResolvedValue([
         makeAsset('a-1', '2026-04-15T10:00:00Z'),
         makeAsset('a-2', '2026-04-15T10:01:00Z'),
         makeAsset('a-3', '2026-04-15T10:05:00Z'),
@@ -94,47 +97,49 @@ Update the existing `getMemoryAssetsForLocation` mocks to use `makeAsset(...)` i
         makeAsset('a-11', '2026-04-17T13:00:00Z'),
         makeAsset('a-12', '2026-04-17T17:00:00Z'),
       ]),
-    };
-    const memoryRepository = { search: vi.fn().mockResolvedValue([]) };
+  };
+  const memoryRepository = { search: vi.fn().mockResolvedValue([]) };
 
-    const rule = new RecentTripMemoryRule(assetRepository as never, memoryRepository as never);
-    const [candidate] = await rule.evaluate({
-      ownerId: 'user-1',
-      target: DateTime.fromISO('2026-04-23', { zone: 'utc' }),
-    });
-
-    expect(candidate).toMatchObject({
-      title: 'Recent trip to Paris, France',
-      subtitle: '12 photos over 3 days',
-      assetIds: ['a-1', 'a-3', 'a-5', 'a-6', 'a-9', 'a-11', 'a-12'],
-    });
+  const rule = new RecentTripMemoryRule(assetRepository as never, memoryRepository as never);
+  const [candidate] = await rule.evaluate({
+    ownerId: 'user-1',
+    target: DateTime.fromISO('2026-04-23', { zone: 'utc' }),
   });
 
-  it('collapses adjacent assets inside the two-minute burst window', async () => {
-    const assetRepository = {
-      getMemoryLocationClusters: vi
-        .fn()
-        .mockResolvedValueOnce([
-          {
-            country: 'Germany',
-            city: 'Berlin',
-            assetCount: 20,
-            dayCount: 12,
-            firstDate: new Date('2026-01-01T00:00:00Z'),
-            lastDate: new Date('2026-03-20T00:00:00Z'),
-          },
-        ])
-        .mockResolvedValueOnce([
-          {
-            country: 'France',
-            city: 'Paris',
-            assetCount: 8,
-            dayCount: 2,
-            firstDate: new Date('2026-04-15T00:00:00Z'),
-            lastDate: new Date('2026-04-16T00:00:00Z'),
-          },
-        ]),
-      getMemoryAssetsForLocation: vi.fn().mockResolvedValue([
+  expect(candidate).toMatchObject({
+    title: 'Recent trip to Paris, France',
+    subtitle: '12 photos over 3 days',
+    assetIds: ['a-1', 'a-3', 'a-5', 'a-6', 'a-9', 'a-11', 'a-12'],
+  });
+});
+
+it('collapses adjacent assets inside the two-minute burst window', async () => {
+  const assetRepository = {
+    getMemoryLocationClusters: vi
+      .fn()
+      .mockResolvedValueOnce([
+        {
+          country: 'Germany',
+          city: 'Berlin',
+          assetCount: 20,
+          dayCount: 12,
+          firstDate: new Date('2026-01-01T00:00:00Z'),
+          lastDate: new Date('2026-03-20T00:00:00Z'),
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          country: 'France',
+          city: 'Paris',
+          assetCount: 8,
+          dayCount: 2,
+          firstDate: new Date('2026-04-15T00:00:00Z'),
+          lastDate: new Date('2026-04-16T00:00:00Z'),
+        },
+      ]),
+    getMemoryAssetsForLocation: vi
+      .fn()
+      .mockResolvedValue([
         makeAsset('a-1', '2026-04-15T10:00:00Z'),
         makeAsset('a-2', '2026-04-15T10:01:00Z'),
         makeAsset('a-3', '2026-04-15T10:03:00Z'),
@@ -143,43 +148,45 @@ Update the existing `getMemoryAssetsForLocation` mocks to use `makeAsset(...)` i
         makeAsset('a-6', '2026-04-16T09:01:00Z'),
         makeAsset('a-7', '2026-04-16T13:00:00Z'),
       ]),
-    };
-    const memoryRepository = { search: vi.fn().mockResolvedValue([]) };
+  };
+  const memoryRepository = { search: vi.fn().mockResolvedValue([]) };
 
-    const rule = new RecentTripMemoryRule(assetRepository as never, memoryRepository as never);
-    const [candidate] = await rule.evaluate({
-      ownerId: 'user-1',
-      target: DateTime.fromISO('2026-04-23', { zone: 'utc' }),
-    });
-
-    expect(candidate?.assetIds).toEqual(['a-1', 'a-4', 'a-5', 'a-7']);
+  const rule = new RecentTripMemoryRule(assetRepository as never, memoryRepository as never);
+  const [candidate] = await rule.evaluate({
+    ownerId: 'user-1',
+    target: DateTime.fromISO('2026-04-23', { zone: 'utc' }),
   });
 
-  it('keeps a small well-spaced representative pool intact', async () => {
-    const assetRepository = {
-      getMemoryLocationClusters: vi
-        .fn()
-        .mockResolvedValueOnce([
-          {
-            country: 'Germany',
-            city: 'Berlin',
-            assetCount: 20,
-            dayCount: 12,
-            firstDate: new Date('2026-01-01T00:00:00Z'),
-            lastDate: new Date('2026-03-20T00:00:00Z'),
-          },
-        ])
-        .mockResolvedValueOnce([
-          {
-            country: 'France',
-            city: 'Paris',
-            assetCount: 9,
-            dayCount: 2,
-            firstDate: new Date('2026-04-15T00:00:00Z'),
-            lastDate: new Date('2026-04-16T00:00:00Z'),
-          },
-        ]),
-      getMemoryAssetsForLocation: vi.fn().mockResolvedValue([
+  expect(candidate?.assetIds).toEqual(['a-1', 'a-4', 'a-5', 'a-7']);
+});
+
+it('keeps a small well-spaced representative pool intact', async () => {
+  const assetRepository = {
+    getMemoryLocationClusters: vi
+      .fn()
+      .mockResolvedValueOnce([
+        {
+          country: 'Germany',
+          city: 'Berlin',
+          assetCount: 20,
+          dayCount: 12,
+          firstDate: new Date('2026-01-01T00:00:00Z'),
+          lastDate: new Date('2026-03-20T00:00:00Z'),
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          country: 'France',
+          city: 'Paris',
+          assetCount: 9,
+          dayCount: 2,
+          firstDate: new Date('2026-04-15T00:00:00Z'),
+          lastDate: new Date('2026-04-16T00:00:00Z'),
+        },
+      ]),
+    getMemoryAssetsForLocation: vi
+      .fn()
+      .mockResolvedValue([
         makeAsset('a-1', '2026-04-15T08:00:00Z'),
         makeAsset('a-2', '2026-04-15T10:30:00Z'),
         makeAsset('a-3', '2026-04-15T14:00:00Z'),
@@ -187,43 +194,45 @@ Update the existing `getMemoryAssetsForLocation` mocks to use `makeAsset(...)` i
         makeAsset('a-5', '2026-04-16T12:00:00Z'),
         makeAsset('a-6', '2026-04-16T18:00:00Z'),
       ]),
-    };
-    const memoryRepository = { search: vi.fn().mockResolvedValue([]) };
+  };
+  const memoryRepository = { search: vi.fn().mockResolvedValue([]) };
 
-    const rule = new RecentTripMemoryRule(assetRepository as never, memoryRepository as never);
-    const [candidate] = await rule.evaluate({
-      ownerId: 'user-1',
-      target: DateTime.fromISO('2026-04-23', { zone: 'utc' }),
-    });
-
-    expect(candidate?.assetIds).toEqual(['a-1', 'a-2', 'a-3', 'a-4', 'a-5', 'a-6']);
+  const rule = new RecentTripMemoryRule(assetRepository as never, memoryRepository as never);
+  const [candidate] = await rule.evaluate({
+    ownerId: 'user-1',
+    target: DateTime.fromISO('2026-04-23', { zone: 'utc' }),
   });
 
-  it('caps a long trip at ten assets while preserving the trip endpoints', async () => {
-    const assetRepository = {
-      getMemoryLocationClusters: vi
-        .fn()
-        .mockResolvedValueOnce([
-          {
-            country: 'Germany',
-            city: 'Berlin',
-            assetCount: 20,
-            dayCount: 12,
-            firstDate: new Date('2026-01-01T00:00:00Z'),
-            lastDate: new Date('2026-03-20T00:00:00Z'),
-          },
-        ])
-        .mockResolvedValueOnce([
-          {
-            country: 'France',
-            city: 'Paris',
-            assetCount: 21,
-            dayCount: 11,
-            firstDate: new Date('2026-04-01T00:00:00Z'),
-            lastDate: new Date('2026-04-11T00:00:00Z'),
-          },
-        ]),
-      getMemoryAssetsForLocation: vi.fn().mockResolvedValue([
+  expect(candidate?.assetIds).toEqual(['a-1', 'a-2', 'a-3', 'a-4', 'a-5', 'a-6']);
+});
+
+it('caps a long trip at ten assets while preserving the trip endpoints', async () => {
+  const assetRepository = {
+    getMemoryLocationClusters: vi
+      .fn()
+      .mockResolvedValueOnce([
+        {
+          country: 'Germany',
+          city: 'Berlin',
+          assetCount: 20,
+          dayCount: 12,
+          firstDate: new Date('2026-01-01T00:00:00Z'),
+          lastDate: new Date('2026-03-20T00:00:00Z'),
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          country: 'France',
+          city: 'Paris',
+          assetCount: 21,
+          dayCount: 11,
+          firstDate: new Date('2026-04-01T00:00:00Z'),
+          lastDate: new Date('2026-04-11T00:00:00Z'),
+        },
+      ]),
+    getMemoryAssetsForLocation: vi
+      .fn()
+      .mockResolvedValue([
         makeAsset('a-1', '2026-04-01T09:00:00Z'),
         makeAsset('a-2', '2026-04-02T09:00:00Z'),
         makeAsset('a-3', '2026-04-03T09:00:00Z'),
@@ -236,17 +245,17 @@ Update the existing `getMemoryAssetsForLocation` mocks to use `makeAsset(...)` i
         makeAsset('a-10', '2026-04-10T09:00:00Z'),
         makeAsset('a-11', '2026-04-11T09:00:00Z'),
       ]),
-    };
-    const memoryRepository = { search: vi.fn().mockResolvedValue([]) };
+  };
+  const memoryRepository = { search: vi.fn().mockResolvedValue([]) };
 
-    const rule = new RecentTripMemoryRule(assetRepository as never, memoryRepository as never);
-    const [candidate] = await rule.evaluate({
-      ownerId: 'user-1',
-      target: DateTime.fromISO('2026-04-23', { zone: 'utc' }),
-    });
-
-    expect(candidate?.assetIds).toEqual(['a-1', 'a-2', 'a-3', 'a-4', 'a-5', 'a-7', 'a-8', 'a-9', 'a-10', 'a-11']);
+  const rule = new RecentTripMemoryRule(assetRepository as never, memoryRepository as never);
+  const [candidate] = await rule.evaluate({
+    ownerId: 'user-1',
+    target: DateTime.fromISO('2026-04-23', { zone: 'utc' }),
   });
+
+  expect(candidate?.assetIds).toEqual(['a-1', 'a-2', 'a-3', 'a-4', 'a-5', 'a-7', 'a-8', 'a-9', 'a-10', 'a-11']);
+});
 ```
 
 - [ ] **Step 2: Run the rule spec to verify it fails**
@@ -376,10 +385,7 @@ export class RecentTripMemoryRule implements MemoryRule {
       return [items[Math.floor((items.length - 1) / 2)]!];
     }
 
-    const indexes = Array.from(
-      { length: count },
-      (_, index) => Math.round((index * (items.length - 1)) / (count - 1)),
-    );
+    const indexes = Array.from({ length: count }, (_, index) => Math.round((index * (items.length - 1)) / (count - 1)));
 
     return indexes.map((index) => items[index]!);
   }
@@ -468,6 +474,7 @@ git commit -m "feat(server): curate recent trip memory assets"
 ## Task 2: Preserve Curated Order Through Memory Readback
 
 **Files:**
+
 - Modify: `server/test/medium/specs/services/memory.service.spec.ts`
 - Modify: `server/src/repositories/memory.repository.ts`
 - Regenerate: `server/src/queries/memory.repository.sql`
@@ -477,174 +484,174 @@ git commit -m "feat(server): curate recent trip memory assets"
 Append this test after the existing `creates a recent-trip rule memory for a dense non-home cluster` case in `server/test/medium/specs/services/memory.service.spec.ts`:
 
 ```ts
-    it('reads back curated recent-trip assets in chronological localDateTime order', async () => {
-      const { sut, ctx } = setup();
-      const assetRepo = ctx.get(AssetRepository);
-      const memoryRepo = ctx.get(MemoryRepository);
-      const now = DateTime.fromObject({ year: 2026, month: 4, day: 23 }, { zone: 'utc' }) as DateTime<true>;
-      const { user } = await ctx.newUser();
+it('reads back curated recent-trip assets in chronological localDateTime order', async () => {
+  const { sut, ctx } = setup();
+  const assetRepo = ctx.get(AssetRepository);
+  const memoryRepo = ctx.get(MemoryRepository);
+  const now = DateTime.fromObject({ year: 2026, month: 4, day: 23 }, { zone: 'utc' }) as DateTime<true>;
+  const { user } = await ctx.newUser();
 
-      const addTripAsset = async ({
-        localDateTime,
-        fileCreatedAt,
-        city,
-        country,
-      }: {
-        localDateTime: string;
-        fileCreatedAt: string;
-        city: string;
-        country: string;
-      }) => {
-        const { asset } = await ctx.newAsset({
-          ownerId: user.id,
-          localDateTime: new Date(localDateTime),
-          fileCreatedAt: new Date(fileCreatedAt),
-        });
-        await Promise.all([
-          ctx.newExif({ assetId: asset.id, city, country }),
-          ctx.newJobStatus({ assetId: asset.id }),
-          assetRepo.upsertFiles([
-            { assetId: asset.id, type: AssetFileType.Preview, path: `/preview-${asset.id}.jpg` },
-            { assetId: asset.id, type: AssetFileType.Thumbnail, path: `/thumb-${asset.id}.jpg` },
-          ]),
-        ]);
-        return asset.id;
-      };
-
-      await addTripAsset({
-        localDateTime: '2026-01-15T12:00:00Z',
-        fileCreatedAt: '2026-01-15T12:00:00Z',
-        city: 'Berlin',
-        country: 'Germany',
-      });
-      await addTripAsset({
-        localDateTime: '2026-01-22T12:00:00Z',
-        fileCreatedAt: '2026-01-22T12:00:00Z',
-        city: 'Berlin',
-        country: 'Germany',
-      });
-      await addTripAsset({
-        localDateTime: '2026-02-01T12:00:00Z',
-        fileCreatedAt: '2026-02-01T12:00:00Z',
-        city: 'Berlin',
-        country: 'Germany',
-      });
-      await addTripAsset({
-        localDateTime: '2026-02-10T12:00:00Z',
-        fileCreatedAt: '2026-02-10T12:00:00Z',
-        city: 'Berlin',
-        country: 'Germany',
-      });
-      await addTripAsset({
-        localDateTime: '2026-02-18T12:00:00Z',
-        fileCreatedAt: '2026-02-18T12:00:00Z',
-        city: 'Berlin',
-        country: 'Germany',
-      });
-      await addTripAsset({
-        localDateTime: '2026-03-01T12:00:00Z',
-        fileCreatedAt: '2026-03-01T12:00:00Z',
-        city: 'Berlin',
-        country: 'Germany',
-      });
-      await addTripAsset({
-        localDateTime: '2026-03-12T12:00:00Z',
-        fileCreatedAt: '2026-03-12T12:00:00Z',
-        city: 'Berlin',
-        country: 'Germany',
-      });
-
-      const expectedTripIds = [
-        await addTripAsset({
-          localDateTime: '2026-04-15T10:00:00Z',
-          fileCreatedAt: '2026-04-16T20:00:00Z',
-          city: 'Paris',
-          country: 'France',
-        }),
-        await addTripAsset({
-          localDateTime: '2026-04-15T10:01:00Z',
-          fileCreatedAt: '2026-04-16T19:59:00Z',
-          city: 'Paris',
-          country: 'France',
-        }),
-        await addTripAsset({
-          localDateTime: '2026-04-15T12:00:00Z',
-          fileCreatedAt: '2026-04-16T19:58:00Z',
-          city: 'Paris',
-          country: 'France',
-        }),
-        await addTripAsset({
-          localDateTime: '2026-04-15T12:01:00Z',
-          fileCreatedAt: '2026-04-16T19:57:00Z',
-          city: 'Paris',
-          country: 'France',
-        }),
-        await addTripAsset({
-          localDateTime: '2026-04-15T16:00:00Z',
-          fileCreatedAt: '2026-04-16T19:56:00Z',
-          city: 'Paris',
-          country: 'France',
-        }),
-        await addTripAsset({
-          localDateTime: '2026-04-16T09:00:00Z',
-          fileCreatedAt: '2026-04-16T19:55:00Z',
-          city: 'Paris',
-          country: 'France',
-        }),
-        await addTripAsset({
-          localDateTime: '2026-04-16T09:01:00Z',
-          fileCreatedAt: '2026-04-16T19:54:00Z',
-          city: 'Paris',
-          country: 'France',
-        }),
-        await addTripAsset({
-          localDateTime: '2026-04-16T13:00:00Z',
-          fileCreatedAt: '2026-04-16T19:53:00Z',
-          city: 'Paris',
-          country: 'France',
-        }),
-        await addTripAsset({
-          localDateTime: '2026-04-16T17:00:00Z',
-          fileCreatedAt: '2026-04-16T19:52:00Z',
-          city: 'Paris',
-          country: 'France',
-        }),
-        await addTripAsset({
-          localDateTime: '2026-04-16T20:00:00Z',
-          fileCreatedAt: '2026-04-16T19:51:00Z',
-          city: 'Paris',
-          country: 'France',
-        }),
-      ];
-
-      vi.setSystemTime(now.toJSDate());
-      await sut.onMemoriesCreate();
-
-      const [memory] = await memoryRepo.search(user.id, { type: MemoryType.Rule, for: now.toJSDate() });
-      expect(memory?.data).toMatchObject({
-        ruleId: 'recent_trip',
-        title: 'Recent trip to Paris, France',
-      });
-      expect(memory?.assets).toHaveLength(7);
-      expect(memory?.assets.map(({ id }) => id)).toEqual([
-        expectedTripIds[0],
-        expectedTripIds[2],
-        expectedTripIds[4],
-        expectedTripIds[5],
-        expectedTripIds[7],
-        expectedTripIds[8],
-        expectedTripIds[9],
-      ]);
-      expect(memory?.assets.map(({ localDateTime }) => localDateTime.toISOString())).toEqual([
-        '2026-04-15T10:00:00.000Z',
-        '2026-04-15T12:00:00.000Z',
-        '2026-04-15T16:00:00.000Z',
-        '2026-04-16T09:00:00.000Z',
-        '2026-04-16T13:00:00.000Z',
-        '2026-04-16T17:00:00.000Z',
-        '2026-04-16T20:00:00.000Z',
-      ]);
+  const addTripAsset = async ({
+    localDateTime,
+    fileCreatedAt,
+    city,
+    country,
+  }: {
+    localDateTime: string;
+    fileCreatedAt: string;
+    city: string;
+    country: string;
+  }) => {
+    const { asset } = await ctx.newAsset({
+      ownerId: user.id,
+      localDateTime: new Date(localDateTime),
+      fileCreatedAt: new Date(fileCreatedAt),
     });
+    await Promise.all([
+      ctx.newExif({ assetId: asset.id, city, country }),
+      ctx.newJobStatus({ assetId: asset.id }),
+      assetRepo.upsertFiles([
+        { assetId: asset.id, type: AssetFileType.Preview, path: `/preview-${asset.id}.jpg` },
+        { assetId: asset.id, type: AssetFileType.Thumbnail, path: `/thumb-${asset.id}.jpg` },
+      ]),
+    ]);
+    return asset.id;
+  };
+
+  await addTripAsset({
+    localDateTime: '2026-01-15T12:00:00Z',
+    fileCreatedAt: '2026-01-15T12:00:00Z',
+    city: 'Berlin',
+    country: 'Germany',
+  });
+  await addTripAsset({
+    localDateTime: '2026-01-22T12:00:00Z',
+    fileCreatedAt: '2026-01-22T12:00:00Z',
+    city: 'Berlin',
+    country: 'Germany',
+  });
+  await addTripAsset({
+    localDateTime: '2026-02-01T12:00:00Z',
+    fileCreatedAt: '2026-02-01T12:00:00Z',
+    city: 'Berlin',
+    country: 'Germany',
+  });
+  await addTripAsset({
+    localDateTime: '2026-02-10T12:00:00Z',
+    fileCreatedAt: '2026-02-10T12:00:00Z',
+    city: 'Berlin',
+    country: 'Germany',
+  });
+  await addTripAsset({
+    localDateTime: '2026-02-18T12:00:00Z',
+    fileCreatedAt: '2026-02-18T12:00:00Z',
+    city: 'Berlin',
+    country: 'Germany',
+  });
+  await addTripAsset({
+    localDateTime: '2026-03-01T12:00:00Z',
+    fileCreatedAt: '2026-03-01T12:00:00Z',
+    city: 'Berlin',
+    country: 'Germany',
+  });
+  await addTripAsset({
+    localDateTime: '2026-03-12T12:00:00Z',
+    fileCreatedAt: '2026-03-12T12:00:00Z',
+    city: 'Berlin',
+    country: 'Germany',
+  });
+
+  const expectedTripIds = [
+    await addTripAsset({
+      localDateTime: '2026-04-15T10:00:00Z',
+      fileCreatedAt: '2026-04-16T20:00:00Z',
+      city: 'Paris',
+      country: 'France',
+    }),
+    await addTripAsset({
+      localDateTime: '2026-04-15T10:01:00Z',
+      fileCreatedAt: '2026-04-16T19:59:00Z',
+      city: 'Paris',
+      country: 'France',
+    }),
+    await addTripAsset({
+      localDateTime: '2026-04-15T12:00:00Z',
+      fileCreatedAt: '2026-04-16T19:58:00Z',
+      city: 'Paris',
+      country: 'France',
+    }),
+    await addTripAsset({
+      localDateTime: '2026-04-15T12:01:00Z',
+      fileCreatedAt: '2026-04-16T19:57:00Z',
+      city: 'Paris',
+      country: 'France',
+    }),
+    await addTripAsset({
+      localDateTime: '2026-04-15T16:00:00Z',
+      fileCreatedAt: '2026-04-16T19:56:00Z',
+      city: 'Paris',
+      country: 'France',
+    }),
+    await addTripAsset({
+      localDateTime: '2026-04-16T09:00:00Z',
+      fileCreatedAt: '2026-04-16T19:55:00Z',
+      city: 'Paris',
+      country: 'France',
+    }),
+    await addTripAsset({
+      localDateTime: '2026-04-16T09:01:00Z',
+      fileCreatedAt: '2026-04-16T19:54:00Z',
+      city: 'Paris',
+      country: 'France',
+    }),
+    await addTripAsset({
+      localDateTime: '2026-04-16T13:00:00Z',
+      fileCreatedAt: '2026-04-16T19:53:00Z',
+      city: 'Paris',
+      country: 'France',
+    }),
+    await addTripAsset({
+      localDateTime: '2026-04-16T17:00:00Z',
+      fileCreatedAt: '2026-04-16T19:52:00Z',
+      city: 'Paris',
+      country: 'France',
+    }),
+    await addTripAsset({
+      localDateTime: '2026-04-16T20:00:00Z',
+      fileCreatedAt: '2026-04-16T19:51:00Z',
+      city: 'Paris',
+      country: 'France',
+    }),
+  ];
+
+  vi.setSystemTime(now.toJSDate());
+  await sut.onMemoriesCreate();
+
+  const [memory] = await memoryRepo.search(user.id, { type: MemoryType.Rule, for: now.toJSDate() });
+  expect(memory?.data).toMatchObject({
+    ruleId: 'recent_trip',
+    title: 'Recent trip to Paris, France',
+  });
+  expect(memory?.assets).toHaveLength(7);
+  expect(memory?.assets.map(({ id }) => id)).toEqual([
+    expectedTripIds[0],
+    expectedTripIds[2],
+    expectedTripIds[4],
+    expectedTripIds[5],
+    expectedTripIds[7],
+    expectedTripIds[8],
+    expectedTripIds[9],
+  ]);
+  expect(memory?.assets.map(({ localDateTime }) => localDateTime.toISOString())).toEqual([
+    '2026-04-15T10:00:00.000Z',
+    '2026-04-15T12:00:00.000Z',
+    '2026-04-15T16:00:00.000Z',
+    '2026-04-16T09:00:00.000Z',
+    '2026-04-16T13:00:00.000Z',
+    '2026-04-16T17:00:00.000Z',
+    '2026-04-16T20:00:00.000Z',
+  ]);
+});
 ```
 
 - [ ] **Step 2: Run the medium spec to verify the ordering regression fails**
@@ -744,6 +751,7 @@ git commit -m "fix(server): preserve curated memory chronology"
 ## Task 3: Final Verification
 
 **Files:**
+
 - No new files
 
 - [ ] **Step 1: Run the focused unit, medium, and typecheck suites**
