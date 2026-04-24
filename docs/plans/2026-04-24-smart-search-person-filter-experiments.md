@@ -19,11 +19,11 @@ This document records the release-candidate experiments run against a real user 
 
 ## Experiments
 
-| RC | Image Tag | Commit | Query Shape | Result |
-| --- | --- | --- | --- | --- |
-| RC1 | `fix-search-smart-person-filter-rc1` | `8b97cb2ea` | `clip_index` ordered scan with correlated `EXISTS` for `personIds` | Fixed the original bad grouped-face plan and gave the best overall baseline |
-| RC2 | `fix-search-smart-person-filter-rc2` | `3f70fa8c7` | Runtime heuristic: exact `person_assets` subset-sort for one-person searches under a threshold | Helped some cases, but regressed others badly on large person clusters |
-| RC3 | `fix-search-smart-person-filter-rc3` | `83d8570aa` | Lowered the heuristic threshold so this user fell back to ANN-first again | Reverted to the RC1-style path for this user, but performed worse than RC1 on the key `books` case |
+| RC  | Image Tag                            | Commit      | Query Shape                                                                                    | Result                                                                                             |
+| --- | ------------------------------------ | ----------- | ---------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| RC1 | `fix-search-smart-person-filter-rc1` | `8b97cb2ea` | `clip_index` ordered scan with correlated `EXISTS` for `personIds`                             | Fixed the original bad grouped-face plan and gave the best overall baseline                        |
+| RC2 | `fix-search-smart-person-filter-rc2` | `3f70fa8c7` | Runtime heuristic: exact `person_assets` subset-sort for one-person searches under a threshold | Helped some cases, but regressed others badly on large person clusters                             |
+| RC3 | `fix-search-smart-person-filter-rc3` | `83d8570aa` | Lowered the heuristic threshold so this user fell back to ANN-first again                      | Reverted to the RC1-style path for this user, but performed worse than RC1 on the key `books` case |
 
 ## Representative Snippets
 
@@ -104,8 +104,7 @@ Representative implementation:
 ```ts
 export const PERSON_SUBSET_RUNTIME_COUNT_THRESHOLD = 75_000;
 
-const strategy =
-  personAssetCount <= PERSON_SUBSET_RUNTIME_COUNT_THRESHOLD ? 'personSubset' : 'annExists';
+const strategy = personAssetCount <= PERSON_SUBSET_RUNTIME_COUNT_THRESHOLD ? 'personSubset' : 'annExists';
 ```
 
 ### RC3: lower the threshold and fall back to ANN
@@ -157,13 +156,13 @@ Observed tradeoff:
 
 The table below focuses on one-person filtered searches from the user runs.
 
-| Query | RC1 | RC2 | RC3 | Preferred |
-| --- | ---: | ---: | ---: | --- |
-| `books` | `9224ms`, `47` rows | `5073ms`, `83` rows | `11242ms`, `47` rows | RC2 on this query only |
-| `mountains` | `3561ms` | `3689ms` | `3810ms` | RC1 |
-| `trees` | `2483ms` | `3944ms` | `2597ms` | RC1 |
-| `dress` | `4254ms` | `3135ms` | n/a | RC2 on this query only |
-| `beach` | n/a one-person | `3043ms` | `1634ms` | RC3 on this query only |
+| Query       |                 RC1 |                 RC2 |                  RC3 | Preferred              |
+| ----------- | ------------------: | ------------------: | -------------------: | ---------------------- |
+| `books`     | `9224ms`, `47` rows | `5073ms`, `83` rows | `11242ms`, `47` rows | RC2 on this query only |
+| `mountains` |            `3561ms` |            `3689ms` |             `3810ms` | RC1                    |
+| `trees`     |            `2483ms` |            `3944ms` |             `2597ms` | RC1                    |
+| `dress`     |            `4254ms` |            `3135ms` |                  n/a | RC2 on this query only |
+| `beach`     |      n/a one-person |            `3043ms` |             `1634ms` | RC3 on this query only |
 
 These runs were not stable enough across queries to justify shipping the heuristic path.
 
