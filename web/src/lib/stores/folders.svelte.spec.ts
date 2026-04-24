@@ -25,9 +25,7 @@ describe('foldersStore', () => {
       resolvePaths = resolve;
     });
 
-    vi.mocked(getUniqueOriginalPaths).mockImplementation(
-      (() => pendingPaths) as typeof getUniqueOriginalPaths,
-    );
+    vi.mocked(getUniqueOriginalPaths).mockImplementation((() => pendingPaths) as typeof getUniqueOriginalPaths);
 
     const first = foldersStore.fetchTree();
     const second = foldersStore.fetchTree();
