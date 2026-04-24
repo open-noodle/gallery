@@ -24,11 +24,11 @@ The timeline/query layer already supports combining `albumId` with the normal as
 
 ## Mode Matrix
 
-| Mode | Filter state | Suggestion scope | Timeline scope |
-| --- | --- | --- | --- |
-| `VIEW` | `albumFilters` | Current album (`albumId`) | Existing album assets |
-| `SELECT_THUMBNAIL` | `albumFilters` | Current album (`albumId`) | Existing album assets |
-| `SELECT_ASSETS` | `pickerFilters` | Add-assets picker dataset | Current picker dataset with `timelineAlbumId` markers |
+| Mode               | Filter state    | Suggestion scope          | Timeline scope                                        |
+| ------------------ | --------------- | ------------------------- | ----------------------------------------------------- |
+| `VIEW`             | `albumFilters`  | Current album (`albumId`) | Existing album assets                                 |
+| `SELECT_THUMBNAIL` | `albumFilters`  | Current album (`albumId`) | Existing album assets                                 |
+| `SELECT_ASSETS`    | `pickerFilters` | Add-assets picker dataset | Current picker dataset with `timelineAlbumId` markers |
 
 `VIEW` and `SELECT_THUMBNAIL` intentionally share one state because they operate on the same asset set. `SELECT_ASSETS` is separate because it operates on a different dataset and shared state would make mode switches feel misleading.
 

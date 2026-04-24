@@ -62,11 +62,19 @@ class SharedSpacesApi {
   /// * [String] id (required):
   ///
   /// * [SharedSpaceAssetAddDto] sharedSpaceAssetAddDto (required):
-  Future<void> addAssets(String id, SharedSpaceAssetAddDto sharedSpaceAssetAddDto,) async {
+  Future<bool?> addAssets(String id, SharedSpaceAssetAddDto sharedSpaceAssetAddDto,) async {
     final response = await addAssetsWithHttpInfo(id, sharedSpaceAssetAddDto,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
+    // When a remote server returns no body with a status of 204, we shall not decode it.
+    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
+    // FormatException when trying to decode an empty string.
+    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'bool',) as bool;
+    
+    }
+    return null;
   }
 
   /// Add a member to a shared space
@@ -277,11 +285,19 @@ class SharedSpacesApi {
   /// Parameters:
   ///
   /// * [String] id (required):
-  Future<void> deduplicateSpacePeople(String id,) async {
+  Future<bool?> deduplicateSpacePeople(String id,) async {
     final response = await deduplicateSpacePeopleWithHttpInfo(id,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
+    // When a remote server returns no body with a status of 204, we shall not decode it.
+    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
+    // FormatException when trying to decode an empty string.
+    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'bool',) as bool;
+    
+    }
+    return null;
   }
 
   /// Delete a person from a shared space
@@ -331,11 +347,19 @@ class SharedSpacesApi {
   /// * [String] id (required):
   ///
   /// * [String] personId (required):
-  Future<void> deleteSpacePerson(String id, String personId,) async {
+  Future<bool?> deleteSpacePerson(String id, String personId,) async {
     final response = await deleteSpacePersonWithHttpInfo(id, personId,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
+    // When a remote server returns no body with a status of 204, we shall not decode it.
+    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
+    // FormatException when trying to decode an empty string.
+    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'bool',) as bool;
+    
+    }
+    return null;
   }
 
   /// Delete a person alias in a shared space
@@ -385,11 +409,19 @@ class SharedSpacesApi {
   /// * [String] id (required):
   ///
   /// * [String] personId (required):
-  Future<void> deleteSpacePersonAlias(String id, String personId,) async {
+  Future<bool?> deleteSpacePersonAlias(String id, String personId,) async {
     final response = await deleteSpacePersonAliasWithHttpInfo(id, personId,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
+    // When a remote server returns no body with a status of 204, we shall not decode it.
+    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
+    // FormatException when trying to decode an empty string.
+    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'bool',) as bool;
+    
+    }
+    return null;
   }
 
   /// Get all shared spaces
@@ -911,22 +943,11 @@ class SharedSpacesApi {
   /// * [String] id (required):
   ///
   /// * [String] personId (required):
-  Future<List<String>?> getSpacePersonAssets(String id, String personId,) async {
+  Future<void> getSpacePersonAssets(String id, String personId,) async {
     final response = await getSpacePersonAssetsWithHttpInfo(id, personId,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
-    // When a remote server returns no body with a status of 204, we shall not decode it.
-    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
-    // FormatException when trying to decode an empty string.
-    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
-      final responseBody = await _decodeBodyBytes(response);
-      return (await apiClient.deserializeAsync(responseBody, 'List<String>') as List)
-        .cast<String>()
-        .toList(growable: false);
-
-    }
-    return null;
   }
 
   /// Get a space person thumbnail
@@ -1037,11 +1058,19 @@ class SharedSpacesApi {
   /// * [String] id (required):
   ///
   /// * [SharedSpaceLibraryLinkDto] sharedSpaceLibraryLinkDto (required):
-  Future<void> linkLibrary(String id, SharedSpaceLibraryLinkDto sharedSpaceLibraryLinkDto,) async {
+  Future<bool?> linkLibrary(String id, SharedSpaceLibraryLinkDto sharedSpaceLibraryLinkDto,) async {
     final response = await linkLibraryWithHttpInfo(id, sharedSpaceLibraryLinkDto,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
+    // When a remote server returns no body with a status of 204, we shall not decode it.
+    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
+    // FormatException when trying to decode an empty string.
+    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'bool',) as bool;
+    
+    }
+    return null;
   }
 
   /// Mark space as viewed
@@ -1086,11 +1115,19 @@ class SharedSpacesApi {
   /// Parameters:
   ///
   /// * [String] id (required):
-  Future<void> markSpaceViewed(String id,) async {
+  Future<bool?> markSpaceViewed(String id,) async {
     final response = await markSpaceViewedWithHttpInfo(id,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
+    // When a remote server returns no body with a status of 204, we shall not decode it.
+    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
+    // FormatException when trying to decode an empty string.
+    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'bool',) as bool;
+    
+    }
+    return null;
   }
 
   /// Merge people in a shared space
@@ -1144,11 +1181,19 @@ class SharedSpacesApi {
   /// * [String] personId (required):
   ///
   /// * [SharedSpacePersonMergeDto] sharedSpacePersonMergeDto (required):
-  Future<void> mergeSpacePeople(String id, String personId, SharedSpacePersonMergeDto sharedSpacePersonMergeDto,) async {
+  Future<bool?> mergeSpacePeople(String id, String personId, SharedSpacePersonMergeDto sharedSpacePersonMergeDto,) async {
     final response = await mergeSpacePeopleWithHttpInfo(id, personId, sharedSpacePersonMergeDto,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
+    // When a remote server returns no body with a status of 204, we shall not decode it.
+    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
+    // FormatException when trying to decode an empty string.
+    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'bool',) as bool;
+    
+    }
+    return null;
   }
 
   /// Remove assets from a shared space
@@ -1197,11 +1242,19 @@ class SharedSpacesApi {
   /// * [String] id (required):
   ///
   /// * [SharedSpaceAssetRemoveDto] sharedSpaceAssetRemoveDto (required):
-  Future<void> removeAssets(String id, SharedSpaceAssetRemoveDto sharedSpaceAssetRemoveDto,) async {
+  Future<bool?> removeAssets(String id, SharedSpaceAssetRemoveDto sharedSpaceAssetRemoveDto,) async {
     final response = await removeAssetsWithHttpInfo(id, sharedSpaceAssetRemoveDto,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
+    // When a remote server returns no body with a status of 204, we shall not decode it.
+    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
+    // FormatException when trying to decode an empty string.
+    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'bool',) as bool;
+    
+    }
+    return null;
   }
 
   /// Remove a member from a shared space
@@ -1251,11 +1304,19 @@ class SharedSpacesApi {
   /// * [String] id (required):
   ///
   /// * [String] userId (required):
-  Future<void> removeMember(String id, String userId,) async {
+  Future<bool?> removeMember(String id, String userId,) async {
     final response = await removeMemberWithHttpInfo(id, userId,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
+    // When a remote server returns no body with a status of 204, we shall not decode it.
+    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
+    // FormatException when trying to decode an empty string.
+    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'bool',) as bool;
+    
+    }
+    return null;
   }
 
   /// Delete a shared space
@@ -1300,11 +1361,19 @@ class SharedSpacesApi {
   /// Parameters:
   ///
   /// * [String] id (required):
-  Future<void> removeSpace(String id,) async {
+  Future<bool?> removeSpace(String id,) async {
     final response = await removeSpaceWithHttpInfo(id,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
+    // When a remote server returns no body with a status of 204, we shall not decode it.
+    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
+    // FormatException when trying to decode an empty string.
+    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'bool',) as bool;
+    
+    }
+    return null;
   }
 
   /// Set a person alias in a shared space
@@ -1358,11 +1427,19 @@ class SharedSpacesApi {
   /// * [String] personId (required):
   ///
   /// * [SharedSpacePersonAliasDto] sharedSpacePersonAliasDto (required):
-  Future<void> setSpacePersonAlias(String id, String personId, SharedSpacePersonAliasDto sharedSpacePersonAliasDto,) async {
+  Future<bool?> setSpacePersonAlias(String id, String personId, SharedSpacePersonAliasDto sharedSpacePersonAliasDto,) async {
     final response = await setSpacePersonAliasWithHttpInfo(id, personId, sharedSpacePersonAliasDto,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
+    // When a remote server returns no body with a status of 204, we shall not decode it.
+    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
+    // FormatException when trying to decode an empty string.
+    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'bool',) as bool;
+    
+    }
+    return null;
   }
 
   /// Unlink a library from a shared space
@@ -1412,11 +1489,19 @@ class SharedSpacesApi {
   /// * [String] id (required):
   ///
   /// * [String] libraryId (required):
-  Future<void> unlinkLibrary(String id, String libraryId,) async {
+  Future<bool?> unlinkLibrary(String id, String libraryId,) async {
     final response = await unlinkLibraryWithHttpInfo(id, libraryId,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
+    // When a remote server returns no body with a status of 204, we shall not decode it.
+    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
+    // FormatException when trying to decode an empty string.
+    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'bool',) as bool;
+    
+    }
+    return null;
   }
 
   /// Update a member in a shared space

@@ -63,6 +63,7 @@
 ## Task 1: Add `albumId` HTTP validation for suggestion endpoints
 
 **Files:**
+
 - Modify: `server/src/controllers/search.controller.spec.ts`
 - Modify: `server/src/dtos/search.dto.ts`
 
@@ -134,9 +135,7 @@ describe('GET /search/suggestions/filters', () => {
       hasUnnamedPeople: false,
     });
 
-    const { status, body } = await request(ctx.getHttpServer())
-      .get('/search/suggestions/filters')
-      .query({ albumId });
+    const { status, body } = await request(ctx.getHttpServer()).get('/search/suggestions/filters').query({ albumId });
 
     expect(status).toBe(200);
     expect(body).toEqual({
@@ -148,10 +147,7 @@ describe('GET /search/suggestions/filters', () => {
       mediaTypes: [],
       hasUnnamedPeople: false,
     });
-    expect(service.getFilterSuggestions).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ albumId }),
-    );
+    expect(service.getFilterSuggestions).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ albumId }));
   });
 
   it('rejects albumId mixed with spaceId', async () => {
@@ -279,6 +275,7 @@ git commit -m "feat: add album-scoped suggestion dto validation"
 ## Task 2: Enforce album access and service-level scope rules
 
 **Files:**
+
 - Modify: `server/src/services/search.service.spec.ts`
 - Modify: `server/src/services/search.service.ts`
 
@@ -353,27 +350,24 @@ it('checks album access and passes albumId to getFilterSuggestions', async () =>
   expect(result.countries).toEqual(['Germany']);
   expect(mocks.access.album.checkOwnerAccess).toHaveBeenCalled();
   expect(mocks.access.album.checkSharedAlbumAccess).toHaveBeenCalled();
-  expect(mocks.search.getFilterSuggestions).toHaveBeenCalledWith(
-    [auth.user.id],
-    expect.objectContaining({ albumId }),
-  );
+  expect(mocks.search.getFilterSuggestions).toHaveBeenCalledWith([auth.user.id], expect.objectContaining({ albumId }));
   expect(mocks.sharedSpace.getSpaceIdsForTimeline).not.toHaveBeenCalled();
 });
 
 it('rejects albumId mixed with withSharedSpaces for getFilterSuggestions', async () => {
   const auth = AuthFactory.create();
 
-  await expect(
-    sut.getFilterSuggestions(auth, { albumId: newUuid(), withSharedSpaces: true }),
-  ).rejects.toThrow('Cannot use albumId with withSharedSpaces');
+  await expect(sut.getFilterSuggestions(auth, { albumId: newUuid(), withSharedSpaces: true })).rejects.toThrow(
+    'Cannot use albumId with withSharedSpaces',
+  );
 });
 
 it('rejects albumId mixed with spaceId for getFilterSuggestions', async () => {
   const auth = AuthFactory.create();
 
-  await expect(
-    sut.getFilterSuggestions(auth, { albumId: newUuid(), spaceId: newUuid() }),
-  ).rejects.toThrow('Cannot use albumId with spaceId');
+  await expect(sut.getFilterSuggestions(auth, { albumId: newUuid(), spaceId: newUuid() })).rejects.toThrow(
+    'Cannot use albumId with spaceId',
+  );
 });
 ```
 
@@ -448,6 +442,7 @@ git commit -m "feat: enforce album scope for search suggestions"
 ## Task 3: Add repository album scope through `album_asset`
 
 **Files:**
+
 - Modify: `server/src/repositories/search.repository.spec.ts`
 - Modify: `server/src/repositories/search.repository.ts`
 
@@ -643,6 +638,7 @@ git commit -m "feat: scope suggestion queries by album membership"
 ## Task 4: Regenerate the OpenAPI document and TypeScript SDK
 
 **Files:**
+
 - Modify: `open-api/immich-openapi-specs.json`
 - Modify: `open-api/typescript-sdk/src/fetch-client.ts`
 
@@ -676,6 +672,7 @@ git commit -m "chore: regenerate sdk for album-scoped suggestions"
 ## Task 5: Add album filter helper modules
 
 **Files:**
+
 - Create: `web/src/lib/utils/album-filter-config.ts`
 - Create: `web/src/lib/utils/album-filter-options.ts`
 - Create: `web/src/lib/utils/__tests__/album-filter-config.spec.ts`
@@ -879,7 +876,11 @@ function applyCommonFilterFields(base: Record<string, unknown>, filters: FilterS
   return base;
 }
 
-export function buildAlbumTimelineOptions(albumId: string, order: AssetOrder, filters: FilterState): Record<string, unknown> {
+export function buildAlbumTimelineOptions(
+  albumId: string,
+  order: AssetOrder,
+  filters: FilterState,
+): Record<string, unknown> {
   return applyCommonFilterFields({ albumId, order }, filters);
 }
 
@@ -950,7 +951,8 @@ function toSuggestionRequest(filters: FilterState) {
 export function buildAlbumDetailFilterConfig(albumId: string): FilterPanelConfig {
   return {
     sections: [...sections],
-    suggestionsProvider: async (filters) => mapSuggestions(await getFilterSuggestions({ albumId, ...toSuggestionRequest(filters) })),
+    suggestionsProvider: async (filters) =>
+      mapSuggestions(await getFilterSuggestions({ albumId, ...toSuggestionRequest(filters) })),
     providers: {
       cities: (country, context) =>
         getSearchSuggestions({ $type: SearchSuggestionType.City, albumId, country, ...context }),
@@ -993,6 +995,7 @@ git commit -m "feat: add album filter helper builders"
 ## Task 6: Wire the album route with separate mode-specific filter state
 
 **Files:**
+
 - Create: `web/src/routes/(user)/albums/[albumId=id]/[[photos=photos]]/[[assetId=id]]/mock-timeline.test-wrapper.svelte`
 - Create: `web/src/routes/(user)/albums/[albumId=id]/[[photos=photos]]/[[assetId=id]]/+page.spec.ts`
 - Modify: `web/src/routes/(user)/albums/[albumId=id]/[[photos=photos]]/[[assetId=id]]/+page.svelte`
@@ -1066,8 +1069,10 @@ function renderPage(album = albumFactory.build({ assetCount: 2 })) {
 
   sdkMock.getFilterSuggestions.mockImplementation(async ({ albumId }) => {
     if (albumId) {
-      const personName = albumId === 'album-2' ? 'Second Album Person' : albumId === 'album-1' ? 'First Album Person' : 'Album Person';
-      const tagName = albumId === 'album-2' ? 'Second Album Tag' : albumId === 'album-1' ? 'First Album Tag' : 'Album Tag';
+      const personName =
+        albumId === 'album-2' ? 'Second Album Person' : albumId === 'album-1' ? 'First Album Person' : 'Album Person';
+      const tagName =
+        albumId === 'album-2' ? 'Second Album Tag' : albumId === 'album-1' ? 'First Album Tag' : 'Album Tag';
       return {
         countries: [],
         cameraMakes: [],
@@ -1162,7 +1167,9 @@ describe('album detail filter panel', () => {
     expect(screen.getByTestId('timeline-options').textContent).toContain('"timelineAlbumId"');
     expect(screen.getByText('No photos available to add match your filters')).toBeInTheDocument();
     await user.click(screen.getByText('Clear all filters'));
-    await waitFor(() => expect(screen.queryByText('No photos available to add match your filters')).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.queryByText('No photos available to add match your filters')).not.toBeInTheDocument(),
+    );
   });
 
   it('keeps already-in-album assets disabled after picker filters change', async () => {
@@ -1278,9 +1285,13 @@ const pickerFilterConfig = $derived.by(() => {
 });
 
 const totalAssetCount = $derived(timelineManager?.assetCount ?? 0);
-const activeFilterCount = $derived(getActiveFilterCount(viewMode === AlbumPageViewMode.SELECT_ASSETS ? pickerFilters : albumFilters));
+const activeFilterCount = $derived(
+  getActiveFilterCount(viewMode === AlbumPageViewMode.SELECT_ASSETS ? pickerFilters : albumFilters),
+);
 const isTimelineEmpty = $derived(timelineManager?.isInitialized && totalAssetCount === 0 && activeFilterCount === 0);
-const showFilteredEmptyState = $derived(timelineManager?.isInitialized && totalAssetCount === 0 && activeFilterCount > 0);
+const showFilteredEmptyState = $derived(
+  timelineManager?.isInitialized && totalAssetCount === 0 && activeFilterCount > 0,
+);
 const timeBuckets = $derived(
   timelineManager?.months?.map((month) => ({
     timeBucket: `${month.yearMonth.year}-${String(month.yearMonth.month).padStart(2, '0')}-01T00:00:00.000Z`,
@@ -1443,6 +1454,7 @@ git commit -m "feat: add filter panel to album detail modes"
 ## Task 7: Add album E2E coverage and run the focused verification suite
 
 **Files:**
+
 - Modify: `e2e/src/specs/web/album.e2e-spec.ts`
 
 - [ ] **Step 1: Add a reusable album fixture helper**
@@ -1506,7 +1518,10 @@ test('filters album detail assets and clears back to the full album', async ({ c
   await expect(page.locator('[data-testid="active-filters-bar"]')).not.toBeVisible();
 });
 
-test('reuses album filters for select cover but keeps a separate picker state for add assets', async ({ context, page }) => {
+test('reuses album filters for select cover but keeps a separate picker state for add assets', async ({
+  context,
+  page,
+}) => {
   const { album, tags } = await createFilterableAlbum();
   await utils.setAuthCookies(context, admin.accessToken);
   await page.goto(`/albums/${album.id}`);
@@ -1569,6 +1584,7 @@ pnpm --dir e2e test:web -- e2e/src/specs/web/album.e2e-spec.ts
 ```
 
 Expected:
+
 - server: all targeted album-scope tests `PASS`
 - web: helper and route integration tests `PASS`
 - e2e: album filter panel spec `PASS`
