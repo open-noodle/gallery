@@ -1,4 +1,4 @@
-import { getAssetUrl, getReleaseType } from '$lib/utils';
+import { getAssetUrl, getMemoryTitle, getReleaseType } from '$lib/utils';
 import { AssetTypeEnum } from '@immich/sdk';
 import { assetFactory } from '@test-data/factories/asset-factory';
 import { sharedLinkFactory } from '@test-data/factories/shared-link-factory';
@@ -181,6 +181,43 @@ describe('utils', () => {
     it('should return "none" for matching versions', () => {
       expect(getReleaseType({ major: 1, minor: 0, patch: 0 }, { major: 1, minor: 0, patch: 0 })).toBe('none');
       expect(getReleaseType({ major: 1, minor: 2, patch: 3 }, { major: 1, minor: 2, patch: 3 })).toBe('none');
+    });
+  });
+
+  describe(getMemoryTitle.name, () => {
+    const translate = vi.fn((key: string, payload?: { values?: Record<string, number> }) => {
+      if (key === 'years_ago') {
+        return `${payload?.values?.years} years ago`;
+      }
+
+      return key;
+    });
+
+    it('prefers a server-supplied title when present', () => {
+      expect(
+        getMemoryTitle(
+          {
+            type: 'rule',
+            title: 'Happy birthday, Alice',
+            data: { title: 'Happy birthday, Alice' },
+          } as any,
+          translate as any,
+          new Date('2026-04-23T00:00:00Z'),
+        ),
+      ).toBe('Happy birthday, Alice');
+    });
+
+    it('falls back to the localized on-this-day title when no server title exists', () => {
+      expect(
+        getMemoryTitle(
+          {
+            type: 'on_this_day',
+            data: { year: 2024 },
+          } as any,
+          translate as any,
+          new Date('2026-04-23T00:00:00Z'),
+        ),
+      ).toBe('2 years ago');
     });
   });
 });
