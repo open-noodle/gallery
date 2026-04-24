@@ -52,9 +52,9 @@ import { installFakeAbortTimeout, restoreAbortTimeout } from './__tests__/fake-a
 import { commandContextManager } from './command-context-manager.svelte';
 import { COMMAND_ITEMS, type CommandItem } from './command-items';
 import {
-  type EntityItem,
   GlobalSearchManager,
   RECONCILE_ORDER_BY_SCOPE,
+  type EntityItem,
   type Provider,
   type ProviderStatus,
   type SearchMode,
