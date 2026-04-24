@@ -137,7 +137,7 @@ export class RecentTripMemoryRule implements MemoryRule {
     }
 
     return [...selected]
-      .sort((left, right) => left.localDateTime.getTime() - right.localDateTime.getTime())
+      .toSorted((left, right) => left.localDateTime.getTime() - right.localDateTime.getTime())
       .map(({ id }) => id);
   }
 
