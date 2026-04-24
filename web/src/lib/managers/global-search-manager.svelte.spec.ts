@@ -52,6 +52,7 @@ import { installFakeAbortTimeout, restoreAbortTimeout } from './__tests__/fake-a
 import { commandContextManager } from './command-context-manager.svelte';
 import { COMMAND_ITEMS, type CommandItem } from './command-items';
 import {
+  type EntityItem,
   GlobalSearchManager,
   RECONCILE_ORDER_BY_SCOPE,
   type Provider,
@@ -2632,18 +2633,18 @@ describe('SWR loading rules', () => {
 
   it('stale-batch providers do not deadlock batchInFlight after a new batch supersedes', async () => {
     const m = new GlobalSearchManager();
-    const photosProvider = (m as unknown as { providers: { photos: Provider } }).providers.photos;
+    const photosProvider = (m as unknown as { providers: { photos: Provider<EntityItem> } }).providers.photos;
     const originalPhotosRun = photosProvider.run;
     let resolveStalePhotos!: () => void;
     let invocationCount = 0;
-    photosProvider.run = vi.fn((...args) => {
+    photosProvider.run = vi.fn((query: string, mode: SearchMode, signal: AbortSignal) => {
       invocationCount++;
       if (invocationCount === 1) {
         return new Promise(
           (r) => (resolveStalePhotos = () => r({ status: 'empty' } as ProviderStatus<EntityItem>)),
         ) as Promise<ProviderStatus<EntityItem>>;
       }
-      return originalPhotosRun(...args);
+      return originalPhotosRun(query, mode, signal);
     });
     try {
       m.open();
