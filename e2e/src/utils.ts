@@ -137,6 +137,7 @@ const requireFromServer = createRequire('/usr/src/app/server/package.json');
 const { Queue } = requireFromServer('bullmq');
 
 const queueNames = ${JSON.stringify(Object.values(QueueName))};
+const pausableQueueNames = queueNames.filter((name) => name !== 'backgroundTask');
 const connection = {
   host: process.env.REDIS_HOSTNAME || 'redis',
   port: process.env.REDIS_PORT ? Number(process.env.REDIS_PORT) : 6379,
@@ -145,11 +146,12 @@ const connection = {
 };
 
 const queues = queueNames.map((name) => new Queue(name, { connection, prefix: 'immich_bull' }));
+const pausableQueues = queues.filter((queue) => pausableQueueNames.includes(queue.name));
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const cleanup = async () => {
   try {
-    await Promise.all(queues.map((queue) => queue.pause()));
+    await Promise.all(pausableQueues.map((queue) => queue.pause()));
 
     const deadline = Date.now() + 30_000;
     while (true) {
@@ -175,7 +177,7 @@ const cleanup = async () => {
     );
   } finally {
     await Promise.all(
-      queues.map(async (queue) => {
+      pausableQueues.map(async (queue) => {
         try {
           await queue.resume();
         } catch {}
