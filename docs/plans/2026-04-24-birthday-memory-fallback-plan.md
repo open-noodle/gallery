@@ -30,6 +30,7 @@
 ## Task 1: Add Birthday Rule Fallback And Rule-Level Coverage
 
 **Files:**
+
 - Modify: `server/src/services/memory-rules/birthday.rule.spec.ts`
 - Modify: `server/src/services/memory-rules/birthday.rule.ts`
 
@@ -38,93 +39,93 @@
 Append these tests to `server/src/services/memory-rules/birthday.rule.spec.ts`:
 
 ```ts
-  it('creates a snapshot fallback birthday candidate from four single-year assets', async () => {
-    const personRepository = {
-      getBirthdaysForDay: vi
-        .fn()
-        .mockResolvedValue([{ id: 'person-1', name: 'Pierre', birthDate: new Date('2025-04-24T00:00:00Z') }]),
-    };
-    const assetRepository = {
-      getMemoryAssetsForPerson: vi.fn().mockResolvedValue([
-        { id: 'a-4', localDateTime: new Date('2026-04-18T15:25:11.543Z') },
-        { id: 'a-3', localDateTime: new Date('2026-04-18T15:25:09.803Z') },
-        { id: 'a-2', localDateTime: new Date('2026-04-18T15:25:08.244Z') },
-        { id: 'a-1', localDateTime: new Date('2026-04-18T15:25:07.335Z') },
-      ]),
-    };
+it('creates a snapshot fallback birthday candidate from four single-year assets', async () => {
+  const personRepository = {
+    getBirthdaysForDay: vi
+      .fn()
+      .mockResolvedValue([{ id: 'person-1', name: 'Pierre', birthDate: new Date('2025-04-24T00:00:00Z') }]),
+  };
+  const assetRepository = {
+    getMemoryAssetsForPerson: vi.fn().mockResolvedValue([
+      { id: 'a-4', localDateTime: new Date('2026-04-18T15:25:11.543Z') },
+      { id: 'a-3', localDateTime: new Date('2026-04-18T15:25:09.803Z') },
+      { id: 'a-2', localDateTime: new Date('2026-04-18T15:25:08.244Z') },
+      { id: 'a-1', localDateTime: new Date('2026-04-18T15:25:07.335Z') },
+    ]),
+  };
 
-    const rule = new BirthdayMemoryRule(personRepository as never, assetRepository as never);
-    const [candidate] = await rule.evaluate({
+  const rule = new BirthdayMemoryRule(personRepository as never, assetRepository as never);
+  const [candidate] = await rule.evaluate({
+    ownerId: 'user-1',
+    target: DateTime.fromISO('2026-04-24', { zone: 'utc' }),
+  });
+
+  expect(candidate).toMatchObject({
+    ruleId: 'birthday',
+    dedupeKey: 'birthday:person-1:2026-04-24',
+    title: 'Happy birthday, Pierre',
+    subtitle: 'Recent photos of Pierre',
+    score: 254,
+    assetIds: ['a-4', 'a-3', 'a-2', 'a-1'],
+    context: { personId: 'person-1', distinctYears: 1 },
+  });
+});
+
+it('skips the snapshot fallback when only three single-year assets qualify', async () => {
+  const personRepository = {
+    getBirthdaysForDay: vi
+      .fn()
+      .mockResolvedValue([{ id: 'person-1', name: 'Pierre', birthDate: new Date('2025-04-24T00:00:00Z') }]),
+  };
+  const assetRepository = {
+    getMemoryAssetsForPerson: vi.fn().mockResolvedValue([
+      { id: 'a-3', localDateTime: new Date('2026-04-18T15:25:09.803Z') },
+      { id: 'a-2', localDateTime: new Date('2026-04-18T15:25:08.244Z') },
+      { id: 'a-1', localDateTime: new Date('2026-04-18T15:25:07.335Z') },
+    ]),
+  };
+
+  const rule = new BirthdayMemoryRule(personRepository as never, assetRepository as never);
+
+  await expect(
+    rule.evaluate({
       ownerId: 'user-1',
       target: DateTime.fromISO('2026-04-24', { zone: 'utc' }),
-    });
+    }),
+  ).resolves.toEqual([]);
+});
 
-    expect(candidate).toMatchObject({
-      ruleId: 'birthday',
-      dedupeKey: 'birthday:person-1:2026-04-24',
-      title: 'Happy birthday, Pierre',
-      subtitle: 'Recent photos of Pierre',
-      score: 254,
-      assetIds: ['a-4', 'a-3', 'a-2', 'a-1'],
-      context: { personId: 'person-1', distinctYears: 1 },
-    });
+it('prefers the throwback path over the snapshot fallback when multiple years qualify', async () => {
+  const personRepository = {
+    getBirthdaysForDay: vi
+      .fn()
+      .mockResolvedValue([{ id: 'person-1', name: 'Alice', birthDate: new Date('1990-04-24T00:00:00Z') }]),
+  };
+  const assetRepository = {
+    getMemoryAssetsForPerson: vi.fn().mockResolvedValue([
+      { id: 'a-2025-1', localDateTime: new Date('2025-04-01T12:00:00Z') },
+      { id: 'a-2025-2', localDateTime: new Date('2025-03-01T12:00:00Z') },
+      { id: 'a-2024-1', localDateTime: new Date('2024-04-01T12:00:00Z') },
+      { id: 'a-2023-1', localDateTime: new Date('2023-04-01T12:00:00Z') },
+      { id: 'a-2022-1', localDateTime: new Date('2022-04-01T12:00:00Z') },
+      { id: 'a-2021-1', localDateTime: new Date('2021-04-01T12:00:00Z') },
+    ]),
+  };
+
+  const rule = new BirthdayMemoryRule(personRepository as never, assetRepository as never);
+  const candidates = await rule.evaluate({
+    ownerId: 'user-1',
+    target: DateTime.fromISO('2026-04-24', { zone: 'utc' }),
   });
 
-  it('skips the snapshot fallback when only three single-year assets qualify', async () => {
-    const personRepository = {
-      getBirthdaysForDay: vi
-        .fn()
-        .mockResolvedValue([{ id: 'person-1', name: 'Pierre', birthDate: new Date('2025-04-24T00:00:00Z') }]),
-    };
-    const assetRepository = {
-      getMemoryAssetsForPerson: vi.fn().mockResolvedValue([
-        { id: 'a-3', localDateTime: new Date('2026-04-18T15:25:09.803Z') },
-        { id: 'a-2', localDateTime: new Date('2026-04-18T15:25:08.244Z') },
-        { id: 'a-1', localDateTime: new Date('2026-04-18T15:25:07.335Z') },
-      ]),
-    };
-
-    const rule = new BirthdayMemoryRule(personRepository as never, assetRepository as never);
-
-    await expect(
-      rule.evaluate({
-        ownerId: 'user-1',
-        target: DateTime.fromISO('2026-04-24', { zone: 'utc' }),
-      }),
-    ).resolves.toEqual([]);
-  });
-
-  it('prefers the throwback path over the snapshot fallback when multiple years qualify', async () => {
-    const personRepository = {
-      getBirthdaysForDay: vi
-        .fn()
-        .mockResolvedValue([{ id: 'person-1', name: 'Alice', birthDate: new Date('1990-04-24T00:00:00Z') }]),
-    };
-    const assetRepository = {
-      getMemoryAssetsForPerson: vi.fn().mockResolvedValue([
-        { id: 'a-2025-1', localDateTime: new Date('2025-04-01T12:00:00Z') },
-        { id: 'a-2025-2', localDateTime: new Date('2025-03-01T12:00:00Z') },
-        { id: 'a-2024-1', localDateTime: new Date('2024-04-01T12:00:00Z') },
-        { id: 'a-2023-1', localDateTime: new Date('2023-04-01T12:00:00Z') },
-        { id: 'a-2022-1', localDateTime: new Date('2022-04-01T12:00:00Z') },
-        { id: 'a-2021-1', localDateTime: new Date('2021-04-01T12:00:00Z') },
-      ]),
-    };
-
-    const rule = new BirthdayMemoryRule(personRepository as never, assetRepository as never);
-    const candidates = await rule.evaluate({
-      ownerId: 'user-1',
-      target: DateTime.fromISO('2026-04-24', { zone: 'utc' }),
-    });
-
-    expect(candidates).toEqual([
-      expect.objectContaining({
-        subtitle: 'Photos from different years',
-        score: 356,
-        assetIds: ['a-2025-1', 'a-2025-2', 'a-2024-1', 'a-2023-1', 'a-2022-1', 'a-2021-1'],
-      }),
-    ]);
-  });
+  expect(candidates).toEqual([
+    expect.objectContaining({
+      subtitle: 'Photos from different years',
+      score: 356,
+      assetIds: ['a-2025-1', 'a-2025-2', 'a-2024-1', 'a-2023-1', 'a-2022-1', 'a-2021-1'],
+    }),
+  ]);
+});
 ```
 
 - [ ] **Step 2: Run the rule tests to verify the fallback cases fail**
@@ -235,6 +236,7 @@ git commit -m "feat(server): add birthday memory fallback"
 ## Task 2: Lock Ranking Through The Memory Service
 
 **Files:**
+
 - Modify: `server/src/services/memory.service.spec.ts`
 
 - [ ] **Step 1: Write the failing service-level ranking test**
@@ -242,84 +244,84 @@ git commit -m "feat(server): add birthday memory fallback"
 Append this test to the `describe('onMemoriesCreate')` block in `server/src/services/memory.service.spec.ts`:
 
 ```ts
-    it('prefers a fallback birthday candidate over recent trip when only one rule slot remains', async () => {
-      vi.useFakeTimers();
-      vi.setSystemTime(new Date('2026-04-24T12:00:00Z'));
+it('prefers a fallback birthday candidate over recent trip when only one rule slot remains', async () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date('2026-04-24T12:00:00Z'));
 
-      const user = factory.userAdmin();
-      mocks.user.getList.mockResolvedValue([user]);
-      mocks.systemMetadata.get.mockResolvedValue({
-        lastOnThisDayDate: '2026-04-26T00:00:00.000Z',
-        lastRuleDate: '2026-04-23T00:00:00.000Z',
-      });
-      mocks.asset.getByDayOfYear.mockResolvedValue([]);
-      mocks.memory.search.mockResolvedValue([
-        getForMemory(
-          MemoryFactory.create({
-            ownerId: user.id,
-            type: MemoryType.Rule,
-            memoryAt: new Date('2026-04-24T00:00:00Z'),
-            data: {
-              ruleId: 'existing',
-              dedupeKey: 'existing',
-              title: 'Existing',
-            } satisfies RuleMemoryData,
-          }),
-        ),
-      ]);
-      mocks.memory.hasRuleMemory.mockResolvedValue(false);
-      mocks.memory.create.mockResolvedValue(MemoryFactory.create() as any);
+  const user = factory.userAdmin();
+  mocks.user.getList.mockResolvedValue([user]);
+  mocks.systemMetadata.get.mockResolvedValue({
+    lastOnThisDayDate: '2026-04-26T00:00:00.000Z',
+    lastRuleDate: '2026-04-23T00:00:00.000Z',
+  });
+  mocks.asset.getByDayOfYear.mockResolvedValue([]);
+  mocks.memory.search.mockResolvedValue([
+    getForMemory(
+      MemoryFactory.create({
+        ownerId: user.id,
+        type: MemoryType.Rule,
+        memoryAt: new Date('2026-04-24T00:00:00Z'),
+        data: {
+          ruleId: 'existing',
+          dedupeKey: 'existing',
+          title: 'Existing',
+        } satisfies RuleMemoryData,
+      }),
+    ),
+  ]);
+  mocks.memory.hasRuleMemory.mockResolvedValue(false);
+  mocks.memory.create.mockResolvedValue(MemoryFactory.create() as any);
 
-      const birthdayRule = {
-        id: 'birthday',
-        evaluate: vi.fn().mockResolvedValue([
-          {
-            ruleId: 'birthday',
-            dedupeKey: 'birthday:person-1:2026-04-24',
-            title: 'Happy birthday, Pierre',
-            subtitle: 'Recent photos of Pierre',
-            score: 254,
-            assetIds: ['a-1', 'a-2', 'a-3', 'a-4'],
-            memoryAt: DateTime.fromISO('2026-04-24T00:00:00Z'),
-          },
-        ]),
-      };
-      const recentTripRule = {
-        id: 'recent_trip',
-        evaluate: vi.fn().mockResolvedValue([
-          {
-            ruleId: 'recent_trip',
-            dedupeKey: 'recent_trip:germany:nurnberg:2026-04-24',
-            title: 'Recent trip to Nürnberg, Germany',
-            subtitle: '20 photos over 30 days',
-            score: 220,
-            assetIds: ['t-1', 't-2', 't-3'],
-            memoryAt: DateTime.fromISO('2026-04-24T00:00:00Z'),
-          },
-        ]),
-      };
+  const birthdayRule = {
+    id: 'birthday',
+    evaluate: vi.fn().mockResolvedValue([
+      {
+        ruleId: 'birthday',
+        dedupeKey: 'birthday:person-1:2026-04-24',
+        title: 'Happy birthday, Pierre',
+        subtitle: 'Recent photos of Pierre',
+        score: 254,
+        assetIds: ['a-1', 'a-2', 'a-3', 'a-4'],
+        memoryAt: DateTime.fromISO('2026-04-24T00:00:00Z'),
+      },
+    ]),
+  };
+  const recentTripRule = {
+    id: 'recent_trip',
+    evaluate: vi.fn().mockResolvedValue([
+      {
+        ruleId: 'recent_trip',
+        dedupeKey: 'recent_trip:germany:nurnberg:2026-04-24',
+        title: 'Recent trip to Nürnberg, Germany',
+        subtitle: '20 photos over 30 days',
+        score: 220,
+        assetIds: ['t-1', 't-2', 't-3'],
+        memoryAt: DateTime.fromISO('2026-04-24T00:00:00Z'),
+      },
+    ]),
+  };
 
-      vi.spyOn(sut as never, 'getMemoryRules').mockReturnValue([recentTripRule, birthdayRule] as never);
+  vi.spyOn(sut as never, 'getMemoryRules').mockReturnValue([recentTripRule, birthdayRule] as never);
 
-      await sut.onMemoriesCreate();
+  await sut.onMemoriesCreate();
 
-      expect(mocks.memory.create).toHaveBeenCalledTimes(1);
-      expect(mocks.memory.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          ownerId: user.id,
-          type: MemoryType.Rule,
-          data: expect.objectContaining({
-            ruleId: 'birthday',
-            title: 'Happy birthday, Pierre',
-            subtitle: 'Recent photos of Pierre',
-            score: 254,
-          }),
-        }),
-        new Set(['a-1', 'a-2', 'a-3', 'a-4']),
-      );
+  expect(mocks.memory.create).toHaveBeenCalledTimes(1);
+  expect(mocks.memory.create).toHaveBeenCalledWith(
+    expect.objectContaining({
+      ownerId: user.id,
+      type: MemoryType.Rule,
+      data: expect.objectContaining({
+        ruleId: 'birthday',
+        title: 'Happy birthday, Pierre',
+        subtitle: 'Recent photos of Pierre',
+        score: 254,
+      }),
+    }),
+    new Set(['a-1', 'a-2', 'a-3', 'a-4']),
+  );
 
-      vi.useRealTimers();
-    });
+  vi.useRealTimers();
+});
 ```
 
 - [ ] **Step 2: Run the focused service test**
@@ -372,6 +374,7 @@ git commit -m "test(server): cover birthday fallback ranking"
 ## Task 3: Add A Real-DB Pierre Regression
 
 **Files:**
+
 - Modify: `server/test/medium/specs/services/memory.service.spec.ts`
 
 - [ ] **Step 1: Add the medium test for the live Pierre shape**
@@ -379,58 +382,58 @@ git commit -m "test(server): cover birthday fallback ranking"
 Append this test immediately after `it('creates a birthday rule memory on the birthday itself', ...)` in `server/test/medium/specs/services/memory.service.spec.ts`:
 
 ```ts
-    it('creates a fallback birthday memory from four single-year Pierre photos', async () => {
-      const { sut, ctx } = setup();
-      const assetRepo = ctx.get(AssetRepository);
-      const memoryRepo = ctx.get(MemoryRepository);
-      const now = DateTime.fromObject({ year: 2026, month: 4, day: 24 }, { zone: 'utc' }) as DateTime<true>;
-      const { user } = await ctx.newUser();
-      const { person } = await ctx.newPerson({
-        ownerId: user.id,
-        name: 'Pierre',
-        birthDate: new Date('2025-04-24T00:00:00Z'),
-      });
+it('creates a fallback birthday memory from four single-year Pierre photos', async () => {
+  const { sut, ctx } = setup();
+  const assetRepo = ctx.get(AssetRepository);
+  const memoryRepo = ctx.get(MemoryRepository);
+  const now = DateTime.fromObject({ year: 2026, month: 4, day: 24 }, { zone: 'utc' }) as DateTime<true>;
+  const { user } = await ctx.newUser();
+  const { person } = await ctx.newPerson({
+    ownerId: user.id,
+    name: 'Pierre',
+    birthDate: new Date('2025-04-24T00:00:00Z'),
+  });
 
-      const addPierreAsset = async (localDateTime: string) => {
-        const { asset } = await ctx.newAsset({ ownerId: user.id, localDateTime });
-        await Promise.all([
-          ctx.newExif({ assetId: asset.id, city: 'Berlin', country: 'Germany' }),
-          ctx.newJobStatus({ assetId: asset.id }),
-          ctx.newAssetFace({ assetId: asset.id, personId: person.id }),
-          assetRepo.upsertFiles([
-            { assetId: asset.id, type: AssetFileType.Preview, path: `/preview-${asset.id}.jpg` },
-            { assetId: asset.id, type: AssetFileType.Thumbnail, path: `/thumb-${asset.id}.jpg` },
-          ]),
-        ]);
-      };
+  const addPierreAsset = async (localDateTime: string) => {
+    const { asset } = await ctx.newAsset({ ownerId: user.id, localDateTime });
+    await Promise.all([
+      ctx.newExif({ assetId: asset.id, city: 'Berlin', country: 'Germany' }),
+      ctx.newJobStatus({ assetId: asset.id }),
+      ctx.newAssetFace({ assetId: asset.id, personId: person.id }),
+      assetRepo.upsertFiles([
+        { assetId: asset.id, type: AssetFileType.Preview, path: `/preview-${asset.id}.jpg` },
+        { assetId: asset.id, type: AssetFileType.Thumbnail, path: `/thumb-${asset.id}.jpg` },
+      ]),
+    ]);
+  };
 
-      await addPierreAsset('2026-04-18T15:25:07.335Z');
-      await addPierreAsset('2026-04-18T15:25:08.244Z');
-      await addPierreAsset('2026-04-18T15:25:09.803Z');
-      await addPierreAsset('2026-04-18T15:25:11.543Z');
+  await addPierreAsset('2026-04-18T15:25:07.335Z');
+  await addPierreAsset('2026-04-18T15:25:08.244Z');
+  await addPierreAsset('2026-04-18T15:25:09.803Z');
+  await addPierreAsset('2026-04-18T15:25:11.543Z');
 
-      vi.setSystemTime(now.toJSDate());
-      await sut.onMemoriesCreate();
+  vi.setSystemTime(now.toJSDate());
+  await sut.onMemoriesCreate();
 
-      const memories = await memoryRepo.search(user.id, { type: MemoryType.Rule, for: now.toJSDate() });
-      expect(memories).toEqual([
-        expect.objectContaining({
-          type: MemoryType.Rule,
-          data: expect.objectContaining({
-            ruleId: 'birthday',
-            title: 'Happy birthday, Pierre',
-            subtitle: 'Recent photos of Pierre',
-          }),
-          assets: expect.arrayContaining([
-            expect.objectContaining({}),
-            expect.objectContaining({}),
-            expect.objectContaining({}),
-            expect.objectContaining({}),
-          ]),
-        }),
-      ]);
-      expect(memories[0]?.assets).toHaveLength(4);
-    });
+  const memories = await memoryRepo.search(user.id, { type: MemoryType.Rule, for: now.toJSDate() });
+  expect(memories).toEqual([
+    expect.objectContaining({
+      type: MemoryType.Rule,
+      data: expect.objectContaining({
+        ruleId: 'birthday',
+        title: 'Happy birthday, Pierre',
+        subtitle: 'Recent photos of Pierre',
+      }),
+      assets: expect.arrayContaining([
+        expect.objectContaining({}),
+        expect.objectContaining({}),
+        expect.objectContaining({}),
+        expect.objectContaining({}),
+      ]),
+    }),
+  ]);
+  expect(memories[0]?.assets).toHaveLength(4);
+});
 ```
 
 - [ ] **Step 2: Run the focused medium test file**
@@ -451,10 +454,10 @@ Expected:
 The medium regression should pass with the Task 1 implementation. If it does not, verify `server/src/services/memory-rules/birthday.rule.ts` still uses this exact fallback selection:
 
 ```ts
-      const fallbackAssetIds = [...assets]
-        .toSorted((left, right) => right.localDateTime.getTime() - left.localDateTime.getTime())
-        .slice(0, 4)
-        .map(({ id }) => id);
+const fallbackAssetIds = [...assets]
+  .toSorted((left, right) => right.localDateTime.getTime() - left.localDateTime.getTime())
+  .slice(0, 4)
+  .map(({ id }) => id);
 ```
 
 Do not reintroduce the throwback `2`-per-year cap into the fallback branch.

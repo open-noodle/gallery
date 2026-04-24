@@ -333,7 +333,7 @@ describe(MemoryService.name, () => {
         }),
       ]);
       expect(memories[0]?.assets).toHaveLength(4);
-      expect(memories[0]?.assets.map(({ id }) => id).sort()).toEqual([...pierreAssetIds].sort());
+      expect(memories[0]?.assets.map(({ id }) => id).toSorted()).toEqual([...pierreAssetIds].toSorted());
     });
 
     it('creates a recent-trip rule memory for a dense non-home cluster', async () => {
