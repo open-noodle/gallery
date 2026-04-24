@@ -106,7 +106,8 @@ export class MemoryService extends BaseService {
     const showAt = target.startOf('day').toJSDate();
     const hideAt = target.endOf('day').toJSDate();
     const seenDedupeKeys = new Set<string>();
-    const candidates = (await this.evaluateRuleCandidates(ownerId, target)).sort((left, right) => right.score - left.score);
+    const evaluatedCandidates = await this.evaluateRuleCandidates(ownerId, target);
+    const candidates = evaluatedCandidates.toSorted((left, right) => right.score - left.score);
     let inserted = 0;
 
     for (const candidate of candidates) {

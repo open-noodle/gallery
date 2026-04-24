@@ -72,14 +72,13 @@ export class RecentTripMemoryRule implements MemoryRule {
       return [];
     }
 
-    const assetIds = (
-      await this.assetRepository.getMemoryAssetsForLocation(ownerId, {
-        country: candidate.country,
-        city: candidate.city,
-        takenAfter: recentFrom.toJSDate(),
-        takenBefore: target.endOf('day').toJSDate(),
-      })
-    ).map(({ id }) => id);
+    const locationAssets = await this.assetRepository.getMemoryAssetsForLocation(ownerId, {
+      country: candidate.country,
+      city: candidate.city,
+      takenAfter: recentFrom.toJSDate(),
+      takenBefore: target.endOf('day').toJSDate(),
+    });
+    const assetIds = locationAssets.map(({ id }) => id);
 
     const placeLabel = candidate.city ? `${candidate.city}, ${candidate.country}` : candidate.country;
     const dedupeDay = target.toFormat('yyyy-MM-dd');

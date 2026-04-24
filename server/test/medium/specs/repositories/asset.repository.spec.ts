@@ -188,7 +188,7 @@ describe(AssetRepository.name, () => {
 
       const result = await sut.getMemoryAssetsForPerson(user.id, person.id, cutoff);
 
-      expect(result.map(({ id }) => id).sort()).toEqual([duplicateFaceAsset.id, matchingAsset.id].sort());
+      expect(result.map(({ id }) => id).toSorted()).toEqual([duplicateFaceAsset.id, matchingAsset.id].toSorted());
       expect(result).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ id: matchingAsset.id, localDateTime: new Date('2025-04-01T12:00:00Z') }),

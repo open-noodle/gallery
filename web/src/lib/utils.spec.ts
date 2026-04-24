@@ -1,5 +1,5 @@
 import { getAssetUrl, getMemoryTitle, getReleaseType } from '$lib/utils';
-import { AssetTypeEnum } from '@immich/sdk';
+import { AssetTypeEnum, MemoryType, type MemoryResponseDto } from '@immich/sdk';
 import { assetFactory } from '@test-data/factories/asset-factory';
 import { sharedLinkFactory } from '@test-data/factories/shared-link-factory';
 
@@ -185,23 +185,35 @@ describe('utils', () => {
   });
 
   describe(getMemoryTitle.name, () => {
-    const translate = vi.fn((key: string, payload?: { values?: Record<string, number> }) => {
+    const translate: Parameters<typeof getMemoryTitle>[1] = vi.fn((key: string, payload?: { values?: Record<string, number> }) => {
       if (key === 'years_ago') {
         return `${payload?.values?.years} years ago`;
       }
 
       return key;
     });
+    const memory = (overrides: Partial<MemoryResponseDto>): MemoryResponseDto => ({
+      assets: [],
+      createdAt: '2026-04-23T00:00:00Z',
+      data: {},
+      id: 'memory-id',
+      isSaved: false,
+      memoryAt: '2026-04-23T00:00:00Z',
+      ownerId: 'owner-id',
+      type: MemoryType.Rule,
+      updatedAt: '2026-04-23T00:00:00Z',
+      ...overrides,
+    });
 
     it('prefers a server-supplied title when present', () => {
       expect(
         getMemoryTitle(
-          {
-            type: 'rule',
+          memory({
+            type: MemoryType.Rule,
             title: 'Happy birthday, Alice',
             data: { title: 'Happy birthday, Alice' },
-          } as any,
-          translate as any,
+          }),
+          translate,
           new Date('2026-04-23T00:00:00Z'),
         ),
       ).toBe('Happy birthday, Alice');
@@ -210,11 +222,11 @@ describe('utils', () => {
     it('falls back to the localized on-this-day title when no server title exists', () => {
       expect(
         getMemoryTitle(
-          {
-            type: 'on_this_day',
+          memory({
+            type: MemoryType.OnThisDay,
             data: { year: 2024 },
-          } as any,
-          translate as any,
+          }),
+          translate,
           new Date('2026-04-23T00:00:00Z'),
         ),
       ).toBe('2 years ago');

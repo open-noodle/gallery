@@ -321,7 +321,7 @@ export const handlePromiseError = <T>(promise: Promise<T>): void => {
 
 export const getMemoryTitle = (
   memory: MemoryResponseDto,
-  translate: (id: any, options?: any) => string,
+  translate: (id: string, options?: { values?: Record<string, number> }) => string,
   now = new Date(),
 ) => {
   if (memory.title) {
