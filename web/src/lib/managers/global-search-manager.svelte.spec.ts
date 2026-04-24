@@ -2670,16 +2670,37 @@ describe('SWR loading rules', () => {
   });
 
   it('setMode preserves ok photos until re-run completes (SWR)', async () => {
-    vi.mocked(searchSmart).mockResolvedValueOnce({
-      assets: { items: [{ id: 'a1' } as never], nextPage: null },
-    } as never);
     const m = new GlobalSearchManager();
-    m.open();
-    m.setQuery('beach');
-    await vi.advanceTimersByTimeAsync(200);
-    expect(m.sections.photos.status).toBe('ok');
-    m.setMode('metadata');
-    expect(m.sections.photos.status).toBe('ok');
+    const photosProvider = (m as unknown as { providers: { photos: Provider<EntityItem> } }).providers.photos;
+    const originalPhotosRun = photosProvider.run;
+    let resolveRerun!: () => void;
+
+    photosProvider.run = vi.fn((_query: string, mode: SearchMode) => {
+      if (mode === 'smart') {
+        return Promise.resolve({
+          status: 'ok',
+          items: [{ id: 'a1' } as EntityItem],
+          total: 1,
+        } as ProviderStatus<EntityItem>);
+      }
+      return new Promise(
+        (r) => (resolveRerun = () => r({ status: 'empty' } as ProviderStatus<EntityItem>)),
+      ) as Promise<ProviderStatus<EntityItem>>;
+    });
+
+    try {
+      m.open();
+      m.setQuery('beach');
+      await vi.advanceTimersByTimeAsync(200);
+      expect(m.sections.photos.status).toBe('ok');
+      m.setMode('metadata');
+      expect(m.sections.photos.status).toBe('ok');
+      await flushMicrotasks();
+      resolveRerun();
+      await vi.advanceTimersByTimeAsync(10);
+    } finally {
+      photosProvider.run = originalPhotosRun;
+    }
   });
 
   it('setMode joins the batch counter — mode switch during live batch does NOT drop stripe early', async () => {
