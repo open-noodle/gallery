@@ -493,13 +493,12 @@
                     <button
                       type="button"
                       onclick={() => manager.topSearchMatch && manager.activateSearch(manager.topSearchMatch.query)}
-                      class="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-start {manager.activeItemId ===
-                      manager.topSearchMatch.id
+                      class="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-start {manager.activeItemId === manager.topSearchMatch.id
                         ? 'bg-primary/10'
                         : ''}"
                     >
-                        <Icon icon={mdiMagnify} />
-                        <span>{$t('cmdk_top_search_label', { values: { query: manager.topSearchMatch.query } })}</span>
+                      <Icon icon={mdiMagnify} />
+                      <span>{$t('cmdk_top_search_label', { values: { query: manager.topSearchMatch.query } })}</span>
                     </button>
                   </div>
                 </Command.Group>

@@ -133,7 +133,9 @@ describe('Map page query intersection', () => {
       expect(screen.getByTestId('search-chip')).toHaveTextContent('beach');
       expect(sdkMock.getFilteredMapMarkers).toHaveBeenCalledTimes(1);
       expect(sdkMock.searchSmart).toHaveBeenCalledWith(
-        expect.objectContaining({ smartSearchDto: expect.objectContaining({ query: 'beach', page: 1, size: 100 }) }),
+        expect.objectContaining({
+          smartSearchDto: expect.objectContaining({ query: 'beach', page: 1, size: 100 }),
+        }),
       );
       expect(screen.getByTestId('map-stub')).toHaveAttribute('data-marker-ids', 'asset-2');
     });

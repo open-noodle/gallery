@@ -3,7 +3,11 @@
   import { page } from '$app/state';
   import ActiveFiltersBar from '$lib/components/filter-panel/active-filters-bar.svelte';
   import FilterPanel from '$lib/components/filter-panel/filter-panel.svelte';
-  import { clearFilters, createFilterState, getActiveFilterCount } from '$lib/components/filter-panel/filter-panel';
+  import {
+    clearFilters,
+    createFilterState,
+    getActiveFilterCount,
+  } from '$lib/components/filter-panel/filter-panel';
   import type { FilterState } from '$lib/components/filter-panel/filter-panel';
   import { handlePhotosRemoveFilter } from '$lib/utils/photos-filter-options';
   import { buildMapMarkerOptions, buildMapTimeBucketOptions } from '$lib/utils/map-filter-options';
@@ -87,7 +91,9 @@
       },
     };
   });
-  const hasActiveFilters = $derived(getActiveFilterCount(filters) > 0 || committedQuery.trim().length > 0);
+  const hasActiveFilters = $derived(
+    getActiveFilterCount(filters) > 0 || committedQuery.trim().length > 0,
+  );
   const noResults = $derived(mapMarkers.length === 0 && hasActiveFilters);
   const timeBucketOptions = $derived.by(() => buildMapTimeBucketOptions(filters, spaceId));
   const mapMarkerOptions = $derived.by(() => buildMapMarkerOptions(filters, spaceId));
@@ -165,7 +171,7 @@
               break;
             }
 
-            nextPage = assets.nextPage;
+            nextPage = assets.nextPage === null ? null : Number(assets.nextPage);
           }
 
           if (controller.signal.aborted) {

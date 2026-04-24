@@ -3,14 +3,16 @@ import SearchBar from '$lib/elements/SearchBar.svelte';
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import type { Component } from 'svelte';
 
+type SearchBarWrapperProps = {
+  component: typeof SearchBar;
+  componentProps: Record<string, unknown>;
+};
+
 function renderSearchBar(props: Record<string, unknown>) {
-  return render(
-    TestWrapper as Component<{ component: typeof SearchBar; componentProps: typeof props }>,
-    {
-      component: SearchBar,
-      componentProps: props,
-    },
-  );
+  return render(TestWrapper as Component<SearchBarWrapperProps>, {
+    component: SearchBar,
+    componentProps: props,
+  });
 }
 
 describe('SearchBar', () => {

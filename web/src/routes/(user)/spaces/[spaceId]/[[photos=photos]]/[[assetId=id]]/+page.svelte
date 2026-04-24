@@ -111,6 +111,10 @@
     () => members,
   );
 
+  function getSearchSortOrder(query: string): FilterState['sortOrder'] {
+    return query.trim().length > 0 ? 'relevance' : 'desc';
+  }
+
   // Sync when navigating between spaces (component persists, data updates)
   $effect(() => {
     if (data.space.id !== space.id) {
@@ -119,7 +123,7 @@
       members = data.members;
       filters = {
         ...createFilterState(),
-        sortOrder: nextCommittedSearchQuery.trim().length > 0 ? 'relevance' : 'desc',
+        sortOrder: getSearchSortOrder(nextCommittedSearchQuery),
       };
       activities = [];
       hasMoreActivities = false;
@@ -155,9 +159,9 @@
 
   // Filter state
   const initialCommittedSearchQuery = page.url.searchParams.get('q') ?? '';
-  let filters = $state({
+  let filters = $state<FilterState>({
     ...createFilterState(),
-    sortOrder: initialCommittedSearchQuery.trim().length > 0 ? 'relevance' : 'desc',
+    sortOrder: getSearchSortOrder(initialCommittedSearchQuery),
   });
   let personNames = new SvelteMap<string, string>();
   let tagNames = new SvelteMap<string, string>();
@@ -669,7 +673,7 @@
       isLoading = false;
       filters = {
         ...filters,
-        sortOrder: nextCommittedSearchQuery.trim().length > 0 ? 'relevance' : 'desc',
+        sortOrder: getSearchSortOrder(nextCommittedSearchQuery),
       };
       lastHandledCommittedSearchQuery = nextCommittedSearchQuery;
     });

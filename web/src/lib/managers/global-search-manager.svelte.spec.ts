@@ -4174,16 +4174,16 @@ describe('prefix scoping — runBatch gating', () => {
 
   it('scope people with bare @ bypasses minQueryLength', async () => {
     const m = new GlobalSearchManager();
-    const searchPersonSpy = vi.mocked(searchPerson);
-    searchPersonSpy.mockClear();
+    const getAllPeopleSpy = vi.mocked(getAllPeople);
+    getAllPeopleSpy.mockClear();
 
     m.setQuery('@'); // payload.length = 0, below people.minQueryLength = 2
     await vi.advanceTimersByTimeAsync(150);
 
     // people.minQueryLength=2 would normally set section to idle; bypass
-    // dispatches to the provider's bare branch instead (which does NOT call searchPerson).
+    // dispatches to the bare-suggestions branch instead.
     expect(m.sections.people.status).not.toBe('idle');
-    expect(searchPersonSpy).not.toHaveBeenCalled();
+    expect(getAllPeopleSpy).toHaveBeenCalledTimes(1);
   });
 
   it('scope people with single-char payload relaxes minQueryLength to 1', async () => {
