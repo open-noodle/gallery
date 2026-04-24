@@ -44,14 +44,21 @@
   });
   let selectedValue = $state<string>('');
 
-  $effect(() => {
-    manager.setQuery(inputValue);
-  });
+  function setSelectedValue(value: string | null) {
+    selectedValue = value ?? '';
+    manager.setActiveItem(value);
+  }
+
+  function syncSelectedValueFromBits(value: string) {
+    if (manager.activeItemId === manager.topSearchMatch?.id) {
+      selectedValue = '';
+      return;
+    }
+    setSelectedValue(value);
+  }
 
   $effect(() => {
-    if (selectedValue) {
-      manager.setActiveItem(selectedValue);
-    }
+    manager.setQuery(inputValue);
   });
 
   // bits-ui's built-in scroll-into-view logic has a quirk: when the selected item is
@@ -91,33 +98,40 @@
   });
 
   $effect(() => {
+    if (manager.activeItemId === manager.topSearchMatch?.id) {
+      if (selectedValue !== '') {
+        selectedValue = '';
+      }
+      return;
+    }
     if (manager.activeItemId && manager.activeItemId !== selectedValue) {
-      selectedValue = manager.activeItemId;
+      setSelectedValue(manager.activeItemId);
     }
   });
 
   let lastAutoSelectedTopSearchQuery = $state<string | null>(null);
   let lastDismissedTopSearchQuery = $state<string | null>(null);
-  let previousSelectedValue = $state('');
+  let previousActiveItemId = $state<string | null>(null);
   $effect(() => {
     const topSearchMatch = manager.topSearchMatch;
     if (!topSearchMatch) {
       lastAutoSelectedTopSearchQuery = null;
       lastDismissedTopSearchQuery = null;
-      previousSelectedValue = selectedValue;
+      previousActiveItemId = manager.activeItemId;
       return;
     }
-    if (previousSelectedValue === topSearchMatch.id && selectedValue !== topSearchMatch.id) {
+    if (previousActiveItemId === topSearchMatch.id && manager.activeItemId !== topSearchMatch.id) {
       lastDismissedTopSearchQuery = topSearchMatch.query;
     }
     if (
       lastAutoSelectedTopSearchQuery !== topSearchMatch.query &&
       lastDismissedTopSearchQuery !== topSearchMatch.query
     ) {
-      selectedValue = topSearchMatch.id;
+      selectedValue = '';
+      manager.setActiveItem(topSearchMatch.id);
       lastAutoSelectedTopSearchQuery = topSearchMatch.query;
     }
-    previousSelectedValue = selectedValue;
+    previousActiveItemId = manager.activeItemId;
   });
 
   // Render-time filter: drop unreachable navigate recents before they hit the DOM.
@@ -230,6 +244,25 @@
     manager.close();
   }
 
+  function moveSelectionFromTopSearch(direction: 1 | -1) {
+    const topSearchId = manager.topSearchMatch?.id;
+    const currentValue = selectedValue || manager.activeItemId;
+    if (!topSearchId || currentValue !== topSearchId) {
+      return false;
+    }
+    const items = [...document.querySelectorAll<HTMLElement>('[data-command-item]')];
+    if (items.length === 0) {
+      return false;
+    }
+    const target = direction === 1 ? items[0] : items.at(-1);
+    const nextValue = target?.dataset.value;
+    if (!nextValue) {
+      return false;
+    }
+    setSelectedValue(nextValue);
+    return true;
+  }
+
   function onKeyDown(e: KeyboardEvent) {
     // Bare `?` opens the app-wide keyboard shortcuts modal. No modifiers — Ctrl/Alt/Meta
     // fall through so browser chords (e.g. a custom user-agent binding) still work.
@@ -280,6 +313,19 @@
       e.preventDefault();
       return;
     }
+    if (e.key === 'Enter' && manager.topSearchMatch && manager.activeItemId === manager.topSearchMatch.id) {
+      manager.activateSearch(manager.topSearchMatch.query);
+      e.preventDefault();
+      return;
+    }
+    if (e.key === 'ArrowDown' && moveSelectionFromTopSearch(1)) {
+      e.preventDefault();
+      return;
+    }
+    if (e.key === 'ArrowUp' && moveSelectionFromTopSearch(-1)) {
+      e.preventDefault();
+      return;
+    }
     if (e.key === 'Home' || e.key === 'End') {
       // bits-ui tags each Command.Item with a data-command-item attribute (see
       // bits-ui command.svelte.js:1204 — `createBitsAttrs({ component: 'command' ... })`
@@ -312,8 +358,9 @@
       shouldFilter={false}
       vimBindings={false}
       loop
-      bind:value={selectedValue}
+      bind:value={() => selectedValue, syncSelectedValueFromBits}
       aria-labelledby="global-search-label"
+      onkeydown={onKeyDown}
       class="flex h-full min-h-0 flex-col"
     >
       <div class="flex items-center border-b border-gray-200 dark:border-gray-700">
@@ -322,7 +369,6 @@
           autofocus
           placeholder={$t('cmdk_placeholder')}
           maxlength={256}
-          onkeydown={onKeyDown}
           class="min-w-0 flex-1 bg-transparent px-4 py-3 text-sm focus:outline-none"
         />
         <IconButton
@@ -443,18 +489,19 @@
                   >
                     {$t('cmdk_top_result')}
                   </Command.GroupHeading>
-                  <Command.GroupItems>
-                    <Command.Item
-                      value={manager.topSearchMatch.id}
-                      onSelect={() => manager.topSearchMatch && manager.activateSearch(manager.topSearchMatch.query)}
-                      class="group"
+                  <div class="px-1">
+                    <button
+                      type="button"
+                      onclick={() => manager.topSearchMatch && manager.activateSearch(manager.topSearchMatch.query)}
+                      class="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-start {manager.activeItemId ===
+                      manager.topSearchMatch.id
+                        ? 'bg-primary/10'
+                        : ''}"
                     >
-                      <div class="flex items-center gap-3 rounded-lg px-3 py-2 group-data-[selected]:bg-primary/10">
                         <Icon icon={mdiMagnify} />
                         <span>{$t('cmdk_top_search_label', { values: { query: manager.topSearchMatch.query } })}</span>
-                      </div>
-                    </Command.Item>
-                  </Command.GroupItems>
+                    </button>
+                  </div>
                 </Command.Group>
               {/if}
               {#if manager.topCommandMatch}
