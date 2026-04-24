@@ -13,7 +13,7 @@ import { InjectKysely } from 'nestjs-kysely';
 import type { IBulkAsset } from 'src/types.js';
 import { Chunked, ChunkedSet, DummyValue, GenerateSql } from 'src/decorators.js';
 import { MemorySearchDto } from 'src/dtos/memory.dto.js';
-import { AssetFileType, AssetOrderWithRandom, AssetVisibility } from 'src/enum.js';
+import { AssetFileType, AssetOrderWithRandom, AssetVisibility, MemoryType } from 'src/enum.js';
 import { type YearMonthDay } from 'src/repositories/asset.repository.js';
 import { DB } from 'src/schema/index.js';
 import { MemoryTable } from 'src/schema/tables/memory.table.js';
@@ -210,6 +210,21 @@ export class MemoryRepository implements IBulkAsset {
   @GenerateSql({ params: [DummyValue.UUID] })
   async delete(id: string) {
     await this.db.deleteFrom('memory').where('id', '=', id).execute();
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.STRING, DummyValue.STRING] })
+  async hasRuleMemory(ownerId: string, ruleId: string, dedupeKey: string) {
+    const result = await this.db
+      .selectFrom('memory')
+      .select('id')
+      .where('ownerId', '=', ownerId)
+      .where('type', '=', MemoryType.Rule)
+      .where(sql<string>`memory.data->>'ruleId'`, '=', ruleId)
+      .where(sql<string>`memory.data->>'dedupeKey'`, '=', dedupeKey)
+      .where('deletedAt', 'is', null)
+      .executeTakeFirst();
+
+    return !!result;
   }
 
   @GenerateSql({ params: [DummyValue.UUID, [DummyValue.UUID]] })

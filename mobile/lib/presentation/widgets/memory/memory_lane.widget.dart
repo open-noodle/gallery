@@ -11,6 +11,21 @@ import 'package:immich_mobile/providers/haptic_feedback.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/memory.provider.dart';
 import 'package:immich_mobile/routing/router.dart';
 
+String getMemoryTitle(BuildContext context, Memory memory) {
+  final serverTitle = memory.data.title;
+  if (serverTitle != null && serverTitle.isNotEmpty) {
+    return serverTitle;
+  }
+
+  final year = memory.data.year;
+  if (year != null) {
+    final yearsAgo = DateTime.now().year - year;
+    return 'years_ago'.t(context: context, args: {'years': yearsAgo.toString()});
+  }
+
+  return 'memory'.t(context: context);
+}
+
 class MemoryLane extends ConsumerWidget {
   const MemoryLane({super.key});
 
@@ -50,8 +65,7 @@ class MemoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final yearsAgo = DateTime.now().year - memory.data.year;
-    final title = context.t.years_ago(years: yearsAgo);
+    final title = getMemoryTitle(context, memory);
     return Center(
       child: Stack(
         children: [
