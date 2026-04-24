@@ -1,6 +1,4 @@
 <script lang="ts">
-  import { page } from '$app/state';
-  import SearchSortDropdown from '$lib/components/filter-panel/search-sort-dropdown.svelte';
   import { Icon, IconButton, Modal, modalManager, ModalBody } from '@immich/ui';
   import { mdiClose, mdiMagnify } from '@mdi/js';
   import { Command } from 'bits-ui';
@@ -26,7 +24,6 @@
   import { authManager } from '$lib/managers/auth-manager.svelte';
   import { NAVIGATION_ITEMS, type NavigationItem } from '$lib/managers/navigation-items';
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
-  import { getSearchablePageState } from '$lib/utils/searchable-page-search';
 
   interface Props {
     manager: GlobalSearchManager;
@@ -241,7 +238,6 @@
     return { status: 'ok' as const, items, total: items.length };
   });
   const showPreview = $derived(mediaQueryManager.minLg);
-  const showSearchSortControl = $derived(getSearchablePageState(page.url).isSearchable && inputValue.trim().length > 0);
 
   // Progress stripe: only show after a 200ms grace window. A clean setTimeout
   // pattern — the effect fires on every batchInFlight transition and the cleanup
@@ -403,16 +399,6 @@
           oninput={() => inputEditRevision++}
           class="min-w-0 flex-1 bg-transparent px-4 py-3 text-sm focus:outline-none"
         />
-        {#if showSearchSortControl}
-          <div class="shrink-0">
-            <SearchSortDropdown
-              sortOrder={manager.searchSortOrder}
-              onSelect={(mode) => {
-                void manager.applySearchSort(mode, inputValue);
-              }}
-            />
-          </div>
-        {/if}
         <IconButton
           icon={mdiClose}
           size="small"

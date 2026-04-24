@@ -246,37 +246,14 @@ describe('global-search root', () => {
     expect(m.isOpen).toBe(false);
   });
 
-  it('shows the search sort control on searchable pages with an active query', () => {
+  it('does not render the search sort control inside the palette', () => {
     mockPage.url = new URL('https://gallery.test/photos?q=beach&sort=asc');
     const m = new GlobalSearchManager();
     m.open();
 
     render(GlobalSearch, { props: { manager: m } });
 
-    expect(screen.getByTestId('search-sort-btn')).toHaveTextContent(/oldest first/i);
-  });
-
-  it('hides the search sort control on non-searchable pages', () => {
-    mockPage.url = new URL('https://gallery.test/albums');
-    const m = new GlobalSearchManager();
-    m.open();
-
-    render(GlobalSearch, { props: { manager: m } });
-
     expect(screen.queryByTestId('search-sort-btn')).not.toBeInTheDocument();
-  });
-
-  it('reveals the search sort control while typing on a searchable page', async () => {
-    mockPage.url = new URL('https://gallery.test/photos');
-    const m = new GlobalSearchManager();
-    m.open();
-
-    render(GlobalSearch, { props: { manager: m } });
-    expect(screen.queryByTestId('search-sort-btn')).not.toBeInTheDocument();
-
-    await user.type(screen.getByRole('combobox'), 'beach');
-
-    expect(screen.getByTestId('search-sort-btn')).toBeInTheDocument();
   });
 
   it('Esc once clears input, twice closes (APG two-stage)', async () => {
