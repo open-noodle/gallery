@@ -230,6 +230,17 @@ export const utils = {
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
+        // E2E files reuse the same Docker stack. Clearing Redis first drops
+        // stale BullMQ jobs from the previous file before we truncate Postgres.
+        const { exitCode, stderr } = await executeCommand('docker', [
+          'exec',
+          'immich-e2e-redis',
+          'redis-cli',
+          'FLUSHALL',
+        ]).promise;
+        if (exitCode !== 0) {
+          throw new Error(`Failed to flush Redis queues: ${stderr || `exit code ${exitCode}`}`);
+        }
         await client.query(query);
         return;
       } catch (error: any) {
