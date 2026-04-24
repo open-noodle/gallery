@@ -354,7 +354,10 @@ test.describe('global search palette', () => {
       await dialog.getByRole('combobox').fill('auto');
       const topResultGroup = dialog.locator('[data-cmdk-top-result-navigation]');
       await expect(topResultGroup.getByText(/auto-classification/i).first()).toBeVisible();
-      await topResultGroup.getByText(/auto-classification/i).first().click();
+      await topResultGroup
+        .getByText(/auto-classification/i)
+        .first()
+        .click();
       await expect(page).toHaveURL(/\/admin\/system-settings\?isOpen=classification/);
     });
 
@@ -443,7 +446,10 @@ test.describe('global search palette', () => {
       await dialog.getByRole('combobox').fill('auto');
       const topResultGroup = dialog.locator('[data-cmdk-top-result-navigation]');
       await expect(topResultGroup.getByText(/auto-classification/i).first()).toBeVisible();
-      await topResultGroup.getByText(/auto-classification/i).first().click();
+      await topResultGroup
+        .getByText(/auto-classification/i)
+        .first()
+        .click();
       await expect(page).toHaveURL(/classification/);
       // Step 2: swap to non-admin cookies (simulating a demotion).
       await utils.setAuthCookies(context, nonAdmin.accessToken);

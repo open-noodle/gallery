@@ -101,7 +101,10 @@ test.describe('cmdk commands (v1.3.0)', () => {
     await expect(topResultGroup.getByText(/^upload$/i).first()).toBeVisible();
 
     const fileChooserPromise = page.waitForEvent('filechooser', { timeout: 5000 });
-    await topResultGroup.getByText(/^upload$/i).first().click();
+    await topResultGroup
+      .getByText(/^upload$/i)
+      .first()
+      .click();
     const fileChooser = await fileChooserPromise;
     expect(fileChooser).toBeTruthy();
   });
@@ -117,7 +120,10 @@ test.describe('cmdk commands (v1.3.0)', () => {
     await dialog.getByRole('combobox').fill('auto-classification');
     const navGroup = dialog.locator('[data-cmdk-top-result-navigation]');
     await expect(navGroup.getByText(/auto-classification/i).first()).toBeVisible();
-    await navGroup.getByText(/auto-classification/i).first().click();
+    await navGroup
+      .getByText(/auto-classification/i)
+      .first()
+      .click();
     await expect(page).toHaveURL(/classification/);
 
     // Go back to /photos and verify RECENT has the seeded entry.
