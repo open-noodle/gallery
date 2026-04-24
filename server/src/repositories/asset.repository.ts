@@ -114,6 +114,11 @@ export interface YearMonthDay {
   year: number;
 }
 
+export interface MemoryAsset {
+  id: string;
+  localDateTime: Date;
+}
+
 interface AssetExploreFieldOptions {
   maxFields: number;
   minAssetsPerField: number;
@@ -438,6 +443,36 @@ export class AssetRepository {
       .select((eb) => eb.fn.jsonAgg(eb.table('res')).as('assets'))
       .groupBy(sql`("localDateTime" at time zone 'UTC')::date`)
       .orderBy(sql`("localDateTime" at time zone 'UTC')::date`, 'desc')
+      .execute();
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID, DummyValue.DATE] })
+  getMemoryAssetsForPerson(ownerId: string, personId: string, takenBefore: Date): Promise<MemoryAsset[]> {
+    return this.db
+      .selectFrom('asset')
+      .select(['asset.id', 'asset.localDateTime'])
+      .innerJoin('asset_face', 'asset_face.assetId', 'asset.id')
+      .innerJoin('asset_job_status', 'asset_job_status.assetId', 'asset.id')
+      .where('asset.ownerId', '=', ownerId)
+      .where('asset_face.personId', '=', personId)
+      .where('asset_face.deletedAt', 'is', null)
+      .where('asset_face.isVisible', 'is', true)
+      .where('asset.visibility', '=', AssetVisibility.Timeline)
+      .where('asset.deletedAt', 'is', null)
+      .where('asset.localDateTime', '<=', takenBefore)
+      .where((eb) =>
+        eb.exists(
+          eb
+            .selectFrom('asset_file')
+            .select('asset_file.assetId')
+            .whereRef('asset_file.assetId', '=', 'asset.id')
+            .where('asset_file.type', '=', AssetFileType.Preview),
+        ),
+      )
+      .distinctOn(['asset.id'])
+      .orderBy('asset.id')
+      .orderBy('asset.localDateTime', 'desc')
+      .limit(60)
       .execute();
   }
 

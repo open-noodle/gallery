@@ -7,6 +7,7 @@ import { DatabaseRepository } from 'src/repositories/database.repository';
 import { LoggingRepository } from 'src/repositories/logging.repository';
 import { MemoryRepository } from 'src/repositories/memory.repository';
 import { PartnerRepository } from 'src/repositories/partner.repository';
+import { PersonRepository } from 'src/repositories/person.repository';
 import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository';
 import { UserRepository } from 'src/repositories/user.repository';
 import { DB } from 'src/schema';
@@ -25,6 +26,7 @@ const setup = (db?: Kysely<DB>) => {
       AssetRepository,
       DatabaseRepository,
       MemoryRepository,
+      PersonRepository,
       UserRepository,
       SystemMetadataRepository,
       UserRepository,
@@ -234,6 +236,54 @@ describe(MemoryService.name, () => {
 
       const memoriesAfter = await memoryRepo.search(user.id, {});
       expect(memoriesAfter.length).toBe(1);
+    });
+
+    it('creates a birthday rule memory on the birthday itself', async () => {
+      const { sut, ctx } = setup();
+      const assetRepo = ctx.get(AssetRepository);
+      const memoryRepo = ctx.get(MemoryRepository);
+      const now = DateTime.fromObject({ year: 2026, month: 4, day: 23 }, { zone: 'utc' }) as DateTime<true>;
+      const { user } = await ctx.newUser();
+      const { person } = await ctx.newPerson({
+        ownerId: user.id,
+        name: 'Alice',
+        birthDate: new Date('1990-04-23T00:00:00Z'),
+      });
+
+      const addBirthdayAsset = async (localDateTime: string) => {
+        const { asset } = await ctx.newAsset({ ownerId: user.id, localDateTime });
+        await Promise.all([
+          ctx.newExif({ assetId: asset.id, city: 'Berlin', country: 'Germany' }),
+          ctx.newJobStatus({ assetId: asset.id }),
+          ctx.newAssetFace({ assetId: asset.id, personId: person.id }),
+          assetRepo.upsertFiles([
+            { assetId: asset.id, type: AssetFileType.Preview, path: `/preview-${asset.id}.jpg` },
+            { assetId: asset.id, type: AssetFileType.Thumbnail, path: `/thumb-${asset.id}.jpg` },
+          ]),
+        ]);
+      };
+
+      await addBirthdayAsset('2025-04-01T12:00:00Z');
+      await addBirthdayAsset('2024-04-01T12:00:00Z');
+      await addBirthdayAsset('2023-04-01T12:00:00Z');
+      await addBirthdayAsset('2022-04-01T12:00:00Z');
+      await addBirthdayAsset('2021-04-01T12:00:00Z');
+      await addBirthdayAsset('2020-04-01T12:00:00Z');
+
+      vi.setSystemTime(now.toJSDate());
+      await sut.onMemoriesCreate();
+
+      const memories = await memoryRepo.search(user.id, { type: MemoryType.Rule, for: now.toJSDate() });
+      expect(memories).toEqual([
+        expect.objectContaining({
+          type: MemoryType.Rule,
+          data: expect.objectContaining({
+            ruleId: 'birthday',
+            title: 'Happy birthday, Alice',
+            subtitle: 'Photos from different years',
+          }),
+        }),
+      ]);
     });
   });
 

@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { MemoryType } from 'src/enum';
+import { MemoryType, SystemMetadataKey } from 'src/enum';
 import { MemoryService } from 'src/services/memory.service';
 import { OnThisDayData, RuleMemoryData } from 'src/types';
 import { AssetFactory } from 'test/factories/asset.factory';
@@ -79,6 +79,61 @@ describe(MemoryService.name, () => {
 
       // Should still update system metadata even on error
       expect(mocks.systemMetadata.set).toHaveBeenCalled();
+    });
+
+    it('should generate birthday rule memories only for the current day and persist lastRuleDate', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-04-23T12:00:00Z'));
+
+      const user = factory.userAdmin();
+      mocks.user.getList.mockResolvedValue([user]);
+      mocks.systemMetadata.get.mockResolvedValue(null);
+      mocks.asset.getByDayOfYear.mockResolvedValue([]);
+      mocks.person.getBirthdaysForDay.mockResolvedValue([
+        { id: 'person-1', name: 'Alice', birthDate: new Date('1990-04-23T00:00:00Z') },
+      ]);
+      mocks.asset.getMemoryAssetsForPerson.mockResolvedValue([
+        { id: 'a-2025-1', localDateTime: new Date('2025-04-01T12:00:00Z') },
+        { id: 'a-2024-1', localDateTime: new Date('2024-04-01T12:00:00Z') },
+        { id: 'a-2023-1', localDateTime: new Date('2023-04-01T12:00:00Z') },
+        { id: 'a-2022-1', localDateTime: new Date('2022-04-01T12:00:00Z') },
+        { id: 'a-2021-1', localDateTime: new Date('2021-04-01T12:00:00Z') },
+        { id: 'a-2020-1', localDateTime: new Date('2020-04-01T12:00:00Z') },
+      ]);
+      mocks.memory.hasRuleMemory.mockResolvedValue(false);
+      mocks.memory.create.mockResolvedValue(
+        MemoryFactory.create({
+          ownerId: user.id,
+          type: MemoryType.Rule,
+          data: {
+            ruleId: 'birthday',
+            dedupeKey: 'birthday:person-1:2026-04-23',
+            title: 'Happy birthday, Alice',
+            subtitle: 'Photos from different years',
+          },
+        }) as any,
+      );
+
+      await sut.onMemoriesCreate();
+
+      expect(mocks.person.getBirthdaysForDay).toHaveBeenCalledTimes(1);
+      expect(mocks.memory.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ownerId: user.id,
+          type: MemoryType.Rule,
+          data: expect.objectContaining({
+            ruleId: 'birthday',
+            title: 'Happy birthday, Alice',
+          }),
+        }),
+        new Set(['a-2025-1', 'a-2024-1', 'a-2023-1', 'a-2022-1', 'a-2021-1', 'a-2020-1']),
+      );
+      expect(mocks.systemMetadata.set).toHaveBeenCalledWith(
+        SystemMetadataKey.MemoriesState,
+        expect.objectContaining({ lastRuleDate: '2026-04-23T00:00:00.000Z' }),
+      );
+
+      vi.useRealTimers();
     });
   });
 
