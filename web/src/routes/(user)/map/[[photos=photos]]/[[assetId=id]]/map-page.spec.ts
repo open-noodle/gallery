@@ -71,13 +71,10 @@ function renderPage() {
     },
   };
 
-  return render(
-    TestWrapper as Component<{ component: typeof MapPage; componentProps: typeof props }>,
-    {
-      component: MapPage,
-      componentProps: props,
-    },
-  );
+  return render(TestWrapper as Component<{ component: typeof MapPage; componentProps: typeof props }>, {
+    component: MapPage,
+    componentProps: props,
+  });
 }
 
 async function flushQueryDebounce() {

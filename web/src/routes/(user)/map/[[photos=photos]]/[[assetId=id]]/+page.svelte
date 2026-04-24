@@ -3,11 +3,7 @@
   import { page } from '$app/state';
   import ActiveFiltersBar from '$lib/components/filter-panel/active-filters-bar.svelte';
   import FilterPanel from '$lib/components/filter-panel/filter-panel.svelte';
-  import {
-    clearFilters,
-    createFilterState,
-    getActiveFilterCount,
-  } from '$lib/components/filter-panel/filter-panel';
+  import { clearFilters, createFilterState, getActiveFilterCount } from '$lib/components/filter-panel/filter-panel';
   import type { FilterState } from '$lib/components/filter-panel/filter-panel';
   import { handlePhotosRemoveFilter } from '$lib/utils/photos-filter-options';
   import { buildMapMarkerOptions, buildMapTimeBucketOptions } from '$lib/utils/map-filter-options';
@@ -25,12 +21,7 @@
   import { buildMapFilterConfig } from '$lib/utils/map-filter-config';
   import { navigate } from '$lib/utils/navigation';
   import { buildSmartSearchParams, SEARCH_FILTER_DEBOUNCE_MS } from '$lib/utils/space-search';
-  import {
-    getFilteredMapMarkers,
-    getTimeBuckets,
-    type MapMarkerResponseDto,
-    searchSmart,
-  } from '@immich/sdk';
+  import { getFilteredMapMarkers, getTimeBuckets, type MapMarkerResponseDto, searchSmart } from '@immich/sdk';
   import { Icon, IconButton } from '@immich/ui';
   import { SvelteMap, SvelteSet } from 'svelte/reactivity';
   import { mdiArrowLeft, mdiFilterVariant } from '@mdi/js';
@@ -91,9 +82,7 @@
       },
     };
   });
-  const hasActiveFilters = $derived(
-    getActiveFilterCount(filters) > 0 || committedQuery.trim().length > 0,
-  );
+  const hasActiveFilters = $derived(getActiveFilterCount(filters) > 0 || committedQuery.trim().length > 0);
   const noResults = $derived(mapMarkers.length === 0 && hasActiveFilters);
   const timeBucketOptions = $derived.by(() => buildMapTimeBucketOptions(filters, spaceId));
   const mapMarkerOptions = $derived.by(() => buildMapMarkerOptions(filters, spaceId));

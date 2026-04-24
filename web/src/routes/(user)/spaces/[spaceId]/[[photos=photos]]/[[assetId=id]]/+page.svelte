@@ -869,7 +869,13 @@
       {/if}
 
       {#if showSearchResults}
-        <SmartSearchResults searchQuery={committedSearchQuery} bind:isLoading {filters} spaceId={space.id} isShared={true} />
+        <SmartSearchResults
+          searchQuery={committedSearchQuery}
+          bind:isLoading
+          {filters}
+          spaceId={space.id}
+          isShared={true}
+        />
       {/if}
 
       {#if !showSearchResults}
