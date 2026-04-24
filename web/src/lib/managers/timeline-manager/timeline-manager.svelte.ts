@@ -2,6 +2,10 @@ import { VirtualScrollManager } from '#lib/managers/VirtualScrollManager/Virtual
 import { authManager } from '#lib/managers/auth-manager.svelte.ts';
 import { eventManager } from '#lib/managers/event-manager.svelte.ts';
 import { GroupInsertionCache } from '#lib/managers/timeline-manager/group-insertion-cache.svelte.ts';
+import {
+  getTimelineAlbumQueryOptions,
+  mergeTimeBuckets,
+} from '#lib/managers/timeline-manager/internal/album-picker-support.ts';
 import { updateTimelineMonthViewportProximity } from '#lib/managers/timeline-manager/internal/intersection-support.svelte.ts';
 import { updateGeometry } from '#lib/managers/timeline-manager/internal/layout-support.svelte.ts';
 import { loadFromTimeBuckets } from '#lib/managers/timeline-manager/internal/load-support.svelte.ts';
@@ -299,12 +303,23 @@ export class TimelineManager extends VirtualScrollManager {
   }
 
   async #initializeTimelineMonths() {
-    const timebuckets = await getTimeBuckets({
-      ...authManager.params,
-      ...this.#options,
-    });
+    const albumQueryOptions = getTimelineAlbumQueryOptions(this.#options);
+    const [timebuckets, albumTimebuckets] = await Promise.all([
+      getTimeBuckets({
+        ...authManager.params,
+        ...this.#options,
+      }),
+      albumQueryOptions
+        ? getTimeBuckets({
+            ...authManager.params,
+            ...albumQueryOptions,
+          })
+        : Promise.resolve([]),
+    ]);
+    const mergedTimebuckets =
+      albumTimebuckets.length > 0 ? mergeTimeBuckets(timebuckets, albumTimebuckets, this.#options.order) : timebuckets;
 
-    this.months = timebuckets.map((timeBucket) => {
+    this.months = mergedTimebuckets.map((timeBucket) => {
       const date = new SvelteDate(timeBucket.timeBucket);
       return new TimelineMonth(
         this,

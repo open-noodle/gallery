@@ -23,7 +23,7 @@ class AssetApiRepository extends ApiRepository {
   TrashApi get _trashApi => _apiService.trashApi;
 
   Future<void> delete(List<String> ids, bool force) async {
-    return _api.deleteAssets(AssetBulkDeleteDto(ids: ids, force: Optional.present(force)));
+    await _api.deleteAssets(AssetBulkDeleteDto(ids: ids, force: Optional.present(force)));
   }
 
   Future<void> restoreTrash(List<String> ids) async {
@@ -47,7 +47,7 @@ class AssetApiRepository extends ApiRepository {
   }
 
   Future<void> unStack(List<String> ids) async {
-    return _stacksApi.deleteStacks(BulkIdsDto(ids: ids));
+    await _stacksApi.deleteStacks(BulkIdsDto(ids: ids));
   }
 
   api.AssetVisibility _mapVisibility(AssetVisibility visibility) => switch (visibility) {
@@ -86,7 +86,7 @@ class AssetApiRepository extends ApiRepository {
   }
 
   Future<void> removeEdits(String assetId) async {
-    return _api.removeAssetEdits(assetId);
+    await _api.removeAssetEdits(assetId);
   }
 
   Future<void> update(
