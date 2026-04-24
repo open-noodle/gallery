@@ -25,6 +25,99 @@ This document records the release-candidate experiments run against a real user 
 | RC2 | `fix-search-smart-person-filter-rc2` | `3f70fa8c7` | Runtime heuristic: exact `person_assets` subset-sort for one-person searches under a threshold | Helped some cases, but regressed others badly on large person clusters |
 | RC3 | `fix-search-smart-person-filter-rc3` | `83d8570aa` | Lowered the heuristic threshold so this user fell back to ANN-first again | Reverted to the RC1-style path for this user, but performed worse than RC1 on the key `books` case |
 
+## Representative Snippets
+
+### RC1: ANN-first with correlated `EXISTS`
+
+Representative SQL shape:
+
+```sql
+select to_json("asset_exif") as "exifInfo", "asset".*
+from "asset"
+inner join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
+inner join "smart_search" on "asset"."id" = "smart_search"."assetId"
+where "asset"."visibility" = $1
+  and "asset"."ownerId" = any($2::uuid[])
+  and "asset"."deletedAt" is null
+  and (smart_search.embedding <=> $3) <= $4
+  and exists (
+    select
+    from "asset_face"
+    where "asset_face"."assetId" = "asset"."id"
+      and "asset_face"."deletedAt" is null
+      and "asset_face"."isVisible" is true
+      and "asset_face"."personId" = $5::uuid
+  )
+order by smart_search.embedding <=> $6
+limit $7 offset $8
+```
+
+Representative implementation:
+
+```ts
+let baseQuery = searchAssetBuilder(kysely, {
+  ...without(options, 'personIds', 'personMatchAny'),
+  ratingIsMinimum: true,
+})
+  .selectAll('asset')
+  .innerJoin('smart_search', 'asset.id', 'smart_search.assetId')
+  .orderBy(sql`smart_search.embedding <=> ${options.embedding}`);
+
+baseQuery = baseQuery.where((eb) =>
+  eb.exists(
+    eb
+      .selectFrom('asset_face')
+      .whereRef('asset_face.assetId', '=', 'asset.id')
+      .where('asset_face.deletedAt', 'is', null)
+      .where('asset_face.isVisible', 'is', true)
+      .where('asset_face.personId', '=', asUuid(personId)),
+  ),
+);
+```
+
+### RC2: exact `person_assets` subset-sort
+
+Representative SQL shape:
+
+```sql
+select to_json("asset_exif") as "exifInfo", "asset".*
+from "asset"
+inner join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
+inner join (
+  select distinct "assetId"
+  from "asset_face"
+  where "asset_face"."personId" = $1::uuid
+    and "asset_face"."deletedAt" is null
+    and "asset_face"."isVisible" is true
+) as "person_assets" on "person_assets"."assetId" = "asset"."id"
+inner join "smart_search" on "asset"."id" = "smart_search"."assetId"
+where "asset"."visibility" = $2
+  and "asset"."ownerId" = any($3::uuid[])
+  and "asset"."deletedAt" is null
+  and (smart_search.embedding <=> $4) <= $5
+order by smart_search.embedding <=> $6
+limit $7 offset $8
+```
+
+Representative implementation:
+
+```ts
+export const PERSON_SUBSET_RUNTIME_COUNT_THRESHOLD = 75_000;
+
+const strategy =
+  personAssetCount <= PERSON_SUBSET_RUNTIME_COUNT_THRESHOLD ? 'personSubset' : 'annExists';
+```
+
+### RC3: lower the threshold and fall back to ANN
+
+Representative implementation:
+
+```ts
+export const PERSON_SUBSET_RUNTIME_COUNT_THRESHOLD = 20_000;
+```
+
+This did not introduce a new query shape. It only changed which branch the runtime heuristic picked for the user dataset, sending the one-person case back to the RC1 ANN-first path.
+
 ## Outcome Summary
 
 ### RC1
