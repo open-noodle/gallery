@@ -4,7 +4,7 @@
 
 **Goal:** Ship the Phase 1 Prometheus monitoring slice: server domain metrics, queue staleness metrics, ML service metrics, Prometheus scrape config, Grafana dashboard, and docs.
 
-**Architecture:** Keep server metrics inside the existing opt-in OpenTelemetry exporter. Add an `app` telemetry group for domain snapshot metrics, use observable gauges for absolute values, publish queue metrics from the microservices worker, and expose ML metrics from the existing FastAPI app on `/metrics`.
+**Architecture:** Keep server metrics inside the existing opt-in OpenTelemetry exporter. Add an `app` telemetry group for domain snapshot metrics, keep app aggregate SQL in a dedicated `AppMetricsRepository` to avoid high-conflict domain repository edits, use observable gauges for absolute values, publish queue metrics from the microservices worker, and expose ML metrics from the existing FastAPI app on `/metrics`.
 
 **Tech Stack:** NestJS 11, OpenTelemetry, BullMQ, Kysely, Vitest, Python FastAPI, `prometheus-client`, uv, Grafana dashboard JSON, Docusaurus docs.
 
@@ -18,11 +18,9 @@
 - Modify `server/src/repositories/telemetry.repository.ts`: add an `app` metric group and observable gauge support.
 - Add `server/src/repositories/telemetry.repository.spec.ts`: unit coverage for observable gauge registration.
 - Modify `server/test/repositories/telemetry.repository.mock.ts`: mock `app.observeGauge()`.
-- Modify `server/src/repositories/asset.repository.ts`: add typed aggregate queries for server asset/search/storage metrics.
-- Modify `server/test/repositories/asset.repository.mock.ts`: mock the new asset telemetry method.
-- Modify `server/test/medium/specs/repositories/asset.repository.spec.ts`: medium coverage for asset telemetry aggregates.
-- Modify `server/src/repositories/person.repository.ts`: add typed aggregate query for face/person metrics.
-- Modify `server/test/medium/specs/repositories/person.repository.spec.ts`: medium coverage for face/person telemetry aggregates.
+- Add `server/src/repositories/app-metrics.repository.ts`: typed aggregate queries for asset, user, search, state, face, and person metrics.
+- Add `server/test/medium/specs/repositories/app-metrics.repository.spec.ts`: medium coverage for app telemetry aggregates.
+- Modify `server/src/repositories/index.ts`: register `AppMetricsRepository`.
 - Modify `server/src/repositories/job.repository.ts`: add queue count and oldest-job-age telemetry methods.
 - Modify `server/test/repositories/job.repository.mock.ts`: mock the new queue telemetry method.
 - Add `server/src/services/app-metrics.service.ts`: registers observable gauges and manages snapshot cache/failure behavior.
@@ -36,6 +34,17 @@
 - Add `docker/grafana-dashboard.json`: importable Phase 1 dashboard.
 - Modify `docs/docs/features/monitoring.md`: explain Phase 1 metrics, ML scrape target, dashboard import, privacy, and deferred scope.
 - Modify `docs/docs/install/environment-variables.md`: add `app` to telemetry include/exclude docs.
+
+## Rebase-Friendly Implementation Notes
+
+This plan keeps the high-conflict surface small:
+
+- Do not add telemetry-only methods to `server/src/repositories/asset.repository.ts` or `server/src/repositories/person.repository.ts`.
+- Keep app aggregate SQL in the new `server/src/repositories/app-metrics.repository.ts` file.
+- Keep `AppMetricsService` standalone with explicit constructor dependencies instead of extending `BaseService`.
+- Do not modify `server/test/utils.ts`; instantiate `AppMetricsService` directly in its unit test.
+- Do not modify `server/test/medium.factory.ts`; instantiate `AppMetricsRepository` directly in its medium test and use `BaseService` only to create test data helpers.
+- Limit unavoidable edits to registration and shared telemetry files: `server/src/enum.ts`, `server/src/repositories/index.ts`, `server/src/repositories/telemetry.repository.ts`, `server/src/services/index.ts`, and the existing mocks.
 
 ## Task 1: Telemetry App Group And Observable Gauge Support
 
@@ -250,107 +259,142 @@ git add server/src/enum.ts server/src/repositories/config.repository.spec.ts ser
 git commit -m "feat(server): add app telemetry gauges"
 ```
 
-## Task 2: Server Domain Metric Repository Queries
+## Task 2: Server App Metrics Repository
 
 **Files:**
 
-- Modify: `server/src/repositories/asset.repository.ts`
-- Modify: `server/test/repositories/asset.repository.mock.ts`
-- Modify: `server/test/medium/specs/repositories/asset.repository.spec.ts`
-- Modify: `server/src/repositories/person.repository.ts`
-- Modify: `server/test/medium/specs/repositories/person.repository.spec.ts`
+- Add: `server/src/repositories/app-metrics.repository.ts`
+- Add: `server/test/medium/specs/repositories/app-metrics.repository.spec.ts`
+- Modify: `server/src/repositories/index.ts`
 
-- [ ] **Step 1: Write failing medium tests for asset telemetry aggregates**
+- [ ] **Step 1: Write failing medium tests for app metric aggregates**
 
-Append this describe block to `server/test/medium/specs/repositories/asset.repository.spec.ts`:
+Create `server/test/medium/specs/repositories/app-metrics.repository.spec.ts`:
 
 ```typescript
-describe('getTelemetryMetrics', () => {
-  it('returns low-cardinality asset, user, storage, embedding, trash, and external metrics', async () => {
-    const { ctx, sut } = setup();
-    const { user: user1 } = await ctx.newUser();
-    const { user: user2 } = await ctx.newUser();
+import { Kysely } from 'kysely';
+import { AssetType, AssetVisibility } from 'src/enum';
+import { AppMetricsRepository } from 'src/repositories/app-metrics.repository';
+import { LoggingRepository } from 'src/repositories/logging.repository';
+import { DB } from 'src/schema';
+import { BaseService } from 'src/services/base.service';
+import { newMediumService } from 'test/medium.factory';
+import { newEmbedding } from 'test/small.factory';
+import { getKyselyDB } from 'test/utils';
 
-    const { asset: image1 } = await ctx.newAsset({
-      ownerId: user1.id,
-      type: AssetType.Image,
-      visibility: AssetVisibility.Timeline,
-    });
-    const { asset: video1 } = await ctx.newAsset({
-      ownerId: user1.id,
-      type: AssetType.Video,
-      visibility: AssetVisibility.Timeline,
-    });
-    const { asset: image2 } = await ctx.newAsset({
-      ownerId: user2.id,
-      type: AssetType.Image,
-      visibility: AssetVisibility.Timeline,
-      isExternal: true,
-    });
-    const { asset: hidden } = await ctx.newAsset({
-      ownerId: user2.id,
-      type: AssetType.Image,
-      visibility: AssetVisibility.Hidden,
-    });
-    const { asset: trashed } = await ctx.newAsset({
-      ownerId: user2.id,
-      type: AssetType.Video,
-      visibility: AssetVisibility.Timeline,
-    });
+let defaultDatabase: Kysely<DB>;
 
-    await Promise.all([
-      ctx.newExif({ assetId: image1.id, fileSizeInByte: 100 }),
-      ctx.newExif({ assetId: video1.id, fileSizeInByte: 200 }),
-      ctx.newExif({ assetId: image2.id, fileSizeInByte: 300 }),
-      ctx.newExif({ assetId: hidden.id, fileSizeInByte: 400 }),
-      ctx.newExif({ assetId: trashed.id, fileSizeInByte: 500 }),
-      ctx.database.insertInto('smart_search').values({ assetId: image1.id, embedding: newEmbedding() }).execute(),
-      ctx.softDeleteAsset(trashed.id),
-    ]);
+const setup = (db?: Kysely<DB>) => {
+  const database = db || defaultDatabase;
+  const { ctx } = newMediumService(BaseService, {
+    database,
+    real: [],
+    mock: [LoggingRepository],
+  });
+  return { ctx, sut: new AppMetricsRepository(database) };
+};
 
-    const result = await sut.getTelemetryMetrics();
+beforeAll(async () => {
+  defaultDatabase = await getKyselyDB();
+});
 
-    expect(result.assetsByType).toEqual(
-      expect.arrayContaining([
-        { type: AssetType.Image, count: 2, storageBytes: 400 },
-        { type: AssetType.Video, count: 1, storageBytes: 200 },
-      ]),
-    );
-    expect(result.usersByType).toEqual(
-      expect.arrayContaining([
-        { userId: user1.id, type: AssetType.Image, count: 1, storageBytes: 100 },
-        { userId: user1.id, type: AssetType.Video, count: 1, storageBytes: 200 },
-        { userId: user2.id, type: AssetType.Image, count: 1, storageBytes: 300 },
-      ]),
-    );
-    expect(result.search).toEqual({ eligibleAssets: 3, embeddedAssets: 1 });
-    expect(result.state).toEqual({ externalAssets: 1, trashAssets: 1 });
+describe(AppMetricsRepository.name, () => {
+  describe('getMetrics', () => {
+    it('returns low-cardinality asset, user, search, state, face, and person metrics', async () => {
+      const { ctx, sut } = setup();
+      const { user: user1 } = await ctx.newUser();
+      const { user: user2 } = await ctx.newUser();
+
+      const { asset: image1 } = await ctx.newAsset({
+        ownerId: user1.id,
+        type: AssetType.Image,
+        visibility: AssetVisibility.Timeline,
+      });
+      const { asset: video1 } = await ctx.newAsset({
+        ownerId: user1.id,
+        type: AssetType.Video,
+        visibility: AssetVisibility.Timeline,
+      });
+      const { asset: image2 } = await ctx.newAsset({
+        ownerId: user2.id,
+        type: AssetType.Image,
+        visibility: AssetVisibility.Timeline,
+        isExternal: true,
+      });
+      const { asset: hidden } = await ctx.newAsset({
+        ownerId: user2.id,
+        type: AssetType.Image,
+        visibility: AssetVisibility.Hidden,
+      });
+      const { asset: trashed } = await ctx.newAsset({
+        ownerId: user2.id,
+        type: AssetType.Video,
+        visibility: AssetVisibility.Timeline,
+      });
+      const { person: person1 } = await ctx.newPerson({ ownerId: user1.id, name: 'Alice' });
+      const { person: person2 } = await ctx.newPerson({ ownerId: user1.id, name: 'Bob' });
+
+      await Promise.all([
+        ctx.newExif({ assetId: image1.id, fileSizeInByte: 100 }),
+        ctx.newExif({ assetId: video1.id, fileSizeInByte: 200 }),
+        ctx.newExif({ assetId: image2.id, fileSizeInByte: 300 }),
+        ctx.newExif({ assetId: hidden.id, fileSizeInByte: 400 }),
+        ctx.newExif({ assetId: trashed.id, fileSizeInByte: 500 }),
+        ctx.database.insertInto('smart_search').values({ assetId: image1.id, embedding: newEmbedding() }).execute(),
+        ctx.newAssetFace({ assetId: image1.id, personId: person1.id, isVisible: true }),
+        ctx.newAssetFace({ assetId: image1.id, personId: person1.id, isVisible: true }),
+        ctx.newAssetFace({ assetId: video1.id, personId: person2.id, isVisible: true }),
+        ctx.newAssetFace({ assetId: video1.id, personId: person2.id, isVisible: false }),
+        ctx.newAssetFace({ assetId: video1.id, personId: null, isVisible: true }),
+        ctx.newAssetFace({ assetId: hidden.id, personId: person2.id, isVisible: true }),
+        ctx.newAssetFace({ assetId: trashed.id, personId: person2.id, isVisible: true }),
+        ctx.softDeleteAsset(trashed.id),
+      ]);
+
+      const result = await sut.getMetrics();
+
+      expect(result.asset.assetsByType).toEqual(
+        expect.arrayContaining([
+          { type: AssetType.Image, count: 2, storageBytes: 400 },
+          { type: AssetType.Video, count: 1, storageBytes: 200 },
+        ]),
+      );
+      expect(result.asset.usersByType).toEqual(
+        expect.arrayContaining([
+          { userId: user1.id, type: AssetType.Image, count: 1, storageBytes: 100 },
+          { userId: user1.id, type: AssetType.Video, count: 1, storageBytes: 200 },
+          { userId: user2.id, type: AssetType.Image, count: 1, storageBytes: 300 },
+        ]),
+      );
+      expect(result.asset.search).toEqual({ eligibleAssets: 3, embeddedAssets: 1 });
+      expect(result.asset.state).toEqual({ externalAssets: 1, trashAssets: 1 });
+      expect(result.person).toEqual({ faces: 4, people: 2 });
+    });
   });
 });
 ```
 
-Update the imports at the top:
-
-```typescript
-import { AssetFileType, AssetOrder, AssetType, AssetVisibility } from 'src/enum';
-import { factory, newEmbedding } from 'test/small.factory';
-```
-
-- [ ] **Step 2: Run the asset medium test and verify it fails**
+- [ ] **Step 2: Run the app metrics repository medium test and verify it fails**
 
 Run:
 
 ```bash
-pnpm --dir server exec vitest --config test/vitest.config.medium.mjs --run test/medium/specs/repositories/asset.repository.spec.ts
+pnpm --dir server exec vitest --config test/vitest.config.medium.mjs --run test/medium/specs/repositories/app-metrics.repository.spec.ts
 ```
 
-Expected: FAIL because `AssetRepository.getTelemetryMetrics()` does not exist.
+Expected: FAIL because `AppMetricsRepository` does not exist.
 
-- [ ] **Step 3: Add asset telemetry types and query method**
+- [ ] **Step 3: Add the app metrics repository**
 
-In `server/src/repositories/asset.repository.ts`, add these interfaces near `AssetStats`:
+Create `server/src/repositories/app-metrics.repository.ts`:
 
 ```typescript
+import { Injectable } from '@nestjs/common';
+import { Kysely, SelectQueryBuilder } from 'kysely';
+import { InjectKysely } from 'nestjs-kysely';
+import { AssetType, AssetVisibility } from 'src/enum';
+import { DB } from 'src/schema';
+
 export interface AssetTelemetryByType {
   type: AssetType;
   count: number;
@@ -377,205 +421,157 @@ export interface AssetTelemetryMetrics {
   search: SearchTelemetryMetrics;
   state: AssetStateTelemetryMetrics;
 }
-```
 
-Add this method inside `AssetRepository`:
-
-```typescript
-async getTelemetryMetrics(): Promise<AssetTelemetryMetrics> {
-  const visibleTimelineAssets = <O extends object>(qb: SelectQueryBuilder<DB, 'asset', O>) =>
-    qb.where('asset.deletedAt', 'is', null).where('asset.visibility', '=', AssetVisibility.Timeline);
-
-  const assetsByType = await visibleTimelineAssets(
-    this.db
-      .selectFrom('asset')
-      .leftJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
-      .select(['asset.type'])
-      .select((eb) => [
-        eb.fn.countAll<number>().as('count'),
-        eb.fn.coalesce(eb.fn.sum<number>('asset_exif.fileSizeInByte'), eb.lit(0)).as('storageBytes'),
-      ])
-      .groupBy('asset.type'),
-  ).execute();
-
-  const usersByType = await visibleTimelineAssets(
-    this.db
-      .selectFrom('asset')
-      .leftJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
-      .select(['asset.ownerId as userId', 'asset.type'])
-      .select((eb) => [
-        eb.fn.countAll<number>().as('count'),
-        eb.fn.coalesce(eb.fn.sum<number>('asset_exif.fileSizeInByte'), eb.lit(0)).as('storageBytes'),
-      ])
-      .groupBy(['asset.ownerId', 'asset.type']),
-  ).execute();
-
-  const search = await visibleTimelineAssets(
-    this.db
-      .selectFrom('asset')
-      .leftJoin('smart_search', 'smart_search.assetId', 'asset.id')
-      .select((eb) => [
-        eb.fn.countAll<number>().as('eligibleAssets'),
-        eb.fn.count<number>('smart_search.assetId').as('embeddedAssets'),
-      ])
-      .where('asset.type', 'in', [AssetType.Image, AssetType.Video]),
-  ).executeTakeFirstOrThrow();
-
-  const state = await this.db
-    .selectFrom('asset')
-    .select((eb) => [
-      eb.fn.countAll<number>().filterWhere('asset.deletedAt', 'is not', null).as('trashAssets'),
-      eb.fn
-        .countAll<number>()
-        .filterWhere((eb) => eb.and([eb('asset.deletedAt', 'is', null), eb('asset.isExternal', '=', true)]))
-        .as('externalAssets'),
-    ])
-    .executeTakeFirstOrThrow();
-
-  return {
-    assetsByType: assetsByType.map((item) => ({
-      type: item.type,
-      count: Number(item.count),
-      storageBytes: Number(item.storageBytes),
-    })),
-    usersByType: usersByType.map((item) => ({
-      userId: item.userId,
-      type: item.type,
-      count: Number(item.count),
-      storageBytes: Number(item.storageBytes),
-    })),
-    search: {
-      eligibleAssets: Number(search.eligibleAssets),
-      embeddedAssets: Number(search.embeddedAssets),
-    },
-    state: {
-      externalAssets: Number(state.externalAssets),
-      trashAssets: Number(state.trashAssets),
-    },
-  };
-}
-```
-
-- [ ] **Step 4: Update the asset repository mock**
-
-In `server/test/repositories/asset.repository.mock.ts`, add:
-
-```typescript
-getTelemetryMetrics: vitest.fn(),
-```
-
-- [ ] **Step 5: Run the asset medium test and verify it passes**
-
-Run:
-
-```bash
-pnpm --dir server exec vitest --config test/vitest.config.medium.mjs --run test/medium/specs/repositories/asset.repository.spec.ts
-```
-
-Expected: PASS.
-
-- [ ] **Step 6: Write failing medium tests for face/person telemetry aggregates**
-
-Append this describe block to `server/test/medium/specs/repositories/person.repository.spec.ts`:
-
-```typescript
-describe('getTelemetryMetrics', () => {
-  it('returns visible face and person counts without exposing names', async () => {
-    const { ctx, sut } = setup();
-    const { user } = await ctx.newUser();
-    const { asset: asset1 } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
-    const { asset: asset2 } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
-    const { asset: hiddenAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Hidden });
-    const { asset: trashedAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
-    const { person: person1 } = await ctx.newPerson({ ownerId: user.id, name: 'Alice' });
-    const { person: person2 } = await ctx.newPerson({ ownerId: user.id, name: 'Bob' });
-
-    await Promise.all([
-      ctx.newAssetFace({ assetId: asset1.id, personId: person1.id, isVisible: true }),
-      ctx.newAssetFace({ assetId: asset1.id, personId: person1.id, isVisible: true }),
-      ctx.newAssetFace({ assetId: asset2.id, personId: person2.id, isVisible: true }),
-      ctx.newAssetFace({ assetId: asset2.id, personId: person2.id, isVisible: false }),
-      ctx.newAssetFace({ assetId: asset2.id, personId: null, isVisible: true }),
-      ctx.newAssetFace({ assetId: hiddenAsset.id, personId: person2.id, isVisible: true }),
-      ctx.newAssetFace({ assetId: trashedAsset.id, personId: person2.id, isVisible: true }),
-      ctx.softDeleteAsset(trashedAsset.id),
-    ]);
-
-    const result = await sut.getTelemetryMetrics();
-
-    expect(result).toEqual({ faces: 4, people: 2 });
-  });
-});
-```
-
-Update the imports at the top:
-
-```typescript
-import { AssetFileType, AssetVisibility } from 'src/enum';
-```
-
-- [ ] **Step 7: Run the person medium test and verify it fails**
-
-Run:
-
-```bash
-pnpm --dir server exec vitest --config test/vitest.config.medium.mjs --run test/medium/specs/repositories/person.repository.spec.ts
-```
-
-Expected: FAIL because `PersonRepository.getTelemetryMetrics()` does not exist.
-
-- [ ] **Step 8: Add person telemetry query**
-
-In `server/src/repositories/person.repository.ts`, add:
-
-```typescript
 export interface PersonTelemetryMetrics {
   faces: number;
   people: number;
 }
-```
 
-Add this method inside `PersonRepository`:
+export interface AppMetricsSnapshot {
+  asset: AssetTelemetryMetrics;
+  person: PersonTelemetryMetrics;
+}
 
-```typescript
-async getTelemetryMetrics(): Promise<PersonTelemetryMetrics> {
-  const result = await this.db
-    .selectFrom('asset_face')
-    .innerJoin('asset', 'asset.id', 'asset_face.assetId')
-    .select((eb) => [
-      eb.fn.countAll<number>().as('faces'),
-      eb.fn.count<number>(eb.fn('distinct', ['asset_face.personId'])).filterWhere('asset_face.personId', 'is not', null).as('people'),
-    ])
-    .where('asset_face.deletedAt', 'is', null)
-    .where('asset_face.isVisible', 'is', true)
-    .where('asset.deletedAt', 'is', null)
-    .where('asset.visibility', '=', AssetVisibility.Timeline)
-    .executeTakeFirstOrThrow();
+@Injectable()
+export class AppMetricsRepository {
+  constructor(@InjectKysely() private db: Kysely<DB>) {}
 
-  return {
-    faces: Number(result.faces),
-    people: Number(result.people),
-  };
+  async getMetrics(): Promise<AppMetricsSnapshot> {
+    const [asset, person] = await Promise.all([this.getAssetMetrics(), this.getPersonMetrics()]);
+    return { asset, person };
+  }
+
+  private visibleTimelineAssets<O extends object>(qb: SelectQueryBuilder<DB, 'asset', O>) {
+    return qb.where('asset.deletedAt', 'is', null).where('asset.visibility', '=', AssetVisibility.Timeline);
+  }
+
+  private async getAssetMetrics(): Promise<AssetTelemetryMetrics> {
+    const assetsByType = await this.visibleTimelineAssets(
+      this.db
+        .selectFrom('asset')
+        .leftJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
+        .select(['asset.type'])
+        .select((eb) => [
+          eb.fn.countAll<number>().as('count'),
+          eb.fn.coalesce(eb.fn.sum<number>('asset_exif.fileSizeInByte'), eb.lit(0)).as('storageBytes'),
+        ])
+        .groupBy('asset.type'),
+    ).execute();
+
+    const usersByType = await this.visibleTimelineAssets(
+      this.db
+        .selectFrom('asset')
+        .leftJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
+        .select(['asset.ownerId as userId', 'asset.type'])
+        .select((eb) => [
+          eb.fn.countAll<number>().as('count'),
+          eb.fn.coalesce(eb.fn.sum<number>('asset_exif.fileSizeInByte'), eb.lit(0)).as('storageBytes'),
+        ])
+        .groupBy(['asset.ownerId', 'asset.type']),
+    ).execute();
+
+    const search = await this.visibleTimelineAssets(
+      this.db
+        .selectFrom('asset')
+        .leftJoin('smart_search', 'smart_search.assetId', 'asset.id')
+        .select((eb) => [
+          eb.fn.countAll<number>().as('eligibleAssets'),
+          eb.fn.count<number>('smart_search.assetId').as('embeddedAssets'),
+        ])
+        .where('asset.type', 'in', [AssetType.Image, AssetType.Video]),
+    ).executeTakeFirstOrThrow();
+
+    const state = await this.db
+      .selectFrom('asset')
+      .select((eb) => [
+        eb.fn.countAll<number>().filterWhere('asset.deletedAt', 'is not', null).as('trashAssets'),
+        eb.fn
+          .countAll<number>()
+          .filterWhere((eb) => eb.and([eb('asset.deletedAt', 'is', null), eb('asset.isExternal', '=', true)]))
+          .as('externalAssets'),
+      ])
+      .executeTakeFirstOrThrow();
+
+    return {
+      assetsByType: assetsByType.map((item) => ({
+        type: item.type,
+        count: Number(item.count),
+        storageBytes: Number(item.storageBytes),
+      })),
+      usersByType: usersByType.map((item) => ({
+        userId: item.userId,
+        type: item.type,
+        count: Number(item.count),
+        storageBytes: Number(item.storageBytes),
+      })),
+      search: {
+        eligibleAssets: Number(search.eligibleAssets),
+        embeddedAssets: Number(search.embeddedAssets),
+      },
+      state: {
+        externalAssets: Number(state.externalAssets),
+        trashAssets: Number(state.trashAssets),
+      },
+    };
+  }
+
+  private async getPersonMetrics(): Promise<PersonTelemetryMetrics> {
+    const result = await this.db
+      .selectFrom('asset_face')
+      .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+      .select((eb) => [
+        eb.fn.countAll<number>().as('faces'),
+        eb.fn
+          .count<number>(eb.fn('distinct', ['asset_face.personId']))
+          .filterWhere('asset_face.personId', 'is not', null)
+          .as('people'),
+      ])
+      .where('asset_face.deletedAt', 'is', null)
+      .where('asset_face.isVisible', 'is', true)
+      .where('asset.deletedAt', 'is', null)
+      .where('asset.visibility', '=', AssetVisibility.Timeline)
+      .executeTakeFirstOrThrow();
+
+    return {
+      faces: Number(result.faces),
+      people: Number(result.people),
+    };
+  }
 }
 ```
 
-- [ ] **Step 9: Run the person medium test and verify it passes**
+- [ ] **Step 4: Register `AppMetricsRepository`**
+
+In `server/src/repositories/index.ts`, add the import:
+
+```typescript
+import { AppMetricsRepository } from 'src/repositories/app-metrics.repository';
+```
+
+Add it to `repositories` near `AppRepository`:
+
+```typescript
+AppMetricsRepository,
+AppRepository,
+```
+
+- [ ] **Step 5: Run the app metrics repository medium test and verify it passes**
 
 Run:
 
 ```bash
-pnpm --dir server exec vitest --config test/vitest.config.medium.mjs --run test/medium/specs/repositories/person.repository.spec.ts
+pnpm --dir server exec vitest --config test/vitest.config.medium.mjs --run test/medium/specs/repositories/app-metrics.repository.spec.ts
 ```
 
 Expected: PASS.
 
-- [ ] **Step 10: Commit Task 2**
+- [ ] **Step 6: Commit Task 2**
 
 Run:
 
 ```bash
-git add server/src/repositories/asset.repository.ts server/test/repositories/asset.repository.mock.ts server/test/medium/specs/repositories/asset.repository.spec.ts server/src/repositories/person.repository.ts server/test/medium/specs/repositories/person.repository.spec.ts
-git commit -m "feat(server): collect domain metric aggregates"
+git add server/src/repositories/app-metrics.repository.ts server/src/repositories/index.ts server/test/medium/specs/repositories/app-metrics.repository.spec.ts
+git commit -m "feat(server): collect app metric aggregates"
 ```
 
 ## Task 3: Queue Telemetry And App Metrics Service
@@ -650,14 +646,20 @@ describe(JobRepository.name, () => {
 });
 ```
 
-In `server/src/services/app-metrics.service.spec.ts`, start with service-level tests that use the public `JobRepository.getTelemetryMetrics()` mock:
+In `server/src/services/app-metrics.service.spec.ts`, start with service-level tests that use direct
+`AppMetricsRepository` and `JobRepository.getTelemetryMetrics()` mocks:
 
 ```typescript
 import { ObservableCallback, ObservableResult } from '@opentelemetry/api';
 import { AssetType, ImmichWorker, QueueName } from 'src/enum';
+import { AppMetricsRepository } from 'src/repositories/app-metrics.repository';
+import { ConfigRepository } from 'src/repositories/config.repository';
+import { JobRepository } from 'src/repositories/job.repository';
+import { LoggingRepository } from 'src/repositories/logging.repository';
+import { TelemetryRepository } from 'src/repositories/telemetry.repository';
 import { AppMetricsService } from 'src/services/app-metrics.service';
-import { newTestService, ServiceMocks } from 'test/utils';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { newTelemetryRepositoryMock } from 'test/repositories/telemetry.repository.mock';
+import { beforeEach, describe, expect, it, Mocked, vi } from 'vitest';
 
 const observe = async (callback: ObservableCallback) => {
   const result = { observe: vi.fn() } as unknown as ObservableResult;
@@ -665,18 +667,43 @@ const observe = async (callback: ObservableCallback) => {
   return result.observe as ReturnType<typeof vi.fn>;
 };
 
+type AppMetricsServiceMocks = {
+  logger: Mocked<Pick<LoggingRepository, 'setContext' | 'warn'>>;
+  config: Mocked<Pick<ConfigRepository, 'getWorker'>>;
+  telemetry: ReturnType<typeof newTelemetryRepositoryMock>;
+  appMetrics: Mocked<Pick<AppMetricsRepository, 'getMetrics'>>;
+  job: Mocked<Pick<JobRepository, 'getTelemetryMetrics'>>;
+};
+
 describe(AppMetricsService.name, () => {
   let sut: AppMetricsService;
-  let mocks: ServiceMocks;
+  let mocks: AppMetricsServiceMocks;
   let appCallbacks: Map<string, ObservableCallback>;
   let jobCallbacks: Map<string, ObservableCallback>;
 
   beforeEach(() => {
-    ({ sut, mocks } = newTestService(AppMetricsService));
+    mocks = {
+      logger: { setContext: vi.fn(), warn: vi.fn() },
+      config: { getWorker: vi.fn() },
+      telemetry: newTelemetryRepositoryMock(),
+      appMetrics: { getMetrics: vi.fn() },
+      job: { getTelemetryMetrics: vi.fn() },
+    };
+    sut = new AppMetricsService(
+      mocks.logger as unknown as LoggingRepository,
+      mocks.config as unknown as ConfigRepository,
+      mocks.telemetry as unknown as TelemetryRepository,
+      mocks.appMetrics as unknown as AppMetricsRepository,
+      mocks.job as unknown as JobRepository,
+    );
     appCallbacks = new Map();
     jobCallbacks = new Map();
-    mocks.telemetry.app.observeGauge.mockImplementation((name, callback) => appCallbacks.set(name, callback));
-    mocks.telemetry.jobs.observeGauge.mockImplementation((name, callback) => jobCallbacks.set(name, callback));
+    mocks.telemetry.app.observeGauge.mockImplementation((name, callback) => {
+      appCallbacks.set(name, callback);
+    });
+    mocks.telemetry.jobs.observeGauge.mockImplementation((name, callback) => {
+      jobCallbacks.set(name, callback);
+    });
   });
 
   it('registers app gauges on the API worker', () => {
@@ -783,27 +810,34 @@ import { Injectable } from '@nestjs/common';
 import { ObservableCallback, ObservableResult } from '@opentelemetry/api';
 import { OnEvent } from 'src/decorators';
 import { ImmichWorker } from 'src/enum';
-import { AssetTelemetryMetrics } from 'src/repositories/asset.repository';
+import { AppMetricsRepository, AppMetricsSnapshot } from 'src/repositories/app-metrics.repository';
+import { ConfigRepository } from 'src/repositories/config.repository';
 import { QueueTelemetryMetrics } from 'src/repositories/job.repository';
-import { PersonTelemetryMetrics } from 'src/repositories/person.repository';
-import { BaseService } from 'src/services/base.service';
+import { JobRepository } from 'src/repositories/job.repository';
+import { LoggingRepository } from 'src/repositories/logging.repository';
+import { TelemetryRepository } from 'src/repositories/telemetry.repository';
 
 const SNAPSHOT_TTL_MS = 60_000;
 
-type AppSnapshot = {
-  asset: AssetTelemetryMetrics;
-  person: PersonTelemetryMetrics;
-};
-
 @Injectable()
-export class AppMetricsService extends BaseService {
-  private appSnapshot?: AppSnapshot;
+export class AppMetricsService {
+  private appSnapshot?: AppMetricsSnapshot;
   private appSnapshotAttemptedAt?: number;
-  private appRefresh?: Promise<AppSnapshot | undefined>;
+  private appRefresh?: Promise<AppMetricsSnapshot | undefined>;
   private queueSnapshot?: QueueTelemetryMetrics;
   private queueSnapshotAttemptedAt?: number;
   private queueRefresh?: Promise<QueueTelemetryMetrics | undefined>;
   private registered = false;
+
+  constructor(
+    private logger: LoggingRepository,
+    private configRepository: ConfigRepository,
+    private telemetryRepository: TelemetryRepository,
+    private appMetricsRepository: AppMetricsRepository,
+    private jobRepository: JobRepository,
+  ) {
+    this.logger.setContext(AppMetricsService.name);
+  }
 
   @OnEvent({ name: 'AppBootstrap' })
   onBootstrap() {
@@ -812,7 +846,7 @@ export class AppMetricsService extends BaseService {
     }
     this.registered = true;
 
-    switch (this.worker) {
+    switch (this.configRepository.getWorker()) {
       case ImmichWorker.Api: {
         this.registerAppGauges();
         break;
@@ -872,7 +906,10 @@ export class AppMetricsService extends BaseService {
     });
   }
 
-  private observeAppGauge(name: string, observeSnapshot: (snapshot: AppSnapshot, result: ObservableResult) => void) {
+  private observeAppGauge(
+    name: string,
+    observeSnapshot: (snapshot: AppMetricsSnapshot, result: ObservableResult) => void,
+  ) {
     const callback: ObservableCallback = async (result) => {
       const snapshot = await this.getAppSnapshot();
       if (snapshot) {
@@ -895,7 +932,7 @@ export class AppMetricsService extends BaseService {
     this.telemetryRepository.jobs.observeGauge(name, callback);
   }
 
-  private async getAppSnapshot(): Promise<AppSnapshot | undefined> {
+  private async getAppSnapshot(): Promise<AppMetricsSnapshot | undefined> {
     if (this.appSnapshotAttemptedAt !== undefined && Date.now() - this.appSnapshotAttemptedAt < SNAPSHOT_TTL_MS) {
       return this.appSnapshot;
     }
@@ -907,13 +944,9 @@ export class AppMetricsService extends BaseService {
     }
   }
 
-  private async refreshAppSnapshot(): Promise<AppSnapshot | undefined> {
+  private async refreshAppSnapshot(): Promise<AppMetricsSnapshot | undefined> {
     try {
-      const [asset, person] = await Promise.all([
-        this.assetRepository.getTelemetryMetrics(),
-        this.personRepository.getTelemetryMetrics(),
-      ]);
-      this.appSnapshot = { asset, person };
+      this.appSnapshot = await this.appMetricsRepository.getMetrics();
     } catch (error: Error | unknown) {
       this.logger.warn(`Unable to refresh app metrics snapshot: ${error instanceof Error ? error.message : error}`);
     } finally {
@@ -970,13 +1003,15 @@ Add these tests to `server/src/services/app-metrics.service.spec.ts`:
 ```typescript
 it('observes app metrics with user_id labels only', async () => {
   mocks.config.getWorker.mockReturnValue(ImmichWorker.Api);
-  mocks.asset.getTelemetryMetrics.mockResolvedValue({
-    assetsByType: [{ type: AssetType.Image, count: 2, storageBytes: 400 }],
-    usersByType: [{ userId: 'user-1', type: AssetType.Image, count: 2, storageBytes: 400 }],
-    search: { eligibleAssets: 4, embeddedAssets: 3 },
-    state: { trashAssets: 1, externalAssets: 1 },
+  mocks.appMetrics.getMetrics.mockResolvedValue({
+    asset: {
+      assetsByType: [{ type: AssetType.Image, count: 2, storageBytes: 400 }],
+      usersByType: [{ userId: 'user-1', type: AssetType.Image, count: 2, storageBytes: 400 }],
+      search: { eligibleAssets: 4, embeddedAssets: 3 },
+      state: { trashAssets: 1, externalAssets: 1 },
+    },
+    person: { faces: 8, people: 2 },
   });
-  mocks.person.getTelemetryMetrics.mockResolvedValue({ faces: 8, people: 2 });
 
   sut.onBootstrap();
   const observed = await observe(appCallbacks.get('immich.users.storage_bytes')!);
@@ -988,42 +1023,49 @@ it('observes app metrics with user_id labels only', async () => {
 
 it('serves the cached app snapshot inside the ttl', async () => {
   mocks.config.getWorker.mockReturnValue(ImmichWorker.Api);
-  mocks.asset.getTelemetryMetrics
+  mocks.appMetrics.getMetrics
     .mockResolvedValueOnce({
-      assetsByType: [{ type: AssetType.Image, count: 2, storageBytes: 400 }],
-      usersByType: [],
-      search: { eligibleAssets: 4, embeddedAssets: 3 },
-      state: { trashAssets: 1, externalAssets: 1 },
+      asset: {
+        assetsByType: [{ type: AssetType.Image, count: 2, storageBytes: 400 }],
+        usersByType: [],
+        search: { eligibleAssets: 4, embeddedAssets: 3 },
+        state: { trashAssets: 1, externalAssets: 1 },
+      },
+      person: { faces: 8, people: 2 },
     })
     .mockResolvedValueOnce({
-      assetsByType: [{ type: AssetType.Image, count: 9, storageBytes: 900 }],
-      usersByType: [],
-      search: { eligibleAssets: 9, embeddedAssets: 9 },
-      state: { trashAssets: 0, externalAssets: 0 },
+      asset: {
+        assetsByType: [{ type: AssetType.Image, count: 9, storageBytes: 900 }],
+        usersByType: [],
+        search: { eligibleAssets: 9, embeddedAssets: 9 },
+        state: { trashAssets: 0, externalAssets: 0 },
+      },
+      person: { faces: 9, people: 3 },
     });
-  mocks.person.getTelemetryMetrics.mockResolvedValue({ faces: 8, people: 2 });
   vi.useFakeTimers();
 
   sut.onBootstrap();
   await observe(appCallbacks.get('immich.assets.total')!);
   const observed = await observe(appCallbacks.get('immich.assets.total')!);
 
-  expect(mocks.asset.getTelemetryMetrics).toHaveBeenCalledTimes(1);
+  expect(mocks.appMetrics.getMetrics).toHaveBeenCalledTimes(1);
   expect(observed).toHaveBeenCalledWith(2, { type: 'image' });
   vi.useRealTimers();
 });
 
 it('keeps the previous app snapshot when refresh fails', async () => {
   mocks.config.getWorker.mockReturnValue(ImmichWorker.Api);
-  mocks.asset.getTelemetryMetrics
+  mocks.appMetrics.getMetrics
     .mockResolvedValueOnce({
-      assetsByType: [{ type: AssetType.Image, count: 2, storageBytes: 400 }],
-      usersByType: [],
-      search: { eligibleAssets: 4, embeddedAssets: 3 },
-      state: { trashAssets: 1, externalAssets: 1 },
+      asset: {
+        assetsByType: [{ type: AssetType.Image, count: 2, storageBytes: 400 }],
+        usersByType: [],
+        search: { eligibleAssets: 4, embeddedAssets: 3 },
+        state: { trashAssets: 1, externalAssets: 1 },
+      },
+      person: { faces: 8, people: 2 },
     })
     .mockRejectedValueOnce(new Error('database down'));
-  mocks.person.getTelemetryMetrics.mockResolvedValue({ faces: 8, people: 2 });
   vi.useFakeTimers();
 
   sut.onBootstrap();
@@ -1037,8 +1079,7 @@ it('keeps the previous app snapshot when refresh fails', async () => {
 
 it('omits app metric series when the first refresh fails', async () => {
   mocks.config.getWorker.mockReturnValue(ImmichWorker.Api);
-  mocks.asset.getTelemetryMetrics.mockRejectedValue(new Error('database down'));
-  mocks.person.getTelemetryMetrics.mockResolvedValue({ faces: 8, people: 2 });
+  mocks.appMetrics.getMetrics.mockRejectedValue(new Error('database down'));
 
   sut.onBootstrap();
   const observed = await observe(appCallbacks.get('immich.assets.total')!);
@@ -1049,8 +1090,7 @@ it('omits app metric series when the first refresh fails', async () => {
 
 it('throttles first-refresh failures inside the ttl', async () => {
   mocks.config.getWorker.mockReturnValue(ImmichWorker.Api);
-  mocks.asset.getTelemetryMetrics.mockRejectedValue(new Error('database down'));
-  mocks.person.getTelemetryMetrics.mockResolvedValue({ faces: 8, people: 2 });
+  mocks.appMetrics.getMetrics.mockRejectedValue(new Error('database down'));
   vi.useFakeTimers();
 
   sut.onBootstrap();
@@ -1058,7 +1098,7 @@ it('throttles first-refresh failures inside the ttl', async () => {
   const observed = await observe(appCallbacks.get('immich.assets.total')!);
 
   expect(observed).not.toHaveBeenCalled();
-  expect(mocks.asset.getTelemetryMetrics).toHaveBeenCalledTimes(1);
+  expect(mocks.appMetrics.getMetrics).toHaveBeenCalledTimes(1);
   vi.useRealTimers();
 });
 
@@ -1716,7 +1756,7 @@ Expected: PASS.
 Run:
 
 ```bash
-pnpm --dir server exec vitest --config test/vitest.config.medium.mjs --run test/medium/specs/repositories/asset.repository.spec.ts test/medium/specs/repositories/person.repository.spec.ts
+pnpm --dir server exec vitest --config test/vitest.config.medium.mjs --run test/medium/specs/repositories/app-metrics.repository.spec.ts
 ```
 
 Expected: PASS. If the medium test database is unavailable, stop and bring up the repo's medium-test database before continuing.

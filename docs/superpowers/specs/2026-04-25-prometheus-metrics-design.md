@@ -58,9 +58,14 @@ Server metrics remain opt-in. If `IMMICH_TELEMETRY_INCLUDE` is empty, no server 
 started. If telemetry is enabled, the new app snapshot metrics are published through the existing
 server OpenTelemetry metric service. Snapshot values must be exported with observable or settable
 gauge instruments, not the existing additive `MetricGroupRepository.addToGauge()` helper, because
-these metrics represent absolute counts instead of deltas. The implementation should live close to
-the existing telemetry layer, while SQL queries live in repositories so they stay typed, testable, and
-generated where appropriate.
+these metrics represent absolute counts instead of deltas.
+
+The server app aggregate SQL should live in a dedicated `AppMetricsRepository` rather than adding
+telemetry-only methods to high-churn domain repositories such as `AssetRepository` and
+`PersonRepository`. This keeps the feature additive, reduces upstream rebase conflicts, and still
+keeps SQL in a typed, testable repository boundary. `AppMetricsService` should be a standalone
+service with explicit dependencies instead of extending `BaseService`, which avoids changing global
+service test helpers for this feature.
 
 The implementation should introduce an `app` telemetry group for these domain metrics so admins can
 enable them separately from HTTP API request metrics. `IMMICH_TELEMETRY_INCLUDE=all` includes `app`.
@@ -118,15 +123,22 @@ For requests that include multiple entries, the implementation should record one
 
 Server metrics are exposed from a cached snapshot.
 
-The snapshot collector refreshes at most once every 30 to 60 seconds. Prometheus scrapes can happen more often, but they should serve the cached values unless the cache is stale. This avoids turning frequent scrapes into repeated full-table database scans.
+The snapshot collector refreshes at most once every 30 to 60 seconds. Prometheus scrapes can happen
+more often, but they should serve the cached values unless the cache is stale. This avoids turning
+frequent scrapes into repeated aggregate database scans. Phase 1 should not add indexes
+preemptively; the initial queries should rely on existing asset, face, visibility, deletion, and
+smart-search indexes, with query tuning deferred until real deployments show a bottleneck.
 
-The snapshot fetches:
+`AppMetricsRepository` fetches:
 
 - Aggregated asset and storage counts from the database.
 - Per-user asset and storage counts from the database.
 - Smart-search embedding coverage from the asset and smart-search tables.
 - Face/person totals from face and person tables.
 - Trash and external-library totals from asset fields.
+
+`JobRepository` fetches:
+
 - Queue counts from BullMQ `getJobCounts()` for every `QueueName`.
 - Oldest waiting, delayed, and failed job age from BullMQ job timestamps for every `QueueName`.
 
@@ -181,8 +193,8 @@ Update `docker/prometheus.yml` to scrape:
 
 Server tests:
 
-- Snapshot repository/service returns the expected asset, storage, per-user, embedding, face/person,
-  trash, external, queue count, and queue staleness values.
+- `AppMetricsRepository` and `AppMetricsService` return the expected asset, storage, per-user,
+  embedding, face/person, trash, external, queue count, and queue staleness values.
 - Per-user metric labels contain `user_id` and no user name or email.
 - Snapshot cache serves previous values within the refresh window.
 - Failed refresh preserves the previous successful snapshot.
