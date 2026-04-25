@@ -16,7 +16,7 @@ pnpmfileChecksum: sha256-un98do36L0wZyqsjcLozQ3YUadCAn2yz5bXcBbOuyDA=
 
 patchedDependencies:
   '@immich/ui@0.77.3':
-    hash: 4c70b6d22983b272dbf65debd2ed3b3ed5bf0a0d3b03409f8b67f6c64b64a235
+    hash: d69a93cc80569b975a611aa211b8ef8139313b6402e340e75a784ff70086a867
     path: patches/@immich__ui@0.77.3.patch
 
 importers:
@@ -749,7 +749,7 @@ importers:
         version: link:../packages/sdk
       '@immich/ui':
         specifier: ^0.77.0
-        version: 0.77.3(patch_hash=4c70b6d22983b272dbf65debd2ed3b3ed5bf0a0d3b03409f8b67f6c64b64a235)(@sveltejs/kit@2.57.1(@opentelemetry/api@1.9.1)(@sveltejs/vite-plugin-svelte@7.0.0(svelte@5.55.2)(vite@8.0.10(@types/node@25.6.0)(esbuild@0.28.0)(jiti@2.6.1)(sass@1.99.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3)))(svelte@5.55.2)(typescript@6.0.3)(vite@8.0.10(@types/node@25.6.0)(esbuild@0.28.0)(jiti@2.6.1)(sass@1.99.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3)))(svelte@5.55.2)
+        version: 0.77.3(patch_hash=d69a93cc80569b975a611aa211b8ef8139313b6402e340e75a784ff70086a867)(@sveltejs/kit@2.57.1(@opentelemetry/api@1.9.1)(@sveltejs/vite-plugin-svelte@7.0.0(svelte@5.55.2)(vite@8.0.10(@types/node@25.6.0)(esbuild@0.28.0)(jiti@2.6.1)(sass@1.99.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3)))(svelte@5.55.2)(typescript@6.0.3)(vite@8.0.10(@types/node@25.6.0)(esbuild@0.28.0)(jiti@2.6.1)(sass@1.99.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3)))(svelte@5.55.2)
       '@mapbox/mapbox-gl-rtl-text':
         specifier: 0.4.0
         version: 0.4.0
@@ -16323,7 +16323,7 @@ snapshots:
       pg-connection-string: 2.12.0
       postgres: 3.4.9
 
-  '@immich/ui@0.77.3(patch_hash=4c70b6d22983b272dbf65debd2ed3b3ed5bf0a0d3b03409f8b67f6c64b64a235)(@sveltejs/kit@2.57.1(@opentelemetry/api@1.9.1)(@sveltejs/vite-plugin-svelte@7.0.0(svelte@5.55.2)(vite@8.0.10(@types/node@25.6.0)(esbuild@0.28.0)(jiti@2.6.1)(sass@1.99.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3)))(svelte@5.55.2)(typescript@6.0.3)(vite@8.0.10(@types/node@25.6.0)(esbuild@0.28.0)(jiti@2.6.1)(sass@1.99.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3)))(svelte@5.55.2)':
+  '@immich/ui@0.77.3(patch_hash=d69a93cc80569b975a611aa211b8ef8139313b6402e340e75a784ff70086a867)(@sveltejs/kit@2.57.1(@opentelemetry/api@1.9.1)(@sveltejs/vite-plugin-svelte@7.0.0(svelte@5.55.2)(vite@8.0.10(@types/node@25.6.0)(esbuild@0.28.0)(jiti@2.6.1)(sass@1.99.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3)))(svelte@5.55.2)(typescript@6.0.3)(vite@8.0.10(@types/node@25.6.0)(esbuild@0.28.0)(jiti@2.6.1)(sass@1.99.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3)))(svelte@5.55.2)':
     dependencies:
       '@internationalized/date': 3.12.1
       '@mdi/js': 7.4.47
