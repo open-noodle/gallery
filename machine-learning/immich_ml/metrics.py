@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import os
 import time
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
+from typing import cast
 
 from prometheus_client import CollectorRegistry, Counter, Gauge, Histogram, generate_latest, multiprocess
 
@@ -100,7 +101,8 @@ def is_multiprocess_enabled() -> bool:
 def render() -> bytes:
     if is_multiprocess_enabled():
         multiprocess_registry = CollectorRegistry()
-        multiprocess.MultiProcessCollector(multiprocess_registry)
+        multi_process_collector = cast(Callable[[CollectorRegistry], object], multiprocess.MultiProcessCollector)
+        multi_process_collector(multiprocess_registry)
         return generate_latest(multiprocess_registry)
 
     return generate_latest(registry)

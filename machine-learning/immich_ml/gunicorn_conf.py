@@ -1,4 +1,6 @@
 import os
+from collections.abc import Callable
+from typing import cast
 
 from gunicorn.arbiter import Arbiter
 from gunicorn.workers.base import Worker
@@ -14,4 +16,5 @@ def pre_fork(arbiter: Arbiter, _: Worker) -> None:
 
 
 def child_exit(_: Arbiter, worker: Worker) -> None:
-    multiprocess.mark_process_dead(worker.pid)
+    mark_process_dead = cast(Callable[[int], None], multiprocess.mark_process_dead)
+    mark_process_dead(worker.pid)
