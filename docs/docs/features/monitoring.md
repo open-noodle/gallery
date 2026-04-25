@@ -21,14 +21,28 @@ These metrics come in a variety of forms:
 - Histograms, where each observation is assigned to a certain number of "buckets". Example: response time, where each bucket is a number of milliseconds. This one is a bit more complicated.
   - Buckets in this case are _cumulative_; that is, an observation is placed not only into the smallest bucket that contains it, but also to all buckets larger than this. For example, if a histogram has three buckets for 1ms, 5ms and 10ms, an observation of 3ms will be bucketed into both 5ms and 10ms.
 
-The metrics in gallery are grouped into API (endpoint calls and response times), host (memory and CPU utilization), and IO (internal database queries, image processing, and so on). Each group of metrics can be enabled or disabled independently.
+The metrics in gallery are grouped into API (endpoint calls and response times), host (memory and CPU utilization), app (Gallery domain metrics), IO (internal database queries, image processing, and so on), repo, and job metrics. Each group of metrics can be enabled or disabled independently.
+
+### Phase 1 Gallery Metrics
+
+Gallery adds a small set of application metrics on top of the standard OpenTelemetry metrics:
+
+- Asset counts and storage by type.
+- Per-user asset and storage metrics labeled by `user_id` only.
+- Smart-search embedding coverage.
+- Face and person totals.
+- Trash and external-library totals.
+- Queue counts and oldest waiting, delayed, and failed job age.
+- Machine-learning request counts, latency histograms, active requests, model cache entries, and model load latency.
+
+Per-user metrics intentionally use `user_id` only. Names, emails, filenames, paths, search text, IP addresses, and request payloads are not exported as labels.
 
 ### Configuration
 
 Gallery will not expose an endpoint for metrics by default. To enable this endpoint, you can add the `IMMICH_TELEMETRY_INCLUDE=all` environmental variable to your `.env` file. Note that only the server container currently use this variable.
 
 :::tip
-`IMMICH_TELEMETRY_INCLUDE=all` enables all metrics. For a more granular configuration you can enumerate the telemetry metrics that should be included as a comma separated list (e.g. `IMMICH_TELEMETRY_INCLUDE=repo,api`). Alternatively, you can also exclude specific metrics with `IMMICH_TELEMETRY_EXCLUDE`. For more information refer to the [environment section](/install/environment-variables.md#prometheus).
+`IMMICH_TELEMETRY_INCLUDE=all` enables all metrics. For a more granular configuration you can enumerate the telemetry metrics that should be included as a comma separated list (e.g. `IMMICH_TELEMETRY_INCLUDE=repo,api,app`). Alternatively, you can also exclude specific metrics with `IMMICH_TELEMETRY_EXCLUDE`. For more information refer to the [environment section](/install/environment-variables.md#prometheus).
 :::
 
 The next step is to configure a new or existing Prometheus instance to scrape this endpoint. The following steps assume that you do not have an existing Prometheus instance, but the steps will be similar either way.
@@ -63,11 +77,21 @@ The last piece is the [configuration file][prom-file]. This file defines (among 
 The provided file is just a starting point. There are a ton of ways to configure Prometheus, so feel free to experiment!
 :::
 
-After bringing down the containers with `docker compose down` and back up with `docker compose up -d`, a Prometheus instance will now collect metrics from the gallery server and microservices containers. Note that we didn't need to expose any new ports for these containers - the communication is handled in the internal Docker network.
+The provided configuration includes the machine-learning service as a separate scrape target:
+
+```yaml
+- job_name: immich_machine_learning
+  metrics_path: /metrics
+  static_configs:
+    - targets: ['immich-machine-learning:3003']
+```
+
+After bringing down the containers with `docker compose down` and back up with `docker compose up -d`, a Prometheus instance will now collect metrics from the gallery server, microservices, and machine-learning containers. Note that we didn't need to expose any new ports for these containers - the communication is handled in the internal Docker network.
 
 :::note
 To see exactly what metrics are made available, you can additionally add `8081:8081` (API metrics) and `8082:8082` (microservices metrics) to the immich_server container's ports.
 Visiting the `/metrics` endpoint for these services will show the same raw data that Prometheus collects.
+The machine-learning service exposes `/metrics` on its regular `3003` service port, so expose `3003:3003` on the immich_machine_learning container if you also want to inspect those metrics from the host.
 To configure these ports see [`IMMICH_API_METRICS_PORT` & `IMMICH_MICROSERVICES_METRICS_PORT`](/install/environment-variables/#general).
 :::
 
@@ -104,6 +128,8 @@ volumes:
 
 After bringing down the services and back up again, you can now visit Grafana to view your metrics. On the first login, enter `admin` for both username and password and update your password. You can then go to the settings and add a data source with `http://immich-prometheus:9090` to point Grafana to your Prometheus instance.
 
+Gallery ships a starter dashboard at `docker/grafana-dashboard.json`. In Grafana, open **Dashboards > New > Import**, upload the JSON file, and select your Prometheus data source.
+
 ### Usage
 
 You can make your first dashboard to get started. Don't forget to save it frequently, or you'll lose all your progress!
@@ -111,6 +137,10 @@ You can make your first dashboard to get started. Don't forget to save it freque
 You can then make a new panel, specifying Prometheus as the data source for it.
 
 -- TODO: add images and more details here
+
+### Deferred Scope
+
+Phase 1 does not add auth/IP metrics, upload throughput, face/CLIP score distributions, duplicate metrics, video transcode quality metrics, DB bloat metrics, geocoding/OCR coverage, new memory metrics, cache hit/miss internals, or custom CPU/memory/GPU/network metrics beyond existing host and infrastructure exporters. Those need separate product and privacy decisions.
 
 ## Structured Logging
 
