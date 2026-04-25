@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import os
 import time
 from collections.abc import Iterable
 
-from prometheus_client import CollectorRegistry, Counter, Gauge, Histogram, generate_latest
+from prometheus_client import CollectorRegistry, Counter, Gauge, Histogram, generate_latest, multiprocess
 
 from .schemas import InferenceEntries, ModelTask, ModelType
 
@@ -27,6 +28,7 @@ REQUEST_DURATION = Histogram(
 ACTIVE_REQUESTS = Gauge(
     "immich_ml_active_requests",
     "In-flight machine-learning prediction requests.",
+    multiprocess_mode="livesum",
     registry=registry,
 )
 
@@ -34,6 +36,7 @@ MODEL_CACHE_ENTRIES = Gauge(
     "immich_ml_model_cache_entries",
     "Machine-learning model cache entries.",
     ["task", "type"],
+    multiprocess_mode="livesum",
     registry=registry,
 )
 
@@ -44,6 +47,8 @@ MODEL_LOAD_DURATION = Histogram(
     buckets=(10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000, float("inf")),
     registry=registry,
 )
+
+_MODEL_CACHE_LABELS: set[tuple[str, str]] = set()
 
 
 def labels_from_entries(entries: InferenceEntries) -> list[tuple[str, str]]:
@@ -73,15 +78,31 @@ def record_model_load(task: str, model_type: str, status: str, started: float) -
 
 
 def set_model_cache_entries(labels: Iterable[tuple[str, str]]) -> None:
-    MODEL_CACHE_ENTRIES.clear()
     counts: dict[tuple[str, str], int] = {}
     for label in labels:
         counts[label] = counts.get(label, 0) + 1
+
+    current_labels = set(counts)
+    for task, model_type in _MODEL_CACHE_LABELS - current_labels:
+        MODEL_CACHE_ENTRIES.labels(task=task, type=model_type).set(0)
+
     for (task, model_type), count in counts.items():
         MODEL_CACHE_ENTRIES.labels(task=task, type=model_type).set(count)
 
+    _MODEL_CACHE_LABELS.clear()
+    _MODEL_CACHE_LABELS.update(current_labels)
+
+
+def is_multiprocess_enabled() -> bool:
+    return bool(os.environ.get("PROMETHEUS_MULTIPROC_DIR"))
+
 
 def render() -> bytes:
+    if is_multiprocess_enabled():
+        multiprocess_registry = CollectorRegistry()
+        multiprocess.MultiProcessCollector(multiprocess_registry)
+        return generate_latest(multiprocess_registry)
+
     return generate_latest(registry)
 
 
@@ -90,4 +111,5 @@ def reset_metrics_for_tests() -> None:
     REQUEST_DURATION.clear()
     ACTIVE_REQUESTS.set(0)
     MODEL_CACHE_ENTRIES.clear()
+    _MODEL_CACHE_LABELS.clear()
     MODEL_LOAD_DURATION.clear()

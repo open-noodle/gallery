@@ -1,5 +1,7 @@
 import json
 import os
+import subprocess
+import sys
 from io import BytesIO
 from pathlib import Path
 from random import randint
@@ -1383,6 +1385,83 @@ class TestPrometheusMetrics:
 
         assert response.status_code == 422
         assert 'immich_ml_requests_total{status="validation_error",task="unknown",type="unknown"} 1.0' in metrics
+
+    def test_render_aggregates_multiprocess_metrics(self, tmp_path: Path) -> None:
+        record_script = """
+from immich_ml import metrics
+metrics.REQUESTS.labels(task="clip", type="textual", status="success").inc()
+"""
+        render_script = """
+from immich_ml import metrics
+print(metrics.render().decode())
+"""
+        env = {**os.environ, "PROMETHEUS_MULTIPROC_DIR": tmp_path.as_posix()}
+
+        subprocess.run([sys.executable, "-c", record_script], check=True, env=env)
+        subprocess.run([sys.executable, "-c", record_script], check=True, env=env)
+        result = subprocess.run(
+            [sys.executable, "-c", render_script],
+            capture_output=True,
+            check=True,
+            env=env,
+            text=True,
+        )
+
+        assert 'immich_ml_requests_total{status="success",task="clip",type="textual"} 2.0' in result.stdout
+
+    def test_model_cache_entries_zeroes_removed_labels(self) -> None:
+        from immich_ml import metrics
+
+        metrics.reset_metrics_for_tests()
+        metrics.set_model_cache_entries([("clip", "visual")])
+        metrics.set_model_cache_entries([])
+
+        rendered = metrics.render().decode()
+
+        assert 'immich_ml_model_cache_entries{task="clip",type="visual"} 0.0' in rendered
+
+    def test_prepare_prometheus_multiprocess_dir_cleans_stale_files(
+        self, tmp_path: Path, monkeypatch: MonkeyPatch
+    ) -> None:
+        from immich_ml.prometheus import prepare_prometheus_multiprocess_dir
+
+        stale_file = tmp_path / "counter_123.db"
+        unrelated_file = tmp_path / "keep.txt"
+        stale_file.write_text("stale")
+        unrelated_file.write_text("keep")
+        monkeypatch.setenv("PROMETHEUS_MULTIPROC_DIR", tmp_path.as_posix())
+
+        result = prepare_prometheus_multiprocess_dir()
+
+        assert result == tmp_path
+        assert os.environ["PROMETHEUS_MULTIPROC_DIR"] == tmp_path.as_posix()
+        assert not stale_file.exists()
+        assert unrelated_file.exists()
+
+    def test_gunicorn_child_exit_marks_worker_dead(self, mocker: MockerFixture) -> None:
+        from immich_ml import gunicorn_conf
+
+        mark_process_dead = mocker.patch.object(gunicorn_conf.multiprocess, "mark_process_dead")
+
+        gunicorn_conf.child_exit(mock.Mock(), SimpleNamespace(pid=1234))
+
+        mark_process_dead.assert_called_once_with(1234)
+
+    def test_refresh_model_cache_metrics_counts_cached_models(self, monkeypatch: MonkeyPatch) -> None:
+        from immich_ml import metrics
+        from immich_ml.main import refresh_model_cache_metrics
+
+        metrics.reset_metrics_for_tests()
+        mock_model = mock.Mock(spec=InferenceModel)
+        mock_model.model_task = ModelTask.SEARCH
+        mock_model.model_type = ModelType.VISUAL
+        cache = SimpleNamespace(_cache={"model": mock_model})
+        monkeypatch.setattr("immich_ml.main.model_cache", SimpleNamespace(cache=cache))
+
+        refresh_model_cache_metrics()
+        rendered = metrics.render().decode()
+
+        assert 'immich_ml_model_cache_entries{task="clip",type="visual"} 1.0' in rendered
 
     @pytest.mark.asyncio
     async def test_model_load_records_success_and_retry_metrics(self, deployed_app: TestClient) -> None:

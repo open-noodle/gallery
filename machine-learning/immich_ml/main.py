@@ -40,6 +40,8 @@ from .schemas import (
 
 MultiPartParser.spool_max_size = 2**26  # spools to disk if payload is 64 MiB or larger
 
+MODEL_CACHE_METRICS_INTERVAL_S = 15
+
 model_cache = ModelCache(revalidate=settings.model_ttl > 0)
 thread_pool: ThreadPoolExecutor | None = None
 lock = threading.Lock()
@@ -66,6 +68,8 @@ async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
             asyncio.ensure_future(idle_shutdown_task())
         if settings.preload is not None:
             await preload_models(settings.preload)
+        if metrics.is_multiprocess_enabled():
+            asyncio.ensure_future(model_cache_metrics_task())
         yield
     finally:
         log.handlers.clear()
@@ -182,14 +186,18 @@ def ping() -> PlainTextResponse:
     return PlainTextResponse("pong")
 
 
-@app.get("/metrics")
-def prometheus_metrics() -> Response:
+def refresh_model_cache_metrics() -> None:
     cache_labels = [
         (model.model_task.value, model.model_type.value)
         for model in model_cache.cache._cache.values()
         if isinstance(model, InferenceModel)
     ]
     metrics.set_model_cache_entries(cache_labels)
+
+
+@app.get("/metrics")
+def prometheus_metrics() -> Response:
+    refresh_model_cache_metrics()
     return Response(metrics.render(), media_type=CONTENT_TYPE_LATEST)
 
 
@@ -305,3 +313,9 @@ async def idle_shutdown_task() -> None:
             os.kill(os.getpid(), signal.SIGINT)
             break
         await asyncio.sleep(settings.model_ttl_poll_s)
+
+
+async def model_cache_metrics_task() -> None:
+    while True:
+        refresh_model_cache_metrics()
+        await asyncio.sleep(MODEL_CACHE_METRICS_INTERVAL_S)
