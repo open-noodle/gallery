@@ -120,4 +120,28 @@ void main() {
     verifyNever(() => permissionRepository.requestLocationAlwaysPermission());
     verifyNever(() => permissionRepository.openSettings());
   });
+
+  testWidgets('background location denial opens settings after disclosure grant action', (tester) async {
+    when(() => permissionRepository.hasLocationWhenInUsePermission()).thenAnswer((_) async => true);
+    when(() => permissionRepository.hasLocationAlwaysPermission()).thenAnswer((_) async => false);
+    when(() => permissionRepository.requestLocationAlwaysPermission()).thenAnswer((_) async => false);
+    when(() => permissionRepository.openSettings()).thenAnswer((_) async => true);
+
+    await tester.pumpConsumerWidget(
+      const NetworkingSettings(),
+      overrides: [
+        authProvider.overrideWith((ref) => authNotifier),
+        networkServiceProvider.overrideWithValue(networkService),
+      ],
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('background_location_permission'), findsOneWidget);
+
+    await tester.tap(find.text('grant_permission'));
+    await tester.pumpAndSettle();
+
+    verify(() => permissionRepository.requestLocationAlwaysPermission()).called(1);
+    verify(() => permissionRepository.openSettings()).called(1);
+  });
 }
