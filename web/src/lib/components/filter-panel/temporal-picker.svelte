@@ -123,10 +123,10 @@
 </script>
 
 <div data-testid="temporal-picker">
-  <div class="mb-3 space-y-1.5" data-testid="custom-date-range">
-    <div class="grid grid-cols-2 gap-2">
-      <label class="space-y-1 text-xs font-medium text-gray-600 dark:text-gray-300">
-        <span>From</span>
+  <div class="mb-4 space-y-2" data-testid="custom-date-range">
+    <div class="grid grid-cols-2 gap-2.5">
+      <label class="flex flex-col gap-1.5 text-[11px] font-medium leading-none text-gray-600 dark:text-gray-300">
+        <span class="px-0.5">From</span>
         <input
           bind:value={fromValue}
           oninput={validateAndEmitCustomRange}
@@ -139,12 +139,12 @@
           aria-describedby={customRangeErrorTarget === 'from' || customRangeErrorTarget === 'range'
             ? CUSTOM_RANGE_ERROR_ID
             : undefined}
-          class="w-full rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-700 outline-none transition-colors placeholder:text-gray-400 focus:border-immich-primary dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:focus:border-immich-dark-primary"
+          class="h-8 w-full rounded-lg border border-gray-200 bg-white px-2.5 text-xs text-gray-700 outline-none transition-colors placeholder:text-gray-400 focus:border-immich-primary dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:focus:border-immich-dark-primary"
           data-testid="custom-date-from-input"
         />
       </label>
-      <label class="space-y-1 text-xs font-medium text-gray-600 dark:text-gray-300">
-        <span>To</span>
+      <label class="flex flex-col gap-1.5 text-[11px] font-medium leading-none text-gray-600 dark:text-gray-300">
+        <span class="px-0.5">To</span>
         <input
           bind:value={toValue}
           oninput={validateAndEmitCustomRange}
@@ -157,7 +157,7 @@
           aria-describedby={customRangeErrorTarget === 'to' || customRangeErrorTarget === 'range'
             ? CUSTOM_RANGE_ERROR_ID
             : undefined}
-          class="w-full rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-700 outline-none transition-colors placeholder:text-gray-400 focus:border-immich-primary dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:focus:border-immich-dark-primary"
+          class="h-8 w-full rounded-lg border border-gray-200 bg-white px-2.5 text-xs text-gray-700 outline-none transition-colors placeholder:text-gray-400 focus:border-immich-primary dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:focus:border-immich-dark-primary"
           data-testid="custom-date-to-input"
         />
       </label>
