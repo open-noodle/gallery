@@ -1,8 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:flutter_hooks/flutter_hooks.dart' hide Store;
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/domain/models/store.model.dart';
+import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/models/auth/auxilary_endpoint.model.dart';
@@ -31,25 +33,74 @@ class NetworkingSettings extends HookConsumerWidget {
         ref.read(networkProvider.notifier).getWifiReadBackgroundPermission(),
       ]);
 
-      bool? isGrantLocationAlwaysPermission;
+      if (!context.mounted) {
+        return;
+      }
 
-      if (!hasLocationInUse) {
-        await showDialog(
+      final disclosureAccepted = Store.get(StoreKey.autoEndpointLocationDisclosureAccepted, false);
+      var canRequestBackgroundLocation = hasLocationInUse;
+
+      if (!hasLocationInUse || !disclosureAccepted) {
+        final isGrantLocationInUsePermission = await showDialog<bool>(
           context: context,
-          builder: (context) {
+          builder: (dialogContext) {
             return AlertDialog(
               title: Text(context.t.location_permission),
               content: Text(context.t.location_permission_content),
               actions: [
+                TextButton(onPressed: () => Navigator.pop(dialogContext), child: Text("cancel".tr())),
                 TextButton(
                   onPressed: () async {
-                    final isGrant = await ref.read(networkProvider.notifier).requestWifiReadPermission();
+                    final isGrant = hasLocationInUse
+                        ? true
+                        : await ref.read(networkProvider.notifier).requestWifiReadPermission();
 
-                    if (!context.mounted) {
+                    if (!dialogContext.mounted) {
                       return;
                     }
 
-                    Navigator.pop(context, isGrant);
+                    Navigator.pop(dialogContext, isGrant);
+                  },
+                  child: Text("grant_permission".tr()),
+                ),
+              ],
+            );
+          },
+        );
+
+        if (!context.mounted) {
+          return;
+        }
+
+        canRequestBackgroundLocation = isGrantLocationInUsePermission ?? false;
+      }
+
+      if (!canRequestBackgroundLocation) {
+        return;
+      }
+
+      bool? isGrantLocationAlwaysPermission;
+
+      if (!hasLocationAlways || !disclosureAccepted) {
+        isGrantLocationAlwaysPermission = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) {
+            return AlertDialog(
+              title: Text("background_location_permission".tr()),
+              content: Text("background_location_permission_content".tr()),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(dialogContext), child: Text("cancel".tr())),
+                TextButton(
+                  onPressed: () async {
+                    final isGrant = hasLocationAlways
+                        ? true
+                        : await ref.read(networkProvider.notifier).requestWifiReadBackgroundPermission();
+
+                    if (!dialogContext.mounted) {
+                      return;
+                    }
+
+                    Navigator.pop(dialogContext, isGrant);
                   },
                   child: Text(context.t.grant_permission),
                 ),
@@ -63,35 +114,16 @@ class NetworkingSettings extends HookConsumerWidget {
         return;
       }
 
-      if (!hasLocationAlways) {
-        isGrantLocationAlwaysPermission = await showDialog(
-          context: context,
-          builder: (context) {
-            return AlertDialog(
-              title: Text(context.t.background_location_permission),
-              content: Text(context.t.background_location_permission_content),
-              actions: [
-                TextButton(
-                  onPressed: () async {
-                    final isGrant = await ref.read(networkProvider.notifier).requestWifiReadBackgroundPermission();
-
-                    if (!context.mounted) {
-                      return;
-                    }
-
-                    Navigator.pop(context, isGrant);
-                  },
-                  child: Text(context.t.grant_permission),
-                ),
-              ],
-            );
-          },
-        );
-      }
-
       if (isGrantLocationAlwaysPermission != null && !isGrantLocationAlwaysPermission) {
         await ref.read(networkProvider.notifier).openSettings();
+        return;
       }
+
+      if (!disclosureAccepted && isGrantLocationAlwaysPermission == null) {
+        return;
+      }
+
+      await Store.put(StoreKey.autoEndpointLocationDisclosureAccepted, true);
     }
 
     useEffect(() {
