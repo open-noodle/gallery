@@ -164,7 +164,7 @@ describe('TemporalPicker component', () => {
       expect(input).toHaveAttribute('inputmode', 'numeric');
       expect(input).toHaveAttribute('autocomplete', 'off');
       expect(input).toHaveAttribute('placeholder', 'YYYY-MM-DD');
-      expect(input).toHaveAttribute('pattern', '\\d{4}-\\d{2}-\\d{2}');
+      expect(input).toHaveAttribute('pattern', String.raw`\d{4}-\d{2}-\d{2}`);
     }
   });
 

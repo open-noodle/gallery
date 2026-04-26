@@ -134,7 +134,7 @@
           inputmode="numeric"
           autocomplete="off"
           placeholder="YYYY-MM-DD"
-          pattern={'\\d{4}-\\d{2}-\\d{2}'}
+          pattern={String.raw`\d{4}-\d{2}-\d{2}`}
           aria-invalid={customRangeErrorTarget === 'from' || customRangeErrorTarget === 'range' ? 'true' : undefined}
           aria-describedby={customRangeErrorTarget === 'from' || customRangeErrorTarget === 'range'
             ? CUSTOM_RANGE_ERROR_ID
@@ -152,7 +152,7 @@
           inputmode="numeric"
           autocomplete="off"
           placeholder="YYYY-MM-DD"
-          pattern={'\\d{4}-\\d{2}-\\d{2}'}
+          pattern={String.raw`\d{4}-\d{2}-\d{2}`}
           aria-invalid={customRangeErrorTarget === 'to' || customRangeErrorTarget === 'range' ? 'true' : undefined}
           aria-describedby={customRangeErrorTarget === 'to' || customRangeErrorTarget === 'range'
             ? CUSTOM_RANGE_ERROR_ID
