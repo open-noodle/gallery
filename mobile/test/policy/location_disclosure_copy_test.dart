@@ -81,4 +81,10 @@ void main() {
       expectAutomaticEndpointDisclosures(source, translations);
     }
   });
+
+  test('generated runtime automatic endpoint disclosures match policy requirements', () {
+    for (final MapEntry(key: locale, value: translations) in CodegenLoader.mapLocales.entries) {
+      expectAutomaticEndpointDisclosures('CodegenLoader.$locale', translations);
+    }
+  });
 }
