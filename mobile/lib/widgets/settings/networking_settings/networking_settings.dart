@@ -28,16 +28,17 @@ class NetworkingSettings extends HookConsumerWidget {
         ref.read(networkProvider.notifier).getWifiReadBackgroundPermission(),
       ]);
 
-      bool? isGrantLocationAlwaysPermission;
+      var canRequestBackgroundLocation = hasLocationInUse;
 
       if (!hasLocationInUse) {
-        await showDialog(
+        final isGrantLocationInUsePermission = await showDialog<bool>(
           context: context,
           builder: (context) {
             return AlertDialog(
               title: Text("location_permission".tr()),
               content: Text("location_permission_content".tr()),
               actions: [
+                TextButton(onPressed: () => Navigator.pop(context), child: Text("cancel".tr())),
                 TextButton(
                   onPressed: () async {
                     final isGrant = await ref.read(networkProvider.notifier).requestWifiReadPermission();
@@ -50,16 +51,25 @@ class NetworkingSettings extends HookConsumerWidget {
             );
           },
         );
+
+        canRequestBackgroundLocation = isGrantLocationInUsePermission ?? false;
       }
 
+      if (!canRequestBackgroundLocation) {
+        return;
+      }
+
+      bool? isGrantLocationAlwaysPermission;
+
       if (!hasLocationAlways) {
-        isGrantLocationAlwaysPermission = await showDialog(
+        isGrantLocationAlwaysPermission = await showDialog<bool>(
           context: context,
           builder: (context) {
             return AlertDialog(
               title: Text("background_location_permission".tr()),
               content: Text("background_location_permission_content".tr()),
               actions: [
+                TextButton(onPressed: () => Navigator.pop(context), child: Text("cancel".tr())),
                 TextButton(
                   onPressed: () async {
                     final isGrant = await ref.read(networkProvider.notifier).requestWifiReadBackgroundPermission();
