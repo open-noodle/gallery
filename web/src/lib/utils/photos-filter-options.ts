@@ -38,8 +38,12 @@ export function buildPhotosTimelineOptions(filters: FilterState): Record<string,
 
   const context = buildFilterContext(filters);
   if (context) {
-    base.takenAfter = context.takenAfter;
-    base.takenBefore = context.takenBefore;
+    if (context.takenAfter) {
+      base.takenAfter = context.takenAfter;
+    }
+    if (context.takenBefore) {
+      base.takenBefore = context.takenBefore;
+    }
   }
 
   return base;
@@ -67,7 +71,13 @@ export function handlePhotosRemoveFilter(filters: FilterState, type: string, id?
       return { ...filters, mediaType: 'all' };
     }
     case 'timeline': {
-      return { ...filters, selectedYear: undefined, selectedMonth: undefined };
+      return {
+        ...filters,
+        dateAfter: undefined,
+        dateBefore: undefined,
+        selectedYear: undefined,
+        selectedMonth: undefined,
+      };
     }
     default: {
       return filters;
