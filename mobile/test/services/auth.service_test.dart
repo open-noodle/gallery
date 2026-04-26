@@ -3,7 +3,9 @@ import 'package:drift/native.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:immich_mobile/data/db/main/database.dart';
+import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/domain/services/store.service.dart';
+import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/models/auth/auxilary_endpoint.model.dart';
 import 'package:immich_mobile/services/auth.service.dart';
@@ -23,6 +25,8 @@ void main() {
   late Drift db;
 
   setUp(() async {
+    await Store.clear();
+
     authApiRepository = MockAuthApiRepository();
     authRepository = MockAuthRepository();
     apiService = MockApiService();
@@ -112,7 +116,18 @@ void main() {
       verifyNever(() => networkService.getWifiName());
     });
 
+    test('Should not read Wi-Fi name before automatic endpoint location disclosure consent', () async {
+      when(() => authRepository.getEndpointSwitchingFeature()).thenReturn(true);
+
+      final result = await sut.setOpenApiServiceEndpoint();
+
+      expect(result, isNull);
+      verify(() => authRepository.getEndpointSwitchingFeature()).called(1);
+      verifyNever(() => networkService.getWifiName());
+    });
+
     test('Should set local connection if wifi name matches', () async {
+      await Store.put(StoreKey.autoEndpointLocationDisclosureAccepted, true);
       when(() => authRepository.getEndpointSwitchingFeature()).thenReturn(true);
       when(() => authRepository.getPreferredWifiName()).thenReturn('TestWifi');
       when(() => authRepository.getLocalEndpoint()).thenReturn('http://local.endpoint');
@@ -131,6 +146,7 @@ void main() {
     });
 
     test('Should set external endpoint if wifi name not matching', () async {
+      await Store.put(StoreKey.autoEndpointLocationDisclosureAccepted, true);
       when(() => authRepository.getEndpointSwitchingFeature()).thenReturn(true);
       when(() => authRepository.getPreferredWifiName()).thenReturn('DifferentWifi');
       when(
@@ -151,6 +167,7 @@ void main() {
     });
 
     test('Should set second external endpoint if the first throw any error', () async {
+      await Store.put(StoreKey.autoEndpointLocationDisclosureAccepted, true);
       when(() => authRepository.getEndpointSwitchingFeature()).thenReturn(true);
       when(() => authRepository.getPreferredWifiName()).thenReturn('DifferentWifi');
       when(() => authRepository.getExternalEndpointList()).thenReturn([
@@ -176,6 +193,7 @@ void main() {
     });
 
     test('Should set second external endpoint if the first throw ApiException', () async {
+      await Store.put(StoreKey.autoEndpointLocationDisclosureAccepted, true);
       when(() => authRepository.getEndpointSwitchingFeature()).thenReturn(true);
       when(() => authRepository.getPreferredWifiName()).thenReturn('DifferentWifi');
       when(() => authRepository.getExternalEndpointList()).thenReturn([
@@ -201,6 +219,7 @@ void main() {
     });
 
     test('Should handle error when setting local connection', () async {
+      await Store.put(StoreKey.autoEndpointLocationDisclosureAccepted, true);
       when(() => authRepository.getEndpointSwitchingFeature()).thenReturn(true);
       when(() => authRepository.getPreferredWifiName()).thenReturn('TestWifi');
       when(() => authRepository.getLocalEndpoint()).thenReturn('http://local.endpoint');
@@ -219,6 +238,7 @@ void main() {
     });
 
     test('Should handle error when setting external connection', () async {
+      await Store.put(StoreKey.autoEndpointLocationDisclosureAccepted, true);
       when(() => authRepository.getEndpointSwitchingFeature()).thenReturn(true);
       when(() => authRepository.getPreferredWifiName()).thenReturn('DifferentWifi');
       when(
