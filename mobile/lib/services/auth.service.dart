@@ -111,6 +111,7 @@ class AuthService {
   /// - Current user information
   /// - Access token
   /// - Server-specific endpoint configuration
+  /// - Automatic endpoint location disclosure consent
   ///
   /// All deletions are executed in parallel using [Future.wait].
   Future<void> clearLocalData() async {
@@ -126,6 +127,7 @@ class AuthService {
         .networkLocalEndpoint,
         .networkExternalEndpointList,
       ]),
+      Store.delete(StoreKey.autoEndpointLocationDisclosureAccepted),
     ]);
   }
 
@@ -141,6 +143,10 @@ class AuthService {
   Future<String?> setOpenApiServiceEndpoint() async {
     final enable = _authRepository.getEndpointSwitchingFeature();
     if (!enable) {
+      return null;
+    }
+
+    if (!Store.get(StoreKey.autoEndpointLocationDisclosureAccepted, false)) {
       return null;
     }
 
