@@ -97,6 +97,7 @@ void main() {
   });
 
   testWidgets('background location disclosure can be declined without opening settings', (tester) async {
+    await Store.put(StoreKey.autoEndpointLocationDisclosureAccepted, true);
     when(() => permissionRepository.hasLocationWhenInUsePermission()).thenAnswer((_) async => true);
     when(() => permissionRepository.hasLocationAlwaysPermission()).thenAnswer((_) async => false);
 
@@ -122,6 +123,7 @@ void main() {
   });
 
   testWidgets('background location denial opens settings after disclosure grant action', (tester) async {
+    await Store.put(StoreKey.autoEndpointLocationDisclosureAccepted, true);
     when(() => permissionRepository.hasLocationWhenInUsePermission()).thenAnswer((_) async => true);
     when(() => permissionRepository.hasLocationAlwaysPermission()).thenAnswer((_) async => false);
     when(() => permissionRepository.requestLocationAlwaysPermission()).thenAnswer((_) async => false);
@@ -143,5 +145,34 @@ void main() {
 
     verify(() => permissionRepository.requestLocationAlwaysPermission()).called(1);
     verify(() => permissionRepository.openSettings()).called(1);
+  });
+
+  testWidgets('automatic endpoint disclosure is required even when location permissions already exist', (tester) async {
+    when(() => permissionRepository.hasLocationWhenInUsePermission()).thenAnswer((_) async => true);
+    when(() => permissionRepository.hasLocationAlwaysPermission()).thenAnswer((_) async => true);
+
+    await tester.pumpConsumerWidget(
+      const NetworkingSettings(),
+      overrides: [
+        authProvider.overrideWith((ref) => authNotifier),
+        networkServiceProvider.overrideWithValue(networkService),
+      ],
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('location_permission'), findsOneWidget);
+
+    await tester.tap(find.text('grant_permission'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('background_location_permission'), findsOneWidget);
+
+    await tester.tap(find.text('grant_permission'));
+    await tester.pumpAndSettle();
+
+    expect(Store.get(StoreKey.autoEndpointLocationDisclosureAccepted), isTrue);
+    verifyNever(() => permissionRepository.requestLocationWhenInUsePermission());
+    verifyNever(() => permissionRepository.requestLocationAlwaysPermission());
+    verifyNever(() => permissionRepository.openSettings());
   });
 }

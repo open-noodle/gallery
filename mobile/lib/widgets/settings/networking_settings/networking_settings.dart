@@ -2,6 +2,8 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart' hide Store;
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/domain/models/store.model.dart';
+import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/extensions/translate_extensions.dart';
 import 'package:immich_mobile/models/auth/auxilary_endpoint.model.dart';
@@ -32,9 +34,10 @@ class NetworkingSettings extends HookConsumerWidget {
         return;
       }
 
+      final disclosureAccepted = Store.get(StoreKey.autoEndpointLocationDisclosureAccepted, false);
       var canRequestBackgroundLocation = hasLocationInUse;
 
-      if (!hasLocationInUse) {
+      if (!hasLocationInUse || !disclosureAccepted) {
         final isGrantLocationInUsePermission = await showDialog<bool>(
           context: context,
           builder: (dialogContext) {
@@ -45,7 +48,9 @@ class NetworkingSettings extends HookConsumerWidget {
                 TextButton(onPressed: () => Navigator.pop(dialogContext), child: Text("cancel".tr())),
                 TextButton(
                   onPressed: () async {
-                    final isGrant = await ref.read(networkProvider.notifier).requestWifiReadPermission();
+                    final isGrant = hasLocationInUse
+                        ? true
+                        : await ref.read(networkProvider.notifier).requestWifiReadPermission();
 
                     if (!dialogContext.mounted) {
                       return;
@@ -73,7 +78,7 @@ class NetworkingSettings extends HookConsumerWidget {
 
       bool? isGrantLocationAlwaysPermission;
 
-      if (!hasLocationAlways) {
+      if (!hasLocationAlways || !disclosureAccepted) {
         isGrantLocationAlwaysPermission = await showDialog<bool>(
           context: context,
           builder: (dialogContext) {
@@ -84,7 +89,9 @@ class NetworkingSettings extends HookConsumerWidget {
                 TextButton(onPressed: () => Navigator.pop(dialogContext), child: Text("cancel".tr())),
                 TextButton(
                   onPressed: () async {
-                    final isGrant = await ref.read(networkProvider.notifier).requestWifiReadBackgroundPermission();
+                    final isGrant = hasLocationAlways
+                        ? true
+                        : await ref.read(networkProvider.notifier).requestWifiReadBackgroundPermission();
 
                     if (!dialogContext.mounted) {
                       return;
@@ -106,7 +113,14 @@ class NetworkingSettings extends HookConsumerWidget {
 
       if (isGrantLocationAlwaysPermission != null && !isGrantLocationAlwaysPermission) {
         await ref.read(networkProvider.notifier).openSettings();
+        return;
       }
+
+      if (!disclosureAccepted && isGrantLocationAlwaysPermission == null) {
+        return;
+      }
+
+      await Store.put(StoreKey.autoEndpointLocationDisclosureAccepted, true);
     }
 
     useEffect(() {
