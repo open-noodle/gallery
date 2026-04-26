@@ -24,6 +24,7 @@
 ## Task 1: Add Failing Policy Copy Test
 
 **Files:**
+
 - Create: `mobile/test/policy/location_disclosure_copy_test.dart`
 
 - [ ] **Step 1: Write the failing copy test**
@@ -84,6 +85,7 @@ Expected: FAIL because the current `i18n/en.json` strings do not contain the req
 ## Task 2: Add Failing Networking Consent Widget Tests
 
 **Files:**
+
 - Create: `mobile/test/widgets/settings/networking_settings_test.dart`
 
 - [ ] **Step 1: Write the failing networking widget tests**
@@ -199,6 +201,7 @@ Expected: FAIL because the current networking permission dialogs do not render a
 ## Task 3: Update Source Disclosure Copy and Regenerate Localization
 
 **Files:**
+
 - Modify: `i18n/en.json`
 - Modify: `mobile/lib/generated/codegen_loader.g.dart`
 - Modify: `mobile/lib/generated/translations.g.dart`
@@ -240,6 +243,7 @@ Expected: PASS.
 ## Task 4: Implement Networking Permission Decline Flow
 
 **Files:**
+
 - Modify: `mobile/lib/widgets/settings/networking_settings/networking_settings.dart`
 - Test: `mobile/test/widgets/settings/networking_settings_test.dart`
 
@@ -336,6 +340,7 @@ Expected: PASS.
 ## Task 5: Harden Map Permission Dialog Dismissal
 
 **Files:**
+
 - Modify: `mobile/lib/presentation/widgets/map/map_utils.dart`
 - Modify: `mobile/lib/utils/map_utils.dart`
 
@@ -397,6 +402,7 @@ Expected: formatter completes successfully.
 ## Task 6: Verify and Commit Implementation
 
 **Files:**
+
 - Verify all changed files from Tasks 1-5.
 
 - [ ] **Step 1: Run focused tests**
