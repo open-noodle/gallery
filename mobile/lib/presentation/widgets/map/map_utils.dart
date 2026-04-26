@@ -81,10 +81,12 @@ class MapUtils {
       bool shouldRequestPermission = false;
 
       if (permission == LocationPermission.denied && !silent) {
-        shouldRequestPermission = await showDialog(
-          context: context,
-          builder: (context) => _LocationPermissionDisabledDialog(context),
-        );
+        shouldRequestPermission =
+            await showDialog<bool>(
+              context: context,
+              builder: (context) => _LocationPermissionDisabledDialog(context),
+            ) ??
+            false;
         if (shouldRequestPermission) {
           permission = await Geolocator.requestPermission();
         }
