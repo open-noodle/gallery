@@ -13,7 +13,7 @@ import 'package:immich_mobile/repositories/permission.repository.dart';
 import 'package:immich_mobile/services/network.service.dart';
 import 'package:immich_mobile/widgets/settings/networking_settings/networking_settings.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:state_notifier/state_notifier.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../test_utils.dart';
 import '../../widget_tester_extensions.dart';
