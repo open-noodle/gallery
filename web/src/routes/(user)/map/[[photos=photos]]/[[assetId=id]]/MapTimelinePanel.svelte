@@ -19,10 +19,9 @@
   import { getAssetBulkActions } from '#lib/services/asset.service.ts';
   import { getStackBulkActions } from '#lib/services/stack.service.ts';
   import type { FilterState } from '#lib/components/filter-panel/filter-panel.ts';
-  import { buildFilterContext } from '#lib/components/filter-panel/filter-panel.ts';
   import { mapSettings } from '#lib/stores/preferences.store.ts';
   import { type OnLink, type OnUnlink } from '#lib/utils/actions.ts';
-  import { AssetTypeEnum, AssetVisibility } from '@immich/sdk';
+  import { buildMapTimelineOptions } from '#lib/utils/map-filter-options.ts';
   import { ActionButton, CloseButton, CommandPaletteDefaultProvider, Icon } from '@immich/ui';
   import { mdiDotsVertical, mdiImageMultiple } from '@mdi/js';
   import { ceil, floor } from 'lodash-es';
@@ -75,30 +74,12 @@
   );
 
   const timelineOptions = $derived.by(() => {
-    const context = filters ? buildFilterContext(filters) : undefined;
     return {
-      bbox: timelineBoundingBox,
-      visibility: spaceId ? undefined : AssetVisibility.Timeline,
-      isFavorite: filters?.isFavorite ?? (spaceId ? undefined : $mapSettings.onlyFavorites || undefined),
-      withPartners: spaceId ? undefined : $mapSettings.withPartners || undefined,
-      spaceId,
-      assetFilter: selectedClusterIds,
+      ...buildMapTimelineOptions(filters, timelineBoundingBox, selectedClusterIds, spaceId, {
+        onlyFavorites: $mapSettings.onlyFavorites,
+        withPartners: $mapSettings.withPartners,
+      }),
       withStacked: true,
-      ...(filters?.personIds &&
-        filters.personIds.length > 0 && {
-          personIds: spaceId ? undefined : filters.personIds,
-          spacePersonIds: spaceId ? filters.personIds : undefined,
-        }),
-      ...(filters?.make && { make: filters.make }),
-      ...(filters?.model && { model: filters.model }),
-      ...(filters?.tagIds && filters.tagIds.length > 0 && { tagIds: filters.tagIds }),
-      ...(filters?.rating !== undefined && { rating: filters.rating }),
-      ...(filters?.mediaType &&
-        filters.mediaType !== 'all' && {
-          $type: filters.mediaType === 'image' ? AssetTypeEnum.Image : AssetTypeEnum.Video,
-        }),
-      ...(context?.takenAfter && { takenAfter: context.takenAfter }),
-      ...(context?.takenBefore && { takenBefore: context.takenBefore }),
     };
   });
 
