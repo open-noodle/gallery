@@ -168,6 +168,121 @@ describe('TemporalPicker component', () => {
     }
   });
 
+  it('should clear invalid custom range state before selecting a year', async () => {
+    const { getByTestId, queryByText } = render(TemporalPicker, {
+      props: { timeBuckets: buckets, onYearSelect: vi.fn() },
+    });
+
+    await fireEvent.input(getByTestId('custom-date-from-input'), { target: { value: '2024-1-1' } });
+    expect(queryByText('Enter a valid From date')).toBeTruthy();
+
+    await fireEvent.click(getByTestId('year-btn-2023'));
+
+    expect(getByTestId('custom-date-from-input')).toHaveValue('');
+    expect(getByTestId('custom-date-to-input')).toHaveValue('');
+    expect(queryByText('Enter a valid From date')).toBeNull();
+  });
+
+  it('should clear invalid custom range state before selecting a month', async () => {
+    const { getByTestId, queryByText } = render(TemporalPicker, {
+      props: { timeBuckets: buckets, selectedYear: 2023, onMonthSelect: vi.fn() },
+    });
+
+    await fireEvent.input(getByTestId('custom-date-to-input'), { target: { value: '2024-2-31' } });
+    expect(queryByText('Enter a valid To date')).toBeTruthy();
+
+    await fireEvent.click(getByTestId('month-btn-6'));
+
+    expect(getByTestId('custom-date-from-input')).toHaveValue('');
+    expect(getByTestId('custom-date-to-input')).toHaveValue('');
+    expect(queryByText('Enter a valid To date')).toBeNull();
+  });
+
+  it('should clear stale validation error when props rerender to a valid range', async () => {
+    const { getByTestId, queryByText, rerender } = render(TemporalPicker, {
+      props: { timeBuckets: buckets },
+    });
+
+    await fireEvent.input(getByTestId('custom-date-from-input'), { target: { value: '2024-1-1' } });
+    expect(queryByText('Enter a valid From date')).toBeTruthy();
+
+    await rerender({ timeBuckets: buckets, dateAfter: '2024-01-01', dateBefore: '2024-12-31' });
+
+    expect(getByTestId('custom-date-from-input')).toHaveValue('2024-01-01');
+    expect(getByTestId('custom-date-to-input')).toHaveValue('2024-12-31');
+    expect(queryByText('Enter a valid From date')).toBeNull();
+  });
+
+  it('should clear stale validation error when props rerender to an empty range', async () => {
+    const { getByTestId, queryByText, rerender } = render(TemporalPicker, {
+      props: { timeBuckets: buckets },
+    });
+
+    await fireEvent.input(getByTestId('custom-date-to-input'), { target: { value: '2024-2-31' } });
+    expect(queryByText('Enter a valid To date')).toBeTruthy();
+
+    await rerender({ timeBuckets: buckets });
+
+    expect(getByTestId('custom-date-from-input')).toHaveValue('');
+    expect(getByTestId('custom-date-to-input')).toHaveValue('');
+    expect(queryByText('Enter a valid To date')).toBeNull();
+  });
+
+  it('should associate from validation errors with the from input', async () => {
+    const { getByTestId, getByText } = render(TemporalPicker, {
+      props: { timeBuckets: buckets },
+    });
+
+    await fireEvent.input(getByTestId('custom-date-from-input'), { target: { value: '2024-1-1' } });
+
+    const fromInput = getByTestId('custom-date-from-input');
+    const toInput = getByTestId('custom-date-to-input');
+    const error = getByText('Enter a valid From date');
+
+    expect(fromInput).toHaveAttribute('aria-invalid', 'true');
+    expect(fromInput).toHaveAttribute('aria-describedby', 'custom-date-range-error');
+    expect(toInput).not.toHaveAttribute('aria-invalid', 'true');
+    expect(error).toHaveAttribute('id', 'custom-date-range-error');
+    expect(error).toHaveAttribute('role', 'alert');
+  });
+
+  it('should associate to validation errors with the to input', async () => {
+    const { getByTestId, getByText } = render(TemporalPicker, {
+      props: { timeBuckets: buckets },
+    });
+
+    await fireEvent.input(getByTestId('custom-date-to-input'), { target: { value: '2024-2-31' } });
+
+    const fromInput = getByTestId('custom-date-from-input');
+    const toInput = getByTestId('custom-date-to-input');
+    const error = getByText('Enter a valid To date');
+
+    expect(fromInput).not.toHaveAttribute('aria-invalid', 'true');
+    expect(toInput).toHaveAttribute('aria-invalid', 'true');
+    expect(toInput).toHaveAttribute('aria-describedby', 'custom-date-range-error');
+    expect(error).toHaveAttribute('id', 'custom-date-range-error');
+    expect(error).toHaveAttribute('role', 'alert');
+  });
+
+  it('should associate inverted range errors with both custom date inputs', async () => {
+    const { getByTestId, getByText } = render(TemporalPicker, {
+      props: { timeBuckets: buckets, dateAfter: '2024-12-31' },
+    });
+
+    await fireEvent.input(getByTestId('custom-date-to-input'), { target: { value: '2024-01-01' } });
+
+    const fromInput = getByTestId('custom-date-from-input');
+    const toInput = getByTestId('custom-date-to-input');
+    const error = getByText('From date must be on or before To date');
+
+    expect(fromInput).toHaveAttribute('aria-invalid', 'true');
+    expect(fromInput).toHaveAttribute('aria-describedby', 'custom-date-range-error');
+    expect(toInput).toHaveAttribute('aria-invalid', 'true');
+    expect(toInput).toHaveAttribute('aria-describedby', 'custom-date-range-error');
+    expect(error).toHaveAttribute('id', 'custom-date-range-error');
+    expect(error).toHaveAttribute('role', 'alert');
+  });
+
   it('should show month grid when selectedYear is set via prop', () => {
     const { getByTestId, queryByTestId } = render(TemporalPicker, {
       props: { timeBuckets: buckets, selectedYear: 2023 },

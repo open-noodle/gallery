@@ -2,6 +2,7 @@
   import { aggregateYears, getMonthsForYear } from './temporal-utils';
 
   const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const CUSTOM_RANGE_ERROR_ID = 'custom-date-range-error';
 
   interface Props {
     timeBuckets: Array<{ timeBucket: string; count: number }>;
@@ -30,13 +31,12 @@
   let fromValue = $state('');
   let toValue = $state('');
   let customRangeError = $state<string | undefined>();
+  let customRangeErrorTarget = $state<'from' | 'to' | 'range' | undefined>();
 
   $effect(() => {
     fromValue = dateAfter ?? '';
-  });
-
-  $effect(() => {
     toValue = dateBefore ?? '';
+    clearCustomRangeError();
   });
 
   function parseDateOnly(value: string): { valid: true; value?: string } | { valid: false } {
@@ -59,25 +59,39 @@
     return { valid: true, value };
   }
 
+  function clearCustomRangeError() {
+    customRangeError = undefined;
+    customRangeErrorTarget = undefined;
+  }
+
+  function clearCustomRangeState() {
+    fromValue = '';
+    toValue = '';
+    clearCustomRangeError();
+  }
+
   function validateAndEmitCustomRange() {
     const parsedFrom = parseDateOnly(fromValue);
     if (!parsedFrom.valid) {
       customRangeError = 'Enter a valid From date';
+      customRangeErrorTarget = 'from';
       return;
     }
 
     const parsedTo = parseDateOnly(toValue);
     if (!parsedTo.valid) {
       customRangeError = 'Enter a valid To date';
+      customRangeErrorTarget = 'to';
       return;
     }
 
     if (parsedFrom.value && parsedTo.value && parsedFrom.value > parsedTo.value) {
       customRangeError = 'From date must be on or before To date';
+      customRangeErrorTarget = 'range';
       return;
     }
 
-    customRangeError = undefined;
+    clearCustomRangeError();
     onCustomRangeChange?.(parsedFrom.value, parsedTo.value);
   }
 
@@ -85,6 +99,7 @@
     if (count === 0) {
       return;
     }
+    clearCustomRangeState();
     onYearSelect?.(year);
   }
 
@@ -92,6 +107,7 @@
     if (count === 0) {
       return;
     }
+    clearCustomRangeState();
     if (selectedMonth === month) {
       // Toggle off: deselect month
       onMonthSelect?.(year, undefined);
@@ -101,6 +117,7 @@
   }
 
   function handleBackToAll() {
+    clearCustomRangeState();
     onYearSelect?.(undefined);
   }
 </script>
@@ -118,6 +135,10 @@
           autocomplete="off"
           placeholder="YYYY-MM-DD"
           pattern={'\\d{4}-\\d{2}-\\d{2}'}
+          aria-invalid={customRangeErrorTarget === 'from' || customRangeErrorTarget === 'range' ? 'true' : undefined}
+          aria-describedby={customRangeErrorTarget === 'from' || customRangeErrorTarget === 'range'
+            ? CUSTOM_RANGE_ERROR_ID
+            : undefined}
           class="w-full rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-700 outline-none transition-colors placeholder:text-gray-400 focus:border-immich-primary dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:focus:border-immich-dark-primary"
           data-testid="custom-date-from-input"
         />
@@ -132,13 +153,17 @@
           autocomplete="off"
           placeholder="YYYY-MM-DD"
           pattern={'\\d{4}-\\d{2}-\\d{2}'}
+          aria-invalid={customRangeErrorTarget === 'to' || customRangeErrorTarget === 'range' ? 'true' : undefined}
+          aria-describedby={customRangeErrorTarget === 'to' || customRangeErrorTarget === 'range'
+            ? CUSTOM_RANGE_ERROR_ID
+            : undefined}
           class="w-full rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-700 outline-none transition-colors placeholder:text-gray-400 focus:border-immich-primary dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:focus:border-immich-dark-primary"
           data-testid="custom-date-to-input"
         />
       </label>
     </div>
     {#if customRangeError}
-      <p class="text-xs text-red-600 dark:text-red-400">{customRangeError}</p>
+      <p id={CUSTOM_RANGE_ERROR_ID} role="alert" class="text-xs text-red-600 dark:text-red-400">{customRangeError}</p>
     {/if}
   </div>
 
