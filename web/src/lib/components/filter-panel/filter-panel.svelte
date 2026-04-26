@@ -16,7 +16,6 @@
   } from '@mdi/js';
   import { untrack } from 'svelte';
   import type {
-    FilterContext,
     FilterPanelConfig,
     FilterSection as FilterSectionType,
     FilterState,
