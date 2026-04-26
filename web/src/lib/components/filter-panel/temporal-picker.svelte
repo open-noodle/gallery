@@ -5,16 +5,81 @@
 
   interface Props {
     timeBuckets: Array<{ timeBucket: string; count: number }>;
+    dateAfter?: string;
+    dateBefore?: string;
     selectedYear?: number;
     selectedMonth?: number;
+    onCustomRangeChange?: (dateAfter?: string, dateBefore?: string) => void;
     onYearSelect?: (year: number | undefined) => void;
     onMonthSelect?: (year: number, month: number | undefined) => void;
   }
 
-  let { timeBuckets, selectedYear, selectedMonth, onYearSelect, onMonthSelect }: Props = $props();
+  let {
+    timeBuckets,
+    dateAfter,
+    dateBefore,
+    selectedYear,
+    selectedMonth,
+    onCustomRangeChange,
+    onYearSelect,
+    onMonthSelect,
+  }: Props = $props();
 
   let years = $derived(aggregateYears(timeBuckets));
   let months = $derived(selectedYear === undefined ? [] : getMonthsForYear(timeBuckets, selectedYear));
+  let fromValue = $state('');
+  let toValue = $state('');
+  let customRangeError = $state<string | undefined>();
+
+  $effect(() => {
+    fromValue = dateAfter ?? '';
+  });
+
+  $effect(() => {
+    toValue = dateBefore ?? '';
+  });
+
+  function parseDateOnly(value: string): { valid: true; value?: string } | { valid: false } {
+    if (value === '') {
+      return { valid: true };
+    }
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    if (!match) {
+      return { valid: false };
+    }
+
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    const date = new Date(Date.UTC(year, month - 1, day));
+    if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) {
+      return { valid: false };
+    }
+
+    return { valid: true, value };
+  }
+
+  function validateAndEmitCustomRange() {
+    const parsedFrom = parseDateOnly(fromValue);
+    if (!parsedFrom.valid) {
+      customRangeError = 'Enter a valid From date';
+      return;
+    }
+
+    const parsedTo = parseDateOnly(toValue);
+    if (!parsedTo.valid) {
+      customRangeError = 'Enter a valid To date';
+      return;
+    }
+
+    if (parsedFrom.value && parsedTo.value && parsedFrom.value > parsedTo.value) {
+      customRangeError = 'From date must be on or before To date';
+      return;
+    }
+
+    customRangeError = undefined;
+    onCustomRangeChange?.(parsedFrom.value, parsedTo.value);
+  }
 
   function handleYearClick(year: number, count: number) {
     if (count === 0) {
@@ -41,6 +106,42 @@
 </script>
 
 <div data-testid="temporal-picker">
+  <div class="mb-3 space-y-1.5" data-testid="custom-date-range">
+    <div class="grid grid-cols-2 gap-2">
+      <label class="space-y-1 text-xs font-medium text-gray-600 dark:text-gray-300">
+        <span>From</span>
+        <input
+          bind:value={fromValue}
+          oninput={validateAndEmitCustomRange}
+          type="text"
+          inputmode="numeric"
+          autocomplete="off"
+          placeholder="YYYY-MM-DD"
+          pattern={'\\d{4}-\\d{2}-\\d{2}'}
+          class="w-full rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-700 outline-none transition-colors placeholder:text-gray-400 focus:border-immich-primary dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:focus:border-immich-dark-primary"
+          data-testid="custom-date-from-input"
+        />
+      </label>
+      <label class="space-y-1 text-xs font-medium text-gray-600 dark:text-gray-300">
+        <span>To</span>
+        <input
+          bind:value={toValue}
+          oninput={validateAndEmitCustomRange}
+          type="text"
+          inputmode="numeric"
+          autocomplete="off"
+          placeholder="YYYY-MM-DD"
+          pattern={'\\d{4}-\\d{2}-\\d{2}'}
+          class="w-full rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-700 outline-none transition-colors placeholder:text-gray-400 focus:border-immich-primary dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:focus:border-immich-dark-primary"
+          data-testid="custom-date-to-input"
+        />
+      </label>
+    </div>
+    {#if customRangeError}
+      <p class="text-xs text-red-600 dark:text-red-400">{customRangeError}</p>
+    {/if}
+  </div>
+
   {#if selectedYear !== undefined}
     <!-- Breadcrumb -->
     <div class="mb-2 flex items-center gap-1 text-xs text-gray-500 dark:text-gray-300">
