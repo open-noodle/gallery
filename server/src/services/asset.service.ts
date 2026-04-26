@@ -4,7 +4,7 @@ import { DateTime, Duration } from 'luxon';
 import { isAbsolute } from 'node:path';
 import { StorageCore } from 'src/cores/storage.core.js';
 import type { AssetFile } from 'src/database.js';
-import type { AuthDto } from 'src/dtos/auth.dto.js';
+import { type AuthDto, isMetadataHidden } from 'src/dtos/auth.dto.js';
 import type { JobItem, JobOf } from 'src/types.js';
 import { OnJob } from 'src/decorators.js';
 import { AssetResponseDto, SanitizedAssetResponseDto, mapAsset } from 'src/dtos/asset-response.dto.js';
@@ -87,7 +87,15 @@ export class AssetService extends BaseService {
 
     const data = mapAsset(asset, { withStack: true, auth });
 
-    if (!auth.sharedLink && data.ownerId !== auth.user.id) {
+    if (isMetadataHidden(auth)) {
+      return data;
+    }
+
+    if (auth.sharedLink) {
+      data.unassignedFaces = [];
+    } else if (data.ownerId !== auth.user.id) {
+      data.unassignedFaces = [];
+
       if (spaceId) {
         const member = await this.sharedSpaceRepository.getMember(spaceId, auth.user.id);
         if (!member) {
