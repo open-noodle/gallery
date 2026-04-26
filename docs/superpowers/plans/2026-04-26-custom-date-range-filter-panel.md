@@ -22,7 +22,7 @@
   Responsibility: render From/To controls above the existing year/month picker, validate local input, and emit custom range changes.
 
 - Modify: `web/src/lib/components/filter-panel/__tests__/temporal-picker.spec.ts`
-  Responsibility: prove custom range rendering, valid updates, invalid/inverted range suppression, and year/month switching.
+  Responsibility: prove custom range rendering, valid updates, malformed/impossible/inverted range suppression, invalid-field clearing, and year/month switching.
 
 - Modify: `web/src/lib/components/filter-panel/filter-panel.svelte`
   Responsibility: track custom dates in temporal effects, pass custom props to `TemporalPicker`, clear the opposite temporal mode on selection, and mark the timeline section active for custom dates.
@@ -48,6 +48,9 @@
 - Modify: `web/src/lib/utils/__tests__/album-filter-options.spec.ts`
   Responsibility: cover custom dates for album timeline and asset picker options.
 
+- Modify: `web/src/lib/utils/__tests__/album-filter-config.spec.ts`
+  Responsibility: prove album suggestion requests send API-ready custom `takenAfter` and `takenBefore` values.
+
 - Modify: `web/src/lib/utils/map-filter-options.ts`
   Responsibility: continue using `buildFilterContext()` for custom dates; no logic split required.
 
@@ -60,8 +63,14 @@
 - Modify: `web/src/lib/utils/__tests__/space-search.spec.ts`
   Responsibility: cover custom dates in smart-search params and preserve space-person mapping.
 
+- Create: `web/src/lib/utils/space-filter-options.ts`
+  Responsibility: build spaces timeline options with shared temporal context and remove active filter chips.
+
+- Create: `web/src/lib/utils/__tests__/space-filter-options.spec.ts`
+  Responsibility: cover spaces timeline custom dates, space-person mapping, and temporal removal.
+
 - Modify: `web/src/routes/(user)/spaces/[spaceId]/[[photos=photos]]/[[assetId=id]]/+page.svelte`
-  Responsibility: replace route-local year/month date construction with `buildFilterContext()` and clear custom dates in local timeline removal.
+  Responsibility: use the tested spaces filter-options helper instead of route-local temporal construction and removal logic.
 
 - Modify: `web/src/lib/components/search/smart-search-results.svelte`
   Responsibility: track `dateAfter` and `dateBefore` as reactive search dependencies.
@@ -308,6 +317,38 @@ it('should not emit inverted custom ranges', async () => {
   expect(spy).not.toHaveBeenCalled();
   expect(getByTestId('custom-date-error').textContent).toContain('From date must be on or before To date');
 });
+
+it('should not emit malformed custom dates', async () => {
+  const spy = vi.fn();
+  const { getByTestId } = render(TemporalPicker, {
+    props: { timeBuckets: buckets, onCustomRangeChange: spy },
+  });
+  await fireEvent.input(getByTestId('custom-date-from'), { target: { value: '2024-1-1' } });
+  expect(spy).not.toHaveBeenCalled();
+  expect(getByTestId('custom-date-error').textContent).toContain('Enter a valid From date');
+});
+
+it('should not emit impossible custom dates', async () => {
+  const spy = vi.fn();
+  const { getByTestId } = render(TemporalPicker, {
+    props: { timeBuckets: buckets, onCustomRangeChange: spy },
+  });
+  await fireEvent.input(getByTestId('custom-date-to'), { target: { value: '2024-02-31' } });
+  expect(spy).not.toHaveBeenCalled();
+  expect(getByTestId('custom-date-error').textContent).toContain('Enter a valid To date');
+});
+
+it('should emit remaining open-ended range after clearing an invalid field', async () => {
+  const spy = vi.fn();
+  const { getByTestId } = render(TemporalPicker, {
+    props: { timeBuckets: buckets, dateAfter: '2024-01-01', onCustomRangeChange: spy },
+  });
+  await fireEvent.input(getByTestId('custom-date-to'), { target: { value: '2024-02-31' } });
+  expect(spy).not.toHaveBeenCalled();
+
+  await fireEvent.input(getByTestId('custom-date-to'), { target: { value: '' } });
+  expect(spy).toHaveBeenCalledWith('2024-01-01', undefined);
+});
 ```
 
 - [ ] **Step 2: Run tests and verify failure**
@@ -394,7 +435,11 @@ Render the custom range before the selected-year branch:
     <label class="flex flex-col gap-1 text-xs text-gray-500 dark:text-gray-300">
       <span>From</span>
       <input
-        type="date"
+        type="text"
+        inputmode="numeric"
+        autocomplete="off"
+        placeholder="YYYY-MM-DD"
+        pattern="\d{4}-\d{2}-\d{2}"
         bind:value={localDateAfter}
         data-testid="custom-date-from"
         class="rounded-md border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
@@ -404,7 +449,11 @@ Render the custom range before the selected-year branch:
     <label class="flex flex-col gap-1 text-xs text-gray-500 dark:text-gray-300">
       <span>To</span>
       <input
-        type="date"
+        type="text"
+        inputmode="numeric"
+        autocomplete="off"
+        placeholder="YYYY-MM-DD"
+        pattern="\d{4}-\d{2}-\d{2}"
         bind:value={localDateBefore}
         data-testid="custom-date-to"
         class="rounded-md border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
@@ -524,6 +573,34 @@ it('should clear selected year when custom from date changes', async () => {
   );
 });
 
+it('should clear selected year and month when custom to date changes', async () => {
+  const suggestionsProvider = vi.fn().mockResolvedValue({
+    countries: [],
+    cameraMakes: [],
+    tags: [],
+    people: [],
+    ratings: [1, 2, 3, 4, 5],
+    mediaTypes: ['IMAGE', 'VIDEO'],
+    hasUnnamedPeople: false,
+  });
+
+  render(FilterPanel, {
+    props: { config: { sections: ['timeline'], suggestionsProvider }, timeBuckets },
+  });
+  await vi.advanceTimersByTimeAsync(0);
+
+  await fireEvent.click(screen.getByTestId('year-btn-2023'));
+  await vi.advanceTimersByTimeAsync(250);
+  await fireEvent.click(screen.getByTestId('month-btn-6'));
+  await vi.advanceTimersByTimeAsync(250);
+  await fireEvent.input(screen.getByTestId('custom-date-to'), { target: { value: '2024-12-31' } });
+  await vi.advanceTimersByTimeAsync(250);
+
+  expect(suggestionsProvider).toHaveBeenLastCalledWith(
+    expect.objectContaining({ dateBefore: '2024-12-31', selectedYear: undefined, selectedMonth: undefined }),
+  );
+});
+
 it('should clear custom dates when year is selected', async () => {
   const suggestionsProvider = vi.fn().mockResolvedValue({
     countries: [],
@@ -552,6 +629,34 @@ it('should clear custom dates when year is selected', async () => {
       selectedYear: 2023,
       selectedMonth: undefined,
     }),
+  );
+});
+
+it('should clear custom dates when month is selected', async () => {
+  const suggestionsProvider = vi.fn().mockResolvedValue({
+    countries: [],
+    cameraMakes: [],
+    tags: [],
+    people: [],
+    ratings: [1, 2, 3, 4, 5],
+    mediaTypes: ['IMAGE', 'VIDEO'],
+    hasUnnamedPeople: false,
+  });
+
+  render(FilterPanel, {
+    props: { config: { sections: ['timeline'], suggestionsProvider }, timeBuckets },
+  });
+  await vi.advanceTimersByTimeAsync(0);
+
+  await fireEvent.input(screen.getByTestId('custom-date-from'), { target: { value: '2024-01-01' } });
+  await vi.advanceTimersByTimeAsync(250);
+  await fireEvent.click(screen.getByTestId('year-btn-2023'));
+  await vi.advanceTimersByTimeAsync(250);
+  await fireEvent.click(screen.getByTestId('month-btn-6'));
+  await vi.advanceTimersByTimeAsync(250);
+
+  expect(suggestionsProvider).toHaveBeenLastCalledWith(
+    expect.objectContaining({ dateAfter: undefined, dateBefore: undefined, selectedYear: 2023, selectedMonth: 6 }),
   );
 });
 
@@ -905,14 +1010,17 @@ git commit -m "feat(web): show custom date filter chips"
 **Files:**
 
 - Modify: `web/src/lib/utils/__tests__/album-filter-options.spec.ts`
+- Modify: `web/src/lib/utils/__tests__/album-filter-config.spec.ts`
 - Modify: `web/src/lib/utils/__tests__/map-filter-options.spec.ts`
+- Create: `web/src/lib/utils/__tests__/space-filter-options.spec.ts`
+- Create: `web/src/lib/utils/space-filter-options.ts`
 - Modify: `web/src/lib/utils/__tests__/space-search.spec.ts`
 - Modify: `web/src/lib/utils/space-search.ts`
 - Modify: `web/src/routes/(user)/spaces/[spaceId]/[[photos=photos]]/[[assetId=id]]/+page.svelte`
 - Modify: `web/src/lib/components/search/smart-search-results.spec.ts`
 - Modify: `web/src/lib/components/search/smart-search-results.svelte`
 
-- [ ] **Step 1: Add failing route helper tests**
+- [ ] **Step 1: Add failing route option tests**
 
 Add to `album-filter-options.spec.ts`:
 
@@ -956,6 +1064,114 @@ it('includes custom dates in map time bucket options', () => {
 });
 ```
 
+Create `space-filter-options.spec.ts`:
+
+```typescript
+import { createFilterState } from '$lib/components/filter-panel/filter-panel';
+import { buildSpaceTimelineOptions, handleSpaceRemoveFilter } from '$lib/utils/space-filter-options';
+import { AssetOrder, AssetTypeEnum } from '@immich/sdk';
+
+describe('buildSpaceTimelineOptions', () => {
+  it('maps custom dates and people for spaces timeline options', () => {
+    const filters = {
+      ...createFilterState(),
+      personIds: ['space-person-1'],
+      dateAfter: '2024-01-01',
+      dateBefore: '2024-12-31',
+    };
+
+    expect(buildSpaceTimelineOptions('space-1', filters)).toEqual(
+      expect.objectContaining({
+        spaceId: 'space-1',
+        withStacked: true,
+        spacePersonIds: ['space-person-1'],
+        takenAfter: '2024-01-01T00:00:00.000Z',
+        takenBefore: '2025-01-01T00:00:00.000Z',
+      }),
+    );
+  });
+
+  it('prefers custom dates over selected year and month', () => {
+    const filters = {
+      ...createFilterState(),
+      selectedYear: 2023,
+      selectedMonth: 8,
+      dateBefore: '2024-12-31',
+    };
+
+    const result = buildSpaceTimelineOptions('space-1', filters);
+    expect(result.takenAfter).toBeUndefined();
+    expect(result.takenBefore).toBe('2025-01-01T00:00:00.000Z');
+  });
+
+  it('maps media type and sort order for spaces timeline options', () => {
+    const filters = { ...createFilterState(), mediaType: 'video' as const, sortOrder: 'asc' as const };
+
+    expect(buildSpaceTimelineOptions('space-1', filters)).toEqual(
+      expect.objectContaining({
+        $type: AssetTypeEnum.Video,
+        order: AssetOrder.Asc,
+      }),
+    );
+  });
+});
+
+describe('handleSpaceRemoveFilter', () => {
+  it('clears both temporal modes when removing timeline filter', () => {
+    const filters = {
+      ...createFilterState(),
+      dateAfter: '2024-01-01',
+      dateBefore: '2024-12-31',
+      selectedYear: 2023,
+      selectedMonth: 8,
+    };
+
+    const result = handleSpaceRemoveFilter(filters, 'timeline');
+    expect(result.dateAfter).toBeUndefined();
+    expect(result.dateBefore).toBeUndefined();
+    expect(result.selectedYear).toBeUndefined();
+    expect(result.selectedMonth).toBeUndefined();
+  });
+});
+```
+
+- [ ] **Step 2: Add failing suggestion DTO and smart-search tests**
+
+Add to `album-filter-config.spec.ts`:
+
+```typescript
+it('passes custom dates to album detail filter suggestions', async () => {
+  const config = buildAlbumDetailFilterConfig('album-1');
+  await config.suggestionsProvider!({
+    ...createFilterState(),
+    dateAfter: '2024-01-01',
+    dateBefore: '2024-12-31',
+  });
+
+  expect(getFilterSuggestions).toHaveBeenCalledWith(
+    expect.objectContaining({
+      albumId: 'album-1',
+      takenAfter: '2024-01-01T00:00:00.000Z',
+      takenBefore: '2025-01-01T00:00:00.000Z',
+    }),
+  );
+});
+
+it('passes custom dates to album asset picker filter suggestions', async () => {
+  const config = buildAlbumAssetPickerFilterConfig();
+  await config.suggestionsProvider!({
+    ...createFilterState(),
+    dateBefore: '2024-12-31',
+  });
+
+  expect(getFilterSuggestions).toHaveBeenCalledWith(
+    expect.objectContaining({
+      takenBefore: '2025-01-01T00:00:00.000Z',
+    }),
+  );
+});
+```
+
 Add to `space-search.spec.ts`:
 
 ```typescript
@@ -977,8 +1193,6 @@ it('prefers custom dates over selected year and month', () => {
   expect(result.takenBefore).toBeUndefined();
 });
 ```
-
-- [ ] **Step 2: Add failing smart search reactivity test**
 
 Add to `smart-search-results.spec.ts`:
 
@@ -1005,12 +1219,96 @@ it('triggers re-fetch when custom date range changes', async () => {
 Run:
 
 ```bash
-pnpm --dir web exec vitest --run src/lib/utils/__tests__/album-filter-options.spec.ts src/lib/utils/__tests__/map-filter-options.spec.ts src/lib/utils/__tests__/space-search.spec.ts src/lib/components/search/smart-search-results.spec.ts
+pnpm --dir web exec vitest --run src/lib/utils/__tests__/album-filter-options.spec.ts src/lib/utils/__tests__/album-filter-config.spec.ts src/lib/utils/__tests__/map-filter-options.spec.ts src/lib/utils/__tests__/space-filter-options.spec.ts src/lib/utils/__tests__/space-search.spec.ts src/lib/components/search/smart-search-results.spec.ts
 ```
 
-Expected: space search and smart-search result reactivity fail until custom fields are wired. Album/map may pass after Task 1 because they already consume `buildFilterContext()`.
+Expected: the new spaces helper test fails because the helper does not exist; space search and smart-search result reactivity fail until custom fields are wired. Album/map may pass after Task 1 because they already consume `buildFilterContext()`.
 
-- [ ] **Step 4: Use shared temporal context in smart search params**
+- [ ] **Step 4: Create tested spaces timeline helper**
+
+Create `space-filter-options.ts`:
+
+```typescript
+import { buildFilterContext, type FilterState } from '$lib/components/filter-panel/filter-panel';
+import { AssetOrder, AssetTypeEnum } from '@immich/sdk';
+
+export function buildSpaceTimelineOptions(spaceId: string, filters: FilterState): Record<string, unknown> {
+  const base: Record<string, unknown> = { spaceId, withStacked: true };
+  if (filters.personIds.length > 0) {
+    base.spacePersonIds = filters.personIds;
+  }
+  if (filters.city) {
+    base.city = filters.city;
+  }
+  if (filters.country) {
+    base.country = filters.country;
+  }
+  if (filters.make) {
+    base.make = filters.make;
+  }
+  if (filters.model) {
+    base.model = filters.model;
+  }
+  if (filters.tagIds.length > 0) {
+    base.tagIds = filters.tagIds;
+  }
+  if (filters.rating !== undefined) {
+    base.rating = filters.rating;
+  }
+  if (filters.mediaType !== 'all') {
+    base.$type = filters.mediaType === 'image' ? AssetTypeEnum.Image : AssetTypeEnum.Video;
+  }
+  base.order = filters.sortOrder === 'asc' ? AssetOrder.Asc : AssetOrder.Desc;
+
+  const context = buildFilterContext(filters);
+  if (context?.takenAfter) {
+    base.takenAfter = context.takenAfter;
+  }
+  if (context?.takenBefore) {
+    base.takenBefore = context.takenBefore;
+  }
+
+  return base;
+}
+
+export function handleSpaceRemoveFilter(filters: FilterState, type: string, id?: string): FilterState {
+  switch (type) {
+    case 'person': {
+      return { ...filters, personIds: filters.personIds.filter((p) => p !== id) };
+    }
+    case 'location': {
+      return { ...filters, city: undefined, country: undefined };
+    }
+    case 'camera': {
+      return { ...filters, make: undefined, model: undefined };
+    }
+    case 'tag': {
+      return { ...filters, tagIds: filters.tagIds.filter((t) => t !== id) };
+    }
+    case 'rating': {
+      return { ...filters, rating: undefined };
+    }
+    case 'media':
+    case 'mediaType': {
+      return { ...filters, mediaType: 'all' };
+    }
+    case 'timeline': {
+      return {
+        ...filters,
+        dateAfter: undefined,
+        dateBefore: undefined,
+        selectedYear: undefined,
+        selectedMonth: undefined,
+      };
+    }
+    default: {
+      return filters;
+    }
+  }
+}
+```
+
+- [ ] **Step 5: Use shared temporal context in smart search params**
 
 Update `space-search.ts`:
 
@@ -1030,33 +1328,36 @@ if (context?.takenBefore) {
 }
 ```
 
-- [ ] **Step 5: Use shared temporal context in spaces route timeline options**
+- [ ] **Step 6: Use tested helper in spaces route**
 
-In the spaces route, replace the route-local temporal block with:
+In `web/src/routes/(user)/spaces/[spaceId]/[[photos=photos]]/[[assetId=id]]/+page.svelte`, import the helper:
 
 ```typescript
-const context = buildFilterContext(filters);
-if (context?.takenAfter) {
-  base.takenAfter = context.takenAfter;
-}
-if (context?.takenBefore) {
-  base.takenBefore = context.takenBefore;
+import { buildSpaceTimelineOptions, handleSpaceRemoveFilter } from '$lib/utils/space-filter-options';
+```
+
+Replace `handleRemoveFilter()` with:
+
+```typescript
+function handleRemoveFilter(type: string, id?: string) {
+  filters = handleSpaceRemoveFilter(filters, type, id);
 }
 ```
 
-Update `handleRemoveFilter('timeline')`:
+Replace the view-mode timeline options branch with:
 
 ```typescript
-filters = {
-  ...filters,
-  dateAfter: undefined,
-  dateBefore: undefined,
-  selectedYear: undefined,
-  selectedMonth: undefined,
-};
+const options = $derived.by(() => {
+  if (viewMode === 'select-assets') {
+    return { visibility: AssetVisibility.Timeline, timelineSpaceId: space.id };
+  }
+  return buildSpaceTimelineOptions(space.id, filters);
+});
 ```
 
-- [ ] **Step 6: Track custom dates in smart search result reactivity**
+Remove the route imports for `AssetOrder` and `AssetTypeEnum`; after this replacement those enum usages live in `space-filter-options.ts`.
+
+- [ ] **Step 7: Track custom dates in smart search result reactivity**
 
 Update the dependency array in `smart-search-results.svelte`:
 
@@ -1080,12 +1381,12 @@ const _ = [
 ];
 ```
 
-- [ ] **Step 7: Run tests and commit**
+- [ ] **Step 8: Run tests and commit**
 
 Run:
 
 ```bash
-pnpm --dir web exec vitest --run src/lib/utils/__tests__/album-filter-options.spec.ts src/lib/utils/__tests__/map-filter-options.spec.ts src/lib/utils/__tests__/space-search.spec.ts src/lib/components/search/smart-search-results.spec.ts
+pnpm --dir web exec vitest --run src/lib/utils/__tests__/album-filter-options.spec.ts src/lib/utils/__tests__/album-filter-config.spec.ts src/lib/utils/__tests__/map-filter-options.spec.ts src/lib/utils/__tests__/space-filter-options.spec.ts src/lib/utils/__tests__/space-search.spec.ts src/lib/components/search/smart-search-results.spec.ts
 ```
 
 Expected: all route/search helper tests pass.
@@ -1093,7 +1394,7 @@ Expected: all route/search helper tests pass.
 Commit:
 
 ```bash
-git add web/src/lib/utils/__tests__/album-filter-options.spec.ts web/src/lib/utils/__tests__/map-filter-options.spec.ts web/src/lib/utils/__tests__/space-search.spec.ts web/src/lib/utils/space-search.ts 'web/src/routes/(user)/spaces/[spaceId]/[[photos=photos]]/[[assetId=id]]/+page.svelte' web/src/lib/components/search/smart-search-results.svelte web/src/lib/components/search/smart-search-results.spec.ts
+git add web/src/lib/utils/__tests__/album-filter-options.spec.ts web/src/lib/utils/__tests__/album-filter-config.spec.ts web/src/lib/utils/__tests__/map-filter-options.spec.ts web/src/lib/utils/__tests__/space-filter-options.spec.ts web/src/lib/utils/space-filter-options.ts web/src/lib/utils/__tests__/space-search.spec.ts web/src/lib/utils/space-search.ts 'web/src/routes/(user)/spaces/[spaceId]/[[photos=photos]]/[[assetId=id]]/+page.svelte' web/src/lib/components/search/smart-search-results.svelte web/src/lib/components/search/smart-search-results.spec.ts
 git commit -m "feat(web): apply custom date ranges to search routes"
 ```
 
@@ -1108,7 +1409,7 @@ git commit -m "feat(web): apply custom date ranges to search routes"
 Run:
 
 ```bash
-pnpm --dir web exec vitest --run src/lib/components/filter-panel/__tests__/filter-state.spec.ts src/lib/components/filter-panel/__tests__/temporal-picker.spec.ts src/lib/components/filter-panel/__tests__/contextual-refetch.spec.ts src/lib/components/filter-panel/__tests__/active-filters-bar.spec.ts src/lib/utils/__tests__/photos-filter-options.spec.ts src/lib/utils/__tests__/album-filter-options.spec.ts src/lib/utils/__tests__/map-filter-options.spec.ts src/lib/utils/__tests__/space-search.spec.ts src/lib/components/search/smart-search-results.spec.ts
+pnpm --dir web exec vitest --run src/lib/components/filter-panel/__tests__/filter-state.spec.ts src/lib/components/filter-panel/__tests__/temporal-picker.spec.ts src/lib/components/filter-panel/__tests__/contextual-refetch.spec.ts src/lib/components/filter-panel/__tests__/active-filters-bar.spec.ts src/lib/utils/__tests__/photos-filter-options.spec.ts src/lib/utils/__tests__/album-filter-options.spec.ts src/lib/utils/__tests__/album-filter-config.spec.ts src/lib/utils/__tests__/map-filter-options.spec.ts src/lib/utils/__tests__/space-filter-options.spec.ts src/lib/utils/__tests__/space-search.spec.ts src/lib/components/search/smart-search-results.spec.ts
 ```
 
 Expected: all listed tests pass.
@@ -1129,8 +1430,8 @@ Expected: both commands pass. Existing Svelte warnings are acceptable only if th
 Run:
 
 ```bash
-pnpm --dir web exec prettier --check src/lib/components/filter-panel/filter-panel.ts src/lib/components/filter-panel/filter-panel.svelte src/lib/components/filter-panel/temporal-picker.svelte src/lib/components/filter-panel/active-filters-bar.svelte src/lib/components/filter-panel/__tests__/filter-state.spec.ts src/lib/components/filter-panel/__tests__/temporal-picker.spec.ts src/lib/components/filter-panel/__tests__/contextual-refetch.spec.ts src/lib/components/filter-panel/__tests__/active-filters-bar.spec.ts src/lib/utils/photos-filter-options.ts src/lib/utils/__tests__/photos-filter-options.spec.ts src/lib/utils/album-filter-options.ts src/lib/utils/__tests__/album-filter-options.spec.ts src/lib/utils/map-filter-options.ts src/lib/utils/__tests__/map-filter-options.spec.ts src/lib/utils/space-search.ts src/lib/utils/__tests__/space-search.spec.ts src/lib/components/search/smart-search-results.svelte src/lib/components/search/smart-search-results.spec.ts 'src/routes/(user)/spaces/[spaceId]/[[photos=photos]]/[[assetId=id]]/+page.svelte'
-pnpm --dir web exec eslint src/lib/components/filter-panel/filter-panel.ts src/lib/components/filter-panel/filter-panel.svelte src/lib/components/filter-panel/temporal-picker.svelte src/lib/components/filter-panel/active-filters-bar.svelte src/lib/components/filter-panel/__tests__/filter-state.spec.ts src/lib/components/filter-panel/__tests__/temporal-picker.spec.ts src/lib/components/filter-panel/__tests__/contextual-refetch.spec.ts src/lib/components/filter-panel/__tests__/active-filters-bar.spec.ts src/lib/utils/photos-filter-options.ts src/lib/utils/__tests__/photos-filter-options.spec.ts src/lib/utils/album-filter-options.ts src/lib/utils/__tests__/album-filter-options.spec.ts src/lib/utils/map-filter-options.ts src/lib/utils/__tests__/map-filter-options.spec.ts src/lib/utils/space-search.ts src/lib/utils/__tests__/space-search.spec.ts src/lib/components/search/smart-search-results.svelte src/lib/components/search/smart-search-results.spec.ts 'src/routes/(user)/spaces/[spaceId]/[[photos=photos]]/[[assetId=id]]/+page.svelte' --max-warnings 0
+pnpm --dir web exec prettier --check src/lib/components/filter-panel/filter-panel.ts src/lib/components/filter-panel/filter-panel.svelte src/lib/components/filter-panel/temporal-picker.svelte src/lib/components/filter-panel/active-filters-bar.svelte src/lib/components/filter-panel/__tests__/filter-state.spec.ts src/lib/components/filter-panel/__tests__/temporal-picker.spec.ts src/lib/components/filter-panel/__tests__/contextual-refetch.spec.ts src/lib/components/filter-panel/__tests__/active-filters-bar.spec.ts src/lib/utils/photos-filter-options.ts src/lib/utils/__tests__/photos-filter-options.spec.ts src/lib/utils/album-filter-options.ts src/lib/utils/__tests__/album-filter-options.spec.ts src/lib/utils/__tests__/album-filter-config.spec.ts src/lib/utils/map-filter-options.ts src/lib/utils/__tests__/map-filter-options.spec.ts src/lib/utils/space-filter-options.ts src/lib/utils/__tests__/space-filter-options.spec.ts src/lib/utils/space-search.ts src/lib/utils/__tests__/space-search.spec.ts src/lib/components/search/smart-search-results.svelte src/lib/components/search/smart-search-results.spec.ts 'src/routes/(user)/spaces/[spaceId]/[[photos=photos]]/[[assetId=id]]/+page.svelte'
+pnpm --dir web exec eslint src/lib/components/filter-panel/filter-panel.ts src/lib/components/filter-panel/filter-panel.svelte src/lib/components/filter-panel/temporal-picker.svelte src/lib/components/filter-panel/active-filters-bar.svelte src/lib/components/filter-panel/__tests__/filter-state.spec.ts src/lib/components/filter-panel/__tests__/temporal-picker.spec.ts src/lib/components/filter-panel/__tests__/contextual-refetch.spec.ts src/lib/components/filter-panel/__tests__/active-filters-bar.spec.ts src/lib/utils/photos-filter-options.ts src/lib/utils/__tests__/photos-filter-options.spec.ts src/lib/utils/album-filter-options.ts src/lib/utils/__tests__/album-filter-options.spec.ts src/lib/utils/__tests__/album-filter-config.spec.ts src/lib/utils/map-filter-options.ts src/lib/utils/__tests__/map-filter-options.spec.ts src/lib/utils/space-filter-options.ts src/lib/utils/__tests__/space-filter-options.spec.ts src/lib/utils/space-search.ts src/lib/utils/__tests__/space-search.spec.ts src/lib/components/search/smart-search-results.svelte src/lib/components/search/smart-search-results.spec.ts 'src/routes/(user)/spaces/[spaceId]/[[photos=photos]]/[[assetId=id]]/+page.svelte' --max-warnings 0
 ```
 
 Expected: both commands pass. If Prettier fails, run the same file list with `--write`, review the diff, then rerun check.

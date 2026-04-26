@@ -32,6 +32,7 @@ Out of scope:
 5. **Invalid typed dates stay local** - invalid input does not update `FilterState` or refetch suggestions.
 6. **Shared state drives every page** - route option builders should continue consuming `buildFilterContext()` instead of duplicating date logic.
 7. **Contextual suggestions must update** - changing custom dates must narrow the available people, locations, cameras, and tags just like changing year/month does today.
+8. **Date inputs are validated text inputs** - use `YYYY-MM-DD` text fields, not native `type="date"`, so malformed and impossible typed dates can stay visible locally while `FilterState` remains unchanged.
 
 ## Interaction Model
 
@@ -68,6 +69,8 @@ If the user types an invalid date:
 - Show a small inline error for that field.
 - Do not update `FilterState`.
 - Do not refetch suggestions until the field is valid or cleared.
+- Treat impossible calendar dates such as `2024-02-31` as invalid, not as normalized JavaScript dates.
+- If the user clears an invalid field while the other side is valid, emit the remaining open-ended range.
 
 ## Data Model
 
@@ -101,6 +104,8 @@ If one custom field is cleared while the other remains valid, keep the remaining
 ## Component Design
 
 Add a focused custom date range control inside the existing timeline section. It can live in `temporal-picker.svelte` or a new child component owned by it; the implementation should keep the public timeline-section API small.
+
+Use text inputs with `inputmode="numeric"`, `placeholder="YYYY-MM-DD"`, and strict parsing. Native date inputs are not used because browsers may prevent or normalize invalid text before the component can preserve the typed value and show the required local validation error.
 
 The control exposes:
 
@@ -153,6 +158,8 @@ This avoids route-specific suggestion behavior and keeps photos, albums, spaces,
 
 Route option builders that already consume `buildFilterContext()` should pick up custom dates through the shared helper. Any route that still builds temporal options locally must be changed to use the shared helper so custom dates and year/month semantics stay consistent.
 
+Route-local temporal option construction should be extracted into helper functions when practical so the custom date behavior can be covered by unit tests. The spaces timeline options currently build date ranges inside the route component, so this slice should introduce a small spaces filter-options helper and make the route consume it.
+
 Expected routes:
 
 - `/photos` timeline options and smart-search filters.
@@ -188,7 +195,8 @@ Add or update focused web tests:
   - entering `To` clears selected year/month
   - selecting a year clears custom dates
   - selecting a month clears custom dates
-  - invalid dates and inverted ranges do not call the change handler
+  - malformed dates, impossible dates, and inverted ranges do not call the change handler
+  - clearing an invalid field emits the remaining valid open-ended range
 
 - `active-filters-bar.spec.ts`
   - bounded custom range chip label
@@ -206,8 +214,10 @@ Add or update focused web tests:
 - route option helper tests
   - photos options include custom `takenAfter` / `takenBefore`
   - album options include custom dates for album and picker modes
+  - real suggestion config builders send custom `takenAfter` / `takenBefore` to `getFilterSuggestions()`
   - map options include custom dates for markers and time buckets
-  - spaces options include custom dates while preserving existing space person behavior
+  - spaces timeline options include custom dates while preserving existing space-person mapping
+  - spaces timeline removal clears both custom dates and year/month
   - smart-search result components rerun when `dateAfter` or `dateBefore` changes
 
 ## Rollout Notes
