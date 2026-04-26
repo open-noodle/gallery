@@ -582,7 +582,7 @@
   "back_close_deselect": "Til baka, loka eða hætta við val",
   "background_backup_running_error": "Afritun er nú þegar í gangi í bakgrunni, get ekki hafið handvirka afritun",
   "background_location_permission": "Leyfi á staðsetningu afritunar",
-  "background_location_permission_content": "Til að skipta um net í bakgrunni þarf Immich *alltaf* að hafa nákvæman aðgang að nákvæmum staðsetningargögnum svo að forritið geti lesið heitið á Wi-Fi netinu",
+  "background_location_permission_content": "Immich uses background location permission to keep reading the Wi-Fi network name while automatic server switching runs in the background. The Wi-Fi network name is saved on this device for matching, and your precise device location is not stored or shared.",
   "background_options": "Bakgrunnsvalmöguleikar",
   "backup": "Afrit",
   "backup_album_selection_page_albums_device": "Myndasöfn á tæki ({count})",
