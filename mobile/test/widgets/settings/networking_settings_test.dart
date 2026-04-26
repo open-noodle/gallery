@@ -175,4 +175,32 @@ void main() {
     verifyNever(() => permissionRepository.requestLocationAlwaysPermission());
     verifyNever(() => permissionRepository.openSettings());
   });
+
+  testWidgets('use current connection does not read Wi-Fi after endpoint disclosure decline', (tester) async {
+    when(() => permissionRepository.hasLocationWhenInUsePermission()).thenAnswer((_) async => true);
+    when(() => permissionRepository.hasLocationAlwaysPermission()).thenAnswer((_) async => true);
+
+    await tester.pumpConsumerWidget(
+      const NetworkingSettings(),
+      overrides: [
+        authProvider.overrideWith((ref) => authNotifier),
+        networkServiceProvider.overrideWithValue(networkService),
+      ],
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('location_permission'), findsOneWidget);
+
+    await tester.tap(find.text('cancel'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('location_permission'), findsNothing);
+
+    await tester.tap(find.text('use_current_connection'));
+    await tester.pumpAndSettle();
+
+    verifyNever(() => networkRepository.getWifiName());
+    verifyNever(() => authNotifier.saveWifiName(any()));
+    expect(Store.get(StoreKey.autoEndpointLocationDisclosureAccepted, false), isFalse);
+  });
 }
