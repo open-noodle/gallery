@@ -19,6 +19,8 @@ void main() {
   }
 
   void expectMapDisclosure(String source, String content) {
+    expect(content, contains('Noodle Gallery'), reason: source);
+    expect(content, isNot(contains('Immich')), reason: source);
     expect(content, contains('precise current location'), reason: source);
     expect(content, contains('center the map'), reason: source);
     expect(content, contains('current area'), reason: source);
@@ -33,6 +35,8 @@ void main() {
 
   void expectAutomaticEndpointDisclosures(String source, Map<String, dynamic> translations) {
     if (translations case {'location_permission_content': final String foreground}) {
+      expect(foreground, contains('Noodle Gallery'), reason: source);
+      expect(foreground, isNot(contains('Immich')), reason: source);
       expect(foreground, contains('precise location'), reason: source);
       expect(foreground, contains('Wi-Fi network name'), reason: source);
       expect(foreground, contains('saved on this device for matching'), reason: source);
@@ -41,6 +45,8 @@ void main() {
     }
 
     if (translations case {'background_location_permission_content': final String background}) {
+      expect(background, contains('Noodle Gallery'), reason: source);
+      expect(background, isNot(contains('Immich')), reason: source);
       expect(background, contains('background location'), reason: source);
       expect(background, contains('Wi-Fi network name'), reason: source);
       expect(background, contains('saved on this device for matching'), reason: source);
