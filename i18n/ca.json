@@ -1495,7 +1495,7 @@
   "map_cannot_get_user_location": "No es pot obtenir la ubicació de l'usuari",
   "map_location_dialog_yes": "Sí",
   "map_location_picker_page_use_location": "Utilitzar aquesta ubicació",
-  "map_location_service_disabled_content": "El servei de localització s'ha d'activar per mostrar els elements de la teva ubicació actual. Vols activar-lo ara?",
+  "map_location_service_disabled_content": "Immich uses your precise current location to center the map and show photos and videos from your current area. Location services must be enabled before Immich can access this location. Your precise device location is not stored or shared. Do you want to open location settings now?",
   "map_location_service_disabled_title": "Servei de localització desactivat",
   "map_marker_for_images": "Marcador de mapa per a imatges fetes a {city}, {country}",
   "map_marker_with_image": "Marcador de mapa amb imatge",

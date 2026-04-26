@@ -1495,7 +1495,7 @@
   "map_cannot_get_user_location": "사용자의 위치를 가져올 수 없습니다.",
   "map_location_dialog_yes": "예",
   "map_location_picker_page_use_location": "이 위치 사용",
-  "map_location_service_disabled_content": "현재 위치의 항목을 표시하려면 위치 서비스를 활성화해야 합니다. 지금 활성화하시겠습니까?",
+  "map_location_service_disabled_content": "Immich uses your precise current location to center the map and show photos and videos from your current area. Location services must be enabled before Immich can access this location. Your precise device location is not stored or shared. Do you want to open location settings now?",
   "map_location_service_disabled_title": "위치 서비스 비활성화됨",
   "map_marker_for_images": "{country}, {city}에서 촬영된 이미지의 지도 마커",
   "map_marker_with_image": "이미지가 있는 지도 마커",

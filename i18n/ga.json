@@ -1495,7 +1495,7 @@
   "map_cannot_get_user_location": "Ní féidir suíomh an úsáideora a fháil",
   "map_location_dialog_yes": "Tá",
   "map_location_picker_page_use_location": "Úsáid an suíomh seo",
-  "map_location_service_disabled_content": "Ní mór seirbhís suímh a chumasú chun sócmhainní ó do shuíomh reatha a thaispeáint. Ar mhaith leat é a chumasú anois?",
+  "map_location_service_disabled_content": "Immich uses your precise current location to center the map and show photos and videos from your current area. Location services must be enabled before Immich can access this location. Your precise device location is not stored or shared. Do you want to open location settings now?",
   "map_location_service_disabled_title": "Seirbhís Suímh díchumasaithe",
   "map_marker_for_images": "Marcóir léarscáile le haghaidh íomhánna a tógadh i {city}, {country}",
   "map_marker_with_image": "Marcóir léarscáile le híomhá",

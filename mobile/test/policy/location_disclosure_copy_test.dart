@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:immich_mobile/generated/codegen_loader.g.dart';
 
 void main() {
   Map<String, dynamic> loadTranslations(String path) {
@@ -24,6 +25,12 @@ void main() {
     expect(content, contains('precise device location is not stored or shared'), reason: source);
   }
 
+  void expectMapServiceDisclosure(String source, String content) {
+    expectMapDisclosure(source, content);
+    expect(content, contains('Location services must be enabled'), reason: source);
+    expect(content, contains('open location settings'), reason: source);
+  }
+
   void expectAutomaticEndpointDisclosures(String source, Map<String, dynamic> translations) {
     if (translations case {'location_permission_content': final String foreground}) {
       expect(foreground, contains('precise location'), reason: source);
@@ -42,10 +49,24 @@ void main() {
     }
   }
 
-  test('map disclosure explains precise current location usage', () {
+  test('map disclosures explain precise current location usage', () {
     for (final MapEntry(key: source, value: translations) in loadAllTranslationFiles()) {
       if (translations case {'map_no_location_permission_content': final String content}) {
         expectMapDisclosure(source, content);
+      }
+      if (translations case {'map_location_service_disabled_content': final String content}) {
+        expectMapServiceDisclosure(source, content);
+      }
+    }
+  });
+
+  test('generated runtime map disclosures match policy requirements', () {
+    for (final MapEntry(key: locale, value: translations) in CodegenLoader.mapLocales.entries) {
+      if (translations case {'map_no_location_permission_content': final String content}) {
+        expectMapDisclosure('CodegenLoader.$locale.map_no_location_permission_content', content);
+      }
+      if (translations case {'map_location_service_disabled_content': final String content}) {
+        expectMapServiceDisclosure('CodegenLoader.$locale.map_location_service_disabled_content', content);
       }
     }
   });

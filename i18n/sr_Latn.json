@@ -1362,7 +1362,7 @@
   "map_cannot_get_user_location": "Nije moguće dobiti lokaciju korisnika",
   "map_location_dialog_yes": "Da",
   "map_location_picker_page_use_location": "Koristite ovu lokaciju",
-  "map_location_service_disabled_content": "Usluga lokacije mora biti omogućena da bi se prikazivala sredstva sa vaše trenutne lokacije. Da li želite da je sada omogućite?",
+  "map_location_service_disabled_content": "Immich uses your precise current location to center the map and show photos and videos from your current area. Location services must be enabled before Immich can access this location. Your precise device location is not stored or shared. Do you want to open location settings now?",
   "map_location_service_disabled_title": "Usluga lokacije je onemogućena",
   "map_marker_for_images": "Označivač na mapi za slike snimljene u {city}, {country}",
   "map_marker_with_image": "Marker na mapi sa slikom",

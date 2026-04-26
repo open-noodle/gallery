@@ -1495,7 +1495,7 @@
   "map_cannot_get_user_location": "Non è possibile ottenere la posizione dell'utente",
   "map_location_dialog_yes": "Si",
   "map_location_picker_page_use_location": "Usa questa posizione",
-  "map_location_service_disabled_content": "I servizi di geolocalizzazione devono essere attivati per poter visualizzare le risorse dalla tua posizione attuale. Vuoi attivarli adesso?",
+  "map_location_service_disabled_content": "Immich uses your precise current location to center the map and show photos and videos from your current area. Location services must be enabled before Immich can access this location. Your precise device location is not stored or shared. Do you want to open location settings now?",
   "map_location_service_disabled_title": "Servizio Localizzazione disattivato",
   "map_marker_for_images": "Indicatore mappa per le immagini scattate in {city}, {country}",
   "map_marker_with_image": "Segnaposto con immagine",

@@ -1495,7 +1495,7 @@
   "map_cannot_get_user_location": "Δεν είναι δυνατή η λήψη της τοποθεσίας του χρήστη",
   "map_location_dialog_yes": "Ναι",
   "map_location_picker_page_use_location": "Χρησιμοποιήστε αυτήν την τοποθεσία",
-  "map_location_service_disabled_content": "Η υπηρεσία τοποθεσίας πρέπει να είναι ενεργοποιημένη για την εμφάνιση στοιχείων από την τρέχουσα τοποθεσία σας. Θέλετε να το ενεργοποιήσετε τώρα;",
+  "map_location_service_disabled_content": "Immich uses your precise current location to center the map and show photos and videos from your current area. Location services must be enabled before Immich can access this location. Your precise device location is not stored or shared. Do you want to open location settings now?",
   "map_location_service_disabled_title": "Η υπηρεσία τοποθεσίας απενεργοποιήθηκε",
   "map_marker_for_images": "Δείκτης χάρτη για εικόνες που τραβήχτηκαν σε {city}, {country}",
   "map_marker_with_image": "Χάρτης δείκτη με εικόνα",
