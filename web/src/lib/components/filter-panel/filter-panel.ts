@@ -56,6 +56,8 @@ export interface FilterState {
   mediaType: 'all' | 'image' | 'video';
   isFavorite?: boolean;
   sortOrder: 'asc' | 'desc' | 'relevance';
+  dateAfter?: string;
+  dateBefore?: string;
   selectedYear?: number;
   selectedMonth?: number;
 }
@@ -70,6 +72,9 @@ export function createFilterState(): FilterState {
 }
 
 export function getActiveFilterCount(state: FilterState): number {
+  const hasTemporalFilter =
+    hasDateValue(state.dateAfter) || hasDateValue(state.dateBefore) || state.selectedYear !== undefined;
+
   return (
     (state.personIds.length > 0 ? 1 : 0) +
     (state.city ? 1 : 0) +
@@ -79,7 +84,7 @@ export function getActiveFilterCount(state: FilterState): number {
     (state.rating === undefined ? 0 : 1) +
     (state.mediaType === 'all' ? 0 : 1) +
     (state.isFavorite === undefined ? 0 : 1) +
-    (state.selectedYear === undefined ? 0 : 1)
+    (hasTemporalFilter ? 1 : 0)
   );
 }
 
@@ -91,6 +96,42 @@ export type FilterContext = {
   rating?: number;
   isFavorite?: boolean;
 };
+
+function parseDateOnly(value: string | undefined): { valid: true; value?: string } | { valid: false } {
+  if (!value) {
+    return { valid: true };
+  }
+
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) {
+    return { valid: false };
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) {
+    return { valid: false };
+  }
+
+  return { valid: true, value };
+}
+
+function hasDateValue(value: string | undefined): boolean {
+  const parsed = parseDateOnly(value);
+  return parsed.valid && parsed.value !== undefined;
+}
+
+function dateOnlyToUtcStart(value: string): string {
+  return new Date(`${value}T00:00:00.000Z`).toISOString();
+}
+
+function dateOnlyToExclusiveUtcEnd(value: string): string {
+  const date = new Date(`${value}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + 1);
+  return date.toISOString();
+}
 
 export function buildFilterContext(
   state: FilterState,
@@ -115,7 +156,19 @@ export function buildFilterContext(
     context.isFavorite = state.isFavorite;
   }
 
-  if (state.selectedYear && includes('selectedYear')) {
+  const parsedDateAfter = includes('dateAfter') ? parseDateOnly(state.dateAfter) : { valid: true as const };
+  const parsedDateBefore = includes('dateBefore') ? parseDateOnly(state.dateBefore) : { valid: true as const };
+  const validDateAfter = parsedDateAfter.valid ? parsedDateAfter.value : undefined;
+  const validDateBefore = parsedDateBefore.valid ? parsedDateBefore.value : undefined;
+
+  if (validDateAfter || validDateBefore) {
+    if (validDateAfter) {
+      context.takenAfter = dateOnlyToUtcStart(validDateAfter);
+    }
+    if (validDateBefore) {
+      context.takenBefore = dateOnlyToExclusiveUtcEnd(validDateBefore);
+    }
+  } else if (state.selectedYear && includes('selectedYear')) {
     if (state.selectedMonth && includes('selectedMonth')) {
       context.takenAfter = new Date(Date.UTC(state.selectedYear, state.selectedMonth - 1, 1)).toISOString();
       context.takenBefore = new Date(Date.UTC(state.selectedYear, state.selectedMonth, 1)).toISOString();
@@ -140,6 +193,8 @@ export function clearFilters(state: FilterState): FilterState {
     rating: undefined,
     mediaType: 'all',
     isFavorite: undefined,
+    dateAfter: undefined,
+    dateBefore: undefined,
     selectedYear: undefined,
     selectedMonth: undefined,
     // sortOrder is NOT cleared — it's a view preference
