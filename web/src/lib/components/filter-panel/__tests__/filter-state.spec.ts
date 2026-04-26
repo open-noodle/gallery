@@ -74,6 +74,13 @@ describe('FilterState utilities', () => {
     expect(getActiveFilterCount(state)).toBe(2);
   });
 
+  it('should not count empty custom date strings as active temporal filters', () => {
+    const state = createFilterState();
+    state.dateAfter = '';
+    state.dateBefore = '';
+    expect(getActiveFilterCount(state)).toBe(0);
+  });
+
   it('should not double-count country when city is set', () => {
     const state = createFilterState();
     state.country = 'Germany';
@@ -232,8 +239,40 @@ describe('buildFilterContext', () => {
     });
   });
 
+  it('should not build context for empty custom date strings', () => {
+    const state = createFilterState();
+    state.dateAfter = '';
+    state.dateBefore = '';
+    expect(buildFilterContext(state)).toBeUndefined();
+  });
+
   it('should build to-only custom date context with exclusive end date', () => {
     const state = createFilterState();
+    state.dateBefore = '2024-12-31';
+    expect(buildFilterContext(state)).toEqual({
+      takenBefore: '2025-01-01T00:00:00.000Z',
+    });
+  });
+
+  it('should ignore invalid custom date strings', () => {
+    const state = createFilterState();
+    state.dateAfter = 'not-a-date';
+    state.dateBefore = '2024-02-31';
+    expect(buildFilterContext(state)).toBeUndefined();
+  });
+
+  it('should build from-only context when to date is invalid', () => {
+    const state = createFilterState();
+    state.dateAfter = '2024-01-01';
+    state.dateBefore = '2024-02-31';
+    expect(buildFilterContext(state)).toEqual({
+      takenAfter: '2024-01-01T00:00:00.000Z',
+    });
+  });
+
+  it('should build to-only context when from date is malformed', () => {
+    const state = createFilterState();
+    state.dateAfter = '01/01/2024';
     state.dateBefore = '2024-12-31';
     expect(buildFilterContext(state)).toEqual({
       takenBefore: '2025-01-01T00:00:00.000Z',

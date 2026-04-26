@@ -97,38 +97,42 @@ export type FilterContext = {
   isFavorite?: boolean;
 };
 
-function parseDateOnly(value: string | undefined): { valid: true; value?: string } | { valid: false } {
-  if (!value) {
-    return { valid: true };
+function hasDateValue(value: string | undefined): value is string {
+  return value !== undefined && value !== '';
+}
+
+function parseDateOnly(value: string | undefined): Date | undefined {
+  if (!hasDateValue(value)) {
+    return undefined;
   }
 
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
   if (!match) {
-    return { valid: false };
+    return undefined;
   }
 
   const year = Number(match[1]);
   const month = Number(match[2]);
   const day = Number(match[3]);
   const date = new Date(Date.UTC(year, month - 1, day));
+
   if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) {
-    return { valid: false };
+    return undefined;
   }
 
-  return { valid: true, value };
+  return date;
 }
 
-function hasDateValue(value: string | undefined): boolean {
-  const parsed = parseDateOnly(value);
-  return parsed.valid && parsed.value !== undefined;
+function dateOnlyToUtcStart(value: string | undefined): string | undefined {
+  return parseDateOnly(value)?.toISOString();
 }
 
-function dateOnlyToUtcStart(value: string): string {
-  return new Date(`${value}T00:00:00.000Z`).toISOString();
-}
+function dateOnlyToExclusiveUtcEnd(value: string | undefined): string | undefined {
+  const date = parseDateOnly(value);
+  if (!date) {
+    return undefined;
+  }
 
-function dateOnlyToExclusiveUtcEnd(value: string): string {
-  const date = new Date(`${value}T00:00:00.000Z`);
   date.setUTCDate(date.getUTCDate() + 1);
   return date.toISOString();
 }
@@ -156,17 +160,15 @@ export function buildFilterContext(
     context.isFavorite = state.isFavorite;
   }
 
-  const parsedDateAfter = includes('dateAfter') ? parseDateOnly(state.dateAfter) : { valid: true as const };
-  const parsedDateBefore = includes('dateBefore') ? parseDateOnly(state.dateBefore) : { valid: true as const };
-  const validDateAfter = parsedDateAfter.valid ? parsedDateAfter.value : undefined;
-  const validDateBefore = parsedDateBefore.valid ? parsedDateBefore.value : undefined;
+  const validDateAfter = includes('dateAfter') ? dateOnlyToUtcStart(state.dateAfter) : undefined;
+  const validDateBefore = includes('dateBefore') ? dateOnlyToExclusiveUtcEnd(state.dateBefore) : undefined;
 
   if (validDateAfter || validDateBefore) {
     if (validDateAfter) {
-      context.takenAfter = dateOnlyToUtcStart(validDateAfter);
+      context.takenAfter = validDateAfter;
     }
     if (validDateBefore) {
-      context.takenBefore = dateOnlyToExclusiveUtcEnd(validDateBefore);
+      context.takenBefore = validDateBefore;
     }
   } else if (state.selectedYear && includes('selectedYear')) {
     if (state.selectedMonth && includes('selectedMonth')) {
