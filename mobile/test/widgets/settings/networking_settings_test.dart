@@ -89,6 +89,7 @@ void main() {
     await tester.tap(find.text('cancel'));
     await tester.pumpAndSettle();
 
+    expect(find.text('location_permission'), findsNothing);
     verifyNever(() => permissionRepository.requestLocationWhenInUsePermission());
     verifyNever(() => permissionRepository.requestLocationAlwaysPermission());
     verifyNever(() => permissionRepository.openSettings());
@@ -115,6 +116,7 @@ void main() {
     await tester.tap(find.text('cancel'));
     await tester.pumpAndSettle();
 
+    expect(find.text('background_location_permission'), findsNothing);
     verifyNever(() => permissionRepository.requestLocationAlwaysPermission());
     verifyNever(() => permissionRepository.openSettings());
   });
