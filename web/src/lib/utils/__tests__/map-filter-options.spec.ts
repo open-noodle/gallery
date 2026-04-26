@@ -1,8 +1,8 @@
 import { createFilterState } from '$lib/components/filter-panel/filter-panel';
 import {
   buildMapMarkerOptions,
-  buildMapTimelineOptions,
   buildMapTimeBucketOptions,
+  buildMapTimelineOptions,
 } from '$lib/utils/map-filter-options';
 import { AssetTypeEnum, AssetVisibility } from '@immich/sdk';
 
