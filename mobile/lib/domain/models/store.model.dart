@@ -14,7 +14,7 @@ enum StoreKey<T> {
   serverEndpoint<String>._(12),
   advancedTroubleshooting<bool>._(114),
   enableHapticFeedback<bool>._(126),
-
+  autoEndpointLocationDisclosureAccepted<bool>._(142),
   manageLocalMediaAndroid<bool>._(137),
   // Read-only Mode settings
   readonlyModeEnabled<bool>._(138),
