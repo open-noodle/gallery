@@ -206,10 +206,7 @@ describe(AssetService.name, () => {
     });
 
     it('should strip unassigned faces for space member with spaceId', async () => {
-      const asset = AssetFactory.from()
-        .exif()
-        .face({ id: 'unassigned-face-id' })
-        .build();
+      const asset = AssetFactory.from().exif().face({ id: 'unassigned-face-id' }).build();
       mocks.access.asset.checkSpaceAccess.mockResolvedValue(new Set([asset.id]));
       mocks.asset.getById.mockResolvedValue(asset as any);
       mocks.sharedSpace.getMember.mockResolvedValue({ userId: authStub.admin.user.id } as any);
