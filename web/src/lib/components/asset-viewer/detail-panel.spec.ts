@@ -1,6 +1,6 @@
 import { renderWithTooltips } from '$tests/helpers';
-import '@testing-library/jest-dom';
 import { AssetTypeEnum, AssetVisibility, type AssetResponseDto } from '@immich/sdk';
+import '@testing-library/jest-dom';
 import DetailPanel from './detail-panel.svelte';
 
 const { getAllAlbumsMock, getAssetInfoMock } = vi.hoisted(() => ({
