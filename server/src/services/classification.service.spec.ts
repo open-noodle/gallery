@@ -5,11 +5,26 @@ import { makeStream, newTestService, ServiceMocks } from 'test/utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const makeClassificationConfig = (
-  categories: Array<{ name: string; prompts: string[]; similarity: number; action: string; enabled?: boolean }> = [],
+  categories: Array<{
+    name: string;
+    prompts: string[];
+    similarity: number;
+    action: string;
+    enabled?: boolean;
+    faceExclusion?: 'off' | 'any_assigned_face' | 'named_people' | 'named_visible_people';
+  }> = [],
   enabled = true,
+  facialRecognitionEnabled = true,
 ) => ({
-  classification: { enabled, categories: categories.map((c) => ({ ...c, enabled: c.enabled ?? true })) },
-  machineLearning: { clip: { modelName: 'test-model' } },
+  classification: {
+    enabled,
+    categories: categories.map((c) => ({ ...c, enabled: c.enabled ?? true, faceExclusion: c.faceExclusion ?? 'off' })),
+  },
+  machineLearning: {
+    enabled: true,
+    clip: { modelName: 'test-model' },
+    facialRecognition: { enabled: facialRecognitionEnabled },
+  },
 });
 
 describe(ClassificationService.name, () => {
