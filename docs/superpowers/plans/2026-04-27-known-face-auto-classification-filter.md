@@ -262,6 +262,21 @@ Add this `describe` block before `removeAutoTagAssignments`:
       });
     });
 
+    it('should treat assigned unnamed people as assigned but not named', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      const { person } = await ctx.newPerson({ ownerId: user.id, name: '   ', isHidden: false, type: 'person' });
+
+      await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+
+      await expect(sut.getFaceSummary(asset.id)).resolves.toEqual({
+        hasAssignedFace: true,
+        hasNamedPerson: false,
+        hasNamedVisiblePerson: false,
+      });
+    });
+
     it('should ignore invisible deleted and pet rows', async () => {
       const { ctx, sut } = setup();
       const { user } = await ctx.newUser();
@@ -314,14 +329,15 @@ Add this method to `ClassificationRepository`:
       .innerJoin('person', 'person.id', 'asset_face.personId')
       .select([
         sql<boolean>`count(*) > 0`.as('hasAssignedFace'),
-        sql<boolean>`count(*) filter (where btrim(person.name) != '') > 0`.as('hasNamedPerson'),
-        sql<boolean>`count(*) filter (where btrim(person.name) != '' and person."isHidden" is false) > 0`.as(
+        sql<boolean>`count(*) filter (where btrim("person"."name") != '') > 0`.as('hasNamedPerson'),
+        sql<boolean>`count(*) filter (where btrim("person"."name") != '' and "person"."isHidden" is false) > 0`.as(
           'hasNamedVisiblePerson',
         ),
       ])
       .where('asset_face.assetId', '=', assetId)
       .where('asset_face.deletedAt', 'is', null)
       .where('asset_face.isVisible', 'is', true)
+      .where('asset_face.personId', 'is not', null)
       .where('person.type', '=', 'person')
       .executeTakeFirst();
 
@@ -440,7 +456,7 @@ describe(JobRepository.name, () => {
     const { sut, queue } = setup([{ ...emptyCounts(), waiting: 1 }, emptyCounts()]);
 
     const promise = sut.waitForQueueCompletion(QueueName.FaceDetection);
-    await vi.waitFor(() => expect(queue.getJobCounts).toHaveBeenCalledTimes(1));
+    expect(queue.getJobCounts).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(1000);
     await promise;
 
@@ -451,7 +467,7 @@ describe(JobRepository.name, () => {
     const { sut, queue } = setup([{ ...emptyCounts(), delayed: 1 }, emptyCounts()]);
 
     const promise = sut.waitForQueueCompletion(QueueName.FacialRecognition);
-    await vi.waitFor(() => expect(queue.getJobCounts).toHaveBeenCalledTimes(1));
+    expect(queue.getJobCounts).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(1000);
     await promise;
 
@@ -605,6 +621,9 @@ In `server/src/services/classification.service.spec.ts`, add these tests inside 
       await sut.handleClassify({ id: 'asset-1' });
 
       expect(mocks.job.waitForQueueCompletion).toHaveBeenCalledWith(QueueName.FaceDetection, QueueName.FacialRecognition);
+      expect(mocks.job.waitForQueueCompletion.mock.invocationCallOrder[0]).toBeLessThan(
+        mocks.classification.getFaceSummary.mock.invocationCallOrder[0],
+      );
       expect(mocks.machineLearning.encodeText).toHaveBeenCalledTimes(1);
       expect(mocks.machineLearning.encodeText).toHaveBeenCalledWith('a screenshot', { modelName: 'test-model' });
     });
@@ -641,6 +660,38 @@ In `server/src/services/classification.service.spec.ts`, add these tests inside 
       expect(mocks.tag.upsertAssetIds).toHaveBeenCalledWith([{ tagId: 'tag-id', assetId: 'asset-1' }]);
     });
 
+    it('should skip named_people category when a named person exists', async () => {
+      mocks.asset.getById.mockResolvedValue({
+        id: 'asset-1',
+        ownerId: 'user-1',
+        visibility: AssetVisibility.Timeline,
+      } as any);
+      mocks.search.getEmbedding.mockResolvedValue('[1,0,0]' as any);
+      mocks.classification.getFaceSummary.mockResolvedValue({
+        hasAssignedFace: true,
+        hasNamedPerson: true,
+        hasNamedVisiblePerson: true,
+      });
+      sut['getConfig'] = vi.fn().mockResolvedValue(
+        makeClassificationConfig([
+          {
+            name: 'People',
+            prompts: ['a portrait'],
+            similarity: 0.8,
+            action: 'tag',
+            faceExclusion: 'named_people',
+          },
+        ]),
+      );
+
+      const result = await sut.handleClassify({ id: 'asset-1' });
+
+      expect(result).toBe(JobStatus.Skipped);
+      expect(mocks.machineLearning.encodeText).not.toHaveBeenCalled();
+      expect(mocks.tag.upsertAssetIds).not.toHaveBeenCalled();
+      expect(mocks.classification.setClassifiedAt).toHaveBeenCalledWith('asset-1');
+    });
+
     it('should ignore hidden named people for named_visible_people', async () => {
       mocks.asset.getById.mockResolvedValue({
         id: 'asset-1',
@@ -670,6 +721,38 @@ In `server/src/services/classification.service.spec.ts`, add these tests inside 
       await sut.handleClassify({ id: 'asset-1' });
 
       expect(mocks.tag.upsertAssetIds).toHaveBeenCalledWith([{ tagId: 'tag-id', assetId: 'asset-1' }]);
+    });
+
+    it('should skip named_visible_people category when a visible named person exists', async () => {
+      mocks.asset.getById.mockResolvedValue({
+        id: 'asset-1',
+        ownerId: 'user-1',
+        visibility: AssetVisibility.Timeline,
+      } as any);
+      mocks.search.getEmbedding.mockResolvedValue('[1,0,0]' as any);
+      mocks.classification.getFaceSummary.mockResolvedValue({
+        hasAssignedFace: true,
+        hasNamedPerson: true,
+        hasNamedVisiblePerson: true,
+      });
+      sut['getConfig'] = vi.fn().mockResolvedValue(
+        makeClassificationConfig([
+          {
+            name: 'People',
+            prompts: ['a portrait'],
+            similarity: 0.8,
+            action: 'tag',
+            faceExclusion: 'named_visible_people',
+          },
+        ]),
+      );
+
+      const result = await sut.handleClassify({ id: 'asset-1' });
+
+      expect(result).toBe(JobStatus.Skipped);
+      expect(mocks.machineLearning.encodeText).not.toHaveBeenCalled();
+      expect(mocks.tag.upsertAssetIds).not.toHaveBeenCalled();
+      expect(mocks.classification.setClassifiedAt).toHaveBeenCalledWith('asset-1');
     });
 
     it('should skip face-aware categories when facial recognition is disabled and still classify off categories', async () => {
@@ -739,7 +822,7 @@ In `server/src/services/classification.service.spec.ts`, add these tests inside 
     });
 ```
 
-Add this test inside `describe('handleClassifyQueueAll', () => { ... })`:
+Add these tests inside `describe('handleClassifyQueueAll', () => { ... })`:
 
 ```ts
     it('should queue face work before forced classification when enabled categories are face-aware', async () => {
@@ -770,6 +853,66 @@ Add this test inside `describe('handleClassifyQueueAll', () => { ... })`:
         { name: JobName.AssetClassify, data: { id: 'asset-1' } },
       ]);
     });
+
+    it('should not queue face work before forced classification when facial recognition is disabled', async () => {
+      mocks.classification.streamUnclassifiedAssets.mockReturnValue(makeStream([{ id: 'asset-1', ownerId: 'user-1' }]));
+      sut['getConfig'] = vi.fn().mockResolvedValue(
+        makeClassificationConfig(
+          [
+            {
+              name: 'People',
+              prompts: ['a portrait'],
+              similarity: 0.8,
+              action: 'tag',
+              faceExclusion: 'named_people',
+            },
+          ],
+          true,
+          false,
+        ),
+      );
+
+      await sut.handleClassifyQueueAll({ force: true });
+
+      expect(mocks.job.queue).not.toHaveBeenCalledWith({
+        name: JobName.AssetDetectFacesQueueAll,
+        data: { force: true },
+      });
+      expect(mocks.job.queue).not.toHaveBeenCalledWith({
+        name: JobName.FacialRecognitionQueueAll,
+        data: { force: true },
+      });
+      expect(mocks.job.queueAll).toHaveBeenCalledWith([
+        { name: JobName.AssetClassify, data: { id: 'asset-1' } },
+      ]);
+    });
+```
+
+Add this regression test inside `describe('onConfigUpdate', () => { ... })` to lock in the future-only rule:
+
+```ts
+    it('should not clean up tags when only face exclusion changes', async () => {
+      const oldConfig = makeClassificationConfig([
+        { name: 'Screenshots', prompts: ['screenshot'], similarity: 0.28, action: 'tag', faceExclusion: 'off' },
+      ]);
+      const newConfig = makeClassificationConfig([
+        {
+          name: 'Screenshots',
+          prompts: ['screenshot'],
+          similarity: 0.28,
+          action: 'tag',
+          faceExclusion: 'named_people',
+        },
+      ]);
+
+      await sut.onConfigUpdate({ oldConfig, newConfig } as any);
+
+      expect(mocks.classification.removeAutoTagAssignments).not.toHaveBeenCalled();
+      expect(mocks.systemMetadata.set).toHaveBeenCalledWith(
+        SystemMetadataKey.ClassificationConfigState,
+        newConfig.classification,
+      );
+    });
 ```
 
 Add `QueueName` to the enum import at the top of the spec:
@@ -794,16 +937,20 @@ Expected: FAIL because `getFaceSummary` is not used and face queue waiting is no
 In `server/src/services/classification.service.ts`, update imports:
 
 ```ts
-import { ClassificationFaceExclusion, SystemConfig } from 'src/config';
-import { ClassificationFaceSummary } from 'src/repositories/classification.repository';
+import { type ClassificationFaceExclusion, type SystemConfig } from 'src/config';
+import { type ClassificationFaceSummary } from 'src/repositories/classification.repository';
 import { isFacialRecognitionEnabled } from 'src/utils/misc';
 ```
 
 Add these helper methods inside `ClassificationService` before `parseEmbedding`:
 
 ```ts
+  private getFaceExclusion(category: ClassificationConfig['categories'][number]): ClassificationFaceExclusion {
+    return category.faceExclusion ?? 'off';
+  }
+
   private isFaceAwareCategory(category: ClassificationConfig['categories'][number]) {
-    return category.faceExclusion !== 'off';
+    return this.getFaceExclusion(category) !== 'off';
   }
 
   private matchesFaceExclusion(rule: ClassificationFaceExclusion, summary: ClassificationFaceSummary) {
@@ -840,7 +987,7 @@ Add these helper methods inside `ClassificationService` before `parseEmbedding`:
     await this.jobRepository.waitForQueueCompletion(QueueName.FaceDetection, QueueName.FacialRecognition);
     const faceSummary = await this.classificationRepository.getFaceSummary(assetId);
 
-    return categories.filter((category) => !this.matchesFaceExclusion(category.faceExclusion, faceSummary));
+    return categories.filter((category) => !this.matchesFaceExclusion(this.getFaceExclusion(category), faceSummary));
   }
 ```
 
@@ -884,27 +1031,30 @@ with:
 
 - [ ] **Step 5: Queue face work during forced scans**
 
-In `handleClassifyQueueAll`, after the `force` reset block and before streaming unclassified assets, add:
+In `handleClassifyQueueAll`, change the first config read from:
+
+```ts
+    const { classification } = await this.getConfig({ withCache: true });
+```
+
+to:
+
+```ts
+    const { classification, machineLearning } = await this.getConfig({ withCache: true });
+```
+
+Then, after the `force` reset block and before streaming unclassified assets, add:
 
 ```ts
     const faceAwareCategories = classification.categories.filter(
       (category) => category.enabled && this.isFaceAwareCategory(category),
     );
 
-    const { machineLearning } = await this.getConfig({ withCache: true });
     if (force && faceAwareCategories.length > 0 && isFacialRecognitionEnabled(machineLearning)) {
       await this.jobRepository.queue({ name: JobName.AssetDetectFacesQueueAll, data: { force: true } });
       await this.jobRepository.queue({ name: JobName.FacialRecognitionQueueAll, data: { force: true } });
     }
 ```
-
-If the method currently reads only `{ classification }`, change that first config read to:
-
-```ts
-    const { classification, machineLearning } = await this.getConfig({ withCache: true });
-```
-
-and do not add a second `getConfig` call.
 
 - [ ] **Step 6: Run the focused service tests**
 
@@ -963,7 +1113,7 @@ Run:
 
 ```bash
 git status --short
-git diff -- open-api | sed -n '1,220p'
+git diff -- open-api mobile/openapi | sed -n '1,220p'
 ```
 
 Expected: generated files show the new `faceExclusion` schema/property and no unrelated hand edits.
@@ -973,7 +1123,7 @@ Expected: generated files show the new `faceExclusion` schema/property and no un
 Run:
 
 ```bash
-git add open-api
+git add open-api mobile/openapi
 git commit -m "chore(openapi): regenerate classification face exclusion clients"
 ```
 
@@ -1217,7 +1367,7 @@ The **Face exclusion** setting has four modes:
 
 Face-aware categories require facial recognition. If facial recognition is disabled, Gallery skips those categories instead of treating the asset as safe to classify. Categories set to **Off** continue to run normally.
 
-Face exclusion is future-only. Changing the setting does not remove existing `Auto/...` tags, and later face recognition, person naming, hiding, or merging does not clean up old tags automatically. Run **Scan All Libraries** after changing rules if you want assets to be classified again under the new settings.
+Face exclusion is future-only. Changing the setting does not remove existing `Auto/...` tags, and later face recognition, person naming, hiding, or merging does not clean up old tags automatically. Run **Scan All Libraries** after changing rules if you want assets to be evaluated again under the new settings; a forced scan can add new matches, but it still does not remove old `Auto/...` tags that are now excluded.
 ```
 
 - [ ] **Step 2: Update config-file docs**
