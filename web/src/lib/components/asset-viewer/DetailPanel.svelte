@@ -14,6 +14,7 @@
   import { getAssetMediaUrl } from '$lib/utils';
   import { delay, getDimensions } from '$lib/utils/asset-utils';
   import { getByteUnitString } from '$lib/utils/byte-units';
+  import { getMapProviderLinks } from '$lib/utils/exif-utils';
   import { handleError } from '$lib/utils/handle-error';
   import { getParentPath } from '$lib/utils/tree-utils';
   import {
@@ -311,14 +312,16 @@
         >
           {#snippet popup({ marker })}
             {@const { lat, lon } = marker}
+            {@const mapProviderLinks = getMapProviderLinks(lat, lon)}
             <div class="flex flex-col items-center gap-1">
               <Text fontWeight="bold">{lat.toPrecision(6)}, {lon.toPrecision(6)}</Text>
-              <Link
-                href="https://www.openstreetmap.org/?mlat={lat}&mlon={lon}&zoom=13#map=15/{lat}/{lon}"
-                class="text-primary"
-              >
-                {$t('open_in_openstreetmap')}
-              </Link>
+              <div class="flex flex-col items-center gap-1">
+                {#each mapProviderLinks as link (link.key)}
+                  <Link href={link.url} class="text-primary">
+                    {$t(link.label)}
+                  </Link>
+                {/each}
+              </div>
             </div>
           {/snippet}
         </Map>
