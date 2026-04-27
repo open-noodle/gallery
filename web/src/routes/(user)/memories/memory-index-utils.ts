@@ -37,7 +37,7 @@ const getMonthKey = (date: Date) =>
 const getTypeLabel = (memory: MemoryResponseDto, translate: MessageFormatter) =>
   memory.type === MemoryType.OnThisDay ? translate('memory_type_on_this_day') : '';
 
-export const buildMemoryIndexItems = (
+export const filterMemoryIndexItems = (
   memories: MemoryResponseDto[],
   { translate, locale, now = new Date(), filter = 'all', query = '' }: BuildMemoryIndexOptions,
 ): MemoryIndexItem[] => {
@@ -74,14 +74,14 @@ export const buildMemoryIndexItems = (
     .sort((a, b) => b.shownAt.getTime() - a.shownAt.getTime());
 };
 
-export const buildMemoryIndexGroups = (
+export const groupMemoryIndexItems = (
   memories: MemoryResponseDto[],
   options: BuildMemoryIndexOptions,
 ): MemoryIndexGroup[] => {
   const monthFormatter = new Intl.DateTimeFormat(options.locale, { month: 'long', year: 'numeric' });
   const groups = new Map<string, MemoryIndexGroup>();
 
-  for (const item of buildMemoryIndexItems(memories, options)) {
+  for (const item of filterMemoryIndexItems(memories, options)) {
     const group = groups.get(item.monthKey);
 
     if (group) {
