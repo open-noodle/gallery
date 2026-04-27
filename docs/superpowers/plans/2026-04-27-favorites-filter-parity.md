@@ -31,6 +31,7 @@
 ### Task 1: Active Favorites Chip
 
 **Files:**
+
 - Modify: `web/src/lib/components/filter-panel/__tests__/active-filters-bar.spec.ts`
 - Modify: `web/src/lib/components/filter-panel/active-filters-bar.svelte`
 
@@ -39,53 +40,53 @@
 Add these tests inside `describe('ActiveFiltersBar', () => { ... })` after the media type tests:
 
 ```ts
-  it('should render chip for favorites filter', () => {
-    const filters = { ...createFilterState(), isFavorite: true };
+it('should render chip for favorites filter', () => {
+  const filters = { ...createFilterState(), isFavorite: true };
 
-    const { getAllByTestId } = render(ActiveFiltersBar, {
-      props: {
-        filters,
-        onRemoveFilter: () => {},
-        onClearAll: () => {},
-      },
-    });
-
-    const chips = getAllByTestId('active-chip');
-    expect(chips).toHaveLength(1);
-    expect(chips[0]).toHaveTextContent('Favorites');
+  const { getAllByTestId } = render(ActiveFiltersBar, {
+    props: {
+      filters,
+      onRemoveFilter: () => {},
+      onClearAll: () => {},
+    },
   });
 
-  it('should remove favorites filter on chip close', async () => {
-    let removedType: string | undefined;
-    const filters = { ...createFilterState(), isFavorite: true };
+  const chips = getAllByTestId('active-chip');
+  expect(chips).toHaveLength(1);
+  expect(chips[0]).toHaveTextContent('Favorites');
+});
 
-    const { getByTestId } = render(ActiveFiltersBar, {
-      props: {
-        filters,
-        onRemoveFilter: (type) => {
-          removedType = type;
-        },
-        onClearAll: () => {},
+it('should remove favorites filter on chip close', async () => {
+  let removedType: string | undefined;
+  const filters = { ...createFilterState(), isFavorite: true };
+
+  const { getByTestId } = render(ActiveFiltersBar, {
+    props: {
+      filters,
+      onRemoveFilter: (type) => {
+        removedType = type;
       },
-    });
-
-    await fireEvent.click(getByTestId('chip-close'));
-    expect(removedType).toBe('favorites');
+      onClearAll: () => {},
+    },
   });
 
-  it('should not render a favorites chip for isFavorite false', () => {
-    const filters = { ...createFilterState(), isFavorite: false };
+  await fireEvent.click(getByTestId('chip-close'));
+  expect(removedType).toBe('favorites');
+});
 
-    const { queryAllByTestId } = render(ActiveFiltersBar, {
-      props: {
-        filters,
-        onRemoveFilter: () => {},
-        onClearAll: () => {},
-      },
-    });
+it('should not render a favorites chip for isFavorite false', () => {
+  const filters = { ...createFilterState(), isFavorite: false };
 
-    expect(queryAllByTestId('active-chip')).toHaveLength(0);
+  const { queryAllByTestId } = render(ActiveFiltersBar, {
+    props: {
+      filters,
+      onRemoveFilter: () => {},
+      onClearAll: () => {},
+    },
   });
+
+  expect(queryAllByTestId('active-chip')).toHaveLength(0);
+});
 ```
 
 - [ ] **Step 2: Run the failing tests**
@@ -131,6 +132,7 @@ git commit -m "fix: show favorites active filter chip"
 ### Task 2: Filter Section Preference Migration
 
 **Files:**
+
 - Modify: `web/src/lib/components/filter-panel/filter-panel.svelte`
 - Modify: `web/src/lib/components/filter-panel/__tests__/filter-panel.spec.ts`
 
@@ -139,52 +141,52 @@ git commit -m "fix: show favorites active filter chip"
 In `web/src/lib/components/filter-panel/__tests__/filter-panel.spec.ts`, add these tests in the visible-section persistence describe block after the localStorage restore tests:
 
 ```ts
-  it('should add favorites to legacy visible-section preferences without unhiding known hidden sections', () => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(['people']));
+it('should add favorites to legacy visible-section preferences without unhiding known hidden sections', () => {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(['people']));
 
-    renderPanel(['people', 'rating', 'favorites']);
+  renderPanel(['people', 'rating', 'favorites']);
 
-    expect(screen.getByTestId('filter-section-people')).toBeTruthy();
-    expect(screen.getByTestId('filter-section-favorites')).toBeTruthy();
-    expect(screen.queryByTestId('filter-section-rating')).toBeNull();
-  });
+  expect(screen.getByTestId('filter-section-people')).toBeTruthy();
+  expect(screen.getByTestId('filter-section-favorites')).toBeTruthy();
+  expect(screen.queryByTestId('filter-section-rating')).toBeNull();
+});
 
-  it('should add favorites to empty legacy visible-section preferences without unhiding all known sections', () => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
+it('should add favorites to empty legacy visible-section preferences without unhiding all known sections', () => {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
 
-    renderPanel(['people', 'rating', 'favorites']);
+  renderPanel(['people', 'rating', 'favorites']);
 
-    expect(screen.getByTestId('filter-section-favorites')).toBeTruthy();
-    expect(screen.queryByTestId('filter-section-people')).toBeNull();
-    expect(screen.queryByTestId('filter-section-rating')).toBeNull();
-  });
+  expect(screen.getByTestId('filter-section-favorites')).toBeTruthy();
+  expect(screen.queryByTestId('filter-section-people')).toBeNull();
+  expect(screen.queryByTestId('filter-section-rating')).toBeNull();
+});
 
-  it('should fall back to all visible when legacy visible-section preferences only contain unknown sections', () => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(['obsolete-section']));
+it('should fall back to all visible when legacy visible-section preferences only contain unknown sections', () => {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(['obsolete-section']));
 
-    renderPanel(['people', 'rating', 'favorites']);
+  renderPanel(['people', 'rating', 'favorites']);
 
-    expect(screen.getByTestId('filter-section-people')).toBeTruthy();
-    expect(screen.getByTestId('filter-section-rating')).toBeTruthy();
-    expect(screen.getByTestId('filter-section-favorites')).toBeTruthy();
-  });
+  expect(screen.getByTestId('filter-section-people')).toBeTruthy();
+  expect(screen.getByTestId('filter-section-rating')).toBeTruthy();
+  expect(screen.getByTestId('filter-section-favorites')).toBeTruthy();
+});
 
-  it('should add sections missing from stored known-section metadata without unhiding known hidden sections', () => {
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({
-        selected: ['people'],
-        known: ['people', 'rating', 'favorites'],
-      }),
-    );
+it('should add sections missing from stored known-section metadata without unhiding known hidden sections', () => {
+  localStorage.setItem(
+    STORAGE_KEY,
+    JSON.stringify({
+      selected: ['people'],
+      known: ['people', 'rating', 'favorites'],
+    }),
+  );
 
-    renderPanel(['people', 'rating', 'favorites', 'media']);
+  renderPanel(['people', 'rating', 'favorites', 'media']);
 
-    expect(screen.getByTestId('filter-section-people')).toBeTruthy();
-    expect(screen.getByTestId('filter-section-media')).toBeTruthy();
-    expect(screen.queryByTestId('filter-section-rating')).toBeNull();
-    expect(screen.queryByTestId('filter-section-favorites')).toBeNull();
-  });
+  expect(screen.getByTestId('filter-section-people')).toBeTruthy();
+  expect(screen.getByTestId('filter-section-media')).toBeTruthy();
+  expect(screen.queryByTestId('filter-section-rating')).toBeNull();
+  expect(screen.queryByTestId('filter-section-favorites')).toBeNull();
+});
 ```
 
 - [ ] **Step 2: Add failing expanded-section migration tests**
@@ -192,53 +194,53 @@ In `web/src/lib/components/filter-panel/__tests__/filter-panel.spec.ts`, add the
 In the `Section Accordion Persistence` describe block, add:
 
 ```ts
-  it('should expand favorites for legacy expanded-section preferences without expanding known collapsed sections', () => {
-    localStorage.setItem(EXPANDED_KEY, JSON.stringify(['people']));
+it('should expand favorites for legacy expanded-section preferences without expanding known collapsed sections', () => {
+  localStorage.setItem(EXPANDED_KEY, JSON.stringify(['people']));
 
-    renderPanel(['people', 'rating', 'favorites']);
+  renderPanel(['people', 'rating', 'favorites']);
 
-    const peopleContent = screen.getByTestId('filter-section-people').querySelector('.filter-section-content');
-    const ratingContent = screen.getByTestId('filter-section-rating').querySelector('.filter-section-content');
-    const favoritesContent = screen.getByTestId('filter-section-favorites').querySelector('.filter-section-content');
+  const peopleContent = screen.getByTestId('filter-section-people').querySelector('.filter-section-content');
+  const ratingContent = screen.getByTestId('filter-section-rating').querySelector('.filter-section-content');
+  const favoritesContent = screen.getByTestId('filter-section-favorites').querySelector('.filter-section-content');
 
-    expect(peopleContent).toBeTruthy();
-    expect(favoritesContent).toBeTruthy();
-    expect(ratingContent).toBeNull();
-  });
+  expect(peopleContent).toBeTruthy();
+  expect(favoritesContent).toBeTruthy();
+  expect(ratingContent).toBeNull();
+});
 
-  it('should fall back to all expanded when legacy expanded-section preferences only contain unknown sections', () => {
-    localStorage.setItem(EXPANDED_KEY, JSON.stringify(['obsolete-section']));
+it('should fall back to all expanded when legacy expanded-section preferences only contain unknown sections', () => {
+  localStorage.setItem(EXPANDED_KEY, JSON.stringify(['obsolete-section']));
 
-    renderPanel(['people', 'rating', 'favorites']);
+  renderPanel(['people', 'rating', 'favorites']);
 
-    const peopleContent = screen.getByTestId('filter-section-people').querySelector('.filter-section-content');
-    const ratingContent = screen.getByTestId('filter-section-rating').querySelector('.filter-section-content');
-    const favoritesContent = screen.getByTestId('filter-section-favorites').querySelector('.filter-section-content');
+  const peopleContent = screen.getByTestId('filter-section-people').querySelector('.filter-section-content');
+  const ratingContent = screen.getByTestId('filter-section-rating').querySelector('.filter-section-content');
+  const favoritesContent = screen.getByTestId('filter-section-favorites').querySelector('.filter-section-content');
 
-    expect(peopleContent).toBeTruthy();
-    expect(ratingContent).toBeTruthy();
-    expect(favoritesContent).toBeTruthy();
-  });
+  expect(peopleContent).toBeTruthy();
+  expect(ratingContent).toBeTruthy();
+  expect(favoritesContent).toBeTruthy();
+});
 
-  it('should expand newly introduced sections from stored known-section metadata', () => {
-    localStorage.setItem(
-      EXPANDED_KEY,
-      JSON.stringify({
-        selected: ['people'],
-        known: ['people', 'rating', 'favorites'],
-      }),
-    );
+it('should expand newly introduced sections from stored known-section metadata', () => {
+  localStorage.setItem(
+    EXPANDED_KEY,
+    JSON.stringify({
+      selected: ['people'],
+      known: ['people', 'rating', 'favorites'],
+    }),
+  );
 
-    renderPanel(['people', 'rating', 'favorites', 'media']);
+  renderPanel(['people', 'rating', 'favorites', 'media']);
 
-    const mediaContent = screen.getByTestId('filter-section-media').querySelector('.filter-section-content');
-    const ratingContent = screen.getByTestId('filter-section-rating').querySelector('.filter-section-content');
-    const favoritesContent = screen.getByTestId('filter-section-favorites').querySelector('.filter-section-content');
+  const mediaContent = screen.getByTestId('filter-section-media').querySelector('.filter-section-content');
+  const ratingContent = screen.getByTestId('filter-section-rating').querySelector('.filter-section-content');
+  const favoritesContent = screen.getByTestId('filter-section-favorites').querySelector('.filter-section-content');
 
-    expect(mediaContent).toBeTruthy();
-    expect(ratingContent).toBeNull();
-    expect(favoritesContent).toBeNull();
-  });
+  expect(mediaContent).toBeTruthy();
+  expect(ratingContent).toBeNull();
+  expect(favoritesContent).toBeNull();
+});
 ```
 
 - [ ] **Step 3: Run the failing persistence tests**
@@ -385,6 +387,7 @@ git commit -m "fix: migrate filter section preferences"
 ### Task 3: Album Regression, Utility, And Config Plumbing
 
 **Files:**
+
 - Modify: `web/src/lib/utils/photos-filter-options.ts`
 - Modify: `web/src/lib/utils/space-filter-options.ts`
 - Modify: `web/src/lib/utils/album-filter-options.ts`
@@ -401,27 +404,27 @@ git commit -m "fix: migrate filter section preferences"
 Add this test to `web/src/routes/(user)/albums/[albumId=id]/[[photos=photos]]/[[assetId=id]]/page.route.spec.ts`:
 
 ```ts
-  it('applies favorites independently in album view and picker modes', async () => {
-    renderPage();
-    const user = userEvent.setup();
+it('applies favorites independently in album view and picker modes', async () => {
+  renderPage();
+  const user = userEvent.setup();
 
-    await waitFor(() => expect(screen.getByTestId('favorites-only')).toBeInTheDocument());
-    await user.click(screen.getByTestId('favorites-only'));
+  await waitFor(() => expect(screen.getByTestId('favorites-only')).toBeInTheDocument());
+  await user.click(screen.getByTestId('favorites-only'));
 
-    expect(screen.getByTestId('active-chip')).toHaveTextContent('Favorites');
-    expect(screen.getByTestId('timeline-options').textContent).toContain('"isFavorite":true');
+  expect(screen.getByTestId('active-chip')).toHaveTextContent('Favorites');
+  expect(screen.getByTestId('timeline-options').textContent).toContain('"isFavorite":true');
 
-    await fireEvent.click(screen.getByLabelText('add_photos'));
-    await waitFor(() => expect(screen.getByTestId('favorites-only')).toBeInTheDocument());
-    expect(screen.queryByTestId('active-chip')).not.toBeInTheDocument();
+  await fireEvent.click(screen.getByLabelText('add_photos'));
+  await waitFor(() => expect(screen.getByTestId('favorites-only')).toBeInTheDocument());
+  expect(screen.queryByTestId('active-chip')).not.toBeInTheDocument();
 
-    await user.click(screen.getByTestId('favorites-only'));
+  await user.click(screen.getByTestId('favorites-only'));
 
-    expect(screen.getByTestId('active-chip')).toHaveTextContent('Favorites');
-    expect(screen.getByTestId('timeline-options').textContent).toContain('"timelineAlbumId":"');
-    expect(screen.getByTestId('timeline-options').textContent).toContain('"isFavorite":true');
-    expect(screen.getByTestId('timeline-options').textContent).not.toContain('"withPartners":true');
-  });
+  expect(screen.getByTestId('active-chip')).toHaveTextContent('Favorites');
+  expect(screen.getByTestId('timeline-options').textContent).toContain('"timelineAlbumId":"');
+  expect(screen.getByTestId('timeline-options').textContent).toContain('"isFavorite":true');
+  expect(screen.getByTestId('timeline-options').textContent).not.toContain('"withPartners":true');
+});
 ```
 
 - [ ] **Step 2: Add failing utility tests**
@@ -429,99 +432,99 @@ Add this test to `web/src/routes/(user)/albums/[albumId=id]/[[photos=photos]]/[[
 Add these tests to `web/src/lib/utils/__tests__/photos-filter-options.spec.ts`:
 
 ```ts
-  it('should include isFavorite and omit shared timeline inclusions when favorites is selected', () => {
-    const filters = { ...createFilterState(), isFavorite: true };
-    const options = buildPhotosTimelineOptions(filters);
+it('should include isFavorite and omit shared timeline inclusions when favorites is selected', () => {
+  const filters = { ...createFilterState(), isFavorite: true };
+  const options = buildPhotosTimelineOptions(filters);
 
-    expect(options.isFavorite).toBe(true);
-    expect(options).not.toHaveProperty('withPartners');
-    expect(options).not.toHaveProperty('withSharedSpaces');
-  });
+  expect(options.isFavorite).toBe(true);
+  expect(options).not.toHaveProperty('withPartners');
+  expect(options).not.toHaveProperty('withSharedSpaces');
+});
 ```
 
 Add this test in the `handlePhotosRemoveFilter` describe:
 
 ```ts
-  it('should clear favorites filter', () => {
-    const filters = { ...createFilterState(), isFavorite: true };
+it('should clear favorites filter', () => {
+  const filters = { ...createFilterState(), isFavorite: true };
 
-    expect(handlePhotosRemoveFilter(filters, 'favorites').isFavorite).toBeUndefined();
-    expect(handlePhotosRemoveFilter(filters, 'isFavorite').isFavorite).toBeUndefined();
-  });
+  expect(handlePhotosRemoveFilter(filters, 'favorites').isFavorite).toBeUndefined();
+  expect(handlePhotosRemoveFilter(filters, 'isFavorite').isFavorite).toBeUndefined();
+});
 ```
 
 Add these tests to `web/src/lib/utils/__tests__/space-filter-options.spec.ts`:
 
 ```ts
-  it('preserves favorites in spaces timeline options', () => {
-    const filters = { ...createFilterState(), isFavorite: true };
+it('preserves favorites in spaces timeline options', () => {
+  const filters = { ...createFilterState(), isFavorite: true };
 
-    expect(buildSpaceTimelineOptions('space-1', filters)).toEqual(
-      expect.objectContaining({
-        spaceId: 'space-1',
-        isFavorite: true,
-      }),
-    );
-  });
+  expect(buildSpaceTimelineOptions('space-1', filters)).toEqual(
+    expect.objectContaining({
+      spaceId: 'space-1',
+      isFavorite: true,
+    }),
+  );
+});
 
-  it('clears favorites when removing favorites filter', () => {
-    const filters = { ...createFilterState(), isFavorite: true };
+it('clears favorites when removing favorites filter', () => {
+  const filters = { ...createFilterState(), isFavorite: true };
 
-    expect(handleSpaceRemoveFilter(filters, 'favorites').isFavorite).toBeUndefined();
-    expect(handleSpaceRemoveFilter(filters, 'isFavorite').isFavorite).toBeUndefined();
-  });
+  expect(handleSpaceRemoveFilter(filters, 'favorites').isFavorite).toBeUndefined();
+  expect(handleSpaceRemoveFilter(filters, 'isFavorite').isFavorite).toBeUndefined();
+});
 ```
 
 Add these tests to `web/src/lib/utils/__tests__/album-filter-options.spec.ts`:
 
 ```ts
-  it('maps favorites for album timeline options', () => {
-    const filters = { ...createFilterState(), isFavorite: true };
+it('maps favorites for album timeline options', () => {
+  const filters = { ...createFilterState(), isFavorite: true };
 
-    expect(buildAlbumTimelineOptions('album-1', AssetOrder.Desc, filters)).toEqual(
-      expect.objectContaining({
-        albumId: 'album-1',
-        isFavorite: true,
-      }),
-    );
-  });
+  expect(buildAlbumTimelineOptions('album-1', AssetOrder.Desc, filters)).toEqual(
+    expect.objectContaining({
+      albumId: 'album-1',
+      isFavorite: true,
+    }),
+  );
+});
 
-  it('maps favorites and omits partners for album asset picker options', () => {
-    const filters = { ...createFilterState(), isFavorite: true };
-    const options = buildAlbumAssetPickerOptions('album-1', filters);
+it('maps favorites and omits partners for album asset picker options', () => {
+  const filters = { ...createFilterState(), isFavorite: true };
+  const options = buildAlbumAssetPickerOptions('album-1', filters);
 
-    expect(options).toEqual(
-      expect.objectContaining({
-        timelineAlbumId: 'album-1',
-        isFavorite: true,
-      }),
-    );
-    expect(options).not.toHaveProperty('withPartners');
-  });
+  expect(options).toEqual(
+    expect.objectContaining({
+      timelineAlbumId: 'album-1',
+      isFavorite: true,
+    }),
+  );
+  expect(options).not.toHaveProperty('withPartners');
+});
 ```
 
 Add tests to `web/src/lib/utils/__tests__/album-filter-config.spec.ts`:
 
 ```ts
-  it('keeps the album filter sections in plan order', () => {
-    const config = buildAlbumDetailFilterConfig('album-1');
-    expect(config.sections).toEqual(['timeline', 'people', 'location', 'camera', 'tags', 'rating', 'media', 'favorites']);
-  });
+it('keeps the album filter sections in plan order', () => {
+  const config = buildAlbumDetailFilterConfig('album-1');
+  expect(config.sections).toEqual(['timeline', 'people', 'location', 'camera', 'tags', 'rating', 'media', 'favorites']);
+});
 
-  it('passes isFavorite to album detail filter suggestions', async () => {
-    const config = buildAlbumDetailFilterConfig('album-1');
-    await config.suggestionsProvider!({ ...createFilterState(), isFavorite: true });
+it('passes isFavorite to album detail filter suggestions', async () => {
+  const config = buildAlbumDetailFilterConfig('album-1');
+  await config.suggestionsProvider!({ ...createFilterState(), isFavorite: true });
 
-    expect(getFilterSuggestions).toHaveBeenCalledWith(expect.objectContaining({ albumId: 'album-1', isFavorite: true }));
-  });
+  expect(getFilterSuggestions).toHaveBeenCalledWith(expect.objectContaining({ albumId: 'album-1', isFavorite: true }));
+});
 
-  it('keeps the picker filter sections in plan order and passes isFavorite to suggestions', async () => {
-    const config = buildAlbumAssetPickerFilterConfig();
-    expect(config.sections).toEqual(['timeline', 'people', 'location', 'camera', 'tags', 'rating', 'media', 'favorites']);
+it('keeps the picker filter sections in plan order and passes isFavorite to suggestions', async () => {
+  const config = buildAlbumAssetPickerFilterConfig();
+  expect(config.sections).toEqual(['timeline', 'people', 'location', 'camera', 'tags', 'rating', 'media', 'favorites']);
 
-    await config.suggestionsProvider!({ ...createFilterState(), isFavorite: true });
-    expect(getFilterSuggestions).toHaveBeenCalledWith(expect.objectContaining({ isFavorite: true }));
-  });
+  await config.suggestionsProvider!({ ...createFilterState(), isFavorite: true });
+  expect(getFilterSuggestions).toHaveBeenCalledWith(expect.objectContaining({ isFavorite: true }));
+});
 ```
 
 Update the existing album-config section-order tests to the expectations above instead of leaving duplicate tests with the old seven-section order.
@@ -553,9 +556,9 @@ export function buildPhotosTimelineOptions(filters: FilterState): Record<string,
 Add after the rating block:
 
 ```ts
-  if (filters.isFavorite !== undefined) {
-    base.isFavorite = filters.isFavorite;
-  }
+if (filters.isFavorite !== undefined) {
+  base.isFavorite = filters.isFavorite;
+}
 ```
 
 Add to `handlePhotosRemoveFilter()`:
@@ -572,9 +575,9 @@ Add to `handlePhotosRemoveFilter()`:
 In `web/src/lib/utils/space-filter-options.ts`, add after the rating block:
 
 ```ts
-  if (filters.isFavorite !== undefined) {
-    base.isFavorite = filters.isFavorite;
-  }
+if (filters.isFavorite !== undefined) {
+  base.isFavorite = filters.isFavorite;
+}
 ```
 
 Add to `handleSpaceRemoveFilter()`:
@@ -603,9 +606,9 @@ Add `isFavorite` to `toSuggestionRequest()`:
 In `web/src/lib/utils/album-filter-options.ts`, add after the rating block:
 
 ```ts
-  if (filters.isFavorite !== undefined) {
-    base.isFavorite = filters.isFavorite;
-  }
+if (filters.isFavorite !== undefined) {
+  base.isFavorite = filters.isFavorite;
+}
 ```
 
 Change `buildAlbumAssetPickerOptions()` so `withPartners` is conditional:
@@ -645,6 +648,7 @@ git commit -m "fix: wire favorites filter options"
 ### Task 4: Route Wiring For Photos And Spaces
 
 **Files:**
+
 - Create: `web/src/test-data/mocks/filter-panel-favorites.stub.svelte`
 - Modify: `web/src/test-data/mocks/smart-search-results.stub.svelte`
 - Modify: `web/src/routes/(user)/photos/[[assetId=id]]/+page.svelte`
@@ -764,52 +768,52 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 Add tests:
 
 ```ts
-  it('exposes favorites in the Photos filter panel', () => {
-    mockPage.url = new URL('https://gallery.test/photos');
+it('exposes favorites in the Photos filter panel', () => {
+  mockPage.url = new URL('https://gallery.test/photos');
 
-    renderPage();
+  renderPage();
 
-    expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute(
-      'data-sections',
-      'timeline,people,location,camera,tags,rating,media,favorites',
-    );
+  expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute(
+    'data-sections',
+    'timeline,people,location,camera,tags,rating,media,favorites',
+  );
+});
+
+it('selects favorites in Photos timeline mode and uses owner-only timeline options', async () => {
+  mockPage.url = new URL('https://gallery.test/photos');
+
+  renderPage();
+  await fireEvent.click(screen.getByTestId('select-favorites-filter'));
+
+  await waitFor(() => {
+    expect(buildPhotosTimelineOptions).toHaveBeenCalledWith(expect.objectContaining({ isFavorite: true }));
   });
+});
 
-  it('selects favorites in Photos timeline mode and uses owner-only timeline options', async () => {
-    mockPage.url = new URL('https://gallery.test/photos');
+it('selects favorites in Photos search mode and disables shared-space search scope', async () => {
+  mockPage.url = new URL('https://gallery.test/photos?q=nature');
 
-    renderPage();
-    await fireEvent.click(screen.getByTestId('select-favorites-filter'));
+  renderPage();
+  await fireEvent.click(screen.getByTestId('select-favorites-filter'));
 
-    await waitFor(() => {
-      expect(buildPhotosTimelineOptions).toHaveBeenCalledWith(expect.objectContaining({ isFavorite: true }));
-    });
-  });
+  expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-is-favorite', 'true');
+  expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-with-shared-spaces', 'false');
+});
 
-  it('selects favorites in Photos search mode and disables shared-space search scope', async () => {
-    mockPage.url = new URL('https://gallery.test/photos?q=nature');
+it('selects favorites in Photos and disables shared-space scope for dependent suggestions', async () => {
+  mockPage.url = new URL('https://gallery.test/photos');
 
-    renderPage();
-    await fireEvent.click(screen.getByTestId('select-favorites-filter'));
+  renderPage();
+  await fireEvent.click(screen.getByTestId('select-favorites-filter'));
+  await fireEvent.click(screen.getByTestId('load-city-suggestions'));
+  await fireEvent.click(screen.getByTestId('load-camera-model-suggestions'));
 
-    expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-is-favorite', 'true');
-    expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-with-shared-spaces', 'false');
-  });
-
-  it('selects favorites in Photos and disables shared-space scope for dependent suggestions', async () => {
-    mockPage.url = new URL('https://gallery.test/photos');
-
-    renderPage();
-    await fireEvent.click(screen.getByTestId('select-favorites-filter'));
-    await fireEvent.click(screen.getByTestId('load-city-suggestions'));
-    await fireEvent.click(screen.getByTestId('load-camera-model-suggestions'));
-
-    expect(getSearchSuggestions).toHaveBeenCalledWith(expect.objectContaining({ country: 'Germany', isFavorite: true }));
-    expect(getSearchSuggestions).toHaveBeenCalledWith(expect.objectContaining({ make: 'Sony', isFavorite: true }));
-    for (const [request] of vi.mocked(getSearchSuggestions).mock.calls) {
-      expect(request).not.toHaveProperty('withSharedSpaces');
-    }
-  });
+  expect(getSearchSuggestions).toHaveBeenCalledWith(expect.objectContaining({ country: 'Germany', isFavorite: true }));
+  expect(getSearchSuggestions).toHaveBeenCalledWith(expect.objectContaining({ make: 'Sony', isFavorite: true }));
+  for (const [request] of vi.mocked(getSearchSuggestions).mock.calls) {
+    expect(request).not.toHaveProperty('withSharedSpaces');
+  }
+});
 ```
 
 - [ ] **Step 4: Add failing Spaces route tests**
@@ -832,24 +836,24 @@ import { fireEvent, render, screen } from '@testing-library/svelte';
 Add tests:
 
 ```ts
-  it('exposes favorites in the Spaces view filter panel', () => {
-    renderPage();
+it('exposes favorites in the Spaces view filter panel', () => {
+  renderPage();
 
-    expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute(
-      'data-sections',
-      'timeline,people,location,camera,tags,rating,media,favorites',
-    );
-  });
+  expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute(
+    'data-sections',
+    'timeline,people,location,camera,tags,rating,media,favorites',
+  );
+});
 
-  it('keeps favorites scoped to the concrete space in Spaces search mode', async () => {
-    mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?q=beach');
+it('keeps favorites scoped to the concrete space in Spaces search mode', async () => {
+  mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?q=beach');
 
-    renderPage();
-    await fireEvent.click(screen.getByTestId('select-favorites-filter'));
+  renderPage();
+  await fireEvent.click(screen.getByTestId('select-favorites-filter'));
 
-    expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-is-favorite', 'true');
-    expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-space-id', 'space-1');
-  });
+  expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-is-favorite', 'true');
+  expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-space-id', 'space-1');
+});
 ```
 
 - [ ] **Step 5: Run failing route tests**
@@ -936,6 +940,7 @@ git commit -m "fix: add favorites filter to photos and spaces"
 ### Task 5: Focused Verification And Cleanup
 
 **Files:**
+
 - Review all files modified by Tasks 1-4.
 
 - [ ] **Step 1: Run the full focused test suite**

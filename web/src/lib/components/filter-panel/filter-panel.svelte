@@ -338,6 +338,12 @@
     favorites: 'Favorites',
   };
 
+  const sectionToggleLabels: Record<string, string> = {
+    ...sectionTitles,
+    // Avoid colliding with asset action buttons labeled "Favorite" in browser automation.
+    favorites: 'Starred filter section',
+  };
+
   type StoredSectionSet = string[] | { selected?: string[]; known?: string[] };
 
   const LEGACY_INTRODUCED_SECTIONS = new Set<FilterSectionType>(['favorites']);
@@ -679,7 +685,7 @@
               ? 'bg-primary/10 text-primary'
               : 'text-gray-400 hover:bg-subtle hover:text-gray-500 dark:text-gray-600 dark:hover:text-gray-400'}"
             onclick={() => toggleSection(section)}
-            aria-label={sectionTitles[section]}
+            aria-label={sectionToggleLabels[section]}
             aria-pressed={visibleSections.has(section)}
             title={sectionTitles[section]}
             data-testid="section-toggle-{section}"

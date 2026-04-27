@@ -349,6 +349,14 @@ describe('Section Selector', () => {
     }
   });
 
+  it('should keep favorites section toggle label distinct from asset favorite action', () => {
+    renderPanel(['favorites']);
+
+    const favoritesToggle = screen.getByTestId('section-toggle-favorites');
+    expect(favoritesToggle).toHaveAttribute('aria-label', 'Starred filter section');
+    expect(favoritesToggle).toHaveAttribute('title', 'Favorites');
+  });
+
   // Test 2
   it('should not render toggle icons for unconfigured sections', () => {
     renderPanel(['people', 'rating']);
