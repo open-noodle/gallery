@@ -131,7 +131,7 @@ describe('ActiveFiltersBar', () => {
     const { getByTestId } = render(ActiveFiltersBar, {
       props: {
         filters,
-        onRemoveFilter: (type) => {
+        onRemoveFilter: (type: string) => {
           removedType = type;
         },
         onClearAll: () => {},

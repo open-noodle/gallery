@@ -308,12 +308,18 @@ describe('hidden prop', () => {
 
 describe('Section Selector', () => {
   const STORAGE_KEY = 'gallery-filter-visible-sections';
-  const allSections = ['timeline', 'people', 'location', 'camera', 'tags', 'rating', 'media'] as const;
+  const allSections: FilterSection[] = [
+    'timeline',
+    'people',
+    'location',
+    'camera',
+    'tags',
+    'rating',
+    'media',
+    'favorites',
+  ];
 
-  function renderPanel(
-    sections: Array<(typeof allSections)[number]> = [...allSections],
-    filters?: ReturnType<typeof createFilterState>,
-  ) {
+  function renderPanel(sections: FilterSection[] = [...allSections], filters?: ReturnType<typeof createFilterState>) {
     return render(FilterPanel, {
       props: {
         config: { sections: [...sections], providers: {} },
