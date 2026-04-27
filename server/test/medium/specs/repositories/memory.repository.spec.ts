@@ -70,6 +70,38 @@ describe(MemoryRepository.name, () => {
       }
     });
 
+    it('should use the shown date when deciding retention for scheduled memories', async () => {
+      const now = vi.spyOn(DateTime, 'now').mockReturnValue(cleanupNow());
+
+      try {
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        const generatedDate = new Date('2026-04-20T00:00:00Z');
+        const { memory: alreadyShownMemory } = await ctx.newMemory({
+          ownerId: user.id,
+          createdAt: generatedDate,
+          updatedAt: generatedDate,
+          showAt: new Date('2026-04-25T00:00:00Z'),
+          isSaved: false,
+        });
+        const { memory: futureMemory } = await ctx.newMemory({
+          ownerId: user.id,
+          createdAt: generatedDate,
+          updatedAt: generatedDate,
+          showAt: new Date('2026-04-30T00:00:00Z'),
+          isSaved: false,
+        });
+
+        await sut.cleanup(1);
+
+        const memoryIds = (await selectMemoryIds(ctx)).map(({ id }) => id);
+        expect(memoryIds).not.toContain(alreadyShownMemory.id);
+        expect(memoryIds).toContain(futureMemory.id);
+      } finally {
+        now.mockRestore();
+      }
+    });
+
     it('should keep old unsaved memories when retention is zero', async () => {
       const now = vi.spyOn(DateTime, 'now').mockReturnValue(cleanupNow());
 

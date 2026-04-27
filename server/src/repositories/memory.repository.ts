@@ -28,7 +28,7 @@ export class MemoryRepository implements IBulkAsset {
 
     return this.db
       .deleteFrom('memory')
-      .where('createdAt', '<', DateTime.now().minus({ days: retentionDays }).toJSDate())
+      .where(sql<Date>`coalesce("showAt", "createdAt")`, '<', DateTime.now().minus({ days: retentionDays }).toJSDate())
       .where('isSaved', '=', false)
       .execute();
   }

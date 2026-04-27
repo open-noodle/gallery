@@ -36,10 +36,10 @@ type GroupMemoryIndexOptions = {
   locale?: string;
 };
 
-const getMemoryYear = (memory: MemoryResponseDto) => new Date(memory.memoryAt).getFullYear().toString();
+const getMemoryYear = (memory: MemoryResponseDto) => new Date(memory.memoryAt).getUTCFullYear().toString();
 
 const getMonthKey = (date: Date) =>
-  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+  `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
 
 const getTypeLabel = (memory: MemoryResponseDto, translate: MessageFormatter) =>
   memory.type === MemoryType.OnThisDay ? translate('memory_type_on_this_day') : '';
@@ -48,7 +48,12 @@ export const buildMemoryIndexItems = (
   memories: MemoryResponseDto[],
   { translate, locale, now = new Date() }: BuildMemoryIndexOptions,
 ): MemoryIndexItem[] => {
-  const dateFormatter = new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', year: 'numeric' });
+  const dateFormatter = new Intl.DateTimeFormat(locale, {
+    day: 'numeric',
+    month: 'short',
+    timeZone: 'UTC',
+    year: 'numeric',
+  });
 
   return memories
     .filter((memory) => memory.assets.length > 0)
@@ -93,7 +98,7 @@ export const groupMemoryIndexItems = (
   items: MemoryIndexItem[],
   { locale }: GroupMemoryIndexOptions = {},
 ): MemoryIndexGroup[] => {
-  const monthFormatter = new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' });
+  const monthFormatter = new Intl.DateTimeFormat(locale, { month: 'long', timeZone: 'UTC', year: 'numeric' });
   const groups = new Map<string, MemoryIndexGroup>();
 
   for (const item of items) {

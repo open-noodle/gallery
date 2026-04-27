@@ -84,6 +84,27 @@ describe('memory index utilities', () => {
     ]);
   });
 
+  it('groups and labels UTC day-boundary dates without local timezone shifting', () => {
+    const previousTimezone = process.env.TZ;
+    process.env.TZ = 'America/Los_Angeles';
+
+    try {
+      const items = buildMemoryIndexItems(
+        [memory({ id: 'april-utc', createdAt: '2026-01-01T00:00:00.000Z', showAt: '2026-04-01T00:00:00.000Z' })],
+        options,
+      );
+      const groups = groupMemoryIndexItems(items, { locale: options.locale });
+
+      expect(items[0]).toMatchObject({
+        dateLabel: 'Apr 1, 2026',
+        monthKey: '2026-04',
+      });
+      expect(groups).toMatchObject([{ key: '2026-04', label: 'April 2026' }]);
+    } finally {
+      process.env.TZ = previousTimezone;
+    }
+  });
+
   it('returns only saved memories for the saved filter', () => {
     const items = buildMemoryIndexItems(
       [
