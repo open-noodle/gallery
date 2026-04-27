@@ -9,7 +9,7 @@ import { JobCounts } from 'src/types';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('node:timers/promises', () => ({
-  setTimeout: vi.fn().mockResolvedValue(undefined),
+  setTimeout: vi.fn().mockResolvedValue(void 0),
 }));
 
 const setTimeoutMock = vi.mocked(setTimeout);
@@ -40,12 +40,7 @@ const setup = (counts: JobCounts[]) => {
     warn: vi.fn(),
   } as unknown as LoggingRepository;
 
-  const sut = new JobRepository(
-    moduleRef,
-    {} as ConfigRepository,
-    {} as EventRepository,
-    logger,
-  );
+  const sut = new JobRepository(moduleRef, {} as ConfigRepository, {} as EventRepository, logger);
 
   return { sut, queue, logger };
 };
