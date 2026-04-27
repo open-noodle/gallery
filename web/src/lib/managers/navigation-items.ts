@@ -1,3 +1,4 @@
+import { Route } from '$lib/route';
 import type { ServerFeaturesDto } from '@immich/sdk';
 import {
   mdiAccountMultipleOutline,
@@ -238,7 +239,7 @@ const USER_PAGES: readonly NavigationItem[] = [
     labelKey: 'memories',
     descriptionKey: 'cmdk_nav_memories_description',
     icon: mdiHistory,
-    route: '/memory',
+    route: Route.memories(),
     adminOnly: false,
   },
 ];

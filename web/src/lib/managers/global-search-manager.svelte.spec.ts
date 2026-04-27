@@ -3180,7 +3180,7 @@ describe('Batch 4 post-review: route consistency, SWR cursor, debounce-window cl
   it('activateRecent navigates to the LIVE NavigationItem.route even when the saved entry.route is stale', () => {
     const m = new GlobalSearchManager();
     m.open();
-    // Saved entry has a fake old path; the live catalog has '/memory' for memories.
+    // Saved entry has a fake old path; the live catalog has '/memories' for memories.
     const staleEntry = {
       kind: 'navigate' as const,
       id: 'nav:userPages:memories',
@@ -3192,8 +3192,8 @@ describe('Batch 4 post-review: route consistency, SWR cursor, debounce-window cl
     };
     addEntry(staleEntry);
     m.activateRecent(staleEntry);
-    // NAVIGATION_ITEMS defines memories.route as '/memory'. The live value must win.
-    expect(goto).toHaveBeenCalledWith('/memory');
+    // NAVIGATION_ITEMS defines memories.route as '/memories'. The live value must win.
+    expect(goto).toHaveBeenCalledWith('/memories');
     expect(goto).not.toHaveBeenCalledWith('/old-memories-path');
   });
 
