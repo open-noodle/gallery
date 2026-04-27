@@ -1,4 +1,5 @@
 import type { TimelineAsset } from '$lib/managers/timeline-manager/types';
+import { Route } from '$lib/route';
 import { toTimelineAsset } from '$lib/utils/timeline-util';
 import type { MemoryResponseDto } from '@immich/sdk';
 
@@ -57,3 +58,6 @@ export const removeAssetsFromMemoryList = (memories: MemoryResponseDto[], ids: s
     }))
     .filter((memory) => memory.assets.length > 0);
 };
+
+export const getMemoryViewerExitRoute = (source?: 'history') =>
+  source === 'history' ? Route.memories() : Route.photos();

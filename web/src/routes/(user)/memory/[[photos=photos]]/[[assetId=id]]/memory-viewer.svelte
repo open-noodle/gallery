@@ -28,7 +28,12 @@
   import { getAssetBulkActions } from '$lib/services/asset.service';
   import { locale, videoViewerMuted, videoViewerVolume } from '$lib/stores/preferences.store';
   import { getAssetMediaUrl, handlePromiseError, memoryLaneTitle } from '$lib/utils';
-  import { findMemoryAsset, removeAssetsFromMemoryList, type MemoryAssetSource } from '$lib/utils/memory-viewer-source';
+  import {
+    findMemoryAsset,
+    getMemoryViewerExitRoute,
+    removeAssetsFromMemoryList,
+    type MemoryAssetSource,
+  } from '$lib/utils/memory-viewer-source';
   import { fromISODateTimeUTC, toTimelineAsset } from '$lib/utils/timeline-util';
   import {
     AssetMediaSize,
@@ -95,6 +100,7 @@
   let progressBarController: Tween<number> | undefined = $state(undefined);
   let videoPlayer: HTMLVideoElement | undefined = $state();
   const memoryViewerSource = $derived(isHistorySource ? 'history' : undefined);
+  const exitRoute = $derived(getMemoryViewerExitRoute(memoryViewerSource));
   const asHref = (asset: { id: string }) => Route.memoryViewer({ id: asset.id, source: memoryViewerSource });
 
   const handleNavigate = async (asset?: { id: string }) => {
@@ -128,7 +134,7 @@
   const handlePreviousAsset = () => handleNavigate(current?.previous?.asset);
   const handleNextMemory = () => handleNavigate(current?.nextMemory?.assets[0]);
   const handlePreviousMemory = () => handleNavigate(current?.previousMemory?.assets[0]);
-  const handleEscape = async () => goto(Route.photos());
+  const handleEscape = async () => goto(exitRoute);
   const handleSelectAll = () =>
     assetMultiSelectManager.selectAssets(current?.memory.assets.map((a) => toTimelineAsset(a)) || []);
 
@@ -306,7 +312,7 @@
 
   const init = (target: Page | NavigationTarget | null) => {
     if (activeMemories.length === 0) {
-      return handlePromiseError(goto(Route.photos()));
+      return handlePromiseError(goto(exitRoute));
     }
 
     current = loadFromParams(target);
@@ -439,7 +445,7 @@
   bind:clientWidth={viewport.width}
 >
   {#if current}
-    <ControlAppBar onClose={() => goto(Route.photos())} forceDark multiRow>
+    <ControlAppBar onClose={() => goto(exitRoute)} forceDark multiRow>
       {#snippet leading()}
         {#if current}
           <p class="text-lg">

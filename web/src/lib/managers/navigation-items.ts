@@ -70,6 +70,7 @@ const SYSTEM_SETTINGS_SOURCE: ReadonlyArray<[key: string, baseKey: string, icon:
   ['machine-learning', 'machine_learning_settings', mdiRobotOutline],
   ['classification', 'classification_settings', mdiMagnifyScan],
   ['location', 'map_gps_settings', mdiMapMarkerOutline],
+  ['memories', 'memories_settings', mdiHistory],
   ['metadata', 'metadata_settings', mdiDatabaseOutline],
   ['nightly-tasks', 'nightly_tasks_settings', mdiClockOutline],
   ['notifications', 'notification_settings', mdiBellOutline],

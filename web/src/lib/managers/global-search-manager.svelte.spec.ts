@@ -1977,7 +1977,7 @@ describe('navigation memo cache', () => {
     const cache = (
       m as unknown as { getNavigationSearchStrings: () => Map<string, string> }
     ).getNavigationSearchStrings();
-    expect(cache.size).toBe(35);
+    expect(cache.size).toBe(NAVIGATION_ITEMS.length);
     for (const [id, str] of cache) {
       expect(id.startsWith('nav:')).toBe(true);
       expect(str.length).toBeGreaterThan(0);
@@ -1997,7 +1997,7 @@ describe('navigation memo cache', () => {
     const cache = (
       m as unknown as { getNavigationSearchStrings: () => Map<string, string> }
     ).getNavigationSearchStrings();
-    expect(cache.size).toBe(35);
+    expect(cache.size).toBe(NAVIGATION_ITEMS.length);
   });
 
   it('clears the cached table when the locale subscription fires with a new value', () => {
@@ -2013,7 +2013,7 @@ describe('navigation memo cache', () => {
       m as unknown as { getNavigationSearchStrings: () => Map<string, string> }
     ).getNavigationSearchStrings();
     expect(second).not.toBe(first);
-    expect(second.size).toBe(35);
+    expect(second.size).toBe(NAVIGATION_ITEMS.length);
   });
 });
 

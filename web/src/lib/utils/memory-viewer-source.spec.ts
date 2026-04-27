@@ -1,4 +1,4 @@
-import { findMemoryAsset, removeAssetsFromMemoryList } from '$lib/utils/memory-viewer-source';
+import { findMemoryAsset, getMemoryViewerExitRoute, removeAssetsFromMemoryList } from '$lib/utils/memory-viewer-source';
 import { AssetTypeEnum, AssetVisibility, MemoryType, type AssetResponseDto, type MemoryResponseDto } from '@immich/sdk';
 
 const asset = (id: string): AssetResponseDto => ({
@@ -101,5 +101,10 @@ describe('memory viewer source', () => {
     expect(remaining.map((memory) => memory.assets.map((asset) => asset.id))).toEqual([['a2'], ['a4']]);
     expect(remaining[0]).not.toBe(memories[0]);
     expect(memories[0].assets.map((asset) => asset.id)).toEqual(['a1', 'a2']);
+  });
+
+  it('returns to the memories index when exiting the history viewer', () => {
+    expect(getMemoryViewerExitRoute('history')).toBe('/memories');
+    expect(getMemoryViewerExitRoute()).toBe('/photos');
   });
 });
