@@ -23,6 +23,7 @@ During review, we expanded the scope to include Albums because album assets alre
 - Do not add a redundant Favorites filter to the dedicated `/favorites` page.
 - Do not broaden localization cleanup beyond the newly added Favorites labels.
 - Do not add a Map route-level regression; shared component and utility coverage is sufficient for the reported Map chip gap.
+- Do not change Album asset picker suggestions to exclude assets already in the album; that is an existing picker-suggestion mismatch outside this issue.
 
 ## Behavior
 
@@ -37,6 +38,10 @@ Favorites appears after `Media Type` in the filter section order for Map, Photos
 
 On owner-timeline requests that normally include partner assets or shared-space assets, selecting Favorites narrows the request back to the user's own favorited timeline assets. The backend rejects `isFavorite` when combined with `withPartners` or `withSharedSpaces`, and this design preserves that server contract instead of redefining cross-owner favorite semantics. Concrete shared-space scopes using `spaceId` remain supported.
 
+Photos search mode follows the same owner-only rule. When Favorites is selected, Photos smart-search and Photos dependent suggestions should not include `withSharedSpaces`. Map keeps its existing behavior: it may send `withSharedSpaces` with `isFavorite`, and the existing backend map service narrows that combination to owner-only favorites.
+
+Spaces exposes Favorites only in normal view mode. Select-assets and select-cover flows do not show the filter panel today, so they remain unchanged.
+
 ## Architecture
 
 The implementation should reuse the existing filter state model. `FilterState.isFavorite` already exists and is already counted by `getActiveFilterCount()` and included in `buildFilterContext()` when requested.
@@ -49,6 +54,7 @@ The changes are expected in these areas:
 - Album filter configs should include the `favorites` section and pass `isFavorite` to filter suggestions.
 - Photos, Spaces, and Album option builders should pass `isFavorite` through to their timeline or picker requests.
 - Owner-timeline option builders should omit `withPartners` and `withSharedSpaces` when `isFavorite` is selected.
+- Photos search and dependent suggestion builders should omit `withSharedSpaces` when `isFavorite` is selected.
 - `FilterPanel` localStorage hydration should merge newly introduced sections into saved visible and expanded section sets.
 
 Map already includes the `favorites` section and passes `isFavorite` through map marker, time-bucket, and timeline option builders. Its missing behavior comes from the shared active-chip renderer.
@@ -65,7 +71,7 @@ When a user selects Favorites:
 6. `ActiveFiltersBar` renders a `Favorites` chip.
 7. Closing the chip routes through the page's remove-filter handler and clears `isFavorite`.
 
-For search result mode, `SmartSearchResults` already tracks and passes `filters.isFavorite`, so no separate search redesign is needed.
+For search result mode, `SmartSearchResults` already tracks and passes `filters.isFavorite`; the route-level scope passed into it should match the no-query timeline scope.
 
 ## Persistence
 
@@ -81,6 +87,7 @@ Add or update focused tests for:
 - Photos, Spaces, Album, and Map filter configs include `favorites` in the expected order.
 - Photos, Spaces, and Album option builders include `isFavorite: true` when selected.
 - Photos and Album picker option builders omit partner/shared-space inclusion when `isFavorite` is selected.
+- Photos search and dependent suggestions omit shared-space inclusion when `isFavorite` is selected.
 - Photos and Spaces remove-filter handlers clear favorites.
 - Album suggestions include `isFavorite` for detail and picker configs.
 - `FilterPanel` visible and expanded section hydration merges newly introduced sections into saved section sets.
