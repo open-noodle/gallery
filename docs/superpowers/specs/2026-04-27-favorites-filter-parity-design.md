@@ -35,6 +35,8 @@ The active filter bar renders one chip labeled with the existing `favorites` i18
 
 Favorites appears after `Media Type` in the filter section order for Map, Photos, Spaces, Album detail view, and Album asset picker.
 
+On owner-timeline requests that normally include partner assets or shared-space assets, selecting Favorites narrows the request back to the user's own favorited timeline assets. The backend rejects `isFavorite` when combined with `withPartners` or `withSharedSpaces`, and this design preserves that server contract instead of redefining cross-owner favorite semantics. Concrete shared-space scopes using `spaceId` remain supported.
+
 ## Architecture
 
 The implementation should reuse the existing filter state model. `FilterState.isFavorite` already exists and is already counted by `getActiveFilterCount()` and included in `buildFilterContext()` when requested.
@@ -46,6 +48,7 @@ The changes are expected in these areas:
 - Photos and Spaces filter panel configs should include the `favorites` section.
 - Album filter configs should include the `favorites` section and pass `isFavorite` to filter suggestions.
 - Photos, Spaces, and Album option builders should pass `isFavorite` through to their timeline or picker requests.
+- Owner-timeline option builders should omit `withPartners` and `withSharedSpaces` when `isFavorite` is selected.
 - `FilterPanel` localStorage hydration should merge newly introduced sections into saved visible and expanded section sets.
 
 Map already includes the `favorites` section and passes `isFavorite` through map marker, time-bucket, and timeline option builders. Its missing behavior comes from the shared active-chip renderer.
@@ -57,9 +60,10 @@ When a user selects Favorites:
 1. `FavoritesFilter` sets `filters.isFavorite` to `true`.
 2. `FilterPanel` emits the bound filter state to the owning route.
 3. The route's option builder includes `isFavorite: true` in the timeline, picker, marker, time-bucket, or search request used by that surface.
-4. The route's suggestions provider includes `isFavorite: true`, so dependent filter options narrow to the favorites subset.
-5. `ActiveFiltersBar` renders a `Favorites` chip.
-6. Closing the chip routes through the page's remove-filter handler and clears `isFavorite`.
+4. If the owner timeline request would otherwise include partner or shared-space assets, the option builder removes those inclusions while Favorites is selected.
+5. The route's suggestions provider includes `isFavorite: true`, so dependent filter options narrow to the favorites subset.
+6. `ActiveFiltersBar` renders a `Favorites` chip.
+7. Closing the chip routes through the page's remove-filter handler and clears `isFavorite`.
 
 For search result mode, `SmartSearchResults` already tracks and passes `filters.isFavorite`, so no separate search redesign is needed.
 
@@ -76,6 +80,7 @@ Add or update focused tests for:
 - `ActiveFiltersBar` renders and removes a Favorites chip.
 - Photos, Spaces, Album, and Map filter configs include `favorites` in the expected order.
 - Photos, Spaces, and Album option builders include `isFavorite: true` when selected.
+- Photos and Album picker option builders omit partner/shared-space inclusion when `isFavorite` is selected.
 - Photos and Spaces remove-filter handlers clear favorites.
 - Album suggestions include `isFavorite` for detail and picker configs.
 - `FilterPanel` visible and expanded section hydration merges newly introduced sections into saved section sets.
