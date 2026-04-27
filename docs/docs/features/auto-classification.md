@@ -107,6 +107,25 @@ The default is **0.28** (Normal). Start there and adjust based on results.
 - **Tag only** (`tag`) — Matching photos get an `Auto/{category name}` tag. They stay on your timeline.
 - **Tag and archive** (`tag_and_archive`) — Matching photos get tagged AND moved to the Archive. Useful for screenshots or receipts you want organized but not on your timeline.
 
+### Face exclusion
+
+Each category can optionally skip assets that contain known human faces. This is useful when a category should classify non-personal images, such as receipts, nature photos, or screenshots, without tagging genuine photos of people.
+
+The **Face exclusion** setting has four modes:
+
+| Mode                  | Behavior                                                                                           |
+| --------------------- | -------------------------------------------------------------------------------------------------- |
+| Off                   | Classifies assets as usual.                                                                        |
+| Any assigned face     | Skips the category when the asset has a visible face assigned to a person cluster.                 |
+| Named people          | Skips the category when the asset has a visible face assigned to a named person.                   |
+| Named, visible people | Skips the category when the asset has a visible face assigned to a named person who is not hidden. |
+
+Unassigned detected faces do not count as known faces, and pets do not count as human faces for this filter.
+
+Face-aware categories require facial recognition. If facial recognition is disabled, Gallery skips those categories instead of treating the asset as safe to classify. Categories set to **Off** continue to run normally.
+
+Face exclusion is future-only. Changing the setting does not remove existing `Auto/...` tags, and later face recognition, person naming, hiding, or merging does not clean up old tags automatically. Run **Scan All Libraries** after changing rules if you want assets to be evaluated again under the new settings; a forced scan can add new matches, but it still does not remove old `Auto/...` tags that are now excluded.
+
 ## Scanning Your Library
 
 New uploads are classified automatically. To classify your existing library:
