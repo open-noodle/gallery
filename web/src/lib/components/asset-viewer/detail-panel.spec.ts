@@ -1,6 +1,6 @@
 import { renderWithTooltips } from '$tests/helpers';
 import '@testing-library/jest-dom';
-import type { AssetResponseDto } from '@immich/sdk';
+import { AssetTypeEnum, AssetVisibility, type AssetResponseDto } from '@immich/sdk';
 import DetailPanel from './detail-panel.svelte';
 
 const { getAllAlbumsMock, getAssetInfoMock } = vi.hoisted(() => ({
@@ -106,11 +106,12 @@ describe('DetailPanel', () => {
       id: 'asset-1',
       ownerId: 'owner-1',
       libraryId: 'library-1',
-      type: 'IMAGE',
+      type: AssetTypeEnum.Image,
       originalPath: '/library/asset-1.jpg',
       originalFileName: 'asset-1.jpg',
       originalMimeType: 'image/jpeg',
       thumbhash: 'thumbhash',
+      createdAt: '2026-01-01T00:00:00.000Z',
       fileCreatedAt: '2026-01-01T00:00:00.000Z',
       fileModifiedAt: '2026-01-01T00:00:00.000Z',
       localDateTime: '2026-01-01T00:00:00.000Z',
@@ -122,7 +123,7 @@ describe('DetailPanel', () => {
       checksum: 'checksum',
       isOffline: false,
       hasMetadata: false,
-      visibility: 'timeline',
+      visibility: AssetVisibility.Timeline,
       width: 1000,
       height: 800,
       isEdited: false,
