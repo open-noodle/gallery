@@ -42,6 +42,7 @@ classification:
         - 'a screenshot of a chat conversation'
       similarity: 0.28
       action: tag
+      faceExclusion: off
       enabled: true
     - name: Receipts
       prompts:
@@ -50,6 +51,7 @@ classification:
         - 'a restaurant bill'
       similarity: 0.28
       action: tag_and_archive
+      faceExclusion: off
       enabled: true
 ```
 
@@ -68,13 +70,14 @@ curl -X PUT -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json
 
 ### Category Fields
 
-| Field        | Type     | Required | Description                                                          |
-| ------------ | -------- | -------- | -------------------------------------------------------------------- |
-| `name`       | string   | Yes      | Category name. Must be unique. Used as the tag name (`Auto/{name}`). |
-| `prompts`    | string[] | Yes      | At least one text prompt describing photos to match.                 |
-| `similarity` | number   | Yes      | Threshold 0-1. Higher = stricter matching. Default: 0.28.            |
-| `action`     | string   | Yes      | `tag` (tag only) or `tag_and_archive` (tag and move to archive).     |
-| `enabled`    | boolean  | Yes      | Whether this category is active. Disabled categories are skipped.    |
+| Field           | Type     | Required | Description                                                                                               |
+| --------------- | -------- | -------- | --------------------------------------------------------------------------------------------------------- |
+| `name`          | string   | Yes      | Category name. Must be unique. Used as the tag name (`Auto/{name}`).                                      |
+| `prompts`       | string[] | Yes      | At least one text prompt describing photos to match.                                                      |
+| `similarity`    | number   | Yes      | Threshold 0-1. Higher = stricter matching. Default: 0.28.                                                 |
+| `action`        | string   | Yes      | `tag` (tag only) or `tag_and_archive` (tag and move to archive).                                          |
+| `faceExclusion` | string   | No       | Face exclusion mode: `off`, `any_assigned_face`, `named_people`, or `named_visible_people`. Default: off. |
+| `enabled`       | boolean  | Yes      | Whether this category is active. Disabled categories are skipped.                                         |
 
 ### Writing Good Prompts
 
