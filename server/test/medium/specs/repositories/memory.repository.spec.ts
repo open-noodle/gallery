@@ -62,7 +62,8 @@ describe(MemoryRepository.name, () => {
 
         await sut.cleanup(365);
 
-        const memoryIds = (await selectMemoryIds(ctx)).map(({ id }) => id);
+        const memories = await selectMemoryIds(ctx);
+        const memoryIds = memories.map(({ id }) => id);
         expect(memoryIds).not.toContain(oldUnsavedMemory.id);
         expect(memoryIds).toEqual(expect.arrayContaining([newUnsavedMemory.id, oldSavedMemory.id]));
       } finally {
@@ -94,7 +95,8 @@ describe(MemoryRepository.name, () => {
 
         await sut.cleanup(1);
 
-        const memoryIds = (await selectMemoryIds(ctx)).map(({ id }) => id);
+        const memories = await selectMemoryIds(ctx);
+        const memoryIds = memories.map(({ id }) => id);
         expect(memoryIds).not.toContain(alreadyShownMemory.id);
         expect(memoryIds).toContain(futureMemory.id);
       } finally {
@@ -116,7 +118,8 @@ describe(MemoryRepository.name, () => {
 
         await sut.cleanup(0);
 
-        const memoryIds = (await selectMemoryIds(ctx)).map(({ id }) => id);
+        const memories = await selectMemoryIds(ctx);
+        const memoryIds = memories.map(({ id }) => id);
         expect(memoryIds).toContain(memory.id);
       } finally {
         now.mockRestore();
@@ -147,7 +150,8 @@ describe(MemoryRepository.name, () => {
 
         await sut.cleanup(0);
 
-        const memoryIds = (await selectMemoryIds(ctx)).map(({ id }) => id);
+        const memories = await selectMemoryIds(ctx);
+        const memoryIds = memories.map(({ id }) => id);
         expect(memoryIds).toContain(memory.id);
         await expect(selectMemoryAssetRows(ctx)).resolves.toEqual([
           { assetId: timelineAsset.id, memoriesId: memory.id },
