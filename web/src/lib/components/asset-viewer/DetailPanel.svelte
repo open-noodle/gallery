@@ -13,6 +13,7 @@
   import { getAssetMediaUrl } from '#lib/utils.ts';
   import { delay, getDimensions } from '#lib/utils/asset-utils.ts';
   import { getByteUnitString } from '#lib/utils/byte-units.ts';
+  import { getMapProviderLinks } from '#lib/utils/exif-utils.ts';
   import { getParentPath } from '#lib/utils/tree-utils.ts';
   import { AssetMediaSize, getAssetInfo, type AlbumResponseDto, type AssetResponseDto } from '@immich/sdk';
   import { createQuery } from '@tanstack/svelte-query';
@@ -300,13 +301,15 @@
           {#snippet popup({ marker })}
             <div class="flex flex-col items-center gap-1">
               {const { lat, lon } = $derived(marker)}
+              {const mapProviderLinks = $derived(getMapProviderLinks(lat, lon))}
               <Text fontWeight="bold">{lat.toPrecision(6)}, {lon.toPrecision(6)}</Text>
-              <Link
-                href="https://www.openstreetmap.org/?mlat={lat}&mlon={lon}&zoom=13#map=15/{lat}/{lon}"
-                class="text-primary"
-              >
-                {$t('open_in_openstreetmap')}
-              </Link>
+              <div class="flex flex-col items-center gap-1">
+                {#each mapProviderLinks as link (link.key)}
+                  <Link href={link.url} class="text-primary">
+                    {$t(link.label)}
+                  </Link>
+                {/each}
+              </div>
             </div>
           {/snippet}
         </Map>
