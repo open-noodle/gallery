@@ -2,8 +2,8 @@ import { getAssetMediaUrl } from '$lib/utils';
 import { AssetMediaSize, MemoryType, type MemoryResponseDto } from '@immich/sdk';
 import { render, screen } from '@testing-library/svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
-import type { MemoryIndexItem } from './memory-index-utils';
 import MemoryCard from './memory-card.svelte';
+import type { MemoryIndexItem } from './memory-index-utils';
 
 vi.mock('$lib/utils', () => ({
   getAssetMediaUrl: vi.fn(({ id }) => `/thumbnail/${id}`),

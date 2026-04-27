@@ -36,10 +36,7 @@ const options = {
 describe('memory index utilities', () => {
   it('filters out memories with no assets', () => {
     const items = buildMemoryIndexItems(
-      [
-        memory({ id: 'empty-memory', assets: [] }),
-        memory({ id: 'memory-with-assets', title: 'Has assets' }),
-      ],
+      [memory({ id: 'empty-memory', assets: [] }), memory({ id: 'memory-with-assets', title: 'Has assets' })],
       options,
     );
 
@@ -107,10 +104,7 @@ describe('memory index utilities', () => {
 
   it('returns only saved memories for the saved filter', () => {
     const items = buildMemoryIndexItems(
-      [
-        memory({ id: 'saved', isSaved: true }),
-        memory({ id: 'unsaved', isSaved: false }),
-      ],
+      [memory({ id: 'saved', isSaved: true }), memory({ id: 'unsaved', isSaved: false })],
       options,
     );
 
@@ -160,15 +154,11 @@ describe('memory index utilities', () => {
 
     const items = buildMemoryIndexItems(memories, options);
 
-    expect(filterMemoryIndexItems(items, { query: 'summer' }).map((item) => item.memory.id)).toEqual([
-      'title-match',
-    ]);
+    expect(filterMemoryIndexItems(items, { query: 'summer' }).map((item) => item.memory.id)).toEqual(['title-match']);
     expect(filterMemoryIndexItems(items, { query: 'coastal' }).map((item) => item.memory.id)).toEqual([
       'subtitle-match',
     ]);
-    expect(filterMemoryIndexItems(items, { query: '2017' }).map((item) => item.memory.id)).toEqual([
-      'year-match',
-    ]);
+    expect(filterMemoryIndexItems(items, { query: '2017' }).map((item) => item.memory.id)).toEqual(['year-match']);
     expect(filterMemoryIndexItems(items, { query: 'Feb 4, 2026' }).map((item) => item.memory.id)).toEqual([
       'date-match',
     ]);

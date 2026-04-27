@@ -56,7 +56,7 @@ const asset = (id: string): AssetResponseDto => ({
 });
 
 const memory = (id: string, assetIds: string[]): MemoryResponseDto => ({
-  assets: assetIds.map(asset),
+  assets: assetIds.map((id) => asset(id)),
   createdAt: '2024-01-01T00:00:00.000Z',
   data: {},
   id,

@@ -38,8 +38,7 @@ type GroupMemoryIndexOptions = {
 
 const getMemoryYear = (memory: MemoryResponseDto) => new Date(memory.memoryAt).getUTCFullYear().toString();
 
-const getMonthKey = (date: Date) =>
-  `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+const getMonthKey = (date: Date) => `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
 
 const getTypeLabel = (memory: MemoryResponseDto, translate: MessageFormatter) =>
   memory.type === MemoryType.OnThisDay ? translate('memory_type_on_this_day') : '';

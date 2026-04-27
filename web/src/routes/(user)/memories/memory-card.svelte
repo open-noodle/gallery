@@ -17,7 +17,7 @@
   let firstAsset = $derived(item.memory.assets[0]);
   let collageAssets = $derived(item.memory.assets.slice(0, item.memory.assets.length >= 3 ? 4 : 1));
   let hasCollage = $derived(item.memory.assets.length >= 3);
-  let loading = $derived(preload ? 'eager' : 'lazy');
+  let loading: 'eager' | 'lazy' = $derived(preload ? 'eager' : 'lazy');
 
   const getCollageImageClass = (index: number, count: number) => {
     const base = 'size-full object-cover transition duration-200 group-hover:scale-[1.02]';
@@ -48,7 +48,7 @@
             <img
               src={getAssetMediaUrl({ id: asset.id, size: AssetMediaSize.Thumbnail })}
               alt=""
-              loading={loading}
+              {loading}
               class={getCollageImageClass(index, collageAssets.length)}
             />
           {/each}
@@ -57,7 +57,7 @@
         <img
           src={getAssetMediaUrl({ id: firstAsset.id, size: AssetMediaSize.Thumbnail })}
           alt=""
-          loading={loading}
+          {loading}
           class="size-full object-cover transition duration-200 group-hover:scale-[1.02]"
         />
       {/if}
