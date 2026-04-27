@@ -25,8 +25,15 @@ type BuildMemoryIndexOptions = {
   translate: MessageFormatter;
   locale?: string;
   now?: Date;
+};
+
+type FilterMemoryIndexOptions = {
   filter?: MemoryIndexFilter;
   query?: string;
+};
+
+type GroupMemoryIndexOptions = {
+  locale?: string;
 };
 
 const getMemoryYear = (memory: MemoryResponseDto) => new Date(memory.memoryAt).getFullYear().toString();
@@ -37,16 +44,14 @@ const getMonthKey = (date: Date) =>
 const getTypeLabel = (memory: MemoryResponseDto, translate: MessageFormatter) =>
   memory.type === MemoryType.OnThisDay ? translate('memory_type_on_this_day') : '';
 
-export const filterMemoryIndexItems = (
+export const buildMemoryIndexItems = (
   memories: MemoryResponseDto[],
-  { translate, locale, now = new Date(), filter = 'all', query = '' }: BuildMemoryIndexOptions,
+  { translate, locale, now = new Date() }: BuildMemoryIndexOptions,
 ): MemoryIndexItem[] => {
   const dateFormatter = new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', year: 'numeric' });
-  const normalizedQuery = query.trim().toLowerCase();
 
   return memories
     .filter((memory) => memory.assets.length > 0)
-    .filter((memory) => filter === 'all' || memory.isSaved)
     .map((memory): MemoryIndexItem => {
       const shownAt = new Date(memory.showAt ?? memory.createdAt);
       const title = getMemoryTitle(memory, translate, now);
@@ -70,18 +75,28 @@ export const filterMemoryIndexItems = (
         searchText,
       };
     })
-    .filter((item) => normalizedQuery === '' || item.searchText.includes(normalizedQuery))
     .sort((a, b) => b.shownAt.getTime() - a.shownAt.getTime());
 };
 
+export const filterMemoryIndexItems = (
+  items: MemoryIndexItem[],
+  { filter = 'all', query = '' }: FilterMemoryIndexOptions = {},
+): MemoryIndexItem[] => {
+  const normalizedQuery = query.trim().toLowerCase();
+
+  return items
+    .filter((item) => filter === 'all' || item.memory.isSaved)
+    .filter((item) => normalizedQuery === '' || item.searchText.includes(normalizedQuery));
+};
+
 export const groupMemoryIndexItems = (
-  memories: MemoryResponseDto[],
-  options: BuildMemoryIndexOptions,
+  items: MemoryIndexItem[],
+  { locale }: GroupMemoryIndexOptions = {},
 ): MemoryIndexGroup[] => {
-  const monthFormatter = new Intl.DateTimeFormat(options.locale, { month: 'long', year: 'numeric' });
+  const monthFormatter = new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' });
   const groups = new Map<string, MemoryIndexGroup>();
 
-  for (const item of filterMemoryIndexItems(memories, options)) {
+  for (const item of items) {
     const group = groups.get(item.monthKey);
 
     if (group) {

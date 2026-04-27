@@ -1,6 +1,6 @@
 import { MemoryType, type MemoryResponseDto } from '@immich/sdk';
 import type { MessageFormatter } from 'svelte-i18n';
-import { filterMemoryIndexItems, groupMemoryIndexItems } from './memory-index-utils';
+import { buildMemoryIndexItems, filterMemoryIndexItems, groupMemoryIndexItems } from './memory-index-utils';
 
 const translate = ((key: string, payload?: { values?: Record<string, number> }) => {
   if (key === 'years_ago') {
@@ -35,7 +35,7 @@ const options = {
 
 describe('memory index utilities', () => {
   it('filters out memories with no assets', () => {
-    const items = filterMemoryIndexItems(
+    const items = buildMemoryIndexItems(
       [
         memory({ id: 'empty-memory', assets: [] }),
         memory({ id: 'memory-with-assets', title: 'Has assets' }),
@@ -47,7 +47,7 @@ describe('memory index utilities', () => {
   });
 
   it('sorts by shown or generated date, newest first', () => {
-    const items = filterMemoryIndexItems(
+    const items = buildMemoryIndexItems(
       [
         memory({ id: 'created-newer', createdAt: '2026-03-01T00:00:00.000Z' }),
         memory({ id: 'shown-newest', createdAt: '2026-01-01T00:00:00.000Z', showAt: '2026-04-01T00:00:00.000Z' }),
@@ -60,7 +60,7 @@ describe('memory index utilities', () => {
   });
 
   it('groups memories by shown or generated month', () => {
-    const groups = groupMemoryIndexItems(
+    const items = buildMemoryIndexItems(
       [
         memory({ id: 'april-shown', createdAt: '2026-01-01T00:00:00.000Z', showAt: '2026-04-10T00:00:00.000Z' }),
         memory({ id: 'march-created', createdAt: '2026-03-15T00:00:00.000Z' }),
@@ -68,6 +68,7 @@ describe('memory index utilities', () => {
       ],
       options,
     );
+    const groups = groupMemoryIndexItems(items, { locale: options.locale });
 
     expect(groups).toMatchObject([
       {
@@ -84,15 +85,15 @@ describe('memory index utilities', () => {
   });
 
   it('returns only saved memories for the saved filter', () => {
-    const items = filterMemoryIndexItems(
+    const items = buildMemoryIndexItems(
       [
         memory({ id: 'saved', isSaved: true }),
         memory({ id: 'unsaved', isSaved: false }),
       ],
-      { ...options, filter: 'saved' },
+      options,
     );
 
-    expect(items.map((item) => item.memory.id)).toEqual(['saved']);
+    expect(filterMemoryIndexItems(items, { filter: 'saved' }).map((item) => item.memory.id)).toEqual(['saved']);
   });
 
   it('matches search by title, subtitle, memory year, date label, type label, and raw type enum', () => {
@@ -136,24 +137,24 @@ describe('memory index utilities', () => {
       }),
     ];
 
-    expect(filterMemoryIndexItems(memories, { ...options, query: 'summer' }).map((item) => item.memory.id)).toEqual([
+    const items = buildMemoryIndexItems(memories, options);
+
+    expect(filterMemoryIndexItems(items, { query: 'summer' }).map((item) => item.memory.id)).toEqual([
       'title-match',
     ]);
-    expect(filterMemoryIndexItems(memories, { ...options, query: 'coastal' }).map((item) => item.memory.id)).toEqual([
+    expect(filterMemoryIndexItems(items, { query: 'coastal' }).map((item) => item.memory.id)).toEqual([
       'subtitle-match',
     ]);
-    expect(filterMemoryIndexItems(memories, { ...options, query: '2017' }).map((item) => item.memory.id)).toEqual([
+    expect(filterMemoryIndexItems(items, { query: '2017' }).map((item) => item.memory.id)).toEqual([
       'year-match',
     ]);
-    expect(filterMemoryIndexItems(memories, { ...options, query: 'Feb 4, 2026' }).map((item) => item.memory.id)).toEqual([
+    expect(filterMemoryIndexItems(items, { query: 'Feb 4, 2026' }).map((item) => item.memory.id)).toEqual([
       'date-match',
     ]);
-    expect(filterMemoryIndexItems(memories, { ...options, query: 'On this day' }).map((item) => item.memory.id)).toEqual([
+    expect(filterMemoryIndexItems(items, { query: 'On this day' }).map((item) => item.memory.id)).toEqual([
       'type-match',
     ]);
-    expect(
-      filterMemoryIndexItems(memories, { ...options, query: MemoryType.OnThisDay }).map((item) => item.memory.id),
-    ).toEqual([
+    expect(filterMemoryIndexItems(items, { query: MemoryType.OnThisDay }).map((item) => item.memory.id)).toEqual([
       'type-match',
     ]);
   });
