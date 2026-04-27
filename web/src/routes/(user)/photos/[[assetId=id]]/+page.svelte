@@ -77,7 +77,7 @@
   let tagNames = new SvelteMap<string, string>();
 
   const filterConfig: FilterPanelConfig = {
-    sections: ['timeline', 'people', 'location', 'camera', 'tags', 'rating', 'media'],
+    sections: ['timeline', 'people', 'location', 'camera', 'tags', 'rating', 'media', 'favorites'],
     suggestionsProvider: async (filters: FilterState) => {
       const context = buildFilterContext(filters);
       const response = await getFilterSuggestions({
@@ -97,7 +97,7 @@
         isFavorite: filters.isFavorite,
         takenAfter: context?.takenAfter,
         takenBefore: context?.takenBefore,
-        withSharedSpaces: true,
+        ...(filters.isFavorite === undefined ? { withSharedSpaces: true } : {}),
       });
       const mappedPeople = response.people.map((p) => ({
         id: p.id,
@@ -125,15 +125,15 @@
         getSearchSuggestions({
           $type: SearchSuggestionType.City,
           country,
-          withSharedSpaces: true,
           ...context,
+          ...(context?.isFavorite === undefined ? { withSharedSpaces: true } : {}),
         }),
       cameraModels: (make, context) =>
         getSearchSuggestions({
           $type: SearchSuggestionType.CameraModel,
           make,
-          withSharedSpaces: true,
           ...context,
+          ...(context?.isFavorite === undefined ? { withSharedSpaces: true } : {}),
         }),
     },
   };
@@ -252,7 +252,7 @@
           searchQuery={committedQuery}
           {filters}
           isShared={false}
-          withSharedSpaces={true}
+          withSharedSpaces={filters.isFavorite === undefined}
         />
       {:else}
         <Timeline
