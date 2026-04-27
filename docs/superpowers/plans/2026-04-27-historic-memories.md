@@ -42,6 +42,9 @@
 - Create: `web/src/routes/admin/system-settings/MemoriesSettings.svelte`  
   Responsibility: render admin retention input and save only `memories` config.
 
+- Create: `web/src/routes/admin/system-settings/MemoriesSettings.spec.ts`
+  Responsibility: prove the admin retention field renders the configured value and uses the existing settings form copy.
+
 - Modify: `web/src/routes/admin/system-settings/+page.svelte`  
   Responsibility: add the Memories settings accordion.
 
@@ -414,6 +417,7 @@ git commit -m "feat: configure memory retention cleanup"
 - Modify: `open-api/immich-openapi-specs.json`
 - Modify: `open-api/typescript-sdk/src/fetch-client.ts`
 - Create: `web/src/routes/admin/system-settings/MemoriesSettings.svelte`
+- Create: `web/src/routes/admin/system-settings/MemoriesSettings.spec.ts`
 - Modify: `web/src/routes/admin/system-settings/+page.svelte`
 - Modify: `i18n/en.json`
 
@@ -438,7 +442,68 @@ In `i18n/en.json`, add these keys inside the top-level `"admin"` object near the
     "memory_retention_setting_description": "Number of days to keep generated memories. Set to 0 to keep memories forever.",
 ```
 
-- [ ] **Step 3: Create the Memories settings component**
+- [ ] **Step 3: Add failing admin settings component test**
+
+Create `web/src/routes/admin/system-settings/MemoriesSettings.spec.ts`:
+
+```typescript
+import TestWrapper from '$lib/components/TestWrapper.svelte';
+import '@testing-library/jest-dom/vitest';
+import { render, screen } from '@testing-library/svelte';
+import type { SystemConfigDto } from '@immich/sdk';
+import type { Component } from 'svelte';
+import MemoriesSettings from './MemoriesSettings.svelte';
+
+const config = {
+  memories: {
+    retentionDays: 365,
+  },
+} as SystemConfigDto;
+
+vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({
+  featureFlagsManager: {
+    value: {
+      configFile: false,
+    },
+  },
+}));
+
+vi.mock('$lib/managers/system-config-manager.svelte', () => ({
+  systemConfigManager: {
+    value: config,
+    cloneValue: vi.fn(() => structuredClone(config)),
+  },
+}));
+
+vi.mock('$lib/components/shared-components/settings/SystemConfigButtonRow.svelte', async () => {
+  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+  return { default: MockComponent };
+});
+
+describe('MemoriesSettings', () => {
+  it('should render the retention field with the current configured value', () => {
+    render(TestWrapper as Component<{ component: typeof MemoriesSettings; componentProps: Record<string, never> }>, {
+      component: MemoriesSettings,
+      componentProps: {},
+    });
+
+    expect(screen.getByLabelText('admin.memory_retention_setting')).toHaveValue(365);
+    expect(screen.getByText('admin.memory_retention_setting_description')).toBeInTheDocument();
+  });
+});
+```
+
+- [ ] **Step 4: Run admin settings component test and verify it fails**
+
+Run:
+
+```bash
+pnpm --dir web exec vitest run src/routes/admin/system-settings/MemoriesSettings.spec.ts
+```
+
+Expected: fails because `MemoriesSettings.svelte` does not exist.
+
+- [ ] **Step 5: Create the Memories settings component**
 
 Create `web/src/routes/admin/system-settings/MemoriesSettings.svelte`:
 
@@ -479,7 +544,7 @@ Create `web/src/routes/admin/system-settings/MemoriesSettings.svelte`:
 </div>
 ```
 
-- [ ] **Step 4: Add Memories settings to the admin accordion**
+- [ ] **Step 6: Add Memories settings to the admin accordion**
 
 In `web/src/routes/admin/system-settings/+page.svelte`, add:
 
@@ -505,11 +570,12 @@ Add this object immediately after the Nightly Tasks settings item:
     },
 ```
 
-- [ ] **Step 5: Run admin settings typecheck and commit**
+- [ ] **Step 7: Run admin settings tests, typecheck, and commit**
 
 Run:
 
 ```bash
+pnpm --dir web exec vitest run src/routes/admin/system-settings/MemoriesSettings.spec.ts
 pnpm --filter immich-web exec svelte-check --fail-on-warnings
 ```
 
@@ -518,9 +584,11 @@ Expected: no type errors for `configToEdit.memories.retentionDays` or settings i
 Commit:
 
 ```bash
-git add open-api/immich-openapi-specs.json open-api/typescript-sdk/src/fetch-client.ts open-api/typescript-sdk/build i18n/en.json web/src/routes/admin/system-settings/MemoriesSettings.svelte web/src/routes/admin/system-settings/+page.svelte
+git add open-api/immich-openapi-specs.json open-api/typescript-sdk/src/fetch-client.ts i18n/en.json web/src/routes/admin/system-settings/MemoriesSettings.svelte web/src/routes/admin/system-settings/MemoriesSettings.spec.ts web/src/routes/admin/system-settings/+page.svelte
 git commit -m "feat: expose memory retention setting"
 ```
+
+Note: `open-api/typescript-sdk/build/` is intentionally ignored by git. The OpenAPI generation step builds it for local tests, but do not add it to the commit.
 
 ## Task 3: Route Split And History Viewer Source
 
@@ -614,9 +682,26 @@ In `web/src/lib/managers/global-search-manager.svelte.spec.ts`, update the live 
 Create `web/src/lib/utils/memory-viewer-source.ts` with the implementation in Step 7, then create `web/src/lib/utils/memory-viewer-source.spec.ts` with:
 
 ```typescript
-import { MemoryType, type MemoryResponseDto } from '@immich/sdk';
+import { AssetTypeEnum, AssetVisibility, MemoryType, type AssetResponseDto, type MemoryResponseDto } from '@immich/sdk';
 import { describe, expect, it } from 'vitest';
 import { findMemoryAsset, removeAssetsFromMemoryList } from './memory-viewer-source';
+
+const asset = (id: string): AssetResponseDto =>
+  ({
+    id,
+    ownerId: 'user-id',
+    type: AssetTypeEnum.Image,
+    fileCreatedAt: '2026-04-23T12:00:00.000Z',
+    localDateTime: '2026-04-23T12:00:00.000Z',
+    isFavorite: false,
+    isTrashed: false,
+    visibility: AssetVisibility.Timeline,
+    thumbhash: null,
+    duration: null,
+    exifInfo: null,
+    people: [],
+    tags: [],
+  }) as AssetResponseDto;
 
 const memory = (id: string, assetIds: string[]): MemoryResponseDto =>
   ({
@@ -628,7 +713,7 @@ const memory = (id: string, assetIds: string[]): MemoryResponseDto =>
     memoryAt: '2024-04-23T00:00:00.000Z',
     createdAt: '2026-04-23T00:00:00.000Z',
     updatedAt: '2026-04-23T00:00:00.000Z',
-    assets: assetIds.map((assetId) => ({ id: assetId })),
+    assets: assetIds.map(asset),
   }) as MemoryResponseDto;
 
 describe('memory viewer source', () => {
@@ -787,7 +872,7 @@ In `web/src/routes/(user)/memory/[[photos=photos]]/[[assetId=id]]/memory-viewer.
     removeAssetsFromMemoryList,
     type MemoryAssetSource,
   } from '$lib/utils/memory-viewer-source';
-  import { deleteMemory, removeMemoryAssets, searchMemories, updateMemory } from '@immich/sdk';
+  import { deleteMemory, removeMemoryAssets, searchMemories, updateMemory, type MemoryResponseDto } from '@immich/sdk';
 ```
 
 Replace the `current` state type:
@@ -1234,14 +1319,14 @@ const item: MemoryIndexItem = {
 
 describe('MemoryCard', () => {
   it('should render card details and link to the history viewer source', () => {
-    render(MemoryCard, { item, preload: true });
+    const { container } = render(MemoryCard, { item, preload: true });
 
     const link = screen.getByRole('link', { name: /2 years ago/i });
     expect(link).toHaveAttribute('href', '/memory?id=asset-1&source=history');
     expect(screen.getByText('Spring highlights')).toBeInTheDocument();
     expect(screen.getByText('Apr 23, 2026')).toBeInTheDocument();
     expect(screen.getByTestId('memory-saved-indicator')).toBeInTheDocument();
-    expect(screen.getAllByRole('img')).toHaveLength(3);
+    expect(container.querySelectorAll('img')).toHaveLength(3);
   });
 });
 ```
@@ -1279,66 +1364,67 @@ Create `web/src/routes/(user)/memories/memory-card.svelte`:
 
   const assets = $derived(item.memory.assets.slice(0, 4));
   const firstAsset = $derived(item.memory.assets[0]);
-  const href = $derived(firstAsset ? Route.memoryViewer({ id: firstAsset.id, source: 'history' }) : Route.memories());
 </script>
 
-<a
-  {href}
-  aria-label={item.title}
-  class="group relative block rounded-2xl border border-transparent p-5 hover:border-gray-200 hover:bg-gray-100 dark:hover:border-gray-800 dark:hover:bg-gray-900"
-  data-testid="memory-card"
->
-  <div class="relative aspect-square overflow-hidden rounded-2xl bg-gray-200 dark:bg-immich-dark-gray">
-    {#if assets.length >= 3}
-      <div class="grid h-full grid-cols-2 grid-rows-2 gap-0.5">
-        {#each assets as asset, index (asset.id)}
-          <img
-            class="h-full w-full object-cover {index === 0 ? 'row-span-2' : ''}"
-            src={getAssetMediaUrl({ id: asset.id, size: AssetMediaSize.Thumbnail })}
-            alt=""
-            loading={preload ? 'eager' : 'lazy'}
-            draggable="false"
-          />
-        {/each}
-      </div>
-    {:else if firstAsset}
-      <img
-        class="h-full w-full object-cover"
-        src={getAssetMediaUrl({ id: firstAsset.id, size: AssetMediaSize.Thumbnail })}
-        alt=""
-        loading={preload ? 'eager' : 'lazy'}
-        draggable="false"
-      />
-    {/if}
+{#if firstAsset}
+  <a
+    href={Route.memoryViewer({ id: firstAsset.id, source: 'history' })}
+    aria-label={item.title}
+    class="group relative block rounded-2xl border border-transparent p-5 hover:border-gray-200 hover:bg-gray-100 dark:hover:border-gray-800 dark:hover:bg-gray-900"
+    data-testid="memory-card"
+  >
+    <div class="relative aspect-square overflow-hidden rounded-2xl bg-gray-200 dark:bg-immich-dark-gray">
+      {#if assets.length >= 3}
+        <div class="grid h-full grid-cols-2 grid-rows-2 gap-0.5">
+          {#each assets as asset, index (asset.id)}
+            <img
+              class="h-full w-full object-cover {index === 0 ? 'row-span-2' : ''}"
+              src={getAssetMediaUrl({ id: asset.id, size: AssetMediaSize.Thumbnail })}
+              alt=""
+              loading={preload ? 'eager' : 'lazy'}
+              draggable="false"
+            />
+          {/each}
+        </div>
+      {:else}
+        <img
+          class="h-full w-full object-cover"
+          src={getAssetMediaUrl({ id: firstAsset.id, size: AssetMediaSize.Thumbnail })}
+          alt=""
+          loading={preload ? 'eager' : 'lazy'}
+          draggable="false"
+        />
+      {/if}
 
-    {#if item.memory.isSaved}
-      <div
-        class="absolute end-2 top-2 rounded-full bg-white/80 p-1 text-immich-primary shadow-sm dark:bg-gray-900/80"
-        data-testid="memory-saved-indicator"
-      >
-        <Icon icon={mdiHeart} size="16" />
-      </div>
-    {/if}
-  </div>
+      {#if item.memory.isSaved}
+        <div
+          class="absolute end-2 top-2 rounded-full bg-white/80 p-1 text-immich-primary shadow-sm dark:bg-gray-900/80"
+          data-testid="memory-saved-indicator"
+        >
+          <Icon icon={mdiHeart} size="16" />
+        </div>
+      {/if}
+    </div>
 
-  <div class="mt-4">
-    <p class="line-clamp-2 w-full text-lg font-semibold leading-6 text-black group-hover:text-primary dark:text-white">
-      {item.title}
-    </p>
-
-    {#if item.subtitle}
-      <p class="truncate text-sm text-immich-text-gray-500 dark:text-immich-dark-fg">
-        {item.subtitle}
+    <div class="mt-4">
+      <p class="line-clamp-2 w-full text-lg font-semibold leading-6 text-black group-hover:text-primary dark:text-white">
+        {item.title}
       </p>
-    {/if}
 
-    <span class="flex flex-wrap gap-2 text-sm text-immich-text-gray-500 dark:text-immich-dark-fg">
-      <p>{item.dateLabel}</p>
-      <p>&middot;</p>
-      <p>{$t('memory_assets_count', { values: { count: item.memory.assets.length } })}</p>
-    </span>
-  </div>
-</a>
+      {#if item.subtitle}
+        <p class="truncate text-sm text-immich-text-gray-500 dark:text-immich-dark-fg">
+          {item.subtitle}
+        </p>
+      {/if}
+
+      <span class="flex flex-wrap gap-2 text-sm text-immich-text-gray-500 dark:text-immich-dark-fg">
+        <p>{item.dateLabel}</p>
+        <p>&middot;</p>
+        <p>{$t('memory_assets_count', { values: { count: item.memory.assets.length } })}</p>
+      </span>
+    </div>
+  </a>
+{/if}
 ```
 
 - [ ] **Step 8: Run utility/card tests and commit**
@@ -1363,10 +1449,57 @@ git commit -m "feat: add memory history card model"
 **Files:**
 
 - Create: `web/src/routes/(user)/memories/+page.ts`
+- Create: `web/src/routes/(user)/memories/page-load.spec.ts`
 - Create: `web/src/routes/(user)/memories/+page.svelte`
 - Create: `web/src/routes/(user)/memories/page.spec.ts`
 
-- [ ] **Step 1: Add route load**
+- [ ] **Step 1: Add failing route load test**
+
+Create `web/src/routes/(user)/memories/page-load.spec.ts`:
+
+```typescript
+const { mockAuthenticate, mockGetFormatter } = vi.hoisted(() => ({
+  mockAuthenticate: vi.fn(),
+  mockGetFormatter: vi.fn(),
+}));
+
+vi.mock('$lib/utils/auth', () => ({
+  authenticate: mockAuthenticate,
+}));
+
+vi.mock('$lib/utils/i18n', () => ({
+  getFormatter: mockGetFormatter,
+}));
+
+import { load } from './+page';
+
+describe('Memories page load', () => {
+  it('should authenticate and set the memories title', async () => {
+    const url = new URL('https://gallery.test/memories');
+    mockGetFormatter.mockResolvedValue((key: string) => key);
+
+    await expect(load({ url } as Parameters<typeof load>[0])).resolves.toEqual({
+      meta: {
+        title: 'memories',
+      },
+    });
+
+    expect(mockAuthenticate).toHaveBeenCalledWith(url);
+  });
+});
+```
+
+- [ ] **Step 2: Run route load test and verify it fails**
+
+Run:
+
+```bash
+pnpm --dir web exec vitest run src/routes/'(user)'/memories/page-load.spec.ts
+```
+
+Expected: fails because `+page.ts` does not exist.
+
+- [ ] **Step 3: Add route load**
 
 Create `web/src/routes/(user)/memories/+page.ts`:
 
@@ -1387,14 +1520,14 @@ export const load = (async ({ url }) => {
 }) satisfies PageLoad;
 ```
 
-- [ ] **Step 2: Add failing page component tests**
+- [ ] **Step 4: Add failing page component tests**
 
 Create `web/src/routes/(user)/memories/page.spec.ts`:
 
 ```typescript
 import TestWrapper from '$lib/components/TestWrapper.svelte';
 import '@testing-library/jest-dom/vitest';
-import { render, screen, waitFor } from '@testing-library/svelte';
+import { render, screen } from '@testing-library/svelte';
 import { searchMemories, MemoryType, type MemoryResponseDto } from '@immich/sdk';
 import userEvent from '@testing-library/user-event';
 import type { Component } from 'svelte';
@@ -1501,7 +1634,7 @@ describe('Memories page', () => {
 });
 ```
 
-- [ ] **Step 3: Run page tests and verify they fail**
+- [ ] **Step 5: Run page tests and verify they fail**
 
 Run:
 
@@ -1511,7 +1644,7 @@ pnpm --dir web exec vitest run src/routes/'(user)'/memories/page.spec.ts
 
 Expected: fails because `+page.svelte` does not exist.
 
-- [ ] **Step 4: Implement the Memories page**
+- [ ] **Step 6: Implement the Memories page**
 
 Create `web/src/routes/(user)/memories/+page.svelte`:
 
@@ -1621,23 +1754,24 @@ Create `web/src/routes/(user)/memories/+page.svelte`:
 </UserPageLayout>
 ```
 
-- [ ] **Step 5: Run page tests and web typecheck**
+- [ ] **Step 7: Run page tests and web typecheck**
 
 Run:
 
 ```bash
 pnpm --dir web exec vitest run src/routes/'(user)'/memories/page.spec.ts
+pnpm --dir web exec vitest run src/routes/'(user)'/memories/page-load.spec.ts
 pnpm --filter immich-web exec svelte-check --fail-on-warnings
 ```
 
 Expected: the page tests pass and Svelte typecheck is clean.
 
-- [ ] **Step 6: Commit Memories page**
+- [ ] **Step 8: Commit Memories page**
 
 Commit:
 
 ```bash
-git add web/src/routes/'(user)'/memories/+page.ts web/src/routes/'(user)'/memories/+page.svelte web/src/routes/'(user)'/memories/page.spec.ts
+git add web/src/routes/'(user)'/memories/+page.ts web/src/routes/'(user)'/memories/+page.svelte web/src/routes/'(user)'/memories/page-load.spec.ts web/src/routes/'(user)'/memories/page.spec.ts
 git commit -m "feat: add memories history page"
 ```
 
@@ -1753,7 +1887,7 @@ test.describe('Memories index', () => {
     await expect(page.getByRole('heading', { name: 'March 2026' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'April history' })).toBeVisible();
 
-    await page.getByLabel('memory_filter_saved').click();
+    await page.getByRole('radio', { name: 'Saved' }).click();
     await expect(page.getByRole('link', { name: 'April history' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'March history' })).not.toBeVisible();
 
@@ -1780,7 +1914,7 @@ Run:
 
 ```bash
 pnpm --filter immich exec vitest run src/services/system-config.service.spec.ts src/services/memory.service.spec.ts test/medium/specs/repositories/memory.repository.spec.ts
-pnpm --dir web exec vitest run src/lib/route.spec.ts src/lib/utils/memory-viewer-source.spec.ts src/routes/'(user)'/memories/memory-index-utils.spec.ts src/routes/'(user)'/memories/memory-card.spec.ts src/routes/'(user)'/memories/page.spec.ts src/lib/managers/global-search-manager.svelte.spec.ts src/routes/'(user)'/photos/'[[assetId=id]]'/photos-page.spec.ts
+pnpm --dir web exec vitest run src/lib/route.spec.ts src/lib/utils/memory-viewer-source.spec.ts src/routes/'(user)'/memories/memory-index-utils.spec.ts src/routes/'(user)'/memories/memory-card.spec.ts src/routes/'(user)'/memories/page-load.spec.ts src/routes/'(user)'/memories/page.spec.ts src/lib/managers/global-search-manager.svelte.spec.ts src/routes/'(user)'/photos/'[[assetId=id]]'/photos-page.spec.ts
 pnpm --filter immich-web exec svelte-check --fail-on-warnings
 pnpm --dir e2e exec playwright test --project=web src/ui/specs/memory/memory-index.e2e-spec.ts
 ```
@@ -1811,5 +1945,6 @@ git commit -m "test: cover memories history page"
 
 - Spec coverage: retention default `365`, retention `0`, saved-memory preservation, invalid asset-link cleanup, `/memories` page, route split, local search, saved filter, grouping by `showAt ?? createdAt`, card links to viewer, admin setting, sidebar/command palette route, empty/loading/error states, and E2E click-through are all covered by tasks.
 - Implementation adjustment: the approved design said historic cards should open the existing viewer while the current viewer uses today-only `memoryManager` state. Task 3 adds a history source mode for the viewer so historic links are viable without contaminating the today-only carousel state.
+- TDD check: server cleanup, config validation, route helpers, admin settings UI, viewer source helpers, index utilities, card rendering, route load, page behavior, and E2E coverage all add or update tests before the matching implementation step.
 - Non-goals preserved: no backfill, no new API endpoint, no pagination, no mobile implementation, no redesign of the full-screen viewer.
 - Placeholder scan: this plan has no deferred validation and no copy-forward shorthand steps.
