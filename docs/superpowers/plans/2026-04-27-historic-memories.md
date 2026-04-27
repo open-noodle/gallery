@@ -139,26 +139,26 @@ Add this block to `updatedConfig` near `nightlyTasks`:
 Add these tests inside `describe('getConfig', () => { ... })` after the existing number transform test:
 
 ```typescript
-    it('should default generated memory retention to 365 days', async () => {
-      mocks.systemMetadata.get.mockResolvedValue({});
+it('should default generated memory retention to 365 days', async () => {
+  mocks.systemMetadata.get.mockResolvedValue({});
 
-      await expect(sut.getSystemConfig()).resolves.toMatchObject({
-        memories: {
-          retentionDays: 365,
-        },
-      });
-    });
+  await expect(sut.getSystemConfig()).resolves.toMatchObject({
+    memories: {
+      retentionDays: 365,
+    },
+  });
+});
 
-    it('should accept zero generated memory retention', async () => {
-      mocks.config.getEnv.mockReturnValue(mockEnvData({ configFile: 'immich-config.json' }));
-      mocks.systemMetadata.readFile.mockResolvedValue(JSON.stringify({ memories: { retentionDays: 0 } }));
+it('should accept zero generated memory retention', async () => {
+  mocks.config.getEnv.mockReturnValue(mockEnvData({ configFile: 'immich-config.json' }));
+  mocks.systemMetadata.readFile.mockResolvedValue(JSON.stringify({ memories: { retentionDays: 0 } }));
 
-      await expect(sut.getSystemConfig()).resolves.toMatchObject({
-        memories: {
-          retentionDays: 0,
-        },
-      });
-    });
+  await expect(sut.getSystemConfig()).resolves.toMatchObject({
+    memories: {
+      retentionDays: 0,
+    },
+  });
+});
 ```
 
 Add this object to the validation `tests` array:
@@ -186,9 +186,9 @@ Expected: fails because `SystemConfig` and `SystemConfigSchema` do not define `m
 In `server/src/config.ts`, add this section to `SystemConfig` after `nightlyTasks`:
 
 ```typescript
-  memories: {
-    retentionDays: number;
-  };
+memories: {
+  retentionDays: number;
+}
 ```
 
 Add this default object after `nightlyTasks` in `defaults`:
@@ -236,25 +236,25 @@ import { defaults } from 'src/config';
 Replace the existing cleanup test with:
 
 ```typescript
-  describe('onMemoryCleanup', () => {
-    it('should clean up memories using the configured retention period', async () => {
-      mocks.systemMetadata.get.mockResolvedValue({ memories: { retentionDays: 0 } });
-      mocks.memory.cleanup.mockResolvedValue([]);
+describe('onMemoryCleanup', () => {
+  it('should clean up memories using the configured retention period', async () => {
+    mocks.systemMetadata.get.mockResolvedValue({ memories: { retentionDays: 0 } });
+    mocks.memory.cleanup.mockResolvedValue([]);
 
-      await sut.onMemoriesCleanup();
+    await sut.onMemoriesCleanup();
 
-      expect(mocks.memory.cleanup).toHaveBeenCalledWith(0);
-    });
-
-    it('should use the default memory retention period when unset', async () => {
-      mocks.systemMetadata.get.mockResolvedValue({});
-      mocks.memory.cleanup.mockResolvedValue([]);
-
-      await sut.onMemoriesCleanup();
-
-      expect(mocks.memory.cleanup).toHaveBeenCalledWith(defaults.memories.retentionDays);
-    });
+    expect(mocks.memory.cleanup).toHaveBeenCalledWith(0);
   });
+
+  it('should use the default memory retention period when unset', async () => {
+    mocks.systemMetadata.get.mockResolvedValue({});
+    mocks.memory.cleanup.mockResolvedValue([]);
+
+    await sut.onMemoriesCleanup();
+
+    expect(mocks.memory.cleanup).toHaveBeenCalledWith(defaults.memories.retentionDays);
+  });
+});
 ```
 
 - [ ] **Step 6: Run memory service tests and verify they fail**
@@ -310,52 +310,52 @@ const selectMemoryAssetRows = (ctx: ReturnType<typeof setup>['ctx']) =>
 Add this `describe('cleanup')` block before `describe('hasRuleMemory')`:
 
 ```typescript
-  describe('cleanup', () => {
-    it('should delete only unsaved memories older than the retention period', async () => {
-      const { ctx, sut } = setup();
-      const { user } = await ctx.newUser();
-      const oldDate = new Date('2024-01-01T00:00:00Z');
-      const newDate = new Date('2026-01-01T00:00:00Z');
-      vi.setSystemTime(new Date('2026-04-27T00:00:00Z'));
+describe('cleanup', () => {
+  it('should delete only unsaved memories older than the retention period', async () => {
+    const { ctx, sut } = setup();
+    const { user } = await ctx.newUser();
+    const oldDate = new Date('2024-01-01T00:00:00Z');
+    const newDate = new Date('2026-01-01T00:00:00Z');
+    vi.setSystemTime(new Date('2026-04-27T00:00:00Z'));
 
-      const { result: oldUnsaved } = await ctx.newMemory({ ownerId: user.id, createdAt: oldDate, isSaved: false });
-      const { result: newUnsaved } = await ctx.newMemory({ ownerId: user.id, createdAt: newDate, isSaved: false });
-      const { result: oldSaved } = await ctx.newMemory({ ownerId: user.id, createdAt: oldDate, isSaved: true });
+    const { result: oldUnsaved } = await ctx.newMemory({ ownerId: user.id, createdAt: oldDate, isSaved: false });
+    const { result: newUnsaved } = await ctx.newMemory({ ownerId: user.id, createdAt: newDate, isSaved: false });
+    const { result: oldSaved } = await ctx.newMemory({ ownerId: user.id, createdAt: oldDate, isSaved: true });
 
-      await sut.cleanup(365);
+    await sut.cleanup(365);
 
-      await expect(selectMemoryIds(ctx)).resolves.toEqual(
-        expect.arrayContaining([{ id: newUnsaved.id }, { id: oldSaved.id }]),
-      );
-      await expect(selectMemoryIds(ctx)).resolves.not.toContainEqual({ id: oldUnsaved.id });
-    });
-
-    it('should not delete memory records when retention is zero', async () => {
-      const { ctx, sut } = setup();
-      const { user } = await ctx.newUser();
-      const oldDate = new Date('2024-01-01T00:00:00Z');
-      vi.setSystemTime(new Date('2026-04-27T00:00:00Z'));
-
-      const { result: memory } = await ctx.newMemory({ ownerId: user.id, createdAt: oldDate, isSaved: false });
-
-      await sut.cleanup(0);
-
-      await expect(selectMemoryIds(ctx)).resolves.toContainEqual({ id: memory.id });
-    });
-
-    it('should still remove memory asset links for assets outside the timeline when retention is zero', async () => {
-      const { ctx, sut } = setup();
-      const { user } = await ctx.newUser();
-      const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Archive });
-      const { result: memory } = await ctx.newMemory({ ownerId: user.id, isSaved: false });
-      await ctx.newMemoryAsset({ memoryId: memory.id, assetId: asset.id });
-
-      await sut.cleanup(0);
-
-      await expect(selectMemoryAssetRows(ctx)).resolves.toEqual([]);
-      await expect(selectMemoryIds(ctx)).resolves.toContainEqual({ id: memory.id });
-    });
+    await expect(selectMemoryIds(ctx)).resolves.toEqual(
+      expect.arrayContaining([{ id: newUnsaved.id }, { id: oldSaved.id }]),
+    );
+    await expect(selectMemoryIds(ctx)).resolves.not.toContainEqual({ id: oldUnsaved.id });
   });
+
+  it('should not delete memory records when retention is zero', async () => {
+    const { ctx, sut } = setup();
+    const { user } = await ctx.newUser();
+    const oldDate = new Date('2024-01-01T00:00:00Z');
+    vi.setSystemTime(new Date('2026-04-27T00:00:00Z'));
+
+    const { result: memory } = await ctx.newMemory({ ownerId: user.id, createdAt: oldDate, isSaved: false });
+
+    await sut.cleanup(0);
+
+    await expect(selectMemoryIds(ctx)).resolves.toContainEqual({ id: memory.id });
+  });
+
+  it('should still remove memory asset links for assets outside the timeline when retention is zero', async () => {
+    const { ctx, sut } = setup();
+    const { user } = await ctx.newUser();
+    const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Archive });
+    const { result: memory } = await ctx.newMemory({ ownerId: user.id, isSaved: false });
+    await ctx.newMemoryAsset({ memoryId: memory.id, assetId: asset.id });
+
+    await sut.cleanup(0);
+
+    await expect(selectMemoryAssetRows(ctx)).resolves.toEqual([]);
+    await expect(selectMemoryIds(ctx)).resolves.toContainEqual({ id: memory.id });
+  });
+});
 ```
 
 - [ ] **Step 10: Run repository tests and verify they fail**
@@ -549,7 +549,7 @@ Create `web/src/routes/admin/system-settings/MemoriesSettings.svelte`:
 In `web/src/routes/admin/system-settings/+page.svelte`, add:
 
 ```typescript
-  import MemoriesSettings from './MemoriesSettings.svelte';
+import MemoriesSettings from './MemoriesSettings.svelte';
 ```
 
 Add `mdiHistory` to the `@mdi/js` import:
@@ -608,25 +608,25 @@ Note: `open-api/typescript-sdk/build/` is intentionally ignored by git. The Open
 In `web/src/lib/route.spec.ts`, add this block:
 
 ```typescript
-  describe(Route.memories.name, () => {
-    it('should return the historic memories index route', () => {
-      expect(Route.memories()).toBe('/memories');
-    });
+describe(Route.memories.name, () => {
+  it('should return the historic memories index route', () => {
+    expect(Route.memories()).toBe('/memories');
+  });
+});
+
+describe(Route.memoryViewer.name, () => {
+  it('should return the memory viewer route', () => {
+    expect(Route.memoryViewer()).toBe('/memory');
   });
 
-  describe(Route.memoryViewer.name, () => {
-    it('should return the memory viewer route', () => {
-      expect(Route.memoryViewer()).toBe('/memory');
-    });
-
-    it('should include the selected asset id', () => {
-      expect(Route.memoryViewer({ id: 'asset-id' })).toBe('/memory?id=asset-id');
-    });
-
-    it('should include the history source when requested', () => {
-      expect(Route.memoryViewer({ id: 'asset-id', source: 'history' })).toBe('/memory?id=asset-id&source=history');
-    });
+  it('should include the selected asset id', () => {
+    expect(Route.memoryViewer({ id: 'asset-id' })).toBe('/memory?id=asset-id');
   });
+
+  it('should include the history source when requested', () => {
+    expect(Route.memoryViewer({ id: 'asset-id', source: 'history' })).toBe('/memory?id=asset-id&source=history');
+  });
+});
 ```
 
 - [ ] **Step 2: Run route tests and verify they fail**
@@ -672,9 +672,9 @@ Change the Memories navigation item:
 In `web/src/lib/managers/global-search-manager.svelte.spec.ts`, update the live catalog route expectations around the memories regression test:
 
 ```typescript
-    // NAVIGATION_ITEMS defines memories.route as '/memories'. The live value must win.
-    expect(goto).toHaveBeenCalledWith('/memories');
-    expect(goto).not.toHaveBeenCalledWith('/old-memories-path');
+// NAVIGATION_ITEMS defines memories.route as '/memories'. The live value must win.
+expect(goto).toHaveBeenCalledWith('/memories');
+expect(goto).not.toHaveBeenCalledWith('/old-memories-path');
 ```
 
 - [ ] **Step 5: Add memory viewer source helper tests**
@@ -837,11 +837,7 @@ export const removeAssetsFromMemoryList = (memories: MemoryResponseDto[], ids: s
 In `web/src/lib/managers/memory-manager.svelte.ts`, remove the local `MemoryIndex` type and import:
 
 ```typescript
-import {
-  findMemoryAsset,
-  removeAssetsFromMemoryList,
-  type MemoryAssetSource,
-} from '$lib/utils/memory-viewer-source';
+import { findMemoryAsset, removeAssetsFromMemoryList, type MemoryAssetSource } from '$lib/utils/memory-viewer-source';
 ```
 
 Change the exported type:
@@ -867,157 +863,153 @@ Remove the `memoryAssets` derived block and update methods:
 In `web/src/routes/(user)/memory/[[photos=photos]]/[[assetId=id]]/memory-viewer.svelte`, add imports:
 
 ```typescript
-  import {
-    findMemoryAsset,
-    removeAssetsFromMemoryList,
-    type MemoryAssetSource,
-  } from '$lib/utils/memory-viewer-source';
-  import { deleteMemory, removeMemoryAssets, searchMemories, updateMemory, type MemoryResponseDto } from '@immich/sdk';
+import { findMemoryAsset, removeAssetsFromMemoryList, type MemoryAssetSource } from '$lib/utils/memory-viewer-source';
+import { deleteMemory, removeMemoryAssets, searchMemories, updateMemory, type MemoryResponseDto } from '@immich/sdk';
 ```
 
 Replace the `current` state type:
 
 ```typescript
-  let current = $state<MemoryAssetSource | undefined>(undefined);
+let current = $state<MemoryAssetSource | undefined>(undefined);
 ```
 
 Add history source state after `current`:
 
 ```typescript
-  let historyMemories = $state<MemoryResponseDto[]>([]);
-  let historyMemoriesLoading: Promise<void> | undefined = undefined;
-  const isHistorySource = $derived(page.url.searchParams.get('source') === 'history');
-  const activeMemories = $derived(isHistorySource ? historyMemories : memoryManager.memories);
+let historyMemories = $state<MemoryResponseDto[]>([]);
+let historyMemoriesLoading: Promise<void> | undefined = undefined;
+const isHistorySource = $derived(page.url.searchParams.get('source') === 'history');
+const activeMemories = $derived(isHistorySource ? historyMemories : memoryManager.memories);
 ```
 
 Add the local history loader:
 
 ```typescript
-  const loadHistoryMemories = async () => {
-    if (!historyMemoriesLoading) {
-      historyMemoriesLoading = searchMemories({}).then((memories) => {
-        historyMemories = memories.filter((memory) => memory.assets.length > 0);
-      });
-    }
+const loadHistoryMemories = async () => {
+  if (!historyMemoriesLoading) {
+    historyMemoriesLoading = searchMemories({}).then((memories) => {
+      historyMemories = memories.filter((memory) => memory.assets.length > 0);
+    });
+  }
 
-    await historyMemoriesLoading;
-  };
+  await historyMemoriesLoading;
+};
 ```
 
 Update `loadFromParams()`:
 
 ```typescript
-  const loadFromParams = (page: Page | NavigationTarget | null) => {
-    const assetId = page?.params?.assetId ?? page?.url.searchParams.get(QueryParameter.ID) ?? undefined;
-    return isHistorySource ? findMemoryAsset(historyMemories, assetId) : memoryManager.getMemoryAsset(assetId);
-  };
+const loadFromParams = (page: Page | NavigationTarget | null) => {
+  const assetId = page?.params?.assetId ?? page?.url.searchParams.get(QueryParameter.ID) ?? undefined;
+  return isHistorySource ? findMemoryAsset(historyMemories, assetId) : memoryManager.getMemoryAsset(assetId);
+};
 ```
 
 Update the empty-memory check in `init()`:
 
 ```typescript
-    if (activeMemories.length === 0) {
-      return handlePromiseError(goto(Route.photos()));
-    }
+if (activeMemories.length === 0) {
+  return handlePromiseError(goto(Route.photos()));
+}
 ```
 
 Replace action handlers so history source updates local state and today source delegates to `memoryManager`:
 
 ```typescript
-  const handleDeleteOrArchiveAssets = (ids: string[]) => {
-    if (!current) {
-      return;
-    }
+const handleDeleteOrArchiveAssets = (ids: string[]) => {
+  if (!current) {
+    return;
+  }
 
-    if (isHistorySource) {
-      historyMemories = removeAssetsFromMemoryList(historyMemories, ids);
-    } else {
-      memoryManager.hideAssetsFromMemory(ids);
-    }
+  if (isHistorySource) {
+    historyMemories = removeAssetsFromMemoryList(historyMemories, ids);
+  } else {
+    memoryManager.hideAssetsFromMemory(ids);
+  }
 
-    init(page);
-  };
+  init(page);
+};
 
-  const handleDeleteMemoryAsset = async () => {
-    if (!current) {
-      return;
-    }
+const handleDeleteMemoryAsset = async () => {
+  if (!current) {
+    return;
+  }
 
-    if (isHistorySource) {
-      if (current.memory.assets.length === 1) {
-        await deleteMemory({ id: current.memory.id });
-        historyMemories = historyMemories.filter((memory) => memory.id !== current!.memory.id);
-      } else {
-        await removeMemoryAssets({ id: current.memory.id, bulkIdsDto: { ids: [current.asset.id] } });
-        historyMemories = removeAssetsFromMemoryList(historyMemories, [current.asset.id]);
-      }
-    } else {
-      await memoryManager.deleteAssetFromMemory(current.asset.id);
-    }
-
-    init(page);
-  };
-
-  const handleDeleteMemory = async () => {
-    if (!current) {
-      return;
-    }
-
-    if (isHistorySource) {
+  if (isHistorySource) {
+    if (current.memory.assets.length === 1) {
       await deleteMemory({ id: current.memory.id });
       historyMemories = historyMemories.filter((memory) => memory.id !== current!.memory.id);
     } else {
-      await memoryManager.deleteMemory(current.memory.id);
+      await removeMemoryAssets({ id: current.memory.id, bulkIdsDto: { ids: [current.asset.id] } });
+      historyMemories = removeAssetsFromMemoryList(historyMemories, [current.asset.id]);
     }
+  } else {
+    await memoryManager.deleteAssetFromMemory(current.asset.id);
+  }
 
-    toastManager.primary($t('removed_memory'));
-    init(page);
-  };
+  init(page);
+};
 
-  const handleSaveMemory = async () => {
-    if (!current) {
-      return;
-    }
+const handleDeleteMemory = async () => {
+  if (!current) {
+    return;
+  }
 
-    const newSavedState = !current.memory.isSaved;
+  if (isHistorySource) {
+    await deleteMemory({ id: current.memory.id });
+    historyMemories = historyMemories.filter((memory) => memory.id !== current!.memory.id);
+  } else {
+    await memoryManager.deleteMemory(current.memory.id);
+  }
 
-    if (isHistorySource) {
-      await updateMemory({ id: current.memory.id, memoryUpdateDto: { isSaved: newSavedState } });
-      current.memory.isSaved = newSavedState;
-    } else {
-      await memoryManager.updateMemorySaved(current.memory.id, newSavedState);
-    }
+  toastManager.primary($t('removed_memory'));
+  init(page);
+};
 
-    toastManager.primary(newSavedState ? $t('added_to_favorites') : $t('removed_from_favorites'));
-    init(page);
-  };
+const handleSaveMemory = async () => {
+  if (!current) {
+    return;
+  }
+
+  const newSavedState = !current.memory.isSaved;
+
+  if (isHistorySource) {
+    await updateMemory({ id: current.memory.id, memoryUpdateDto: { isSaved: newSavedState } });
+    current.memory.isSaved = newSavedState;
+  } else {
+    await memoryManager.updateMemorySaved(current.memory.id, newSavedState);
+  }
+
+  toastManager.primary(newSavedState ? $t('added_to_favorites') : $t('removed_from_favorites'));
+  init(page);
+};
 ```
 
 Update the `afterNavigate()` callback to load the correct source:
 
 ```typescript
-  afterNavigate(({ from, to }) => {
-    const ready = isHistorySource ? loadHistoryMemories() : memoryManager.ready();
+afterNavigate(({ from, to }) => {
+  const ready = isHistorySource ? loadHistoryMemories() : memoryManager.ready();
 
-    ready.then(
-      () => {
-        let target;
-        if (to?.params?.assetId) {
-          target = to;
-        } else if (from?.params?.assetId) {
-          target = from;
-        } else {
-          target = page;
-        }
+  ready.then(
+    () => {
+      let target;
+      if (to?.params?.assetId) {
+        target = to;
+      } else if (from?.params?.assetId) {
+        target = from;
+      } else {
+        target = page;
+      }
 
-        init(target);
-        initPlayer();
-      },
-      (error) => {
-        console.error(`Error loading memories: ${error}`);
-      },
-    );
-  });
+      init(target);
+      initPlayer();
+    },
+    (error) => {
+      console.error(`Error loading memories: ${error}`);
+    },
+  );
+});
 ```
 
 - [ ] **Step 10: Run route/viewer tests and commit**
@@ -1096,7 +1088,11 @@ const memory = (overrides: Partial<MemoryResponseDto>): MemoryResponseDto =>
 
 describe('memory index utils', () => {
   it('should filter memories without visible assets', () => {
-    const items = buildMemoryIndexItems([memory({ id: 'empty', assets: [] }), memory({ id: 'visible' })], translate, 'en-US');
+    const items = buildMemoryIndexItems(
+      [memory({ id: 'empty', assets: [] }), memory({ id: 'visible' })],
+      translate,
+      'en-US',
+    );
 
     expect(items).toHaveLength(1);
     expect(items[0].memory.id).toBe('visible');
@@ -1126,8 +1122,16 @@ describe('memory index utils', () => {
     );
 
     expect(groupMemoryIndexItems(items, 'en-US')).toEqual([
-      expect.objectContaining({ key: '2026-04', label: 'April 2026', items: [expect.objectContaining({ memory: expect.objectContaining({ id: 'april' }) })] }),
-      expect.objectContaining({ key: '2026-03', label: 'March 2026', items: [expect.objectContaining({ memory: expect.objectContaining({ id: 'march' }) })] }),
+      expect.objectContaining({
+        key: '2026-04',
+        label: 'April 2026',
+        items: [expect.objectContaining({ memory: expect.objectContaining({ id: 'april' }) })],
+      }),
+      expect.objectContaining({
+        key: '2026-03',
+        label: 'March 2026',
+        items: [expect.objectContaining({ memory: expect.objectContaining({ id: 'march' }) })],
+      }),
     ]);
   });
 
@@ -1138,7 +1142,9 @@ describe('memory index utils', () => {
       'en-US',
     );
 
-    expect(filterMemoryIndexItems(items, { query: '', filter: 'saved' }).map((item) => item.memory.id)).toEqual(['saved']);
+    expect(filterMemoryIndexItems(items, { query: '', filter: 'saved' }).map((item) => item.memory.id)).toEqual([
+      'saved',
+    ]);
   });
 
   it('should search by title, subtitle, year, date, and type label', () => {
@@ -1261,10 +1267,7 @@ export const filterMemoryIndexItems = (
   });
 };
 
-export const groupMemoryIndexItems = (
-  items: MemoryIndexItem[],
-  locale: string | undefined,
-): MemoryIndexGroup[] => {
+export const groupMemoryIndexItems = (items: MemoryIndexItem[], locale: string | undefined): MemoryIndexGroup[] => {
   const groups = new Map<string, MemoryIndexGroup>();
 
   for (const item of items) {
@@ -1561,10 +1564,13 @@ const memory = (overrides: Partial<MemoryResponseDto>): MemoryResponseDto =>
   }) as MemoryResponseDto;
 
 function renderPage() {
-  return render(TestWrapper as Component<{ component: typeof MemoriesPage; componentProps: { data: { meta: { title: string } } } }>, {
-    component: MemoriesPage,
-    componentProps: { data: { meta: { title: 'Memories' } } },
-  });
+  return render(
+    TestWrapper as Component<{ component: typeof MemoriesPage; componentProps: { data: { meta: { title: string } } } }>,
+    {
+      component: MemoriesPage,
+      componentProps: { data: { meta: { title: 'Memories' } } },
+    },
+  );
 }
 
 describe('Memories page', () => {
@@ -1818,7 +1824,12 @@ import { faker } from '@faker-js/faker';
 import type { MemoryResponseDto } from '@immich/sdk';
 import { expect, test } from '@playwright/test';
 import { generateMemory } from 'src/ui/generators/memory';
-import { createDefaultTimelineConfig, generateTimelineData, TimelineAssetConfig, TimelineData } from 'src/ui/generators/timeline';
+import {
+  createDefaultTimelineConfig,
+  generateTimelineData,
+  TimelineAssetConfig,
+  TimelineData,
+} from 'src/ui/generators/timeline';
 import { setupBaseMockApiRoutes } from 'src/ui/mock-network/base-network';
 import { MemoryChanges, setupMemoryMockApiRoutes } from 'src/ui/mock-network/memory-network';
 import { setupTimelineMockApiRoutes, TimelineTestContext } from 'src/ui/mock-network/timeline-network';
@@ -1871,7 +1882,12 @@ test.describe('Memories index', () => {
 
   test.beforeEach(async ({ context }) => {
     await setupBaseMockApiRoutes(context, adminUserId);
-    await setupTimelineMockApiRoutes(context, timelineRestData, { albumAdditions: [], assetDeletions: [], assetArchivals: [], assetFavorites: [] }, testContext);
+    await setupTimelineMockApiRoutes(
+      context,
+      timelineRestData,
+      { albumAdditions: [], assetDeletions: [], assetArchivals: [], assetFavorites: [] },
+      testContext,
+    );
     await setupMemoryMockApiRoutes(context, memories, memoryChanges);
   });
 
