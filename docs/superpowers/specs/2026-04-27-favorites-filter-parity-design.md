@@ -32,7 +32,7 @@ Favorites remains a two-state control everywhere it appears:
 - `All` maps to `filters.isFavorite === undefined`.
 - `Favorites` maps to `filters.isFavorite === true`.
 
-The active filter bar renders one chip labeled with the existing `favorites` i18n key. Closing that chip resets `isFavorite` to `undefined`, returning the control to `All`. The chip appears after media type chips and before timeline chips.
+The active filter bar renders one chip labeled exactly `Favorites`, matching the existing filter control copy. Closing that chip resets `isFavorite` to `undefined`, returning the control to `All`. The chip appears after media type chips and before timeline chips.
 
 Favorites appears after `Media Type` in the filter section order for Map, Photos, Spaces, Album detail view, and Album asset picker.
 
@@ -55,7 +55,7 @@ The changes are expected in these areas:
 - Photos, Spaces, and Album option builders should pass `isFavorite` through to their timeline or picker requests.
 - Owner-timeline option builders should omit `withPartners` and `withSharedSpaces` when `isFavorite` is selected.
 - Photos search and dependent suggestion builders should omit `withSharedSpaces` when `isFavorite` is selected.
-- `FilterPanel` localStorage hydration should merge newly introduced sections into saved visible and expanded section sets.
+- `FilterPanel` localStorage hydration should add newly introduced sections into saved visible and expanded section sets without unhiding sections the user already hid.
 
 Map already includes the `favorites` section and passes `isFavorite` through map marker, time-bucket, and timeline option builders. Its missing behavior comes from the shared active-chip renderer.
 
@@ -77,7 +77,7 @@ For search result mode, `SmartSearchResults` already tracks and passes `filters.
 
 Existing users may have saved visible or expanded section arrays in localStorage. If `favorites` is simply added to a route config, those old saved arrays would omit the new section and make the fix look absent.
 
-`FilterPanel` should handle this generically by merging any sections present in the current config but missing from the saved set into the hydrated visible and expanded sets. This keeps old user preferences for existing sections while showing new first-class sections by default. Users can still hide or collapse Favorites afterward.
+`FilterPanel` should handle this by tracking the section keys known when preferences are saved. On hydration, it should add config sections that are not in the saved known-section set, while preserving hidden or collapsed state for known sections. Legacy array-only entries should be treated as pre-Favorites entries, so `favorites` is added by default without unhiding any other existing section. Users can still hide or collapse Favorites afterward.
 
 ## Testing
 
@@ -90,7 +90,7 @@ Add or update focused tests for:
 - Photos search and dependent suggestions omit shared-space inclusion when `isFavorite` is selected.
 - Photos and Spaces remove-filter handlers clear favorites.
 - Album suggestions include `isFavorite` for detail and picker configs.
-- `FilterPanel` visible and expanded section hydration merges newly introduced sections into saved section sets.
+- `FilterPanel` visible and expanded section hydration adds newly introduced sections without unhiding known sections that were already hidden or collapsed.
 - Album route regression covers Favorites in both album detail mode and asset picker mode.
 - Lightweight Photos and Spaces route regressions verify Favorites wiring without full UI interaction scaffolding.
 
