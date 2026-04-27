@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { DateTime } from 'luxon';
+import { defaults } from 'src/config';
 import { MemoryType, SystemMetadataKey } from 'src/enum';
 import { MemoryService } from 'src/services/memory.service';
 import { OnThisDayData, RuleMemoryData } from 'src/types';
@@ -23,10 +24,22 @@ describe(MemoryService.name, () => {
   });
 
   describe('onMemoryCleanup', () => {
-    it('should clean up memories', async () => {
+    it('should clean up memories using configured retention days', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({ memories: { retentionDays: 0 } });
       mocks.memory.cleanup.mockResolvedValue([]);
+
       await sut.onMemoriesCleanup();
-      expect(mocks.memory.cleanup).toHaveBeenCalled();
+
+      expect(mocks.memory.cleanup).toHaveBeenCalledWith(0);
+    });
+
+    it('should clean up memories using default retention days', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({});
+      mocks.memory.cleanup.mockResolvedValue([]);
+
+      await sut.onMemoriesCleanup();
+
+      expect(mocks.memory.cleanup).toHaveBeenCalledWith(defaults.memories.retentionDays);
     });
   });
 

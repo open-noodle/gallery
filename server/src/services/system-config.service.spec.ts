@@ -22,6 +22,7 @@ import { newTestService, ServiceMocks } from 'test/utils';
 const partialConfig = {
   ffmpeg: { crf: 30 },
   oauth: { autoLaunch: true },
+  memories: { retentionDays: 0 },
   trash: { days: 10 },
   user: { deleteDelay: 15 },
 } satisfies DeepPartial<SystemConfig>;
@@ -133,6 +134,9 @@ const updatedConfig = Object.freeze<SystemConfig>({
     missingThumbnails: true,
     generateMemories: true,
     syncQuotaUsage: true,
+  },
+  memories: {
+    retentionDays: 0,
   },
   reverseGeocoding: {
     enabled: true,
@@ -272,6 +276,7 @@ describe(SystemConfigService.name, () => {
       mocks.systemMetadata.get.mockResolvedValue({
         ffmpeg: { crf: 30 },
         oauth: { autoLaunch: true },
+        memories: { retentionDays: 0 },
         trash: { days: 10 },
         user: { deleteDelay: 15 },
       });
@@ -303,6 +308,23 @@ describe(SystemConfigService.name, () => {
 
       await expect(sut.getSystemConfig()).resolves.toMatchObject({
         ffmpeg: expect.objectContaining({ threads: 42 }),
+      });
+    });
+
+    it('should default generated memory retention to 365 days', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({});
+
+      await expect(sut.getSystemConfig()).resolves.toMatchObject({
+        memories: { retentionDays: 365 },
+      });
+    });
+
+    it('should accept zero generated memory retention from a config file', async () => {
+      mocks.config.getEnv.mockReturnValue(mockEnvData({ configFile: 'immich-config.json' }));
+      mocks.systemMetadata.readFile.mockResolvedValue(JSON.stringify({ memories: { retentionDays: 0 } }));
+
+      await expect(sut.getSystemConfig()).resolves.toMatchObject({
+        memories: { retentionDays: 0 },
       });
     });
 
@@ -376,6 +398,8 @@ describe(SystemConfigService.name, () => {
           crf: 30
         oauth:
           autoLaunch: true
+        memories:
+          retentionDays: 0
         trash:
           days: 10
         user:
@@ -469,6 +493,11 @@ describe(SystemConfigService.name, () => {
         should: 'validate enums',
         config: { ffmpeg: { transcode: 'unknown' } },
         throws: '[ffmpeg.transcode] Invalid option: expected one of',
+      },
+      {
+        should: 'validate generated memory retention',
+        config: { memories: { retentionDays: -1 } },
+        throws: '[memories.retentionDays] Too small: expected number to be >=0',
       },
       {
         should: 'validate required oauth fields',

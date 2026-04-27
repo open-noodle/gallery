@@ -165,7 +165,8 @@ export class MemoryService extends BaseService {
 
   @OnJob({ name: JobName.MemoryCleanup, queue: QueueName.BackgroundTask })
   async onMemoriesCleanup() {
-    await this.memoryRepository.cleanup();
+    const config = await this.getConfig({ withCache: false });
+    await this.memoryRepository.cleanup(config.memories.retentionDays);
   }
 
   async search(auth: AuthDto, dto: MemorySearchDto) {

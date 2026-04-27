@@ -202,6 +202,12 @@ const SystemConfigNightlyTasksSchema = z
   })
   .meta({ id: 'SystemConfigNightlyTasksDto' });
 
+const SystemConfigMemoriesSchema = z
+  .object({
+    retentionDays: z.coerce.number().int().min(0).describe('Retention days'),
+  })
+  .meta({ id: 'SystemConfigMemoriesDto' });
+
 const SystemConfigOAuthSchema = z
   .object({
     autoLaunch: configBool.describe('Auto launch'),
@@ -392,6 +398,7 @@ export const SystemConfigSchema = z
     map: SystemConfigMapSchema,
     newVersionCheck: SystemConfigNewVersionCheckSchema,
     nightlyTasks: SystemConfigNightlyTasksSchema,
+    memories: SystemConfigMemoriesSchema,
     oauth: SystemConfigOAuthSchema,
     passwordLogin: SystemConfigPasswordLoginSchema,
     reverseGeocoding: SystemConfigReverseGeocodingSchema,
