@@ -36,6 +36,13 @@ const compileFilteredAssetIds = (sut: SearchRepository, options: Record<string, 
 const compileExifField = (sut: SearchRepository, field: 'country' | 'model', options: Record<string, unknown>) =>
   (sut as any).getExifField(field, ['00000000-0000-0000-0000-000000000000'], options).compile().sql;
 
+const compileFilteredPeopleQuery = (sut: SearchRepository, options: Record<string, unknown>) =>
+  (sut as any)
+    .buildFilteredGlobalPeopleQuery(
+      (sut as any).buildFilteredAssetIds(['00000000-0000-0000-0000-000000000000'], options),
+    )
+    .compile().sql;
+
 const FAILURE_MESSAGE =
   'Do not add any secondary ORDER BY key to the inner searchSmart query. ' +
   'See comment at src/repositories/search.repository.ts (above the orderBy call). ' +
@@ -231,6 +238,12 @@ describe(SearchRepository.name, () => {
 
       expect(sql).toMatch(/"asset_exif"\."rating"\s*>=\s*\$\d+/i);
       expect(sql).not.toMatch(/"asset_exif"\."rating"\s*=\s*\$\d+/i);
+    });
+
+    it('orders global people suggestions by favorite first, then name', () => {
+      const sql = compileFilteredPeopleQuery(sut, {});
+
+      expect(sql).toMatch(/order by\s+"person"\."isFavorite"\s+desc,\s*"person"\."name"/i);
     });
   });
 

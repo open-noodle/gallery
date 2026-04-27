@@ -307,5 +307,23 @@ describe(SearchService.name, () => {
 
       expect(result.people.map((p) => p.name)).toContain('Bob');
     });
+
+    it('should return favorite people before alphabetical matches', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+
+      const { asset: favoriteAsset } = await ctx.newAsset({ ownerId: user.id });
+      const { person: favoritePerson } = await ctx.newPerson({ ownerId: user.id, name: 'Zelda', isFavorite: true });
+      await ctx.newAssetFace({ assetId: favoriteAsset.id, personId: favoritePerson.id });
+
+      const { asset: nonFavoriteAsset } = await ctx.newAsset({ ownerId: user.id });
+      const { person: nonFavoritePerson } = await ctx.newPerson({ ownerId: user.id, name: 'Alice', isFavorite: false });
+      await ctx.newAssetFace({ assetId: nonFavoriteAsset.id, personId: nonFavoritePerson.id });
+
+      const auth = factory.auth({ user: { id: user.id } });
+      const result = await sut.getFilterSuggestions(auth, {});
+
+      expect(result.people.map((p) => p.name)).toEqual(['Zelda', 'Alice']);
+    });
   });
 });
