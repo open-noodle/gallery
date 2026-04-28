@@ -2828,12 +2828,12 @@ export type SystemConfigMapDto = {
     lightStyle: string;
 };
 export type SystemConfigMemoriesDto = {
-    /** Retention days */
-    retentionDays: number;
     /** Birthday memories */
     birthday: boolean;
     /** Recent trip memories */
     recentTrips: boolean;
+    /** Retention days */
+    retentionDays: number;
 };
 export type SystemConfigFacesDto = {
     /** Import */
