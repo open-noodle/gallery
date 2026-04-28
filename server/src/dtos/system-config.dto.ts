@@ -205,6 +205,8 @@ const SystemConfigNightlyTasksSchema = z
 const SystemConfigMemoriesSchema = z
   .object({
     retentionDays: z.coerce.number().int().min(0).describe('Retention days'),
+    birthday: configBool.describe('Birthday memories'),
+    recentTrips: configBool.describe('Recent trip memories'),
   })
   .meta({ id: 'SystemConfigMemoriesDto' });
 

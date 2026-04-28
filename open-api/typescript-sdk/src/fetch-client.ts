@@ -2830,6 +2830,10 @@ export type SystemConfigMapDto = {
 export type SystemConfigMemoriesDto = {
     /** Retention days */
     retentionDays: number;
+    /** Birthday memories */
+    birthday: boolean;
+    /** Recent trip memories */
+    recentTrips: boolean;
 };
 export type SystemConfigFacesDto = {
     /** Import */

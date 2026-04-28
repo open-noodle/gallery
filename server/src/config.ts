@@ -152,6 +152,8 @@ export type SystemConfig = {
   };
   memories: {
     retentionDays: number;
+    birthday: boolean;
+    recentTrips: boolean;
   };
   trash: {
     enabled: boolean;
@@ -384,6 +386,8 @@ export const defaults = Object.freeze<SystemConfig>({
   },
   memories: {
     retentionDays: 365,
+    birthday: true,
+    recentTrips: true,
   },
   trash: {
     enabled: true,

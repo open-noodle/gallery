@@ -144,7 +144,11 @@ Errors:
 
 ## Admin Settings UI
 
-Expose `memories.retentionDays` in system settings.
+Expose generated memory settings in system settings:
+
+- `memories.retentionDays`
+- `memories.birthday`
+- `memories.recentTrips`
 
 Preferred placement:
 
@@ -157,6 +161,8 @@ Field behavior:
 - Label: "Memory retention".
 - Description: "Number of days to keep generated memories. Set to 0 to keep memories forever."
 - Default shown value: `365`.
+- Switches for birthday memories and recent trip memories.
+- Both switches default on.
 - Save through existing system config save flow.
 
 ## Testing Plan
@@ -164,16 +170,20 @@ Field behavior:
 Server:
 
 - Config default includes `memories.retentionDays = 365`.
+- Config default enables birthday and recent trip generated memories.
 - Config validation accepts `0` and positive integers.
 - Config validation rejects negative values.
+- Config validation accepts and persists disabled birthday/recent trip flags.
 - Cleanup deletes unsaved memories older than the configured retention.
 - Cleanup keeps unsaved memories newer than the configured retention.
 - Cleanup keeps saved memories regardless of age.
 - Cleanup does not delete memory records when retention is `0`.
 - Cleanup still removes invalid memory asset links.
+- Disabled generated memory rules do not evaluate or persist rule memories.
 
 Web:
 
+- Memories settings renders and saves retention plus birthday/recent trip toggles.
 - Route helper tests for `/memories` and the viewer helper.
 - Index page groups by `showAt ?? createdAt`.
 - Index page filters empty-asset memories.

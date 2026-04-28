@@ -56,6 +56,16 @@ Rule memories run only through the current day and are capped at 2 rule-generate
 
 You can enable, disable, or reschedule this task from **Administration → Settings → Nightly Tasks**. The same setting is exposed as `nightlyTasks.generateMemories` in the [config file](/install/config-file).
 
+## Generated memory controls
+
+You can configure generated memories from **Administration → Settings → Memories**:
+
+- `memories.retentionDays` controls how long generated memories are kept. Set it to `0` to keep generated memories forever.
+- `memories.birthday` enables or disables birthday rule memories.
+- `memories.recentTrips` enables or disables recent trip rule memories.
+
+The birthday and recent trip rules are enabled by default. The nightly `nightlyTasks.generateMemories` setting still controls whether any memories are generated at all.
+
 ## API behavior
 
 The memory API exposes rule memories with:

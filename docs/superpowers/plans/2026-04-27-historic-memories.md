@@ -8,6 +8,8 @@
 
 **Tech Stack:** NestJS, Kysely, Zod DTOs, generated OpenAPI TypeScript SDK, Svelte 5, SvelteKit, Vitest, @testing-library/svelte, Playwright E2E.
 
+**Addendum 2026-04-28:** Generated memory rule enablement is also config-driven. `SystemConfig.memories` includes `birthday` and `recentTrips`, both defaulting to `true`, and the Memories admin settings render switches for both rule families. Server tests cover defaults, config-file values, update persistence, and disabled-rule generation; web tests cover rendering and saving the switches.
+
 ---
 
 ## File Structure

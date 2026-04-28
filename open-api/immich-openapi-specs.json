@@ -28903,10 +28903,20 @@
             "maximum": 9007199254740991,
             "minimum": 0,
             "type": "integer"
+          },
+          "birthday": {
+            "description": "Birthday memories",
+            "type": "boolean"
+          },
+          "recentTrips": {
+            "description": "Recent trip memories",
+            "type": "boolean"
           }
         },
         "required": [
-          "retentionDays"
+          "retentionDays",
+          "birthday",
+          "recentTrips"
         ],
         "type": "object"
       },

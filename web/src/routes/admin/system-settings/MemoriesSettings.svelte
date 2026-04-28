@@ -1,6 +1,7 @@
 <script lang="ts">
   import SettingButtonsRow from '$lib/components/shared-components/settings/SystemConfigButtonRow.svelte';
   import SettingInputField from '$lib/components/shared-components/settings/setting-input-field.svelte';
+  import SettingSwitch from '$lib/components/shared-components/settings/setting-switch.svelte';
   import { SettingInputFieldType } from '$lib/constants';
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
   import { systemConfigManager } from '$lib/managers/system-config-manager.svelte';
@@ -25,6 +26,18 @@
           required={true}
           {disabled}
           isEdited={configToEdit.memories.retentionDays !== config.memories.retentionDays}
+        />
+        <SettingSwitch
+          title={$t('admin.birthday_memories_setting')}
+          subtitle={$t('admin.birthday_memories_setting_description')}
+          bind:checked={configToEdit.memories.birthday}
+          {disabled}
+        />
+        <SettingSwitch
+          title={$t('admin.recent_trip_memories_setting')}
+          subtitle={$t('admin.recent_trip_memories_setting_description')}
+          bind:checked={configToEdit.memories.recentTrips}
+          {disabled}
         />
 
         <SettingButtonsRow bind:configToEdit keys={['memories']} {disabled} />

@@ -161,6 +161,11 @@ The default configuration looks like this:
     "enabled": true,
     "lightStyle": "https://tiles.openfreemap.org/styles/positron"
   },
+  "memories": {
+    "birthday": true,
+    "recentTrips": true,
+    "retentionDays": 365
+  },
   "metadata": {
     "faces": {
       "import": false

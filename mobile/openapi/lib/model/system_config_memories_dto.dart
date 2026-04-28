@@ -14,6 +14,8 @@ class SystemConfigMemoriesDto {
   /// Returns a new [SystemConfigMemoriesDto] instance.
   SystemConfigMemoriesDto({
     required this.retentionDays,
+    required this.birthday,
+    required this.recentTrips,
   });
 
   /// Retention days
@@ -22,21 +24,33 @@ class SystemConfigMemoriesDto {
   /// Maximum value: 9007199254740991
   int retentionDays;
 
+  /// Birthday memories
+  bool birthday;
+
+  /// Recent trip memories
+  bool recentTrips;
+
   @override
   bool operator ==(Object other) => identical(this, other) || other is SystemConfigMemoriesDto &&
-    other.retentionDays == retentionDays;
+    other.retentionDays == retentionDays &&
+    other.birthday == birthday &&
+    other.recentTrips == recentTrips;
 
   @override
   int get hashCode =>
     // ignore: unnecessary_parenthesis
-    (retentionDays.hashCode);
+    (retentionDays.hashCode) +
+    (birthday.hashCode) +
+    (recentTrips.hashCode);
 
   @override
-  String toString() => 'SystemConfigMemoriesDto[retentionDays=$retentionDays]';
+  String toString() => 'SystemConfigMemoriesDto[retentionDays=$retentionDays, birthday=$birthday, recentTrips=$recentTrips]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
       json[r'retentionDays'] = this.retentionDays;
+      json[r'birthday'] = this.birthday;
+      json[r'recentTrips'] = this.recentTrips;
     return json;
   }
 
@@ -50,6 +64,8 @@ class SystemConfigMemoriesDto {
 
       return SystemConfigMemoriesDto(
         retentionDays: mapValueOfType<int>(json, r'retentionDays')!,
+        birthday: mapValueOfType<bool>(json, r'birthday')!,
+        recentTrips: mapValueOfType<bool>(json, r'recentTrips')!,
       );
     }
     return null;
@@ -98,6 +114,7 @@ class SystemConfigMemoriesDto {
   /// The list of required keys that must be present in a JSON.
   static const requiredKeys = <String>{
     'retentionDays',
+    'birthday',
+    'recentTrips',
   };
 }
-
