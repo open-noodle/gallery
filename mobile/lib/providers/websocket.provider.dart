@@ -11,6 +11,7 @@ import 'package:immich_mobile/providers/auth.provider.dart';
 import 'package:immich_mobile/providers/background_sync.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
 import 'package:immich_mobile/providers/server_info.provider.dart';
+import 'package:immich_mobile/providers/sync_status.provider.dart';
 import 'package:immich_mobile/utils/debounce.dart';
 import 'package:immich_mobile/utils/debug_print.dart';
 import 'package:logging/logging.dart';
@@ -175,7 +176,11 @@ class WebsocketNotifier extends StateNotifier<WebsocketState> {
   }
 
   void _handleSyncAssetEditReadyV1(dynamic data) {
-    unawaited(_ref.read(backgroundSyncProvider).syncWebsocketEditV1(data));
+    unawaited(
+      _ref.read(backgroundSyncProvider).syncWebsocketEditV1(data).then((_) {
+        _ref.read(syncStatusProvider.notifier).markRemoteContentChanged();
+      }),
+    );
   }
 
   void _handleRemoteChange(dynamic _) {
@@ -183,7 +188,11 @@ class WebsocketNotifier extends StateNotifier<WebsocketState> {
   }
 
   void _handleSyncAssetEditReadyV2(dynamic data) {
-    unawaited(_ref.read(backgroundSyncProvider).syncWebsocketEditV2(data));
+    unawaited(
+      _ref.read(backgroundSyncProvider).syncWebsocketEditV2(data).then((_) {
+        _ref.read(syncStatusProvider.notifier).markRemoteContentChanged();
+      }),
+    );
   }
 
   void _processBatchedAssetUploadReadyV1() {
@@ -195,6 +204,7 @@ class WebsocketNotifier extends StateNotifier<WebsocketState> {
     try {
       unawaited(
         _ref.read(backgroundSyncProvider).syncWebsocketBatchV1(_batchedAssetUploadReady.toList()).then((_) {
+          _ref.read(syncStatusProvider.notifier).markRemoteContentChanged();
           if (isSyncAlbumEnabled) {
             unawaited(_ref.read(backgroundSyncProvider).syncLinkedAlbum());
           }
@@ -216,6 +226,7 @@ class WebsocketNotifier extends StateNotifier<WebsocketState> {
     try {
       unawaited(
         _ref.read(backgroundSyncProvider).syncWebsocketBatchV2(_batchedAssetUploadReady.toList()).then((_) {
+          _ref.read(syncStatusProvider.notifier).markRemoteContentChanged();
           if (isSyncAlbumEnabled) {
             unawaited(_ref.read(backgroundSyncProvider).syncLinkedAlbum());
           }
