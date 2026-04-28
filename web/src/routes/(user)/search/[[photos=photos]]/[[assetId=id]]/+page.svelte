@@ -18,6 +18,7 @@
   import AssetSelectControlBar from '#lib/components/timeline/AssetSelectControlBar.svelte';
   import { QueryParameter } from '#lib/constants.ts';
   import { assetMultiSelectManager } from '#lib/managers/asset-multi-select-manager.svelte.ts';
+  import { registerSelectionContext } from '#lib/managers/command-context-manager.svelte.ts';
   import { globalSearchManager } from '#lib/managers/global-search-manager.svelte.ts';
   import type { Viewport } from '#lib/managers/timeline-manager/types.ts';
   import { Route } from '#lib/route.ts';
@@ -118,6 +119,43 @@
     assetMultiSelectManager.clear();
     onAssetDelete(assetIds);
   };
+
+  const onFavorite = (ids: string[], isFavorite: boolean) => {
+    for (const id of ids) {
+      const asset = searchResultAssets.find((asset) => asset.id === id);
+      if (asset) {
+        asset.isFavorite = isFavorite;
+      }
+    }
+  };
+
+  const onArchive = (ids: string[], visibility: AssetVisibility) => {
+    const idSet = new Set(ids);
+    if (terms.visibility && terms.visibility !== visibility) {
+      searchResultAssets = searchResultAssets.filter((asset) => !idSet.has(asset.id));
+      return;
+    }
+    for (const id of ids) {
+      const asset = searchResultAssets.find((asset) => asset.id === id);
+      if (asset) {
+        asset.visibility = visibility;
+      }
+    }
+  };
+
+  const onUndoDelete = () => {
+    void onSearchQueryUpdate();
+  };
+
+  registerSelectionContext({
+    getAssets: () => assetMultiSelectManager.assets,
+    clearSelection: () => assetMultiSelectManager.clear(),
+    canAddToAlbum: () => true,
+    getOnFavorite: () => onFavorite,
+    getOnArchive: () => onArchive,
+    getOnDelete: () => onAssetDelete,
+    getOnUndoDelete: () => onUndoDelete,
+  });
 
   const handleSelectAll = () => {
     assetMultiSelectManager.selectAssets(searchResultAssets.map((asset) => toTimelineAsset(asset)));
@@ -357,17 +395,7 @@
           />
           <ActionButton action={Actions.AddToAlbum} />
           {#if assetMultiSelectManager.isAllUserOwned}
-            <FavoriteAction
-              removeFavorite={assetMultiSelectManager.isAllFavorite}
-              onFavorite={(ids, isFavorite) => {
-                for (const id of ids) {
-                  const asset = searchResultAssets.find((asset) => asset.id === id);
-                  if (asset) {
-                    asset.isFavorite = isFavorite;
-                  }
-                }
-              }}
-            />
+            <FavoriteAction removeFavorite={assetMultiSelectManager.isAllFavorite} {onFavorite} />
 
             <ButtonContextMenu icon={mdiDotsVertical} title={$t('menu')}>
               <ActionMenuItem action={Actions.AddToAlbum} />
@@ -376,7 +404,7 @@
               <ChangeDate menuItem />
               <ChangeDescription menuItem />
               <ChangeLocation menuItem />
-              <ArchiveAction menuItem unarchive={assetMultiSelectManager.isAllArchived} />
+              <ArchiveAction menuItem unarchive={assetMultiSelectManager.isAllArchived} {onArchive} />
               <SetVisibilityAction menuItem onVisibilitySet={handleSetVisibility} />
               <ActionMenuItem action={Actions.Tag} />
 
