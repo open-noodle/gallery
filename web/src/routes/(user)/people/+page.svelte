@@ -2,9 +2,11 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import { scrollMemory } from '$lib/actions/scroll-memory';
-  import { shortcut } from '$lib/actions/shortcut';
-  import PeopleCard from './PeopleCard.svelte';
-  import PeopleInfiniteScroll from './PeopleInfiniteScroll.svelte';
+  import ActionMenuItem from '$lib/components/ActionMenuItem.svelte';
+  import PeopleManagementGrid from '$lib/components/people/people-management-grid.svelte';
+  import type { ManagedPerson } from '$lib/components/people/people-types';
+  import ButtonContextMenu from '$lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
+  import MenuOption from '$lib/components/shared-components/context-menu/MenuOption.svelte';
   import SearchPeople from '$lib/components/faces-page/PeopleSearch.svelte';
   import UserPageLayout from '$lib/components/layouts/UserPageLayout.svelte';
   import OnEvents from '$lib/components/OnEvents.svelte';
@@ -13,24 +15,24 @@
   import PeopleFilterModal from '$lib/modals/PeopleFilterModal.svelte';
   import PersonMergeSuggestionModal from '$lib/modals/PersonMergeSuggestionModal.svelte';
   import { Route } from '$lib/route';
+  import { getPersonActions } from '$lib/services/person.service';
   import { locale } from '$lib/stores/preferences.store';
   import { websocketEvents } from '$lib/stores/websocket';
   import { normalizeSearchString } from '$lib/utils/string-utils';
-  import { handlePromiseError } from '$lib/utils';
+  import { getPeopleThumbnailUrl, handlePromiseError } from '$lib/utils';
   import { handleError } from '$lib/utils/handle-error';
   import { clearQueryParam } from '$lib/utils/navigation';
-  import { getPeopleUserActions } from '$lib/services/person-user.service';
-  import { handleUpdatePersonName } from '$lib/services/person.service';
+  import { getAllPeople, getPerson, searchPerson, updatePerson, type PersonResponseDto } from '@immich/sdk';
+  import { Button, Icon, modalManager, toastManager } from '@immich/ui';
   import {
-    getAllPeople,
-    getClusterGroupUsers,
-    getPerson,
-    searchPerson,
-    type PersonResponseDto,
-    type UserResponseDto,
-  } from '@immich/sdk';
-  import { ActionButton, Button, Icon, IconButton, modalManager } from '@immich/ui';
-  import { mdiAccountOff, mdiEyeOutline, mdiTune } from '@mdi/js';
+    mdiAccountMultipleCheckOutline,
+    mdiAccountOff,
+    mdiDotsVertical,
+    mdiEyeOffOutline,
+    mdiEyeOutline,
+    mdiHeartMinusOutline,
+    mdiHeartOutline,
+  } from '@mdi/js';
   import { onMount } from 'svelte';
   import { t } from 'svelte-i18n';
   import type { PageData } from './$types';
@@ -50,7 +52,6 @@
   let potentialMergePeople: PersonResponseDto[] = $state([]);
   let editingPerson: PersonResponseDto | null = $state(null);
   let searchedPeopleLocal: PersonResponseDto[] = $state([]);
-  let innerHeight = $state(0);
   let searchPeopleElement = $state<ReturnType<typeof SearchPeople>>();
 
   let clusterGroupUsers: UserResponseDto[] = $state([]);
@@ -175,6 +176,46 @@
     }
   };
 
+  const handleHidePerson = async (detail: PersonResponseDto) => {
+    try {
+      const updatedPerson = await updatePerson({
+        id: detail.id,
+        personUpdateDto: { isHidden: true },
+      });
+
+      people = people.map((person: PersonResponseDto) => {
+        if (person.id === updatedPerson.id) {
+          return updatedPerson;
+        }
+        return person;
+      });
+
+      toastManager.primary($t('changed_visibility_successfully'));
+    } catch (error) {
+      handleError(error, $t('errors.unable_to_hide_person'));
+    }
+  };
+
+  const handleToggleFavorite = async (detail: PersonResponseDto) => {
+    try {
+      const updatedPerson = await updatePerson({
+        id: detail.id,
+        personUpdateDto: { isFavorite: !detail.isFavorite },
+      });
+
+      people = people.map((person: PersonResponseDto) => {
+        if (person.id === updatedPerson.id) {
+          return updatedPerson;
+        }
+        return person;
+      });
+
+      toastManager.primary(updatedPerson.isFavorite ? $t('added_to_favorites') : $t('removed_from_favorites'));
+    } catch (error) {
+      handleError(error, $t('errors.unable_to_add_remove_favorites', { values: { favorite: detail.isFavorite } }));
+    }
+  };
+
   const handleMergePeople = async (detail: PersonResponseDto) => {
     await goto(Route.viewPerson(detail, { previousRoute: Route.people(), action: 'merge' }));
   };
@@ -220,12 +261,21 @@
   );
   let showPeople = $derived(searchName ? searchedPeopleLocal : visiblePeople);
 
-  const onNameChangeInputFocus = (person: PersonResponseDto) => {
-    editingPerson = person;
-    newName = person.name;
-  };
+  const toManagedPerson = (person: PersonResponseDto): ManagedPerson => ({
+    id: person.id,
+    displayName: person.name,
+    canonicalName: person.name,
+    thumbnailUrl: getPeopleThumbnailUrl(person),
+    href: Route.viewPerson(person, { previousRoute: Route.people() }),
+    isHidden: person.isHidden,
+    isFavorite: person.isFavorite,
+    type: person.type,
+    species: person.species,
+  });
 
   const onNameChangeSubmit = async (name: string, targetPerson: PersonResponseDto) => {
+    editingPerson = targetPerson;
+    newName = name;
     try {
       if (name === targetPerson.name) {
         return;
@@ -258,14 +308,13 @@
     }
   };
 
-  const onNameChangeInputUpdate = (event: Event) => {
-    if (event.target) {
-      newName = (event.target as HTMLInputElement).value;
-    }
-  };
-
   const updateName = async (id: string, name: string) => {
-    await handleUpdatePersonName({ id, name });
+    const updatedPerson = await updatePerson({
+      id,
+      personUpdateDto: { name },
+    });
+
+    people = people.map((person: PersonResponseDto) => (person.id === id ? updatedPerson : person));
     newName = '';
   };
 
@@ -286,8 +335,6 @@
     });
   };
 </script>
-
-<svelte:window bind:innerHeight />
 
 <OnEvents {onPersonUpdate} />
 
@@ -350,26 +397,39 @@
   {/snippet}
 
   {#if countVisiblePeople > 0 && (!searchName || searchedPeopleLocal.length > 0)}
-    <PeopleInfiniteScroll people={showPeople} hasNextPage={!!nextPage && !searchName} {loadNextPage}>
-      {#snippet children({ person })}
-        <div
-          class="rounded-xl border-2 border-transparent p-2 transition-all hover:border-immich-primary/50 hover:bg-gray-200 hover:shadow-sm hover:dark:border-immich-dark-primary/25 dark:hover:bg-immich-dark-primary/20"
+    <PeopleManagementGrid
+      people={showPeople}
+      {toManagedPerson}
+      hasNextPage={!!nextPage && !searchName}
+      {loadNextPage}
+      canEditNames
+      onNameSubmit={onNameChangeSubmit}
+    >
+      {#snippet actions(person)}
+        {@const Actions = getPersonActions($t, person)}
+        <ButtonContextMenu
+          buttonClass="icon-white-drop-shadow"
+          color="secondary"
+          size="medium"
+          variant="filled"
+          icon={mdiDotsVertical}
+          title={$t('show_person_options')}
         >
-          <PeopleCard {person} onMergePeople={() => handleMergePeople(person)} />
-
-          <input
-            type="text"
-            class="mt-2 w-full rounded-2xl border-gray-100 bg-white py-2 text-center text-sm text-primary placeholder-gray-400 dark:border-gray-900 dark:bg-immich-dark-gray"
-            value={person.name}
-            placeholder={$t('add_a_name')}
-            use:shortcut={{ shortcut: { key: 'Enter' }, onShortcut: (e) => e.currentTarget.blur() }}
-            onfocusin={() => onNameChangeInputFocus(person)}
-            onfocusout={() => onNameChangeSubmit(newName, person)}
-            oninput={(event) => onNameChangeInputUpdate(event)}
+          <MenuOption onClick={() => handleHidePerson(person)} icon={mdiEyeOffOutline} text={$t('hide_person')} />
+          <ActionMenuItem action={Actions.SetDateOfBirth} />
+          <MenuOption
+            onClick={() => handleMergePeople(person)}
+            icon={mdiAccountMultipleCheckOutline}
+            text={$t('merge_people')}
           />
-        </div>
+          <MenuOption
+            onClick={() => handleToggleFavorite(person)}
+            icon={person.isFavorite ? mdiHeartMinusOutline : mdiHeartOutline}
+            text={person.isFavorite ? $t('unfavorite') : $t('to_favorite')}
+          />
+        </ButtonContextMenu>
       {/snippet}
-    </PeopleInfiniteScroll>
+    </PeopleManagementGrid>
   {:else}
     <div class="flex min-h-[calc(66vh-11rem)] w-full place-content-center items-center dark:text-white">
       <div class="flex flex-col content-center items-center text-center">
