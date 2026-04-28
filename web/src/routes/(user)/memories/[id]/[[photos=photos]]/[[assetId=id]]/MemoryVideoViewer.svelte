@@ -1,7 +1,7 @@
 <script lang="ts">
   import { assetViewerFadeDuration } from '$lib/constants';
   import type { TimelineAsset } from '$lib/managers/timeline-manager/types';
-  import { autoPlayVideo } from '$lib/stores/preferences.store';
+  import { autoPlayVideo, videoViewerMuted, videoViewerVolume } from '$lib/stores/preferences.store';
   import { getAssetMediaUrl, getAssetPlaybackUrl } from '$lib/utils';
   import { AssetMediaSize } from '@immich/sdk';
   import 'media-chrome/media-controller';
@@ -34,6 +34,9 @@
         playsinline
         disablepictureinpicture
         class="size-full"
+        onvolumechange={(e) => ($videoViewerMuted = e.currentTarget.muted)}
+        muted={$videoViewerMuted}
+        bind:volume={$videoViewerVolume}
         src={getAssetPlaybackUrl({ id: asset.id })}
         poster={getAssetMediaUrl({ id: asset.id, size: AssetMediaSize.Preview })}
         draggable="false"
