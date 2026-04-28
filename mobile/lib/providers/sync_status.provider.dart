@@ -31,6 +31,7 @@ abstract class SyncStatusState with _$SyncStatusState {
     @Default(SyncStatus.idle) SyncStatus localSyncStatus,
     @Default(SyncStatus.idle) SyncStatus hashJobStatus,
     @Default(SyncStatus.idle) SyncStatus cloudIdSyncStatus,
+    @Default(0) int remoteContentChangedCount,
     String? errorMessage,
   }) = _SyncStatusState;
 
@@ -65,7 +66,15 @@ class SyncStatusNotifier extends Notifier<SyncStatusState> {
   }
 
   void startRemoteSync() => setRemoteSyncStatus(SyncStatus.syncing);
-  void completeRemoteSync() => setRemoteSyncStatus(SyncStatus.success);
+  void markRemoteContentChanged() =>
+      state = state.copyWith(remoteContentChangedCount: state.remoteContentChangedCount + 1);
+  // Unlike setRemoteSyncStatus above, a successful remote sync clears any stale error message:
+  // freezed's copyWith treats an explicit null as "set to null" rather than "keep existing".
+  void completeRemoteSync() => state = state.copyWith(
+    remoteSyncStatus: SyncStatus.success,
+    remoteContentChangedCount: state.remoteContentChangedCount + 1,
+    errorMessage: null,
+  );
   void errorRemoteSync(String error) => setRemoteSyncStatus(SyncStatus.error, error);
 
   ///
