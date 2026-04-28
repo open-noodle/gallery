@@ -36,9 +36,6 @@
   const filteredItems = $derived(filterMemoryIndexItems(items, { query: searchQuery, filter }));
   const groups = $derived(groupMemoryIndexItems(filteredItems, { locale: $locale }));
   const labels = $derived([$t('memory_filter_all'), $t('memory_filter_saved')]);
-  const description = $derived(
-    !isLoading && !hasError ? `(${filteredItems.length.toLocaleString($locale)})` : undefined,
-  );
 
   onMount(() => {
     const loadMemories = async () => {
@@ -56,13 +53,28 @@
   });
 </script>
 
-<UserPageLayout title={data.meta.title} {description}>
-  {#snippet buttons()}
-    <div class="flex h-10 items-center gap-2">
-      <div class="w-56 sm:w-72">
-        <SearchBar placeholder={$t('memories_search_placeholder')} bind:name={searchQuery} showLoadingSpinner={false} />
+<UserPageLayout title={data.meta.title}>
+  {#if isLoading}
+    <div class="flex min-h-80 items-center justify-center">
+      <LoadingSpinner size="large" />
+    </div>
+  {:else if hasError}
+    <EmptyPlaceholder text={$t('memories_error')} fullWidth class="mx-auto mt-10 max-w-xl" />
+  {:else if memories.length === 0}
+    <EmptyPlaceholder text={$t('memories_empty')} fullWidth class="mx-auto mt-10 max-w-xl" />
+  {:else}
+    <div class="relative mb-4 flex flex-wrap items-center justify-end gap-2" data-testid="memories-controls">
+      <div class="min-w-0 grow sm:grow-0">
+        <div class="w-full sm:w-72">
+          <SearchBar
+            placeholder={$t('memories_search_placeholder')}
+            bind:name={searchQuery}
+            showLoadingSpinner={false}
+          />
+        </div>
       </div>
-      <div class="h-full">
+
+      <div class="h-10">
         <GroupTab
           label={$t('memories')}
           {filters}
@@ -72,34 +84,28 @@
         />
       </div>
     </div>
-  {/snippet}
 
-  <section class="mx-auto flex w-full max-w-screen-2xl flex-col gap-8 px-2 py-6 sm:px-4 lg:px-8">
-    {#if isLoading}
-      <div class="flex min-h-80 items-center justify-center">
-        <LoadingSpinner size="large" />
-      </div>
-    {:else if hasError}
-      <EmptyPlaceholder text={$t('memories_error')} fullWidth class="mx-auto max-w-xl" />
-    {:else if filteredItems.length === 0}
-      <EmptyPlaceholder text={$t('memories_empty')} fullWidth class="mx-auto max-w-xl" />
+    {#if filteredItems.length === 0}
+      <EmptyPlaceholder text={$t('memories_empty')} fullWidth class="mx-auto mt-10 max-w-xl" />
     {:else}
-      {#each groups as group (group.key)}
-        <section class="space-y-3" aria-labelledby={`memories-${group.key}`}>
-          <h2 id={`memories-${group.key}`} class="text-sm font-medium tracking-normal text-gray-600 dark:text-gray-300">
-            {group.label}
-          </h2>
+      <div class="flex flex-col gap-8">
+        {#each groups as group (group.key)}
+          <section class="space-y-2" aria-labelledby={`memories-${group.key}`}>
+            <h2
+              id={`memories-${group.key}`}
+              class="px-5 text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
+            >
+              {group.label}
+            </h2>
 
-          <div
-            class="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
-            data-testid="memory-group-grid"
-          >
-            {#each group.items as item, index (item.memory.id)}
-              <MemoryCard {item} preload={group.key === groups[0]?.key && index < 8} />
-            {/each}
-          </div>
-        </section>
-      {/each}
+            <div class="grid grid-auto-fill-72 gap-y-4" data-testid="memory-group-grid">
+              {#each group.items as item, index (item.memory.id)}
+                <MemoryCard {item} preload={group.key === groups[0]?.key && index < 20} />
+              {/each}
+            </div>
+          </section>
+        {/each}
+      </div>
     {/if}
-  </section>
+  {/if}
 </UserPageLayout>

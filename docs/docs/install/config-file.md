@@ -289,6 +289,26 @@ The `classification` section configures [Auto-Classification](/features/auto-cla
 The first category tags matching photos as `Auto/Nature`. The second tags and archives screenshots so they don't clutter your timeline. See the [Auto-Classification docs](/features/auto-classification) for the full field reference and prompt writing tips.
 :::
 
+:::info Memories
+The `memories` section configures generated memory retention and rule families. The same values are available in **Administration → Settings → Memories** when no config file is in use.
+
+```json
+"memories": {
+  "birthday": true,
+  "recentTrips": true,
+  "retentionDays": 365
+}
+```
+
+- `retentionDays` is the number of days to keep unsaved generated memory records. Set it to `0` to keep memory records forever. Saved memories are not removed by retention cleanup.
+- `birthday` enables or disables birthday rule memories.
+- `recentTrips` enables or disables recent trip rule memories.
+
+These rule toggles do not disable classic **On this day** memories. To disable all generated memories, set `nightlyTasks.generateMemories` to `false`.
+
+See the [Memories docs](/features/memories) for details about how retention and generated-memory rules work.
+:::
+
 ### Step 2 - Specify the file location
 
 In your `.env` file, set the variable `IMMICH_CONFIG_FILE` to the path of your config.

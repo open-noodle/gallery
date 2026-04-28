@@ -15,23 +15,11 @@
   let { item, preload = false }: Props = $props();
 
   let firstAsset = $derived(item.memory.assets[0]);
-  let collageAssets = $derived(item.memory.assets.slice(0, item.memory.assets.length >= 3 ? 4 : 1));
-  let hasCollage = $derived(item.memory.assets.length >= 3);
+  let collageAssets = $derived(item.memory.assets.slice(0, 4));
+  let collageLayout = $derived(
+    collageAssets.length === 1 ? 'single' : collageAssets.length <= 3 ? 'asymmetric' : 'grid',
+  );
   let loading: 'eager' | 'lazy' = $derived(preload ? 'eager' : 'lazy');
-
-  const getCollageImageClass = (index: number, count: number) => {
-    const base = 'size-full object-cover transition duration-200 group-hover:scale-[1.02]';
-
-    if (index === 0) {
-      return `col-span-2 row-span-2 ${base}`;
-    }
-
-    if (count === 3 || index === 3) {
-      return `col-span-2 ${base}`;
-    }
-
-    return base;
-  };
 </script>
 
 {#if firstAsset}
@@ -39,32 +27,68 @@
     href={Route.memoryViewer({ id: firstAsset.id, source: 'history' })}
     aria-label={item.title}
     data-testid="memory-card"
-    class="group block overflow-hidden rounded-lg border border-gray-200 bg-white transition hover:border-gray-300 hover:shadow-sm dark:border-gray-800 dark:bg-gray-950 dark:hover:border-gray-700"
+    class="group relative block rounded-2xl border border-transparent p-5 hover:border-gray-200 hover:bg-gray-100 dark:hover:border-gray-800 dark:hover:bg-gray-900"
   >
-    <div class="relative aspect-[4/3] overflow-hidden bg-gray-100 dark:bg-gray-900">
-      {#if hasCollage}
-        <div class="grid size-full grid-cols-4 grid-rows-2 gap-0.5 bg-gray-200 dark:bg-gray-800">
-          {#each collageAssets as asset, index (asset.id)}
+    <div class="relative overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-900">
+      {#if collageLayout === 'single'}
+        <div class="aspect-square overflow-hidden rounded-xl">
+          <img
+            src={getAssetMediaUrl({ id: firstAsset.id, size: AssetMediaSize.Thumbnail })}
+            alt=""
+            {loading}
+            draggable="false"
+            class="size-full object-cover transition duration-200 group-hover:scale-[1.02]"
+          />
+        </div>
+      {:else if collageLayout === 'asymmetric'}
+        <div
+          class="grid aspect-square gap-0.5 overflow-hidden rounded-xl bg-gray-200 dark:bg-gray-800"
+          style="grid-template-columns: 3fr 2fr;"
+        >
+          <img
+            src={getAssetMediaUrl({ id: collageAssets[0].id, size: AssetMediaSize.Thumbnail })}
+            alt=""
+            {loading}
+            draggable="false"
+            class="size-full object-cover transition duration-200 group-hover:scale-[1.02]"
+            style="grid-row: 1 / {collageAssets.length === 2 ? 2 : 3};"
+          />
+          <img
+            src={getAssetMediaUrl({ id: collageAssets[1].id, size: AssetMediaSize.Thumbnail })}
+            alt=""
+            {loading}
+            draggable="false"
+            class="size-full object-cover transition duration-200 group-hover:scale-[1.02]"
+          />
+          {#if collageAssets.length >= 3}
+            <img
+              src={getAssetMediaUrl({ id: collageAssets[2].id, size: AssetMediaSize.Thumbnail })}
+              alt=""
+              {loading}
+              draggable="false"
+              class="size-full object-cover transition duration-200 group-hover:scale-[1.02]"
+            />
+          {/if}
+        </div>
+      {:else}
+        <div
+          class="grid aspect-square grid-cols-2 grid-rows-2 gap-0.5 overflow-hidden rounded-xl bg-gray-200 dark:bg-gray-800"
+        >
+          {#each collageAssets as asset (asset.id)}
             <img
               src={getAssetMediaUrl({ id: asset.id, size: AssetMediaSize.Thumbnail })}
               alt=""
               {loading}
-              class={getCollageImageClass(index, collageAssets.length)}
+              draggable="false"
+              class="size-full object-cover transition duration-200 group-hover:scale-[1.02]"
             />
           {/each}
         </div>
-      {:else}
-        <img
-          src={getAssetMediaUrl({ id: firstAsset.id, size: AssetMediaSize.Thumbnail })}
-          alt=""
-          {loading}
-          class="size-full object-cover transition duration-200 group-hover:scale-[1.02]"
-        />
       {/if}
 
       {#if item.memory.isSaved}
         <div
-          class="absolute start-2 top-2 flex size-7 items-center justify-center rounded-full bg-black/45 text-white shadow-sm backdrop-blur-sm"
+          class="absolute start-2 top-2 z-10 flex size-7 items-center justify-center rounded-full bg-white/70 text-immich-primary shadow-sm backdrop-blur-sm dark:bg-gray-800/70"
           data-testid="memory-saved-indicator"
         >
           <Icon icon={mdiHeart} size="15" />
@@ -72,18 +96,25 @@
       {/if}
     </div>
 
-    <div class="space-y-1 p-3">
-      <div>
-        <p class="truncate text-sm font-medium text-gray-950 dark:text-white" title={item.title}>{item.title}</p>
+    <div class="mt-4">
+      <div class="space-y-0.5">
+        <p
+          class="line-clamp-2 w-full text-lg font-semibold leading-6 text-black group-hover:text-primary dark:text-white"
+          title={item.title}
+        >
+          {item.title}
+        </p>
         {#if item.subtitle}
-          <p class="truncate text-xs text-gray-500 dark:text-gray-400" title={item.subtitle}>{item.subtitle}</p>
+          <p class="truncate text-xs font-medium text-gray-500 dark:text-gray-400" title={item.subtitle}>
+            {item.subtitle}
+          </p>
         {/if}
       </div>
 
-      <div class="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-        <span>{item.dateLabel}</span>
-        <span aria-hidden="true">&middot;</span>
-        <span>{$t('memory_assets_count', { values: { count: item.memory.assets.length } })}</span>
+      <div class="mt-1 flex gap-2 text-sm text-gray-600 dark:text-immich-dark-fg">
+        <p>{item.dateLabel}</p>
+        <p aria-hidden="true">&middot;</p>
+        <p>{$t('memory_assets_count', { values: { count: item.memory.assets.length } })}</p>
       </div>
     </div>
   </a>

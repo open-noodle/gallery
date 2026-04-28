@@ -58,13 +58,31 @@ You can enable, disable, or reschedule this task from **Administration → Setti
 
 ## Generated memory controls
 
-You can configure generated memories from **Administration → Settings → Memories**:
+You can browse retained memories from **Memories** in the Library section of the web sidebar. The page shows all retained generated memories, grouped by the date they were shown. It has local search and an **All/Saved** filter. Opening a card uses the same full-screen memory viewer as the daily memory lane.
 
-- `memories.retentionDays` controls how long generated memories are kept. Set it to `0` to keep generated memories forever.
-- `memories.birthday` enables or disables birthday rule memories.
-- `memories.recentTrips` enables or disables recent trip rule memories.
+You can configure generated memories from **Administration → Settings → Memories**. If you run Gallery with a config file, the settings page is read-only and these values must be changed in the config file instead.
 
-The birthday and recent trip rules are enabled by default. The nightly `nightlyTasks.generateMemories` setting still controls whether any memories are generated at all.
+| Setting                  | Default | Behavior                                                                                            |
+| ------------------------ | ------- | --------------------------------------------------------------------------------------------------- |
+| `memories.retentionDays` | `365`   | Number of days to keep unsaved generated memory records. Set to `0` to keep memory records forever. |
+| `memories.birthday`      | `true`  | Enables or disables birthday rule memories.                                                         |
+| `memories.recentTrips`   | `true`  | Enables or disables recent trip rule memories.                                                      |
+
+Memory retention only removes unsaved memory records. Saved memories are kept regardless of age. Cleanup uses the memory display date (`showAt`) when available, otherwise it uses the memory creation date. Cleanup still removes links to hidden, archived, or deleted assets even when `memories.retentionDays` is `0`.
+
+The birthday and recent trip switches only control those rule-memory families. Classic **On this day** memories still run while the nightly **Generate memories** task is enabled. The global `nightlyTasks.generateMemories` setting controls whether any generated memories are created at all.
+
+Example config-file override:
+
+```json
+{
+  "memories": {
+    "retentionDays": 0,
+    "birthday": false,
+    "recentTrips": true
+  }
+}
+```
 
 ## API behavior
 
