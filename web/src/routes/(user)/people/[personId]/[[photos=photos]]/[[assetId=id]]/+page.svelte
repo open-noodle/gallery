@@ -4,6 +4,7 @@
   import { scrollMemoryClearer } from '#lib/actions/scroll-memory.ts';
   import ActionMenuItem from '#lib/components/ActionMenuItem.svelte';
   import ImageThumbnail from '#lib/components/assets/thumbnail/ImageThumbnail.svelte';
+  import PeopleMergeSelector from '#lib/components/people/people-merge-selector.svelte';
   import OnEvents from '#lib/components/OnEvents.svelte';
   import ButtonContextMenu from '#lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
   import MenuOption from '#lib/components/shared-components/context-menu/MenuOption.svelte';
@@ -34,7 +35,15 @@
   import { normalizeSearchString } from '#lib/utils/string-utils.ts';
   import { afterNavigate, goto, refreshAll } from '$app/navigation';
   import { page } from '$app/state';
-  import { AssetVisibility, searchPerson, updatePerson, type PersonResponseDto } from '@immich/sdk';
+  import {
+    AssetVisibility,
+    getAllPeople,
+    getPerson,
+    mergePerson,
+    searchPerson,
+    updatePerson,
+    type PersonResponseDto,
+  } from '@immich/sdk';
   import {
     ActionButton,
     CommandPaletteDefaultProvider,
@@ -57,7 +66,6 @@
   import { t } from 'svelte-i18n';
   import type { PageData } from './$types';
   import EditNameInput from './EditNameInput.svelte';
-  import MergeFaceSelector from './MergeFaceSelector.svelte';
   import UnmergeFaceSelector from './UnmergeFaceSelector.svelte';
 
   interface Props {
@@ -152,6 +160,28 @@
     await handleGoBack();
 
     data = { ...data, person };
+  };
+
+  const getMergeDisplayName = (person: PersonResponseDto) => person.name;
+
+  const loadMergePeople = async (sortFaces: boolean, person: PersonResponseDto) => {
+    const data = await getAllPeople({ withHidden: false, closestPersonId: sortFaces ? person.id : undefined });
+    return data.people;
+  };
+
+  const mergePeople = async (person: PersonResponseDto, selectedPeople: PersonResponseDto[]) => {
+    const results = await mergePerson({
+      id: person.id,
+      mergePersonDto: { ids: selectedPeople.map(({ id }) => id) },
+    });
+    const mergedPerson = await getPerson({ id: person.id });
+    const count = results.filter(({ success }) => success).length;
+    toastManager.primary($t('merged_people_count', { values: { count } }));
+    return mergedPerson;
+  };
+
+  const handleSwapMergePerson = async (person: PersonResponseDto) => {
+    await goto(Route.viewPerson(person, { previousRoute: Route.people(), action: 'merge' }));
   };
 
   const handleSelectFeaturePhoto = async (asset: TimelineAsset) => {
@@ -543,5 +573,15 @@
 {/if}
 
 {#if viewMode === PersonPageViewMode.MERGE_PEOPLE}
-  <MergeFaceSelector {person} onBack={handleGoBack} onMerge={handleMerge} />
+  <PeopleMergeSelector
+    {person}
+    getDisplayName={getMergeDisplayName}
+    getThumbnailUrl={getPeopleThumbnailUrl}
+    loadPeople={loadMergePeople}
+    {mergePeople}
+    searchPeople={(name) => searchPerson({ name })}
+    onBack={handleGoBack}
+    onMerge={handleMerge}
+    onSwapPerson={handleSwapMergePerson}
+  />
 {/if}
