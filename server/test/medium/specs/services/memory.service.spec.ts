@@ -4,6 +4,7 @@ import { BulkIdErrorReason } from 'src/dtos/asset-ids.response.dto';
 import { AssetFileType, MemoryType } from 'src/enum';
 import { AccessRepository } from 'src/repositories/access.repository';
 import { AssetRepository } from 'src/repositories/asset.repository';
+import { ConfigRepository } from 'src/repositories/config.repository';
 import { DatabaseRepository } from 'src/repositories/database.repository';
 import { LoggingRepository } from 'src/repositories/logging.repository';
 import { MemoryRepository } from 'src/repositories/memory.repository';
@@ -25,6 +26,7 @@ const setup = (db?: Kysely<DB>) => {
     real: [
       AccessRepository,
       AssetRepository,
+      ConfigRepository,
       DatabaseRepository,
       MemoryRepository,
       PersonRepository,
