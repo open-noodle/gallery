@@ -25,7 +25,7 @@ const asMakeDate = (eb: ExpressionBuilder<DB, 'asset'>, { year, month, day }: Ye
 export class MemoryRepository implements IBulkAsset {
   constructor(@InjectKysely() private db: Kysely<DB>) {}
 
-  async cleanup() {
+  async cleanup(retentionDays: number) {
     await this.db
       .deleteFrom('memory_asset')
       .using('asset')
@@ -33,9 +33,13 @@ export class MemoryRepository implements IBulkAsset {
       .where('asset.visibility', '!=', AssetVisibility.Timeline)
       .execute();
 
+    if (retentionDays === 0) {
+      return [];
+    }
+
     return this.db
       .deleteFrom('memory')
-      .where('createdAt', '<', DateTime.now().minus({ days: 30 }).toJSDate())
+      .where(sql<Date>`coalesce("showAt", "createdAt")`, '<', DateTime.now().minus({ days: retentionDays }).toJSDate())
       .where('isSaved', '=', false)
       .execute();
   }
