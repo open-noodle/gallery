@@ -1,11 +1,19 @@
-import { render } from '@testing-library/svelte';
+import { getIntersectionObserverMock } from '$lib/__mocks__/intersection-observer.mock';
+import { sdkMock } from '$lib/__mocks__/sdk.mock';
+import { personFactory } from '@test-data/factories/person-factory';
+import '@testing-library/jest-dom';
+import { render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import type { ComponentProps } from 'svelte';
 import { vi } from 'vitest';
-import { getIntersectionObserverMock } from '$lib/__mocks__/intersection-observer.mock';
-import { personFactory } from '@test-data/factories/person-factory';
 import ManagePeoplePage from './+page.svelte';
 import ManagePeoplePageTestWrapper from './ManagePeopleVisibility.test-wrapper.svelte';
+
+const { gotoMock } = vi.hoisted(() => ({
+  gotoMock: vi.fn(),
+}));
+
+vi.mock('$app/navigation', () => ({ goto: gotoMock }));
 
 vi.mock(import('$lib/managers/feature-flags-manager.svelte'), function () {
   return {
@@ -13,8 +21,12 @@ vi.mock(import('$lib/managers/feature-flags-manager.svelte'), function () {
   };
 });
 
-vi.mock('$lib/components/layouts/UserPageLayout.svelte', async () => {
-  return await import('@test-data/mocks/UserPageLayout.mock.svelte');
+vi.mock('@immich/ui', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@immich/ui')>();
+  return {
+    ...original,
+    toastManager: { primary: vi.fn(), warning: vi.fn() },
+  };
 });
 
 const getData = (
@@ -35,6 +47,9 @@ const getData = (
 describe('People manage page', () => {
   beforeEach(() => {
     vi.stubGlobal('IntersectionObserver', getIntersectionObserverMock());
+    vi.clearAllMocks();
+    sdkMock.updatePeople.mockResolvedValue([]);
+    gotoMock.mockResolvedValue(undefined);
   });
 
   it('keeps toggled hidden state when loading more people', async () => {
@@ -44,21 +59,18 @@ describe('People manage page', () => {
       personFactory.build({ id: 'c', isHidden: true }),
     ];
 
-    const { container, rerender } = render(ManagePeoplePageTestWrapper, { data: getData([personA, personB], true) });
+    const { rerender } = render(ManagePeoplePageTestWrapper, { data: getData([personA, personB], true) });
     const user = userEvent.setup();
 
-    let personButtons = container.querySelectorAll('button[aria-pressed]');
-    expect(personButtons).toHaveLength(2);
+    expect(screen.getByTestId('visibility-person-a')).toHaveAttribute('aria-pressed', 'false');
 
-    await user.click(personButtons[0]);
-    expect(personButtons[0].getAttribute('aria-pressed')).toBe('true');
+    await user.click(screen.getByTestId('visibility-person-a'));
+    expect(screen.getByTestId('visibility-person-a')).toHaveAttribute('aria-pressed', 'true');
 
     await rerender({ data: getData([personA, personB, personC], false) });
 
-    personButtons = container.querySelectorAll('button[aria-pressed]');
-    expect(personButtons).toHaveLength(3);
-    expect(personButtons[0].getAttribute('aria-pressed')).toBe('true');
-    expect(personButtons[2].getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByTestId('visibility-person-a')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('visibility-person-c')).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('shows newly loaded hidden people as hidden', async () => {
@@ -68,12 +80,44 @@ describe('People manage page', () => {
       personFactory.build({ id: 'c', isHidden: true }),
     ];
 
-    const { container, rerender } = render(ManagePeoplePageTestWrapper, { data: getData([personA, personB], true) });
+    const { rerender } = render(ManagePeoplePageTestWrapper, { data: getData([personA, personB], true) });
 
     await rerender({ data: getData([personA, personB, personC], false) });
 
-    const personButtons = container.querySelectorAll('button[aria-pressed]');
-    expect(personButtons).toHaveLength(3);
-    expect(personButtons[2].getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByTestId('visibility-person-a')).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByTestId('visibility-person-c')).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('saves global visibility through updatePeople and maps updated hidden state back to global people', async () => {
+    const people = [
+      personFactory.build({ id: 'a', name: 'Alice', isHidden: false }),
+      personFactory.build({ id: 'b', name: 'Bob', isHidden: true }),
+      personFactory.build({ id: 'c', name: 'Charlie', isHidden: false }),
+    ];
+    sdkMock.updatePeople.mockResolvedValueOnce([
+      { id: 'a', success: true },
+      { id: 'b', success: false },
+    ]);
+    render(ManagePeoplePageTestWrapper, { data: getData(people) });
+    const user = userEvent.setup();
+
+    await user.click(screen.getByTestId('visibility-person-a'));
+    await user.click(screen.getByTestId('visibility-person-b'));
+    await user.click(screen.getByTestId('save-visibility'));
+
+    await waitFor(() => {
+      expect(sdkMock.updatePeople).toHaveBeenCalledWith({
+        peopleUpdateDto: {
+          people: [
+            { id: 'a', isHidden: true },
+            { id: 'b', isHidden: false },
+          ],
+        },
+      });
+    });
+    expect(screen.getByTestId('visibility-person-a')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('visibility-person-b')).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByTestId('visibility-person-c')).toHaveAttribute('aria-pressed', 'false');
+    expect(gotoMock).toHaveBeenCalledWith('/people');
   });
 });
