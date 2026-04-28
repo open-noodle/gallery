@@ -38,6 +38,12 @@ describe('Route', () => {
     });
   });
 
+  describe(Route.memories.name, () => {
+    it('should link to the memories index', () => {
+      expect(Route.memories()).toBe('/memories');
+    });
+  });
+
   describe(Route.tags.name, () => {
     it('links to the tag root', () => {
       expect(Route.tags()).toBe('/tags');
