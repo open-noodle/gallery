@@ -29,13 +29,14 @@
   let id: string = generateId();
 
   let switchId = $derived(`input-${id}`);
+  let labelId = $derived(`label-${id}`);
   let subtitleId = $derived(subtitle ? `${id}-subtitle` : undefined);
 </script>
 
 <div class="flex place-items-center justify-between">
   <div class="me-2">
     <div class="flex h-6.5 place-items-center gap-1">
-      <label class="text-sm font-medium text-primary" for={switchId}>
+      <label id={labelId} class="text-sm font-medium text-primary" for={switchId}>
         {title}
       </label>
       {#if isEdited}
@@ -54,5 +55,5 @@
     {@render children?.()}
   </div>
 
-  <Switch {id} bind:checked {disabled} onCheckedChange={onToggle} aria-describedby={subtitleId} />
+  <Switch {id} bind:checked {disabled} onCheckedChange={onToggle} aria-labelledby={labelId} aria-describedby={subtitleId} />
 </div>
