@@ -148,7 +148,7 @@ const TimeBucketAssetResponseSchema = z
   })
   .meta({ id: 'TimeBucketAssetResponseDto' });
 
-const TimeBucketsResponseSchema = z
+export const TimeBucketsResponseSchema = z
   .object({
     timeBucket: z
       .string()
