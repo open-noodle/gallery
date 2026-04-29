@@ -41,9 +41,13 @@
 
   let normalizedSearchQuery = $derived(searchQuery.trim().toLowerCase());
   let shouldFetchCitiesForSearch = $derived(normalizedSearchQuery.length >= MIN_CITY_SEARCH_LENGTH);
-  let hasPendingCitySearchFetches = $derived.by(
-    () => shouldFetchCitiesForSearch && countries.some((country) => loadingCitiesByCountry[country]),
-  );
+  let hasPendingCitySearchFetches = $derived.by(() => {
+    if (!shouldFetchCitiesForSearch) {
+      return false;
+    }
+
+    return countries.some((country) => loadingCitiesByCountry[country] || (!(country in cityCache) && !cityFetchErrors[country]));
+  });
 
   // Clear search when countries list changes (e.g. temporal filter refetch)
   let previousCountriesLength = 0;

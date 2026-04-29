@@ -750,6 +750,23 @@ describe('LocationFilter', () => {
     });
   });
 
+  it('should not show no-results before debounced city search fetches start', async () => {
+    const onCityFetch = vi.fn(() => Promise.resolve([]));
+
+    const { getByTestId, queryByTestId } = render(LocationFilter, {
+      props: {
+        countries: ['Germany', 'Switzerland'],
+        onCityFetch,
+        onSelectionChange: () => {},
+      },
+    });
+
+    await fireEvent.input(getByTestId('location-search-input'), { target: { value: 'gene' } });
+
+    expect(onCityFetch).not.toHaveBeenCalled();
+    expect(queryByTestId('location-no-results')).toBeNull();
+  });
+
   it('should find a city in a country beyond the initial country cap', async () => {
     const cityMap: Record<string, string[]> = {
       Mexico: ['Merida'],
@@ -877,6 +894,21 @@ describe('LocationFilter', () => {
 
     const searchInput = getByTestId('location-search-input');
     await fireEvent.input(searchInput, { target: { value: 'zzzzz' } });
+
+    await waitFor(() => expect(getByTestId('location-no-results').textContent).toBe('No matching locations'));
+  });
+
+  it('should show "No matching locations" immediately for one-character empty search results', async () => {
+    const { getByTestId } = render(LocationFilter, {
+      props: {
+        countries: manyCountries,
+        onCityFetch: mockCityFetch,
+        onSelectionChange: () => {},
+      },
+    });
+
+    const searchInput = getByTestId('location-search-input');
+    await fireEvent.input(searchInput, { target: { value: 'q' } });
 
     expect(getByTestId('location-no-results').textContent).toBe('No matching locations');
   });
