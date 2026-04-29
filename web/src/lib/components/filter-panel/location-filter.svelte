@@ -3,6 +3,7 @@
 
   import { Icon } from '@immich/ui';
   import { mdiMagnify } from '@mdi/js';
+  import { untrack } from 'svelte';
 
   interface Props {
     countries: string[];
@@ -27,9 +28,17 @@
   let searchQuery = $state('');
   let showAll = $state(false);
   let expandedCityLists = $state<Record<string, boolean>>({});
+  let cityCache = $state<Record<string, string[]>>({});
+  let loadingCitiesByCountry = $state<Record<string, boolean>>({});
+  let cityFetchErrors = $state<Record<string, boolean>>({});
+  let latestCityFetchIds = $state<Record<string, number>>({});
+  let cityFetchSequence = 0;
+  let cityCacheKey = $state('');
 
   const COUNTRY_SHOW_COUNT = 10;
   const CITY_SHOW_COUNT = 10;
+
+  let normalizedSearchQuery = $derived(searchQuery.trim().toLowerCase());
 
   // Clear search when countries list changes (e.g. temporal filter refetch)
   let previousCountriesLength = 0;
@@ -42,11 +51,31 @@
     previousCountriesLength = currentLength;
   });
 
-  let filteredCountries = $derived(
-    searchQuery.trim()
-      ? countries.filter((c) => c.toLowerCase().includes(searchQuery.trim().toLowerCase()))
-      : countries,
-  );
+  $effect(() => {
+    const nextKey = JSON.stringify({ countries, context });
+    if (cityCacheKey && nextKey !== cityCacheKey) {
+      cityFetchSequence += 1;
+      cityCache = {};
+      loadingCitiesByCountry = {};
+      cityFetchErrors = {};
+      latestCityFetchIds = {};
+      expandedCityLists = {};
+      cities = [];
+    }
+    cityCacheKey = nextKey;
+  });
+
+  let filteredCountries = $derived.by(() => {
+    if (!normalizedSearchQuery) {
+      return countries;
+    }
+
+    return countries.filter((country) => {
+      const countryMatches = country.toLowerCase().includes(normalizedSearchQuery);
+      const cityMatches = (cityCache[country] ?? []).some((city) => city.toLowerCase().includes(normalizedSearchQuery));
+      return countryMatches || cityMatches;
+    });
+  });
 
   let visibleCountries = $derived(
     searchQuery.trim() || showAll ? filteredCountries : filteredCountries.slice(0, COUNTRY_SHOW_COUNT),
@@ -56,8 +85,6 @@
 
   let expandedCountry = $state<string | undefined>(undefined);
   let cities = $state<string[]>([]);
-  let loadingCities = $state(false);
-  let cityFetchRequestId = 0;
 
   // Orphaned country: selected but not in current results
   let orphanedCountry = $derived(selectedCountry && !countries.includes(selectedCountry) ? selectedCountry : undefined);
@@ -69,47 +96,97 @@
     }
   });
 
+  function ensureCities(country: string) {
+    if (country in cityCache || loadingCitiesByCountry[country]) {
+      return;
+    }
+
+    const requestedCountry = country;
+    const _context = context;
+    const requestId = ++cityFetchSequence;
+
+    latestCityFetchIds = { ...latestCityFetchIds, [requestedCountry]: requestId };
+    loadingCitiesByCountry = { ...loadingCitiesByCountry, [requestedCountry]: true };
+    cityFetchErrors = { ...cityFetchErrors, [requestedCountry]: false };
+    if (expandedCountry === requestedCountry) {
+      cities = [];
+    }
+
+    void onCityFetch(requestedCountry, _context)
+      .then((result) => {
+        if (latestCityFetchIds[requestedCountry] !== requestId) {
+          return;
+        }
+
+        cityCache = { ...cityCache, [requestedCountry]: result };
+        loadingCitiesByCountry = { ...loadingCitiesByCountry, [requestedCountry]: false };
+        cityFetchErrors = { ...cityFetchErrors, [requestedCountry]: false };
+
+        if (expandedCountry === requestedCountry) {
+          cities = result;
+        }
+
+        // Cascade child auto-clear: if selected city is not in new results, clear it
+        if (selectedCountry === requestedCountry && selectedCity && result.length > 0 && !result.includes(selectedCity)) {
+          onSelectionChange(requestedCountry, undefined);
+        }
+      })
+      .catch(() => {
+        if (latestCityFetchIds[requestedCountry] !== requestId) {
+          return;
+        }
+
+        loadingCitiesByCountry = { ...loadingCitiesByCountry, [requestedCountry]: false };
+        cityFetchErrors = { ...cityFetchErrors, [requestedCountry]: true };
+        if (expandedCountry === requestedCountry) {
+          cities = [];
+        }
+      });
+  }
+
   $effect(() => {
     if (expandedCountry) {
-      const requestedCountry = expandedCountry;
-      const _context = context;
-      const requestId = ++cityFetchRequestId;
-      loadingCities = true;
-      cities = [];
-      void onCityFetch(requestedCountry, _context)
-        .then((result) => {
-          if (requestId !== cityFetchRequestId || expandedCountry !== requestedCountry) {
-            return;
-          }
-
-          cities = result;
-          loadingCities = false;
-
-          // Cascade child auto-clear: if selected city is not in new results, clear it
-          if (selectedCity && result.length > 0 && !result.includes(selectedCity)) {
-            onSelectionChange(requestedCountry, undefined);
-          }
-        })
-        .catch(() => {
-          if (requestId !== cityFetchRequestId || expandedCountry !== requestedCountry) {
-            return;
-          }
-
-          loadingCities = false;
-        });
+      cities = cityCache[expandedCountry] ?? [];
+      untrack(() => ensureCities(expandedCountry!));
     } else {
-      cityFetchRequestId++;
       cities = [];
-      loadingCities = false;
     }
   });
 
-  function getFilteredCities(): string[] {
-    return cities;
+  $effect(() => {
+    if (selectedCountry) {
+      untrack(() => ensureCities(selectedCountry));
+    }
+  });
+
+  $effect(() => {
+    if (!normalizedSearchQuery) {
+      return;
+    }
+
+    const currentCountries = countries;
+    const timeout = setTimeout(() => {
+      untrack(() => {
+        for (const country of currentCountries) {
+          ensureCities(country);
+        }
+      });
+    }, 150);
+
+    return () => clearTimeout(timeout);
+  });
+
+  function getFilteredCities(country: string): string[] {
+    const cachedCities = cityCache[country] ?? (expandedCountry === country ? cities : []);
+    if (!normalizedSearchQuery || country.toLowerCase().includes(normalizedSearchQuery)) {
+      return cachedCities;
+    }
+
+    return cachedCities.filter((city) => city.toLowerCase().includes(normalizedSearchQuery));
   }
 
   function getVisibleCities(country: string): string[] {
-    const filtered = getFilteredCities();
+    const filtered = getFilteredCities(country);
     if (expandedCityLists[country]) {
       return filtered;
     }
@@ -128,7 +205,7 @@
   }
 
   function getRemainingCityCount(country: string): number {
-    return Math.max(0, getFilteredCities().length - getVisibleCities(country).length);
+    return Math.max(0, getFilteredCities(country).length - getVisibleCities(country).length);
   }
 
   function showAllCities(country: string) {
@@ -235,7 +312,7 @@
       </button>
 
       <!-- Cities (indented when country is expanded) -->
-      {#if expandedCountry === country && !loadingCities}
+      {#if (expandedCountry === country || (normalizedSearchQuery && (cityCache[country] ?? []).length > 0)) && !loadingCitiesByCountry[country]}
         {#each getVisibleCities(country) as city (city)}
           {@const isCitySelected = selectedCity === city && selectedCountry === country}
           <button

@@ -662,6 +662,67 @@ describe('LocationFilter', () => {
     expect(queryByTestId('location-country-Italy')).toBeNull();
   });
 
+  it('should search city names and show matching cities under their country', async () => {
+    const { getByTestId, queryByTestId } = render(LocationFilter, {
+      props: {
+        countries: mockCountries,
+        onCityFetch: mockCityFetch,
+        onSelectionChange: () => {},
+      },
+    });
+
+    await fireEvent.input(getByTestId('location-search-input'), { target: { value: 'ber' } });
+
+    await waitFor(() => {
+      expect(queryByTestId('location-country-Germany')).toBeTruthy();
+      expect(queryByTestId('location-city-Berlin')).toBeTruthy();
+      expect(queryByTestId('location-country-Italy')).toBeNull();
+      expect(queryByTestId('location-city-Munich')).toBeNull();
+    });
+  });
+
+  it('should find a city in a country beyond the initial country cap', async () => {
+    const cityMap: Record<string, string[]> = {
+      Mexico: ['Merida'],
+    };
+
+    const { getByTestId, queryByTestId } = render(LocationFilter, {
+      props: {
+        countries: manyCountries,
+        onCityFetch: (country) => Promise.resolve(cityMap[country] ?? []),
+        onSelectionChange: () => {},
+      },
+    });
+
+    expect(queryByTestId('location-country-Mexico')).toBeNull();
+
+    await fireEvent.input(getByTestId('location-search-input'), { target: { value: 'meri' } });
+
+    await waitFor(() => {
+      expect(queryByTestId('location-country-Mexico')).toBeTruthy();
+      expect(queryByTestId('location-city-Merida')).toBeTruthy();
+    });
+  });
+
+  it('should select a city from city search results', async () => {
+    const onSelectionChange = vi.fn();
+
+    const { getByTestId, queryByTestId } = render(LocationFilter, {
+      props: {
+        countries: mockCountries,
+        onCityFetch: mockCityFetch,
+        onSelectionChange,
+      },
+    });
+
+    await fireEvent.input(getByTestId('location-search-input'), { target: { value: 'ber' } });
+
+    await waitFor(() => expect(queryByTestId('location-city-Berlin')).toBeTruthy());
+    await fireEvent.click(getByTestId('location-city-Berlin'));
+
+    expect(onSelectionChange).toHaveBeenLastCalledWith('Germany', 'Berlin');
+  });
+
   it('should search case-insensitively', async () => {
     const { getByTestId, queryByTestId } = render(LocationFilter, {
       props: {
