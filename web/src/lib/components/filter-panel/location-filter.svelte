@@ -70,19 +70,28 @@
 
   $effect(() => {
     if (expandedCountry) {
+      const requestedCountry = expandedCountry;
       const _context = context;
       loadingCities = true;
-      void onCityFetch(expandedCountry, _context).then((result) => {
+      void onCityFetch(requestedCountry, _context).then((result) => {
+        if (expandedCountry !== requestedCountry) {
+          if (!expandedCountry) {
+            loadingCities = false;
+          }
+          return;
+        }
+
         cities = result;
         loadingCities = false;
 
         // Cascade child auto-clear: if selected city is not in new results, clear it
         if (selectedCity && result.length > 0 && !result.includes(selectedCity)) {
-          onSelectionChange(expandedCountry, undefined);
+          onSelectionChange(requestedCountry, undefined);
         }
       });
     } else {
       cities = [];
+      loadingCities = false;
     }
   });
 

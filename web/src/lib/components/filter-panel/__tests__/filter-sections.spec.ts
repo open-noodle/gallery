@@ -395,6 +395,52 @@ describe('LocationFilter', () => {
     });
   });
 
+  it('should ignore stale city fetch responses after expanding another country', async () => {
+    let resolveGermany!: (cities: string[]) => void;
+    let resolveFrance!: (cities: string[]) => void;
+    const germanyPromise = new Promise<string[]>((resolve) => {
+      resolveGermany = resolve;
+    });
+    const francePromise = new Promise<string[]>((resolve) => {
+      resolveFrance = resolve;
+    });
+    const onSelectionChange = vi.fn();
+    const onCityFetch = vi.fn((country: string) => (country === 'Germany' ? germanyPromise : francePromise));
+
+    const { getByTestId, queryByTestId, rerender } = render(LocationFilter, {
+      props: {
+        countries: ['Germany', 'France'],
+        onCityFetch,
+        onSelectionChange,
+      },
+    });
+
+    await fireEvent.click(getByTestId('location-country-Germany'));
+    await waitFor(() => expect(onCityFetch).toHaveBeenCalledWith('Germany', undefined));
+    await fireEvent.click(getByTestId('location-country-France'));
+    await waitFor(() => expect(onCityFetch).toHaveBeenCalledWith('France', undefined));
+    await waitFor(() => expect(queryByTestId('location-city-French City 1')).toBeNull());
+
+    resolveFrance(['French City 1']);
+    await waitFor(() => expect(queryByTestId('location-city-French City 1')).toBeTruthy());
+    await rerender({
+      countries: ['Germany', 'France'],
+      selectedCountry: 'France',
+      selectedCity: 'French City 1',
+      onCityFetch,
+      onSelectionChange,
+    });
+    onSelectionChange.mockClear();
+
+    resolveGermany(['German City 1']);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await waitFor(() => {
+      expect(queryByTestId('location-city-French City 1')).toBeTruthy();
+      expect(queryByTestId('location-city-German City 1')).toBeNull();
+    });
+    expect(onSelectionChange).not.toHaveBeenCalled();
+  });
+
   it('should not show city-level show more for countries with no cities', async () => {
     const fetchPromise = Promise.resolve([]);
     const onCityFetch = vi.fn(() => fetchPromise);
