@@ -679,21 +679,27 @@ describe('LocationFilter', () => {
     expect(onCityFetch).not.toHaveBeenCalled();
   });
 
-  it('should not fetch all country cities when search already matches a country name', async () => {
-    const onCityFetch = vi.fn(() => Promise.resolve([]));
+  it('should search matching city names when the query also matches a country name', async () => {
+    const cityMap: Record<string, string[]> = {
+      Germany: [],
+      Switzerland: ['Geneva'],
+    };
 
-    const { getByTestId } = render(LocationFilter, {
+    const { getByTestId, queryByTestId } = render(LocationFilter, {
       props: {
-        countries: manyCountries,
-        onCityFetch,
+        countries: ['Germany', 'Switzerland'],
+        onCityFetch: (country) => Promise.resolve(cityMap[country] ?? []),
         onSelectionChange: () => {},
       },
     });
 
-    await fireEvent.input(getByTestId('location-search-input'), { target: { value: 'Germany' } });
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    await fireEvent.input(getByTestId('location-search-input'), { target: { value: 'ge' } });
 
-    expect(onCityFetch).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(queryByTestId('location-country-Germany')).toBeTruthy();
+      expect(queryByTestId('location-country-Switzerland')).toBeTruthy();
+      expect(queryByTestId('location-city-Geneva')).toBeTruthy();
+    });
   });
 
   it('should search city names and show matching cities under their country', async () => {
