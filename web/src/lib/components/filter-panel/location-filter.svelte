@@ -37,8 +37,16 @@
 
   const COUNTRY_SHOW_COUNT = 10;
   const CITY_SHOW_COUNT = 10;
+  const MIN_CITY_SEARCH_LENGTH = 2;
 
   let normalizedSearchQuery = $derived(searchQuery.trim().toLowerCase());
+  let shouldFetchCitiesForSearch = $derived.by(() => {
+    if (normalizedSearchQuery.length < MIN_CITY_SEARCH_LENGTH) {
+      return false;
+    }
+
+    return !countries.some((country) => country.toLowerCase().includes(normalizedSearchQuery));
+  });
 
   // Clear search when countries list changes (e.g. temporal filter refetch)
   let previousCountriesLength = 0;
@@ -160,7 +168,7 @@
   });
 
   $effect(() => {
-    if (!normalizedSearchQuery) {
+    if (!shouldFetchCitiesForSearch) {
       return;
     }
 

@@ -662,6 +662,40 @@ describe('LocationFilter', () => {
     expect(queryByTestId('location-country-Italy')).toBeNull();
   });
 
+  it('should not fetch all country cities for one-character searches', async () => {
+    const onCityFetch = vi.fn(() => Promise.resolve([]));
+
+    const { getByTestId } = render(LocationFilter, {
+      props: {
+        countries: manyCountries,
+        onCityFetch,
+        onSelectionChange: () => {},
+      },
+    });
+
+    await fireEvent.input(getByTestId('location-search-input'), { target: { value: 'a' } });
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    expect(onCityFetch).not.toHaveBeenCalled();
+  });
+
+  it('should not fetch all country cities when search already matches a country name', async () => {
+    const onCityFetch = vi.fn(() => Promise.resolve([]));
+
+    const { getByTestId } = render(LocationFilter, {
+      props: {
+        countries: manyCountries,
+        onCityFetch,
+        onSelectionChange: () => {},
+      },
+    });
+
+    await fireEvent.input(getByTestId('location-search-input'), { target: { value: 'Germany' } });
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    expect(onCityFetch).not.toHaveBeenCalled();
+  });
+
   it('should search city names and show matching cities under their country', async () => {
     const { getByTestId, queryByTestId } = render(LocationFilter, {
       props: {
