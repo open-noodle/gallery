@@ -441,6 +441,54 @@ describe('LocationFilter', () => {
     expect(onSelectionChange).not.toHaveBeenCalled();
   });
 
+  it('should ignore stale same-country city fetch responses after context changes', async () => {
+    let resolveFirstGermany!: (cities: string[]) => void;
+    let resolveSecondGermany!: (cities: string[]) => void;
+    const firstGermanyPromise = new Promise<string[]>((resolve) => {
+      resolveFirstGermany = resolve;
+    });
+    const secondGermanyPromise = new Promise<string[]>((resolve) => {
+      resolveSecondGermany = resolve;
+    });
+    const germanyRequests = [firstGermanyPromise, secondGermanyPromise];
+    const onCityFetch = vi.fn(() => germanyRequests.shift() ?? Promise.resolve([]));
+    const onSelectionChange = vi.fn();
+
+    const { queryByTestId, rerender } = render(LocationFilter, {
+      props: {
+        countries: ['Germany'],
+        selectedCountry: 'Germany',
+        selectedCity: 'Berlin',
+        context: { takenAfter: '2026-01-01' },
+        onCityFetch,
+        onSelectionChange,
+      },
+    });
+
+    await waitFor(() => expect(onCityFetch).toHaveBeenCalledTimes(1));
+    await rerender({
+      countries: ['Germany'],
+      selectedCountry: 'Germany',
+      selectedCity: 'Berlin',
+      context: { takenAfter: '2026-02-01' },
+      onCityFetch,
+      onSelectionChange,
+    });
+    await waitFor(() => expect(onCityFetch).toHaveBeenCalledTimes(2));
+
+    resolveSecondGermany(['Berlin']);
+    await waitFor(() => expect(queryByTestId('location-city-Berlin')).toBeTruthy());
+    onSelectionChange.mockClear();
+
+    resolveFirstGermany(['Munich']);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await waitFor(() => {
+      expect(queryByTestId('location-city-Berlin')).toBeTruthy();
+      expect(queryByTestId('location-city-Munich')).toBeNull();
+    });
+    expect(onSelectionChange).not.toHaveBeenCalled();
+  });
+
   it('should not show city-level show more for countries with no cities', async () => {
     const fetchPromise = Promise.resolve([]);
     const onCityFetch = vi.fn(() => fetchPromise);

@@ -57,6 +57,7 @@
   let expandedCountry = $state<string | undefined>(undefined);
   let cities = $state<string[]>([]);
   let loadingCities = $state(false);
+  let cityFetchRequestId = 0;
 
   // Orphaned country: selected but not in current results
   let orphanedCountry = $derived(selectedCountry && !countries.includes(selectedCountry) ? selectedCountry : undefined);
@@ -72,12 +73,10 @@
     if (expandedCountry) {
       const requestedCountry = expandedCountry;
       const _context = context;
+      const requestId = ++cityFetchRequestId;
       loadingCities = true;
       void onCityFetch(requestedCountry, _context).then((result) => {
-        if (expandedCountry !== requestedCountry) {
-          if (!expandedCountry) {
-            loadingCities = false;
-          }
+        if (requestId !== cityFetchRequestId || expandedCountry !== requestedCountry) {
           return;
         }
 
@@ -90,6 +89,7 @@
         }
       });
     } else {
+      cityFetchRequestId++;
       cities = [];
       loadingCities = false;
     }
