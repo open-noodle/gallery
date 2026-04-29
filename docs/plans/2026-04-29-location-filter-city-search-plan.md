@@ -46,6 +46,7 @@ pnpm --filter immich-web exec vitest run src/lib/components/filter-panel/__tests
 ## Task 0: Commit Reviewed Design And Plan
 
 **Files:**
+
 - Add: `docs/plans/2026-04-29-location-filter-city-search-design.md`
 - Add: `docs/plans/2026-04-29-location-filter-city-search-plan.md`
 
@@ -78,6 +79,7 @@ Expected: one docs commit on `feat/location-filter-city-search`.
 ## Task 1: Red Test For Capped City Lists
 
 **Files:**
+
 - Modify: `web/src/lib/components/filter-panel/__tests__/filter-sections.spec.ts`
 
 - [ ] **Step 1: Add tests before production code**
@@ -85,75 +87,75 @@ Expected: one docs commit on `feat/location-filter-city-search`.
 Add these tests inside `describe('LocationFilter', () => { ... })`, after `should show cities when country is expanded`. The first test is the required RED test for the core bug. The other two lock edge behavior before any production code is written.
 
 ```ts
-  it('should cap expanded city lists and expand cities with city-level show more', async () => {
-    const cities = Array.from({ length: 12 }, (_, index) => `City ${index + 1}`);
+it('should cap expanded city lists and expand cities with city-level show more', async () => {
+  const cities = Array.from({ length: 12 }, (_, index) => `City ${index + 1}`);
 
-    const { getByTestId, queryByTestId } = render(LocationFilter, {
-      props: {
-        countries: ['Germany'],
-        onCityFetch: () => Promise.resolve(cities),
-        onSelectionChange: () => {},
-      },
-    });
-
-    await fireEvent.click(getByTestId('location-country-Germany'));
-
-    await waitFor(() => {
-      expect(queryByTestId('location-city-City 1')).toBeTruthy();
-      expect(queryByTestId('location-city-City 10')).toBeTruthy();
-      expect(queryByTestId('location-city-City 11')).toBeNull();
-      expect(queryByTestId('location-city-City 12')).toBeNull();
-      expect(getByTestId('location-city-show-more-Germany').textContent).toContain('Show 2 more');
-    });
-
-    await fireEvent.click(getByTestId('location-city-show-more-Germany'));
-
-    expect(queryByTestId('location-city-City 11')).toBeTruthy();
-    expect(queryByTestId('location-city-City 12')).toBeTruthy();
+  const { getByTestId, queryByTestId } = render(LocationFilter, {
+    props: {
+      countries: ['Germany'],
+      onCityFetch: () => Promise.resolve(cities),
+      onSelectionChange: () => {},
+    },
   });
 
-  it('should expand hidden cities only for the selected country city list', async () => {
-    const cityMap: Record<string, string[]> = {
-      Germany: Array.from({ length: 12 }, (_, index) => `German City ${index + 1}`),
-      France: Array.from({ length: 12 }, (_, index) => `French City ${index + 1}`),
-    };
+  await fireEvent.click(getByTestId('location-country-Germany'));
 
-    const { getByTestId, queryByTestId } = render(LocationFilter, {
-      props: {
-        countries: ['Germany', 'France'],
-        onCityFetch: (country) => Promise.resolve(cityMap[country] ?? []),
-        onSelectionChange: () => {},
-      },
-    });
-
-    await fireEvent.click(getByTestId('location-country-Germany'));
-    await waitFor(() => expect(queryByTestId('location-city-German City 11')).toBeNull());
-
-    await fireEvent.click(getByTestId('location-city-show-more-Germany'));
-    expect(queryByTestId('location-city-German City 11')).toBeTruthy();
-
-    await fireEvent.click(getByTestId('location-country-France'));
-    await waitFor(() => {
-      expect(queryByTestId('location-city-French City 10')).toBeTruthy();
-      expect(queryByTestId('location-city-French City 11')).toBeNull();
-    });
+  await waitFor(() => {
+    expect(queryByTestId('location-city-City 1')).toBeTruthy();
+    expect(queryByTestId('location-city-City 10')).toBeTruthy();
+    expect(queryByTestId('location-city-City 11')).toBeNull();
+    expect(queryByTestId('location-city-City 12')).toBeNull();
+    expect(getByTestId('location-city-show-more-Germany').textContent).toContain('Show 2 more');
   });
 
-  it('should not show city-level show more for countries with no cities', async () => {
-    const { getByTestId, queryByTestId } = render(LocationFilter, {
-      props: {
-        countries: ['Germany'],
-        onCityFetch: () => Promise.resolve([]),
-        onSelectionChange: () => {},
-      },
-    });
+  await fireEvent.click(getByTestId('location-city-show-more-Germany'));
 
-    await fireEvent.click(getByTestId('location-country-Germany'));
+  expect(queryByTestId('location-city-City 11')).toBeTruthy();
+  expect(queryByTestId('location-city-City 12')).toBeTruthy();
+});
 
-    await waitFor(() => {
-      expect(queryByTestId('location-city-show-more-Germany')).toBeNull();
-    });
+it('should expand hidden cities only for the selected country city list', async () => {
+  const cityMap: Record<string, string[]> = {
+    Germany: Array.from({ length: 12 }, (_, index) => `German City ${index + 1}`),
+    France: Array.from({ length: 12 }, (_, index) => `French City ${index + 1}`),
+  };
+
+  const { getByTestId, queryByTestId } = render(LocationFilter, {
+    props: {
+      countries: ['Germany', 'France'],
+      onCityFetch: (country) => Promise.resolve(cityMap[country] ?? []),
+      onSelectionChange: () => {},
+    },
   });
+
+  await fireEvent.click(getByTestId('location-country-Germany'));
+  await waitFor(() => expect(queryByTestId('location-city-German City 11')).toBeNull());
+
+  await fireEvent.click(getByTestId('location-city-show-more-Germany'));
+  expect(queryByTestId('location-city-German City 11')).toBeTruthy();
+
+  await fireEvent.click(getByTestId('location-country-France'));
+  await waitFor(() => {
+    expect(queryByTestId('location-city-French City 10')).toBeTruthy();
+    expect(queryByTestId('location-city-French City 11')).toBeNull();
+  });
+});
+
+it('should not show city-level show more for countries with no cities', async () => {
+  const { getByTestId, queryByTestId } = render(LocationFilter, {
+    props: {
+      countries: ['Germany'],
+      onCityFetch: () => Promise.resolve([]),
+      onSelectionChange: () => {},
+    },
+  });
+
+  await fireEvent.click(getByTestId('location-country-Germany'));
+
+  await waitFor(() => {
+    expect(queryByTestId('location-city-show-more-Germany')).toBeNull();
+  });
+});
 ```
 
 - [ ] **Step 2: Run the targeted test and verify RED**
@@ -171,65 +173,65 @@ Expected: FAIL because `location-city-City 11` is currently rendered and `locati
 In `web/src/lib/components/filter-panel/location-filter.svelte`, replace:
 
 ```ts
-  let showAll = $state(false);
+let showAll = $state(false);
 
-  const INITIAL_SHOW_COUNT = 10;
+const INITIAL_SHOW_COUNT = 10;
 ```
 
 with:
 
 ```ts
-  let showAll = $state(false);
-  let expandedCityLists = $state<Record<string, boolean>>({});
+let showAll = $state(false);
+let expandedCityLists = $state<Record<string, boolean>>({});
 
-  const COUNTRY_SHOW_COUNT = 10;
-  const CITY_SHOW_COUNT = 10;
+const COUNTRY_SHOW_COUNT = 10;
+const CITY_SHOW_COUNT = 10;
 ```
 
 Replace current uses of `INITIAL_SHOW_COUNT` for country display with `COUNTRY_SHOW_COUNT`:
 
 ```ts
-  let visibleCountries = $derived(
-    searchQuery.trim() || showAll ? filteredCountries : filteredCountries.slice(0, COUNTRY_SHOW_COUNT),
-  );
+let visibleCountries = $derived(
+  searchQuery.trim() || showAll ? filteredCountries : filteredCountries.slice(0, COUNTRY_SHOW_COUNT),
+);
 
-  let remainingCount = $derived(Math.max(0, filteredCountries.length - COUNTRY_SHOW_COUNT));
+let remainingCount = $derived(Math.max(0, filteredCountries.length - COUNTRY_SHOW_COUNT));
 ```
 
 Add these helpers before `handleCountryClick`:
 
 ```ts
-  function getFilteredCities(country: string): string[] {
-    return cities;
-  }
+function getFilteredCities(country: string): string[] {
+  return cities;
+}
 
-  function getVisibleCities(country: string): string[] {
-    const filtered = getFilteredCities(country);
-    return expandedCityLists[country] ? filtered : filtered.slice(0, CITY_SHOW_COUNT);
-  }
+function getVisibleCities(country: string): string[] {
+  const filtered = getFilteredCities(country);
+  return expandedCityLists[country] ? filtered : filtered.slice(0, CITY_SHOW_COUNT);
+}
 
-  function getRemainingCityCount(country: string): number {
-    return Math.max(0, getFilteredCities(country).length - CITY_SHOW_COUNT);
-  }
+function getRemainingCityCount(country: string): number {
+  return Math.max(0, getFilteredCities(country).length - CITY_SHOW_COUNT);
+}
 
-  function showAllCities(country: string) {
-    expandedCityLists = { ...expandedCityLists, [country]: true };
-  }
+function showAllCities(country: string) {
+  expandedCityLists = { ...expandedCityLists, [country]: true };
+}
 ```
 
 Reset collapsed city state when opening a country by replacing `handleCountryClick` with:
 
 ```ts
-  function handleCountryClick(country: string) {
-    if (selectedCountry === country && !selectedCity) {
-      expandedCountry = undefined;
-      onSelectionChange(undefined, undefined);
-    } else {
-      expandedCountry = country;
-      expandedCityLists = { ...expandedCityLists, [country]: false };
-      onSelectionChange(country, undefined);
-    }
+function handleCountryClick(country: string) {
+  if (selectedCountry === country && !selectedCity) {
+    expandedCountry = undefined;
+    onSelectionChange(undefined, undefined);
+  } else {
+    expandedCountry = country;
+    expandedCityLists = { ...expandedCityLists, [country]: false };
+    onSelectionChange(country, undefined);
   }
+}
 ```
 
 Replace the city `#each` block:
@@ -279,6 +281,7 @@ git commit -m "feat: cap location city lists"
 ## Task 2: Complete City Search Across Current Country Suggestions
 
 **Files:**
+
 - Modify: `web/src/lib/components/filter-panel/__tests__/filter-sections.spec.ts`
 - Modify: `web/src/lib/components/filter-panel/location-filter.svelte`
 
@@ -287,66 +290,66 @@ git commit -m "feat: cap location city lists"
 Add these tests inside the `LocationFilter` describe block:
 
 ```ts
-  it('should search city names and show matching cities under their country', async () => {
-    const { getByTestId, queryByTestId } = render(LocationFilter, {
-      props: {
-        countries: mockCountries,
-        onCityFetch: mockCityFetch,
-        onSelectionChange: () => {},
-      },
-    });
-
-    await fireEvent.input(getByTestId('location-search-input'), { target: { value: 'ber' } });
-
-    await waitFor(() => {
-      expect(queryByTestId('location-country-Germany')).toBeTruthy();
-      expect(queryByTestId('location-city-Berlin')).toBeTruthy();
-      expect(queryByTestId('location-country-Italy')).toBeNull();
-      expect(queryByTestId('location-city-Munich')).toBeNull();
-    });
+it('should search city names and show matching cities under their country', async () => {
+  const { getByTestId, queryByTestId } = render(LocationFilter, {
+    props: {
+      countries: mockCountries,
+      onCityFetch: mockCityFetch,
+      onSelectionChange: () => {},
+    },
   });
 
-  it('should find a city in a country beyond the initial country cap', async () => {
-    const cityMap: Record<string, string[]> = {
-      Mexico: ['Merida'],
-    };
+  await fireEvent.input(getByTestId('location-search-input'), { target: { value: 'ber' } });
 
-    const { getByTestId, queryByTestId } = render(LocationFilter, {
-      props: {
-        countries: manyCountries,
-        onCityFetch: (country) => Promise.resolve(cityMap[country] ?? []),
-        onSelectionChange: () => {},
-      },
-    });
+  await waitFor(() => {
+    expect(queryByTestId('location-country-Germany')).toBeTruthy();
+    expect(queryByTestId('location-city-Berlin')).toBeTruthy();
+    expect(queryByTestId('location-country-Italy')).toBeNull();
+    expect(queryByTestId('location-city-Munich')).toBeNull();
+  });
+});
 
-    expect(queryByTestId('location-country-Mexico')).toBeNull();
+it('should find a city in a country beyond the initial country cap', async () => {
+  const cityMap: Record<string, string[]> = {
+    Mexico: ['Merida'],
+  };
 
-    await fireEvent.input(getByTestId('location-search-input'), { target: { value: 'meri' } });
-
-    await waitFor(() => {
-      expect(queryByTestId('location-country-Mexico')).toBeTruthy();
-      expect(queryByTestId('location-city-Merida')).toBeTruthy();
-    });
+  const { getByTestId, queryByTestId } = render(LocationFilter, {
+    props: {
+      countries: manyCountries,
+      onCityFetch: (country) => Promise.resolve(cityMap[country] ?? []),
+      onSelectionChange: () => {},
+    },
   });
 
-  it('should select a city from city search results', async () => {
-    const onSelectionChange = vi.fn();
+  expect(queryByTestId('location-country-Mexico')).toBeNull();
 
-    const { getByTestId, queryByTestId } = render(LocationFilter, {
-      props: {
-        countries: mockCountries,
-        onCityFetch: mockCityFetch,
-        onSelectionChange,
-      },
-    });
+  await fireEvent.input(getByTestId('location-search-input'), { target: { value: 'meri' } });
 
-    await fireEvent.input(getByTestId('location-search-input'), { target: { value: 'ber' } });
-
-    await waitFor(() => expect(queryByTestId('location-city-Berlin')).toBeTruthy());
-    await fireEvent.click(getByTestId('location-city-Berlin'));
-
-    expect(onSelectionChange).toHaveBeenLastCalledWith('Germany', 'Berlin');
+  await waitFor(() => {
+    expect(queryByTestId('location-country-Mexico')).toBeTruthy();
+    expect(queryByTestId('location-city-Merida')).toBeTruthy();
   });
+});
+
+it('should select a city from city search results', async () => {
+  const onSelectionChange = vi.fn();
+
+  const { getByTestId, queryByTestId } = render(LocationFilter, {
+    props: {
+      countries: mockCountries,
+      onCityFetch: mockCityFetch,
+      onSelectionChange,
+    },
+  });
+
+  await fireEvent.input(getByTestId('location-search-input'), { target: { value: 'ber' } });
+
+  await waitFor(() => expect(queryByTestId('location-city-Berlin')).toBeTruthy());
+  await fireEvent.click(getByTestId('location-city-Berlin'));
+
+  expect(onSelectionChange).toHaveBeenLastCalledWith('Germany', 'Berlin');
+});
 ```
 
 - [ ] **Step 2: Run and verify RED**
@@ -364,134 +367,134 @@ Expected: FAIL because city search currently only filters countries and does not
 In `location-filter.svelte`, add a normalized query and cache state after `expandedCityLists`:
 
 ```ts
-  let cityCache = $state<Record<string, string[]>>({});
-  let loadingCitiesByCountry = $state<Record<string, boolean>>({});
-  let cityFetchErrors = $state<Record<string, boolean>>({});
-  let latestCityFetchIds = $state<Record<string, number>>({});
-  let cityFetchSequence = 0;
+let cityCache = $state<Record<string, string[]>>({});
+let loadingCitiesByCountry = $state<Record<string, boolean>>({});
+let cityFetchErrors = $state<Record<string, boolean>>({});
+let latestCityFetchIds = $state<Record<string, number>>({});
+let cityFetchSequence = 0;
 
-  let normalizedSearchQuery = $derived(searchQuery.trim().toLowerCase());
-  let cityCacheKey = $state('');
+let normalizedSearchQuery = $derived(searchQuery.trim().toLowerCase());
+let cityCacheKey = $state('');
 ```
 
 Add cache invalidation after the existing country-length reset effect:
 
 ```ts
-  $effect(() => {
-    const nextKey = JSON.stringify({ countries, context });
-    if (cityCacheKey && nextKey !== cityCacheKey) {
-      cityCache = {};
-      loadingCitiesByCountry = {};
-      cityFetchErrors = {};
-      latestCityFetchIds = {};
-      expandedCityLists = {};
-      cities = [];
-    }
-    cityCacheKey = nextKey;
-  });
+$effect(() => {
+  const nextKey = JSON.stringify({ countries, context });
+  if (cityCacheKey && nextKey !== cityCacheKey) {
+    cityCache = {};
+    loadingCitiesByCountry = {};
+    cityFetchErrors = {};
+    latestCityFetchIds = {};
+    expandedCityLists = {};
+    cities = [];
+  }
+  cityCacheKey = nextKey;
+});
 ```
 
 Add `ensureCities` before the existing city-fetching effect:
 
 ```ts
-  function ensureCities(country: string) {
-    if (cityCache[country] || loadingCitiesByCountry[country]) {
-      return;
-    }
-
-    const fetchId = ++cityFetchSequence;
-    const requestContext = context;
-    latestCityFetchIds = { ...latestCityFetchIds, [country]: fetchId };
-    loadingCitiesByCountry = { ...loadingCitiesByCountry, [country]: true };
-    cityFetchErrors = { ...cityFetchErrors, [country]: false };
-
-    void onCityFetch(country, requestContext)
-      .then((result) => {
-        if (latestCityFetchIds[country] !== fetchId) {
-          return;
-        }
-
-        cityCache = { ...cityCache, [country]: result };
-        loadingCitiesByCountry = { ...loadingCitiesByCountry, [country]: false };
-
-        if (selectedCountry === country && selectedCity && result.length > 0 && !result.includes(selectedCity)) {
-          onSelectionChange(country, undefined);
-        }
-      })
-      .catch((error) => {
-        console.error('Failed to fetch cities:', error);
-        if (latestCityFetchIds[country] !== fetchId) {
-          return;
-        }
-
-        loadingCitiesByCountry = { ...loadingCitiesByCountry, [country]: false };
-        cityFetchErrors = { ...cityFetchErrors, [country]: true };
-      });
+function ensureCities(country: string) {
+  if (cityCache[country] || loadingCitiesByCountry[country]) {
+    return;
   }
+
+  const fetchId = ++cityFetchSequence;
+  const requestContext = context;
+  latestCityFetchIds = { ...latestCityFetchIds, [country]: fetchId };
+  loadingCitiesByCountry = { ...loadingCitiesByCountry, [country]: true };
+  cityFetchErrors = { ...cityFetchErrors, [country]: false };
+
+  void onCityFetch(country, requestContext)
+    .then((result) => {
+      if (latestCityFetchIds[country] !== fetchId) {
+        return;
+      }
+
+      cityCache = { ...cityCache, [country]: result };
+      loadingCitiesByCountry = { ...loadingCitiesByCountry, [country]: false };
+
+      if (selectedCountry === country && selectedCity && result.length > 0 && !result.includes(selectedCity)) {
+        onSelectionChange(country, undefined);
+      }
+    })
+    .catch((error) => {
+      console.error('Failed to fetch cities:', error);
+      if (latestCityFetchIds[country] !== fetchId) {
+        return;
+      }
+
+      loadingCitiesByCountry = { ...loadingCitiesByCountry, [country]: false };
+      cityFetchErrors = { ...cityFetchErrors, [country]: true };
+    });
+}
 ```
 
 Replace the existing `$effect` that directly calls `onCityFetch(expandedCountry, _context)` with:
 
 ```ts
-  $effect(() => {
-    if (expandedCountry) {
-      ensureCities(expandedCountry);
-      cities = cityCache[expandedCountry] ?? [];
-    } else {
-      cities = [];
+$effect(() => {
+  if (expandedCountry) {
+    ensureCities(expandedCountry);
+    cities = cityCache[expandedCountry] ?? [];
+  } else {
+    cities = [];
+  }
+});
+
+$effect(() => {
+  if (!selectedCountry) {
+    return;
+  }
+
+  ensureCities(selectedCountry);
+});
+
+$effect(() => {
+  if (!normalizedSearchQuery) {
+    return;
+  }
+
+  const timer = setTimeout(() => {
+    for (const country of countries) {
+      ensureCities(country);
     }
-  });
+  }, 150);
 
-  $effect(() => {
-    if (!selectedCountry) {
-      return;
-    }
-
-    ensureCities(selectedCountry);
-  });
-
-  $effect(() => {
-    if (!normalizedSearchQuery) {
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      for (const country of countries) {
-        ensureCities(country);
-      }
-    }, 150);
-
-    return () => clearTimeout(timer);
-  });
+  return () => clearTimeout(timer);
+});
 ```
 
 Replace `filteredCountries` with:
 
 ```ts
-  let filteredCountries = $derived.by(() => {
-    if (!normalizedSearchQuery) {
-      return countries;
-    }
+let filteredCountries = $derived.by(() => {
+  if (!normalizedSearchQuery) {
+    return countries;
+  }
 
-    return countries.filter((country) => {
-      const countryMatches = country.toLowerCase().includes(normalizedSearchQuery);
-      const cityMatches = (cityCache[country] ?? []).some((city) => city.toLowerCase().includes(normalizedSearchQuery));
-      return countryMatches || cityMatches || selectedCountry === country;
-    });
+  return countries.filter((country) => {
+    const countryMatches = country.toLowerCase().includes(normalizedSearchQuery);
+    const cityMatches = (cityCache[country] ?? []).some((city) => city.toLowerCase().includes(normalizedSearchQuery));
+    return countryMatches || cityMatches || selectedCountry === country;
   });
+});
 ```
 
 Replace `getFilteredCities` with:
 
 ```ts
-  function getFilteredCities(country: string): string[] {
-    const cachedCities = cityCache[country] ?? (expandedCountry === country ? cities : []);
-    if (!normalizedSearchQuery) {
-      return cachedCities;
-    }
-
-    return cachedCities.filter((city) => city.toLowerCase().includes(normalizedSearchQuery));
+function getFilteredCities(country: string): string[] {
+  const cachedCities = cityCache[country] ?? (expandedCountry === country ? cities : []);
+  if (!normalizedSearchQuery) {
+    return cachedCities;
   }
+
+  return cachedCities.filter((city) => city.toLowerCase().includes(normalizedSearchQuery));
+}
 ```
 
 Change the city section condition:
@@ -520,6 +523,7 @@ git commit -m "feat: search location cities"
 ## Task 3: Selection Visibility And Toggle Edge Cases
 
 **Files:**
+
 - Modify: `web/src/lib/components/filter-panel/__tests__/filter-sections.spec.ts`
 - Modify: `web/src/lib/components/filter-panel/location-filter.svelte`
 
@@ -528,82 +532,82 @@ git commit -m "feat: search location cities"
 Replace the existing `should preserve selected country across search/clear cycle` test with:
 
 ```ts
-  it('should keep selected country visible during search even when it does not match', async () => {
-    const { getByTestId, queryByTestId } = render(LocationFilter, {
-      props: {
-        countries: mockCountries,
-        selectedCountry: 'Germany',
-        onCityFetch: mockCityFetch,
-        onSelectionChange: () => {},
-      },
-    });
-
-    await fireEvent.input(getByTestId('location-search-input'), { target: { value: 'Italy' } });
-
-    expect(queryByTestId('location-country-Germany')).toBeTruthy();
-    expect(queryByTestId('location-country-Italy')).toBeTruthy();
+it('should keep selected country visible during search even when it does not match', async () => {
+  const { getByTestId, queryByTestId } = render(LocationFilter, {
+    props: {
+      countries: mockCountries,
+      selectedCountry: 'Germany',
+      onCityFetch: mockCityFetch,
+      onSelectionChange: () => {},
+    },
   });
+
+  await fireEvent.input(getByTestId('location-search-input'), { target: { value: 'Italy' } });
+
+  expect(queryByTestId('location-country-Germany')).toBeTruthy();
+  expect(queryByTestId('location-country-Italy')).toBeTruthy();
+});
 ```
 
 Add these tests inside the `LocationFilter` describe block:
 
 ```ts
-  it('should keep selected city visible when it is outside the initial city cap', async () => {
-    const cities = Array.from({ length: 12 }, (_, index) => `City ${index + 1}`);
+it('should keep selected city visible when it is outside the initial city cap', async () => {
+  const cities = Array.from({ length: 12 }, (_, index) => `City ${index + 1}`);
 
-    const { getByTestId, queryByTestId } = render(LocationFilter, {
-      props: {
-        countries: ['Germany'],
-        selectedCountry: 'Germany',
-        selectedCity: 'City 12',
-        onCityFetch: () => Promise.resolve(cities),
-        onSelectionChange: () => {},
-      },
-    });
-
-    await fireEvent.click(getByTestId('location-country-Germany'));
-
-    await waitFor(() => {
-      expect(queryByTestId('location-city-City 12')).toBeTruthy();
-    });
+  const { getByTestId, queryByTestId } = render(LocationFilter, {
+    props: {
+      countries: ['Germany'],
+      selectedCountry: 'Germany',
+      selectedCity: 'City 12',
+      onCityFetch: () => Promise.resolve(cities),
+      onSelectionChange: () => {},
+    },
   });
 
-  it('should clear country selection when clicking an already-selected country with no selected city', async () => {
-    const onSelectionChange = vi.fn();
+  await fireEvent.click(getByTestId('location-country-Germany'));
 
-    const { getByTestId } = render(LocationFilter, {
-      props: {
-        countries: mockCountries,
-        selectedCountry: 'Germany',
-        onCityFetch: mockCityFetch,
-        onSelectionChange,
-      },
-    });
+  await waitFor(() => {
+    expect(queryByTestId('location-city-City 12')).toBeTruthy();
+  });
+});
 
-    await fireEvent.click(getByTestId('location-country-Germany'));
+it('should clear country selection when clicking an already-selected country with no selected city', async () => {
+  const onSelectionChange = vi.fn();
 
-    expect(onSelectionChange).toHaveBeenLastCalledWith(undefined, undefined);
+  const { getByTestId } = render(LocationFilter, {
+    props: {
+      countries: mockCountries,
+      selectedCountry: 'Germany',
+      onCityFetch: mockCityFetch,
+      onSelectionChange,
+    },
   });
 
-  it('should clear city selection but keep country when clicking an already-selected city', async () => {
-    const onSelectionChange = vi.fn();
+  await fireEvent.click(getByTestId('location-country-Germany'));
 
-    const { getByTestId, queryByTestId } = render(LocationFilter, {
-      props: {
-        countries: mockCountries,
-        selectedCountry: 'Germany',
-        selectedCity: 'Berlin',
-        onCityFetch: mockCityFetch,
-        onSelectionChange,
-      },
-    });
+  expect(onSelectionChange).toHaveBeenLastCalledWith(undefined, undefined);
+});
 
-    await fireEvent.click(getByTestId('location-country-Germany'));
-    await waitFor(() => expect(queryByTestId('location-city-Berlin')).toBeTruthy());
-    await fireEvent.click(getByTestId('location-city-Berlin'));
+it('should clear city selection but keep country when clicking an already-selected city', async () => {
+  const onSelectionChange = vi.fn();
 
-    expect(onSelectionChange).toHaveBeenLastCalledWith('Germany', undefined);
+  const { getByTestId, queryByTestId } = render(LocationFilter, {
+    props: {
+      countries: mockCountries,
+      selectedCountry: 'Germany',
+      selectedCity: 'Berlin',
+      onCityFetch: mockCityFetch,
+      onSelectionChange,
+    },
   });
+
+  await fireEvent.click(getByTestId('location-country-Germany'));
+  await waitFor(() => expect(queryByTestId('location-city-Berlin')).toBeTruthy());
+  await fireEvent.click(getByTestId('location-city-Berlin'));
+
+  expect(onSelectionChange).toHaveBeenLastCalledWith('Germany', undefined);
+});
 ```
 
 - [ ] **Step 2: Run and verify RED**
@@ -621,27 +625,27 @@ Expected: FAIL because selected city `City 12` is outside the initial city cap a
 Replace `getVisibleCities` with:
 
 ```ts
-  function getVisibleCities(country: string): string[] {
-    const filtered = getFilteredCities(country);
-    const visible = expandedCityLists[country] ? filtered : filtered.slice(0, CITY_SHOW_COUNT);
+function getVisibleCities(country: string): string[] {
+  const filtered = getFilteredCities(country);
+  const visible = expandedCityLists[country] ? filtered : filtered.slice(0, CITY_SHOW_COUNT);
 
-    if (
-      selectedCountry === country &&
-      selectedCity &&
-      (cityCache[country] ?? []).includes(selectedCity) &&
-      !visible.includes(selectedCity)
-    ) {
-      return [...visible, selectedCity];
-    }
-
-    return visible;
+  if (
+    selectedCountry === country &&
+    selectedCity &&
+    (cityCache[country] ?? []).includes(selectedCity) &&
+    !visible.includes(selectedCity)
+  ) {
+    return [...visible, selectedCity];
   }
+
+  return visible;
+}
 ```
 
 Verify the `filteredCountries` return expression is exactly:
 
 ```ts
-      return countryMatches || cityMatches || selectedCountry === country;
+return countryMatches || cityMatches || selectedCountry === country;
 ```
 
 - [ ] **Step 4: Run and verify GREEN**
@@ -664,6 +668,7 @@ git commit -m "fix: preserve selected location visibility"
 ## Task 4: Async Failures, Loading, And Stale Fetches
 
 **Files:**
+
 - Modify: `web/src/lib/components/filter-panel/__tests__/filter-sections.spec.ts`
 - Modify: `web/src/lib/components/filter-panel/location-filter.svelte`
 
@@ -672,94 +677,95 @@ git commit -m "fix: preserve selected location visibility"
 Add these tests inside the `LocationFilter` describe block:
 
 ```ts
-  it('should not show no-results while city search fetches are still pending', async () => {
-    let resolveCities!: (cities: string[]) => void;
-    const pendingCities = new Promise<string[]>((resolve) => {
-      resolveCities = resolve;
-    });
-
-    const { getByTestId, queryByTestId } = render(LocationFilter, {
-      props: {
-        countries: ['Germany'],
-        onCityFetch: () => pendingCities,
-        onSelectionChange: () => {},
-      },
-    });
-
-    await fireEvent.input(getByTestId('location-search-input'), { target: { value: 'ber' } });
-
-    expect(queryByTestId('location-no-results')).toBeNull();
-
-    resolveCities(['Berlin']);
-
-    await waitFor(() => {
-      expect(queryByTestId('location-city-Berlin')).toBeTruthy();
-      expect(queryByTestId('location-no-results')).toBeNull();
-    });
+it('should not show no-results while city search fetches are still pending', async () => {
+  let resolveCities!: (cities: string[]) => void;
+  const pendingCities = new Promise<string[]>((resolve) => {
+    resolveCities = resolve;
   });
 
-  it('should keep the panel usable when a city fetch fails', async () => {
-    const onSelectionChange = vi.fn();
-
-    const { getByTestId, queryByTestId } = render(LocationFilter, {
-      props: {
-        countries: ['Germany', 'France'],
-        selectedCountry: 'Germany',
-        onCityFetch: (country) => (country === 'Germany' ? Promise.reject(new Error('failed')) : Promise.resolve(['Paris'])),
-        onSelectionChange,
-      },
-    });
-
-    await fireEvent.click(getByTestId('location-country-Germany'));
-
-    await waitFor(() => {
-      expect(queryByTestId('location-country-Germany')).toBeTruthy();
-    });
-
-    await fireEvent.click(getByTestId('location-country-France'));
-    expect(onSelectionChange).toHaveBeenLastCalledWith('France', undefined);
-  });
-
-  it('should ignore stale city fetch responses after context changes', async () => {
-    let resolveFirst!: (cities: string[]) => void;
-    let resolveSecond!: (cities: string[]) => void;
-    const first = new Promise<string[]>((resolve) => {
-      resolveFirst = resolve;
-    });
-    const second = new Promise<string[]>((resolve) => {
-      resolveSecond = resolve;
-    });
-    const cityFetch = vi.fn().mockReturnValueOnce(first).mockReturnValueOnce(second);
-
-    const { getByTestId, queryByTestId, rerender } = render(LocationFilter, {
-      props: {
-        countries: ['Germany'],
-        context: { isFavorite: true },
-        onCityFetch: cityFetch,
-        onSelectionChange: () => {},
-      },
-    });
-
-    await fireEvent.click(getByTestId('location-country-Germany'));
-
-    await rerender({
+  const { getByTestId, queryByTestId } = render(LocationFilter, {
+    props: {
       countries: ['Germany'],
-      context: { isFavorite: false },
+      onCityFetch: () => pendingCities,
+      onSelectionChange: () => {},
+    },
+  });
+
+  await fireEvent.input(getByTestId('location-search-input'), { target: { value: 'ber' } });
+
+  expect(queryByTestId('location-no-results')).toBeNull();
+
+  resolveCities(['Berlin']);
+
+  await waitFor(() => {
+    expect(queryByTestId('location-city-Berlin')).toBeTruthy();
+    expect(queryByTestId('location-no-results')).toBeNull();
+  });
+});
+
+it('should keep the panel usable when a city fetch fails', async () => {
+  const onSelectionChange = vi.fn();
+
+  const { getByTestId, queryByTestId } = render(LocationFilter, {
+    props: {
+      countries: ['Germany', 'France'],
+      selectedCountry: 'Germany',
+      onCityFetch: (country) =>
+        country === 'Germany' ? Promise.reject(new Error('failed')) : Promise.resolve(['Paris']),
+      onSelectionChange,
+    },
+  });
+
+  await fireEvent.click(getByTestId('location-country-Germany'));
+
+  await waitFor(() => {
+    expect(queryByTestId('location-country-Germany')).toBeTruthy();
+  });
+
+  await fireEvent.click(getByTestId('location-country-France'));
+  expect(onSelectionChange).toHaveBeenLastCalledWith('France', undefined);
+});
+
+it('should ignore stale city fetch responses after context changes', async () => {
+  let resolveFirst!: (cities: string[]) => void;
+  let resolveSecond!: (cities: string[]) => void;
+  const first = new Promise<string[]>((resolve) => {
+    resolveFirst = resolve;
+  });
+  const second = new Promise<string[]>((resolve) => {
+    resolveSecond = resolve;
+  });
+  const cityFetch = vi.fn().mockReturnValueOnce(first).mockReturnValueOnce(second);
+
+  const { getByTestId, queryByTestId, rerender } = render(LocationFilter, {
+    props: {
+      countries: ['Germany'],
+      context: { isFavorite: true },
       onCityFetch: cityFetch,
       onSelectionChange: () => {},
-    });
-
-    await fireEvent.click(getByTestId('location-country-Germany'));
-
-    resolveSecond(['Berlin']);
-    await waitFor(() => expect(queryByTestId('location-city-Berlin')).toBeTruthy());
-
-    resolveFirst(['Munich']);
-    await new Promise((resolve) => setTimeout(resolve, 0));
-
-    expect(queryByTestId('location-city-Berlin')).toBeTruthy();
-    expect(queryByTestId('location-city-Munich')).toBeNull();
+    },
   });
+
+  await fireEvent.click(getByTestId('location-country-Germany'));
+
+  await rerender({
+    countries: ['Germany'],
+    context: { isFavorite: false },
+    onCityFetch: cityFetch,
+    onSelectionChange: () => {},
+  });
+
+  await fireEvent.click(getByTestId('location-country-Germany'));
+
+  resolveSecond(['Berlin']);
+  await waitFor(() => expect(queryByTestId('location-city-Berlin')).toBeTruthy());
+
+  resolveFirst(['Munich']);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  expect(queryByTestId('location-city-Berlin')).toBeTruthy();
+  expect(queryByTestId('location-city-Munich')).toBeNull();
+});
 ```
 
 - [ ] **Step 2: Run and verify RED**
@@ -777,15 +783,15 @@ Expected: FAIL because `location-no-results` appears before delayed city fetches
 Add this derived value near `filteredCountries`:
 
 ```ts
-  let hasPendingCitySearch = $derived.by(() => {
-    if (!normalizedSearchQuery) {
-      return false;
-    }
+let hasPendingCitySearch = $derived.by(() => {
+  if (!normalizedSearchQuery) {
+    return false;
+  }
 
-    return countries.some(
-      (country) => loadingCitiesByCountry[country] || (!cityCache[country] && !cityFetchErrors[country]),
-    );
-  });
+  return countries.some(
+    (country) => loadingCitiesByCountry[country] || (!cityCache[country] && !cityFetchErrors[country]),
+  );
+});
 ```
 
 Update the no-results condition:
@@ -799,19 +805,19 @@ Update the no-results condition:
 In the cache invalidation effect from Task 2, increment `cityFetchSequence` before clearing request IDs:
 
 ```ts
-      cityFetchSequence += 1;
+cityFetchSequence += 1;
 ```
 
 The invalidation effect should contain this exact block:
 
 ```ts
-      cityFetchSequence += 1;
-      cityCache = {};
-      loadingCitiesByCountry = {};
-      cityFetchErrors = {};
-      latestCityFetchIds = {};
-      expandedCityLists = {};
-      cities = [];
+cityFetchSequence += 1;
+cityCache = {};
+loadingCitiesByCountry = {};
+cityFetchErrors = {};
+latestCityFetchIds = {};
+expandedCityLists = {};
+cities = [];
 ```
 
 - [ ] **Step 4: Run and verify GREEN**
@@ -834,6 +840,7 @@ git commit -m "fix: handle location city fetch edge cases"
 ## Task 5: Final Refactor And Verification
 
 **Files:**
+
 - Modify: `web/src/lib/components/filter-panel/location-filter.svelte`
 - Modify: `web/src/lib/components/filter-panel/__tests__/filter-sections.spec.ts`
 
@@ -842,22 +849,22 @@ git commit -m "fix: handle location city fetch edge cases"
 In `location-filter.svelte`, keep the final state names clear:
 
 ```ts
-  const COUNTRY_SHOW_COUNT = 10;
-  const CITY_SHOW_COUNT = 10;
+const COUNTRY_SHOW_COUNT = 10;
+const CITY_SHOW_COUNT = 10;
 
-  let searchQuery = $state('');
-  let showAll = $state(false);
-  let expandedCityLists = $state<Record<string, boolean>>({});
-  let cityCache = $state<Record<string, string[]>>({});
-  let loadingCitiesByCountry = $state<Record<string, boolean>>({});
-  let cityFetchErrors = $state<Record<string, boolean>>({});
-  let latestCityFetchIds = $state<Record<string, number>>({});
+let searchQuery = $state('');
+let showAll = $state(false);
+let expandedCityLists = $state<Record<string, boolean>>({});
+let cityCache = $state<Record<string, string[]>>({});
+let loadingCitiesByCountry = $state<Record<string, boolean>>({});
+let cityFetchErrors = $state<Record<string, boolean>>({});
+let latestCityFetchIds = $state<Record<string, number>>({});
 ```
 
 Delete the old single-purpose loading state:
 
 ```ts
-  let loadingCities = $state(false);
+let loadingCities = $state(false);
 ```
 
 Replace any remaining `!loadingCities` template checks with:
@@ -869,7 +876,7 @@ Replace any remaining `!loadingCities` template checks with:
 Keep `cities` only as the expanded-country mirror used by the Task 2 effect:
 
 ```ts
-      cities = cityCache[expandedCountry] ?? [];
+cities = cityCache[expandedCountry] ?? [];
 ```
 
 - [ ] **Step 2: Run targeted tests**
@@ -901,6 +908,7 @@ git diff -- web/src/lib/components/filter-panel/location-filter.svelte web/src/l
 ```
 
 Verify these points manually from the diff:
+
 - no backend/API files changed;
 - `FilterPanelConfig.providers.cities` signature is unchanged;
 - city search is complete across `countries`, not only visible countries;
