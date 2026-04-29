@@ -369,6 +369,29 @@ describe('LocationFilter', () => {
     expect(onSelectionChange).not.toHaveBeenCalled();
   });
 
+  it('should keep a selected city visible when it does not match the active search', async () => {
+    const onSelectionChange = vi.fn();
+
+    const { getByTestId, queryByTestId } = render(LocationFilter, {
+      props: {
+        countries: ['Germany', 'Italy'],
+        selectedCountry: 'Germany',
+        selectedCity: 'Berlin',
+        onCityFetch: () => Promise.resolve(['Berlin', 'Munich']),
+        onSelectionChange,
+      },
+    });
+
+    await waitFor(() => expect(queryByTestId('location-city-Berlin')).toBeTruthy());
+
+    await fireEvent.input(getByTestId('location-search-input'), { target: { value: 'Italy' } });
+
+    expect(queryByTestId('location-country-Germany')).toBeTruthy();
+    expect(queryByTestId('location-city-Berlin')).toBeTruthy();
+    expect(queryByTestId('location-country-Italy')).toBeTruthy();
+    expect(onSelectionChange).not.toHaveBeenCalled();
+  });
+
   it('should expand hidden cities only for the selected country city list', async () => {
     const cityMap: Record<string, string[]> = {
       Germany: Array.from({ length: 12 }, (_, index) => `German City ${index + 1}`),
@@ -677,6 +700,25 @@ describe('LocationFilter', () => {
     await new Promise((resolve) => setTimeout(resolve, 200));
 
     expect(onCityFetch).not.toHaveBeenCalled();
+  });
+
+  it('should not use cached city matches for one-character searches', async () => {
+    const { getByTestId, queryByTestId } = render(LocationFilter, {
+      props: {
+        countries: ['Germany'],
+        onCityFetch: () => Promise.resolve(['Berlin']),
+        onSelectionChange: () => {},
+      },
+    });
+
+    await fireEvent.click(getByTestId('location-country-Germany'));
+    await waitFor(() => expect(queryByTestId('location-city-Berlin')).toBeTruthy());
+
+    await fireEvent.input(getByTestId('location-search-input'), { target: { value: 'b' } });
+
+    expect(queryByTestId('location-country-Germany')).toBeNull();
+    expect(queryByTestId('location-city-Berlin')).toBeNull();
+    expect(getByTestId('location-no-results').textContent).toBe('No matching locations');
   });
 
   it('should search matching city names when the query also matches a country name', async () => {

@@ -81,7 +81,9 @@
 
     return countries.filter((country) => {
       const countryMatches = country.toLowerCase().includes(normalizedSearchQuery);
-      const cityMatches = (cityCache[country] ?? []).some((city) => city.toLowerCase().includes(normalizedSearchQuery));
+      const cityMatches =
+        shouldFetchCitiesForSearch &&
+        (cityCache[country] ?? []).some((city) => city.toLowerCase().includes(normalizedSearchQuery));
       return countryMatches || cityMatches || selectedCountry === country;
     });
   });
@@ -187,11 +189,23 @@
 
   function getFilteredCities(country: string): string[] {
     const cachedCities = cityCache[country] ?? (expandedCountry === country ? cities : []);
-    if (!normalizedSearchQuery || country.toLowerCase().includes(normalizedSearchQuery)) {
+    if (!normalizedSearchQuery) {
       return cachedCities;
     }
 
-    return cachedCities.filter((city) => city.toLowerCase().includes(normalizedSearchQuery));
+    const countryMatches = country.toLowerCase().includes(normalizedSearchQuery);
+    const filtered =
+      expandedCountry === country && countryMatches
+        ? cachedCities
+        : shouldFetchCitiesForSearch
+          ? cachedCities.filter((city) => city.toLowerCase().includes(normalizedSearchQuery))
+          : [];
+
+    if (selectedCountry === country && selectedCity && !filtered.includes(selectedCity)) {
+      return [...filtered, selectedCity];
+    }
+
+    return filtered;
   }
 
   function getVisibleCities(country: string): string[] {
@@ -295,6 +309,7 @@
 
     {#each visibleCountries as country (country)}
       {@const isCountrySelected = selectedCountry === country}
+      {@const visibleCities = getVisibleCities(country)}
       <!-- Country row -->
       <button
         type="button"
@@ -321,8 +336,8 @@
       </button>
 
       <!-- Cities (indented when country is expanded) -->
-      {#if (expandedCountry === country || (normalizedSearchQuery && (cityCache[country] ?? []).length > 0)) && !loadingCitiesByCountry[country]}
-        {#each getVisibleCities(country) as city (city)}
+      {#if (expandedCountry === country || (normalizedSearchQuery && visibleCities.length > 0)) && !loadingCitiesByCountry[country]}
+        {#each visibleCities as city (city)}
           {@const isCitySelected = selectedCity === city && selectedCountry === country}
           <button
             type="button"
