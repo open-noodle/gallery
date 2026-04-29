@@ -768,7 +768,9 @@ describe('LocationFilter', () => {
     const switzerlandPromise = new Promise<string[]>((resolve) => {
       resolveSwitzerland = resolve;
     });
-    const onCityFetch = vi.fn((country: string) => (country === 'Switzerland' ? switzerlandPromise : Promise.resolve([])));
+    const onCityFetch = vi.fn((country: string) =>
+      country === 'Switzerland' ? switzerlandPromise : Promise.resolve([]),
+    );
 
     const { getByTestId, queryByTestId } = render(LocationFilter, {
       props: {

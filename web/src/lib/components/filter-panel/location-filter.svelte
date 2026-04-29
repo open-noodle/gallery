@@ -46,7 +46,9 @@
       return false;
     }
 
-    return countries.some((country) => loadingCitiesByCountry[country] || (!(country in cityCache) && !cityFetchErrors[country]));
+    return countries.some(
+      (country) => loadingCitiesByCountry[country] || (!(country in cityCache) && !cityFetchErrors[country]),
+    );
   });
 
   // Clear search when countries list changes (e.g. temporal filter refetch)
@@ -138,7 +140,12 @@
         }
 
         // Cascade child auto-clear: if selected city is not in new results, clear it
-        if (selectedCountry === requestedCountry && selectedCity && result.length > 0 && !result.includes(selectedCity)) {
+        if (
+          selectedCountry === requestedCountry &&
+          selectedCity &&
+          result.length > 0 &&
+          !result.includes(selectedCity)
+        ) {
           onSelectionChange(requestedCountry, undefined);
         }
       })
