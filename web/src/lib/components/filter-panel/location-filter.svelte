@@ -73,7 +73,7 @@
     return countries.filter((country) => {
       const countryMatches = country.toLowerCase().includes(normalizedSearchQuery);
       const cityMatches = (cityCache[country] ?? []).some((city) => city.toLowerCase().includes(normalizedSearchQuery));
-      return countryMatches || cityMatches;
+      return countryMatches || cityMatches || selectedCountry === country;
     });
   });
 

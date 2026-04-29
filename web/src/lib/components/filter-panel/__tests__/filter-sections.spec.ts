@@ -833,7 +833,7 @@ describe('LocationFilter', () => {
     expect(queryByTestId('location-country-Germany')).toBeNull();
   });
 
-  it('should preserve selected country across search/clear cycle', async () => {
+  it('should keep selected country visible during search', async () => {
     const { getByTestId, queryByTestId } = render(LocationFilter, {
       props: {
         countries: mockCountries,
@@ -845,11 +845,10 @@ describe('LocationFilter', () => {
 
     const searchInput = getByTestId('location-search-input');
 
-    // Search hides Germany
     await fireEvent.input(searchInput, { target: { value: 'Italy' } });
-    expect(queryByTestId('location-country-Germany')).toBeNull();
+    expect(queryByTestId('location-country-Germany')).toBeTruthy();
+    expect(queryByTestId('location-country-Italy')).toBeTruthy();
 
-    // Clear search — Germany reappears
     await fireEvent.input(searchInput, { target: { value: '' } });
     expect(queryByTestId('location-country-Germany')).toBeTruthy();
   });
