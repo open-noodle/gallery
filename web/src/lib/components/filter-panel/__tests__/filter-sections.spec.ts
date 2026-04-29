@@ -360,7 +360,8 @@ describe('LocationFilter', () => {
     });
 
     await waitFor(() => {
-      expect(queryByTestId('location-city-City 10')).toBeTruthy();
+      expect(queryByTestId('location-city-City 9')).toBeTruthy();
+      expect(queryByTestId('location-city-City 10')).toBeNull();
       expect(queryByTestId('location-city-City 11')).toBeTruthy();
       expect(queryByTestId('location-city-City 12')).toBeNull();
       expect(queryByTestId('location-city-show-more-Germany')).toBeTruthy();

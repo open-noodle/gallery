@@ -121,7 +121,7 @@
       filtered.includes(selectedCity) &&
       !visible.includes(selectedCity)
     ) {
-      return [...visible, selectedCity];
+      return [...visible.slice(0, CITY_SHOW_COUNT - 1), selectedCity];
     }
 
     return visible;
