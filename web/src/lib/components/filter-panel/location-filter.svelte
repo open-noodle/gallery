@@ -169,12 +169,10 @@
   });
 
   $effect(() => {
-    if (!shouldFetchCitiesForSearch) {
+    if (!shouldFetchCitiesForSearch || !cityCacheKey) {
       return;
     }
 
-    const searchCacheKey = cityCacheKey;
-    void searchCacheKey;
     const currentCountries = countries;
     const timeout = setTimeout(() => {
       untrack(() => {
