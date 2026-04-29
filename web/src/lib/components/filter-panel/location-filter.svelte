@@ -26,8 +26,10 @@
 
   let searchQuery = $state('');
   let showAll = $state(false);
+  let expandedCityLists = $state<Record<string, boolean>>({});
 
-  const INITIAL_SHOW_COUNT = 10;
+  const COUNTRY_SHOW_COUNT = 10;
+  const CITY_SHOW_COUNT = 10;
 
   // Clear search when countries list changes (e.g. temporal filter refetch)
   let previousCountriesLength = 0;
@@ -47,10 +49,10 @@
   );
 
   let visibleCountries = $derived(
-    searchQuery.trim() || showAll ? filteredCountries : filteredCountries.slice(0, INITIAL_SHOW_COUNT),
+    searchQuery.trim() || showAll ? filteredCountries : filteredCountries.slice(0, COUNTRY_SHOW_COUNT),
   );
 
-  let remainingCount = $derived(Math.max(0, filteredCountries.length - INITIAL_SHOW_COUNT));
+  let remainingCount = $derived(Math.max(0, filteredCountries.length - COUNTRY_SHOW_COUNT));
 
   let expandedCountry = $state<string | undefined>(undefined);
   let cities = $state<string[]>([]);
@@ -77,14 +79,30 @@
     }
   });
 
+  function getFilteredCities(country: string): string[] {
+    return cities;
+  }
+
+  function getVisibleCities(country: string): string[] {
+    const filtered = getFilteredCities(country);
+    return expandedCityLists[country] ? filtered : filtered.slice(0, CITY_SHOW_COUNT);
+  }
+
+  function getRemainingCityCount(country: string): number {
+    return Math.max(0, getFilteredCities(country).length - CITY_SHOW_COUNT);
+  }
+
+  function showAllCities(country: string) {
+    expandedCityLists = { ...expandedCityLists, [country]: true };
+  }
+
   function handleCountryClick(country: string) {
     if (selectedCountry === country && !selectedCity) {
-      // Deselect country
       expandedCountry = undefined;
       onSelectionChange(undefined, undefined);
     } else {
-      // Select country
       expandedCountry = country;
+      expandedCityLists = { ...expandedCityLists, [country]: false };
       onSelectionChange(country, undefined);
     }
   }
@@ -179,7 +197,7 @@
 
       <!-- Cities (indented when country is expanded) -->
       {#if expandedCountry === country && !loadingCities}
-        {#each cities as city (city)}
+        {#each getVisibleCities(country) as city (city)}
           {@const isCitySelected = selectedCity === city && selectedCountry === country}
           <button
             type="button"
@@ -204,6 +222,16 @@
             <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-left">{city}</span>
           </button>
         {/each}
+        {#if !expandedCityLists[country] && getRemainingCityCount(country) > 0}
+          <button
+            type="button"
+            class="ml-5 py-1 text-xs font-medium text-immich-primary dark:text-immich-dark-primary"
+            onclick={() => showAllCities(country)}
+            data-testid="location-city-show-more-{country}"
+          >
+            Show {getRemainingCityCount(country)} more
+          </button>
+        {/if}
       {/if}
     {/each}
 

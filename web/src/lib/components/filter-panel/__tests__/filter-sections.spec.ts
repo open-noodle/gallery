@@ -318,6 +318,76 @@ describe('LocationFilter', () => {
     });
   });
 
+  it('should cap expanded city lists and expand cities with city-level show more', async () => {
+    const cities = Array.from({ length: 12 }, (_, index) => `City ${index + 1}`);
+
+    const { getByTestId, queryByTestId } = render(LocationFilter, {
+      props: {
+        countries: ['Germany'],
+        onCityFetch: () => Promise.resolve(cities),
+        onSelectionChange: () => {},
+      },
+    });
+
+    await fireEvent.click(getByTestId('location-country-Germany'));
+
+    await waitFor(() => {
+      expect(queryByTestId('location-city-City 1')).toBeTruthy();
+      expect(queryByTestId('location-city-City 10')).toBeTruthy();
+      expect(queryByTestId('location-city-City 11')).toBeNull();
+      expect(queryByTestId('location-city-City 12')).toBeNull();
+      expect(getByTestId('location-city-show-more-Germany').textContent).toContain('Show 2 more');
+    });
+
+    await fireEvent.click(getByTestId('location-city-show-more-Germany'));
+
+    expect(queryByTestId('location-city-City 11')).toBeTruthy();
+    expect(queryByTestId('location-city-City 12')).toBeTruthy();
+  });
+
+  it('should expand hidden cities only for the selected country city list', async () => {
+    const cityMap: Record<string, string[]> = {
+      Germany: Array.from({ length: 12 }, (_, index) => `German City ${index + 1}`),
+      France: Array.from({ length: 12 }, (_, index) => `French City ${index + 1}`),
+    };
+
+    const { getByTestId, queryByTestId } = render(LocationFilter, {
+      props: {
+        countries: ['Germany', 'France'],
+        onCityFetch: (country) => Promise.resolve(cityMap[country] ?? []),
+        onSelectionChange: () => {},
+      },
+    });
+
+    await fireEvent.click(getByTestId('location-country-Germany'));
+    await waitFor(() => expect(queryByTestId('location-city-German City 11')).toBeNull());
+
+    await fireEvent.click(getByTestId('location-city-show-more-Germany'));
+    expect(queryByTestId('location-city-German City 11')).toBeTruthy();
+
+    await fireEvent.click(getByTestId('location-country-France'));
+    await waitFor(() => {
+      expect(queryByTestId('location-city-French City 10')).toBeTruthy();
+      expect(queryByTestId('location-city-French City 11')).toBeNull();
+    });
+  });
+
+  it('should not show city-level show more for countries with no cities', async () => {
+    const { getByTestId, queryByTestId } = render(LocationFilter, {
+      props: {
+        countries: ['Germany'],
+        onCityFetch: () => Promise.resolve([]),
+        onSelectionChange: () => {},
+      },
+    });
+
+    await fireEvent.click(getByTestId('location-country-Germany'));
+
+    await waitFor(() => {
+      expect(queryByTestId('location-city-show-more-Germany')).toBeNull();
+    });
+  });
+
   it('should auto-fill country when city is selected', async () => {
     let lastCountry: string | undefined;
     let lastCity: string | undefined;
