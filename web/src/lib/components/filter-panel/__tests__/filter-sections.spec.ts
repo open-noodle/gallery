@@ -345,6 +345,29 @@ describe('LocationFilter', () => {
     expect(queryByTestId('location-city-City 12')).toBeTruthy();
   });
 
+  it('should keep a selected city visible when it is outside the initial city cap', async () => {
+    const cities = Array.from({ length: 12 }, (_, index) => `City ${index + 1}`);
+
+    const { getByTestId, queryByTestId } = render(LocationFilter, {
+      props: {
+        countries: ['Germany'],
+        selectedCountry: 'Germany',
+        selectedCity: 'City 11',
+        onCityFetch: () => Promise.resolve(cities),
+        onSelectionChange: () => {},
+      },
+    });
+
+    await fireEvent.click(getByTestId('location-country-Germany'));
+
+    await waitFor(() => {
+      expect(queryByTestId('location-city-City 10')).toBeTruthy();
+      expect(queryByTestId('location-city-City 11')).toBeTruthy();
+      expect(queryByTestId('location-city-City 12')).toBeNull();
+      expect(queryByTestId('location-city-show-more-Germany')).toBeTruthy();
+    });
+  });
+
   it('should expand hidden cities only for the selected country city list', async () => {
     const cityMap: Record<string, string[]> = {
       Germany: Array.from({ length: 12 }, (_, index) => `German City ${index + 1}`),
@@ -373,15 +396,20 @@ describe('LocationFilter', () => {
   });
 
   it('should not show city-level show more for countries with no cities', async () => {
+    const fetchPromise = Promise.resolve([]);
+    const onCityFetch = vi.fn(() => fetchPromise);
+
     const { getByTestId, queryByTestId } = render(LocationFilter, {
       props: {
         countries: ['Germany'],
-        onCityFetch: () => Promise.resolve([]),
+        onCityFetch,
         onSelectionChange: () => {},
       },
     });
 
     await fireEvent.click(getByTestId('location-country-Germany'));
+    await waitFor(() => expect(onCityFetch).toHaveBeenCalledTimes(1));
+    await fetchPromise;
 
     await waitFor(() => {
       expect(queryByTestId('location-city-show-more-Germany')).toBeNull();

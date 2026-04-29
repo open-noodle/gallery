@@ -85,11 +85,25 @@
 
   function getVisibleCities(country: string): string[] {
     const filtered = getFilteredCities(country);
-    return expandedCityLists[country] ? filtered : filtered.slice(0, CITY_SHOW_COUNT);
+    if (expandedCityLists[country]) {
+      return filtered;
+    }
+
+    const visible = filtered.slice(0, CITY_SHOW_COUNT);
+    if (
+      selectedCountry === country &&
+      selectedCity &&
+      filtered.includes(selectedCity) &&
+      !visible.includes(selectedCity)
+    ) {
+      return [...visible, selectedCity];
+    }
+
+    return visible;
   }
 
   function getRemainingCityCount(country: string): number {
-    return Math.max(0, getFilteredCities(country).length - CITY_SHOW_COUNT);
+    return Math.max(0, getFilteredCities(country).length - getVisibleCities(country).length);
   }
 
   function showAllCities(country: string) {
