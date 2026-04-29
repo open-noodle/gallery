@@ -41,6 +41,9 @@
 
   let normalizedSearchQuery = $derived(searchQuery.trim().toLowerCase());
   let shouldFetchCitiesForSearch = $derived(normalizedSearchQuery.length >= MIN_CITY_SEARCH_LENGTH);
+  let hasPendingCitySearchFetches = $derived.by(
+    () => shouldFetchCitiesForSearch && countries.some((country) => loadingCitiesByCountry[country]),
+  );
 
   // Clear search when countries list changes (e.g. temporal filter refetch)
   let previousCountriesLength = 0;
@@ -282,7 +285,7 @@
     {/if}
 
     <!-- Empty search results -->
-    {#if filteredCountries.length === 0 && searchQuery.trim()}
+    {#if filteredCountries.length === 0 && searchQuery.trim() && !hasPendingCitySearchFetches}
       <p class="text-sm text-gray-400 dark:text-gray-500" data-testid="location-no-results">No matching locations</p>
     {/if}
 

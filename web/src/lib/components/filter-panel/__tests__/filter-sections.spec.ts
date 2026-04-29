@@ -721,6 +721,35 @@ describe('LocationFilter', () => {
     });
   });
 
+  it('should not show no-results while city search fetches are pending', async () => {
+    let resolveSwitzerland!: (cities: string[]) => void;
+    const switzerlandPromise = new Promise<string[]>((resolve) => {
+      resolveSwitzerland = resolve;
+    });
+    const onCityFetch = vi.fn((country: string) => (country === 'Switzerland' ? switzerlandPromise : Promise.resolve([])));
+
+    const { getByTestId, queryByTestId } = render(LocationFilter, {
+      props: {
+        countries: ['Germany', 'Switzerland'],
+        onCityFetch,
+        onSelectionChange: () => {},
+      },
+    });
+
+    await fireEvent.input(getByTestId('location-search-input'), { target: { value: 'gene' } });
+    await waitFor(() => expect(onCityFetch).toHaveBeenCalledWith('Switzerland', undefined));
+
+    expect(queryByTestId('location-no-results')).toBeNull();
+
+    resolveSwitzerland(['Geneva']);
+
+    await waitFor(() => {
+      expect(queryByTestId('location-country-Switzerland')).toBeTruthy();
+      expect(queryByTestId('location-city-Geneva')).toBeTruthy();
+      expect(queryByTestId('location-no-results')).toBeNull();
+    });
+  });
+
   it('should find a city in a country beyond the initial country cap', async () => {
     const cityMap: Record<string, string[]> = {
       Mexico: ['Merida'],
