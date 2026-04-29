@@ -384,7 +384,7 @@ describe('LocationFilter', () => {
     });
 
     await fireEvent.click(getByTestId('location-country-Germany'));
-    await waitFor(() => expect(queryByTestId('location-city-German City 11')).toBeNull());
+    await waitFor(() => expect(queryByTestId('location-city-show-more-Germany')).toBeTruthy());
 
     await fireEvent.click(getByTestId('location-city-show-more-Germany'));
     expect(queryByTestId('location-city-German City 11')).toBeTruthy();
@@ -765,6 +765,43 @@ describe('LocationFilter', () => {
 
     expect(onCityFetch).not.toHaveBeenCalled();
     expect(queryByTestId('location-no-results')).toBeNull();
+  });
+
+  it('should refetch city search results when context changes with the same active query', async () => {
+    const countries = ['Germany', 'Switzerland'];
+    const onCityFetch = vi.fn((country: string, context?: { takenAfter?: string }) => {
+      if (country === 'Switzerland' && context?.takenAfter === '2026-02-01') {
+        return Promise.resolve(['Geneva']);
+      }
+
+      return Promise.resolve([]);
+    });
+
+    const { getByTestId, queryByTestId, rerender } = render(LocationFilter, {
+      props: {
+        countries,
+        context: { takenAfter: '2026-01-01' },
+        onCityFetch,
+        onSelectionChange: () => {},
+      },
+    });
+
+    await fireEvent.input(getByTestId('location-search-input'), { target: { value: 'gene' } });
+    await waitFor(() => expect(onCityFetch).toHaveBeenCalledWith('Switzerland', { takenAfter: '2026-01-01' }));
+    await waitFor(() => expect(queryByTestId('location-no-results')).toBeTruthy());
+
+    await rerender({
+      countries,
+      context: { takenAfter: '2026-02-01' },
+      onCityFetch,
+      onSelectionChange: () => {},
+    });
+
+    await waitFor(() => expect(onCityFetch).toHaveBeenCalledWith('Switzerland', { takenAfter: '2026-02-01' }));
+    await waitFor(() => {
+      expect(queryByTestId('location-country-Switzerland')).toBeTruthy();
+      expect(queryByTestId('location-city-Geneva')).toBeTruthy();
+    });
   });
 
   it('should find a city in a country beyond the initial country cap', async () => {

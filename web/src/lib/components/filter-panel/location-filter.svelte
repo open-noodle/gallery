@@ -173,6 +173,8 @@
       return;
     }
 
+    const searchCacheKey = cityCacheKey;
+    void searchCacheKey;
     const currentCountries = countries;
     const timeout = setTimeout(() => {
       untrack(() => {
