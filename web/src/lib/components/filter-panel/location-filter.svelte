@@ -75,19 +75,27 @@
       const _context = context;
       const requestId = ++cityFetchRequestId;
       loadingCities = true;
-      void onCityFetch(requestedCountry, _context).then((result) => {
-        if (requestId !== cityFetchRequestId || expandedCountry !== requestedCountry) {
-          return;
-        }
+      void onCityFetch(requestedCountry, _context)
+        .then((result) => {
+          if (requestId !== cityFetchRequestId || expandedCountry !== requestedCountry) {
+            return;
+          }
 
-        cities = result;
-        loadingCities = false;
+          cities = result;
+          loadingCities = false;
 
-        // Cascade child auto-clear: if selected city is not in new results, clear it
-        if (selectedCity && result.length > 0 && !result.includes(selectedCity)) {
-          onSelectionChange(requestedCountry, undefined);
-        }
-      });
+          // Cascade child auto-clear: if selected city is not in new results, clear it
+          if (selectedCity && result.length > 0 && !result.includes(selectedCity)) {
+            onSelectionChange(requestedCountry, undefined);
+          }
+        })
+        .catch(() => {
+          if (requestId !== cityFetchRequestId || expandedCountry !== requestedCountry) {
+            return;
+          }
+
+          loadingCities = false;
+        });
     } else {
       cityFetchRequestId++;
       cities = [];
@@ -95,12 +103,12 @@
     }
   });
 
-  function getFilteredCities(country: string): string[] {
+  function getFilteredCities(): string[] {
     return cities;
   }
 
   function getVisibleCities(country: string): string[] {
-    const filtered = getFilteredCities(country);
+    const filtered = getFilteredCities();
     if (expandedCityLists[country]) {
       return filtered;
     }
@@ -119,7 +127,7 @@
   }
 
   function getRemainingCityCount(country: string): number {
-    return Math.max(0, getFilteredCities(country).length - getVisibleCities(country).length);
+    return Math.max(0, getFilteredCities().length - getVisibleCities(country).length);
   }
 
   function showAllCities(country: string) {
