@@ -75,6 +75,7 @@
       const _context = context;
       const requestId = ++cityFetchRequestId;
       loadingCities = true;
+      cities = [];
       void onCityFetch(requestedCountry, _context)
         .then((result) => {
           if (requestId !== cityFetchRequestId || expandedCountry !== requestedCountry) {

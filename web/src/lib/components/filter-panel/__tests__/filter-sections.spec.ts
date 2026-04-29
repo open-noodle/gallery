@@ -526,6 +526,46 @@ describe('LocationFilter', () => {
     expect(onSelectionChange).toHaveBeenCalledWith('France', undefined);
   });
 
+  it('should not render prior country cities when the next country fetch rejects', async () => {
+    let resolveGermany!: (cities: string[]) => void;
+    let rejectFrance!: (error: Error) => void;
+    const germanyPromise = new Promise<string[]>((resolve) => {
+      resolveGermany = resolve;
+    });
+    const francePromise = new Promise<string[]>((_, reject) => {
+      rejectFrance = reject;
+    });
+    const onCityFetch = vi.fn((country: string) => (country === 'Germany' ? germanyPromise : francePromise));
+    const onSelectionChange = vi.fn();
+
+    const { getByTestId, queryByTestId } = render(LocationFilter, {
+      props: {
+        countries: ['Germany', 'France'],
+        onCityFetch,
+        onSelectionChange,
+      },
+    });
+
+    await fireEvent.click(getByTestId('location-country-Germany'));
+    await waitFor(() => expect(onCityFetch).toHaveBeenCalledWith('Germany', undefined));
+
+    resolveGermany(['Munich']);
+    await waitFor(() => expect(queryByTestId('location-city-Munich')).toBeTruthy());
+
+    await fireEvent.click(getByTestId('location-country-France'));
+    await waitFor(() => expect(onCityFetch).toHaveBeenCalledWith('France', undefined));
+    onSelectionChange.mockClear();
+
+    rejectFrance(new Error('city fetch failed'));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    await waitFor(() => {
+      expect(queryByTestId('location-city-Munich')).toBeNull();
+      expect(getByTestId('location-country-France')).toBeTruthy();
+    });
+    expect(onSelectionChange).not.toHaveBeenCalled();
+  });
+
   it('should not show city-level show more for countries with no cities', async () => {
     const fetchPromise = Promise.resolve([]);
     const onCityFetch = vi.fn(() => fetchPromise);
