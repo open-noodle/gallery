@@ -401,7 +401,7 @@ describe('LocationFilter', () => {
     const { getByTestId, queryByTestId } = render(LocationFilter, {
       props: {
         countries: ['Germany', 'France'],
-        onCityFetch: (country) => Promise.resolve(cityMap[country] ?? []),
+        onCityFetch: (country: string) => Promise.resolve(cityMap[country] ?? []),
         onSelectionChange: () => {},
       },
     });
@@ -730,7 +730,7 @@ describe('LocationFilter', () => {
     const { getByTestId, queryByTestId } = render(LocationFilter, {
       props: {
         countries: ['Germany', 'Switzerland'],
-        onCityFetch: (country) => Promise.resolve(cityMap[country] ?? []),
+        onCityFetch: (country: string) => Promise.resolve(cityMap[country] ?? []),
         onSelectionChange: () => {},
       },
     });
@@ -854,7 +854,7 @@ describe('LocationFilter', () => {
     const { getByTestId, queryByTestId } = render(LocationFilter, {
       props: {
         countries: manyCountries,
-        onCityFetch: (country) => Promise.resolve(cityMap[country] ?? []),
+        onCityFetch: (country: string) => Promise.resolve(cityMap[country] ?? []),
         onSelectionChange: () => {},
       },
     });
