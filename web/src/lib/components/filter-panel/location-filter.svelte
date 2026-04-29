@@ -62,6 +62,13 @@
   let orphanedCountry = $derived(selectedCountry && !countries.includes(selectedCountry) ? selectedCountry : undefined);
 
   $effect(() => {
+    if (selectedCountry && selectedCity && expandedCountry !== selectedCountry) {
+      expandedCountry = selectedCountry;
+      expandedCityLists = { ...expandedCityLists, [selectedCountry]: false };
+    }
+  });
+
+  $effect(() => {
     if (expandedCountry) {
       const _context = context;
       loadingCities = true;

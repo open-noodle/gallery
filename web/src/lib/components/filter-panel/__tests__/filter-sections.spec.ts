@@ -347,18 +347,17 @@ describe('LocationFilter', () => {
 
   it('should keep a selected city visible when it is outside the initial city cap', async () => {
     const cities = Array.from({ length: 12 }, (_, index) => `City ${index + 1}`);
+    const onSelectionChange = vi.fn();
 
-    const { getByTestId, queryByTestId } = render(LocationFilter, {
+    const { queryByTestId } = render(LocationFilter, {
       props: {
         countries: ['Germany'],
         selectedCountry: 'Germany',
         selectedCity: 'City 11',
         onCityFetch: () => Promise.resolve(cities),
-        onSelectionChange: () => {},
+        onSelectionChange,
       },
     });
-
-    await fireEvent.click(getByTestId('location-country-Germany'));
 
     await waitFor(() => {
       expect(queryByTestId('location-city-City 10')).toBeTruthy();
@@ -366,6 +365,7 @@ describe('LocationFilter', () => {
       expect(queryByTestId('location-city-City 12')).toBeNull();
       expect(queryByTestId('location-city-show-more-Germany')).toBeTruthy();
     });
+    expect(onSelectionChange).not.toHaveBeenCalled();
   });
 
   it('should expand hidden cities only for the selected country city list', async () => {
