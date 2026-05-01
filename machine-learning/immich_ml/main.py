@@ -10,10 +10,11 @@ from typing import Any, AsyncGenerator, Callable
 from zipfile import BadZipFile
 
 import orjson
-from fastapi import Depends, FastAPI, File, Form, HTTPException
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Response
 from fastapi.responses import JSONResponse, PlainTextResponse
 from onnxruntime.capi.onnxruntime_pybind11_state import InvalidProtobuf, NoSuchFile
 from PIL.Image import Image
+from prometheus_client import CONTENT_TYPE_LATEST
 from pydantic import TypeAdapter, ValidationError
 from starlette.formparsers import MultiPartParser
 
@@ -22,6 +23,7 @@ from immich_ml.models.base import InferenceModel
 from immich_ml.models.transforms import decode_pil
 from immich_ml.sessions.ort import flush_denormals
 
+from . import metrics
 from .config import PreloadModelData, log, settings
 from .models.base import InferenceEntry
 from .models.cache import ModelCache
@@ -47,6 +49,8 @@ class ORJSONResponse(JSONResponse):
 
 PIPELINE_REQUEST = TypeAdapter(PipelineRequest)
 MultiPartParser.spool_max_size = 2**26  # spools to disk if payload is 64 MiB or larger
+
+MODEL_CACHE_METRICS_INTERVAL_S = 15
 
 model_cache = ModelCache()
 thread_pool: ThreadPoolExecutor | None = None
@@ -77,6 +81,8 @@ async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
         if settings.preload is not None:
             await preload_models(settings.preload)
             allocator.release()
+        if metrics.is_multiprocess_enabled():
+            asyncio.ensure_future(model_cache_metrics_task())
         yield
     finally:
         log.handlers.clear()
@@ -126,6 +132,7 @@ def _names(setting: str | None) -> list[str]:
 async def update_state() -> AsyncGenerator[None, None]:
     global active_requests, last_called, release
     active_requests += 1
+    metrics.ACTIVE_REQUESTS.inc()
     last_called = time.time()
     if release is not None:
         release.cancel()
@@ -134,14 +141,17 @@ async def update_state() -> AsyncGenerator[None, None]:
         yield
     finally:
         active_requests -= 1
+        metrics.ACTIVE_REQUESTS.dec()
         if not active_requests:
             release = asyncio.get_running_loop().call_later(5, allocator.release)
 
 
 def get_entries(entries: str = Form()) -> list[InferenceEntry[Any]]:
+    started = time.perf_counter()
     try:
         found = list(PIPELINE_REQUEST.validate_json(entries).entries())
     except (ValidationError, ValueError) as e:
+        metrics.record_validation_error(started)
         log.error(f"Invalid request format: {e}")
         raise HTTPException(422, "Invalid request format.")
     if not found:
@@ -162,23 +172,42 @@ def ping() -> PlainTextResponse:
     return PlainTextResponse("pong")
 
 
+def refresh_model_cache_metrics() -> None:
+    models = list(model_cache._models.values())  # a snapshot: /metrics runs off the loop, which may add or evict
+    cache_labels = [(model.model_task.value, model.model_type.value) for model in models]
+    metrics.set_model_cache_entries(cache_labels)
+
+
+@app.get("/metrics")
+def prometheus_metrics() -> Response:
+    refresh_model_cache_metrics()
+    return Response(metrics.render(), media_type=CONTENT_TYPE_LATEST)
+
+
 @app.post("/predict", dependencies=[Depends(update_state)])
 async def predict(
     entries: list[InferenceEntry[Any]] = Depends(get_entries),
     image: bytes | None = File(default=None),
     text: str | None = Form(default=None),
 ) -> Any:
-    if image is not None:
-        decoded = await run(lambda: decode_pil(image))
-        if decoded.width == 0 or decoded.height == 0:
-            raise HTTPException(400, "Image has zero width or height")
-        inputs: Image | str = decoded
-    elif text is not None:
-        inputs = text
-    else:
-        raise HTTPException(400, "Either image or text must be provided")
-    response = await run_inference(inputs, entries)
-    return ORJSONResponse(response)
+    started = time.perf_counter()
+    metric_labels = metrics.labels_from_entries(entries)
+    try:
+        if image is not None:
+            decoded = await run(lambda: decode_pil(image))
+            if decoded.width == 0 or decoded.height == 0:
+                raise HTTPException(400, "Image has zero width or height")
+            inputs: Image | str = decoded
+        elif text is not None:
+            inputs = text
+        else:
+            raise HTTPException(400, "Either image or text must be provided")
+        response = await run_inference(inputs, entries)
+        metrics.record_predict(metric_labels, "success", started)
+        return ORJSONResponse(response)
+    except Exception:
+        metrics.record_predict(metric_labels, "error", started)
+        raise
 
 
 async def run_inference(payload: Image | str, entries: list[InferenceEntry[Any]]) -> InferenceResponse:
@@ -217,8 +246,20 @@ async def run[R](func: Callable[[], R]) -> R:
 
 async def load[O: Options](model: InferenceModel[O]) -> InferenceModel[O]:
     if not model.loaded:
-        await attempt(model, model.load, (OSError, BadZipFile, *MODEL_FILE_ERRORS))
+        await attempt(model, partial(timed_load, model), (OSError, BadZipFile, *MODEL_FILE_ERRORS))
     return model
+
+
+def timed_load[O: Options](model: InferenceModel[O]) -> None:
+    # Gallery: one duration sample per load, so a corrupt-cache retry records its failure and its success.
+    # Timed here rather than in `attempt`, which also wraps `predict` and `build`.
+    started = time.perf_counter()
+    try:
+        model.load()
+    except Exception:
+        metrics.record_model_load(model.model_task.value, model.model_type.value, "error", started)
+        raise
+    metrics.record_model_load(model.model_task.value, model.model_type.value, "success", started)
 
 
 async def attempt[O: Options, R](
@@ -256,3 +297,9 @@ async def idle_shutdown_task() -> None:
             os.kill(os.getpid(), signal.SIGINT)
             break
         await asyncio.sleep(settings.model_ttl_poll_s)
+
+
+async def model_cache_metrics_task() -> None:
+    while True:
+        refresh_model_cache_metrics()
+        await asyncio.sleep(MODEL_CACHE_METRICS_INTERVAL_S)
