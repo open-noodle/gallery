@@ -30,3 +30,4 @@ vite.config.js.timestamp-*
 *.tsbuildInfo
 misc/release/notes.md
 .worktrees
+.codex
