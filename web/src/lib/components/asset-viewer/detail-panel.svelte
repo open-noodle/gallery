@@ -117,7 +117,9 @@
 
   const getAssetFolderHref = (asset: AssetResponseDto) => Route.folders({ path: getParentPath(asset.originalPath) });
 
-  const getPersonFallbackThumbnailUrl = (person: AssetResponseDto['people'][number]) =>
+  type AssetPerson = NonNullable<AssetResponseDto['people']>[number];
+
+  const getPersonFallbackThumbnailUrl = (person: AssetPerson) =>
     effectiveSpaceId && person.spacePersonId
       ? createUrl(`/shared-spaces/${effectiveSpaceId}/people/${person.spacePersonId}/thumbnail`, {
           updatedAt: person.updatedAt,
