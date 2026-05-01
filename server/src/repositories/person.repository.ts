@@ -429,6 +429,27 @@ export class PersonRepository {
       .executeTakeFirst();
   }
 
+  /**
+   * Option M: resolve a person by group id ALONE.
+   *
+   * Upstream deleted `person.id`; the primary key is now composite `(ownerId, personGroupId)`. Most
+   * fork call sites only ever carry the person's public id — which `mapPerson` emits as
+   * `personGroupId` — and have no owner in hand. This is sound ONLY because Gallery never creates
+   * multi-user cluster groups, so `person_group` stays 1:1 with `person`.
+   *
+   * That invariant is enforced by the unique index `person_personGroupId_key`
+   * (`1791000000000-RepointFaceReviewToPersonGroup`). Keeping the assumption in this single accessor
+   * is deliberate: it is the one place M's 1:1 bet is load-bearing.
+   */
+  @GenerateSql({ params: [DummyValue.UUID] })
+  getByGroupIdOnly(personGroupId: string) {
+    return this.db //
+      .selectFrom('person')
+      .selectAll('person')
+      .where('person.personGroupId', '=', personGroupId)
+      .executeTakeFirst();
+  }
+
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.STRING, { withHidden: true }] })
   getByName(userId: string, personName: string, { withHidden }: PersonNameSearchOptions) {
     return this.db
