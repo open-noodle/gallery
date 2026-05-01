@@ -229,6 +229,16 @@
       }
     }
   };
+
+  const isApplePlatform = typeof navigator !== 'undefined' && /Mac|iPhone|iPod|iPad/.test(navigator.platform);
+
+  const openModalSearch = () => {
+    // Use valueOrUndefined so the shortcut never throws if it fires before
+    // feature flags have loaded (SSR→hydration race).
+    if (featureFlagsManager.valueOrUndefined?.search) {
+      globalSearchManager.toggle('modal');
+    }
+  };
 </script>
 
 <OnEvents {onWebsocketConnect} />
@@ -270,10 +280,16 @@
     {
       shortcut: { ctrl: true, key: 'k' },
       onShortcut: () => {
-        // Use valueOrUndefined so the shortcut never throws if it fires before
-        // feature flags have loaded (SSR→hydration race).
-        if (featureFlagsManager.valueOrUndefined?.search) {
-          globalSearchManager.toggle();
+        if (!isApplePlatform) {
+          openModalSearch();
+        }
+      },
+    },
+    {
+      shortcut: { meta: true, key: 'k' },
+      onShortcut: () => {
+        if (isApplePlatform) {
+          openModalSearch();
         }
       },
     },
@@ -305,7 +321,7 @@
 
   <DownloadPanel />
   <UploadPanel />
-  {#if globalSearchManager.isOpen}
+  {#if globalSearchManager.isOpen && globalSearchManager.presentation === 'modal'}
     <GlobalSearch manager={globalSearchManager} />
   {/if}
 </TooltipProvider>
