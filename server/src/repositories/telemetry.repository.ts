@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { MetricOptions, ValueType } from '@opentelemetry/api';
+import { MetricOptions, ObservableCallback } from '@opentelemetry/api';
 import { AsyncLocalStorageContextManager } from '@opentelemetry/context-async-hooks';
 import { PrometheusExporter } from '@opentelemetry/exporter-prometheus';
 import { HttpInstrumentation } from '@opentelemetry/instrumentation-http';
@@ -9,7 +9,7 @@ import { NestInstrumentation } from '@opentelemetry/instrumentation-nestjs-core'
 import { PgInstrumentation } from '@opentelemetry/instrumentation-pg';
 import { resourceFromAttributes } from '@opentelemetry/resources';
 import { AggregationType } from '@opentelemetry/sdk-metrics';
-import { NodeSDK } from '@opentelemetry/sdk-node';
+import { NodeSDK, contextBase } from '@opentelemetry/sdk-node';
 import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic-conventions';
 import { snakeCase, startCase } from 'lodash-es';
 import { MetricService } from 'nestjs-otel';
@@ -44,6 +44,12 @@ export class MetricGroupRepository {
     }
   }
 
+  observeGauge(name: string, callback: ObservableCallback, options?: MetricOptions): void {
+    if (this.enabled) {
+      this.metricService.getObservableGauge(name, options).addCallback(callback);
+    }
+  }
+
   configure(options: MetricGroupOptions): this {
     this.enabled = options.enabled;
     return this;
@@ -68,7 +74,7 @@ export const bootstrapTelemetry = (port: number) => {
       [ATTR_SERVICE_NAME]: `immich`,
       [ATTR_SERVICE_VERSION]: serverVersion.toString(),
     }),
-    metricReaders: [new PrometheusExporter({ port })],
+    metricReader: new PrometheusExporter({ port }),
     contextManager: new AsyncLocalStorageContextManager(),
     instrumentations: [
       new HttpInstrumentation({
@@ -106,6 +112,7 @@ export const teardownTelemetry = async () => {
 @Injectable()
 export class TelemetryRepository {
   api: MetricGroupRepository;
+  app: MetricGroupRepository;
   host: MetricGroupRepository;
   jobs: MetricGroupRepository;
   repo: MetricGroupRepository;
@@ -120,6 +127,7 @@ export class TelemetryRepository {
     const { metrics } = telemetry;
 
     this.api = new MetricGroupRepository(metricService).configure({ enabled: metrics.has(ImmichTelemetry.Api) });
+    this.app = new MetricGroupRepository(metricService).configure({ enabled: metrics.has(ImmichTelemetry.App) });
     this.host = new MetricGroupRepository(metricService).configure({ enabled: metrics.has(ImmichTelemetry.Host) });
     this.jobs = new MetricGroupRepository(metricService).configure({ enabled: metrics.has(ImmichTelemetry.Job) });
     this.repo = new MetricGroupRepository(metricService).configure({ enabled: metrics.has(ImmichTelemetry.Repo) });
@@ -162,7 +170,7 @@ export class TelemetryRepository {
         prefix: 'immich',
         description: `The elapsed time in ${unit} for the ${startCase(className)} to ${propertyName.toLowerCase()}`,
         unit,
-        valueType: ValueType.DOUBLE,
+        valueType: contextBase.ValueType.DOUBLE,
       });
 
       descriptor.value = function (...args: any[]) {
