@@ -315,5 +315,4 @@ export class UserRepository {
       .where('user.deletedAt', 'is', null)
       .execute();
   }
-
 }
