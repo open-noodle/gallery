@@ -3,7 +3,7 @@ import { Readable } from 'node:stream';
 export type ServeStrategy =
   | { type: 'file'; path: string }
   | { type: 'redirect'; url: string }
-  | { type: 'stream'; stream: Readable; length?: number; debugLabel?: string };
+  | { type: 'stream'; stream: Readable; length?: number };
 
 export interface StorageBackend {
   /** Write content to the given key */

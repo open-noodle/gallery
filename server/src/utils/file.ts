@@ -47,7 +47,6 @@ export class ImmichStreamResponse {
   public readonly length?: number;
   public readonly cacheControl!: CacheControl;
   public readonly fileName?: string;
-  public readonly debugLabel?: string;
 
   constructor(response: ImmichStreamResponse) {
     Object.assign(this, response);
@@ -65,9 +64,6 @@ const cacheControlHeaders: Record<CacheControl, string | null> = {
   [CacheControl.PrivateWithoutCache]: 'private, no-cache, no-transform',
   [CacheControl.None]: null, // falsy value to prevent adding Cache-Control header
 };
-
-const isS3ProxyDebugLoggingEnabled = () =>
-  ['1', 'true', 'yes', 'on'].includes((process.env.IMMICH_S3_PROXY_DEBUG_LOGS || '').toLowerCase());
 
 export const sendFile = async (
   res: Response,
@@ -103,10 +99,6 @@ export const sendFile = async (
     }
 
     if (file instanceof ImmichStreamResponse) {
-      const startedAt = Date.now();
-      const debugLabel = isS3ProxyDebugLoggingEnabled() ? file.debugLabel : undefined;
-      let bytesWrittenAtClose = 0;
-
       const cacheControlHeader = cacheControlHeaders[file.cacheControl];
       if (cacheControlHeader) {
         res.set('Cache-Control', cacheControlHeader);
@@ -118,43 +110,9 @@ export const sendFile = async (
       if (file.fileName) {
         res.header('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(file.fileName)}`);
       }
-      if (debugLabel) {
-        logger.log(
-          `[StreamResponseTrace] start label=${debugLabel} contentType=${file.contentType} length=${
-            file.length ?? 'unknown'
-          }`,
-        );
-
-        res.once('finish', () => {
-          logger.log(
-            `[StreamResponseTrace] finish label=${debugLabel} totalMs=${Date.now() - startedAt} writableEnded=${
-              res.writableEnded
-            } bytesWritten=${res.socket?.bytesWritten ?? 'unknown'}`,
-          );
-        });
-
-        res.once('error', (error) => {
-          logger.warn(
-            `[StreamResponseTrace] response-error label=${debugLabel} totalMs=${Date.now() - startedAt} error=${
-              error instanceof Error ? error.message : String(error)
-            }`,
-          );
-        });
-      }
       if (typeof res.once === 'function') {
         res.once('close', () => {
-          bytesWrittenAtClose = res.socket?.bytesWritten ?? bytesWrittenAtClose;
-          if (debugLabel) {
-            logger.log(
-              `[StreamResponseTrace] close label=${debugLabel} totalMs=${Date.now() - startedAt} writableEnded=${
-                res.writableEnded
-              } streamDestroyed=${file.stream.destroyed} bytesWritten=${bytesWrittenAtClose}`,
-            );
-          }
           if (!res.writableEnded && !file.stream.destroyed) {
-            if (debugLabel) {
-              logger.warn(`[StreamResponseTrace] destroy-upstream label=${debugLabel}`);
-            }
             file.stream.destroy();
           }
         });

@@ -455,7 +455,6 @@ describe(StorageService.name, () => {
               presignedUrlExpiry: 3600,
               serveMode: 'redirect',
               proxyReadIdleTimeoutMs: 300_000,
-              proxyDebugLogs: false,
             },
           },
         }),
