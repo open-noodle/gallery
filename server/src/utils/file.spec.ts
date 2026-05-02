@@ -41,7 +41,7 @@ describe('sendFile with ImmichMediaResponse', () => {
   let mockLogger: LoggingRepository;
 
   beforeEach(() => {
-    mockLogger = { error: vi.fn(), setContext: vi.fn() } as unknown as LoggingRepository;
+    mockLogger = { error: vi.fn(), log: vi.fn(), warn: vi.fn(), setContext: vi.fn() } as unknown as LoggingRepository;
   });
 
   it('should send redirect response with 302', async () => {
@@ -151,6 +151,59 @@ describe('sendFile with ImmichMediaResponse', () => {
 
     expect(destroy).toHaveBeenCalledTimes(1);
     expect(next).not.toHaveBeenCalled();
+  });
+
+  it('should emit stream diagnostics when S3 proxy debug logging is enabled', async () => {
+    const previous = process.env.IMMICH_S3_PROXY_DEBUG_LOGS;
+    process.env.IMMICH_S3_PROXY_DEBUG_LOGS = 'true';
+    const stream = new Readable({
+      read() {
+        // keep the stream open until the client aborts
+      },
+    });
+    const res = Object.assign(new EventEmitter(), {
+      set: vi.fn(),
+      header: vi.fn(),
+      headersSent: false,
+      writableEnded: false,
+      socket: { bytesWritten: 42 },
+    }) as any;
+    stream.pipe = vi.fn().mockReturnValue(res);
+    const next = vi.fn();
+
+    try {
+      await sendFile(
+        res,
+        next,
+        () =>
+          new ImmichStreamResponse({
+            stream,
+            contentType: 'image/jpeg',
+            length: 123,
+            cacheControl: CacheControl.PrivateWithCache,
+            debugLabel: 's3-proxy:1:key.jpg',
+          }),
+        mockLogger,
+      );
+
+      res.emit('close');
+
+      expect(mockLogger.log).toHaveBeenCalledWith(
+        expect.stringContaining('[StreamResponseTrace] start label=s3-proxy:1:key.jpg'),
+      );
+      expect(mockLogger.log).toHaveBeenCalledWith(
+        expect.stringContaining('[StreamResponseTrace] close label=s3-proxy:1:key.jpg'),
+      );
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining('[StreamResponseTrace] destroy-upstream label=s3-proxy:1:key.jpg'),
+      );
+    } finally {
+      if (previous === undefined) {
+        delete process.env.IMMICH_S3_PROXY_DEBUG_LOGS;
+      } else {
+        process.env.IMMICH_S3_PROXY_DEBUG_LOGS = previous;
+      }
+    }
   });
 
   it('should not destroy a stream when the response closes after completion', async () => {

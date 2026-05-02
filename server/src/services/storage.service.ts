@@ -83,8 +83,11 @@ export class StorageService extends BaseService {
     StorageService.writeBackendType = envData.storage.backend;
 
     if (envData.storage.s3.bucket) {
-      StorageService.s3Backend = new S3StorageBackend(envData.storage.s3);
+      StorageService.s3Backend = new S3StorageBackend({ ...envData.storage.s3, logger: this.logger });
       this.logger.log(`S3 storage backend configured (bucket: ${envData.storage.s3.bucket})`);
+      if (envData.storage.s3.proxyDebugLogs) {
+        this.logger.warn('S3 proxy debug logging is enabled');
+      }
     }
 
     if (envData.storage.backend === 's3' && !StorageService.s3Backend) {

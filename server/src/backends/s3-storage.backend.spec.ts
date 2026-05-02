@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
+import { once } from 'node:events';
 import { Readable } from 'node:stream';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -153,6 +154,40 @@ describe('S3StorageBackend', () => {
 
       const strategy = await proxyBackend.getServeStrategy('key.jpg', 'image/jpeg');
       expect(strategy.type).toBe('stream');
+    });
+
+    it('should emit diagnostic logs when proxy debug logging is enabled', async () => {
+      const logger = { log: vi.fn(), warn: vi.fn() } as any;
+      const proxyBackend = new S3StorageBackend({
+        bucket: 'test-bucket',
+        region: 'us-east-1',
+        presignedUrlExpiry: 3600,
+        serveMode: 'proxy' as const,
+        proxyDebugLogs: true,
+        logger,
+      });
+      const proxyClient = (S3Client as unknown as ReturnType<typeof vi.fn>).mock.results.at(-1)?.value;
+      proxyClient.send.mockResolvedValueOnce({
+        Body: Readable.from([Buffer.from('proxied')]),
+        ContentLength: 7,
+      });
+
+      const strategy = await proxyBackend.getServeStrategy('key.jpg', 'image/jpeg');
+      expect(strategy).toMatchObject({ type: 'stream', debugLabel: 's3-proxy:1:key.jpg' });
+      if (strategy.type === 'stream') {
+        strategy.stream.resume();
+        await once(strategy.stream, 'end');
+      }
+
+      expect(logger.log.mock.calls.map(([message]: [string]) => message)).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining('[S3ProxyTrace:1] request'),
+          expect.stringContaining('[S3ProxyTrace:1] acquired'),
+          expect.stringContaining('[S3ProxyTrace:1] s3-response'),
+          expect.stringContaining('[S3ProxyTrace:1] first-byte'),
+          expect.stringContaining('[S3ProxyTrace:1] release reason=end'),
+        ]),
+      );
     });
 
     it('should limit concurrent proxied S3 reads', async () => {

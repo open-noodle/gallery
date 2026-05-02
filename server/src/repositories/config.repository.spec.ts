@@ -49,6 +49,7 @@ const resetEnv = () => {
     'IMMICH_S3_PRESIGNED_URL_EXPIRY',
     'IMMICH_S3_SERVE_MODE',
     'IMMICH_S3_PROXY_READ_IDLE_TIMEOUT_MS',
+    'IMMICH_S3_PROXY_DEBUG_LOGS',
   ]) {
     delete process.env[env];
   }
@@ -364,6 +365,7 @@ describe('getEnv', () => {
       process.env.IMMICH_S3_PRESIGNED_URL_EXPIRY = '7200';
       process.env.IMMICH_S3_SERVE_MODE = 'proxy';
       process.env.IMMICH_S3_PROXY_READ_IDLE_TIMEOUT_MS = '120000';
+      process.env.IMMICH_S3_PROXY_DEBUG_LOGS = 'true';
 
       const { storage } = getEnv();
 
@@ -377,6 +379,7 @@ describe('getEnv', () => {
         presignedUrlExpiry: 7200,
         serveMode: 'proxy',
         proxyReadIdleTimeoutMs: 120_000,
+        proxyDebugLogs: true,
       });
     });
 
@@ -395,6 +398,7 @@ describe('getEnv', () => {
         presignedUrlExpiry: 3600,
         serveMode: 'redirect',
         proxyReadIdleTimeoutMs: 300_000,
+        proxyDebugLogs: false,
       });
     });
   });

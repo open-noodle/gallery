@@ -261,6 +261,7 @@ export class BaseService {
           length: strategy.length,
           cacheControl,
           fileName,
+          debugLabel: strategy.debugLabel,
         });
       }
     }
