@@ -69,10 +69,7 @@ export class S3StorageBackend implements StorageBackend {
     this.presignedUrlExpiry = config.presignedUrlExpiry;
     this.serveMode = config.serveMode;
     this.proxyReadLimiter = new AsyncLimiter(config.proxyReadConcurrency ?? DEFAULT_PROXY_READ_CONCURRENCY);
-    this.proxyReadIdleTimeoutMs = Math.max(
-      0,
-      config.proxyReadIdleTimeoutMs ?? DEFAULT_PROXY_READ_IDLE_TIMEOUT_MS,
-    );
+    this.proxyReadIdleTimeoutMs = Math.max(0, config.proxyReadIdleTimeoutMs ?? DEFAULT_PROXY_READ_IDLE_TIMEOUT_MS);
 
     this.client = new S3Client({
       region: config.region,
