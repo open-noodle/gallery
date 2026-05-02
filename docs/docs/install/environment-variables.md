@@ -217,6 +217,7 @@ Additional machine learning parameters can be tuned from the admin UI.
 | `IMMICH_S3_SECRET_ACCESS_KEY`    | Secret access key (falls back to IAM role if omitted)                                 |             | server     | api, microservices |
 | `IMMICH_S3_PRESIGNED_URL_EXPIRY` | Presigned URL expiration time in seconds                                              |   `3600`    | server     | api, microservices |
 | `IMMICH_S3_SERVE_MODE`           | How to serve S3 assets: `redirect` (presigned URL) or `proxy` (stream through server) | `redirect`  | server     | api, microservices |
+| `IMMICH_S3_PROXY_READ_IDLE_TIMEOUT_MS` | Idle timeout for proxied S3 reads in milliseconds; set to `0` to disable       |  `300000`   | server     | api, microservices |
 
 :::info
 For detailed setup instructions, see the [S3-Compatible Storage](/features/s3-storage) guide.
