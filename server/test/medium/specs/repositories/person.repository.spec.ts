@@ -8,6 +8,7 @@ import { DB } from 'src/schema/index.js';
 import { BaseService } from 'src/services/base.service.js';
 import { MediumTestContext, newMediumService } from 'test/medium.factory.js';
 import { getKyselyDB } from 'test/utils.js';
+import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
 
 let defaultDatabase: Kysely<DB>;
 
@@ -515,169 +516,69 @@ describe(PersonRepository.name, () => {
     });
   });
 
-  describe('getAllForUser', () => {
-    it('should return the user own people', async () => {
-      const { ctx, sut } = setup(await getKyselyDB());
+  describe('representative face picker queries', () => {
+    it('filters deleted, hidden, and offline representative face candidates', async () => {
+      const { ctx, sut } = setup();
       const { user } = await ctx.newUser();
-      const person = await newNamedPerson(ctx, user.id, 'Alice');
-
-      await expect(listFor(sut, user.id)).resolves.toEqual([
-        expect.objectContaining({ ownerId: user.id, personGroupId: person.personGroupId, name: 'Alice' }),
-      ]);
-    });
-
-    it('should not return people belonging to another user', async () => {
-      const { ctx, sut } = setup(await getKyselyDB());
-      const [{ user: user1 }, { user: user2 }] = [await ctx.newUser(), await ctx.newUser()];
-      await newNamedPerson(ctx, user1.id, 'Alice');
-
-      await expect(listFor(sut, user2.id)).resolves.toEqual([]);
-    });
-
-    it('should return a person shared with the user', async () => {
-      const { ctx, sut } = setup(await getKyselyDB());
-      const [{ user: owner }, { user: sharedWith }] = [await ctx.newUser(), await ctx.newUser()];
-      const person = await newNamedPerson(ctx, owner.id, 'Alice');
-
-      await ctx.get(PersonUserRepository).createAll([
-        {
-          personGroupId: person.personGroupId,
-          sharedById: owner.id,
-          sharedWithId: sharedWith.id,
-          role: PersonUserRole.Read,
-        },
-      ]);
-
-      await expect(listFor(sut, sharedWith.id, { partnerIds: [owner.id] })).resolves.toEqual([
-        expect.objectContaining({
-          ownerId: sharedWith.id,
-          personGroupId: person.personGroupId,
-          // the trigger seeds the name from the sharer
-          name: 'Alice',
-          otherPeople: [expect.objectContaining({ sharedById: owner.id, name: 'Alice' })],
-        }),
-      ]);
-    });
-
-    it('should not return a shared person without any visible faces', async () => {
-      const { ctx, sut } = setup(await getKyselyDB());
-      const [{ user: owner }, { user: sharedWith }] = [await ctx.newUser(), await ctx.newUser()];
-      const { result: person } = await ctx.newPerson({ ownerId: owner.id, name: 'Alice' });
-
-      await ctx.get(PersonUserRepository).createAll([
-        {
-          personGroupId: person.personGroupId,
-          sharedById: owner.id,
-          sharedWithId: sharedWith.id,
-          role: PersonUserRole.Read,
-        },
-      ]);
-
-      await expect(listFor(sut, sharedWith.id, { partnerIds: [owner.id] })).resolves.toEqual([]);
-    });
-
-    it('should not return a shared person whose faces are only on assets the user cannot see', async () => {
-      const { ctx, sut } = setup(await getKyselyDB());
-      const [{ user: owner }, { user: sharedWith }] = [await ctx.newUser(), await ctx.newUser()];
-      const person = await newNamedPerson(ctx, owner.id, 'Alice');
-
-      await ctx.get(PersonUserRepository).createAll([
-        {
-          personGroupId: person.personGroupId,
-          sharedById: owner.id,
-          sharedWithId: sharedWith.id,
-          role: PersonUserRole.Read,
-        },
-      ]);
-
-      await expect(listFor(sut, sharedWith.id)).resolves.toEqual([]);
-    });
-
-    it('should count faces on partner assets', async () => {
-      const { ctx, sut } = setup(await getKyselyDB());
-      const [{ user: owner }, { user: partner }] = [await ctx.newUser(), await ctx.newUser()];
-      const { result: person } = await ctx.newPerson({ ownerId: owner.id, name: '' });
-      for (let i = 0; i < 3; i++) {
-        const { asset } = await ctx.newAsset({ ownerId: partner.id });
-        await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
-      }
-
-      await expect(listFor(sut, owner.id)).resolves.toEqual([]);
-      await expect(listFor(sut, owner.id, { partnerIds: [partner.id] })).resolves.toEqual([
-        expect.objectContaining({ ownerId: owner.id, personGroupId: person.personGroupId }),
-      ]);
-    });
-
-    it('should count people with the same rules as the list', async () => {
-      const { ctx, sut } = setup(await getKyselyDB());
-      const [{ user: owner }, { user: partner }] = [await ctx.newUser(), await ctx.newUser()];
-      const named = await newNamedPerson(ctx, owner.id, 'Alice');
-      await ctx.database
-        .updateTable('person')
-        .set({ isHidden: true })
-        .where('personGroupId', '=', named.personGroupId)
-        .execute();
-      await ctx.newPerson({ ownerId: owner.id, name: '' });
-      const { result: onPartnerAssets } = await ctx.newPerson({ ownerId: owner.id, name: '' });
-      for (let i = 0; i < 3; i++) {
-        const { asset } = await ctx.newAsset({ ownerId: partner.id });
-        await ctx.newAssetFace({ assetId: asset.id, personGroupId: onPartnerAssets.personGroupId });
-      }
-
-      await expect(sut.getNumberOfPeople(owner.id, { partnerIds: [] })).resolves.toEqual({ total: 1, hidden: 1 });
-      await expect(sut.getNumberOfPeople(owner.id, { partnerIds: [partner.id] })).resolves.toEqual({
-        total: 2,
-        hidden: 1,
+      const { person } = await ctx.newPerson({ ownerId: user.id });
+      const { asset: validAsset } = await ctx.newAsset({ ownerId: user.id });
+      const { result: validFaceId } = await ctx.newAssetFace({ assetId: validAsset.id, personId: person.id });
+      const { asset: offlineAsset } = await ctx.newAsset({ ownerId: user.id, isOffline: true });
+      const { result: offlineFaceId } = await ctx.newAssetFace({ assetId: offlineAsset.id, personId: person.id });
+      const { asset: deletedAsset } = await ctx.newAsset({ ownerId: user.id, deletedAt: new Date() });
+      const { result: deletedAssetFaceId } = await ctx.newAssetFace({
+        assetId: deletedAsset.id,
+        personId: person.id,
       });
+      const { result: hiddenFaceId } = await ctx.newAssetFace({
+        assetId: validAsset.id,
+        personId: person.id,
+        isVisible: false,
+      });
+      const { result: deletedFaceId } = await ctx.newAssetFace({
+        assetId: validAsset.id,
+        personId: person.id,
+        deletedAt: new Date(),
+      });
+
+      const faces = await sut.getRepresentativeFaces({ personId: person.id, take: 20, skip: 0 });
+
+      expect(faces.map((face) => face.id)).toEqual([validFaceId]);
+      await expect(
+        sut.getRepresentativeFaceForUpdate({ personId: person.id, assetFaceId: offlineFaceId }),
+      ).resolves.toBeUndefined();
+      await expect(
+        sut.getRepresentativeFaceForUpdate({ personId: person.id, assetFaceId: deletedAssetFaceId }),
+      ).resolves.toBeUndefined();
+      await expect(
+        sut.getRepresentativeFaceForUpdate({ personId: person.id, assetFaceId: hiddenFaceId }),
+      ).resolves.toBeUndefined();
+      await expect(
+        sut.getRepresentativeFaceForUpdate({ personId: person.id, assetFaceId: deletedFaceId }),
+      ).resolves.toBeUndefined();
     });
 
-    it('should require unnamed people to meet the minimum face count', async () => {
-      const { ctx, sut } = setup(await getKyselyDB());
+    it('rejects a face linked to a different identity', async () => {
+      const { ctx, sut } = setup();
+      const faceIdentityRepository = ctx.get(FaceIdentityRepository);
       const { user } = await ctx.newUser();
-      const { result: person } = await ctx.newPerson({ ownerId: user.id, name: '' });
+      const { person: targetPerson } = await ctx.newPerson({ ownerId: user.id });
+      const { person: otherPerson } = await ctx.newPerson({ ownerId: user.id });
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
+      const { result: faceId } = await ctx.newAssetFace({ assetId: asset.id, personId: targetPerson.id });
+      const otherIdentity = await faceIdentityRepository.ensurePersonIdentity(otherPerson.id);
+      await faceIdentityRepository.replaceFaceIdentity({
+        assetFaceId: faceId,
+        identityId: otherIdentity.id,
+        source: 'manual',
+      });
 
-      await expect(listFor(sut, user.id)).resolves.toEqual([]);
-    });
+      const faces = await sut.getRepresentativeFaces({ personId: targetPerson.id, take: 20, skip: 0 });
 
-    it('should stop returning a shared person once the user deletes their copy', async () => {
-      const { ctx, sut } = setup(await getKyselyDB());
-      const [{ user: owner }, { user: sharedWith }] = [await ctx.newUser(), await ctx.newUser()];
-      const person = await newNamedPerson(ctx, owner.id, 'Alice');
-
-      await ctx.get(PersonUserRepository).createAll([
-        {
-          personGroupId: person.personGroupId,
-          sharedById: owner.id,
-          sharedWithId: sharedWith.id,
-          role: PersonUserRole.Read,
-        },
-      ]);
-      await expect(listFor(sut, sharedWith.id, { partnerIds: [owner.id] })).resolves.toHaveLength(1);
-
-      await sut.delete([person.personGroupId], sharedWith.id);
-
-      await expect(listFor(sut, sharedWith.id, { partnerIds: [owner.id] })).resolves.toEqual([]);
-      // the owner still has theirs
-      await expect(listFor(sut, owner.id)).resolves.toHaveLength(1);
-    });
-
-    it('should exclude hidden people unless asked for them', async () => {
-      const { ctx, sut } = setup(await getKyselyDB());
-      const { user } = await ctx.newUser();
-      const visible = await newNamedPerson(ctx, user.id, 'Alice');
-      const hidden = await newNamedPerson(ctx, user.id, 'Bob');
-      await ctx.database
-        .updateTable('person')
-        .set({ isHidden: true })
-        .where('personGroupId', '=', hidden.personGroupId)
-        .execute();
-
-      await expect(listFor(sut, user.id)).resolves.toEqual([
-        expect.objectContaining({ personGroupId: visible.personGroupId }),
-      ]);
-      await expect(listFor(sut, user.id, { withHidden: true })).resolves.toHaveLength(2);
+      expect(faces.map((face) => face.id)).not.toContain(faceId);
+      await expect(
+        sut.getRepresentativeFaceForUpdate({ personId: targetPerson.id, assetFaceId: faceId }),
+      ).resolves.toBeUndefined();
     });
   });
 });

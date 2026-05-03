@@ -1,17 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import {
-  type Expression,
-  type ExpressionBuilder,
-  type Insertable,
-  type Kysely,
-  type Selectable,
-  type ShallowDehydrateObject,
-  type SqlBool,
-  type Updateable,
-  expressionBuilder,
-  sql,
-} from 'kysely';
-import { jsonArrayFrom, jsonObjectFrom } from 'kysely/helpers/postgres';
+import { type ExpressionBuilder, type Insertable, type Kysely, type SqlBool, type Updateable, sql } from 'kysely';
+import { jsonObjectFrom } from 'kysely/helpers/postgres';
 import { InjectKysely } from 'nestjs-kysely';
 import { AssetFace, PersonUser, columns } from 'src/database.js';
 import { Chunked, ChunkedArray, DummyValue, GenerateSql } from 'src/decorators.js';
@@ -98,6 +87,17 @@ export interface GetAllFacesOptions {
   assetId?: string;
   sourceType?: SourceType;
   clusterGroupId?: string;
+}
+
+export interface RepresentativeFaceListOptions {
+  personId: string;
+  take: number;
+  skip: number;
+}
+
+export interface RepresentativeFaceUpdateOptions {
+  personId: string;
+  assetFaceId: string;
 }
 
 export type UnassignFacesOptions = DeleteFacesOptions & { clusterGroupId?: string };
@@ -590,6 +590,90 @@ export class PersonRepository {
       .where('asset_face.id', '=', id)
       .where('asset_face.deletedAt', 'is', null)
       .executeTakeFirstOrThrow();
+  }
+
+  @GenerateSql({ params: [{ personId: DummyValue.UUID, take: 50, skip: 0 }] })
+  getRepresentativeFaces(options: RepresentativeFaceListOptions) {
+    return this.db
+      .selectFrom('person')
+      .innerJoin('asset_face', (join) =>
+        join.on((eb) =>
+          eb.or([
+            eb('asset_face.personId', '=', eb.ref('person.id')),
+            eb.exists(
+              eb
+                .selectFrom('face_identity_face')
+                .select('face_identity_face.assetFaceId')
+                .whereRef('face_identity_face.assetFaceId', '=', 'asset_face.id')
+                .whereRef('face_identity_face.identityId', '=', 'person.identityId'),
+            ),
+          ]),
+        ),
+      )
+      .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+      .selectAll('asset_face')
+      .select(['asset.fileCreatedAt', 'person.faceAssetId as representativeFaceId'])
+      .where('person.id', '=', options.personId)
+      .where('asset_face.deletedAt', 'is', null)
+      .where('asset_face.isVisible', '=', true)
+      .where('asset.deletedAt', 'is', null)
+      .where('asset.isOffline', '=', false)
+      .where((eb) =>
+        eb.not(
+          eb.exists(
+            eb
+              .selectFrom('face_identity_face')
+              .select('face_identity_face.assetFaceId')
+              .whereRef('face_identity_face.assetFaceId', '=', 'asset_face.id')
+              .where(sql<SqlBool>`face_identity_face."identityId" IS DISTINCT FROM person."identityId"`),
+          ),
+        ),
+      )
+      .orderBy('asset.fileCreatedAt', 'desc')
+      .orderBy('asset_face.id')
+      .offset(options.skip)
+      .limit(options.take + 1)
+      .execute();
+  }
+
+  @GenerateSql({ params: [{ personId: DummyValue.UUID, assetFaceId: DummyValue.UUID }] })
+  getRepresentativeFaceForUpdate(options: RepresentativeFaceUpdateOptions) {
+    return this.db
+      .selectFrom('person')
+      .innerJoin('asset_face', (join) =>
+        join.on((eb) =>
+          eb.or([
+            eb('asset_face.personId', '=', eb.ref('person.id')),
+            eb.exists(
+              eb
+                .selectFrom('face_identity_face')
+                .select('face_identity_face.assetFaceId')
+                .whereRef('face_identity_face.assetFaceId', '=', 'asset_face.id')
+                .whereRef('face_identity_face.identityId', '=', 'person.identityId'),
+            ),
+          ]),
+        ),
+      )
+      .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+      .selectAll('asset_face')
+      .where('person.id', '=', options.personId)
+      .where('asset_face.id', '=', options.assetFaceId)
+      .where('asset_face.deletedAt', 'is', null)
+      .where('asset_face.isVisible', '=', true)
+      .where('asset.deletedAt', 'is', null)
+      .where('asset.isOffline', '=', false)
+      .where((eb) =>
+        eb.not(
+          eb.exists(
+            eb
+              .selectFrom('face_identity_face')
+              .select('face_identity_face.assetFaceId')
+              .whereRef('face_identity_face.assetFaceId', '=', 'asset_face.id')
+              .where(sql<SqlBool>`face_identity_face."identityId" IS DISTINCT FROM person."identityId"`),
+          ),
+        ),
+      )
+      .executeTakeFirst();
   }
 
   @GenerateSql({ params: [DummyValue.UUID] })

@@ -53,6 +53,8 @@ import { AssetOcrTable } from 'src/schema/tables/asset-ocr.table.js';
 import { AssetTable } from 'src/schema/tables/asset.table.js';
 import { ClusterGroupRequestTable } from 'src/schema/tables/cluster-group-request.table.js';
 import { ClusterGroupTable } from 'src/schema/tables/cluster-group.table.js';
+import { FaceIdentityFaceTable } from 'src/schema/tables/face-identity-face.table.js';
+import { FaceIdentityTable } from 'src/schema/tables/face-identity.table.js';
 import { FaceSearchTable } from 'src/schema/tables/face-search.table.js';
 import { GeodataPlacesTable } from 'src/schema/tables/geodata-places.table.js';
 import { IntegrityReportTable } from 'src/schema/tables/integrity-report.table.js';
@@ -145,6 +147,8 @@ export class ImmichDatabase {
     AssetExifTable,
     ClusterGroupTable,
     ClusterGroupRequestTable,
+    FaceIdentityTable,
+    FaceIdentityFaceTable,
     FaceSearchTable,
     GeodataPlacesTable,
     IntegrityReportTable,
@@ -279,6 +283,8 @@ export interface DB {
   ocr_search: OcrSearchTable;
 
   face_search: FaceSearchTable;
+  face_identity: FaceIdentityTable;
+  face_identity_face: FaceIdentityFaceTable;
 
   geodata_places: GeodataPlacesTable;
 
