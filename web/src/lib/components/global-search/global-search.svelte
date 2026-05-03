@@ -451,7 +451,9 @@
         />
         <kbd
           class="hidden shrink-0 rounded-lg border border-gray-300 bg-white px-2 py-1 font-mono text-[11px] font-semibold tracking-wide text-gray-500 sm:inline-block dark:border-immich-dark-gray dark:bg-immich-dark-bg dark:text-gray-300"
-          >{hotkeyLabel}</kbd
+        >
+          {hotkeyLabel}
+        </kbd>
       </div>
       <TypedSearchTokenRail tokens={manager.typedSearchDisplayTokens} />
 
@@ -480,8 +482,7 @@
             </div>
           {/if}
           <Command.List
-            class="max-h-[min(520px,calc(100vh-8rem))] overflow-y-auto pb-2 {manager
-              .typedSearchDisplayTokens.length > 0
+            class="max-h-[min(520px,calc(100vh-8rem))] overflow-y-auto pb-2 {manager.typedSearchDisplayTokens.length > 0
               ? 'pt-1'
               : 'pt-2'}"
           >

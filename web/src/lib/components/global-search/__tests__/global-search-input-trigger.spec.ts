@@ -38,6 +38,21 @@ describe('global-search-input-trigger', () => {
     expect(document.querySelector('[data-cmdk-dropdown-panel]')).not.toBeNull();
   });
 
+  it('renders typed filter pills while using the inline dropdown search field', async () => {
+    const user = userEvent.setup();
+
+    render(GlobalSearchInputTrigger);
+
+    const input = screen.getByRole('combobox', { name: 'cmdk_placeholder' });
+    await user.click(input);
+    await user.type(input, 'person:anna');
+
+    expect(document.querySelector('[data-cmdk-dropdown-panel]')).not.toBeNull();
+    expect(screen.getByTestId('typed-search-token-person')).toHaveAttribute('data-status', 'pending-entity');
+    expect(screen.getByTestId('typed-search-token-person-key')).toHaveTextContent('person');
+    expect(screen.getByTestId('typed-search-token-person-value')).toHaveTextContent('anna');
+  });
+
   it('keeps the dropdown panel closed until the search field receives focus', async () => {
     const user = userEvent.setup();
 
