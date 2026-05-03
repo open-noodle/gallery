@@ -30,6 +30,23 @@ describe('TypedSearchTokenRail', () => {
     expect(screen.getByTestId('typed-search-token-rail')).toHaveClass('px-4', 'pt-2', 'pb-1');
   });
 
+  it('renders typed filters as substantial key-value capsules', () => {
+    render(TypedSearchTokenRail, {
+      props: {
+        tokens: [{ raw: 'person:anna', key: 'person', value: 'anna', status: 'pending-entity' }],
+      },
+    });
+
+    expect(screen.getByTestId('typed-search-token-person')).toHaveClass(
+      'min-h-7',
+      'overflow-hidden',
+      'rounded-full',
+      'text-xs',
+    );
+    expect(screen.getByTestId('typed-search-token-person-key')).toHaveClass('uppercase', 'tracking-[0.08em]');
+    expect(screen.getByTestId('typed-search-token-person-value')).toHaveClass('px-2.5', 'py-1.5');
+  });
+
   it('renders error tokens with issue text', () => {
     render(TypedSearchTokenRail, {
       props: {
