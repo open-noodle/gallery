@@ -12,18 +12,37 @@ import { preferencesFactory } from '#test-data/factories/preferences-factory';
 import { sharedLinkFactory } from '#test-data/factories/shared-link-factory';
 import { userAdminFactory } from '#test-data/factories/user-factory';
 
+const { downloadUrlMock } = vitest.hoisted(() => ({
+  downloadUrlMock: vitest.fn(),
+}));
+
 vitest.mock('@immich/ui', () => ({
   toastManager: {
     primary: vitest.fn(),
   },
 }));
 
+vitest.mock('#lib/utils/asset-utils.js', async () => {
+  const originalModule =
+    await vitest.importActual<typeof import('#lib/utils/asset-utils.ts')>('#lib/utils/asset-utils.ts');
+  return {
+    ...originalModule,
+    downloadUrl: downloadUrlMock,
+  };
+});
+
 vitest.mock('#lib/utils/i18n.js', () => ({
   getFormatter: vitest.fn(),
   getPreferredLocale: vitest.fn(),
 }));
 
-vitest.mock('@immich/sdk');
+vitest.mock('@immich/sdk', async () => {
+  const originalModule = await vitest.importActual<typeof import('@immich/sdk')>('@immich/sdk');
+  return {
+    ...originalModule,
+    getAssetInfo: vitest.fn(),
+  };
+});
 
 vitest.mock('#lib/managers/asset-viewer-manager.svelte.js', () => ({
   assetViewerManager: {
@@ -188,6 +207,23 @@ describe('AssetService', () => {
       expect($t).toHaveBeenNthCalledWith(1, 'downloading_asset_filename', { values: { filename: 'asset.heic' } });
       expect($t).toHaveBeenNthCalledWith(2, 'downloading_asset_filename', { values: { filename: 'asset-motion.mov' } });
       expect(toastManager.primary).toHaveBeenCalledWith('formatter');
+    });
+
+    it('should request attachment disposition for single-asset downloads', async () => {
+      downloadUrlMock.mockClear();
+      const $t = vitest.fn().mockReturnValue('formatter');
+      vitest.mocked(getFormatter).mockResolvedValue($t);
+      const asset = assetFactory.build({ id: 'asset-1', originalFileName: 'asset.jpg', thumbhash: 'cache-1' });
+
+      await handleDownloadAsset(asset, { edited: false });
+
+      expect(downloadUrlMock).toHaveBeenCalledWith(
+        expect.stringContaining('/api/assets/asset-1/original'),
+        'asset.jpg',
+      );
+      expect(downloadUrlMock.mock.calls[0][0]).toContain('download=true');
+      expect(downloadUrlMock.mock.calls[0][0]).toContain('edited=false');
+      expect(downloadUrlMock.mock.calls[0][0]).toContain('c=cache-1');
     });
   });
 });
