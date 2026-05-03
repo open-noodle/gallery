@@ -278,7 +278,9 @@ describe('Spaces page search URL state', () => {
   });
 
   it('hydrates typed filter URL params into the space FilterState', async () => {
-    mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?q=beach&people=space-person-1&city=Berlin&type=video');
+    mockPage.url = new URL(
+      'https://gallery.test/spaces/space-1/photos?q=beach&people=space-person-1&city=Berlin&type=video',
+    );
 
     renderPage({ space: makeSpace(), members: [makeMember()] });
 

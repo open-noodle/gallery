@@ -179,7 +179,7 @@ export function parseTypedSearch(raw: string): TypedSearchParseResult {
 
   return {
     raw,
-    queryText: queryParts.join(' ').trim().replace(/\s+/g, ' '),
+    queryText: queryParts.join(' ').trim().replaceAll(/\s+/g, ' '),
     scalarTokens,
     resolutionTokens,
     displayTokens,
@@ -219,7 +219,7 @@ function splitSearch(raw: string): ParsedPiece[] {
     parts.push(current);
   }
 
-  return parts.map(parsePiece);
+  return parts.map((part) => parsePiece(part));
 }
 
 function parsePiece(raw: string): ParsedPiece {
@@ -239,7 +239,7 @@ function parsePiece(raw: string): ParsedPiece {
 
   const closingQuoteIndex = findClosingQuote(rawValue);
   const value = closingQuoteIndex === -1 ? rawValue.slice(1) : rawValue.slice(1, closingQuoteIndex);
-  if (value.includes('\\"')) {
+  if (value.includes(String.raw`\"`)) {
     return { raw, key, value, issue: 'escaped-quote' };
   }
   if (closingQuoteIndex === -1) {
@@ -269,8 +269,9 @@ function normalizeScalarToken(key: TypedSearchFilterKey, raw: string, value: str
       return { token: { kind: 'scalar', key, raw, value, normalizedValue } };
     }
     case 'city':
-    case 'country':
+    case 'country': {
       return { token: { kind: 'scalar', key, raw, value, normalizedValue: value } };
+    }
     case 'type': {
       const normalizedValue = normalizeMediaType(value);
       if (!normalizedValue) {
@@ -292,8 +293,9 @@ function normalizeScalarToken(key: TypedSearchFilterKey, raw: string, value: str
       }
       return { token: { kind: 'scalar', key, raw, value, normalizedValue } };
     }
-    default:
+    default: {
       return { issue: makeIssue('unknown-key', raw, `Unknown filter "${key}"`, key, value) };
+    }
   }
 }
 
@@ -351,14 +353,17 @@ function normalizeFavorite(value: string): boolean | undefined {
   switch (value.toLowerCase()) {
     case 'true':
     case 'yes':
-    case '1':
+    case '1': {
       return true;
+    }
     case 'false':
     case 'no':
-    case '0':
+    case '0': {
       return false;
-    default:
+    }
+    default: {
       return undefined;
+    }
   }
 }
 

@@ -1383,11 +1383,11 @@ describe('activate("command")', () => {
     expect(goto).toHaveBeenCalledWith('/spaces/space-1/photos?view=grid&q=beach&sort=asc');
   });
 
-  it('activateSearch with empty text clears the committed searchable-page query', () => {
+  it('activateSearch with empty text clears the committed searchable-page query', async () => {
     const m = new GlobalSearchManager();
     mockPage.url = new URL('https://gallery.test/photos?q=mountain&sort=asc&view=grid');
 
-    m.activateSearch('');
+    await m.activateSearch('');
 
     expect(goto).toHaveBeenCalledWith('/photos?view=grid');
     expect(getEntries()).toEqual([]);

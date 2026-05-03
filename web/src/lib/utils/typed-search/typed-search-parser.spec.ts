@@ -94,14 +94,16 @@ describe('parseTypedSearch', () => {
   });
 
   it('rejects escaped quote sequences in quoted values', () => {
-    const result = parseTypedSearch('person:"Anna \\"The Ace\\""');
+    const raw = String.raw`person:"Anna \"The Ace\""`;
+    const value = String.raw`Anna \"The Ace\"`;
+    const result = parseTypedSearch(raw);
 
     expect(result.issues).toEqual([
       {
         code: 'escaped-quote',
         key: 'person',
-        raw: 'person:"Anna \\"The Ace\\""',
-        value: 'Anna \\"The Ace\\"',
+        raw,
+        value,
         message: 'Escaped quotes are not supported in filters',
       },
     ]);

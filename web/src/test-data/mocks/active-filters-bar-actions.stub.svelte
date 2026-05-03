@@ -10,7 +10,8 @@
 </script>
 
 <div data-testid="active-filters-bar-stub">
-  <button type="button" data-testid="active-filters-clear-search" onclick={() => onClearSearch?.()}>Clear search</button>
+  <button type="button" data-testid="active-filters-clear-search" onclick={() => onClearSearch?.()}>Clear search</button
+  >
   <button
     type="button"
     data-testid="active-filters-clear-all"
@@ -23,7 +24,11 @@
   >
     Clear all
   </button>
-  <button type="button" data-testid="active-filters-remove-person" onclick={() => onRemoveFilter?.('person', 'person-1')}>
+  <button
+    type="button"
+    data-testid="active-filters-remove-person"
+    onclick={() => onRemoveFilter?.('person', 'person-1')}
+  >
     Remove person
   </button>
 </div>

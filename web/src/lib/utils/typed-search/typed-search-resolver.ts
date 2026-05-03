@@ -145,27 +145,34 @@ function suggestionScope(context: TypedSearchResolveContext) {
 
 function applyScalar(filters: FilterState, token: TypedSearchScalarToken) {
   switch (token.key) {
-    case 'from':
+    case 'from': {
       filters.dateAfter = String(token.normalizedValue);
       return;
-    case 'to':
+    }
+    case 'to': {
       filters.dateBefore = String(token.normalizedValue);
       return;
-    case 'city':
+    }
+    case 'city': {
       filters.city = String(token.normalizedValue);
       return;
-    case 'country':
+    }
+    case 'country': {
       filters.country = String(token.normalizedValue);
       return;
-    case 'type':
+    }
+    case 'type': {
       filters.mediaType = token.normalizedValue as FilterState['mediaType'];
       return;
-    case 'favorite':
+    }
+    case 'favorite': {
       filters.isFavorite = Boolean(token.normalizedValue);
       return;
-    case 'rating':
+    }
+    case 'rating': {
       filters.rating = Number(token.normalizedValue);
       return;
+    }
   }
 }
 

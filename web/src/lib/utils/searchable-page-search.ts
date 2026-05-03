@@ -224,10 +224,12 @@ function appendSearchablePageFilterParams(params: URLSearchParams, filters: Filt
 }
 
 function splitListParam(value: string | null): string[] {
-  return value
-    ?.split(',')
-    .map((item) => item.trim())
-    .filter(Boolean) ?? [];
+  return (
+    value
+      ?.split(',')
+      .map((item) => item.trim())
+      .filter(Boolean) ?? []
+  );
 }
 
 function parseRating(value: string | null): number | undefined {

@@ -43,8 +43,8 @@ export function consumeTypedSearchNames(destination: string) {
   try {
     const parsed = JSON.parse(raw) as StoredTypedSearchNames;
     return {
-      personNames: new Map(parsed.personNames ?? []),
-      tagNames: new Map(parsed.tagNames ?? []),
+      personNames: parsed.personNames ? new Map(parsed.personNames) : new Map<string, string>(),
+      tagNames: parsed.tagNames ? new Map(parsed.tagNames) : new Map<string, string>(),
     };
   } catch {
     return emptyNames();

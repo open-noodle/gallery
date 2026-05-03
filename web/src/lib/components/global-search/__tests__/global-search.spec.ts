@@ -385,7 +385,7 @@ describe('global-search root', () => {
   it('keeps the palette open and shows typed search issues after failed Enter commit', async () => {
     const m = new GlobalSearchManager();
     m.open();
-    vi.spyOn(m, 'activateSearch').mockImplementation(async () => {
+    vi.spyOn(m, 'activateSearch').mockImplementation(() => {
       m.typedSearchIssues = [
         {
           code: 'no-match',
@@ -395,6 +395,7 @@ describe('global-search root', () => {
           message: 'No person found for "anna"',
         },
       ];
+      return Promise.resolve();
     });
     render(GlobalSearch, { props: { manager: m } });
 

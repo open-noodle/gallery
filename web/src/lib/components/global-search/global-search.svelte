@@ -368,7 +368,7 @@
       return;
     }
     if (e.key === 'Enter' && inputValue.trim() === '' && getSearchablePageState(page.url).query !== '') {
-      manager.activateSearch('');
+      void manager.activateSearch('');
       e.preventDefault();
       return;
     }

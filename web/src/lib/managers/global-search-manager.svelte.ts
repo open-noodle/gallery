@@ -1255,7 +1255,7 @@ export class GlobalSearchManager {
     this.typedSearchPlainQuery = parsed.queryText;
     this.typedSearchIssues = [];
     this.typedSearchChoices = [];
-    for (const key of [...this.selectedTypedSearchChoices.keys()]) {
+    for (const key of this.selectedTypedSearchChoices.keys()) {
       if (!parsed.resolutionTokens.some((token) => token.raw === key)) {
         this.selectedTypedSearchChoices.delete(key);
       }
