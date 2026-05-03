@@ -20,18 +20,22 @@
   - Owns Enter-only resolution of `person:`, `tag:`, and `camera:` tokens into a `FilterState` patch and display-name maps.
 - Create: `web/src/lib/utils/typed-search/typed-search-resolver.spec.ts`
   - Unit tests with mocked `@immich/sdk` calls for resolution success, ambiguity, missing matches, and SDK errors.
+- Create: `web/src/lib/utils/typed-search/typed-search-name-cache.ts`
+  - Stores resolver-provided person/tag display names in `sessionStorage` by destination URL so active chips can show labels immediately after palette navigation.
+- Create: `web/src/lib/utils/typed-search/typed-search-name-cache.spec.ts`
+  - Unit tests for storing, reading, one-shot consumption, and malformed storage data.
 - Create: `web/src/lib/components/global-search/typed-search-token-rail.svelte`
   - Renders the quiet inline token rail behind/around the command input while preserving normal text input behavior.
 - Create: `web/src/lib/components/global-search/__tests__/typed-search-token-rail.spec.ts`
   - Component tests for token states and accessible labels.
 - Modify: `web/src/lib/utils/searchable-page-search.ts`
   - Extends existing helpers with typed filter serialization and hydration.
-- Modify: `web/src/lib/utils/__tests__/searchable-page-search.spec.ts`
-  - Adds URL round-trip tests for typed filters and sort/query preservation.
+- Create: `web/src/lib/utils/__tests__/searchable-page-search.spec.ts`
+  - Adds URL round-trip tests for existing searchable-page behavior and typed filters.
 - Modify: `web/src/lib/managers/global-search-manager.svelte.ts`
   - Adds typed-search parse state, commit issues, ambiguity state, and `activateSearch()` commit path.
 - Modify: `web/src/lib/managers/global-search-manager.svelte.spec.ts`
-  - Adds manager tests for Enter commit, all-or-nothing blocking, resolver errors, context-aware destinations, and recents.
+  - Adds manager tests for Enter commit, all-or-nothing blocking, resolver errors, live-provider plain-query payloads, context-aware destinations, and recents.
 - Modify: `web/src/lib/components/global-search/global-search.svelte`
   - Renders token rail, issue rows, ambiguity rows, and routes Enter through typed-search commit.
 - Modify: `web/src/lib/components/global-search/__tests__/global-search.spec.ts`
@@ -39,11 +43,15 @@
 - Modify: `web/src/routes/(user)/photos/[[assetId=id]]/+page.svelte`
   - Hydrates typed filter URL params into local `FilterState`; clears typed filter params with search/filter clear actions.
 - Modify: `web/src/routes/(user)/photos/[[assetId=id]]/photos-page.spec.ts`
-  - Adds photos page URL hydration tests.
+  - Adds photos page URL hydration and clear-filter URL sync tests.
+- Create: `web/src/test-data/mocks/active-filters-bar-actions.stub.svelte`
+  - Exposes active-filter clear/remove callbacks for destination page route tests.
+- Modify: `web/src/test-data/mocks/smart-search-results.stub.svelte`
+  - Exposes filter fields as data attributes for route hydration assertions.
 - Modify: `web/src/routes/(user)/spaces/[spaceId]/[[photos=photos]]/[[assetId=id]]/+page.svelte`
   - Hydrates typed filter URL params into local `FilterState`; clears typed filter params with search/filter clear actions.
 - Modify: `web/src/routes/(user)/spaces/[spaceId]/[[photos=photos]]/[[assetId=id]]/spaces-page.spec.ts`
-  - Adds space page URL hydration tests.
+  - Adds space page URL hydration and active-filter URL sync tests.
 
 ## Common Types And APIs
 
@@ -143,7 +151,7 @@ Expected: exit 0 and `open-api/typescript-sdk/build/index.js` exists.
 Run:
 
 ```bash
-pnpm --dir web exec vitest --run src/lib/utils/__tests__/searchable-page-search.spec.ts src/lib/managers/global-search-manager.svelte.spec.ts
+pnpm --dir web exec vitest --run src/lib/utils/__tests__/space-search.spec.ts src/lib/managers/global-search-manager.svelte.spec.ts
 ```
 
 Expected: existing tests pass. If unrelated existing tests fail, record the failure and continue only after confirming the failure exists before feature edits.
@@ -243,6 +251,20 @@ describe('parseTypedSearch', () => {
     const result = parseTypedSearch('person: city:"New York');
 
     expect(result.issues.map((issue) => issue.code)).toEqual(['empty-value', 'unterminated-quote']);
+  });
+
+  it('rejects escaped quote sequences in quoted values', () => {
+    const result = parseTypedSearch('person:"Anna \\"The Ace\\""');
+
+    expect(result.issues).toEqual([
+      {
+        code: 'escaped-quote',
+        key: 'person',
+        raw: 'person:"Anna \\"The Ace\\""',
+        value: 'Anna \\"The Ace\\"',
+        message: 'Escaped quotes are not supported in filters',
+      },
+    ]);
   });
 
   it('rejects duplicate scalar filters but allows repeated people and tags', () => {
@@ -408,6 +430,7 @@ export function parseTypedSearch(raw: string): TypedSearchParseResult {
 Implement helper functions in the same file:
 
 - `splitSearch(raw)` scans whitespace-delimited pieces while preserving quoted values.
+- `splitSearch(raw)` must leave URL-like strings containing `://` as plain query text instead of treating `http:` as an unknown filter.
 - `normalizeScalarToken(key, raw, value)` validates `from`, `to`, `city`, `country`, `type`, `favorite`, and `rating`.
 - `expandDate(value, boundary)` accepts `YYYY`, `YYYY-MM`, and `YYYY-MM-DD`.
 - `validateDateRange(tokens)` compares normalized `from` and `to`.
@@ -438,19 +461,56 @@ git commit -m "feat(web): add typed search parser"
 
 **Files:**
 - Modify: `web/src/lib/utils/searchable-page-search.ts`
-- Modify: `web/src/lib/utils/__tests__/searchable-page-search.spec.ts`
+- Create: `web/src/lib/utils/__tests__/searchable-page-search.spec.ts`
+- Create: `web/src/lib/utils/typed-search/typed-search-name-cache.ts`
+- Create: `web/src/lib/utils/typed-search/typed-search-name-cache.spec.ts`
 
 - [ ] **Step 1: Write failing URL tests**
 
-Append to `web/src/lib/utils/__tests__/searchable-page-search.spec.ts`:
+Create `web/src/lib/utils/__tests__/searchable-page-search.spec.ts`:
 
 ```ts
 import { createFilterState } from '$lib/components/filter-panel/filter-panel';
 import {
   buildSearchablePageUrl,
   clearSearchablePageFilterParams,
+  getSearchablePageState,
   getSearchablePageFilterState,
 } from '$lib/utils/searchable-page-search';
+
+describe('searchable page URL state', () => {
+  it('detects photos as a searchable page', () => {
+    const state = getSearchablePageState(new URL('https://gallery.test/photos?q=beach'));
+
+    expect(state).toMatchObject({
+      basePath: '/photos',
+      isSearchable: true,
+      query: 'beach',
+      sortOrder: 'relevance',
+    });
+  });
+
+  it('detects spaces and space photos as searchable pages', () => {
+    expect(getSearchablePageState(new URL('https://gallery.test/spaces/space-1')).basePath).toBe('/spaces/space-1');
+    expect(getSearchablePageState(new URL('https://gallery.test/spaces/space-1/photos')).basePath).toBe(
+      '/spaces/space-1/photos',
+    );
+  });
+
+  it('builds the existing query-only URL without filters', () => {
+    const url = new URL('https://gallery.test/photos?view=timeline');
+
+    expect(buildSearchablePageUrl(url, 'beach')).toBe('/photos?view=timeline&q=beach');
+  });
+
+  it('preserves existing typed filter params when no replacement filter state is supplied', () => {
+    const url = new URL('https://gallery.test/photos?q=beach&people=person-1&city=Berlin&view=timeline');
+
+    expect(buildSearchablePageUrl(url, 'sunset', 'asc')).toBe(
+      '/photos?q=sunset&people=person-1&city=Berlin&view=timeline&sort=asc',
+    );
+  });
+});
 
 describe('typed filter URL state', () => {
   it('serializes typed filters into photos URLs while preserving query and sort', () => {
@@ -476,6 +536,20 @@ describe('typed filter URL state', () => {
     expect(result).toBe(
       '/photos?view=timeline&q=beach&sort=asc&people=person-1%2Cperson-2&tags=tag-1&city=Berlin&country=Germany&make=Nikon&model=Z8&type=image&favorite=true&rating=4&from=2025-01-01&to=2026-12-31',
     );
+  });
+
+  it('serializes typed filters into space URLs', () => {
+    const url = new URL('https://gallery.test/spaces/space-1/photos?panel=closed');
+    const filters = {
+      ...createFilterState(),
+      city: 'Berlin',
+      mediaType: 'video' as const,
+      sortOrder: 'relevance' as const,
+    };
+
+    const result = buildSearchablePageUrl(url, 'beach', 'relevance', filters);
+
+    expect(result).toBe('/spaces/space-1/photos?panel=closed&q=beach&city=Berlin&type=video');
   });
 
   it('hydrates typed filter params into FilterState', () => {
@@ -510,15 +584,53 @@ describe('typed filter URL state', () => {
 });
 ```
 
+Create `web/src/lib/utils/typed-search/typed-search-name-cache.spec.ts`:
+
+```ts
+import { beforeEach, describe, expect, it } from 'vitest';
+import { consumeTypedSearchNames, storeTypedSearchNames } from './typed-search-name-cache';
+
+describe('typed search name cache', () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+  });
+
+  it('stores and consumes names by destination URL', () => {
+    storeTypedSearchNames('/photos?q=beach&people=person-1', {
+      personNames: new Map([['person-1', 'Anna']]),
+      tagNames: new Map([['tag-1', 'Travel']]),
+    });
+
+    const result = consumeTypedSearchNames('/photos?q=beach&people=person-1');
+
+    expect(result.personNames).toEqual(new Map([['person-1', 'Anna']]));
+    expect(result.tagNames).toEqual(new Map([['tag-1', 'Travel']]));
+    expect(consumeTypedSearchNames('/photos?q=beach&people=person-1')).toEqual({
+      personNames: new Map(),
+      tagNames: new Map(),
+    });
+  });
+
+  it('ignores malformed storage data', () => {
+    sessionStorage.setItem('typed-search:names:/photos', '{not-json');
+
+    expect(consumeTypedSearchNames('/photos')).toEqual({
+      personNames: new Map(),
+      tagNames: new Map(),
+    });
+  });
+});
+```
+
 - [ ] **Step 2: Run URL tests and verify red**
 
 Run:
 
 ```bash
-pnpm --dir web exec vitest --run src/lib/utils/__tests__/searchable-page-search.spec.ts
+pnpm --dir web exec vitest --run src/lib/utils/__tests__/searchable-page-search.spec.ts src/lib/utils/typed-search/typed-search-name-cache.spec.ts
 ```
 
-Expected: FAIL because `clearSearchablePageFilterParams` and `getSearchablePageFilterState` are missing and `buildSearchablePageUrl` does not accept filters.
+Expected: FAIL because `clearSearchablePageFilterParams`, `getSearchablePageFilterState`, and typed-search name cache helpers are missing and `buildSearchablePageUrl` does not accept filters.
 
 - [ ] **Step 3: Implement URL helpers**
 
@@ -597,20 +709,73 @@ export function buildSearchablePageUrl(
 Inside it, after query/sort handling:
 
 ```ts
-clearSearchablePageFilterParams(params);
-if (filters) {
+if (filters !== undefined) {
+  clearSearchablePageFilterParams(params);
   appendSearchablePageFilterParams(params, filters);
 }
 ```
 
 Add `appendSearchablePageFilterParams`, `splitListParam`, `parseRating`, `parseMediaType`, `parseFavorite`, and `parseDateParam` in the same file.
 
+Create `web/src/lib/utils/typed-search/typed-search-name-cache.ts`:
+
+```ts
+type StoredTypedSearchNames = {
+  personNames: Array<[string, string]>;
+  tagNames: Array<[string, string]>;
+};
+
+const prefix = 'typed-search:names:';
+
+function emptyNames() {
+  return {
+    personNames: new Map<string, string>(),
+    tagNames: new Map<string, string>(),
+  };
+}
+
+export function storeTypedSearchNames(
+  destination: string,
+  names: { personNames: Map<string, string>; tagNames: Map<string, string> },
+) {
+  if (typeof sessionStorage === 'undefined') {
+    return;
+  }
+  const payload: StoredTypedSearchNames = {
+    personNames: [...names.personNames.entries()],
+    tagNames: [...names.tagNames.entries()],
+  };
+  sessionStorage.setItem(`${prefix}${destination}`, JSON.stringify(payload));
+}
+
+export function consumeTypedSearchNames(destination: string) {
+  if (typeof sessionStorage === 'undefined') {
+    return emptyNames();
+  }
+  const key = `${prefix}${destination}`;
+  const raw = sessionStorage.getItem(key);
+  sessionStorage.removeItem(key);
+  if (!raw) {
+    return emptyNames();
+  }
+  try {
+    const parsed = JSON.parse(raw) as StoredTypedSearchNames;
+    return {
+      personNames: new Map(parsed.personNames ?? []),
+      tagNames: new Map(parsed.tagNames ?? []),
+    };
+  } catch {
+    return emptyNames();
+  }
+}
+```
+
 - [ ] **Step 4: Run URL tests and verify green**
 
 Run:
 
 ```bash
-pnpm --dir web exec vitest --run src/lib/utils/__tests__/searchable-page-search.spec.ts
+pnpm --dir web exec vitest --run src/lib/utils/__tests__/searchable-page-search.spec.ts src/lib/utils/typed-search/typed-search-name-cache.spec.ts
 ```
 
 Expected: PASS.
@@ -620,7 +785,7 @@ Expected: PASS.
 Run:
 
 ```bash
-git add web/src/lib/utils/searchable-page-search.ts web/src/lib/utils/__tests__/searchable-page-search.spec.ts
+git add web/src/lib/utils/searchable-page-search.ts web/src/lib/utils/__tests__/searchable-page-search.spec.ts web/src/lib/utils/typed-search/typed-search-name-cache.ts web/src/lib/utils/typed-search/typed-search-name-cache.spec.ts
 git commit -m "feat(web): serialize typed search filters in URLs"
 ```
 
@@ -631,12 +796,94 @@ git commit -m "feat(web): serialize typed search filters in URLs"
 **Files:**
 - Modify: `web/src/routes/(user)/photos/[[assetId=id]]/+page.svelte`
 - Modify: `web/src/routes/(user)/photos/[[assetId=id]]/photos-page.spec.ts`
+- Create: `web/src/test-data/mocks/active-filters-bar-actions.stub.svelte`
+- Modify: `web/src/test-data/mocks/smart-search-results.stub.svelte`
 - Modify: `web/src/routes/(user)/spaces/[spaceId]/[[photos=photos]]/[[assetId=id]]/+page.svelte`
 - Modify: `web/src/routes/(user)/spaces/[spaceId]/[[photos=photos]]/[[assetId=id]]/spaces-page.spec.ts`
 
-- [ ] **Step 1: Write failing photos hydration test**
+- [ ] **Step 1: Extend the smart-search results test stub**
+
+Modify the `<div>` in `web/src/test-data/mocks/smart-search-results.stub.svelte` so route tests can assert hydrated filters:
+
+```svelte
+<div
+  {...rest}
+  data-testid="smart-search-results"
+  data-loading={String(isLoading)}
+  data-search-query={searchQuery}
+  data-sort-order={filters?.sortOrder ?? ''}
+  data-is-favorite={String(filters?.isFavorite)}
+  data-filter-favorite={String(filters?.isFavorite)}
+  data-filter-person-ids={filters?.personIds.join(',') ?? ''}
+  data-filter-tag-ids={filters?.tagIds.join(',') ?? ''}
+  data-filter-media-type={filters?.mediaType ?? ''}
+  data-filter-rating={filters?.rating ?? ''}
+  data-filter-date-after={filters?.dateAfter ?? ''}
+  data-filter-date-before={filters?.dateBefore ?? ''}
+  data-filter-city={filters?.city ?? ''}
+  data-filter-country={filters?.country ?? ''}
+  data-filter-make={filters?.make ?? ''}
+  data-filter-model={filters?.model ?? ''}
+  data-with-shared-spaces={String(withSharedSpaces)}
+  data-space-id={spaceId ?? ''}
+  data-country={filters?.country ?? ''}
+  data-language={language}
+  data-total={total ?? ''}
+></div>
+```
+
+Create `web/src/test-data/mocks/active-filters-bar-actions.stub.svelte` so route tests can exercise clear/remove callbacks:
+
+```svelte
+<script lang="ts">
+  type Props = {
+    searchQuery?: string;
+    onClearSearch?: () => void;
+    onClearAll?: () => void;
+    onRemoveFilter?: (type: string, id?: string) => void;
+  };
+
+  let { searchQuery = '', onClearSearch, onClearAll, onRemoveFilter }: Props = $props();
+</script>
+
+<div data-testid="active-filters-bar-stub">
+  <button type="button" data-testid="active-filters-clear-search" onclick={() => onClearSearch?.()}>Clear search</button>
+  <button
+    type="button"
+    data-testid="active-filters-clear-all"
+    onclick={() => {
+      onClearAll?.();
+      if (searchQuery) {
+        onClearSearch?.();
+      }
+    }}
+  >
+    Clear all
+  </button>
+  <button type="button" data-testid="active-filters-remove-person" onclick={() => onRemoveFilter?.('person', 'person-1')}>
+    Remove person
+  </button>
+</div>
+```
+
+- [ ] **Step 2: Write failing photos hydration test**
 
 Append to `Photos page search URL state` in `photos-page.spec.ts`:
+
+Add the mocked navigation import if it is not already present:
+
+```ts
+import { goto } from '$app/navigation';
+```
+
+Update the active filters bar mock in this spec to use the actionable stub:
+
+```ts
+vi.mock('$lib/components/filter-panel/active-filters-bar.svelte', async () => {
+  const { default: MockComponent } = await import('@test-data/mocks/active-filters-bar-actions.stub.svelte');
+  return { default: MockComponent };
+});
+```
 
 ```ts
 it('hydrates typed filter URL params into the photos FilterState', () => {
@@ -655,11 +902,46 @@ it('hydrates typed filter URL params into the photos FilterState', () => {
   expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-filter-date-after', '2025-01-01');
   expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-filter-date-before', '2025-12-31');
 });
+
+it('clears only q when clearing the search chip', async () => {
+  mockPage.url = new URL('https://gallery.test/photos?view=timeline&q=beach&people=person-1&city=Berlin');
+
+  renderPage();
+  await fireEvent.click(await screen.findByTestId('active-filters-clear-search'));
+
+  expect(goto).toHaveBeenCalledWith('/photos?view=timeline&people=person-1&city=Berlin', {
+    replaceState: true,
+    keepFocus: true,
+    noScroll: true,
+  });
+});
+
+it('clears typed filter URL params and q when clearing all active filters', async () => {
+  mockPage.url = new URL('https://gallery.test/photos?view=timeline&q=beach&people=person-1&city=Berlin');
+
+  renderPage();
+  await fireEvent.click(await screen.findByTestId('active-filters-clear-all'));
+
+  expect(goto).toHaveBeenLastCalledWith('/photos?view=timeline', {
+    replaceState: true,
+    keepFocus: true,
+    noScroll: true,
+  });
+});
 ```
 
-- [ ] **Step 2: Write failing spaces hydration test**
+- [ ] **Step 3: Write failing spaces hydration test**
 
 Append to `spaces-page.spec.ts`:
+
+Update the active filters bar mock in this spec to use the actionable stub:
+
+```ts
+vi.mock('$lib/components/filter-panel/active-filters-bar.svelte', async () => {
+  const { default: MockComponent } = await import('@test-data/mocks/active-filters-bar-actions.stub.svelte');
+  return { default: MockComponent };
+});
+```
 
 ```ts
 it('hydrates typed filter URL params into the space FilterState', async () => {
@@ -672,9 +954,22 @@ it('hydrates typed filter URL params into the space FilterState', async () => {
   expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-filter-city', 'Berlin');
   expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-filter-media-type', 'video');
 });
+
+it('removes only the selected typed filter from the space URL', async () => {
+  mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?q=beach&people=person-1&city=Berlin');
+
+  renderPage({ space: makeSpace(), members: [makeMember()] });
+  await fireEvent.click(await screen.findByTestId('active-filters-remove-person'));
+
+  expect(gotoMock).toHaveBeenCalledWith('/spaces/space-1/photos?q=beach&city=Berlin', {
+    replaceState: true,
+    keepFocus: true,
+    noScroll: true,
+  });
+});
 ```
 
-- [ ] **Step 3: Run page tests and verify red**
+- [ ] **Step 4: Run page tests and verify red**
 
 Run:
 
@@ -682,9 +977,9 @@ Run:
 pnpm --dir web exec vitest --run 'src/routes/(user)/photos/[[assetId=id]]/photos-page.spec.ts' 'src/routes/(user)/spaces/[spaceId]/[[photos=photos]]/[[assetId=id]]/spaces-page.spec.ts'
 ```
 
-Expected: FAIL because route components ignore typed filter URL params.
+Expected: FAIL because route components ignore typed filter URL params and active filter callbacks do not sync typed filter params back to the URL, not because the test stubs lack assertion attributes.
 
-- [ ] **Step 4: Implement photos hydration**
+- [ ] **Step 5: Implement photos hydration**
 
 Modify imports in `photos +page.svelte`:
 
@@ -694,6 +989,7 @@ import {
   getSearchablePageFilterState,
   getSearchablePageState,
 } from '$lib/utils/searchable-page-search';
+import { consumeTypedSearchNames } from '$lib/utils/typed-search/typed-search-name-cache';
 ```
 
 Initialize filters:
@@ -707,6 +1003,18 @@ let filters = $state<FilterState>({
   sortOrder: initialSearchState.sortOrder,
 });
 let lastHandledSearchState = $state(`${initialSearchState.query}:${initialSearchState.sortOrder}:${page.url.search}`);
+```
+
+Immediately after `personNames` and `tagNames` are initialized, consume cached names for the current route:
+
+```ts
+const initialTypedSearchNames = consumeTypedSearchNames(page.url.pathname + page.url.search);
+for (const [id, name] of initialTypedSearchNames.personNames) {
+  personNames.set(id, name);
+}
+for (const [id, name] of initialTypedSearchNames.tagNames) {
+  tagNames.set(id, name);
+}
 ```
 
 Update the URL sync effect token and assignment:
@@ -723,9 +1031,65 @@ filters = {
 
 Keep the existing smart facet reset when query changes, and also reset facets when filter URL params change.
 
-- [ ] **Step 5: Implement spaces hydration**
+Update `clearSearch()` so clearing the search chip preserves the current filter state instead of preserving stale filter params from `page.url`:
 
-Make the same import, initial state, and URL sync changes in the spaces page. In the space-change effect, use:
+```ts
+function clearSearch() {
+  isLoading = false;
+  const nextUrl = buildSearchablePageUrl(page.url, '', filters.sortOrder, filters);
+  if (!nextUrl) {
+    return;
+  }
+  void goto(nextUrl, { replaceState: true, keepFocus: true, noScroll: true });
+}
+```
+
+Add a local URL sync helper and use it from active filter callbacks:
+
+```ts
+function syncFilterUrl(nextFilters: FilterState) {
+  const nextUrl = buildSearchablePageUrl(page.url, committedQuery, nextFilters.sortOrder, nextFilters);
+  if (!nextUrl) {
+    return;
+  }
+  void goto(nextUrl, { replaceState: true, keepFocus: true, noScroll: true });
+}
+```
+
+Update `onRemoveFilter` and `onClearAll`:
+
+```svelte
+onRemoveFilter={(type, id) => {
+  const nextFilters = handlePhotosRemoveFilter(filters, type, id);
+  filters = nextFilters;
+  syncFilterUrl(nextFilters);
+}}
+onClearAll={() => {
+  const nextFilters = clearFilters(filters);
+  filters = nextFilters;
+  if (!committedQuery.trim()) {
+    syncFilterUrl(nextFilters);
+  }
+}}
+```
+
+- [ ] **Step 6: Implement spaces hydration**
+
+Make the same import, initial state, active-filter URL sync, and URL-state sync changes in the spaces page. Use the spaces page's existing `committedSearchQuery` name where the photos page uses `committedQuery`.
+
+Update `clearSearch()`, `handleRemoveFilter()`, and `onClearAll` with the same URL-sync rules:
+
+```ts
+function handleRemoveFilter(type: string, id?: string) {
+  const nextFilters = handleSpaceRemoveFilter(filters, type, id);
+  filters = nextFilters;
+  syncFilterUrl(nextFilters);
+}
+```
+
+When `onClearAll` runs and `committedSearchQuery.trim()` is non-empty, let the active filters bar's follow-up `onClearSearch` write the combined no-query/no-filter URL. If there is no query, call `syncFilterUrl(nextFilters)` immediately.
+
+In the space-change effect, use:
 
 ```ts
 const nextFilterState = getSearchablePageFilterState(page.url);
@@ -737,7 +1101,9 @@ filters = {
 lastHandledSearchState = `${nextSearchState.query}:${nextSearchState.sortOrder}:${page.url.search}`;
 ```
 
-- [ ] **Step 6: Run page tests and verify green**
+Also consume cached typed-search names in the spaces page using the same `consumeTypedSearchNames(page.url.pathname + page.url.search)` pattern after `personNames` and `tagNames` are initialized.
+
+- [ ] **Step 7: Run page tests and verify green**
 
 Run:
 
@@ -747,12 +1113,12 @@ pnpm --dir web exec vitest --run 'src/routes/(user)/photos/[[assetId=id]]/photos
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit route hydration slice**
+- [ ] **Step 8: Commit route hydration slice**
 
 Run:
 
 ```bash
-git add 'web/src/routes/(user)/photos/[[assetId=id]]/+page.svelte' 'web/src/routes/(user)/photos/[[assetId=id]]/photos-page.spec.ts' 'web/src/routes/(user)/spaces/[spaceId]/[[photos=photos]]/[[assetId=id]]/+page.svelte' 'web/src/routes/(user)/spaces/[spaceId]/[[photos=photos]]/[[assetId=id]]/spaces-page.spec.ts'
+git add 'web/src/routes/(user)/photos/[[assetId=id]]/+page.svelte' 'web/src/routes/(user)/photos/[[assetId=id]]/photos-page.spec.ts' web/src/test-data/mocks/active-filters-bar-actions.stub.svelte web/src/test-data/mocks/smart-search-results.stub.svelte 'web/src/routes/(user)/spaces/[spaceId]/[[photos=photos]]/[[assetId=id]]/+page.svelte' 'web/src/routes/(user)/spaces/[spaceId]/[[photos=photos]]/[[assetId=id]]/spaces-page.spec.ts'
 git commit -m "feat(web): hydrate typed search filters from URLs"
 ```
 
@@ -847,12 +1213,112 @@ describe('resolveTypedSearchFilters', () => {
     }
   });
 
+  it('uses a selected ambiguity choice without calling SDK resolution again for that token', async () => {
+    const selectedChoices = new Map([
+      [
+        'person:anna',
+        { tokenRaw: 'person:anna', key: 'person' as const, id: 'person-2', label: 'Anna Maria', value: 'anna' },
+      ],
+    ]);
+
+    const result = await resolveTypedSearchFilters(parseTypedSearch('person:anna'), { selectedChoices });
+
+    expect(searchPerson).not.toHaveBeenCalled();
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.filters.personIds).toEqual(['person-2']);
+      expect(result.personNames.get('person-2')).toBe('Anna Maria');
+    }
+  });
+
+  it('accumulates repeated people and tags in input order', async () => {
+    vi.mocked(searchPerson)
+      .mockResolvedValueOnce([{ id: 'person-1', name: 'Anna' } as never])
+      .mockResolvedValueOnce([{ id: 'person-2', name: 'Bob' } as never]);
+    vi.mocked(getFilterSuggestions).mockResolvedValue({
+      people: [],
+      countries: [],
+      cameraMakes: [],
+      cameraModels: [],
+      tags: [
+        { id: 'tag-1', value: 'Travel' },
+        { id: 'tag-2', value: 'Family' },
+      ],
+      ratings: [],
+      mediaTypes: [],
+      hasUnnamedPeople: false,
+    });
+
+    const result = await resolveTypedSearchFilters(parseTypedSearch('person:anna person:bob tag:travel tag:family'), {});
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.filters.personIds).toEqual(['person-1', 'person-2']);
+      expect(result.filters.tagIds).toEqual(['tag-1', 'tag-2']);
+    }
+  });
+
+  it('blocks when tag has no match', async () => {
+    const result = await resolveTypedSearchFilters(parseTypedSearch('tag:vacation'), {});
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.issues[0]).toMatchObject({ code: 'no-match', key: 'tag', value: 'vacation' });
+    }
+  });
+
+  it('blocks when tag resolution is ambiguous', async () => {
+    vi.mocked(getFilterSuggestions).mockResolvedValue({
+      people: [],
+      countries: [],
+      cameraMakes: [],
+      cameraModels: [],
+      tags: [
+        { id: 'tag-1', value: 'Travel' },
+        { id: 'tag-2', value: 'Travel 2025' },
+      ],
+      ratings: [],
+      mediaTypes: [],
+      hasUnnamedPeople: false,
+    });
+
+    const result = await resolveTypedSearchFilters(parseTypedSearch('tag:trav'), {});
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.issues[0]).toMatchObject({ code: 'ambiguous', key: 'tag', value: 'trav' });
+      expect(result.choices).toHaveLength(2);
+    }
+  });
+
   it('passes spaceId to suggestion-backed resolution', async () => {
     vi.mocked(searchPerson).mockResolvedValue([{ id: 'space-person-1', name: 'Anna' } as never]);
 
     await resolveTypedSearchFilters(parseTypedSearch('person:anna camera:nikon'), { spaceId: 'space-1' });
 
-    expect(getFilterSuggestions).toHaveBeenCalledWith(expect.objectContaining({ spaceId: 'space-1' }));
+    expect(getFilterSuggestions).toHaveBeenCalledWith(expect.objectContaining({ spaceId: 'space-1' }), expect.anything());
+  });
+
+  it('uses space-scoped people from filter suggestions when resolving people inside a space', async () => {
+    vi.mocked(getFilterSuggestions).mockResolvedValue({
+      people: [{ id: 'space-person-1', name: 'Anna' }],
+      countries: [],
+      cameraMakes: [],
+      cameraModels: [],
+      tags: [],
+      ratings: [],
+      mediaTypes: [],
+      hasUnnamedPeople: false,
+    });
+
+    const result = await resolveTypedSearchFilters(parseTypedSearch('person:anna'), { spaceId: 'space-1' });
+
+    expect(searchPerson).not.toHaveBeenCalled();
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.filters.personIds).toEqual(['space-person-1']);
+      expect(result.personNames.get('space-person-1')).toBe('Anna');
+    }
   });
 
   it('blocks when camera matches both make and model', async () => {
@@ -874,6 +1340,26 @@ describe('resolveTypedSearchFilters', () => {
       expect(result.issues[0]).toMatchObject({ code: 'ambiguous', key: 'camera', value: 'nikon' });
     }
   });
+
+  it('blocks when camera has no match', async () => {
+    const result = await resolveTypedSearchFilters(parseTypedSearch('camera:nikon'), {});
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.issues[0]).toMatchObject({ code: 'no-match', key: 'camera', value: 'nikon' });
+    }
+  });
+
+  it('returns a resolver-error issue for SDK failures', async () => {
+    vi.mocked(searchPerson).mockRejectedValue(new Error('network down'));
+
+    const result = await resolveTypedSearchFilters(parseTypedSearch('person:anna'), {});
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.issues[0]).toMatchObject({ code: 'resolver-error', message: 'network down' });
+    }
+  });
 });
 ```
 
@@ -893,7 +1379,7 @@ Create `typed-search-resolver.ts` with:
 
 ```ts
 import { createFilterState, type FilterState } from '$lib/components/filter-panel/filter-panel';
-import { AssetTypeEnum, getFilterSuggestions, searchPerson } from '@immich/sdk';
+import { getFilterSuggestions, searchPerson } from '@immich/sdk';
 import type { TypedSearchIssue, TypedSearchParseResult } from './typed-search-parser';
 
 export type TypedSearchChoice = {
@@ -908,6 +1394,7 @@ export type TypedSearchChoice = {
 export type TypedSearchResolveContext = {
   spaceId?: string;
   signal?: AbortSignal;
+  selectedChoices?: Map<string, TypedSearchChoice>;
 };
 
 export type TypedSearchResolveResult =
@@ -939,12 +1426,25 @@ export async function resolveTypedSearchFilters(
     applyScalar(filters, token.key, token.normalizedValue);
   }
 
-  const suggestions = parsed.resolutionTokens.some((token) => token.key === 'tag' || token.key === 'camera')
+  const needsSuggestions = parsed.resolutionTokens.some(
+    (token) => token.key === 'tag' || token.key === 'camera' || (token.key === 'person' && context.spaceId),
+  );
+  const suggestions = needsSuggestions
     ? await getFilterSuggestions({ spaceId: context.spaceId }, { signal: context.signal })
     : undefined;
 
   for (const token of parsed.resolutionTokens) {
+    const selectedChoice = context.selectedChoices?.get(token.raw);
+    if (selectedChoice) {
+      applySelectedChoice(selectedChoice, filters, personNames, tagNames);
+      continue;
+    }
+
     if (token.key === 'person') {
+      if (context.spaceId && suggestions) {
+        resolvePersonTokenFromSuggestions(token, suggestions.people, filters, personNames, issues, choices);
+        continue;
+      }
       const people = await searchPerson({ name: token.value, withHidden: false }, { signal: context.signal });
       const exact = people.filter((person) => person.name.toLowerCase() === token.value.toLowerCase());
       const matches = exact.length > 0 ? exact : people;
@@ -972,7 +1472,9 @@ export async function resolveTypedSearchFilters(
 }
 ```
 
-Add local helpers `applyScalar`, `resolveTagToken`, and `resolveCameraToken`. Keep all matching case-insensitive. For SDK errors other than abort, return one `resolver-error` issue.
+Wrap the SDK calls in `try/catch`. Re-throw abort errors so palette close still cancels work; for other SDK errors, return `{ ok: false, queryText: parsed.queryText, issues: [{ code: 'resolver-error', raw: parsed.raw, message }], choices: [] }`.
+
+Add local helpers `applyScalar`, `applySelectedChoice`, `resolvePersonTokenFromSuggestions`, `resolveTagToken`, and `resolveCameraToken`. Keep all matching case-insensitive; prefer exact entity/tag matches when one exists, return `ambiguous` when multiple non-exact suggestions match, and return `no-match` when nothing matches.
 
 - [ ] **Step 4: Run resolver tests and verify green**
 
@@ -1008,33 +1510,40 @@ Add mocks near the existing mocks in `global-search-manager.svelte.spec.ts`:
 ```ts
 const { typedSearchMock } = vi.hoisted(() => ({
   typedSearchMock: {
-    parseTypedSearch: vi.fn(),
     resolveTypedSearchFilters: vi.fn(),
   },
-}));
-
-vi.mock('$lib/utils/typed-search/typed-search-parser', () => ({
-  parseTypedSearch: typedSearchMock.parseTypedSearch,
 }));
 
 vi.mock('$lib/utils/typed-search/typed-search-resolver', () => ({
   resolveTypedSearchFilters: typedSearchMock.resolveTypedSearchFilters,
 }));
+
+vi.mock('$lib/utils/typed-search/typed-search-name-cache', () => ({
+  storeTypedSearchNames: vi.fn(),
+}));
 ```
+
+Add this import near the existing test imports:
+
+```ts
+import { storeTypedSearchNames } from '$lib/utils/typed-search/typed-search-name-cache';
+```
+
+Use the real `parseTypedSearch()` implementation in this manager spec. Do not mock the parser here: the existing manager file has many `setQuery()` tests that call `vi.resetAllMocks()`, and a parser mock would create broad unrelated failures unless every existing `beforeEach` restored its implementation.
 
 Add tests:
 
 ```ts
 describe('GlobalSearchManager typed search commit', () => {
   beforeEach(() => {
-    typedSearchMock.parseTypedSearch.mockReset();
     typedSearchMock.resolveTypedSearchFilters.mockReset();
+    vi.mocked(storeTypedSearchNames).mockClear();
+    vi.mocked(goto).mockClear();
     mockPage.url = new URL('https://gallery.test/photos');
   });
 
   it('navigates with typed filters when resolution succeeds', async () => {
     const manager = new GlobalSearchManager();
-    typedSearchMock.parseTypedSearch.mockReturnValue({ queryText: 'beach', scalarTokens: [], resolutionTokens: [], displayTokens: [], issues: [] });
     typedSearchMock.resolveTypedSearchFilters.mockResolvedValue({
       ok: true,
       queryText: 'beach',
@@ -1055,10 +1564,64 @@ describe('GlobalSearchManager typed search commit', () => {
     expect(manager.typedSearchIssues).toEqual([]);
   });
 
+  it('dispatches live providers with the plain query while preserving raw top-search commit text', async () => {
+    const manager = new GlobalSearchManager();
+    const providers = (manager as unknown as { providers: Record<keyof Sections, Provider> }).providers;
+    const photosRun = vi.fn().mockResolvedValue({ status: 'empty' as const });
+    providers.photos.run = photosRun;
+
+    manager.setQuery('beach camera:nikon');
+
+    await vi.waitFor(() => expect(photosRun).toHaveBeenCalledWith('beach', expect.anything(), expect.anything()));
+    expect(manager.topSearchMatch).toEqual({ id: 'top-search', query: 'beach', rawQuery: 'beach camera:nikon' });
+  });
+
+  it('blocks parser issues before calling the resolver', async () => {
+    const manager = new GlobalSearchManager();
+
+    await manager.activateSearch('beach persn:anna');
+
+    expect(typedSearchMock.resolveTypedSearchFilters).not.toHaveBeenCalled();
+    expect(goto).not.toHaveBeenCalled();
+    expect(manager.typedSearchIssues[0]).toMatchObject({ code: 'unknown-key', raw: 'persn:anna' });
+  });
+
+  it('stores resolver names for the destination URL before navigating', async () => {
+    const manager = new GlobalSearchManager();
+    typedSearchMock.resolveTypedSearchFilters.mockResolvedValue({
+      ok: true,
+      queryText: 'beach',
+      filters: { personIds: ['person-1'], tagIds: ['tag-1'], mediaType: 'all', sortOrder: 'desc' },
+      personNames: new Map([['person-1', 'Anna']]),
+      tagNames: new Map([['tag-1', 'Travel']]),
+    });
+
+    await manager.activateSearch('beach person:anna tag:travel');
+
+    expect(storeTypedSearchNames).toHaveBeenCalledWith('/photos?q=beach&people=person-1&tags=tag-1', {
+      personNames: new Map([['person-1', 'Anna']]),
+      tagNames: new Map([['tag-1', 'Travel']]),
+    });
+  });
+
+  it('supports filter-only searches without q', async () => {
+    const manager = new GlobalSearchManager();
+    typedSearchMock.resolveTypedSearchFilters.mockResolvedValue({
+      ok: true,
+      queryText: '',
+      filters: { personIds: ['person-1'], tagIds: [], mediaType: 'all', sortOrder: 'desc' },
+      personNames: new Map([['person-1', 'Anna']]),
+      tagNames: new Map(),
+    });
+
+    await manager.activateSearch('person:anna');
+
+    expect(goto).toHaveBeenCalledWith('/photos?people=person-1');
+  });
+
   it('blocks navigation and exposes issues when resolution fails', async () => {
     const manager = new GlobalSearchManager();
     const issue = { code: 'no-match', key: 'person', raw: 'person:anna', value: 'anna', message: 'No person found for "anna"' };
-    typedSearchMock.parseTypedSearch.mockReturnValue({ queryText: 'beach', scalarTokens: [], resolutionTokens: [], displayTokens: [], issues: [] });
     typedSearchMock.resolveTypedSearchFilters.mockResolvedValue({ ok: false, queryText: 'beach', issues: [issue], choices: [] });
 
     await manager.activateSearch('beach person:anna');
@@ -1067,10 +1630,27 @@ describe('GlobalSearchManager typed search commit', () => {
     expect(manager.typedSearchIssues).toEqual([issue]);
   });
 
+  it('stores an ambiguity choice and clears matching issue state', () => {
+    const manager = new GlobalSearchManager();
+    const issue = { code: 'ambiguous', key: 'person', raw: 'person:anna', value: 'anna', message: 'Choose a person for "anna"' };
+    const choice = { tokenRaw: 'person:anna', key: 'person' as const, id: 'person-2', label: 'Anna Maria', value: 'anna' };
+    manager.typedSearchIssues = [issue];
+    manager.typedSearchChoices = [choice];
+    manager.typedSearchDisplayTokens = [{ raw: 'person:anna', key: 'person', value: 'anna', status: 'error', issue }];
+
+    manager.selectTypedSearchChoice(choice);
+
+    expect(manager.selectedTypedSearchChoices.get('person:anna')).toEqual(choice);
+    expect(manager.typedSearchIssues).toEqual([]);
+    expect(manager.typedSearchChoices).toEqual([]);
+    expect(manager.typedSearchDisplayTokens).toEqual([
+      { raw: 'person:anna', key: 'person', value: 'Anna Maria', status: 'resolved-entity' },
+    ]);
+  });
+
   it('falls back to photos when current page is not searchable', async () => {
     mockPage.url = new URL('https://gallery.test/albums');
     const manager = new GlobalSearchManager();
-    typedSearchMock.parseTypedSearch.mockReturnValue({ queryText: 'beach', scalarTokens: [], resolutionTokens: [], displayTokens: [], issues: [] });
     typedSearchMock.resolveTypedSearchFilters.mockResolvedValue({
       ok: true,
       queryText: 'beach',
@@ -1094,7 +1674,7 @@ Run:
 pnpm --dir web exec vitest --run src/lib/managers/global-search-manager.svelte.spec.ts
 ```
 
-Expected: FAIL because `activateSearch` is synchronous and manager has no typed issue state.
+Expected: FAIL because `activateSearch` is synchronous, manager has no typed issue state, and live provider batches still use the raw query.
 
 - [ ] **Step 3: Implement manager commit state**
 
@@ -1103,6 +1683,7 @@ Modify `global-search-manager.svelte.ts`:
 ```ts
 import { parseTypedSearch, type TypedSearchDisplayToken, type TypedSearchIssue } from '$lib/utils/typed-search/typed-search-parser';
 import { resolveTypedSearchFilters, type TypedSearchChoice } from '$lib/utils/typed-search/typed-search-resolver';
+import { storeTypedSearchNames } from '$lib/utils/typed-search/typed-search-name-cache';
 ```
 
 Add state:
@@ -1111,6 +1692,9 @@ Add state:
 typedSearchDisplayTokens = $state<TypedSearchDisplayToken[]>([]);
 typedSearchIssues = $state<TypedSearchIssue[]>([]);
 typedSearchChoices = $state<TypedSearchChoice[]>([]);
+// eslint-disable-next-line svelte/prefer-svelte-reactivity
+selectedTypedSearchChoices = new Map<string, TypedSearchChoice>();
+typedSearchPlainQuery = $state('');
 ```
 
 Add a parse helper:
@@ -1119,12 +1703,55 @@ Add a parse helper:
 parseTypedSearchDraft(text = this.query) {
   const parsed = parseTypedSearch(text);
   this.typedSearchDisplayTokens = parsed.displayTokens;
-  if (this.typedSearchIssues.length === 0) {
-    this.typedSearchChoices = [];
+  this.typedSearchPlainQuery = parsed.queryText;
+  this.typedSearchIssues = [];
+  this.typedSearchChoices = [];
+  for (const key of [...this.selectedTypedSearchChoices.keys()]) {
+    if (!parsed.resolutionTokens.some((token) => token.raw === key)) {
+      this.selectedTypedSearchChoices.delete(key);
+    }
   }
   return parsed;
 }
 ```
+
+Add a choice helper:
+
+```ts
+selectTypedSearchChoice(choice: TypedSearchChoice) {
+  this.selectedTypedSearchChoices.set(choice.tokenRaw, choice);
+  this.typedSearchIssues = this.typedSearchIssues.filter((issue) => issue.raw !== choice.tokenRaw);
+  this.typedSearchChoices = this.typedSearchChoices.filter((item) => item.tokenRaw !== choice.tokenRaw);
+  this.typedSearchDisplayTokens = this.typedSearchDisplayTokens.map((token) =>
+    token.raw === choice.tokenRaw
+      ? { raw: token.raw, key: token.key, value: choice.label, status: 'resolved-entity' as const }
+      : token,
+  );
+}
+```
+
+Update live provider payload and top-search display so live results use plain query text, while Enter still commits the raw input:
+
+```ts
+private getSearchProviderPayload(): string {
+  if (this.scope !== 'all') {
+    return this.payload;
+  }
+  return this.typedSearchPlainQuery;
+}
+```
+
+Use `getSearchProviderPayload()` in `runBatch()` for entity providers when `scope === 'all'`. Keep prefix scopes (`@`, `#`, `/`, `>`) using `this.payload`. Update the top-search type and derived value:
+
+In `setQuery()`, call `parseTypedSearchDraft()` after `this.query` is updated and before the debounced batch is scheduled. For non-`all` prefix scopes, clear typed-search display/issues/choices so prefix modes do not show stale typed tokens.
+
+In `runBatch()`, derive `providerPayload = scope === 'all' ? this.getSearchProviderPayload() : payload` and use `providerPayload` for min-length checks and `provider.run(providerPayload, mode, signal)`. Keep the original `payload` for bare-prefix detection so `@`, `#`, `/`, and `>` behavior remains unchanged.
+
+```ts
+type TopSearchMatch = { id: 'top-search'; query: string; rawQuery: string };
+```
+
+For all-scope typed search, return `{ id: 'top-search', query: this.typedSearchPlainQuery || query, rawQuery: query }` so a filter-only search can still be committed.
 
 Change `activateSearch` to async:
 
@@ -1136,8 +1763,19 @@ async activateSearch(text: string): Promise<void> {
   }
 
   const parsed = this.parseTypedSearchDraft(trimmed);
+  if (parsed.issues.length > 0) {
+    this.typedSearchIssues = parsed.issues;
+    this.typedSearchChoices = [];
+    this.typedSearchDisplayTokens = parsed.displayTokens;
+    return;
+  }
+
   const spaceId = page.url.pathname.startsWith('/spaces/') ? page.url.pathname.split('/').filter(Boolean)[1] : undefined;
-  const resolved = await resolveTypedSearchFilters(parsed, { spaceId, signal: this.closeSignal });
+  const resolved = await resolveTypedSearchFilters(parsed, {
+    spaceId,
+    signal: this.closeSignal,
+    selectedChoices: this.selectedTypedSearchChoices,
+  });
 
   if (!resolved.ok) {
     this.typedSearchIssues = resolved.issues;
@@ -1157,11 +1795,13 @@ async activateSearch(text: string): Promise<void> {
     text: trimmed,
     lastUsed: Date.now(),
   });
-  void goto(this.buildSearchDestination(resolved.queryText, resolved.filters));
+  const destination = this.buildSearchDestination(resolved.queryText, resolved.filters);
+  storeTypedSearchNames(destination, { personNames: resolved.personNames, tagNames: resolved.tagNames });
+  void goto(destination);
 }
 ```
 
-Update `buildSearchDestination(text: string, filters?: FilterState)` and pass filters into `buildSearchablePageUrl`. For non-searchable fallback, construct `/photos` params using a temporary URL and `buildSearchablePageUrl(new URL('/photos', page.url), text, this.searchSortOrder, filters)`.
+Update `buildSearchDestination(text: string, filters?: FilterState)` and pass filters into `buildSearchablePageUrl`. For non-searchable fallback, construct `/photos` params using a temporary URL and `buildSearchablePageUrl(new URL('/photos', page.url), text, this.searchSortOrder, filters)`. Return a string from every branch; if `buildSearchablePageUrl` unexpectedly returns `null` for the fallback URL, return `/photos`.
 
 - [ ] **Step 4: Update call sites that assume synchronous activateSearch**
 
@@ -1172,6 +1812,8 @@ void this.activateSearch(entry.text);
 ```
 
 In `global-search.svelte`, existing calls already use `manager.activateSearch(...)`; convert click and key handlers to `void manager.activateSearch(...)`.
+
+When the active item is `manager.topSearchMatch`, pass `manager.topSearchMatch.rawQuery` to `activateSearch()` and keep `manager.topSearchMatch.query` for display text.
 
 - [ ] **Step 5: Run manager tests and verify green**
 
@@ -1309,21 +1951,40 @@ Expected: PASS.
 
 - [ ] **Step 5: Write failing palette integration tests**
 
+In `global-search.spec.ts`, include `getFilterSuggestions` in the existing `@immich/sdk` import and mock:
+
+```ts
+import { AssetVisibility, getFilterSuggestions, getMlHealth, searchAssets, searchPerson, searchPlaces, searchSmart } from '@immich/sdk';
+```
+
+```ts
+getFilterSuggestions: vi.fn().mockResolvedValue({
+  people: [],
+  countries: [],
+  cameraMakes: [],
+  cameraModels: [],
+  tags: [],
+  ratings: [],
+  mediaTypes: [],
+  hasUnnamedPeople: false,
+}),
+```
+
 Add to `global-search.spec.ts`:
 
 ```ts
-it('renders typed search tokens while typing without resolving filters', async () => {
+it('renders typed search tokens while typing without resolving suggestion-backed filters', async () => {
   const m = new GlobalSearchManager();
   const parseSpy = vi.spyOn(m, 'parseTypedSearchDraft');
   m.open();
   render(GlobalSearch, { props: { manager: m } });
 
-  await user.type(screen.getByRole('combobox'), 'beach person:anna from:2025');
+  await user.type(screen.getByRole('combobox'), 'beach camera:nikon from:2025');
 
   expect(parseSpy).toHaveBeenCalled();
   expect(screen.getByTestId('typed-search-token-rail')).toBeInTheDocument();
-  expect(screen.getByTestId('typed-search-token-person')).toHaveAttribute('data-status', 'pending-entity');
-  expect(searchPerson).not.toHaveBeenCalled();
+  expect(screen.getByTestId('typed-search-token-camera')).toHaveAttribute('data-status', 'pending-entity');
+  expect(getFilterSuggestions).not.toHaveBeenCalled();
 });
 
 it('keeps the palette open and shows typed search issues after failed Enter commit', async () => {
@@ -1340,6 +2001,28 @@ it('keeps the palette open and shows typed search issues after failed Enter comm
   expect(screen.getByText('No person found for "anna"')).toBeVisible();
   expect(screen.getByRole('dialog')).toBeInTheDocument();
 });
+
+it('renders ambiguity choices and sends selection to the manager', async () => {
+  const m = new GlobalSearchManager();
+  const selectSpy = vi.spyOn(m, 'selectTypedSearchChoice');
+  m.typedSearchIssues = [{ code: 'ambiguous', key: 'person', raw: 'person:anna', value: 'anna', message: 'Choose a person for "anna"' }];
+  m.typedSearchChoices = [
+    { tokenRaw: 'person:anna', key: 'person', id: 'person-1', label: 'Anna', value: 'anna' },
+    { tokenRaw: 'person:anna', key: 'person', id: 'person-2', label: 'Anna Maria', value: 'anna' },
+  ];
+  m.open();
+  render(GlobalSearch, { props: { manager: m } });
+
+  await user.click(screen.getByRole('button', { name: 'Anna Maria' }));
+
+  expect(selectSpy).toHaveBeenCalledWith({
+    tokenRaw: 'person:anna',
+    key: 'person',
+    id: 'person-2',
+    label: 'Anna Maria',
+    value: 'anna',
+  });
+});
 ```
 
 - [ ] **Step 6: Run palette tests and verify red**
@@ -1350,7 +2033,7 @@ Run:
 pnpm --dir web exec vitest --run src/lib/components/global-search/__tests__/global-search.spec.ts
 ```
 
-Expected: FAIL because the palette does not render token rail or issue rows.
+Expected: FAIL because the palette does not render token rail, issue rows, or ambiguity choice rows.
 
 - [ ] **Step 7: Integrate token rail and issue rows**
 
@@ -1391,6 +2074,29 @@ Above normal command groups, render issues:
 {/if}
 ```
 
+Below issue rows, render ambiguity choices:
+
+```svelte
+{#if manager.typedSearchChoices.length > 0}
+  <Command.Group class="mb-4" data-typed-search-choices>
+    <Command.GroupHeading class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+      Choose filter value
+    </Command.GroupHeading>
+    <div class="space-y-1 px-3">
+      {#each manager.typedSearchChoices as choice (`${choice.tokenRaw}:${choice.key}:${choice.id ?? choice.field ?? choice.label}`)}
+        <button
+          type="button"
+          class="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm hover:bg-primary/10"
+          onclick={() => manager.selectTypedSearchChoice(choice)}
+        >
+          <span>{choice.label}</span>
+        </button>
+      {/each}
+    </div>
+  </Command.Group>
+{/if}
+```
+
 - [ ] **Step 8: Run UI tests and verify green**
 
 Run:
@@ -1423,7 +2129,7 @@ Run:
 
 ```bash
 pnpm --filter @immich/sdk build
-pnpm --dir web exec vitest --run src/lib/utils/typed-search/typed-search-parser.spec.ts src/lib/utils/typed-search/typed-search-resolver.spec.ts src/lib/utils/__tests__/searchable-page-search.spec.ts src/lib/managers/global-search-manager.svelte.spec.ts src/lib/components/global-search/__tests__/typed-search-token-rail.spec.ts src/lib/components/global-search/__tests__/global-search.spec.ts 'src/routes/(user)/photos/[[assetId=id]]/photos-page.spec.ts' 'src/routes/(user)/spaces/[spaceId]/[[photos=photos]]/[[assetId=id]]/spaces-page.spec.ts'
+pnpm --dir web exec vitest --run src/lib/utils/typed-search/typed-search-parser.spec.ts src/lib/utils/typed-search/typed-search-resolver.spec.ts src/lib/utils/typed-search/typed-search-name-cache.spec.ts src/lib/utils/__tests__/searchable-page-search.spec.ts src/lib/managers/global-search-manager.svelte.spec.ts src/lib/components/global-search/__tests__/typed-search-token-rail.spec.ts src/lib/components/global-search/__tests__/global-search.spec.ts 'src/routes/(user)/photos/[[assetId=id]]/photos-page.spec.ts' 'src/routes/(user)/spaces/[spaceId]/[[photos=photos]]/[[assetId=id]]/spaces-page.spec.ts'
 ```
 
 Expected: PASS.
