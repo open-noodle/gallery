@@ -257,9 +257,7 @@ export type Person = {
   isHidden: boolean;
   species: string | null;
   thumbnailPath: string;
-  otherPeople: { sharedById: string; name: string; birthDate: string | null; role: PersonUserRole }[];
-  sharedBy: PersonUser[];
-  sharedWith: PersonUser[];
+  identityId: string | null;
 };
 
 export type PersonUser = User & { role: PersonUserRole };
@@ -307,6 +305,7 @@ export type SharedSpaceMember = {
   role: string;
   joinedAt: Date;
   showInTimeline: boolean;
+  sharePersonMetadata: boolean;
   lastViewedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -339,6 +338,7 @@ export type SharedSpacePerson = {
   spaceId: string;
   name: string;
   representativeFaceId: string | null;
+  representativeFaceSource: 'auto' | 'manual';
   isHidden: boolean;
   type: string;
   birthDate: string | null;
@@ -347,11 +347,19 @@ export type SharedSpacePerson = {
   createdAt: Date;
   updatedAt: Date;
   updateId: string;
-  // Populated via LEFT JOIN to asset_face → person in repository queries
-  personalPersonId: string | null;
-  personalName: string | null;
-  personalThumbnailPath: string | null;
-  personalBirthDate: Date | null;
+  identityId: string | null;
+  nameSource: string;
+  nameSourceProfileType: string | null;
+  nameSourceProfileId: string | null;
+  nameSourceUpdatedAt: Date | null;
+  birthDateSource: string;
+  birthDateSourceProfileType: string | null;
+  birthDateSourceProfileId: string | null;
+  birthDateSourceUpdatedAt: Date | null;
+  personalPersonId?: string | null;
+  personalName?: string | null;
+  personalThumbnailPath?: string | null;
+  personalBirthDate?: Date | null;
 };
 
 export type SharedSpacePersonFace = {
