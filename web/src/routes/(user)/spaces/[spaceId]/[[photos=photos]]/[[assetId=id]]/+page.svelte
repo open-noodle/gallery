@@ -39,6 +39,7 @@
   import { TimelineManager } from '$lib/managers/timeline-manager/timeline-manager.svelte';
   import { registerSelectionContext, registerSpaceContext } from '$lib/managers/command-context-manager.svelte';
   import { eventManager } from '$lib/managers/event-manager.svelte';
+  import { globalSearchManager } from '$lib/managers/global-search-manager.svelte';
   import { Route } from '$lib/route';
   import { MAX_SPACE_ASSETS_PER_REQUEST } from '$lib/constants';
   import { assetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
@@ -182,6 +183,7 @@
   for (const [id, name] of initialTypedSearchNames.tagNames) {
     tagNames.set(id, name);
   }
+  $effect(() => globalSearchManager.registerSearchablePageFilters(() => filters));
   let smartFacets = $state<SmartSearchFacetsResponseDto>();
   let smartFacetKey = $state('');
   let smartFacetInFlight:

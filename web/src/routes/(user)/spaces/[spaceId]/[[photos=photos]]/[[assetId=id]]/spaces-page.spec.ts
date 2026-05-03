@@ -1,5 +1,6 @@
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import TestWrapper from '$lib/components/TestWrapper.svelte';
+import type { FilterState } from '$lib/components/filter-panel/filter-panel';
 import type { TimelineAsset } from '$lib/managers/timeline-manager/types';
 import { lang } from '$lib/stores/preferences.store';
 import type { SharedSpaceMemberResponseDto, SharedSpaceResponseDto } from '@immich/sdk';
@@ -19,6 +20,7 @@ const {
   mockEventManager,
   mockRegisterSelectionContext,
   mockRegisterSpaceContext,
+  mockRegisterSearchablePageFilters,
 } = vi.hoisted(() => ({
   gotoMock: vi.fn().mockResolvedValue(undefined),
   mockPage: {
@@ -42,6 +44,7 @@ const {
   },
   mockRegisterSelectionContext: vi.fn(),
   mockRegisterSpaceContext: vi.fn(),
+  mockRegisterSearchablePageFilters: vi.fn(() => vi.fn()),
 }));
 
 vi.mock('$app/navigation', () => ({ goto: gotoMock }));
@@ -134,6 +137,11 @@ vi.mock('$lib/managers/command-context-manager.svelte', () => ({
   registerSpaceContext: mockRegisterSpaceContext,
 }));
 vi.mock('$lib/managers/event-manager.svelte', () => ({ eventManager: mockEventManager }));
+vi.mock('$lib/managers/global-search-manager.svelte', () => ({
+  globalSearchManager: {
+    registerSearchablePageFilters: mockRegisterSearchablePageFilters,
+  },
+}));
 vi.mock('$lib/utils/space-hero-storage', () => ({
   loadHeroCollapsed: vi.fn().mockReturnValue(false),
   persistHeroCollapsed: vi.fn(),
@@ -223,6 +231,7 @@ describe('Spaces page search URL state', () => {
     mockAssetMultiSelectManager.assets = [];
     mockPage.url = new URL('https://gallery.test/spaces/space-1/photos');
     lang.set('de');
+    mockRegisterSearchablePageFilters.mockReturnValue(vi.fn());
     vi.mocked(sdkMock.markSpaceViewed).mockResolvedValue(void 0 as never);
     sdkMock.addAssets.mockResolvedValue(void 0 as never);
     sdkMock.updateMemberPreferences.mockResolvedValue(makeMember({ sharePersonMetadata: false }));
@@ -310,6 +319,19 @@ describe('Spaces page search URL state', () => {
       'data-sections',
       'timeline,people,location,camera,tags,rating,media,favorites',
     );
+  });
+
+  it('registers current space filters for global sort changes', async () => {
+    renderPage();
+    await waitFor(() => expect(mockRegisterSearchablePageFilters).toHaveBeenCalledOnce());
+    const calls = mockRegisterSearchablePageFilters.mock.calls as unknown as Array<[() => FilterState]>;
+    const getFilters = calls[0][0];
+
+    expect(getFilters().isFavorite).toBeUndefined();
+    expect(getFilters().sortOrder).toBe('desc');
+    await fireEvent.click(screen.getByTestId('select-favorites-filter'));
+
+    await waitFor(() => expect(getFilters()).toMatchObject({ isFavorite: true, sortOrder: 'desc' }));
   });
 
   it('updates current member metadata sharing from the space menu', async () => {

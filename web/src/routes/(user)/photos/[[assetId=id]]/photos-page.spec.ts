@@ -1,6 +1,7 @@
 import { goto } from '$app/navigation';
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import TestWrapper from '$lib/components/TestWrapper.svelte';
+import type { FilterState } from '$lib/components/filter-panel/filter-panel';
 import { lang } from '$lib/stores/preferences.store';
 import { buildPhotosTimelineOptions } from '$lib/utils/photos-filter-options';
 import { AssetTypeEnum } from '@immich/sdk';
@@ -9,27 +10,34 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import type { Component } from 'svelte';
 import PhotosPage from './+page.svelte';
 
-const { mockPage, mockAssetMultiSelectManager, mockAuthManager, mockMemoryManager, mockRegisterSelectionContext } =
-  vi.hoisted(() => ({
-    mockPage: {
-      url: new URL('https://gallery.test/photos?q=nature'),
-      route: { id: '/(user)/photos/[[assetId=id]]' },
-      params: {},
-    },
-    mockAssetMultiSelectManager: {
-      selectionActive: false,
-      assets: [],
-      clear: vi.fn(),
-      isAllUserOwned: true,
-    },
-    mockAuthManager: {
-      preferences: { memories: { enabled: false } },
-    },
-    mockMemoryManager: {
-      memories: [] as unknown[],
-    },
-    mockRegisterSelectionContext: vi.fn(),
-  }));
+const {
+  mockPage,
+  mockAssetMultiSelectManager,
+  mockAuthManager,
+  mockMemoryManager,
+  mockRegisterSelectionContext,
+  mockRegisterSearchablePageFilters,
+} = vi.hoisted(() => ({
+  mockPage: {
+    url: new URL('https://gallery.test/photos?q=nature'),
+    route: { id: '/(user)/photos/[[assetId=id]]' },
+    params: {},
+  },
+  mockAssetMultiSelectManager: {
+    selectionActive: false,
+    assets: [],
+    clear: vi.fn(),
+    isAllUserOwned: true,
+  },
+  mockAuthManager: {
+    preferences: { memories: { enabled: false } },
+  },
+  mockMemoryManager: {
+    memories: [] as unknown[],
+  },
+  mockRegisterSelectionContext: vi.fn(),
+  mockRegisterSearchablePageFilters: vi.fn(() => vi.fn()),
+}));
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('$app/state', () => ({ page: mockPage }));
@@ -166,6 +174,12 @@ vi.mock('$lib/managers/command-context-manager.svelte', () => ({
   registerSelectionContext: mockRegisterSelectionContext,
 }));
 
+vi.mock('$lib/managers/global-search-manager.svelte', () => ({
+  globalSearchManager: {
+    registerSearchablePageFilters: mockRegisterSearchablePageFilters,
+  },
+}));
+
 vi.mock('$lib/managers/memory-manager.svelte', () => ({
   memoryManager: mockMemoryManager,
 }));
@@ -212,6 +226,7 @@ describe('Photos page search URL state', () => {
     mockAssetMultiSelectManager.selectionActive = false;
     mockAssetMultiSelectManager.assets = [];
     mockMemoryManager.memories = [];
+    mockRegisterSearchablePageFilters.mockReturnValue(vi.fn());
     sdkMock.getFilterSuggestions.mockResolvedValue({
       people: [],
       countries: [],
@@ -308,6 +323,21 @@ describe('Photos page search URL state', () => {
       'data-sections',
       'timeline,people,location,camera,tags,rating,media,favorites',
     );
+  });
+
+  it('registers current photos filters for global sort changes', async () => {
+    mockPage.url = new URL('https://gallery.test/photos');
+
+    renderPage();
+    await waitFor(() => expect(mockRegisterSearchablePageFilters).toHaveBeenCalledOnce());
+    const calls = mockRegisterSearchablePageFilters.mock.calls as unknown as Array<[() => FilterState]>;
+    const getFilters = calls[0][0];
+
+    expect(getFilters().isFavorite).toBeUndefined();
+    expect(getFilters().sortOrder).toBe('desc');
+    await fireEvent.click(screen.getByTestId('select-favorites-filter'));
+
+    await waitFor(() => expect(getFilters()).toMatchObject({ isFavorite: true, sortOrder: 'desc' }));
   });
 
   it('passes favorites into photos timeline options when selected', async () => {

@@ -357,6 +357,7 @@ export class GlobalSearchManager {
   private storageListener?: (e: StorageEvent) => void;
   private mlProbed = false;
   private keepOpenOnNextNavigate = false;
+  private searchablePageFiltersProvider?: () => FilterState | undefined;
 
   /**
    * Catalogs fetched lazily on first provider run and shared for the remainder of the
@@ -1311,7 +1312,7 @@ export class GlobalSearchManager {
   async applySearchSort(sortOrder: SearchablePageSortOrder, text = this.query) {
     this.searchSortOrder = sortOrder;
 
-    const nextUrl = buildSearchablePageUrl(page.url, text, sortOrder);
+    const nextUrl = buildSearchablePageUrl(page.url, text, sortOrder, this.searchablePageFiltersProvider?.());
     if (!nextUrl || nextUrl === page.url.pathname + page.url.search) {
       return;
     }
@@ -1327,6 +1328,16 @@ export class GlobalSearchManager {
       this.keepOpenOnNextNavigate = false;
       throw error;
     }
+  }
+
+  registerSearchablePageFilters(provider: () => FilterState | undefined) {
+    this.searchablePageFiltersProvider = provider;
+
+    return () => {
+      if (this.searchablePageFiltersProvider === provider) {
+        this.searchablePageFiltersProvider = undefined;
+      }
+    };
   }
 
   async activateSearch(text: string): Promise<void> {

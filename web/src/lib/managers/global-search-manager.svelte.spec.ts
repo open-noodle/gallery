@@ -1609,6 +1609,20 @@ describe('activate("command")', () => {
     expect(m.consumeKeepOpenOnNextNavigate()).toBe(false);
   });
 
+  it('applySearchSort serializes registered searchable page filters', async () => {
+    const m = new GlobalSearchManager();
+    mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?view=timeline&rating=2');
+    m.registerSearchablePageFilters(() => ({ ...createFilterState(), rating: 3 }));
+
+    await m.applySearchSort('asc', '');
+
+    expect(goto).toHaveBeenCalledWith('/spaces/space-1/photos?view=timeline&sort=asc&rating=3', {
+      replaceState: true,
+      keepFocus: true,
+      noScroll: true,
+    });
+  });
+
   it('open resets pre-search page sorting back to relevance for a new search session', () => {
     const m = new GlobalSearchManager();
     mockPage.url = new URL('https://gallery.test/photos?sort=asc');

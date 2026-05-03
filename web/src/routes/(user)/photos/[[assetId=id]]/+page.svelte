@@ -37,6 +37,7 @@
   import { assetViewerManager } from '$lib/managers/asset-viewer-manager.svelte';
   import { authManager } from '$lib/managers/auth-manager.svelte';
   import { registerSelectionContext } from '$lib/managers/command-context-manager.svelte';
+  import { globalSearchManager } from '$lib/managers/global-search-manager.svelte';
   import { memoryManager } from '$lib/managers/memory-manager.svelte';
   import { TimelineManager } from '$lib/managers/timeline-manager/timeline-manager.svelte';
   import { Route } from '$lib/route';
@@ -106,6 +107,7 @@
   for (const [id, name] of initialTypedSearchNames.tagNames) {
     tagNames.set(id, name);
   }
+  $effect(() => globalSearchManager.registerSearchablePageFilters(() => filters));
   let smartFacets = $state<SmartSearchFacetsResponseDto>();
   let smartFacetKey = $state('');
   let smartFacetInFlight:
