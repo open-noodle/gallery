@@ -25,11 +25,18 @@ export function getLivePhotoMotionFilename(stillName: string, motionName: string
   return getFileNameWithoutExtension(stillName) + getFilenameExtension(motionName);
 }
 
+export type ContentDisposition = 'inline' | 'attachment';
+
+export const getContentDispositionHeader = (disposition: ContentDisposition, fileName: string): string => {
+  return `${disposition}; filename*=UTF-8''${encodeURIComponent(fileName)}`;
+};
+
 export class ImmichFileResponse {
   public readonly path!: string;
   public readonly contentType!: string;
   public readonly cacheControl!: CacheControl;
   public readonly fileName?: string;
+  public readonly disposition?: ContentDisposition;
 
   constructor(response: ImmichFileResponse) {
     Object.assign(this, response);
@@ -51,6 +58,7 @@ export class ImmichStreamResponse {
   public readonly length?: number;
   public readonly cacheControl!: CacheControl;
   public readonly fileName?: string;
+  public readonly disposition?: ContentDisposition;
 
   constructor(response: ImmichStreamResponse) {
     Object.assign(this, response);
@@ -112,7 +120,7 @@ export const sendFile = async (
         res.header('Content-Length', String(file.length));
       }
       if (file.fileName) {
-        res.header('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(file.fileName)}`);
+        res.header('Content-Disposition', getContentDispositionHeader(file.disposition ?? 'inline', file.fileName));
       }
       file.stream.pipe(res);
       return;
@@ -132,7 +140,7 @@ export const sendFile = async (
 
     res.header('Content-Type', file.contentType);
     if (file.fileName) {
-      res.header('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(file.fileName)}`);
+      res.header('Content-Disposition', getContentDispositionHeader(file.disposition ?? 'inline', file.fileName));
     }
 
     return await _sendFile(resolvedPath, { root: '/', dotfiles: 'allow' });
