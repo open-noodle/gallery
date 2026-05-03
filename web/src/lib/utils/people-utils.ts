@@ -1,9 +1,15 @@
 import { AssetTypeEnum, type AssetFaceResponseDto } from '@immich/sdk';
 import type { Faces } from '$lib/managers/asset-viewer-manager.svelte';
-import { getAssetMediaUrl } from '$lib/utils';
+import { createUrl, getAssetMediaUrl } from '$lib/utils';
 import { mapNormalizedRectToContent, type Rect, type Size } from '$lib/utils/container-utils';
 
 export type BoundingBox = Rect & { id: string };
+
+export const getPersonFaceThumbnailUrl = (personId: string, faceId: string, updatedAt?: string) =>
+  createUrl(`/people/${personId}/faces/${faceId}/thumbnail`, { updatedAt });
+
+export const getSpacePersonFaceThumbnailUrl = (spaceId: string, personId: string, faceId: string, updatedAt?: string) =>
+  createUrl(`/shared-spaces/${spaceId}/people/${personId}/faces/${faceId}/thumbnail`, { updatedAt });
 
 export const getBoundingBox = (faces: Faces[], imageSize: Size): BoundingBox[] => {
   const boxes: BoundingBox[] = [];

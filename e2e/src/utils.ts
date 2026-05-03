@@ -485,7 +485,43 @@ export const utils = {
     }
 
     const result = await client.query(
-      'INSERT INTO asset_face ("assetId", "personGroupId") VALUES ($1, $2) RETURNING id',
+      `
+      WITH inserted_face AS (
+        INSERT INTO asset_face ("assetId", "personGroupId")
+        VALUES ($1, $2)
+        RETURNING id
+      ),
+      person_row AS (
+        SELECT "identityId", type
+        FROM "person"
+        WHERE "personGroupId" = $2
+      ),
+      inserted_identity AS (
+        INSERT INTO "face_identity" ("type", "representativeFaceId")
+        SELECT type, (SELECT id FROM inserted_face)
+        FROM person_row
+        WHERE "identityId" IS NULL
+        RETURNING id
+      ),
+      resolved_identity AS (
+        SELECT COALESCE((SELECT "identityId" FROM person_row), (SELECT id FROM inserted_identity)) AS id
+      ),
+      updated_person AS (
+        UPDATE "person"
+        SET
+          "identityId" = (SELECT id FROM resolved_identity),
+          "faceAssetId" = COALESCE("faceAssetId", (SELECT id FROM inserted_face))
+        WHERE "personGroupId" = $2
+      ),
+      updated_identity AS (
+        UPDATE "face_identity"
+        SET "representativeFaceId" = COALESCE("representativeFaceId", (SELECT id FROM inserted_face))
+        WHERE id = (SELECT id FROM resolved_identity)
+      )
+      INSERT INTO "face_identity_face" ("assetFaceId", "identityId", "source")
+      SELECT (SELECT id FROM inserted_face), (SELECT id FROM resolved_identity), 'manual'
+      RETURNING "assetFaceId" AS id
+      `,
       [assetId, personGroupId],
     );
     return result.rows[0].id as string;

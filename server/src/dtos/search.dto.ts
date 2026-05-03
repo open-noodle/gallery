@@ -3,6 +3,7 @@ import { Place } from 'src/database';
 import { HistoryBuilder } from 'src/decorators';
 import { AlbumResponseSchema } from 'src/dtos/album.dto';
 import { AssetResponseSchema } from 'src/dtos/asset-response.dto';
+import { ScopedPrimaryProfileSchema } from 'src/dtos/person.dto';
 import { TimeBucketsResponseSchema } from 'src/dtos/time-bucket.dto';
 import {
   AssetOrder,
@@ -22,6 +23,12 @@ const DEPRECATED_FLAT_FIELD = {
   ...new HistoryBuilder().added('v1').stable('v2').deprecated('v3.2.0').getExtensions(),
   deprecated: true,
 };
+
+const UUID_PATTERN = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}';
+const ScopedPersonTokenSchema = z
+  .string()
+  .regex(new RegExp(`^(?:${UUID_PATTERN}|person:${UUID_PATTERN}|space-person:${UUID_PATTERN})$`))
+  .describe('Legacy person ID or scoped identity filter token');
 
 const BaseSearchSchema = z.object({
   libraryId: z.uuidv4().nullish().describe('Library ID to filter by').meta(DEPRECATED_FLAT_FIELD),
@@ -46,7 +53,7 @@ const BaseSearchSchema = z.object({
   model: z.string().nullable().optional().describe('Filter by camera model').meta(DEPRECATED_FLAT_FIELD),
   lensModel: z.string().nullable().optional().describe('Filter by lens model').meta(DEPRECATED_FLAT_FIELD),
   isNotInAlbum: z.boolean().optional().describe('Filter assets not in any album').meta(DEPRECATED_FLAT_FIELD),
-  personIds: z.array(z.uuidv4()).optional().describe('Filter by person IDs').meta(DEPRECATED_FLAT_FIELD),
+  personIds: z.array(ScopedPersonTokenSchema).optional().describe('Filter by person IDs').meta(DEPRECATED_FLAT_FIELD),
   tagIds: z.array(z.uuidv4()).nullish().describe('Filter by tag IDs').meta(DEPRECATED_FLAT_FIELD),
   albumIds: z.array(z.uuidv4()).optional().describe('Filter by album IDs').meta(DEPRECATED_FLAT_FIELD),
   rating: z
@@ -70,6 +77,7 @@ const BaseSearchSchema = z.object({
   // that meta advertises a structured replacement, and there is none for shared spaces.
   spaceId: z.uuidv4().optional().describe('Shared space ID to filter by'),
   spacePersonIds: z.array(z.uuidv4()).optional().describe('Shared space person IDs to filter by'),
+  withSharedSpaces: z.boolean().optional().describe('Include shared spaces the user is a member of'),
 });
 
 const BaseSearchWithResultsSchema = BaseSearchSchema.extend({
@@ -93,6 +101,7 @@ const SearchPeopleSchema = z
   .object({
     name: z.string().min(1).describe('Person name to search for'),
     withHidden: stringToBool.optional().describe('Include hidden people'),
+    withSharedSpaces: stringToBool.optional().describe('Include shared spaces the user is a member of'),
   })
   .meta({ id: 'SearchPeopleDto' });
 
@@ -126,7 +135,7 @@ const SearchSuggestionRequestBaseSchema = z.object({
   country: z.string().optional().describe('Filter by country'),
   state: z.string().optional().describe('Filter by state/province'),
   personIds: z
-    .preprocess((v) => (v === undefined ? undefined : Array.isArray(v) ? v : [v]), z.array(z.uuidv4()))
+    .preprocess((v) => (v === undefined ? undefined : Array.isArray(v) ? v : [v]), z.array(ScopedPersonTokenSchema))
     .optional()
     .describe('Filter by person IDs'),
   tagIds: z
@@ -176,6 +185,7 @@ const FilterSuggestionsPersonSchema = z
   .object({
     id: z.string().describe('Person ID'),
     name: z.string().describe('Person name'),
+    primaryProfile: ScopedPrimaryProfileSchema.optional().describe('Accessible profile used for thumbnails'),
   })
   .meta({ id: 'FilterSuggestionsPersonDto' });
 
@@ -218,7 +228,7 @@ const SmartSearchFacetsResponseSchema = z
 
 const FilterSuggestionsRequestBaseSchema = z.object({
   personIds: z
-    .preprocess((v) => (v === undefined ? undefined : Array.isArray(v) ? v : [v]), z.array(z.uuidv4()))
+    .preprocess((v) => (v === undefined ? undefined : Array.isArray(v) ? v : [v]), z.array(ScopedPersonTokenSchema))
     .optional()
     .describe('Filter by person IDs'),
   country: z.string().optional().describe('Filter by country'),
