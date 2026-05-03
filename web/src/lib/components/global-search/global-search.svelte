@@ -455,7 +455,6 @@
           {hotkeyLabel}
         </kbd>
       </div>
-      <TypedSearchTokenRail tokens={manager.typedSearchDisplayTokens} />
 
       {#if showDropdownPanel}
         <div
@@ -481,6 +480,7 @@
               </button>
             </div>
           {/if}
+          <TypedSearchTokenRail tokens={manager.typedSearchDisplayTokens} />
           <Command.List
             class="max-h-[min(520px,calc(100vh-8rem))] overflow-y-auto pb-2 {manager.typedSearchDisplayTokens.length > 0
               ? 'pt-1'

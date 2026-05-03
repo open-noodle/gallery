@@ -47,7 +47,10 @@ describe('global-search-input-trigger', () => {
     await user.click(input);
     await user.type(input, 'person:anna');
 
-    expect(document.querySelector('[data-cmdk-dropdown-panel]')).not.toBeNull();
+    const dropdownPanel = document.querySelector('[data-cmdk-dropdown-panel]');
+
+    expect(dropdownPanel).not.toBeNull();
+    expect(dropdownPanel as HTMLElement).toContainElement(screen.getByTestId('typed-search-token-rail'));
     expect(screen.getByTestId('typed-search-token-person')).toHaveAttribute('data-status', 'pending-entity');
     expect(screen.getByTestId('typed-search-token-person-key')).toHaveTextContent('person');
     expect(screen.getByTestId('typed-search-token-person-value')).toHaveTextContent('anna');
