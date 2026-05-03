@@ -1,12 +1,40 @@
-import { AssetTypeEnum, MemoryType, type MemoryResponseDto } from '@immich/sdk';
+import { AssetMediaSize, AssetTypeEnum, type MemoryResponseDto, MemoryType } from '@immich/sdk';
 import { addMessages, init } from 'svelte-i18n';
 import { get } from 'svelte/store';
 import en from '$i18n/en.json';
-import { getAssetUrl, getMemoryTitle, memoryLaneTitle, semverToName } from '$lib/utils';
+import { getAssetMediaUrl, getAssetUrl, getMemoryTitle, memoryLaneTitle, semverToName } from '$lib/utils';
 import { assetFactory } from '@test-data/factories/asset-factory';
 import { sharedLinkFactory } from '@test-data/factories/shared-link-factory';
 
 describe('utils', () => {
+  describe(getAssetMediaUrl.name, () => {
+    it('adds download=true to original media URLs when requested', () => {
+      const url = getAssetMediaUrl({
+        id: 'asset-1',
+        size: AssetMediaSize.Original,
+        edited: false,
+        cacheKey: 'cache-1',
+        download: true,
+      });
+
+      expect(url).toContain('/api/assets/asset-1/original');
+      expect(url).toContain('download=true');
+      expect(url).toContain('edited=false');
+      expect(url).toContain('c=cache-1');
+    });
+
+    it('does not add download=true to thumbnail media URLs', () => {
+      const url = getAssetMediaUrl({
+        id: 'asset-1',
+        size: AssetMediaSize.Thumbnail,
+        download: true,
+      });
+
+      expect(url).toContain('/api/assets/asset-1/thumbnail');
+      expect(url).not.toContain('download=true');
+    });
+  });
+
   describe(getAssetUrl.name, () => {
     it('should return thumbnail URL for static images', () => {
       const asset = assetFactory.build({
