@@ -80,7 +80,7 @@ vi.mock('$lib/components/filter-panel/filter-panel.svelte', async () => {
 });
 
 vi.mock('$lib/components/filter-panel/active-filters-bar.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('@test-data/mocks/active-filters-bar-actions.stub.svelte');
   return { default: MockComponent };
 });
 
@@ -275,6 +275,30 @@ describe('Spaces page search URL state', () => {
     expect(screen.queryByTestId('sort-toggle')).not.toBeInTheDocument();
     expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-search-query', 'beach');
     expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-sort-order', 'asc');
+  });
+
+  it('hydrates typed filter URL params into the space FilterState', async () => {
+    mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?q=beach&people=space-person-1&city=Berlin&type=video');
+
+    renderPage({ space: makeSpace(), members: [makeMember()] });
+
+    expect(await screen.findByTestId('smart-search-results')).toHaveAttribute('data-search-query', 'beach');
+    expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-filter-person-ids', 'space-person-1');
+    expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-filter-city', 'Berlin');
+    expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-filter-media-type', 'video');
+  });
+
+  it('removes only the selected typed filter from the space URL', async () => {
+    mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?q=beach&people=person-1&city=Berlin');
+
+    renderPage({ space: makeSpace(), members: [makeMember()] });
+    await fireEvent.click(await screen.findByTestId('active-filters-remove-person'));
+
+    expect(gotoMock).toHaveBeenCalledWith('/spaces/space-1/photos?q=beach&city=Berlin', {
+      replaceState: true,
+      keepFocus: true,
+      noScroll: true,
+    });
   });
 
   it('exposes favorites in the spaces filter panel', () => {

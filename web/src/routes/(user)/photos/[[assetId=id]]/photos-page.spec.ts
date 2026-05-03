@@ -2,6 +2,7 @@ import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import TestWrapper from '$lib/components/TestWrapper.svelte';
 import { lang } from '$lib/stores/preferences.store';
 import { buildPhotosTimelineOptions } from '$lib/utils/photos-filter-options';
+import { goto } from '$app/navigation';
 import { AssetTypeEnum } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
@@ -44,7 +45,7 @@ vi.mock('$lib/components/ActionMenuItem.svelte', async () => {
 });
 
 vi.mock('$lib/components/filter-panel/active-filters-bar.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('@test-data/mocks/active-filters-bar-actions.stub.svelte');
   return { default: MockComponent };
 });
 
@@ -253,6 +254,49 @@ describe('Photos page search URL state', () => {
     expect(screen.queryByPlaceholderText(/search/i)).not.toBeInTheDocument();
     expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-search-query', 'nature');
     expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-sort-order', 'asc');
+  });
+
+  it('hydrates typed filter URL params into the photos FilterState', () => {
+    mockPage.url = new URL(
+      'https://gallery.test/photos?q=beach&people=person-1&tags=tag-1&type=image&favorite=true&rating=4&from=2025-01-01&to=2025-12-31',
+    );
+
+    renderPage();
+
+    expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-search-query', 'beach');
+    expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-filter-person-ids', 'person-1');
+    expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-filter-tag-ids', 'tag-1');
+    expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-filter-media-type', 'image');
+    expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-filter-favorite', 'true');
+    expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-filter-rating', '4');
+    expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-filter-date-after', '2025-01-01');
+    expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-filter-date-before', '2025-12-31');
+  });
+
+  it('clears only q when clearing the search chip', async () => {
+    mockPage.url = new URL('https://gallery.test/photos?view=timeline&q=beach&people=person-1&city=Berlin');
+
+    renderPage();
+    await fireEvent.click(await screen.findByTestId('active-filters-clear-search'));
+
+    expect(goto).toHaveBeenCalledWith('/photos?view=timeline&people=person-1&city=Berlin', {
+      replaceState: true,
+      keepFocus: true,
+      noScroll: true,
+    });
+  });
+
+  it('clears typed filter URL params and q when clearing all active filters', async () => {
+    mockPage.url = new URL('https://gallery.test/photos?view=timeline&q=beach&people=person-1&city=Berlin');
+
+    renderPage();
+    await fireEvent.click(await screen.findByTestId('active-filters-clear-all'));
+
+    expect(goto).toHaveBeenLastCalledWith('/photos?view=timeline', {
+      replaceState: true,
+      keepFocus: true,
+      noScroll: true,
+    });
   });
 
   it('exposes favorites in the photos filter panel', () => {

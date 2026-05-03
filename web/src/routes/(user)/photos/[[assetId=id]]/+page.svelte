@@ -43,7 +43,12 @@
   import { getAssetBulkActions } from '$lib/services/asset.service';
   import { lang } from '$lib/stores/preferences.store';
   import { getAssetMediaUrl, memoryLaneTitle } from '$lib/utils';
-  import { buildSearchablePageUrl, getSearchablePageState } from '$lib/utils/searchable-page-search';
+  import {
+    buildSearchablePageUrl,
+    getSearchablePageFilterState,
+    getSearchablePageState,
+  } from '$lib/utils/searchable-page-search';
+  import { consumeTypedSearchNames } from '$lib/utils/typed-search/typed-search-name-cache';
   import {
     updateStackedAssetInTimeline,
     updateUnstackedAssetInTimeline,
@@ -81,17 +86,26 @@
 
   // Filter state
   const initialSearchState = getSearchablePageState(page.url);
+  const initialFilterState = getSearchablePageFilterState(page.url);
   let filters = $state<FilterState>({
     ...createFilterState(),
+    ...initialFilterState,
     sortOrder: initialSearchState.sortOrder,
   });
   let committedQuery = $state(initialSearchState.query);
-  let lastHandledSearchState = $state(`${initialSearchState.query}:${initialSearchState.sortOrder}`);
+  let lastHandledSearchState = $state(`${initialSearchState.query}:${initialSearchState.sortOrder}:${page.url.search}`);
   let isLoading = $state(false);
   const showSearchResults = $derived(committedQuery.trim().length > 0);
   const options = $derived(buildPhotosTimelineOptions(filters));
   let personNames = new SvelteMap<string, string>();
   let tagNames = new SvelteMap<string, string>();
+  const initialTypedSearchNames = consumeTypedSearchNames(page.url.pathname + page.url.search);
+  for (const [id, name] of initialTypedSearchNames.personNames) {
+    personNames.set(id, name);
+  }
+  for (const [id, name] of initialTypedSearchNames.tagNames) {
+    tagNames.set(id, name);
+  }
   let smartFacets = $state<SmartSearchFacetsResponseDto>();
   let smartFacetKey = $state('');
   let smartFacetInFlight:
@@ -356,7 +370,15 @@
 
   function clearSearch() {
     isLoading = false;
-    const nextUrl = buildSearchablePageUrl(page.url, '');
+    const nextUrl = buildSearchablePageUrl(page.url, '', filters.sortOrder, filters);
+    if (!nextUrl) {
+      return;
+    }
+    void goto(nextUrl, { replaceState: true, keepFocus: true, noScroll: true });
+  }
+
+  function syncFilterUrl(nextFilters: FilterState) {
+    const nextUrl = buildSearchablePageUrl(page.url, committedQuery, nextFilters.sortOrder, nextFilters);
     if (!nextUrl) {
       return;
     }
@@ -365,7 +387,7 @@
 
   $effect(() => {
     const nextSearchState = getSearchablePageState(page.url);
-    const nextToken = `${nextSearchState.query}:${nextSearchState.sortOrder}`;
+    const nextToken = `${nextSearchState.query}:${nextSearchState.sortOrder}:${page.url.search}`;
 
     if (nextToken === lastHandledSearchState) {
       return;
@@ -375,7 +397,11 @@
     untrack(() => {
       committedQuery = nextSearchState.query;
       isLoading = false;
-      filters = { ...filters, sortOrder: nextSearchState.sortOrder };
+      filters = {
+        ...createFilterState(),
+        ...getSearchablePageFilterState(page.url),
+        sortOrder: nextSearchState.sortOrder,
+      };
       if (queryChanged) {
         smartFacetInFlight?.controller.abort();
         smartFacets = undefined;
@@ -418,10 +444,16 @@
           {personNames}
           {tagNames}
           onRemoveFilter={(type, id) => {
-            filters = handlePhotosRemoveFilter(filters, type, id);
+            const nextFilters = handlePhotosRemoveFilter(filters, type, id);
+            filters = nextFilters;
+            syncFilterUrl(nextFilters);
           }}
           onClearAll={() => {
-            filters = clearFilters(filters);
+            const nextFilters = clearFilters(filters);
+            filters = nextFilters;
+            if (!committedQuery.trim()) {
+              syncFilterUrl(nextFilters);
+            }
           }}
         />
       {/if}
