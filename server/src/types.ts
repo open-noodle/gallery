@@ -259,6 +259,11 @@ export interface INightlyJob extends IBaseJob {
   nightly?: boolean;
 }
 
+export interface IFaceIdentityBackfillJob extends IBaseJob {
+  stage?: 'person' | 'space-person';
+  cursor?: string;
+}
+
 export interface ISharedSpaceFaceMatchJob extends IBaseJob {
   spaceId: string;
   assetId: string;
@@ -275,6 +280,12 @@ export interface ISharedSpaceLibraryFaceSyncJob extends IBaseJob {
 
 export interface ISharedSpacePersonDedupJob extends IBaseJob {
   spaceId: string;
+}
+
+export interface ISharedSpacePersonMetadataBackfillJob extends IBaseJob {
+  cursor?: string;
+  identityId?: string;
+  limit?: number;
 }
 
 export interface ISharedSpaceBulkAddAssetsJob extends IBaseJob {
@@ -431,6 +442,7 @@ export type JobItem =
   | { name: JobName.FacialRecognitionQueueAll; data: IFacialRecognitionQueueAll }
   | { name: JobName.FacialRecognition; data: IDeferrableJob }
   | { name: JobName.PersonGenerateThumbnail; data: IPersonJob }
+  | { name: JobName.FaceIdentityBackfill; data: IFaceIdentityBackfillJob }
 
   // Smart Search
   | { name: JobName.SmartSearchQueueAll; data: IBaseJob }
@@ -514,6 +526,7 @@ export type JobItem =
   | { name: JobName.SharedSpaceFaceMatchAll; data: ISharedSpaceFaceMatchAllJob }
   | { name: JobName.SharedSpaceLibraryFaceSync; data: ISharedSpaceLibraryFaceSyncJob }
   | { name: JobName.SharedSpacePersonDedup; data: ISharedSpacePersonDedupJob }
+  | { name: JobName.SharedSpacePersonMetadataBackfill; data: ISharedSpacePersonMetadataBackfillJob }
 
   // Shared Space Bulk Operations
   | { name: JobName.SharedSpaceBulkAddAssets; data: ISharedSpaceBulkAddAssetsJob }
