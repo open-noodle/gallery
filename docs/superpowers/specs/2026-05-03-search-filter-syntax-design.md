@@ -57,14 +57,14 @@ Keyboard behavior stays simple:
 
 The first version supports existing filter concepts only:
 
-- `person:<name>`: resolves to one or more person IDs.
-- `tag:<name>`: resolves to one or more tag IDs.
+- `person:<name>`: resolves to one person ID; repeated tokens accumulate multiple people.
+- `tag:<name>`: resolves to one tag ID; repeated tokens accumulate multiple tags.
 - `from:<date>`: maps to `dateAfter`.
 - `to:<date>`: maps to `dateBefore`.
 - `city:<value>`: maps to `city`.
 - `country:<value>`: maps to `country`.
-- `camera:<value>`: maps to camera make/model matching.
-- `type:<photo|image|video>`: maps to `mediaType`.
+- `camera:<value>`: resolves through camera make/model suggestions.
+- `type:<photo|image|video>`: maps to `mediaType`; `photo` is an alias for `image`.
 - `favorite:<true|false|yes|no>`: maps to `isFavorite`.
 - `rating:<1-5>`: maps to `rating`.
 
@@ -82,7 +82,18 @@ Quoted values are part of v1 so names and places with spaces work:
 person:"Anna Maria" city:"New York"
 ```
 
+Quoted values must support spaces. Escaped quotes inside values are not part of v1. Unterminated quotes should remain editable while typing and become invalid tokens on Enter.
+
 Unknown alphabetic `key:value` tokens should become invalid tokens and block submission with a useful issue row. This keeps typos such as `persn:anna` visible instead of silently treating them as query text.
+
+Empty values are invalid for every typed filter. While the user is still typing, incomplete tokens such as `person:` may render as pending input; on Enter they block submission.
+
+Duplicate and conflicting filters should be deterministic:
+
+- `person:` and `tag:` may appear multiple times and should accumulate resolved IDs.
+- Repeating scalar filters such as `from:`, `to:`, `city:`, `country:`, `camera:`, `type:`, `favorite:`, and `rating:` should block submission instead of silently choosing one value.
+- `from:` later than `to:` should block submission.
+- `camera:` may set either `make` or `model`; if separate `make` or `model` URL params already exist, typed camera filters should replace only the field they resolve to during commit.
 
 ## Date Semantics
 
@@ -114,7 +125,7 @@ Commit flow:
 
 1. Parse the raw input into query text, scalar tokens, entity tokens, and invalid tokens.
 2. Validate scalar filters locally.
-3. Resolve `person:` and `tag:` tokens in the current context.
+3. Resolve suggestion-backed tokens (`person:`, `tag:`, and `camera:`) in the current context.
 4. If any token fails, keep the palette open and mark the token.
 5. If every token succeeds, build a destination URL with `q`, `sort`, and serialized filters.
 6. Navigate to the context-aware destination.
@@ -143,12 +154,12 @@ This module should have no network or Svelte dependencies.
 
 ### `typed-search-resolver`
 
-Runs only on Enter. It resolves entity tokens and produces either:
+Runs only on Enter. It resolves entity and suggestion-backed tokens and produces either:
 
 - a `FilterState` patch that can be serialized into the destination URL, or
 - blocking issues for unresolved, ambiguous, or invalid tokens.
 
-For `/spaces/:id`, person resolution should prefer space-scoped people/facets where available. For `/photos`, it should resolve globally. Tags should follow the same contextual pattern where the API supports it.
+For `/spaces/:id`, person resolution should prefer space-scoped people/facets where available. For `/photos`, it should resolve globally. Tags and cameras should follow the same contextual pattern where the API supports it.
 
 ### `searchable-page-search`
 
@@ -167,6 +178,8 @@ The existing search flow should then remain responsible for:
 - smart facet loading
 - active filter chip rendering
 - filter panel state
+
+When URL hydration includes person or tag IDs, destination pages must populate `personNames` and `tagNames` maps from resolver output when navigating from the palette, or from filter suggestions/facets after refresh. Active filter chips may temporarily fall back to IDs only while names are loading.
 
 ## URL Serialization
 
@@ -217,6 +230,30 @@ Entity examples:
 
 The issue rows should be concise and actionable. The user should be able to edit the original text and retry without losing input.
 
+## TDD Requirements
+
+Implementation should use red-green-refactor for every behavior change. No production code should be added for a parser, resolver, URL helper, or component behavior until a focused test for that behavior has been written and observed failing for the expected reason.
+
+Recommended order:
+
+1. Add parser tests first, run them, and confirm they fail because `typed-search-parser` does not exist or lacks the behavior.
+2. Implement the smallest parser slice that makes those tests pass.
+3. Add URL serialization/hydration tests and confirm they fail before changing `searchable-page-search` or route state.
+4. Implement the smallest URL/state slice that makes those tests pass.
+5. Add resolver tests with mocked SDK calls and confirm the desired failure before adding resolver behavior.
+6. Implement the smallest resolver slice that makes those tests pass.
+7. Add component/manager tests for token rendering, Enter commit, blocking issues, ambiguity selection, and navigation.
+8. Implement UI and manager integration only after those tests fail correctly.
+
+Focused verification commands should use direct vitest invocation so arguments do not expand into the full web suite:
+
+```bash
+pnpm --filter @immich/sdk build
+pnpm --dir web exec vitest --run <focused-spec-file>
+```
+
+The broader web suite should be run only after the SDK workspace package has been built and focused tests are green.
+
 ## Testing
 
 Parser tests:
@@ -224,12 +261,22 @@ Parser tests:
 - plain query extraction
 - recognized filters
 - quoted values
+- unterminated quotes
+- escaped quote sequences rejected as invalid input
 - malformed tokens
 - unknown keys
 - duplicate filters
+- empty values
+- repeated `person:` and `tag:` accumulation
+- repeated scalar filter rejection
 - date validation
+- date range ordering where `from:` is after `to:`
+- `YYYY`, `YYYY-MM`, and `YYYY-MM-DD` expansion
 - rating validation
 - type/favorite validation
+- `type:photo` aliasing to `image`
+- case normalization for keys and boolean/media values
+- preserving colon-containing plain text that is not an alphabetic `key:value` filter
 
 Resolver tests:
 
@@ -238,6 +285,11 @@ Resolver tests:
 - ambiguous entity matches
 - repeated people/tags
 - space-scoped resolution
+- camera make match
+- camera model match
+- ambiguous camera make/model match
+- no camera match
+- resolver output includes display names for hydrated person/tag chips
 - abort/error handling
 
 URL/state tests:
@@ -246,6 +298,11 @@ URL/state tests:
 - serialize filters into `/spaces/:id`
 - hydrate URL params into `FilterState`
 - preserve query and sort
+- preserve unrelated URL params that the current helper preserves
+- remove only typed filter params when clearing filters
+- invalid URL params fall back safely without crashing
+- `type=photo` is not emitted; `type=image` is emitted
+- multiple people/tags round-trip through URL encoding
 - clear typed filters correctly
 - keep active filter chips in sync with hydrated state
 
@@ -256,6 +313,12 @@ Component tests:
 - Enter blocked on invalid tokens
 - issue rows for unresolved tokens
 - ambiguity rows and selection
+- no navigation on invalid, unresolved, ambiguous, or resolver-error commits
+- successful `/photos` navigation
+- successful `/spaces/:id` and `/spaces/:id/photos` navigation
+- fallback `/photos` navigation from non-searchable pages
+- raw input remains editable after a failed commit
+- resolved entity token state resets when the raw token text changes
 - successful context-aware navigation
 
 ## Implementation Notes
