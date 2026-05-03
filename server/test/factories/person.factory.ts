@@ -15,6 +15,7 @@ export class PersonFactory {
       createdAt: newDate(),
       faceAssetId: null,
       personGroupId: newUuid(),
+      identityId: null,
       isFavorite: false,
       isHidden: false,
       name: 'person',
