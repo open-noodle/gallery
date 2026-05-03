@@ -479,7 +479,12 @@
               </button>
             </div>
           {/if}
-          <Command.List class="max-h-[min(520px,calc(100vh-8rem))] overflow-y-auto py-2">
+          <Command.List
+            class="max-h-[min(520px,calc(100vh-8rem))] overflow-y-auto pb-2 {manager
+              .typedSearchDisplayTokens.length > 0
+              ? 'pt-1'
+              : 'pt-2'}"
+          >
             {#if manager.typedSearchIssues.length > 0}
               <Command.Group class="mb-4" data-typed-search-issues>
                 <Command.GroupHeading
@@ -844,7 +849,9 @@
                 </button>
               </div>
             {/if}
-            <Command.List class="flex-1 overflow-y-auto py-2">
+            <Command.List
+              class="flex-1 overflow-y-auto pb-2 {manager.typedSearchDisplayTokens.length > 0 ? 'pt-1' : 'pt-2'}"
+            >
               {#if manager.typedSearchIssues.length > 0}
                 <Command.Group class="mb-4" data-typed-search-issues>
                   <Command.GroupHeading

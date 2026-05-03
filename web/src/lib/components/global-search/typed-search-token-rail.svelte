@@ -9,7 +9,7 @@
 </script>
 
 {#if tokens.length > 0}
-  <div class="flex min-w-0 flex-wrap items-center gap-1.5 px-3 pb-2" data-testid="typed-search-token-rail">
+  <div class="flex min-w-0 flex-wrap items-center gap-1.5 px-4 pt-2 pb-1" data-testid="typed-search-token-rail">
     {#each tokens as token (`${token.raw}:${token.status}`)}
       <span
         data-testid={`typed-search-token-${token.key}`}

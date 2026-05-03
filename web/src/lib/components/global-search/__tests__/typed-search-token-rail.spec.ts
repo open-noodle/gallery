@@ -20,6 +20,16 @@ describe('TypedSearchTokenRail', () => {
     expect(screen.getByTestId('typed-search-token-person')).toHaveAttribute('data-status', 'pending-entity');
   });
 
+  it('gives filter chips breathing room below the input row', () => {
+    render(TypedSearchTokenRail, {
+      props: {
+        tokens: [{ raw: 'person:anna', key: 'person', value: 'anna', status: 'pending-entity' }],
+      },
+    });
+
+    expect(screen.getByTestId('typed-search-token-rail')).toHaveClass('px-4', 'pt-2', 'pb-1');
+  });
+
   it('renders error tokens with issue text', () => {
     render(TypedSearchTokenRail, {
       props: {
