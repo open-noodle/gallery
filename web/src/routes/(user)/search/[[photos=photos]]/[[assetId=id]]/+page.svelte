@@ -37,6 +37,7 @@
     getTagById,
     type MetadataSearchDto,
     searchAssets,
+    searchPerson,
     searchSmart,
     type SmartSearchDto,
   } from '@immich/sdk';
@@ -69,7 +70,7 @@
   type SearchTerms = MetadataSearchDto & Pick<SmartSearchDto, 'query' | 'queryAssetId'>;
   let searchQuery = $derived(page.url.searchParams.get(QueryParameter.QUERY));
   let terms = $derived<SearchTerms>(searchQuery ? JSON.parse(searchQuery) : {});
-  let searchTermKeys = $derived(getObjectKeys(terms));
+  let searchTermKeys = $derived(getVisibleSearchKeys(terms));
 
   $effect(() => {
     // we want this to *only* be reactive on `terms`
@@ -238,9 +239,25 @@
     return keyMap[key] || key;
   }
 
+  const isScopedPersonToken = (personId: string) =>
+    personId.startsWith('person:') || personId.startsWith('space-person:');
+
   async function getPersonName(personIds: string[]) {
+    const scopedPersonIds = personIds.filter((personId) => isScopedPersonToken(personId));
+    const scopedPeople =
+      scopedPersonIds.length > 0 ? await searchPerson({ name: '', withHidden: true, withSharedSpaces: true }) : [];
+    const scopedPeopleByFilterId = new Map(
+      scopedPeople.map((person) => [person.filterId ?? `person:${person.id}`, person]),
+    );
+
     const personNames = await Promise.all(
       personIds.map(async (personId) => {
+        if (isScopedPersonToken(personId)) {
+          const person = scopedPeopleByFilterId.get(personId);
+
+          return person?.name || $t('no_name');
+        }
+
         const person = await getPerson({ id: personId });
 
         if (person.name === '') {
@@ -280,6 +297,10 @@
 
   function getObjectKeys<T extends object>(obj: T): (keyof T)[] {
     return Object.keys(obj) as (keyof T)[];
+  }
+
+  function getVisibleSearchKeys(terms: SearchTerms) {
+    return getObjectKeys(terms).filter((key) => key !== 'withSharedSpaces');
   }
 
   function removeFilter(key: keyof SearchTerms) {
