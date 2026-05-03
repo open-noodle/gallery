@@ -58,6 +58,7 @@ import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.
 import { StorageMigrationRepository } from 'src/repositories/storage-migration.repository.js';
 import { UserGroupRepository } from 'src/repositories/user-group.repository.js';
 import { ClassificationRepository } from 'src/repositories/classification.repository.js';
+import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
 
 export const repositories = [
   AccessRepository,
@@ -80,6 +81,7 @@ export const repositories = [
   DuplicateRepository,
   EmailRepository,
   EventRepository,
+  FaceIdentityRepository,
   IntegrityRepository,
   JobRepository,
   LibraryRepository,

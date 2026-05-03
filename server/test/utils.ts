@@ -93,6 +93,7 @@ import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.
 import { StorageMigrationRepository } from 'src/repositories/storage-migration.repository.js';
 import { UserGroupRepository } from 'src/repositories/user-group.repository.js';
 import { ClassificationRepository } from 'src/repositories/classification.repository.js';
+import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
 import { RepositoryInterface } from 'src/types.js';
 
 export type ControllerContext = {
@@ -257,6 +258,7 @@ export type ServiceOverrides = {
   duplicateRepository: DuplicateRepository;
   email: EmailRepository;
   event: EventRepository;
+  faceIdentity: FaceIdentityRepository;
   integrityReport: IntegrityRepository;
   job: JobRepository;
   library: LibraryRepository;
@@ -348,6 +350,7 @@ export const getMocks = () => {
     email: automock(EmailRepository, { args: [loggerMock] }),
     // eslint-disable-next-line no-sparse-arrays
     event: automock(EventRepository, { args: [, , loggerMock], strict: false }),
+    faceIdentity: automock(FaceIdentityRepository, { strict: false }),
     integrityReport: automock(IntegrityRepository, { strict: false }),
     job: newJobRepositoryMock(),
     apiKey: automock(ApiKeyRepository),
@@ -427,6 +430,7 @@ export const newTestService = <T extends BaseService>(
     overrides.duplicateRepository || (mocks.duplicateRepository as As<DuplicateRepository>),
     overrides.email || (mocks.email as As<EmailRepository>),
     overrides.event || (mocks.event as As<EventRepository>),
+    overrides.faceIdentity || (mocks.faceIdentity as As<FaceIdentityRepository>),
     overrides.integrityReport || (mocks.integrityReport as As<IntegrityRepository>),
     overrides.job || (mocks.job as As<JobRepository>),
     overrides.library || (mocks.library as As<LibraryRepository>),

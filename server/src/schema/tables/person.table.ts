@@ -15,6 +15,7 @@ import { person_delete_audit } from 'src/schema/functions.js';
 import { AssetFaceTable } from 'src/schema/tables/asset-face.table.js';
 import { PersonGroupTable } from 'src/schema/tables/person-group.table.js';
 import { UserTable } from 'src/schema/tables/user.table.js';
+import { FaceIdentityTable } from 'src/schema/tables/face-identity.table.js';
 
 @Table('person')
 @Index({
@@ -30,6 +31,13 @@ import { UserTable } from 'src/schema/tables/user.table.js';
   when: 'pg_trigger_depth() <= 1',
 })
 @Check({ name: 'person_birthDate_chk', expression: `"birthDate" <= CURRENT_DATE` })
+@Index({
+  name: 'person_ownerId_identityId_key',
+  columns: ['ownerId', 'identityId'],
+  unique: true,
+  where: '"identityId" IS NOT NULL',
+})
+@Index({ name: 'person_identityId_idx', columns: ['identityId'], where: '"identityId" IS NOT NULL' })
 export class PersonTable {
   @ForeignKeyColumn(() => UserTable, {
     onDelete: 'CASCADE',
@@ -79,6 +87,9 @@ export class PersonTable {
 
   @Column({ type: 'character varying', nullable: true })
   species!: string | null;
+
+  @ForeignKeyColumn(() => FaceIdentityTable, { onDelete: 'SET NULL', nullable: true, index: false })
+  identityId!: string | null;
 
   @UpdateIdColumn({ index: true })
   updateId!: Generated<string>;

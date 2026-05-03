@@ -6,6 +6,7 @@ import { DB } from 'src/schema/index.js';
 import { BaseService } from 'src/services/base.service.js';
 import { newMediumService } from 'test/medium.factory.js';
 import { getKyselyDB } from 'test/utils.js';
+import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
 
 let defaultDatabase: Kysely<DB>;
 
@@ -404,6 +405,72 @@ describe(PersonRepository.name, () => {
       await expect(
         sut.getForFeatureFaceUpdate({ personGroupId: person.personGroupId, assetId: asset.id }),
       ).resolves.toEqual(undefined);
+    });
+  });
+
+  describe('representative face picker queries', () => {
+    it('filters deleted, hidden, and offline representative face candidates', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { person } = await ctx.newPerson({ ownerId: user.id });
+      const { asset: validAsset } = await ctx.newAsset({ ownerId: user.id });
+      const { result: validFaceId } = await ctx.newAssetFace({ assetId: validAsset.id, personId: person.id });
+      const { asset: offlineAsset } = await ctx.newAsset({ ownerId: user.id, isOffline: true });
+      const { result: offlineFaceId } = await ctx.newAssetFace({ assetId: offlineAsset.id, personId: person.id });
+      const { asset: deletedAsset } = await ctx.newAsset({ ownerId: user.id, deletedAt: new Date() });
+      const { result: deletedAssetFaceId } = await ctx.newAssetFace({
+        assetId: deletedAsset.id,
+        personId: person.id,
+      });
+      const { result: hiddenFaceId } = await ctx.newAssetFace({
+        assetId: validAsset.id,
+        personId: person.id,
+        isVisible: false,
+      });
+      const { result: deletedFaceId } = await ctx.newAssetFace({
+        assetId: validAsset.id,
+        personId: person.id,
+        deletedAt: new Date(),
+      });
+
+      const faces = await sut.getRepresentativeFaces({ personId: person.id, take: 20, skip: 0 });
+
+      expect(faces.map((face) => face.id)).toEqual([validFaceId]);
+      await expect(
+        sut.getRepresentativeFaceForUpdate({ personId: person.id, assetFaceId: offlineFaceId }),
+      ).resolves.toBeUndefined();
+      await expect(
+        sut.getRepresentativeFaceForUpdate({ personId: person.id, assetFaceId: deletedAssetFaceId }),
+      ).resolves.toBeUndefined();
+      await expect(
+        sut.getRepresentativeFaceForUpdate({ personId: person.id, assetFaceId: hiddenFaceId }),
+      ).resolves.toBeUndefined();
+      await expect(
+        sut.getRepresentativeFaceForUpdate({ personId: person.id, assetFaceId: deletedFaceId }),
+      ).resolves.toBeUndefined();
+    });
+
+    it('rejects a face linked to a different identity', async () => {
+      const { ctx, sut } = setup();
+      const faceIdentityRepository = ctx.get(FaceIdentityRepository);
+      const { user } = await ctx.newUser();
+      const { person: targetPerson } = await ctx.newPerson({ ownerId: user.id });
+      const { person: otherPerson } = await ctx.newPerson({ ownerId: user.id });
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      const { result: faceId } = await ctx.newAssetFace({ assetId: asset.id, personId: targetPerson.id });
+      const otherIdentity = await faceIdentityRepository.ensurePersonIdentity(otherPerson.id);
+      await faceIdentityRepository.replaceFaceIdentity({
+        assetFaceId: faceId,
+        identityId: otherIdentity.id,
+        source: 'manual',
+      });
+
+      const faces = await sut.getRepresentativeFaces({ personId: targetPerson.id, take: 20, skip: 0 });
+
+      expect(faces.map((face) => face.id)).not.toContain(faceId);
+      await expect(
+        sut.getRepresentativeFaceForUpdate({ personId: targetPerson.id, assetFaceId: faceId }),
+      ).resolves.toBeUndefined();
     });
   });
 });

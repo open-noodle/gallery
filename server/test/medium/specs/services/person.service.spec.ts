@@ -20,6 +20,7 @@ import { PersonService } from 'src/services/person.service.js';
 import { newMediumService } from 'test/medium.factory.js';
 import { factory } from 'test/small.factory.js';
 import { getKyselyDB } from 'test/utils.js';
+import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
 
 let defaultDatabase: Kysely<DB>;
 
@@ -30,6 +31,7 @@ const setup = (db?: Kysely<DB>) => {
       AccessRepository,
       AssetJobRepository,
       ConfigRepository,
+      FaceIdentityRepository,
       DatabaseRepository,
       PersonRepository,
       AssetRepository,

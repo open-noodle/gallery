@@ -18,8 +18,8 @@ import { MapMarkerResponseDto } from 'src/dtos/map.dto.js';
 import { AlbumUserRole, Permission } from 'src/enum.js';
 import { AlbumAssetCount, AlbumInfoOptions } from 'src/repositories/album.repository.js';
 import { BaseService } from 'src/services/base.service.js';
-import { addAssets, removeAssets } from 'src/utils/asset.util.js';
-import { asDateTimeString } from 'src/utils/date.js';
+import { addAssets, getMyPartnerIds, removeAssets } from 'src/utils/asset.util.js';
+import { asDateString, asDateTimeString } from 'src/utils/date.js';
 import { findOrFail } from 'src/utils/misc.js';
 import { getPreferences } from 'src/utils/preferences.js';
 
@@ -117,7 +117,21 @@ export class AlbumService extends BaseService {
       return [];
     }
 
-    return this.mapRepository.getAlbumMapMarkers(id);
+    if (auth.sharedLink) {
+      return this.mapRepository.getAlbumMapMarkers(id);
+    }
+
+    const partnerIds = await getMyPartnerIds({
+      userId: auth.user.id,
+      repository: this.partnerRepository,
+      timelineEnabled: true,
+    });
+    const spaceRows = await this.sharedSpaceRepository.getSpaceIdsForTimeline(auth.user.id);
+
+    return this.mapRepository.getAlbumMapMarkers(id, {
+      ownerIds: [auth.user.id, ...partnerIds],
+      timelineSpaceIds: spaceRows.length > 0 ? spaceRows.map((row) => row.spaceId) : undefined,
+    });
   }
 
   async create(auth: AuthDto, dto: CreateAlbumDto): Promise<AlbumResponseDto> {

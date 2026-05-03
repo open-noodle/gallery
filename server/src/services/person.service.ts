@@ -1,10 +1,10 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Insertable, Selectable, Updateable } from 'kysely';
 import { isUndefined, omitBy } from 'lodash-es';
 import { isAbsolute } from 'node:path';
 import type { JobItem, JobOf } from 'src/types.js';
 import { Person } from 'src/database.js';
-import { Chunked, OnJob } from 'src/decorators.js';
+import { Chunked, OnJob, OnEvent } from 'src/decorators.js';
 import { BulkIdErrorReason, BulkIdResponseDto, BulkIdsDto } from 'src/dtos/asset-ids.response.dto.js';
 import { AuthDto } from 'src/dtos/auth.dto.js';
 import {
@@ -12,25 +12,32 @@ import {
   AssetFaceDeleteDto,
   AssetFaceResponseDto,
   AssetFaceUpdateDto,
+  DetachScopedPersonDto,
   FaceDto,
   MergePersonDto,
+  MergeScopedPeopleDto,
   PeopleResponseDto,
   PeopleUpdateDto,
   PersonCreateDto,
+  PersonFacePageQueryDto,
+  PersonFacePageResponseDto,
   PersonResponseDto,
   PersonSearchDto,
   PersonStatisticsResponseDto,
   PersonUpdateDto,
+  RepresentativeFaceUpdateDto,
   mapFaces,
   mapPerson,
 } from 'src/dtos/person.dto.js';
 import {
   AssetVisibility,
   CacheControl,
+  ImmichWorker,
   JobName,
   JobStatus,
   Permission,
   PersonPathType,
+  QueueJobStatus,
   QueueName,
   SourceType,
   SystemMetadataKey,
@@ -44,17 +51,44 @@ import { FaceSearchTable } from 'src/schema/tables/face-search.table.js';
 import { PersonTable } from 'src/schema/tables/person.table.js';
 import { BaseService } from 'src/services/base.service.js';
 import { getDimensions } from 'src/utils/asset.util.js';
+import { asDateString } from 'src/utils/date.js';
 import { ImmichMediaResponse } from 'src/utils/file.js';
 import { mimeTypes } from 'src/utils/mime-types.js';
 import { batched, findOrFail, isFacialRecognitionEnabled } from 'src/utils/misc.js';
 import { Point, transformPoints } from 'src/utils/transform.js';
 
 const personKey = ({ ownerId, personGroupId }: PersonId) => `${ownerId}/${personGroupId}`;
+const FACE_IDENTITY_BACKFILL_CHUNK_SIZE = 1000;
 
 @Injectable()
 export class PersonService extends BaseService {
+  @OnEvent({ name: 'AppBootstrap', workers: [ImmichWorker.Microservices] })
+  async onBootstrap(): Promise<void> {
+    if (await this.faceIdentityRepository.hasBackfillWork()) {
+      const activeBackfills = await this.jobRepository.searchJobs(QueueName.PeopleBackfill, {
+        status: [QueueJobStatus.Active, QueueJobStatus.Delayed, QueueJobStatus.Paused, QueueJobStatus.Waiting],
+      });
+      if (activeBackfills.some((job) => job.name === JobName.FaceIdentityBackfill)) {
+        return;
+      }
+
+      await this.jobRepository.queue({ name: JobName.FaceIdentityBackfill, data: {} });
+    }
+  }
+
   async getAll(auth: AuthDto, dto: PersonSearchDto): Promise<PeopleResponseDto> {
-    const { withHidden = false, closestAssetId, closestPersonId, page, size } = dto;
+    const { withHidden = false, withSharedSpaces = false, closestAssetId, closestPersonId, page, size } = dto;
+    const { machineLearning } = await this.getConfig({ withCache: false });
+
+    if (withSharedSpaces) {
+      return this.faceIdentityRepository.getAccessiblePeople(auth.user.id, {
+        withHidden,
+        page,
+        size,
+        minimumFaceCount: machineLearning.facialRecognition.minFaces,
+      });
+    }
+
     let closestFaceAssetId = closestAssetId;
     const pagination = {
       take: size,
@@ -85,6 +119,39 @@ export class PersonService extends BaseService {
     };
   }
 
+  async mergeScopedPeople(auth: AuthDto, dto: MergeScopedPeopleDto): Promise<void> {
+    const resolved = await this.faceIdentityRepository.resolveRepairRefs(auth.user.id, dto);
+    if (!resolved.accessible) {
+      throw new BadRequestException('One or more people were not found or are not accessible');
+    }
+    if (!resolved.allAttachedProfilesRepairable) {
+      throw new ForbiddenException('Cannot merge identities with inaccessible attached profiles');
+    }
+    if (resolved.hasScopedProfileConflict) {
+      throw new BadRequestException('Cannot merge people that already have separate profiles in the same scope');
+    }
+
+    await this.faceIdentityRepository.mergeIdentities({
+      targetIdentityId: resolved.targetIdentityId,
+      sourceIdentityIds: resolved.sourceIdentityIds,
+      source: 'manual',
+    });
+    await this.queueSpacePersonMetadataBackfill();
+  }
+
+  async detachScopedPerson(auth: AuthDto, dto: DetachScopedPersonDto): Promise<void> {
+    const resolved = await this.faceIdentityRepository.resolveDetachRef(auth.user.id, dto.profile);
+    if (!resolved.accessible) {
+      throw new BadRequestException('Person was not found or is not accessible');
+    }
+    if (!resolved.allBackingFacesRepairable) {
+      throw new ForbiddenException('Cannot detach a profile whose faces also back inaccessible profiles');
+    }
+
+    await this.faceIdentityRepository.detachScopedProfile(dto.profile);
+    await this.queueSpacePersonMetadataBackfill();
+  }
+
   async reassignFaces(auth: AuthDto, personGroupId: string, dto: AssetFaceUpdateDto): Promise<PersonResponseDto[]> {
     await this.requireAccess({ auth, permission: Permission.PersonUpdate, ids: [personGroupId] });
     const person = await this.findOrFail(auth, personGroupId);
@@ -111,6 +178,7 @@ export class PersonService extends BaseService {
         }
 
         await this.personRepository.reassignFace(face.id, person.personGroupId);
+        await this.replaceFaceIdentity(person.personGroupId, face.id, 'manual');
       }
 
       result.push(mapPerson(person));
@@ -128,6 +196,7 @@ export class PersonService extends BaseService {
     const person = await this.findOrFail(auth, personGroupId);
 
     await this.personRepository.reassignFace(face.id, person.personGroupId);
+    await this.replaceFaceIdentity(person.personGroupId, face.id, 'manual');
     if (person.faceAssetId === null) {
       await this.createNewFeaturePhoto([person]);
     }
@@ -170,6 +239,78 @@ export class PersonService extends BaseService {
   async getById(auth: AuthDto, personGroupId: string): Promise<PersonResponseDto> {
     await this.requireAccess({ auth, permission: Permission.PersonRead, ids: [personGroupId] });
     return mapPerson(await this.findOrFail(auth, personGroupId));
+  }
+
+  async getFacesForPicker(auth: AuthDto, id: string, dto: PersonFacePageQueryDto): Promise<PersonFacePageResponseDto> {
+    const person = await this.findOrFail(id);
+    const take = dto.size;
+    const rows = await this.personRepository.getRepresentativeFaces({
+      personId: id,
+      take,
+      skip: (dto.page - 1) * dto.size,
+    });
+    const faces = rows.slice(0, take);
+
+    return {
+      faces: faces.map((face) => ({
+        id: face.id,
+        assetId: face.assetId,
+        imageHeight: face.imageHeight,
+        imageWidth: face.imageWidth,
+        boundingBoxX1: face.boundingBoxX1,
+        boundingBoxX2: face.boundingBoxX2,
+        boundingBoxY1: face.boundingBoxY1,
+        boundingBoxY2: face.boundingBoxY2,
+        sourceType: face.sourceType,
+        fileCreatedAt: asDateString(face.fileCreatedAt) ?? undefined,
+        isRepresentative: face.id === person.faceAssetId,
+      })),
+      hasNextPage: rows.length > take,
+    };
+  }
+
+  async getFaceThumbnail(auth: AuthDto, personId: string, faceId: string): Promise<ImmichMediaResponse> {
+    await this.requireAccess({ auth, permission: Permission.PersonRead, ids: [personId] });
+    const face = await this.personRepository.getRepresentativeFaceForUpdate({ personId, assetFaceId: faceId });
+    if (!face) {
+      throw new NotFoundException();
+    }
+
+    await this.requireAccess({ auth, permission: Permission.AssetRead, ids: [face.assetId] });
+    const sourcePath = await this.getFaceThumbnailSource(face.assetId);
+    if (!sourcePath) {
+      throw new NotFoundException();
+    }
+
+    return this.generateFaceThumbnailResponse(face, sourcePath);
+  }
+
+  async updateRepresentativeFace(
+    auth: AuthDto,
+    id: string,
+    dto: RepresentativeFaceUpdateDto,
+  ): Promise<PersonResponseDto> {
+    await this.requireAccess({ auth, permission: Permission.PersonUpdate, ids: [id] });
+    const current = await this.findOrFail(id);
+    const face = await this.personRepository.getRepresentativeFaceForUpdate({
+      personId: id,
+      assetFaceId: dto.assetFaceId,
+    });
+    if (!face) {
+      throw new BadRequestException('Representative face must belong to the person');
+    }
+
+    await this.requireAccess({ auth, permission: Permission.AssetRead, ids: [face.assetId] });
+    const person = await this.personRepository.update({ id, faceAssetId: face.id });
+    if (current.identityId) {
+      await this.faceIdentityRepository.updateRepresentativeFace({
+        identityId: current.identityId,
+        assetFaceId: face.id,
+      });
+    }
+
+    await this.jobRepository.queue({ name: JobName.PersonGenerateThumbnail, data: { id } });
+    return mapPerson(person);
   }
 
   async getStatistics(auth: AuthDto, personGroupId: string): Promise<PersonStatisticsResponseDto> {
@@ -251,6 +392,13 @@ export class PersonService extends BaseService {
       await this.jobRepository.queue({ name: JobName.PersonGenerateThumbnail, data: { ownerId, personGroupId } });
     }
 
+    if (person.identityId && (name !== undefined || birthDate !== undefined)) {
+      await this.jobRepository.queue({
+        name: JobName.SharedSpacePersonMetadataBackfill,
+        data: { identityId: person.identityId },
+      });
+    }
+
     return mapPerson(person);
   }
 
@@ -281,6 +429,9 @@ export class PersonService extends BaseService {
   async deleteAll(auth: AuthDto, { ids }: BulkIdsDto): Promise<void> {
     await this.requireAccess({ auth, permission: Permission.PersonDelete, ids });
     await this.removeAllPersonGroups(ids, auth.user.id);
+    if (ids.length > 0) {
+      await this.queueSpacePersonMetadataBackfill();
+    }
   }
 
   @Chunked()
@@ -308,6 +459,65 @@ export class PersonService extends BaseService {
     const clusterGroups = await this.personRepository.deleteOrphanedClusterGroups();
 
     this.logger.debug(`Deleted ${personGroups} empty person groups and ${clusterGroups} orphaned cluster groups`);
+    if (people.length > 0) {
+      await this.queueSpacePersonMetadataBackfill();
+    }
+    return JobStatus.Success;
+  }
+
+  @OnJob({ name: JobName.FaceIdentityBackfill, queue: QueueName.PeopleBackfill })
+  async handleFaceIdentityBackfill({
+    stage = 'person',
+    cursor,
+  }: JobOf<JobName.FaceIdentityBackfill>): Promise<JobStatus> {
+    let processed = 0;
+
+    if (stage === 'person') {
+      const result = await this.faceIdentityRepository.backfillPersonalIdentities({
+        cursor,
+        limit: FACE_IDENTITY_BACKFILL_CHUNK_SIZE,
+      });
+      processed += result.processed;
+
+      if (result.nextCursor) {
+        await this.jobRepository.queue({
+          name: JobName.FaceIdentityBackfill,
+          data: { stage: 'person', cursor: result.nextCursor },
+        });
+        return JobStatus.Success;
+      }
+    }
+
+    const result = await this.faceIdentityRepository.backfillSpacePersonIdentities({
+      cursor: stage === 'space-person' ? cursor : undefined,
+      limit: FACE_IDENTITY_BACKFILL_CHUNK_SIZE,
+    });
+    processed += result.processed;
+
+    if (result.conflictCount > 0) {
+      this.logger.warn(`Face identity backfill left ${result.conflictCount} space people unresolved`);
+    }
+
+    if (result.nextCursor) {
+      await this.jobRepository.queue({
+        name: JobName.FaceIdentityBackfill,
+        data: { stage: 'space-person', cursor: result.nextCursor },
+      });
+      return JobStatus.Success;
+    }
+
+    const shouldRebuildSpacePeople = processed > 0 || (await this.faceIdentityRepository.hasBackfillWork());
+
+    if (shouldRebuildSpacePeople) {
+      const spaceIds = await this.sharedSpaceRepository.getSpaceIdsWithFaceRecognitionEnabled();
+      await this.jobRepository.queueAll(
+        spaceIds.map((spaceId) => ({
+          name: JobName.SharedSpaceFaceMatchAll as const,
+          data: { spaceId },
+        })),
+      );
+      await this.queueSpacePersonMetadataBackfill();
+    }
 
     return JobStatus.Success;
   }
@@ -407,6 +617,7 @@ export class PersonService extends BaseService {
     }
 
     if (faceIdsToRemove.length > 0) {
+      await this.faceIdentityRepository.unlinkFaces(faceIdsToRemove);
       this.logger.log(`Removed ${faceIdsToRemove.length} faces below detection threshold in asset ${id}`);
     }
 
@@ -469,6 +680,7 @@ export class PersonService extends BaseService {
 
     if (force) {
       await this.personRepository.unassignFaces({ clusterGroupId, sourceType: SourceType.MachineLearning });
+      await this.faceIdentityRepository.unlinkFacesBySourceType(SourceType.MachineLearning);
       await this.handlePersonCleanup();
       await this.vacuum('asset_face', 'person');
 
@@ -543,6 +755,7 @@ export class PersonService extends BaseService {
 
     if (face.personGroupId) {
       this.logger.debug(`Face ${id} already has a person assigned`);
+      await this.replaceFaceIdentity(face.personId, face.id, 'owner-person');
 
       // Still queue space face matching — this face may belong to a space
       // that was created/linked after the face was originally recognized.
@@ -618,6 +831,7 @@ export class PersonService extends BaseService {
 
       this.logger.debug(`Assigning face ${id} to person group ${personGroupId}`);
       await this.personRepository.reassignFaces({ faceIds: [id], newPersonGroupId: personGroupId });
+      await this.replaceFaceIdentity(personGroupId, id, 'owner-person');
     }
 
     // Queue shared space face matching for any spaces containing this asset
@@ -630,6 +844,15 @@ export class PersonService extends BaseService {
     }
 
     return JobStatus.Success;
+  }
+
+  private async replaceFaceIdentity(
+    personId: string,
+    assetFaceId: string,
+    source: 'owner-person' | 'manual',
+  ): Promise<void> {
+    const identity = await this.faceIdentityRepository.ensurePersonIdentity(personId);
+    await this.faceIdentityRepository.replaceFaceIdentity({ assetFaceId, identityId: identity.id, source });
   }
 
   @OnJob({ name: JobName.PersonFileMigration, queue: QueueName.Migration })
@@ -720,8 +943,16 @@ export class PersonService extends BaseService {
         this.logger.log(`Merging ${mergeName} into ${targetPerson.name || targetPerson.personGroupId}`);
 
         try {
+          const targetIdentity = await this.faceIdentityRepository.ensurePersonIdentity(targetPerson.personGroupId);
+          const sourceIdentity = await this.faceIdentityRepository.ensurePersonIdentity(mergeId);
           await this.personRepository.reassignFaces(mergeData);
           await this.removeAllPersonGroups([mergeId], targetPerson.ownerId);
+          await this.faceIdentityRepository.mergeIdentities({
+            targetIdentityId: targetIdentity.id,
+            sourceIdentityIds: [sourceIdentity.id],
+            source: 'manual',
+          });
+          await this.queueSpacePersonMetadataBackfill(targetIdentity.id);
 
           this.logger.log(`Merged ${mergeName} into ${targetPerson.name || targetPerson.personGroupId}`);
           results.push({ id: mergeId, success: true });
@@ -733,6 +964,13 @@ export class PersonService extends BaseService {
     }
 
     return results;
+  }
+
+  private async queueSpacePersonMetadataBackfill(identityId?: string | null): Promise<void> {
+    await this.jobRepository.queue({
+      name: JobName.SharedSpacePersonMetadataBackfill,
+      data: identityId ? { identityId } : {},
+    });
   }
 
   private findOrFail(auth: AuthDto, personGroupId: string) {
@@ -795,7 +1033,7 @@ export class PersonService extends BaseService {
       dto.imageHeight = originalDimensions.height;
     }
 
-    await this.personRepository.createAssetFace({
+    const faceId = await this.personRepository.createAssetFace({
       personGroupId: person.personGroupId,
       assetId: dto.assetId,
       imageHeight: dto.imageHeight,
@@ -806,6 +1044,7 @@ export class PersonService extends BaseService {
       boundingBoxY2: Math.round(bottomRight.y),
       sourceType: SourceType.Manual,
     });
+    await this.replaceFaceIdentity(dto.personId, faceId, 'manual');
 
     if (!person.faceAssetId) {
       await this.createNewFeaturePhoto([person]);
@@ -815,7 +1054,8 @@ export class PersonService extends BaseService {
   async deleteFace(auth: AuthDto, id: string, dto: AssetFaceDeleteDto): Promise<void> {
     await this.requireAccess({ auth, permission: Permission.FaceDelete, ids: [id] });
 
-    return dto.force ? this.personRepository.deleteAssetFace(id) : this.personRepository.softDeleteAssetFaces(id);
+    await (dto.force ? this.personRepository.deleteAssetFace(id) : this.personRepository.softDeleteAssetFaces(id));
+    await this.faceIdentityRepository.unlinkFaces([id]);
   }
 
   private vacuum(...tables: (keyof DB)[]): Promise<unknown> {
