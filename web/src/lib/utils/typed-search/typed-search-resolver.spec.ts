@@ -1,4 +1,10 @@
-import { AssetTypeEnum, getFilterSuggestions, searchPerson } from '@immich/sdk';
+import {
+  AssetTypeEnum,
+  getFilterSuggestions,
+  getSearchSuggestions,
+  searchPerson,
+  SearchSuggestionType,
+} from '@immich/sdk';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { parseTypedSearch } from './typed-search-parser';
 import { resolveTypedSearchFilters } from './typed-search-resolver';
@@ -7,6 +13,7 @@ vi.mock('@immich/sdk', async () => ({
   ...(await vi.importActual<typeof import('@immich/sdk')>('@immich/sdk')),
   searchPerson: vi.fn(),
   getFilterSuggestions: vi.fn(),
+  getSearchSuggestions: vi.fn(),
 }));
 
 describe('resolveTypedSearchFilters', () => {
@@ -16,12 +23,12 @@ describe('resolveTypedSearchFilters', () => {
       people: [],
       countries: [],
       cameraMakes: [],
-      cameraModels: [],
       tags: [],
       ratings: [],
       mediaTypes: [AssetTypeEnum.Image, AssetTypeEnum.Video],
       hasUnnamedPeople: false,
     });
+    vi.mocked(getSearchSuggestions).mockResolvedValue([]);
   });
 
   it('resolves a single person, tag, and camera make', async () => {
@@ -30,7 +37,6 @@ describe('resolveTypedSearchFilters', () => {
       people: [],
       countries: [],
       cameraMakes: ['Nikon'],
-      cameraModels: [],
       tags: [{ id: 'tag-1', value: 'Travel' }],
       ratings: [4],
       mediaTypes: [AssetTypeEnum.Image],
@@ -102,7 +108,6 @@ describe('resolveTypedSearchFilters', () => {
       people: [],
       countries: [],
       cameraMakes: [],
-      cameraModels: [],
       tags: [
         { id: 'tag-1', value: 'Travel' },
         { id: 'tag-2', value: 'Family' },
@@ -112,7 +117,10 @@ describe('resolveTypedSearchFilters', () => {
       hasUnnamedPeople: false,
     });
 
-    const result = await resolveTypedSearchFilters(parseTypedSearch('person:anna person:bob tag:travel tag:family'), {});
+    const result = await resolveTypedSearchFilters(
+      parseTypedSearch('person:anna person:bob tag:travel tag:family'),
+      {},
+    );
 
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -135,7 +143,6 @@ describe('resolveTypedSearchFilters', () => {
       people: [],
       countries: [],
       cameraMakes: [],
-      cameraModels: [],
       tags: [
         { id: 'tag-1', value: 'Travel' },
         { id: 'tag-2', value: 'Travel 2025' },
@@ -159,7 +166,10 @@ describe('resolveTypedSearchFilters', () => {
 
     await resolveTypedSearchFilters(parseTypedSearch('person:anna camera:nikon'), { spaceId: 'space-1' });
 
-    expect(getFilterSuggestions).toHaveBeenCalledWith(expect.objectContaining({ spaceId: 'space-1' }), expect.anything());
+    expect(getFilterSuggestions).toHaveBeenCalledWith(
+      expect.objectContaining({ spaceId: 'space-1' }),
+      expect.anything(),
+    );
   });
 
   it('uses space-scoped people from filter suggestions when resolving people inside a space', async () => {
@@ -167,7 +177,6 @@ describe('resolveTypedSearchFilters', () => {
       people: [{ id: 'space-person-1', name: 'Anna' }],
       countries: [],
       cameraMakes: [],
-      cameraModels: [],
       tags: [],
       ratings: [],
       mediaTypes: [],
@@ -189,15 +198,19 @@ describe('resolveTypedSearchFilters', () => {
       people: [],
       countries: [],
       cameraMakes: ['Nikon'],
-      cameraModels: ['Nikon'],
       tags: [],
       ratings: [],
       mediaTypes: [],
       hasUnnamedPeople: false,
     });
+    vi.mocked(getSearchSuggestions).mockResolvedValue(['Nikon']);
 
     const result = await resolveTypedSearchFilters(parseTypedSearch('camera:nikon'), {});
 
+    expect(getSearchSuggestions).toHaveBeenCalledWith(
+      expect.objectContaining({ $type: SearchSuggestionType.CameraModel }),
+      expect.anything(),
+    );
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.issues[0]).toMatchObject({ code: 'ambiguous', key: 'camera', value: 'nikon' });

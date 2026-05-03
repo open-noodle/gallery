@@ -1,5 +1,5 @@
 import { createFilterState, type FilterState } from '$lib/components/filter-panel/filter-panel';
-import { getFilterSuggestions, searchPerson } from '@immich/sdk';
+import { getFilterSuggestions, getSearchSuggestions, searchPerson, SearchSuggestionType } from '@immich/sdk';
 import type {
   TypedSearchIssue,
   TypedSearchParseResult,
@@ -97,8 +97,14 @@ async function resolveTypedSearchFiltersInternal(
     (token) => token.key === 'tag' || token.key === 'camera' || (token.key === 'person' && context.spaceId),
   );
   const suggestions = needsSuggestions
-    ? await getFilterSuggestions({ spaceId: context.spaceId }, { signal: context.signal })
+    ? await getFilterSuggestions(suggestionScope(context), { signal: context.signal })
     : undefined;
+  const cameraModels = unresolvedTokens.some((token) => token.key === 'camera')
+    ? await getSearchSuggestions(
+        { $type: SearchSuggestionType.CameraModel, ...suggestionScope(context) },
+        { signal: context.signal },
+      )
+    : [];
 
   for (const token of parsed.resolutionTokens) {
     const selectedChoice = context.selectedChoices?.get(token.raw);
@@ -124,13 +130,17 @@ async function resolveTypedSearchFiltersInternal(
     }
 
     if (token.key === 'camera' && suggestions) {
-      resolveCameraToken(token, suggestions.cameraMakes, suggestions.cameraModels ?? [], filters, issues, choices);
+      resolveCameraToken(token, suggestions.cameraMakes, cameraModels, filters, issues, choices);
     }
   }
 
   return issues.length > 0
     ? { ok: false, queryText: parsed.queryText, issues, choices }
     : { ok: true, queryText: parsed.queryText, filters, personNames, tagNames };
+}
+
+function suggestionScope(context: TypedSearchResolveContext) {
+  return context.spaceId ? { spaceId: context.spaceId } : { withSharedSpaces: true };
 }
 
 function applyScalar(filters: FilterState, token: TypedSearchScalarToken) {

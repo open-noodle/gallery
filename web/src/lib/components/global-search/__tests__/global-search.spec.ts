@@ -587,7 +587,7 @@ describe('global-search root', () => {
 
   it('pressing Enter on typed text activates the promoted search row', async () => {
     const m = new GlobalSearchManager();
-    const activateSearchSpy = vi.spyOn(m, 'activateSearch').mockImplementation(() => {});
+    const activateSearchSpy = vi.spyOn(m, 'activateSearch').mockImplementation(async () => {});
     m.open();
     render(GlobalSearch, { props: { manager: m } });
 
@@ -626,7 +626,7 @@ describe('global-search root', () => {
   it('pressing Enter on an almost-exact command query activates the promoted command instead of search', async () => {
     const m = new GlobalSearchManager();
     const activateSpy = vi.spyOn(m, 'activate').mockImplementation(() => {});
-    const activateSearchSpy = vi.spyOn(m, 'activateSearch').mockImplementation(() => {});
+    const activateSearchSpy = vi.spyOn(m, 'activateSearch').mockImplementation(async () => {});
     m.open();
     render(GlobalSearch, { props: { manager: m } });
 
@@ -828,7 +828,7 @@ describe('global-search root', () => {
   it('activateRecent("query", ...) replays through activateSearch on the current page', () => {
     addEntry({ kind: 'query', id: 'query:sunset', text: 'sunset', lastUsed: 1 });
     const m = new GlobalSearchManager();
-    const activateSearchSpy = vi.spyOn(m, 'activateSearch').mockImplementation(() => {});
+    const activateSearchSpy = vi.spyOn(m, 'activateSearch').mockImplementation(async () => {});
     m.open();
     render(GlobalSearch, { props: { manager: m } });
 

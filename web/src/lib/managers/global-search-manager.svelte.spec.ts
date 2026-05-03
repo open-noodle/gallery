@@ -1519,7 +1519,7 @@ describe('activate("command")', () => {
     it('stores an ambiguity choice and clears matching issue state', () => {
       const manager = new GlobalSearchManager();
       const issue = {
-        code: 'ambiguous',
+        code: 'ambiguous' as const,
         key: 'person',
         raw: 'person:anna',
         value: 'anna',
@@ -5428,7 +5428,7 @@ describe('prefix scoping — defensive recent replay of scoped query', () => {
 
   it('activateRecent({kind:query, text:"@alice"}) replays the raw scoped text through activateSearch', () => {
     const m = new GlobalSearchManager();
-    const spy = vi.spyOn(m, 'activateSearch').mockImplementation(() => {});
+    const spy = vi.spyOn(m, 'activateSearch').mockImplementation(async () => {});
 
     m.activateRecent({ kind: 'query', id: 'query:@alice', text: '@alice', lastUsed: Date.now() });
 

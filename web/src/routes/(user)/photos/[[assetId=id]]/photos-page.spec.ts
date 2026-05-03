@@ -1,8 +1,8 @@
+import { goto } from '$app/navigation';
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import TestWrapper from '$lib/components/TestWrapper.svelte';
 import { lang } from '$lib/stores/preferences.store';
 import { buildPhotosTimelineOptions } from '$lib/utils/photos-filter-options';
-import { goto } from '$app/navigation';
 import { AssetTypeEnum } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
@@ -26,7 +26,7 @@ const { mockPage, mockAssetMultiSelectManager, mockAuthManager, mockMemoryManage
       preferences: { memories: { enabled: false } },
     },
     mockMemoryManager: {
-      memories: [],
+      memories: [] as unknown[],
     },
     mockRegisterSelectionContext: vi.fn(),
   }));
