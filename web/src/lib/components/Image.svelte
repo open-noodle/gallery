@@ -12,7 +12,7 @@
     ref?: HTMLImageElement;
   };
 
-  let { src, onStart, onLoad, onError, ref = $bindable(), ...rest }: Props = $props();
+  let { src, onStart, onLoad, onError, ref = $bindable(), crossorigin = 'anonymous', ...rest }: Props = $props();
 
   let capturedSource: string | undefined = $state();
   let loaded = $state(false);
@@ -76,6 +76,7 @@
     <img
       bind:this={ref}
       src={capturedSource}
+      {crossorigin}
       {...rest}
       style:visibility={isFirefox && !loaded ? 'hidden' : undefined}
       onload={handleLoad}
