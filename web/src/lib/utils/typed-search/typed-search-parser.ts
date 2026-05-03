@@ -95,6 +95,10 @@ const FILTER_KEYS = new Set<TypedSearchFilterKey>([
 
 const RESOLUTION_KEYS = new Set<TypedSearchResolutionKey>(['person', 'tag', 'camera']);
 const REPEATABLE_KEYS = new Set<TypedSearchFilterKey>(['person', 'tag']);
+const FILTER_KEY_ALIASES: Record<string, TypedSearchFilterKey> = {
+  people: 'person',
+  tags: 'tag',
+};
 
 export function parseTypedSearch(raw: string): TypedSearchParseResult {
   const pieces = splitSearch(raw);
@@ -111,8 +115,8 @@ export function parseTypedSearch(raw: string): TypedSearchParseResult {
       continue;
     }
 
-    const key = piece.key.toLowerCase() as TypedSearchFilterKey;
-    if (!FILTER_KEYS.has(key)) {
+    const key = normalizeFilterKey(piece.key);
+    if (!key) {
       const issue = makeIssue('unknown-key', piece.raw, `Unknown filter "${piece.key}"`, piece.key, piece.value);
       issues.push(issue);
       displayTokens.push({ raw: piece.raw, key: piece.key, value: piece.value, status: 'error', issue });
@@ -181,6 +185,12 @@ export function parseTypedSearch(raw: string): TypedSearchParseResult {
     displayTokens,
     issues,
   };
+}
+
+function normalizeFilterKey(rawKey: string): TypedSearchFilterKey | undefined {
+  const lowerKey = rawKey.toLowerCase();
+  const aliasedKey = FILTER_KEY_ALIASES[lowerKey] ?? lowerKey;
+  return FILTER_KEYS.has(aliasedKey as TypedSearchFilterKey) ? (aliasedKey as TypedSearchFilterKey) : undefined;
 }
 
 function splitSearch(raw: string): ParsedPiece[] {

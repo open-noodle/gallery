@@ -30,6 +30,21 @@ describe('parseTypedSearch', () => {
     ]);
   });
 
+  it('accepts plural people and tags aliases', () => {
+    const result = parseTypedSearch('people:anna tags:nature beach');
+
+    expect(result.queryText).toBe('beach');
+    expect(result.resolutionTokens).toEqual([
+      { kind: 'resolution', key: 'person', raw: 'people:anna', value: 'anna' },
+      { kind: 'resolution', key: 'tag', raw: 'tags:nature', value: 'nature' },
+    ]);
+    expect(result.displayTokens).toMatchObject([
+      { raw: 'people:anna', key: 'person', value: 'anna', status: 'pending-entity' },
+      { raw: 'tags:nature', key: 'tag', value: 'nature', status: 'pending-entity' },
+    ]);
+    expect(result.issues).toEqual([]);
+  });
+
   it('rejects unknown alphabetic key value tokens', () => {
     const result = parseTypedSearch('beach persn:anna');
 

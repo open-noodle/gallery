@@ -623,6 +623,19 @@ describe('global-search root', () => {
     expect(activateSearchSpy).toHaveBeenCalledWith('beach camera:nikon');
   });
 
+  it('pressing Enter on a filter-only tags query commits search instead of navigating to Tags', async () => {
+    const m = new GlobalSearchManager();
+    const activateSpy = vi.spyOn(m, 'activate').mockImplementation(() => {});
+    const activateSearchSpy = vi.spyOn(m, 'activateSearch').mockImplementation(async () => {});
+    m.open();
+    render(GlobalSearch, { props: { manager: m } });
+
+    await user.type(screen.getByRole('combobox'), 'tags:nature{enter}');
+
+    expect(activateSearchSpy).toHaveBeenCalledWith('tags:nature');
+    expect(activateSpy).not.toHaveBeenCalledWith('nav', expect.objectContaining({ id: 'nav:userPages:tags' }));
+  });
+
   it('pressing Enter on an almost-exact command query activates the promoted command instead of search', async () => {
     const m = new GlobalSearchManager();
     const activateSpy = vi.spyOn(m, 'activate').mockImplementation(() => {});

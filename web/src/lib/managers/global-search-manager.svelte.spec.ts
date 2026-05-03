@@ -1858,6 +1858,16 @@ describe('topNavigationMatch', () => {
     expect(m.topNavigationMatch?.id).toBe('nav:userPages:people');
   });
 
+  it('does not promote navigation when the matching word is typed-filter syntax', () => {
+    const m = new GlobalSearchManager();
+    m.open();
+    m.setQuery('tags:nature beach');
+
+    expect(m.topNavigationMatch).toBeNull();
+    expect(m.topSearchMatch).toEqual({ id: 'top-search', query: 'beach', rawQuery: 'tags:nature beach' });
+    expect(m.sections.navigation.status).toBe('empty');
+  });
+
   it('promotes Favorites when the user types "favorites" (prefix match)', () => {
     // Query chosen so it does NOT also match any command label — `album` now
     // trips `cmd:new_album` which (correctly) suppresses the nav promotion.
@@ -2687,6 +2697,13 @@ describe('commands provider', () => {
 
     expect(manager.topCommandMatch?.id).toBe('cmd:space_add_member');
     expect(manager.topCommandMatch?.id).not.toBe('cmd:selection_add_to_album');
+  });
+
+  it('topCommandMatch does not promote commands when typed filters are present', () => {
+    manager.setQuery('from:2025 theme');
+
+    expect(manager.topCommandMatch).toBeNull();
+    expect(manager.topSearchMatch).toEqual({ id: 'top-search', query: 'theme', rawQuery: 'from:2025 theme' });
   });
 
   it('under `@alice`, commands section is empty', async () => {

@@ -1754,6 +1754,9 @@ export class GlobalSearchManager {
     if (this.scope !== 'all') {
       return null;
     }
+    if (this.typedSearchDisplayTokens.length > 0) {
+      return null;
+    }
     const q = this.query.trim();
     if (q.length === 0) {
       return null;
@@ -1808,6 +1811,9 @@ export class GlobalSearchManager {
     // section itself lists matching commands — promoting + deduping here would
     // make the section render empty, so only promote under unscoped 'all'.
     if (this.scope !== 'all') {
+      return null;
+    }
+    if (this.typedSearchDisplayTokens.length > 0) {
       return null;
     }
     const q = this.query.trim();
@@ -1968,12 +1974,17 @@ export class GlobalSearchManager {
     // provider can branch: non-nav entity scopes hide the section entirely, bare
     // `>` returns the full filtered catalog sorted alphabetically, and fuzzy search
     // runs when there's a payload under scope 'all' or 'nav'.
-    this.sections.navigation = this.runNavigationProvider(this.payload, this.scope);
+    const searchProviderPayload = this.getSearchProviderPayload();
+    this.sections.navigation = this.runNavigationProvider(searchProviderPayload, this.scope);
     // Commands mirror navigation: synchronous on every keystroke, bypasses the debounce.
     // Pass the current `topCommandMatch.id` so a command that is promoted to the top-
     // result slot doesn't also render inside its own section (same dedup shape the
     // component applies for nav).
-    this.sections.commands = this.runCommandsProvider(this.payload, this.scope, this.topCommandMatch?.id ?? null);
+    this.sections.commands = this.runCommandsProvider(
+      searchProviderPayload,
+      this.scope,
+      this.topCommandMatch?.id ?? null,
+    );
     // The prior cursor may point at a nav/entity item that no longer exists in the new
     // results. Reconcile synchronously so the highlight doesn't lag the displayed list.
     this.reconcileCursor();
