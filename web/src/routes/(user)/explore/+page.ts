@@ -10,7 +10,7 @@ export const load = (async ({ url }) => {
 
   const [explore, people] = await Promise.all([
     getExploreData(),
-    getAllPeople({ withHidden: false }),
+    getAllPeople({ withHidden: false, withSharedSpaces: true }),
     memoryManager.refresh(),
   ]);
   const $t = await getFormatter();
