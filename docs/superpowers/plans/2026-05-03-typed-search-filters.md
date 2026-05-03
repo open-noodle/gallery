@@ -132,6 +132,7 @@ export type TypedSearchParseResult = {
 ### Task 0: Baseline Verification
 
 **Files:**
+
 - Read: `open-api/typescript-sdk/package.json`
 - Read: `web/vite.config.ts`
 - No production edits
@@ -165,6 +166,7 @@ If no files changed, do not commit. If a repo-local generated artifact had to be
 ### Task 1: Parser TDD
 
 **Files:**
+
 - Create: `web/src/lib/utils/typed-search/typed-search-parser.ts`
 - Create: `web/src/lib/utils/typed-search/typed-search-parser.spec.ts`
 
@@ -390,7 +392,12 @@ export function parseTypedSearch(raw: string): TypedSearchParseResult {
     }
 
     if (RESOLUTION_KEYS.has(key as TypedSearchResolutionKey)) {
-      resolutionTokens.push({ kind: 'resolution', key: key as TypedSearchResolutionKey, raw: piece.raw, value: piece.value });
+      resolutionTokens.push({
+        kind: 'resolution',
+        key: key as TypedSearchResolutionKey,
+        raw: piece.raw,
+        value: piece.value,
+      });
       displayTokens.push({ raw: piece.raw, key, value: piece.value, status: 'pending-entity' });
       continue;
     }
@@ -460,6 +467,7 @@ git commit -m "feat(web): add typed search parser"
 ### Task 2: URL Serialization And Hydration TDD
 
 **Files:**
+
 - Modify: `web/src/lib/utils/searchable-page-search.ts`
 - Create: `web/src/lib/utils/__tests__/searchable-page-search.spec.ts`
 - Create: `web/src/lib/utils/typed-search/typed-search-name-cache.ts`
@@ -656,7 +664,17 @@ export const SEARCHABLE_PAGE_FILTER_PARAMS = [
 export type SearchablePageFilterState = Partial<
   Pick<
     FilterState,
-    'personIds' | 'tagIds' | 'city' | 'country' | 'make' | 'model' | 'mediaType' | 'isFavorite' | 'rating' | 'dateAfter' | 'dateBefore'
+    | 'personIds'
+    | 'tagIds'
+    | 'city'
+    | 'country'
+    | 'make'
+    | 'model'
+    | 'mediaType'
+    | 'isFavorite'
+    | 'rating'
+    | 'dateAfter'
+    | 'dateBefore'
   >
 >;
 ```
@@ -703,7 +721,7 @@ export function buildSearchablePageUrl(
   query: string,
   sortOrder: SearchablePageSortOrder = 'relevance',
   filters?: FilterState,
-): string | null
+): string | null;
 ```
 
 Inside it, after query/sort handling:
@@ -794,6 +812,7 @@ git commit -m "feat(web): serialize typed search filters in URLs"
 ### Task 3: Destination Page Hydration TDD
 
 **Files:**
+
 - Modify: `web/src/routes/(user)/photos/[[assetId=id]]/+page.svelte`
 - Modify: `web/src/routes/(user)/photos/[[assetId=id]]/photos-page.spec.ts`
 - Create: `web/src/test-data/mocks/active-filters-bar-actions.stub.svelte`
@@ -945,7 +964,9 @@ vi.mock('$lib/components/filter-panel/active-filters-bar.svelte', async () => {
 
 ```ts
 it('hydrates typed filter URL params into the space FilterState', async () => {
-  mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?q=beach&people=space-person-1&city=Berlin&type=video');
+  mockPage.url = new URL(
+    'https://gallery.test/spaces/space-1/photos?q=beach&people=space-person-1&city=Berlin&type=video',
+  );
 
   renderPage({ space: makeSpace(), members: [makeMember()] });
 
@@ -1127,6 +1148,7 @@ git commit -m "feat(web): hydrate typed search filters from URLs"
 ### Task 4: Resolver TDD
 
 **Files:**
+
 - Create: `web/src/lib/utils/typed-search/typed-search-resolver.ts`
 - Create: `web/src/lib/utils/typed-search/typed-search-resolver.spec.ts`
 
@@ -1249,7 +1271,10 @@ describe('resolveTypedSearchFilters', () => {
       hasUnnamedPeople: false,
     });
 
-    const result = await resolveTypedSearchFilters(parseTypedSearch('person:anna person:bob tag:travel tag:family'), {});
+    const result = await resolveTypedSearchFilters(
+      parseTypedSearch('person:anna person:bob tag:travel tag:family'),
+      {},
+    );
 
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -1296,7 +1321,10 @@ describe('resolveTypedSearchFilters', () => {
 
     await resolveTypedSearchFilters(parseTypedSearch('person:anna camera:nikon'), { spaceId: 'space-1' });
 
-    expect(getFilterSuggestions).toHaveBeenCalledWith(expect.objectContaining({ spaceId: 'space-1' }), expect.anything());
+    expect(getFilterSuggestions).toHaveBeenCalledWith(
+      expect.objectContaining({ spaceId: 'space-1' }),
+      expect.anything(),
+    );
   });
 
   it('uses space-scoped people from filter suggestions when resolving people inside a space', async () => {
@@ -1452,10 +1480,30 @@ export async function resolveTypedSearchFilters(
         filters.personIds.push(matches[0].id);
         personNames.set(matches[0].id, matches[0].name || matches[0].id);
       } else if (matches.length === 0) {
-        issues.push({ code: 'no-match', key: 'person', raw: token.raw, value: token.value, message: `No person found for "${token.value}"` });
+        issues.push({
+          code: 'no-match',
+          key: 'person',
+          raw: token.raw,
+          value: token.value,
+          message: `No person found for "${token.value}"`,
+        });
       } else {
-        issues.push({ code: 'ambiguous', key: 'person', raw: token.raw, value: token.value, message: `Choose a person for "${token.value}"` });
-        choices.push(...matches.map((person) => ({ tokenRaw: token.raw, key: 'person' as const, id: person.id, label: person.name || person.id, value: token.value })));
+        issues.push({
+          code: 'ambiguous',
+          key: 'person',
+          raw: token.raw,
+          value: token.value,
+          message: `Choose a person for "${token.value}"`,
+        });
+        choices.push(
+          ...matches.map((person) => ({
+            tokenRaw: token.raw,
+            key: 'person' as const,
+            id: person.id,
+            label: person.name || person.id,
+            value: token.value,
+          })),
+        );
       }
     }
 
@@ -1468,7 +1516,9 @@ export async function resolveTypedSearchFilters(
     }
   }
 
-  return issues.length > 0 ? { ok: false, queryText: parsed.queryText, issues, choices } : { ok: true, queryText: parsed.queryText, filters, personNames, tagNames };
+  return issues.length > 0
+    ? { ok: false, queryText: parsed.queryText, issues, choices }
+    : { ok: true, queryText: parsed.queryText, filters, personNames, tagNames };
 }
 ```
 
@@ -1500,6 +1550,7 @@ git commit -m "feat(web): resolve typed search filters"
 ### Task 5: GlobalSearchManager Commit TDD
 
 **Files:**
+
 - Modify: `web/src/lib/managers/global-search-manager.svelte.ts`
 - Modify: `web/src/lib/managers/global-search-manager.svelte.spec.ts`
 
@@ -1621,8 +1672,19 @@ describe('GlobalSearchManager typed search commit', () => {
 
   it('blocks navigation and exposes issues when resolution fails', async () => {
     const manager = new GlobalSearchManager();
-    const issue = { code: 'no-match', key: 'person', raw: 'person:anna', value: 'anna', message: 'No person found for "anna"' };
-    typedSearchMock.resolveTypedSearchFilters.mockResolvedValue({ ok: false, queryText: 'beach', issues: [issue], choices: [] });
+    const issue = {
+      code: 'no-match',
+      key: 'person',
+      raw: 'person:anna',
+      value: 'anna',
+      message: 'No person found for "anna"',
+    };
+    typedSearchMock.resolveTypedSearchFilters.mockResolvedValue({
+      ok: false,
+      queryText: 'beach',
+      issues: [issue],
+      choices: [],
+    });
 
     await manager.activateSearch('beach person:anna');
 
@@ -1632,8 +1694,20 @@ describe('GlobalSearchManager typed search commit', () => {
 
   it('stores an ambiguity choice and clears matching issue state', () => {
     const manager = new GlobalSearchManager();
-    const issue = { code: 'ambiguous', key: 'person', raw: 'person:anna', value: 'anna', message: 'Choose a person for "anna"' };
-    const choice = { tokenRaw: 'person:anna', key: 'person' as const, id: 'person-2', label: 'Anna Maria', value: 'anna' };
+    const issue = {
+      code: 'ambiguous',
+      key: 'person',
+      raw: 'person:anna',
+      value: 'anna',
+      message: 'Choose a person for "anna"',
+    };
+    const choice = {
+      tokenRaw: 'person:anna',
+      key: 'person' as const,
+      id: 'person-2',
+      label: 'Anna Maria',
+      value: 'anna',
+    };
     manager.typedSearchIssues = [issue];
     manager.typedSearchChoices = [choice];
     manager.typedSearchDisplayTokens = [{ raw: 'person:anna', key: 'person', value: 'anna', status: 'error', issue }];
@@ -1681,7 +1755,11 @@ Expected: FAIL because `activateSearch` is synchronous, manager has no typed iss
 Modify `global-search-manager.svelte.ts`:
 
 ```ts
-import { parseTypedSearch, type TypedSearchDisplayToken, type TypedSearchIssue } from '$lib/utils/typed-search/typed-search-parser';
+import {
+  parseTypedSearch,
+  type TypedSearchDisplayToken,
+  type TypedSearchIssue,
+} from '$lib/utils/typed-search/typed-search-parser';
 import { resolveTypedSearchFilters, type TypedSearchChoice } from '$lib/utils/typed-search/typed-search-resolver';
 import { storeTypedSearchNames } from '$lib/utils/typed-search/typed-search-name-cache';
 ```
@@ -1839,6 +1917,7 @@ git commit -m "feat(web): commit typed search filters from global search"
 ### Task 6: Token Rail UI TDD
 
 **Files:**
+
 - Create: `web/src/lib/components/global-search/typed-search-token-rail.svelte`
 - Create: `web/src/lib/components/global-search/__tests__/typed-search-token-rail.spec.ts`
 - Modify: `web/src/lib/components/global-search/global-search.svelte`
@@ -1880,7 +1959,13 @@ describe('TypedSearchTokenRail', () => {
             key: 'person',
             value: 'anna',
             status: 'error',
-            issue: { code: 'no-match', raw: 'person:anna', key: 'person', value: 'anna', message: 'No person found for "anna"' },
+            issue: {
+              code: 'no-match',
+              raw: 'person:anna',
+              key: 'person',
+              value: 'anna',
+              message: 'No person found for "anna"',
+            },
           },
         ],
       },
@@ -1954,7 +2039,15 @@ Expected: PASS.
 In `global-search.spec.ts`, include `getFilterSuggestions` in the existing `@immich/sdk` import and mock:
 
 ```ts
-import { AssetVisibility, getFilterSuggestions, getMlHealth, searchAssets, searchPerson, searchPlaces, searchSmart } from '@immich/sdk';
+import {
+  AssetVisibility,
+  getFilterSuggestions,
+  getMlHealth,
+  searchAssets,
+  searchPerson,
+  searchPlaces,
+  searchSmart,
+} from '@immich/sdk';
 ```
 
 ```ts
@@ -1991,7 +2084,9 @@ it('keeps the palette open and shows typed search issues after failed Enter comm
   const m = new GlobalSearchManager();
   m.open();
   vi.spyOn(m, 'activateSearch').mockImplementation(async () => {
-    m.typedSearchIssues = [{ code: 'no-match', key: 'person', raw: 'person:anna', value: 'anna', message: 'No person found for "anna"' }];
+    m.typedSearchIssues = [
+      { code: 'no-match', key: 'person', raw: 'person:anna', value: 'anna', message: 'No person found for "anna"' },
+    ];
   });
   render(GlobalSearch, { props: { manager: m } });
 
@@ -2005,7 +2100,9 @@ it('keeps the palette open and shows typed search issues after failed Enter comm
 it('renders ambiguity choices and sends selection to the manager', async () => {
   const m = new GlobalSearchManager();
   const selectSpy = vi.spyOn(m, 'selectTypedSearchChoice');
-  m.typedSearchIssues = [{ code: 'ambiguous', key: 'person', raw: 'person:anna', value: 'anna', message: 'Choose a person for "anna"' }];
+  m.typedSearchIssues = [
+    { code: 'ambiguous', key: 'person', raw: 'person:anna', value: 'anna', message: 'Choose a person for "anna"' },
+  ];
   m.typedSearchChoices = [
     { tokenRaw: 'person:anna', key: 'person', id: 'person-1', label: 'Anna', value: 'anna' },
     { tokenRaw: 'person:anna', key: 'person', id: 'person-2', label: 'Anna Maria', value: 'anna' },
@@ -2121,6 +2218,7 @@ git commit -m "feat(web): show typed search filter tokens"
 ### Task 7: Final Integration Verification
 
 **Files:**
+
 - No planned code edits unless verification exposes a defect
 
 - [ ] **Step 1: Run focused typed search tests**
