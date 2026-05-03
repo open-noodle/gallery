@@ -74,7 +74,13 @@ import { AssetFileType, CacheControl, ImageFormat, StorageFolder } from 'src/enu
 import { ServeStrategy } from 'src/interfaces/storage-backend.interface.js';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { StorageMigrationRepository } from 'src/repositories/storage-migration.repository.js';
-import { ImmichFileResponse, ImmichMediaResponse, ImmichRedirectResponse, ImmichStreamResponse } from 'src/utils/file.js';
+import {
+  ContentDisposition,
+  ImmichFileResponse,
+  ImmichMediaResponse,
+  ImmichRedirectResponse,
+  ImmichStreamResponse,
+} from 'src/utils/file.js';
 import { UserGroupRepository } from 'src/repositories/user-group.repository.js';
 import { ClassificationRepository } from 'src/repositories/classification.repository.js';
 import { clamp } from 'src/utils/misc.js';
@@ -341,11 +347,18 @@ export class BaseService {
     contentType: string,
     cacheControl: CacheControl,
     fileName?: string,
+    disposition: ContentDisposition = 'inline',
   ): Promise<ImmichMediaResponse> {
     // lazy import to avoid circular dependency (StorageService extends BaseService)
     const { StorageService } = await import('./storage.service.js');
     const backend = StorageService.resolveBackendForKey(filePath);
-    const strategy: ServeStrategy = await backend.getServeStrategy(filePath, contentType);
+    const strategy: ServeStrategy = await backend.getServeStrategy(filePath, {
+      contentType,
+      cacheControl,
+      fileName,
+      disposition,
+    });
+    const responseDisposition = disposition === 'inline' ? undefined : disposition;
 
     switch (strategy.type) {
       case 'file': {
@@ -354,12 +367,13 @@ export class BaseService {
           contentType,
           cacheControl,
           fileName,
+          disposition: responseDisposition,
         });
       }
       case 'redirect': {
         return new ImmichRedirectResponse({
           url: strategy.url,
-          cacheControl,
+          cacheControl: CacheControl.PrivateWithoutCache,
         });
       }
       case 'stream': {
@@ -369,6 +383,7 @@ export class BaseService {
           length: strategy.length,
           cacheControl,
           fileName,
+          disposition: responseDisposition,
         });
       }
     }
