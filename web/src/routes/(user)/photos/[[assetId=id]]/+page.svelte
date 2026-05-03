@@ -39,11 +39,15 @@
   import { getAssetBulkActions } from '#lib/services/asset.service.ts';
   import { getStackBulkActions } from '#lib/services/stack.service.ts';
   import { lang } from '#lib/stores/preferences.store.ts';
-  import { createUrl, getAssetMediaUrl, memoryLaneTitle } from '#lib/utils.ts';
+  import { getAssetMediaUrl, memoryLaneTitle } from '#lib/utils.ts';
   import { buildSearchablePageUrl, getSearchablePageState } from '#lib/utils/searchable-page-search.ts';
   import { type OnLink, type OnUnlink } from '#lib/utils/actions.ts';
   import { openFileUploadDialog } from '#lib/utils/file-uploader.ts';
-  import { buildPhotosTimelineOptions, handlePhotosRemoveFilter } from '#lib/utils/photos-filter-options.ts';
+  import {
+    buildPhotosTimelineOptions,
+    getPhotosPersonFilterThumbnailUrl,
+    handlePhotosRemoveFilter,
+  } from '#lib/utils/photos-filter-options.ts';
   import {
     buildSmartSearchFacetKey,
     buildSmartSearchFacetsParams,
@@ -137,7 +141,7 @@
     const mappedPeople = response.people.map((p) => ({
       id: p.id,
       name: p.name,
-      thumbnailUrl: createUrl(`/people/${p.id}/thumbnail`),
+      thumbnailUrl: getPhotosPersonFilterThumbnailUrl(p),
     }));
     for (const p of response.people) {
       personNames.set(p.id, p.name);
