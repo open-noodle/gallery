@@ -7,8 +7,8 @@
   import SingleGridRow from '#lib/components/shared-components/SingleGridRow.svelte';
   import { assetViewerManager } from '#lib/managers/asset-viewer-manager.svelte.ts';
   import { Route } from '#lib/route.ts';
-  import { getAssetMediaUrl, getPeopleThumbnailUrl, memoryLaneTitle } from '#lib/utils.ts';
-  import { getAssetInfo, AssetMediaSize, type SearchExploreResponseDto } from '@immich/sdk';
+  import { createUrl, getAssetMediaUrl, getPeopleThumbnailUrl, memoryLaneTitle } from '#lib/utils.ts';
+  import { getAssetInfo, AssetMediaSize, type PersonResponseDto, type SearchExploreResponseDto } from '@immich/sdk';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import MemoryCard from '#lib/components/memories/MemoryCard.svelte';
   import { ImageCarousel } from '@immich/ui';
@@ -63,6 +63,20 @@
   const assetCursor = $derived({
     current: assetViewerManager.asset!,
   });
+
+  const getPersonHref = (person: PersonResponseDto) =>
+    person.primaryProfile?.type === 'space-person' && person.primaryProfile.spaceId
+      ? Route.viewSpacePerson(person.primaryProfile.spaceId, person.primaryProfile.id, {
+          previousRoute: Route.explore(),
+        })
+      : Route.viewPerson({ ...person, id: person.primaryProfile?.id ?? person.id });
+
+  const getPersonThumbnail = (person: PersonResponseDto) =>
+    person.primaryProfile?.type === 'space-person' && person.primaryProfile.spaceId
+      ? createUrl(`/shared-spaces/${person.primaryProfile.spaceId}/people/${person.primaryProfile.id}/thumbnail`, {
+          updatedAt: person.updatedAt,
+        })
+      : getPeopleThumbnailUrl({ ...person, id: person.primaryProfile?.id ?? person.id });
 </script>
 
 <OnEvents {onPersonThumbnailReady} />
@@ -81,12 +95,12 @@
       <SingleGridRow class="grid grid-flow-col grid-auto-fill-20 gap-x-4 md:grid-auto-fill-28">
         {#snippet children({ itemCount })}
           {#each people.slice(0, itemCount) as person (person.id)}
-            <a href={Route.viewPerson(person)} class="text-center">
+            <a href={getPersonHref(person)} class="text-center">
               <div class="@container relative">
                 <ImageThumbnail
                   circle
                   shadow
-                  url={getPeopleThumbnailUrl(person)}
+                  url={getPersonThumbnail(person)}
                   altText={person.name}
                   widthStyle="100%"
                 />
