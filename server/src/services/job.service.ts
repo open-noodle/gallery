@@ -70,6 +70,14 @@ const asJobItem = (dto: JobCreateDto): JobItem => {
       return { name: JobName.IntegrityDeleteReportType, data: { type: IntegrityReport.ChecksumFail } };
     }
 
+    case ManualJobName.FaceIdentityBackfill: {
+      return { name: JobName.FaceIdentityBackfill, data: {} };
+    }
+
+    case ManualJobName.SharedSpacePersonMetadataBackfill: {
+      return { name: JobName.SharedSpacePersonMetadataBackfill, data: {} };
+    }
+
     default: {
       throw new BadRequestException('Invalid job name');
     }
