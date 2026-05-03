@@ -77,7 +77,7 @@ describe('global-search-input-trigger', () => {
 
   it('pressing Enter after clearing the top search field clears the committed search', async () => {
     mockPage.url = new URL('https://gallery.test/photos?q=mountains');
-    const activateSearchSpy = vi.spyOn(globalSearchManager, 'activateSearch').mockImplementation(() => {});
+    const activateSearchSpy = vi.spyOn(globalSearchManager, 'activateSearch').mockImplementation(async () => {});
     const user = userEvent.setup();
 
     render(GlobalSearchInputTrigger);

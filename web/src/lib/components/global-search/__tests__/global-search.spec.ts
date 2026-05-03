@@ -599,7 +599,7 @@ describe('global-search root', () => {
   it('pressing Enter after clearing the modal input clears the committed search', async () => {
     mockPage.url = new URL('https://gallery.test/photos?q=mountain');
     const m = new GlobalSearchManager();
-    const activateSearchSpy = vi.spyOn(m, 'activateSearch').mockImplementation(() => {});
+    const activateSearchSpy = vi.spyOn(m, 'activateSearch').mockImplementation(async () => {});
     m.open('modal');
     render(GlobalSearch, { props: { manager: m } });
 

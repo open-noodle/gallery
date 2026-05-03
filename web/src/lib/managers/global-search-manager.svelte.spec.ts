@@ -270,12 +270,13 @@ describe('GlobalSearchManager (skeleton)', () => {
     expect(manager.searchSortOrder).toBe('asc');
   });
 
-  it('open() clears the modal query once after activating a text search', () => {
+  it('open() clears the modal query once after activating a text search', async () => {
     const m = new GlobalSearchManager();
     mockPage.url = new URL('https://gallery.test/photos');
+    mockResolvedTypedSearch('beach');
 
     m.open('modal');
-    m.activateSearch('beach');
+    await m.activateSearch('beach');
     m.close();
     mockPage.url = new URL('https://gallery.test/photos?q=beach&sort=asc');
 
@@ -285,12 +286,13 @@ describe('GlobalSearchManager (skeleton)', () => {
     expect(m.searchSortOrder).toBe('relevance');
   });
 
-  it('open() still hydrates the dropdown query after activating a text search', () => {
+  it('open() still hydrates the dropdown query after activating a text search', async () => {
     const m = new GlobalSearchManager();
     mockPage.url = new URL('https://gallery.test/photos');
+    mockResolvedTypedSearch('beach');
 
     m.open('modal');
-    m.activateSearch('beach');
+    await m.activateSearch('beach');
     m.close();
     mockPage.url = new URL('https://gallery.test/photos?q=beach&sort=asc');
 
