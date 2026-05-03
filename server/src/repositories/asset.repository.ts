@@ -8,6 +8,7 @@ import {
   SelectQueryBuilder,
   ShallowDehydrateObject,
   sql,
+  SqlBool,
   Updateable,
   UpdateResult,
 } from 'kysely';
@@ -36,6 +37,7 @@ import { AssetTable } from 'src/schema/tables/asset.table';
 import {
   anyUuid,
   asUuid,
+  hasAnyFaceIdentity,
   hasAnyPerson,
   hasAnySpacePerson,
   inSharedAlbum,
@@ -90,10 +92,14 @@ interface AssetBuilderOptions {
   spacePersonId?: string;
   personIds?: string[];
   spacePersonIds?: string[];
+  identityIds?: string[];
+  forceEmptyResult?: boolean;
   tagIds?: string[];
   userIds?: string[];
   timelineSpaceIds?: string[];
   withStacked?: boolean;
+  withPartners?: boolean;
+  withSharedSpaces?: boolean;
   exifInfo?: boolean;
   status?: AssetStatus;
   assetType?: AssetType;
@@ -967,6 +973,7 @@ export class AssetRepository {
         qb
           .selectFrom('asset')
           .select(truncatedDate<Date>(options.orderBy).as('timeBucket'))
+          .$if(!!options.forceEmptyResult, (qb) => qb.where(sql<SqlBool>`false`))
           .$if(!!options.isTrashed, (qb) => qb.where('asset.status', '!=', AssetStatus.Deleted))
           .where('asset.deletedAt', options.isTrashed ? 'is not' : 'is', null)
           .$if(
@@ -1035,6 +1042,7 @@ export class AssetRepository {
           )
           .$if(!!options.personIds?.length, (qb) => hasAnyPerson(qb, options.personIds!))
           .$if(!!options.spacePersonIds?.length, (qb) => hasAnySpacePerson(qb, options.spacePersonIds!))
+          .$if(!!options.identityIds?.length, (qb) => hasAnyFaceIdentity(qb, options.identityIds!))
           .$if(!!options.withStacked, (qb) =>
             qb
               .leftJoin('stack', (join) =>
@@ -1130,6 +1138,7 @@ export class AssetRepository {
             qb.select(['asset_exif.city', 'asset_exif.country']),
           )
           .$if(!!options.withCoordinates, (qb) => qb.select(['asset_exif.latitude', 'asset_exif.longitude']))
+          .$if(!!options.forceEmptyResult, (qb) => qb.where(sql<SqlBool>`false`))
           .where('asset.deletedAt', options.isTrashed ? 'is not' : 'is', null)
           .$if(options.visibility === undefined, withDefaultVisibility)
           .$if(!!options.visibility, (qb) => qb.where('asset.visibility', '=', options.visibility!))
@@ -1176,6 +1185,7 @@ export class AssetRepository {
           )
           .$if(!!options.personIds?.length, (qb) => hasAnyPerson(qb, options.personIds!))
           .$if(!!options.spacePersonIds?.length, (qb) => hasAnySpacePerson(qb, options.spacePersonIds!))
+          .$if(!!options.identityIds?.length, (qb) => hasAnyFaceIdentity(qb, options.identityIds!))
           .$if(!!options.city, (qb) => qb.where('asset_exif.city', '=', options.city!))
           .$if(!!options.country, (qb) => qb.where('asset_exif.country', '=', options.country!))
           .$if(!!options.make, (qb) => qb.where('asset_exif.make', '=', options.make!))
@@ -1500,13 +1510,16 @@ export class AssetRepository {
 
   @GenerateSql({ params: [DummyValue.UUID, AssetFileType.Preview, true] })
   async getForThumbnail(id: string, type: AssetFileType, isEdited: boolean) {
+    const types = type === AssetFileType.Thumbnail ? [AssetFileType.Thumbnail, AssetFileType.Preview] : [type];
+
     return this.db
       .selectFrom('asset')
       .where('asset.id', '=', id)
       .leftJoin('asset_file', (join) =>
-        join.onRef('asset.id', '=', 'asset_file.assetId').on('asset_file.type', '=', type),
+        join.onRef('asset.id', '=', 'asset_file.assetId').on('asset_file.type', 'in', types),
       )
       .select(['asset.originalPath', 'asset.originalFileName', 'asset_file.path as path'])
+      .orderBy(sql`case when asset_file.type = ${type} then 0 else 1 end`)
       .orderBy('asset_file.isEdited', isEdited ? 'desc' : 'asc')
       .executeTakeFirstOrThrow();
   }
