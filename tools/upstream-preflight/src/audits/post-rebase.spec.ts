@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { Manifest } from '../types';
 import {
@@ -8,6 +11,8 @@ import {
   auditMigrationCount,
   auditMigrationGlobs,
   auditMigrationTimestampCollisions,
+  renderPostRebaseAuditMarkdown,
+  writePostRebaseAuditReport,
 } from './post-rebase';
 
 const manifest: Manifest = {
@@ -147,5 +152,52 @@ describe('auditGeneratedArtifactSignals', () => {
     expect(result.details).toEqual([
       'Review regenerated artifact open-api/typescript-sdk/index.ts',
     ]);
+  });
+});
+
+describe('post-rebase audit reports', () => {
+  it('renders batch-scoped audit markdown', () => {
+    expect(
+      renderPostRebaseAuditMarkdown({
+        date: '2026-05-04',
+        batch: '02',
+        results: [
+          {
+            ok: false,
+            title: 'Generated Artifact Review',
+            details: ['Review regenerated artifact open-api/spec.json'],
+          },
+        ],
+        upstreamTouchedFiles: ['open-api/spec.json'],
+      }),
+    ).toContain('# Upstream Post-Rebase Audit - Batch 02');
+  });
+
+  it('writes batch markdown and json reports under the output directory', () => {
+    const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gallery-audit-'));
+    const paths = writePostRebaseAuditReport(outputDir, {
+      date: '2026-05-04',
+      batch: '07',
+      results: [
+        {
+          ok: true,
+          title: 'Fork-Owned File Survival',
+          details: ['All literal fork-owned files are present'],
+        },
+      ],
+      upstreamTouchedFiles: ['server/src/services/search.service.ts'],
+    });
+
+    expect(path.basename(paths.markdownPath)).toBe(
+      'batch-07-postrebase-audit.md',
+    );
+    expect(path.basename(paths.jsonPath)).toBe(
+      'batch-07-postrebase-audit.json',
+    );
+    expect(fs.readFileSync(paths.markdownPath, 'utf8')).toContain('Batch 07');
+    expect(JSON.parse(fs.readFileSync(paths.jsonPath, 'utf8'))).toMatchObject({
+      batch: '07',
+      ok: true,
+    });
   });
 });

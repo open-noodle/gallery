@@ -3,6 +3,13 @@ import path from 'node:path';
 import micromatch from 'micromatch';
 import type { AuditResult, Manifest } from '../types';
 
+export type PostRebaseAuditReportInput = {
+  date: string;
+  batch?: string;
+  results: AuditResult[];
+  upstreamTouchedFiles: string[];
+};
+
 export function auditForkOwnedFiles(
   manifest: Manifest,
   currentFiles: string[],
@@ -206,6 +213,67 @@ export function runPostRebaseAudits(
     ),
     auditGeneratedArtifactSignals(upstreamTouchedFiles),
   ];
+}
+
+export function renderPostRebaseAuditMarkdown(
+  input: PostRebaseAuditReportInput,
+): string {
+  const rows = input.results
+    .map(
+      (result) =>
+        `| ${result.ok ? 'OK' : 'ISSUE'} | ${result.title} | ${result.details.join('<br>')} |`,
+    )
+    .join('\n');
+  const touchedFiles =
+    input.upstreamTouchedFiles.length > 0
+      ? input.upstreamTouchedFiles.map((file) => `- \`${file}\``).join('\n')
+      : '- None';
+  const title = input.batch
+    ? `Upstream Post-Rebase Audit - Batch ${input.batch}`
+    : 'Upstream Post-Rebase Audit';
+
+  return `# ${title}
+
+- **Date**: ${input.date}
+- **Status**: ${input.results.every((result) => result.ok) ? 'OK' : 'ISSUE'}
+
+## Audit Results
+
+| Status | Check | Details |
+| --- | --- | --- |
+${rows || '| OK | No audit results | - |'}
+
+## Upstream Touched Files
+
+${touchedFiles}
+`;
+}
+
+export function writePostRebaseAuditReport(
+  outputDir: string,
+  input: PostRebaseAuditReportInput,
+) {
+  fs.mkdirSync(outputDir, { recursive: true });
+  const basename = input.batch
+    ? `batch-${input.batch}-postrebase-audit`
+    : `postrebase-audit-${input.date}`;
+  const markdownPath = path.join(outputDir, `${basename}.md`);
+  const jsonPath = path.join(outputDir, `${basename}.json`);
+
+  fs.writeFileSync(markdownPath, renderPostRebaseAuditMarkdown(input));
+  fs.writeFileSync(
+    jsonPath,
+    JSON.stringify(
+      {
+        ...input,
+        ok: input.results.every((result) => result.ok),
+      },
+      null,
+      2,
+    ),
+  );
+
+  return { markdownPath, jsonPath };
 }
 
 function collectExpectedMigrations(manifest: Manifest): string[] {

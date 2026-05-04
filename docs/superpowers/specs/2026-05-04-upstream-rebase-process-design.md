@@ -71,7 +71,7 @@ metadata:
   upstream_branch: main
   fork_remote: origin
   fork_branch: main
-  last_verified_fork_head: 863e690f6280bc28ee715f66ecf91b4b4a5683f8
+  last_verified_fork_head: 919deb87a6477d5058e0fa7b3960d30de577b495
 
 features:
   shared-spaces:
@@ -318,7 +318,9 @@ by default and summarized into the final committed upstream sync report.
 
 `make upstream-postrebase-audit` should compare the current rebased branch to
 `upstream/main` or the current batch tip and verify that fork-owned behavior is
-still present.
+still present. When `BATCH=NN` or `--batch NN` is provided, it should persist
+batch audit markdown and JSON under
+`$(git rev-parse --git-path upstream-preflight)/batches/`.
 
 Initial audits:
 

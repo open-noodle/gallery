@@ -849,7 +849,7 @@ function listFiles(cwd: string): string[] {
 Modify `tools/upstream-preflight/src/index.ts`:
 
 ```ts
-import { runPostRebaseAudits } from './audits/post-rebase';
+import { runPostRebaseAudits, writePostRebaseAuditReport } from './audits/post-rebase';
 ```
 
 Add this command:
@@ -858,12 +858,26 @@ Add this command:
 program
   .command('postrebase-audit')
   .option('--manifest <path>', 'ownership manifest path', defaultManifestPath)
-  .action((options: { manifest: string }) => {
+  .option('--batch <id>', 'upstream batch id')
+  .option('--output-dir <path>', 'post-rebase audit output directory')
+  .action((options: { manifest: string; batch?: string; outputDir?: string }) => {
+    const batch = options.batch ?? process.env.BATCH;
     const context = buildPreflightContext(options.manifest);
     const results = runPostRebaseAudits(context.manifest, context.upstreamRange.files, repoRoot());
     for (const result of results) {
       console.log(`${result.ok ? 'OK' : 'ISSUE'}: ${result.title}`);
       for (const detail of result.details) console.log(`- ${detail}`);
+    }
+    if (batch || options.outputDir) {
+      const outputDir = options.outputDir
+        ? resolveCliPath(options.outputDir)
+        : path.join(getGitPath(process.cwd(), 'upstream-preflight'), 'batches');
+      writePostRebaseAuditReport(outputDir, {
+        date: new Date().toISOString().slice(0, 10),
+        batch,
+        results,
+        upstreamTouchedFiles: context.upstreamRange.files,
+      });
     }
     process.exitCode = results.every((result) => result.ok) ? 0 : 1;
   });
@@ -879,6 +893,7 @@ Run:
 pnpm --filter @gallery/upstream-preflight run test -- post-rebase.spec.ts
 pnpm --filter @gallery/upstream-preflight run check
 make upstream-postrebase-audit
+make upstream-postrebase-audit BATCH=01
 git add tools/upstream-preflight/src/audits/post-rebase.ts tools/upstream-preflight/src/audits/post-rebase.spec.ts tools/upstream-preflight/src/index.ts docs/superpowers/plans/2026-05-04-upstream-rebase-process-03-audits.md
 git commit -m "feat: audit fork survival after upstream rebase"
 ```
@@ -887,7 +902,9 @@ Expected: tests and type check pass. The real audit prints fork-owned file
 survival and Gallery migration count/filename checks. On the current upstream
 backlog, `make upstream-postrebase-audit` exits non-zero only because upstream
 touches generated OpenAPI/mobile client/SQL artifacts that require explicit
-review after the affected batch.
+review after the affected batch. `make upstream-postrebase-audit BATCH=01`
+also writes batch audit markdown and JSON under
+`$(git rev-parse --git-path upstream-preflight)/batches/`.
 
 ### Task 4: Include Audits In Preflight
 

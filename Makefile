@@ -60,7 +60,7 @@ upstream-batch-plan:
 
 .PHONY: upstream-postrebase-audit
 upstream-postrebase-audit:
-	$(UPSTREAM_PREFLIGHT) run postrebase-audit
+	$(UPSTREAM_PREFLIGHT) run postrebase-audit $(if $(BATCH),-- --batch $(BATCH),)
 
 .PHONY: mobile-drift-rebase-check
 mobile-drift-rebase-check:
@@ -77,7 +77,7 @@ fork-patches-check:
 .PHONY: fork-ownership-coverage-check
 fork-ownership-coverage-check:
 	git diff --name-only upstream/main...origin/main | sort > /tmp/gallery-fork-files.txt
-	$(UPSTREAM_PREFLIGHT) run coverage -- /tmp/gallery-fork-files.txt docs/fork/ownership.yml
+	$(UPSTREAM_PREFLIGHT) run coverage -- /tmp/gallery-fork-files.txt docs/fork/ownership.yml --expected-head "$$(git rev-parse origin/main)"
 
 prod:
 	@trap 'make prod-down' EXIT; COMPOSE_BAKE=true docker compose -f ./docker/docker-compose.prod.yml up --build -V --remove-orphans

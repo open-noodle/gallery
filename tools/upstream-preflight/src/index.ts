@@ -6,7 +6,10 @@ import { Command } from 'commander';
 import { runCiInvariantAudits } from './audits/ci-invariants';
 import { runMobileDriftAudit } from './audits/mobile-drift';
 import { runPatchAudits } from './audits/patches';
-import { runPostRebaseAudits } from './audits/post-rebase';
+import {
+  runPostRebaseAudits,
+  writePostRebaseAuditReport,
+} from './audits/post-rebase';
 import { planBatches, renderBatchMarkdown } from './batch';
 import { collectGitRange, getGitPath, getMergeBase } from './git';
 import { defaultManifestPath, loadManifest } from './manifest';
@@ -238,18 +241,38 @@ program
 program
   .command('postrebase-audit')
   .option('--manifest <path>', 'ownership manifest path', defaultManifestPath)
-  .action((options: { manifest: string }) => {
-    const context = buildPreflightContext(options.manifest);
-    const results = runPostRebaseAudits(
-      context.manifest,
-      context.upstreamRange.files,
-      repoRoot(),
-    );
-    for (const result of results) {
-      console.log(`${result.ok ? 'OK' : 'ISSUE'}: ${result.title}`);
-      for (const detail of result.details) console.log(`- ${detail}`);
-    }
-    process.exitCode = results.every((result) => result.ok) ? 0 : 1;
-  });
+  .option('--batch <id>', 'upstream batch id')
+  .option('--output-dir <path>', 'post-rebase audit output directory')
+  .action(
+    (options: { manifest: string; batch?: string; outputDir?: string }) => {
+      const batch = options.batch ?? process.env.BATCH;
+      const context = buildPreflightContext(options.manifest);
+      const results = runPostRebaseAudits(
+        context.manifest,
+        context.upstreamRange.files,
+        repoRoot(),
+      );
+      for (const result of results) {
+        console.log(`${result.ok ? 'OK' : 'ISSUE'}: ${result.title}`);
+        for (const detail of result.details) console.log(`- ${detail}`);
+      }
+      if (batch || options.outputDir) {
+        const outputDir = options.outputDir
+          ? resolveCliPath(options.outputDir)
+          : path.join(
+              getGitPath(process.cwd(), 'upstream-preflight'),
+              'batches',
+            );
+        const { markdownPath } = writePostRebaseAuditReport(outputDir, {
+          date: new Date().toISOString().slice(0, 10),
+          batch,
+          results,
+          upstreamTouchedFiles: context.upstreamRange.files,
+        });
+        console.log(`Wrote post-rebase audit report: ${markdownPath}`);
+      }
+      process.exitCode = results.every((result) => result.ok) ? 0 : 1;
+    },
+  );
 
 program.parse(process.argv);

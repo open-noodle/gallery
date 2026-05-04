@@ -74,7 +74,7 @@ Replace the old process section with:
 7. Review and approve the batch plan with the user.
 8. Rebase one recommended batch at a time.
 9. For every conflict, record the file, fork side, upstream side, chosen resolution, risk, and verification needed.
-10. After each batch, run `make upstream-postrebase-audit` and the batch's required checks.
+10. After each batch, run `make upstream-postrebase-audit BATCH=NN` and the batch's required checks.
 11. Push high-risk batches to `rebase/upstream-batch-NN` when remote CI signal is useful.
 12. Continue until the final batch reaches `upstream/main`.
 13. Run full local and remote CI on the final branch.
@@ -120,7 +120,7 @@ image names.
 Run these checks after each high-risk batch and before final push:
 
 ```bash
-make upstream-postrebase-audit
+make upstream-postrebase-audit BATCH=<batch-id>
 make ci-invariants-check
 make fork-patches-check
 ```
@@ -169,6 +169,7 @@ Run:
 make upstream-preflight
 make upstream-batch-plan
 make upstream-postrebase-audit
+make upstream-postrebase-audit BATCH=01
 make ci-invariants-check
 make fork-patches-check
 ```
@@ -178,7 +179,8 @@ Expected: `make upstream-preflight`, `make upstream-batch-plan`,
 upstream backlog, `make upstream-postrebase-audit` exits non-zero only for the
 generated OpenAPI/mobile client/SQL artifact review signal. If
 `make ci-invariants-check` fails, the output identifies the exact workflow and
-forbidden pattern.
+forbidden pattern. The batch audit command writes markdown and JSON under
+`$(git rev-parse --git-path upstream-preflight)/batches/`.
 
 - [x] **Step 3: Verify intended mobile Drift failure on the current backlog**
 

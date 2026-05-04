@@ -65,10 +65,10 @@ Expected at the time this plan was updated:
 ```text
 ## plan/upstream-rebase-process...origin/main [ahead N]
 ## plan/upstream-rebase-process...origin/main [ahead N]
-863e690f6280bc28ee715f66ecf91b4b4a5683f8
+919deb87a6477d5058e0fa7b3960d30de577b495
 af39384efbe389740ab3b9df897291ab1e428535
-2042 /tmp/gallery-fork-files.txt
- 2042 files changed, 422095 insertions(+), 11553 deletions(-)
+2071 /tmp/gallery-fork-files.txt
+ 2071 files changed, 422347 insertions(+), 11594 deletions(-)
 ```
 
 If `origin/main` has moved, use the new `git rev-parse origin/main` value for
@@ -220,7 +220,7 @@ upstream-batch-plan:
 
 .PHONY: upstream-postrebase-audit
 upstream-postrebase-audit:
-	$(UPSTREAM_PREFLIGHT) run postrebase-audit
+	$(UPSTREAM_PREFLIGHT) run postrebase-audit $(if $(BATCH),-- --batch $(BATCH),)
 
 .PHONY: mobile-drift-rebase-check
 mobile-drift-rebase-check:
@@ -402,7 +402,7 @@ metadata:
   upstream_branch: main
   fork_remote: origin
   fork_branch: main
-  last_verified_fork_head: 863e690f6280bc28ee715f66ecf91b4b4a5683f8
+  last_verified_fork_head: 919deb87a6477d5058e0fa7b3960d30de577b495
 features:
   shared-spaces:
     title: Shared Spaces
@@ -835,20 +835,41 @@ export function findUncoveredFiles(files: string[], manifest: Manifest): string[
     .filter((file) => !micromatch.isMatch(file, coverageGlobs, micromatchOptions));
 }
 
+export function validateManifestForkHead(manifest: Manifest, expectedHead: string | undefined): string[] {
+  if (!expectedHead) {
+    return [];
+  }
+
+  if (manifest.metadata.last_verified_fork_head === expectedHead) {
+    return [];
+  }
+
+  return [
+    `Ownership manifest last_verified_fork_head ${manifest.metadata.last_verified_fork_head} does not match ${expectedHead}`,
+  ];
+}
+
 export function runCoverageCli(argv = process.argv.slice(2)) {
-  const [fileListPath, manifestPath = defaultManifestPath] = argv[0] === '--' ? argv.slice(1) : argv;
+  const options = parseCoverageArgs(argv);
+  const { fileListPath, manifestPath, expectedHead } = options;
   if (!fileListPath) {
-    throw new Error('Usage: tsx src/coverage.ts <fork-file-list> [manifest-path]');
+    throw new Error('Usage: tsx src/coverage.ts <fork-file-list> [manifest-path] [--expected-head <sha>]');
   }
 
   const manifest = loadManifest(resolveCliPath(manifestPath));
   const files = fs.readFileSync(resolveCliPath(fileListPath), 'utf8').split(/\r?\n/).filter(Boolean);
   const uncovered = findUncoveredFiles(files, manifest);
+  const headErrors = validateManifestForkHead(manifest, expectedHead);
 
-  if (uncovered.length > 0) {
-    console.error(`Ownership manifest does not cover ${uncovered.length} fork files:`);
-    for (const file of uncovered) {
-      console.error(file);
+  if (uncovered.length > 0 || headErrors.length > 0) {
+    for (const error of headErrors) {
+      console.error(error);
+    }
+    if (uncovered.length > 0) {
+      console.error(`Ownership manifest does not cover ${uncovered.length} fork files:`);
+      for (const file of uncovered) {
+        console.error(file);
+      }
     }
     process.exitCode = 1;
     return;
@@ -859,6 +880,31 @@ export function runCoverageCli(argv = process.argv.slice(2)) {
 
 function resolveCliPath(inputPath: string) {
   return path.resolve(process.env.INIT_CWD ?? process.cwd(), inputPath);
+}
+
+function parseCoverageArgs(argv: string[]) {
+  const args = argv[0] === '--' ? argv.slice(1) : argv;
+  const positional: string[] = [];
+  let expectedHead: string | undefined;
+
+  for (let index = 0; index < args.length; index++) {
+    const arg = args[index];
+    if (arg === '--expected-head') {
+      if (!args[index + 1]) {
+        throw new Error('--expected-head requires a commit SHA');
+      }
+      expectedHead = args[index + 1];
+      index++;
+      continue;
+    }
+    positional.push(arg);
+  }
+
+  return {
+    fileListPath: positional[0],
+    manifestPath: positional[1] ?? defaultManifestPath,
+    expectedHead,
+  };
 }
 
 function featureCoverageGlobs(feature: FeatureEntry): string[] {
@@ -885,7 +931,7 @@ Create `tools/upstream-preflight/src/coverage.spec.ts`:
 
 ```ts
 import { describe, expect, it } from 'vitest';
-import { findUncoveredFiles, manifestCoverageGlobs } from './coverage';
+import { findUncoveredFiles, manifestCoverageGlobs, runCoverageCli, validateManifestForkHead } from './coverage';
 import type { Manifest } from './types';
 
 const manifest: Manifest = {
@@ -895,7 +941,7 @@ const manifest: Manifest = {
     upstream_branch: 'main',
     fork_remote: 'origin',
     fork_branch: 'main',
-    last_verified_fork_head: '863e690f6280bc28ee715f66ecf91b4b4a5683f8',
+    last_verified_fork_head: '919deb87a6477d5058e0fa7b3960d30de577b495',
   },
   features: {
     'shared-spaces': {
@@ -932,6 +978,16 @@ describe('fork ownership coverage', () => {
       'server/src/schema/migrations-gallery/1772230000000-CreateStorageMigrationLogTable.ts',
     );
   });
+
+  it('reports a stale manifest fork head', () => {
+    expect(validateManifestForkHead(manifest, '0000000000000000000000000000000000000000')).toEqual([
+      'Ownership manifest last_verified_fork_head 919deb87a6477d5058e0fa7b3960d30de577b495 does not match 0000000000000000000000000000000000000000',
+    ]);
+  });
+
+  it('requires a value for the expected manifest fork head', () => {
+    expect(() => runCoverageCli(['files.txt', '--expected-head'])).toThrow('--expected-head requires a commit SHA');
+  });
 });
 ```
 
@@ -949,7 +1005,7 @@ Add this target near the other upstream preflight targets in `Makefile`:
 .PHONY: fork-ownership-coverage-check
 fork-ownership-coverage-check:
 	git diff --name-only upstream/main...origin/main | sort > /tmp/gallery-fork-files.txt
-	$(UPSTREAM_PREFLIGHT) run coverage -- /tmp/gallery-fork-files.txt docs/fork/ownership.yml
+	$(UPSTREAM_PREFLIGHT) run coverage -- /tmp/gallery-fork-files.txt docs/fork/ownership.yml --expected-head "$$(git rev-parse origin/main)"
 ```
 
 - [x] **Step 7: Verify parser and coverage helper**
@@ -981,7 +1037,7 @@ metadata:
   upstream_branch: main
   fork_remote: origin
   fork_branch: main
-  last_verified_fork_head: 863e690f6280bc28ee715f66ecf91b4b4a5683f8
+  last_verified_fork_head: 919deb87a6477d5058e0fa7b3960d30de577b495
 
 coverage_ignore:
   - docs/superpowers/**
@@ -1377,8 +1433,8 @@ Expected:
 
 ```text
 29
-Ownership manifest covers 2042 fork files
-Ownership manifest covers 2078 fork files
+Ownership manifest covers 2071 fork files
+Ownership manifest covers 2107 fork files
 ```
 
 The branch coverage count can move as this plan changes; it must include

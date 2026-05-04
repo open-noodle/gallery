@@ -47,12 +47,29 @@ export function findUncoveredFiles(
     );
 }
 
+export function validateManifestForkHead(
+  manifest: Manifest,
+  expectedHead: string | undefined,
+): string[] {
+  if (!expectedHead) {
+    return [];
+  }
+
+  if (manifest.metadata.last_verified_fork_head === expectedHead) {
+    return [];
+  }
+
+  return [
+    `Ownership manifest last_verified_fork_head ${manifest.metadata.last_verified_fork_head} does not match ${expectedHead}`,
+  ];
+}
+
 export function runCoverageCli(argv = process.argv.slice(2)) {
-  const [fileListPath, manifestPath = defaultManifestPath] =
-    argv[0] === '--' ? argv.slice(1) : argv;
+  const options = parseCoverageArgs(argv);
+  const { fileListPath, manifestPath, expectedHead } = options;
   if (!fileListPath) {
     throw new Error(
-      'Usage: tsx src/coverage.ts <fork-file-list> [manifest-path]',
+      'Usage: tsx src/coverage.ts <fork-file-list> [manifest-path] [--expected-head <sha>]',
     );
   }
 
@@ -62,13 +79,19 @@ export function runCoverageCli(argv = process.argv.slice(2)) {
     .split(/\r?\n/)
     .filter(Boolean);
   const uncovered = findUncoveredFiles(files, manifest);
+  const headErrors = validateManifestForkHead(manifest, expectedHead);
 
-  if (uncovered.length > 0) {
-    console.error(
-      `Ownership manifest does not cover ${uncovered.length} fork files:`,
-    );
-    for (const file of uncovered) {
-      console.error(file);
+  if (uncovered.length > 0 || headErrors.length > 0) {
+    for (const error of headErrors) {
+      console.error(error);
+    }
+    if (uncovered.length > 0) {
+      console.error(
+        `Ownership manifest does not cover ${uncovered.length} fork files:`,
+      );
+      for (const file of uncovered) {
+        console.error(file);
+      }
     }
     process.exitCode = 1;
     return;
@@ -79,6 +102,31 @@ export function runCoverageCli(argv = process.argv.slice(2)) {
 
 function resolveCliPath(inputPath: string) {
   return path.resolve(process.env.INIT_CWD ?? process.cwd(), inputPath);
+}
+
+function parseCoverageArgs(argv: string[]) {
+  const args = argv[0] === '--' ? argv.slice(1) : argv;
+  const positional: string[] = [];
+  let expectedHead: string | undefined;
+
+  for (let index = 0; index < args.length; index++) {
+    const arg = args[index];
+    if (arg === '--expected-head') {
+      if (!args[index + 1]) {
+        throw new Error('--expected-head requires a commit SHA');
+      }
+      expectedHead = args[index + 1];
+      index++;
+      continue;
+    }
+    positional.push(arg);
+  }
+
+  return {
+    fileListPath: positional[0],
+    manifestPath: positional[1] ?? defaultManifestPath,
+    expectedHead,
+  };
 }
 
 function featureCoverageGlobs(feature: FeatureEntry): string[] {
