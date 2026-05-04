@@ -48,6 +48,32 @@ e2e-rebase-smoke:
 	cd e2e && PLAYWRIGHT_DISABLE_WEBSERVER=true pnpm exec playwright test --project=rebase-smoke
 	cd e2e && docker compose down -v
 
+UPSTREAM_PREFLIGHT = pnpm --filter @gallery/upstream-preflight
+
+.PHONY: upstream-preflight
+upstream-preflight:
+	$(UPSTREAM_PREFLIGHT) run preflight
+
+.PHONY: upstream-batch-plan
+upstream-batch-plan:
+	$(UPSTREAM_PREFLIGHT) run batch-plan
+
+.PHONY: upstream-postrebase-audit
+upstream-postrebase-audit:
+	$(UPSTREAM_PREFLIGHT) run postrebase-audit
+
+.PHONY: mobile-drift-rebase-check
+mobile-drift-rebase-check:
+	$(UPSTREAM_PREFLIGHT) run mobile-drift-check
+
+.PHONY: ci-invariants-check
+ci-invariants-check:
+	$(UPSTREAM_PREFLIGHT) run ci-invariants-check
+
+.PHONY: fork-patches-check
+fork-patches-check:
+	$(UPSTREAM_PREFLIGHT) run fork-patches-check
+
 prod:
 	@trap 'make prod-down' EXIT; COMPOSE_BAKE=true docker compose -f ./docker/docker-compose.prod.yml up --build -V --remove-orphans
 
