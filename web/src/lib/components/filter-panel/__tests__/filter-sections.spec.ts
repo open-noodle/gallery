@@ -398,6 +398,49 @@ describe('LocationFilter', () => {
     expect(onSelectionChange).not.toHaveBeenCalled();
   });
 
+  it('should mark a city-only selection as selected under its matching country', async () => {
+    const onSelectionChange = vi.fn();
+
+    const { getByTestId, queryByTestId } = render(LocationFilter, {
+      props: {
+        countries: ['United States of America'],
+        selectedCity: 'New York City',
+        onCityFetch: () => Promise.resolve(['New York City', 'Seattle']),
+        onSelectionChange,
+      },
+    });
+
+    await fireEvent.click(getByTestId('location-country-United States of America'));
+    onSelectionChange.mockClear();
+
+    await waitFor(() => expect(queryByTestId('location-city-New York City')).toBeTruthy());
+    const selectedCity = getByTestId('location-city-New York City');
+    expect(selectedCity.className).toContain('font-medium');
+    expect(selectedCity.textContent).toContain('New York City');
+    expect(onSelectionChange).not.toHaveBeenCalled();
+  });
+
+  it('should clear a city-only selection when clicking the selected city', async () => {
+    const onSelectionChange = vi.fn();
+
+    const { getByTestId, queryByTestId } = render(LocationFilter, {
+      props: {
+        countries: ['United States of America'],
+        selectedCity: 'New York City',
+        onCityFetch: () => Promise.resolve(['New York City', 'Seattle']),
+        onSelectionChange,
+      },
+    });
+
+    await fireEvent.click(getByTestId('location-country-United States of America'));
+    await waitFor(() => expect(queryByTestId('location-city-New York City')).toBeTruthy());
+    onSelectionChange.mockClear();
+
+    await fireEvent.click(getByTestId('location-city-New York City'));
+
+    expect(onSelectionChange).toHaveBeenCalledWith(undefined, undefined);
+  });
+
   it('should keep a selected city visible when it does not match the active search', async () => {
     const onSelectionChange = vi.fn();
 

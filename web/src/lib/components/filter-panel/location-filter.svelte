@@ -254,7 +254,11 @@
   }
 
   function handleCityClick(city: string, country: string) {
-    if (selectedCity === city) {
+    if (selectedCity === city && !selectedCountry) {
+      // City-only filters can come from typed search syntax. Clicking the selected
+      // city should clear that city filter rather than turning it into country-only.
+      onSelectionChange(undefined, undefined);
+    } else if (selectedCity === city) {
       // Deselect city, keep country
       onSelectionChange(country, undefined);
     } else {
@@ -345,7 +349,7 @@
       <!-- Cities (indented when country is expanded) -->
       {#if (expandedCountry === country || (normalizedSearchQuery && visibleCities.length > 0)) && !loadingCitiesByCountry[country]}
         {#each visibleCities as city (city)}
-          {@const isCitySelected = selectedCity === city && selectedCountry === country}
+          {@const isCitySelected = selectedCity === city && (!selectedCountry || selectedCountry === country)}
           <button
             type="button"
             class="-mx-2 ml-5 flex w-[calc(100%-1.25rem+1rem)] items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-subtle {isCitySelected
