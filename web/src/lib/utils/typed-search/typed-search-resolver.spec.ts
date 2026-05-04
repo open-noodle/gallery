@@ -56,6 +56,49 @@ describe('resolveTypedSearchFilters', () => {
     }
   });
 
+  it('canonicalizes city filters with case-insensitive suggestions', async () => {
+    vi.mocked(getSearchSuggestions).mockResolvedValue(['Munich']);
+
+    const result = await resolveTypedSearchFilters(parseTypedSearch('city:munich'), {});
+
+    expect(getSearchSuggestions).toHaveBeenCalledWith(
+      expect.objectContaining({ $type: SearchSuggestionType.City, withSharedSpaces: true }),
+      { signal: undefined },
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.filters.city).toBe('Munich');
+    }
+  });
+
+  it('canonicalizes country filters before resolving city casing', async () => {
+    vi.mocked(getFilterSuggestions).mockResolvedValue({
+      people: [],
+      countries: ['Germany'],
+      cameraMakes: [],
+      tags: [],
+      ratings: [],
+      mediaTypes: [AssetTypeEnum.Image],
+      hasUnnamedPeople: false,
+    });
+    vi.mocked(getSearchSuggestions).mockResolvedValue(['Munich']);
+
+    const result = await resolveTypedSearchFilters(parseTypedSearch('country:germany city:munich'), {});
+
+    expect(getFilterSuggestions).toHaveBeenCalledWith(expect.objectContaining({ withSharedSpaces: true }), {
+      signal: undefined,
+    });
+    expect(getSearchSuggestions).toHaveBeenCalledWith(
+      expect.objectContaining({ $type: SearchSuggestionType.City, country: 'Germany', withSharedSpaces: true }),
+      { signal: undefined },
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.filters.country).toBe('Germany');
+      expect(result.filters.city).toBe('Munich');
+    }
+  });
+
   it('blocks when person resolution has no match', async () => {
     vi.mocked(searchPerson).mockResolvedValue([]);
 

@@ -84,27 +84,52 @@ async function resolveTypedSearchFiltersInternal(
   const personNames = new Map<string, string>();
   const tagNames = new Map<string, string>();
 
-  for (const token of parsed.scalarTokens) {
-    applyScalar(filters, token);
-  }
-
   if (issues.length > 0) {
     return { ok: false, queryText: parsed.queryText, issues, choices };
   }
 
+  const countryToken = parsed.scalarTokens.find((token) => token.key === 'country');
+  const cityToken = parsed.scalarTokens.find((token) => token.key === 'city');
   const unresolvedTokens = parsed.resolutionTokens.filter((token) => !context.selectedChoices?.has(token.raw));
   const needsSuggestions = unresolvedTokens.some(
     (token) => token.key === 'tag' || token.key === 'camera' || (token.key === 'person' && context.spaceId),
   );
-  const suggestions = needsSuggestions
+  const needsFilterSuggestions = needsSuggestions || countryToken !== undefined;
+  const suggestions = needsFilterSuggestions
     ? await getFilterSuggestions(suggestionScope(context), { signal: context.signal })
     : undefined;
+  const canonicalScalarValues = new Map<TypedSearchScalarToken['key'], string>();
+  if (countryToken) {
+    const country = canonicalExactMatch(suggestions?.countries ?? [], String(countryToken.normalizedValue));
+    canonicalScalarValues.set('country', country);
+  }
+
+  const country = countryToken ? canonicalScalarValues.get('country') : undefined;
+  const citySuggestions = cityToken
+    ? await getSearchSuggestions(
+        {
+          $type: SearchSuggestionType.City,
+          ...(country ? { country } : {}),
+          ...suggestionScope(context),
+        },
+        { signal: context.signal },
+      )
+    : [];
+  if (cityToken) {
+    const city = canonicalExactMatch(citySuggestions.filter(isString), String(cityToken.normalizedValue));
+    canonicalScalarValues.set('city', city);
+  }
+
   const cameraModels = unresolvedTokens.some((token) => token.key === 'camera')
     ? await getSearchSuggestions(
         { $type: SearchSuggestionType.CameraModel, ...suggestionScope(context) },
         { signal: context.signal },
       )
     : [];
+
+  for (const token of parsed.scalarTokens) {
+    applyScalar(filters, token, canonicalScalarValues.get(token.key));
+  }
 
   for (const token of parsed.resolutionTokens) {
     const selectedChoice = context.selectedChoices?.get(token.raw);
@@ -143,7 +168,7 @@ function suggestionScope(context: TypedSearchResolveContext) {
   return context.spaceId ? { spaceId: context.spaceId } : { withSharedSpaces: true };
 }
 
-function applyScalar(filters: FilterState, token: TypedSearchScalarToken) {
+function applyScalar(filters: FilterState, token: TypedSearchScalarToken, canonicalValue?: string) {
   switch (token.key) {
     case 'from': {
       filters.dateAfter = String(token.normalizedValue);
@@ -154,11 +179,11 @@ function applyScalar(filters: FilterState, token: TypedSearchScalarToken) {
       return;
     }
     case 'city': {
-      filters.city = String(token.normalizedValue);
+      filters.city = canonicalValue ?? String(token.normalizedValue);
       return;
     }
     case 'country': {
-      filters.country = String(token.normalizedValue);
+      filters.country = canonicalValue ?? String(token.normalizedValue);
       return;
     }
     case 'type': {
@@ -305,6 +330,14 @@ function resolveCameraToken(
 
 function matchesValue(candidate: string, value: string): boolean {
   return candidate.toLowerCase().includes(value.toLowerCase());
+}
+
+function canonicalExactMatch(candidates: string[], value: string): string {
+  return candidates.find((candidate) => candidate.toLowerCase() === value.toLowerCase()) ?? value;
+}
+
+function isString(value: string | null): value is string {
+  return typeof value === 'string';
 }
 
 function tagLabel(tag: TagSuggestion): string {
