@@ -225,6 +225,7 @@ Modify `tools/upstream-preflight/src/index.ts`:
 
 ```ts
 import { runMobileDriftAudit } from './audits/mobile-drift';
+import { selectBatchAuditScope } from './batch';
 ```
 
 Replace the scaffold `mobile-drift-check` command with:
@@ -233,9 +234,16 @@ Replace the scaffold `mobile-drift-check` command with:
 program
   .command('mobile-drift-check')
   .option('--manifest <path>', 'ownership manifest path', defaultManifestPath)
-  .action((options: { manifest: string }) => {
+  .option('--batch <id>', 'upstream batch id')
+  .action((options: { manifest: string; batch?: string }) => {
+    const batch = options.batch ?? process.env.BATCH;
     const context = buildPreflightContext(options.manifest);
-    const result = runMobileDriftAudit(context.manifest, context.upstreamRange.files);
+    const auditScope = selectBatchAuditScope({
+      batch,
+      batchPlan: context.batchPlan,
+      upstreamTouchedFiles: context.upstreamRange.files,
+    });
+    const result = runMobileDriftAudit(context.manifest, auditScope.upstreamTouchedFiles);
     console.log(`${result.ok ? 'OK' : 'ISSUE'}: ${result.title}`);
     for (const detail of result.details) console.log(`- ${detail}`);
     process.exitCode = result.ok ? 0 : 1;
@@ -252,11 +260,15 @@ Run:
 pnpm --filter @gallery/upstream-preflight run test -- mobile-drift.spec.ts
 pnpm --filter @gallery/upstream-preflight run check
 make mobile-drift-rebase-check
+make mobile-drift-rebase-check BATCH=01
 git add tools/upstream-preflight/src/audits/mobile-drift.ts tools/upstream-preflight/src/audits/mobile-drift.spec.ts tools/upstream-preflight/src/index.ts
 git commit -m "feat: audit mobile drift rebase collisions"
 ```
 
-Expected: tests and type check pass. On the current upstream backlog, `make mobile-drift-rebase-check` exits non-zero and reports the shipped v23/v24 collision.
+Expected: tests and type check pass. On the current upstream backlog,
+unbatched `make mobile-drift-rebase-check` exits non-zero and reports the
+shipped v23/v24 collision. `make mobile-drift-rebase-check BATCH=01` passes
+when batch 01 does not touch those shipped Drift versions.
 
 Implementation note: the real Gallery callbacks use generated camelCase entity
 names, so the manifest markers are `sharedSpaceEntity`,
@@ -514,6 +526,9 @@ disabled upstream workflow do not false positive.
 Create `tools/upstream-preflight/src/audits/post-rebase.spec.ts`:
 
 ```ts
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   auditExtensionSymbols,
@@ -523,6 +538,7 @@ import {
   auditMigrationCount,
   auditMigrationGlobs,
   auditMigrationTimestampCollisions,
+  writePostRebaseAuditReport,
 } from './post-rebase';
 import type { Manifest } from '../types';
 
@@ -640,6 +656,21 @@ describe('auditGeneratedArtifactSignals', () => {
 
     expect(result.ok).toBe(false);
     expect(result.details).toEqual(['Review regenerated artifact open-api/typescript-sdk/index.ts']);
+  });
+});
+
+describe('post-rebase audit reports', () => {
+  it('writes batch markdown and json reports under the output directory', () => {
+    const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gallery-audit-'));
+    const paths = writePostRebaseAuditReport(outputDir, {
+      date: '2026-05-04',
+      batch: '07',
+      results: [{ ok: true, title: 'Fork-Owned File Survival', details: ['All literal fork-owned files are present'] }],
+      upstreamTouchedFiles: ['server/src/services/search.service.ts'],
+    });
+
+    expect(path.basename(paths.markdownPath)).toBe('batch-07-postrebase-audit.md');
+    expect(path.basename(paths.jsonPath)).toBe('batch-07-postrebase-audit.json');
   });
 });
 ```
@@ -813,6 +844,53 @@ export function runPostRebaseAudits(
   ];
 }
 
+export function renderPostRebaseAuditMarkdown(input: {
+  date: string;
+  batch?: string;
+  results: AuditResult[];
+  upstreamTouchedFiles: string[];
+}): string {
+  const rows = input.results
+    .map((result) => `| ${result.ok ? 'OK' : 'ISSUE'} | ${result.title} | ${result.details.join('<br>')} |`)
+    .join('\n');
+  const touchedFiles =
+    input.upstreamTouchedFiles.length > 0
+      ? input.upstreamTouchedFiles.map((file) => `- \`${file}\``).join('\n')
+      : '- None';
+  const title = input.batch ? `Upstream Post-Rebase Audit - Batch ${input.batch}` : 'Upstream Post-Rebase Audit';
+
+  return `# ${title}
+
+- **Date**: ${input.date}
+- **Status**: ${input.results.every((result) => result.ok) ? 'OK' : 'ISSUE'}
+
+## Audit Results
+
+| Status | Check | Details |
+| --- | --- | --- |
+${rows || '| OK | No audit results | - |'}
+
+## Upstream Touched Files
+
+${touchedFiles}
+`;
+}
+
+export function writePostRebaseAuditReport(
+  outputDir: string,
+  input: { date: string; batch?: string; results: AuditResult[]; upstreamTouchedFiles: string[] },
+) {
+  fs.mkdirSync(outputDir, { recursive: true });
+  const basename = input.batch ? `batch-${input.batch}-postrebase-audit` : `postrebase-audit-${input.date}`;
+  const markdownPath = path.join(outputDir, `${basename}.md`);
+  const jsonPath = path.join(outputDir, `${basename}.json`);
+
+  fs.writeFileSync(markdownPath, renderPostRebaseAuditMarkdown(input));
+  fs.writeFileSync(jsonPath, JSON.stringify({ ...input, ok: input.results.every((result) => result.ok) }, null, 2));
+
+  return { markdownPath, jsonPath };
+}
+
 function listFiles(cwd: string): string[] {
   const files: string[] = [];
   const ignored = new Set(['.git', 'node_modules', '.svelte-kit', 'dist', 'build']);
@@ -849,7 +927,8 @@ function listFiles(cwd: string): string[] {
 Modify `tools/upstream-preflight/src/index.ts`:
 
 ```ts
-import { runPostRebaseAudits, selectPostRebaseAuditScope, writePostRebaseAuditReport } from './audits/post-rebase';
+import { runPostRebaseAudits, writePostRebaseAuditReport } from './audits/post-rebase';
+import { selectBatchAuditScope } from './batch';
 ```
 
 Add this command:
@@ -863,7 +942,7 @@ program
   .action((options: { manifest: string; batch?: string; outputDir?: string }) => {
     const batch = options.batch ?? process.env.BATCH;
     const context = buildPreflightContext(options.manifest);
-    const auditScope = selectPostRebaseAuditScope({
+    const auditScope = selectBatchAuditScope({
       batch,
       batchPlan: context.batchPlan,
       upstreamTouchedFiles: context.upstreamRange.files,

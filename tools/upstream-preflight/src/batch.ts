@@ -2,6 +2,17 @@ import type { Batch, BatchPlan, ClassifiedCommit, RiskLevel } from './types';
 
 const riskRank: Record<RiskLevel, number> = { low: 0, medium: 1, high: 2 };
 
+export type BatchAuditScopeInput = {
+  batch?: string;
+  batchPlan: BatchPlan;
+  upstreamTouchedFiles: string[];
+};
+
+export type BatchAuditScope = {
+  batch?: string;
+  upstreamTouchedFiles: string[];
+};
+
 function batchRisk(commits: ClassifiedCommit[]): RiskLevel {
   return commits.reduce<RiskLevel>(
     (risk, commit) =>
@@ -68,6 +79,34 @@ export function planBatches(
   return { batches };
 }
 
+export function selectBatchAuditScope(
+  input: BatchAuditScopeInput,
+): BatchAuditScope {
+  if (!input.batch) {
+    return { upstreamTouchedFiles: input.upstreamTouchedFiles };
+  }
+
+  const requestedBatch = normalizeBatchId(input.batch);
+  const batch = input.batchPlan.batches.find(
+    (candidate) => candidate.id === requestedBatch,
+  );
+  if (!batch) {
+    const availableBatches = input.batchPlan.batches
+      .map((candidate) => candidate.id)
+      .join(', ');
+    throw new Error(
+      `Unknown upstream batch ${input.batch}. Available batches: ${availableBatches || 'none'}`,
+    );
+  }
+
+  return {
+    batch: batch.id,
+    upstreamTouchedFiles: [
+      ...new Set(batch.commits.flatMap((commit) => commit.files)),
+    ].sort(),
+  };
+}
+
 export function renderBatchMarkdown(plan: BatchPlan): string {
   const rows = plan.batches
     .map(
@@ -82,7 +121,9 @@ export function renderBatchMarkdown(plan: BatchPlan): string {
 \`\`\`bash
 git rebase ${batch.tipSha}
 make upstream-postrebase-audit BATCH=${batch.id}
-${batch.requiredChecks.map((check) => `make ${check}`).join('\n')}
+${batch.requiredChecks
+  .map((check) => renderRequiredCheckCommand(check, batch.id))
+  .join('\n')}
 git push origin HEAD:rebase/upstream-batch-${batch.id} --force
 \`\`\``,
     )
@@ -96,4 +137,16 @@ ${rows || '| - | - | 0 | LOW | No incoming upstream commits | - |'}
 
 ${commands || 'No upstream batches are required.'}
 `;
+}
+
+function renderRequiredCheckCommand(check: string, batchId: string): string {
+  if (check === 'mobile-drift-rebase-check') {
+    return `make ${check} BATCH=${batchId}`;
+  }
+
+  return `make ${check}`;
+}
+
+function normalizeBatchId(batch: string): string {
+  return /^\d+$/.test(batch) ? batch.padStart(2, '0') : batch;
 }

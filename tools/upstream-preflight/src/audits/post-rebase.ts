@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import micromatch from 'micromatch';
-import type { AuditResult, BatchPlan, Manifest } from '../types';
+import type { AuditResult, Manifest } from '../types';
 
 export type PostRebaseAuditReportInput = {
   date: string;
@@ -9,45 +9,6 @@ export type PostRebaseAuditReportInput = {
   results: AuditResult[];
   upstreamTouchedFiles: string[];
 };
-
-export type PostRebaseAuditScopeInput = {
-  batch?: string;
-  batchPlan: BatchPlan;
-  upstreamTouchedFiles: string[];
-};
-
-export type PostRebaseAuditScope = {
-  batch?: string;
-  upstreamTouchedFiles: string[];
-};
-
-export function selectPostRebaseAuditScope(
-  input: PostRebaseAuditScopeInput,
-): PostRebaseAuditScope {
-  if (!input.batch) {
-    return { upstreamTouchedFiles: input.upstreamTouchedFiles };
-  }
-
-  const requestedBatch = normalizeBatchId(input.batch);
-  const batch = input.batchPlan.batches.find(
-    (candidate) => candidate.id === requestedBatch,
-  );
-  if (!batch) {
-    const availableBatches = input.batchPlan.batches
-      .map((candidate) => candidate.id)
-      .join(', ');
-    throw new Error(
-      `Unknown upstream batch ${input.batch}. Available batches: ${availableBatches || 'none'}`,
-    );
-  }
-
-  return {
-    batch: batch.id,
-    upstreamTouchedFiles: [
-      ...new Set(batch.commits.flatMap((commit) => commit.files)),
-    ].sort(),
-  };
-}
 
 export function auditForkOwnedFiles(
   manifest: Manifest,
@@ -323,10 +284,6 @@ function collectExpectedMigrations(manifest: Manifest): string[] {
       ),
     ),
   ].sort();
-}
-
-function normalizeBatchId(batch: string): string {
-  return /^\d+$/.test(batch) ? batch.padStart(2, '0') : batch;
 }
 
 function listFiles(cwd: string): string[] {

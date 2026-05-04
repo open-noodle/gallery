@@ -1,17 +1,22 @@
 import { describe, expect, it } from 'vitest';
-import { planBatches, renderBatchMarkdown } from './batch';
-import type { ClassifiedCommit, RiskLevel } from './types';
+import {
+  planBatches,
+  renderBatchMarkdown,
+  selectBatchAuditScope,
+} from './batch';
+import type { BatchPlan, ClassifiedCommit, RiskLevel } from './types';
 
 function commit(
   shortSha: string,
   risk: RiskLevel,
   reasons: string[] = [],
+  files: string[] = [],
 ): ClassifiedCommit {
   return {
     sha: `${shortSha}000000000000000000000000000000000000000`,
     shortSha,
     subject: `${risk} commit`,
-    files: [],
+    files,
     domains: [],
     overlapFiles: [],
     features: [],
@@ -56,6 +61,96 @@ describe('planBatches', () => {
 
     expect(markdown).toContain('| 01 | `539a39ae4` | 1 | HIGH |');
     expect(markdown).toContain('git rebase 539a39ae4');
-    expect(markdown).toContain('make mobile-drift-rebase-check');
+    expect(markdown).toContain('make mobile-drift-rebase-check BATCH=01');
+  });
+});
+
+describe('selectBatchAuditScope', () => {
+  const batchPlan: BatchPlan = {
+    batches: [
+      {
+        id: '01',
+        tipSha: '111111111',
+        commits: [
+          commit(
+            '111111111',
+            'medium',
+            [],
+            [
+              'server/src/queries/asset.job.repository.sql',
+              'web/src/routes/+page.svelte',
+            ],
+          ),
+        ],
+        risk: 'medium',
+        why: [],
+        requiredChecks: [],
+      },
+      {
+        id: '02',
+        tipSha: '222222222',
+        commits: [
+          commit(
+            '222222222',
+            'high',
+            [],
+            [
+              'mobile/openapi/lib/api.dart',
+              'open-api/immich-openapi-specs.json',
+            ],
+          ),
+        ],
+        risk: 'high',
+        why: ['Matches risk pattern openapi-generated'],
+        requiredChecks: ['mobile-drift-rebase-check'],
+      },
+    ],
+  };
+
+  const allUpstreamFiles = batchPlan.batches.flatMap((batch) =>
+    batch.commits.flatMap((item) => item.files),
+  );
+
+  it('selects only the requested batch files for audit signals', () => {
+    expect(
+      selectBatchAuditScope({
+        batch: '01',
+        batchPlan,
+        upstreamTouchedFiles: allUpstreamFiles,
+      }),
+    ).toEqual({
+      batch: '01',
+      upstreamTouchedFiles: [
+        'server/src/queries/asset.job.repository.sql',
+        'web/src/routes/+page.svelte',
+      ],
+    });
+  });
+
+  it('uses the full upstream file list when no batch is requested', () => {
+    expect(
+      selectBatchAuditScope({
+        batchPlan,
+        upstreamTouchedFiles: allUpstreamFiles,
+      }).upstreamTouchedFiles,
+    ).toEqual(allUpstreamFiles);
+  });
+
+  it('normalizes numeric batch ids and rejects unknown batches', () => {
+    expect(
+      selectBatchAuditScope({
+        batch: '1',
+        batchPlan,
+        upstreamTouchedFiles: allUpstreamFiles,
+      }).batch,
+    ).toBe('01');
+
+    expect(() =>
+      selectBatchAuditScope({
+        batch: '99',
+        batchPlan,
+        upstreamTouchedFiles: allUpstreamFiles,
+      }),
+    ).toThrow('Unknown upstream batch 99. Available batches: 01, 02');
   });
 });

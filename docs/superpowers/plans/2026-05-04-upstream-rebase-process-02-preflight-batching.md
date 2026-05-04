@@ -390,15 +390,15 @@ Create `tools/upstream-preflight/src/batch.spec.ts`:
 
 ```ts
 import { describe, expect, it } from 'vitest';
-import { planBatches, renderBatchMarkdown } from './batch';
-import type { ClassifiedCommit, RiskLevel } from './types';
+import { planBatches, renderBatchMarkdown, selectBatchAuditScope } from './batch';
+import type { BatchPlan, ClassifiedCommit, RiskLevel } from './types';
 
-function commit(shortSha: string, risk: RiskLevel, reasons: string[] = []): ClassifiedCommit {
+function commit(shortSha: string, risk: RiskLevel, reasons: string[] = [], files: string[] = []): ClassifiedCommit {
   return {
     sha: `${shortSha}000000000000000000000000000000000000000`,
     shortSha,
     subject: `${risk} commit`,
-    files: [],
+    files,
     domains: [],
     overlapFiles: [],
     features: [],
@@ -435,7 +435,40 @@ describe('planBatches', () => {
 
     expect(markdown).toContain('| 01 | `539a39ae4` | 1 | HIGH |');
     expect(markdown).toContain('git rebase 539a39ae4');
-    expect(markdown).toContain('make mobile-drift-rebase-check');
+    expect(markdown).toContain('make mobile-drift-rebase-check BATCH=01');
+  });
+});
+
+describe('selectBatchAuditScope', () => {
+  const batchPlan: BatchPlan = {
+    batches: [
+      {
+        id: '01',
+        tipSha: '111111111',
+        commits: [commit('111111111', 'medium', [], ['server/src/queries/asset.job.repository.sql'])],
+        risk: 'medium',
+        why: [],
+        requiredChecks: [],
+      },
+      {
+        id: '02',
+        tipSha: '222222222',
+        commits: [commit('222222222', 'high', [], ['mobile/openapi/lib/api.dart'])],
+        risk: 'high',
+        why: ['Matches risk pattern openapi-generated'],
+        requiredChecks: ['mobile-drift-rebase-check'],
+      },
+    ],
+  };
+
+  it('selects only the requested batch files for audit signals', () => {
+    expect(
+      selectBatchAuditScope({
+        batch: '01',
+        batchPlan,
+        upstreamTouchedFiles: ['server/src/queries/asset.job.repository.sql', 'mobile/openapi/lib/api.dart'],
+      }),
+    ).toEqual({ batch: '01', upstreamTouchedFiles: ['server/src/queries/asset.job.repository.sql'] });
   });
 });
 ```
@@ -509,6 +542,24 @@ export function planBatches(commits: ClassifiedCommit[], softCap = 10): BatchPla
   return { batches };
 }
 
+export function selectBatchAuditScope(input: { batch?: string; batchPlan: BatchPlan; upstreamTouchedFiles: string[] }) {
+  if (!input.batch) {
+    return { upstreamTouchedFiles: input.upstreamTouchedFiles };
+  }
+
+  const requestedBatch = /^\d+$/.test(input.batch) ? input.batch.padStart(2, '0') : input.batch;
+  const batch = input.batchPlan.batches.find((candidate) => candidate.id === requestedBatch);
+  if (!batch) {
+    const availableBatches = input.batchPlan.batches.map((candidate) => candidate.id).join(', ');
+    throw new Error(`Unknown upstream batch ${input.batch}. Available batches: ${availableBatches || 'none'}`);
+  }
+
+  return {
+    batch: batch.id,
+    upstreamTouchedFiles: [...new Set(batch.commits.flatMap((commit) => commit.files))].sort(),
+  };
+}
+
 export function renderBatchMarkdown(plan: BatchPlan): string {
   const rows = plan.batches
     .map(
@@ -523,7 +574,7 @@ export function renderBatchMarkdown(plan: BatchPlan): string {
 \`\`\`bash
 git rebase ${batch.tipSha}
 make upstream-postrebase-audit BATCH=${batch.id}
-${batch.requiredChecks.join('\n')}
+${batch.requiredChecks.map((check) => renderRequiredCheckCommand(check, batch.id)).join('\n')}
 git push origin HEAD:rebase/upstream-batch-${batch.id} --force
 \`\`\``,
     )
@@ -537,6 +588,14 @@ ${rows || '| - | - | 0 | LOW | No incoming upstream commits | - |'}
 
 ${commands || 'No upstream batches are required.'}
 `;
+}
+
+function renderRequiredCheckCommand(check: string, batchId: string): string {
+  if (check === 'mobile-drift-rebase-check') {
+    return `make ${check} BATCH=${batchId}`;
+  }
+
+  return `make ${check}`;
 }
 ```
 

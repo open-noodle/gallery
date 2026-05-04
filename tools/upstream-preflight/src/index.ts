@@ -8,10 +8,13 @@ import { runMobileDriftAudit } from './audits/mobile-drift';
 import { runPatchAudits } from './audits/patches';
 import {
   runPostRebaseAudits,
-  selectPostRebaseAuditScope,
   writePostRebaseAuditReport,
 } from './audits/post-rebase';
-import { planBatches, renderBatchMarkdown } from './batch';
+import {
+  planBatches,
+  renderBatchMarkdown,
+  selectBatchAuditScope,
+} from './batch';
 import { collectGitRange, getGitPath, getMergeBase } from './git';
 import { defaultManifestPath, loadManifest } from './manifest';
 import { renderPreflightMarkdown } from './report';
@@ -198,11 +201,18 @@ program
 program
   .command('mobile-drift-check')
   .option('--manifest <path>', 'ownership manifest path', defaultManifestPath)
-  .action((options: { manifest: string }) => {
+  .option('--batch <id>', 'upstream batch id')
+  .action((options: { manifest: string; batch?: string }) => {
+    const batch = options.batch ?? process.env.BATCH;
     const context = buildPreflightContext(options.manifest);
+    const auditScope = selectBatchAuditScope({
+      batch,
+      batchPlan: context.batchPlan,
+      upstreamTouchedFiles: context.upstreamRange.files,
+    });
     const result = runMobileDriftAudit(
       context.manifest,
-      context.upstreamRange.files,
+      auditScope.upstreamTouchedFiles,
       repoRoot(),
     );
     console.log(`${result.ok ? 'OK' : 'ISSUE'}: ${result.title}`);
@@ -249,7 +259,7 @@ program
     (options: { manifest: string; batch?: string; outputDir?: string }) => {
       const batch = options.batch ?? process.env.BATCH;
       const context = buildPreflightContext(options.manifest);
-      const auditScope = selectPostRebaseAuditScope({
+      const auditScope = selectBatchAuditScope({
         batch,
         batchPlan: context.batchPlan,
         upstreamTouchedFiles: context.upstreamRange.files,

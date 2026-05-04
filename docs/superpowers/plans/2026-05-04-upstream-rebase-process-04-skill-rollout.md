@@ -199,6 +199,10 @@ Upstream touches shipped Gallery Drift version v24
 renumber incoming upstream migrations to v25/v26
 ```
 
+When the same check is run after an individual batch, use
+`make mobile-drift-rebase-check BATCH=NN` so the collision signals are limited
+to that batch's planned commits.
+
 - [x] **Step 4: Verify generated artifacts stay out of source**
 
 Run:

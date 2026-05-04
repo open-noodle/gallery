@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import type { BatchPlan, ClassifiedCommit, Manifest } from '../types';
+import type { Manifest } from '../types';
 import {
   auditExpectedMigrations,
   auditExtensionSymbols,
@@ -12,7 +12,6 @@ import {
   auditMigrationGlobs,
   auditMigrationTimestampCollisions,
   renderPostRebaseAuditMarkdown,
-  selectPostRebaseAuditScope,
   writePostRebaseAuditReport,
 } from './post-rebase';
 
@@ -45,21 +44,6 @@ const manifest: Manifest = {
     },
   },
 };
-
-function commit(shortSha: string, files: string[]): ClassifiedCommit {
-  return {
-    sha: `${shortSha}000000000000000000000000000000000000000`,
-    shortSha,
-    subject: 'upstream commit',
-    files,
-    domains: [],
-    overlapFiles: [],
-    features: [],
-    risk: 'medium',
-    reasons: [],
-    requiredChecks: [],
-  };
-}
 
 describe('auditForkOwnedFiles', () => {
   it('fails when a literal owned file is missing', () => {
@@ -215,90 +199,5 @@ describe('post-rebase audit reports', () => {
       batch: '07',
       ok: true,
     });
-  });
-});
-
-describe('selectPostRebaseAuditScope', () => {
-  const batchPlan: BatchPlan = {
-    batches: [
-      {
-        id: '01',
-        tipSha: '111111111',
-        commits: [
-          commit('111111111', [
-            'server/src/queries/asset.job.repository.sql',
-            'web/src/routes/+page.svelte',
-          ]),
-        ],
-        risk: 'medium',
-        why: [],
-        requiredChecks: [],
-      },
-      {
-        id: '02',
-        tipSha: '222222222',
-        commits: [
-          commit('222222222', [
-            'mobile/openapi/lib/api.dart',
-            'open-api/immich-openapi-specs.json',
-          ]),
-        ],
-        risk: 'high',
-        why: ['Matches risk pattern openapi-generated'],
-        requiredChecks: ['mobile-drift-rebase-check'],
-      },
-    ],
-  };
-
-  const allUpstreamFiles = batchPlan.batches.flatMap((batch) =>
-    batch.commits.flatMap((item) => item.files),
-  );
-
-  it('selects only the requested batch files for post-rebase audit signals', () => {
-    const scope = selectPostRebaseAuditScope({
-      batch: '01',
-      batchPlan,
-      upstreamTouchedFiles: allUpstreamFiles,
-    });
-
-    expect(scope.batch).toBe('01');
-    expect(scope.upstreamTouchedFiles).toEqual([
-      'server/src/queries/asset.job.repository.sql',
-      'web/src/routes/+page.svelte',
-    ]);
-    expect(auditGeneratedArtifactSignals(scope.upstreamTouchedFiles)).toEqual({
-      ok: false,
-      title: 'Generated Artifact Review',
-      details: [
-        'Review regenerated artifact server/src/queries/asset.job.repository.sql',
-      ],
-    });
-  });
-
-  it('uses the full upstream file list when no batch is requested', () => {
-    expect(
-      selectPostRebaseAuditScope({
-        batchPlan,
-        upstreamTouchedFiles: allUpstreamFiles,
-      }).upstreamTouchedFiles,
-    ).toEqual(allUpstreamFiles);
-  });
-
-  it('normalizes numeric batch ids and rejects unknown batches', () => {
-    expect(
-      selectPostRebaseAuditScope({
-        batch: '1',
-        batchPlan,
-        upstreamTouchedFiles: allUpstreamFiles,
-      }).batch,
-    ).toBe('01');
-
-    expect(() =>
-      selectPostRebaseAuditScope({
-        batch: '99',
-        batchPlan,
-        upstreamTouchedFiles: allUpstreamFiles,
-      }),
-    ).toThrow('Unknown upstream batch 99. Available batches: 01, 02');
   });
 });

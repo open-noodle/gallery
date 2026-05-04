@@ -64,7 +64,7 @@ upstream-postrebase-audit:
 
 .PHONY: mobile-drift-rebase-check
 mobile-drift-rebase-check:
-	$(UPSTREAM_PREFLIGHT) run mobile-drift-check
+	$(UPSTREAM_PREFLIGHT) run mobile-drift-check $(if $(BATCH),-- --batch $(BATCH),)
 
 .PHONY: ci-invariants-check
 ci-invariants-check:

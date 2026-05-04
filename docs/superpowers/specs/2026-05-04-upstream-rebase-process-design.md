@@ -286,7 +286,7 @@ The planner should also print exact operator commands for each batch.
 ```bash
 git rebase <batch-tip-sha>
 make upstream-postrebase-audit BATCH=02
-make mobile-drift-rebase-check
+make mobile-drift-rebase-check BATCH=02
 git push origin HEAD:rebase/upstream-batch-02 --force
 ```
 
@@ -364,6 +364,10 @@ shipped, the check should require this strategy:
 - Upstream's original v24 callback becomes `from25To26`.
 - `schemaVersion` becomes 26.
 - regenerated snapshots v25/v26 include Gallery v24 plus upstream changes.
+
+When `BATCH=NN` or `--batch NN` is provided, the command should limit incoming
+upstream collision signals to that batch's planned commits. Without `BATCH`, it
+should inspect the full incoming upstream range.
 
 The check should include a fixture-based migration test in a later phase. The
 fixture should represent a real Gallery v24 database before the upstream
