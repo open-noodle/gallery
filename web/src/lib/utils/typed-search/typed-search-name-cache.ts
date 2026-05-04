@@ -4,6 +4,7 @@ type StoredTypedSearchNames = {
 };
 
 const prefix = 'typed-search:names:';
+const displayPrefix = 'typed-search:display:';
 
 function emptyNames() {
   return {
@@ -15,6 +16,7 @@ function emptyNames() {
 export function storeTypedSearchNames(
   destination: string,
   names: { personNames: Map<string, string>; tagNames: Map<string, string> },
+  displayText?: string,
 ) {
   if (typeof sessionStorage === 'undefined') {
     return;
@@ -26,6 +28,18 @@ export function storeTypedSearchNames(
   };
 
   sessionStorage.setItem(`${prefix}${destination}`, JSON.stringify(payload));
+  const trimmedDisplayText = displayText?.trim();
+  if (trimmedDisplayText) {
+    sessionStorage.setItem(`${displayPrefix}${destination}`, trimmedDisplayText);
+  }
+}
+
+export function getTypedSearchDisplayText(destination: string): string | undefined {
+  if (typeof sessionStorage === 'undefined') {
+    return undefined;
+  }
+
+  return sessionStorage.getItem(`${displayPrefix}${destination}`) ?? undefined;
 }
 
 export function consumeTypedSearchNames(destination: string) {

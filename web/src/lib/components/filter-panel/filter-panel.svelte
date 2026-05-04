@@ -37,6 +37,8 @@
     config: FilterPanelConfig;
     timeBuckets: Array<{ timeBucket: string; count: number }>;
     filters?: FilterState;
+    personNames?: Map<string, string>;
+    tagNames?: Map<string, string>;
     persistCollapsed?: boolean;
     storageKey?: string;
     hidden?: boolean;
@@ -48,6 +50,8 @@
     config,
     timeBuckets,
     filters = $bindable(createFilterState()),
+    personNames,
+    tagNames,
     storageKey = 'gallery-filter-visible-sections',
     hidden = false,
     persistCollapsed = true,
@@ -738,6 +742,7 @@
               <PeopleFilter
                 {people}
                 selectedIds={filters.personIds}
+                selectedNames={personNames}
                 onSelectionChange={handlePeopleChange}
                 emptyText={hasUnnamedPeople ? 'Name people to use this filter' : undefined}
               />
@@ -770,7 +775,12 @@
                 onSelectionChange={handleCameraChange}
               />
             {:else if section === 'tags'}
-              <TagsFilter {tags} selectedIds={filters.tagIds} onSelectionChange={handleTagsChange} />
+              <TagsFilter
+                {tags}
+                selectedIds={filters.tagIds}
+                selectedNames={tagNames}
+                onSelectionChange={handleTagsChange}
+              />
             {:else if section === 'rating'}
               <RatingFilter selectedRating={filters.rating} {availableRatings} onRatingChange={handleRatingChange} />
             {:else if section === 'media'}

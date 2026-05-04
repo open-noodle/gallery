@@ -245,6 +245,35 @@ describe('PeopleFilter', () => {
 
     expect(getByTestId('people-empty').textContent).toBe('No people found');
   });
+
+  it('should display orphaned selected person name from typed search cache', () => {
+    const { getByTestId } = render(PeopleFilter, {
+      props: {
+        people: [{ id: 'p-other', name: 'Other Person' }],
+        selectedIds: ['p-cat'],
+        selectedNames: new Map([['p-cat', 'cat']]),
+        onSelectionChange: () => {},
+      },
+    });
+
+    const orphanItem = getByTestId('people-item-p-cat');
+    expect(orphanItem.textContent).toContain('cat');
+    expect(orphanItem.textContent).not.toContain('p-cat');
+  });
+
+  it('should show typed selected person even when suggestions are empty', () => {
+    const { getByTestId, queryByTestId } = render(PeopleFilter, {
+      props: {
+        people: [],
+        selectedIds: ['p-cat'],
+        selectedNames: new Map([['p-cat', 'cat']]),
+        onSelectionChange: () => {},
+      },
+    });
+
+    expect(queryByTestId('people-empty')).toBeNull();
+    expect(getByTestId('people-item-p-cat').textContent).toContain('cat');
+  });
 });
 
 describe('LocationFilter', () => {

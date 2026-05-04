@@ -434,6 +434,8 @@
         timeBuckets={smartFacetBuckets}
         storageKey="gallery-filter-visible-sections-photos"
         hidden={isTimelineEmpty}
+        {personNames}
+        {tagNames}
       />
     {/key}
     <div class="flex flex-1 flex-col overflow-hidden pl-4">

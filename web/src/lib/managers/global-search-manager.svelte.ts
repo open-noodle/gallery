@@ -1390,7 +1390,7 @@ export class GlobalSearchManager {
     });
     this.clearQueryOnNextModalOpen = true;
     const destination = this.buildSearchDestination(resolved.queryText, resolved.filters);
-    storeTypedSearchNames(destination, { personNames: resolved.personNames, tagNames: resolved.tagNames });
+    storeTypedSearchNames(destination, { personNames: resolved.personNames, tagNames: resolved.tagNames }, trimmed);
     void goto(destination);
   }
 

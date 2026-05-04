@@ -4,6 +4,7 @@ import TestWrapper from '$lib/components/TestWrapper.svelte';
 import type { FilterState } from '$lib/components/filter-panel/filter-panel';
 import { lang } from '$lib/stores/preferences.store';
 import { buildPhotosTimelineOptions } from '$lib/utils/photos-filter-options';
+import { storeTypedSearchNames } from '$lib/utils/typed-search/typed-search-name-cache';
 import { AssetTypeEnum } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
@@ -227,6 +228,7 @@ describe('Photos page search URL state', () => {
     mockAssetMultiSelectManager.assets = [];
     mockMemoryManager.memories = [];
     mockRegisterSearchablePageFilters.mockReturnValue(vi.fn());
+    sessionStorage.clear();
     sdkMock.getFilterSuggestions.mockResolvedValue({
       people: [],
       countries: [],
@@ -338,6 +340,25 @@ describe('Photos page search URL state', () => {
     await fireEvent.click(screen.getByTestId('select-favorites-filter'));
 
     await waitFor(() => expect(getFilters()).toMatchObject({ isFavorite: true, sortOrder: 'desc' }));
+  });
+
+  it('passes typed search names into the photos filter panel', () => {
+    mockPage.url = new URL('https://gallery.test/photos?people=person-cat&tags=tag-nature');
+    storeTypedSearchNames('/photos?people=person-cat&tags=tag-nature', {
+      personNames: new Map([['person-cat', 'cat']]),
+      tagNames: new Map([['tag-nature', 'nature']]),
+    });
+
+    renderPage();
+
+    expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute(
+      'data-person-names',
+      JSON.stringify([['person-cat', 'cat']]),
+    );
+    expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute(
+      'data-tag-names',
+      JSON.stringify([['tag-nature', 'nature']]),
+    );
   });
 
   it('passes favorites into photos timeline options when selected', async () => {

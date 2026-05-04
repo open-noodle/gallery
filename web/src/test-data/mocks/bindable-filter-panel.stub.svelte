@@ -9,10 +9,12 @@
     filters?: FilterState;
     config?: FilterPanelConfig;
     timeBuckets?: Array<{ timeBucket: string; count: number }>;
+    personNames?: Map<string, string>;
+    tagNames?: Map<string, string>;
     [key: string]: unknown;
   }
 
-  let { filters = $bindable(), config, timeBuckets = [], ...rest }: Props = $props();
+  let { filters = $bindable(), config, timeBuckets = [], personNames, tagNames, ...rest }: Props = $props();
   let suggestions = $state('');
   let requestToken = 0;
 
@@ -65,6 +67,8 @@
   data-is-favorite={String(filters?.isFavorite)}
   data-time-buckets={JSON.stringify(timeBuckets)}
   data-suggestions={suggestions}
+  data-person-names={JSON.stringify([...(personNames?.entries() ?? [])])}
+  data-tag-names={JSON.stringify([...(tagNames?.entries() ?? [])])}
 >
   <button type="button" data-testid="select-favorites-filter" onclick={selectFavorites}>Favorites</button>
   <button type="button" data-testid="load-city-suggestions" onclick={loadCitySuggestions}>Load cities</button>

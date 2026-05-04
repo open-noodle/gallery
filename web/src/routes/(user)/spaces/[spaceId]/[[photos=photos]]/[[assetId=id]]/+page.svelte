@@ -936,7 +936,14 @@
     <!-- Filter Panel (left sidebar) -->
     {#if viewMode === 'view'}
       {#key `${space.id}:${showSearchResults ? `spaces-search-${committedSearchQuery.trim()}:${$lang}` : 'spaces-browse'}`}
-        <FilterPanel config={filterConfig} bind:filters timeBuckets={smartFacetBuckets} hidden={isTimelineEmpty} />
+        <FilterPanel
+          config={filterConfig}
+          bind:filters
+          timeBuckets={smartFacetBuckets}
+          hidden={isTimelineEmpty}
+          {personNames}
+          {tagNames}
+        />
       {/key}
     {/if}
 

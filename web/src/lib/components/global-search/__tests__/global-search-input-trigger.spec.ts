@@ -1,4 +1,5 @@
 import { globalSearchManager } from '$lib/managers/global-search-manager.svelte';
+import { storeTypedSearchNames } from '$lib/utils/typed-search/typed-search-name-cache';
 import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -21,6 +22,7 @@ describe('global-search-input-trigger', () => {
     mockPage.url = new URL('https://gallery.test/photos');
     mockPage.route.id = null;
     mockPage.params = {};
+    sessionStorage.clear();
   });
 
   it('opens a dropdown from an editable search field', async () => {
@@ -75,6 +77,23 @@ describe('global-search-input-trigger', () => {
     render(GlobalSearchInputTrigger);
 
     expect(screen.getByRole('combobox', { name: 'cmdk_placeholder' })).toHaveValue('mountains');
+    expect(document.querySelector('[data-cmdk-dropdown-panel]')).toBeNull();
+  });
+
+  it('shows committed raw typed search text while the search field is closed', () => {
+    mockPage.url = new URL('https://gallery.test/photos?people=person-cat');
+    storeTypedSearchNames(
+      '/photos?people=person-cat',
+      {
+        personNames: new Map([['person-cat', 'cat']]),
+        tagNames: new Map(),
+      },
+      'person:cat',
+    );
+
+    render(GlobalSearchInputTrigger);
+
+    expect(screen.getByRole('combobox', { name: 'cmdk_placeholder' })).toHaveValue('person:cat');
     expect(document.querySelector('[data-cmdk-dropdown-panel]')).toBeNull();
   });
 

@@ -27,6 +27,7 @@
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
   import { page } from '$app/state';
   import { getSearchablePageState } from '$lib/utils/searchable-page-search';
+  import { getTypedSearchDisplayText } from '$lib/utils/typed-search/typed-search-name-cache';
   import TypedSearchTokenRail from './typed-search-token-rail.svelte';
 
   interface Props {
@@ -52,7 +53,8 @@
   );
   $effect(() => {
     if (variant === 'dropdown' && !showDropdownPanel) {
-      inputValue = closedDropdownSearchState?.query ?? '';
+      inputValue =
+        getTypedSearchDisplayText(page.url.pathname + page.url.search) ?? closedDropdownSearchState?.query ?? '';
       return;
     }
     inputValue = manager.query;

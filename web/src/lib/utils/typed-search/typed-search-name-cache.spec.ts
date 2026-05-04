@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { consumeTypedSearchNames, storeTypedSearchNames } from './typed-search-name-cache';
+import { consumeTypedSearchNames, getTypedSearchDisplayText, storeTypedSearchNames } from './typed-search-name-cache';
 
 describe('typed search name cache', () => {
   beforeEach(() => {
@@ -29,5 +29,20 @@ describe('typed search name cache', () => {
       personNames: new Map(),
       tagNames: new Map(),
     });
+  });
+
+  it('keeps raw typed search display text after consuming names', () => {
+    storeTypedSearchNames(
+      '/photos?people=person-cat',
+      {
+        personNames: new Map([['person-cat', 'cat']]),
+        tagNames: new Map(),
+      },
+      'person:cat',
+    );
+
+    expect(getTypedSearchDisplayText('/photos?people=person-cat')).toBe('person:cat');
+    consumeTypedSearchNames('/photos?people=person-cat');
+    expect(getTypedSearchDisplayText('/photos?people=person-cat')).toBe('person:cat');
   });
 });

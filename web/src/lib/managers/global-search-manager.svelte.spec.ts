@@ -1475,10 +1475,14 @@ describe('activate("command")', () => {
 
       await manager.activateSearch('beach person:anna tag:travel');
 
-      expect(storeTypedSearchNames).toHaveBeenCalledWith('/photos?q=beach&people=person-1&tags=tag-1', {
-        personNames: new Map([['person-1', 'Anna']]),
-        tagNames: new Map([['tag-1', 'Travel']]),
-      });
+      expect(storeTypedSearchNames).toHaveBeenCalledWith(
+        '/photos?q=beach&people=person-1&tags=tag-1',
+        {
+          personNames: new Map([['person-1', 'Anna']]),
+          tagNames: new Map([['tag-1', 'Travel']]),
+        },
+        'beach person:anna tag:travel',
+      );
     });
 
     it('supports filter-only searches without q', async () => {

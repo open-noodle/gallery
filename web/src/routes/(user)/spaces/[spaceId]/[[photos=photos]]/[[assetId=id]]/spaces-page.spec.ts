@@ -3,6 +3,7 @@ import TestWrapper from '$lib/components/TestWrapper.svelte';
 import type { FilterState } from '$lib/components/filter-panel/filter-panel';
 import type { TimelineAsset } from '$lib/managers/timeline-manager/types';
 import { lang } from '$lib/stores/preferences.store';
+import { storeTypedSearchNames } from '$lib/utils/typed-search/typed-search-name-cache';
 import type { SharedSpaceMemberResponseDto, SharedSpaceResponseDto } from '@immich/sdk';
 import { AssetTypeEnum, AssetVisibility, SharedSpaceRole } from '@immich/sdk';
 import '@testing-library/jest-dom';
@@ -232,6 +233,7 @@ describe('Spaces page search URL state', () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-1/photos');
     lang.set('de');
     mockRegisterSearchablePageFilters.mockReturnValue(vi.fn());
+    sessionStorage.clear();
     vi.mocked(sdkMock.markSpaceViewed).mockResolvedValue(void 0 as never);
     sdkMock.addAssets.mockResolvedValue(void 0 as never);
     sdkMock.updateMemberPreferences.mockResolvedValue(makeMember({ sharePersonMetadata: false }));
@@ -332,6 +334,25 @@ describe('Spaces page search URL state', () => {
     await fireEvent.click(screen.getByTestId('select-favorites-filter'));
 
     await waitFor(() => expect(getFilters()).toMatchObject({ isFavorite: true, sortOrder: 'desc' }));
+  });
+
+  it('passes typed search names into the space filter panel', () => {
+    mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?people=person-cat&tags=tag-nature');
+    storeTypedSearchNames('/spaces/space-1/photos?people=person-cat&tags=tag-nature', {
+      personNames: new Map([['person-cat', 'cat']]),
+      tagNames: new Map([['tag-nature', 'nature']]),
+    });
+
+    renderPage();
+
+    expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute(
+      'data-person-names',
+      JSON.stringify([['person-cat', 'cat']]),
+    );
+    expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute(
+      'data-tag-names',
+      JSON.stringify([['tag-nature', 'nature']]),
+    );
   });
 
   it('updates current member metadata sharing from the space menu', async () => {
