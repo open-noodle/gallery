@@ -30,8 +30,47 @@
   - Manifest parser and loader.
 - Create: `tools/upstream-preflight/src/manifest.spec.ts`
   - Parser coverage for all top-level manifest sections.
+- Create: `tools/upstream-preflight/src/coverage.ts`
+  - Fork diff coverage helper and CLI.
+- Create: `tools/upstream-preflight/src/coverage.spec.ts`
+  - Coverage checks for uncovered fork files and explicit migrations.
 - Create: `docs/fork/ownership.yml`
   - Versioned fork ownership source of truth.
+
+### Task 0: Current Fork Baseline
+
+**Files:**
+
+- Read: git remotes and fork diff
+
+- [ ] **Step 1: Refresh the local view of the fork**
+
+Run:
+
+```bash
+git fetch origin main
+git status --short --branch
+git rebase origin/main
+git status --short --branch
+git rev-parse origin/main
+git diff --name-only upstream/main...origin/main | sort > /tmp/gallery-fork-files.txt
+wc -l /tmp/gallery-fork-files.txt
+git diff --shortstat upstream/main...origin/main
+```
+
+Expected at the time this plan was reviewed:
+
+```text
+## plan/upstream-rebase-process...origin/main [ahead 3, behind 2]
+## plan/upstream-rebase-process...origin/main [ahead 3]
+d95f37ffcbefcb63e8ab1330de74d0b57d96db2a
+2040 /tmp/gallery-fork-files.txt
+ 2040 files changed, 421935 insertions(+), 11553 deletions(-)
+```
+
+If `origin/main` has moved, use the new `git rev-parse origin/main` value for
+`metadata.last_verified_fork_head` in Task 3 and regenerate
+`/tmp/gallery-fork-files.txt` before running the coverage check.
 
 ### Task 1: Workspace Package Scaffold
 
@@ -214,13 +253,17 @@ git add pnpm-workspace.yaml Makefile tools/upstream-preflight pnpm-lock.yaml
 git commit -m "chore: scaffold upstream preflight tooling"
 ```
 
-### Task 2: Manifest Types And Parser
+### Task 2: Manifest Types, Parser, And Coverage Helpers
 
 **Files:**
 
+- Modify: `tools/upstream-preflight/package.json`
+- Modify: `Makefile`
 - Create: `tools/upstream-preflight/src/types.ts`
 - Create: `tools/upstream-preflight/src/manifest.ts`
 - Create: `tools/upstream-preflight/src/manifest.spec.ts`
+- Create: `tools/upstream-preflight/src/coverage.ts`
+- Create: `tools/upstream-preflight/src/coverage.spec.ts`
 
 - [ ] **Step 1: Add shared types**
 
@@ -237,13 +280,14 @@ export type Manifest = {
     upstream_branch: string;
     fork_remote: string;
     fork_branch: string;
-    last_verified_fork_head: string | null;
+    last_verified_fork_head: string;
   };
   features: Record<string, FeatureEntry>;
   checks?: Record<string, CheckEntry>;
   ci_invariants?: CiInvariant[];
   patches?: PackagePatch[];
   risk_patterns?: RiskPattern[];
+  coverage_ignore?: string[];
 };
 
 export type FeatureEntry = {
@@ -259,6 +303,7 @@ export type FeatureEntry = {
   database?: {
     tables?: string[];
     migration_globs?: string[];
+    expected_migrations?: string[];
   };
   mobile?: {
     drift_versions?: {
@@ -345,16 +390,14 @@ Create `tools/upstream-preflight/src/manifest.spec.ts`:
 import { describe, expect, it } from 'vitest';
 import { parseManifest } from './manifest';
 
-describe('parseManifest', () => {
-  it('loads all manifest sections', () => {
-    const manifest = parseManifest(`
+const validManifest = `
 version: 1
 metadata:
   upstream_remote: upstream
   upstream_branch: main
   fork_remote: origin
   fork_branch: main
-  last_verified_fork_head: 22ca79659
+  last_verified_fork_head: d95f37ffcbefcb63e8ab1330de74d0b57d96db2a
 features:
   shared-spaces:
     title: Shared Spaces
@@ -363,6 +406,10 @@ features:
     domains: [server, web, mobile, database, e2e]
     owned_paths: [server/src/services/shared-space.service.ts]
     upstream_extension_paths: [server/src/services/search.service.ts]
+    database:
+      migration_globs: [server/src/schema/migrations-gallery/*SharedSpace*.ts]
+      expected_migrations:
+        - server/src/schema/migrations-gallery/1772230000000-CreateStorageMigrationLogTable.ts
     mobile:
       drift_versions:
         owned: [23, 24]
@@ -383,24 +430,68 @@ patches:
     package: '@immich/ui'
     version_source: pnpm-workspace.yaml
     expected_patch: patches/@immich__ui@0.76.2.patch
-    required_check: fork-patches-check
+    required_check: mobile-drift-rebase-check
 risk_patterns:
   - id: breaking-refactor
     risk: high
     subject_regex: 'refactor!'
     notes: Breaking upstream refactor
-`);
+coverage_ignore:
+  - docs/superpowers/**
+`;
+
+describe('parseManifest', () => {
+  it('loads all manifest sections', () => {
+    const manifest = parseManifest(validManifest);
 
     expect(manifest.features['shared-spaces'].aliases).toEqual(['mobile-shared-space-drift-sync']);
     expect(manifest.features['shared-spaces'].mobile?.drift_versions?.owned).toEqual([23, 24]);
+    expect(manifest.features['shared-spaces'].database?.expected_migrations).toEqual([
+      'server/src/schema/migrations-gallery/1772230000000-CreateStorageMigrationLogTable.ts',
+    ]);
     expect(manifest.checks?.['mobile-drift-rebase-check'].command).toBe('make mobile-drift-rebase-check');
     expect(manifest.ci_invariants?.[0].id).toBe('no-push-o-matic');
     expect(manifest.patches?.[0].expected_patch).toBe('patches/@immich__ui@0.76.2.patch');
     expect(manifest.risk_patterns?.[0].id).toBe('breaking-refactor');
+    expect(manifest.coverage_ignore).toEqual(['docs/superpowers/**']);
   });
 
   it('throws a useful error for unsupported versions', () => {
     expect(() => parseManifest('version: 2')).toThrow('Unsupported ownership manifest version: 2');
+  });
+
+  it('rejects invalid enum values', () => {
+    expect(() => parseManifest(validManifest.replace('risk: high', 'risk: severe'))).toThrow(
+      'Invalid risk for feature shared-spaces: severe',
+    );
+    expect(() =>
+      parseManifest(validManifest.replace('domains: [server, web, mobile, database, e2e]', 'domains: [api]')),
+    ).toThrow('Invalid domain for feature shared-spaces: api');
+  });
+
+  it('rejects duplicate aliases and missing checks', () => {
+    expect(() =>
+      parseManifest(validManifest.replace('aliases: [mobile-shared-space-drift-sync]', 'aliases: [shared-spaces]')),
+    ).toThrow('Duplicate feature alias: shared-spaces');
+    expect(() =>
+      parseManifest(
+        validManifest.replace('required_checks: [mobile-drift-rebase-check]', 'required_checks: [missing-check]'),
+      ),
+    ).toThrow('Feature shared-spaces references unknown check: missing-check');
+  });
+
+  it('rejects invalid patch and migration entries', () => {
+    expect(() =>
+      parseManifest(validManifest.replace('expected_patch: patches/@immich__ui@0.76.2.patch', 'expected_patch: 12')),
+    ).toThrow('Patch immich-ui-command-patch must define expected_patch');
+    expect(() =>
+      parseManifest(
+        validManifest.replace(
+          '1772230000000-CreateStorageMigrationLogTable.ts',
+          '1772230000000-CreateStorageMigrationLogTable.sql',
+        ),
+      ),
+    ).toThrow('Expected migration for feature shared-spaces must be a TypeScript file');
   });
 });
 ```
@@ -412,26 +503,277 @@ Create `tools/upstream-preflight/src/manifest.ts`:
 ```ts
 import fs from 'node:fs';
 import YAML from 'yaml';
-import type { Manifest } from './types';
+import type { CheckEntry, Domain, Manifest, RiskLevel } from './types';
 
 export const defaultManifestPath = 'docs/fork/ownership.yml';
 
+const validRisks = new Set<RiskLevel>(['low', 'medium', 'high']);
+const validDomains = new Set<Domain>(['server', 'web', 'mobile', 'database', 'ci', 'docs', 'e2e', 'ml', 'config']);
+const validCheckPhases = new Set<CheckEntry['phase']>(['preflight', 'post-batch', 'preflight-and-post-batch', 'final']);
+
 export function parseManifest(source: string): Manifest {
-  const value = YAML.parse(source) as Partial<Manifest> | null;
+  const value = YAML.parse(source) as unknown;
+  const root = assertRecord(value, 'Ownership manifest must be a YAML object');
 
-  if (!value || value.version !== 1) {
-    throw new Error(`Unsupported ownership manifest version: ${String(value?.version)}`);
+  if (root.version !== 1) {
+    throw new Error(`Unsupported ownership manifest version: ${String(root.version)}`);
   }
 
-  if (!value.metadata) {
-    throw new Error('Ownership manifest is missing metadata');
+  const metadata = assertRecord(root.metadata, 'Ownership manifest is missing metadata');
+  for (const field of ['upstream_remote', 'upstream_branch', 'fork_remote', 'fork_branch', 'last_verified_fork_head']) {
+    assertString(metadata[field], `Ownership manifest metadata must define ${field}`);
+  }
+  if (!/^[0-9a-f]{40}$/.test(metadata.last_verified_fork_head as string)) {
+    throw new Error('Ownership manifest metadata last_verified_fork_head must be a full commit SHA');
   }
 
-  if (!value.features || Object.keys(value.features).length === 0) {
+  const checks =
+    root.checks === undefined ? undefined : assertRecord(root.checks, 'Ownership manifest checks must be a map');
+  const checkIds = new Set(Object.keys(checks ?? {}));
+  validateChecks(checks);
+
+  const features = assertRecord(root.features, 'Ownership manifest must define features');
+  if (Object.keys(features).length === 0) {
     throw new Error('Ownership manifest must define at least one feature');
   }
+  validateFeatures(features, checkIds);
 
-  return value as Manifest;
+  validateCiInvariants(root.ci_invariants);
+  validatePatches(root.patches, checkIds);
+  validateRiskPatterns(root.risk_patterns);
+  optionalStringArray(root.coverage_ignore, 'coverage_ignore');
+
+  return root as Manifest;
+}
+
+function validateChecks(checks: Record<string, unknown> | undefined) {
+  for (const [id, rawCheck] of Object.entries(checks ?? {})) {
+    const check = assertRecord(rawCheck, `Check ${id} must be an object`);
+    assertString(check.command, `Check ${id} must define command`);
+    const phase = assertString(check.phase, `Check ${id} must define phase`);
+    if (!validCheckPhases.has(phase as CheckEntry['phase'])) {
+      throw new Error(`Invalid phase for check ${id}: ${phase}`);
+    }
+    validateRiskArray(check.required_for_risk, `Check ${id} required_for_risk`);
+    validateOptionalDomainArray(check.required_for_domains, `Check ${id} required_for_domains`);
+  }
+}
+
+function validateFeatures(features: Record<string, unknown>, checkIds: Set<string>) {
+  const aliases = new Set(Object.keys(features));
+
+  for (const [id, rawFeature] of Object.entries(features)) {
+    const feature = assertRecord(rawFeature, `Feature ${id} must be an object`);
+    assertString(feature.title, `Feature ${id} must define title`);
+
+    const risk = assertString(feature.risk, `Feature ${id} must define risk`);
+    if (!validRisks.has(risk as RiskLevel)) {
+      throw new Error(`Invalid risk for feature ${id}: ${risk}`);
+    }
+
+    validateDomainArray(feature.domains, `Feature ${id} domains`);
+    optionalStringArray(feature.owned_paths, `Feature ${id} owned_paths`);
+    optionalStringArray(feature.upstream_extension_paths, `Feature ${id} upstream_extension_paths`);
+    optionalStringArray(feature.optional_paths, `Feature ${id} optional_paths`);
+    optionalStringArray(feature.generated_artifacts, `Feature ${id} generated_artifacts`);
+
+    for (const alias of optionalStringArray(feature.aliases, `Feature ${id} aliases`) ?? []) {
+      if (aliases.has(alias)) {
+        throw new Error(`Duplicate feature alias: ${alias}`);
+      }
+      aliases.add(alias);
+    }
+
+    for (const checkId of optionalStringArray(feature.required_checks, `Feature ${id} required_checks`) ?? []) {
+      if (!checkIds.has(checkId)) {
+        throw new Error(`Feature ${id} references unknown check: ${checkId}`);
+      }
+    }
+
+    const symbols = optionalRecord(feature.expected_symbols, `Feature ${id} expected_symbols`);
+    for (const [path, expectedSymbols] of Object.entries(symbols ?? {})) {
+      optionalStringArray(expectedSymbols, `Feature ${id} expected_symbols for ${path}`);
+    }
+
+    validateDatabase(feature.database, id);
+    validateMobile(feature.mobile, id);
+  }
+}
+
+function validateDatabase(value: unknown, featureId: string) {
+  const database = optionalRecord(value, `Feature ${featureId} database`);
+  if (!database) {
+    return;
+  }
+
+  optionalStringArray(database.tables, `Feature ${featureId} database tables`);
+  optionalStringArray(database.migration_globs, `Feature ${featureId} database migration_globs`);
+
+  const migrations =
+    optionalStringArray(database.expected_migrations, `Feature ${featureId} expected_migrations`) ?? [];
+  const seen = new Set<string>();
+  for (const migration of migrations) {
+    if (!migration.endsWith('.ts')) {
+      throw new Error(`Expected migration for feature ${featureId} must be a TypeScript file: ${migration}`);
+    }
+    if (seen.has(migration)) {
+      throw new Error(`Duplicate expected migration for feature ${featureId}: ${migration}`);
+    }
+    seen.add(migration);
+  }
+}
+
+function validateMobile(value: unknown, featureId: string) {
+  const mobile = optionalRecord(value, `Feature ${featureId} mobile`);
+  if (!mobile) {
+    return;
+  }
+
+  optionalStringArray(mobile.paths, `Feature ${featureId} mobile paths`);
+  const driftVersions = optionalRecord(mobile.drift_versions, `Feature ${featureId} mobile drift_versions`);
+  if (!driftVersions) {
+    return;
+  }
+
+  if (!Array.isArray(driftVersions.owned) || !driftVersions.owned.every((version) => Number.isInteger(version))) {
+    throw new Error(`Feature ${featureId} mobile drift_versions owned must be integer versions`);
+  }
+  if (driftVersions.shipped !== true && driftVersions.shipped !== false) {
+    throw new Error(`Feature ${featureId} mobile drift_versions shipped must be boolean`);
+  }
+  if (driftVersions.owner !== 'gallery') {
+    throw new Error(`Feature ${featureId} mobile drift_versions owner must be gallery`);
+  }
+  const callbacks = optionalRecord(driftVersions.expected_callbacks, `Feature ${featureId} expected_callbacks`);
+  for (const [version, names] of Object.entries(callbacks ?? {})) {
+    optionalStringArray(names, `Feature ${featureId} expected_callbacks for ${version}`);
+  }
+}
+
+function validateCiInvariants(value: unknown) {
+  if (value === undefined) {
+    return;
+  }
+  if (!Array.isArray(value)) {
+    throw new Error('ci_invariants must be an array');
+  }
+  for (const rawInvariant of value) {
+    const invariant = assertRecord(rawInvariant, 'CI invariant must be an object');
+    const id = assertString(invariant.id, 'CI invariant must define id');
+    assertString(invariant.title, `CI invariant ${id} must define title`);
+    stringArray(invariant.forbidden_patterns, `CI invariant ${id} forbidden_patterns`);
+    stringArray(invariant.paths, `CI invariant ${id} paths`);
+    optionalStringArray(invariant.exceptions, `CI invariant ${id} exceptions`);
+  }
+}
+
+function validatePatches(value: unknown, checkIds: Set<string>) {
+  if (value === undefined) {
+    return;
+  }
+  if (!Array.isArray(value)) {
+    throw new Error('patches must be an array');
+  }
+  for (const rawPatch of value) {
+    const patch = assertRecord(rawPatch, 'Patch must be an object');
+    const id = assertString(patch.id, 'Patch must define id');
+    assertString(patch.package, `Patch ${id} must define package`);
+    assertString(patch.version_source, `Patch ${id} must define version_source`);
+    assertString(patch.expected_patch, `Patch ${id} must define expected_patch`);
+    const requiredCheck = assertString(patch.required_check, `Patch ${id} must define required_check`);
+    if (!checkIds.has(requiredCheck)) {
+      throw new Error(`Patch ${id} references unknown check: ${requiredCheck}`);
+    }
+  }
+}
+
+function validateRiskPatterns(value: unknown) {
+  if (value === undefined) {
+    return;
+  }
+  if (!Array.isArray(value)) {
+    throw new Error('risk_patterns must be an array');
+  }
+  for (const rawPattern of value) {
+    const pattern = assertRecord(rawPattern, 'Risk pattern must be an object');
+    const id = assertString(pattern.id, 'Risk pattern must define id');
+    const risk = assertString(pattern.risk, `Risk pattern ${id} must define risk`);
+    if (!validRisks.has(risk as RiskLevel)) {
+      throw new Error(`Invalid risk for pattern ${id}: ${risk}`);
+    }
+    if (pattern.subject_regex !== undefined) {
+      assertString(pattern.subject_regex, `Risk pattern ${id} subject_regex must be a string`);
+    }
+    optionalStringArray(pattern.path_globs, `Risk pattern ${id} path_globs`);
+    if (pattern.subject_regex === undefined && pattern.path_globs === undefined) {
+      throw new Error(`Risk pattern ${id} must define subject_regex or path_globs`);
+    }
+    assertString(pattern.notes, `Risk pattern ${id} must define notes`);
+  }
+}
+
+function validateRiskArray(value: unknown, message: string) {
+  for (const risk of optionalStringArray(value, message) ?? []) {
+    if (!validRisks.has(risk as RiskLevel)) {
+      throw new Error(`Invalid risk in ${message}: ${risk}`);
+    }
+  }
+}
+
+function validateDomainArray(value: unknown, message: string) {
+  const domains = stringArray(value, message);
+  if (domains.length === 0) {
+    throw new Error(`${message} must define at least one domain`);
+  }
+  validateDomainValues(domains, message);
+}
+
+function validateOptionalDomainArray(value: unknown, message: string) {
+  validateDomainValues(optionalStringArray(value, message) ?? [], message);
+}
+
+function validateDomainValues(domains: string[], message: string) {
+  for (const domain of domains) {
+    if (!validDomains.has(domain as Domain)) {
+      const owner = message.replace(' domains', '').replace(/^Feature /, 'feature ');
+      throw new Error(`Invalid domain for ${owner}: ${domain}`);
+    }
+  }
+}
+
+function stringArray(value: unknown, message: string): string[] {
+  if (!Array.isArray(value) || !value.every((item) => typeof item === 'string')) {
+    throw new Error(`${message} must be a string array`);
+  }
+  return value;
+}
+
+function optionalStringArray(value: unknown, message: string): string[] | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  return stringArray(value, message);
+}
+
+function optionalRecord(value: unknown, message: string): Record<string, unknown> | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  return assertRecord(value, message);
+}
+
+function assertRecord(value: unknown, message: string): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(message);
+  }
+  return value as Record<string, unknown>;
+}
+
+function assertString(value: unknown, message: string): string {
+  if (typeof value !== 'string' || value.length === 0) {
+    throw new Error(message);
+  }
+  return value;
 }
 
 export function loadManifest(path = defaultManifestPath): Manifest {
@@ -439,12 +781,172 @@ export function loadManifest(path = defaultManifestPath): Manifest {
 }
 ```
 
-- [ ] **Step 4: Verify parser**
+- [ ] **Step 4: Add fork diff coverage helper**
+
+Create `tools/upstream-preflight/src/coverage.ts`:
+
+```ts
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import micromatch from 'micromatch';
+import { defaultManifestPath, loadManifest } from './manifest';
+import type { FeatureEntry, Manifest } from './types';
+
+export function manifestCoverageGlobs(manifest: Manifest): string[] {
+  const globs = new Set<string>();
+
+  for (const feature of Object.values(manifest.features)) {
+    for (const glob of featureCoverageGlobs(feature)) {
+      globs.add(glob);
+    }
+  }
+
+  for (const invariant of manifest.ci_invariants ?? []) {
+    for (const glob of invariant.paths) {
+      globs.add(glob);
+    }
+    for (const exception of invariant.exceptions ?? []) {
+      globs.add(exception);
+    }
+  }
+
+  for (const patch of manifest.patches ?? []) {
+    globs.add(patch.expected_patch);
+    globs.add(patch.version_source);
+  }
+
+  return [...globs].sort();
+}
+
+export function findUncoveredFiles(files: string[], manifest: Manifest): string[] {
+  const coverageGlobs = manifestCoverageGlobs(manifest);
+  const ignoreGlobs = manifest.coverage_ignore ?? [];
+
+  return files
+    .filter((file) => !micromatch.isMatch(file, ignoreGlobs))
+    .filter((file) => !micromatch.isMatch(file, coverageGlobs));
+}
+
+export function runCoverageCli(argv = process.argv.slice(2)) {
+  const [fileListPath, manifestPath = defaultManifestPath] = argv;
+  if (!fileListPath) {
+    throw new Error('Usage: tsx src/coverage.ts <fork-file-list> [manifest-path]');
+  }
+
+  const manifest = loadManifest(manifestPath);
+  const files = fs.readFileSync(fileListPath, 'utf8').split(/\r?\n/).filter(Boolean);
+  const uncovered = findUncoveredFiles(files, manifest);
+
+  if (uncovered.length > 0) {
+    console.error(`Ownership manifest does not cover ${uncovered.length} fork files:`);
+    for (const file of uncovered) {
+      console.error(file);
+    }
+    process.exitCode = 1;
+    return;
+  }
+
+  console.log(`Ownership manifest covers ${files.length} fork files`);
+}
+
+function featureCoverageGlobs(feature: FeatureEntry): string[] {
+  return [
+    ...(feature.owned_paths ?? []),
+    ...(feature.upstream_extension_paths ?? []),
+    ...(feature.optional_paths ?? []),
+    ...Object.keys(feature.expected_symbols ?? {}),
+    ...(feature.generated_artifacts ?? []),
+    ...(feature.database?.migration_globs ?? []),
+    ...(feature.database?.expected_migrations ?? []),
+    ...(feature.mobile?.paths ?? []),
+  ];
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  runCoverageCli();
+}
+```
+
+- [ ] **Step 5: Write coverage tests**
+
+Create `tools/upstream-preflight/src/coverage.spec.ts`:
+
+```ts
+import { describe, expect, it } from 'vitest';
+import { findUncoveredFiles, manifestCoverageGlobs } from './coverage';
+import type { Manifest } from './types';
+
+const manifest: Manifest = {
+  version: 1,
+  metadata: {
+    upstream_remote: 'upstream',
+    upstream_branch: 'main',
+    fork_remote: 'origin',
+    fork_branch: 'main',
+    last_verified_fork_head: 'd95f37ffcbefcb63e8ab1330de74d0b57d96db2a',
+  },
+  features: {
+    'shared-spaces': {
+      title: 'Shared Spaces',
+      risk: 'high',
+      domains: ['server', 'database'],
+      owned_paths: ['server/src/services/shared-space.service.ts'],
+      database: {
+        migration_globs: ['server/src/schema/migrations-gallery/*SharedSpace*.ts'],
+        expected_migrations: ['server/src/schema/migrations-gallery/1772230000000-CreateStorageMigrationLogTable.ts'],
+      },
+    },
+  },
+  coverage_ignore: ['docs/superpowers/**'],
+};
+
+describe('fork ownership coverage', () => {
+  it('reports files not covered by ownership globs', () => {
+    expect(
+      findUncoveredFiles(
+        [
+          'server/src/services/shared-space.service.ts',
+          'server/src/schema/migrations-gallery/1772250000000-AddShowInTimelineToSharedSpaceMember.ts',
+          'docs/superpowers/plans/scratch.md',
+          'web/src/routes/(user)/photos/+page.svelte',
+        ],
+        manifest,
+      ),
+    ).toEqual(['web/src/routes/(user)/photos/+page.svelte']);
+  });
+
+  it('includes explicit expected migrations in coverage globs', () => {
+    expect(manifestCoverageGlobs(manifest)).toContain(
+      'server/src/schema/migrations-gallery/1772230000000-CreateStorageMigrationLogTable.ts',
+    );
+  });
+});
+```
+
+- [ ] **Step 6: Wire coverage script and Make target**
+
+Add this script to `tools/upstream-preflight/package.json`:
+
+```json
+"coverage": "tsx src/coverage.ts"
+```
+
+Add this target near the other upstream preflight targets in `Makefile`:
+
+```makefile
+.PHONY: fork-ownership-coverage-check
+fork-ownership-coverage-check:
+	git diff --name-only upstream/main...origin/main | sort > /tmp/gallery-fork-files.txt
+	$(UPSTREAM_PREFLIGHT) run coverage -- /tmp/gallery-fork-files.txt docs/fork/ownership.yml
+```
+
+- [ ] **Step 7: Verify parser and coverage helper**
 
 Run:
 
 ```bash
-pnpm --filter @gallery/upstream-preflight run test -- manifest.spec.ts
+pnpm --filter @gallery/upstream-preflight run test -- manifest.spec.ts coverage.spec.ts
 pnpm --filter @gallery/upstream-preflight run check
 ```
 
@@ -468,7 +970,10 @@ metadata:
   upstream_branch: main
   fork_remote: origin
   fork_branch: main
-  last_verified_fork_head: 22ca79659
+  last_verified_fork_head: d95f37ffcbefcb63e8ab1330de74d0b57d96db2a
+
+coverage_ignore:
+  - docs/superpowers/**
 
 features:
   shared-spaces:
@@ -717,6 +1222,36 @@ features:
       tables: [user_groups, user_group_members]
       migration_globs:
         - server/src/schema/migrations-gallery/*.ts
+      expected_migrations:
+        - server/src/schema/migrations-gallery/1772230000000-CreateStorageMigrationLogTable.ts
+        - server/src/schema/migrations-gallery/1772240000000-CreateSharedSpaceTables.ts
+        - server/src/schema/migrations-gallery/1772250000000-AddShowInTimelineToSharedSpaceMember.ts
+        - server/src/schema/migrations-gallery/1772260000000-AddThumbnailAssetIdToSharedSpace.ts
+        - server/src/schema/migrations-gallery/1772270000000-AddColorToSharedSpace.ts
+        - server/src/schema/migrations-gallery/1772782339000-AddPetDetectionColumns.ts
+        - server/src/schema/migrations-gallery/1772790000000-AddLastActivityAtToSharedSpace.ts
+        - server/src/schema/migrations-gallery/1772800000000-AddLastViewedAtToSharedSpaceMember.ts
+        - server/src/schema/migrations-gallery/1772810000000-AddSharedSpaceActivityTable.ts
+        - server/src/schema/migrations-gallery/1772815000000-AddThumbnailCropYToSharedSpace.ts
+        - server/src/schema/migrations-gallery/1772820000000-AddSharedSpaceFaceRecognition.ts
+        - server/src/schema/migrations-gallery/1773846750001-AddPersonNameTrigramIndex.ts
+        - server/src/schema/migrations-gallery/1774215658876-AddSharedSpaceLibraryTable.ts
+        - server/src/schema/migrations-gallery/1774300000000-CreateUserGroupTables.ts
+        - server/src/schema/migrations-gallery/1775000000000-AddPetsEnabledToSharedSpace.ts
+        - server/src/schema/migrations-gallery/1775100000000-AddAssetDuplicateChecksum.ts
+        - server/src/schema/migrations-gallery/1775100000000-DropSpacePersonThumbnailPath.ts
+        - server/src/schema/migrations-gallery/1776000000000-AddClassificationTables.ts
+        - server/src/schema/migrations-gallery/1777000000000-AddSpacePersonCounts.ts
+        - server/src/schema/migrations-gallery/1777000000000-AdminScopedClassification.ts
+        - server/src/schema/migrations-gallery/1778000000000-MoveClassificationToConfig.ts
+        - server/src/schema/migrations-gallery/1778100000000-SharedSpaceAuditTables.ts
+        - server/src/schema/migrations-gallery/1778110000000-AddSharedSpaceMemberSyncColumns.ts
+        - server/src/schema/migrations-gallery/1778120000000-AddSharedSpaceAssetSyncColumns.ts
+        - server/src/schema/migrations-gallery/1778200000000-LibraryAuditTables.ts
+        - server/src/schema/migrations-gallery/1778210000000-AddLibrarySyncColumns.ts
+        - server/src/schema/migrations-gallery/1778300000000-AddLibraryUserTable.ts
+        - server/src/schema/migrations-gallery/1778400000000-AddFaceIdentities.ts
+        - server/src/schema/migrations-gallery/1778500000000-AddSpacePersonRepresentativeFaceSource.ts
     required_checks: [ci-invariants-check, fork-patches-check]
 
 checks:
@@ -809,7 +1344,30 @@ done
 
 Expected: no output and exit 0.
 
-- [ ] **Step 3: Compare against local skill inventory**
+- [ ] **Step 3: Verify explicit migration inventory and fork file coverage**
+
+Run:
+
+```bash
+find server/src/schema/migrations-gallery -type f -name '*.ts' | sort > /tmp/gallery-migrations.txt
+rg -n "server/src/schema/migrations-gallery/[0-9]+-.+\\.ts" docs/fork/ownership.yml | wc -l
+diff -u /tmp/gallery-migrations.txt <(rg -o "server/src/schema/migrations-gallery/[0-9]+-[^ ]+\\.ts" docs/fork/ownership.yml | sort -u)
+git diff --name-only upstream/main...origin/main | sort > /tmp/gallery-fork-files.txt
+make fork-ownership-coverage-check
+```
+
+Expected:
+
+```text
+29
+Ownership manifest covers 2040 fork files
+```
+
+If `origin/main` moved in Task 0, the fork file count can differ. The required
+outcome is still zero uncovered fork files; add missing ownership globs or
+intentional `coverage_ignore` entries before committing.
+
+- [ ] **Step 4: Compare against local skill inventory**
 
 Run:
 
@@ -820,15 +1378,16 @@ git log --oneline --no-merges ddc8c44cd..HEAD
 
 Expected: all feature families in the old skill inventory are represented as feature IDs or aliases in `docs/fork/ownership.yml`.
 
-- [ ] **Step 4: Verify manifest and commit**
+- [ ] **Step 5: Verify manifest and commit**
 
 Run:
 
 ```bash
-pnpm --filter @gallery/upstream-preflight run test -- manifest.spec.ts
+pnpm --filter @gallery/upstream-preflight run test -- manifest.spec.ts coverage.spec.ts
 pnpm --filter @gallery/upstream-preflight run check
-git add docs/fork/ownership.yml tools/upstream-preflight/src/types.ts tools/upstream-preflight/src/manifest.ts tools/upstream-preflight/src/manifest.spec.ts
+make fork-ownership-coverage-check
+git add Makefile docs/fork/ownership.yml tools/upstream-preflight/package.json tools/upstream-preflight/src/types.ts tools/upstream-preflight/src/manifest.ts tools/upstream-preflight/src/manifest.spec.ts tools/upstream-preflight/src/coverage.ts tools/upstream-preflight/src/coverage.spec.ts
 git commit -m "feat: add fork ownership manifest"
 ```
 
-Expected: tests pass, type check passes, and commit succeeds.
+Expected: tests pass, type check passes, coverage reports zero uncovered fork files, and commit succeeds.
