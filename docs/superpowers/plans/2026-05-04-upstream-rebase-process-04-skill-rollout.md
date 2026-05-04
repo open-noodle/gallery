@@ -121,11 +121,13 @@ Run these checks after each high-risk batch and before final push:
 
 ```bash
 make upstream-postrebase-audit BATCH=<batch-id>
+make mobile-drift-rebase-check BATCH=<batch-id>
 make ci-invariants-check
 make fork-patches-check
 ```
 
-These checks read `docs/fork/ownership.yml` and `pnpm-workspace.yaml`.
+These checks read `docs/fork/ownership.yml`, `pnpm-workspace.yaml`, and the
+batch plan emitted by `make upstream-batch-plan`.
 ````
 
 - [x] **Step 6: Verify the skill has no stale known-bad strings**
@@ -157,6 +159,7 @@ Run:
 pnpm --filter @gallery/upstream-preflight run test
 pnpm --filter @gallery/upstream-preflight run check
 pnpm --filter @gallery/upstream-preflight run format
+make fork-ownership-coverage-check
 ```
 
 Expected: all commands pass.
@@ -170,6 +173,7 @@ make upstream-preflight
 make upstream-batch-plan
 make upstream-postrebase-audit
 make upstream-postrebase-audit BATCH=01
+make mobile-drift-rebase-check BATCH=01
 make ci-invariants-check
 make fork-patches-check
 ```
@@ -181,7 +185,9 @@ generated OpenAPI/mobile client/SQL artifact review signal. If
 `make ci-invariants-check` fails, the output identifies the exact workflow and
 forbidden pattern. The batch audit command writes markdown and JSON under
 `$(git rev-parse --git-path upstream-preflight)/batches/` and limits upstream
-change signals to the requested batch.
+change signals to the requested batch. The batch-scoped mobile Drift command
+passes for batch 01 because that batch does not touch the shipped Gallery Drift
+versions.
 
 - [x] **Step 3: Verify intended mobile Drift failure on the current backlog**
 
@@ -271,9 +277,13 @@ Verification:
 
 - pnpm --filter @gallery/upstream-preflight run test
 - pnpm --filter @gallery/upstream-preflight run check
+- pnpm --filter @gallery/upstream-preflight run format
+- make fork-ownership-coverage-check
 - make upstream-preflight
 - make upstream-batch-plan
 - make upstream-postrebase-audit
+- make upstream-postrebase-audit BATCH=01
+- make mobile-drift-rebase-check BATCH=01
 - make ci-invariants-check
 - make fork-patches-check
 - make mobile-drift-rebase-check (expected failure on current upstream v23/v24 collision)
