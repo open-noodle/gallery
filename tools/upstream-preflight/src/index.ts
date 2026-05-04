@@ -8,6 +8,7 @@ import { runMobileDriftAudit } from './audits/mobile-drift';
 import { runPatchAudits } from './audits/patches';
 import {
   runPostRebaseAudits,
+  selectPostRebaseAuditScope,
   writePostRebaseAuditReport,
 } from './audits/post-rebase';
 import { planBatches, renderBatchMarkdown } from './batch';
@@ -54,6 +55,7 @@ function buildPreflightContext(manifestPath: string) {
     mergeBase,
     upstreamRange,
     forkRange,
+    batchPlan,
     classifiedCommits,
     overlapFiles,
     batchMarkdown,
@@ -247,9 +249,14 @@ program
     (options: { manifest: string; batch?: string; outputDir?: string }) => {
       const batch = options.batch ?? process.env.BATCH;
       const context = buildPreflightContext(options.manifest);
+      const auditScope = selectPostRebaseAuditScope({
+        batch,
+        batchPlan: context.batchPlan,
+        upstreamTouchedFiles: context.upstreamRange.files,
+      });
       const results = runPostRebaseAudits(
         context.manifest,
-        context.upstreamRange.files,
+        auditScope.upstreamTouchedFiles,
         repoRoot(),
       );
       for (const result of results) {
@@ -265,9 +272,9 @@ program
             );
         const { markdownPath } = writePostRebaseAuditReport(outputDir, {
           date: new Date().toISOString().slice(0, 10),
-          batch,
+          batch: auditScope.batch,
           results,
-          upstreamTouchedFiles: context.upstreamRange.files,
+          upstreamTouchedFiles: auditScope.upstreamTouchedFiles,
         });
         console.log(`Wrote post-rebase audit report: ${markdownPath}`);
       }

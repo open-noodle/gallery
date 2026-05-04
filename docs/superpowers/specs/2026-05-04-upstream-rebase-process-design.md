@@ -320,7 +320,9 @@ by default and summarized into the final committed upstream sync report.
 `upstream/main` or the current batch tip and verify that fork-owned behavior is
 still present. When `BATCH=NN` or `--batch NN` is provided, it should persist
 batch audit markdown and JSON under
-`$(git rev-parse --git-path upstream-preflight)/batches/`.
+`$(git rev-parse --git-path upstream-preflight)/batches/` and limit upstream
+change signals to the selected batch's planned commits. Without `BATCH`, the
+audit uses the full incoming upstream range.
 
 Initial audits:
 

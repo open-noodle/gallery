@@ -180,7 +180,8 @@ upstream backlog, `make upstream-postrebase-audit` exits non-zero only for the
 generated OpenAPI/mobile client/SQL artifact review signal. If
 `make ci-invariants-check` fails, the output identifies the exact workflow and
 forbidden pattern. The batch audit command writes markdown and JSON under
-`$(git rev-parse --git-path upstream-preflight)/batches/`.
+`$(git rev-parse --git-path upstream-preflight)/batches/` and limits upstream
+change signals to the requested batch.
 
 - [x] **Step 3: Verify intended mobile Drift failure on the current backlog**
 

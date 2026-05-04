@@ -849,7 +849,7 @@ function listFiles(cwd: string): string[] {
 Modify `tools/upstream-preflight/src/index.ts`:
 
 ```ts
-import { runPostRebaseAudits, writePostRebaseAuditReport } from './audits/post-rebase';
+import { runPostRebaseAudits, selectPostRebaseAuditScope, writePostRebaseAuditReport } from './audits/post-rebase';
 ```
 
 Add this command:
@@ -863,7 +863,12 @@ program
   .action((options: { manifest: string; batch?: string; outputDir?: string }) => {
     const batch = options.batch ?? process.env.BATCH;
     const context = buildPreflightContext(options.manifest);
-    const results = runPostRebaseAudits(context.manifest, context.upstreamRange.files, repoRoot());
+    const auditScope = selectPostRebaseAuditScope({
+      batch,
+      batchPlan: context.batchPlan,
+      upstreamTouchedFiles: context.upstreamRange.files,
+    });
+    const results = runPostRebaseAudits(context.manifest, auditScope.upstreamTouchedFiles, repoRoot());
     for (const result of results) {
       console.log(`${result.ok ? 'OK' : 'ISSUE'}: ${result.title}`);
       for (const detail of result.details) console.log(`- ${detail}`);
@@ -874,9 +879,9 @@ program
         : path.join(getGitPath(process.cwd(), 'upstream-preflight'), 'batches');
       writePostRebaseAuditReport(outputDir, {
         date: new Date().toISOString().slice(0, 10),
-        batch,
+        batch: auditScope.batch,
         results,
-        upstreamTouchedFiles: context.upstreamRange.files,
+        upstreamTouchedFiles: auditScope.upstreamTouchedFiles,
       });
     }
     process.exitCode = results.every((result) => result.ok) ? 0 : 1;
@@ -904,7 +909,8 @@ backlog, `make upstream-postrebase-audit` exits non-zero only because upstream
 touches generated OpenAPI/mobile client/SQL artifacts that require explicit
 review after the affected batch. `make upstream-postrebase-audit BATCH=01`
 also writes batch audit markdown and JSON under
-`$(git rev-parse --git-path upstream-preflight)/batches/`.
+`$(git rev-parse --git-path upstream-preflight)/batches/`, with generated
+artifact and migration-collision signals limited to batch 01's planned commits.
 
 ### Task 4: Include Audits In Preflight
 
