@@ -3,7 +3,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import micromatch from 'micromatch';
 import { Command } from 'commander';
+import { runCiInvariantAudits } from './audits/ci-invariants';
 import { runMobileDriftAudit } from './audits/mobile-drift';
+import { runPatchAudits } from './audits/patches';
 import { planBatches, renderBatchMarkdown } from './batch';
 import { collectGitRange, getGitPath, getMergeBase } from './git';
 import { defaultManifestPath, loadManifest } from './manifest';
@@ -216,11 +218,37 @@ program
     process.exitCode = result.ok ? 0 : 1;
   });
 
-for (const command of [
-  'postrebase-audit',
-  'ci-invariants-check',
-  'fork-patches-check',
-]) {
+program
+  .command('ci-invariants-check')
+  .option('--manifest <path>', 'ownership manifest path', defaultManifestPath)
+  .action((options: { manifest: string }) => {
+    const results = runCiInvariantAudits(
+      loadManifest(resolveCliPath(options.manifest)),
+      repoRoot(),
+    );
+    for (const result of results) {
+      console.log(`${result.ok ? 'OK' : 'ISSUE'}: ${result.title}`);
+      for (const detail of result.details) console.log(`- ${detail}`);
+    }
+    process.exitCode = results.every((result) => result.ok) ? 0 : 1;
+  });
+
+program
+  .command('fork-patches-check')
+  .option('--manifest <path>', 'ownership manifest path', defaultManifestPath)
+  .action((options: { manifest: string }) => {
+    const results = runPatchAudits(
+      loadManifest(resolveCliPath(options.manifest)),
+      repoRoot(),
+    );
+    for (const result of results) {
+      console.log(`${result.ok ? 'OK' : 'ISSUE'}: ${result.title}`);
+      for (const detail of result.details) console.log(`- ${detail}`);
+    }
+    process.exitCode = results.every((result) => result.ok) ? 0 : 1;
+  });
+
+for (const command of ['postrebase-audit']) {
   program.command(command).action(() => {
     console.log(`${command} scaffold`);
   });

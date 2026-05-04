@@ -39,7 +39,7 @@
 - Create: `tools/upstream-preflight/src/audits/mobile-drift.spec.ts`
 - Modify: `tools/upstream-preflight/src/index.ts`
 
-- [ ] **Step 1: Add mobile Drift tests**
+- [x] **Step 1: Add mobile Drift tests**
 
 Create `tools/upstream-preflight/src/audits/mobile-drift.spec.ts`:
 
@@ -107,7 +107,7 @@ describe('analyzeMobileDriftFiles', () => {
 });
 ```
 
-- [ ] **Step 2: Implement mobile Drift audit**
+- [x] **Step 2: Implement mobile Drift audit**
 
 Create `tools/upstream-preflight/src/audits/mobile-drift.ts`:
 
@@ -219,7 +219,7 @@ export function runMobileDriftAudit(
 }
 ```
 
-- [ ] **Step 3: Wire mobile command**
+- [x] **Step 3: Wire mobile command**
 
 Modify `tools/upstream-preflight/src/index.ts`:
 
@@ -244,7 +244,7 @@ program
 
 Remove `mobile-drift-check` from the scaffold-command loop so the command is not registered twice.
 
-- [ ] **Step 4: Verify and commit mobile audit**
+- [x] **Step 4: Verify and commit mobile audit**
 
 Run:
 
@@ -258,6 +258,10 @@ git commit -m "feat: audit mobile drift rebase collisions"
 
 Expected: tests and type check pass. On the current upstream backlog, `make mobile-drift-rebase-check` exits non-zero and reports the shipped v23/v24 collision.
 
+Implementation note: the real Gallery callbacks use generated camelCase entity
+names, so the manifest markers are `sharedSpaceEntity`,
+`sharedSpaceAssetEntity`, `libraryEntity`, and `sharedSpaceLibraryEntity`.
+
 ### Task 2: CI Invariant And Patch Audits
 
 **Files:**
@@ -268,7 +272,7 @@ Expected: tests and type check pass. On the current upstream backlog, `make mobi
 - Create: `tools/upstream-preflight/src/audits/patches.spec.ts`
 - Modify: `tools/upstream-preflight/src/index.ts`
 
-- [ ] **Step 1: Add CI invariant tests**
+- [x] **Step 1: Add CI invariant tests**
 
 Create `tools/upstream-preflight/src/audits/ci-invariants.spec.ts`:
 
@@ -283,25 +287,25 @@ describe('checkCiInvariantText', () => {
         id: 'no-push-o-matic',
         title: 'No PUSH_O_MATIC',
         forbidden_patterns: ['PUSH_O_MATIC', 'create-workflow-token'],
-        paths: ['.github/workflows/**/*.yml'],
+        paths: ['.github/workflows/**/*.yml', '.github/workflows/**/*.yaml'],
         exceptions: ['.github/workflows/merge-translations.yml'],
       },
       [
-        { path: '.github/workflows/test.yml', text: 'uses: create-workflow-token\nsecret: PUSH_O_MATIC_APP_ID' },
+        { path: '.github/workflows/test.yaml', text: 'uses: create-workflow-token\nsecret: PUSH_O_MATIC_APP_ID' },
         { path: '.github/workflows/merge-translations.yml', text: 'PUSH_O_MATIC_APP_ID' },
       ],
     );
 
     expect(result.ok).toBe(false);
     expect(result.details).toEqual([
-      '.github/workflows/test.yml contains forbidden pattern PUSH_O_MATIC',
-      '.github/workflows/test.yml contains forbidden pattern create-workflow-token',
+      '.github/workflows/test.yaml contains forbidden pattern PUSH_O_MATIC',
+      '.github/workflows/test.yaml contains forbidden pattern create-workflow-token',
     ]);
   });
 });
 ```
 
-- [ ] **Step 2: Implement CI invariant audit**
+- [x] **Step 2: Implement CI invariant audit**
 
 Create `tools/upstream-preflight/src/audits/ci-invariants.ts`:
 
@@ -315,11 +319,10 @@ export type TextFile = { path: string; text: string };
 
 export function checkCiInvariantText(invariant: CiInvariant, files: TextFile[]): AuditResult {
   const details: string[] = [];
-  const matchedFiles = files.filter((file) => micromatch.isMatch(file.path, invariant.paths));
-  const exceptionSet = new Set(invariant.exceptions ?? []);
+  const matchedFiles = files.filter((file) => micromatch.isMatch(file.path, invariant.paths, { dot: true }));
 
   for (const file of matchedFiles) {
-    if (exceptionSet.has(file.path)) continue;
+    if (invariant.exceptions && micromatch.isMatch(file.path, invariant.exceptions, { dot: true })) continue;
     for (const pattern of invariant.forbidden_patterns) {
       if (file.text.includes(pattern)) {
         details.push(`${file.path} contains forbidden pattern ${pattern}`);
@@ -350,7 +353,7 @@ export function runCiInvariantAudits(manifest: Manifest, cwd = process.cwd()): A
 }
 ```
 
-- [ ] **Step 3: Add patch audit tests**
+- [x] **Step 3: Add patch audit tests**
 
 Create `tools/upstream-preflight/src/audits/patches.spec.ts`:
 
@@ -390,7 +393,7 @@ describe('checkPackagePatchText', () => {
 });
 ```
 
-- [ ] **Step 4: Implement patch audit**
+- [x] **Step 4: Implement patch audit**
 
 Create `tools/upstream-preflight/src/audits/patches.ts`:
 
@@ -401,13 +404,13 @@ import type { AuditResult, Manifest, PackagePatch } from '../types';
 
 export function checkPackagePatchText(
   patch: PackagePatch,
-  workspaceText: string,
+  sourceText: string,
   existingPatchFiles: string[],
 ): AuditResult {
   const details: string[] = [];
 
-  if (!workspaceText.includes(patch.expected_patch)) {
-    details.push(`pnpm-workspace.yaml does not reference ${patch.expected_patch}`);
+  if (!sourceText.includes(patch.expected_patch)) {
+    details.push(`${patch.version_source} does not reference ${patch.expected_patch}`);
   }
 
   if (!existingPatchFiles.includes(patch.expected_patch)) {
@@ -422,16 +425,18 @@ export function checkPackagePatchText(
 }
 
 export function runPatchAudits(manifest: Manifest, cwd = process.cwd()): AuditResult[] {
-  const workspacePath = path.join(cwd, 'pnpm-workspace.yaml');
-  const workspaceText = fs.existsSync(workspacePath) ? fs.readFileSync(workspacePath, 'utf8') : '';
   const patchRoot = path.join(cwd, 'patches');
   const patchFiles = fs.existsSync(patchRoot) ? fs.readdirSync(patchRoot).map((file) => `patches/${file}`) : [];
 
-  return (manifest.patches ?? []).map((patch) => checkPackagePatchText(patch, workspaceText, patchFiles));
+  return (manifest.patches ?? []).map((patch) => {
+    const sourcePath = path.join(cwd, patch.version_source);
+    const sourceText = fs.existsSync(sourcePath) ? fs.readFileSync(sourcePath, 'utf8') : '';
+    return checkPackagePatchText(patch, sourceText, patchFiles);
+  });
 }
 ```
 
-- [ ] **Step 5: Wire CI and patch commands**
+- [x] **Step 5: Wire CI and patch commands**
 
 Modify `tools/upstream-preflight/src/index.ts`:
 
@@ -447,7 +452,7 @@ program
   .command('ci-invariants-check')
   .option('--manifest <path>', 'ownership manifest path', defaultManifestPath)
   .action((options: { manifest: string }) => {
-    const results = runCiInvariantAudits(loadManifest(options.manifest));
+    const results = runCiInvariantAudits(loadManifest(resolveCliPath(options.manifest)), repoRoot());
     for (const result of results) {
       console.log(`${result.ok ? 'OK' : 'ISSUE'}: ${result.title}`);
       for (const detail of result.details) console.log(`- ${detail}`);
@@ -459,7 +464,7 @@ program
   .command('fork-patches-check')
   .option('--manifest <path>', 'ownership manifest path', defaultManifestPath)
   .action((options: { manifest: string }) => {
-    const results = runPatchAudits(loadManifest(options.manifest));
+    const results = runPatchAudits(loadManifest(resolveCliPath(options.manifest)), repoRoot());
     for (const result of results) {
       console.log(`${result.ok ? 'OK' : 'ISSUE'}: ${result.title}`);
       for (const detail of result.details) console.log(`- ${detail}`);
@@ -470,7 +475,7 @@ program
 
 Remove these two command names from the scaffold-command loop so they are not registered twice.
 
-- [ ] **Step 6: Verify and commit CI and patch audits**
+- [x] **Step 6: Verify and commit CI and patch audits**
 
 Run:
 
@@ -479,11 +484,19 @@ pnpm --filter @gallery/upstream-preflight run test -- ci-invariants.spec.ts patc
 pnpm --filter @gallery/upstream-preflight run check
 make ci-invariants-check
 make fork-patches-check
-git add tools/upstream-preflight/src/audits/ci-invariants.ts tools/upstream-preflight/src/audits/ci-invariants.spec.ts tools/upstream-preflight/src/audits/patches.ts tools/upstream-preflight/src/audits/patches.spec.ts tools/upstream-preflight/src/index.ts
+git add tools/upstream-preflight/src/audits/ci-invariants.ts tools/upstream-preflight/src/audits/ci-invariants.spec.ts tools/upstream-preflight/src/audits/patches.ts tools/upstream-preflight/src/audits/patches.spec.ts tools/upstream-preflight/src/index.ts docs/fork/ownership.yml docs/superpowers/specs/2026-05-04-upstream-rebase-process-design.md docs/superpowers/plans/2026-05-04-upstream-rebase-process-01-manifest-foundation.md docs/superpowers/plans/2026-05-04-upstream-rebase-process-03-audits.md
 git commit -m "feat: audit rebase ci invariants and patches"
 ```
 
 Expected: tests and type check pass. `make fork-patches-check` passes. If `make ci-invariants-check` exits non-zero, the output names the exact workflow and forbidden string that must be fixed or excepted in the manifest.
+
+Implementation note: the real repo has `.yaml` workflow files, and two current
+workflows need explicit exceptions: `preview-label.yaml` for the upstream
+preview token workflow and `gallery-revert-to-immich-validation.yml` because it
+intentionally boots upstream Immich images during revert validation. The
+docs-deploy invariant checks `workflow_run:` so inert references to
+`github.event.workflow_run` in the disabled upstream workflow do not false
+positive.
 
 ### Task 3: Post-Rebase Audit
 

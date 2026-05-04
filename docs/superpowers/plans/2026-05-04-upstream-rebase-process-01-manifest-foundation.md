@@ -424,7 +424,7 @@ ci_invariants:
   - id: no-push-o-matic
     title: No PUSH_O_MATIC
     forbidden_patterns: [PUSH_O_MATIC]
-    paths: [.github/workflows/**/*.yml]
+    paths: [.github/workflows/**/*.yml, .github/workflows/**/*.yaml]
 patches:
   - id: immich-ui-command-patch
     package: '@immich/ui'
@@ -1284,8 +1284,10 @@ ci_invariants:
   - id: no-push-o-matic
     title: No upstream PUSH_O_MATIC token dependency
     forbidden_patterns: [PUSH_O_MATIC, create-workflow-token]
-    paths: [.github/workflows/**/*.yml]
-    exceptions: [.github/workflows/merge-translations.yml]
+    paths: [.github/workflows/**/*.yml, .github/workflows/**/*.yaml]
+    exceptions:
+      - .github/workflows/merge-translations.yml
+      - .github/workflows/preview-label.yaml
   - id: gallery-release-image-names
     title: Gallery release workflows publish Gallery images
     forbidden_patterns:
@@ -1293,10 +1295,10 @@ ci_invariants:
       - ghcr.io/immich-app/immich-web
       - ghcr.io/immich-app/immich-machine-learning
     paths: [.github/workflows/gallery-*.yml]
-    exceptions: []
+    exceptions: [.github/workflows/gallery-revert-to-immich-validation.yml]
   - id: gallery-docs-deploy-disabled-upstream
     title: Upstream docs deploy stays workflow_dispatch only
-    forbidden_patterns: [workflow_run]
+    forbidden_patterns: ['workflow_run:']
     paths: [.github/workflows/docs-deploy.yml]
     exceptions: []
 
