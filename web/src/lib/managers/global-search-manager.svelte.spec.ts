@@ -40,6 +40,7 @@ vi.mock('$lib/utils/typed-search/typed-search-resolver', () => ({
 }));
 
 vi.mock('$lib/utils/typed-search/typed-search-name-cache', () => ({
+  getTypedSearchDisplayText: vi.fn(() => undefined),
   storeTypedSearchNames: vi.fn(),
 }));
 
@@ -47,7 +48,7 @@ import { goto } from '$app/navigation';
 import { createFilterState, type FilterState } from '$lib/components/filter-panel/filter-panel';
 import * as recentModule from '$lib/stores/cmdk-recent';
 import { addEntry, getEntries, __resetForTests as resetRecentStore } from '$lib/stores/cmdk-recent';
-import { storeTypedSearchNames } from '$lib/utils/typed-search/typed-search-name-cache';
+import { getTypedSearchDisplayText, storeTypedSearchNames } from '$lib/utils/typed-search/typed-search-name-cache';
 import {
   AssetVisibility,
   getAlbumInfo,
@@ -91,6 +92,8 @@ afterEach(() => {
   mockPage.route.id = null;
   mockPage.params = {};
   mockPage.url = new URL('https://gallery.test/photos');
+  vi.mocked(getTypedSearchDisplayText).mockReset();
+  vi.mocked(getTypedSearchDisplayText).mockReturnValue(undefined);
   commandContextManager.setAlbum(null);
   commandContextManager.setSpace(null);
   commandContextManager.setSelection(null);
@@ -268,6 +271,17 @@ describe('GlobalSearchManager (skeleton)', () => {
     expect(manager.isOpen).toBe(true);
     expect(manager.query).toBe('beach');
     expect(manager.searchSortOrder).toBe('asc');
+  });
+
+  it('open() hydrates cached raw typed search text for searchable page filters', () => {
+    mockPage.url = new URL('https://gallery.test/photos?q=mountains&tags=tag-nature');
+    vi.mocked(getTypedSearchDisplayText).mockReturnValue('tag:nature mountains');
+
+    manager.open('dropdown');
+
+    expect(getTypedSearchDisplayText).toHaveBeenCalledWith('/photos?q=mountains&tags=tag-nature');
+    expect(manager.query).toBe('tag:nature mountains');
+    expect(manager.searchSortOrder).toBe('relevance');
   });
 
   it('open() clears the modal query once after activating a text search', async () => {

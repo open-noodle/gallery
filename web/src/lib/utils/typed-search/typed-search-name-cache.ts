@@ -3,6 +3,10 @@ type StoredTypedSearchNames = {
   tagNames: Array<[string, string]>;
 };
 
+type NameMapSink = {
+  set(id: string, name: string): unknown;
+};
+
 const prefix = 'typed-search:names:';
 const displayPrefix = 'typed-search:display:';
 
@@ -62,5 +66,15 @@ export function consumeTypedSearchNames(destination: string) {
     };
   } catch {
     return emptyNames();
+  }
+}
+
+export function consumeTypedSearchNamesInto(destination: string, personNames: NameMapSink, tagNames: NameMapSink) {
+  const names = consumeTypedSearchNames(destination);
+  for (const [id, name] of names.personNames) {
+    personNames.set(id, name);
+  }
+  for (const [id, name] of names.tagNames) {
+    tagNames.set(id, name);
   }
 }

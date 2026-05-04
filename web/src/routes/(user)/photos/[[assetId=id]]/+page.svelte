@@ -49,7 +49,7 @@
     getSearchablePageFilterState,
     getSearchablePageState,
   } from '$lib/utils/searchable-page-search';
-  import { consumeTypedSearchNames } from '$lib/utils/typed-search/typed-search-name-cache';
+  import { consumeTypedSearchNamesInto } from '$lib/utils/typed-search/typed-search-name-cache';
   import {
     updateStackedAssetInTimeline,
     updateUnstackedAssetInTimeline,
@@ -100,13 +100,7 @@
   const options = $derived(buildPhotosTimelineOptions(filters));
   let personNames = new SvelteMap<string, string>();
   let tagNames = new SvelteMap<string, string>();
-  const initialTypedSearchNames = consumeTypedSearchNames(page.url.pathname + page.url.search);
-  for (const [id, name] of initialTypedSearchNames.personNames) {
-    personNames.set(id, name);
-  }
-  for (const [id, name] of initialTypedSearchNames.tagNames) {
-    tagNames.set(id, name);
-  }
+  consumeTypedSearchNamesInto(page.url.pathname + page.url.search, personNames, tagNames);
   $effect(() => globalSearchManager.registerSearchablePageFilters(() => filters));
   let smartFacets = $state<SmartSearchFacetsResponseDto>();
   let smartFacetKey = $state('');
@@ -404,6 +398,7 @@
         ...getSearchablePageFilterState(page.url),
         sortOrder: nextSearchState.sortOrder,
       };
+      consumeTypedSearchNamesInto(page.url.pathname + page.url.search, personNames, tagNames);
       if (queryChanged) {
         smartFacetInFlight?.controller.abort();
         smartFacets = undefined;

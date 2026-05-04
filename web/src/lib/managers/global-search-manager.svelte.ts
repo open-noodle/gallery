@@ -11,7 +11,7 @@ import {
   getSearchablePageState,
   type SearchablePageSortOrder,
 } from '$lib/utils/searchable-page-search';
-import { storeTypedSearchNames } from '$lib/utils/typed-search/typed-search-name-cache';
+import { getTypedSearchDisplayText, storeTypedSearchNames } from '$lib/utils/typed-search/typed-search-name-cache';
 import {
   parseTypedSearch,
   type TypedSearchDisplayToken,
@@ -626,13 +626,19 @@ export class GlobalSearchManager {
     this.isOpen = true;
     this.presentation = presentation;
     const currentPageSearchState = getSearchablePageState(page.url);
-    if (presentation === 'modal' && this.clearQueryOnNextModalOpen) {
+    const typedDisplayText = currentPageSearchState.isSearchable
+      ? getTypedSearchDisplayText(page.url.pathname + page.url.search)
+      : undefined;
+    if (presentation === 'modal' && this.clearQueryOnNextModalOpen && typedDisplayText === undefined) {
       this.query = '';
       this.searchSortOrder = 'relevance';
       this.clearQueryOnNextModalOpen = false;
     } else if (currentPageSearchState.isSearchable) {
-      this.query = currentPageSearchState.query;
+      this.query = typedDisplayText ?? currentPageSearchState.query;
       this.searchSortOrder = currentPageSearchState.query ? currentPageSearchState.sortOrder : 'relevance';
+      if (typedDisplayText !== undefined) {
+        this.clearQueryOnNextModalOpen = false;
+      }
       this.parseTypedSearchDraft(this.query);
     } else {
       this.query = '';

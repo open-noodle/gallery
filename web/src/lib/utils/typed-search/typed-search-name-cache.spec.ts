@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { consumeTypedSearchNames, getTypedSearchDisplayText, storeTypedSearchNames } from './typed-search-name-cache';
+import {
+  consumeTypedSearchNames,
+  consumeTypedSearchNamesInto,
+  getTypedSearchDisplayText,
+  storeTypedSearchNames,
+} from './typed-search-name-cache';
 
 describe('typed search name cache', () => {
   beforeEach(() => {
@@ -44,5 +49,29 @@ describe('typed search name cache', () => {
     expect(getTypedSearchDisplayText('/photos?people=person-cat')).toBe('person:cat');
     consumeTypedSearchNames('/photos?people=person-cat');
     expect(getTypedSearchDisplayText('/photos?people=person-cat')).toBe('person:cat');
+  });
+
+  it('merges consumed names into existing name maps for same-page navigations', () => {
+    const personNames = new Map<string, string>([['person-anna', 'Anna']]);
+    const tagNames = new Map<string, string>();
+
+    storeTypedSearchNames('/photos?q=nature&people=person-cat&tags=tag-nature', {
+      personNames: new Map([['person-cat', 'cat']]),
+      tagNames: new Map([['tag-nature', 'nature']]),
+    });
+
+    consumeTypedSearchNamesInto('/photos?q=nature&people=person-cat&tags=tag-nature', personNames, tagNames);
+
+    expect(personNames).toEqual(
+      new Map([
+        ['person-anna', 'Anna'],
+        ['person-cat', 'cat'],
+      ]),
+    );
+    expect(tagNames).toEqual(new Map([['tag-nature', 'nature']]));
+    expect(consumeTypedSearchNames('/photos?q=nature&people=person-cat&tags=tag-nature')).toEqual({
+      personNames: new Map(),
+      tagNames: new Map(),
+    });
   });
 });

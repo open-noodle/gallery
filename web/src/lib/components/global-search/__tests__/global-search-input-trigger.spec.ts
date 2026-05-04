@@ -97,6 +97,29 @@ describe('global-search-input-trigger', () => {
     expect(document.querySelector('[data-cmdk-dropdown-panel]')).toBeNull();
   });
 
+  it('keeps committed raw typed search text after opening the inline dropdown', async () => {
+    mockPage.url = new URL('https://gallery.test/photos?q=mountains&tags=tag-nature');
+    storeTypedSearchNames(
+      '/photos?q=mountains&tags=tag-nature',
+      {
+        personNames: new Map(),
+        tagNames: new Map([['tag-nature', 'nature']]),
+      },
+      'tag:nature mountains',
+    );
+    const user = userEvent.setup();
+
+    render(GlobalSearchInputTrigger);
+
+    const input = screen.getByRole('combobox', { name: 'cmdk_placeholder' });
+    expect(input).toHaveValue('tag:nature mountains');
+
+    await user.click(input);
+
+    expect(input).toHaveValue('tag:nature mountains');
+    expect(document.querySelector('[data-cmdk-dropdown-panel]')).not.toBeNull();
+  });
+
   it('pressing Enter after clearing the top search field clears the committed search', async () => {
     mockPage.url = new URL('https://gallery.test/photos?q=mountains');
     const activateSearchSpy = vi.spyOn(globalSearchManager, 'activateSearch').mockImplementation(async () => {});
