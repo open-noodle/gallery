@@ -5,7 +5,7 @@ metadata:
   upstream_branch: main
   fork_remote: origin
   fork_branch: main
-  last_verified_fork_head: 521721c46a07bd9fec46cb9cd5f77704f41121a1
+  last_verified_fork_head: 863e690f6280bc28ee715f66ecf91b4b4a5683f8
 
 coverage_ignore:
   - docs/superpowers/**
@@ -250,6 +250,7 @@ features:
       - fork-migration-compatibility
       - schema-functions
       - structured-json-logging
+      - upstream-rebase-tooling
     risk: high
     domains: [ci, server, web, mobile, docs, config, database]
     owned_paths:
@@ -262,6 +263,7 @@ features:
       - .github/workflows/docs-build.yml
       - .github/workflows/docs-deploy.yml
       - server/src/schema/migrations-gallery/**
+      - tools/upstream-preflight/**
     upstream_extension_paths:
       - .github/workflows/**
       - server/Dockerfile

@@ -9,7 +9,7 @@ const manifest: Manifest = {
     upstream_branch: 'main',
     fork_remote: 'origin',
     fork_branch: 'main',
-    last_verified_fork_head: '521721c46a07bd9fec46cb9cd5f77704f41121a1',
+    last_verified_fork_head: '863e690f6280bc28ee715f66ecf91b4b4a5683f8',
   },
   features: {
     search: {

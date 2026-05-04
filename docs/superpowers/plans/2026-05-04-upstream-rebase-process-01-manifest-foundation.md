@@ -49,28 +49,33 @@ Run:
 
 ```bash
 git fetch origin main
+git fetch upstream main
 git status --short --branch
 git rebase origin/main
 git status --short --branch
 git rev-parse origin/main
+git rev-parse upstream/main
 git diff --name-only upstream/main...origin/main | sort > /tmp/gallery-fork-files.txt
 wc -l /tmp/gallery-fork-files.txt
 git diff --shortstat upstream/main...origin/main
 ```
 
-Expected at the time this plan was reviewed:
+Expected at the time this plan was updated:
 
 ```text
-## plan/upstream-rebase-process...origin/main [ahead 3, behind 2]
-## plan/upstream-rebase-process...origin/main [ahead 3]
-d95f37ffcbefcb63e8ab1330de74d0b57d96db2a
-2040 /tmp/gallery-fork-files.txt
- 2040 files changed, 421935 insertions(+), 11553 deletions(-)
+## plan/upstream-rebase-process...origin/main [ahead N]
+## plan/upstream-rebase-process...origin/main [ahead N]
+863e690f6280bc28ee715f66ecf91b4b4a5683f8
+af39384efbe389740ab3b9df897291ab1e428535
+2042 /tmp/gallery-fork-files.txt
+ 2042 files changed, 422095 insertions(+), 11553 deletions(-)
 ```
 
 If `origin/main` has moved, use the new `git rev-parse origin/main` value for
-`metadata.last_verified_fork_head` in Task 3 and regenerate
-`/tmp/gallery-fork-files.txt` before running the coverage check.
+`metadata.last_verified_fork_head` in Task 3. If either remote ref has moved,
+regenerate `/tmp/gallery-fork-files.txt` before running the coverage check. Do
+not leave a placeholder, `null`, or an older fork head in the committed
+manifest.
 
 ### Task 1: Workspace Package Scaffold
 
@@ -397,7 +402,7 @@ metadata:
   upstream_branch: main
   fork_remote: origin
   fork_branch: main
-  last_verified_fork_head: d95f37ffcbefcb63e8ab1330de74d0b57d96db2a
+  last_verified_fork_head: 863e690f6280bc28ee715f66ecf91b4b4a5683f8
 features:
   shared-spaces:
     title: Shared Spaces
@@ -793,6 +798,8 @@ import micromatch from 'micromatch';
 import { defaultManifestPath, loadManifest } from './manifest';
 import type { FeatureEntry, Manifest } from './types';
 
+const micromatchOptions = { dot: true };
+
 export function manifestCoverageGlobs(manifest: Manifest): string[] {
   const globs = new Set<string>();
 
@@ -824,18 +831,18 @@ export function findUncoveredFiles(files: string[], manifest: Manifest): string[
   const ignoreGlobs = manifest.coverage_ignore ?? [];
 
   return files
-    .filter((file) => !micromatch.isMatch(file, ignoreGlobs))
-    .filter((file) => !micromatch.isMatch(file, coverageGlobs));
+    .filter((file) => !micromatch.isMatch(file, ignoreGlobs, micromatchOptions))
+    .filter((file) => !micromatch.isMatch(file, coverageGlobs, micromatchOptions));
 }
 
 export function runCoverageCli(argv = process.argv.slice(2)) {
-  const [fileListPath, manifestPath = defaultManifestPath] = argv;
+  const [fileListPath, manifestPath = defaultManifestPath] = argv[0] === '--' ? argv.slice(1) : argv;
   if (!fileListPath) {
     throw new Error('Usage: tsx src/coverage.ts <fork-file-list> [manifest-path]');
   }
 
-  const manifest = loadManifest(manifestPath);
-  const files = fs.readFileSync(fileListPath, 'utf8').split(/\r?\n/).filter(Boolean);
+  const manifest = loadManifest(resolveCliPath(manifestPath));
+  const files = fs.readFileSync(resolveCliPath(fileListPath), 'utf8').split(/\r?\n/).filter(Boolean);
   const uncovered = findUncoveredFiles(files, manifest);
 
   if (uncovered.length > 0) {
@@ -848,6 +855,10 @@ export function runCoverageCli(argv = process.argv.slice(2)) {
   }
 
   console.log(`Ownership manifest covers ${files.length} fork files`);
+}
+
+function resolveCliPath(inputPath: string) {
+  return path.resolve(process.env.INIT_CWD ?? process.cwd(), inputPath);
 }
 
 function featureCoverageGlobs(feature: FeatureEntry): string[] {
@@ -884,7 +895,7 @@ const manifest: Manifest = {
     upstream_branch: 'main',
     fork_remote: 'origin',
     fork_branch: 'main',
-    last_verified_fork_head: 'd95f37ffcbefcb63e8ab1330de74d0b57d96db2a',
+    last_verified_fork_head: '863e690f6280bc28ee715f66ecf91b4b4a5683f8',
   },
   features: {
     'shared-spaces': {
@@ -970,7 +981,7 @@ metadata:
   upstream_branch: main
   fork_remote: origin
   fork_branch: main
-  last_verified_fork_head: d95f37ffcbefcb63e8ab1330de74d0b57d96db2a
+  last_verified_fork_head: 863e690f6280bc28ee715f66ecf91b4b4a5683f8
 
 coverage_ignore:
   - docs/superpowers/**
@@ -1195,6 +1206,7 @@ features:
       - fork-migration-compatibility
       - schema-functions
       - structured-json-logging
+      - upstream-rebase-tooling
     risk: high
     domains: [ci, server, web, mobile, docs, config, database]
     owned_paths:
@@ -1207,6 +1219,7 @@ features:
       - .github/workflows/docs-build.yml
       - .github/workflows/docs-deploy.yml
       - server/src/schema/migrations-gallery/**
+      - tools/upstream-preflight/**
     upstream_extension_paths:
       - .github/workflows/**
       - server/Dockerfile
@@ -1338,7 +1351,7 @@ risk_patterns:
 Run:
 
 ```bash
-for id in shared-spaces storage-migration direct-s3-media-delivery pet-detection user-groups google-photos-import google-takeout-zip-on-demand image-editing auto-classification video-duplicate-detection clip-relevance-threshold support-ui global-search-command-palette gallery-map-shared-photos filter-panel smart-search-main-timeline space-library-linking bulk-add-to-spaces space-activity-logging collapsible-space-hero space-search-sorting dynamic-filter-suggestions space-person-dedup checksum-tombstone duplicate-space-membership-sync library-user-denormalization infrastructure-detachment release-version-publishing rc-build-workflow split-mobile-server-release switch-back-to-immich open-in-app-deeplink environment-tagged-user-agent system-config-caching global-face-identities representative-face-source typed-search-filters rule-based-memories historic-memories prometheus-metrics mobile-spaces mobile-shared-space-drift-sync mobile-photos-filter-sheet mobile-map-markers mobile-bottom-nav-design mobile-deeplink-oauth-branding mobile-ios-purpose-strings mobile-release-signing branding fork-migration-compatibility schema-functions structured-json-logging; do
+for id in shared-spaces storage-migration direct-s3-media-delivery pet-detection user-groups google-photos-import google-takeout-zip-on-demand image-editing auto-classification video-duplicate-detection clip-relevance-threshold support-ui global-search-command-palette gallery-map-shared-photos filter-panel smart-search-main-timeline space-library-linking bulk-add-to-spaces space-activity-logging collapsible-space-hero space-search-sorting dynamic-filter-suggestions space-person-dedup checksum-tombstone duplicate-space-membership-sync library-user-denormalization infrastructure-detachment release-version-publishing rc-build-workflow split-mobile-server-release switch-back-to-immich open-in-app-deeplink environment-tagged-user-agent system-config-caching global-face-identities representative-face-source typed-search-filters rule-based-memories historic-memories prometheus-metrics mobile-spaces mobile-shared-space-drift-sync mobile-photos-filter-sheet mobile-map-markers mobile-bottom-nav-design mobile-deeplink-oauth-branding mobile-ios-purpose-strings mobile-release-signing branding fork-migration-compatibility schema-functions structured-json-logging upstream-rebase-tooling; do
   rg -q "$id" docs/fork/ownership.yml || { echo "missing manifest feature or alias: $id"; exit 1; }
 done
 ```
@@ -1355,18 +1368,27 @@ rg -n "server/src/schema/migrations-gallery/[0-9]+-.+\\.ts" docs/fork/ownership.
 diff -u /tmp/gallery-migrations.txt <(rg -o "server/src/schema/migrations-gallery/[0-9]+-[^ ]+\\.ts" docs/fork/ownership.yml | sort -u)
 git diff --name-only upstream/main...origin/main | sort > /tmp/gallery-fork-files.txt
 make fork-ownership-coverage-check
+git diff --name-only upstream/main...HEAD | sort > /tmp/gallery-branch-fork-files.txt
+pnpm --filter @gallery/upstream-preflight run coverage -- /tmp/gallery-branch-fork-files.txt docs/fork/ownership.yml
+test "$(sed -n 's/^  last_verified_fork_head: //p' docs/fork/ownership.yml)" = "$(git rev-parse origin/main)"
 ```
 
 Expected:
 
 ```text
 29
-Ownership manifest covers 2040 fork files
+Ownership manifest covers 2042 fork files
+Ownership manifest covers 2078 fork files
 ```
 
-If `origin/main` moved in Task 0, the fork file count can differ. The required
-outcome is still zero uncovered fork files; add missing ownership globs or
-intentional `coverage_ignore` entries before committing.
+The branch coverage count can move as this plan changes; it must include
+`tools/upstream-preflight/**` and exit 0.
+
+If either remote ref moved in Task 0, the fork file count can differ. The
+required outcome is still zero uncovered fork files for both `origin/main` and
+the current phase branch, plus an exact manifest head match with
+`git rev-parse origin/main`; add missing ownership globs or intentional
+`coverage_ignore` entries before committing.
 
 - [x] **Step 4: Compare against local skill inventory**
 
