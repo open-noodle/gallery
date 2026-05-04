@@ -15,7 +15,9 @@ describe('git range collection', () => {
     repo.commit('feat: fork shared spaces');
 
     expect(getMergeBase(repo.path, 'main', 'upstream')).toBe(base);
-    expect(getGitPath(repo.path, 'upstream-preflight/preflight.json')).toContain('upstream-preflight/preflight.json');
+    expect(
+      getGitPath(repo.path, 'upstream-preflight/preflight.json'),
+    ).toContain('upstream-preflight/preflight.json');
 
     const range = collectGitRange(repo.path, `${base}..upstream`);
 

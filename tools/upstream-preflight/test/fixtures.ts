@@ -11,9 +11,15 @@ export type TempRepo = {
 };
 
 export function createTempRepo(): TempRepo {
-  const repoPath = fs.mkdtempSync(path.join(os.tmpdir(), 'gallery-upstream-preflight-'));
+  const repoPath = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'gallery-upstream-preflight-'),
+  );
   const git = (...args: string[]) =>
-    execFileSync('git', args, { cwd: repoPath, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+    execFileSync('git', args, {
+      cwd: repoPath,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    }).trim();
 
   git('init', '-b', 'main');
   git('config', 'user.name', 'Test User');

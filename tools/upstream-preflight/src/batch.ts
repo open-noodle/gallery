@@ -4,13 +4,16 @@ const riskRank: Record<RiskLevel, number> = { low: 0, medium: 1, high: 2 };
 
 function batchRisk(commits: ClassifiedCommit[]): RiskLevel {
   return commits.reduce<RiskLevel>(
-    (risk, commit) => (riskRank[commit.risk] > riskRank[risk] ? commit.risk : risk),
+    (risk, commit) =>
+      riskRank[commit.risk] > riskRank[risk] ? commit.risk : risk,
     'low',
   );
 }
 
 function makeBatch(index: number, commits: ClassifiedCommit[]): Batch {
-  const requiredChecks = [...new Set(commits.flatMap((commit) => commit.requiredChecks))].sort();
+  const requiredChecks = [
+    ...new Set(commits.flatMap((commit) => commit.requiredChecks)),
+  ].sort();
   const why = [...new Set(commits.flatMap((commit) => commit.reasons))];
   const tip = commits.at(-1);
 
@@ -36,7 +39,10 @@ function mustStartOwnBatch(commit: ClassifiedCommit): boolean {
   );
 }
 
-export function planBatches(commits: ClassifiedCommit[], softCap = 10): BatchPlan {
+export function planBatches(
+  commits: ClassifiedCommit[],
+  softCap = 10,
+): BatchPlan {
   const batches: Batch[] = [];
   let current: ClassifiedCommit[] = [];
 

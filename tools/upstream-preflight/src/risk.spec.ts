@@ -33,8 +33,18 @@ const manifest: Manifest = {
     },
   },
   risk_patterns: [
-    { id: 'breaking-refactor', risk: 'high', subject_regex: 'refactor!', notes: 'Breaking refactor' },
-    { id: 'server-schema', risk: 'high', path_globs: ['server/src/schema/migrations/**'], notes: 'Schema change' },
+    {
+      id: 'breaking-refactor',
+      risk: 'high',
+      subject_regex: 'refactor!',
+      notes: 'Breaking refactor',
+    },
+    {
+      id: 'server-schema',
+      risk: 'high',
+      path_globs: ['server/src/schema/migrations/**'],
+      notes: 'Schema change',
+    },
   ],
 };
 
@@ -68,8 +78,13 @@ describe('classifyCommit', () => {
 
     expect(result.risk).toBe('high');
     expect(result.features).toEqual(['shared-spaces']);
-    expect(result.requiredChecks).toEqual(['e2e-rebase-smoke', 'storage-migration-tests']);
-    expect(result.reasons).toContain('Touches shared-spaces upstream extension path');
+    expect(result.requiredChecks).toEqual([
+      'e2e-rebase-smoke',
+      'storage-migration-tests',
+    ]);
+    expect(result.reasons).toContain(
+      'Touches shared-spaces upstream extension path',
+    );
     expect(result.reasons).toContain('Matches risk pattern breaking-refactor');
   });
 });

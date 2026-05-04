@@ -8,7 +8,11 @@ export type GitRange = {
 };
 
 export function runGit(cwd: string, args: string[]): string {
-  return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  return execFileSync('git', args, {
+    cwd,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  }).trim();
 }
 
 export function getMergeBase(cwd: string, left: string, right: string): string {
@@ -27,7 +31,14 @@ export function collectGitRange(cwd: string, range: string): GitRange {
 
   const commits = shas.map((sha) => {
     const subject = runGit(cwd, ['log', '-1', '--format=%s', sha]);
-    const files = runGit(cwd, ['diff-tree', '--no-commit-id', '--name-only', '-r', '-M', sha])
+    const files = runGit(cwd, [
+      'diff-tree',
+      '--no-commit-id',
+      '--name-only',
+      '-r',
+      '-M',
+      sha,
+    ])
       .split('\n')
       .map((line) => line.trim())
       .filter(Boolean)
