@@ -24,10 +24,6 @@ services:
         - BUILD_IMAGE=e2e
         - BUILD_SOURCE_REF=e2e
         - BUILD_SOURCE_COMMIT=e2eeeeeeeeeeeeeeeeee
-      # Build-only token for mise tool downloads; passed as a BuildKit secret,
-      # not as a runtime environment variable or image layer.
-      secrets:
-        - github_token
     environment:
       DB_HOSTNAME: database
       DB_USERNAME: postgres
@@ -71,7 +67,3 @@ services:
       timeout: 5s
       retries: 30
       start_period: 10s
-
-secrets:
-  github_token:
-    environment: GITHUB_TOKEN
