@@ -613,6 +613,24 @@ describe('global-search root', () => {
     expect(activateSearchSpy).toHaveBeenCalledWith('');
   });
 
+  it('does not restore stale modal input text after the manager clears on reopen', async () => {
+    mockPage.url = new URL('https://gallery.test/photos');
+    const m = new GlobalSearchManager();
+    m.open('modal');
+    render(GlobalSearch, { props: { manager: m } });
+
+    await user.type(screen.getByRole('combobox'), 'beach');
+    await m.activateSearch('beach');
+    m.close();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(m.query).toBe('');
+    mockPage.url = new URL('https://gallery.test/photos?q=beach&sort=asc');
+
+    m.open('modal');
+
+    await vi.waitFor(() => expect(screen.getByRole('combobox')).toHaveValue(''));
+  });
+
   it('pressing Enter on typed filters commits the raw search text, not the plain preview label', async () => {
     const m = new GlobalSearchManager();
     const activateSearchSpy = vi.spyOn(m, 'activateSearch').mockImplementation(async () => {});

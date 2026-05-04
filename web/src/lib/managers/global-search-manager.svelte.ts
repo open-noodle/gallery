@@ -629,7 +629,7 @@ export class GlobalSearchManager {
     const typedDisplayText = currentPageSearchState.isSearchable
       ? getTypedSearchDisplayText(page.url.pathname + page.url.search)
       : undefined;
-    if (presentation === 'modal' && this.clearQueryOnNextModalOpen && typedDisplayText === undefined) {
+    if (presentation === 'modal' && this.clearQueryOnNextModalOpen) {
       this.query = '';
       this.searchSortOrder = 'relevance';
       this.clearQueryOnNextModalOpen = false;

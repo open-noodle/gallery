@@ -300,6 +300,23 @@ describe('GlobalSearchManager (skeleton)', () => {
     expect(m.searchSortOrder).toBe('relevance');
   });
 
+  it('open() clears the modal query once even when the activated text search has cached display text', async () => {
+    const m = new GlobalSearchManager();
+    mockPage.url = new URL('https://gallery.test/photos');
+    mockResolvedTypedSearch('beach');
+
+    m.open('modal');
+    await m.activateSearch('beach');
+    m.close();
+    mockPage.url = new URL('https://gallery.test/photos?q=beach&sort=asc');
+    vi.mocked(getTypedSearchDisplayText).mockReturnValue('beach');
+
+    m.open('modal');
+
+    expect(m.query).toBe('');
+    expect(m.searchSortOrder).toBe('relevance');
+  });
+
   it('open() still hydrates the dropdown query after activating a text search', async () => {
     const m = new GlobalSearchManager();
     mockPage.url = new URL('https://gallery.test/photos');
