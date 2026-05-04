@@ -25,9 +25,9 @@
 - Create: `tools/upstream-preflight/src/audits/patches.spec.ts`
   - Covers expected patch presence and missing patch failures.
 - Create: `tools/upstream-preflight/src/audits/post-rebase.ts`
-  - Checks fork-owned file survival and Gallery migration count.
+  - Checks fork-owned file survival and Gallery migration count/filenames.
 - Create: `tools/upstream-preflight/src/audits/post-rebase.spec.ts`
-  - Covers missing fork files and migration counting.
+  - Covers missing fork files and migration count/filename checks.
 - Modify: `tools/upstream-preflight/src/index.ts`
   - Wires audit commands and includes audit signals in preflight.
 
@@ -506,7 +506,7 @@ positive.
 - Create: `tools/upstream-preflight/src/audits/post-rebase.spec.ts`
 - Modify: `tools/upstream-preflight/src/index.ts`
 
-- [ ] **Step 1: Add post-rebase tests**
+- [x] **Step 1: Add post-rebase tests**
 
 Create `tools/upstream-preflight/src/audits/post-rebase.spec.ts`:
 
@@ -514,6 +514,7 @@ Create `tools/upstream-preflight/src/audits/post-rebase.spec.ts`:
 import { describe, expect, it } from 'vitest';
 import {
   auditExtensionSymbols,
+  auditExpectedMigrations,
   auditForkOwnedFiles,
   auditGeneratedArtifactSignals,
   auditMigrationCount,
@@ -529,7 +530,7 @@ const manifest: Manifest = {
     upstream_branch: 'main',
     fork_remote: 'origin',
     fork_branch: 'main',
-    last_verified_fork_head: null,
+    last_verified_fork_head: '0000000000000000000000000000000000000000',
   },
   features: {
     'shared-spaces': {
@@ -542,6 +543,7 @@ const manifest: Manifest = {
       },
       database: {
         migration_globs: ['server/src/schema/migrations-gallery/*SharedSpace*.ts'],
+        expected_migrations: ['server/src/schema/migrations-gallery/1770000000000-SharedSpace.ts'],
       },
     },
   },
@@ -558,13 +560,40 @@ describe('auditForkOwnedFiles', () => {
 
 describe('auditMigrationCount', () => {
   it('reports the gallery migration count', () => {
-    const result = auditMigrationCount([
-      '1778400000000-AddFaceIdentities.ts',
-      '1778500000000-AddSpacePersonRepresentativeFaceSource.ts',
-    ]);
+    const result = auditMigrationCount(
+      ['1778400000000-AddFaceIdentities.ts', '1778500000000-AddSpacePersonRepresentativeFaceSource.ts'],
+      [
+        'server/src/schema/migrations-gallery/1778400000000-AddFaceIdentities.ts',
+        'server/src/schema/migrations-gallery/1778500000000-AddSpacePersonRepresentativeFaceSource.ts',
+      ],
+    );
 
     expect(result.ok).toBe(true);
-    expect(result.details).toEqual(['Gallery migration count: 2']);
+    expect(result.details).toEqual(['Gallery migration count: 2 (expected 2)']);
+  });
+
+  it('fails when the count differs from manifest expectations', () => {
+    const result = auditMigrationCount(
+      ['1778400000000-AddFaceIdentities.ts'],
+      [
+        'server/src/schema/migrations-gallery/1778400000000-AddFaceIdentities.ts',
+        'server/src/schema/migrations-gallery/1778500000000-AddSpacePersonRepresentativeFaceSource.ts',
+      ],
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.details).toEqual(['Gallery migration count: 1 (expected 2)']);
+  });
+});
+
+describe('auditExpectedMigrations', () => {
+  it('fails when a manifest expected migration is missing', () => {
+    const result = auditExpectedMigrations(manifest, ['server/src/schema/migrations-gallery/1770000000000-Other.ts']);
+
+    expect(result.ok).toBe(false);
+    expect(result.details).toEqual([
+      'Missing expected Gallery migration server/src/schema/migrations-gallery/1770000000000-SharedSpace.ts',
+    ]);
   });
 });
 
@@ -612,7 +641,7 @@ describe('auditGeneratedArtifactSignals', () => {
 });
 ```
 
-- [ ] **Step 2: Implement post-rebase audit**
+- [x] **Step 2: Implement post-rebase audit**
 
 Create `tools/upstream-preflight/src/audits/post-rebase.ts`:
 
@@ -641,11 +670,32 @@ export function auditForkOwnedFiles(manifest: Manifest, currentFiles: string[]):
   };
 }
 
-export function auditMigrationCount(migrations: string[]): AuditResult {
+export function auditMigrationCount(migrations: string[], expectedMigrations: string[] = []): AuditResult {
+  const expectedCount = expectedMigrations.length;
+  const details =
+    expectedCount > 0
+      ? [`Gallery migration count: ${migrations.length} (expected ${expectedCount})`]
+      : [`Gallery migration count: ${migrations.length}`];
+
   return {
-    ok: true,
+    ok: expectedCount === 0 || migrations.length === expectedCount,
     title: 'Gallery Migration Count',
-    details: [`Gallery migration count: ${migrations.length}`],
+    details,
+  };
+}
+
+export function auditExpectedMigrations(manifest: Manifest, currentFiles: string[]): AuditResult {
+  const expectedMigrations = [
+    ...new Set(Object.values(manifest.features).flatMap((feature) => feature.database?.expected_migrations ?? [])),
+  ].sort();
+  const missing = expectedMigrations
+    .filter((file) => !currentFiles.includes(file))
+    .map((file) => `Missing expected Gallery migration ${file}`);
+
+  return {
+    ok: missing.length === 0,
+    title: 'Gallery Migration Filename Survival',
+    details: missing.length > 0 ? missing : ['All manifest expected migrations are present'],
   };
 }
 
@@ -737,6 +787,9 @@ export function runPostRebaseAudits(
     ? fs.readdirSync(migrationRoot).filter((file) => file.endsWith('.ts'))
     : [];
   const galleryMigrationPaths = migrations.map((file) => `server/src/schema/migrations-gallery/${file}`);
+  const expectedMigrations = [
+    ...new Set(Object.values(manifest.features).flatMap((feature) => feature.database?.expected_migrations ?? [])),
+  ].sort();
   const textPaths = Object.values(manifest.features).flatMap((feature) => Object.keys(feature.expected_symbols ?? {}));
   const fileTextByPath = Object.fromEntries(
     textPaths.map((file) => {
@@ -749,7 +802,8 @@ export function runPostRebaseAudits(
   return [
     auditForkOwnedFiles(manifest, currentFiles),
     auditExtensionSymbols(manifest, fileTextByPath),
-    auditMigrationCount(migrations),
+    auditMigrationCount(migrations, expectedMigrations),
+    auditExpectedMigrations(manifest, currentFiles),
     auditMigrationGlobs(manifest, currentFiles),
     auditMigrationTimestampCollisions(galleryMigrationPaths, upstreamMigrations),
     auditGeneratedArtifactSignals(upstreamTouchedFiles),
@@ -787,7 +841,7 @@ function listFiles(cwd: string): string[] {
 }
 ```
 
-- [ ] **Step 3: Wire post-rebase command**
+- [x] **Step 3: Wire post-rebase command**
 
 Modify `tools/upstream-preflight/src/index.ts`:
 
@@ -803,7 +857,7 @@ program
   .option('--manifest <path>', 'ownership manifest path', defaultManifestPath)
   .action((options: { manifest: string }) => {
     const context = buildPreflightContext(options.manifest);
-    const results = runPostRebaseAudits(context.manifest, context.upstreamRange.files);
+    const results = runPostRebaseAudits(context.manifest, context.upstreamRange.files, repoRoot());
     for (const result of results) {
       console.log(`${result.ok ? 'OK' : 'ISSUE'}: ${result.title}`);
       for (const detail of result.details) console.log(`- ${detail}`);
@@ -814,7 +868,7 @@ program
 
 Remove `postrebase-audit` from the scaffold-command loop.
 
-- [ ] **Step 4: Verify and commit post-rebase audit**
+- [x] **Step 4: Verify and commit post-rebase audit**
 
 Run:
 
@@ -822,11 +876,15 @@ Run:
 pnpm --filter @gallery/upstream-preflight run test -- post-rebase.spec.ts
 pnpm --filter @gallery/upstream-preflight run check
 make upstream-postrebase-audit
-git add tools/upstream-preflight/src/audits/post-rebase.ts tools/upstream-preflight/src/audits/post-rebase.spec.ts tools/upstream-preflight/src/index.ts
+git add tools/upstream-preflight/src/audits/post-rebase.ts tools/upstream-preflight/src/audits/post-rebase.spec.ts tools/upstream-preflight/src/index.ts docs/superpowers/plans/2026-05-04-upstream-rebase-process-03-audits.md
 git commit -m "feat: audit fork survival after upstream rebase"
 ```
 
-Expected: tests and type check pass. The real audit prints fork-owned file survival and Gallery migration count.
+Expected: tests and type check pass. The real audit prints fork-owned file
+survival and Gallery migration count/filename checks. On the current upstream
+backlog, `make upstream-postrebase-audit` exits non-zero only because upstream
+touches generated OpenAPI/mobile client/SQL artifacts that require explicit
+review after the affected batch.
 
 ### Task 4: Include Audits In Preflight
 

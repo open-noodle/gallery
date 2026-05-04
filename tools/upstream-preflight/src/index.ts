@@ -6,6 +6,7 @@ import { Command } from 'commander';
 import { runCiInvariantAudits } from './audits/ci-invariants';
 import { runMobileDriftAudit } from './audits/mobile-drift';
 import { runPatchAudits } from './audits/patches';
+import { runPostRebaseAudits } from './audits/post-rebase';
 import { planBatches, renderBatchMarkdown } from './batch';
 import { collectGitRange, getGitPath, getMergeBase } from './git';
 import { defaultManifestPath, loadManifest } from './manifest';
@@ -248,10 +249,21 @@ program
     process.exitCode = results.every((result) => result.ok) ? 0 : 1;
   });
 
-for (const command of ['postrebase-audit']) {
-  program.command(command).action(() => {
-    console.log(`${command} scaffold`);
+program
+  .command('postrebase-audit')
+  .option('--manifest <path>', 'ownership manifest path', defaultManifestPath)
+  .action((options: { manifest: string }) => {
+    const context = buildPreflightContext(options.manifest);
+    const results = runPostRebaseAudits(
+      context.manifest,
+      context.upstreamRange.files,
+      repoRoot(),
+    );
+    for (const result of results) {
+      console.log(`${result.ok ? 'OK' : 'ISSUE'}: ${result.title}`);
+      for (const detail of result.details) console.log(`- ${detail}`);
+    }
+    process.exitCode = results.every((result) => result.ok) ? 0 : 1;
   });
-}
 
 program.parse(process.argv);
