@@ -74,6 +74,11 @@ ci-invariants-check:
 fork-patches-check:
 	$(UPSTREAM_PREFLIGHT) run fork-patches-check
 
+.PHONY: fork-ownership-coverage-check
+fork-ownership-coverage-check:
+	git diff --name-only upstream/main...origin/main | sort > /tmp/gallery-fork-files.txt
+	$(UPSTREAM_PREFLIGHT) run coverage -- /tmp/gallery-fork-files.txt docs/fork/ownership.yml
+
 prod:
 	@trap 'make prod-down' EXIT; COMPOSE_BAKE=true docker compose -f ./docker/docker-compose.prod.yml up --build -V --remove-orphans
 
