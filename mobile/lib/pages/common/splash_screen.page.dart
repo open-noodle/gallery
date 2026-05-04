@@ -323,30 +323,35 @@ class SplashScreenPageState extends ConsumerState<SplashScreenPage> {
                   wsProvider.connect();
                   unawaited(infoProvider.getServerInfo());
 
-                  bool syncSuccess = false;
-                  await Future.wait([
-                    backgroundManager.syncLocal(full: true),
-                    backgroundManager.syncRemote().then((success) => syncSuccess = success),
-                  ]);
+                  final sync = backgroundManager.syncRemoteThenLocal(fullLocalSync: true);
+                  final syncSuccess = await sync.remoteSync;
 
                   await viewIntentHandler.flushDeferredViewIntent();
 
-                  if (syncSuccess) {
-                    await Future.wait([
-                      backgroundManager.hashAssets().then((_) {
-                        unawaited(_resumeBackup(backupNotifier));
-                      }),
-                      _resumeBackup(backupNotifier),
-                      // TODO: Bring back when the soft freeze issue is addressed
-                      // backgroundManager.syncCloudIds(),
-                    ]);
-                  } else {
-                    await backgroundManager.hashAssets();
-                  }
+                  unawaited(
+                    sync.deferredLocalSync
+                        .then((_) async {
+                          if (syncSuccess) {
+                            await Future.wait([
+                              backgroundManager.hashAssets().then((_) {
+                                unawaited(_resumeBackup(backupNotifier));
+                              }),
+                              _resumeBackup(backupNotifier),
+                              // TODO: Bring back when the soft freeze issue is addressed
+                              // backgroundManager.syncCloudIds(),
+                            ]);
+                          } else {
+                            await backgroundManager.hashAssets();
+                          }
 
-                  if (SettingsRepository.instance.appConfig.backup.syncAlbums) {
-                    await backgroundManager.syncLinkedAlbum();
-                  }
+                          if (SettingsRepository.instance.appConfig.backup.syncAlbums) {
+                            await backgroundManager.syncLinkedAlbum();
+                          }
+                        })
+                        .catchError((error, stackTrace) {
+                          log.warning('Deferred local sync failed after session resume', error, stackTrace);
+                        }),
+                  );
                 } catch (e) {
                   log.severe('Failed establishing connection to the server: $e');
                 }
