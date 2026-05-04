@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import micromatch from 'micromatch';
 import { Command } from 'commander';
+import { runMobileDriftAudit } from './audits/mobile-drift';
 import { planBatches, renderBatchMarkdown } from './batch';
 import { collectGitRange, getGitPath, getMergeBase } from './git';
 import { defaultManifestPath, loadManifest } from './manifest';
@@ -17,6 +18,10 @@ const program = new Command()
 
 function resolveCliPath(inputPath: string) {
   return path.resolve(process.env.INIT_CWD ?? process.cwd(), inputPath);
+}
+
+function repoRoot() {
+  return process.env.INIT_CWD ?? process.cwd();
 }
 
 function buildPreflightContext(manifestPath: string) {
@@ -196,9 +201,23 @@ program
     console.log(buildPreflightContext(options.manifest).batchMarkdown);
   });
 
+program
+  .command('mobile-drift-check')
+  .option('--manifest <path>', 'ownership manifest path', defaultManifestPath)
+  .action((options: { manifest: string }) => {
+    const context = buildPreflightContext(options.manifest);
+    const result = runMobileDriftAudit(
+      context.manifest,
+      context.upstreamRange.files,
+      repoRoot(),
+    );
+    console.log(`${result.ok ? 'OK' : 'ISSUE'}: ${result.title}`);
+    for (const detail of result.details) console.log(`- ${detail}`);
+    process.exitCode = result.ok ? 0 : 1;
+  });
+
 for (const command of [
   'postrebase-audit',
-  'mobile-drift-check',
   'ci-invariants-check',
   'fork-patches-check',
 ]) {

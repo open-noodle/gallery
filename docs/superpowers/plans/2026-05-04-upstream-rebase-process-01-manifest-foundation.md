@@ -1034,8 +1034,8 @@ features:
         shipped: true
         owner: gallery
         expected_callbacks:
-          23: [shared_space_entity, shared_space_asset_entity]
-          24: [library_entity, shared_space_library_entity]
+          23: [sharedSpaceEntity, sharedSpaceAssetEntity]
+          24: [libraryEntity, sharedSpaceLibraryEntity]
       paths:
         - mobile/lib/infrastructure/repositories/db.repository.dart
         - mobile/drift_schemas/main/drift_schema_v23.json
