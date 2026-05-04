@@ -27,7 +27,7 @@
 
 - Modify: `/home/pierre/.codex/skills/rebase-upstream-report/SKILL.md`
 
-- [ ] **Step 1: Back up the current skill file**
+- [x] **Step 1: Back up the current skill file**
 
 Run:
 
@@ -38,7 +38,7 @@ test -f /home/pierre/.codex/skills/rebase-upstream-report/SKILL.md.bak-2026-05-0
 
 Expected: backup file exists.
 
-- [ ] **Step 2: Replace the source-of-truth section**
+- [x] **Step 2: Replace the source-of-truth section**
 
 Edit `/home/pierre/.codex/skills/rebase-upstream-report/SKILL.md` so the first major section after the intro is:
 
@@ -58,7 +58,7 @@ Do not manually reconstruct the fork feature inventory from this skill. If the
 manifest is missing a fork feature, update the manifest first.
 ````
 
-- [ ] **Step 3: Replace one-shot rebase flow with batched flow**
+- [x] **Step 3: Replace one-shot rebase flow with batched flow**
 
 Replace the old process section with:
 
@@ -82,7 +82,7 @@ Replace the old process section with:
 15. Force-push `main` only after the final result is green and approved.
 ```
 
-- [ ] **Step 4: Fix the mobile Drift contradiction**
+- [x] **Step 4: Fix the mobile Drift contradiction**
 
 Run:
 
@@ -98,7 +98,7 @@ versions, keep Gallery's shipped versions unchanged and renumber incoming
 upstream migrations above Gallery's current highest version.
 ```
 
-- [ ] **Step 5: Remove stale inventory facts**
+- [x] **Step 5: Remove stale inventory facts**
 
 Run:
 
@@ -128,7 +128,7 @@ make fork-patches-check
 These checks read `docs/fork/ownership.yml` and `pnpm-workspace.yaml`.
 ````
 
-- [ ] **Step 6: Verify the skill has no stale known-bad strings**
+- [x] **Step 6: Verify the skill has no stale known-bad strings**
 
 Run:
 
@@ -138,6 +138,9 @@ rg -n "0\\.69\\.0|fork v23/v24 must be renumbered|27 migrations" /home/pierre/.c
 
 Expected: no matches.
 
+Implementation note: the previous local skill was backed up to
+`/home/pierre/.codex/skills/rebase-upstream-report/SKILL.md.bak-2026-05-04`.
+
 ### Task 2: Full Tool Verification
 
 **Files:**
@@ -146,7 +149,7 @@ Expected: no matches.
 - Read: `tools/upstream-preflight/**`
 - Read: `Makefile`
 
-- [ ] **Step 1: Run package verification**
+- [x] **Step 1: Run package verification**
 
 Run:
 
@@ -158,7 +161,7 @@ pnpm --filter @gallery/upstream-preflight run format
 
 Expected: all commands pass.
 
-- [ ] **Step 2: Run normal Makefile entry points**
+- [x] **Step 2: Run normal Makefile entry points**
 
 Run:
 
@@ -170,9 +173,14 @@ make ci-invariants-check
 make fork-patches-check
 ```
 
-Expected: commands pass unless a manifest-forbidden workflow string is present. If `make ci-invariants-check` fails, the output identifies the exact workflow and forbidden pattern.
+Expected: `make upstream-preflight`, `make upstream-batch-plan`,
+`make ci-invariants-check`, and `make fork-patches-check` pass. On the current
+upstream backlog, `make upstream-postrebase-audit` exits non-zero only for the
+generated OpenAPI/mobile client/SQL artifact review signal. If
+`make ci-invariants-check` fails, the output identifies the exact workflow and
+forbidden pattern.
 
-- [ ] **Step 3: Verify intended mobile Drift failure on the current backlog**
+- [x] **Step 3: Verify intended mobile Drift failure on the current backlog**
 
 Run:
 
@@ -188,7 +196,7 @@ Upstream touches shipped Gallery Drift version v24
 renumber incoming upstream migrations to v25/v26
 ```
 
-- [ ] **Step 4: Verify generated artifacts stay out of source**
+- [x] **Step 4: Verify generated artifacts stay out of source**
 
 Run:
 
@@ -213,7 +221,7 @@ Expected:
 - Modify: `Makefile`
 - Read: `/home/pierre/.codex/skills/rebase-upstream-report/SKILL.md`
 
-- [ ] **Step 1: Commit remaining repo files**
+- [x] **Step 1: Commit remaining repo files**
 
 Run:
 
@@ -223,8 +231,11 @@ git commit -m "feat: add upstream rebase process tooling"
 ```
 
 Expected: commit succeeds if previous phase commits did not already include all files.
+Implementation note: previous phase commits already captured the tooling; this
+phase only commits the plan execution status because the skill update is outside
+the repository.
 
-- [ ] **Step 2: Record local skill update separately**
+- [x] **Step 2: Record local skill update separately**
 
 Run:
 
@@ -234,7 +245,7 @@ git status --short
 
 Expected: repo status is clean or contains only intentionally uncommitted generated files. The skill update is outside the repo and does not appear in `git status`.
 
-- [ ] **Step 3: Prepare final implementation summary**
+- [x] **Step 3: Prepare final implementation summary**
 
 Use this summary shape:
 
