@@ -33,6 +33,8 @@ export type SearchablePageFilterState = Partial<
   >
 >;
 
+export type SearchablePageTransientTemporalState = Partial<Pick<FilterState, 'selectedYear' | 'selectedMonth'>>;
+
 type SearchablePageState = {
   basePath: string | null;
   isSearchable: boolean;
@@ -185,6 +187,21 @@ export function getSearchablePageFilterState(url: URL): SearchablePageFilterStat
   }
 
   return result;
+}
+
+export function preserveTransientTemporalFilters<T extends SearchablePageFilterState>(
+  filters: T,
+  transient?: SearchablePageTransientTemporalState,
+): T & SearchablePageTransientTemporalState {
+  if (transient?.selectedYear === undefined || filters.dateAfter || filters.dateBefore) {
+    return filters;
+  }
+
+  return {
+    ...filters,
+    selectedYear: transient.selectedYear,
+    selectedMonth: transient.selectedMonth,
+  };
 }
 
 function appendSearchablePageFilterParams(params: URLSearchParams, filters: FilterState) {

@@ -48,6 +48,8 @@
     buildSearchablePageUrl,
     getSearchablePageFilterState,
     getSearchablePageState,
+    preserveTransientTemporalFilters,
+    type SearchablePageTransientTemporalState,
   } from '$lib/utils/searchable-page-search';
   import { consumeTypedSearchNamesInto } from '$lib/utils/typed-search/typed-search-name-cache';
   import {
@@ -95,6 +97,9 @@
   });
   let committedQuery = $state(initialSearchState.query);
   let lastHandledSearchState = $state(`${initialSearchState.query}:${initialSearchState.sortOrder}:${page.url.search}`);
+  let pendingFilterUrlSync = $state<
+    { url: string; transientTemporal?: SearchablePageTransientTemporalState } | undefined
+  >();
   let isLoading = $state(false);
   const showSearchResults = $derived(committedQuery.trim().length > 0);
   const options = $derived(buildPhotosTimelineOptions(filters));
@@ -383,12 +388,20 @@
     if (!nextUrl || nextUrl === page.url.pathname + page.url.search) {
       return;
     }
+    pendingFilterUrlSync = {
+      url: nextUrl,
+      transientTemporal: {
+        selectedYear: nextFilters.selectedYear,
+        selectedMonth: nextFilters.selectedMonth,
+      },
+    };
     void goto(nextUrl, { replaceState: true, keepFocus: true, noScroll: true });
   }
 
   $effect(() => {
     const nextSearchState = getSearchablePageState(page.url);
     const nextToken = `${nextSearchState.query}:${nextSearchState.sortOrder}:${page.url.search}`;
+    const currentUrl = page.url.pathname + page.url.search;
 
     if (nextToken === lastHandledSearchState) {
       return;
@@ -396,13 +409,19 @@
 
     const queryChanged = nextSearchState.query !== committedQuery;
     untrack(() => {
+      const filterState = getSearchablePageFilterState(page.url);
+      const transientTemporal =
+        pendingFilterUrlSync?.url === currentUrl ? pendingFilterUrlSync.transientTemporal : undefined;
       committedQuery = nextSearchState.query;
       isLoading = false;
       filters = {
         ...createFilterState(),
-        ...getSearchablePageFilterState(page.url),
+        ...preserveTransientTemporalFilters(filterState, transientTemporal),
         sortOrder: nextSearchState.sortOrder,
       };
+      if (pendingFilterUrlSync?.url === currentUrl) {
+        pendingFilterUrlSync = undefined;
+      }
       consumeTypedSearchNamesInto(page.url.pathname + page.url.search, personNames, tagNames);
       if (queryChanged) {
         smartFacetInFlight?.controller.abort();

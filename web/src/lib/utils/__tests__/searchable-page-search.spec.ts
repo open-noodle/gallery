@@ -4,6 +4,7 @@ import {
   clearSearchablePageFilterParams,
   getSearchablePageFilterState,
   getSearchablePageState,
+  preserveTransientTemporalFilters,
 } from '$lib/utils/searchable-page-search';
 import { describe, expect, it } from 'vitest';
 
@@ -101,6 +102,24 @@ describe('typed filter URL state', () => {
     const url = new URL('https://gallery.test/photos?type=gif&favorite=maybe&rating=9&from=soon&to=2026-99-01');
 
     expect(getSearchablePageFilterState(url)).toEqual({});
+  });
+
+  it('preserves transient selected year and month while hydrating URL-backed filters', () => {
+    const urlFilters = getSearchablePageFilterState(new URL('https://gallery.test/photos?city=Berlin'));
+
+    expect(preserveTransientTemporalFilters(urlFilters, { selectedYear: 2023, selectedMonth: 6 })).toEqual({
+      city: 'Berlin',
+      selectedYear: 2023,
+      selectedMonth: 6,
+    });
+  });
+
+  it('does not preserve transient year selection over an explicit custom date range', () => {
+    const urlFilters = getSearchablePageFilterState(new URL('https://gallery.test/photos?from=2024-01-01'));
+
+    expect(preserveTransientTemporalFilters(urlFilters, { selectedYear: 2023, selectedMonth: 6 })).toEqual({
+      dateAfter: '2024-01-01',
+    });
   });
 
   it('clears only typed filter params', () => {
