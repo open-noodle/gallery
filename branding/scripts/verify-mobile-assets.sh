@@ -37,7 +37,7 @@ check_android12_splash_bounds() {
   box_height="${BASH_REMATCH[2]}"
   offset_x="${BASH_REMATCH[3]}"
   offset_y="${BASH_REMATCH[4]}"
-  max_box=$((width * 5 / 9))
+  max_box=$((width * 4 / 9))
   max_box_slack=2
   max_offset_diff=2
   right_pad=$((width - offset_x - box_width))
