@@ -127,34 +127,46 @@ class AppLifeCycleNotifier extends StateNotifier<AppLifeCycleEnum> {
     final isAlbumLinkedSyncEnable = _ref.read(appConfigProvider).backup.syncAlbums;
 
     try {
-      bool syncSuccess = false;
-      await Future.wait([
-        _safeRun(() {
-          final full = CurrentPlatform.isAndroid || _fullSyncPending;
-          _fullSyncPending = false;
-          return backgroundManager.syncLocal(full: full);
-        }, "syncLocal"),
-        _safeRun(() async {
-          syncSuccess = await backgroundManager.syncRemote();
-        }, "syncRemote"),
-      ]);
+      // immich-31557: a delta sync can miss photos taken after a background launch, so force a
+      // full local sync once. The flag is consumed when the sync is scheduled.
+      final fullLocalSync = CurrentPlatform.isAndroid || _fullSyncPending;
+      _fullSyncPending = false;
+      final sync = backgroundManager.syncRemoteThenLocal(
+        fullLocalSync: fullLocalSync,
+        shouldRunLocal: _shouldContinueOperation,
+      );
+      final syncSuccess = await sync.remoteSync;
+      // #28983: refresh memories on resume (grafted onto fork's #513 deferred-sync restructure)
       _ref.invalidate(memoryLaneProvider);
       _ref.invalidate(allMemoriesProvider);
-      if (syncSuccess) {
-        await Future.wait([
-          _safeRun(backgroundManager.hashAssets, "hashAssets").then((_) {
-            unawaited(_resumeBackup());
-          }),
-          _resumeBackup(),
-          _safeRun(backgroundManager.syncCloudIds, "syncCloudIds"),
-        ]);
-      } else {
-        await _safeRun(backgroundManager.hashAssets, "hashAssets");
-      }
 
-      if (isAlbumLinkedSyncEnable) {
-        await _safeRun(backgroundManager.syncLinkedAlbum, "syncLinkedAlbum");
-      }
+      unawaited(
+        sync.deferredLocalSync
+            .then((_) async {
+              if (!_shouldContinueOperation()) {
+                return;
+              }
+
+              if (syncSuccess) {
+                await Future.wait([
+                  _safeRun(backgroundManager.hashAssets, "hashAssets").then((_) {
+                    _resumeBackup();
+                  }),
+                  _resumeBackup(),
+                  _safeRun(backgroundManager.syncCloudIds, "syncCloudIds"),
+                ]);
+              } else {
+                await _safeRun(backgroundManager.hashAssets, "hashAssets");
+              }
+
+              if (isAlbumLinkedSyncEnable) {
+                await _safeRun(backgroundManager.syncLinkedAlbum, "syncLinkedAlbum");
+              }
+            })
+            .catchError((error, stackTrace) {
+              _log.warning("Error during deferred local sync operation", error, stackTrace);
+            }),
+      );
     } catch (e, stackTrace) {
       _log.severe("Error during background sync", e, stackTrace);
     }
