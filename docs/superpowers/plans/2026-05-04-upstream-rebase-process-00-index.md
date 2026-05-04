@@ -47,7 +47,7 @@ normal development branches.
 - Read: `docs/superpowers/specs/2026-05-04-upstream-rebase-process-design.md`
 - Read: `docs/superpowers/plans/2026-05-04-upstream-rebase-process-01-manifest-foundation.md`
 
-- [ ] **Step 1: Confirm the worktree**
+- [x] **Step 1: Confirm the worktree**
 
 Run:
 
@@ -60,7 +60,7 @@ Expected: `git status` reports branch `plan/upstream-rebase-process`, a clean
 worktree, and no `behind` marker after rebasing onto `origin/main`. The top log
 entry is the latest committed plan change.
 
-- [ ] **Step 2: Confirm dependency baseline**
+- [x] **Step 2: Confirm dependency baseline**
 
 Run:
 
@@ -71,7 +71,7 @@ pnpm --dir docs exec prettier --check superpowers/specs/2026-05-04-upstream-reba
 
 Expected: both commands exit 0.
 
-- [ ] **Step 3: Start Phase 1**
+- [x] **Step 3: Start Phase 1**
 
 Open:
 

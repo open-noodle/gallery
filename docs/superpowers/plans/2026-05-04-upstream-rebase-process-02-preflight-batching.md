@@ -41,7 +41,7 @@
 - Create: `tools/upstream-preflight/src/git.ts`
 - Create: `tools/upstream-preflight/src/git.spec.ts`
 
-- [ ] **Step 1: Add git fixture helper**
+- [x] **Step 1: Add git fixture helper**
 
 Create `tools/upstream-preflight/test/fixtures.ts`:
 
@@ -83,7 +83,7 @@ export function createTempRepo(): TempRepo {
 }
 ```
 
-- [ ] **Step 2: Add git adapter test**
+- [x] **Step 2: Add git adapter test**
 
 Create `tools/upstream-preflight/src/git.spec.ts`:
 
@@ -123,7 +123,7 @@ describe('git range collection', () => {
 });
 ```
 
-- [ ] **Step 3: Implement git adapter**
+- [x] **Step 3: Implement git adapter**
 
 Create `tools/upstream-preflight/src/git.ts`:
 
@@ -180,7 +180,7 @@ export function collectGitRange(cwd: string, range: string): GitRange {
 }
 ```
 
-- [ ] **Step 4: Verify and commit git adapter**
+- [x] **Step 4: Verify and commit git adapter**
 
 Run:
 
@@ -200,7 +200,7 @@ Expected: tests pass, type check passes, and commit succeeds.
 - Create: `tools/upstream-preflight/src/risk.ts`
 - Create: `tools/upstream-preflight/src/risk.spec.ts`
 
-- [ ] **Step 1: Add classifier tests**
+- [x] **Step 1: Add classifier tests**
 
 Create `tools/upstream-preflight/src/risk.spec.ts`:
 
@@ -282,7 +282,7 @@ describe('classifyCommit', () => {
 });
 ```
 
-- [ ] **Step 2: Implement classifier**
+- [x] **Step 2: Implement classifier**
 
 Create `tools/upstream-preflight/src/risk.ts`:
 
@@ -364,7 +364,7 @@ export function classifyCommit(commit: GitCommit, manifest: Manifest, forkFiles:
 }
 ```
 
-- [ ] **Step 3: Verify and commit classifier**
+- [x] **Step 3: Verify and commit classifier**
 
 Run:
 
@@ -384,7 +384,7 @@ Expected: tests pass, type check passes, and commit succeeds.
 - Create: `tools/upstream-preflight/src/batch.ts`
 - Create: `tools/upstream-preflight/src/batch.spec.ts`
 
-- [ ] **Step 1: Add batch tests**
+- [x] **Step 1: Add batch tests**
 
 Create `tools/upstream-preflight/src/batch.spec.ts`:
 
@@ -440,7 +440,7 @@ describe('planBatches', () => {
 });
 ```
 
-- [ ] **Step 2: Implement batch planner**
+- [x] **Step 2: Implement batch planner**
 
 Create `tools/upstream-preflight/src/batch.ts`:
 
@@ -540,7 +540,7 @@ ${commands || 'No upstream batches are required.'}
 }
 ```
 
-- [ ] **Step 3: Verify and commit planner**
+- [x] **Step 3: Verify and commit planner**
 
 Run:
 
@@ -561,7 +561,7 @@ Expected: tests pass, type check passes, and commit succeeds.
 - Create: `tools/upstream-preflight/src/report.spec.ts`
 - Modify: `tools/upstream-preflight/src/index.ts`
 
-- [ ] **Step 1: Add report test**
+- [x] **Step 1: Add report test**
 
 Create `tools/upstream-preflight/src/report.spec.ts`:
 
@@ -626,7 +626,7 @@ describe('renderPreflightMarkdown', () => {
 });
 ```
 
-- [ ] **Step 2: Implement report renderer**
+- [x] **Step 2: Implement report renderer**
 
 Create `tools/upstream-preflight/src/report.ts`:
 
@@ -791,7 +791,7 @@ ${hotspotRows || '| - | 0 | - |'}
 }
 ```
 
-- [ ] **Step 3: Wire CLI commands**
+- [x] **Step 3: Wire CLI commands**
 
 Replace `tools/upstream-preflight/src/index.ts` with:
 
@@ -966,7 +966,7 @@ for (const command of ['postrebase-audit', 'mobile-drift-check', 'ci-invariants-
 program.parse(process.argv);
 ```
 
-- [ ] **Step 4: Verify real reports and commit**
+- [x] **Step 4: Verify real reports and commit**
 
 Run:
 

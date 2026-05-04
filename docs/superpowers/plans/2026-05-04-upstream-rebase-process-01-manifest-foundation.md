@@ -43,7 +43,7 @@
 
 - Read: git remotes and fork diff
 
-- [ ] **Step 1: Refresh the local view of the fork**
+- [x] **Step 1: Refresh the local view of the fork**
 
 Run:
 
@@ -83,7 +83,7 @@ If `origin/main` has moved, use the new `git rev-parse origin/main` value for
 - Create: `tools/upstream-preflight/vitest.config.ts`
 - Create: `tools/upstream-preflight/src/index.ts`
 
-- [ ] **Step 1: Add workspace package**
+- [x] **Step 1: Add workspace package**
 
 Add this entry to `pnpm-workspace.yaml` under `packages`:
 
@@ -91,7 +91,7 @@ Add this entry to `pnpm-workspace.yaml` under `packages`:
 - tools/upstream-preflight
 ```
 
-- [ ] **Step 2: Create package metadata**
+- [x] **Step 2: Create package metadata**
 
 Create `tools/upstream-preflight/package.json`:
 
@@ -130,7 +130,7 @@ Create `tools/upstream-preflight/package.json`:
 }
 ```
 
-- [ ] **Step 3: Create TypeScript config**
+- [x] **Step 3: Create TypeScript config**
 
 Create `tools/upstream-preflight/tsconfig.json`:
 
@@ -155,7 +155,7 @@ Create `tools/upstream-preflight/tsconfig.json`:
 }
 ```
 
-- [ ] **Step 4: Create Vitest config**
+- [x] **Step 4: Create Vitest config**
 
 Create `tools/upstream-preflight/vitest.config.ts`:
 
@@ -170,7 +170,7 @@ export default defineConfig({
 });
 ```
 
-- [ ] **Step 5: Create scaffold CLI**
+- [x] **Step 5: Create scaffold CLI**
 
 Create `tools/upstream-preflight/src/index.ts`:
 
@@ -198,7 +198,7 @@ for (const command of [
 program.parse(process.argv);
 ```
 
-- [ ] **Step 6: Add Makefile targets**
+- [x] **Step 6: Add Makefile targets**
 
 Append this block near the existing rebase and e2e targets in `Makefile`:
 
@@ -230,7 +230,7 @@ fork-patches-check:
 	$(UPSTREAM_PREFLIGHT) run fork-patches-check
 ```
 
-- [ ] **Step 7: Install and verify scaffold**
+- [x] **Step 7: Install and verify scaffold**
 
 Run:
 
@@ -244,7 +244,7 @@ pnpm --filter @gallery/upstream-preflight run test
 
 Expected: Make targets print scaffold output, TypeScript check passes, and Vitest exits 0 with no tests.
 
-- [ ] **Step 8: Commit scaffold**
+- [x] **Step 8: Commit scaffold**
 
 Run:
 
@@ -265,7 +265,7 @@ git commit -m "chore: scaffold upstream preflight tooling"
 - Create: `tools/upstream-preflight/src/coverage.ts`
 - Create: `tools/upstream-preflight/src/coverage.spec.ts`
 
-- [ ] **Step 1: Add shared types**
+- [x] **Step 1: Add shared types**
 
 Create `tools/upstream-preflight/src/types.ts`:
 
@@ -382,7 +382,7 @@ export type AuditResult = {
 };
 ```
 
-- [ ] **Step 2: Write parser test**
+- [x] **Step 2: Write parser test**
 
 Create `tools/upstream-preflight/src/manifest.spec.ts`:
 
@@ -496,7 +496,7 @@ describe('parseManifest', () => {
 });
 ```
 
-- [ ] **Step 3: Implement parser**
+- [x] **Step 3: Implement parser**
 
 Create `tools/upstream-preflight/src/manifest.ts`:
 
@@ -781,7 +781,7 @@ export function loadManifest(path = defaultManifestPath): Manifest {
 }
 ```
 
-- [ ] **Step 4: Add fork diff coverage helper**
+- [x] **Step 4: Add fork diff coverage helper**
 
 Create `tools/upstream-preflight/src/coverage.ts`:
 
@@ -868,7 +868,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
 }
 ```
 
-- [ ] **Step 5: Write coverage tests**
+- [x] **Step 5: Write coverage tests**
 
 Create `tools/upstream-preflight/src/coverage.spec.ts`:
 
@@ -924,7 +924,7 @@ describe('fork ownership coverage', () => {
 });
 ```
 
-- [ ] **Step 6: Wire coverage script and Make target**
+- [x] **Step 6: Wire coverage script and Make target**
 
 Add this script to `tools/upstream-preflight/package.json`:
 
@@ -941,7 +941,7 @@ fork-ownership-coverage-check:
 	$(UPSTREAM_PREFLIGHT) run coverage -- /tmp/gallery-fork-files.txt docs/fork/ownership.yml
 ```
 
-- [ ] **Step 7: Verify parser and coverage helper**
+- [x] **Step 7: Verify parser and coverage helper**
 
 Run:
 
@@ -958,7 +958,7 @@ Expected: both commands pass.
 
 - Create: `docs/fork/ownership.yml`
 
-- [ ] **Step 1: Create manifest seed**
+- [x] **Step 1: Create manifest seed**
 
 Create `docs/fork/ownership.yml`:
 
@@ -1334,7 +1334,7 @@ risk_patterns:
     notes: OpenAPI shape or generated client change
 ```
 
-- [ ] **Step 2: Verify required fork inventory strings are covered**
+- [x] **Step 2: Verify required fork inventory strings are covered**
 
 Run:
 
@@ -1346,7 +1346,7 @@ done
 
 Expected: no output and exit 0.
 
-- [ ] **Step 3: Verify explicit migration inventory and fork file coverage**
+- [x] **Step 3: Verify explicit migration inventory and fork file coverage**
 
 Run:
 
@@ -1369,7 +1369,7 @@ If `origin/main` moved in Task 0, the fork file count can differ. The required
 outcome is still zero uncovered fork files; add missing ownership globs or
 intentional `coverage_ignore` entries before committing.
 
-- [ ] **Step 4: Compare against local skill inventory**
+- [x] **Step 4: Compare against local skill inventory**
 
 Run:
 
@@ -1380,7 +1380,7 @@ git log --oneline --no-merges ddc8c44cd..HEAD
 
 Expected: all feature families in the old skill inventory are represented as feature IDs or aliases in `docs/fork/ownership.yml`.
 
-- [ ] **Step 5: Verify manifest and commit**
+- [x] **Step 5: Verify manifest and commit**
 
 Run:
 
