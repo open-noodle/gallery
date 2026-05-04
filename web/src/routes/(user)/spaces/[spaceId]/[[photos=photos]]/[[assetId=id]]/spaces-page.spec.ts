@@ -314,6 +314,19 @@ describe('Spaces page search URL state', () => {
     });
   });
 
+  it('syncs the URL when a location typed filter is cleared from the space filter panel', async () => {
+    mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?city=New+York+City');
+
+    renderPage({ space: makeSpace(), members: [makeMember()] });
+    await fireEvent.click(screen.getByTestId('filter-panel-clear-location'));
+
+    expect(gotoMock).toHaveBeenCalledWith('/spaces/space-1/photos', {
+      replaceState: true,
+      keepFocus: true,
+      noScroll: true,
+    });
+  });
+
   it('exposes favorites in the spaces filter panel', () => {
     renderPage();
 

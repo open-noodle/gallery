@@ -303,6 +303,19 @@ describe('Photos page search URL state', () => {
     });
   });
 
+  it('syncs the URL when a location typed filter is cleared from the filter panel', async () => {
+    mockPage.url = new URL('https://gallery.test/photos?city=New+York+City');
+
+    renderPage();
+    await fireEvent.click(screen.getByTestId('filter-panel-clear-location'));
+
+    expect(goto).toHaveBeenCalledWith('/photos', {
+      replaceState: true,
+      keepFocus: true,
+      noScroll: true,
+    });
+  });
+
   it('clears typed filter URL params and q when clearing all active filters', async () => {
     mockPage.url = new URL('https://gallery.test/photos?view=timeline&q=beach&people=person-1&city=Berlin');
 

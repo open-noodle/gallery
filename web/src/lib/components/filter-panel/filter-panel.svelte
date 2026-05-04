@@ -39,6 +39,7 @@
     filters?: FilterState;
     personNames?: Map<string, string>;
     tagNames?: Map<string, string>;
+    onFiltersChange?: (filters: FilterState) => void;
     persistCollapsed?: boolean;
     storageKey?: string;
     hidden?: boolean;
@@ -52,6 +53,7 @@
     filters = $bindable(createFilterState()),
     personNames,
     tagNames,
+    onFiltersChange,
     storageKey = 'gallery-filter-visible-sections',
     hidden = false,
     persistCollapsed = true,
@@ -556,40 +558,57 @@
     }
   });
 
+  function updateFilters(nextFilters: FilterState) {
+    filters = nextFilters;
+    onFiltersChange?.(nextFilters);
+  }
+
   function handlePeopleChange(ids: string[]) {
-    filters = { ...filters, personIds: ids };
+    updateFilters({ ...filters, personIds: ids });
   }
 
   function handleLocationChange(country?: string, city?: string) {
-    filters = { ...filters, country, city };
+    updateFilters({ ...filters, country, city });
   }
 
   function handleCameraChange(make?: string, model?: string) {
-    filters = { ...filters, make, model };
+    updateFilters({ ...filters, make, model });
   }
 
   function handleTagsChange(ids: string[]) {
-    filters = { ...filters, tagIds: ids };
+    updateFilters({ ...filters, tagIds: ids });
   }
 
   function handleRatingChange(rating?: number) {
-    filters = { ...filters, rating };
+    updateFilters({ ...filters, rating });
   }
 
   function handleMediaTypeChange(type: 'all' | 'image' | 'video') {
-    filters = { ...filters, mediaType: type };
+    updateFilters({ ...filters, mediaType: type });
   }
 
   function handleCustomDateRangeChange(dateAfter: string | undefined, dateBefore: string | undefined) {
-    filters = { ...filters, dateAfter, dateBefore, selectedYear: undefined, selectedMonth: undefined };
+    updateFilters({ ...filters, dateAfter, dateBefore, selectedYear: undefined, selectedMonth: undefined });
   }
 
   function handleYearSelect(year: number | undefined) {
-    filters = { ...filters, dateAfter: undefined, dateBefore: undefined, selectedYear: year, selectedMonth: undefined };
+    updateFilters({
+      ...filters,
+      dateAfter: undefined,
+      dateBefore: undefined,
+      selectedYear: year,
+      selectedMonth: undefined,
+    });
   }
 
   function handleMonthSelect(year: number, month: number | undefined) {
-    filters = { ...filters, dateAfter: undefined, dateBefore: undefined, selectedYear: year, selectedMonth: month };
+    updateFilters({
+      ...filters,
+      dateAfter: undefined,
+      dateBefore: undefined,
+      selectedYear: year,
+      selectedMonth: month,
+    });
   }
 
   function hasActiveFilter(section: string): boolean {
@@ -793,7 +812,7 @@
               <FavoritesFilter
                 selected={filters.isFavorite}
                 onToggle={(value) => {
-                  filters = { ...filters, isFavorite: value };
+                  updateFilters({ ...filters, isFavorite: value });
                 }}
               />
             {/if}

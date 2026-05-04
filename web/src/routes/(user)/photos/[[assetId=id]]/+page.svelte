@@ -374,8 +374,13 @@
   }
 
   function syncFilterUrl(nextFilters: FilterState) {
-    const nextUrl = buildSearchablePageUrl(page.url, committedQuery, nextFilters.sortOrder, nextFilters);
-    if (!nextUrl) {
+    const currentSearchState = getSearchablePageState(page.url);
+    const sortOrder =
+      !committedQuery.trim() && nextFilters.sortOrder === 'desc' && !currentSearchState.hasExplicitSort
+        ? 'relevance'
+        : nextFilters.sortOrder;
+    const nextUrl = buildSearchablePageUrl(page.url, committedQuery, sortOrder, nextFilters);
+    if (!nextUrl || nextUrl === page.url.pathname + page.url.search) {
       return;
     }
     void goto(nextUrl, { replaceState: true, keepFocus: true, noScroll: true });
@@ -431,6 +436,7 @@
         hidden={isTimelineEmpty}
         {personNames}
         {tagNames}
+        onFiltersChange={syncFilterUrl}
       />
     {/key}
     <div class="flex flex-1 flex-col overflow-hidden pl-4">

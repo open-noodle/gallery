@@ -763,8 +763,13 @@
   };
 
   function syncFilterUrl(nextFilters: FilterState) {
-    const nextUrl = buildSearchablePageUrl(page.url, committedSearchQuery, nextFilters.sortOrder, nextFilters);
-    if (!nextUrl) {
+    const currentSearchState = getSearchablePageState(page.url);
+    const sortOrder =
+      !committedSearchQuery.trim() && nextFilters.sortOrder === 'desc' && !currentSearchState.hasExplicitSort
+        ? 'relevance'
+        : nextFilters.sortOrder;
+    const nextUrl = buildSearchablePageUrl(page.url, committedSearchQuery, sortOrder, nextFilters);
+    if (!nextUrl || nextUrl === page.url.pathname + page.url.search) {
       return;
     }
     void goto(nextUrl, {
@@ -939,6 +944,7 @@
           hidden={isTimelineEmpty}
           {personNames}
           {tagNames}
+          onFiltersChange={syncFilterUrl}
         />
       {/key}
     {/if}
