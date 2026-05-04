@@ -326,29 +326,33 @@ class Drift extends $Drift {
             await m.createIndex(v24.idxRemoteAssetLibraryCreated);
           },
           from24To25: (m, v25) async {
-            await m.renameColumn(v25.localAssetEntity, 'duration_in_seconds', v25.localAssetEntity.durationMs);
-            await m.renameColumn(v25.remoteAssetEntity, 'duration_in_seconds', v25.remoteAssetEntity.durationMs);
+            await m.createIndex(v25.idxSharedSpaceAssetAssetSpace);
+            await m.createIndex(v25.idxSharedSpaceLibraryLibrarySpace);
+          },
+          from25To26: (m, v26) async {
+            await m.renameColumn(v26.localAssetEntity, 'duration_in_seconds', v26.localAssetEntity.durationMs);
+            await m.renameColumn(v26.remoteAssetEntity, 'duration_in_seconds', v26.remoteAssetEntity.durationMs);
             await m.renameColumn(
-              v25.trashedLocalAssetEntity,
+              v26.trashedLocalAssetEntity,
               'duration_in_seconds',
-              v25.trashedLocalAssetEntity.durationMs,
+              v26.trashedLocalAssetEntity.durationMs,
             );
 
             await localAssetEntity.update().write(
-              LocalAssetEntityCompanion.custom(durationMs: v25.localAssetEntity.durationMs * const Constant(1000)),
+              LocalAssetEntityCompanion.custom(durationMs: v26.localAssetEntity.durationMs * const Constant(1000)),
             );
             await remoteAssetEntity.update().write(
-              RemoteAssetEntityCompanion.custom(durationMs: v25.remoteAssetEntity.durationMs * const Constant(1000)),
+              RemoteAssetEntityCompanion.custom(durationMs: v26.remoteAssetEntity.durationMs * const Constant(1000)),
             );
             await trashedLocalAssetEntity.update().write(
               TrashedLocalAssetEntityCompanion.custom(
-                durationMs: v25.trashedLocalAssetEntity.durationMs * const Constant(1000),
+                durationMs: v26.trashedLocalAssetEntity.durationMs * const Constant(1000),
               ),
             );
           },
-          from25To26: (m, v26) async {
+          from26To27: (m, v27) async {
             await customStatement('DROP INDEX IF EXISTS idx_remote_album_owner_id');
-            await m.alterTable(TableMigration(v26.remoteAlbumEntity));
+            await m.alterTable(TableMigration(v27.remoteAlbumEntity));
           },
           from26To27: (m, v27) async {
             await customStatement('ALTER TABLE metadata RENAME TO settings');
