@@ -33,15 +33,15 @@ describe('checkCiInvariantText', () => {
   it('allows exception globs', () => {
     const result = checkCiInvariantText(
       {
-        id: 'no-upstream-preview',
-        title: 'No upstream preview token dependency',
+        id: 'translation-token-exception',
+        title: 'Translation token exception',
         forbidden_patterns: ['PUSH_O_MATIC'],
         paths: ['.github/workflows/**/*.yml'],
-        exceptions: ['.github/workflows/preview-*.yml'],
+        exceptions: ['.github/workflows/merge-*.yml'],
       },
       [
         {
-          path: '.github/workflows/preview-label.yml',
+          path: '.github/workflows/merge-translations.yml',
           text: 'PUSH_O_MATIC_APP_ID',
         },
       ],

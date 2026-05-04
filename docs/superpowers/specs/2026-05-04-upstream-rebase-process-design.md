@@ -136,7 +136,6 @@ ci_invariants:
       - .github/workflows/**/*.yaml
     exceptions:
       - .github/workflows/merge-translations.yml
-      - .github/workflows/preview-label.yaml
 
 patches:
   - id: immich-ui-command-patch

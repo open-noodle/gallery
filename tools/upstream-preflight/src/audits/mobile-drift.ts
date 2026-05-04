@@ -13,6 +13,9 @@ export type MobileDriftInput = {
 
 export function analyzeMobileDriftFiles(input: MobileDriftInput): AuditResult {
   const details: string[] = [];
+  const pushDetail = (detail: string) => {
+    if (!details.includes(detail)) details.push(detail);
+  };
   const schemaVersionMatch = input.currentDbRepository.match(
     /schemaVersion\s*=>\s*(\d+)/,
   );
@@ -32,14 +35,14 @@ export function analyzeMobileDriftFiles(input: MobileDriftInput): AuditResult {
   }
 
   if (schemaVersion === undefined)
-    details.push('Could not read mobile schemaVersion');
+    pushDetail('Could not read mobile schemaVersion');
   if (highestSnapshot !== undefined && schemaVersion !== highestSnapshot) {
-    details.push(
+    pushDetail(
       `schemaVersion ${String(schemaVersion)} does not match highest snapshot v${highestSnapshot}`,
     );
   }
   for (const [version, count] of snapshotCounts.entries()) {
-    if (count > 1) details.push(`Duplicate Drift snapshot version v${version}`);
+    if (count > 1) pushDetail(`Duplicate Drift snapshot version v${version}`);
   }
   for (
     let version = lowestSnapshot ?? 1;
@@ -47,23 +50,50 @@ export function analyzeMobileDriftFiles(input: MobileDriftInput): AuditResult {
     version++
   ) {
     if (!snapshotCounts.has(version))
-      details.push(`Missing Drift snapshot v${version}`);
+      pushDetail(`Missing Drift snapshot v${version}`);
   }
 
+  if (schemaVersion !== undefined && lowestSnapshot !== undefined) {
+    for (let version = lowestSnapshot; version < schemaVersion; version++) {
+      const callbackName = `from${version}To${version + 1}`;
+      const callbackCount = countMigrationCallbacks(
+        input.currentDbRepository,
+        callbackName,
+      );
+      if (callbackCount === 0) {
+        pushDetail(`Missing migration callback ${callbackName}`);
+      }
+      if (callbackCount > 1) {
+        pushDetail(`Duplicate migration callback ${callbackName}`);
+      }
+    }
+  }
+
+  const touchedOwnedVersions = input.galleryOwnedVersions
+    .filter((version) =>
+      input.upstreamTouchedFiles.some((file) =>
+        file.includes(`drift_schema_v${version}.json`),
+      ),
+    )
+    .sort((left, right) => left - right);
+  const highestOwnedVersion = Math.max(...input.galleryOwnedVersions);
+  const renumberedVersions = touchedOwnedVersions.map(
+    (_, index) => highestOwnedVersion + index + 1,
+  );
   for (const version of input.galleryOwnedVersions) {
     const upstreamTouchesVersion = input.upstreamTouchedFiles.some((file) =>
       file.includes(`drift_schema_v${version}.json`),
     );
     if (input.galleryVersionsShipped && upstreamTouchesVersion) {
-      details.push(
-        `Upstream touches shipped Gallery Drift version v${version}; keep Gallery v23/v24 and renumber incoming upstream migrations to v25/v26`,
+      pushDetail(
+        `Upstream touches shipped Gallery Drift version v${version}; keep Gallery ${formatVersions(input.galleryOwnedVersions)} and renumber incoming upstream migrations to ${formatVersions(renumberedVersions)}`,
       );
     }
 
     const expectedMarkers = input.expectedGalleryCallbacks?.[version] ?? [];
     const callbackName = `from${version - 1}To${version}`;
     if (!input.currentDbRepository.includes(callbackName)) {
-      details.push(`Missing migration callback ${callbackName}`);
+      pushDetail(`Missing migration callback ${callbackName}`);
     }
     const callbackStart = input.currentDbRepository.indexOf(callbackName);
     const callbackText =
@@ -83,7 +113,7 @@ export function analyzeMobileDriftFiles(input: MobileDriftInput): AuditResult {
         : '';
     for (const marker of expectedMarkers) {
       if (!callbackText.includes(marker)) {
-        details.push(`${callbackName} is missing Gallery marker ${marker}`);
+        pushDetail(`${callbackName} is missing Gallery marker ${marker}`);
       }
     }
   }
@@ -135,4 +165,16 @@ export function runMobileDriftAudit(
     upstreamTouchedFiles,
     expectedGalleryCallbacks,
   });
+}
+
+function countMigrationCallbacks(source: string, callbackName: string): number {
+  return [...source.matchAll(new RegExp(`\\b${callbackName}\\s*:`, 'g'))]
+    .length;
+}
+
+function formatVersions(versions: number[]): string {
+  const uniqueVersions = [...new Set(versions)].sort(
+    (left, right) => left - right,
+  );
+  return uniqueVersions.map((version) => `v${version}`).join('/');
 }

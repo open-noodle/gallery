@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { collectExtensionHotspots } from './signals';
+import { collectExtensionHotspots, collectFeatureOverlaps } from './signals';
 import type { ClassifiedCommit, Manifest } from './types';
 
 const manifest: Manifest = {
@@ -16,6 +16,7 @@ const manifest: Manifest = {
       title: 'Search',
       risk: 'high',
       domains: ['server'],
+      owned_paths: ['server/src/services/gallery-search.service.ts'],
       upstream_extension_paths: ['server/src/services/search.service.ts'],
     },
   },
@@ -48,6 +49,25 @@ describe('collectExtensionHotspots', () => {
         path: 'server/src/services/search.service.ts',
         hits: 1,
         features: ['search'],
+      },
+    ]);
+  });
+});
+
+describe('collectFeatureOverlaps', () => {
+  it('reports only files that match the feature surface', () => {
+    const classifiedCommit = commit([
+      'server/src/services/search.service.ts',
+      'server/src/services/unrelated.service.ts',
+      'web/src/routes/+layout.svelte',
+    ]);
+    classifiedCommit.shortSha = 'abc123def';
+
+    expect(collectFeatureOverlaps(manifest, [classifiedCommit])).toEqual([
+      {
+        feature: 'search',
+        commits: ['abc123def'],
+        files: ['server/src/services/search.service.ts'],
       },
     ]);
   });

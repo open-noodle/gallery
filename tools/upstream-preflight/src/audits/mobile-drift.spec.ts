@@ -78,4 +78,48 @@ describe('analyzeMobileDriftFiles', () => {
       'from22To23 is missing Gallery marker shared_space_entity',
     );
   });
+
+  it('flags missing callbacks in the full snapshot range', () => {
+    const result = analyzeMobileDriftFiles({
+      galleryOwnedVersions: [23, 24],
+      galleryVersionsShipped: true,
+      currentDbRepository: `
+        int get schemaVersion => 25;
+        from22To23: (m, v23) async {}
+        from23To24: (m, v24) async {}
+      `,
+      currentSnapshots: [
+        'drift_schema_v22.json',
+        'drift_schema_v23.json',
+        'drift_schema_v24.json',
+        'drift_schema_v25.json',
+      ],
+      upstreamTouchedFiles: [],
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.details).toContain('Missing migration callback from24To25');
+  });
+
+  it('flags duplicate callbacks in the snapshot range', () => {
+    const result = analyzeMobileDriftFiles({
+      galleryOwnedVersions: [23, 24],
+      galleryVersionsShipped: true,
+      currentDbRepository: `
+        int get schemaVersion => 24;
+        from22To23: (m, v23) async {}
+        from22To23: (m, v23) async {}
+        from23To24: (m, v24) async {}
+      `,
+      currentSnapshots: [
+        'drift_schema_v22.json',
+        'drift_schema_v23.json',
+        'drift_schema_v24.json',
+      ],
+      upstreamTouchedFiles: [],
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.details).toContain('Duplicate migration callback from22To23');
+  });
 });

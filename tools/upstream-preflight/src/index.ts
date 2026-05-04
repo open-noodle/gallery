@@ -12,7 +12,7 @@ import { collectGitRange, getGitPath, getMergeBase } from './git';
 import { defaultManifestPath, loadManifest } from './manifest';
 import { renderPreflightMarkdown } from './report';
 import { classifyCommit, detectDomain } from './risk';
-import { collectExtensionHotspots } from './signals';
+import { collectExtensionHotspots, collectFeatureOverlaps } from './signals';
 import type { ClassifiedCommit, Manifest } from './types';
 
 const program = new Command()
@@ -68,31 +68,6 @@ function collectDomainOverlaps(overlapFiles: string[]) {
     .sort((left, right) => left.domain.localeCompare(right.domain));
 }
 
-function collectFeatureOverlaps(classifiedCommits: ClassifiedCommit[]) {
-  const byFeature = new Map<
-    string,
-    { commits: Set<string>; files: Set<string> }
-  >();
-  for (const commit of classifiedCommits) {
-    for (const feature of commit.features) {
-      const overlap = byFeature.get(feature) ?? {
-        commits: new Set<string>(),
-        files: new Set<string>(),
-      };
-      overlap.commits.add(commit.shortSha);
-      for (const file of commit.files) overlap.files.add(file);
-      byFeature.set(feature, overlap);
-    }
-  }
-  return [...byFeature.entries()]
-    .map(([feature, overlap]) => ({
-      feature,
-      commits: [...overlap.commits].sort(),
-      files: [...overlap.files].sort(),
-    }))
-    .sort((left, right) => left.feature.localeCompare(right.feature));
-}
-
 function collectSignalFiles(files: string[], globs: string[]): string[] {
   return micromatch(files, globs).sort();
 }
@@ -145,7 +120,10 @@ program
       upstreamFileCount: context.upstreamRange.files.length,
       overlapFiles: context.overlapFiles,
       domainOverlaps: collectDomainOverlaps(context.overlapFiles),
-      featureOverlaps: collectFeatureOverlaps(context.classifiedCommits),
+      featureOverlaps: collectFeatureOverlaps(
+        context.manifest,
+        context.classifiedCommits,
+      ),
       dependencyChanges: collectSignalFiles(context.upstreamRange.files, [
         'package.json',
         'pnpm-lock.yaml',

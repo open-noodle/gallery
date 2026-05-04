@@ -1287,7 +1287,6 @@ ci_invariants:
     paths: [.github/workflows/**/*.yml, .github/workflows/**/*.yaml]
     exceptions:
       - .github/workflows/merge-translations.yml
-      - .github/workflows/preview-label.yaml
   - id: gallery-release-image-names
     title: Gallery release workflows publish Gallery images
     forbidden_patterns:

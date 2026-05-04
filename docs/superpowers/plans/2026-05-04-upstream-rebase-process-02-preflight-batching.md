@@ -858,24 +858,8 @@ function collectDomainOverlaps(overlapFiles: string[]) {
     .sort((left, right) => left.domain.localeCompare(right.domain));
 }
 
-function collectFeatureOverlaps(classifiedCommits: ClassifiedCommit[]) {
-  const byFeature = new Map<string, { commits: Set<string>; files: Set<string> }>();
-  for (const commit of classifiedCommits) {
-    for (const feature of commit.features) {
-      const overlap = byFeature.get(feature) ?? { commits: new Set<string>(), files: new Set<string>() };
-      overlap.commits.add(commit.shortSha);
-      for (const file of commit.files) overlap.files.add(file);
-      byFeature.set(feature, overlap);
-    }
-  }
-  return [...byFeature.entries()]
-    .map(([feature, overlap]) => ({
-      feature,
-      commits: [...overlap.commits].sort(),
-      files: [...overlap.files].sort(),
-    }))
-    .sort((left, right) => left.feature.localeCompare(right.feature));
-}
+// Feature overlap reporting lives in signals.ts. It matches each commit's files
+// against the feature surface and only reports feature-relevant paths.
 
 function collectSignalFiles(files: string[], globs: string[]): string[] {
   return micromatch(files, globs).sort();
@@ -915,7 +899,7 @@ program
       upstreamFileCount: context.upstreamRange.files.length,
       overlapFiles: context.overlapFiles,
       domainOverlaps: collectDomainOverlaps(context.overlapFiles),
-      featureOverlaps: collectFeatureOverlaps(context.classifiedCommits),
+      featureOverlaps: collectFeatureOverlaps(context.manifest, context.classifiedCommits),
       dependencyChanges: collectSignalFiles(context.upstreamRange.files, [
         'package.json',
         'pnpm-lock.yaml',
@@ -982,3 +966,10 @@ git commit -m "feat: generate upstream preflight and batch reports"
 ```
 
 Expected: tests pass, type check passes, reports print Markdown, generated JSON exists under Git metadata, source status only shows intentional files before commit, and commit succeeds.
+
+Implementation note: feature overlap reporting uses a helper in
+`tools/upstream-preflight/src/signals.ts` and reports only files that match the
+feature's owned, extension, mobile, database, symbol, or generated-artifact
+surface, independent of whether the risk classifier attached the feature ID to
+the commit. It must not add every file from a commit just because one file
+matched the feature.

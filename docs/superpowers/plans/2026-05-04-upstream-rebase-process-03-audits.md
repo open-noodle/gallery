@@ -261,6 +261,8 @@ Expected: tests and type check pass. On the current upstream backlog, `make mobi
 Implementation note: the real Gallery callbacks use generated camelCase entity
 names, so the manifest markers are `sharedSpaceEntity`,
 `sharedSpaceAssetEntity`, `libraryEntity`, and `sharedSpaceLibraryEntity`.
+The mobile Drift audit also verifies every `fromNToN+1` callback in the current
+snapshot range, so an appended upstream migration cannot leave a callback gap.
 
 ### Task 2: CI Invariant And Patch Audits
 
@@ -490,13 +492,14 @@ git commit -m "feat: audit rebase ci invariants and patches"
 
 Expected: tests and type check pass. `make fork-patches-check` passes. If `make ci-invariants-check` exits non-zero, the output names the exact workflow and forbidden string that must be fixed or excepted in the manifest.
 
-Implementation note: the real repo has `.yaml` workflow files, and two current
-workflows need explicit exceptions: `preview-label.yaml` for the upstream
-preview token workflow and `gallery-revert-to-immich-validation.yml` because it
-intentionally boots upstream Immich images during revert validation. The
-docs-deploy invariant checks `workflow_run:` so inert references to
-`github.event.workflow_run` in the disabled upstream workflow do not false
-positive.
+Implementation note: the real repo has `.yaml` workflow files. The upstream
+preview label workflow is disabled in Gallery rather than excepted because it
+depends on upstream `PUSH_O_MATIC` tokens. The
+`gallery-revert-to-immich-validation.yml` workflow remains excepted from the
+Gallery image-name invariant because it intentionally boots upstream Immich
+images during revert validation. The docs-deploy invariant checks
+`workflow_run:` so inert references to `github.event.workflow_run` in the
+disabled upstream workflow do not false positive.
 
 ### Task 3: Post-Rebase Audit
 
