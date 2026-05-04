@@ -171,7 +171,15 @@ program
       ]),
       broadRefactorHints: collectBroadRefactorHints(context.classifiedCommits),
       batchMarkdown: context.batchMarkdown,
-      auditResults: [],
+      auditResults: [
+        runMobileDriftAudit(
+          context.manifest,
+          context.upstreamRange.files,
+          repoRoot(),
+        ),
+        ...runCiInvariantAudits(context.manifest, repoRoot()),
+        ...runPatchAudits(context.manifest, repoRoot()),
+      ],
       extensionHotspots: collectExtensionHotspots(
         context.manifest,
         context.classifiedCommits,

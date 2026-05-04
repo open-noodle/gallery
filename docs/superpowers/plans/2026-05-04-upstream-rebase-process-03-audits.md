@@ -893,7 +893,7 @@ review after the affected batch.
 - Modify: `tools/upstream-preflight/src/index.ts`
 - Modify: `tools/upstream-preflight/src/report.spec.ts`
 
-- [ ] **Step 1: Expand report test**
+- [x] **Step 1: Expand report test**
 
 Modify `tools/upstream-preflight/src/report.spec.ts` so the existing render test passes this audit result:
 
@@ -913,19 +913,19 @@ Add this assertion:
 expect(markdown).toContain('Mobile Drift Migration Check');
 ```
 
-- [ ] **Step 2: Feed audit signals into preflight**
+- [x] **Step 2: Feed audit signals into preflight**
 
 In the `preflight` action inside `tools/upstream-preflight/src/index.ts`, replace `auditResults: []` with:
 
 ```ts
 auditResults: [
-  runMobileDriftAudit(context.manifest, context.upstreamRange.files),
-  ...runCiInvariantAudits(context.manifest),
-  ...runPatchAudits(context.manifest),
+  runMobileDriftAudit(context.manifest, context.upstreamRange.files, repoRoot()),
+  ...runCiInvariantAudits(context.manifest, repoRoot()),
+  ...runPatchAudits(context.manifest, repoRoot()),
 ],
 ```
 
-- [ ] **Step 3: Verify and commit integrated audits**
+- [x] **Step 3: Verify and commit integrated audits**
 
 Run:
 

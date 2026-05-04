@@ -57,7 +57,13 @@ describe('renderPreflightMarkdown', () => {
       ],
       batchMarkdown:
         '| Batch | Tip SHA | Commits | Risk | Why | Required Checks |',
-      auditResults: [],
+      auditResults: [
+        {
+          ok: false,
+          title: 'Mobile Drift Migration Check',
+          details: ['Upstream touches shipped Gallery Drift version v23'],
+        },
+      ],
       extensionHotspots: [
         {
           path: 'server/src/services/search.service.ts',
@@ -75,5 +81,6 @@ describe('renderPreflightMarkdown', () => {
     expect(markdown).toContain('Incoming Commit List');
     expect(markdown).toContain('Dependency And Lockfile Changes');
     expect(markdown).toContain('Server Migration Signals');
+    expect(markdown).toContain('Mobile Drift Migration Check');
   });
 });
