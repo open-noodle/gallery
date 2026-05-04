@@ -15,9 +15,10 @@ fi
 
 check_android12_splash_bounds() {
   local file="$1"
+  local relative_file="${file#"$REPO_ROOT/"}"
 
   if [[ ! -f "$file" ]]; then
-    echo "  FAIL: missing ${file#$REPO_ROOT/}"
+    echo "  FAIL: missing $relative_file"
     EXIT_CODE=1
     return
   fi
@@ -27,7 +28,7 @@ check_android12_splash_bounds() {
   read -r width height bbox <<<"$details"
 
   if [[ ! "$bbox" =~ ^([0-9]+)x([0-9]+)\+([0-9]+)\+([0-9]+)$ ]]; then
-    echo "  FAIL: could not parse non-transparent bounds for ${file#$REPO_ROOT/}: $bbox"
+    echo "  FAIL: could not parse non-transparent bounds for $relative_file: $bbox"
     EXIT_CODE=1
     return
   fi
@@ -45,18 +46,18 @@ check_android12_splash_bounds() {
   vertical_delta=$((offset_y > bottom_pad ? offset_y - bottom_pad : bottom_pad - offset_y))
 
   if (( box_width > max_box + max_box_slack || box_height > max_box + max_box_slack )); then
-    echo "  FAIL: ${file#$REPO_ROOT/} content is ${box_width}x${box_height}; max is ${max_box}x${max_box}"
+    echo "  FAIL: $relative_file content is ${box_width}x${box_height}; max is ${max_box}x${max_box}"
     EXIT_CODE=1
     return
   fi
 
   if (( horizontal_delta > max_offset_diff || vertical_delta > max_offset_diff )); then
-    echo "  FAIL: ${file#$REPO_ROOT/} content is not centered (left=$offset_x right=$right_pad top=$offset_y bottom=$bottom_pad)"
+    echo "  FAIL: $relative_file content is not centered (left=$offset_x right=$right_pad top=$offset_y bottom=$bottom_pad)"
     EXIT_CODE=1
     return
   fi
 
-  echo "  OK: ${file#$REPO_ROOT/} content ${box_width}x${box_height} within ${max_box}x${max_box} target (+${max_box_slack}px resize slack)"
+  echo "  OK: $relative_file content ${box_width}x${box_height} within ${max_box}x${max_box} target (+${max_box_slack}px resize slack)"
 }
 
 android12_splash_files=(
