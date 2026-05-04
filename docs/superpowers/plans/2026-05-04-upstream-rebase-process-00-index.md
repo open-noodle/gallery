@@ -26,6 +26,7 @@ The design source is `docs/superpowers/specs/2026-05-04-upstream-rebase-process-
 - Work only in `/home/pierre/dev/gallery/.claude/worktrees/upstream-rebase-process` on branch `plan/upstream-rebase-process`.
 - Do not update `main` from this worktree.
 - Do not modify unrelated dirty files in `/home/pierre/dev/gallery`.
+- Phase 4 may update `/home/pierre/.codex/skills/rebase-upstream-report/SKILL.md`; keep that local skill edit separate from repo commits.
 - Keep generated reports under `$(git rev-parse --git-path upstream-preflight)` so source status stays clean.
 - Treat `make mobile-drift-rebase-check` failing on the current upstream backlog as correct only when it identifies the shipped Gallery v23/v24 collision and recommends renumbering incoming upstream migrations above Gallery v24.
 
@@ -35,8 +36,9 @@ The phase plans implement design phases 1 through 4. They also surface phase 6
 fork-surface reduction signals in the preflight report. Phase 5 advisory CI gates
 remain a documented follow-up: after the local tooling proves stable, add a
 workflow for `rebase/upstream-*` branches that runs `make upstream-preflight`,
-`make upstream-postrebase-audit`, `make ci-invariants-check`, and
-`make fork-patches-check` without blocking normal development branches.
+`make fork-ownership-coverage-check`, `make upstream-postrebase-audit`,
+`make ci-invariants-check`, and `make fork-patches-check` without blocking
+normal development branches.
 
 ### Task 0: Baseline Check
 
@@ -54,12 +56,9 @@ git status --short --branch
 git log --oneline --decorate --max-count=3
 ```
 
-Expected:
-
-```text
-## plan/upstream-rebase-process...origin/main [ahead 2, behind 1]
-c27979452 (HEAD -> plan/upstream-rebase-process) docs: split upstream rebase process plan
-```
+Expected: `git status` reports branch `plan/upstream-rebase-process`, a clean
+worktree, and no `behind` marker after rebasing onto `origin/main`. The top log
+entry is the latest committed plan change.
 
 - [ ] **Step 2: Confirm dependency baseline**
 
@@ -80,4 +79,5 @@ Open:
 sed -n '1,260p' docs/superpowers/plans/2026-05-04-upstream-rebase-process-01-manifest-foundation.md
 ```
 
-Expected: the phase begins with workspace package scaffolding and ownership manifest work.
+Expected: the phase begins with current fork baseline capture, then workspace
+package scaffolding and ownership manifest work.
