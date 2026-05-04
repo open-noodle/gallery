@@ -91,6 +91,8 @@ describe(MetadataService.name, () => {
     mockReadTags();
 
     mocks.config.getWorker.mockReturnValue(ImmichWorker.Microservices);
+    mocks.faceIdentity.ensurePersonIdentity.mockResolvedValue({ id: 'identity-1' } as any);
+    mocks.sharedSpace.getSpaceIdsForAsset.mockResolvedValue([]);
 
     delete process.env.TZ;
   });
@@ -1566,6 +1568,50 @@ describe(MetadataService.name, () => {
         {
           name: JobName.PersonGenerateThumbnail,
           data: { ownerId: asset.ownerId, personGroupId: 'random-uuid' },
+        },
+      ]);
+    });
+
+    it('should link imported metadata faces to identity-backed people', async () => {
+      const asset = AssetFactory.create();
+      const person = PersonFactory.create();
+
+      mocks.assetJob.getForMetadataExtraction.mockResolvedValue(getForMetadataExtraction(asset));
+      mocks.systemMetadata.get.mockResolvedValue({ metadata: { faces: { import: true } } });
+      mockReadTags(makeFaceTags({ Name: person.name }));
+      mocks.person.getDistinctNames.mockResolvedValue([]);
+      mocks.person.createAll.mockResolvedValue([person.id]);
+      mocks.faceIdentity.ensurePersonIdentity.mockResolvedValue({ id: 'identity-1' } as any);
+
+      await sut.handleMetadataExtraction({ id: asset.id });
+
+      expect(mocks.faceIdentity.ensurePersonIdentity).toHaveBeenCalledWith('random-uuid');
+      expect(mocks.faceIdentity.replaceFaceIdentity).toHaveBeenCalledWith({
+        assetFaceId: 'random-uuid',
+        identityId: 'identity-1',
+        source: 'import',
+      });
+    });
+
+    it('should queue shared-space matching for imported metadata faces', async () => {
+      const asset = AssetFactory.create();
+      const person = PersonFactory.create();
+
+      mocks.assetJob.getForMetadataExtraction.mockResolvedValue(getForMetadataExtraction(asset));
+      mocks.systemMetadata.get.mockResolvedValue({ metadata: { faces: { import: true } } });
+      mockReadTags(makeFaceTags({ Name: person.name }));
+      mocks.person.getDistinctNames.mockResolvedValue([]);
+      mocks.person.createAll.mockResolvedValue([person.id]);
+      mocks.faceIdentity.ensurePersonIdentity.mockResolvedValue({ id: 'identity-1' } as any);
+      mocks.sharedSpace.getSpaceIdsForAsset.mockResolvedValue([{ spaceId: 'space-1' }]);
+
+      await sut.handleMetadataExtraction({ id: asset.id });
+
+      expect(mocks.sharedSpace.getSpaceIdsForAsset).toHaveBeenCalledWith(asset.id);
+      expect(mocks.job.queueAll).toHaveBeenCalledWith([
+        {
+          name: JobName.SharedSpaceFaceMatch,
+          data: { spaceId: 'space-1', assetId: asset.id },
         },
       ]);
     });
