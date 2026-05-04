@@ -238,6 +238,23 @@
     return Math.max(0, getFilteredCities(country).length - getVisibleCities(country).length);
   }
 
+  let cityOnlySelectionHasVisibleRow = $derived.by(() => {
+    if (!selectedCity || selectedCountry) {
+      return false;
+    }
+
+    for (const country of visibleCountries) {
+      const cityRowsVisible =
+        (expandedCountry === country || (normalizedSearchQuery && getVisibleCities(country).length > 0)) &&
+        !loadingCitiesByCountry[country];
+      if (cityRowsVisible && getVisibleCities(country).includes(selectedCity)) {
+        return true;
+      }
+    }
+
+    return false;
+  });
+
   function showAllCities(country: string) {
     expandedCityLists = { ...expandedCityLists, [country]: true };
   }
@@ -310,6 +327,23 @@
           {/if}
         </div>
         <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-left">{orphanedCountry}</span>
+      </button>
+    {/if}
+
+    {#if selectedCity && !selectedCountry && !cityOnlySelectionHasVisibleRow}
+      <button
+        type="button"
+        class="-mx-2 flex w-[calc(100%+1rem)] items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium hover:bg-subtle"
+        onclick={() => onSelectionChange(undefined, undefined)}
+        aria-pressed="true"
+        data-testid="location-city-{selectedCity}"
+      >
+        <div
+          class="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full border-2 border-immich-primary bg-immich-primary dark:border-immich-dark-primary dark:bg-immich-dark-primary"
+        >
+          <div class="h-1.5 w-1.5 rounded-full bg-white dark:bg-black"></div>
+        </div>
+        <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-left">{selectedCity}</span>
       </button>
     {/if}
 
