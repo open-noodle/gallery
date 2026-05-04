@@ -85,6 +85,25 @@ describe('analyzeMobileDriftFiles', () => {
 
     expect(result.ok).toBe(true);
   });
+
+  it('flags duplicate snapshots, missing snapshots, and missing callback markers', () => {
+    const result = analyzeMobileDriftFiles({
+      galleryOwnedVersions: [23],
+      galleryVersionsShipped: true,
+      expectedGalleryCallbacks: { 23: ['shared_space_entity'] },
+      currentDbRepository: `
+        int get schemaVersion => 24;
+        from22To23: (m, v23) async {}
+      `,
+      currentSnapshots: ['drift_schema_v22.json', 'drift_schema_v22.json', 'drift_schema_v24.json'],
+      upstreamTouchedFiles: [],
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.details.join('\n')).toContain('Duplicate Drift snapshot version v22');
+    expect(result.details.join('\n')).toContain('Missing Drift snapshot v23');
+    expect(result.details.join('\n')).toContain('from22To23 is missing Gallery marker shared_space_entity');
+  });
 });
 ```
 
@@ -103,6 +122,7 @@ export type MobileDriftInput = {
   currentDbRepository: string;
   currentSnapshots: string[];
   upstreamTouchedFiles: string[];
+  expectedGalleryCallbacks?: Record<number, string[]>;
 };
 
 export function analyzeMobileDriftFiles(input: MobileDriftInput): AuditResult {
@@ -115,10 +135,21 @@ export function analyzeMobileDriftFiles(input: MobileDriftInput): AuditResult {
     .map(Number)
     .sort((left, right) => left - right);
   const highestSnapshot = snapshotVersions.at(-1);
+  const lowestSnapshot = snapshotVersions[0];
+  const snapshotCounts = new Map<number, number>();
+  for (const version of snapshotVersions) {
+    snapshotCounts.set(version, (snapshotCounts.get(version) ?? 0) + 1);
+  }
 
   if (schemaVersion === undefined) details.push('Could not read mobile schemaVersion');
   if (highestSnapshot !== undefined && schemaVersion !== highestSnapshot) {
     details.push(`schemaVersion ${String(schemaVersion)} does not match highest snapshot v${highestSnapshot}`);
+  }
+  for (const [version, count] of snapshotCounts.entries()) {
+    if (count > 1) details.push(`Duplicate Drift snapshot version v${version}`);
+  }
+  for (let version = lowestSnapshot ?? 1; version <= (schemaVersion ?? 0); version++) {
+    if (!snapshotCounts.has(version)) details.push(`Missing Drift snapshot v${version}`);
   }
 
   for (const version of input.galleryOwnedVersions) {
@@ -131,9 +162,25 @@ export function analyzeMobileDriftFiles(input: MobileDriftInput): AuditResult {
       );
     }
 
+    const expectedMarkers = input.expectedGalleryCallbacks?.[version] ?? [];
     const callbackName = `from${version - 1}To${version}`;
     if (!input.currentDbRepository.includes(callbackName)) {
       details.push(`Missing migration callback ${callbackName}`);
+    }
+    const callbackStart = input.currentDbRepository.indexOf(callbackName);
+    const callbackText =
+      callbackStart >= 0
+        ? input.currentDbRepository.slice(
+            callbackStart,
+            input.currentDbRepository.indexOf('from', callbackStart + callbackName.length) >= 0
+              ? input.currentDbRepository.indexOf('from', callbackStart + callbackName.length)
+              : undefined,
+          )
+        : '';
+    for (const marker of expectedMarkers) {
+      if (!callbackText.includes(marker)) {
+        details.push(`${callbackName} is missing Gallery marker ${marker}`);
+      }
     }
   }
 
@@ -153,6 +200,10 @@ export function runMobileDriftAudit(
   const ownedVersions = Object.values(manifest.features).flatMap(
     (feature) => feature.mobile?.drift_versions?.owned ?? [],
   );
+  const expectedGalleryCallbacks = Object.assign(
+    {},
+    ...Object.values(manifest.features).map((feature) => feature.mobile?.drift_versions?.expected_callbacks ?? {}),
+  ) as Record<number, string[]>;
   const shipped = Object.values(manifest.features).some((feature) => feature.mobile?.drift_versions?.shipped);
   const repositoryPath = path.join(cwd, 'mobile/lib/infrastructure/repositories/db.repository.dart');
   const snapshotsPath = path.join(cwd, 'mobile/drift_schemas/main');
@@ -163,6 +214,7 @@ export function runMobileDriftAudit(
     currentDbRepository: fs.existsSync(repositoryPath) ? fs.readFileSync(repositoryPath, 'utf8') : '',
     currentSnapshots: fs.existsSync(snapshotsPath) ? fs.readdirSync(snapshotsPath) : [],
     upstreamTouchedFiles,
+    expectedGalleryCallbacks,
   });
 }
 ```
@@ -447,7 +499,14 @@ Create `tools/upstream-preflight/src/audits/post-rebase.spec.ts`:
 
 ```ts
 import { describe, expect, it } from 'vitest';
-import { auditForkOwnedFiles, auditMigrationCount } from './post-rebase';
+import {
+  auditExtensionSymbols,
+  auditForkOwnedFiles,
+  auditGeneratedArtifactSignals,
+  auditMigrationCount,
+  auditMigrationGlobs,
+  auditMigrationTimestampCollisions,
+} from './post-rebase';
 import type { Manifest } from '../types';
 
 const manifest: Manifest = {
@@ -465,6 +524,12 @@ const manifest: Manifest = {
       risk: 'high',
       domains: ['server'],
       owned_paths: ['server/src/services/shared-space.service.ts'],
+      expected_symbols: {
+        'server/src/schema/functions.ts': ['library_user'],
+      },
+      database: {
+        migration_globs: ['server/src/schema/migrations-gallery/*SharedSpace*.ts'],
+      },
     },
   },
 };
@@ -487,6 +552,49 @@ describe('auditMigrationCount', () => {
 
     expect(result.ok).toBe(true);
     expect(result.details).toEqual(['Gallery migration count: 2']);
+  });
+});
+
+describe('auditExtensionSymbols', () => {
+  it('fails when an expected symbol is missing from an extension path', () => {
+    const result = auditExtensionSymbols(manifest, {
+      'server/src/schema/functions.ts': 'create trigger unrelated',
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.details).toEqual(['server/src/schema/functions.ts is missing expected symbol library_user']);
+  });
+});
+
+describe('auditMigrationGlobs', () => {
+  it('fails when a manifest migration glob has no matching file', () => {
+    const result = auditMigrationGlobs(manifest, ['server/src/schema/migrations-gallery/1770000000000-Other.ts']);
+
+    expect(result.ok).toBe(false);
+    expect(result.details).toEqual([
+      'No Gallery migration matches server/src/schema/migrations-gallery/*SharedSpace*.ts',
+    ]);
+  });
+});
+
+describe('auditMigrationTimestampCollisions', () => {
+  it('fails when upstream and Gallery migrations share a timestamp', () => {
+    const result = auditMigrationTimestampCollisions(
+      ['server/src/schema/migrations-gallery/1770000000000-SharedSpace.ts'],
+      ['server/src/schema/migrations/1770000000000-Upstream.ts'],
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.details).toEqual(['Migration timestamp collision: 1770000000000']);
+  });
+});
+
+describe('auditGeneratedArtifactSignals', () => {
+  it('reports generated artifacts touched by upstream', () => {
+    const result = auditGeneratedArtifactSignals(['open-api/typescript-sdk/index.ts']);
+
+    expect(result.ok).toBe(false);
+    expect(result.details).toEqual(['Review regenerated artifact open-api/typescript-sdk/index.ts']);
   });
 });
 ```
@@ -528,14 +636,111 @@ export function auditMigrationCount(migrations: string[]): AuditResult {
   };
 }
 
-export function runPostRebaseAudits(manifest: Manifest, cwd = process.cwd()): AuditResult[] {
+export function auditExtensionSymbols(manifest: Manifest, fileTextByPath: Record<string, string>): AuditResult {
+  const details: string[] = [];
+
+  for (const feature of Object.values(manifest.features)) {
+    for (const [file, symbols] of Object.entries(feature.expected_symbols ?? {})) {
+      const text = fileTextByPath[file] ?? '';
+      for (const symbol of symbols) {
+        if (!text.includes(symbol)) {
+          details.push(`${file} is missing expected symbol ${symbol}`);
+        }
+      }
+    }
+  }
+
+  return {
+    ok: details.length === 0,
+    title: 'Fork Extension Symbol Survival',
+    details: details.length > 0 ? details : ['All manifest expected symbols are present'],
+  };
+}
+
+export function auditMigrationGlobs(manifest: Manifest, currentFiles: string[]): AuditResult {
+  const details: string[] = [];
+
+  for (const feature of Object.values(manifest.features)) {
+    for (const glob of feature.database?.migration_globs ?? []) {
+      if (micromatch(currentFiles, glob).length === 0) {
+        details.push(`No Gallery migration matches ${glob}`);
+      }
+    }
+  }
+
+  return {
+    ok: details.length === 0,
+    title: 'Gallery Migration Manifest Coverage',
+    details: details.length > 0 ? details : ['All manifest migration globs match current files'],
+  };
+}
+
+export function auditMigrationTimestampCollisions(
+  galleryMigrations: string[],
+  upstreamMigrations: string[],
+): AuditResult {
+  const galleryTimestamps = new Set(
+    galleryMigrations
+      .map((file) => path.basename(file).match(/^(\d+)/)?.[1])
+      .filter((value): value is string => Boolean(value)),
+  );
+  const details = upstreamMigrations
+    .map((file) => path.basename(file).match(/^(\d+)/)?.[1])
+    .filter((value): value is string => Boolean(value) && galleryTimestamps.has(value))
+    .map((timestamp) => `Migration timestamp collision: ${timestamp}`);
+
+  return {
+    ok: details.length === 0,
+    title: 'Migration Timestamp Collision Check',
+    details:
+      details.length > 0 ? [...new Set(details)] : ['No upstream migration timestamp collides with Gallery migrations'],
+  };
+}
+
+export function auditGeneratedArtifactSignals(upstreamTouchedFiles: string[]): AuditResult {
+  const generatedFiles = micromatch(upstreamTouchedFiles, [
+    'open-api/**',
+    'mobile/openapi/**',
+    'server/src/queries/**/*.sql',
+  ]);
+  return {
+    ok: generatedFiles.length === 0,
+    title: 'Generated Artifact Review',
+    details:
+      generatedFiles.length > 0
+        ? generatedFiles.map((file) => `Review regenerated artifact ${file}`)
+        : ['No upstream generated artifact changes require review'],
+  };
+}
+
+export function runPostRebaseAudits(
+  manifest: Manifest,
+  upstreamTouchedFiles: string[] = [],
+  cwd = process.cwd(),
+): AuditResult[] {
   const currentFiles = listFiles(cwd);
   const migrationRoot = path.join(cwd, 'server/src/schema/migrations-gallery');
   const migrations = fs.existsSync(migrationRoot)
     ? fs.readdirSync(migrationRoot).filter((file) => file.endsWith('.ts'))
     : [];
+  const galleryMigrationPaths = migrations.map((file) => `server/src/schema/migrations-gallery/${file}`);
+  const textPaths = Object.values(manifest.features).flatMap((feature) => Object.keys(feature.expected_symbols ?? {}));
+  const fileTextByPath = Object.fromEntries(
+    textPaths.map((file) => {
+      const fullPath = path.join(cwd, file);
+      return [file, fs.existsSync(fullPath) ? fs.readFileSync(fullPath, 'utf8') : ''];
+    }),
+  );
+  const upstreamMigrations = micromatch(upstreamTouchedFiles, ['server/src/schema/migrations/**/*.ts']);
 
-  return [auditForkOwnedFiles(manifest, currentFiles), auditMigrationCount(migrations)];
+  return [
+    auditForkOwnedFiles(manifest, currentFiles),
+    auditExtensionSymbols(manifest, fileTextByPath),
+    auditMigrationCount(migrations),
+    auditMigrationGlobs(manifest, currentFiles),
+    auditMigrationTimestampCollisions(galleryMigrationPaths, upstreamMigrations),
+    auditGeneratedArtifactSignals(upstreamTouchedFiles),
+  ];
 }
 
 function listFiles(cwd: string): string[] {
@@ -584,7 +789,8 @@ program
   .command('postrebase-audit')
   .option('--manifest <path>', 'ownership manifest path', defaultManifestPath)
   .action((options: { manifest: string }) => {
-    const results = runPostRebaseAudits(loadManifest(options.manifest));
+    const context = buildPreflightContext(options.manifest);
+    const results = runPostRebaseAudits(context.manifest, context.upstreamRange.files);
     for (const result of results) {
       console.log(`${result.ok ? 'OK' : 'ISSUE'}: ${result.title}`);
       for (const detail of result.details) console.log(`- ${detail}`);

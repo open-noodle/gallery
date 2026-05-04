@@ -253,6 +253,9 @@ export type FeatureEntry = {
   domains: Domain[];
   owned_paths?: string[];
   upstream_extension_paths?: string[];
+  optional_paths?: string[];
+  expected_symbols?: Record<string, string[]>;
+  generated_artifacts?: string[];
   database?: {
     tables?: string[];
     migration_globs?: string[];
@@ -262,6 +265,7 @@ export type FeatureEntry = {
       owned: number[];
       shipped: boolean;
       owner: 'gallery';
+      expected_callbacks?: Record<number, string[]>;
     };
     paths?: string[];
   };
@@ -350,7 +354,7 @@ metadata:
   upstream_branch: main
   fork_remote: origin
   fork_branch: main
-  last_verified_fork_head: null
+  last_verified_fork_head: 22ca79659
 features:
   shared-spaces:
     title: Shared Spaces
@@ -464,7 +468,7 @@ metadata:
   upstream_branch: main
   fork_remote: origin
   fork_branch: main
-  last_verified_fork_head: null
+  last_verified_fork_head: 22ca79659
 
 features:
   shared-spaces:
@@ -524,6 +528,9 @@ features:
         owned: [23, 24]
         shipped: true
         owner: gallery
+        expected_callbacks:
+          23: [shared_space_entity, shared_space_asset_entity]
+          24: [library_entity, shared_space_library_entity]
       paths:
         - mobile/lib/infrastructure/repositories/db.repository.dart
         - mobile/drift_schemas/main/drift_schema_v23.json
@@ -534,6 +541,7 @@ features:
     title: Storage Migration, Direct S3 Delivery, Import, And Media Edits
     aliases:
       - storage-migration
+      - direct-s3-media-delivery
       - google-photos-import
       - google-takeout-zip-on-demand
       - image-editing
@@ -577,6 +585,7 @@ features:
       - space-search-sorting
       - dynamic-filter-suggestions
       - typed-search-filters
+      - rule-based-memories
       - historic-memories
     risk: high
     domains: [server, web, mobile, e2e]
@@ -750,6 +759,11 @@ ci_invariants:
       - ghcr.io/immich-app/immich-machine-learning
     paths: [.github/workflows/gallery-*.yml]
     exceptions: []
+  - id: gallery-docs-deploy-disabled-upstream
+    title: Upstream docs deploy stays workflow_dispatch only
+    forbidden_patterns: [workflow_run]
+    paths: [.github/workflows/docs-deploy.yml]
+    exceptions: []
 
 patches:
   - id: immich-ui-command-patch
@@ -788,7 +802,7 @@ risk_patterns:
 Run:
 
 ```bash
-for id in shared-spaces storage-migration pet-detection user-groups google-photos-import google-takeout-zip-on-demand image-editing auto-classification video-duplicate-detection clip-relevance-threshold support-ui global-search-command-palette gallery-map-shared-photos filter-panel smart-search-main-timeline space-library-linking bulk-add-to-spaces space-activity-logging collapsible-space-hero space-search-sorting dynamic-filter-suggestions space-person-dedup checksum-tombstone duplicate-space-membership-sync library-user-denormalization infrastructure-detachment release-version-publishing rc-build-workflow split-mobile-server-release switch-back-to-immich open-in-app-deeplink environment-tagged-user-agent system-config-caching global-face-identities representative-face-source typed-search-filters historic-memories prometheus-metrics mobile-spaces mobile-shared-space-drift-sync mobile-photos-filter-sheet mobile-map-markers mobile-bottom-nav-design mobile-deeplink-oauth-branding mobile-ios-purpose-strings mobile-release-signing branding fork-migration-compatibility schema-functions structured-json-logging; do
+for id in shared-spaces storage-migration direct-s3-media-delivery pet-detection user-groups google-photos-import google-takeout-zip-on-demand image-editing auto-classification video-duplicate-detection clip-relevance-threshold support-ui global-search-command-palette gallery-map-shared-photos filter-panel smart-search-main-timeline space-library-linking bulk-add-to-spaces space-activity-logging collapsible-space-hero space-search-sorting dynamic-filter-suggestions space-person-dedup checksum-tombstone duplicate-space-membership-sync library-user-denormalization infrastructure-detachment release-version-publishing rc-build-workflow split-mobile-server-release switch-back-to-immich open-in-app-deeplink environment-tagged-user-agent system-config-caching global-face-identities representative-face-source typed-search-filters rule-based-memories historic-memories prometheus-metrics mobile-spaces mobile-shared-space-drift-sync mobile-photos-filter-sheet mobile-map-markers mobile-bottom-nav-design mobile-deeplink-oauth-branding mobile-ios-purpose-strings mobile-release-signing branding fork-migration-compatibility schema-functions structured-json-logging; do
   rg -q "$id" docs/fork/ownership.yml || { echo "missing manifest feature or alias: $id"; exit 1; }
 done
 ```

@@ -227,6 +227,18 @@ const manifest: Manifest = {
       required_checks: ['e2e-rebase-smoke'],
     },
   },
+  checks: {
+    'e2e-rebase-smoke': {
+      command: 'make e2e-rebase-smoke',
+      phase: 'post-batch',
+      required_for_risk: ['high'],
+    },
+    'storage-migration-tests': {
+      command: 'make test-server',
+      phase: 'post-batch',
+      required_for_domains: ['server'],
+    },
+  },
   risk_patterns: [
     { id: 'breaking-refactor', risk: 'high', subject_regex: 'refactor!', notes: 'Breaking refactor' },
     { id: 'server-schema', risk: 'high', path_globs: ['server/src/schema/migrations/**'], notes: 'Schema change' },
@@ -263,7 +275,7 @@ describe('classifyCommit', () => {
 
     expect(result.risk).toBe('high');
     expect(result.features).toEqual(['shared-spaces']);
-    expect(result.requiredChecks).toEqual(['e2e-rebase-smoke']);
+    expect(result.requiredChecks).toEqual(['e2e-rebase-smoke', 'storage-migration-tests']);
     expect(result.reasons).toContain('Touches shared-spaces upstream extension path');
     expect(result.reasons).toContain('Matches risk pattern breaking-refactor');
   });
@@ -295,6 +307,10 @@ function maxRisk(left: RiskLevel, right: RiskLevel): RiskLevel {
   return riskRank[right] > riskRank[left] ? right : left;
 }
 
+function checkAppliesToCommit(checkRisk: RiskLevel, commitRisk: RiskLevel): boolean {
+  return riskRank[commitRisk] >= riskRank[checkRisk];
+}
+
 export function classifyCommit(commit: GitCommit, manifest: Manifest, forkFiles: string[]): ClassifiedCommit {
   const domains = [...new Set(commit.files.map(detectDomain))].sort();
   const overlapFiles = commit.files.filter((file) => forkFiles.includes(file));
@@ -324,6 +340,15 @@ export function classifyCommit(commit: GitCommit, manifest: Manifest, forkFiles:
     if (subjectMatches || pathMatches) {
       risk = maxRisk(risk, pattern.risk);
       reasons.push(`Matches risk pattern ${pattern.id}`);
+    }
+  }
+
+  for (const [checkId, check] of Object.entries(manifest.checks ?? {})) {
+    if (check.required_for_risk?.some((checkRisk) => checkAppliesToCommit(checkRisk, risk))) {
+      requiredChecks.add(checkId);
+    }
+    if (check.required_for_domains?.some((domain) => domains.includes(domain))) {
+      requiredChecks.add(checkId);
     }
   }
 
@@ -390,7 +415,7 @@ describe('planBatches', () => {
         commit('000000001', 'low'),
         commit('000000002', 'low'),
         commit('539a39ae4', 'high', ['Matches risk pattern mobile-drift']),
-        commit('000000004', 'low'),
+        commit('000000004', 'medium', ['Matches risk pattern openapi-generated']),
         commit('000000005', 'medium'),
       ],
       10,
@@ -399,7 +424,8 @@ describe('planBatches', () => {
     expect(plan.batches.map((batch) => batch.commits.map((item) => item.shortSha))).toEqual([
       ['000000001', '000000002'],
       ['539a39ae4'],
-      ['000000004', '000000005'],
+      ['000000004'],
+      ['000000005'],
     ]);
     expect(plan.batches[1].requiredChecks).toEqual(['mobile-drift-rebase-check']);
   });
@@ -449,6 +475,14 @@ function makeBatch(index: number, commits: ClassifiedCommit[]): Batch {
   };
 }
 
+function mustStartOwnBatch(commit: ClassifiedCommit): boolean {
+  return (
+    commit.risk === 'high' ||
+    commit.features.length > 1 ||
+    commit.reasons.some((reason) => reason.includes('openapi-generated'))
+  );
+}
+
 export function planBatches(commits: ClassifiedCommit[], softCap = 10): BatchPlan {
   const batches: Batch[] = [];
   let current: ClassifiedCommit[] = [];
@@ -461,7 +495,7 @@ export function planBatches(commits: ClassifiedCommit[], softCap = 10): BatchPla
   };
 
   for (const commit of commits) {
-    if (commit.risk === 'high') {
+    if (mustStartOwnBatch(commit)) {
       flush();
       batches.push(makeBatch(batches.length + 1, [commit]));
       continue;
@@ -557,9 +591,24 @@ describe('renderPreflightMarkdown', () => {
       upstreamShortStat: '852 files changed',
       forkShortStat: '2040 files changed',
       classifiedCommits: [commit],
+      incomingCommits: [commit],
       forkFileCount: 2040,
       upstreamFileCount: 852,
       overlapFiles: ['mobile/lib/infrastructure/repositories/db.repository.dart'],
+      domainOverlaps: [{ domain: 'mobile', files: ['mobile/lib/infrastructure/repositories/db.repository.dart'] }],
+      featureOverlaps: [
+        {
+          feature: 'mobile-app-and-branding',
+          commits: ['539a39ae4'],
+          files: ['mobile/lib/infrastructure/repositories/db.repository.dart'],
+        },
+      ],
+      dependencyChanges: ['pnpm-lock.yaml'],
+      serverMigrationChanges: ['server/src/schema/migrations/1740000000000-Upstream.ts'],
+      serverTableOverlaps: ['shared_spaces'],
+      mobileDriftChanges: ['mobile/drift_schemas/main/drift_schema_v23.json'],
+      ciWorkflowChanges: ['.github/workflows/test.yml'],
+      broadRefactorHints: ['539a39ae4 touches 1 files and matches risk pattern mobile-drift'],
       batchMarkdown: '| Batch | Tip SHA | Commits | Risk | Why | Required Checks |',
       auditResults: [],
       extensionHotspots: [{ path: 'server/src/services/search.service.ts', hits: 4, features: ['shared-spaces'] }],
@@ -570,6 +619,9 @@ describe('renderPreflightMarkdown', () => {
     expect(markdown).toContain('mobile-drift-rebase-check');
     expect(markdown).toContain('Fork Surface Reduction Signals');
     expect(markdown).toContain('server/src/services/search.service.ts');
+    expect(markdown).toContain('Incoming Commit List');
+    expect(markdown).toContain('Dependency And Lockfile Changes');
+    expect(markdown).toContain('Server Migration Signals');
   });
 });
 ```
@@ -587,15 +639,35 @@ export type ExtensionHotspot = {
   features: string[];
 };
 
+export type DomainOverlap = {
+  domain: string;
+  files: string[];
+};
+
+export type FeatureOverlap = {
+  feature: string;
+  commits: string[];
+  files: string[];
+};
+
 export type PreflightReportInput = {
   date: string;
   mergeBase: string;
   upstreamShortStat: string;
   forkShortStat: string;
   classifiedCommits: ClassifiedCommit[];
+  incomingCommits: ClassifiedCommit[];
   forkFileCount: number;
   upstreamFileCount: number;
   overlapFiles: string[];
+  domainOverlaps: DomainOverlap[];
+  featureOverlaps: FeatureOverlap[];
+  dependencyChanges: string[];
+  serverMigrationChanges: string[];
+  serverTableOverlaps: string[];
+  mobileDriftChanges: string[];
+  ciWorkflowChanges: string[];
+  broadRefactorHints: string[];
   batchMarkdown: string;
   auditResults: AuditResult[];
   extensionHotspots: ExtensionHotspot[];
@@ -604,6 +676,10 @@ export type PreflightReportInput = {
 export function renderPreflightMarkdown(input: PreflightReportInput): string {
   const highRiskRows = input.classifiedCommits
     .filter((commit) => commit.risk === 'high')
+    .sort(
+      (left, right) =>
+        right.overlapFiles.length - left.overlapFiles.length || right.reasons.length - left.reasons.length,
+    )
     .map(
       (commit) =>
         `| \`${commit.shortSha}\` | ${commit.subject} | ${commit.domains.join(', ')} | ${commit.features.join(', ') || '-'} | ${commit.requiredChecks.join(', ') || '-'} | ${commit.reasons.join('; ')} |`,
@@ -615,6 +691,26 @@ export function renderPreflightMarkdown(input: PreflightReportInput): string {
   const hotspotRows = input.extensionHotspots
     .map((hotspot) => `| \`${hotspot.path}\` | ${hotspot.hits} | ${hotspot.features.join(', ')} |`)
     .join('\n');
+  const incomingRows = input.incomingCommits
+    .map(
+      (commit) =>
+        `| \`${commit.shortSha}\` | ${commit.subject} | ${commit.domains.join(', ') || '-'} | ${commit.risk.toUpperCase()} |`,
+    )
+    .join('\n');
+  const domainRows = input.domainOverlaps
+    .map(
+      (overlap) =>
+        `| ${overlap.domain} | ${overlap.files.length} | ${overlap.files.map((file) => `\`${file}\``).join('<br>')} |`,
+    )
+    .join('\n');
+  const featureRows = input.featureOverlaps
+    .map(
+      (overlap) =>
+        `| ${overlap.feature} | ${overlap.commits.join(', ')} | ${overlap.files.map((file) => `\`${file}\``).join('<br>')} |`,
+    )
+    .join('\n');
+  const listOrNone = (items: string[]) =>
+    items.length > 0 ? items.map((item) => `- \`${item}\``).join('\n') : '- None';
 
   return `# Upstream Preflight Report - ${input.date}
 
@@ -622,6 +718,7 @@ export function renderPreflightMarkdown(input: PreflightReportInput): string {
 
 - **Merge base**: \`${input.mergeBase}\`
 - **Incoming upstream files**: ${input.upstreamFileCount}
+- **Incoming upstream commits**: ${input.incomingCommits.length}
 - **Fork delta files**: ${input.forkFileCount}
 - **Direct overlap files**: ${input.overlapFiles.length}
 - **Incoming upstream diff**: ${input.upstreamShortStat || 'no changes'}
@@ -632,6 +729,48 @@ export function renderPreflightMarkdown(input: PreflightReportInput): string {
 | SHA | Subject | Domains | Features | Required Checks | Reasons |
 | --- | --- | --- | --- | --- | --- |
 ${highRiskRows || '| - | None | - | - | - | - |'}
+
+## Incoming Commit List
+
+| SHA | Subject | Domains | Risk |
+| --- | --- | --- | --- |
+${incomingRows || '| - | None | - | - |'}
+
+## Overlap By Domain
+
+| Domain | Files | Paths |
+| --- | ---: | --- |
+${domainRows || '| - | 0 | - |'}
+
+## Overlap By Manifest Feature
+
+| Feature | Commits | Files |
+| --- | --- | --- |
+${featureRows || '| - | - | - |'}
+
+## Dependency And Lockfile Changes
+
+${listOrNone(input.dependencyChanges)}
+
+## Server Migration Signals
+
+${listOrNone(input.serverMigrationChanges)}
+
+## Server Table Overlap Signals
+
+${listOrNone(input.serverTableOverlaps)}
+
+## Mobile Drift Signals
+
+${listOrNone(input.mobileDriftChanges)}
+
+## CI Workflow Signals
+
+${listOrNone(input.ciWorkflowChanges)}
+
+## Broad Refactor Hints
+
+${input.broadRefactorHints.length > 0 ? input.broadRefactorHints.map((hint) => `- ${hint}`).join('\n') : '- None'}
 
 ## Audit Signals
 
@@ -666,7 +805,7 @@ import { planBatches, renderBatchMarkdown } from './batch';
 import { collectGitRange, getGitPath, getMergeBase } from './git';
 import { defaultManifestPath, loadManifest } from './manifest';
 import { renderPreflightMarkdown } from './report';
-import { classifyCommit } from './risk';
+import { classifyCommit, detectDomain } from './risk';
 import type { ClassifiedCommit, Manifest } from './types';
 
 const program = new Command()
@@ -708,6 +847,56 @@ function collectExtensionHotspots(manifest: Manifest, classifiedCommits: Classif
     .slice(0, 20);
 }
 
+function collectDomainOverlaps(overlapFiles: string[]) {
+  const byDomain = new Map<string, string[]>();
+  for (const file of overlapFiles) {
+    const domain = detectDomain(file);
+    byDomain.set(domain, [...(byDomain.get(domain) ?? []), file]);
+  }
+  return [...byDomain.entries()]
+    .map(([domain, files]) => ({ domain, files: files.sort() }))
+    .sort((left, right) => left.domain.localeCompare(right.domain));
+}
+
+function collectFeatureOverlaps(classifiedCommits: ClassifiedCommit[]) {
+  const byFeature = new Map<string, { commits: Set<string>; files: Set<string> }>();
+  for (const commit of classifiedCommits) {
+    for (const feature of commit.features) {
+      const overlap = byFeature.get(feature) ?? { commits: new Set<string>(), files: new Set<string>() };
+      overlap.commits.add(commit.shortSha);
+      for (const file of commit.files) overlap.files.add(file);
+      byFeature.set(feature, overlap);
+    }
+  }
+  return [...byFeature.entries()]
+    .map(([feature, overlap]) => ({
+      feature,
+      commits: [...overlap.commits].sort(),
+      files: [...overlap.files].sort(),
+    }))
+    .sort((left, right) => left.feature.localeCompare(right.feature));
+}
+
+function collectSignalFiles(files: string[], globs: string[]): string[] {
+  return micromatch(files, globs).sort();
+}
+
+function collectServerTableOverlaps(manifest: Manifest, upstreamFiles: string[]) {
+  const upstreamText = upstreamFiles.join('\n');
+  const tables = Object.values(manifest.features).flatMap((feature) => feature.database?.tables ?? []);
+  return [...new Set(tables)]
+    .filter((table) => upstreamText.includes(table) || upstreamText.includes(table.replaceAll('_', '-')))
+    .sort();
+}
+
+function collectBroadRefactorHints(commits: ClassifiedCommit[]): string[] {
+  return commits
+    .filter(
+      (commit) => commit.files.length >= 25 || commit.reasons.some((reason) => reason.includes('breaking-refactor')),
+    )
+    .map((commit) => `${commit.shortSha} touches ${commit.files.length} files: ${commit.subject}`);
+}
+
 program
   .command('preflight')
   .option('--manifest <path>', 'ownership manifest path', defaultManifestPath)
@@ -721,9 +910,31 @@ program
       upstreamShortStat: context.upstreamRange.shortStat,
       forkShortStat: context.forkRange.shortStat,
       classifiedCommits: context.classifiedCommits,
+      incomingCommits: context.classifiedCommits,
       forkFileCount: context.forkRange.files.length,
       upstreamFileCount: context.upstreamRange.files.length,
       overlapFiles: context.overlapFiles,
+      domainOverlaps: collectDomainOverlaps(context.overlapFiles),
+      featureOverlaps: collectFeatureOverlaps(context.classifiedCommits),
+      dependencyChanges: collectSignalFiles(context.upstreamRange.files, [
+        'package.json',
+        'pnpm-lock.yaml',
+        'pnpm-workspace.yaml',
+        '**/package.json',
+        'machine-learning/pyproject.toml',
+        'machine-learning/uv.lock',
+      ]),
+      serverMigrationChanges: collectSignalFiles(context.upstreamRange.files, [
+        'server/src/schema/migrations/**',
+        'server/src/schema/tables/**',
+      ]),
+      serverTableOverlaps: collectServerTableOverlaps(context.manifest, context.upstreamRange.files),
+      mobileDriftChanges: collectSignalFiles(context.upstreamRange.files, [
+        'mobile/lib/infrastructure/repositories/db.repository.dart',
+        'mobile/drift_schemas/main/**',
+      ]),
+      ciWorkflowChanges: collectSignalFiles(context.upstreamRange.files, ['.github/workflows/**']),
+      broadRefactorHints: collectBroadRefactorHints(context.classifiedCommits),
       batchMarkdown: context.batchMarkdown,
       auditResults: [],
       extensionHotspots: collectExtensionHotspots(context.manifest, context.classifiedCommits),

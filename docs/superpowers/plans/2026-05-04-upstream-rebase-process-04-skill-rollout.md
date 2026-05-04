@@ -65,17 +65,21 @@ Replace the old process section with:
 ```markdown
 ## Process
 
-1. Create a fresh worktree.
-2. Fetch `upstream/main`.
-3. Run `make upstream-preflight`.
-4. Review and approve the generated risk report.
-5. Run `make upstream-batch-plan`.
-6. Rebase one recommended batch at a time.
-7. After each batch, run `make upstream-postrebase-audit` and the batch's required checks.
-8. Push high-risk batches to `rebase/upstream-batch-NN` when remote CI signal is useful.
-9. Continue until the final batch reaches `upstream/main`.
-10. Run full local and remote CI.
-11. Back up and force-push `main` only after the final result is green.
+1. Create a fresh worktree from `main`; never reuse a previous upstream rebase worktree.
+2. Create a temporary integration branch such as `rebase/upstream-batched`.
+3. Fetch `upstream/main`.
+4. Run `make upstream-preflight`.
+5. Review the generated report with the user before rebasing. Call out high-risk commits, mobile Drift collisions, CI/package patch issues, and broad refactor hints.
+6. Run `make upstream-batch-plan`.
+7. Review and approve the batch plan with the user.
+8. Rebase one recommended batch at a time.
+9. For every conflict, record the file, fork side, upstream side, chosen resolution, risk, and verification needed.
+10. After each batch, run `make upstream-postrebase-audit` and the batch's required checks.
+11. Push high-risk batches to `rebase/upstream-batch-NN` when remote CI signal is useful.
+12. Continue until the final batch reaches `upstream/main`.
+13. Run full local and remote CI on the final branch.
+14. Back up current `origin/main` before any force push.
+15. Force-push `main` only after the final result is green and approved.
 ```
 
 - [ ] **Step 4: Fix the mobile Drift contradiction**
@@ -106,6 +110,12 @@ Replace hardcoded inventory tables with:
 
 ````markdown
 ## Fork Compatibility Checks
+
+Keep reusable historical gotchas only when they encode a concrete invariant or
+operator rule. Examples that should remain as short rules are: preserve Gallery's
+shipped mobile Drift versions, preserve S3 cleanup branches in media/auth/user
+flows, avoid upstream `PUSH_O_MATIC` workflow tokens, and keep Gallery release
+image names.
 
 Run these checks after each high-risk batch and before final push:
 

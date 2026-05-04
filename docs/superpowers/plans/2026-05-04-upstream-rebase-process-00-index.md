@@ -29,6 +29,15 @@ The design source is `docs/superpowers/specs/2026-05-04-upstream-rebase-process-
 - Keep generated reports under `$(git rev-parse --git-path upstream-preflight)` so source status stays clean.
 - Treat `make mobile-drift-rebase-check` failing on the current upstream backlog as correct only when it identifies the shipped Gallery v23/v24 collision and recommends renumbering incoming upstream migrations above Gallery v24.
 
+## Deferred Follow-Ups
+
+The phase plans implement design phases 1 through 4. They also surface phase 6
+fork-surface reduction signals in the preflight report. Phase 5 advisory CI gates
+remain a documented follow-up: after the local tooling proves stable, add a
+workflow for `rebase/upstream-*` branches that runs `make upstream-preflight`,
+`make upstream-postrebase-audit`, `make ci-invariants-check`, and
+`make fork-patches-check` without blocking normal development branches.
+
 ### Task 0: Baseline Check
 
 **Files:**
@@ -48,8 +57,8 @@ git log --oneline --decorate --max-count=3
 Expected:
 
 ```text
-## plan/upstream-rebase-process...origin/main [ahead 1]
-36878e444 (HEAD -> plan/upstream-rebase-process) docs: upstream rebase process design
+## plan/upstream-rebase-process...origin/main [ahead 2, behind 1]
+c27979452 (HEAD -> plan/upstream-rebase-process) docs: split upstream rebase process plan
 ```
 
 - [ ] **Step 2: Confirm dependency baseline**
