@@ -153,8 +153,8 @@ class RemoteAssetEntity extends Table with TableInfo {
     requiredDuringInsert: false,
     $customConstraints: 'NULL',
   );
-  late final GeneratedColumn<int> durationMs = GeneratedColumn<int>(
-    'duration_ms',
+  late final GeneratedColumn<int> durationInSeconds = GeneratedColumn<int>(
+    'duration_in_seconds',
     aliasedName,
     true,
     type: DriftSqlType.int,
@@ -267,7 +267,7 @@ class RemoteAssetEntity extends Table with TableInfo {
     updatedAt,
     width,
     height,
-    durationMs,
+    durationInSeconds,
     id,
     checksum,
     isFavorite,
@@ -445,8 +445,8 @@ class LocalAssetEntity extends Table with TableInfo {
     requiredDuringInsert: false,
     $customConstraints: 'NULL',
   );
-  late final GeneratedColumn<int> durationMs = GeneratedColumn<int>(
-    'duration_ms',
+  late final GeneratedColumn<int> durationInSeconds = GeneratedColumn<int>(
+    'duration_in_seconds',
     aliasedName,
     true,
     type: DriftSqlType.int,
@@ -536,7 +536,7 @@ class LocalAssetEntity extends Table with TableInfo {
     updatedAt,
     width,
     height,
-    durationMs,
+    durationInSeconds,
     id,
     checksum,
     isFavorite,
@@ -2579,8 +2579,8 @@ class TrashedLocalAssetEntity extends Table with TableInfo {
     requiredDuringInsert: false,
     $customConstraints: 'NULL',
   );
-  late final GeneratedColumn<int> durationMs = GeneratedColumn<int>(
-    'duration_ms',
+  late final GeneratedColumn<int> durationInSeconds = GeneratedColumn<int>(
+    'duration_in_seconds',
     aliasedName,
     true,
     type: DriftSqlType.int,
@@ -2654,7 +2654,7 @@ class TrashedLocalAssetEntity extends Table with TableInfo {
     updatedAt,
     width,
     height,
-    durationMs,
+    durationInSeconds,
     id,
     albumId,
     checksum,
@@ -2797,9 +2797,17 @@ class DatabaseAtV25 extends GeneratedDatabase {
     'idx_shared_space_library_space_id',
     'CREATE INDEX IF NOT EXISTS idx_shared_space_library_space_id ON shared_space_library_entity (space_id)',
   );
+  late final Index idxSharedSpaceLibraryLibrarySpace = Index(
+    'idx_shared_space_library_library_space',
+    'CREATE INDEX IF NOT EXISTS idx_shared_space_library_library_space ON shared_space_library_entity (library_id, space_id)',
+  );
   late final Index idxSharedSpaceAssetSpaceAsset = Index(
     'idx_shared_space_asset_space_asset',
     'CREATE INDEX IF NOT EXISTS idx_shared_space_asset_space_asset ON shared_space_asset_entity (space_id, asset_id)',
+  );
+  late final Index idxSharedSpaceAssetAssetSpace = Index(
+    'idx_shared_space_asset_asset_space',
+    'CREATE INDEX IF NOT EXISTS idx_shared_space_asset_asset_space ON shared_space_asset_entity (asset_id, space_id)',
   );
   late final Index idxLocalAlbumAssetAlbumAsset = Index(
     'idx_local_album_asset_album_asset',
@@ -2930,7 +2938,9 @@ class DatabaseAtV25 extends GeneratedDatabase {
     localAlbumAssetEntity,
     idxSharedSpaceCreatedById,
     idxSharedSpaceLibrarySpaceId,
+    idxSharedSpaceLibraryLibrarySpace,
     idxSharedSpaceAssetSpaceAsset,
+    idxSharedSpaceAssetAssetSpace,
     idxLocalAlbumAssetAlbumAsset,
     idxRemoteAlbumOwnerId,
     idxLocalAssetChecksum,
