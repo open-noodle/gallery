@@ -5,6 +5,7 @@ packages:
   - i18n
   - server
   - plugins
+  - tools/upstream-preflight
   - web
   - .github
 dedupePeerDependents: false
