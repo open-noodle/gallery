@@ -72,20 +72,59 @@ Before starting an upstream sync, confirm the manifest is current:
 make fork-ownership-coverage-check
 ```
 
-This target:
+This target treats `last_verified_fork_head` as the reviewed floor for the
+manifest, not as a permanent lock to the current fork head. It:
 
 1. Lists fork files with `git diff --name-only upstream/main...origin/main`.
 2. Checks that every fork file is covered by `docs/fork/ownership.yml`, unless
    it is explicitly ignored.
-3. Verifies `metadata.last_verified_fork_head` matches `git rev-parse
+3. Compares `metadata.last_verified_fork_head` with `git rev-parse
 origin/main`.
 
-If this check fails because `origin/main` moved, update the manifest baseline and
-refresh any affected ownership entries before rebasing.
+Baseline outcomes:
+
+- Exact match: the manifest is current.
+- Baseline is an ancestor of `origin/main`: the check passes with warnings and
+  lists files changed since the manifest was verified.
+- Baseline is not an ancestor of `origin/main`: the check fails because the
+  manifest baseline does not describe the current fork history.
+
+The coverage check always runs against the full fork delta, not only files
+changed since the manifest baseline. The changed-since-baseline list is a review
+aid for manifest maintenance.
+
+Broad optional manifest globs such as `mobile/**`, `docs/**`, or
+`server/src/**` are allowed as safety nets. Files changed after the manifest
+baseline that are covered only by those broad optional globs produce warnings.
+To make those warnings blocking during manifest cleanup, run:
+
+```bash
+pnpm --filter @gallery/upstream-preflight run coverage -- /tmp/gallery-fork-files.txt docs/fork/ownership.yml --expected-head "$(git rev-parse origin/main)" --strict-broad-coverage
+```
 
 ## Preflight
 
-Run the preflight report before rebasing:
+Run the readiness command before rebasing:
+
+```bash
+make upstream-rebase-ready
+```
+
+Readiness writes fresh preflight, batch plan, and readiness reports under Git
+metadata:
+
+```bash
+$(git rev-parse --git-path upstream-preflight)
+```
+
+It fails for blockers such as uncovered fork files, non-ancestor manifest
+baselines, CI invariant failures, package patch failures, and current fork
+integrity failures. It passes with warnings for ancestor baseline drift and
+broad optional coverage. Known upstream work such as mobile Drift renumbering,
+generated artifact review, and migration timestamp collisions is listed as
+planned resolution work.
+
+You can still run the preflight report directly:
 
 ```bash
 make upstream-preflight
@@ -115,7 +154,8 @@ The preflight report includes:
 
 Review the report before rebasing. Pay particular attention to high-risk
 commits, direct overlaps, mobile Drift collisions, generated artifacts, and
-workflow changes.
+workflow changes. The fork-surface section is advisory and should be interpreted
+with the [fork surface guidelines](./fork-surface-guidelines.md).
 
 ## Batch Plan
 
@@ -124,6 +164,18 @@ Generate the batch plan:
 ```bash
 make upstream-batch-plan
 ```
+
+The planner prints Markdown and writes the persisted plan under Git metadata:
+
+```bash
+$(git rev-parse --git-path upstream-preflight)/batch-plan.md
+$(git rev-parse --git-path upstream-preflight)/batch-plan.json
+```
+
+The JSON includes the merge base, manifest-defined upstream and fork refs, the
+current upstream and fork heads, the manifest baseline, generation time, and the
+batch soft cap. Batch tips and commit entries are stored as full SHAs; Markdown
+uses short SHAs only for readability.
 
 The planner keeps upstream commit order and groups low-risk commits together up
 to a soft cap. It isolates high-risk commits and commits that touch multiple
@@ -135,8 +187,10 @@ Each batch includes:
 - upstream tip SHA
 - commit count
 - risk level
+- whether it is a checkpoint
 - reasons
-- required checks
+- cheap post-batch checks
+- expensive checkpoint checks
 - exact operator commands
 
 Example:
@@ -145,14 +199,38 @@ Example:
 git rebase <batch-tip-sha>
 make upstream-postrebase-audit BATCH=02
 make mobile-drift-rebase-check BATCH=02
+make e2e-rebase-smoke
 git push origin HEAD:rebase/upstream-batch-02 --force
 ```
+
+Cheap checks run after every affected batch. Expensive checks and remote pushes
+only render at checkpoints. Checkpoints are selected conservatively: every
+high-risk batch, any low/medium run after roughly ten cumulative upstream
+commits, and the final batch.
 
 Review and approve the batch plan before starting the rebase.
 
 ## Rebase Mechanics
 
-Rebase the fork stack from one upstream batch tip to the next:
+Before each rebase step, ask the tool which persisted batch is next:
+
+```bash
+make upstream-next-batch
+```
+
+This validates that `batch-plan.json` still matches the current upstream ref,
+then prints the next batch id, full tip SHA, risk, reasons, and exact commands.
+If upstream moved, rerun `make upstream-batch-plan` and review the new plan
+before continuing.
+
+Rebase the fork stack from one upstream batch tip to the next. The command
+printed by `make upstream-next-batch` uses the full persisted batch tip:
+
+```bash
+git rebase <full-batch-tip-sha>
+```
+
+The equivalent manual form is:
 
 ```bash
 BASE="$(git merge-base origin/main upstream/main)"
@@ -160,15 +238,10 @@ NEXT="<batch-tip-sha>"
 git rebase --onto "$NEXT" "$BASE" HEAD
 ```
 
-After a batch succeeds, move the base to the batch tip:
-
-```bash
-BASE="$NEXT"
-NEXT="<next-batch-tip-sha>"
-git rebase --onto "$NEXT" "$BASE" HEAD
-```
-
-Repeat until the final batch reaches `upstream/main`.
+After a batch succeeds, run the printed audit commands and then run
+`make upstream-next-batch` again. The tool derives completed batches from
+`HEAD`, so operators do not need to track `BASE` or `NEXT` manually. Repeat
+until it reports that the branch already includes `upstream/main`.
 
 When conflicts occur, record the conflict resolution:
 
@@ -271,7 +344,8 @@ For the current v23/v24 collision pattern, the expected strategy is:
 
 ## CI And Patch Checks
 
-Run these after high-risk batches and before final push:
+Run these when `make upstream-next-batch` prints them after affected batches and
+before final push:
 
 ```bash
 make ci-invariants-check
@@ -310,8 +384,10 @@ Before asking to update `main`, run:
 ```bash
 pnpm install --frozen-lockfile
 make fork-ownership-coverage-check
+make upstream-rebase-ready
 make upstream-preflight
 make upstream-batch-plan
+make upstream-next-batch
 make upstream-postrebase-audit
 make ci-invariants-check
 make fork-patches-check

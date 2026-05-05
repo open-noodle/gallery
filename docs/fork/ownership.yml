@@ -10,6 +10,20 @@ metadata:
 coverage_ignore:
   - docs/superpowers/**
 
+fork_surface:
+  preferred_namespaces:
+    server:
+      - server/src/gallery/**
+    web:
+      - web/src/lib/gallery/**
+    mobile:
+      - mobile/lib/gallery/**
+    database:
+      - server/src/schema/migrations-gallery/**
+    ci:
+      - .github/actions/gallery-*/**
+      - .github/workflows/gallery-*.yml
+
 features:
   shared-spaces:
     title: Shared Spaces And Space Identity
@@ -344,26 +358,32 @@ checks:
   e2e-rebase-smoke:
     command: make e2e-rebase-smoke
     phase: post-batch
+    cost: expensive
     required_for_risk: [high]
   mobile-drift-rebase-check:
     command: make mobile-drift-rebase-check
     phase: preflight-and-post-batch
+    cost: cheap
     required_for_domains: [mobile, database]
   ci-invariants-check:
     command: make ci-invariants-check
     phase: preflight-and-post-batch
+    cost: cheap
     required_for_domains: [ci]
   fork-patches-check:
     command: make fork-patches-check
     phase: preflight-and-post-batch
+    cost: cheap
     required_for_domains: [web, ci]
   storage-migration-tests:
-    command: make test-server
+    command: make storage-migration-tests
     phase: post-batch
+    cost: expensive
     required_for_domains: [server, database]
   storage-migration-e2e:
-    command: make e2e-rebase-smoke
+    command: make storage-migration-e2e
     phase: post-batch
+    cost: expensive
     required_for_domains: [e2e]
 
 ci_invariants:

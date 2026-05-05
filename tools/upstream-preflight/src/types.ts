@@ -1,14 +1,14 @@
-export type RiskLevel = 'low' | 'medium' | 'high';
+export type RiskLevel = "low" | "medium" | "high";
 export type Domain =
-  | 'server'
-  | 'web'
-  | 'mobile'
-  | 'database'
-  | 'ci'
-  | 'docs'
-  | 'e2e'
-  | 'ml'
-  | 'config';
+  | "server"
+  | "web"
+  | "mobile"
+  | "database"
+  | "ci"
+  | "docs"
+  | "e2e"
+  | "ml"
+  | "config";
 
 export type Manifest = {
   version: 1;
@@ -25,6 +25,9 @@ export type Manifest = {
   patches?: PackagePatch[];
   risk_patterns?: RiskPattern[];
   coverage_ignore?: string[];
+  fork_surface?: {
+    preferred_namespaces?: Partial<Record<Domain, string[]>>;
+  };
 };
 
 export type FeatureEntry = {
@@ -46,7 +49,7 @@ export type FeatureEntry = {
     drift_versions?: {
       owned: number[];
       shipped: boolean;
-      owner: 'gallery';
+      owner: "gallery";
       expected_callbacks?: Record<number, string[]>;
     };
     paths?: string[];
@@ -56,7 +59,8 @@ export type FeatureEntry = {
 
 export type CheckEntry = {
   command: string;
-  phase: 'preflight' | 'post-batch' | 'preflight-and-post-batch' | 'final';
+  phase: "preflight" | "post-batch" | "preflight-and-post-batch" | "final";
+  cost?: "cheap" | "expensive";
   required_for_risk?: RiskLevel[];
   required_for_domains?: Domain[];
 };
@@ -101,7 +105,21 @@ export type ClassifiedCommit = GitCommit & {
   requiredChecks: string[];
 };
 
-export type BatchPlan = { batches: Batch[] };
+export type BatchPlanMetadata = {
+  generatedAt: string;
+  mergeBase: string;
+  upstreamRef: string;
+  upstreamHead: string;
+  forkRef: string;
+  forkHead: string;
+  manifestForkBaseline: string;
+  softCap: number;
+};
+
+export type BatchPlan = {
+  metadata: BatchPlanMetadata;
+  batches: Batch[];
+};
 
 export type Batch = {
   id: string;
@@ -110,10 +128,27 @@ export type Batch = {
   risk: RiskLevel;
   why: string[];
   requiredChecks: string[];
+  postBatchChecks: string[];
+  checkpointChecks: string[];
+  checkpoint: boolean;
 };
 
 export type AuditResult = {
   ok: boolean;
   title: string;
   details: string[];
+};
+
+export type ManifestHeadValidation = {
+  ok: boolean;
+  errors: string[];
+  warnings: string[];
+  changedSinceBaseline: string[];
+};
+
+export type CoverageClassification = {
+  file: string;
+  explicitGlobs: string[];
+  broadOptionalGlobs: string[];
+  narrowOptionalGlobs: string[];
 };

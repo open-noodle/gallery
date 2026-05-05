@@ -40,6 +40,16 @@ workflow for `rebase/upstream-*` branches that runs `make upstream-preflight`,
 `make ci-invariants-check`, and `make fork-patches-check` without blocking
 normal development branches.
 
+Follow-up hardening has its own design and split plan index:
+
+- `docs/superpowers/specs/2026-05-05-upstream-rebase-hardening-design.md`
+- `docs/superpowers/plans/2026-05-05-upstream-rebase-hardening.md`
+
+The hardening index links the phase plans for ancestor-aware manifest baselines,
+broad coverage warnings, persisted batch provenance, `upstream-next-batch`,
+`upstream-rebase-ready`, checkpoint-aware batch commands, and low-friction
+`gallery/*` namespace conventions.
+
 ### Task 0: Baseline Check
 
 **Files:**

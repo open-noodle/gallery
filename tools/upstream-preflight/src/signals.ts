@@ -1,6 +1,32 @@
-import micromatch from 'micromatch';
-import type { ClassifiedCommit, Manifest } from './types';
-import type { FeatureOverlap } from './report';
+import micromatch from "micromatch";
+import type {
+  ClassifiedCommit,
+  CoverageClassification,
+  Manifest,
+} from "./types";
+import type { FeatureOverlap } from "./report";
+
+export type ForkSurfaceGroup = {
+  count: number;
+  sample: string[];
+};
+
+export type ForkSurfaceSignals = {
+  configured: boolean;
+  preferredNamespaceFiles: ForkSurfaceGroup;
+  outsidePreferredNamespaceFiles: ForkSurfaceGroup;
+  adapterHookFiles: ForkSurfaceGroup;
+  extractionCandidates: ForkSurfaceGroup;
+  broadOnlyRecentFiles: ForkSurfaceGroup;
+};
+
+export type ForkSurfaceSignalInput = {
+  manifest: Manifest;
+  forkFiles: string[];
+  overlapFiles: string[];
+  broadOnlyRecentFiles: CoverageClassification[];
+  sampleLimit?: number;
+};
 
 export function collectExtensionHotspots(
   manifest: Manifest,
@@ -77,7 +103,60 @@ export function collectFeatureOverlaps(
     .sort((left, right) => left.feature.localeCompare(right.feature));
 }
 
-function featureSignalGlobs(feature: Manifest['features'][string]): string[] {
+export function collectForkSurfaceSignals(
+  input: ForkSurfaceSignalInput,
+): ForkSurfaceSignals {
+  const sampleLimit = input.sampleLimit ?? 20;
+  const preferredGlobs = Object.values(
+    input.manifest.fork_surface?.preferred_namespaces ?? {},
+  ).flat();
+
+  if (preferredGlobs.length === 0) {
+    return {
+      configured: false,
+      preferredNamespaceFiles: group([]),
+      outsidePreferredNamespaceFiles: group([]),
+      adapterHookFiles: group([]),
+      extractionCandidates: group([]),
+      broadOnlyRecentFiles: group(
+        input.broadOnlyRecentFiles.map((classification) => classification.file),
+        sampleLimit,
+      ),
+    };
+  }
+
+  const extensionGlobs = Object.values(input.manifest.features).flatMap(
+    (feature) => feature.upstream_extension_paths ?? [],
+  );
+  const preferredFiles = input.forkFiles.filter((file) =>
+    micromatch.isMatch(file, preferredGlobs, { dot: true }),
+  );
+  const outsideFiles = input.forkFiles.filter(
+    (file) => !micromatch.isMatch(file, preferredGlobs, { dot: true }),
+  );
+  const adapterHookFiles = outsideFiles.filter((file) =>
+    micromatch.isMatch(file, extensionGlobs, { dot: true }),
+  );
+  const extractionCandidates = input.overlapFiles.filter(
+    (file) =>
+      !micromatch.isMatch(file, preferredGlobs, { dot: true }) &&
+      !micromatch.isMatch(file, extensionGlobs, { dot: true }),
+  );
+
+  return {
+    configured: true,
+    preferredNamespaceFiles: group(preferredFiles, sampleLimit),
+    outsidePreferredNamespaceFiles: group(outsideFiles, sampleLimit),
+    adapterHookFiles: group(adapterHookFiles, sampleLimit),
+    extractionCandidates: group(extractionCandidates, sampleLimit),
+    broadOnlyRecentFiles: group(
+      input.broadOnlyRecentFiles.map((classification) => classification.file),
+      sampleLimit,
+    ),
+  };
+}
+
+function featureSignalGlobs(feature: Manifest["features"][string]): string[] {
   return [
     ...(feature.owned_paths ?? []),
     ...(feature.upstream_extension_paths ?? []),
@@ -87,4 +166,12 @@ function featureSignalGlobs(feature: Manifest['features'][string]): string[] {
     ...Object.keys(feature.expected_symbols ?? {}),
     ...(feature.generated_artifacts ?? []),
   ];
+}
+
+function group(files: string[], sampleLimit = 20): ForkSurfaceGroup {
+  const sorted = [...new Set(files)].sort();
+  return {
+    count: sorted.length,
+    sample: sorted.slice(0, sampleLimit),
+  };
 }

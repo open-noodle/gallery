@@ -1,4 +1,5 @@
-import type { AuditResult, ClassifiedCommit } from './types';
+import type { AuditResult, ClassifiedCommit } from "./types";
+import type { ForkSurfaceSignals } from "./signals";
 
 export type ExtensionHotspot = {
   path: string;
@@ -38,11 +39,12 @@ export type PreflightReportInput = {
   batchMarkdown: string;
   auditResults: AuditResult[];
   extensionHotspots: ExtensionHotspot[];
+  forkSurfaceSignals?: ForkSurfaceSignals;
 };
 
 export function renderPreflightMarkdown(input: PreflightReportInput): string {
   const highRiskRows = input.classifiedCommits
-    .filter((commit) => commit.risk === 'high')
+    .filter((commit) => commit.risk === "high")
     .sort(
       (left, right) =>
         right.overlapFiles.length - left.overlapFiles.length ||
@@ -50,43 +52,53 @@ export function renderPreflightMarkdown(input: PreflightReportInput): string {
     )
     .map(
       (commit) =>
-        `| \`${commit.shortSha}\` | ${commit.subject} | ${commit.domains.join(', ')} | ${commit.features.join(', ') || '-'} | ${commit.requiredChecks.join(', ') || '-'} | ${commit.reasons.join('; ')} |`,
+        `| \`${commit.shortSha}\` | ${commit.subject} | ${commit.domains.join(", ")} | ${commit.features.join(", ") || "-"} | ${commit.requiredChecks.join(", ") || "-"} | ${commit.reasons.join("; ")} |`,
     )
-    .join('\n');
+    .join("\n");
   const auditRows = input.auditResults
     .map(
       (audit) =>
-        `| ${audit.ok ? 'OK' : 'ISSUE'} | ${audit.title} | ${audit.details.join('<br>')} |`,
+        `| ${audit.ok ? "OK" : "ISSUE"} | ${audit.title} | ${audit.details.join("<br>")} |`,
     )
-    .join('\n');
+    .join("\n");
   const hotspotRows = input.extensionHotspots
     .map(
       (hotspot) =>
-        `| \`${hotspot.path}\` | ${hotspot.hits} | ${hotspot.features.join(', ')} |`,
+        `| \`${hotspot.path}\` | ${hotspot.hits} | ${hotspot.features.join(", ")} |`,
     )
-    .join('\n');
+    .join("\n");
   const incomingRows = input.incomingCommits
     .map(
       (commit) =>
-        `| \`${commit.shortSha}\` | ${commit.subject} | ${commit.domains.join(', ') || '-'} | ${commit.risk.toUpperCase()} |`,
+        `| \`${commit.shortSha}\` | ${commit.subject} | ${commit.domains.join(", ") || "-"} | ${commit.risk.toUpperCase()} |`,
     )
-    .join('\n');
+    .join("\n");
   const domainRows = input.domainOverlaps
     .map(
       (overlap) =>
-        `| ${overlap.domain} | ${overlap.files.length} | ${overlap.files.map((file) => `\`${file}\``).join('<br>')} |`,
+        `| ${overlap.domain} | ${overlap.files.length} | ${overlap.files.map((file) => `\`${file}\``).join("<br>")} |`,
     )
-    .join('\n');
+    .join("\n");
   const featureRows = input.featureOverlaps
     .map(
       (overlap) =>
-        `| ${overlap.feature} | ${overlap.commits.join(', ')} | ${overlap.files.map((file) => `\`${file}\``).join('<br>')} |`,
+        `| ${overlap.feature} | ${overlap.commits.join(", ")} | ${overlap.files.map((file) => `\`${file}\``).join("<br>")} |`,
     )
-    .join('\n');
+    .join("\n");
   const listOrNone = (items: string[]) =>
     items.length > 0
-      ? items.map((item) => `- \`${item}\``).join('\n')
-      : '- None';
+      ? items.map((item) => `- \`${item}\``).join("\n")
+      : "- None";
+  const forkSurface = input.forkSurfaceSignals;
+  const renderSurfaceGroup = (
+    label: string,
+    group: { count: number; sample: string[] } | undefined,
+  ) =>
+    `| ${label} | ${group?.count ?? 0} | ${
+      group && group.sample.length > 0
+        ? group.sample.map((file) => `\`${file}\``).join("<br>")
+        : "-"
+    } |`;
 
   return `# Upstream Preflight Report - ${input.date}
 
@@ -97,32 +109,32 @@ export function renderPreflightMarkdown(input: PreflightReportInput): string {
 - **Incoming upstream commits**: ${input.incomingCommits.length}
 - **Fork delta files**: ${input.forkFileCount}
 - **Direct overlap files**: ${input.overlapFiles.length}
-- **Incoming upstream diff**: ${input.upstreamShortStat || 'no changes'}
-- **Fork diff**: ${input.forkShortStat || 'no changes'}
+- **Incoming upstream diff**: ${input.upstreamShortStat || "no changes"}
+- **Fork diff**: ${input.forkShortStat || "no changes"}
 
 ## High-Risk Commits
 
 | SHA | Subject | Domains | Features | Required Checks | Reasons |
 | --- | --- | --- | --- | --- | --- |
-${highRiskRows || '| - | None | - | - | - | - |'}
+${highRiskRows || "| - | None | - | - | - | - |"}
 
 ## Incoming Commit List
 
 | SHA | Subject | Domains | Risk |
 | --- | --- | --- | --- |
-${incomingRows || '| - | None | - | - |'}
+${incomingRows || "| - | None | - | - |"}
 
 ## Overlap By Domain
 
 | Domain | Files | Paths |
 | --- | ---: | --- |
-${domainRows || '| - | 0 | - |'}
+${domainRows || "| - | 0 | - |"}
 
 ## Overlap By Manifest Feature
 
 | Feature | Commits | Files |
 | --- | --- | --- |
-${featureRows || '| - | - | - |'}
+${featureRows || "| - | - | - |"}
 
 ## Dependency And Lockfile Changes
 
@@ -146,13 +158,13 @@ ${listOrNone(input.ciWorkflowChanges)}
 
 ## Broad Refactor Hints
 
-${input.broadRefactorHints.length > 0 ? input.broadRefactorHints.map((hint) => `- ${hint}`).join('\n') : '- None'}
+${input.broadRefactorHints.length > 0 ? input.broadRefactorHints.map((hint) => `- ${hint}`).join("\n") : "- None"}
 
 ## Audit Signals
 
 | Status | Check | Details |
 | --- | --- | --- |
-${auditRows || '| OK | No audit signals | - |'}
+${auditRows || "| OK | No audit signals | - |"}
 
 ## Recommended Batch Plan
 
@@ -160,8 +172,20 @@ ${input.batchMarkdown}
 
 ## Fork Surface Reduction Signals
 
+${forkSurface && !forkSurface.configured ? "Fork surface preferred namespaces are not configured." : "Fork surface findings are advisory and do not block preflight."}
+
+| Signal | Count | Sample |
+| --- | ---: | --- |
+${renderSurfaceGroup("Preferred namespace files", forkSurface?.preferredNamespaceFiles)}
+${renderSurfaceGroup("Outside preferred namespaces", forkSurface?.outsidePreferredNamespaceFiles)}
+${renderSurfaceGroup("Adapter/hook files", forkSurface?.adapterHookFiles)}
+${renderSurfaceGroup("Extraction candidates", forkSurface?.extractionCandidates)}
+${renderSurfaceGroup("Recent broad-only files", forkSurface?.broadOnlyRecentFiles)}
+
+### Upstream Extension Hotspots
+
 | Upstream Extension Path | Incoming Touch Count | Features |
 | --- | ---: | --- |
-${hotspotRows || '| - | 0 | - |'}
+${hotspotRows || "| - | 0 | - |"}
 `;
 }

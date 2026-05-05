@@ -48,15 +48,31 @@ e2e-rebase-smoke:
 	cd e2e && PLAYWRIGHT_DISABLE_WEBSERVER=true pnpm exec playwright test --project=rebase-smoke
 	cd e2e && docker compose down -v
 
+.PHONY: storage-migration-tests
+storage-migration-tests:
+	cd e2e && ./storage-migration.sh --cleanup --verbose
+
+.PHONY: storage-migration-e2e
+storage-migration-e2e:
+	cd e2e && ./storage-migration.sh --cleanup --verbose
+
 UPSTREAM_PREFLIGHT = pnpm --filter @gallery/upstream-preflight
 
 .PHONY: upstream-preflight
 upstream-preflight:
 	$(UPSTREAM_PREFLIGHT) run preflight
 
+.PHONY: upstream-rebase-ready
+upstream-rebase-ready:
+	$(UPSTREAM_PREFLIGHT) run ready
+
 .PHONY: upstream-batch-plan
 upstream-batch-plan:
 	$(UPSTREAM_PREFLIGHT) run batch-plan
+
+.PHONY: upstream-next-batch
+upstream-next-batch:
+	$(UPSTREAM_PREFLIGHT) run next-batch
 
 .PHONY: upstream-postrebase-audit
 upstream-postrebase-audit:
