@@ -411,6 +411,25 @@ planning signals:
 
 Unexpected audit failures should stop the rebase until they are understood.
 
+## Current Backlog Notes
+
+A disposable rehearsal against `upstream/main` at
+`7acda0572dc3349977d1aa66e90a3ef1474583fa` confirmed these expected stops for
+the current backlog:
+
+- Batch 01 rebases after one web conflict in
+  `web/src/lib/components/asset-viewer/detail-panel-tags.svelte`. Preserve
+  upstream's `Badge onClose` API while keeping Gallery's owner-only tag removal
+  behavior for space members.
+- Batch 01 post-rebase audit reports generated artifact review for
+  `server/src/queries/asset.job.repository.sql`.
+- Batch 02 reaches the known mobile Drift conflict on fork commit `12edb59cd`.
+  The conflicted files include `mobile/drift_schemas/main/drift_schema_v23.json`,
+  generated Drift files, and `mobile/lib/infrastructure/repositories/db.repository.dart`.
+  Resolve this during the real rebase by keeping Gallery v23/v24 shipped
+  versions and appending incoming upstream migrations above Gallery's current
+  highest version.
+
 ## Final Push
 
 Before force-pushing `main`, create a backup branch:
