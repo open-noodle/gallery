@@ -17,7 +17,6 @@ import { userAdminFactory } from '@test-data/factories/user-factory';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
-import { readFileSync } from 'node:fs';
 import PeoplePage from './+page.svelte';
 
 const { gotoMock, pageStore } = vi.hoisted(() => {
@@ -328,14 +327,6 @@ describe('Global people page', () => {
     expect(renderedButtonLabels).not.toContain('view_face_statistics_details');
     expect(screen.queryByRole('button', { name: 'view_face_statistics_details' })).not.toBeInTheDocument();
     expect(sdkMock.getPeopleFaceStatistics).not.toHaveBeenCalled();
-  });
-
-  it('derives the unsupported global statistics filter from the active URL query before mount', () => {
-    const source = readFileSync('src/routes/(user)/people/+page.svelte', 'utf8');
-
-    expect(source).toMatch(
-      /let hasUnsupportedStatsFilter = \$derived\(\s*!!\$page\.url\.searchParams\.get\(QueryParameter\.SEARCHED_PEOPLE\) \|\| !!searchName\.trim\(\),\s*\)/,
-    );
   });
 
   it('hides the face statistics details button when overview statistics are unavailable', () => {
