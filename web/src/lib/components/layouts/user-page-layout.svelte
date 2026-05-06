@@ -20,6 +20,7 @@
     use?: ActionArray;
     actions?: Array<HeaderButtonActionItem | MenuItemType>;
     leading?: Snippet;
+    descriptionTrailing?: Snippet;
     sidebar?: Snippet;
     buttons?: Snippet;
     children?: Snippet;
@@ -33,6 +34,7 @@
     use = [],
     actions = [],
     leading,
+    descriptionTrailing,
     sidebar,
     buttons,
     children,
@@ -88,6 +90,11 @@
             >
               {description}
             </p>
+          {/if}
+          {#if descriptionTrailing}
+            <div class="shrink-0" data-testid="page-header-description-trailing">
+              {@render descriptionTrailing()}
+            </div>
           {/if}
         </div>
 
