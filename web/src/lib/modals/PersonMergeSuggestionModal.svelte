@@ -1,7 +1,8 @@
 <script lang="ts">
   import { getPeopleThumbnailUrl } from '$lib/utils';
   import { handleError } from '$lib/utils/handle-error';
-  import { mergePeople, type PersonResponseDto } from '@immich/sdk';
+  import { isSpaceScopedPerson, toScopedPersonRef } from '$lib/utils/scoped-person-ref';
+  import { mergePeople, mergeScopedPeople, type PersonResponseDto } from '@immich/sdk';
   import { FormModal, Icon, IconButton, toastManager } from '@immich/ui';
   import { mdiArrowLeft, mdiCallMerge, mdiSwapHorizontal } from '@mdi/js';
   import { onMount, tick } from 'svelte';
@@ -35,7 +36,14 @@
 
   const onSubmit = async () => {
     try {
-      await mergePeople({ mergePersonDto: { ids: [personToBeMergedInto.id, personToMerge.id] } });
+      await (isSpaceScopedPerson(personToMerge) || isSpaceScopedPerson(personToBeMergedInto)
+        ? mergeScopedPeople({
+            mergeScopedPeopleDto: {
+              target: toScopedPersonRef(personToBeMergedInto),
+              sources: [toScopedPersonRef(personToMerge)],
+            },
+          })
+        : mergePeople({ mergePersonDto: { ids: [personToBeMergedInto.id, personToMerge.id] } }));
       toastManager.primary($t('merge_people_successfully'));
       onClose([personToMerge, personToBeMergedInto]);
     } catch (error) {
