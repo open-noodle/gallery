@@ -4,6 +4,7 @@
   import { QueryParameter, timeBeforeShowLoadingSpinner } from '$lib/constants';
   import SearchBar from '$lib/elements/SearchBar.svelte';
   import UserPageLayout from '$lib/components/layouts/user-page-layout.svelte';
+  import PeopleFaceStatisticsInfo from '$lib/components/people/people-face-statistics-info.svelte';
   import PeopleManagementGrid from '$lib/components/people/people-management-grid.svelte';
   import PeopleMergeSelector from '$lib/components/people/people-merge-selector.svelte';
   import type { ManagedPerson } from '$lib/components/people/people-types';
@@ -19,6 +20,7 @@
   import { formatPeopleHeaderDescription } from '$lib/utils/people-statistics';
   import {
     getSpacePeople,
+    getSpacePeopleFaceStatistics,
     getSpacePeopleStatistics,
     mergeSpacePeople,
     SharedSpaceRole,
@@ -80,6 +82,10 @@
         })
       : undefined,
   );
+  let showFaceStatisticsInfo = $derived(!!peopleStatistics && !!headerDescription);
+  let spaceFaceStatisticsCacheKey = $derived(
+    `user:${authManager.user.id}:space:${space.id}:people:face-statistics:name=${encodeURIComponent(searchName.trim())}`,
+  );
   let allPeople = $state<SharedSpacePersonResponseDto[]>([]);
   let mergingPerson = $state<SharedSpacePersonResponseDto>();
 
@@ -131,6 +137,8 @@
     const name = searchName.trim();
     return { id: space.id, ...(name ? { name } : {}) };
   };
+
+  const loadSpaceFaceStatistics = () => getSpacePeopleFaceStatistics(getStatisticsQuery());
 
   const cancelSearchRequest = () => {
     abortController?.abort();
@@ -371,6 +379,12 @@
   title={$t('spaces_people_title')}
   description={headerDescription}
 >
+  {#snippet descriptionTrailing()}
+    {#if showFaceStatisticsInfo}
+      <PeopleFaceStatisticsInfo cacheKey={spaceFaceStatisticsCacheKey} loadStatistics={loadSpaceFaceStatistics} />
+    {/if}
+  {/snippet}
+
   {#snippet leading()}
     <IconButton
       variant="ghost"

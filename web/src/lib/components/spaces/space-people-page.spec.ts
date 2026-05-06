@@ -1,7 +1,9 @@
 import { getAnimateMock } from '$lib/__mocks__/animate.mock';
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
+import { clearPeopleFaceStatisticsInfoCache } from '$lib/components/people/people-face-statistics-info.svelte';
 import { authManager } from '$lib/managers/auth-manager.svelte';
 import {
+  type PeopleFaceStatisticsResponseDto,
   SharedSpaceRole,
   type SharedSpaceMemberResponseDto,
   type SharedSpacePeopleStatisticsResponseDto,
@@ -92,6 +94,18 @@ function makePerson(overrides: Partial<SharedSpacePersonResponseDto> = {}): Shar
   } as SharedSpacePersonResponseDto;
 }
 
+function makeFaceStatistics(
+  overrides: Partial<PeopleFaceStatisticsResponseDto> = {},
+): PeopleFaceStatisticsResponseDto {
+  return {
+    assignedHiddenFaceCount: 3456,
+    assignedVisibleFaceCount: 2345,
+    detectedFaceCount: 1234,
+    unassignedFaceCount: 4567,
+    ...overrides,
+  };
+}
+
 function renderPage({
   space = makeSpace(),
   members = [makeMember()],
@@ -129,11 +143,13 @@ function renderPage({
 describe('Spaces people page', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    clearPeopleFaceStatisticsInfoCache();
     Element.prototype.animate = getAnimateMock();
     gotoMock.mockResolvedValue(undefined);
     pageStore.setUrl('http://localhost/spaces/space-1/people');
     sdkMock.getSpacePeople.mockResolvedValue([]);
     sdkMock.getSpacePeopleStatistics.mockResolvedValue({ total: 0, hidden: 0, detectedFaceCount: 0 });
+    sdkMock.getSpacePeopleFaceStatistics.mockResolvedValue(makeFaceStatistics());
   });
 
   it('shows the visible person count and detected face count next to the heading', () => {
@@ -189,6 +205,155 @@ describe('Spaces people page', () => {
     renderPage();
 
     expect(sdkMock.getSpacePeopleFaceStatistics).not.toHaveBeenCalled();
+  });
+
+  it('renders a face statistics details button when overview stats exist', () => {
+    renderPage({
+      people: [makePerson({ id: 'p1' })],
+      peopleStatistics: { total: 12, hidden: 2, detectedFaceCount: 2901 },
+    });
+
+    expect(screen.getByRole('button', { name: 'view_face_statistics_details' })).toBeInTheDocument();
+  });
+
+  it('loads and renders detailed space face statistics when the info button is clicked', async () => {
+    sdkMock.getSpacePeopleFaceStatistics.mockResolvedValue(
+      makeFaceStatistics({
+        detectedFaceCount: 1234,
+        assignedVisibleFaceCount: 2345,
+        assignedHiddenFaceCount: 3456,
+        unassignedFaceCount: 4567,
+      }),
+    );
+    renderPage({
+      people: [makePerson({ id: 'p1' })],
+      peopleStatistics: { total: 12, hidden: 2, detectedFaceCount: 2901 },
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: 'view_face_statistics_details' }));
+
+    expect(sdkMock.getSpacePeopleFaceStatistics).toHaveBeenCalledWith({ id: 'space-1' });
+    expect(await screen.findByText('detected_faces')).toBeInTheDocument();
+    expect(screen.getByText('1,234')).toBeInTheDocument();
+    expect(screen.getByText('assigned_to_visible_people')).toBeInTheDocument();
+    expect(screen.getByText('2,345')).toBeInTheDocument();
+    expect(screen.getByText('assigned_to_hidden_people')).toBeInTheDocument();
+    expect(screen.getByText('3,456')).toBeInTheDocument();
+    expect(screen.getByText('unassigned')).toBeInTheDocument();
+    expect(screen.getByText('4,567')).toBeInTheDocument();
+  });
+
+  it('uses cached detailed space face statistics when the info UI is closed and reopened', async () => {
+    sdkMock.getSpacePeopleFaceStatistics.mockResolvedValue(makeFaceStatistics({ detectedFaceCount: 1234 }));
+    renderPage({
+      people: [makePerson({ id: 'p1' })],
+      peopleStatistics: { total: 12, hidden: 2, detectedFaceCount: 2901 },
+    });
+
+    const trigger = screen.getByRole('button', { name: 'view_face_statistics_details' });
+    await userEvent.click(trigger);
+    expect(await screen.findByText('1,234')).toBeInTheDocument();
+
+    await userEvent.click(trigger);
+    await userEvent.click(trigger);
+
+    expect(sdkMock.getSpacePeopleFaceStatistics).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('1,234')).toBeInTheDocument();
+  });
+
+  it('loads detailed space face statistics with the active supported name search', async () => {
+    sdkMock.getSpacePeople.mockResolvedValue([makePerson({ id: 'p1', name: 'Alice' })]);
+    sdkMock.getSpacePeopleStatistics.mockResolvedValue({ total: 1, hidden: 0, detectedFaceCount: 7 });
+    renderPage({
+      people: [makePerson({ id: 'p1', name: 'Alice' }), makePerson({ id: 'p2', name: 'Bob' })],
+      peopleStatistics: { total: 2, hidden: 0, detectedFaceCount: 22 },
+    });
+
+    await fireEvent.input(screen.getByPlaceholderText('search_people'), { target: { value: 'Ali' } });
+    await waitFor(() => {
+      expect(sdkMock.getSpacePeopleStatistics).toHaveBeenCalledWith({ id: 'space-1', name: 'Ali' }, expect.any(Object));
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: 'view_face_statistics_details' }));
+
+    expect(sdkMock.getSpacePeopleFaceStatistics).toHaveBeenCalledWith({ id: 'space-1', name: 'Ali' });
+  });
+
+  it('loads filtered detailed face statistics separately after search changes from empty to a name', async () => {
+    sdkMock.getSpacePeople.mockResolvedValue([makePerson({ id: 'p1', name: 'Alice' })]);
+    sdkMock.getSpacePeopleStatistics.mockResolvedValue({ total: 1, hidden: 0, detectedFaceCount: 7 });
+    sdkMock.getSpacePeopleFaceStatistics
+      .mockResolvedValueOnce(makeFaceStatistics({ detectedFaceCount: 1111 }))
+      .mockResolvedValueOnce(makeFaceStatistics({ detectedFaceCount: 2222 }));
+    renderPage({
+      people: [makePerson({ id: 'p1', name: 'Alice' }), makePerson({ id: 'p2', name: 'Bob' })],
+      peopleStatistics: { total: 2, hidden: 0, detectedFaceCount: 22 },
+    });
+
+    const trigger = screen.getByRole('button', { name: 'view_face_statistics_details' });
+    await userEvent.click(trigger);
+    expect(await screen.findByText('1,111')).toBeInTheDocument();
+
+    await fireEvent.input(screen.getByPlaceholderText('search_people'), { target: { value: 'Ali' } });
+    await waitFor(() => {
+      expect(sdkMock.getSpacePeopleStatistics).toHaveBeenCalledWith({ id: 'space-1', name: 'Ali' }, expect.any(Object));
+    });
+
+    expect(await screen.findByText('2,222')).toBeInTheDocument();
+    expect(screen.queryByText('1,111')).not.toBeInTheDocument();
+    expect(sdkMock.getSpacePeopleFaceStatistics).toHaveBeenCalledTimes(2);
+  });
+
+  it('loads detailed space face statistics separately after the authenticated user changes', async () => {
+    sdkMock.getSpacePeopleFaceStatistics
+      .mockResolvedValueOnce(makeFaceStatistics({ detectedFaceCount: 1111 }))
+      .mockResolvedValueOnce(makeFaceStatistics({ detectedFaceCount: 2222 }));
+    renderPage({
+      people: [makePerson({ id: 'p1' })],
+      peopleStatistics: { total: 12, hidden: 2, detectedFaceCount: 2901 },
+    });
+
+    const trigger = screen.getByRole('button', { name: 'view_face_statistics_details' });
+    await userEvent.click(trigger);
+    expect(await screen.findByText('1,111')).toBeInTheDocument();
+
+    await userEvent.click(trigger);
+    authManager.setUser(userAdminFactory.build({ id: 'other-user-id' }));
+    await userEvent.click(trigger);
+
+    expect(await screen.findByText('2,222')).toBeInTheDocument();
+    expect(sdkMock.getSpacePeopleFaceStatistics).toHaveBeenCalledTimes(2);
+  });
+
+  it('renders a detailed face statistics error while keeping the primary face count in the header', async () => {
+    sdkMock.getSpacePeopleFaceStatistics.mockRejectedValue(new Error('network'));
+    renderPage({
+      people: [makePerson({ id: 'p1' })],
+      peopleStatistics: { total: 12, hidden: 2, detectedFaceCount: 2901 },
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: 'view_face_statistics_details' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('unable_to_load_face_statistics');
+    expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(10) \u00b7 2,901 faces');
+  });
+
+  it('hides the face statistics details button when overview statistics are unavailable', () => {
+    renderPage({
+      people: [makePerson({ id: 'p1', name: 'Alice' })],
+      peopleStatistics: null,
+    });
+
+    expect(screen.queryByRole('button', { name: 'view_face_statistics_details' })).not.toBeInTheDocument();
+  });
+
+  it('hides the face statistics details button when no face count is visible in the header', () => {
+    renderPage({
+      people: [],
+      peopleStatistics: { total: 0, hidden: 0, detectedFaceCount: 0 },
+    });
+
+    expect(screen.queryByRole('button', { name: 'view_face_statistics_details' })).not.toBeInTheDocument();
   });
 
   it('searches people within the current space and updates the heading count', async () => {
