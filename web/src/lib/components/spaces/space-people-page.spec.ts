@@ -362,6 +362,70 @@ describe('Spaces people page', () => {
     expect(sdkMock.getSpacePeopleFaceStatistics).toHaveBeenCalledWith({ id: 'space-1', name: 'Bob' });
   });
 
+  it('does not apply stale space people statistics after navigating to another space', async () => {
+    const space1 = makeSpace({ id: 'space-1', name: 'Space One' });
+    const space2 = makeSpace({ id: 'space-2', name: 'Space Two' });
+    const alice = makePerson({ id: 'alice', name: 'Alice', spaceId: 'space-1' });
+    const bob = makePerson({ id: 'bob', name: 'Bob', spaceId: 'space-1' });
+    const charlie = makePerson({ id: 'charlie', name: 'Charlie', spaceId: 'space-2' });
+    const clearPeopleRequest = deferred<SharedSpacePersonResponseDto[]>();
+    const clearStatsRequest = deferred<SharedSpacePeopleStatisticsResponseDto>();
+
+    sdkMock.getSpacePeople.mockImplementation(({ id, name }) => {
+      if (id === 'space-1' && name === 'Ali') {
+        return Promise.resolve([alice]);
+      }
+      if (id === 'space-1') {
+        return clearPeopleRequest.promise;
+      }
+      return Promise.resolve([charlie]);
+    });
+    sdkMock.getSpacePeopleStatistics.mockImplementation(({ id, name }) => {
+      if (id === 'space-1' && name === 'Ali') {
+        return Promise.resolve({ total: 1, hidden: 0, detectedFaceCount: 7 });
+      }
+      if (id === 'space-1') {
+        return clearStatsRequest.promise;
+      }
+      return Promise.resolve({ total: 1, hidden: 0, detectedFaceCount: 9 });
+    });
+
+    const view = renderPage({
+      space: space1,
+      people: [alice, bob],
+      peopleStatistics: { total: 2, hidden: 0, detectedFaceCount: 22 },
+    });
+
+    await fireEvent.input(screen.getByPlaceholderText('search_people'), { target: { value: 'Ali' } });
+    await waitFor(() => {
+      expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(1) \u00b7 7 faces');
+    });
+
+    await userEvent.click(screen.getByLabelText('clear_value'));
+    await waitFor(() => {
+      expect(sdkMock.getSpacePeopleStatistics).toHaveBeenCalledWith({ id: 'space-1' });
+    });
+
+    pageStore.setUrl('http://localhost/spaces/space-2/people');
+    await view.rerender({
+      data: {
+        space: space2,
+        members: [makeMember()],
+        people: [charlie],
+        peopleStatistics: { total: 1, hidden: 0, detectedFaceCount: 9 },
+        meta: { title: 'Space Two - People' },
+      },
+    });
+
+    clearPeopleRequest.resolve([alice, bob]);
+    clearStatsRequest.resolve({ total: 2, hidden: 0, detectedFaceCount: 22 });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(screen.getByDisplayValue('Charlie')).toBeInTheDocument();
+    expect(screen.queryByDisplayValue('Alice')).not.toBeInTheDocument();
+    expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(1) \u00b7 9 faces');
+  });
+
   it('loads filtered detailed face statistics separately after search changes from empty to a name', async () => {
     sdkMock.getSpacePeople.mockResolvedValue([makePerson({ id: 'p1', name: 'Alice' })]);
     sdkMock.getSpacePeopleStatistics.mockResolvedValue({ total: 1, hidden: 0, detectedFaceCount: 7 });
