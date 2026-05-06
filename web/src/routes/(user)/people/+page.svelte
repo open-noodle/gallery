@@ -3,6 +3,7 @@
   import { page } from '$app/stores';
   import { scrollMemory } from '$lib/actions/scroll-memory';
   import ActionMenuItem from '$lib/components/ActionMenuItem.svelte';
+  import PeopleFaceStatisticsInfo from '$lib/components/people/people-face-statistics-info.svelte';
   import PeopleManagementGrid from '$lib/components/people/people-management-grid.svelte';
   import type { ManagedPerson } from '$lib/components/people/people-types';
   import ButtonContextMenu from '$lib/components/shared-components/context-menu/button-context-menu.svelte';
@@ -12,6 +13,7 @@
   import UserPageLayout from '$lib/components/layouts/user-page-layout.svelte';
   import OnEvents from '$lib/components/OnEvents.svelte';
   import { QueryParameter, SessionStorageKey } from '$lib/constants';
+  import { authManager } from '$lib/managers/auth-manager.svelte';
   import PersonMergeSuggestionModal from '$lib/modals/PersonMergeSuggestionModal.svelte';
   import { Route } from '$lib/route';
   import { getPersonActions } from '$lib/services/person.service';
@@ -24,6 +26,7 @@
   import { formatPeopleHeaderDescription } from '$lib/utils/people-statistics';
   import {
     getAllPeople,
+    getPeopleFaceStatistics,
     getPerson,
     searchPerson,
     updatePerson,
@@ -256,6 +259,11 @@
       showZeroPeople: hasUnsupportedStatsFilter || (overviewStatistics?.detectedFaceCount ?? 0) > 0,
     }),
   );
+  let showFaceStatisticsInfo = $derived(
+    !!overviewStatistics && !hasUnsupportedStatsFilter && !!headerDescription,
+  );
+  let globalFaceStatisticsCacheKey = $derived(`user:${authManager.user.id}:global:people:withSharedSpaces=true`);
+  const loadGlobalFaceStatistics = () => getPeopleFaceStatistics({ withSharedSpaces: true });
   let showPeople = $derived(searchName ? searchedPeopleLocal : visiblePeople);
 
   const getPersonHref = (person: PersonResponseDto) => getGlobalPersonHref(person, Route.people());
@@ -402,6 +410,12 @@
     ],
   ]}
 >
+  {#snippet descriptionTrailing()}
+    {#if showFaceStatisticsInfo}
+      <PeopleFaceStatisticsInfo cacheKey={globalFaceStatisticsCacheKey} loadStatistics={loadGlobalFaceStatistics} />
+    {/if}
+  {/snippet}
+
   {#snippet buttons()}
     {#if people.length > 0}
       <div class="flex gap-2 items-center justify-center">
