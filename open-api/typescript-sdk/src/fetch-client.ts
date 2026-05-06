@@ -1553,11 +1553,29 @@ export type DetachScopedPersonDto = {
     /** Scoped profile to detach */
     profile: ScopedPersonProfileRefDto;
 };
+export type PeopleFaceStatisticsResponseDto = {
+    /** Number of detected faces assigned to hidden people */
+    assignedHiddenFaceCount: number;
+    /** Number of detected faces assigned to visible people */
+    assignedVisibleFaceCount: number;
+    /** Number of detected faces in the accessible people scope */
+    detectedFaceCount: number;
+    /** Number of detected faces not assigned to people in this scope */
+    unassignedFaceCount: number;
+};
 export type MergeScopedPeopleDto = {
     /** Source scoped profiles */
     sources: ScopedPersonProfileRefDto[];
     /** Target scoped profile */
     target: ScopedPersonProfileRefDto;
+};
+export type PeopleStatisticsResponseDto = {
+    /** Number of detected faces in the accessible people scope */
+    detectedFaceCount: number;
+    /** Number of hidden people */
+    hidden: number;
+    /** Total number of people */
+    total: number;
 };
 export type PersonUpdateDto = {
     /** Person date of birth */
@@ -2696,6 +2714,8 @@ export type SharedSpacePersonResponseDto = {
     updatedAt: string;
 };
 export type SharedSpacePeopleStatisticsResponseDto = {
+    /** Number of detected faces in the shared-space people scope */
+    detectedFaceCount: number;
     /** Number of hidden people */
     hidden: number;
     /** Total number of people */
@@ -5859,6 +5879,31 @@ export function detachScopedPerson({ detachScopedPersonDto }: {
     })));
 }
 /**
+ * Get people face statistics
+ */
+export function getPeopleFaceStatistics({ closestAssetId, closestPersonId, page, size, withHidden, withSharedSpaces }: {
+    closestAssetId?: string;
+    closestPersonId?: string;
+    page?: number;
+    size?: number;
+    withHidden?: boolean;
+    withSharedSpaces?: boolean;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: PeopleFaceStatisticsResponseDto;
+    }>(`/people/face-statistics${QS.query(QS.explode({
+        closestAssetId,
+        closestPersonId,
+        page,
+        size,
+        withHidden,
+        withSharedSpaces
+    }))}`, {
+        ...opts
+    }));
+}
+/**
  * Merge scoped people by identity
  */
 export function mergeScopedPeople({ mergeScopedPeopleDto }: {
@@ -5869,6 +5914,31 @@ export function mergeScopedPeople({ mergeScopedPeopleDto }: {
         method: "POST",
         body: mergeScopedPeopleDto
     })));
+}
+/**
+ * Get people statistics
+ */
+export function getPeopleStatistics({ closestAssetId, closestPersonId, page, size, withHidden, withSharedSpaces }: {
+    closestAssetId?: string;
+    closestPersonId?: string;
+    page?: number;
+    size?: number;
+    withHidden?: boolean;
+    withSharedSpaces?: boolean;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: PeopleStatisticsResponseDto;
+    }>(`/people/statistics${QS.query(QS.explode({
+        closestAssetId,
+        closestPersonId,
+        page,
+        size,
+        withHidden,
+        withSharedSpaces
+    }))}`, {
+        ...opts
+    }));
 }
 /**
  * Delete person
@@ -7121,6 +7191,34 @@ export function deduplicateSpacePeople({ id }: {
     return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/people/deduplicate`, {
         ...opts,
         method: "POST"
+    }));
+}
+/**
+ * Get people face statistics in a shared space
+ */
+export function getSpacePeopleFaceStatistics({ id, limit, name, named, offset, takenAfter, takenBefore, withHidden }: {
+    id: string;
+    limit?: number;
+    name?: string;
+    named?: boolean;
+    offset?: number;
+    takenAfter?: string;
+    takenBefore?: string;
+    withHidden?: boolean;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: PeopleFaceStatisticsResponseDto;
+    }>(`/shared-spaces/${encodeURIComponent(id)}/people/face-statistics${QS.query(QS.explode({
+        limit,
+        name,
+        named,
+        offset,
+        takenAfter,
+        takenBefore,
+        withHidden
+    }))}`, {
+        ...opts
     }));
 }
 /**

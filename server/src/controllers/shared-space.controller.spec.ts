@@ -78,4 +78,62 @@ describe(SharedSpaceController.name, () => {
       expect(body).toEqual(errorDto.badRequest(['[assetFaceId] Invalid UUID']));
     });
   });
+
+  describe('GET /shared-spaces/:id/people/statistics', () => {
+    it('should serialize detected face count', async () => {
+      const spaceId = factory.uuid();
+      service.getSpacePeopleStatistics.mockResolvedValue({
+        total: 5,
+        hidden: 1,
+        detectedFaceCount: 19,
+      } as any);
+
+      const { status, body } = await request(ctx.getHttpServer())
+        .get(`/shared-spaces/${spaceId}/people/statistics`)
+        .query({ name: 'Ali' })
+        .set('Authorization', `Bearer token`);
+
+      expect(status).toBe(200);
+      expect(service.getSpacePeopleStatistics).toHaveBeenCalledWith(
+        undefined,
+        spaceId,
+        expect.objectContaining({ name: 'Ali' }),
+      );
+      expect(body).toEqual({
+        total: 5,
+        hidden: 1,
+        detectedFaceCount: 19,
+      });
+    });
+  });
+
+  describe('GET /shared-spaces/:id/people/face-statistics', () => {
+    it('should serialize lazy shared-space face statistics', async () => {
+      const spaceId = factory.uuid();
+      service.getSpacePeopleFaceStatistics.mockResolvedValue({
+        detectedFaceCount: 19,
+        assignedVisibleFaceCount: 15,
+        assignedHiddenFaceCount: 1,
+        unassignedFaceCount: 3,
+      });
+
+      const { status, body } = await request(ctx.getHttpServer())
+        .get(`/shared-spaces/${spaceId}/people/face-statistics`)
+        .query({ name: 'Ali' })
+        .set('Authorization', `Bearer token`);
+
+      expect(status).toBe(200);
+      expect(service.getSpacePeopleFaceStatistics).toHaveBeenCalledWith(
+        undefined,
+        spaceId,
+        expect.objectContaining({ name: 'Ali' }),
+      );
+      expect(body).toEqual({
+        detectedFaceCount: 19,
+        assignedVisibleFaceCount: 15,
+        assignedHiddenFaceCount: 1,
+        unassignedFaceCount: 3,
+      });
+    });
+  });
 });

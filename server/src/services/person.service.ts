@@ -17,7 +17,9 @@ import {
   mapPerson,
   MergePersonDto,
   MergeScopedPeopleDto,
+  PeopleFaceStatisticsResponseDto,
   PeopleResponseDto,
+  PeopleStatisticsResponseDto,
   PeopleUpdateDto,
   PersonCreateDto,
   PersonFacePageQueryDto,
@@ -117,6 +119,40 @@ export class PersonService extends BaseService {
       total,
       hidden,
     };
+  }
+
+  async getPeopleStatistics(auth: AuthDto, dto: PersonSearchDto): Promise<PeopleStatisticsResponseDto> {
+    if (dto.closestPersonId || dto.closestAssetId) {
+      throw new BadRequestException('closestPersonId and closestAssetId are not supported for people statistics');
+    }
+
+    const { machineLearning } = await this.getConfig({ withCache: false });
+
+    if (dto.withSharedSpaces) {
+      return this.faceIdentityRepository.getAccessiblePeopleStatistics(auth.user.id, {
+        minimumFaceCount: machineLearning.facialRecognition.minFaces,
+      });
+    }
+
+    return this.personRepository.getPeopleOverviewStatistics(auth.user.id);
+  }
+
+  async getPeopleFaceStatistics(auth: AuthDto, dto: PersonSearchDto): Promise<PeopleFaceStatisticsResponseDto> {
+    if (dto.closestPersonId || dto.closestAssetId) {
+      throw new BadRequestException('closestPersonId and closestAssetId are not supported for people face statistics');
+    }
+
+    const { machineLearning } = await this.getConfig({ withCache: false });
+
+    if (dto.withSharedSpaces) {
+      return this.faceIdentityRepository.getAccessiblePeopleFaceStatistics(auth.user.id, {
+        minimumFaceCount: machineLearning.facialRecognition.minFaces,
+      });
+    }
+
+    return this.personRepository.getPeopleFaceStatistics(auth.user.id, {
+      minimumFaceCount: machineLearning.facialRecognition.minFaces,
+    });
   }
 
   async mergeScopedPeople(auth: AuthDto, dto: MergeScopedPeopleDto): Promise<void> {

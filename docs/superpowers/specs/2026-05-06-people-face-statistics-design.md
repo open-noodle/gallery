@@ -29,7 +29,8 @@ This design covers global people, space people, global person detail, and space-
 
 ## Terminology
 
-- **Person count**: count of visible person identities in the current scope.
+- **Header person count**: count of visible person identities in the current scope, derived from `total - hidden`.
+- **Overview total**: count of all eligible person identities in the current scope, including visible and hidden people.
 - **Face count**: count of detected face observations, not distinct people.
 - **Primary face count**: count of all detected face observations in the current accessible scope.
 - **Detected faces**: all detected face observations in the current accessible asset scope.
@@ -90,7 +91,7 @@ Space-person-detail statistics use only the selected shared space and selected p
 
 Each face observation must be counted at most once per response, by stable face ID. Each asset must be considered at most once per response, even when it is reachable through more than one access path, such as owned library plus shared space, multiple shared spaces, or direct space asset plus linked/external library.
 
-Each visible person identity must be counted at most once per response. If personal and shared-space person rows resolve to the same accessible identity, the people total counts that identity once.
+Each eligible person identity must be counted at most once per response. If personal and shared-space person rows resolve to the same accessible identity, the people `total` counts that identity once. The visible header person count is derived as `total - hidden`.
 
 All counts are backend aggregates. The frontend must not derive these numbers from loaded grid rows, because pagination and lazy loading would make the counts incorrect.
 
@@ -127,13 +128,13 @@ Overview statistics are safe for initial page load.
 
 ```ts
 type PeopleOverviewStatistics = {
-  total: number;             // visible people
-  hidden: number;            // hidden people
+  total: number;             // all eligible people, visible + hidden
+  hidden: number;            // hidden people subset of total
   detectedFaceCount: number; // all detected in-scope faces
 };
 ```
 
-`total` and `hidden` preserve the existing people-statistics naming. `detectedFaceCount` is explicit because the header's face number is all detected in-scope faces, not only assigned visible faces.
+`total` and `hidden` preserve the existing people-statistics naming. `total` is the full eligible people count, `hidden` is the hidden subset, and the visible header count is `total - hidden`. `detectedFaceCount` is explicit because the header's face number is all detected in-scope faces, not only assigned visible faces.
 
 ### Detailed Face Statistics
 
@@ -259,8 +260,8 @@ Scope:
 
 Required tests:
 
-- global overview counts visible people and detected in-scope faces
-- global overview excludes hidden people from people totals while including their detected faces in `detectedFaceCount`
+- global overview counts total people, hidden people, and detected in-scope faces
+- global overview includes hidden people in `total` and their detected faces in `detectedFaceCount`
 - global overview includes unassigned detected faces in `detectedFaceCount`
 - shared-space overview counts only the selected space
 - shared-space overview includes linked/external-library photos attached to that space
@@ -273,7 +274,7 @@ Required tests:
 - aggregate counts are independent of pagination
 - empty library returns zero people, zero hidden people, and zero detected faces
 - empty shared space returns zero people, zero hidden people, and zero detected faces
-- all-hidden people return zero visible people while still reporting detected faces
+- all-hidden people return `total === hidden`, derive zero visible people, and still report detected faces
 
 ### Phase 2: Lazy Detailed Face Statistics
 
@@ -362,7 +363,7 @@ Scope:
 Required tests:
 
 - filtered people pages pass matching supported filters to stats endpoints
-- same person represented through personal and shared-space identities is counted once in visible people totals
+- same person represented through personal and shared-space identities is counted once in overview people totals
 - stats remain stable after reconciliation jobs rerun
 - stats remain stable when uploads and shared-space materialization run in different orders
 - external/linked-library photo fixtures are covered in both global and space scopes

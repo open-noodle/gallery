@@ -87,6 +87,70 @@ describe(PersonController.name, () => {
     });
   });
 
+  describe('GET /people/statistics', () => {
+    it('should be an authenticated route', async () => {
+      await request(ctx.getHttpServer()).get('/people/statistics');
+      expect(ctx.authenticate).toHaveBeenCalled();
+    });
+
+    it('should return people overview statistics', async () => {
+      service.getPeopleStatistics.mockResolvedValue({
+        total: 7,
+        hidden: 2,
+        detectedFaceCount: 23,
+      });
+
+      const { status, body } = await request(ctx.getHttpServer())
+        .get('/people/statistics')
+        .query({ withSharedSpaces: true })
+        .set('Authorization', `Bearer token`);
+
+      expect(status).toBe(200);
+      expect(service.getPeopleStatistics).toHaveBeenCalledWith(
+        undefined,
+        expect.objectContaining({ withSharedSpaces: true }),
+      );
+      expect(body).toEqual({
+        total: 7,
+        hidden: 2,
+        detectedFaceCount: 23,
+      });
+    });
+  });
+
+  describe('GET /people/face-statistics', () => {
+    it('should be an authenticated route', async () => {
+      await request(ctx.getHttpServer()).get('/people/face-statistics');
+      expect(ctx.authenticate).toHaveBeenCalled();
+    });
+
+    it('should return lazy people face statistics', async () => {
+      service.getPeopleFaceStatistics.mockResolvedValue({
+        detectedFaceCount: 23,
+        assignedVisibleFaceCount: 18,
+        assignedHiddenFaceCount: 3,
+        unassignedFaceCount: 2,
+      });
+
+      const { status, body } = await request(ctx.getHttpServer())
+        .get('/people/face-statistics')
+        .query({ withSharedSpaces: true })
+        .set('Authorization', `Bearer token`);
+
+      expect(status).toBe(200);
+      expect(service.getPeopleFaceStatistics).toHaveBeenCalledWith(
+        undefined,
+        expect.objectContaining({ withSharedSpaces: true }),
+      );
+      expect(body).toEqual({
+        detectedFaceCount: 23,
+        assignedVisibleFaceCount: 18,
+        assignedHiddenFaceCount: 3,
+        unassignedFaceCount: 2,
+      });
+    });
+  });
+
   describe('POST /people', () => {
     it('should be an authenticated route', async () => {
       await request(ctx.getHttpServer()).post('/people');

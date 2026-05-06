@@ -78,6 +78,8 @@ describe('Face identity query shape', () => {
     const sqlText = collectIdentityQueryText();
     const identityOnlyText = [
       /async getAccessiblePeopleIdentityPage[\s\S]*?async getAccessiblePeopleCounts/.exec(sqlText)?.[0] ?? '',
+      /async getAccessiblePeopleStatistics[\s\S]*?async getAccessiblePeopleIdentityPage/.exec(sqlText)?.[0] ?? '',
+      /async getAccessiblePeopleFaceStatistics[\s\S]*?async getAccessiblePersonByProfileId/.exec(sqlText)?.[0] ?? '',
       /async hydrateAccessiblePeople[\s\S]*?private mapAccessiblePerson/.exec(sqlText)?.[0] ?? '',
       /async getAccessiblePersonFilterSuggestions[\s\S]*?async getAccessiblePeople/.exec(sqlText)?.[0] ?? '',
       /async searchAccessiblePeople[\s\S]*?async getAccessiblePersonFilterSuggestions/.exec(sqlText)?.[0] ?? '',
@@ -86,6 +88,7 @@ describe('Face identity query shape', () => {
     ].join('\n');
 
     expect(identityOnlyText).toContain('face_identity_face');
+    expect(identityOnlyText).toContain('getAccessiblePeopleFaceStatistics');
     expect(identityOnlyText).not.toContain('<=>');
     expect(identityOnlyText).not.toContain('face_search.embedding');
     expect(identityOnlyText).not.toContain('clip_index');
