@@ -10,7 +10,7 @@ import {
   type SharedSpacePersonResponseDto,
   type SharedSpaceResponseDto,
 } from '@immich/sdk';
-import { modalManager } from '@immich/ui';
+import { modalManager, toastManager } from '@immich/ui';
 import { preferencesFactory } from '@test-data/factories/preferences-factory';
 import { userAdminFactory } from '@test-data/factories/user-factory';
 import '@testing-library/jest-dom';
@@ -424,6 +424,54 @@ describe('Spaces people page', () => {
     expect(screen.getByDisplayValue('Charlie')).toBeInTheDocument();
     expect(screen.queryByDisplayValue('Alice')).not.toBeInTheDocument();
     expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(1) \u00b7 9 faces');
+  });
+
+  it('does not show stale search errors after navigating to another space', async () => {
+    const space1 = makeSpace({ id: 'space-1', name: 'Space One' });
+    const space2 = makeSpace({ id: 'space-2', name: 'Space Two' });
+    const alice = makePerson({ id: 'alice', name: 'Alice', spaceId: 'space-1' });
+    const bob = makePerson({ id: 'bob', name: 'Bob', spaceId: 'space-1' });
+    const charlie = makePerson({ id: 'charlie', name: 'Charlie', spaceId: 'space-2' });
+    const searchPeopleRequest = deferred<SharedSpacePersonResponseDto[]>();
+
+    sdkMock.getSpacePeople.mockImplementation(({ id, name }) => {
+      if (id === 'space-1' && name === 'Ali') {
+        return searchPeopleRequest.promise;
+      }
+      return Promise.resolve([charlie]);
+    });
+    sdkMock.getSpacePeopleStatistics.mockResolvedValue({ total: 1, hidden: 0, detectedFaceCount: 7 });
+
+    const view = renderPage({
+      space: space1,
+      people: [alice, bob],
+      peopleStatistics: { total: 2, hidden: 0, detectedFaceCount: 22 },
+    });
+
+    await fireEvent.input(screen.getByPlaceholderText('search_people'), { target: { value: 'Ali' } });
+    await waitFor(() => {
+      expect(sdkMock.getSpacePeople).toHaveBeenCalledWith(
+        { id: 'space-1', name: 'Ali', limit: 100 },
+        expect.any(Object),
+      );
+    });
+
+    pageStore.setUrl('http://localhost/spaces/space-2/people');
+    await view.rerender({
+      data: {
+        space: space2,
+        members: [makeMember()],
+        people: [charlie],
+        peopleStatistics: { total: 1, hidden: 0, detectedFaceCount: 9 },
+        meta: { title: 'Space Two - People' },
+      },
+    });
+
+    searchPeopleRequest.reject(new Error('stale search failed'));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(toastManager.danger).not.toHaveBeenCalled();
+    expect(screen.getByDisplayValue('Charlie')).toBeInTheDocument();
   });
 
   it('loads filtered detailed face statistics separately after search changes from empty to a name', async () => {

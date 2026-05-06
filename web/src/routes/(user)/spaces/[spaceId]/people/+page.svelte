@@ -251,7 +251,7 @@
       statisticsSearchName = requestSearchName || null;
       hasMore = people.length >= PAGE_SIZE;
     } catch (error) {
-      if (controller.signal.aborted) {
+      if (controller.signal.aborted || !statisticsScopeMatches(requestSpaceId, requestSearchName)) {
         return;
       }
       handleError(error, $t('spaces_error_loading_people'));
