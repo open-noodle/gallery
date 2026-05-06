@@ -15,7 +15,9 @@
   let { people, spaceId, selectedPersonIds = [], onPersonClick }: Props = $props();
 
   const namedPeople = $derived(
-    [...people].filter((p) => !p.isHidden && p.name).sort((a, b) => b.assetCount - a.assetCount),
+    [...people]
+      .filter((p) => !p.isHidden && p.name)
+      .sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id)),
   );
 
   const SEE_ALL_THRESHOLD = 6;
