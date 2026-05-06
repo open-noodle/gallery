@@ -1,7 +1,13 @@
 import { getAnimateMock } from '$lib/__mocks__/animate.mock';
 import { getIntersectionObserverMock } from '$lib/__mocks__/intersection-observer.mock';
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
-import { RepresentativeFaceSource, Type, type PersonResponseDto, type SharedSpacePersonResponseDto } from '@immich/sdk';
+import {
+  RepresentativeFaceSource,
+  Type,
+  type PeopleStatisticsResponseDto,
+  type PersonResponseDto,
+  type SharedSpacePersonResponseDto,
+} from '@immich/sdk';
 import { personFactory } from '@test-data/factories/person-factory';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
@@ -76,7 +82,14 @@ function makeSpacePerson(overrides: Partial<SharedSpacePersonResponseDto> = {}):
   };
 }
 
-function renderPage(people: PersonResponseDto[] = [makePerson()]) {
+function renderPage(
+  people: PersonResponseDto[] = [makePerson()],
+  peopleStatistics: PeopleStatisticsResponseDto | null = {
+    total: people.length,
+    hidden: people.filter((person) => person.isHidden).length,
+    detectedFaceCount: 0,
+  },
+) {
   return render(PeoplePage, {
     props: {
       data: {
@@ -86,6 +99,7 @@ function renderPage(people: PersonResponseDto[] = [makePerson()]) {
           hidden: people.filter((person) => person.isHidden).length,
           hasNextPage: false,
         },
+        peopleStatistics,
         meta: { title: 'People' },
       },
     },
@@ -119,6 +133,58 @@ describe('Global people page', () => {
 
     expect(screen.getByRole('link', { name: 'Alice' })).toHaveAttribute('href', '/people/p1?previousRoute=%2Fpeople');
     expect(screen.getByDisplayValue('Alice')).toHaveAttribute('placeholder', 'add_a_name');
+  });
+
+  it('shows visible people and detected faces in the heading', () => {
+    renderPage([makePerson({ id: 'p1' })], { total: 12, hidden: 2, detectedFaceCount: 2901 });
+
+    expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(10) \u00b7 2,901 faces');
+  });
+
+  it('derives the heading person count from overview statistics instead of loaded rows', () => {
+    renderPage([makePerson({ id: 'p1' })], { total: 60, hidden: 4, detectedFaceCount: 100 });
+
+    expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(56) \u00b7 100 faces');
+  });
+
+  it('shows detected faces when all people are hidden', () => {
+    renderPage([makePerson({ id: 'p1', isHidden: true })], { total: 1, hidden: 1, detectedFaceCount: 42 });
+
+    expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(0) \u00b7 42 faces');
+  });
+
+  it('omits the heading description for an empty scope with no detected faces', () => {
+    renderPage([], { total: 0, hidden: 0, detectedFaceCount: 0 });
+
+    expect(screen.getByTestId('user-page-layout')).not.toHaveAttribute('data-description');
+  });
+
+  it('keeps rendering people and falls back to the list count when statistics are unavailable', () => {
+    renderPage([makePerson({ id: 'p1', name: 'Alice' })], null);
+
+    expect(screen.getByRole('link', { name: 'Alice' })).toBeInTheDocument();
+    expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(1)');
+  });
+
+  it('does not call detailed face statistics on initial render', () => {
+    renderPage([makePerson()]);
+
+    expect(sdkMock.getPeopleFaceStatistics).not.toHaveBeenCalled();
+  });
+
+  it('hides the face count while global name search is active because it is unsupported by overview stats', async () => {
+    pageStore.setUrl('http://localhost/people?searchedPeople=Ali');
+    sdkMock.searchPerson.mockResolvedValue([makePerson({ id: 'p1', name: 'Alice' })]);
+
+    renderPage([makePerson({ id: 'p1', name: 'Alice' })], { total: 12, hidden: 2, detectedFaceCount: 2901 });
+
+    await waitFor(() => {
+      expect(sdkMock.searchPerson).toHaveBeenCalledWith({ name: 'Ali', withSharedSpaces: true }, expect.any(Object));
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(1)');
+    });
+    expect(screen.getByTestId('user-page-layout').getAttribute('data-description')).not.toContain('faces');
   });
 
   it('saves global person names through the shared editable footer', async () => {

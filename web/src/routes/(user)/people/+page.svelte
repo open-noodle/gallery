@@ -21,6 +21,7 @@
   import { getGlobalPersonHref, getGlobalPersonThumbnailUrl } from '$lib/utils/global-person-route';
   import { handleError } from '$lib/utils/handle-error';
   import { clearQueryParam } from '$lib/utils/navigation';
+  import { formatPeopleHeaderDescription } from '$lib/utils/people-statistics';
   import {
     getAllPeople,
     getPerson,
@@ -238,7 +239,23 @@
   let people = $derived(data.people.people);
 
   let visiblePeople = $derived(people.filter((people) => !people.isHidden));
-  let countVisiblePeople = $derived(searchName ? searchedPeopleLocal.length : data.people.total - data.people.hidden);
+  let overviewStatistics = $derived(data.peopleStatistics);
+  let peopleCountStatistics = $derived(overviewStatistics ?? data.people);
+  let hasUnsupportedStatsFilter = $derived(!!searchName.trim());
+  let countVisiblePeople = $derived(
+    searchName ? searchedPeopleLocal.length : peopleCountStatistics.total - peopleCountStatistics.hidden,
+  );
+  let headerDescription = $derived(
+    formatPeopleHeaderDescription({
+      visiblePeopleCount: countVisiblePeople,
+      detectedFaceCount: overviewStatistics?.detectedFaceCount,
+      locale: $locale,
+      faceSingular: $t('face'),
+      facePlural: $t('faces'),
+      includeFaceCount: !!overviewStatistics && !hasUnsupportedStatsFilter,
+      showZeroPeople: hasUnsupportedStatsFilter || (overviewStatistics?.detectedFaceCount ?? 0) > 0,
+    }),
+  );
   let showPeople = $derived(searchName ? searchedPeopleLocal : visiblePeople);
 
   const getPersonHref = (person: PersonResponseDto) => getGlobalPersonHref(person, Route.people());
@@ -366,7 +383,7 @@
 
 <UserPageLayout
   title={$t('people')}
-  description={countVisiblePeople === 0 && !searchName ? undefined : `(${countVisiblePeople.toLocaleString($locale)})`}
+  description={headerDescription}
   use={[
     [
       scrollMemory,

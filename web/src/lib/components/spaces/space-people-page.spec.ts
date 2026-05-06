@@ -4,6 +4,7 @@ import { authManager } from '$lib/managers/auth-manager.svelte';
 import {
   SharedSpaceRole,
   type SharedSpaceMemberResponseDto,
+  type SharedSpacePeopleStatisticsResponseDto,
   type SharedSpacePersonResponseDto,
   type SharedSpaceResponseDto,
 } from '@immich/sdk';
@@ -43,7 +44,7 @@ vi.mock('@immich/ui', async (importOriginal) => {
   return {
     ...original,
     modalManager: { show: vi.fn(), showDialog: vi.fn() },
-    toastManager: { primary: vi.fn(), success: vi.fn(), warning: vi.fn() },
+    toastManager: { danger: vi.fn(), primary: vi.fn(), success: vi.fn(), warning: vi.fn() },
   };
 });
 
@@ -95,13 +96,17 @@ function renderPage({
   space = makeSpace(),
   members = [makeMember()],
   people = [makePerson()],
-  peopleStatistics = { total: people.length, hidden: people.filter((person) => person.isHidden).length },
+  peopleStatistics = {
+    total: people.length,
+    hidden: people.filter((person) => person.isHidden).length,
+    detectedFaceCount: 0,
+  },
   userId = 'current-user-id',
 }: {
   space?: SharedSpaceResponseDto;
   members?: SharedSpaceMemberResponseDto[];
   people?: SharedSpacePersonResponseDto[];
-  peopleStatistics?: { total: number; hidden: number };
+  peopleStatistics?: SharedSpacePeopleStatisticsResponseDto | null;
   userId?: string;
 } = {}) {
   const currentUser = userAdminFactory.build({ id: userId });
@@ -128,24 +133,70 @@ describe('Spaces people page', () => {
     gotoMock.mockResolvedValue(undefined);
     pageStore.setUrl('http://localhost/spaces/space-1/people');
     sdkMock.getSpacePeople.mockResolvedValue([]);
-    sdkMock.getSpacePeopleStatistics.mockResolvedValue({ total: 0, hidden: 0 });
+    sdkMock.getSpacePeopleStatistics.mockResolvedValue({ total: 0, hidden: 0, detectedFaceCount: 0 });
   });
 
-  it('shows the visible person count next to the heading', () => {
+  it('shows the visible person count and detected face count next to the heading', () => {
     renderPage({
       people: [makePerson({ id: 'p1' })],
-      peopleStatistics: { total: 12, hidden: 2 },
+      peopleStatistics: { total: 12, hidden: 2, detectedFaceCount: 1980 },
     });
 
-    expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(10)');
+    expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(10) \u00b7 1,980 faces');
+  });
+
+  it('derives the heading person count from overview statistics instead of loaded rows', () => {
+    renderPage({
+      people: [makePerson({ id: 'p1' })],
+      peopleStatistics: { total: 60, hidden: 4, detectedFaceCount: 100 },
+    });
+
+    expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(56) \u00b7 100 faces');
+  });
+
+  it('shows detected faces when all space people are hidden', () => {
+    renderPage({
+      people: [makePerson({ id: 'p1', isHidden: true })],
+      peopleStatistics: { total: 1, hidden: 1, detectedFaceCount: 42 },
+    });
+
+    expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(0) \u00b7 42 faces');
+  });
+
+  it('omits the heading description for an empty scope with no detected faces', () => {
+    renderPage({
+      people: [],
+      peopleStatistics: { total: 0, hidden: 0, detectedFaceCount: 0 },
+    });
+
+    expect(screen.getByTestId('user-page-layout')).not.toHaveAttribute('data-description');
+  });
+
+  it('keeps loaded people and controls when overview statistics are unavailable', () => {
+    renderPage({
+      people: [makePerson({ id: 'p1', name: 'Alice' })],
+      peopleStatistics: null,
+      members: [makeMember({ role: SharedSpaceRole.Editor })],
+    });
+
+    expect(screen.getByDisplayValue('Alice')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('search_people')).toBeInTheDocument();
+    expect(screen.getByText('show_and_hide_people')).toBeInTheDocument();
+    expect(screen.getByTestId('user-page-layout')).not.toHaveAttribute('data-description');
+  });
+
+  it('does not call detailed face statistics on initial render', () => {
+    renderPage();
+
+    expect(sdkMock.getSpacePeopleFaceStatistics).not.toHaveBeenCalled();
   });
 
   it('searches people within the current space and updates the heading count', async () => {
     const people = [makePerson({ id: 'p1', name: 'Alice' }), makePerson({ id: 'p2', name: 'Bob' })];
     sdkMock.getSpacePeople.mockResolvedValue([people[0]]);
-    sdkMock.getSpacePeopleStatistics.mockResolvedValue({ total: 1, hidden: 0 });
+    sdkMock.getSpacePeopleStatistics.mockResolvedValue({ total: 1, hidden: 0, detectedFaceCount: 7 });
 
-    renderPage({ people, peopleStatistics: { total: 2, hidden: 0 } });
+    renderPage({ people, peopleStatistics: { total: 2, hidden: 0, detectedFaceCount: 22 } });
 
     await fireEvent.input(screen.getByPlaceholderText('search_people'), { target: { value: 'Ali' } });
 
@@ -158,7 +209,72 @@ describe('Spaces people page', () => {
     expect(sdkMock.getSpacePeopleStatistics).toHaveBeenCalledWith({ id: 'space-1', name: 'Ali' }, expect.any(Object));
     expect(screen.getByDisplayValue('Alice')).toBeInTheDocument();
     expect(screen.queryByDisplayValue('Bob')).not.toBeInTheDocument();
-    expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(1)');
+    expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(1) \u00b7 7 faces');
+  });
+
+  it('clears search statistics back to the unfiltered space scope', async () => {
+    const people = [makePerson({ id: 'p1', name: 'Alice' })];
+    sdkMock.getSpacePeople.mockResolvedValue(people);
+    sdkMock.getSpacePeopleStatistics
+      .mockResolvedValueOnce({ total: 1, hidden: 0, detectedFaceCount: 7 })
+      .mockResolvedValueOnce({ total: 2, hidden: 0, detectedFaceCount: 22 });
+
+    renderPage({ people, peopleStatistics: { total: 2, hidden: 0, detectedFaceCount: 22 } });
+
+    await fireEvent.input(screen.getByPlaceholderText('search_people'), { target: { value: 'Ali' } });
+    await waitFor(() => {
+      expect(sdkMock.getSpacePeopleStatistics).toHaveBeenCalledWith({ id: 'space-1', name: 'Ali' }, expect.any(Object));
+    });
+
+    await userEvent.click(screen.getByLabelText('clear_value'));
+
+    await waitFor(() => {
+      expect(sdkMock.getSpacePeopleStatistics).toHaveBeenCalledWith({ id: 'space-1' });
+    });
+  });
+
+  it('keeps search results when filtered overview statistics fail', async () => {
+    const people = [makePerson({ id: 'p1', name: 'Alice' }), makePerson({ id: 'p2', name: 'Bob' })];
+    sdkMock.getSpacePeople.mockResolvedValue([people[0]]);
+    sdkMock.getSpacePeopleStatistics.mockRejectedValue(new Error('stats unavailable'));
+
+    renderPage({ people, peopleStatistics: { total: 2, hidden: 0, detectedFaceCount: 22 } });
+
+    await fireEvent.input(screen.getByPlaceholderText('search_people'), { target: { value: 'Ali' } });
+
+    await waitFor(() => {
+      expect(sdkMock.getSpacePeople).toHaveBeenCalledWith(
+        { id: 'space-1', name: 'Ali', limit: 100 },
+        expect.any(Object),
+      );
+    });
+    expect(screen.getByDisplayValue('Alice')).toBeInTheDocument();
+    expect(screen.queryByDisplayValue('Bob')).not.toBeInTheDocument();
+    expect(screen.getByTestId('user-page-layout')).not.toHaveAttribute('data-description');
+  });
+
+  it('updates the hidden count without losing the detected face count when a person is hidden', async () => {
+    const people = [makePerson({ id: 'p1', name: 'Alice' })];
+    const { baseElement } = renderPage({
+      people,
+      peopleStatistics: { total: 2, hidden: 0, detectedFaceCount: 42 },
+      members: [makeMember({ role: SharedSpaceRole.Editor })],
+    });
+
+    await fireEvent.mouseEnter(baseElement.querySelector('[role="group"]')!);
+
+    const user = userEvent.setup();
+    await user.click(screen.getByLabelText('show_person_options'));
+    await user.click(screen.getByText('hide_person'));
+
+    await waitFor(() => {
+      expect(sdkMock.updateSpacePerson).toHaveBeenCalledWith({
+        id: 'space-1',
+        personId: 'p1',
+        sharedSpacePersonUpdateDto: { isHidden: true },
+      });
+    });
+    expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(1) \u00b7 42 faces');
   });
 
   it('renders circular thumbnails for each person', async () => {

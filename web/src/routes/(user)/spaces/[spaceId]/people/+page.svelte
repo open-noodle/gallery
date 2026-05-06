@@ -16,6 +16,7 @@
   import { createUrl, handlePromiseError } from '$lib/utils';
   import { handleError } from '$lib/utils/handle-error';
   import { clearQueryParam } from '$lib/utils/navigation';
+  import { formatPeopleHeaderDescription } from '$lib/utils/people-statistics';
   import {
     getSpacePeople,
     getSpacePeopleStatistics,
@@ -54,7 +55,7 @@
   const space: SharedSpaceResponseDto = $derived(data.space);
   const members: SharedSpaceMemberResponseDto[] = $derived(data.members);
   let people = $state<SharedSpacePersonResponseDto[]>([]);
-  let peopleStatistics = $state<SharedSpacePeopleStatisticsResponseDto>({ total: 0, hidden: 0 });
+  let peopleStatistics = $state<SharedSpacePeopleStatisticsResponseDto | null>(null);
   let loadedSpaceId = $state('');
   let loading = $state(false);
   let hasMore = $state(false);
@@ -65,7 +66,20 @@
 
   let selectHidden = $state(false);
   const visiblePeople = $derived(people.filter((p) => !p.isHidden));
-  const countVisiblePeople = $derived(peopleStatistics.total - peopleStatistics.hidden);
+  const countVisiblePeople = $derived(peopleStatistics ? peopleStatistics.total - peopleStatistics.hidden : 0);
+  const hasSearchablePeople = $derived(countVisiblePeople > 0 || visiblePeople.length > 0 || !!searchName.trim());
+  const headerDescription = $derived(
+    peopleStatistics
+      ? formatPeopleHeaderDescription({
+          visiblePeopleCount: countVisiblePeople,
+          detectedFaceCount: peopleStatistics.detectedFaceCount,
+          locale: $locale,
+          faceSingular: $t('face'),
+          facePlural: $t('faces'),
+          showZeroPeople: !!searchName.trim() || peopleStatistics.detectedFaceCount > 0,
+        })
+      : undefined,
+  );
   let allPeople = $state<SharedSpacePersonResponseDto[]>([]);
   let mergingPerson = $state<SharedSpacePersonResponseDto>();
 
@@ -82,6 +96,7 @@
   const currentMember = $derived(members.find((m) => m.userId === authManager.user.id));
   const isOwner = $derived(currentMember?.role === SharedSpaceRole.Owner);
   const isEditor = $derived(isOwner || currentMember?.role === SharedSpaceRole.Editor);
+  const canManageVisibility = $derived(isEditor && (peopleStatistics?.total ?? people.length) > 0);
 
   onMount(() => {
     const searchedPeople = $page.url.searchParams.get(QueryParameter.SEARCHED_PEOPLE);
@@ -147,7 +162,10 @@
     try {
       const [newPeople, newStatistics] = await Promise.all([
         getSpacePeople(getPeopleQuery({ limit: PAGE_SIZE })),
-        getSpacePeopleStatistics(getStatisticsQuery()),
+        getSpacePeopleStatistics(getStatisticsQuery()).catch((error) => {
+          handleError(error, $t('spaces_error_loading_people'));
+          return null;
+        }),
       ]);
       people = newPeople;
       peopleStatistics = newStatistics;
@@ -175,7 +193,12 @@
     try {
       const [newPeople, newStatistics] = await Promise.all([
         getSpacePeople(getPeopleQuery({ limit: PAGE_SIZE }), { signal: controller.signal }),
-        getSpacePeopleStatistics(getStatisticsQuery(), { signal: controller.signal }),
+        getSpacePeopleStatistics(getStatisticsQuery(), { signal: controller.signal }).catch((error) => {
+          if (!controller.signal.aborted) {
+            handleError(error, $t('spaces_error_loading_people'));
+          }
+          return null;
+        }),
       ]);
 
       if (abortController !== controller) {
@@ -334,7 +357,9 @@
       if (idx !== -1) {
         people[idx] = { ...people[idx], isHidden: true };
       }
-      peopleStatistics = { ...peopleStatistics, hidden: peopleStatistics.hidden + 1 };
+      if (peopleStatistics) {
+        peopleStatistics = { ...peopleStatistics, hidden: peopleStatistics.hidden + 1 };
+      }
       toastManager.primary($t('changed_visibility_successfully'));
     } catch (error) {
       handleError(error, $t('errors.unable_to_hide_person'));
@@ -344,7 +369,7 @@
 
 <UserPageLayout
   title={$t('spaces_people_title')}
-  description={countVisiblePeople === 0 && !searchName ? undefined : `(${countVisiblePeople.toLocaleString($locale)})`}
+  description={headerDescription}
 >
   {#snippet leading()}
     <IconButton
@@ -357,9 +382,9 @@
     />
   {/snippet}
   {#snippet buttons()}
-    {#if countVisiblePeople > 0 || searchName || (isEditor && peopleStatistics.total > 0)}
+    {#if hasSearchablePeople || canManageVisibility}
       <div class="flex gap-2 items-center justify-center">
-        {#if countVisiblePeople > 0 || searchName}
+        {#if hasSearchablePeople}
           <div class="hidden sm:block">
             <div class="w-40 lg:w-80 h-10">
               <SearchBar
@@ -372,7 +397,7 @@
             </div>
           </div>
         {/if}
-        {#if isEditor && peopleStatistics.total > 0}
+        {#if canManageVisibility}
           <Button
             leadingIcon={mdiEyeOutline}
             onclick={openVisibilityModal}
