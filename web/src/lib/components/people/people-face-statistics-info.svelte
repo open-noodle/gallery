@@ -1,15 +1,12 @@
-<script lang="ts" module>
-  import type { PeopleFaceStatisticsResponseDto } from '@immich/sdk';
-
-  const statisticsCache = new Map<string, PeopleFaceStatisticsResponseDto>();
-
-  export const clearPeopleFaceStatisticsInfoCache = () => statisticsCache.clear();
-</script>
-
 <script lang="ts">
   import { clickOutside } from '$lib/actions/click-outside';
+  import {
+    getCachedPeopleFaceStatistics,
+    setCachedPeopleFaceStatistics,
+  } from '$lib/components/people/people-face-statistics-info-cache';
   import { locale } from '$lib/stores/preferences.store';
   import { IconButton } from '@immich/ui';
+  import type { PeopleFaceStatisticsResponseDto } from '@immich/sdk';
   import { mdiInformationOutline } from '@mdi/js';
   import { t } from 'svelte-i18n';
 
@@ -34,7 +31,7 @@
     }
 
     activeCacheKey = cacheKey;
-    statistics = statisticsCache.get(cacheKey);
+    statistics = getCachedPeopleFaceStatistics(cacheKey);
     error = false;
     isLoading = false;
   };
@@ -49,7 +46,7 @@
   async function loadDetails() {
     syncCacheKey();
     const requestCacheKey = cacheKey;
-    const cached = statisticsCache.get(requestCacheKey);
+    const cached = getCachedPeopleFaceStatistics(requestCacheKey);
     if (cached) {
       statistics = cached;
       return;
@@ -59,7 +56,7 @@
     error = false;
     try {
       const loadedStatistics = await loadStatistics();
-      statisticsCache.set(requestCacheKey, loadedStatistics);
+      setCachedPeopleFaceStatistics(requestCacheKey, loadedStatistics);
       if (cacheKey === requestCacheKey) {
         statistics = loadedStatistics;
       }

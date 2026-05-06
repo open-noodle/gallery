@@ -1,14 +1,13 @@
 import '@testing-library/jest-dom';
+import { clearPeopleFaceStatisticsInfoCache } from '$lib/components/people/people-face-statistics-info-cache';
+import TestWrapper from '$lib/components/TestWrapper.svelte';
+import { locale } from '$lib/stores/preferences.store';
 import type { PeopleFaceStatisticsResponseDto } from '@immich/sdk';
 import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { init, register, waitLocale } from 'svelte-i18n';
 import type { Component } from 'svelte';
-import { locale } from '$lib/stores/preferences.store';
-import TestWrapper from '$lib/components/TestWrapper.svelte';
-import PeopleFaceStatisticsInfo, {
-  clearPeopleFaceStatisticsInfoCache,
-} from './people-face-statistics-info.svelte';
+import PeopleFaceStatisticsInfo from './people-face-statistics-info.svelte';
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -171,7 +170,7 @@ describe('PeopleFaceStatisticsInfo', () => {
 
   it('loads fresh statistics for a new cache key and does not show stale rows', async () => {
     const loadStatistics = vi
-      .fn<[], Promise<PeopleFaceStatisticsResponseDto>>()
+      .fn<() => Promise<PeopleFaceStatisticsResponseDto>>()
       .mockResolvedValueOnce(statistics({ detectedFaceCount: 1111 }))
       .mockResolvedValueOnce(statistics({ detectedFaceCount: 2222 }));
     const view = renderInfo({ cacheKey: 'people-a', loadStatistics });
@@ -193,7 +192,7 @@ describe('PeopleFaceStatisticsInfo', () => {
     const firstRequest = deferred<PeopleFaceStatisticsResponseDto>();
     const secondRequest = deferred<PeopleFaceStatisticsResponseDto>();
     const loadStatistics = vi
-      .fn<[], Promise<PeopleFaceStatisticsResponseDto>>()
+      .fn<() => Promise<PeopleFaceStatisticsResponseDto>>()
       .mockReturnValueOnce(firstRequest.promise)
       .mockReturnValueOnce(secondRequest.promise);
     const view = renderInfo({ cacheKey: 'old-key', loadStatistics });
@@ -223,7 +222,7 @@ describe('PeopleFaceStatisticsInfo', () => {
 
   it('renders an alert after a rejected load and leaves the trigger usable', async () => {
     const loadStatistics = vi
-      .fn<[], Promise<PeopleFaceStatisticsResponseDto>>()
+      .fn<() => Promise<PeopleFaceStatisticsResponseDto>>()
       .mockRejectedValueOnce(new Error('network'))
       .mockResolvedValueOnce(statistics({ detectedFaceCount: 1234 }));
 

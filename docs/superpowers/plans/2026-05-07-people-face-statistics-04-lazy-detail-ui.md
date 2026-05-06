@@ -104,7 +104,7 @@ Tell every worker they are not alone in the codebase, must not revert edits made
 - Add `web/src/lib/components/people/people-face-statistics-info.svelte`.
 - Modify `i18n/en.json`.
 
-- [ ] **Step 1: Write failing component tests**
+- [x] **Step 1: Write failing component tests**
 
 Create `web/src/lib/components/people/people-face-statistics-info.spec.ts` with tests for:
 
@@ -139,13 +139,13 @@ Import and call `clearPeopleFaceStatisticsInfoCache()` in `beforeEach` so the mo
 
 Expected red failure: the component file does not exist.
 
-- [ ] **Step 2: Run component tests and verify red**
+- [x] **Step 2: Run component tests and verify red**
 
 ```bash
 pnpm --dir web exec vitest --run src/lib/components/people/people-face-statistics-info.spec.ts
 ```
 
-- [ ] **Step 3: Implement the component and text keys**
+- [x] **Step 3: Implement the component and text keys**
 
 Add these English keys near the existing `face` keys in `i18n/en.json`:
 
@@ -300,7 +300,7 @@ Add `web/src/lib/components/people/people-face-statistics-info.svelte`:
 
 Adjust class names if Svelte or Tailwind checks require it, but preserve the test-visible roles, labels, cache behavior, and row text.
 
-- [ ] **Step 4: Run component tests and verify green**
+- [x] **Step 4: Run component tests and verify green**
 
 ```bash
 pnpm --dir web exec vitest --run src/lib/components/people/people-face-statistics-info.spec.ts
@@ -315,7 +315,7 @@ pnpm --dir web exec vitest --run src/lib/components/people/people-face-statistic
 - Modify `web/src/lib/components/layouts/user-page-layout.svelte`.
 - Modify `web/src/lib/components/spaces/mock-user-page-layout.test-wrapper.svelte`.
 
-- [ ] **Step 1: Write failing layout tests**
+- [x] **Step 1: Write failing layout tests**
 
 Add `web/src/lib/components/layouts/user-page-layout-description-trailing.test-wrapper.svelte`:
 
@@ -338,13 +338,13 @@ Assert:
 
 Expected red failure: `descriptionTrailing` is not a recognized/rendered snippet.
 
-- [ ] **Step 2: Run layout tests and verify red**
+- [x] **Step 2: Run layout tests and verify red**
 
 ```bash
 pnpm --dir web exec vitest --run src/lib/components/layouts/user-page-layout.spec.ts
 ```
 
-- [ ] **Step 3: Implement the slot**
+- [x] **Step 3: Implement the slot**
 
 Update `UserPageLayout` props to include:
 
@@ -372,7 +372,7 @@ Update `web/src/lib/components/spaces/mock-user-page-layout.test-wrapper.svelte`
 {/if}
 ```
 
-- [ ] **Step 4: Run layout tests and verify green**
+- [x] **Step 4: Run layout tests and verify green**
 
 ```bash
 pnpm --dir web exec vitest --run src/lib/components/layouts/user-page-layout.spec.ts
@@ -385,7 +385,7 @@ pnpm --dir web exec vitest --run src/lib/components/layouts/user-page-layout.spe
 - Modify `web/src/routes/(user)/people/people-page.spec.ts`.
 - Modify `web/src/routes/(user)/people/+page.svelte`.
 
-- [ ] **Step 1: Write failing global page tests**
+- [x] **Step 1: Write failing global page tests**
 
 Add tests to `people-page.spec.ts` for:
 
@@ -403,13 +403,13 @@ Add tests to `people-page.spec.ts` for:
 
 Expected red failure: no info button exists.
 
-- [ ] **Step 2: Run global page tests and verify red**
+- [x] **Step 2: Run global page tests and verify red**
 
 ```bash
 pnpm --dir web exec vitest --run 'src/routes/(user)/people/people-page.spec.ts' -t "face statistics|detailed|unsupported global name search"
 ```
 
-- [ ] **Step 3: Implement global integration**
+- [x] **Step 3: Implement global integration**
 
 In `+page.svelte`:
 
@@ -438,7 +438,7 @@ Render the component through the new layout snippet:
 
 Keep the existing `description={headerDescription}` behavior unchanged.
 
-- [ ] **Step 4: Run global page tests and verify green**
+- [x] **Step 4: Run global page tests and verify green**
 
 ```bash
 pnpm --dir web exec vitest --run 'src/routes/(user)/people/people-page.spec.ts'
@@ -451,7 +451,7 @@ pnpm --dir web exec vitest --run 'src/routes/(user)/people/people-page.spec.ts'
 - Modify `web/src/lib/components/spaces/space-people-page.spec.ts`.
 - Modify `web/src/routes/(user)/spaces/[spaceId]/people/+page.svelte`.
 
-- [ ] **Step 1: Write failing shared-space page tests**
+- [x] **Step 1: Write failing shared-space page tests**
 
 Add tests to `space-people-page.spec.ts` for:
 
@@ -469,13 +469,13 @@ Add tests to `space-people-page.spec.ts` for:
 
 Expected red failure: no info button exists.
 
-- [ ] **Step 2: Run shared-space page tests and verify red**
+- [x] **Step 2: Run shared-space page tests and verify red**
 
 ```bash
 pnpm --dir web exec vitest --run src/lib/components/spaces/space-people-page.spec.ts -t "face statistics|detailed|search"
 ```
 
-- [ ] **Step 3: Implement shared-space integration**
+- [x] **Step 3: Implement shared-space integration**
 
 In `+page.svelte`:
 
@@ -503,7 +503,7 @@ Render the component through the new layout snippet:
 
 Keep the existing shared-space header description behavior unchanged.
 
-- [ ] **Step 4: Run shared-space page tests and verify green**
+- [x] **Step 4: Run shared-space page tests and verify green**
 
 ```bash
 pnpm --dir web exec vitest --run src/lib/components/spaces/space-people-page.spec.ts
@@ -511,7 +511,7 @@ pnpm --dir web exec vitest --run src/lib/components/spaces/space-people-page.spe
 
 ## Task 5: Focused Verification And Self-Review
 
-- [ ] **Step 1: Run Phase 4 focused tests**
+- [x] **Step 1: Run Phase 4 focused tests**
 
 ```bash
 pnpm --dir web exec vitest --run \
@@ -521,14 +521,14 @@ pnpm --dir web exec vitest --run \
   src/lib/components/spaces/space-people-page.spec.ts
 ```
 
-- [ ] **Step 2: Run frontend type and Svelte checks**
+- [x] **Step 2: Run frontend type and Svelte checks**
 
 ```bash
 pnpm --dir web check:typescript
 pnpm --dir web check:svelte
 ```
 
-- [ ] **Step 3: Verify lazy endpoint usage**
+- [x] **Step 3: Verify lazy endpoint usage**
 
 ```bash
 rg -n "getPeopleFaceStatistics|getSpacePeopleFaceStatistics" web/src/routes web/src/lib
@@ -540,13 +540,13 @@ Expected:
 - Tests may reference the functions for positive click assertions and negative initial-render assertions.
 - No page-load file imports either detailed endpoint.
 
-- [ ] **Step 4: Verify whitespace**
+- [x] **Step 4: Verify whitespace**
 
 ```bash
 git diff --check
 ```
 
-- [ ] **Step 5: Review changed UI text and behavior**
+- [x] **Step 5: Review changed UI text and behavior**
 
 ```bash
 git diff -- web/src i18n/en.json docs/superpowers/plans/2026-05-07-people-face-statistics-04-lazy-detail-ui.md
