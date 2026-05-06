@@ -17,6 +17,7 @@ import { userAdminFactory } from '@test-data/factories/user-factory';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
+import { readFileSync } from 'node:fs';
 import PeoplePage from './+page.svelte';
 
 const { gotoMock, pageStore } = vi.hoisted(() => {
@@ -287,11 +288,54 @@ describe('Global people page', () => {
 
     renderPage([makePerson({ id: 'p1', name: 'Alice' })], { total: 12, hidden: 2, detectedFaceCount: 2901 });
 
+    expect(screen.queryByRole('button', { name: 'view_face_statistics_details' })).not.toBeInTheDocument();
+    expect(sdkMock.getPeopleFaceStatistics).not.toHaveBeenCalled();
+
     await waitFor(() => {
       expect(sdkMock.searchPerson).toHaveBeenCalledWith({ name: 'Ali', withSharedSpaces: true }, expect.any(Object));
     });
     expect(screen.queryByRole('button', { name: 'view_face_statistics_details' })).not.toBeInTheDocument();
     expect(sdkMock.getPeopleFaceStatistics).not.toHaveBeenCalled();
+  });
+
+  it('does not render the face statistics details button at any point during initial unsupported global name search', async () => {
+    pageStore.setUrl('http://localhost/people?searchedPeople=Ali');
+    const renderedButtonLabels: string[] = [];
+    const observer = new MutationObserver((records) => {
+      for (const record of records) {
+        for (const node of record.addedNodes) {
+          if (!(node instanceof HTMLElement)) {
+            continue;
+          }
+          const labeledElements = [
+            ...(node.matches('[aria-label]') ? [node] : []),
+            ...node.querySelectorAll<HTMLElement>('[aria-label]'),
+          ];
+          renderedButtonLabels.push(...labeledElements.map((element) => element.getAttribute('aria-label') ?? ''));
+        }
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    renderPage([makePerson({ id: 'p1', name: 'Alice' })], {
+      total: 12,
+      hidden: 2,
+      detectedFaceCount: 2901,
+    });
+    await Promise.resolve();
+    observer.disconnect();
+
+    expect(renderedButtonLabels).not.toContain('view_face_statistics_details');
+    expect(screen.queryByRole('button', { name: 'view_face_statistics_details' })).not.toBeInTheDocument();
+    expect(sdkMock.getPeopleFaceStatistics).not.toHaveBeenCalled();
+  });
+
+  it('derives the unsupported global statistics filter from the active URL query before mount', () => {
+    const source = readFileSync('src/routes/(user)/people/+page.svelte', 'utf8');
+
+    expect(source).toMatch(
+      /let hasUnsupportedStatsFilter = \$derived\(\s*!!\$page\.url\.searchParams\.get\(QueryParameter\.SEARCHED_PEOPLE\) \|\| !!searchName\.trim\(\),\s*\)/,
+    );
   });
 
   it('hides the face statistics details button when overview statistics are unavailable', () => {

@@ -244,7 +244,9 @@
   let visiblePeople = $derived(people.filter((people) => !people.isHidden));
   let overviewStatistics = $derived(data.peopleStatistics);
   let peopleCountStatistics = $derived(overviewStatistics ?? data.people);
-  let hasUnsupportedStatsFilter = $derived(!!searchName.trim());
+  let hasUnsupportedStatsFilter = $derived(
+    !!$page.url.searchParams.get(QueryParameter.SEARCHED_PEOPLE) || !!searchName.trim(),
+  );
   let countVisiblePeople = $derived(
     searchName ? searchedPeopleLocal.length : peopleCountStatistics.total - peopleCountStatistics.hidden,
   );
