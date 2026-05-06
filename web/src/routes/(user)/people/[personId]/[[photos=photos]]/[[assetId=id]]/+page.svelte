@@ -38,6 +38,7 @@
   import { createUrl, getPeopleThumbnailUrl } from '$lib/utils';
   import { handleError } from '$lib/utils/handle-error';
   import { getPersonFaceThumbnailUrl } from '$lib/utils/people-utils';
+  import { isSpaceScopedPerson, toScopedPersonRef } from '$lib/utils/scoped-person-ref';
   import { normalizeSearchString } from '$lib/utils/string-utils';
   import {
     AssetVisibility,
@@ -53,7 +54,6 @@
     updatePerson,
     type PersonFaceResponseDto,
     type PersonResponseDto,
-    type ScopedPersonProfileRefDto,
   } from '@immich/sdk';
   import {
     ActionButton,
@@ -79,13 +79,13 @@
   let { data }: Props = $props();
 
   let person = $derived(data.person);
-  let thumbnailData = $derived(getPeopleThumbnailUrl(person));
+  let thumbnailData = $derived(getScopedThumbnailUrl(person));
 
   let timelineManager = $state<TimelineManager>() as TimelineManager;
   let numberOfAssets = $derived(timelineManager?.isInitialized ? timelineManager.assetCount : data.statistics.assets);
   const options = $derived({
     visibility: AssetVisibility.Timeline,
-    personId: data.person.id,
+    personIds: [data.person.filterId ?? data.person.id],
     withSharedSpaces: true,
   });
 
@@ -110,32 +110,15 @@
   let isSearchingPeople = $state(false);
   let suggestionContainer: HTMLElement | undefined = $state();
 
-  const toScopedPersonRef = (person: PersonResponseDto): ScopedPersonProfileRefDto => {
-    if (person.primaryProfile?.type === 'space-person' && person.primaryProfile.spaceId) {
-      return {
-        type: ScopedPersonProfileType.SpacePerson,
-        id: person.primaryProfile.id,
-        spaceId: person.primaryProfile.spaceId,
-      };
-    }
-    if (person.primaryProfile?.type === 'user-person') {
-      return { type: ScopedPersonProfileType.Person, id: person.primaryProfile.id };
-    }
-    return { type: ScopedPersonProfileType.Person, id: person.id };
-  };
-
-  const isSpaceScoped = (person: PersonResponseDto) =>
-    toScopedPersonRef(person).type === ScopedPersonProfileType.SpacePerson;
-
-  const getScopedThumbnailUrl = (person: PersonResponseDto): string => {
+  function getScopedThumbnailUrl(person: PersonResponseDto, updatedAt?: string): string {
     const profile = person.primaryProfile;
     if (profile?.type === 'space-person' && profile.spaceId) {
       return createUrl(`/shared-spaces/${profile.spaceId}/people/${profile.id}/thumbnail`, {
-        updatedAt: person.updatedAt,
+        updatedAt: updatedAt ?? person.updatedAt,
       });
     }
-    return getPeopleThumbnailUrl(person);
-  };
+    return getPeopleThumbnailUrl(person, updatedAt);
+  }
 
   onMount(() => {
     const action = $page.url.searchParams.get(QueryParameter.ACTION);
@@ -149,7 +132,7 @@
 
     return websocketEvents.on('on_person_thumbnail', (personId: string) => {
       if (person.id === personId) {
-        thumbnailData = getPeopleThumbnailUrl(person, Date.now().toString());
+        thumbnailData = getScopedThumbnailUrl(person, Date.now().toString());
       }
     });
   });
@@ -210,7 +193,7 @@
         ? selectedPeople
         : [targetCandidate, ...selectedPeople.filter((selectedPerson) => selectedPerson.id !== targetPerson.id)];
     const usesScopedRepair =
-      isSpaceScoped(targetPerson) || sourcePeople.some((sourcePerson) => isSpaceScoped(sourcePerson));
+      isSpaceScopedPerson(targetPerson) || sourcePeople.some((sourcePerson) => isSpaceScopedPerson(sourcePerson));
     const mergedCount = await (usesScopedRepair
       ? (async () => {
           await mergeScopedPeople({
@@ -407,7 +390,7 @@
       });
 
       if (updated) {
-        thumbnailData = getPeopleThumbnailUrl(person, Date.now().toString());
+        thumbnailData = getScopedThumbnailUrl(person, Date.now().toString());
       }
     },
   };
