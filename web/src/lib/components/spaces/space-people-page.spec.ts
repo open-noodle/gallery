@@ -106,6 +106,16 @@ function makeFaceStatistics(
   };
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+  return { promise, resolve, reject };
+}
+
 function renderPage({
   space = makeSpace(),
   members = [makeMember()],
@@ -289,6 +299,67 @@ describe('Spaces people page', () => {
 
     expect(screen.queryByRole('button', { name: 'view_face_statistics_details' })).not.toBeInTheDocument();
     expect(sdkMock.getSpacePeopleFaceStatistics).not.toHaveBeenCalled();
+  });
+
+  it('does not expose detailed face statistics when a stale cleared search resolves after a new search starts', async () => {
+    const people = [makePerson({ id: 'p1', name: 'Alice' }), makePerson({ id: 'p2', name: 'Bob' })];
+    const clearPeopleRequest = deferred<SharedSpacePersonResponseDto[]>();
+    const clearStatsRequest = deferred<SharedSpacePeopleStatisticsResponseDto>();
+    const bobPeopleRequest = deferred<SharedSpacePersonResponseDto[]>();
+    const bobStatsRequest = deferred<SharedSpacePeopleStatisticsResponseDto>();
+
+    sdkMock.getSpacePeople.mockImplementation(({ name }) => {
+      if (name === 'Ali') {
+        return Promise.resolve([people[0]]);
+      }
+      if (name === 'Bob') {
+        return bobPeopleRequest.promise;
+      }
+      return clearPeopleRequest.promise;
+    });
+    sdkMock.getSpacePeopleStatistics.mockImplementation(({ name }) => {
+      if (name === 'Ali') {
+        return Promise.resolve({ total: 1, hidden: 0, detectedFaceCount: 7 });
+      }
+      if (name === 'Bob') {
+        return bobStatsRequest.promise;
+      }
+      return clearStatsRequest.promise;
+    });
+
+    renderPage({ people, peopleStatistics: { total: 2, hidden: 0, detectedFaceCount: 22 } });
+
+    await fireEvent.input(screen.getByPlaceholderText('search_people'), { target: { value: 'Ali' } });
+    await waitFor(() => {
+      expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(1) \u00b7 7 faces');
+    });
+    expect(screen.getByRole('button', { name: 'view_face_statistics_details' })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByLabelText('clear_value'));
+    await waitFor(() => {
+      expect(sdkMock.getSpacePeopleStatistics).toHaveBeenCalledWith({ id: 'space-1' });
+    });
+
+    await fireEvent.input(screen.getByPlaceholderText('search_people'), { target: { value: 'Bob' } });
+    await waitFor(() => {
+      expect(sdkMock.getSpacePeopleStatistics).toHaveBeenCalledWith({ id: 'space-1', name: 'Bob' }, expect.any(Object));
+    });
+
+    clearPeopleRequest.resolve(people);
+    clearStatsRequest.resolve({ total: 2, hidden: 0, detectedFaceCount: 22 });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(screen.queryByRole('button', { name: 'view_face_statistics_details' })).not.toBeInTheDocument();
+    expect(sdkMock.getSpacePeopleFaceStatistics).not.toHaveBeenCalled();
+
+    bobPeopleRequest.resolve([people[1]]);
+    bobStatsRequest.resolve({ total: 1, hidden: 0, detectedFaceCount: 9 });
+    await waitFor(() => {
+      expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-description', '(1) \u00b7 9 faces');
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: 'view_face_statistics_details' }));
+    expect(sdkMock.getSpacePeopleFaceStatistics).toHaveBeenCalledWith({ id: 'space-1', name: 'Bob' });
   });
 
   it('loads filtered detailed face statistics separately after search changes from empty to a name', async () => {

@@ -136,17 +136,22 @@
     faceCount: person.faceCount,
   });
 
-  const getPeopleQuery = (query: { limit?: number; offset?: number; withHidden?: boolean } = {}) => {
-    const name = searchName.trim();
+  const getPeopleQuery = (
+    query: { limit?: number; offset?: number; withHidden?: boolean } = {},
+    searchFilter = searchName,
+  ) => {
+    const name = searchFilter.trim();
     return { id: space.id, ...(name ? { name } : {}), ...query };
   };
 
-  const getStatisticsQuery = () => {
-    const name = searchName.trim();
+  const getStatisticsQuery = (searchFilter = searchName) => {
+    const name = searchFilter.trim();
     return { id: space.id, ...(name ? { name } : {}) };
   };
 
-  const loadSpaceFaceStatistics = () => getSpacePeopleFaceStatistics(getStatisticsQuery());
+  const searchScopeMatches = (searchFilter: string) => activeStatisticsSearchName === (searchFilter.trim() || null);
+
+  const loadSpaceFaceStatistics = () => getSpacePeopleFaceStatistics(getStatisticsQuery(statisticsSearchName ?? ''));
 
   const cancelSearchRequest = () => {
     abortController?.abort();
@@ -175,20 +180,28 @@
   }
 
   async function refreshPeople() {
+    const requestSearchName = searchName.trim();
     try {
       const [newPeople, newStatistics] = await Promise.all([
-        getSpacePeople(getPeopleQuery({ limit: PAGE_SIZE })),
-        getSpacePeopleStatistics(getStatisticsQuery()).catch((error) => {
+        getSpacePeople(getPeopleQuery({ limit: PAGE_SIZE }, requestSearchName)),
+        getSpacePeopleStatistics(getStatisticsQuery(requestSearchName)).catch((error) => {
           handleError(error, $t('spaces_error_loading_people'));
           return null;
         }),
       ]);
+
+      if (!searchScopeMatches(requestSearchName)) {
+        return;
+      }
+
       people = newPeople;
       peopleStatistics = newStatistics;
-      statisticsSearchName = searchName.trim() || null;
+      statisticsSearchName = requestSearchName || null;
       hasMore = people.length >= PAGE_SIZE;
     } catch (error) {
-      handleError(error, $t('spaces_error_loading_people'));
+      if (searchScopeMatches(requestSearchName)) {
+        handleError(error, $t('spaces_error_loading_people'));
+      }
     }
   }
 
@@ -196,7 +209,8 @@
     searchName = name ?? searchName;
     await updateSearchQueryParam();
 
-    if (!searchName.trim()) {
+    const requestSearchName = searchName.trim();
+    if (!requestSearchName) {
       cancelSearchRequest();
       await refreshPeople();
       return;
@@ -209,8 +223,8 @@
 
     try {
       const [newPeople, newStatistics] = await Promise.all([
-        getSpacePeople(getPeopleQuery({ limit: PAGE_SIZE }), { signal: controller.signal }),
-        getSpacePeopleStatistics(getStatisticsQuery(), { signal: controller.signal }).catch((error) => {
+        getSpacePeople(getPeopleQuery({ limit: PAGE_SIZE }, requestSearchName), { signal: controller.signal }),
+        getSpacePeopleStatistics(getStatisticsQuery(requestSearchName), { signal: controller.signal }).catch((error) => {
           if (!controller.signal.aborted) {
             handleError(error, $t('spaces_error_loading_people'));
           }
@@ -218,13 +232,13 @@
         }),
       ]);
 
-      if (abortController !== controller) {
+      if (abortController !== controller || !searchScopeMatches(requestSearchName)) {
         return;
       }
 
       people = newPeople;
       peopleStatistics = newStatistics;
-      statisticsSearchName = searchName.trim() || null;
+      statisticsSearchName = requestSearchName || null;
       hasMore = people.length >= PAGE_SIZE;
     } catch (error) {
       if (controller.signal.aborted) {

@@ -5,6 +5,7 @@
     setCachedPeopleFaceStatistics,
   } from '$lib/components/people/people-face-statistics-info-cache';
   import { locale } from '$lib/stores/preferences.store';
+  import { generateId } from '$lib/utils/generate-id';
   import { IconButton } from '@immich/ui';
   import type { PeopleFaceStatisticsResponseDto } from '@immich/sdk';
   import { mdiInformationOutline } from '@mdi/js';
@@ -29,6 +30,7 @@
 
   const panelWidth = 288;
   const panelMargin = 8;
+  const detailsId = `people-face-statistics-details-${generateId()}`;
 
   const formatNumber = (value: number) => value.toLocaleString($locale);
 
@@ -113,7 +115,7 @@
   use:clickOutside={{ onOutclick: closeDetails, onEscape: closeDetails }}
 >
   <IconButton
-    aria-controls="people-face-statistics-details"
+    aria-controls={detailsId}
     aria-expanded={isOpen}
     aria-label={$t('view_face_statistics_details')}
     color="secondary"
@@ -130,7 +132,7 @@
       aria-label={$t('view_face_statistics_details')}
       class="fixed z-50 w-72 max-w-[calc(100vw-1rem)] rounded-lg border border-gray-200 bg-white p-3 text-sm shadow-lg dark:border-gray-700 dark:bg-immich-dark-gray"
       data-testid="people-face-statistics-details"
-      id="people-face-statistics-details"
+      id={detailsId}
       role="dialog"
       style:left="{panelLeft}px"
       style:top="{panelTop}px"

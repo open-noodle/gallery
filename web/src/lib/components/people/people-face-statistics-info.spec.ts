@@ -101,16 +101,25 @@ describe('PeopleFaceStatisticsInfo', () => {
 
     const trigger = screen.getByRole('button', { name: 'View face statistics details' });
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
-    expect(trigger).toHaveAttribute('aria-controls', 'people-face-statistics-details');
+    const detailsId = trigger.getAttribute('aria-controls');
+    expect(detailsId).toBeTruthy();
 
     trigger.focus();
     await userEvent.keyboard('{Enter}');
 
     expect(trigger).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByRole('dialog', { name: 'View face statistics details' })).toHaveAttribute(
-      'id',
-      'people-face-statistics-details',
-    );
+    expect(screen.getByRole('dialog', { name: 'View face statistics details' })).toHaveAttribute('id', detailsId);
+  });
+
+  it('uses unique control ids for multiple instances', () => {
+    renderInfo({ cacheKey: 'people-a' });
+    renderInfo({ cacheKey: 'people-b' });
+
+    const controls = screen
+      .getAllByRole('button', { name: 'View face statistics details' })
+      .map((trigger) => trigger.getAttribute('aria-controls'));
+
+    expect(new Set(controls).size).toBe(2);
   });
 
   it('renders the details surface as a compact dialog for narrow viewports', async () => {
