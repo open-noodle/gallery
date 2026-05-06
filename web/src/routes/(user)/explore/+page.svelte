@@ -7,7 +7,8 @@
   import SingleGridRow from '#lib/components/shared-components/SingleGridRow.svelte';
   import { assetViewerManager } from '#lib/managers/asset-viewer-manager.svelte.ts';
   import { Route } from '#lib/route.ts';
-  import { createUrl, getAssetMediaUrl, getPeopleThumbnailUrl, memoryLaneTitle } from '#lib/utils.ts';
+  import { getAssetMediaUrl, memoryLaneTitle } from '#lib/utils.ts';
+  import { getGlobalPersonHref, getGlobalPersonThumbnailUrl } from '#lib/utils/global-person-route.ts';
   import { getAssetInfo, AssetMediaSize, type PersonResponseDto, type SearchExploreResponseDto } from '@immich/sdk';
   import { authManager } from '#lib/managers/auth-manager.svelte.ts';
   import MemoryCard from '#lib/components/memories/MemoryCard.svelte';
@@ -64,19 +65,9 @@
     current: assetViewerManager.asset!,
   });
 
-  const getPersonHref = (person: PersonResponseDto) =>
-    person.primaryProfile?.type === 'space-person' && person.primaryProfile.spaceId
-      ? Route.viewSpacePerson(person.primaryProfile.spaceId, person.primaryProfile.id, {
-          previousRoute: Route.explore(),
-        })
-      : Route.viewPerson({ ...person, id: person.primaryProfile?.id ?? person.id });
+  const getPersonHref = (person: PersonResponseDto) => getGlobalPersonHref(person, Route.explore());
 
-  const getPersonThumbnail = (person: PersonResponseDto) =>
-    person.primaryProfile?.type === 'space-person' && person.primaryProfile.spaceId
-      ? createUrl(`/shared-spaces/${person.primaryProfile.spaceId}/people/${person.primaryProfile.id}/thumbnail`, {
-          updatedAt: person.updatedAt,
-        })
-      : getPeopleThumbnailUrl({ ...person, id: person.primaryProfile?.id ?? person.id });
+  const getPersonThumbnail = (person: PersonResponseDto) => getGlobalPersonThumbnailUrl(person);
 </script>
 
 <OnEvents {onPersonThumbnailReady} />
