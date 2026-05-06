@@ -4,7 +4,7 @@ Date: 2026-05-06
 
 ## Context
 
-The people and space-people headers currently expose a visible people count, but users also need the number of assigned face observations in the same scope. That face count is important when comparing import progress, admin/user visibility, and shared-space consistency.
+The people and space-people headers currently expose a visible people count, but users also need the number of detected face observations in the same scope. That face count is important when comparing import progress, admin/user visibility, and shared-space consistency.
 
 The UI must keep the first page load cheap. Detailed diagnostics are useful, but they should only load when the user explicitly asks for them.
 
@@ -12,7 +12,7 @@ This design covers global people, space people, global person detail, and space-
 
 ## Goals
 
-- Show a primary face count next to the visible people count on global people and space people pages.
+- Show a primary detected-face count next to the visible people count on global people and space people pages.
 - Keep detailed face diagnostics behind a lazy info action.
 - Use consistent API shapes for global and shared-space people statistics.
 - Include person-detail and space-person-detail face counts for consistency.
@@ -31,7 +31,7 @@ This design covers global people, space people, global person detail, and space-
 
 - **Person count**: count of visible person identities in the current scope.
 - **Face count**: count of detected face observations, not distinct people.
-- **Primary face count**: count of face observations assigned to visible people in the current scope.
+- **Primary face count**: count of all detected face observations in the current accessible scope.
 - **Detected faces**: all detected face observations in the current accessible asset scope.
 - **Assigned visible faces**: detected faces assigned to visible people in the current scope.
 - **Assigned hidden faces**: detected faces assigned to hidden people in the current scope.
@@ -42,7 +42,7 @@ This design covers global people, space people, global person detail, and space-
 The header should answer the fast comparison question:
 
 ```text
-People (60) · 2,843 faces  [i]
+People (60) · 2,901 faces  [i]
 ```
 
 The info action should answer the diagnostic question:
@@ -57,7 +57,7 @@ The info action should answer the diagnostic question:
 For a shared space:
 
 ```text
-Space People (14) · 1,930 faces  [i]
+Space People (14) · 1,980 faces  [i]
 ```
 
 ```text
@@ -87,6 +87,10 @@ direct assets in the shared space
 Person-detail statistics use the accessible identity represented by the person route. They must include the user's accessible assets for that identity and must not count inaccessible assets after access changes such as leaving a space.
 
 Space-person-detail statistics use only the selected shared space and selected person identity.
+
+Each face observation must be counted at most once per response, by stable face ID. Each asset must be considered at most once per response, even when it is reachable through more than one access path, such as owned library plus shared space, multiple shared spaces, or direct space asset plus linked/external library.
+
+Each visible person identity must be counted at most once per response. If personal and shared-space person rows resolve to the same accessible identity, the people total counts that identity once.
 
 All counts are backend aggregates. The frontend must not derive these numbers from loaded grid rows, because pagination and lazy loading would make the counts incorrect.
 
@@ -123,13 +127,13 @@ Overview statistics are safe for initial page load.
 
 ```ts
 type PeopleOverviewStatistics = {
-  total: number;            // visible people
-  hidden: number;           // hidden people
-  visibleFaceCount: number; // faces assigned to visible people
+  total: number;             // visible people
+  hidden: number;            // hidden people
+  detectedFaceCount: number; // all detected in-scope faces
 };
 ```
 
-`total` and `hidden` preserve the existing people-statistics naming. `visibleFaceCount` is explicit because it is not all detected faces.
+`total` and `hidden` preserve the existing people-statistics naming. `detectedFaceCount` is explicit because the header's face number is all detected in-scope faces, not only assigned visible faces.
 
 ### Detailed Face Statistics
 
@@ -205,9 +209,9 @@ Detailed stats should be cached for the current query scope and reused if the us
 
 ## Filter Behavior
 
-Statistics should follow the visible page scope. If the people list is filtered by supported query parameters, the statistics request should receive the same filters so the header remains honest.
+Statistics must follow the visible page scope. If the people list is filtered by supported query parameters, the statistics request must receive the same filters so the header remains honest.
 
-Required filters are the filters already supported by each page's people list. If a filter cannot be supported for face statistics in the first implementation plan, the plan must explicitly document that gap and the UI must avoid presenting filtered face totals as if they described the filtered list.
+Required filters are the filters already supported by each page's people list. An implementation plan must list the exact filter parameters it supports. If a page has an active filter that the statistics endpoint cannot support yet, the UI must either hide the filtered face count or label it explicitly as an unfiltered total for the broader scope. It must not present unfiltered face totals as if they described the filtered people list.
 
 ## Access Rules
 
@@ -255,13 +259,21 @@ Scope:
 
 Required tests:
 
-- global overview counts visible people and faces assigned to visible people
-- global overview excludes hidden people and hidden people's faces from primary totals
+- global overview counts visible people and detected in-scope faces
+- global overview excludes hidden people from people totals while including their detected faces in `detectedFaceCount`
+- global overview includes unassigned detected faces in `detectedFaceCount`
 - shared-space overview counts only the selected space
 - shared-space overview includes linked/external-library photos attached to that space
+- overview counts each face once when an asset is reachable through owned library and shared space
+- overview counts each face once when an asset is reachable as both a direct space asset and linked/external-library asset
+- overview counts an accessible resolved identity once when personal and shared-space person rows represent the same identity
+- shared-space overview counts a person once when multiple space assets resolve to the same identity
 - non-members cannot read shared-space overview statistics
 - deleted/trashed/non-visible assets are excluded according to existing page visibility rules
 - aggregate counts are independent of pagination
+- empty library returns zero people, zero hidden people, and zero detected faces
+- empty shared space returns zero people, zero hidden people, and zero detected faces
+- all-hidden people return zero visible people while still reporting detected faces
 
 ### Phase 2: Lazy Detailed Face Statistics
 
@@ -275,33 +287,53 @@ Required tests:
 
 - global detailed stats split visible, hidden, and unassigned faces correctly
 - space detailed stats split visible, hidden, and unassigned faces correctly
-- hidden faces are not included in primary overview face count
-- unassigned faces are not included in primary overview face count
+- detailed stats sum back to the primary overview `detectedFaceCount`
+- hidden faces are included in primary overview `detectedFaceCount` and separately classified as hidden in detailed stats
+- unassigned faces are included in primary overview `detectedFaceCount` and separately classified as unassigned in detailed stats
 - linked/external-library faces appear only when in authorized scope
 - inaccessible spaces and libraries cannot be inferred from detailed counts
+- detailed stats count each face once across overlapping access paths
 - rerunning the same query is deterministic and has no side effects
+- all faces unassigned returns detected count with zero assigned visible and hidden counts
 
-### Phase 3: Frontend Header And Lazy Info UI
+### Phase 3: Frontend Overview Header
 
 Scope:
 
 - global people header
 - shared-space people header
-- reusable stats/info UI if existing structure supports it
 - client query hooks/API SDK updates
 
 Required tests:
 
-- global people page renders people count and face count
-- shared-space people page renders people count and face count
+- global people page renders people count and detected face count
+- shared-space people page renders people count and detected face count
 - mobile/header layout keeps both counts visible
 - detailed face-statistics endpoint is not called on initial render
+- active supported filters are passed to overview statistics endpoints
+- unsupported active filters hide or clearly relabel the face count instead of showing a misleading filtered value
+- overview loading and error states do not break the people list
+
+### Phase 4: Frontend Lazy Detail UI
+
+Scope:
+
+- reusable stats/info UI if existing structure supports it
+- global people lazy detail action
+- shared-space people lazy detail action
+- client query hooks/API SDK updates for detailed face statistics
+
+Required tests:
+
+- info action is an accessible icon button with a useful label
 - clicking info calls the detailed endpoint and renders the diagnostic split
 - closing and reopening the info UI uses cached details for the same scope
 - changing space/filter scope invalidates the cached detail query
-- loading and error states are handled without hiding the primary people/face counts
+- detailed loading and error states are handled without hiding the primary people/face counts
+- desktop presentation fits the header without overlap
+- mobile presentation keeps the header counts visible and shows details in a usable compact popover, dialog, or sheet
 
-### Phase 4: Person Detail Statistics
+### Phase 5: Person Detail Statistics
 
 Scope:
 
@@ -317,18 +349,19 @@ Required tests:
 - leaving a space removes inaccessible space assets from global detail stats while preserving the user's owned assets
 - non-members cannot read space-person detail statistics
 - linked/external-library assets count for space-person detail only when attached to the selected authorized space
+- person with zero accessible assets returns zero assets and zero faces
 
-### Phase 5: Edge-Case Hardening And Verification
+### Phase 6: Edge-Case Hardening And Verification
 
 Scope:
 
-- fill gaps found during phases 1-4
+- fill gaps found during phases 1-5
 - CI-focused verification
 - docs/API consistency checks
 
 Required tests:
 
-- filtered people pages either pass matching filters to stats endpoints or avoid showing misleading filtered face totals
+- filtered people pages pass matching supported filters to stats endpoints
 - same person represented through personal and shared-space identities is counted once in visible people totals
 - stats remain stable after reconciliation jobs rerun
 - stats remain stable when uploads and shared-space materialization run in different orders
@@ -338,16 +371,16 @@ Required tests:
 ## Rollout Notes
 
 - The primary header face count should be safe to ship once phase 1 and phase 3 are complete.
-- The info action should be hidden or disabled until phase 2 is complete.
-- Person-detail face counts can ship after phase 4 without blocking the overview header work.
+- The info action should be hidden or disabled until phase 2 and phase 4 are complete.
+- Person-detail face counts can ship after phase 5 without blocking the overview header work.
 - If implementation is split across PRs, each PR should leave the UI internally consistent and avoid exposing controls whose backend endpoint is not ready.
 
 ## Acceptance Criteria
 
-- Global people and space people pages show both visible people count and assigned visible face count.
+- Global people and space people pages show both visible people count and detected face count.
 - Detailed face diagnostics load only after the info icon is clicked.
 - Global, space, global-person, and space-person statistics use consistent contracts.
 - Linked/external-library photos are counted only in authorized scopes.
-- Hidden and unassigned faces are visible in diagnostics but excluded from primary face totals.
+- Hidden and unassigned faces are included in the primary detected-face total and broken out in diagnostics.
 - Tests cover backend aggregation, access control, external libraries, frontend lazy loading, caching, and mobile/header visibility.
 - Each implementation phase has its own TDD plan before production code is changed.
