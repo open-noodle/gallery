@@ -8,6 +8,7 @@
   import { IconButton } from '@immich/ui';
   import type { PeopleFaceStatisticsResponseDto } from '@immich/sdk';
   import { mdiInformationOutline } from '@mdi/js';
+  import { tick } from 'svelte';
   import { t } from 'svelte-i18n';
 
   interface Props {
@@ -22,8 +23,26 @@
   let error = $state(false);
   let statistics = $state<PeopleFaceStatisticsResponseDto | undefined>();
   let activeCacheKey = $state<string>();
+  let container = $state<HTMLDivElement>();
+  let panelTop = $state(0);
+  let panelLeft = $state(0);
+
+  const panelWidth = 288;
+  const panelMargin = 8;
 
   const formatNumber = (value: number) => value.toLocaleString($locale);
+
+  const updatePanelPosition = () => {
+    if (!container) {
+      return;
+    }
+
+    const rect = container.getBoundingClientRect();
+    const viewportWidth = globalThis.innerWidth || panelWidth + panelMargin * 2;
+    const maxLeft = viewportWidth - panelWidth - panelMargin;
+    panelLeft = Math.max(panelMargin, Math.min(maxLeft, rect.left));
+    panelTop = rect.bottom + 4;
+  };
 
   const syncCacheKey = () => {
     if (activeCacheKey === cacheKey) {
@@ -76,6 +95,7 @@
     isOpen = !isOpen;
     if (isOpen) {
       error = false;
+      void tick().then(updatePanelPosition);
     }
   }
 
@@ -84,7 +104,10 @@
   };
 </script>
 
+<svelte:window onresize={updatePanelPosition} onscroll={updatePanelPosition} />
+
 <div
+  bind:this={container}
   class="relative inline-flex"
   data-testid="people-face-statistics-info"
   use:clickOutside={{ onOutclick: closeDetails, onEscape: closeDetails }}
@@ -105,10 +128,12 @@
   {#if isOpen}
     <div
       aria-label={$t('view_face_statistics_details')}
-      class="absolute start-0 top-9 z-10 w-72 max-w-[calc(100vw-1rem)] rounded-lg border border-gray-200 bg-white p-3 text-sm shadow-lg dark:border-gray-700 dark:bg-immich-dark-gray"
+      class="fixed z-50 w-72 max-w-[calc(100vw-1rem)] rounded-lg border border-gray-200 bg-white p-3 text-sm shadow-lg dark:border-gray-700 dark:bg-immich-dark-gray"
       data-testid="people-face-statistics-details"
       id="people-face-statistics-details"
       role="dialog"
+      style:left="{panelLeft}px"
+      style:top="{panelTop}px"
     >
       {#if isLoading}
         <p class="text-gray-500 dark:text-gray-300" role="status">{$t('loading_face_statistics')}</p>

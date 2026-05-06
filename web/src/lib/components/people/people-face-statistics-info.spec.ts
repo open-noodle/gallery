@@ -118,6 +118,8 @@ describe('PeopleFaceStatisticsInfo', () => {
     await userEvent.click(screen.getByRole('button', { name: 'View face statistics details' }));
 
     const dialog = screen.getByRole('dialog', { name: 'View face statistics details' });
+    expect(dialog).toHaveClass('fixed');
+    expect(dialog).not.toHaveClass('absolute');
     expect(dialog).toHaveClass('w-72');
     expect(dialog).toHaveClass('max-w-[calc(100vw-1rem)]');
   });

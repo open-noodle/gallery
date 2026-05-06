@@ -279,6 +279,18 @@ describe('Spaces people page', () => {
     expect(sdkMock.getSpacePeopleFaceStatistics).toHaveBeenCalledWith({ id: 'space-1', name: 'Ali' });
   });
 
+  it('hides the face statistics details button during initial URL name search until filtered stats load', () => {
+    pageStore.setUrl('http://localhost/spaces/space-1/people?searchedPeople=Ali');
+
+    renderPage({
+      people: [makePerson({ id: 'p1', name: 'Alice' }), makePerson({ id: 'p2', name: 'Bob' })],
+      peopleStatistics: { total: 2, hidden: 0, detectedFaceCount: 22 },
+    });
+
+    expect(screen.queryByRole('button', { name: 'view_face_statistics_details' })).not.toBeInTheDocument();
+    expect(sdkMock.getSpacePeopleFaceStatistics).not.toHaveBeenCalled();
+  });
+
   it('loads filtered detailed face statistics separately after search changes from empty to a name', async () => {
     sdkMock.getSpacePeople.mockResolvedValue([makePerson({ id: 'p1', name: 'Alice' })]);
     sdkMock.getSpacePeopleStatistics.mockResolvedValue({ total: 1, hidden: 0, detectedFaceCount: 7 });
@@ -299,8 +311,10 @@ describe('Spaces people page', () => {
       expect(sdkMock.getSpacePeopleStatistics).toHaveBeenCalledWith({ id: 'space-1', name: 'Ali' }, expect.any(Object));
     });
 
-    expect(await screen.findByText('2,222')).toBeInTheDocument();
     expect(screen.queryByText('1,111')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'view_face_statistics_details' }));
+
+    expect(await screen.findByText('2,222')).toBeInTheDocument();
     expect(sdkMock.getSpacePeopleFaceStatistics).toHaveBeenCalledTimes(2);
   });
 

@@ -62,6 +62,7 @@
   let loading = $state(false);
   let hasMore = $state(false);
   let searchName = $state('');
+  let statisticsSearchName = $state<string | null>(null);
   let showLoadingSpinner = $state(false);
   let abortController: AbortController | null = null;
   let searchTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -70,6 +71,10 @@
   const visiblePeople = $derived(people.filter((p) => !p.isHidden));
   const countVisiblePeople = $derived(peopleStatistics ? peopleStatistics.total - peopleStatistics.hidden : 0);
   const hasSearchablePeople = $derived(countVisiblePeople > 0 || visiblePeople.length > 0 || !!searchName.trim());
+  const activeSearchFilterName = $derived(
+    searchName.trim() || ($page.url.searchParams.get(QueryParameter.SEARCHED_PEOPLE) ?? '').trim(),
+  );
+  const activeStatisticsSearchName = $derived(activeSearchFilterName || null);
   const headerDescription = $derived(
     peopleStatistics
       ? formatPeopleHeaderDescription({
@@ -82,9 +87,11 @@
         })
       : undefined,
   );
-  let showFaceStatisticsInfo = $derived(!!peopleStatistics && !!headerDescription);
+  let showFaceStatisticsInfo = $derived(
+    !!peopleStatistics && !!headerDescription && statisticsSearchName === activeStatisticsSearchName,
+  );
   let spaceFaceStatisticsCacheKey = $derived(
-    `user:${authManager.user.id}:space:${space.id}:people:face-statistics:name=${encodeURIComponent(searchName.trim())}`,
+    `user:${authManager.user.id}:space:${space.id}:people:face-statistics:name=${encodeURIComponent(activeSearchFilterName)}`,
   );
   let allPeople = $state<SharedSpacePersonResponseDto[]>([]);
   let mergingPerson = $state<SharedSpacePersonResponseDto>();
@@ -93,6 +100,7 @@
     if (data.space.id !== loadedSpaceId) {
       people = data.people;
       peopleStatistics = data.peopleStatistics;
+      statisticsSearchName = null;
       hasMore = data.people.length >= PAGE_SIZE;
       mergingPerson = undefined;
       loadedSpaceId = data.space.id;
@@ -177,6 +185,7 @@
       ]);
       people = newPeople;
       peopleStatistics = newStatistics;
+      statisticsSearchName = searchName.trim() || null;
       hasMore = people.length >= PAGE_SIZE;
     } catch (error) {
       handleError(error, $t('spaces_error_loading_people'));
@@ -215,6 +224,7 @@
 
       people = newPeople;
       peopleStatistics = newStatistics;
+      statisticsSearchName = searchName.trim() || null;
       hasMore = people.length >= PAGE_SIZE;
     } catch (error) {
       if (controller.signal.aborted) {
