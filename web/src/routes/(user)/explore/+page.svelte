@@ -5,7 +5,8 @@
   import EmptyPlaceholder from '$lib/components/shared-components/EmptyPlaceholder.svelte';
   import SingleGridRow from '$lib/components/shared-components/SingleGridRow.svelte';
   import { Route } from '$lib/route';
-  import { createUrl, getAssetMediaUrl, getPeopleThumbnailUrl } from '$lib/utils';
+  import { getAssetMediaUrl } from '$lib/utils';
+  import { getGlobalPersonHref, getGlobalPersonThumbnailUrl } from '$lib/utils/global-person-route';
   import { AssetMediaSize, type PersonResponseDto, type SearchExploreResponseDto } from '@immich/sdk';
   import { Icon } from '@immich/ui';
   import { mdiHeart } from '@mdi/js';
@@ -41,19 +42,9 @@
     }
   };
 
-  const getPersonHref = (person: PersonResponseDto) =>
-    person.primaryProfile?.type === 'space-person' && person.primaryProfile.spaceId
-      ? Route.viewSpacePerson(person.primaryProfile.spaceId, person.primaryProfile.id, {
-          previousRoute: Route.explore(),
-        })
-      : Route.viewPerson({ ...person, id: person.primaryProfile?.id ?? person.id });
+  const getPersonHref = (person: PersonResponseDto) => getGlobalPersonHref(person, Route.explore());
 
-  const getPersonThumbnail = (person: PersonResponseDto) =>
-    person.primaryProfile?.type === 'space-person' && person.primaryProfile.spaceId
-      ? createUrl(`/shared-spaces/${person.primaryProfile.spaceId}/people/${person.primaryProfile.id}/thumbnail`, {
-          updatedAt: person.updatedAt,
-        })
-      : getPeopleThumbnailUrl({ ...person, id: person.primaryProfile?.id ?? person.id });
+  const getPersonThumbnail = (person: PersonResponseDto) => getGlobalPersonThumbnailUrl(person);
 </script>
 
 <OnEvents {onPersonThumbnailReady} />
