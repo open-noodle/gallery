@@ -474,20 +474,43 @@
                 {thumbnailData}
               />
             {:else}
-              <div class="relative flex gap-4">
-                <ImageThumbnail
-                  circle
-                  shadow
-                  url={thumbnailData}
-                  altText={person.name}
-                  widthStyle="3.375rem"
-                  heightStyle="3.375rem"
-                />
-                <div class="flex flex-col text-start text-primary">
-                  <div class="flex gap-2">
-                    <button type="button" title={$t('edit_name')} onclick={() => (isEditingName = true)}>
-                      <p class="w-max-40 sm:w-max-72 truncate text-start font-medium">
-                        {person.name || $t('add_a_name')}
+              <div class="relative">
+                <button
+                  type="button"
+                  class="flex items-center justify-center"
+                  title={$t('edit_name')}
+                  onclick={() => (isEditingName = true)}
+                >
+                  <ImageThumbnail
+                    circle
+                    shadow
+                    url={thumbnailData}
+                    altText={person.name}
+                    widthStyle="3.375rem"
+                    heightStyle="3.375rem"
+                  />
+                  <div class="flex flex-col justify-center px-4 text-start text-primary">
+                    <p class="w-40 truncate font-medium sm:w-72">{person.name || $t('add_a_name')}</p>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">
+                      {$t('assets_count', { values: { count: numberOfAssets } })}
+                    </p>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">
+                      {$t('faces_count', { values: { count: data.statistics.faces } })}
+                    </p>
+                    {#if person.birthDate}
+                      <p class="text-sm text-gray-500 dark:text-gray-400">
+                        {$t('person_birthdate', {
+                          values: {
+                            date: DateTime.fromISO(person.birthDate).toLocaleString(
+                              {
+                                month: 'numeric',
+                                day: 'numeric',
+                                year: 'numeric',
+                              },
+                              { locale: $locale },
+                            ),
+                          },
+                        })}
                       </p>
                     </button>
                     <IconButton
