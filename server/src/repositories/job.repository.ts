@@ -19,6 +19,8 @@ type JobMapItem = {
   label: string;
 };
 
+const FORCE_FACIAL_RECOGNITION_QUEUE_ALL_JOB_ID = `${JobName.FacialRecognitionQueueAll}/force`;
+
 export type QueueTelemetryStatus = 'active' | 'completed' | 'failed' | 'delayed' | 'waiting' | 'paused';
 export type QueueTelemetryStalenessStatus = 'waiting' | 'delayed' | 'failed';
 
@@ -220,7 +222,12 @@ export class JobRepository {
         // need to use add() instead of addBulk() for jobId deduplication
         const queue = this.getQueue(queueName);
         if (item.name === JobName.FacialRecognitionQueueAll) {
-          await this.removeFailedStableJob(queue, job.options.jobId);
+          const action = await this.prepareFacialRecognitionQueueAll(queue, item.data, job.options);
+          if (!action.add) {
+            continue;
+          }
+
+          job.options = action.options;
         }
 
         promises.push(queue.add(item.name, item.data, job.options));
@@ -363,10 +370,49 @@ export class JobRepository {
       return;
     }
 
-    const state = await existingJob.getState();
+    const state = (await existingJob.getState()) as string;
     if (state === 'failed') {
       await existingJob.remove();
     }
+  }
+
+  private async prepareFacialRecognitionQueueAll(
+    queue: Queue,
+    data: JobOf<JobName.FacialRecognitionQueueAll>,
+    options: JobsOptions,
+  ): Promise<{ add: true; options: JobsOptions } | { add: false }> {
+    const existingJob = await queue.getJob(JobName.FacialRecognitionQueueAll);
+    if (!existingJob) {
+      return { add: true, options };
+    }
+
+    const state = (await existingJob.getState()) as string;
+    if (state === 'failed') {
+      await existingJob.remove();
+      return { add: true, options };
+    }
+
+    if (data.force !== true) {
+      return { add: true, options };
+    }
+
+    if (state === 'waiting' || state === 'delayed' || state === 'paused') {
+      await existingJob.updateData(data);
+      return { add: false };
+    }
+
+    if (state === 'active') {
+      if (existingJob.data?.force === true) {
+        return { add: false };
+      }
+
+      await queue.drain(true);
+      const forceOptions = { ...options, jobId: FORCE_FACIAL_RECOGNITION_QUEUE_ALL_JOB_ID };
+      await this.removeFailedStableJob(queue, FORCE_FACIAL_RECOGNITION_QUEUE_ALL_JOB_ID);
+      return { add: true, options: forceOptions };
+    }
+
+    return { add: true, options };
   }
 
   private getQueue(queue: QueueName): Queue {

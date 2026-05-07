@@ -782,8 +782,9 @@ export class PersonService extends BaseService {
 
     // Queue SharedSpaceFaceMatchAll AFTER recognition jobs so it runs last.
     // This catches EXIF/manual-sourced faces whose personIds survive
-    // unassignFaces (non-ML source). Queued after recognition jobs so
-    // ML faces have been processed by the per-face space matching path first.
+    // unassignFaces (non-ML source). Force-created recognition jobs suppress
+    // incremental space matching, so the paged rebuild is the authoritative
+    // shared-space reconciliation pass.
     if (force) {
       const spaceIds = await this.sharedSpaceRepository.getSpaceIdsWithFaceRecognitionEnabled();
       await this.jobRepository.queueAll(

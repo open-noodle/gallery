@@ -283,12 +283,44 @@ describe(JobRepository.name, () => {
   });
 
   it.each(['active', 'waiting', 'delayed', 'paused'] as const)(
-    'does not remove a %s stable facial-recognition coordinator',
+    'does not remove a %s stable facial-recognition coordinator when queueing non-force work',
     async (state) => {
       const { sut, queue } = setup();
       const existingJob = {
+        data: { force: true },
         getState: vi.fn().mockResolvedValue(state),
         remove: vi.fn().mockResolvedValue(undefined),
+        updateData: vi.fn().mockResolvedValue(undefined),
+      };
+      queue.getJob.mockResolvedValue(existingJob);
+      setHandlers(sut, [JobName.FacialRecognitionQueueAll]);
+
+      await sut.queue({ name: JobName.FacialRecognitionQueueAll, data: { force: false } });
+
+      expect(queue.getJob).toHaveBeenCalledWith(JobName.FacialRecognitionQueueAll);
+      expect(existingJob.getState).toHaveBeenCalled();
+      expect(existingJob.remove).not.toHaveBeenCalled();
+      expect(existingJob.updateData).not.toHaveBeenCalled();
+      expect(queue.add).toHaveBeenCalledWith(
+        JobName.FacialRecognitionQueueAll,
+        { force: false },
+        {
+          jobId: JobName.FacialRecognitionQueueAll,
+          removeOnComplete: true,
+        },
+      );
+    },
+  );
+
+  it.each(['waiting', 'delayed', 'paused'] as const)(
+    'upgrades a pending %s non-force facial-recognition coordinator when force is requested',
+    async (state) => {
+      const { sut, queue } = setup();
+      const existingJob = {
+        data: { force: false, nightly: true },
+        getState: vi.fn().mockResolvedValue(state),
+        remove: vi.fn().mockResolvedValue(undefined),
+        updateData: vi.fn().mockResolvedValue(undefined),
       };
       queue.getJob.mockResolvedValue(existingJob);
       setHandlers(sut, [JobName.FacialRecognitionQueueAll]);
@@ -298,16 +330,58 @@ describe(JobRepository.name, () => {
       expect(queue.getJob).toHaveBeenCalledWith(JobName.FacialRecognitionQueueAll);
       expect(existingJob.getState).toHaveBeenCalled();
       expect(existingJob.remove).not.toHaveBeenCalled();
-      expect(queue.add).toHaveBeenCalledWith(
-        JobName.FacialRecognitionQueueAll,
-        { force: true },
-        {
-          jobId: JobName.FacialRecognitionQueueAll,
-          removeOnComplete: true,
-        },
-      );
+      expect(existingJob.updateData).toHaveBeenCalledWith({ force: true });
+      expect(queue.add).not.toHaveBeenCalled();
     },
   );
+
+  it('queues a force follow-up coordinator when a non-force coordinator is active', async () => {
+    const { sut, queue } = setup();
+    const existingJob = {
+      data: { force: false },
+      getState: vi.fn().mockResolvedValue('active'),
+      remove: vi.fn().mockResolvedValue(undefined),
+      updateData: vi.fn().mockResolvedValue(undefined),
+    };
+    queue.getJob.mockResolvedValue(existingJob);
+    setHandlers(sut, [JobName.FacialRecognitionQueueAll]);
+
+    await sut.queue({ name: JobName.FacialRecognitionQueueAll, data: { force: true } });
+
+    expect(queue.getJob).toHaveBeenCalledWith(JobName.FacialRecognitionQueueAll);
+    expect(existingJob.getState).toHaveBeenCalled();
+    expect(existingJob.remove).not.toHaveBeenCalled();
+    expect(existingJob.updateData).not.toHaveBeenCalled();
+    expect(queue.drain).toHaveBeenCalledWith(true);
+    expect(queue.add).toHaveBeenCalledWith(
+      JobName.FacialRecognitionQueueAll,
+      { force: true },
+      {
+        jobId: 'FacialRecognitionQueueAll/force',
+        removeOnComplete: true,
+      },
+    );
+  });
+
+  it('does not queue another coordinator when force recognition is already active', async () => {
+    const { sut, queue } = setup();
+    const existingJob = {
+      data: { force: true },
+      getState: vi.fn().mockResolvedValue('active'),
+      remove: vi.fn().mockResolvedValue(undefined),
+      updateData: vi.fn().mockResolvedValue(undefined),
+    };
+    queue.getJob.mockResolvedValue(existingJob);
+    setHandlers(sut, [JobName.FacialRecognitionQueueAll]);
+
+    await sut.queue({ name: JobName.FacialRecognitionQueueAll, data: { force: true } });
+
+    expect(queue.getJob).toHaveBeenCalledWith(JobName.FacialRecognitionQueueAll);
+    expect(existingJob.getState).toHaveBeenCalled();
+    expect(existingJob.remove).not.toHaveBeenCalled();
+    expect(existingJob.updateData).not.toHaveBeenCalled();
+    expect(queue.add).not.toHaveBeenCalled();
+  });
 
   it('does not remove failed stable shared-space jobs while queueing duplicates', async () => {
     const { sut, queue } = setup();
