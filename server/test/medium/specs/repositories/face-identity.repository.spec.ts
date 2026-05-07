@@ -1144,6 +1144,210 @@ describe(FaceIdentityRepository.name, () => {
     });
   });
 
+  describe('getAccessiblePersonStatistics', () => {
+    it('counts owned and timeline shared-space identity faces once each', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: partner } = await ctx.newUser();
+      try {
+        const { person } = await ctx.newPerson({ ownerId: owner.id, name: 'Alice' });
+        const identity = await sut.ensurePersonIdentity(person.id);
+
+        const { asset: ownedAsset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
+        const { assetFace: ownedFace } = await ctx.newAssetFace({ assetId: ownedAsset.id, personId: person.id });
+        await sut.linkFace({ assetFaceId: ownedFace.id, identityId: identity.id, source: 'owner-person' });
+
+        const { space } = await ctx.newSharedSpace({ createdById: partner.id, faceRecognitionEnabled: true });
+        await ctx.newSharedSpaceMember({ spaceId: space.id, userId: partner.id, role: SharedSpaceRole.Owner });
+        await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: SharedSpaceRole.Viewer });
+        await setMemberTimeline(ctx, { spaceId: space.id, userId: owner.id, showInTimeline: true });
+        const { asset: sharedAsset } = await ctx.newAsset({ ownerId: partner.id, visibility: AssetVisibility.Timeline });
+        await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: sharedAsset.id, addedById: partner.id });
+        const { assetFace: sharedFace } = await ctx.newAssetFace({ assetId: sharedAsset.id });
+        await sut.linkFace({ assetFaceId: sharedFace.id, identityId: identity.id, source: 'shared-space-evidence' });
+
+        await expect(sut.getAccessiblePersonStatistics(owner.id, identity.id)).resolves.toEqual({ assets: 2, faces: 2 });
+      } finally {
+        await ctx.database.deleteFrom('user').where('id', 'in', [owner.id, partner.id]).execute();
+      }
+    });
+
+    it('counts linked-library identity faces only through timeline-enabled member spaces', async () => {
+      const { ctx, sut } = setup();
+      const { user: source } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+      try {
+        const { library } = await ctx.newLibrary({ ownerId: source.id });
+        const { person } = await ctx.newPerson({ ownerId: source.id, name: 'Library Person' });
+        const identity = await sut.ensurePersonIdentity(person.id);
+        const { space } = await ctx.newSharedSpace({ createdById: source.id, faceRecognitionEnabled: true });
+        await ctx.newSharedSpaceMember({ spaceId: space.id, userId: source.id, role: SharedSpaceRole.Owner });
+        await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: SharedSpaceRole.Viewer });
+        await setMemberTimeline(ctx, { spaceId: space.id, userId: member.id, showInTimeline: true });
+        await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id, addedById: source.id });
+        const { asset } = await ctx.newAsset({
+          ownerId: source.id,
+          libraryId: library.id,
+          visibility: AssetVisibility.Timeline,
+        });
+        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+        await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
+
+        await expect(sut.getAccessiblePersonStatistics(member.id, identity.id)).resolves.toEqual({
+          assets: 1,
+          faces: 1,
+        });
+
+        await setMemberTimeline(ctx, { spaceId: space.id, userId: member.id, showInTimeline: false });
+
+        await expect(sut.getAccessiblePersonStatistics(member.id, identity.id)).resolves.toEqual({
+          assets: 0,
+          faces: 0,
+        });
+      } finally {
+        await ctx.database.deleteFrom('user').where('id', 'in', [source.id, member.id]).execute();
+      }
+    });
+
+    it('removes inaccessible space assets after the user leaves a space while keeping owned assets', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: partner } = await ctx.newUser();
+      try {
+        const { person } = await ctx.newPerson({ ownerId: owner.id, name: 'Alice' });
+        const identity = await sut.ensurePersonIdentity(person.id);
+
+        const { asset: ownedAsset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
+        const { assetFace: ownedFace } = await ctx.newAssetFace({ assetId: ownedAsset.id, personId: person.id });
+        await sut.linkFace({ assetFaceId: ownedFace.id, identityId: identity.id, source: 'owner-person' });
+
+        const { space } = await ctx.newSharedSpace({ createdById: partner.id, faceRecognitionEnabled: true });
+        await ctx.newSharedSpaceMember({ spaceId: space.id, userId: partner.id, role: SharedSpaceRole.Owner });
+        await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: SharedSpaceRole.Viewer });
+        await setMemberTimeline(ctx, { spaceId: space.id, userId: owner.id, showInTimeline: true });
+        const { asset: sharedAsset } = await ctx.newAsset({ ownerId: partner.id, visibility: AssetVisibility.Timeline });
+        await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: sharedAsset.id, addedById: partner.id });
+        const { assetFace: sharedFace } = await ctx.newAssetFace({ assetId: sharedAsset.id });
+        await sut.linkFace({ assetFaceId: sharedFace.id, identityId: identity.id, source: 'shared-space-evidence' });
+
+        await expect(sut.getAccessiblePersonStatistics(owner.id, identity.id)).resolves.toEqual({
+          assets: 2,
+          faces: 2,
+        });
+
+        await ctx.database
+          .deleteFrom('shared_space_member')
+          .where('spaceId', '=', space.id)
+          .where('userId', '=', owner.id)
+          .execute();
+
+        await expect(sut.getAccessiblePersonStatistics(owner.id, identity.id)).resolves.toEqual({
+          assets: 1,
+          faces: 1,
+        });
+      } finally {
+        await ctx.database.deleteFrom('user').where('id', 'in', [owner.id, partner.id]).execute();
+      }
+    });
+
+    it('keeps global person detail statistics stable after identity backfill reruns', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      try {
+        const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Backfilled Person' });
+        const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+        const identity = await sut.ensurePersonIdentity(person.id);
+        await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
+
+        await expect(sut.getAccessiblePersonStatistics(user.id, identity.id)).resolves.toEqual({ assets: 1, faces: 1 });
+
+        await sut.backfillPersonalIdentities({ limit: 100 });
+        await sut.backfillSpacePersonIdentities({ limit: 100 });
+        await sut.backfillPersonalIdentities({ limit: 100 });
+        await sut.backfillSpacePersonIdentities({ limit: 100 });
+
+        await expect(sut.getAccessiblePersonStatistics(user.id, identity.id)).resolves.toEqual({ assets: 1, faces: 1 });
+      } finally {
+        await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
+      }
+    });
+
+    it('resolves a timeline-enabled shared-space profile id to the accessible identity id', async () => {
+      const { ctx, sut } = setup();
+      const { user: source } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+      try {
+        const { person } = await ctx.newPerson({ ownerId: source.id, name: 'Library Person' });
+        const identity = await sut.ensurePersonIdentity(person.id);
+        const { space } = await ctx.newSharedSpace({ createdById: source.id, faceRecognitionEnabled: true });
+        await ctx.newSharedSpaceMember({ spaceId: space.id, userId: source.id, role: SharedSpaceRole.Owner });
+        await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: SharedSpaceRole.Viewer });
+        await setMemberTimeline(ctx, { spaceId: space.id, userId: member.id, showInTimeline: true });
+        const { asset } = await ctx.newAsset({ ownerId: source.id, visibility: AssetVisibility.Timeline });
+        await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: source.id });
+        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+        const spacePerson = await ctx.database
+          .insertInto('shared_space_person')
+          .values({ spaceId: space.id, identityId: identity.id, name: 'Library Person', type: 'person' })
+          .returningAll()
+          .executeTakeFirstOrThrow();
+        await linkSpaceFace(ctx, spacePerson.id, assetFace.id);
+
+        await expect(sut.getAccessibleProfileIdentityId(member.id, spacePerson.id)).resolves.toBe(identity.id);
+
+        await setMemberTimeline(ctx, { spaceId: space.id, userId: member.id, showInTimeline: false });
+
+        await expect(sut.getAccessibleProfileIdentityId(member.id, spacePerson.id)).resolves.toBeUndefined();
+      } finally {
+        await ctx.database.deleteFrom('user').where('id', 'in', [source.id, member.id]).execute();
+      }
+    });
+
+    it('does not resolve hidden or faceless shared-space profile ids to accessible global statistics', async () => {
+      const { ctx, sut } = setup();
+      const { user: source } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+      try {
+        const { person } = await ctx.newPerson({ ownerId: source.id, name: 'Library Person' });
+        const identity = await sut.ensurePersonIdentity(person.id);
+        const { space } = await ctx.newSharedSpace({ createdById: source.id, faceRecognitionEnabled: true });
+        await ctx.newSharedSpaceMember({ spaceId: space.id, userId: source.id, role: SharedSpaceRole.Owner });
+        await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: SharedSpaceRole.Viewer });
+        await setMemberTimeline(ctx, { spaceId: space.id, userId: member.id, showInTimeline: true });
+        const { asset } = await ctx.newAsset({ ownerId: source.id, visibility: AssetVisibility.Timeline });
+        await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: source.id });
+        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id });
+
+        const hiddenProfile = await ctx.database
+          .insertInto('shared_space_person')
+          .values({ spaceId: space.id, identityId: identity.id, name: 'Hidden', type: 'person', isHidden: true })
+          .returningAll()
+          .executeTakeFirstOrThrow();
+        await linkSpaceFace(ctx, hiddenProfile.id, assetFace.id);
+
+        const { person: facelessPerson } = await ctx.newPerson({ ownerId: source.id, name: 'Faceless Person' });
+        const facelessIdentity = await sut.ensurePersonIdentity(facelessPerson.id);
+        const facelessProfile = await ctx.database
+          .insertInto('shared_space_person')
+          .values({
+            spaceId: space.id,
+            identityId: facelessIdentity.id,
+            name: 'Faceless',
+            type: 'person',
+            isHidden: false,
+          })
+          .returningAll()
+          .executeTakeFirstOrThrow();
+
+        await expect(sut.getAccessibleProfileIdentityId(member.id, hiddenProfile.id)).resolves.toBeUndefined();
+        await expect(sut.getAccessibleProfileIdentityId(member.id, facelessProfile.id)).resolves.toBeUndefined();
+      } finally {
+        await ctx.database.deleteFrom('user').where('id', 'in', [source.id, member.id]).execute();
+      }
+    });
+  });
+
   it('infers shared-space person identity from linked personal faces and reports conflicts', async () => {
     const { ctx, sut } = setup();
     const { user } = await ctx.newUser();

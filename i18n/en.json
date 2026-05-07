@@ -1386,6 +1386,7 @@
   "detected_faces": "Detected faces",
   "face_unassigned": "Unassigned",
   "faces": "faces",
+  "faces_count": "{count, plural, one {# face} other {# faces}}",
   "loading_face_statistics": "Loading face statistics",
   "unable_to_load_face_statistics": "Unable to load face statistics",
   "unassigned": "Unassigned",

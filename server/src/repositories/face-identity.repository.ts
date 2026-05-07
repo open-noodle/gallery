@@ -10,7 +10,7 @@ import {
 } from 'src/dtos/person.dto';
 import { AssetVisibility, SharedSpaceRole, SourceType, VectorIndex } from 'src/enum';
 import { probes } from 'src/repositories/database.repository';
-import type { PeopleFaceStatistics } from 'src/repositories/person.repository';
+import type { PeopleFaceStatistics, PersonStatistics } from 'src/repositories/person.repository';
 import { DB } from 'src/schema';
 import { FaceIdentityFaceSource, FaceIdentityFaceTable } from 'src/schema/tables/face-identity-face.table';
 import { FaceIdentityTable } from 'src/schema/tables/face-identity.table';
@@ -761,6 +761,84 @@ export class FaceIdentityRepository {
       assignedHiddenFaceCount: Number(row?.assignedHiddenFaceCount ?? 0),
       unassignedFaceCount: Number(row?.unassignedFaceCount ?? 0),
     };
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
+  async getAccessiblePersonStatistics(userId: string, identityId: string): Promise<PersonStatistics> {
+    const result = await sql<PersonStatistics>`
+      WITH timeline_spaces AS (
+        SELECT "spaceId"
+        FROM shared_space_member
+        WHERE "userId" = ${userId}
+          AND "showInTimeline" = true
+      ),
+      selected_faces AS (
+        SELECT DISTINCT
+          asset_face.id AS "faceId",
+          asset_face."assetId"
+        FROM face_identity_face
+        INNER JOIN asset_face ON asset_face.id = face_identity_face."assetFaceId"
+        INNER JOIN asset ON asset.id = asset_face."assetId"
+        WHERE face_identity_face."identityId" = ${identityId}
+          AND asset_face."deletedAt" IS NULL
+          AND asset_face."isVisible" = true
+          AND asset."deletedAt" IS NULL
+          AND asset."isOffline" = false
+          AND asset.visibility = ${AssetVisibility.Timeline}
+          AND (
+            asset."ownerId" = ${userId}
+            OR EXISTS (
+              SELECT 1
+              FROM shared_space_asset
+              INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_asset."spaceId"
+              WHERE shared_space_asset."assetId" = asset.id
+            )
+            OR EXISTS (
+              SELECT 1
+              FROM shared_space_library
+              INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_library."spaceId"
+              WHERE shared_space_library."libraryId" = asset."libraryId"
+            )
+          )
+      )
+      SELECT
+        COUNT(DISTINCT "assetId")::int AS assets,
+        COUNT(DISTINCT "faceId")::int AS faces
+      FROM selected_faces
+    `.execute(this.db);
+
+    const row = result.rows[0];
+    return {
+      assets: Number(row?.assets ?? 0),
+      faces: Number(row?.faces ?? 0),
+    };
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
+  async getAccessibleProfileIdentityId(userId: string, profileId: string): Promise<string | undefined> {
+    const result = await sql<{ identityId: string }>`
+      SELECT shared_space_person."identityId"
+      FROM shared_space_person
+      INNER JOIN shared_space_member
+        ON shared_space_member."spaceId" = shared_space_person."spaceId"
+        AND shared_space_member."userId" = ${userId}
+        AND shared_space_member."showInTimeline" = true
+      WHERE shared_space_person.id = ${profileId}
+        AND shared_space_person."identityId" IS NOT NULL
+        AND shared_space_person."isHidden" = false
+        AND EXISTS (
+          SELECT 1
+          FROM shared_space_person_face
+          INNER JOIN asset_face AS profile_face
+            ON profile_face.id = shared_space_person_face."assetFaceId"
+          WHERE shared_space_person_face."personId" = shared_space_person.id
+            AND profile_face."deletedAt" IS NULL
+            AND profile_face."isVisible" = true
+        )
+      LIMIT 1
+    `.execute(this.db);
+
+    return result.rows[0]?.identityId ?? undefined;
   }
 
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })

@@ -15244,6 +15244,69 @@
         "x-immich-state": "Stable"
       }
     },
+    "/shared-spaces/{id}/people/{personId}/statistics": {
+      "get": {
+        "description": "Retrieve asset and face statistics for a person in a shared space.",
+        "operationId": "getSpacePersonStatistics",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "personId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonStatisticsResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Get space person statistics",
+        "tags": [
+          "Shared Spaces"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v2",
+            "state": "Added"
+          },
+          {
+            "version": "v2",
+            "state": "Stable"
+          }
+        ],
+        "x-immich-permission": "sharedSpace.read",
+        "x-immich-state": "Stable"
+      }
+    },
     "/shared-spaces/{id}/people/{personId}/thumbnail": {
       "get": {
         "description": "Retrieve the thumbnail image for a person in a shared space.",
@@ -24685,12 +24748,19 @@
           "assets": {
             "description": "Number of assets",
             "maximum": 9007199254740991,
-            "minimum": -9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "faces": {
+            "description": "Number of faces assigned to this person in the current accessible scope",
+            "maximum": 9007199254740991,
+            "minimum": 0,
             "type": "integer"
           }
         },
         "required": [
-          "assets"
+          "assets",
+          "faces"
         ],
         "type": "object"
       },

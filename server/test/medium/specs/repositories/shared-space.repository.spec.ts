@@ -1877,6 +1877,143 @@ describe(SharedSpaceRepository.name, () => {
     });
   });
 
+  describe('getSpacePersonStatistics', () => {
+    it('counts direct shared-space assets and visible faces for the selected person', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: user.id });
+      const person = await sut.createPerson({ spaceId: space.id, name: 'Alice', representativeFaceId: null });
+      const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
+      const { assetFace: firstFace } = await ctx.newAssetFace({ assetId: asset.id });
+      const { assetFace: secondFace } = await ctx.newAssetFace({ assetId: asset.id });
+      await sut.addPersonFaces(
+        [
+          { personId: person.id, assetFaceId: firstFace.id },
+          { personId: person.id, assetFaceId: secondFace.id },
+        ],
+        { skipRecount: true },
+      );
+
+      await expect(sut.getSpacePersonStatistics(space.id, person.id)).resolves.toEqual({ assets: 1, faces: 2 });
+    });
+
+    it('counts linked-library assets only when the library is linked to the selected space', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: user.id });
+      const { space: otherSpace } = await ctx.newSharedSpace({ createdById: user.id });
+      const { library } = await ctx.newLibrary({ ownerId: user.id });
+      await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id, addedById: user.id });
+
+      const person = await sut.createPerson({ spaceId: space.id, name: 'Alice', representativeFaceId: null });
+      const { asset: linkedAsset } = await ctx.newAsset({
+        ownerId: user.id,
+        libraryId: library.id,
+        visibility: AssetVisibility.Timeline,
+      });
+      const { assetFace: linkedFace } = await ctx.newAssetFace({ assetId: linkedAsset.id });
+      await sut.addPersonFaces([{ personId: person.id, assetFaceId: linkedFace.id }], { skipRecount: true });
+
+      await expect(sut.getSpacePersonStatistics(space.id, person.id)).resolves.toEqual({ assets: 1, faces: 1 });
+      await expect(sut.getSpacePersonStatistics(otherSpace.id, person.id)).resolves.toEqual({ assets: 0, faces: 0 });
+    });
+
+    it('counts a selected-space face once when it is reachable directly and through a linked library', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: user.id });
+      const { library } = await ctx.newLibrary({ ownerId: user.id });
+      await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id, addedById: user.id });
+      const { asset } = await ctx.newAsset({
+        ownerId: user.id,
+        libraryId: library.id,
+        visibility: AssetVisibility.Timeline,
+      });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id });
+      const person = await sut.createPerson({ spaceId: space.id, name: 'Alice', representativeFaceId: assetFace.id });
+      await sut.addPersonFaces([{ personId: person.id, assetFaceId: assetFace.id }], { skipRecount: true });
+
+      await expect(sut.getSpacePersonStatistics(space.id, person.id)).resolves.toEqual({ assets: 1, faces: 1 });
+    });
+
+    it('does not count identity-linked faces that are not assigned to the selected space person', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: user.id });
+      const identity = await ctx.database
+        .insertInto('face_identity')
+        .values({ type: 'person' })
+        .returningAll()
+        .executeTakeFirstOrThrow();
+      const person = await ctx.database
+        .insertInto('shared_space_person')
+        .values({ spaceId: space.id, identityId: identity.id, name: 'Alice', type: 'person' })
+        .returningAll()
+        .executeTakeFirstOrThrow();
+
+      const { asset: assignedAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: assignedAsset.id, addedById: user.id });
+      const { assetFace: assignedFace } = await ctx.newAssetFace({ assetId: assignedAsset.id });
+      await sut.addPersonFaces([{ personId: person.id, assetFaceId: assignedFace.id }], { skipRecount: true });
+
+      const { asset: identityOnlyAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: identityOnlyAsset.id, addedById: user.id });
+      const { assetFace: identityOnlyFace } = await ctx.newAssetFace({ assetId: identityOnlyAsset.id });
+      await ctx.database
+        .insertInto('face_identity_face')
+        .values({ identityId: identity.id, assetFaceId: identityOnlyFace.id, source: 'shared-space-evidence' })
+        .execute();
+
+      await expect(sut.getSpacePersonStatistics(space.id, person.id)).resolves.toEqual({ assets: 1, faces: 1 });
+    });
+
+    it('keeps space person detail statistics stable across asset and face materialization order', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: user.id });
+      const { asset: assetBeforePerson } = await ctx.newAsset({
+        ownerId: user.id,
+        visibility: AssetVisibility.Timeline,
+      });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: assetBeforePerson.id, addedById: user.id });
+      const { assetFace: faceBeforePerson } = await ctx.newAssetFace({ assetId: assetBeforePerson.id });
+      const personCreatedAfterAsset = await sut.createPerson({
+        spaceId: space.id,
+        name: 'After Asset',
+        representativeFaceId: faceBeforePerson.id,
+      });
+      await sut.addPersonFaces([{ personId: personCreatedAfterAsset.id, assetFaceId: faceBeforePerson.id }], {
+        skipRecount: true,
+      });
+
+      const personCreatedBeforeAsset = await sut.createPerson({
+        spaceId: space.id,
+        name: 'Before Asset',
+        representativeFaceId: null,
+      });
+      const { asset: assetAfterPerson } = await ctx.newAsset({
+        ownerId: user.id,
+        visibility: AssetVisibility.Timeline,
+      });
+      const { assetFace: faceAfterPerson } = await ctx.newAssetFace({ assetId: assetAfterPerson.id });
+      await sut.addPersonFaces([{ personId: personCreatedBeforeAsset.id, assetFaceId: faceAfterPerson.id }], {
+        skipRecount: true,
+      });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: assetAfterPerson.id, addedById: user.id });
+
+      await expect(sut.getSpacePersonStatistics(space.id, personCreatedAfterAsset.id)).resolves.toEqual({
+        assets: 1,
+        faces: 1,
+      });
+      await expect(sut.getSpacePersonStatistics(space.id, personCreatedBeforeAsset.id)).resolves.toEqual({
+        assets: 1,
+        faces: 1,
+      });
+    });
+  });
+
   describe('getPeopleFaceStatisticsBySpaceId', () => {
     const expectStats = (
       result: {

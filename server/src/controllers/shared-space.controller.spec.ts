@@ -136,4 +136,28 @@ describe(SharedSpaceController.name, () => {
       });
     });
   });
+
+  describe('GET /shared-spaces/:id/people/:personId/statistics', () => {
+    it('should be an authenticated route', async () => {
+      await request(ctx.getHttpServer()).get(
+        `/shared-spaces/${factory.uuid()}/people/${factory.uuid()}/statistics`,
+      );
+
+      expect(ctx.authenticate).toHaveBeenCalled();
+    });
+
+    it('should serialize space person asset and face statistics', async () => {
+      const spaceId = factory.uuid();
+      const personId = factory.uuid();
+      service.getSpacePersonStatistics.mockResolvedValue({ assets: 5, faces: 8 });
+
+      const { status, body } = await request(ctx.getHttpServer())
+        .get(`/shared-spaces/${spaceId}/people/${personId}/statistics`)
+        .set('Authorization', `Bearer token`);
+
+      expect(status).toBe(200);
+      expect(service.getSpacePersonStatistics).toHaveBeenCalledWith(undefined, spaceId, personId);
+      expect(body).toEqual({ assets: 5, faces: 8 });
+    });
+  });
 });

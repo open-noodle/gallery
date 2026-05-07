@@ -1639,6 +1639,8 @@ export type RepresentativeFaceUpdateDto = {
 export type PersonStatisticsResponseDto = {
     /** Number of assets */
     assets: number;
+    /** Number of faces assigned to this person in the current accessible scope */
+    faces: number;
 };
 export type PluginJsonSchemaProperty = {
     additionalProperties?: boolean | PluginJsonSchemaProperty;
@@ -7396,6 +7398,20 @@ export function updateSpacePersonRepresentativeFace({ id, personId, spaceReprese
         method: "PUT",
         body: spaceRepresentativeFaceUpdateDto
     })));
+}
+/**
+ * Get space person statistics
+ */
+export function getSpacePersonStatistics({ id, personId }: {
+    id: string;
+    personId: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: PersonStatisticsResponseDto;
+    }>(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}/statistics`, {
+        ...opts
+    }));
 }
 /**
  * Get a space person thumbnail

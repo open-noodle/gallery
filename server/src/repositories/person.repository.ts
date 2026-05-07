@@ -40,6 +40,7 @@ export interface UpdateFacesData {
 
 export interface PersonStatistics {
   assets: number;
+  faces: number;
 }
 
 export interface PeopleOverviewStatistics {
@@ -472,20 +473,20 @@ export class PersonRepository {
   async getStatistics(personId: string): Promise<PersonStatistics> {
     const result = await this.db
       .selectFrom('asset_face')
-      .leftJoin('asset', (join) =>
-        join
-          .onRef('asset.id', '=', 'asset_face.assetId')
-          .on('asset.visibility', '=', sql.lit(AssetVisibility.Timeline))
-          .on('asset.deletedAt', 'is', null),
-      )
-      .select((eb) => eb.fn.count(eb.fn('distinct', ['asset.id'])).as('count'))
+      .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+      .select((eb) => eb.fn.count(eb.fn('distinct', ['asset.id'])).as('assets'))
+      .select((eb) => eb.fn.count(eb.fn('distinct', ['asset_face.id'])).as('faces'))
+      .where('asset.visibility', '=', sql.lit(AssetVisibility.Timeline))
+      .where('asset.deletedAt', 'is', null)
+      .where('asset.isOffline', '=', false)
       .where('asset_face.deletedAt', 'is', null)
       .where('asset_face.isVisible', 'is', true)
       .where('asset_face.personId', '=', personId)
       .executeTakeFirst();
 
     return {
-      assets: result ? Number(result.count) : 0,
+      assets: Number(result?.assets ?? 0),
+      faces: Number(result?.faces ?? 0),
     };
   }
 

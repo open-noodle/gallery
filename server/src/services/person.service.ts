@@ -351,8 +351,22 @@ export class PersonService extends BaseService {
   }
 
   async getStatistics(auth: AuthDto, id: string): Promise<PersonStatisticsResponseDto> {
-    await this.requireAccess({ auth, permission: Permission.PersonRead, ids: [id] });
-    return this.personRepository.getStatistics(id);
+    const allowedIds = await this.checkAccess({ auth, permission: Permission.PersonRead, ids: [id] });
+    if (allowedIds.has(id)) {
+      const person = await this.findOrFail(id);
+      if (person.identityId) {
+        return this.faceIdentityRepository.getAccessiblePersonStatistics(auth.user.id, person.identityId);
+      }
+
+      return this.personRepository.getStatistics(id);
+    }
+
+    const identityId = await this.faceIdentityRepository.getAccessibleProfileIdentityId(auth.user.id, id);
+    if (!identityId) {
+      throw new BadRequestException(`Not found or no ${Permission.PersonRead} access`);
+    }
+
+    return this.faceIdentityRepository.getAccessiblePersonStatistics(auth.user.id, identityId);
   }
 
   async getThumbnail(auth: AuthDto, id: string): Promise<ImmichMediaResponse> {

@@ -51,10 +51,13 @@ describe(PersonService.name, () => {
     (mocks.faceIdentity as any).getAccessiblePeopleStatistics ??= vi.fn();
     (mocks.faceIdentity as any).getAccessiblePeopleFaceStatistics ??= vi.fn();
     (mocks.faceIdentity as any).getAccessiblePersonByProfileId ??= vi.fn();
+    (mocks.faceIdentity as any).getAccessiblePersonStatistics ??= vi.fn();
+    (mocks.faceIdentity as any).getAccessibleProfileIdentityId ??= vi.fn();
     (mocks.faceIdentity as any).hasBackfillWork ??= vi.fn();
     (mocks.person as any).getPeopleOverviewStatistics ??= vi.fn();
     (mocks.person as any).getPeopleFaceStatistics ??= vi.fn();
     (mocks.faceIdentity as any).getAccessiblePersonByProfileId.mockResolvedValue(void 0);
+    (mocks.faceIdentity as any).getAccessibleProfileIdentityId.mockResolvedValue(void 0);
     mocks.sharedSpace.getSpaceIdsWithFaceRecognitionEnabled.mockResolvedValue([]);
   });
 
@@ -2524,15 +2527,62 @@ describe(PersonService.name, () => {
   });
 
   describe('getStatistics', () => {
-    it('should get correct number of person', async () => {
+    it('returns personal person asset and face counts for a legacy owned person', async () => {
       const auth = AuthFactory.create();
-      const person = PersonFactory.create();
+      const person = PersonFactory.create({ identityId: null });
 
       mocks.person.getById.mockResolvedValue(person);
-      mocks.person.getStatistics.mockResolvedValue({ assets: 3 });
+      mocks.person.getStatistics.mockResolvedValue({ assets: 3, faces: 4 });
       mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.id]));
-      await expect(sut.getStatistics(auth, person.id)).resolves.toEqual({ assets: 3 });
-      expect(mocks.access.person.checkOwnerAccess).toHaveBeenCalledWith(auth.user.id, new Set([person.id]));
+
+      await expect(sut.getStatistics(auth, person.id)).resolves.toEqual({ assets: 3, faces: 4 });
+      expect(mocks.person.getStatistics).toHaveBeenCalledWith(person.id);
+      expect((mocks.faceIdentity as any).getAccessiblePersonStatistics).not.toHaveBeenCalled();
+    });
+
+    it('returns accessible identity statistics for an owned identity-backed person', async () => {
+      const auth = AuthFactory.create();
+      const person = PersonFactory.create({ identityId: 'identity-1' });
+
+      mocks.person.getById.mockResolvedValue(person);
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.id]));
+      (mocks.faceIdentity as any).getAccessiblePersonStatistics.mockResolvedValue({ assets: 7, faces: 9 });
+
+      await expect(sut.getStatistics(auth, person.id)).resolves.toEqual({ assets: 7, faces: 9 });
+      expect((mocks.faceIdentity as any).getAccessiblePersonStatistics).toHaveBeenCalledWith(auth.user.id, 'identity-1');
+      expect(mocks.person.getStatistics).not.toHaveBeenCalled();
+    });
+
+    it('returns accessible identity statistics for an accessible space-person route id', async () => {
+      const auth = AuthFactory.create();
+      const personId = newUuid();
+
+      mocks.person.getById.mockResolvedValue(undefined);
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set());
+      (mocks.faceIdentity as any).getAccessibleProfileIdentityId.mockResolvedValue('identity-from-space');
+      (mocks.faceIdentity as any).getAccessiblePersonStatistics.mockResolvedValue({ assets: 11, faces: 13 });
+
+      await expect(sut.getStatistics(auth, personId)).resolves.toEqual({ assets: 11, faces: 13 });
+      expect((mocks.faceIdentity as any).getAccessibleProfileIdentityId).toHaveBeenCalledWith(
+        auth.user.id,
+        personId,
+      );
+      expect((mocks.faceIdentity as any).getAccessiblePersonStatistics).toHaveBeenCalledWith(
+        auth.user.id,
+        'identity-from-space',
+      );
+    });
+
+    it('rejects an inaccessible space-person route id before reading statistics', async () => {
+      const auth = AuthFactory.create();
+      const personId = newUuid();
+
+      mocks.person.getById.mockResolvedValue(undefined);
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set());
+      (mocks.faceIdentity as any).getAccessibleProfileIdentityId.mockResolvedValue(undefined);
+
+      await expect(sut.getStatistics(auth, personId)).rejects.toThrow('Not found or no person.read access');
+      expect((mocks.faceIdentity as any).getAccessiblePersonStatistics).not.toHaveBeenCalled();
     });
 
     it('should require person.read permission', async () => {

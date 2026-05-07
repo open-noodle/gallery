@@ -18,6 +18,11 @@ import { anyUuid, searchAssetBuilder } from 'src/utils/database';
 
 const visibleSpaceAssetVisibilities = [AssetVisibility.Archive, AssetVisibility.Timeline];
 
+type SpacePersonStatistics = {
+  assets: number;
+  faces: number;
+};
+
 export type LinkedSpacePerson = {
   id: string;
   isHidden: boolean;
@@ -961,6 +966,59 @@ export class SharedSpaceRepository {
       assignedVisibleFaceCount: Number(row?.assignedVisibleFaceCount ?? 0),
       assignedHiddenFaceCount: Number(row?.assignedHiddenFaceCount ?? 0),
       unassignedFaceCount: Number(row?.unassignedFaceCount ?? 0),
+    };
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
+  async getSpacePersonStatistics(spaceId: string, personId: string): Promise<SpacePersonStatistics> {
+    const result = await sql<SpacePersonStatistics>`
+      WITH "target_person" AS (
+        SELECT
+          "id"
+        FROM "shared_space_person"
+        WHERE "id" = ${personId}
+          AND "spaceId" = ${spaceId}
+      ),
+      "asset_scope" AS (
+        SELECT "asset"."id" AS "assetId"
+        FROM "shared_space_asset"
+        INNER JOIN "asset" ON "asset"."id" = "shared_space_asset"."assetId"
+        WHERE "shared_space_asset"."spaceId" = ${spaceId}
+          AND "asset"."deletedAt" IS NULL
+          AND "asset"."isOffline" = false
+          AND "asset"."visibility" IN (${sql.join(visibleSpaceAssetVisibilities)})
+        UNION
+        SELECT "asset"."id" AS "assetId"
+        FROM "shared_space_library"
+        INNER JOIN "asset" ON "asset"."libraryId" = "shared_space_library"."libraryId"
+        WHERE "shared_space_library"."spaceId" = ${spaceId}
+          AND "asset"."deletedAt" IS NULL
+          AND "asset"."isOffline" = false
+          AND "asset"."visibility" IN (${sql.join(visibleSpaceAssetVisibilities)})
+      ),
+      "selected_faces" AS (
+        SELECT DISTINCT
+          "asset_face"."id" AS "assetFaceId",
+          "asset_face"."assetId"
+        FROM "target_person"
+        INNER JOIN "asset_scope" ON true
+        INNER JOIN "asset_face" ON "asset_face"."assetId" = "asset_scope"."assetId"
+        INNER JOIN "shared_space_person_face"
+          ON "shared_space_person_face"."assetFaceId" = "asset_face"."id"
+          AND "shared_space_person_face"."personId" = "target_person"."id"
+        WHERE "asset_face"."deletedAt" IS NULL
+          AND "asset_face"."isVisible" = true
+      )
+      SELECT
+        COUNT(DISTINCT "assetId")::int AS "assets",
+        COUNT(DISTINCT "assetFaceId")::int AS "faces"
+      FROM "selected_faces"
+    `.execute(this.db);
+
+    const row = result.rows[0];
+    return {
+      assets: Number(row?.assets ?? 0),
+      faces: Number(row?.faces ?? 0),
     };
   }
 

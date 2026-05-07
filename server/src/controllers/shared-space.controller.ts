@@ -22,6 +22,7 @@ import {
   PeopleFaceStatisticsResponseDto,
   PersonFacePageQueryDto,
   PersonFacePageResponseDto,
+  PersonStatisticsResponseDto,
 } from 'src/dtos/person.dto';
 import {
   SharedSpacePeopleStatisticsResponseDto,
@@ -358,6 +359,21 @@ export class SharedSpaceController {
   })
   deduplicateSpacePeople(@Auth() auth: AuthDto, @Param('id') id: string): Promise<void> {
     return this.service.deduplicateSpacePeople(auth, id);
+  }
+
+  @Get(':id/people/:personId/statistics')
+  @Authenticated({ permission: Permission.SharedSpaceRead })
+  @Endpoint({
+    summary: 'Get space person statistics',
+    description: 'Retrieve asset and face statistics for a person in a shared space.',
+    history: new HistoryBuilder().added('v2').stable('v2'),
+  })
+  getSpacePersonStatistics(
+    @Auth() auth: AuthDto,
+    @Param('id') id: string,
+    @Param('personId') personId: string,
+  ): Promise<PersonStatisticsResponseDto> {
+    return this.service.getSpacePersonStatistics(auth, id, personId);
   }
 
   @Get(':id/people/:personId/faces')

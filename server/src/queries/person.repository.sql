@@ -329,16 +329,18 @@ where
 
 -- PersonRepository.getStatistics
 select
-  count(distinct ("asset"."id")) as "count"
+  count(distinct ("asset"."id")) as "assets",
+  count(distinct ("asset_face"."id")) as "faces"
 from
   "asset_face"
-  left join "asset" on "asset"."id" = "asset_face"."assetId"
-  and "asset"."visibility" = 'timeline'
-  and "asset"."deletedAt" is null
+  inner join "asset" on "asset"."id" = "asset_face"."assetId"
 where
-  "asset_face"."deletedAt" is null
+  "asset"."visibility" = 'timeline'
+  and "asset"."deletedAt" is null
+  and "asset"."isOffline" = $1
+  and "asset_face"."deletedAt" is null
   and "asset_face"."isVisible" is true
-  and "asset_face"."personId" = $1
+  and "asset_face"."personId" = $2
 
 -- PersonRepository.getNumberOfPeople
 select

@@ -236,7 +236,8 @@ const AssetFaceDeleteSchema = z
 
 const PersonStatisticsResponseSchema = z
   .object({
-    assets: z.int().describe('Number of assets'),
+    assets: z.int().min(0).describe('Number of assets'),
+    faces: z.int().min(0).describe('Number of faces assigned to this person in the current accessible scope'),
   })
   .meta({ id: 'PersonStatisticsResponseDto' });
 

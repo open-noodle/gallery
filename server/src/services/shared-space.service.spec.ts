@@ -4549,6 +4549,58 @@ describe(SharedSpaceService.name, () => {
     });
   });
 
+  describe('getSpacePersonStatistics', () => {
+    it('returns space person asset and face statistics for a member', async () => {
+      const auth = factory.auth();
+      const spaceId = newUuid();
+      const personId = newUuid();
+      const space = factory.sharedSpace({ id: spaceId, petsEnabled: true });
+      const person = factory.sharedSpacePerson({ id: personId, spaceId, type: 'person' });
+
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ spaceId }));
+      mocks.sharedSpace.getPersonById.mockResolvedValue(person);
+      mocks.sharedSpace.getById.mockResolvedValue(space);
+      mocks.sharedSpace.getSpacePersonStatistics.mockResolvedValue({ assets: 5, faces: 8 });
+
+      await expect(sut.getSpacePersonStatistics(auth, spaceId, personId)).resolves.toEqual({ assets: 5, faces: 8 });
+      expect(mocks.sharedSpace.getSpacePersonStatistics).toHaveBeenCalledWith(spaceId, personId);
+    });
+
+    it('rejects non-members before reading statistics', async () => {
+      mocks.sharedSpace.getMember.mockResolvedValue(undefined);
+
+      await expect(sut.getSpacePersonStatistics(factory.auth(), 'space-1', 'person-1')).rejects.toThrow(
+        'Not a member',
+      );
+      expect(mocks.sharedSpace.getSpacePersonStatistics).not.toHaveBeenCalled();
+    });
+
+    it('rejects a person from another space before reading statistics', async () => {
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ spaceId: 'space-1' }));
+      mocks.sharedSpace.getPersonById.mockResolvedValue(
+        factory.sharedSpacePerson({ id: 'person-1', spaceId: 'space-2' }),
+      );
+
+      await expect(sut.getSpacePersonStatistics(factory.auth(), 'space-1', 'person-1')).rejects.toThrow(
+        'Person not found',
+      );
+      expect(mocks.sharedSpace.getSpacePersonStatistics).not.toHaveBeenCalled();
+    });
+
+    it('rejects pet statistics when pets are disabled for the space', async () => {
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ spaceId: 'space-1' }));
+      mocks.sharedSpace.getPersonById.mockResolvedValue(
+        factory.sharedSpacePerson({ id: 'pet-1', spaceId: 'space-1', type: 'pet' }),
+      );
+      mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: 'space-1', petsEnabled: false }));
+
+      await expect(sut.getSpacePersonStatistics(factory.auth(), 'space-1', 'pet-1')).rejects.toThrow(
+        'Person not found',
+      );
+      expect(mocks.sharedSpace.getSpacePersonStatistics).not.toHaveBeenCalled();
+    });
+  });
+
   describe('getSpacePerson', () => {
     it('should require membership', async () => {
       mocks.sharedSpace.getMember.mockResolvedValue(void 0);

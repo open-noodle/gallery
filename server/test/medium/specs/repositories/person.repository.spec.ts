@@ -390,6 +390,29 @@ describe(PersonRepository.name, () => {
     });
   });
 
+  describe('getStatistics', () => {
+    it('counts distinct visible timeline assets and visible faces for a personal person', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Alice' });
+      const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+      const { assetFace: firstFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+      await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+      await ctx.newAssetFace({ assetId: asset.id, personId: person.id, isVisible: false });
+
+      await expect(sut.getStatistics(person.id)).resolves.toEqual({ assets: 1, faces: 2 });
+      expect(firstFace.personId).toBe(person.id);
+    });
+
+    it('returns zero asset and face counts for a personal person with no accessible faces', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Empty' });
+
+      await expect(sut.getStatistics(person.id)).resolves.toEqual({ assets: 0, faces: 0 });
+    });
+  });
+
   describe('representative face picker queries', () => {
     it('filters deleted, hidden, and offline representative face candidates', async () => {
       const { ctx, sut } = setup();
