@@ -521,38 +521,37 @@ export class PersonRepository {
 
   @GenerateSql({ params: [DummyValue.UUID] })
   async getPeopleOverviewStatistics(userId: string): Promise<PeopleOverviewStatistics> {
-    const [people, faceCount] = await Promise.all([
-      this.db
-        .selectFrom('person')
-        .innerJoin('asset_face', 'asset_face.personId', 'person.id')
-        .innerJoin('asset', 'asset.id', 'asset_face.assetId')
-        .select((eb) => eb.fn.count(eb.fn('distinct', ['person.id'])).as('total'))
-        .select((eb) =>
-          eb.fn
-            .count(eb.fn('distinct', ['person.id']))
-            .filterWhere('person.isHidden', '=', true)
-            .as('hidden'),
-        )
-        .where('person.ownerId', '=', userId)
-        .where('asset.ownerId', '=', userId)
-        .where('asset.deletedAt', 'is', null)
-        .where('asset.isOffline', '=', false)
-        .where('asset.visibility', '=', sql.lit(AssetVisibility.Timeline))
-        .where('asset_face.deletedAt', 'is', null)
-        .where('asset_face.isVisible', 'is', true)
-        .executeTakeFirstOrThrow(),
-      this.db
-        .selectFrom('asset_face')
-        .innerJoin('asset', 'asset.id', 'asset_face.assetId')
-        .select((eb) => eb.fn.count(eb.fn('distinct', ['asset_face.id'])).as('detectedFaceCount'))
-        .where('asset.ownerId', '=', userId)
-        .where('asset.deletedAt', 'is', null)
-        .where('asset.isOffline', '=', false)
-        .where('asset.visibility', '=', sql.lit(AssetVisibility.Timeline))
-        .where('asset_face.deletedAt', 'is', null)
-        .where('asset_face.isVisible', 'is', true)
-        .executeTakeFirstOrThrow(),
-    ]);
+    const people = await this.db
+      .selectFrom('person')
+      .innerJoin('asset_face', 'asset_face.personId', 'person.id')
+      .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+      .select((eb) => eb.fn.count(eb.fn('distinct', ['person.id'])).as('total'))
+      .select((eb) =>
+        eb.fn
+          .count(eb.fn('distinct', ['person.id']))
+          .filterWhere('person.isHidden', '=', true)
+          .as('hidden'),
+      )
+      .where('person.ownerId', '=', userId)
+      .where('asset.ownerId', '=', userId)
+      .where('asset.deletedAt', 'is', null)
+      .where('asset.isOffline', '=', false)
+      .where('asset.visibility', '=', sql.lit(AssetVisibility.Timeline))
+      .where('asset_face.deletedAt', 'is', null)
+      .where('asset_face.isVisible', 'is', true)
+      .executeTakeFirstOrThrow();
+
+    const faceCount = await this.db
+      .selectFrom('asset_face')
+      .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+      .select((eb) => eb.fn.count(eb.fn('distinct', ['asset_face.id'])).as('detectedFaceCount'))
+      .where('asset.ownerId', '=', userId)
+      .where('asset.deletedAt', 'is', null)
+      .where('asset.isOffline', '=', false)
+      .where('asset.visibility', '=', sql.lit(AssetVisibility.Timeline))
+      .where('asset_face.deletedAt', 'is', null)
+      .where('asset_face.isVisible', 'is', true)
+      .executeTakeFirstOrThrow();
 
     return {
       total: Number(people.total),
