@@ -1865,6 +1865,7 @@
   "name_or_nickname": "Name or nickname",
   "name_plus_more_people": "{name} + {count, plural, one {# person} other {# people}}",
   "name_required": "Name is required",
+  "named_visible_people": "Named visible people",
   "nav_albums": "Albums",
   "nav_library": "Library",
   "nav_photos": "Photos",
