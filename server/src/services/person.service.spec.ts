@@ -2560,7 +2560,7 @@ describe(PersonService.name, () => {
       const auth = AuthFactory.create();
       const personId = newUuid();
 
-      mocks.person.getById.mockResolvedValue();
+      mocks.person.getById.mockResolvedValue(void 0);
       mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set());
       (mocks.faceIdentity as any).getAccessibleProfileIdentityId.mockResolvedValue('identity-from-space');
       (mocks.faceIdentity as any).getAccessiblePersonStatistics.mockResolvedValue({ assets: 11, faces: 13 });
@@ -2577,9 +2577,9 @@ describe(PersonService.name, () => {
       const auth = AuthFactory.create();
       const personId = newUuid();
 
-      mocks.person.getById.mockResolvedValue();
+      mocks.person.getById.mockResolvedValue(void 0);
       mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set());
-      (mocks.faceIdentity as any).getAccessibleProfileIdentityId.mockResolvedValue();
+      (mocks.faceIdentity as any).getAccessibleProfileIdentityId.mockResolvedValue(void 0);
 
       await expect(sut.getStatistics(auth, personId)).rejects.toThrow('Not found or no person.read access');
       expect((mocks.faceIdentity as any).getAccessiblePersonStatistics).not.toHaveBeenCalled();
