@@ -894,8 +894,8 @@ describe('People identity RBAC projection', () => {
     expect(afterRemoval).toEqual({ people: [], total: 0, hidden: 0, hasNextPage: false });
   });
 
-  it('matches one photo independently across ten face-recognition spaces', async () => {
-    const { ctx, sut: sharedSpaceService, faceIdentityRepository } = setupSharedSpace();
+  it('materializes one photo independently across ten face-recognition spaces during full rebuilds', async () => {
+    const { ctx, sut: sharedSpaceService, faceIdentityRepository, jobs } = setupSharedSpace();
     const { user: owner } = await ctx.newUser();
     const { result: person } = await ctx.newPerson({ ownerId: owner.id, name: 'Ten Space Source' });
     const { asset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
@@ -917,8 +917,10 @@ describe('People identity RBAC projection', () => {
     }
 
     for (const space of spaces) {
-      await sharedSpaceService.handleSharedSpaceFaceMatch({ spaceId: space.id, assetId: asset.id });
+      await sharedSpaceService.handleSharedSpaceFaceMatchAll({ spaceId: space.id });
     }
+
+    await drainSharedSpaceFaceJobs(sharedSpaceService, jobs);
 
     const faceRows = await ctx.database
       .selectFrom('shared_space_person_face')
