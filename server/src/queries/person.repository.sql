@@ -377,18 +377,6 @@ where
 
 -- PersonRepository.getPeopleOverviewStatistics
 select
-  count(distinct ("asset_face"."id")) as "detectedFaceCount"
-from
-  "asset_face"
-  inner join "asset" on "asset"."id" = "asset_face"."assetId"
-where
-  "asset"."ownerId" = $1
-  and "asset"."deletedAt" is null
-  and "asset"."isOffline" = $2
-  and "asset"."visibility" = 'timeline'
-  and "asset_face"."deletedAt" is null
-  and "asset_face"."isVisible" is true
-select
   count(distinct ("person"."id")) as "total",
   count(distinct ("person"."id")) filter (
     where
@@ -403,6 +391,18 @@ where
   and "asset"."ownerId" = $3
   and "asset"."deletedAt" is null
   and "asset"."isOffline" = $4
+  and "asset"."visibility" = 'timeline'
+  and "asset_face"."deletedAt" is null
+  and "asset_face"."isVisible" is true
+select
+  count(distinct ("asset_face"."id")) as "detectedFaceCount"
+from
+  "asset_face"
+  inner join "asset" on "asset"."id" = "asset_face"."assetId"
+where
+  "asset"."ownerId" = $1
+  and "asset"."deletedAt" is null
+  and "asset"."isOffline" = $2
   and "asset"."visibility" = 'timeline'
   and "asset_face"."deletedAt" is null
   and "asset_face"."isVisible" is true
