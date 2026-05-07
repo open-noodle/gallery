@@ -733,15 +733,21 @@ describe('getSpacePersonStatistics', () => {
 
   it('rejects a person from another space before reading statistics', async () => {
     mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ spaceId: 'space-1' }));
-    mocks.sharedSpace.getPersonById.mockResolvedValue(factory.sharedSpacePerson({ id: 'person-1', spaceId: 'space-2' }));
+    mocks.sharedSpace.getPersonById.mockResolvedValue(
+      factory.sharedSpacePerson({ id: 'person-1', spaceId: 'space-2' }),
+    );
 
-    await expect(sut.getSpacePersonStatistics(factory.auth(), 'space-1', 'person-1')).rejects.toThrow('Person not found');
+    await expect(sut.getSpacePersonStatistics(factory.auth(), 'space-1', 'person-1')).rejects.toThrow(
+      'Person not found',
+    );
     expect(mocks.sharedSpace.getSpacePersonStatistics).not.toHaveBeenCalled();
   });
 
   it('rejects pet statistics when pets are disabled for the space', async () => {
     mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ spaceId: 'space-1' }));
-    mocks.sharedSpace.getPersonById.mockResolvedValue(factory.sharedSpacePerson({ id: 'pet-1', spaceId: 'space-1', type: 'pet' }));
+    mocks.sharedSpace.getPersonById.mockResolvedValue(
+      factory.sharedSpacePerson({ id: 'pet-1', spaceId: 'space-1', type: 'pet' }),
+    );
     mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: 'space-1', petsEnabled: false }));
 
     await expect(sut.getSpacePersonStatistics(factory.auth(), 'space-1', 'pet-1')).rejects.toThrow('Person not found');

@@ -419,9 +419,7 @@ In `+page.svelte`:
 - Add:
 
 ```ts
-let showFaceStatisticsInfo = $derived(
-  !!overviewStatistics && !hasUnsupportedStatsFilter && !!headerDescription,
-);
+let showFaceStatisticsInfo = $derived(!!overviewStatistics && !hasUnsupportedStatsFilter && !!headerDescription);
 let globalFaceStatisticsCacheKey = $derived(`user:${authManager.user.id}:global:people:withSharedSpaces=true`);
 const loadGlobalFaceStatistics = () => getPeopleFaceStatistics({ withSharedSpaces: true });
 ```

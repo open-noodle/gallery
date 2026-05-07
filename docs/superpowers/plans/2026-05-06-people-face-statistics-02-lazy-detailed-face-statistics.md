@@ -745,7 +745,10 @@ describe('getAccessiblePeopleFaceStatistics', () => {
     try {
       const { person: visiblePerson } = await ctx.newPerson({ ownerId: user.id, name: 'Visible' });
       const { asset: visibleAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
-      const { assetFace: visibleFace } = await ctx.newAssetFace({ assetId: visibleAsset.id, personId: visiblePerson.id });
+      const { assetFace: visibleFace } = await ctx.newAssetFace({
+        assetId: visibleAsset.id,
+        personId: visiblePerson.id,
+      });
       const visibleIdentity = await sut.ensurePersonIdentity(visiblePerson.id);
       await sut.linkFace({ assetFaceId: visibleFace.id, identityId: visibleIdentity.id, source: 'owner-person' });
 
@@ -1221,7 +1224,11 @@ describe('getPeopleFaceStatisticsBySpaceId', () => {
     const { assetFace: visibleFace } = await ctx.newAssetFace({ assetId: asset.id });
     const { assetFace: hiddenFace } = await ctx.newAssetFace({ assetId: asset.id });
     await ctx.newAssetFace({ assetId: asset.id });
-    const visiblePerson = await sut.createPerson({ spaceId: space.id, name: 'Visible', representativeFaceId: visibleFace.id });
+    const visiblePerson = await sut.createPerson({
+      spaceId: space.id,
+      name: 'Visible',
+      representativeFaceId: visibleFace.id,
+    });
     const hiddenPerson = await sut.createPerson({
       spaceId: space.id,
       name: 'Hidden',
@@ -1275,8 +1282,16 @@ describe('getPeopleFaceStatisticsBySpaceId', () => {
     await ctx.newSharedSpaceAsset({ spaceId: otherSpace.id, assetId: otherAsset.id });
     const { assetFace: targetFace } = await ctx.newAssetFace({ assetId: targetAsset.id });
     const { assetFace: otherFace } = await ctx.newAssetFace({ assetId: otherAsset.id });
-    const targetPerson = await sut.createPerson({ spaceId: targetSpace.id, name: 'Target', representativeFaceId: targetFace.id });
-    const otherPerson = await sut.createPerson({ spaceId: otherSpace.id, name: 'Other', representativeFaceId: otherFace.id });
+    const targetPerson = await sut.createPerson({
+      spaceId: targetSpace.id,
+      name: 'Target',
+      representativeFaceId: targetFace.id,
+    });
+    const otherPerson = await sut.createPerson({
+      spaceId: otherSpace.id,
+      name: 'Other',
+      representativeFaceId: otherFace.id,
+    });
     await sut.addPersonFaces(
       [
         { personId: targetPerson.id, assetFaceId: targetFace.id },
@@ -1510,8 +1525,18 @@ describe('getPeopleFaceStatisticsBySpaceId', () => {
     const { assetFace: personFace } = await ctx.newAssetFace({ assetId: asset.id });
     const { assetFace: petFace } = await ctx.newAssetFace({ assetId: asset.id });
     await ctx.newAssetFace({ assetId: asset.id });
-    const person = await sut.createPerson({ spaceId: space.id, name: 'Alice', representativeFaceId: personFace.id, type: 'person' });
-    const pet = await sut.createPerson({ spaceId: space.id, name: 'Milo', representativeFaceId: petFace.id, type: 'pet' });
+    const person = await sut.createPerson({
+      spaceId: space.id,
+      name: 'Alice',
+      representativeFaceId: personFace.id,
+      type: 'person',
+    });
+    const pet = await sut.createPerson({
+      spaceId: space.id,
+      name: 'Milo',
+      representativeFaceId: petFace.id,
+      type: 'pet',
+    });
     await sut.addPersonFaces(
       [
         { personId: person.id, assetFaceId: personFace.id },

@@ -144,7 +144,10 @@ describe('GET /people/statistics', () => {
       .set('Authorization', `Bearer token`);
 
     expect(status).toBe(200);
-    expect(service.getPeopleStatistics).toHaveBeenCalledWith(undefined, expect.objectContaining({ withSharedSpaces: true }));
+    expect(service.getPeopleStatistics).toHaveBeenCalledWith(
+      undefined,
+      expect.objectContaining({ withSharedSpaces: true }),
+    );
     expect(body).toEqual({
       total: 7,
       hidden: 2,
@@ -174,7 +177,11 @@ describe('GET /shared-spaces/:id/people/statistics', () => {
       .set('Authorization', `Bearer token`);
 
     expect(status).toBe(200);
-    expect(service.getSpacePeopleStatistics).toHaveBeenCalledWith(undefined, spaceId, expect.objectContaining({ name: 'Ali' }));
+    expect(service.getSpacePeopleStatistics).toHaveBeenCalledWith(
+      undefined,
+      spaceId,
+      expect.objectContaining({ name: 'Ali' }),
+    );
     expect(body).toEqual({
       total: 5,
       hidden: 1,
@@ -642,7 +649,13 @@ describe('getAccessiblePeopleStatistics', () => {
     await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
     const spacePerson = await ctx.database
       .insertInto('shared_space_person')
-      .values({ spaceId: space.id, identityId: identity.id, name: 'Shared Alice', representativeFaceId: assetFace.id, type: 'person' })
+      .values({
+        spaceId: space.id,
+        identityId: identity.id,
+        name: 'Shared Alice',
+        representativeFaceId: assetFace.id,
+        type: 'person',
+      })
       .returningAll()
       .executeTakeFirstOrThrow();
     await ctx.database
@@ -691,7 +704,13 @@ describe('getAccessiblePeopleStatistics', () => {
     await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
     const spacePerson = await ctx.database
       .insertInto('shared_space_person')
-      .values({ spaceId: space.id, identityId: identity.id, name: 'Linked Alice', representativeFaceId: assetFace.id, type: 'person' })
+      .values({
+        spaceId: space.id,
+        identityId: identity.id,
+        name: 'Linked Alice',
+        representativeFaceId: assetFace.id,
+        type: 'person',
+      })
       .returningAll()
       .executeTakeFirstOrThrow();
     await ctx.database
@@ -739,7 +758,13 @@ describe('getAccessiblePeopleStatistics', () => {
     for (const space of [spaceA, spaceB]) {
       const spacePerson = await ctx.database
         .insertInto('shared_space_person')
-        .values({ spaceId: space.id, identityId: identity.id, name: 'Linked Alice', representativeFaceId: assetFace.id, type: 'person' })
+        .values({
+          spaceId: space.id,
+          identityId: identity.id,
+          name: 'Linked Alice',
+          representativeFaceId: assetFace.id,
+          type: 'person',
+        })
         .returningAll()
         .executeTakeFirstOrThrow();
       await ctx.database
@@ -963,8 +988,18 @@ it('does not count faces or people from another shared space', async () => {
   await ctx.newSharedSpaceAsset({ spaceId: otherSpace.id, assetId: otherAsset.id, addedById: user.id });
   const { assetFace: targetFace } = await ctx.newAssetFace({ assetId: targetAsset.id });
   const { assetFace: otherFace } = await ctx.newAssetFace({ assetId: otherAsset.id });
-  const targetPerson = await sut.createPerson({ spaceId: targetSpace.id, name: 'Target', representativeFaceId: targetFace.id, type: 'person' });
-  const otherPerson = await sut.createPerson({ spaceId: otherSpace.id, name: 'Other', representativeFaceId: otherFace.id, type: 'person' });
+  const targetPerson = await sut.createPerson({
+    spaceId: targetSpace.id,
+    name: 'Target',
+    representativeFaceId: targetFace.id,
+    type: 'person',
+  });
+  const otherPerson = await sut.createPerson({
+    spaceId: otherSpace.id,
+    name: 'Other',
+    representativeFaceId: otherFace.id,
+    type: 'person',
+  });
   await sut.addPersonFaces([
     { personId: targetPerson.id, assetFaceId: targetFace.id },
     { personId: otherPerson.id, assetFaceId: otherFace.id },
@@ -988,8 +1023,18 @@ it('counts selected-space detected faces including linked-library assets', async
   await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: directAsset.id, addedById: user.id });
   const directFace = await ctx.newAssetFace({ assetId: directAsset.id });
   const linkedFace = await ctx.newAssetFace({ assetId: linkedAsset.id });
-  const directPerson = await sut.createPerson({ spaceId: space.id, name: 'Direct', representativeFaceId: directFace.assetFace.id, type: 'person' });
-  const linkedPerson = await sut.createPerson({ spaceId: space.id, name: 'Linked', representativeFaceId: linkedFace.assetFace.id, type: 'person' });
+  const directPerson = await sut.createPerson({
+    spaceId: space.id,
+    name: 'Direct',
+    representativeFaceId: directFace.assetFace.id,
+    type: 'person',
+  });
+  const linkedPerson = await sut.createPerson({
+    spaceId: space.id,
+    name: 'Linked',
+    representativeFaceId: linkedFace.assetFace.id,
+    type: 'person',
+  });
   await sut.addPersonFaces([
     { personId: directPerson.id, assetFaceId: directFace.assetFace.id },
     { personId: linkedPerson.id, assetFaceId: linkedFace.assetFace.id },
@@ -1042,7 +1087,12 @@ it('dedupes a face reachable as both direct space asset and linked-library asset
   const { asset } = await ctx.newAsset({ ownerId: user.id, libraryId: library.id });
   await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
   const { assetFace } = await ctx.newAssetFace({ assetId: asset.id });
-  const person = await sut.createPerson({ spaceId: space.id, name: 'Alice', representativeFaceId: assetFace.id, type: 'person' });
+  const person = await sut.createPerson({
+    spaceId: space.id,
+    name: 'Alice',
+    representativeFaceId: assetFace.id,
+    type: 'person',
+  });
   await sut.addPersonFaces([{ personId: person.id, assetFaceId: assetFace.id }]);
 
   await expect(sut.countPersonsBySpaceId(space.id, { petsEnabled: true })).resolves.toMatchObject({
@@ -1069,7 +1119,12 @@ it('excludes deleted, offline, locked, and non-visible shared-space faces', asyn
   await ctx.newAssetFace({ assetId: deletedAsset.id });
   await ctx.newAssetFace({ assetId: offlineAsset.id });
   await ctx.newAssetFace({ assetId: lockedAsset.id });
-  const person = await sut.createPerson({ spaceId: space.id, name: 'Alice', representativeFaceId: visibleFace.id, type: 'person' });
+  const person = await sut.createPerson({
+    spaceId: space.id,
+    name: 'Alice',
+    representativeFaceId: visibleFace.id,
+    type: 'person',
+  });
   await sut.addPersonFaces([{ personId: person.id, assetFaceId: visibleFace.id }]);
   await ctx.softDeleteAsset(deletedAsset.id);
 
@@ -1088,7 +1143,12 @@ it('applies name filters to assigned face counts without counting unassigned fac
   await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
   const { assetFace: aliceFace } = await ctx.newAssetFace({ assetId: asset.id });
   await ctx.newAssetFace({ assetId: asset.id });
-  const alice = await sut.createPerson({ spaceId: space.id, name: 'Alice', representativeFaceId: aliceFace.id, type: 'person' });
+  const alice = await sut.createPerson({
+    spaceId: space.id,
+    name: 'Alice',
+    representativeFaceId: aliceFace.id,
+    type: 'person',
+  });
   await sut.addPersonFaces([{ personId: alice.id, assetFaceId: aliceFace.id }]);
 
   await expect(sut.countPersonsBySpaceId(space.id, { petsEnabled: true, name: 'Ali' })).resolves.toEqual({
@@ -1115,7 +1175,12 @@ it('applies taken-date filters to detected faces while still counting unassigned
   const { assetFace: assignedMatchingFace } = await ctx.newAssetFace({ assetId: matchingAsset.id });
   await ctx.newAssetFace({ assetId: matchingAsset.id, personId: null });
   await ctx.newAssetFace({ assetId: oldAsset.id, personId: null });
-  const person = await sut.createPerson({ spaceId: space.id, name: 'Alice', representativeFaceId: assignedMatchingFace.id, type: 'person' });
+  const person = await sut.createPerson({
+    spaceId: space.id,
+    name: 'Alice',
+    representativeFaceId: assignedMatchingFace.id,
+    type: 'person',
+  });
   await sut.addPersonFaces([{ personId: person.id, assetFaceId: assignedMatchingFace.id }]);
 
   await expect(
@@ -1368,21 +1433,21 @@ git commit -m "feat: add people overview face statistics"
 
 ## Spec Coverage Matrix
 
-| Phase 1 requirement | Covered by |
-| --- | --- |
-| Global overview counts total people, hidden people, and detected in-scope faces | Task 3 personal aggregate tests; Task 4 identity-grouped aggregate tests |
-| Hidden people do not inflate visible header counts but their faces count | Task 3 all-hidden test; Task 4 hidden identity test |
-| Unassigned detected faces count in primary overview totals | Task 3 personal unassigned test; Task 4 global unassigned test; Task 5 date-filter unassigned test |
-| Shared-space overview counts only selected space | Task 5 selected-space and empty-space tests |
-| Linked/external-library photos count in authorized scope | Task 4 linked-library global tests; Task 5 linked-library shared-space test |
-| Face dedupe across owned/shared/direct/linked access paths | Task 4 owned-plus-shared and multi-space linked-library tests; Task 5 direct-plus-linked test |
-| Resolved identity dedupe across personal/shared profiles | Task 4 personal-plus-space identity test |
-| Shared-space person dedupe across multiple assets for one identity | Task 5 multiple-assets same-identity test |
-| Non-members cannot read shared-space overview statistics | Task 2 non-member service test |
-| Deleted, offline, locked, and non-visible data excluded | Task 3 personal exclusion test; Task 5 shared-space exclusion test |
-| Aggregate counts are independent of pagination | Task 2 service tests pass `page`/`size` and `limit`/`offset` without forwarding them to aggregates |
-| Empty library and empty shared space return zeroes | Task 3 empty-library test; Task 5 empty-space test |
-| Unsupported filters do not produce misleading totals | Task 2 rejects closest global filters; Phase 3 is explicitly responsible for search-name UI hiding/relabeling |
+| Phase 1 requirement                                                             | Covered by                                                                                                    |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Global overview counts total people, hidden people, and detected in-scope faces | Task 3 personal aggregate tests; Task 4 identity-grouped aggregate tests                                      |
+| Hidden people do not inflate visible header counts but their faces count        | Task 3 all-hidden test; Task 4 hidden identity test                                                           |
+| Unassigned detected faces count in primary overview totals                      | Task 3 personal unassigned test; Task 4 global unassigned test; Task 5 date-filter unassigned test            |
+| Shared-space overview counts only selected space                                | Task 5 selected-space and empty-space tests                                                                   |
+| Linked/external-library photos count in authorized scope                        | Task 4 linked-library global tests; Task 5 linked-library shared-space test                                   |
+| Face dedupe across owned/shared/direct/linked access paths                      | Task 4 owned-plus-shared and multi-space linked-library tests; Task 5 direct-plus-linked test                 |
+| Resolved identity dedupe across personal/shared profiles                        | Task 4 personal-plus-space identity test                                                                      |
+| Shared-space person dedupe across multiple assets for one identity              | Task 5 multiple-assets same-identity test                                                                     |
+| Non-members cannot read shared-space overview statistics                        | Task 2 non-member service test                                                                                |
+| Deleted, offline, locked, and non-visible data excluded                         | Task 3 personal exclusion test; Task 5 shared-space exclusion test                                            |
+| Aggregate counts are independent of pagination                                  | Task 2 service tests pass `page`/`size` and `limit`/`offset` without forwarding them to aggregates            |
+| Empty library and empty shared space return zeroes                              | Task 3 empty-library test; Task 5 empty-space test                                                            |
+| Unsupported filters do not produce misleading totals                            | Task 2 rejects closest global filters; Phase 3 is explicitly responsible for search-name UI hiding/relabeling |
 
 ## Edge Cases Covered
 

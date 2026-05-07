@@ -128,8 +128,8 @@ Overview statistics are safe for initial page load.
 
 ```ts
 type PeopleOverviewStatistics = {
-  total: number;             // all eligible people, visible + hidden
-  hidden: number;            // hidden people subset of total
+  total: number; // all eligible people, visible + hidden
+  hidden: number; // hidden people subset of total
   detectedFaceCount: number; // all detected in-scope faces
 };
 ```
